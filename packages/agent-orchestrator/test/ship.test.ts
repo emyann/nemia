@@ -20,6 +20,8 @@ import { decideScreen } from './screens.ts';
 import { TEAM, TEAM_DEV } from './team.ts';
 import { promised } from './promised.ts';
 import { Effect } from 'effect';
+import { runGiven, runOver } from './placed.ts';
+import { placeOver, unreadBy } from './place-over.ts';
 
 const ROOT = scratch('wf-ship-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -43,15 +45,24 @@ const {
   roundRun,
   startRun,
   toDecideWords,
-  runWith,
+  runWith: runEngine,
+  gitPlaceLayer,
 } = await import('../src/runner.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
+const runPlaced = runGiven(gitPlaceLayer);
 const { readRun, stepsOf, runFile } = await import('../src/record/record.store.ts');
 const { roundOf } = await import('../src/run.ts');
 const { runStore } = await import('../src/record/files.store.ts');
 const { resumePause, putPause } = await import('../src/pause/pause.store.ts');
 const { main } = await import('../src/cli/main.ts');
 const { checkoutParts } = await import('../src/workspace/worktree.store.ts');
-const { SHIPPED_PLACE, runPlaceVerb } = await import('../src/place/place.store.ts');
+type PlaceVerb = import('../src/place/place.ts').PlaceVerb;
+const { shippedGitPlace } = await import('../src/place/shipped.store.ts');
+const { gitPlace } = await import('../place/git/place.ts');
+type Place = import('../src/place/place.store.ts').Place;
+type PlaceAnswers = import('../src/place/place.ts').PlaceAnswers;
+const { PlaceService } = await import('../src/place/place.store.ts');
+type PlaceOutcome<V extends PlaceVerb> = import('../src/place/place.ts').PlaceOutcome<V>;
 const { stagedHere, statusMemo, mergeStaged, landingDenies, landingWords } = await import('../src/place/landing.store.ts');
 const { landEnding, checkoutHold } = await import('../src/ending/ending.verb.ts');
 const { filedDenies } = await import('../src/ending/ending.ts');
@@ -59,7 +70,6 @@ const { landingContract } = await import('../src/check/check.ts');
 const { heldRead } = await import('../src/list/list.verb.ts');
 const { merging } = await import('../src/prune/prune.verb.ts');
 const { taskPhasesRead, closeoutReader, closeoutAsked, spendReader, exitVerdicts } = await import('../src/views/views.verb.ts');
-type PlaceVerb = import('../src/place/place.ts').PlaceVerb;
 type PlaceRequests = import('../src/place/place.ts').PlaceRequests;
 
 const { headsNow, NOTHING_READ, passStanding, standingLive, standingNow, standingReader } =
@@ -68,10 +78,10 @@ const { headsNow, NOTHING_READ, passStanding, standingLive, standingNow, standin
 const aPass = (e: Engine) => runWith(e, passStanding(runStore.runs.list()));
 
 /** Whether `branch` of `run` is shipped, its standing asked now, as a person's verb asks it (`standingLive`). */
-const isShipped = async (run: RepositoryRun, branch: string) => (await Effect.runPromise(standingLive([run]))).shipped(run, branch);
+const isShipped = async (run: RepositoryRun, branch: string) => (await runPlaced(standingLive([run]))).shipped(run, branch);
 
 /** Every branch of a run's repository and its commit, asked of the shipped place now (`headsNow`): what a memo reads a run's tips off. */
-const liveHeads = (run: RepositoryRun) => headsNow(run, () => SHIPPED_PLACE);
+const liveHeads = (run: RepositoryRun) => headsNow(run, shippedGitPlace);
 
 /** A run this file started on a repository, as `isShipped` reads one: a repository run. */
 const repositoryRun = (run: Run): RepositoryRun => {
@@ -266,7 +276,7 @@ type Given = { repo?: string; board?: ReturnType<typeof board>; dir?: string; wo
  */
 async function atTheGate(given: Given = {}) {
   const repo = given.repo ?? aRepo();
-  const run = await Effect.runPromise(startRun({ brief: 'add sub', repo, workflowDir: given.dir ?? folder() }));
+  const run = await runPlaced(startRun({ brief: 'add sub', repo, workflowDir: given.dir ?? folder() }));
   const { e, tasks, filings, settle } = given.board ?? board();
   await runWith(e, advanceRun(readRun(run.id)));
   const work = readRun(run.id).steps.implement;
@@ -331,7 +341,7 @@ test("REFUSED at shipped defaults: an ending's gate whose result a person merged
     'approve',
     'at its gate, with the branch ahead: a decision to make',
   );
-  const child = await Effect.runPromise(startRun({ brief: 'read the flag', repo, workflowDir: oneStep(), after: [id] }));
+  const child = await runPlaced(startRun({ brief: 'read the flag', repo, workflowDir: oneStep(), after: [id] }));
   assert.deepEqual(
     (await runWith(e, advanceRun(readRun(child.id)))).filed,
     [],
@@ -534,14 +544,15 @@ test('the place reads the checkout as a landing needs it: whose merge is staged,
     return git(repo, 'rev-parse', name);
   };
   const env = { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' };
+  const placed = gitPlace({ env });
   const answered = <V extends PlaceVerb>(verb: V, request: PlaceRequests[V]) => {
-    const outcome = runPlaceVerb(SHIPPED_PLACE, verb, request, { env });
+    const outcome = placed.askNow(verb, request);
     assert.ok('answer' in outcome, `${verb} answered: ${JSON.stringify(outcome)}`);
     return outcome.answer;
   };
   const status = (checkout: string, tips: Record<string, string>) => answered('status', { checkout, tips });
   const land = (checkout: string, act: { act: 'commit'; message: string } | { act: 'abort' }) =>
-    runPlaceVerb(SHIPPED_PLACE, 'land', { checkout, ...act }, { env });
+    placed.askNow('land', { checkout, ...act });
   const stagedIn = (root: string) => ({ stagedFile: answered('open', { root, isolate: false }).staged });
   const a = branch('wf/r/a', 'a.ts', 'a\n');
   const b = branch('wf/r/b', 'b.ts', 'b\n');
@@ -1383,7 +1394,7 @@ test('a run whose ending the pass will not file claims no checkout: one waiting 
   const shared = board();
   const repo = aRepo();
   const waiting = await atTheGate({ repo, board: shared });
-  const child = await Effect.runPromise(startRun({ brief: 'ship the flag', repo, workflowDir: mergeOnly(), after: [waiting.id] }));
+  const child = await runPlaced(startRun({ brief: 'ship the flag', repo, workflowDir: mergeOnly(), after: [waiting.id] }));
   const { file } = await runWith(shared.e, approveRun(child.id, 'ship'));
   fs.writeFileSync(file, JSON.stringify({ at: '2026-09-17T07:00:00.000Z' }));
   assert.deepEqual(
@@ -1404,7 +1415,7 @@ test('a run whose ending the pass will not file claims no checkout: one waiting 
   const other = aRepo();
   const inFlight = await atTheGate({ repo: other, board: capped });
   await runWith(capped.e, approveRun(inFlight.id, 'ship'));
-  const queued = await Effect.runPromise(startRun({ brief: 'ship the flag', repo: other, workflowDir: mergeOnly() }));
+  const queued = await runPlaced(startRun({ brief: 'ship the flag', repo: other, workflowDir: mergeOnly() }));
   fs.writeFileSync((await runWith(capped.e, approveRun(queued.id, 'ship'))).file, JSON.stringify({ at: '2026-09-17T05:00:00.000Z' }));
   process.env.WF_MAX_RUNS = '1';
   try {
@@ -1443,7 +1454,7 @@ test("a run with nothing filed is held by the checkout like any other: its endin
 
   const other = await atTheGate({ repo, board: shared });
   fs.writeFileSync((await runWith(e, approveRun(other.id, 'ship'))).file, JSON.stringify({ at: '2026-09-17T06:00:00.000Z' }));
-  const child = await Effect.runPromise(startRun({ brief: 'ship the flag', repo, workflowDir: mergeOnly(), after: [parent.id] }));
+  const child = await runPlaced(startRun({ brief: 'ship the flag', repo, workflowDir: mergeOnly(), after: [parent.id] }));
   fs.writeFileSync((await runWith(e, approveRun(child.id, 'ship'))).file, JSON.stringify({ at: '2026-09-17T07:00:00.000Z' }));
 
   assert.deepEqual((await runWith(e, advanceRun(readRun(other.id)))).filed, ['ship'], 'the older word takes the checkout');
@@ -1474,7 +1485,7 @@ test("a run another waited on hands forward what its work said, not what its end
   settle(`${id}-ship`, 'succeeded', { ...SIGNED, summary: 'SHIP-ACCOUNT: merged it onto main, the check passed' });
   await runWith(e, advanceRun(readRun(id)));
 
-  const child = await Effect.runPromise(startRun({ brief: 'read the flag', repo, workflowDir: oneStep(), after: [id] }));
+  const child = await runPlaced(startRun({ brief: 'read the flag', repo, workflowDir: oneStep(), after: [id] }));
   const filed = await runWith(e, advanceRun(readRun(child.id)));
   assert.deepEqual(filed.filed, ['implement'], 'the parent shipped, so the child is filed');
   const brief = tasks.get(`${child.id}-implement`)!.spec.brief;
@@ -1544,7 +1555,7 @@ test('REFUSED at shipped defaults: a try of the ending step itself, which has no
 });
 
 test("REFUSED at shipped defaults: `nemia round` at an ending's gate says the run is at that gate — not that what waits on the loop has been filed", async () => {
-  const run = await Effect.runPromise(startRun({ brief: 'add sub', repo: aRepo(), workflowDir: loopingFolder() }));
+  const run = await runPlaced(startRun({ brief: 'add sub', repo: aRepo(), workflowDir: loopingFolder() }));
   const { e, settle } = board();
   await runWith(e, advanceRun(readRun(run.id)));
   settle(`${run.id}-implement`, 'succeeded', SIGNED);
@@ -1686,7 +1697,7 @@ test('REFUSED at shipped defaults: an ending that stopped on its own word is wri
  */
 async function stoppedOnBase(dir = loopingFolder()) {
   const repo = aRepo();
-  const run = await Effect.runPromise(startRun({ brief: 'add sub', repo, workflowDir: dir }));
+  const run = await runPlaced(startRun({ brief: 'add sub', repo, workflowDir: dir }));
   const b = board();
   const { e, settle } = b;
   await runWith(e, advanceRun(readRun(run.id)));
@@ -1860,7 +1871,7 @@ const ENOUGH = 'the findings are cases no shipped team has: follow-up work, not 
  */
 async function atTheCap() {
   const repo = aRepo();
-  const run = await Effect.runPromise(startRun({ brief: 'add sub', repo, workflowDir: loopingFolder(1) }));
+  const run = await runPlaced(startRun({ brief: 'add sub', repo, workflowDir: loopingFolder(1) }));
   const b = board();
   const { e, settle } = b;
   await runWith(e, advanceRun(readRun(run.id)));
@@ -2266,7 +2277,7 @@ const mergeRefused = (id: string, words: RegExp) => (err: Error & { exitCode?: n
 
 test('REFUSED at shipped defaults: a merge of work whose trial merge onto the base is clean — nothing to merge, and the refusal says to approve the landing', async () => {
   const repo = aRepo();
-  const run = await Effect.runPromise(startRun({ brief: 'add sub', repo, workflowDir: loopingFolder() }));
+  const run = await runPlaced(startRun({ brief: 'add sub', repo, workflowDir: loopingFolder() }));
   const { e, settle } = board();
   await runWith(e, advanceRun(readRun(run.id)));
   const work = readRun(run.id).steps.implement;
@@ -2294,7 +2305,7 @@ test('REFUSED at shipped defaults: a merge of an ending stopped on a base that m
   );
 
   const repo = aRepo();
-  const run = await Effect.runPromise(startRun({ brief: 'add sub', repo, workflowDir: folder() }));
+  const run = await runPlaced(startRun({ brief: 'add sub', repo, workflowDir: folder() }));
   const b = board();
   await runWith(b.e, advanceRun(readRun(run.id)));
   b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
@@ -2437,7 +2448,7 @@ test('a loop out of rounds is sent to merge without `nemia round`: the merge spe
 
 test("a merge past round 1 owes no replies: the target's merge try is handed no findings, and its empty list signs it off, so review is filed after it", async () => {
   const repo = aRepo();
-  const run = await Effect.runPromise(startRun({ brief: 'add sub', repo, workflowDir: loopingFolder(2) }));
+  const run = await runPlaced(startRun({ brief: 'add sub', repo, workflowDir: loopingFolder(2) }));
   const { e, settle, tasks } = board();
   const id = run.id;
   await runWith(e, advanceRun(readRun(id)));
@@ -2528,7 +2539,7 @@ const FAILING = [
  */
 async function refusedOnBase(finished = true) {
   const repo = aRepo();
-  const run = await Effect.runPromise(startRun({ brief: 'add sub', repo, workflowDir: loopingFolder() }));
+  const run = await runPlaced(startRun({ brief: 'add sub', repo, workflowDir: loopingFolder() }));
   const b = board();
   await runWith(b.e, advanceRun(readRun(run.id)));
   const work = readRun(run.id).steps.implement;
@@ -2686,37 +2697,27 @@ test("a semantic merge whose check's output the engine cannot give is filed all 
   );
 });
 
-/** A copy of the package's place in a folder of its own, its `status` script replaced by `status` where one is given. */
-function plantedPlace(status?: string): string {
-  const dir = path.join(scratch('wf-ship-place-'), 'git');
-  fs.cpSync(SHIPPED_PLACE, dir, { recursive: true });
-  if (status !== undefined) fs.writeFileSync(path.join(dir, 'scripts', 'status.ts'), status);
-  return dir;
-}
+/** The package's place, its `status` answered by `status`. */
+const statusPlace = (status: (request: PlaceRequests['status']) => PlaceOutcome<'status'>): Place => placeOver(shippedGitPlace, { status });
 
-/** A copy of the package's place whose `status` answers as the package's does, and counts each time it is asked (`asked`). */
-function countedPlace(): { dir: string; asked: () => number } {
-  const dir = plantedPlace();
-  const scripts = path.join(dir, 'scripts');
-  fs.renameSync(path.join(scripts, 'status.ts'), path.join(scripts, 'shipped-status.ts'));
-  const counter = path.join(path.dirname(dir), 'asked.txt');
-  fs.writeFileSync(
-    path.join(scripts, 'status.ts'),
-    `import fs from 'node:fs';\nfs.appendFileSync(${JSON.stringify(counter)}, 'status\\n');\nawait import('./shipped-status.ts');\n`,
-  );
-  const asked = () => (fs.existsSync(counter) ? fs.readFileSync(counter, 'utf8').split('\n').filter(Boolean).length : 0);
-  return { dir, asked };
+/** The package's place, whose `status` answers as the package's does and counts each time it is asked (`asked`). */
+function countedPlace(): { place: Place; asked: () => number } {
+  let asked = 0;
+  const place = statusPlace((request) => {
+    asked += 1;
+    return shippedGitPlace.askNow('status', request);
+  });
+  return { place, asked: () => asked };
 }
 
 /** A place whose `status` gives every request `reply`. */
-const answeringPlace = (reply: object): string =>
-  plantedPlace(`import { serve } from './contract.ts';\nserve(() => (${JSON.stringify(reply)}));\n`);
+const answeringPlace = (reply: PlaceAnswers['status']): Place => statusPlace(() => ({ answer: reply }));
 
-/** A place whose `status` reads no checkout: it exits 1 with its words on stderr. */
-const failingPlace = (): string => plantedPlace(`process.stderr.write('this place cannot read the checkout');\nprocess.exitCode = 1;\n`);
+/** A place whose `status` reads no checkout: it is not heard, in its words. */
+const failingPlace = (): Place => statusPlace(() => unreadBy('status', 'this place cannot read the checkout'));
 
 /** What `landEnding` does with the run `id` as the board reads it now, through the place `place`, and the memo it read through. */
-async function landedThrough(e: Engine, id: string, place: string) {
+async function landedThrough(e: Engine, id: string, place: Place) {
   const run = readRun(id);
   const { views, phaseOf } = await runWith(e, taskPhasesRead(run));
   const memo = statusMemo(liveHeads, place);
@@ -2759,14 +2760,22 @@ test('a run started before its place named a staged-merge file reads its checkou
   const { repo, id, e, settle, checkId, base } = await stagedAndSigned();
   rewritten(id, (record) => delete record.stagedFile);
   assert.equal(stagedHere(repositoryRun(readRun(id))), undefined, 'a record with no marker');
-  assert.equal(mergeStaged(readRun(id), stepsOf(readRun(id)), statusMemo(liveHeads)), true, 'its merge read staged by the place');
+  assert.equal(
+    mergeStaged(readRun(id), stepsOf(readRun(id)), statusMemo(liveHeads, shippedGitPlace)),
+    true,
+    'its merge read staged by the place',
+  );
   settle(checkId, 'succeeded', undefined, 0);
   await runWith(e, advanceRun(readRun(id)));
   const head = git(repo, 'rev-parse', 'HEAD');
   assert.notEqual(head, base);
   assert.deepEqual(readRun(id).steps.ship.landed, { commit: head });
   assert.equal(git(repo, 'status', '--porcelain'), '');
-  assert.equal(mergeStaged(readRun(id), stepsOf(readRun(id)), statusMemo(liveHeads)), false, 'landed, nothing is read staged');
+  assert.equal(
+    mergeStaged(readRun(id), stepsOf(readRun(id)), statusMemo(liveHeads, shippedGitPlace)),
+    false,
+    'landed, nothing is read staged',
+  );
 });
 
 test('REFUSED: a checkout its place gives no reading of is never a verdict — a check passed or refused, nothing is committed or aborted, the record stays unlanded, and the run says why', async () => {
@@ -2789,7 +2798,7 @@ test('REFUSED: a checkout its place gives no reading of is never a verdict — a
 
   const { repo, id, e, settle, checkId, base } = await stagedAndSigned();
   settle(checkId, 'succeeded', undefined, 0);
-  assert.equal((await landedThrough(e, id, plantedPlace())).landed, true, "the same pass through the package's place, copied, lands");
+  assert.equal((await landedThrough(e, id, shippedGitPlace)).landed, true, "the same pass through the package's place lands");
   assert.notEqual(git(repo, 'rev-parse', 'HEAD'), base);
 });
 
@@ -2808,11 +2817,8 @@ test("REFUSED: a merge its place reads as another's (`merging: 'other'`) is left
 });
 
 test('REFUSED: a landing session is denied and told what its place says — a planted place that denies `hg commit` gives exactly that, and no git word', async () => {
-  const place = plantedPlace();
-  const file = path.join(place, 'place.json');
-  const declared = JSON.parse(fs.readFileSync(file, 'utf8')) as { say: Record<string, unknown> };
-  const say = { ...declared.say, stage: 'hg -R {repo} merge {branches}' };
-  fs.writeFileSync(file, JSON.stringify({ ...declared, denyWhileLanding: ['Bash(hg commit:*)'], say }));
+  const say = { ...shippedGitPlace.declared.say, stage: 'hg -R {repo} merge {branches}' };
+  const place: Place = { ...shippedGitPlace, declared: { denyWhileLanding: ['Bash(hg commit:*)'], say } };
   const { id, repo, branch } = await atTheGate();
   const run = readRun(id);
   const ship = stepsOf(run).find((s) => s.name === 'ship')!;
@@ -2841,7 +2847,10 @@ test("the place's `status` is asked only where a landing needs it: never of a la
   assert.ok(landed.steps.ship.landed);
   const { stagedFile: _, ...unmarked } = repositoryRun(landed);
   const runs = Array.from({ length: 10 }, (_, i) => ({ ...(i % 2 ? landed : unmarked), id: `${landed.id}-${i}` }));
-  assert.deepEqual(await runWith(done.e, heldRead(done.e, runs, standingReader(NOTHING_READ), counted.dir)), { staged: [], held: [] });
+  assert.deepEqual(
+    await runWith(done.e, heldRead(done.e, runs, standingReader(NOTHING_READ)).pipe(Effect.provide(PlaceService.layer(counted.place)))),
+    { staged: [], held: [] },
+  );
   assert.equal(counted.asked(), 0, 'a pause read over 10 landed runs, with the marker and without, asks nothing');
 
   const shared = board();
@@ -2854,20 +2863,30 @@ test("the place's `status` is asked only where a landing needs it: never of a la
   await runWith(shared.e, approveRun(waiting.id, 'ship'));
   const run = readRun(waiting.id);
   const held = (memo: ReturnType<typeof statusMemo>) =>
-    runWith(shared.e, checkoutHold(shared.e, run, stepsOf(run), { standing: standingNow(runStore.runs.list()) }, process.env, memo));
+    runWith(
+      shared.e,
+      checkoutHold(
+        shared.e,
+        run,
+        stepsOf(run),
+        { standing: standingNow(runStore.runs.list()).pipe(Effect.provide(gitPlaceLayer)) },
+        process.env,
+        memo,
+      ),
+    );
   for (const phase of ['pending', 'running'] as const) {
     shared.settle(`${staging.id}-ship`, phase);
     assert.deepEqual(
-      await held(statusMemo(liveHeads, counted.dir)),
+      await held(statusMemo(liveHeads, counted.place)),
       { run: staging.id, step: 'ship' },
       `${phase}: held by the ending in it`,
     );
-    assert.deepEqual(await landedThrough(shared.e, staging.id, counted.dir), { notes: [], landed: false });
+    assert.deepEqual(await landedThrough(shared.e, staging.id, counted.place), { notes: [], landed: false });
     assert.equal(counted.asked(), 0, `${phase}: a busy ending asks nothing`);
   }
 
   shared.settle(`${staging.id}-ship`, 'succeeded', BLOCKED);
-  const memo = statusMemo(liveHeads, counted.dir);
+  const memo = statusMemo(liveHeads, counted.place);
   for (let i = 0; i < 2; i++) {
     assert.deepEqual(await held(memo), { run: staging.id, step: 'ship' }, 'held by the run whose merge is staged and not landed');
   }
@@ -2875,40 +2894,19 @@ test("the place's `status` is asked only where a landing needs it: never of a la
   assert.equal(stagedHere(repositoryRun(readRun(staging.id))), true);
 });
 
-test('REFUSED: a record whose place this nemia does not ship stops its own landing, never the pass: it lands nothing, holds the checkout, and `nemia rm` and the pause read say so', async () => {
-  const odd = await stagedAndSigned();
-  const other = await stagedAndSigned();
-  rewritten(odd.id, (record) => {
+test('a record that names a place skill, written when a run named one, lands through the place the pass is given, as any other', async () => {
+  const named = await stagedAndSigned();
+  rewritten(named.id, (record) => {
     record.placeSkill = { skill: 'svn', version: '1' };
     delete record.stagedFile;
   });
-  odd.settle(odd.checkId, 'succeeded', undefined, 0);
-  const out = await runWith(odd.e, advanceRun(readRun(odd.id)));
-  assert.ok(
-    out.notes.some((n) => n.startsWith('ship: the run read no state of its checkout') && n.includes('names the place skill svn')),
-    out.notes.join('\n'),
-  );
-  assert.equal(mergeHead(odd.repo), true, 'its merge stays staged');
-  assert.equal(git(odd.repo, 'rev-parse', 'HEAD'), odd.base);
-  assert.equal(readRun(odd.id).steps.ship.landed, undefined);
-  assert.equal(
-    mergeStaged(readRun(odd.id), stepsOf(readRun(odd.id)), statusMemo(liveHeads)),
-    true,
-    'a merge nobody can read is held, never let go',
-  );
-  assert.throws(
-    () => merging(readRun(odd.id), stepsOf(readRun(odd.id)), statusMemo(liveHeads)),
-    (err: Error) =>
-      err.message.startsWith(`run ${odd.id}: run ${odd.id} names the place skill svn`) && err.message.endsWith('then try again'),
-  );
-
-  await runWith(
-    other.e,
-    heldRead(other.e, [readRun(odd.id), readRun(other.id)], await Effect.runPromise(standingLive([readRun(other.id)]))),
-  );
-  other.settle(other.checkId, 'succeeded', undefined, 0);
-  await runWith(other.e, advanceRun(readRun(other.id)));
-  assert.ok(readRun(other.id).steps.ship.landed && 'commit' in readRun(other.id).steps.ship.landed!, 'and the run beside it lands');
+  assert.deepEqual(readRun(named.id).placeSkill, { skill: 'svn', version: '1' }, 'the record still reads, its name kept');
+  assert.equal(merging(readRun(named.id), stepsOf(readRun(named.id)), statusMemo(liveHeads, shippedGitPlace)), 'ours');
+  named.settle(named.checkId, 'succeeded', undefined, 0);
+  await runWith(named.e, advanceRun(readRun(named.id)));
+  const landed = readRun(named.id).steps.ship.landed;
+  assert.ok(landed && 'commit' in landed, JSON.stringify(landed));
+  assert.equal(mergeHead(named.repo), false);
 });
 
 test('a landed run started before its place named a staged-merge file is removed with no `status`, its checkout gone', async () => {
@@ -2921,7 +2919,11 @@ test('a landed run started before its place named a staged-merge file is removed
   fs.rmSync(done.repo, { recursive: true, force: true });
   const run = readRun(done.id);
   assert.ok(run.steps.ship.landed && 'commit' in run.steps.ship.landed);
-  assert.equal(merging(run, stepsOf(run), statusMemo(liveHeads)), 'none', 'a landing already made owes no read of a checkout that is gone');
+  assert.equal(
+    merging(run, stepsOf(run), statusMemo(liveHeads, shippedGitPlace)),
+    'none',
+    'a landing already made owes no read of a checkout that is gone',
+  );
 });
 
 test('REFUSED: a staged merge its place gives no reading of holds the checkout — another run approved on the same repository waits for it', async () => {
@@ -2941,32 +2943,13 @@ test('REFUSED: a staged merge its place gives no reading of holds the checkout �
       shared.e,
       run,
       stepsOf(run),
-      { standing: standingNow(runStore.runs.list()) },
+      { standing: standingNow(runStore.runs.list()).pipe(Effect.provide(gitPlaceLayer)) },
       process.env,
       statusMemo(liveHeads, failingPlace()),
     ),
   );
   assert.deepEqual(held, { run: staging.id, step: 'ship' }, 'held by the run whose merge nobody can read');
   assert.equal(mergeHead(repo), true);
-});
-
-test('REFUSED: an ending whose place this nemia does not ship is not filed once approved, said in its own note, and the run beside it files its own', async () => {
-  const odd = await atTheGate();
-  const other = await atTheGate();
-  rewritten(odd.id, (record) => {
-    record.placeSkill = { skill: 'svn', version: '1' };
-  });
-  await runWith(odd.e, approveRun(odd.id, 'ship'));
-  await runWith(other.e, approveRun(other.id, 'ship'));
-  const out = await runWith(odd.e, advanceRun(readRun(odd.id)));
-  assert.deepEqual(out.filed, [], 'its ending is not filed');
-  assert.ok(
-    out.notes.some((n) => n.startsWith(`ship: not filed, for its place gives it no words: run ${odd.id} names the place skill svn`)),
-    out.notes.join('\n'),
-  );
-  assert.equal(readRun(odd.id).steps.ship.taskId, null);
-  assert.deepEqual(odd.filings, [`${odd.id}-implement`]);
-  assert.deepEqual((await runWith(other.e, advanceRun(readRun(other.id)))).filed, ['ship'], 'and the run beside it files its ending');
 });
 
 test('a run started before its place named a staged-merge file, its ending signed off blocked with its merge staged, has the merge aborted', async () => {

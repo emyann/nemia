@@ -16,6 +16,7 @@ import { Engine as RuntimeEngine, type Event, type Sighting } from 'agent-runtim
 import { Effect, Logger, Option, References, Tracer } from 'effect';
 import { scratch } from './scratch.ts';
 import { asyncOps, asyncStore, type AsyncJournal, type AsyncRunner } from './promised.ts';
+import { runGiven } from './placed.ts';
 
 const ROOT = scratch('wf-telemetry-nesting-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -25,6 +26,8 @@ process.env.WF_MAX_CONCURRENT = '10';
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 const { startRun } = await import('../src/runner.ts');
+const { gitPlaceLayer } = await import('../src/place/shipped.store.ts');
+const runPlaced = runGiven(gitPlaceLayer);
 const { tickRun } = await import('../src/tick/tick.verb.ts');
 const { EngineService, engineOf } = await import('../src/runtime-client.ts');
 const { runStore } = await import('../src/record/files.store.ts');
@@ -111,7 +114,7 @@ async function tickTraced(): Promise<{ spans: Tracer.NativeSpan[]; logs: Logged[
       annotations: { ...fiber.getRef(References.CurrentLogAnnotations) },
     });
   });
-  await Effect.runPromise(
+  await runPlaced(
     tickRun({ repo: ROOT }).pipe(
       Effect.provide(EngineService.layer(e)),
       Effect.provide(Logger.layer([keeper])),
@@ -123,7 +126,7 @@ async function tickTraced(): Promise<{ spans: Tracer.NativeSpan[]; logs: Logged[
 }
 
 test("a pass's filing of a step is traced under the pass, down to the runtime's journal, each span and log saying the run and the step", async () => {
-  const run = await Effect.runPromise(startRun({ brief: 'one run', repo: REPO, workflowDir: FOLDER }));
+  const run = await runPlaced(startRun({ brief: 'one run', repo: REPO, workflowDir: FOLDER }));
   const { spans, logs } = await tickTraced();
   const append = spans.find((s) => s.name === 'append' && s.attributes.get('kind') === 'filed');
   assert.ok(append, `no append of a filing among ${spans.map((s) => s.name).join(', ')}`);
@@ -149,7 +152,7 @@ test("a pass's filing of a step is traced under the pass, down to the runtime's 
 });
 
 test("a called-off run's pass says the runtime's stop of its step under the run, though no filing names the step", async () => {
-  const run = await Effect.runPromise(startRun({ brief: 'one run called off', repo: REPO, workflowDir: FOLDER }));
+  const run = await runPlaced(startRun({ brief: 'one run called off', repo: REPO, workflowDir: FOLDER }));
   await tickTraced();
   runStore.runs.cancel(run.id);
   const { logs } = await tickTraced();

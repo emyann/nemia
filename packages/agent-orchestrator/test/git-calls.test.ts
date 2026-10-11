@@ -1,11 +1,13 @@
 /**
- * No package and no app takes a dependency on git (the git-out design in docs/, *The rule*): a git call belongs to the place skill, run
- * through `runPlaceVerb`, never to a `src`. Over `packages/*\/src` and `apps/*\/src`, tests left out (`sourcesOf`), three things are
- * refused, each a matcher of `MATCHERS` over the file's syntax tree, so a call oxfmt splits over lines is the same call:
+ * No package and no app takes a dependency on git (the git-out design in docs/, *The rule*): a git call belongs to the place's code
+ * (`place/git`), given as a service, never to a `src`. Over `packages/*\/src` and `apps/*\/src`, tests left out (`sourcesOf`), four things
+ * are refused, each a matcher of `MATCHERS` over the file's syntax tree, so a call oxfmt splits over lines is the same call:
  *
  * - **`spawn`**: `'git'` as the command handed to one of `SPAWNS`, written there or held by a `const` of the same file;
  * - **`wrapper`**: a call of a helper that wraps such a spawn (`WRAPPERS`);
- * - **`path`**: `'.git'` or `'MERGE_HEAD'` as a segment handed to a call of `node:path` or `node:fs`.
+ * - **`path`**: `'.git'` or `'MERGE_HEAD'` as a segment handed to a call of `node:path` or `node:fs`;
+ * - **`script`**: `'scripts'` as a segment handed to one of `SPAWNS`, among its arguments or in a list of them, or to a call of
+ *   `node:path` or `node:fs`: a place answers by a call, and no `src` starts a script to ask it, nor builds the path of one.
  *
  * A word that runs nothing passes: `'git'` in a list, a comparison or another function's argument, `MERGE_HEAD` in a sentence or a comment.
  *
@@ -39,6 +41,9 @@ const PATH_MODULES = ['node:path', 'node:fs', 'node:fs/promises', 'path', 'fs', 
 /** The path segments only git's own files have. */
 const GIT_SEGMENTS = ['.git', 'MERGE_HEAD'];
 
+/** The folder a place's scripts were run from, one process a question. */
+const SCRIPT_SEGMENTS = ['scripts'];
+
 /**
  * The cards of the git-out design's migration that remove a git call from a `src`, by the letter an entry names, each with its filed
  * run and its row.
@@ -60,7 +65,7 @@ const GIT_SITES: Baseline = {};
 /** What a matcher reads of a file beside a call: the `const`s that hold a string, and the names bound to a path module. */
 type FileFacts = { consts: ReadonlyMap<string, string>; pathNames: ReadonlySet<string> };
 
-type Matcher = { name: 'spawn' | 'wrapper' | 'path'; matches: (call: ts.CallExpression, facts: FileFacts) => boolean };
+type Matcher = { name: 'spawn' | 'wrapper' | 'path' | 'script'; matches: (call: ts.CallExpression, facts: FileFacts) => boolean };
 
 /** `node` without the parentheses, `as`, `satisfies` and `!` around it. */
 function unwrapped(node: ts.Expression): ts.Expression {
@@ -108,6 +113,16 @@ const shellRunsGit = (parts: readonly string[]): boolean => /^\s*git(\s|$)/.test
 /** Whether a string holds one of git's own files as a whole `/`-separated segment. */
 const namesGitFile = (text: string): boolean => text.split('/').some((segment) => GIT_SEGMENTS.includes(segment));
 
+/** Whether a string holds the folder of a place's scripts as a whole `/`-separated segment. */
+const namesScript = (text: string): boolean => text.split('/').some((segment) => SCRIPT_SEGMENTS.includes(segment));
+
+/** The arguments of `call`, a list among them given as its elements. */
+const argumentsOf = (call: ts.CallExpression): ts.Expression[] =>
+  call.arguments.flatMap((arg) => {
+    const at = unwrapped(arg);
+    return ts.isArrayLiteralExpression(at) ? [...at.elements] : [arg];
+  });
+
 const MATCHERS: readonly Matcher[] = [
   {
     name: 'spawn',
@@ -124,6 +139,12 @@ const MATCHERS: readonly Matcher[] = [
     name: 'path',
     matches: (call, facts) =>
       facts.pathNames.has(calleeRoot(call) ?? '') && call.arguments.some((arg) => literalParts(arg, facts).some(namesGitFile)),
+  },
+  {
+    name: 'script',
+    matches: (call, facts) =>
+      (SPAWNS.includes(calleeName(call) ?? '') || facts.pathNames.has(calleeRoot(call) ?? '')) &&
+      argumentsOf(call).some((arg) => literalParts(arg, facts).some(namesScript)),
   },
 ];
 
@@ -223,7 +244,7 @@ function ratchetBreaks(counts: Record<string, number>, baseline: Baseline, exist
   const out: string[] = [];
   for (const [file, count] of Object.entries(counts))
     if (!(file in baseline))
-      out.push(`${file} holds ${count} git calls: a git call belongs to the place skill, run through runPlaceVerb; never add them here`);
+      out.push(`${file} holds ${count} git calls: a git call belongs to the place's code, asked as a service; never add them here`);
   for (const [file, entry] of Object.entries(baseline)) {
     const naming = namingBreak(file, entry);
     const counted = countBreak(file, counts[file] ?? 0, entry.count, exists);
@@ -257,6 +278,13 @@ const PLANTS: Readonly<Record<Matcher['name'], readonly string[]>> = {
     "import * as fsp from 'node:fs/promises';\nconst name = 'MERGE_HEAD';\nawait fsp.readFile(name);\n",
     "import { join } from 'node:path';\nimport { existsSync } from 'node:fs';\nexistsSync(join(repo, '.git'));\n",
   ],
+  script: [
+    "import path from 'node:path';\npath.join(dir, 'scripts', `${verb}.ts`);\n",
+    "import { spawnSync } from 'node:child_process';\nspawnSync(process.execPath, [`${dir}/scripts/${verb}.ts`], { input });\n",
+    "import { spawn } from 'node:child_process';\nspawn(\n  process.execPath,\n  ['place/git/scripts/make.ts'],\n  { detached: true },\n);\n",
+    "const script = 'place/git/scripts/open.ts';\nexecFileSync(process.execPath, [script]);\n",
+    "import fs from 'node:fs';\nfs.existsSync(`${dir}/scripts/${verb}.ts`);\n",
+  ],
 };
 
 /** Words that name git and run nothing: each must measure no site. */
@@ -271,6 +299,8 @@ const WORDS = [
   "import path from 'node:path';\npath.join(repo, '.github', 'MERGE_HEAD.md', 'git');\n",
   "import { join } from './elsewhere.ts';\njoin(repo, '.git');\n",
   "execFileSync('npm', ['run', 'git']);\nexecSync('npx gitlab');\n",
+  "const said = 'its scripts are gone: a place answers by a call';\nconst has = pkg.scripts.test;\n",
+  "import path from 'node:path';\npath.join(root, 'transcripts', 'scripts.md');\nspawn(process.execPath, [entry, 'scripts.json']);\n",
 ];
 
 test('a plant of each matcher is one site under it, and over several lines too', () => {
@@ -337,7 +367,7 @@ test('the git calls of every src are held to their baseline, each entry naming i
 
 test('REFUSED: a new file with a git call, in each layer, and a count raised by one', () => {
   const texts = repository();
-  const fix = 'a git call belongs to the place skill, run through runPlaceVerb; never add them here';
+  const fix = "a git call belongs to the place's code, asked as a service; never add them here";
   const planted = (file: string, text: string): string[] => ratchetBreaks(measured(new Map([...texts, [file, text]])), GIT_SITES, onDisk);
   for (const [file, plant] of [
     ['packages/agent-orchestrator/src/x/x.store.ts', PLANTS.spawn[0]],

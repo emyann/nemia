@@ -16,6 +16,7 @@ import type { TaskView } from 'agent-runtime';
 import { CONFIG_FOLDERS } from 'agent-runtime/vocabulary';
 import { scratch } from '../../test/scratch.ts';
 import { board } from '../../test/engine-board.ts';
+import { runOver } from '../../test/placed.ts';
 
 const ROOT = scratch('wf-nemia-');
 process.env.WF_ROOT = ROOT;
@@ -30,7 +31,9 @@ const { customInstructionsFile } = await import('../agents/read.store.ts');
 const { addFactory, factoryNames } = await import('../factory/factory.store.ts');
 const { factoryLevelFile } = await import('../level/level.store.ts');
 const { DEFAULT_HARNESS } = await import('../harness/harness.ts');
-const { engineOf, runWith } = await import('../runtime-client.ts');
+const { engineOf, runWith: runEngine } = await import('../runtime-client.ts');
+const { gitPlaceLayer } = await import('../place/shipped.store.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
 const { nemiaFence } = await import('../admission/index.ts');
 const { TABLE } = await import('../command/commands.verb.ts');
 

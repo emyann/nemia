@@ -43,8 +43,9 @@ import {
   waitedOn,
   waitsOf,
 } from 'agent-orchestrator/run';
-import { type Engine } from '../store.ts';
+import { type Engine, runPlaced } from '../store.ts';
 import { type StepUsed, totalOf, usedOf } from '../detail/usage.ts';
+import type { PlaceService } from 'agent-orchestrator';
 
 export type { DecideCommand };
 
@@ -223,8 +224,14 @@ const MERGES = COMMANDS.find((c) => c.name === 'merges')!;
  * (`resultSteps`), as the decision reads them once it is not. A folder run has no repository to ask, so none of git is read for it.
  * `standings` are none for a run that worked on its base branch itself, whose standing would read `main is on main`.
  */
-export async function decisionOf(run: Run, e: Engine['Service'], home: string, env: NodeJS.ProcessEnv): Promise<RunDecision> {
-  const live = await runWith(e, standingWhen(runStore.runs.list(), run.id));
+export async function decisionOf(
+  run: Run,
+  e: Engine['Service'],
+  placeService: PlaceService['Service'],
+  home: string,
+  env: NodeJS.ProcessEnv,
+): Promise<RunDecision> {
+  const live = await runPlaced(placeService, e, standingWhen(runStore.runs.list(), run.id));
   const parent = await runWith(e, parentsRead(run, await runWith(e, live.when(waitedOn(run).length > 0))));
   const waiting = runWaitingOf(run, waitsOf(run, parent));
   const holding = holdingOf(run, holdsOf(run, parent));
@@ -232,17 +239,26 @@ export async function decisionOf(run: Run, e: Engine['Service'], home: string, e
   if (holding) return { holding };
   const folder = workflowsOf(run, home).steps;
   const views = await runWith(e, viewsOf(run, e));
-  const judgedOver = (git: BranchReader) => runWith(e, judge(run, stepNames(run, folder), folder, views, { reader: e, git, parent }));
+  const judgedOver = (git: BranchReader) =>
+    runPlaced(placeService, e, judge(run, stepNames(run, folder), folder, views, { reader: e, git, parent }));
   const { judged, git } = await judgedLive(judgedOver, (need) => runWith(e, live.when(need)));
   if (judged.status === 'cancelled') return { nothing: `cancelled at ${run.cancelledAt} — nothing to decide` };
-  const decided = await runWith(e, decideRun(run.id, env, live));
+  const decided = await runPlaced(placeService, e, decideRun(run.id, env, live));
   if (judged.status === 'running' && !judged.waitingOnYou.length) return { running: true, ...(decided.held ? { held: decided.held } : {}) };
   const d = decided.decision;
   const nothing = nothingOf(run, d);
   if (nothing) return { nothing };
   const steps = judgedSteps(run, folder);
   const collisions = decided.collisions ?? null;
-  const { read, standings } = await branchesOf(e, run, git, steps, d.kind === 'awaiting' ? d.branches : undefined, collisions);
+  const { read, standings } = await branchesOf(
+    e,
+    placeService,
+    run,
+    git,
+    steps,
+    d.kind === 'awaiting' ? d.branches : undefined,
+    collisions,
+  );
   const touched = read.map(({ branch, radius }) => ({ branch, radius }));
   const filed = Object.keys(run.steps).filter((name) => run.steps[name]?.taskId);
   return {
@@ -293,6 +309,7 @@ function nothingOf(run: Run, d: Decided['decision']): string | undefined {
  */
 async function branchesOf(
   e: Engine['Service'],
+  placeService: PlaceService['Service'],
   run: Run,
   git: BranchReader,
   steps: Parameters<typeof resultSteps>[0],
@@ -312,13 +329,13 @@ async function branchesOf(
     Object.values(run.steps).map((s) => s.branch),
     run.isolate ? run.branch : undefined,
   );
-  const changes = changesOf(run, [...toRead, ...(run.isolate ? results : [])]);
+  const changes = changesOf(placeService, run, [...toRead, ...(run.isolate ? results : [])]);
   const read = toRead.map((branch) => changes.find((c) => c.branch === branch)!);
   if (!run.isolate) return { read, standings: [] };
   const stands = branchStandings(run, results, git);
   const merges = collisions
     ? Object.fromEntries(collisions.base.map(({ branch, ...merge }) => [branch, merge]))
-    : await mergesOf(e, run, stands);
+    : await mergesOf(e, placeService, run, stands);
   const standings: Standing[] = stands.map((s) => ({
     ...s,
     said: branchWord(run, s),
@@ -335,8 +352,13 @@ const statOf = (radius: BranchChanges['radius']): string | null => ('error' in r
  * Whether each branch ahead of the base still merges onto it (`StandingMerge`), keyed by branch, as the table's merge check answers it
  * (`MERGES`, served on the api alone); none asked when no branch is ahead, which nothing would merge.
  */
-async function mergesOf(e: Engine['Service'], run: RepositoryRun, standings: readonly BranchStanding[]) {
+async function mergesOf(
+  e: Engine['Service'],
+  placeService: PlaceService['Service'],
+  run: RepositoryRun,
+  standings: readonly BranchStanding[],
+) {
   const branches = standings.filter((s) => s.where === 'ahead').map((s) => s.branch);
   if (!branches.length) return {};
-  return (await runWith(e, MERGES.handler({ runId: run.id, branches }))) as Record<string, StandingMerge>;
+  return (await runPlaced(placeService, e, MERGES.handler({ runId: run.id, branches }))) as Record<string, StandingMerge>;
 }

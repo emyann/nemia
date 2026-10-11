@@ -11,14 +11,16 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { board as engineBoard } from './engine-board.ts';
 import { scratch } from './scratch.ts';
-import { Effect } from 'effect';
+import { runGiven, runOver } from './placed.ts';
 
 const ROOT = scratch('wf-retry-config-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 process.env.WF_ROOT = ROOT;
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
-const { advanceRun, retryRun, startRun, runWith } = await import('../src/runner.ts');
+const { advanceRun, retryRun, startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
+const runPlaced = runGiven(gitPlaceLayer);
 const { readRun } = await import('../src/record/record.store.ts');
 const { runStore } = await import('../src/record/files.store.ts');
 const { configRefusal, engineOf } = await import('../src/runtime-client.ts');
@@ -37,7 +39,7 @@ function aRepo(): string {
 async function failed() {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\nmodel: opus\n---\nimplement it\n');
-  const run = await Effect.runPromise(startRun({ brief: 'the flag', repo: aRepo(), workflowDir: dir, isolate: false }));
+  const run = await runPlaced(startRun({ brief: 'the flag', repo: aRepo(), workflowDir: dir, isolate: false }));
   const b = engineBoard();
   const e = engineOf(b.layer);
   await runWith(e, advanceRun(readRun(run.id)));

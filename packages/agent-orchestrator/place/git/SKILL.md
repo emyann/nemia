@@ -24,8 +24,8 @@ Your brief names the commit the run started from, its base. When it does not giv
 - **On a result branch**, from the base's checkout: `git log --oneline <base>..<branch>` for its commits and `git diff <base>...<branch>`
   for its change, as the branch made it, whatever the base did since.
 
-The run reads the same without you, from git's object store, through `scripts/report.ts`: what each result branch changed against the
-base, file by file.
+The run reads the same without you, from git's object store, through this place's `report` verb (`verbs/report.ts`): what each result
+branch changed against the base, file by file.
 
 ## Merge the base when a person asks
 
@@ -52,10 +52,10 @@ When your step lands the run's result on its base, in the repository's own check
 4. **When it is clean**: leave it staged. The run checks the merged tree, then commits the merge or takes it back; `git commit` and
    `git merge --continue` are denied you, and a merge without `--no-commit` would commit it all the same.
 
-## The scripts
+## What the run asks of this place
 
-`place.json` declares what this place answers, and `scripts/` holds one script per verb. The run executes them itself, from the copy it
-froze when it started; you need not run them. Each reads one JSON request on stdin, carrying `"v": 1`, and prints one JSON answer:
+The run asks this place itself, in code beside this file (`place.ts`, `verbs/`): each question is a call that runs git, with no script
+and no process between, and you need not ask any of them. What each takes and answers:
 
 - `open` — the repository a run starts in: `{ "root", "isolate" }` answers `{ "repo", "baseRef", "branch", "staged" }`, `staged` the
   file that is there while a merge is staged in that checkout, which the run reads with no process. With `isolate`, it refuses a
@@ -88,8 +88,5 @@ froze when it started; you need not run them. Each reads one JSON request on std
   list its files.
 - `seal` — that empty repository taken away once the checks passed: `{ "tree" }` answers `{ "removed" }`.
 
-A script that will not act prints `{ "refused": "<why>" }`. To see what one says, run it yourself:
-
-```
-echo '{"v":1,"checkout":"<your checkout>","tips":{}}' | node <this skill's folder>/scripts/status.ts
-```
+A verb that will not act answers `{ "refused": "<why>" }`; one git did not answer within its deadline, or that failed before it
+answered, is not heard, and the run asks again on its next pass.

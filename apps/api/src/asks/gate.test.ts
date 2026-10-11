@@ -16,7 +16,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { app } from '../app.ts';
-import { approvalFile, approveRun, askFile, engine, list, retryRun, runStore, runWith, type RunSummary } from 'agent-orchestrator';
+import { approvalFile, approveRun, askFile, engine, list, retryRun, runStore, type RunSummary } from 'agent-orchestrator';
+import { runWith } from '../../test/placed.ts';
 import { answerText, approvalWordsRefusal, approvedAnswerText, onYouWords, type Question } from 'agent-orchestrator/run';
 import { parseWorkflow } from 'agent-orchestrator/workflow';
 

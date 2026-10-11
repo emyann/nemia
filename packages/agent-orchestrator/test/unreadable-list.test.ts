@@ -14,9 +14,9 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { asyncStore, type AsyncJournal, asyncOps, type AsyncRunner } from './promised.ts';
 import { Engine } from 'agent-runtime';
-import { Effect } from 'effect';
 import { scratch } from './scratch.ts';
 import { plainEngine } from './promised.ts';
+import { runGiven } from './placed.ts';
 
 const ROOT = scratch('wf-unreadable-list-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -24,6 +24,8 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 process.env.WF_ROOT = ROOT;
 process.env.WF_MAX_RUNS = '4';
 const { main } = await import('../src/cli/main.ts');
+const { gitPlaceLayer } = await import('../src/place/shipped.store.ts');
+const runPlaced = runGiven(gitPlaceLayer);
 const { passStanding } = await import('../src/standing/standing.verb.ts');
 const { listRuns } = await import('../src/record/record.store.ts');
 
@@ -144,7 +146,7 @@ writeRun('r-try', {
 });
 
 writeRun('r-waiting', {}, { after: ['r-check'] });
-await Effect.runPromise(passStanding(listRuns()));
+await runPlaced(passStanding(listRuns()));
 
 const printedBy = async (t: TestContext, argv: string[]) => {
   const out: string[] = [];

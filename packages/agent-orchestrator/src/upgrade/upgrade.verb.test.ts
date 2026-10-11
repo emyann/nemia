@@ -15,12 +15,14 @@ import { parse, stringify } from 'yaml';
 import { scratch } from '../../test/scratch.ts';
 import { promised } from '../../test/promised.ts';
 import { teamCopy } from '../../test/team.ts';
+import { runOver } from '../../test/placed.ts';
 
 const ROOT = scratch('wf-upgrade-');
 process.env.WF_ROOT = ROOT;
 const FACTORIES = path.join(ROOT, 'factories');
 const { exportTemplate } = await import('../template/template.store.ts');
-const { engine, FACTORY_RULES, factoryRules, readFactory, runWith } = await import('../runner.ts');
+const { engine, FACTORY_RULES, factoryRules, readFactory, runWith: runEngine, gitPlaceLayer } = await import('../runner.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
 const { main } = await import('../cli/main.ts');
 const { reconcileFactory } = await import('../applied/applied.verb.ts');
 const { appliedDir, digestOf, entriesIn, readStatus, replaceBase, resolutionsFile, statusFile, swapTree, treeDir } =

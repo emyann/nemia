@@ -17,12 +17,15 @@ import { Engine as EngineService, nameFor, type Sighting, type SpawnRequest } fr
 import { asyncOps, asyncStore, plainEngine, type AsyncJournal, type AsyncRunner } from './promised.ts';
 import type { Engine } from '../src/runtime-client.ts';
 import { scratch } from './scratch.ts';
+import { runGiven, runOver } from './placed.ts';
 
 const ROOT = scratch('wf-costs-brief-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
-const { advanceRun, retryRun, startRun, runWith } = await import('../src/runner.ts');
+const { advanceRun, retryRun, startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
+const runPlaced = runGiven(gitPlaceLayer);
 const { readRun } = await import('../src/record/record.store.ts');
 const { RECENT_RUNS } = await import('../src/costs/index.ts');
 
@@ -226,7 +229,7 @@ await seed();
 const SECTION = '## What runs of this workflow cost';
 
 test('a step that reads `costs` is told what the newest finished runs of its workflow in its factory cost; the step after it is told none', async () => {
-  const run = await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: WORKFLOW, isolate: false }));
+  const run = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: WORKFLOW, isolate: false }));
   viewed.length = 0;
   assert.deepEqual((await pass(run.id)).filed, ['design']);
   const oldest = ['c00', 'c01', 'c02', 'c03', 'c04'].map((id) => `${id}-design`);
@@ -252,7 +255,7 @@ test('a step that reads `costs` is told what the newest finished runs of its wor
 });
 
 test("a fresh try of the step is told the costs again, and one that continues the last session neither reads nor is told them: it was, on that session's first brief", async () => {
-  const run = await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: WORKFLOW, isolate: false }));
+  const run = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: WORKFLOW, isolate: false }));
   await pass(run.id);
   await pass(run.id);
   fail(`${run.id}-design`, 1);
@@ -281,7 +284,7 @@ test("a fresh try of the step is told the costs again, and one that continues th
 });
 
 test('a round whose target starts a new session is told the costs, and one that continues the last session neither reads nor is told them', async () => {
-  const run = await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: LOOPED, isolate: false }));
+  const run = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: LOOPED, isolate: false }));
   const first = `${run.id}-implement`;
   nameless.add(nameFor(first, 1));
   assert.deepEqual((await pass(run.id)).filed, ['implement']);

@@ -17,6 +17,7 @@ import { Engine, type Sighting } from 'agent-runtime';
 import { Effect } from 'effect';
 import { asyncStore, type AsyncJournal, asyncOps, type AsyncRunner, plainEngine } from './promised.ts';
 import { scratch } from './scratch.ts';
+import { runGiven, runOver } from './placed.ts';
 
 const ROOT = scratch('wf-unloaded-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -25,7 +26,9 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_MAX_CONCURRENT = '10';
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
-const { startRun, runWith } = await import('../src/runner.ts');
+const { startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
+const runPlaced = runGiven(gitPlaceLayer);
 const { readRun, runFile } = await import('../src/record/record.store.ts');
 const { tickRun } = await import('../src/tick/tick.verb.ts');
 const { slotsRead } = await import('../src/cap/cap.verb.ts');
@@ -111,7 +114,7 @@ const printedBy = async (t: TestContext, argv: string[], engine = e) => {
   return { out, err, threw };
 };
 
-const started = (brief: string) => Effect.runPromise(startRun({ brief, repo: REPO, workflowDir: FOLDER }));
+const started = (brief: string) => runPlaced(startRun({ brief, repo: REPO, workflowDir: FOLDER }));
 
 /** The run's record as an early tick wrote it: no workflow frozen on it, its steps read off `dir` on every pass. */
 const unfrozen = (id: string, dir: string): void => {

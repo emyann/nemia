@@ -1,7 +1,8 @@
 /** The flow numbers of every run in the store, for the board: what `nemia stats --json` prints. */
 import { Hono } from 'hono';
-import { STATS, statsQueryOf, type QueryKey, type Stats, runWith } from 'agent-orchestrator';
+import { STATS, statsQueryOf, type QueryKey, type Stats } from 'agent-orchestrator';
 import { type ApiEnv, served } from '../layer.ts';
+import { runPlaced } from '../store.ts';
 
 export type { Stats };
 
@@ -41,7 +42,7 @@ const QUERY_KEYS: Record<QueryKey, string> = {
  *   under `WF_VERIFY_REST=1`.
  */
 export const stats = new Hono<ApiEnv>().get('/api/stats', (c) =>
-  served(c, async ({ e, env, home, memo }) => {
+  served(c, async ({ e, placeService, env, home, memo }) => {
     const given = Object.fromEntries(
       Object.entries(QUERY_KEYS).flatMap(([key, name]) => {
         const value = c.req.query(name);
@@ -49,6 +50,6 @@ export const stats = new Hono<ApiEnv>().get('/api/stats', (c) =>
       }),
     );
     statsQueryOf(given, (key) => `?${QUERY_KEYS[key]}=`);
-    return c.json(await runWith(e, STATS.handler(given, env, home, { stats: memo.stats, series: memo.series })));
+    return c.json(await runPlaced(placeService, e, STATS.handler(given, env, home, { stats: memo.stats, series: memo.series })));
   }),
 );

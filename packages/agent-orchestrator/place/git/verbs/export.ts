@@ -5,27 +5,25 @@
  * `git ls-files -co --exclude-standard` reads the tree as it is; `seal` takes it away. Refuses a repo that is not a directory, a tag the
  * repository does not have, and an `into` that holds anything.
  */
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
-import { git, gitSays, isDirectory, refused, serve, text } from './contract.ts';
+import { git, gitSays, isDirectory, printed, refused, type Asking, type Reply } from '../git.ts';
+import type { PlaceRequests } from '../../../src/place/place.ts';
 
-serve((request) => {
-  const repo = text(request, 'repo');
-  const tag = text(request, 'tag');
-  const into = text(request, 'into');
+/** The verb's body. */
+export function* exported({ repo, tag, into }: PlaceRequests['export']): Asking<Reply<'export'>> {
   if (!isDirectory(repo)) return refused(`${repo} is not a directory, so no tag in it can be exported`);
-  const commit = gitSays(repo, ['rev-parse', '--verify', '--quiet', `refs/tags/${tag}^{commit}`]);
+  const commit = yield* gitSays(repo, ['rev-parse', '--verify', '--quiet', `refs/tags/${tag}^{commit}`]);
   if (commit === undefined) return refused(`${repo} has no tag ${tag}: tag the commit to release (git -C ${repo} tag ${tag} <commit>)`);
   if (fs.existsSync(into) && fs.readdirSync(into).length)
     return refused(`${into} is not empty, and a tag is exported into an empty folder`);
   fs.mkdirSync(into, { recursive: true });
   const tar = `${into}.tar`;
   try {
-    git(repo, ['archive', '--format=tar', `--output=${tar}`, commit]);
-    execFileSync('tar', ['-xf', tar, '-C', into], { stdio: ['ignore', 'pipe', 'pipe'] });
+    yield* git(repo, ['archive', '--format=tar', `--output=${tar}`, commit]);
+    yield* printed({ cmd: 'tar', args: ['-xf', tar, '-C', into] });
   } finally {
     fs.rmSync(tar, { force: true });
   }
-  git(into, ['init', '--quiet']);
+  yield* git(into, ['init', '--quiet']);
   return { commit };
-});
+}

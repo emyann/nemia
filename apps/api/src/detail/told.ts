@@ -2,6 +2,7 @@
 import { handedParts, type HandedPart, type Run, type ToldLayers, toldLayers } from 'agent-orchestrator/run';
 import type { Workflow } from 'agent-orchestrator/workflow';
 import { briefNow, type Views } from 'agent-orchestrator';
+import type { PlaceService } from 'agent-orchestrator';
 
 /**
  * The brief a step was told, whole.
@@ -12,11 +13,17 @@ import { briefNow, type Views } from 'agent-orchestrator';
  * rewrite it. For a step not yet filed, what it would be told now (`briefNow`), from `workflows` — the
  * workflow the run froze, as the tick composes it, with its place's words. For a filed task the engine has no record of, nobody can say.
  */
-function briefOf(run: Run, name: string, workflows: readonly Workflow[] | null, views: Views): string | null {
+function briefOf(
+  run: Run,
+  name: string,
+  workflows: readonly Workflow[] | null,
+  views: Views,
+  placeService: PlaceService['Service'],
+): string | null {
   const taskId = run.steps[name]?.taskId;
   if (taskId) return views.get(taskId)?.state.brief || null;
   const step = workflows?.find((s) => s.name === name);
-  return step && workflows ? briefNow(step, run, workflows) : null;
+  return step && workflows ? briefNow(step, run, workflows, placeService) : null;
 }
 
 /**
@@ -45,8 +52,9 @@ export function toldOf(
   name: string,
   workflows: readonly Workflow[] | null,
   views: Views,
+  placeService: PlaceService['Service'],
 ): { told: string | null; layers: ToldLayers | null; taskParts: TaskPart[] | null } {
-  const told = briefOf(run, name, workflows, views);
+  const told = briefOf(run, name, workflows, views, placeService);
   const frozen = run.workflow?.find((s) => s.name === name);
   const layers = frozen ? toldLayers(frozen, told) : null;
   const task = layers?.task ?? told;

@@ -1,5 +1,5 @@
 /**
- * The git place's `report` (`place/git/scripts/report.ts`), run through `runPlaceVerb` against scratch repositories: the files each branch
+ * The git place's `report` (`place/git/verbs/report.ts`), asked of `gitPlace` against scratch repositories: the files each branch
  * changed — added, modified, renamed, binary, a name git would quote — the diff of each path asked of, whether a path is on a branch, the
  * text of a path at the base, a branch git does not have left out of every answer, and its refusals, never an empty list. Git runs with no
  * user or system configuration and a fixed identity.
@@ -9,14 +9,11 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { runPlaceVerb } from '../src/runner.ts';
+import { gitPlace } from '../place/git/place.ts';
 import type { PlaceOutcome } from '../src/runner.ts';
 import { scratch } from './scratch.ts';
 
-/** The git place the package ships. */
-const GIT_SKILL = path.join(import.meta.dirname, '..', 'place', 'git');
-
-/** The environment git and the script run in: this process's, without its git variables, with no configuration read and one identity. */
+/** The environment git runs in: this process's, without its git variables, with no configuration read and one identity. */
 const ENV: NodeJS.ProcessEnv = {
   ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))),
   GIT_CONFIG_GLOBAL: '/dev/null',
@@ -72,7 +69,7 @@ const request = (dir: string, asked: Partial<Record<'branches' | 'diffOf' | 'pre
 });
 
 /** `report` of the git place, in `ENV`, its request as given: one the contract's type refuses is how a malformed request is sent. */
-const report = (asked: object): PlaceOutcome<'report'> => runPlaceVerb(GIT_SKILL, 'report', asked as never, { env: ENV });
+const report = (asked: object): PlaceOutcome<'report'> => gitPlace({ env: ENV }).askNow('report', asked as never);
 
 /** The answer of an outcome, or a failure naming what it was instead. */
 function answerOf(outcome: PlaceOutcome<'report'>) {
@@ -140,7 +137,7 @@ test("REFUSED: report on no directory, and against a base git cannot read, in th
 
 test('report is unread, never an empty answer, when git cannot be started at all', () => {
   const dir = repository();
-  const outcome = runPlaceVerb(GIT_SKILL, 'report', request(dir), { env: { ...ENV, PATH: scratch('wf-report-no-git-') } });
+  const outcome = gitPlace({ env: { ...ENV, PATH: scratch('wf-report-no-git-') } }).askNow('report', request(dir));
   assert.ok('unread' in outcome, JSON.stringify(outcome));
   assert.match(outcome.unread.said, /ENOENT/);
 });

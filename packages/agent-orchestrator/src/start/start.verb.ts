@@ -8,12 +8,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { configRefusal, readRemote, tried } from '../runtime-client.ts';
 import { remoteAgentsFile } from '../harness/a2a.store.ts';
-import { workspacePlan } from '../workspace/workspace.ts';
 import { type Workflow } from '../step/step.ts';
 import { DEFAULT_HARNESS, isRemoteHarness, remoteNameOf } from '../harness/harness.ts';
 import { filedRefusal, lineOf } from '../keys/index.ts';
 import { filedConfig } from '../filed/filed.ts';
-import { budgetUsdFor, landsOnCheck } from '../status/status.ts';
+import { budgetUsdFor } from '../status/status.ts';
 import { renderedFlags } from '../agents/agents.ts';
 import { ownOf } from '../tick/told.verb.ts';
 import { fansOut, isFolderTeam } from '../workflow/index.ts';
@@ -30,8 +29,7 @@ import { inboxDir, runStore } from '../record/files.store.ts';
 import { storeRootRefusal } from './store-root.ts';
 import { HOME, artifactsDir, inputsDir, runId, runsDir } from '../record/record.store.ts';
 import { writeAgentFiles } from '../agents/agents.store.ts';
-import { SHIPPED_PLACE, openPlace, readPlaceJson } from '../place/place.store.ts';
-import type { PlaceVerb } from '../place/place.ts';
+import { PlaceService, openPlace } from '../place/place.store.ts';
 import { parentRecord } from '../branches/branches.store.ts';
 import { standingLiveOf } from '../standing/standing.verb.ts';
 import { Invalid } from '../refusal/refusal.ts';
@@ -110,6 +108,7 @@ export function stepsToStart(
   workflowDir: string,
   isolate: boolean,
   places: Places,
+  denied: readonly string[],
   factory?: Factory,
   gates: readonly string[] = [],
   refused: ConfigRefused = configRefused,
@@ -163,7 +162,7 @@ export function stepsToStart(
     ...(given ? { inputs: inputsDir({ id: 'run' }) } : {}),
   });
   if (unruled) throw new Invalid({ message: unruled });
-  const refusedConfig = refused(steps, places, gates, formerModesWritten(workflowDir));
+  const refusedConfig = refused(steps, places, gates, denied, formerModesWritten(workflowDir));
   if (refusedConfig) throw new Invalid({ message: refusedConfig });
   return steps;
 }
@@ -202,22 +201,24 @@ export const configRefused = (
   steps: readonly Workflow[],
   places: Places,
   gates: readonly string[],
+  denied: readonly string[],
   written: Readonly<Record<string, string>> = {},
-): string | undefined => refusedStep(steps, places, gates, written, [])?.why;
+): string | undefined => refusedStep(steps, places, gates, written, [], denied)?.why;
 
 /** A run's artifacts folder as a start asks of its steps' first filing, before the run has an id. */
 const startArtifacts = (): string => path.dirname(artifactsDir({ id: 'run' }, 'step'));
 
-/** What the package's place denies a landing session (`denyWhileLanding`), as an ending's first filing is denied it. */
-const shippedDenies = (): readonly string[] => readPlaceJson(SHIPPED_PLACE).denyWhileLanding;
-
-/** `configRefused`'s refusal with the step it refuses, in a run that mounts `mounts` (`factoryMounts`). */
+/**
+ * `configRefused`'s refusal with the step it refuses, in a run that mounts `mounts` (`factoryMounts`) and whose place denies a landing
+ * session `denied`.
+ */
 function refusedStep(
   steps: readonly Workflow[],
   places: Places,
   gates: readonly string[],
   written: Readonly<Record<string, string>>,
   mounts: readonly Mount[],
+  denied: readonly string[],
 ): { step: Workflow; why: string } | undefined {
   for (const step of steps.filter((s) => !isRemoteHarness(s.harness))) {
     const own = ownOf(step, renderedFlags(step, '.'), () => places.repo);
@@ -226,7 +227,7 @@ function refusedStep(
       step,
       steps,
       { gates: [...gates], ...(mounts.length ? { mounts: [...mounts] } : {}) },
-      { model: step.model, budgetUsd: budgetUsdFor(step.budget), runArtifacts, inbox: inboxDir(), own, landingDenied: shippedDenies },
+      { model: step.model, budgetUsd: budgetUsdFor(step.budget), runArtifacts, inbox: inboxDir(), own, landingDenied: () => denied },
     );
     const former = written[step.name];
     const lines = (field: string) =>
@@ -242,17 +243,12 @@ export type ConfigRefused = (
   steps: readonly Workflow[],
   places: Places,
   gates: readonly string[],
+  denied: readonly string[],
   written?: Readonly<Record<string, string>>,
 ) => string | undefined;
 
 /** The refusal `startRun` asks of a folder's steps before a run is written: `configRefused`, unless a layer gives another. */
 export const StartRefusal = Context.Reference<ConfigRefused>('orchestrator/StartRefusal', { defaultValue: () => configRefused });
-
-/**
- * The place skill's directory a repository run is opened with at start (`openPlace`): the package's own place, unless a layer gives
- * another.
- */
-export const StartPlace = Context.Reference<string>('orchestrator/StartPlace', { defaultValue: () => SHIPPED_PLACE });
 
 /**
  * The first step whose `harness: a2a:<name>` names an agent the store's `a2a-agents.json` does not give the engine, refused with the fix,
@@ -353,11 +349,13 @@ function mountRefusal(
   factory: Factory | undefined,
   own: string | undefined,
   mounts: readonly Mount[],
+  denied: readonly string[],
 ): string | undefined {
   const workflow = path.basename(path.resolve(opts.workflowDir));
   const unwritable = writableRefusal(steps, workflow, factory, own, mounts);
   if (unwritable || !factory || !mounts.length) return unwritable;
-  const ask = (asked: readonly Workflow[]) => refusedStep(asked, places, opts.gates ?? [], formerModesWritten(opts.workflowDir), mounts);
+  const ask = (asked: readonly Workflow[]) =>
+    refusedStep(asked, places, opts.gates ?? [], formerModesWritten(opts.workflowDir), mounts, denied);
   const reading = ask(steps.map(({ writable: _, ...step }) => step));
   if (reading) return factoryMountRefusal(factory, `${workflow}/${reading.step.name}`, reading.why);
   const writing = ask(steps);
@@ -433,26 +431,13 @@ const folderRun = Effect.fn('folderRun')(function* (id: string, told: Told, step
 });
 
 /**
- * The verbs a repository run's place must declare for this build to run `steps` through it: `make` and `handoff` when the run cuts
- * worktrees (`isolate`) and a step forks or merges (`workspacePlan`); `status` and `land` when an ending lands on its check
- * (`landsOnCheck`).
- */
-export function placeVerbsNeeded(steps: readonly Workflow[], run: Pick<Run, 'gates'>, isolate: boolean): PlaceVerb[] {
-  const cuts = isolate && steps.some((step) => ['fork', 'merge'].includes(workspacePlan(steps, step).kind));
-  const lands = steps.some((step) => landsOnCheck(step, run));
-  return [...(cuts ? (['make', 'handoff'] as const) : []), ...(lands ? (['status', 'land'] as const) : [])];
-}
-
-/**
- * A repository run's record on `repo`, as the place `StartPlace` names opens it (`openPlace`): the commit HEAD is at, the branch checked
- * out there, and the place skill it ran. Fails with the place's refusal, or an `--after`'s (`afterRefusal`), where the runs it waits on
+ * A repository run's record on `repo`, as the place the program was given opens it (`openPlace`): the commit HEAD is at and the
+ * branch checked out there. Fails with the place's refusal, or an `--after`'s (`afterRefusal`), where the runs it waits on
  * stand read now (`standingLiveOf`).
  */
 const repositoryRun = Effect.fn('repositoryRun')(function* (id: string, told: Told, steps: Run['steps'], repo: string, isolate: boolean) {
-  const placeDir = yield* StartPlace;
-  const needed = placeVerbsNeeded(told.workflow ?? [], told, isolate);
-  const { opened, placeSkill } = yield* tried(() => openPlace(placeDir, repo, needed, isolate));
-  const { baseRef, branch, staged } = opened;
+  const place = yield* PlaceService;
+  const { baseRef, branch, staged } = yield* tried(() => openPlace(place, repo, isolate));
   const git = yield* standingLiveOf(told.after ?? []);
   const refusedAfter = yield* tried(() => afterRefusal(told.after ?? [], { repo, branch }, (id) => parentRecord(id, git)));
   if (refusedAfter) return yield* Effect.fail(new Invalid({ message: refusedAfter }));
@@ -464,7 +449,6 @@ const repositoryRun = Effect.fn('repositoryRun')(function* (id: string, told: To
     isolate,
     ...told,
     branch,
-    placeSkill,
     ...(staged === undefined ? {} : { stagedFile: staged }),
     steps,
     createdAt: new Date().toISOString(),
@@ -572,8 +556,10 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const places = placesOf(opts.repo);
   const factory = yield* tried(() => factoryNamed(opts.factory));
   const refused = yield* StartRefusal;
+  const { declared } = yield* PlaceService;
+  const denied = declared.denyWhileLanding;
   const steps = yield* tried(() =>
-    stepsToStart(opts.workflowDir, isolate, places, factory, opts.gates, refused, Boolean(opts.inputs?.length)),
+    stepsToStart(opts.workflowDir, isolate, places, denied, factory, opts.gates, refused, Boolean(opts.inputs?.length)),
   );
   const folder = isFolderTeam(steps);
   if (folder && opts.repoNamed) return yield* Effect.fail(new Invalid({ message: repoNamedRefusal(opts.repo) }));
@@ -589,7 +575,7 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const refusedContext = contextRefusal(opts.context ?? [], opts.after ?? [], runStore.runs.exists, id);
   if (refusedContext) return yield* Effect.fail(refusedContext);
   const mounts = mountsAt(factory, folder ? undefined : opts.repo);
-  const unmounted = mountRefusal(opts, steps, places, factory, folder ? undefined : opts.repo, mounts);
+  const unmounted = mountRefusal(opts, steps, places, factory, folder ? undefined : opts.repo, mounts, denied);
   if (unmounted) return yield* Effect.fail(new Invalid({ message: unmounted }));
   const told = toldOf(opts, steps, inputs, factory, mounts);
   const stepRecords = Object.fromEntries(steps.map((s) => [s.name, { taskId: null }]));

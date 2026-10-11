@@ -606,6 +606,9 @@ const prunedOf = (run: Run): RunDetail['pruned'] =>
       }
     : null;
 
+/** What `detail` reads of the app's services: the engine, the place, the store's root, and what it read before. */
+type Detailing = Pick<Served, 'e' | 'placeService' | 'home' | 'memo'>;
+
 /**
  * A run in full, judged off the views of its tasks; or, when its unfrozen folder does not load or a task it reads does not
  * (`judgedUnlessUnreadable`), why it is not judged, in the words the list says it with (`RunSummary.unreadable`), and nothing else: the
@@ -619,11 +622,11 @@ const prunedOf = (run: Run): RunDetail['pruned'] =>
  * timeline's rounds are of the loops of the steps the run is judged by. Read through the app's engine and root, what it read before kept in
  * its `memo`.
  */
-export async function detail(run: Run, { e, home, memo }: Pick<Served, 'e' | 'home' | 'memo'>): Promise<RunDetail | { unjudged: string }> {
+export async function detail(run: Run, { e, placeService, home, memo }: Detailing): Promise<RunDetail | { unjudged: string }> {
   const folder = workflowsOf(run, home);
   const workflows = folder.steps;
   const names = stepNames(run, workflows);
-  const { views, read } = await judgedOn(e, run, names, workflows);
+  const { views, read } = await judgedOn(e, placeService, run, names, workflows);
   if ('unreadable' in read) return { unjudged: read.unreadable };
   const judged = read.judged;
   const steps = judgedSteps(run, workflows);
@@ -685,7 +688,7 @@ export async function detail(run: Run, { e, home, memo }: Pick<Served, 'e' | 'ho
           spec: step ? specOf(step) : null,
           filed: filedOf(run.steps[name], views),
           body: step?.body ?? null,
-          ...toldOf(run, name, source, views),
+          ...toldOf(run, name, source, views, placeService),
           taskId,
           workspace: run.steps[name]?.workspace ?? null,
           ...filesOf(run, name),

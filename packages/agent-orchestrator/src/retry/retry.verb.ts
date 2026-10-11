@@ -19,6 +19,7 @@ import { strayAsk } from '../say/say.verb.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhasesRead } from '../views/views.verb.ts';
 import { Conflict, Invalid } from '../refusal/refusal.ts';
 import { landingDenies } from '../place/landing.store.ts';
+import { PlaceService } from '../place/place.store.ts';
 
 /**
  * A person's ask, written: the run, the ask and its file — and `stopFirst`, when the tick stops the step's blocked session before it files
@@ -71,7 +72,8 @@ export const retryRun = Effect.fn('retry')(function* (
   const refused = refusal((yield* tried(() => runStore.asks.read(id))).asks);
   if (refused) return yield* Effect.fail(new Conflict({ message: refused }));
   const step = steps.find((s) => s.name === stepName)!;
-  const refusedConfig = yield* tried(() => tryRefused(run, steps, step, how, spendOf));
+  const denied = landingDenies(run, yield* PlaceService);
+  const refusedConfig = yield* tried(() => tryRefused(run, steps, step, how, spendOf, denied));
   if (refusedConfig) return yield* Effect.fail(new Invalid({ message: refusedConfig }));
   const ask: RetryAsk = {
     step: stepName,
@@ -108,7 +110,14 @@ export const retryRun = Effect.fn('retry')(function* (
  * (`--model`, on a fresh try, and `--budget`), else the step's own (`filedRefusal`). A recheck files no session, and a step on a remote
  * agent is configured by its operator: neither is asked.
  */
-function tryRefused(run: Run, steps: readonly Workflow[], step: Workflow, how: RetryHow, spendOf: SpendOf): string | undefined {
+function tryRefused(
+  run: Run,
+  steps: readonly Workflow[],
+  step: Workflow,
+  how: RetryHow,
+  spendOf: SpendOf,
+  denied: readonly string[],
+): string | undefined {
   if (how.mode === 'recheck' || isRemoteHarness(step.harness)) return undefined;
   const record = run.steps[step.name];
   const budgetUsd = budgetUsdFor(how.budget ?? budgetOf(step, record), stepSpend(run, step.name, spendOf));
@@ -117,7 +126,7 @@ function tryRefused(run: Run, steps: readonly Workflow[], step: Workflow, how: R
     budgetUsd,
     ...filedAt(run),
     own: toldOf(run, step).own,
-    landingDenied: () => landingDenies(run),
+    landingDenied: () => denied,
   });
   const flags = { ...(how.mode === 'fresh' && how.model !== undefined && { model: how.model }), budget: how.budget };
   return filedRefusal((c) => configRefusal(step.harness ?? DEFAULT_HARNESS, c), step.name, config, lineOf(step, flags));

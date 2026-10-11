@@ -18,6 +18,7 @@ import { execFileSync } from 'node:child_process';
 import { scratch } from './scratch.ts';
 import { until, WAITED, type Waiter } from './waits.ts';
 import { Effect } from 'effect';
+import { runGiven, runOver } from './placed.ts';
 
 const ROOT = scratch('wf-agents-calls-');
 process.env.WF_ROOT = ROOT;
@@ -25,7 +26,9 @@ process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
 process.env.CLAUDE_CONFIG_DIR = scratch('wf-agents-calls-config-');
-const { engine, startRun, tickRun, runWith } = await import('../src/runner.ts');
+const { engine, startRun, tickRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
+const runPlaced = runGiven(gitPlaceLayer);
 const { readRun } = await import('../src/record/record.store.ts');
 const { freshRestMemo } = await import('../src/tick/tick.verb.ts');
 
@@ -119,7 +122,7 @@ const counted = async () => {
   return { calls: fake.agentsCalls() - before, done };
 };
 
-const jobRun = await Effect.runPromise(startRun({ brief: 'a job', repo: REPO, workflowDir: folder() }));
+const jobRun = await runPlaced(startRun({ brief: 'a job', repo: REPO, workflowDir: folder() }));
 let bgRun: Effect.Success<ReturnType<typeof startRun>>;
 
 /** What the pass judged of a run. */
@@ -146,7 +149,7 @@ test(
   'a pass with one background session in flight asks `claude agents` once, beside a job — advance adds no observe of its own',
   WAITED,
   async (t) => {
-    bgRun = await Effect.runPromise(startRun({ brief: 'a background session', repo: REPO, workflowDir: folder('background: true\n') }));
+    bgRun = await runPlaced(startRun({ brief: 'a background session', repo: REPO, workflowDir: folder('background: true\n') }));
     const bg = await atWork(t, bgRun.id);
     const { calls, done } = await counted();
     assert.equal(calls, 1, "one `claude agents` for the runtime's observe, and none for the step advance reads");

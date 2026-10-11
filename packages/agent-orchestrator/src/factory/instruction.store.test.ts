@@ -9,13 +9,23 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import { promised } from '../../test/promised.ts';
+import { runOver } from '../../test/placed.ts';
 
 const ROOT = scratch('wf-instruction-');
 const FACTORIES = path.join(ROOT, 'factories');
 
 process.env.WF_ROOT = ROOT;
-const { readFactories, readFactory, setInstruction, FACTORY_INSTRUCT, FACTORY_INSTRUCTION, factoryInstruction, runWith } =
-  await import('../runner.ts');
+const {
+  readFactories,
+  readFactory,
+  setInstruction,
+  FACTORY_INSTRUCT,
+  FACTORY_INSTRUCTION,
+  factoryInstruction,
+  runWith: runEngine,
+  gitPlaceLayer,
+} = await import('../runner.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
 const { readInstructionAt, writeInstructionText } = await import('./instruction.store.ts');
 const { main } = await import('../cli/main.ts');
 

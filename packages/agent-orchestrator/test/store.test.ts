@@ -40,6 +40,10 @@ import { isRepositoryRun, shownNote, shownStatus, SIGNOFF } from '../src/run.ts'
 import { promised } from './promised.ts';
 import { Effect } from 'effect';
 import { plainEngine } from './promised.ts';
+import { givenPlace, runGiven, runOver } from './placed.ts';
+import type { PlaceService } from '../src/place/place.store.ts';
+import type { PlaceOutcome } from '../src/place/place.ts';
+import { placeOver, unreadBy } from './place-over.ts';
 
 const ROOT = scratch('wf-store-');
 const WORKFLOW = path.join(ROOT, 'workflow');
@@ -76,16 +80,21 @@ const {
   startRun,
   startPlan,
   stepsOf,
-  runWith,
+  runWith: runEngine,
+  gitPlaceLayer,
+  shippedGitPlace,
   standingLiveOf,
 } = await import('../src/runner.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
+const runPlaced = runGiven(gitPlaceLayer);
+const placed = givenPlace(gitPlaceLayer);
 /** A run as one waiting on it reads it, where its branches stand asked now, as a person's verb asks them (`standingLiveOf`). */
 const parentNow = (id: string) => standingLiveOf([id]).pipe(Effect.flatMap((git) => parentRead(id, git)));
 const { listRuns, markCancelled, readAnswers, readAsks, readRun } = await import('../src/record/record.store.ts');
 const { passStanding } = await import('../src/standing/standing.verb.ts');
 /** A pass's read of where every run's branches stand, written to `standing.json` as the tick writes it: what `nemia ls` reads. */
 const aPass = (e: Engine) => runWith(e, passStanding(listRuns()));
-const { RunPlace, SHIPPED_PLACE } = await import('../src/place/place.store.ts');
+const { PlaceService: PlaceTag } = await import('../src/place/place.store.ts');
 
 /** A run record over `/repo`, without worktrees: a test of the record, not of git. */
 const aRun = (id: string, steps: Run['steps']): Run => ({
@@ -318,22 +327,22 @@ const recording = () => {
 test("REFUSED at shipped defaults: a run is never started under an id the store has — a record, the asks one left, or a run's directory", async (t) => {
   let draws = 0;
   t.mock.method(Math, 'random', () => (draws++ === 0 ? 0.5 : draws / 97));
-  const first = await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: WORKFLOW, isolate: false }));
+  const first = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: WORKFLOW, isolate: false }));
   draws = 0;
-  const second = await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: WORKFLOW, isolate: false }));
+  const second = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: WORKFLOW, isolate: false }));
   assert.notEqual(second.id, first.id, "the id drawn again: the first run's record has it");
 
   const runs = path.join(ROOT, 'runs');
   fs.rmSync(path.join(runs, `${first.id}.json`));
   fs.mkdirSync(path.join(runs, `${first.id}.asks`));
   draws = 0;
-  const third = await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: WORKFLOW, isolate: false }));
+  const third = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: WORKFLOW, isolate: false }));
   assert.notEqual(third.id, first.id, 'drawn again: the asks its record left have the id');
 
   fs.rmSync(path.join(runs, `${first.id}.asks`), { recursive: true });
   fs.mkdirSync(path.join(runs, first.id));
   draws = 0;
-  const fourth = await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: WORKFLOW, isolate: false }));
+  const fourth = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: WORKFLOW, isolate: false }));
   assert.notEqual(fourth.id, first.id, "drawn again: the run's own directory has the id");
   assert.deepEqual(
     [first, second, third, fourth].map((run) => run.id.replace(/-[^-]+$/, '')),
@@ -346,7 +355,7 @@ test('a run reads the workflow it froze at `nemia start` — the folder edited a
   const folder = fs.mkdtempSync(path.join(ROOT, 'frozen-'));
   fs.writeFileSync(path.join(folder, 'implement.md'), '---\nplace: git\n---\nimplement it as asked\n');
   fs.writeFileSync(path.join(folder, 'review.md'), '---\nafter: implement\nplace: git\n---\nreview it\n');
-  const run = await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: folder, isolate: false }));
+  const run = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: folder, isolate: false }));
 
   fs.writeFileSync(path.join(folder, 'implement.md'), '---\nplace: git\n---\nsomething else entirely\n');
   fs.rmSync(path.join(folder, 'review.md'));
@@ -514,7 +523,7 @@ const repositoryRunOf = (run: Run): RepositoryRun => {
 
 /** `nemia start`, for real, over a fresh repository, the steps working in the checkout itself. */
 const started = async (dir: string) =>
-  repositoryRunOf(await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: dir, isolate: false })));
+  repositoryRunOf(await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: dir, isolate: false })));
 
 test('no `check:` → the run never files a check task, from the first pass to the last', async () => {
   const run = await started(folder());
@@ -694,10 +703,10 @@ test('REFUSED at shipped defaults: a hand-off the place refuses is not marked do
   await runWith(e, advanceRun(readRun(run.id)));
   fs.writeFileSync(path.join(run.repo, 'half-done.txt'), 'work\n');
   settle(`${run.id}-implement`, 'failed');
-  const place = placeAnswering('handoff', `process.stdout.write('{"refused":"a hook said no"}');`);
+  const place = placeAnswering('handoff', { refused: 'a hook said no' });
 
   for (const pass of [1, 2]) {
-    const ticked = await runWith(e, advanceRun(readRun(run.id)).pipe(Effect.provideService(RunPlace, () => place.dir)));
+    const ticked = await runWith(e, advanceRun(readRun(run.id)).pipe(Effect.provide(place.layer)));
     assert.deepEqual(ticked.notes, ['implement: not handed off — the place refused: a hook said no; asked again on the next pass']);
     assert.equal(readRun(run.id).steps.implement.handedOff, undefined, `pass ${pass}: not marked`);
     assert.equal(place.asked(), pass, `pass ${pass}: the place was asked`);
@@ -746,7 +755,7 @@ test("a step named for another step's check is refused at `nemia start`, before 
   const dir = folder('check: npm test');
   fs.writeFileSync(path.join(dir, 'implement-check.md'), '---\nplace: git\n---\na step of its own\n');
   await assert.rejects(
-    async () => await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: dir })),
+    async () => await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: dir })),
     (err: Error & { exitCode?: number }) =>
       err.exitCode === 2 && /implement-check/.test(err.message) && /Rename implement-check\.md/.test(err.message),
     'refused for its name, with worktrees: without them a second root is refused first, for running beside `implement`',
@@ -986,7 +995,7 @@ test('`nemia start` refuses an `output:` file that is not there, and an `input:`
   const early = reviewed('input: review\n');
   fs.writeFileSync(path.join(early, 'respond.md'), '---\nafter: implement\ninput: review\nplace: git\n---\nanswer it\n');
   await assert.rejects(
-    async () => await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: early })),
+    async () => await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: early })),
     (err: Error & { exitCode?: number }) =>
       err.exitCode === 2 && /respond: `input: review`, but respond does not wait on review/.test(err.message),
   );
@@ -1034,7 +1043,7 @@ test("a declared file in the step's files directory counts when it is there, is 
   ];
 
   assert.deepEqual(
-    missingArtifacts(readRun(run.id), 'implement', declaring(declared)),
+    missingArtifacts(shippedGitPlace, readRun(run.id), 'implement', declaring(declared)),
     [
       { path: path.join(files, 'never-written.png'), why: 'missing' },
       { path: path.join(files, 'shots'), why: 'missing' },
@@ -1071,7 +1080,7 @@ test("an absolute path outside the step's files directory is refused, and never 
     (method) => t.mock.method(fs, method as 'statSync'),
   );
   assert.deepEqual(
-    missingArtifacts(readRun(run.id), 'implement', declaring(outside)),
+    missingArtifacts(shippedGitPlace, readRun(run.id), 'implement', declaring(outside)),
     outside.map((p) => ({ path: p, why: 'outside' })),
     'every one is a file that exists, which looking would have found',
   );
@@ -1082,7 +1091,7 @@ test("an absolute path outside the step's files directory is refused, and never 
 
   fs.symlinkSync(secret, path.join(files, 'link.txt'));
   assert.deepEqual(
-    missingArtifacts(readRun(run.id), 'implement', declaring([path.join(files, 'link.txt')])),
+    missingArtifacts(shippedGitPlace, readRun(run.id), 'implement', declaring([path.join(files, 'link.txt')])),
     [{ path: path.join(files, 'link.txt'), why: 'missing' }],
     'a link inside the directory that leads out is as outside as where it leads',
   );
@@ -1119,7 +1128,7 @@ const aNodeRepo = (include?: string): string => {
 };
 
 /** `nemia start` as a person types it: worktrees, the default. */
-const isolated = async (repo: string) => await Effect.runPromise(startRun({ brief: 'add a flag', repo, workflowDir: folder() }));
+const isolated = async (repo: string) => await runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: folder() }));
 
 test("a step's worktree gets what .worktreeinclude lists from the main checkout — a file, a directory — and a node_modules of its own, never a copy", async () => {
   const repo = aNodeRepo(
@@ -1219,7 +1228,7 @@ test('nemia start refuses a .worktreeinclude line outside the repository, by nam
   );
   assert.equal(fs.readdirSync(path.join(ROOT, 'runs')).length, runs);
   assert.ok(
-    await Effect.runPromise(startRun({ brief: 'add a flag', repo, workflowDir: folder(), isolate: false })),
+    await runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: folder(), isolate: false })),
     '--no-worktree cuts nothing and copies nothing, so it has nothing to refuse',
   );
   assert.ok(
@@ -1295,29 +1304,24 @@ test('a pass that dies after cutting a worktree does not wedge every pass after 
   assert.equal(readRun(run.id).steps.implement?.workspace, wt, 'in the worktree that pass cut');
 });
 
-/** A copy of the package's place whose `verb` runs `body`, each call first appending a line to `asked` in the copy. */
-function placeAnswering(verb: 'make' | 'handoff', body: string): { dir: string; asked: () => number } {
-  const dir = path.join(scratch('wf-store-place-'), 'git');
-  fs.cpSync(SHIPPED_PLACE, dir, { recursive: true });
-  const asked = path.join(dir, 'asked');
-  fs.writeFileSync(
-    path.join(dir, 'scripts', `${verb}.ts`),
-    `import fs from 'node:fs';\nfs.appendFileSync(${JSON.stringify(asked)}, '${verb}\\n');\n${body}\n`,
-  );
-  return { dir, asked: () => (fs.existsSync(asked) ? fs.readFileSync(asked, 'utf8').split('\n').length - 1 : 0) };
+/** The package's place whose `verb` answers `outcome`, each call counted in `asked`, as the layer a pass is given it by. */
+function placeAnswering<V extends 'make' | 'handoff'>(verb: V, outcome: PlaceOutcome<V>) {
+  let asked = 0;
+  const answer = () => {
+    asked += 1;
+    return outcome;
+  };
+  return { layer: PlaceTag.layer(placeOver(shippedGitPlace, { [verb]: answer })), asked: () => asked };
 }
 
 test('REFUSED at shipped defaults: a make that answers a workspace other than the one it was asked for is read as not heard — the step is not filed, the notes say both, its record holds no workspace, and the next pass asks again', async () => {
   const run = await isolated(aNodeRepo());
   const elsewhere = scratch('wf-store-elsewhere-');
-  const place = placeAnswering(
-    'make',
-    `process.stdout.write(JSON.stringify({ workspace: ${JSON.stringify(elsewhere)}, branch: 'b', conflicts: [], notes: [] }));`,
-  );
+  const place = placeAnswering('make', { answer: { workspace: elsewhere, branch: 'b', conflicts: [], notes: [] } });
   const { e, filings } = board();
   const at = path.join(ROOT, 'worktrees', run.id, 'implement');
   for (const pass of [1, 2]) {
-    const ticked = await runWith(e, advanceRun(readRun(run.id)).pipe(Effect.provideService(RunPlace, () => place.dir)));
+    const ticked = await runWith(e, advanceRun(readRun(run.id)).pipe(Effect.provide(place.layer)));
     assert.deepEqual(ticked.notes, [
       `implement: not cut — the place's make answered ${elsewhere}, where it was asked for ${at}: read as not heard, and asked again on the next pass`,
     ]);
@@ -1333,15 +1337,13 @@ test('REFUSED at shipped defaults: a make that answers a workspace other than th
 test('a make the place refuses, or that is not heard, files nothing and leaves no workspace or branch on the record, saying why', async () => {
   const run = await isolated(aNodeRepo());
   const { e, filings } = board();
-  for (const [body, said] of [
-    [`process.stdout.write('{"refused":"no room"}');`, 'the place refused: no room'],
-    [
-      `process.stderr.write('fatal: broke\\n');\nprocess.exit(1);`,
-      "the place's make was not heard: fatal: broke; asked again on the next pass",
-    ],
-  ]) {
-    const place = placeAnswering('make', body);
-    const ticked = await runWith(e, advanceRun(readRun(run.id)).pipe(Effect.provideService(RunPlace, () => place.dir)));
+  const outcomes: Array<[PlaceOutcome<'make'>, string]> = [
+    [{ refused: 'no room' }, 'the place refused: no room'],
+    [unreadBy('make', 'fatal: broke'), "the place's make was not heard: fatal: broke; asked again on the next pass"],
+  ];
+  for (const [outcome, said] of outcomes) {
+    const place = placeAnswering('make', outcome);
+    const ticked = await runWith(e, advanceRun(readRun(run.id)).pipe(Effect.provide(place.layer)));
     assert.deepEqual([ticked.notes, ticked.filed, filings], [[`implement: not cut — ${said}`], [], []]);
     const step = readRun(run.id).steps.implement;
     assert.ok(!('workspace' in step) && !('branch' in step), JSON.stringify(step));
@@ -1635,7 +1637,7 @@ test("a step named for another step's try is refused at `nemia start`, before an
   fs.writeFileSync(path.join(dir, 'implement-try2.md'), '---\nafter: implement\nplace: git\n---\na step of its own\n');
   const runs = fs.readdirSync(path.join(ROOT, 'runs')).length;
   await assert.rejects(
-    async () => await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: dir })),
+    async () => await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: dir })),
     (err: Error & { exitCode?: number }) =>
       err.exitCode === 2 &&
       err.message.startsWith("implement-try2: a step may not be named for another step's try") &&
@@ -2509,9 +2511,7 @@ test("a codex step of a repository run is filed with `codex.trustFrom` the real 
   const link = path.join(scratch('wf-linked-'), 'repo');
   fs.symlinkSync(real, link);
   const run = repositoryRunOf(
-    await Effect.runPromise(
-      startRun({ brief: 'add a flag', repo: link, workflowDir: looped('', 'harness: codex\nretries: 1\n'), isolate: false }),
-    ),
+    await runPlaced(startRun({ brief: 'add a flag', repo: link, workflowDir: looped('', 'harness: codex\nretries: 1\n'), isolate: false })),
   );
   assert.equal(run.repo, link, 'the record keeps the path the run was started with');
   const trusted = { trustFrom: fs.realpathSync(real) };
@@ -2536,7 +2536,7 @@ test("a codex step of a repository run is filed with `codex.trustFrom` the real 
 
   const team = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   fs.writeFileSync(path.join(team, 'write.md'), '---\nworkspace: folder\nharness: codex\n---\nwrite the note\n');
-  const inFolders = await Effect.runPromise(startRun({ brief: 'a note', repo: scratch('wf-not-a-repo-'), workflowDir: team }));
+  const inFolders = await runPlaced(startRun({ brief: 'a note', repo: scratch('wf-not-a-repo-'), workflowDir: team }));
   assert.equal(isRepositoryRun(inFolders), false);
   await runWith(b.e, advanceRun(readRun(inFolders.id)));
   const written = b.tasks.get(`${inFolders.id}-write`)!.spec;
@@ -2547,7 +2547,7 @@ test("a codex step of a repository run is filed with `codex.trustFrom` the real 
 test('a codex try of a run whose repository is gone is filed with no `codex.trustFrom`, rather than throwing out of the pass', async () => {
   const repo = aRepo();
   const run = repositoryRunOf(
-    await Effect.runPromise(startRun({ brief: 'add a flag', repo, workflowDir: folder('harness: codex\ncheck: npm test\nretries: 1') })),
+    await runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: folder('harness: codex\ncheck: npm test\nretries: 1') })),
   );
   const b = board();
   await runWith(b.e, advanceRun(readRun(run.id)));
@@ -2695,7 +2695,7 @@ test("a run's first steps are every step that waits on nothing: two roots with n
   fs.writeFileSync(path.join(dir, 'left.md'), '---\nplace: git\n---\nthe left half\n');
   fs.writeFileSync(path.join(dir, 'right.md'), '---\nplace: git\n---\nthe right half\n');
   fs.writeFileSync(path.join(dir, 'join.md'), '---\nafter: left, right\nplace: git\n---\njoin them\n');
-  const run = await Effect.runPromise(startRun({ brief: 'two halves', repo: aRepo(), workflowDir: dir }));
+  const run = await runPlaced(startRun({ brief: 'two halves', repo: aRepo(), workflowDir: dir }));
   const b = board();
   assert.deepEqual((await runWith(b.e, advanceRun(readRun(run.id)))).filed.sort(), ['left', 'right']);
   b.settle(`${run.id}-left`, 'succeeded', SIGNED);
@@ -2710,7 +2710,7 @@ test("a fan-in whose two parents wrote one file differently is filed told the pa
   fs.writeFileSync(path.join(dir, 'right.md'), '---\nplace: git\n---\nthe right half\n');
   fs.writeFileSync(path.join(dir, 'join.md'), '---\nafter: left, right\nplace: git\n---\njoin them\n');
   const joined = async (left: [string, string], right: [string, string]) => {
-    const run = await Effect.runPromise(startRun({ brief: 'two halves', repo: aRepo(), workflowDir: dir }));
+    const run = await runPlaced(startRun({ brief: 'two halves', repo: aRepo(), workflowDir: dir }));
     const b = board();
     assert.deepEqual((await runWith(b.e, advanceRun(readRun(run.id)))).filed.sort(), ['left', 'right']);
     for (const [step, [file, text]] of [
@@ -3395,7 +3395,7 @@ const aParent = async (
     brief = 'the parent',
   }: { work?: string; signed?: boolean; workflowDir?: string; brief?: string } = {},
 ) => {
-  const run = repositoryRunOf(await Effect.runPromise(startRun({ brief, repo, workflowDir: workflowDir ?? oneStep() })));
+  const run = repositoryRunOf(await runPlaced(startRun({ brief, repo, workflowDir: workflowDir ?? oneStep() })));
   await runWith(b.e, advanceRun(readRun(run.id)));
   const wt = readRun(run.id).steps.implement.workspace!;
   if (work) {
@@ -3414,7 +3414,7 @@ test("REFUSED at shipped defaults: a run whose parent has not shipped files noth
   const repo = aRepo();
   const c = board();
   const p = await aParent(repo, c);
-  const child = await Effect.runPromise(startRun({ brief: 'the child', repo, workflowDir: folder(), after: [p.run.id] }));
+  const child = await runPlaced(startRun({ brief: 'the child', repo, workflowDir: folder(), after: [p.run.id] }));
   assert.deepEqual(readRun(child.id).after, [p.run.id], 'frozen on the record');
   const filings = [...c.filings];
   for (let pass = 0; pass < 3; pass++) {
@@ -3479,9 +3479,7 @@ test("REFUSED before review, now shipped: a parent whose step signs off with not
   const repo = aRepo();
   const c = board();
   const p = await aParent(repo, c);
-  const child = await Effect.runPromise(
-    startRun({ brief: 'the child of a change already made', repo, workflowDir: folder(), after: [p.run.id] }),
-  );
+  const child = await runPlaced(startRun({ brief: 'the child of a change already made', repo, workflowDir: folder(), after: [p.run.id] }));
   assert.deepEqual(
     (await runWith(c.e, advanceRun(readRun(child.id)))).filed,
     [],
@@ -3499,7 +3497,7 @@ test("REFUSED before review, now shipped: a parent whose step signs off with not
   assert.equal((await runWith(c.e, parentNow(p.run.id))).shipped, true, 'the gate says what its `nemia decide` says');
   const r = await runWith(c.e, advanceRun(readRun(child.id)));
   assert.deepEqual([r.filed, r.waiting], [['implement'], []]);
-  assert.deepEqual((await Effect.runPromise(startRun({ brief: 'another child', repo, workflowDir: folder(), after: [p.run.id] }))).after, [
+  assert.deepEqual((await runPlaced(startRun({ brief: 'another child', repo, workflowDir: folder(), after: [p.run.id] }))).after, [
     p.run.id,
   ]);
 });
@@ -3516,8 +3514,8 @@ test("REFUSED before review, now shipped: a parent merged and then its branch de
     { [p.branch]: tip },
     "the parent's own pass, as `nemia up` makes one over every run: it has finished, so it records its result branch's tip",
   );
-  const early = await Effect.runPromise(startRun({ brief: 'the early child', repo, workflowDir: folder(), after: [p.run.id] }));
-  const late = await Effect.runPromise(startRun({ brief: 'the late child', repo, workflowDir: folder(), after: [p.run.id] }));
+  const early = await runPlaced(startRun({ brief: 'the early child', repo, workflowDir: folder(), after: [p.run.id] }));
+  const late = await runPlaced(startRun({ brief: 'the late child', repo, workflowDir: folder(), after: [p.run.id] }));
   gitIn(repo, 'merge', '-q', '--no-ff', '-m', 'Merge the parent', p.branch);
   assert.deepEqual((await runWith(c.e, advanceRun(readRun(early.id)))).filed, ['implement']);
 
@@ -3545,10 +3543,9 @@ test("REFUSED before review, now shipped: a parent merged and then its branch de
 
   const r = await runWith(c.e, advanceRun(readRun(late.id)));
   assert.deepEqual([r.filed, r.waiting], [['implement'], []], 'on the base is shipped');
-  assert.deepEqual(
-    (await Effect.runPromise(startRun({ brief: 'the latest child', repo, workflowDir: folder(), after: [p.run.id] }))).after,
-    [p.run.id],
-  );
+  assert.deepEqual((await runPlaced(startRun({ brief: 'the latest child', repo, workflowDir: folder(), after: [p.run.id] }))).after, [
+    p.run.id,
+  ]);
 });
 
 test("the diamond's D, after B and C: B merged and its branch deleted while C is still running — D says `waiting on C` alone, and files its roots on the pass after C ships, from a base with both", async () => {
@@ -3556,7 +3553,7 @@ test("the diamond's D, after B and C: B merged and its branch deleted while C is
   const c = board();
   const b = await aParent(repo, c, { work: 'b.txt' });
   const cc = await aParent(repo, c, { work: 'c.txt', signed: false });
-  const d = await Effect.runPromise(startRun({ brief: 'd, after b and c', repo, workflowDir: folder(), after: [b.run.id, cc.run.id] }));
+  const d = await runPlaced(startRun({ brief: 'd, after b and c', repo, workflowDir: folder(), after: [b.run.id, cc.run.id] }));
   await runWith(c.e, advanceRun(readRun(b.run.id)));
   gitIn(repo, 'merge', '-q', '--no-ff', '-m', 'Merge B', b.branch);
   gitIn(repo, 'worktree', 'remove', '--force', b.wt);
@@ -3593,7 +3590,7 @@ test('REFUSED at shipped defaults: a parent dropped unmerged after its tip was r
   const dropped = await aParent(repo, c, { work: 'dropped.txt' });
   await runWith(c.e, advanceRun(readRun(dropped.run.id)));
   const unseen = await aParent(repo, c, { work: 'unseen.txt' });
-  const child = await Effect.runPromise(
+  const child = await runPlaced(
     startRun({ brief: 'the child of work that is gone', repo, workflowDir: folder(), after: [dropped.run.id, unseen.run.id] }),
   );
   gitIn(repo, 'merge', '-q', '--no-ff', '-m', 'Merge the unseen parent', unseen.branch);
@@ -3627,7 +3624,7 @@ test('REFUSED at shipped defaults: a parent dropped unmerged after its tip was r
   const before = runsWritten();
   for (const p of [dropped, unseen]) {
     await assert.rejects(
-      async () => await Effect.runPromise(startRun({ brief: 'another child', repo, workflowDir: folder(), after: [p.run.id] })),
+      async () => await runPlaced(startRun({ brief: 'another child', repo, workflowDir: folder(), after: [p.run.id] })),
       refusedWith(
         new RegExp(
           `^--after ${escaped(p.run.id)}: ${escaped(p.branch)} is gone, and git cannot find it on ${escaped(p.run.branch)}, so this run would wait for ever\\.`,
@@ -3642,9 +3639,7 @@ test('REFUSED at shipped defaults: a run whose parent was cancelled files nothin
   const repo = aRepo();
   const c = board();
   const p = await aParent(repo, c, { work: 'parent.txt' });
-  const child = await Effect.runPromise(
-    startRun({ brief: 'the child of a cancelled run', repo, workflowDir: folder(), after: [p.run.id] }),
-  );
+  const child = await runPlaced(startRun({ brief: 'the child of a cancelled run', repo, workflowDir: folder(), after: [p.run.id] }));
   const at = markCancelled(p.run.id);
   const filings = [...c.filings];
   for (let pass = 0; pass < 2; pass++) {
@@ -3700,12 +3695,12 @@ test("REFUSED at `nemia start`, before a run is written: --after an unknown run,
   const other = await aParent(aRepo(), b, { work: 'other.txt' });
   const called = await aParent(repo, b, { work: 'called.txt' });
   markCancelled(called.run.id);
-  const direct = await Effect.runPromise(startRun({ brief: 'the direct parent', repo, workflowDir: oneStep(), isolate: false }));
+  const direct = await runPlaced(startRun({ brief: 'the direct parent', repo, workflowDir: oneStep(), isolate: false }));
   const before = runsWritten();
   const starting =
     (...after: string[]) =>
     async () =>
-      await Effect.runPromise(startRun({ brief: 'a child', repo, workflowDir: folder(), after }));
+      await runPlaced(startRun({ brief: 'a child', repo, workflowDir: folder(), after }));
 
   await assert.rejects(starting('no-such-run-zz9z'), refusedWith(/^--after no-such-run-zz9z: the store has no run no-such-run-zz9z\./));
   await assert.rejects(starting(p.run.id, p.run.id), refusedWith(new RegExp(`^--after ${escaped(p.run.id)} is given twice`)));
@@ -3842,7 +3837,7 @@ test("REFUSED at shipped defaults: a one-step run whose step failed with nothing
     '`nemia decide` shows the failure',
   );
   assert.equal((await runWith(c.e, parentNow(p.run.id))).shipped, false);
-  const child = await Effect.runPromise(startRun({ brief: 'the child of a failure', repo, workflowDir: folder(), after: [p.run.id] }));
+  const child = await runPlaced(startRun({ brief: 'the child of a failure', repo, workflowDir: folder(), after: [p.run.id] }));
   for (let pass = 0; pass < 3; pass++) {
     const r = await runWith(c.e, advanceRun(readRun(child.id)));
     assert.deepEqual([r.filed, r.waiting], [[], [{ run: p.run.id }]], `pass ${pass + 1}`);
@@ -3858,7 +3853,7 @@ test("REFUSED at shipped defaults: a one-step run whose step failed with nothing
     { kind: 'shipped', branches: [q.branch] },
     'its step failed, and a person merged what it committed: shipped, whatever the step said',
   );
-  const next = await Effect.runPromise(startRun({ brief: 'the child of merged work', repo, workflowDir: folder(), after: [q.run.id] }));
+  const next = await runPlaced(startRun({ brief: 'the child of merged work', repo, workflowDir: folder(), after: [q.run.id] }));
   assert.deepEqual((await runWith(c.e, advanceRun(readRun(next.id)))).filed, ['implement']);
 });
 
@@ -4294,7 +4289,7 @@ test("REFUSED: nemia plan of a card on the repository whose .worktreeinclude its
   fs.writeFileSync(path.join(repo, '.worktreeinclude'), '../x\n');
   const plan = aPlan(() => ({ 'a.md': cardText(`workflow: ${oneStep()}`, 'the root') }));
   const before = runsWritten();
-  await assert.rejects(Effect.runPromise(startPlan({ dir: plan, repo })), (err: Error & { exitCode?: number }) => {
+  await assert.rejects(runPlaced(startPlan({ dir: plan, repo })), (err: Error & { exitCode?: number }) => {
     assert.equal(
       err.message,
       `${path.join(repo, '.worktreeinclude')}: "../x" is outside the repository. Each line is a gitignored path inside the repository, relative to its root — fix or remove that line.`,
@@ -4320,7 +4315,7 @@ test('a `start()` that refuses part-way stops the plan: the runs already started
     if (++calls === 3) return Effect.die(Object.assign(new Error('the disk is full'), { exitCode: 1 }));
     return startRun(opts);
   };
-  const { started, stopped, folderOf } = await Effect.runPromise(startPlan({ dir: plan, repo, start }));
+  const { started, stopped, folderOf } = await runPlaced(startPlan({ dir: plan, repo, start }));
   assert.deepEqual(
     [started.map((p) => p.card.name), stopped?.card.name, stopped?.error.message, stopped?.rest.map((c) => c.name)],
     [['a', 'b'], 'c', 'the disk is full', ['d']],
@@ -4349,7 +4344,7 @@ test("a run that waited on runs has its roots filed with `## From run <parent>` 
   const q = await aParent(repo, c, { work: 'second.txt', brief: 'Store the flag' });
   assert.doesNotMatch(c.tasks.get(`${p.run.id}-implement`)!.spec.brief, /## From run/, 'a run without `after` is given none');
 
-  const child = await Effect.runPromise(startRun({ brief: 'Show the flag', repo, workflowDir: folder(), after: [p.run.id, q.run.id] }));
+  const child = await runPlaced(startRun({ brief: 'Show the flag', repo, workflowDir: folder(), after: [p.run.id, q.run.id] }));
   for (const parent of [p, q]) gitIn(repo, 'merge', '-q', '--no-ff', '-m', `Merge ${parent.run.id}`, parent.branch);
   const r = await runWith(c.e, advanceRun(readRun(child.id)));
   assert.deepEqual([r.filed, r.waiting], [['implement'], []]);
@@ -4384,7 +4379,7 @@ test('REFUSED to fail the filing: a parent whose closeout cannot be read — a f
     gitIn(repo, 'merge', '-q', '--no-ff', '-m', `Merge ${parent.run.id}`, parent.branch);
     assert.deepEqual((await runWith(c.e, decideRun(parent.run.id))).decision, { kind: 'shipped', branches: [parent.branch] });
   }
-  const child = await Effect.runPromise(
+  const child = await runPlaced(
     startRun({
       brief: 'the child of work merged without a word',
       repo,
@@ -4409,9 +4404,7 @@ test('REFUSED to wait on context: a run handed only a run still in flight files 
   const repo = aRepo();
   const c = board();
   const source = await aParent(repo, c, { work: 'source.txt', signed: false });
-  const child = await Effect.runPromise(
-    startRun({ brief: 'Read what the source has', repo, workflowDir: folder(), context: [source.run.id] }),
-  );
+  const child = await runPlaced(startRun({ brief: 'Read what the source has', repo, workflowDir: folder(), context: [source.run.id] }));
   assert.deepEqual(readRun(child.id).context, [source.run.id], 'frozen on the record');
   const r = await runWith(c.e, advanceRun(readRun(child.id)));
   assert.deepEqual([r.filed, r.waiting], [['implement'], []]);
@@ -4427,7 +4420,7 @@ test('REFUSED to wait on context: a run after one run and handed another waits f
   const c = board();
   const waited = await aParent(repo, c, { work: 'waited.txt' });
   const read = await aParent(repo, c, { work: 'read.txt', signed: false });
-  const child = await Effect.runPromise(
+  const child = await runPlaced(
     startRun({ brief: 'the child', repo, workflowDir: folder(), after: [waited.run.id], context: [read.run.id] }),
   );
   const before = await runWith(c.e, advanceRun(readRun(child.id)));
@@ -4457,9 +4450,7 @@ test('`nemia concluded` prints the section the tick hands a run started with `--
   });
   const { main } = await import('../src/cli/main.ts');
   await main(['concluded', source.run.id], c.e);
-  const child = await Effect.runPromise(
-    startRun({ brief: 'Read what the source has', repo, workflowDir: folder(), context: [source.run.id] }),
-  );
+  const child = await runPlaced(startRun({ brief: 'Read what the source has', repo, workflowDir: folder(), context: [source.run.id] }));
   await runWith(c.e, advanceRun(readRun(child.id)));
   const brief = c.tasks.get(`${child.id}-implement`)!.spec.brief;
   const at = brief.indexOf(`\n## From run ${source.run.id}\n`);
@@ -4780,7 +4771,7 @@ test("REFUSED before, now in order: `nemia start` on `plan → implement ⇄ rev
 });
 
 test("`nemia decide` prints each step in the order the steps run — on a record keyed in the folder's order too", async (t) => {
-  const run = await Effect.runPromise(startRun({ brief: 'plan the flag', repo: aRepo(), workflowDir: plannedFolder(), isolate: false }));
+  const run = await runPlaced(startRun({ brief: 'plan the flag', repo: aRepo(), workflowDir: plannedFolder(), isolate: false }));
   const b = board();
   for (const name of ['plan', 'implement', 'review']) {
     assert.deepEqual(
@@ -4875,7 +4866,7 @@ test("`nemia start --input` copies each file into the run's own inputs/, freezes
   await main(['decide', id], b.e);
   assert.deepEqual(printed[0].split('\n').slice(0, 2), [`${id}  add a flag`, `  inputs  mock.png, brief notes.md  —  in ${dir}`]);
 
-  const plain = await Effect.runPromise(startRun({ brief: 'add a flag', repo, workflowDir: folder(), isolate: false }));
+  const plain = await runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: folder(), isolate: false }));
   assert.equal(
     Object.hasOwn(JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${plain.id}.json`), 'utf8')), 'inputs'),
     false,
@@ -4897,7 +4888,7 @@ test('REFUSED at `nemia start`, before a run is written: an --input that is not 
   const starting =
     (...inputs: string[]) =>
     async () =>
-      await Effect.runPromise(startRun({ brief: 'a run with files', repo, workflowDir: folder(), isolate: false, inputs }));
+      await runPlaced(startRun({ brief: 'a run with files', repo, workflowDir: folder(), isolate: false, inputs }));
   await assert.rejects(
     starting(path.join(given, 'a', 'notes.md'), path.join(given, 'nope.png')),
     refusedWith(
@@ -4965,7 +4956,7 @@ test('REFUSED at shipped defaults: a file a step names through a folder a harnes
   assert.deepEqual([pass.checked, pass.notes], [['implement'], [`implement: collected notes/x.md into ${files}`]]);
   assert.equal(fs.readFileSync(path.join(files, 'notes', 'x.md'), 'utf8'), '# notes/x.md\n', 'a file anywhere else is handed over');
   assert.ok(!fs.existsSync(path.join(files, '.claude')), 'nothing under the configuration folder reaches the files directory');
-  assert.deepEqual(missingArtifacts(readRun(run.id), 'implement', declaring(named)), [
+  assert.deepEqual(missingArtifacts(shippedGitPlace, readRun(run.id), 'implement', declaring(named)), [
     { path: '.claude/skills/x/SKILL.md', why: 'configuration' },
   ]);
 });
@@ -5004,7 +4995,7 @@ test("a file `artifacts` names from the workspace root is collected into the ste
   );
   assert.equal(fs.readFileSync(path.join(files, 'RESPONSE.md'), 'utf8'), '# response, amended\n');
   assert.equal(fs.readFileSync(path.join(files, 'trace.zip'), 'utf8'), 'zip', 'an absolute path in the directory, where it is');
-  assert.deepEqual(missingArtifacts(readRun(run.id), 'implement', declaring(named)), []);
+  assert.deepEqual(missingArtifacts(shippedGitPlace, readRun(run.id), 'implement', declaring(named)), []);
   assert.deepEqual(
     artifactFiles(run, 'implement')
       .map((f) => path.relative(files, f.path))
@@ -5112,7 +5103,7 @@ test('REFUSED at shipped defaults: a copy is never written through a link a step
     'handed off, the files are on the branch',
   );
   assert.deepEqual(
-    missingArtifacts(readRun(run.id), 'implement', declaring(named)),
+    missingArtifacts(shippedGitPlace, readRun(run.id), 'implement', declaring(named)),
     [
       { path: 'shots/shot.png', why: 'not collected' },
       { path: 'report.md', why: 'not collected' },
@@ -5304,7 +5295,7 @@ test('REFUSED before, now read as it was: a run from before collection — its s
   );
   assert.ok(fs.existsSync(path.join(run.repo, 'docs', 'RESPONSE.md')), 'the worktree is still there');
   assert.deepEqual(
-    missingArtifacts(readRun(run.id), 'implement', declaring(['docs/RESPONSE.md', '.e2e/shot.png'])),
+    missingArtifacts(shippedGitPlace, readRun(run.id), 'implement', declaring(['docs/RESPONSE.md', '.e2e/shot.png'])),
     [{ path: '.e2e/shot.png', why: 'not collected' }],
     'the branch has RESPONSE.md; a file git ignores is on no branch',
   );
@@ -5701,7 +5692,7 @@ const rmTyped = async (t: TestContext, e: Engine, ...args: string[]) => {
 test("`nemia rm` forgets a run that is over, at shipped defaults: its worktree removed through git, which lists it no more — what the failed step left uncommitted committed on its branch first, what git ignores not, and nothing a link in it leads to touched — then the record and every file under its id; its branch kept, and said so; the engine's task of it forgotten, and said so; a second `nemia rm` says there is no such run, and exits 0", async (t) => {
   const repo = anIgnoringRepo();
   const b = board();
-  const run = await Effect.runPromise(startRun({ brief: 'add a flag', repo, workflowDir: folder() }));
+  const run = await runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: folder() }));
   await runWith(b.e, advanceRun(readRun(run.id)));
   const wt = readRun(run.id).steps.implement.workspace!;
   assert.equal(wt, path.join(ROOT, 'worktrees', run.id, 'implement'));
@@ -5769,17 +5760,17 @@ test("`nemia rm` forgets a run that is over, at shipped defaults: its worktree r
 test('REFUSED at shipped defaults: `nemia rm` on a run with a step in flight, one whose next step is ready, one with an unspent ask, and one another run waits on — each named on its line with what to do, nothing of it removed, exit 2 — while a run beside them in the same `nemia rm` is forgotten', async (t) => {
   const repo = aRepo();
   const b = board();
-  const running = await Effect.runPromise(startRun({ brief: 'still running', repo, workflowDir: folder() }));
+  const running = await runPlaced(startRun({ brief: 'still running', repo, workflowDir: folder() }));
   await runWith(b.e, advanceRun(readRun(running.id)));
-  const ready = await Effect.runPromise(startRun({ brief: 'review is ready', repo, workflowDir: folder() }));
+  const ready = await runPlaced(startRun({ brief: 'review is ready', repo, workflowDir: folder() }));
   await runWith(b.e, advanceRun(readRun(ready.id)));
   b.settle(`${ready.id}-implement`, 'succeeded', SIGNED);
-  const asked = await Effect.runPromise(startRun({ brief: 'a try asked for', repo, workflowDir: folder() }));
+  const asked = await runPlaced(startRun({ brief: 'a try asked for', repo, workflowDir: folder() }));
   await runWith(b.e, advanceRun(readRun(asked.id)));
   b.settle(`${asked.id}-implement`, 'succeeded');
   await runWith(b.e, retryRun(asked.id, 'implement', { mode: 'nudge' }));
   const parent = await aParent(repo, b, { work: 'parent.txt' });
-  const child = await Effect.runPromise(startRun({ brief: 'the child', repo, workflowDir: folder(), after: [parent.run.id] }));
+  const child = await runPlaced(startRun({ brief: 'the child', repo, workflowDir: folder(), after: [parent.run.id] }));
   const over = await aParent(repo, b, { work: 'over.txt' });
 
   const { printed, error } = await rmTyped(t, b.e, running.id, ready.id, asked.id, parent.run.id, over.run.id);
@@ -5825,9 +5816,7 @@ test('REFUSED at shipped defaults: `nemia rm` on a run with a step in flight, on
 });
 
 test('REFUSED at shipped defaults: a check a pass filed and died before writing down is in flight too — on a cancelled run, which files nothing, it is what holds `nemia rm` until it settles', async () => {
-  const run = await Effect.runPromise(
-    startRun({ brief: 'a check nobody wrote down', repo: aRepo(), workflowDir: folder('check: npm test') }),
-  );
+  const run = await runPlaced(startRun({ brief: 'a check nobody wrote down', repo: aRepo(), workflowDir: folder('check: npm test') }));
   const b = board();
   await runWith(b.e, advanceRun(readRun(run.id)));
   b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
@@ -5932,7 +5921,7 @@ test("`nemia rm --delete-branches` deletes a branch merged into its run's base a
   );
   assert.equal(hasBranch(repo, forced.branch), false);
 
-  const direct = await Effect.runPromise(startRun({ brief: 'on the base itself', repo, workflowDir: oneStep(), isolate: false }));
+  const direct = await runPlaced(startRun({ brief: 'on the base itself', repo, workflowDir: oneStep(), isolate: false }));
   await runWith(b.e, advanceRun(readRun(direct.id)));
   b.settle(`${direct.id}-implement`, 'succeeded', SIGNED);
   const three = await rmTyped(t, b.e, direct.id, '--delete-branches', '--force-unmerged');
@@ -6091,7 +6080,7 @@ const heldInNpmCi = async (t: TestContext, b: ReturnType<typeof board>, brief: s
     process.env.PATH = PATH;
     fs.writeFileSync(let_go, '');
   });
-  const run = await Effect.runPromise(startRun({ brief, repo, workflowDir: folder() }));
+  const run = await runPlaced(startRun({ brief, repo, workflowDir: folder() }));
   const pass = runWith(b.e, advanceRun(readRun(run.id)));
   while (!fs.existsSync(started)) await new Promise((r) => setTimeout(r, 10));
   const wt = path.join(ROOT, 'worktrees', run.id, 'implement');
@@ -6131,7 +6120,7 @@ test("REFUSED at shipped defaults: a pass still cutting a step's worktree when `
 
 test('REFUSED at shipped defaults: a step a pass filed and died before writing down, on a run then cancelled — `nemia rm` finds it on the engine, in flight, and says a tick stops it; the next tick does, and once it has settled the run is forgotten', async () => {
   const b = board();
-  const run = await Effect.runPromise(startRun({ brief: 'filed and never written down', repo: aRepo(), workflowDir: folder() }));
+  const run = await runPlaced(startRun({ brief: 'filed and never written down', repo: aRepo(), workflowDir: folder() }));
   const taskId = `${run.id}-implement`;
   await Effect.runPromise(b.e.file({ id: taskId, brief: 'implement it', cwd: '/' }));
   const at = markCancelled(run.id);
@@ -6184,15 +6173,10 @@ test("REFUSED at shipped defaults: a hand-off git will not commit — a pre-comm
   assert.equal(gitIn(repo, 'log', '-1', '--format=%s', p.branch), 'the flag, committed by a person');
 });
 
-/** A copy of the package's place whose `inventory` says `said` on stderr and exits 1, as a place that cannot read its repository does. */
-function placeUnread(said: string): string {
-  const dir = path.join(scratch('wf-store-place-'), 'git');
-  fs.cpSync(SHIPPED_PLACE, dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, 'scripts', 'inventory.ts'), `process.stderr.write(${JSON.stringify(`${said}\n`)});\nprocess.exit(1);\n`);
-  return dir;
-}
+/** The package's place whose `inventory` is not heard, in `said`, as a place that cannot read its repository answers. */
+const placeUnread = (said: string) => PlaceTag.layer(placeOver(shippedGitPlace, { inventory: () => unreadBy('inventory', said) }));
 
-test("REFUSED at shipped defaults: a place whose inventory exits 1 refuses `nemia rm` as not read, never as nothing to remove — its worktree with the step's work, its branch, its record and its cancellation are all still there, and no task is written down to forget", async () => {
+test("REFUSED at shipped defaults: a place whose inventory is not heard refuses `nemia rm` as not read, never as nothing to remove — its worktree with the step's work, its branch, its record and its cancellation are all still there, and no task is written down to forget", async () => {
   const repo = aRepo();
   const b = board();
   const p = await aParent(repo, b, { work: 'kept.txt' });
@@ -6200,7 +6184,7 @@ test("REFUSED at shipped defaults: a place whose inventory exits 1 refuses `nemi
   markCancelled(p.run.id);
   const planted = placeUnread('the inventory broke');
 
-  const forgot = await runWith(b.e, forgetRun(p.run.id).pipe(Effect.provideService(RunPlace, () => planted)));
+  const forgot = await runWith(b.e, forgetRun(p.run.id).pipe(Effect.provide(planted)));
   assert.equal(forgot.kind, 'refused');
   assert.equal(
     forgot.refusal,
@@ -6309,7 +6293,7 @@ test("REFUSED at shipped defaults: `nemia rm` on a name that is a live run's id 
 test('REFUSED at shipped defaults: a pass that read a `--no-worktree` run before `nemia rm` forgot it hands nothing off and collects nothing afterwards — its workspace, the repository, is still there, and its files directory is not made again', async () => {
   const repo = aRepo();
   const b = board();
-  const run = await Effect.runPromise(startRun({ brief: 'notes on the base itself', repo, workflowDir: oneStep(), isolate: false }));
+  const run = await runPlaced(startRun({ brief: 'notes on the base itself', repo, workflowDir: oneStep(), isolate: false }));
   await runWith(b.e, advanceRun(readRun(run.id)));
   fs.writeFileSync(path.join(repo, 'notes.md'), 'notes\n');
   b.settle(`${run.id}-implement`, 'succeeded', { ...SIGNED, artifacts: ['notes.md'] });
@@ -6343,9 +6327,9 @@ test("`nemia rm`'s program, given the engine as a service, answers what its plai
   const { forgetRun } = await import('../src/forget/forget.verb.ts');
   const { EngineService } = await import('../src/runtime-client.ts');
   const b = board();
-  const run = await Effect.runPromise(startRun({ brief: 'forgotten through its program', repo: aRepo(), workflowDir: folder() }));
+  const run = await runPlaced(startRun({ brief: 'forgotten through its program', repo: aRepo(), workflowDir: folder() }));
   await runWith(b.e, advanceRun(readRun(run.id)));
-  const program = (how: ForgetHow) => Effect.runPromise(forgetRun(run.id, how).pipe(Effect.provide(EngineService.layer(b.e))));
+  const program = (how: ForgetHow) => runPlaced(forgetRun(run.id, how).pipe(Effect.provide(EngineService.layer(b.e))));
 
   const refused = await program({});
   assert.equal(refused.kind, 'refused', 'a step in flight: nothing is touched, so the face may be asked the same');
@@ -6391,7 +6375,7 @@ test("`nemia rm`'s refusal is its program's typed failure; anything else is a de
   const { EngineService } = await import('../src/runtime-client.ts');
   const b = board();
   const recovered = (e: Engine, id: string) =>
-    Effect.runPromise(
+    runPlaced(
       forgetRun(id, {}).pipe(
         Effect.catchTag('Invalid', (r) => Effect.succeed(r.message)),
         Effect.provide(EngineService.layer(e)),
@@ -6403,7 +6387,7 @@ test("`nemia rm`'s refusal is its program's typed failure; anything else is a de
   assert.ok(under('runs', 'garbled.json'), 'and nothing removed');
   fs.rmSync(path.join(ROOT, 'runs', 'garbled.json'));
 
-  const run = await Effect.runPromise(startRun({ brief: 'its journal will not read', repo: aRepo(), workflowDir: folder() }));
+  const run = await runPlaced(startRun({ brief: 'its journal will not read', repo: aRepo(), workflowDir: folder() }));
   await runWith(b.e, advanceRun(readRun(run.id)));
   const boom = new Error('journal');
   const broken = {
@@ -6415,7 +6399,7 @@ test("`nemia rm`'s refusal is its program's typed failure; anything else is a de
     (x: unknown) => x,
   );
   assert.equal(died, boom, 'not a failure the program may catch by its tag: the error itself');
-  const uncaught = await Effect.runPromise(
+  const uncaught = await runPlaced(
     forgetRun(run.id, {}).pipe(
       Effect.catch(() => Effect.succeed('caught')),
       Effect.provide(EngineService.layer(broken)),
@@ -6436,7 +6420,7 @@ test("`nemia rm`'s refusal is its program's typed failure; anything else is a de
 test("`nemia rm`'s program says in its type what it needs and what it refuses: the engine, and a refusal", async () => {
   const { Effect } = await import('effect');
   const { forgetRun } = await import('../src/forget/forget.verb.ts');
-  const typed: EffectOf<Forgot, Refusal, EngineService> = forgetRun('x', {});
+  const typed: EffectOf<Forgot, Refusal, EngineService | PlaceService> = forgetRun('x', {});
   // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
   const infallible: EffectOf<Forgot, never, EngineService> = forgetRun('x', {});
   const unprovided = () =>
@@ -6457,8 +6441,8 @@ const verbPrograms = async () => {
   const { approveRun } = await import('../src/gate/gate.verb.ts');
   const { sayRun } = await import('../src/say/say.verb.ts');
   const { cancelRun } = await import('../src/cancel/cancel.verb.ts');
-  const over = <A, E>(e: Engine, program: EffectOf<A, E, EngineService>): Promise<A> =>
-    Effect.runPromise(program.pipe(Effect.provide(EngineService.layer(e))));
+  const over = <A, E>(e: Engine, program: EffectOf<A, E, EngineService | PlaceService>): Promise<A> =>
+    Effect.runPromise(placed(program).pipe(Effect.provide(EngineService.layer(e))));
   return { Effect, EngineService, over, acceptRun, approveRun, cancelRun, retryRun, roundRun, sayRun };
 };
 
@@ -6549,7 +6533,7 @@ test('the programs of `nemia round`, `nemia accept`, `nemia retry`, `nemia appro
 
 test('REFUSED as a typed failure: a run not there is a `Missing`, and a state that forbids the verb a `Conflict`, which each program fails with in the words its plain face rejects with', async () => {
   const v = await verbPrograms();
-  const recovered = <A>(e: Engine, program: EffectOf<A, Refusal, EngineService>, tag: 'Missing' | 'Conflict') =>
+  const recovered = <A>(e: Engine, program: EffectOf<A, Refusal, EngineService | PlaceService>, tag: 'Missing' | 'Conflict') =>
     v.over(
       e,
       program.pipe(
@@ -6570,7 +6554,7 @@ test('REFUSED as a typed failure: a run not there is a `Missing`, and a state th
   const run = await started(looped());
   await runWith(b.e, advanceRun(readRun(run.id)));
   b.settle(`${run.id}-implement`, 'running');
-  const refusals: Array<[string, EffectOf<unknown, Refusal, EngineService>, Promise<unknown>]> = [
+  const refusals: Array<[string, EffectOf<unknown, Refusal, EngineService | PlaceService>, Promise<unknown>]> = [
     ['nemia retry', v.retryRun(run.id, 'implement', { mode: 'fresh' }), runWith(b.e, retryRun(run.id, 'implement', { mode: 'fresh' }))],
     ['nemia round', v.roundRun(run.id), runWith(b.e, roundRun(run.id))],
     ['nemia approve', v.approveRun(run.id, 'implement', 'ok'), runWith(b.e, approveRun(run.id, 'implement', 'ok'))],
@@ -6587,7 +6571,7 @@ test("REFUSED as a typed failure: a record the store refuses to read is each pro
   const v = await verbPrograms();
   const e = board().e;
   fs.writeFileSync(path.join(ROOT, 'runs', 'garbled.json'), '{ not json');
-  const programs: Array<[string, EffectOf<unknown, Refusal, EngineService>]> = [
+  const programs: Array<[string, EffectOf<unknown, Refusal, EngineService | PlaceService>]> = [
     ['nemia round', v.roundRun('garbled')],
     ['nemia accept', v.acceptRun('garbled', undefined, ENOUGH)],
     ['nemia retry', v.retryRun('garbled', 'implement', { mode: 'fresh' })],
@@ -6619,7 +6603,7 @@ test('a journal that does not read is a defect of each program, which no `Effect
     ...b.e,
     view: () => Effect.die(boom),
   };
-  const verbs: Array<[string, EffectOf<unknown, Refusal, EngineService>, () => Promise<unknown>]> = [
+  const verbs: Array<[string, EffectOf<unknown, Refusal, EngineService | PlaceService>, () => Promise<unknown>]> = [
     ['nemia round', v.roundRun(run.id), () => runWith(broken, roundRun(run.id))],
     ['nemia accept', v.acceptRun(run.id, undefined, ENOUGH), () => runWith(broken, acceptRun(run.id, undefined, ENOUGH))],
     [
@@ -6682,13 +6666,13 @@ test('`nemia cancel` asks the engine to stop before it marks the run: a stop the
   assert.ok((await runWith(b.e, cancelRun(run.id))).run.cancelledAt, 'asked again, it stops and marks');
 });
 
-test('the programs of what a person asks of a run say in their types what they need and what they refuse: the engine, and a refusal', async () => {
+test('the programs of what a person asks of a run say in their types what they need and what they refuse: the engine, the place where they ask it, and a refusal', async () => {
   const v = await verbPrograms();
-  const typed: Array<EffectOf<unknown, Refusal, EngineService>> = [
+  const typed: Array<EffectOf<unknown, Refusal, EngineService | PlaceService>> = [
     v.roundRun('x') satisfies EffectOf<RoundAsked, Refusal, EngineService>,
     v.acceptRun('x') satisfies EffectOf<Accepted, Refusal, EngineService>,
-    v.retryRun('x', 'y', { mode: 'fresh' }) satisfies EffectOf<Asked, Refusal, EngineService>,
-    v.approveRun('x', 'y') satisfies EffectOf<Approved, Refusal, EngineService>,
+    v.retryRun('x', 'y', { mode: 'fresh' }) satisfies EffectOf<Asked, Refusal, EngineService | PlaceService>,
+    v.approveRun('x', 'y') satisfies EffectOf<Approved, Refusal, EngineService | PlaceService>,
     v.sayRun('x', 'y', 'z') satisfies EffectOf<Told, Refusal, EngineService>,
     v.cancelRun('x') satisfies EffectOf<Cancelled, Refusal, EngineService>,
   ];
@@ -6732,7 +6716,7 @@ const viewPrograms = async () => {
   const { EngineService } = await import('../src/runtime-client.ts');
   const views = await import('../src/views/views.verb.ts');
   const { NOTHING_READ, standingLiveOf: liveOf, standingReader } = await import('../src/standing/standing.verb.ts');
-  const live = (ids: readonly string[]) => Effect.runPromise(liveOf(ids));
+  const live = (ids: readonly string[]) => runPlaced(liveOf(ids));
   const over = <A, E>(e: Engine, program: EffectOf<A, E, EngineService>): Promise<A> =>
     Effect.runPromise(program.pipe(Effect.provide(EngineService.layer(e))));
   const fed = (e: Engine, entries: Effect.Success<ReturnType<Engine['feed']>>['entries']): Engine => ({
@@ -6801,9 +6785,7 @@ test('the programs of the views, given the engine as a service, answer what thei
   const shipped = await aParent(repo, b);
   b.settle(`${shipped.run.id}-implement`, 'succeeded', SIGNED);
   const running = await aParent(repo, b);
-  const child = await Effect.runPromise(
-    startRun({ brief: 'the child', repo, workflowDir: folder(), after: [shipped.run.id, running.run.id] }),
-  );
+  const child = await runPlaced(startRun({ brief: 'the child', repo, workflowDir: folder(), after: [shipped.run.id, running.run.id] }));
   const ids = [shipped.run.id, running.run.id, 'no-such-run'];
   const git = await v.live(ids);
   const read = await Promise.all(ids.map((id) => v.over(b.e, v.parentRead(id, git))));
@@ -6824,9 +6806,7 @@ test("REFUSED as a death in the runtime's words: a refusal the engine's view, lo
   const b = board();
   const parent = await aParent(repo, b);
   b.settle(`${parent.run.id}-implement`, 'succeeded', SIGNED);
-  const child = readRun(
-    (await Effect.runPromise(startRun({ brief: 'the child', repo, workflowDir: folder(), after: [parent.run.id] }))).id,
-  );
+  const child = readRun((await runPlaced(startRun({ brief: 'the child', repo, workflowDir: folder(), after: [parent.run.id] }))).id);
   const failed = (): TaskPhase => 'failed';
   const live = await v.live([parent.run.id]);
   const reads = (err: unknown) => {
@@ -6940,7 +6920,7 @@ test('the whole screen of a run from an inbox card, given a file, whose step its
   const given = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'notes.txt');
   fs.writeFileSync(given, 'read me\n');
   const run = repositoryRunOf(
-    await Effect.runPromise(
+    await runPlaced(
       startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: folder(), isolate: false, from: { inbox: 'card-7' }, inputs: [given] }),
     ),
   );
@@ -7195,7 +7175,7 @@ const rejected = async (fn: () => Promise<unknown>, what: string): Promise<unkno
 test('the start program answers what its plain face answers on the same store: a repository run with an input, a gate and a parent, and a folder run', async () => {
   const s = await startProgram();
   const repo = aRepo();
-  const parent = await Effect.runPromise(startRun({ brief: 'the parent', repo, workflowDir: oneStep() }));
+  const parent = await runPlaced(startRun({ brief: 'the parent', repo, workflowDir: oneStep() }));
   const input = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'notes.md');
   fs.writeFileSync(input, 'the notes\n');
   const cases: Array<[string, Parameters<typeof startRun>[0]]> = [
@@ -7205,8 +7185,8 @@ test('the start program answers what its plain face answers on the same store: a
   const differ = ['id', 'workspace', 'branch', 'baseRef', 'createdAt'];
   const same = (r: Run) => Object.fromEntries(Object.entries(r).filter(([k]) => !differ.includes(k)));
   for (const [what, opts] of cases) {
-    const ran = await s.Effect.runPromise(s.startRun(opts));
-    const face = await Effect.runPromise(startRun(opts));
+    const ran = await s.Effect.runPromise(placed(s.startRun(opts)));
+    const face = await runPlaced(startRun(opts));
     const written = (r: Run) => JSON.parse(JSON.stringify(r)) as Run;
     assert.deepStrictEqual(written(ran), readRun(ran.id), `${what}: the program's run is on the record`);
     assert.deepStrictEqual(written(face), readRun(face.id), `${what}: the face's run is on the record`);
@@ -7231,9 +7211,9 @@ test("REFUSED as a typed failure at `nemia start`: each refusal is the start pro
   ];
   for (const [what, opts] of cases) {
     const before = fs.readdirSync(s.runsDir()).sort();
-    const recovered = s.Effect.runSync(s.startRun(opts).pipe(s.Effect.catchTag('Invalid', (r) => s.Effect.succeed(r))));
+    const recovered = s.Effect.runSync(placed(s.startRun(opts)).pipe(s.Effect.catchTag('Invalid', (r) => s.Effect.succeed(r))));
     assert.ok(recovered instanceof s.Invalid, `${what}: an Invalid, recovered by its tag`);
-    const err = await rejected(async () => await Effect.runPromise(startRun(opts)), what);
+    const err = await rejected(async () => await runPlaced(startRun(opts)), what);
     assert.ok(err instanceof s.Invalid, `${what}: the face throws the Invalid itself, not ${String(err)}`);
     assert.equal(err.exitCode, 2, what);
     assert.equal(recovered.message, err.message, what);
@@ -7249,8 +7229,11 @@ test('a run whose inputs cannot be copied is what the start program dies of, not
   const before = fs.readdirSync(s.runsDir()).sort();
   fs.chmodSync(s.runsDir(), 0o555);
   t.after(() => fs.chmodSync(s.runsDir(), 0o755));
-  const died = thrown(() => s.Effect.runSync(s.startRun(opts).pipe(s.Effect.catch(() => s.Effect.succeed('caught')))), 'the program');
-  const face = await rejected(async () => await Effect.runPromise(startRun(opts)), 'the face');
+  const died = thrown(
+    () => s.Effect.runSync(placed(s.startRun(opts)).pipe(s.Effect.catch(() => s.Effect.succeed('caught')))),
+    'the program',
+  );
+  const face = await rejected(async () => await runPlaced(startRun(opts)), 'the face');
   fs.chmodSync(s.runsDir(), 0o755);
   for (const [what, err] of [
     ['the program', died],
@@ -7291,7 +7274,7 @@ test(
     ];
     for (const [what, opts, said] of cases) {
       const before = fs.readdirSync(s.runsDir()).sort();
-      const err = await rejected(async () => await Effect.runPromise(startRun(opts)), what);
+      const err = await rejected(async () => await runPlaced(startRun(opts)), what);
       assert.equal((err as Error & { exitCode?: number }).exitCode, 1, `${what}: ${String(err)}`);
       assert.match((err as Error).message, said, what);
       const id = /runs\/([a-z0-9-]+)\//.exec((err as Error).message)?.[1] ?? '';
@@ -7302,12 +7285,15 @@ test(
   },
 );
 
-test('the start program says in its type that it refuses and requires nothing: a run, a refusal, no service', async () => {
+test('the start program says in its type that it refuses and asks the place: a run, a refusal, and no run without a place given', async () => {
   const s = await startProgram();
   const opts = { brief: 'x', repo: ROOT, workflowDir: WORKFLOW };
-  const typed = s.startRun(opts) satisfies EffectOf<Run, Refusal>;
+  const typed = s.startRun(opts) satisfies EffectOf<Run, Refusal, PlaceService>;
   // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
-  const infallible = s.startRun(opts) satisfies EffectOf<Run>;
-  const provided = () => s.Effect.runSync(s.startRun(opts)) satisfies Run;
-  assert.deepEqual([typeof typed, typeof infallible, typeof provided], ['object', 'object', 'function']);
+  const infallible = s.startRun(opts) satisfies EffectOf<Run, never, PlaceService>;
+  const unplaced = () =>
+    // @ts-expect-error -- a program that asks the place is given none, and runSync takes no requirement
+    s.Effect.runSync(s.startRun(opts));
+  const provided = () => s.Effect.runSync(placed(s.startRun(opts))) satisfies Run;
+  assert.deepEqual([typeof typed, typeof infallible, typeof unplaced, typeof provided], ['object', 'object', 'function', 'function']);
 });

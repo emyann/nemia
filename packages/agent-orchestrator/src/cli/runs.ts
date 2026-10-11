@@ -19,6 +19,7 @@ import {
   runStore,
   runsForgetting,
   runWith,
+  shipped,
   sizeOf,
   TABLE,
   type Args,
@@ -35,7 +36,7 @@ const idsOf = (args: Args): readonly string[] => (Array.isArray(args.runId) ? ar
  */
 async function rmOne(e: Engine, id: string, args: Args): Promise<{ kept: boolean; failed: boolean }> {
   try {
-    const data = await runWith(e, RM.handler({ ...args, runId: id }));
+    const data = await runWith(e, shipped(RM.handler({ ...args, runId: id })));
     for (const line of RM.print(data, args)) console.log(line);
     return { kept: data.forgot.kind === 'refused' || data.forgot.kind === 'held', failed: false };
   } catch (err) {
@@ -96,7 +97,7 @@ async function judged(e: Engine, ids: readonly string[], args: Args, tally: Prun
   const found: Pruning[] = [];
   for (const id of ids) {
     try {
-      found.push((await runWith(e, PRUNE.handler({ ...args, runId: id, yes: false }))).pruning);
+      found.push((await runWith(e, shipped(PRUNE.handler({ ...args, runId: id, yes: false })))).pruning);
     } catch (err) {
       notPrunedLine(id, err, tally);
     }
@@ -113,7 +114,7 @@ async function withEngine(e: Engine, found: Pruning[]): Promise<Pruning[]> {
   const asked = found.filter((p) => p.kind === 'prunable' || p.kind === 'nothing').map((p) => p.id);
   if (!asked.length) return found;
   try {
-    const { counted, uncounted } = await runWith(e, runsForgetting(asked));
+    const { counted, uncounted } = await runWith(e, shipped(runsForgetting(asked)));
     for (const { text } of uncounted) console.log(text);
     return found.map((p) => (counted.has(p.id) ? { ...p, engine: counted.get(p.id)! } : p));
   } catch (err) {
@@ -141,7 +142,7 @@ function printFound(found: Pruning[], named: boolean, tally: PruneTally): void {
 async function prunedAll(e: Engine, prunable: Pruning[], args: Args, tally: PruneTally): Promise<void> {
   for (const p of prunable) {
     try {
-      const data = await runWith(e, PRUNE.handler({ ...args, runId: p.id, yes: true }));
+      const data = await runWith(e, shipped(PRUNE.handler({ ...args, runId: p.id, yes: true })));
       const done = data.pruning;
       for (const line of PRUNE.print(data, args)) console.log(line);
       if (done.kind === 'refused' || done.left.length) tally.notPruned.push(p.id);
@@ -213,7 +214,7 @@ const withWords = (args: Args, command: string): Args =>
  */
 export async function agentsCustomRun(args: Args, e: Engine): Promise<void> {
   const asked = withWords(args, AGENTS_CUSTOM.name);
-  const data = await runWith(e, AGENTS_CUSTOM.handler(asked, undefined, HOME));
+  const data = await runWith(e, shipped(AGENTS_CUSTOM.handler(asked, undefined, HOME)));
   for (const line of AGENTS_CUSTOM.print(data, asked)) console.log(line);
 }
 
@@ -222,7 +223,7 @@ export async function agentsCustomRun(args: Args, e: Engine): Promise<void> {
  */
 export async function factoryInstructRun(args: Args, e: Engine): Promise<void> {
   const asked = withWords(args, FACTORY_INSTRUCT.name);
-  const data = await runWith(e, FACTORY_INSTRUCT.handler(asked, undefined, HOME));
+  const data = await runWith(e, shipped(FACTORY_INSTRUCT.handler(asked, undefined, HOME)));
   for (const line of FACTORY_INSTRUCT.print(data, asked)) console.log(line);
 }
 
@@ -231,7 +232,7 @@ export async function factoryInstructRun(args: Args, e: Engine): Promise<void> {
  */
 export async function factoryRulesRun(args: Args, e: Engine): Promise<void> {
   const asked = withWords(args, FACTORY_RULES.name);
-  const data = await runWith(e, FACTORY_RULES.handler(asked, undefined, HOME));
+  const data = await runWith(e, shipped(FACTORY_RULES.handler(asked, undefined, HOME)));
   for (const line of FACTORY_RULES.print(data, asked)) console.log(line);
 }
 
@@ -240,7 +241,7 @@ export async function factoryRulesRun(args: Args, e: Engine): Promise<void> {
  */
 export async function autoProposeRun(args: Args, e: Engine): Promise<void> {
   const asked = withWords(args, AUTO_PROPOSE.name);
-  const data = await runWith(e, AUTO_PROPOSE.handler(asked, undefined, HOME));
+  const data = await runWith(e, shipped(AUTO_PROPOSE.handler(asked, undefined, HOME)));
   for (const line of AUTO_PROPOSE.print(data, asked)) console.log(line);
 }
 
@@ -251,6 +252,6 @@ export async function autoProposeRun(args: Args, e: Engine): Promise<void> {
 export async function admitRun(args: Args, e: Engine): Promise<void> {
   const floor = typeof args.atLeast === 'string' ? (args.atLeast as Parameters<typeof admitted>[2]) : undefined;
   const auto = typeof args.auto === 'string' ? args.auto : undefined;
-  const answer = await runWith(e, admitted(fs.readFileSync(0, 'utf8'), TABLE, floor, auto));
+  const answer = await runWith(e, shipped(admitted(fs.readFileSync(0, 'utf8'), TABLE, floor, auto)));
   if (answer !== undefined) console.log(JSON.stringify(answer));
 }

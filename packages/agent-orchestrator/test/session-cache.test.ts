@@ -27,12 +27,14 @@ import type { Workflow } from '../src/workflow.ts';
 import { scratch } from './scratch.ts';
 import { TEAM } from './team.ts';
 import { promised } from './promised.ts';
-import { Effect } from 'effect';
+import { runGiven, runOver } from './placed.ts';
 
 const ROOT = scratch('wf-cache-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 process.env.WF_ROOT = ROOT;
-const { advanceRun, retryRun, startRun, stepsOf, runWith } = await import('../src/runner.ts');
+const { advanceRun, retryRun, startRun, stepsOf, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
+const runPlaced = runGiven(gitPlaceLayer);
 const { readRun } = await import('../src/record/record.store.ts');
 
 const LOOPED = ['dev'];
@@ -152,7 +154,7 @@ async function walk(
   dir: string,
   first: { mode: 'nudge' | 'fresh'; model?: string } = { mode: 'nudge' },
 ): Promise<{ id: string; filed: Filed[]; target: string; looping: string; steps: Workflow[] }> {
-  const run = await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: dir }));
+  const run = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: dir }));
   const steps = stepsOf(run);
   const looping = steps.find((s) => s.loop)!;
   const target = looping.loop!;
@@ -377,7 +379,7 @@ test('REFUSED by the check: a chain that changes its schema — round 1 without 
 
 for (const name of LOOPED) {
   test(`${name}, at shipped defaults: the run's own nudge to sign off continues an unsigned session filed as that session was — schema, model, effort, tools, window`, async () => {
-    const run = await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: path.join(TEAM, name) }));
+    const run = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: path.join(TEAM, name) }));
     const target = stepsOf(run).find((s) => s.loop)!.loop!;
     const b = board();
     const order: string[] = [];

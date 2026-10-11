@@ -19,6 +19,7 @@ import { asyncOps, plainEngine, type AsyncRunner } from '../../test/promised.ts'
 import type { Run } from '../run.ts';
 import type { PassCost } from '../meter/meter.ts';
 import { scratch } from '../../test/scratch.ts';
+import { runGiven } from '../../test/placed.ts';
 
 const ROOT = scratch('wf-rest-spans-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -27,6 +28,8 @@ process.env.WF_MAX_CONCURRENT = '10000';
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 const { startRun, tickRun } = await import('../runner.ts');
+const { gitPlaceLayer } = await import('../place/shipped.store.ts');
+const runPlaced = runGiven(gitPlaceLayer);
 const { listRuns } = await import('../record/record.store.ts');
 const { EngineService } = await import('../runtime-client.ts');
 const { freshRestMemo } = await import('./tick.verb.ts');
@@ -94,7 +97,7 @@ const h = engine();
 const MEMO = freshRestMemo();
 const inFlight: Run[] = [];
 for (let k = 0; k < 3; k++)
-  inFlight.push(await Effect.runPromise(startRun({ brief: `in flight ${k}`, repo: REPO, workflowDir: ONE, isolate: false })));
+  inFlight.push(await runPlaced(startRun({ brief: `in flight ${k}`, repo: REPO, workflowDir: ONE, isolate: false })));
 
 /** A pass of the store, its rest judged again or not (`verifyRest`): what it cost, and the spans it made. */
 const traced = async (verifyRest: boolean): Promise<{ cost: PassCost; spans: Tracer.NativeSpan[] }> => {
@@ -106,7 +109,7 @@ const traced = async (verifyRest: boolean): Promise<{ cost: PassCost; spans: Tra
       return span;
     },
   });
-  const pass = await Effect.runPromise(
+  const pass = await runPlaced(
     tickRun({ repo: ROOT, memo: MEMO, verifyRest }).pipe(Effect.provide(EngineService.layer(h.e)), Effect.withTracer(tracer)),
   );
   return { cost: pass.cost!, spans };
@@ -123,7 +126,7 @@ const saidToInFlight = async () => {
  * pass at rest, traced.
  */
 const atRest = async (n: number) => {
-  for (let k = 0; k < n; k++) await Effect.runPromise(startRun({ brief: `run ${k}`, repo: REPO, workflowDir: ONE, isolate: false }));
+  for (let k = 0; k < n; k++) await runPlaced(startRun({ brief: `run ${k}`, repo: REPO, workflowDir: ONE, isolate: false }));
   for (let k = 0; k < 12; k++) {
     await traced(true);
     await h.signAll(inFlight);
@@ -165,7 +168,7 @@ test('a pass at rest makes as many spans over 200 finished runs as over 2: what 
 });
 
 test("a pass that lets a finished run's session go traces the release, with its task", async () => {
-  const run = await Effect.runPromise(startRun({ brief: 'one more', repo: REPO, workflowDir: ONE, isolate: false }));
+  const run = await runPlaced(startRun({ brief: 'one more', repo: REPO, workflowDir: ONE, isolate: false }));
   const released: string[] = [];
   for (let k = 0; k < 12 && !released.length; k++) {
     const { spans } = await traced(true);

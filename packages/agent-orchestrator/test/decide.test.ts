@@ -19,7 +19,8 @@ import type { EngineService } from '../src/runtime-client.ts';
 import { scratch } from './scratch.ts';
 import { decideScreen } from './screens.ts';
 import { promised } from './promised.ts';
-import { Effect } from 'effect';
+import { runGiven, runOver } from './placed.ts';
+import type { PlaceService } from '../src/place/place.store.ts';
 
 const ROOT = scratch('wf-decide-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -40,8 +41,12 @@ const {
   retryRun,
   startRun,
   touchedLines,
-  runWith,
+  runWith: runEngine,
+  gitPlaceLayer,
+  shippedGitPlace,
 } = await import('../src/runner.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
+const runPlaced = runGiven(gitPlaceLayer);
 const { listRuns, readRun } = await import('../src/record/record.store.ts');
 const { passStanding } = await import('../src/standing/standing.verb.ts');
 /** A pass's read of where every run's branches stand, written to `standing.json` as the tick writes it: what `nemia ls` reads. */
@@ -176,7 +181,7 @@ const folder = (implementKeys = '') => {
  */
 const awaiting = async (implementKeys = '') => {
   const repo = aRepo();
-  const run = await Effect.runPromise(startRun({ brief: 'add sub', repo, workflowDir: folder(implementKeys), isolate: false }));
+  const run = await runPlaced(startRun({ brief: 'add sub', repo, workflowDir: folder(implementKeys), isolate: false }));
   const branch = `wf/${run.id}`;
   branchOff(repo, branch, () => {
     fs.appendFileSync(path.join(repo, 'packages/x/src/add.ts'), 'export const sub = (a, b) => a - b;\n');
@@ -412,7 +417,7 @@ test('`nemia decide --help` prints the lists the screen uses, from the one place
 
 test("what a branch touched is the place's report: a rename at both ends, a binary file, a file in no directory, today's lines — and a branch that is gone is not read as nothing", async () => {
   const repo = aRepo();
-  const run = repositoryRun(await Effect.runPromise(startRun({ brief: 'move the test', repo, workflowDir: folder(), isolate: false })));
+  const run = repositoryRun(await runPlaced(startRun({ brief: 'move the test', repo, workflowDir: folder(), isolate: false })));
   branchOff(repo, 'wf/moved', () => {
     fs.mkdirSync(path.join(repo, 'packages/x/spec'));
     git(repo, 'mv', 'packages/x/test/add.test.ts', 'packages/x/spec/add.test.ts');
@@ -420,7 +425,7 @@ test("what a branch touched is the place's report: a rename at both ends, a bina
     write(repo, 'NOTES', 'one\n');
   });
 
-  const [moved] = changesOf(run, ['wf/moved']);
+  const [moved] = changesOf(shippedGitPlace, run, ['wf/moved']);
   const r = moved.radius;
   assert.ok(!('error' in r), JSON.stringify(r));
   assert.deepEqual(
@@ -445,7 +450,7 @@ test("what a branch touched is the place's report: a rename at both ends, a bina
   assert.match(moved.inFull as string, /^rename from packages\/x\/test\/add\.test\.ts$/m, 'asked by its path, the place shows a rename');
   assert.match(moved.inFull as string, /^rename to packages\/x\/spec\/add\.test\.ts$/m);
 
-  const [gone] = changesOf(run, ['wf/never']);
+  const [gone] = changesOf(shippedGitPlace, run, ['wf/never']);
   const notKnown = `what this run changed is not known: the place has no branch wf/never in ${repo}`;
   assert.deepEqual(gone, { branch: 'wf/never', radius: { error: notKnown }, inFull: { error: notKnown }, notes: { error: notKnown } });
   assert.equal(lessonLine([gone]), 'lesson  not known — wf/never could not be read');
@@ -453,12 +458,12 @@ test("what a branch touched is the place's report: a rename at both ends, a bina
 
 test("a branch that touched a lint config lists it as check-affecting, with its whole diff from the place's diffs", async () => {
   const repo = aRepo();
-  const run = repositoryRun(await Effect.runPromise(startRun({ brief: 'quiet a rule', repo, workflowDir: folder(), isolate: false })));
+  const run = repositoryRun(await runPlaced(startRun({ brief: 'quiet a rule', repo, workflowDir: folder(), isolate: false })));
   branchOff(repo, 'wf/lint', () => {
     write(repo, '.oxlintrc.json', '{ "rules": { "no-console": "off" } }\n');
     write(repo, 'packages/x/src/add.ts', 'export const add = (a, b) => a + b + 0;\n');
   });
-  const [lint] = changesOf(run, ['wf/lint']);
+  const [lint] = changesOf(shippedGitPlace, run, ['wf/lint']);
   assert.ok(!('error' in lint.radius), JSON.stringify(lint.radius));
   assert.deepEqual(lint.radius.checkAffecting, ['.oxlintrc.json']);
   assert.match(lint.inFull as string, /^\+\{ "rules": \{ "no-console": "off" \} \}$/m);
@@ -467,13 +472,13 @@ test("a branch that touched a lint config lists it as check-affecting, with its 
 
 test("the lesson line reads the base's workspaces: a package's docs/ is a lesson, a docs/ in its source is not", async () => {
   const repo = aRepo();
-  const run = repositoryRun(await Effect.runPromise(startRun({ brief: 'document it', repo, workflowDir: folder(), isolate: false })));
+  const run = repositoryRun(await runPlaced(startRun({ brief: 'document it', repo, workflowDir: folder(), isolate: false })));
   branchOff(repo, 'wf/source-docs', () => write(repo, 'packages/x/src/docs/strings.ts', 'export const title = "Docs";\n'));
   branchOff(repo, 'wf/package-docs', () => {
     write(repo, 'packages/x/src/docs/strings.ts', 'export const title = "Docs";\n');
     write(repo, 'packages/x/docs/features.md', 'what is left\n');
   });
-  const read = (branch: string) => lessonLine(changesOf(run, [branch]));
+  const read = (branch: string) => lessonLine(changesOf(shippedGitPlace, run, [branch]));
   assert.equal(read('wf/source-docs'), 'lesson  nothing written where the next agent reads');
   assert.equal(read('wf/package-docs'), 'lesson  packages/x/docs/features.md +1 −0');
 });
@@ -501,7 +506,7 @@ test('what a step consumed is summed over its attempts — one that never starte
 });
 
 test('`nemia decide` on a try a person answered: its line says so, and under it what the try before needed and your answer, read off the ask; a blocked step is told the nemia retry --message that answers it', async (t) => {
-  const run = await Effect.runPromise(startRun({ brief: 'add sub', repo: aRepo(), workflowDir: folder(), isolate: false }));
+  const run = await runPlaced(startRun({ brief: 'add sub', repo: aRepo(), workflowDir: folder(), isolate: false }));
   const { e, settle } = board();
   const blocked = (needs: string) => ({ outcome: 'blocked', summary: 'two readings', artifacts: [], needs });
   await runWith(e, advanceRun(readRun(run.id)));
@@ -543,7 +548,7 @@ test('`nemia decide` on a try a person answered: its line says so, and under it 
 
 test("a measured cost on both screens: `nemia decide` prints each step's beside what it used, with the api and tool time, and the run's after the steps; `nemia ls` puts each step's beside its word and the run's on its line — and a run nobody measured prints no dollar", async (t) => {
   const repo = aRepo();
-  const run = await Effect.runPromise(startRun({ brief: 'add sub', repo, workflowDir: folder(), isolate: false }));
+  const run = await runPlaced(startRun({ brief: 'add sub', repo, workflowDir: folder(), isolate: false }));
   const { e, settle, logs } = board();
   await runWith(e, advanceRun(readRun(run.id)));
   settle(`${run.id}-implement`, 'succeeded', SIGNED, { ...USAGE, costUsd: 3.012, apiMs: 486_000, toolMs: 2_400 });
@@ -617,7 +622,7 @@ test('REFUSED to hide why a step stopped past its budget: `nemia decide` on a st
     ],
   ] as const;
   for (const [own, phase, banner] of cases) {
-    const run = await Effect.runPromise(startRun({ brief: `add sub, ${own}`, repo: aRepo(), workflowDir: budgeted(), isolate: false }));
+    const run = await runPlaced(startRun({ brief: `add sub, ${own}`, repo: aRepo(), workflowDir: budgeted(), isolate: false }));
     const { e, settle } = board();
     await runWith(e, advanceRun(readRun(run.id)));
     settle(`${run.id}-implement`, phase, undefined, { costUsd: 3.4 });
@@ -638,7 +643,7 @@ test('REFUSED to hide why a step stopped past its budget: `nemia decide` on a st
 });
 
 test("UNSIGNED after the run's own nudge: `nemia decide` and `nemia ls` say the run nudged it to sign off once, and that it ended unsigned again — the nudge spent, the step yours", async (t) => {
-  const run = await Effect.runPromise(startRun({ brief: 'add sub, unsigned', repo: aRepo(), workflowDir: folder(), isolate: false }));
+  const run = await runPlaced(startRun({ brief: 'add sub, unsigned', repo: aRepo(), workflowDir: folder(), isolate: false }));
   const { e, settle } = board();
   await runWith(e, advanceRun(readRun(run.id)));
   settle(`${run.id}-implement`, 'failed', undefined, undefined, 'unsigned');
@@ -696,7 +701,7 @@ test("a folder whose last step is an ending: `nemia decide` says what that step 
     path.join(dir, 'ship.md'),
     "---\nafter: implement\nplace: git\nworkspace: main\ngate: true\n---\nShip it: trial merge this run's result branch onto main, run the check, and commit.\n\nAbort on any failure.\n",
   );
-  const run = await Effect.runPromise(startRun({ brief: 'add sub', repo, workflowDir: dir }));
+  const run = await runPlaced(startRun({ brief: 'add sub', repo, workflowDir: dir }));
   const { e, settle } = board();
   await runWith(e, advanceRun(readRun(run.id)));
   const work = readRun(run.id).steps.implement;
@@ -745,7 +750,7 @@ const shipping = (): string => {
 
 /** A run of `dir` on `repo` whose implement committed `file` as `text` on its branch, left running or settled as `settled` says. */
 const working = async (repo: string, dir: string, file: string, text: string, settled: boolean) => {
-  const run = await Effect.runPromise(startRun({ brief: `write ${file}`, repo, workflowDir: dir }));
+  const run = await runPlaced(startRun({ brief: `write ${file}`, repo, workflowDir: dir }));
   const { e, settle } = board();
   await runWith(e, advanceRun(readRun(run.id)));
   const work = readRun(run.id).steps.implement;
@@ -801,7 +806,7 @@ test("REFUSED: an ending led by an agent that says `You are …` — `nemia deci
       path.join(dir, 'land.md'),
       `---\nafter: implement\nplace: git\nworkspace: main\ngate: true\nagent: otto\n---\n${note}`,
     );
-    const run = await Effect.runPromise(startRun({ brief: 'add sub', repo: aRepo(), workflowDir: dir }));
+    const run = await runPlaced(startRun({ brief: 'add sub', repo: aRepo(), workflowDir: dir }));
     const { e, settle } = board();
     await runWith(e, advanceRun(readRun(run.id)));
     const work = readRun(run.id).steps.implement;
@@ -833,7 +838,7 @@ test("REFUSED: an ending led by an agent that says `You are …` — `nemia deci
 
 test('a gate on the last step of a folder that merges nothing: approving accepts what the step did — its own prose is not offered as what happens next — and the branch keeps its git commands', async (t) => {
   const repo = aRepo();
-  const run = await Effect.runPromise(startRun({ brief: 'add sub', repo, workflowDir: folder(), gates: ['review'] }));
+  const run = await runPlaced(startRun({ brief: 'add sub', repo, workflowDir: folder(), gates: ['review'] }));
   const { e, settle } = board();
   await runWith(e, advanceRun(readRun(run.id)));
   const work = readRun(run.id).steps.implement;
@@ -867,9 +872,7 @@ test('a gate on the last step of a folder that merges nothing: approving accepts
 
 test('a run that worked on the base branch itself says so, and still says what is to be decided: the screen that used to return before it', async (t) => {
   const repo = aRepo();
-  const run = await Effect.runPromise(
-    startRun({ brief: 'add sub, directly', repo, workflowDir: folder(), isolate: false, gates: ['review'] }),
-  );
+  const run = await runPlaced(startRun({ brief: 'add sub, directly', repo, workflowDir: folder(), isolate: false, gates: ['review'] }));
   const { e, settle } = board();
   await runWith(e, advanceRun(readRun(run.id)));
   settle(`${run.id}-implement`, 'succeeded', SIGNED);
@@ -891,7 +894,7 @@ test("a run whose one step works in the checkout is not shown the base branch's 
   const repo = aRepo();
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   fs.writeFileSync(path.join(dir, 'supervise.md'), '---\nplace: git\nworkspace: main\nslot: none\n---\nWatch the runs.\n');
-  const run = await Effect.runPromise(startRun({ brief: 'supervise this repository', repo, workflowDir: dir }));
+  const run = await runPlaced(startRun({ brief: 'supervise this repository', repo, workflowDir: dir }));
   const { e, settle } = board();
   await runWith(e, advanceRun(readRun(run.id)));
   settle(`${run.id}-supervise`, 'succeeded', {
@@ -911,7 +914,7 @@ test("a run whose one step works in the checkout is not shown the base branch's 
   write(repo, 'CLAUDE.md', 'a lesson somebody else wrote\n');
   git(repo, 'add', '-A');
   git(repo, 'commit', '-q', '-m', 'another run, merged');
-  const [{ radius: moved }] = changesOf(repositoryRun(readRun(run.id)), ['main']);
+  const [{ radius: moved }] = changesOf(shippedGitPlace, repositoryRun(readRun(run.id)), ['main']);
   assert.ok(
     !('error' in moved) && moved.changes.length === 2,
     `another run's merge moved main under the run, and that diff reads; what is refused is reading it as this run's work: ${JSON.stringify(moved)}`,
@@ -928,7 +931,7 @@ test("a run whose one step works in the checkout is not shown the base branch's 
   assert.ok(indexOf(lines, '    needs: Merge add-sub, or hold it?') > said, 'what the person came for: the summary, then the question');
   indexOf(lines, `    to answer it:  nemia retry ${run.id} supervise --message "<answer>"`);
 
-  const direct = await Effect.runPromise(startRun({ brief: 'add sub, directly', repo, workflowDir: folder(), isolate: false }));
+  const direct = await runPlaced(startRun({ brief: 'add sub, directly', repo, workflowDir: folder(), isolate: false }));
   fs.appendFileSync(path.join(repo, 'packages/x/src/add.ts'), 'export const sub = (a, b) => a - b;\n');
   git(repo, 'commit', '-q', '-am', 'the work, on the base branch itself');
   await runWith(e, advanceRun(readRun(direct.id)));
@@ -950,7 +953,7 @@ test('REFUSED at `nemia start`: --no-worktree on a workflow whose last step merg
   fs.writeFileSync(path.join(dir, 'ship.md'), '---\nafter: implement\nplace: git\nworkspace: main\ngate: true\n---\nShip it.\n');
   const before = fs.readdirSync(path.join(ROOT, 'runs')).filter((f) => f.endsWith('.json')).length;
   await assert.rejects(
-    async () => await Effect.runPromise(startRun({ brief: 'add sub', repo, workflowDir: dir, isolate: false })),
+    async () => await runPlaced(startRun({ brief: 'add sub', repo, workflowDir: dir, isolate: false })),
     (err: Error & { exitCode?: number }) => {
       assert.equal(err.exitCode, 2);
       assert.match(
@@ -962,7 +965,7 @@ test('REFUSED at `nemia start`: --no-worktree on a workflow whose last step merg
     },
   );
   assert.equal(fs.readdirSync(path.join(ROOT, 'runs')).filter((f) => f.endsWith('.json')).length, before, 'nothing written');
-  assert.ok(await Effect.runPromise(startRun({ brief: 'add sub', repo, workflowDir: dir })), 'with worktrees, it starts');
+  assert.ok(await runPlaced(startRun({ brief: 'add sub', repo, workflowDir: dir })), 'with worktrees, it starts');
 });
 
 test('`nemia ls` views each task once, and runs added in a repository it already reads add no git process', async (t) => {
@@ -979,13 +982,13 @@ test('`nemia ls` views each task once, and runs added in a repository it already
   };
   const oneStep = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   fs.writeFileSync(path.join(oneStep, 'work.md'), '---\nplace: git\n---\nwork it\n');
-  const first = (await Effect.runPromise(startRun({ brief: 'first', repo, workflowDir: oneStep, isolate: true }))).id;
+  const first = (await runPlaced(startRun({ brief: 'first', repo, workflowDir: oneStep, isolate: true }))).id;
   await runWith(e, advanceRun(readRun(first)));
   settle(`${first}-work`, 'succeeded', SIGNED);
   await runWith(e, advanceRun(readRun(first)));
   const before = await ls();
   for (let k = 1; k < 4; k++) {
-    const more = await Effect.runPromise(
+    const more = await runPlaced(
       startRun({ brief: `more ${k}`, repo, workflowDir: folder(), isolate: false, ...(k === 1 ? { after: [first] } : {}) }),
     );
     branchOff(repo, `wf/${more.id}`, () => write(repo, `more-${k}.txt`, 'x\n'));
@@ -1010,7 +1013,7 @@ test("`nemia decide`'s program, given the engine as a service, answers what its 
   const { Effect } = await import('effect');
   const { decideRun } = await import('../src/decide/decide.verb.ts');
   const { EngineService } = await import('../src/runtime-client.ts');
-  const run = await Effect.runPromise(startRun({ brief: 'add sub', repo: aRepo(), workflowDir: folder(), isolate: false }));
+  const run = await runPlaced(startRun({ brief: 'add sub', repo: aRepo(), workflowDir: folder(), isolate: false }));
   const { e, settle } = board();
   await runWith(e, advanceRun(readRun(run.id)));
   settle(`${run.id}-implement`, 'succeeded', { outcome: 'blocked', summary: 'two readings', artifacts: [], needs: 'Rename --flag?' });
@@ -1021,7 +1024,7 @@ test("`nemia decide`'s program, given the engine as a service, answers what its 
   await runWith(e, advanceRun(readRun(run.id)));
 
   const face = await runWith(e, decideRun(run.id));
-  const program = await Effect.runPromise(decideRun(run.id).pipe(Effect.provide(EngineService.layer(e))));
+  const program = await runPlaced(decideRun(run.id).pipe(Effect.provide(EngineService.layer(e))));
   assert.deepEqual(
     face.answers.implement,
     { try: 2, message: 'Keep it.', needs: 'Rename --flag?' },
@@ -1046,7 +1049,7 @@ test("`nemia decide`'s refusal is its program's typed failure: a `Missing`, pick
   const { Effect } = await import('effect');
   const { decideRun } = await import('../src/decide/decide.verb.ts');
   const { EngineService } = await import('../src/runtime-client.ts');
-  const recovered = await Effect.runPromise(
+  const recovered = await runPlaced(
     decideRun('no-such-run').pipe(
       Effect.catchTag('Missing', (r) => Effect.succeed(r.message)),
       Effect.provide(EngineService.layer(board().e)),
@@ -1058,7 +1061,7 @@ test("`nemia decide`'s refusal is its program's typed failure: a `Missing`, pick
 test("`nemia decide`'s program says in its type what it needs and what it refuses: run without the engine, it does not typecheck, and a refusal is its failure", async () => {
   const { Effect } = await import('effect');
   const { decideRun } = await import('../src/decide/decide.verb.ts');
-  const typed: EffectOf<Decided, Refusal, EngineService> = decideRun('x');
+  const typed: EffectOf<Decided, Refusal, EngineService | PlaceService> = decideRun('x');
   // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
   const infallible: EffectOf<Decided, never, EngineService> = decideRun('x');
   const unprovided = () =>
@@ -1174,7 +1177,7 @@ test('the whole screen of a run waiting on you: verdicts, touched, lesson, in fu
 });
 
 test('the whole screen of a running run, of a try asked for, of a step blocked with its question, and of a try a person answered', async (t) => {
-  const run = await Effect.runPromise(startRun({ brief: 'add sub', repo: aRepo(), workflowDir: folder(), isolate: false }));
+  const run = await runPlaced(startRun({ brief: 'add sub', repo: aRepo(), workflowDir: folder(), isolate: false }));
   const { e, settle } = board();
   await runWith(e, advanceRun(readRun(run.id)));
   assert.deepEqual(await whole(t, e, run.id), ['<id>  add sub', '', '  still running: implement', '  nothing to decide yet']);
@@ -1255,7 +1258,7 @@ test('the whole screen of a step past its budget: FAILED and OVER BUDGET, and th
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\nbudget: 3\n---\nimplement it\n');
   fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\nplace: git\n---\nreview it\n');
-  const run = await Effect.runPromise(startRun({ brief: 'add sub, failed', repo: aRepo(), workflowDir: dir, isolate: false }));
+  const run = await runPlaced(startRun({ brief: 'add sub, failed', repo: aRepo(), workflowDir: dir, isolate: false }));
   const { e, settle } = board();
   await runWith(e, advanceRun(readRun(run.id)));
   settle(`${run.id}-implement`, 'failed', undefined, { costUsd: 3.4 });
@@ -1287,7 +1290,7 @@ test('the whole screen of a step past its budget: FAILED and OVER BUDGET, and th
 });
 
 test('the whole screen of a run the run nudged to sign off, unsigned again, and of one whose cost was measured', async (t) => {
-  const run = await Effect.runPromise(startRun({ brief: 'add sub, unsigned', repo: aRepo(), workflowDir: folder(), isolate: false }));
+  const run = await runPlaced(startRun({ brief: 'add sub, unsigned', repo: aRepo(), workflowDir: folder(), isolate: false }));
   const { e, settle } = board();
   await runWith(e, advanceRun(readRun(run.id)));
   settle(`${run.id}-implement`, 'failed', undefined, undefined, 'unsigned');
@@ -1320,7 +1323,7 @@ test('the whole screen of a run the run nudged to sign off, unsigned again, and 
     '',
   ]);
 
-  const measured = await Effect.runPromise(startRun({ brief: 'add sub', repo: aRepo(), workflowDir: folder(), isolate: false }));
+  const measured = await runPlaced(startRun({ brief: 'add sub', repo: aRepo(), workflowDir: folder(), isolate: false }));
   const other = board();
   await runWith(other.e, advanceRun(readRun(measured.id)));
   other.settle(`${measured.id}-implement`, 'succeeded', SIGNED, { ...USAGE, costUsd: 3.012, apiMs: 486_000, toolMs: 2_400 });
@@ -1373,7 +1376,7 @@ test("the whole screen of an ending at its gate: the folder's words, approve it 
     path.join(dir, 'ship.md'),
     "---\nafter: implement\nplace: git\nworkspace: main\ngate: true\n---\nShip it: trial merge this run's result branch onto main, run the check, and commit.\n\nAbort on any failure.\n",
   );
-  const run = await Effect.runPromise(startRun({ brief: 'add sub', repo, workflowDir: dir }));
+  const run = await runPlaced(startRun({ brief: 'add sub', repo, workflowDir: dir }));
   const { e, settle } = board();
   await runWith(e, advanceRun(readRun(run.id)));
   const work = readRun(run.id).steps.implement;
@@ -1420,7 +1423,7 @@ test("the whole screen of an ending at its gate: the folder's words, approve it 
 
 test('the whole screen of a gate on a last step that merges nothing, before and after its approval', async (t) => {
   const repo = aRepo();
-  const run = await Effect.runPromise(startRun({ brief: 'add sub', repo, workflowDir: folder(), gates: ['review'] }));
+  const run = await runPlaced(startRun({ brief: 'add sub', repo, workflowDir: folder(), gates: ['review'] }));
   const { e, settle } = board();
   await runWith(e, advanceRun(readRun(run.id)));
   const work = readRun(run.id).steps.implement;
@@ -1516,9 +1519,7 @@ test('the whole screen of a gate on a last step that merges nothing, before and 
 
 test('the whole screen of a run that worked on the base branch itself', async (t) => {
   const repo = aRepo();
-  const run = await Effect.runPromise(
-    startRun({ brief: 'add sub, directly', repo, workflowDir: folder(), isolate: false, gates: ['review'] }),
-  );
+  const run = await runPlaced(startRun({ brief: 'add sub, directly', repo, workflowDir: folder(), isolate: false, gates: ['review'] }));
   const { e, settle } = board();
   await runWith(e, advanceRun(readRun(run.id)));
   settle(`${run.id}-implement`, 'succeeded', SIGNED);
@@ -1585,7 +1586,7 @@ test('the whole screen of a run on two branches, one with a note longer than the
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   fs.writeFileSync(path.join(dir, 'docs.md'), '---\nplace: git\n---\nwrite it down\n');
-  const run = await Effect.runPromise(startRun({ brief: 'add sub', repo: aRepo(), workflowDir: dir }));
+  const run = await runPlaced(startRun({ brief: 'add sub', repo: aRepo(), workflowDir: dir }));
   const { e, settle } = board();
   await runWith(e, advanceRun(readRun(run.id)));
   const committed = (step: string, file: string, text: string) => {

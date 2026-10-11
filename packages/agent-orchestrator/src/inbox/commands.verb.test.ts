@@ -9,11 +9,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import { promised } from '../../test/promised.ts';
+import { runOver } from '../../test/placed.ts';
 
 const ROOT = scratch('wf-inbox-card-');
 process.env.WF_ROOT = ROOT;
 const { INBOX_CARD } = await import('./commands.verb.ts');
-const { runWith } = await import('../runtime-client.ts');
+const { runWith: runEngine } = await import('../runtime-client.ts');
+const { gitPlaceLayer } = await import('../place/shipped.store.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
 
 /** No read here asks the engine anything. */
 const NO_ENGINE = promised({});

@@ -9,10 +9,10 @@
  * The phases of a pass. `records`: the run records, with the cancellation, pruning and hold beside each. `asks`: a person's asks,
  * approvals, acceptances and answers. `journals`: the runtime's journals, read through the engine (`view`, `feed`, `logs`, `output`), less
  * the observing a view does. `observe`: asking each harness what runs — the harnesses of one pass at once, so the slowest's time.
- * `runtime`: the runtime's own pass, less its observe. `place`: every place verb's script (`runPlaceVerb`, `runPlaceVerbAsync`), its
- * process and its time, whether it judged (where a branch stands) or acted (a worktree, a hand-off, a landing). `assess`: the judgement,
- * and any time not counted as another phase. `act`: filing, admitting, stopping, collecting a step's artifacts, and writing the run's
- * record, the feed and the ceilings.
+ * `runtime`: the runtime's own pass, less its observe. `place`: every question asked of the place, a call each, the processes the place
+ * starts to answer it and its time, whether it judged (where a branch stands) or acted (a worktree, a hand-off, a landing). `assess`: the
+ * judgement, and any time not counted as another phase. `act`: filing, admitting, stopping, collecting a step's artifacts, and writing the
+ * run's record, the feed and the ceilings.
  */
 export const PHASES = ['records', 'asks', 'journals', 'observe', 'runtime', 'place', 'assess', 'act'] as const;
 export type Phase = (typeof PHASES)[number];

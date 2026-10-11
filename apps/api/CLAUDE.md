@@ -46,7 +46,7 @@ below its layer is in `docs/architecture.md`, *Who owns what*.
   one builds an app. `StoreRoot` moves where the api looks for yours, never the package's runs or inbox, which keep its `HOME`.
 - **A handler's body stays a plain `async` function inside `served`**: a failure yielded in `Effect.gen` never reaches a `try` around
   it, and the routes catch what they word themselves; `runPromise` rejects with the failure itself, so `app.onError` sees its kind.
-  A package's program runs over the request's engine with `runWith(e, …)`, a verb of the engine itself with `engineRead` (store.ts).
+  A package's program runs over the request's engine and the app's place with `runPlaced(placeService, e, …)`, a verb of the engine itself with `engineRead` (store.ts).
 - **A test imports the api and the package statically, after the harness**, which sets `WF_ROOT` and `CLAUDE_CONFIG_DIR` to scratch
   folders as it loads (`root`, `config`): the package fixes its store as its modules load. `harness.test.ts` refuses an `import()`.
 - **A folder's face (`index.ts`) is the door `app.ts` mounts**: an import between folders names the file where the face would close a
@@ -64,6 +64,9 @@ below its layer is in `docs/architecture.md`, *Who owns what*.
   script's `--test-timeout` gives a test given none. `DEADLINES` (`test/waits.test.ts`) refuses a hand-written deadline.
 - **A run's record, asks and stamps, and the inbox's cards, are read through `runStore`** (`agent-orchestrator`): the root exports no
   store function of a run (`packages/agent-orchestrator/test/entries.test.ts`).
+- **A package program that asks the place is run with `runPlaced(placeService, e, program)`** (`src/store.ts`), the place the app's layer
+  holds (`PlaceService` in `Services`, `gitPlaceLayer` in `liveOf`, `Served.placeService`); a test replaces it with
+  `Layer.merge(liveOf(), PlaceService.layer(…))`, and runs a package program itself with the `runWith` of `test/placed.ts`.
 - **A request's factory and repository are resolved in `served`** (`placeFor`, `factories/place.ts`): a handler reads `repo` and `factory`
   off `Served`, never `?repo=` itself, and the api serves no repository but its own and those a factory names (`factories.test.ts`).
 - **An agent fills a step by the file a start would run it with** (`stepsFilled`, the package's `roster/fills.store.ts`), never by its

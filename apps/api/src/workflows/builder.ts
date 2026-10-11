@@ -31,7 +31,6 @@ import {
   skillsFor,
   type Places,
   type WorkflowWritten,
-  runWith,
   repoWriteRefusal,
   workflowStale,
   workflowVersion,
@@ -60,6 +59,8 @@ import { type ApiEnv, served } from '../layer.ts';
 import { KINDS, schemaNameRefusal, WORDS, workflowNameRefusal, type KeyKind } from './words.ts';
 import type { Engine } from '../store.ts';
 import { folderOf, listed, loadedOf, placesOf, specOf, type WorkflowListing, type WorkflowStepSpec } from './workflows.ts';
+import { runPlaced } from '../store.ts';
+import type { PlaceService } from 'agent-orchestrator';
 
 /**
  * The harness a step runs on when it names none, whose words `effort` and `permissionMode` take then — and which takes no `sandbox`. The
@@ -490,7 +491,15 @@ const WRITE = COMMANDS.find((c) => c.name === 'workflows write')!;
  * A write of the folder `name` at `dir`, of yours, read as a start on `repo` reads it, through the engine `e`: a change of the folder
  * there (`changes`), handed the version it holds once its schemas are written, or a new one.
  */
-type Writing = { e: Engine['Service']; name: string; dir: string; repo: string; home: string; changes: boolean };
+type Writing = {
+  e: Engine['Service'];
+  placeService: PlaceService['Service'];
+  name: string;
+  dir: string;
+  repo: string;
+  home: string;
+  changes: boolean;
+};
 
 /**
  * A folder written through the package (`WRITE`, the table's `workflows write`), with the schemas pasted for it, or its refusal (422,
@@ -506,7 +515,7 @@ type Writing = { e: Engine['Service']; name: string; dir: string; repo: string; 
  * a write that fails partway has changed the file all the same, so a schema counts as written before its write, not after it.
  */
 async function write(
-  { e, name, dir, repo, home, changes }: Writing,
+  { e, placeService, name, dir, repo, home, changes }: Writing,
   steps: readonly StepDraft[],
   readme: string | undefined,
   schemas: readonly SchemaFile[] = [],
@@ -547,7 +556,7 @@ async function write(
       ...(readme !== undefined && { readme }),
       ...(changes && { version: workflowVersion(dir, places) }),
     };
-    result = (await runWith(e, WRITE.handler(args, undefined, home))) as WorkflowWritten;
+    result = (await runPlaced(placeService, e, WRITE.handler(args, undefined, home))) as WorkflowWritten;
   } catch (err) {
     putSchemasBack(dir, written);
     if (err instanceof WorkflowError) return refused(err.message);
@@ -555,7 +564,7 @@ async function write(
   }
   const kept = writing.filter((s) => !schemasWritten.includes(s.file)).map((s) => s.file);
   return {
-    workflow: listed(name, 'yours', dir, places, (await loadedOf(e, [dir], repo, home))[dir]),
+    workflow: listed(name, 'yours', dir, places, (await loadedOf(e, placeService, [dir], repo, home))[dir]),
     written: [...result.written, ...schemasWritten].sort(),
     kept: [...result.kept, ...kept].sort(),
     removed: result.removed,
@@ -577,7 +586,7 @@ async function write(
 export const builder = new Hono<ApiEnv>()
   .get('/api/workflows/keys', (c) => served(c, ({ home }) => c.json(keyForm(home))))
   .post('/api/workflows/:from', (c) =>
-    served(c, async ({ e, repo, home }) => {
+    served(c, async ({ e, placeService, repo, home }) => {
       const { from } = c.req.param();
       const route = `POST /api/workflows/${from}`;
       const refused = refusedBeforeReading(
@@ -595,13 +604,13 @@ export const builder = new Hono<ApiEnv>()
       const step = draftOf(read.body.step, '`step`', route, POST_SHAPE);
       if ('status' in step) return c.json({ error: step.error }, step.status);
       const dir = path.join(home, 'workflows', name);
-      const saved = await write({ e, name, dir, repo, home, changes: false }, [step], readme);
+      const saved = await write({ e, placeService, name, dir, repo, home, changes: false }, [step], readme);
       if ('error' in saved) return c.json(saved, 422);
       return c.json(saved, 201);
     }),
   )
   .put('/api/workflows/:from/:name', (c) =>
-    served(c, async ({ e, repo, home }) => {
+    served(c, async ({ e, placeService, repo, home }) => {
       const { from, name } = c.req.param();
       const route = `PUT /api/workflows/${from}/${name}`;
       const refused = refusedBeforeReading(
@@ -631,7 +640,7 @@ export const builder = new Hono<ApiEnv>()
       }
       const now = workflowVersion(folder.dir, placesOf(repo, home));
       if (now !== body.version) return c.json({ error: workflowStale.write(folder.dir, body.version, now), steps: [] }, 409);
-      const saved = await write({ e, name, dir: folder.dir, repo, home, changes: true }, steps, body.readme, schemas);
+      const saved = await write({ e, placeService, name, dir: folder.dir, repo, home, changes: true }, steps, body.readme, schemas);
       if ('error' in saved) return c.json(saved, 422);
       return c.json(saved, 200);
     }),

@@ -12,6 +12,7 @@ import { parse, stringify } from 'yaml';
 import { scratch } from '../../test/scratch.ts';
 import { promised } from '../../test/promised.ts';
 import { teamCopy } from '../../test/team.ts';
+import { runOver } from '../../test/placed.ts';
 
 const ROOT = scratch('wf-applied-');
 process.env.WF_ROOT = ROOT;
@@ -23,7 +24,9 @@ const { reconcileFactory, reconcileOnce } = await import('./applied.verb.ts');
 const { appliedDir, readStatus, statusFile, treeDir } = await import('./applied.store.ts');
 const { readRun } = await import('../record/record.store.ts');
 const { startDue } = await import('../schedule/schedule.verb.ts');
-const { runWith } = await import('../runtime-client.ts');
+const { runWith: runEngine } = await import('../runtime-client.ts');
+const { gitPlaceLayer } = await import('../place/shipped.store.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
 const { Effect } = await import('effect');
 
 /** No verb here asks the engine anything. */

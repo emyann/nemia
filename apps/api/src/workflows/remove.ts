@@ -8,12 +8,13 @@
  */
 import { Schema } from 'effect';
 import { Hono } from 'hono';
-import { COMMANDS, runWith } from 'agent-orchestrator';
+import { COMMANDS } from 'agent-orchestrator';
 import { readBody, valueAt } from '../body.ts';
 import { refusedBeforeReading } from '../guard.ts';
 import { type ApiEnv, served } from '../layer.ts';
 import { buildGuard, yoursOnly } from './builder.ts';
 import { folderOf } from './workflows.ts';
+import { runPlaced } from '../store.ts';
 
 /** The table's entry a folder of yours is removed through, which refuses a folder changed since it was read. */
 const REMOVE = COMMANDS.find((c) => c.name === 'workflows remove')!;
@@ -31,7 +32,7 @@ const DELETE_BODY = Schema.Struct({ version: Schema.NonEmptyString });
  *   with the folder and the files it held (`WorkflowRemoved`).
  */
 export const remover = new Hono<ApiEnv>().delete('/api/workflows/:from/:name', (c) =>
-  served(c, async ({ e, repo, home }) => {
+  served(c, async ({ e, placeService, repo, home }) => {
     const { from, name } = c.req.param();
     const route = `DELETE /api/workflows/${from}/${name}`;
     const refused = refusedBeforeReading(
@@ -53,6 +54,6 @@ export const remover = new Hono<ApiEnv>().delete('/api/workflows/:from/:name', (
     if ('status' in read) return c.json({ error: read.error }, read.status);
     const folder = folderOf(name, 'yours', repo, home);
     if ('status' in folder) return c.json({ error: folder.error }, folder.status);
-    return c.json(await runWith(e, REMOVE.handler({ from, name, version: read.body.version, repo }, undefined, home)));
+    return c.json(await runPlaced(placeService, e, REMOVE.handler({ from, name, version: read.body.version, repo }, undefined, home)));
   }),
 );

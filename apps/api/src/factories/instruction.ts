@@ -4,8 +4,9 @@
  * request, where the factory's file says: a file in its first folder, which the api never writes, or the store.
  */
 import { Hono } from 'hono';
-import { FACTORY_INSTRUCTION, factoryNameRefusal, runWith, type FactoryInstruction } from 'agent-orchestrator';
+import { FACTORY_INSTRUCTION, factoryNameRefusal, type FactoryInstruction } from 'agent-orchestrator';
 import { type ApiEnv, served } from '../layer.ts';
+import { runPlaced } from '../store.ts';
 
 /**
  * A factory's instruction's read. A name that is no factory's is refused in the package's words (400) before anything is read, so none
@@ -20,10 +21,10 @@ import { type ApiEnv, served } from '../layer.ts';
  * the entries (commands/routes.ts), guarded, each answered as the read.
  */
 export const factoryInstruction = new Hono<ApiEnv>().get('/api/factories/:factory/instruction', (c) =>
-  served(c, async ({ e }) => {
+  served(c, async ({ e, placeService }) => {
     const { factory } = c.req.param();
     const wrong = factoryNameRefusal(factory);
     if (wrong !== undefined) return c.json({ error: `GET /api/factories/${factory}/instruction: ${wrong}` }, 400);
-    return c.json((await runWith(e, FACTORY_INSTRUCTION.handler({ factory }))) satisfies FactoryInstruction);
+    return c.json((await runPlaced(placeService, e, FACTORY_INSTRUCTION.handler({ factory }))) satisfies FactoryInstruction);
   }),
 );

@@ -6,9 +6,10 @@
  * session at her keeper's next beat.
  */
 import { Hono } from 'hono';
-import { AGENTS_CUSTOM, customInstructionsFile, runWith } from 'agent-orchestrator';
+import { AGENTS_CUSTOM, customInstructionsFile } from 'agent-orchestrator';
 import { agentNameRefusal, WorkflowError } from 'agent-orchestrator/workflow';
 import { type ApiEnv, served } from '../layer.ts';
+import { runPlaced } from '../store.ts';
 
 /**
  * An agent's custom instructions as the board reads them: the file they are kept in, the words (null for none), and `error`, the
@@ -32,12 +33,12 @@ export type CustomInstructionsCleared = { name: string; file: string; removed: b
  * frontmatter block 422 (`Invalid`), each writing nothing. A save carries no version: the last write wins.
  */
 export const customInstructions = new Hono<ApiEnv>().get('/api/custom-instructions/:name', (c) =>
-  served(c, async ({ e, repo, home }) => {
+  served(c, async ({ e, placeService, repo, home }) => {
     const { name } = c.req.param();
     const wrong = agentNameRefusal(name);
     if (wrong !== undefined) return c.json({ error: `GET /api/custom-instructions/${name}: ${wrong}` }, 400);
     try {
-      return c.json((await runWith(e, AGENTS_CUSTOM.handler({ name, repo }, undefined, home))) as CustomInstructionsAnswer);
+      return c.json((await runPlaced(placeService, e, AGENTS_CUSTOM.handler({ name, repo }, undefined, home))) as CustomInstructionsAnswer);
     } catch (err) {
       if (!(err instanceof WorkflowError)) throw err;
       return c.json({ name, file: customInstructionsFile(home, name), words: null, error: err.message } satisfies CustomInstructionsAnswer);

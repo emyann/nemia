@@ -50,6 +50,7 @@ import { isRemoteHarness } from '../harness/harness.ts';
 import { collisionsDue, type Collisions } from '../collide/collide.ts';
 import { collisionsAt } from '../collide/collisions.verb.ts';
 import { landingDenies, statusMemo } from '../place/landing.store.ts';
+import { PlaceService } from '../place/place.store.ts';
 
 /** A step's current try that a person answered: the try, what they said, and what the try before it needed, when it said. */
 export type Answered = { try: number; message: string; needs?: string };
@@ -266,7 +267,8 @@ export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.
   const verdictOf = (name: string) => checks[name]?.verdict;
   const blocked = harnessBlocked(views);
   const spendOf = spendReader(views);
-  const memo = statusMemo((r) => headsOver(live.read())(r));
+  const place = yield* PlaceService;
+  const memo = statusMemo((r) => headsOver(live.read())(r), place);
   const checkout = yield* checkoutHold(e, run, steps, { standing: live.standing }, env, memo);
   const decided = (git: BranchReader) =>
     decision(steps, run, phaseOf, shippedOf(run, git), reader, asked, verdictOf, asks, rounds, blocked, spendOf, checkout);
@@ -276,7 +278,7 @@ export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.
   const standings = d.kind === 'running' || d.kind === 'cancelled' ? [] : yield* tried(() => standingsOf(run, git));
   const { toDecide: decide } = assess(steps, run, phaseOf, reader, asked, verdictOf, asks, rounds, blocked, spendOf, standings);
   const ending = collisionsDue(steps, run, decide);
-  const collisions = ending ? yield* collisionsAt(run, ending, standings, git) : undefined;
+  const collisions = ending ? yield* collisionsAt(run, ending, standings, git, place) : undefined;
   const answers = yield* answersOf(e, run, views, yield* tried(() => runStore.asks.answers(id)));
   const everyTry = yield* everyTryOf(e, run, views);
   const said = saidOf(run, everyTry);
@@ -290,8 +292,8 @@ export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.
   const ended = Boolean(run.cancelledAt || run.pruned || run.hold);
   const offers = [
     ...roundOffers(steps, run, d, spendOf),
-    ...mergeOffers(steps, run, d, rounds, phaseOf, reader, asked, spendOf),
-    ...retryOffers(steps, run, d, phaseOf, reader, asked, spendOf, verdictOf, () => landingDenies(run)),
+    ...mergeOffers(place, steps, run, d, rounds, phaseOf, reader, asked, spendOf),
+    ...retryOffers(steps, run, d, phaseOf, reader, asked, spendOf, verdictOf, () => landingDenies(run, place)),
   ];
   const parent = yield* parentsRead(run, yield* live.when(waitedOn(run).length > 0)).pipe(over(e));
   const answer: Decided = {

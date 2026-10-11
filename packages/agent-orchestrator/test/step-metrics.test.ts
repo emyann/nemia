@@ -20,6 +20,7 @@ import { Effect, Metric, References, Tracer } from 'effect';
 import { Engine as RuntimeEngine, nameFor, type Sighting } from 'agent-runtime';
 import { asyncOps, asyncStore, plainEngine, type AsyncJournal, type AsyncRunner } from './promised.ts';
 import { scratch } from './scratch.ts';
+import { runGiven, runOver } from './placed.ts';
 
 const ROOT = scratch('wf-step-metrics-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -27,7 +28,9 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 process.env.WF_MAX_RUNS = '10';
 process.env.WF_MAX_CONCURRENT = '10';
-const { retryRun, runWith, startRun, tickRun } = await import('../src/runner.ts');
+const { retryRun, runWith: runEngine, gitPlaceLayer, startRun, tickRun } = await import('../src/runner.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
+const runPlaced = runGiven(gitPlaceLayer);
 const { readRun } = await import('../src/record/record.store.ts');
 const { DENIED_SPAN } = await import('../src/meter/meter.verb.ts');
 const { EngineService } = await import('../src/runtime-client.ts');
@@ -109,7 +112,7 @@ const daemon = () => {
 const FIRST = daemon();
 /** One pass of the tick, as the daemon `life` makes it, its metrics in the test's registry. */
 const tick = (life = FIRST) =>
-  Effect.runPromise(
+  runPlaced(
     tickRun({ memo: life.memo }).pipe(
       Effect.provide(EngineService.layer(engine)),
       Effect.provideService(Metric.MetricRegistry, registry),
@@ -140,7 +143,7 @@ fs.mkdirSync(WORKFLOW);
 fs.writeFileSync(path.join(WORKFLOW, 'implement.md'), '---\nplace: git\n---\nBuild it.\n');
 
 test("a step that settles with a cost records its cost once, by its factory, workflow, step, agent and outcome, and no run's id", async () => {
-  const run = await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: WORKFLOW, isolate: false }));
+  const run = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: WORKFLOW, isolate: false }));
   const taskId = `${run.id}-implement`;
   for (let i = 0; i < 4 && !sessions.has(nameFor(taskId, 1)); i++) await tick();
   assert.ok(sessions.has(nameFor(taskId, 1)), 'its session started');
@@ -177,7 +180,7 @@ const signDenied = (taskId: string, n: number, outcome: 'done' | 'blocked', deni
 
 /** A run of `metered` whose step was denied `Glob` and signed off blocked, read by passes of the first daemon. */
 const blockedRun = async () => {
-  const run = await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: WORKFLOW, isolate: false }));
+  const run = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: WORKFLOW, isolate: false }));
   const taskId = `${run.id}-implement`;
   assert.deepEqual(readRun(run.id).deniedCounted, [], 'a run just started has counted none');
   for (let i = 0; i < 4 && !sessions.has(nameFor(taskId, 1)); i++) await tick();
@@ -232,7 +235,7 @@ const workflowOf = (name: string): string => {
 
 /** A run of the workflow `name`, started and ticked by `life` until its session works. */
 const working = async (name: string, life = FIRST) => {
-  const run = await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: workflowOf(name), isolate: false }));
+  const run = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: workflowOf(name), isolate: false }));
   const taskId = `${run.id}-implement`;
   for (let i = 0; i < 4 && !sessions.has(nameFor(taskId, 1)); i++) await tick(life);
   assert.ok(sessions.has(nameFor(taskId, 1)), 'its session started');

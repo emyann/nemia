@@ -4,12 +4,12 @@
  * and whether git could prune it; whether it is clean and the paths it holds uncommitted, `clean` null where it is locked, prunable or its
  * status does not read; and whether its HEAD's commit is on a branch. Then each branch under `refs/heads/<prefix>`, and whether it is
  * merged into `base` — false where `base` names nothing. A `repo` that is no directory left nothing there: it answers empty. A repository
- * git cannot list exits 1, which is no answer, never an empty one.
+ * git cannot list throws, which is no answer, never an empty one.
  */
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { git, gitSays, isDirectory, serve, text } from './contract.ts';
+import { git, gitSays, isDirectory, printed, type Asking, type Reply } from '../git.ts';
+import type { Held, PlaceRequests } from '../../../src/place/place.ts';
 
 /** A worktree as `git worktree list --porcelain` lists it. */
 type Listed = { path: string; head?: string; branch?: string; detached?: true; locked?: string; prunable?: true };
@@ -52,9 +52,9 @@ function inside(dir: string, p: string): boolean {
 }
 
 /** The paths `git status --porcelain` lists in `worktree`, untrimmed so a first line's leading space stays; undefined when git fails. */
-function changesIn(worktree: string): string[] | undefined {
+function* changesIn(worktree: string): Asking<string[] | undefined> {
   try {
-    const said = execFileSync('git', ['status', '--porcelain'], { cwd: worktree, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    const said = yield* printed({ cmd: 'git', cwd: worktree, args: ['status', '--porcelain'] });
     return said
       .split('\n')
       .filter(Boolean)
@@ -65,11 +65,13 @@ function changesIn(worktree: string): string[] | undefined {
 }
 
 /** One listed worktree, as the contract's `Held` has it. */
-function held(repo: string, w: Listed): object {
+function* held(repo: string, w: Listed): Asking<Held> {
   const readable = w.locked === undefined && !w.prunable;
-  const changes = readable ? changesIn(w.path) : undefined;
+  const changes = readable ? yield* changesIn(w.path) : undefined;
   const contained =
-    w.detached && w.head && readable ? gitSays(repo, ['for-each-ref', '--contains', w.head, '--format=%(refname)', 'refs/heads/']) : '';
+    w.detached && w.head && readable
+      ? yield* gitSays(repo, ['for-each-ref', '--contains', w.head, '--format=%(refname)', 'refs/heads/'])
+      : '';
   return {
     path: w.path,
     ...(w.head ? { head: w.head } : {}),
@@ -83,19 +85,18 @@ function held(repo: string, w: Listed): object {
   };
 }
 
-serve((request) => {
-  const repo = text(request, 'repo');
-  const under = resolved(text(request, 'under'));
-  const prefix = text(request, 'prefix');
-  const base = text(request, 'base');
+/** The verb's body. */
+export function* inventory(request: PlaceRequests['inventory']): Asking<Reply<'inventory'>> {
+  const { repo, prefix, base } = request;
+  const under = resolved(request.under);
   if (!isDirectory(repo)) return { workspaces: [], branches: [] };
-  const workspaces = parseWorktrees(git(repo, ['worktree', 'list', '--porcelain']))
-    .filter((w) => inside(under, w.path))
-    .map((w) => held(repo, w));
-  const branches = git(repo, ['for-each-ref', '--format=%(refname)', `refs/heads/${prefix}`])
-    .split('\n')
-    .filter(Boolean)
-    .map((ref) => ref.replace(/^refs\/heads\//, ''))
-    .map((branch) => ({ branch, merged: gitSays(repo, ['merge-base', '--is-ancestor', `refs/heads/${branch}`, base]) !== undefined }));
+  const workspaces: Held[] = [];
+  for (const w of parseWorktrees(yield* git(repo, ['worktree', 'list', '--porcelain'])))
+    if (inside(under, w.path)) workspaces.push(yield* held(repo, w));
+  const branches: { branch: string; merged: boolean }[] = [];
+  for (const ref of (yield* git(repo, ['for-each-ref', '--format=%(refname)', `refs/heads/${prefix}`])).split('\n').filter(Boolean)) {
+    const branch = ref.replace(/^refs\/heads\//, '');
+    branches.push({ branch, merged: (yield* gitSays(repo, ['merge-base', '--is-ancestor', `refs/heads/${branch}`, base])) !== undefined });
+  }
   return { workspaces, branches };
-});
+}

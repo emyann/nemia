@@ -39,6 +39,18 @@ runtime's.
 **Above the runtime by design**: run slots, checkout holds, worktrees and landing, what a check means, budgets across tries, gates, the
 inbox, factories, stats, agent definitions.
 
+**Where a run's work lives is the place's**, an interface the orchestrator owns and asks (`PlaceService`, `src/place/place.store.ts`:
+`ask(verb, request)` and `askNow`, over the contract of `src/place/place.ts`), required by every program that asks it and with no
+default: the daemon, a CLI command, the api's layer and each test give one by name, and a program given none does not compile
+(`src/place/place.store.test.ts`). Git is one place, in code outside `src` (`packages/agent-orchestrator/place/git`), one object for
+every factory and repository of its process, a question a call that runs git and no process between (`test/git-place.test.ts`); it is
+given as `gitPlaceLayer` by `src/place/shipped.store.ts`, the one file of `src` that imports it (`placeBreaks` in `test/boundary.test.ts`),
+so no `src` names git (`test/git-calls.test.ts`). Two things are given up on purpose. *A team's own place as a folder of scripts*: a
+place is no longer a skill's `scripts/<verb>.ts` declared by a `place.json` and run as a process a question, so a team cannot bring
+one as files; another place is code that implements `PlaceService`, given as a layer where the program is composed. *A place frozen
+per run*: a run copies no place and its record names none (`test/start-place.test.ts`), so a run in flight is answered by the place
+of the process that asks, the release installed, and a change to the place reaches it at the next restart.
+
 **A loop's rounds** are the orchestrator's, counted off the looping step's tries that went `then: 'round'` (`roundIn`,
 `src/status/status.ts`): a reviewer's `again: true`, and a person's `nemia round`. A merge of the base (`nemia merge`, `src/merge/`) is
 no round: the loop's target is filed again to merge the base at the commit a trial merge read, its try `then: 'merge'`, the run's
@@ -234,7 +246,7 @@ A file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or `CLIENT
   meter/tally.store.ts (the pass's meter) and config/config.store.ts, which import no store file. agents/read.store.ts (the
   agents read, and a person's custom instructions) imports only skills/read.store.ts; folder/folder.store.ts imports only
   agents/read.store.ts and skills/read.store.ts; record/record.store.ts imports only the bottom four, folder.store.ts and
-  record/steps.store.ts; workspace/worktree.store.ts imports only record.store.ts, places.store.ts and tally.store.ts; folder/write.store.ts
+  record/steps.store.ts; workspace/worktree.store.ts imports only record.store.ts, places.store.ts, tally.store.ts and place/place.store.ts; folder/write.store.ts
   imports only record.store.ts, the two reads and factory/factory.store.ts. Any other store file imports only these, and none imports it.
   Outside the store, only the client and the controllers beneath the CLI import a store file, and one of them imports
   each.
@@ -248,8 +260,10 @@ A file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or `CLIENT
   the controllers import one another with no cycle.
 - **client** is `src/runtime-client.ts`, the subject of the third rule.
 
-A place skill's scripts (`place/<name>/scripts/`) are none of the four: node runs them as they are, so they import node's
-built-ins and the scripts beside them alone (`placeBreaks` in the same test).
+A place's code (`place/<name>/`, the git place's `place.ts`, `git.ts` and `verbs/`) is none of the four, and stands beside `src`: it
+imports node's built-ins, `effect`, its own files, and what a place is (`src/place/place.ts`, `src/place/place.store.ts`), and one file
+of `src` alone imports it, `src/place/shipped.store.ts`, which gives it as a layer (`gitPlaceLayer`); every other file asks the place it
+is given (`PlaceService`). `placeBreaks` in the same test holds both.
 
 A file in src or bin that no kind names fails the suite. `packages/agent-orchestrator/test/layout.test.ts` holds the
 folders: at most six source files in one, no folder named `utils`, `helpers`, `common`, `shared` or `misc`, no two

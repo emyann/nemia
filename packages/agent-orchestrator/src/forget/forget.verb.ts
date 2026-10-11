@@ -1,6 +1,6 @@
 /**
  * Forgetting a run that is over (`forgetRun`, `nemia rm`): it reads a run as `cancelRun` does, adopting what a pass filed and never wrote
- * down (`tick/advance.verb.ts`), refuses by name before anything is touched, and removes through the run's place (`runPlaceVerb`). A
+ * down (`tick/advance.verb.ts`), refuses by name before anything is touched, and removes through the place it is given. A
  * controller, reaching the runtime through the client (`runtime-client.ts`): an Effect program that requires the engine as a service
  * (`EngineService`), run with `runWith`. It never stops anything. `nemia rm` closes a task held open that waits for a word, which runs
  * nothing and is settled as it signed: no pass reads the run again to close it.
@@ -28,7 +28,7 @@ import {
 import { HOME, lstatOf, stepsOf } from '../record/record.store.ts';
 import { UnloadedFolder } from '../record/steps.store.ts';
 import { runStore } from '../record/files.store.ts';
-import { readPlaceJson, readRunPlace, runPlaceVerb, RunPlace, type RunPlaceRead } from '../place/place.store.ts';
+import { PlaceService, readRunPlace, type Place, type RunPlaceRead } from '../place/place.store.ts';
 import { sayFilled, unansweredWords, type Held } from '../place/place.ts';
 import { standingsOf, type BranchReader } from '../branches/branches.store.ts';
 import { headsOver, NOTHING_READ, standingLive, standingReader } from '../standing/standing.verb.ts';
@@ -64,7 +64,7 @@ type Worktrees = Pick<Forgot, 'removed' | 'handedOff' | 'gone' | 'left'>;
  * and go with its record: no worktree, no branch, and no git asked. A repository run goes in an order `nemia rm` can finish when it is
  * interrupted and run again:
  *
- * 0. **What it left, read by its place** (`inventory`, from the place `RunPlace` names), before anything is written: its worktrees inside
+ * 0. **What it left, read by its place** (`inventory`), before anything is written: its worktrees inside
  *    `worktrees/<id>` and its branches under `wf/<id>/`. An inventory refused or not heard is no answer, never an empty one: the run is
  *    refused in those words (`inventoryUnread`), and nothing is touched.
  * 1. **Its worktrees, through its place**: each the inventory lists (`runWorktrees`), by its real path, so the run's directory and the
@@ -99,10 +99,10 @@ export const forgetRun = Effect.fn('forget')(function* (id: string, how: ForgetH
   const { run, steps, unfrozen } = f;
   const said = { id, repo: run.repo, base: run.branch, isolate: run.isolate, ...(unfrozen ? { unfrozen } : {}) };
   const git = asksStanding(f.run, f.steps) ? yield* standingLive([f.run]) : standingReader(NOTHING_READ);
-  const refusal = yield* tried(() => refusalOf(id, f, git));
+  const asked = yield* PlaceService;
+  const refusal = yield* tried(() => refusalOf(id, f, git, asked));
   if (refusal) return { ...said, kind: 'refused', refusal, ...nothing() } satisfies Forgot;
-  const dirOf = yield* RunPlace;
-  const read = isRepositoryRun(run) ? yield* tried(() => readRunPlace(run, dirOf(run), dir)) : undefined;
+  const read = isRepositoryRun(run) ? yield* tried(() => readRunPlace(run, asked, dir)) : undefined;
   if (isRepositoryRun(run) && read && !('inventory' in read))
     return { ...said, kind: 'refused', refusal: inventoryUnread('rm', id, run.repo, read), ...nothing() } satisfies Forgot;
   const place = read && 'inventory' in read ? read : undefined;
@@ -125,14 +125,13 @@ export const forgetRun = Effect.fn('forget')(function* (id: string, how: ForgetH
 
 /**
  * A run whose record is gone: what is left under its id removed and named, `worktrees/<id>` named as orphaned, never removed, with what
- * to do in the words of the place `RunPlace` names for a record that names none (`orphans`), and the
+ * to do in the place's words (`orphans`), and the
  * engine's tasks a `nemia rm` cut short or left waiting wrote down (`runStore.forgetting`) forgotten now (`forgetTasks`).
  */
 const forgetMissing = Effect.fn('forgetMissing')(function* (id: string, dir: string) {
   const files = yield* tried(() => removeKeyed(id, undefined));
-  const dirOf = yield* RunPlace;
-  const orphans = () => readPlaceJson(dirOf({ id })).say.orphans;
-  const left: Forgot['left'] = lstatOf(dir) ? [{ path: dir, orphaned: true, fix: yield* tried(orphans) }] : [];
+  const { declared } = yield* PlaceService;
+  const left: Forgot['left'] = lstatOf(dir) ? [{ path: dir, orphaned: true, fix: declared.say.orphans }] : [];
   const taskIds = yield* tried(() => runStore.forgetting.read(id));
   const engine = taskIds ? { engine: yield* forgetTasks(id, taskIds) } : {};
   const forgot: Forgot = { id, kind: 'missing', ...nothing(), files, left, ...engine };
@@ -209,7 +208,7 @@ const asksStanding = (run: Run, steps: readonly Workflow[] | undefined): boolean
  * Why `nemia rm` will not forget the run `id`, read (`forgetRefusal`), or null: judged against the store's other runs, where its result
  * stands for an ending that has not run, and a merge the ending staged, as `git` reads them.
  */
-function refusalOf(id: string, f: Forgetting, git: BranchReader): string | null {
+function refusalOf(id: string, f: Forgetting, git: BranchReader, place: Place): string | null {
   const { run, steps } = f;
   const askAt = (a: AskName) => runStore.asks.where(id, a);
   const others = runStore.runs.list().filter((o) => o.id !== id);
@@ -229,7 +228,7 @@ function refusalOf(id: string, f: Forgetting, git: BranchReader): string | null 
     askAt,
     standings,
     'rm',
-    merging(run, steps, statusMemo(headsOver(git))),
+    merging(run, steps, statusMemo(headsOver(git), place)),
   );
 }
 
@@ -271,7 +270,7 @@ function handWorktree(run: RepositoryRun, place: RunPlaceRead, w: Held & { step:
     return false;
   }
   if (w.clean === true) return true;
-  const handed = runPlaceVerb(place.dir, 'handoff', { workspace: w.path, step: w.step, why: ', before its run was forgotten' });
+  const handed = place.place.askNow('handoff', { workspace: w.path, step: w.step, why: ', before its run was forgotten' });
   if ('refused' in handed)
     done.left.push({ path: w.path, step: w.step, uncommitted: handed.refused, fix: sayFilled(place.say.commit, { path: w.path }) });
   else if ('unread' in handed) done.left.push({ path: w.path, step: w.step, unread: { verb: 'handoff', said: handed.unread.said } });
@@ -282,7 +281,7 @@ function handWorktree(run: RepositoryRun, place: RunPlaceRead, w: Held & { step:
 
 /** Remove `removing` through the place's `remove`, never forced, adding to `done` what went and what git would not remove, in its words. */
 function removeListed(run: RepositoryRun, place: RunPlaceRead, removing: readonly Held[], done: Worktrees): void {
-  const outcome = runPlaceVerb(place.dir, 'remove', { repo: run.repo, workspaces: removing.map((w) => w.path), branches: [] });
+  const outcome = place.place.askNow('remove', { repo: run.repo, workspaces: removing.map((w) => w.path), branches: [] });
   if (!('answer' in outcome)) {
     for (const w of removing) done.left.push({ path: w.path, unread: { verb: 'remove', said: unansweredWords(outcome) } });
     return;
@@ -317,7 +316,7 @@ function deleteBranches(run: RepositoryRun, how: ForgetHow, place: RunPlaceRead,
   );
   const doomed = fates.filter((b) => b.deleted).map((b) => b.branch);
   if (!doomed.length) return fates;
-  const outcome = runPlaceVerb(place.dir, 'remove', { repo: run.repo, workspaces: [], branches: doomed });
+  const outcome = place.place.askNow('remove', { repo: run.repo, workspaces: [], branches: doomed });
   const kept = new Map<string, BranchFate['why']>(
     'answer' in outcome
       ? outcome.answer.kept.map((k) => [k.branch, { git: k.said }])

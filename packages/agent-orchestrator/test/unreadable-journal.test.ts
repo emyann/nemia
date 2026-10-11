@@ -17,6 +17,7 @@ import { asyncStore, type AsyncJournal, asyncOps, type AsyncRunner } from './pro
 import { scratch } from './scratch.ts';
 import { Effect } from 'effect';
 import { plainEngine } from './promised.ts';
+import { runGiven, runOver } from './placed.ts';
 
 const ROOT = scratch('wf-unreadable-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -25,7 +26,9 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_MAX_CONCURRENT = '10';
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
-const { startRun, runWith } = await import('../src/runner.ts');
+const { startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
+const runPlaced = runGiven(gitPlaceLayer);
 const { readRun } = await import('../src/record/record.store.ts');
 const { tickRun } = await import('../src/tick/tick.verb.ts');
 const { main } = await import('../src/cli/main.ts');
@@ -115,8 +118,8 @@ const printedBy = async (t: TestContext, argv: string[]) => {
 };
 
 test('a run whose task journal holds an entry no runtime wrote is left out of the pass and said, while the run beside it finishes', async (t) => {
-  const bad = await Effect.runPromise(startRun({ brief: 'the bad one', repo: REPO, workflowDir: FOLDER }));
-  const good = await Effect.runPromise(startRun({ brief: 'the good one', repo: REPO, workflowDir: FOLDER }));
+  const bad = await runPlaced(startRun({ brief: 'the bad one', repo: REPO, workflowDir: FOLDER }));
+  const good = await runPlaced(startRun({ brief: 'the good one', repo: REPO, workflowDir: FOLDER }));
   for (let k = 0; k < 3; k++) await runWith(e, tickRun({ repo: ROOT }));
   const badTask = readRun(bad.id).steps.work.taskId!;
   assert.match((await Effect.runPromise(e.view(badTask))).phase, /^running/, 'both runs at work before the journal is spoiled');

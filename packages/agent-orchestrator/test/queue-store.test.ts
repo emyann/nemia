@@ -22,6 +22,7 @@ import { TEAM } from './team.ts';
 import { decideScreen } from './screens.ts';
 import { promised } from './promised.ts';
 import { Effect } from 'effect';
+import { runGiven, runOver } from './placed.ts';
 
 const ROOT = scratch('wf-queue-');
 const RUNS = path.join(ROOT, 'runs');
@@ -31,8 +32,21 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
-const { addFactory, addToInbox, attachWorkflow, cancelRun, decideRun, readInbox, startRun, startFromInbox, tickRun, runWith } =
-  await import('../src/runner.ts');
+const {
+  addFactory,
+  addToInbox,
+  attachWorkflow,
+  cancelRun,
+  decideRun,
+  readInbox,
+  startRun,
+  startFromInbox,
+  tickRun,
+  runWith: runEngine,
+  gitPlaceLayer,
+} = await import('../src/runner.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
+const runPlaced = runGiven(gitPlaceLayer);
 const { listRuns, readRun } = await import('../src/record/record.store.ts');
 const { main } = await import('../src/cli/main.ts');
 const { filesStore } = await import('../src/record/files.store.ts');
@@ -166,7 +180,7 @@ const started = async (
   createdAt: string,
   opts: { isolate?: boolean; after?: string[]; repo?: string } = {},
 ): Promise<Run> => {
-  const run = await Effect.runPromise(
+  const run = await runPlaced(
     startRun({
       brief,
       repo: opts.repo ?? aRepo(),
@@ -762,12 +776,12 @@ test('REFUSED by name at shipped defaults: `nemia inbox queue` of a name with no
     "a card a run's record names, its removal failed, is refused",
   );
   await assert.rejects(
-    async () => await Effect.runPromise(startFromInbox({ name: 'kept-a1b2', callerRepo: repo })),
+    async () => await runPlaced(startFromInbox({ name: 'kept-a1b2', callerRepo: repo })),
     refusedAs('Conflict', startedAlready),
     'and so is its start, of the same kind',
   );
   await assert.rejects(
-    async () => await Effect.runPromise(startFromInbox({ name: 'no-such-card', callerRepo: repo })),
+    async () => await runPlaced(startFromInbox({ name: 'no-such-card', callerRepo: repo })),
     refusedAs('Missing', /^no card no-such-card in the inbox\. Its cards are: .*\. Start one of those — nemia start /),
     'a start of a card not there',
   );
@@ -917,7 +931,7 @@ test('a queued card whose start fails without a refusal — its `.worktreeinclud
   assert.deepEqual([first.queue.card, first.queue.again], ['odd-include-a1b2', false]);
   assert.match(
     first.queue.failed,
-    /^the place's open was not heard: ELOOP: too many symbolic links encountered, stat '.*\.worktreeinclude'\. Nothing was started: start it again$/,
+    /^the place's open was not heard: open threw before it answered: ELOOP: too many symbolic links encountered, stat '.*\.worktreeinclude'\. Nothing was started: start it again$/,
     "a repository whose `.worktreeinclude` is a link to itself: the place's open cannot read it, and an open not heard is no refusal",
   );
   const written = JSON.parse(fs.readFileSync(path.join(ROOT, 'queue', 'odd-include-a1b2.json'), 'utf8'));
@@ -925,7 +939,7 @@ test('a queued card whose start fails without a refusal — its `.worktreeinclud
   const listed = (await printedBy(t, b.e, 'inbox')).find((l) => l.startsWith('odd-include-a1b2'))!;
   assert.match(
     listed,
-    / {2}queued 1 of 2 — failed at \S+: the place's open was not heard: ELOOP: too many symbolic links encountered.* — not a refusal: the tick tries it again on every pass, where it keeps its place$/,
+    / {2}queued 1 of 2 — failed at \S+: the place's open was not heard: open threw before it answered: ELOOP: too many symbolic links encountered.* — not a refusal: the tick tries it again on every pass, where it keeps its place$/,
   );
 
   const up = board();
@@ -953,7 +967,7 @@ test('a queued card whose start fails without a refusal — its `.worktreeinclud
   );
   assert.match(
     named[0],
-    /^\d\d:\d\d:\d\d  odd-include-a1b2 not started: the place's open was not heard: ELOOP: too many symbolic links encountered.* — not a refusal: tried again on the next pass, where it keeps its place, and said again only if it fails otherwise$/,
+    /^\d\d:\d\d:\d\d  odd-include-a1b2 not started: the place's open was not heard: open threw before it answered: ELOOP: too many symbolic links encountered.* — not a refusal: tried again on the next pass, where it keeps its place, and said again only if it fails otherwise$/,
   );
   const again = await runWith(b.e, tickRun());
   assert.deepEqual(
@@ -1047,7 +1061,10 @@ test('a `nemia up` at a cap of 1 names the card its queue is stuck on once a slo
     1,
     `a run holds the one slot, so the daemon's first pass reads no queue, and its second tries the card and fails as the pass above did, \`again\`, never said by this daemon:\n${printed.join('\n')}`,
   );
-  assert.match(named[0], /^\d\d:\d\d:\d\d  odd-include-a1b2 not started: the place's open was not heard: ELOOP: too many symbolic links/);
+  assert.match(
+    named[0],
+    /^\d\d:\d\d:\d\d  odd-include-a1b2 not started: the place's open was not heard: open threw before it answered: ELOOP: too many symbolic links/,
+  );
   const filed = printed.findIndex((l) => l.includes(`${busy.id}  filed implement`));
   assert.ok(filed >= 0 && filed < printed.indexOf(named[0]), `the pass that held the slot came first: ${printed.join('\n')}`);
 });

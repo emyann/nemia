@@ -16,6 +16,7 @@ import { artifactPlace, sizeOf, type ArtifactFile, type MissingArtifact } from '
 import { isRepositoryRun, type Run } from '../record/record.ts';
 import { artifactsDir, lstatOf } from '../record/record.store.ts';
 import { presentOn } from '../branches/changes.store.ts';
+import type { Place } from '../place/place.store.ts';
 
 /** What is at a path at the tip of a step's branch, as its run's place says (`presentOn`), or what the place said instead. */
 type OnBranch = (rel: string) => 'file' | 'directory' | 'absent' | { readonly unknown: string };
@@ -31,10 +32,16 @@ type OnBranch = (rel: string) => 'file' | 'directory' | 'absent' | { readonly un
  * as where it leads. Any other absolute path, and a path that climbs out of the workspace as written, are reported without being looked
  * at (`artifactPlace`), as is a path through a folder a harness reads as its own configuration, which is never collected.
  */
-export function missingArtifacts(run: Run, stepName: string, closeout: Closeout | { error: string } | undefined): MissingArtifact[] {
+export function missingArtifacts(
+  place: Place,
+  run: Run,
+  stepName: string,
+  closeout: Closeout | { error: string } | undefined,
+): MissingArtifact[] {
   if (!closeout || 'error' in closeout) return [];
   const dir = artifactsDir(run, stepName);
   const onBranch = branchOf(
+    place,
     run,
     stepName,
     closeout.artifacts.filter((file) => artifactPlace(file, dir) === 'workspace'),
@@ -60,12 +67,12 @@ export function missingArtifacts(run: Run, stepName: string, closeout: Closeout 
  * them, asked the first time one is needed, and then read from its answer. Absent everywhere for a step with no branch or a run with no
  * repository.
  */
-function branchOf(run: Run, stepName: string, files: readonly string[]): OnBranch {
+function branchOf(place: Place, run: Run, stepName: string, files: readonly string[]): OnBranch {
   const branch = run.steps[stepName]?.branch;
   let read: ReturnType<typeof presentOn> | undefined;
   return (rel) => {
     if (!branch || !isRepositoryRun(run)) return 'absent';
-    read ??= presentOn(run, branch, [...new Set(files.map((file) => path.normalize(file)))]);
+    read ??= presentOn(place, run, branch, [...new Set(files.map((file) => path.normalize(file)))]);
     return 'unknown' in read ? { unknown: read.unknown } : (read[rel] ?? 'absent');
   };
 }

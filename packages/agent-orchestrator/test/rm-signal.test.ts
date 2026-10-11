@@ -1,5 +1,5 @@
 /**
- * `nemia rm` removes a repository run's worktrees through its place's `remove`, which runs in a process group of its own. A SIGINT to
+ * `nemia rm` removes a repository run's worktrees through its place's `remove`, whose git runs in a process group of its own. A SIGINT to
  * `nemia rm` ends it and is not passed on to that group, which outlives it: a `git worktree remove` a person's ^C reached would stop
  * halfway. Once that group is gone, `nemia rm` again forgets the run: what the first left is read again by the place's inventory. The run
  * is started in this process on a scratch store, then forgotten by the CLI in a child whose `git` hangs on `worktree remove` alone.
@@ -10,14 +10,16 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { Effect } from 'effect';
 import { nodeChild } from './child.ts';
 import { scratch } from './scratch.ts';
+import { runGiven } from './placed.ts';
 
 const DIR = scratch('wf-rm-signal-');
 const STORE = path.join(DIR, 'store');
 process.env.WF_ROOT = STORE;
 const { startRun } = await import('../src/start/start.verb.ts');
+const { gitPlaceLayer } = await import('../src/place/shipped.store.ts');
+const runPlaced = runGiven(gitPlaceLayer);
 const { markCancelled } = await import('../src/record/record.store.ts');
 
 const BIN = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
@@ -62,14 +64,14 @@ async function aCancelledRun() {
   git(repo, 'commit', '-q', '--allow-empty', '-m', 'base');
   const workflowDir = fs.mkdtempSync(path.join(DIR, 'one-'));
   fs.writeFileSync(path.join(workflowDir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
-  const run = await Effect.runPromise(startRun({ brief: 'add a flag', repo, workflowDir }));
+  const run = await runPlaced(startRun({ brief: 'add a flag', repo, workflowDir }));
   const wt = path.join(STORE, 'worktrees', run.id, 'implement');
   git(repo, 'worktree', 'add', '-q', '-b', `wf/${run.id}/implement`, wt);
   markCancelled(run.id);
   return { id: run.id, repo, wt };
 }
 
-test("a SIGINT to nemia rm is not passed on to its place's remove: the rm ends by the signal, and remove's process group is still there; once it is gone, nemia rm again forgets the run", async (t) => {
+test("a SIGINT to nemia rm is not passed on to the git its place's remove runs: the rm ends by the signal, and that git's process group is still there; once it is gone, nemia rm again forgets the run", async (t) => {
   const { id, wt } = await aCancelledRun();
   const bin = path.join(DIR, 'bin');
   const said = path.join(DIR, 'git-said');
@@ -101,17 +103,17 @@ test("a SIGINT to nemia rm is not passed on to its place's remove: the rm ends b
     rm.child.kill('SIGKILL');
     if (pgid > 0) killGroup(pgid);
   });
-  await rm.until(() => fs.existsSync(said), 'the fake git, run under remove, says its pid and its parent');
-  pgid = Number(fs.readFileSync(said, 'utf8').trim().split(' ')[1]);
-  const parent = spawnSync('ps', ['-o', 'args=', '-p', String(pgid)], { encoding: 'utf8' }).stdout;
-  assert.match(parent, /scripts\/remove\.ts/, `the git that hangs is remove's: its parent is ${parent}`);
+  await rm.until(() => fs.existsSync(said), 'the fake git, run by remove, says its pid and its parent');
+  const [pid, parent] = fs.readFileSync(said, 'utf8').trim().split(' ').map(Number);
+  pgid = pid!;
+  assert.equal(parent, rm.child.pid, 'the git that hangs is run by nemia rm itself, no process between');
   assert.equal(spawnSync('ps', ['-o', 'pgid=', '-p', String(pgid)], { encoding: 'utf8' }).stdout.trim(), String(pgid));
   rm.child.kill('SIGINT');
   const ended = await rm.closed;
   assert.equal(ended.signal, 'SIGINT', `nemia rm ended by SIGINT; it said: ${rm.err()}`);
-  assert.ok(groupOf(pgid).includes(String(pgid)), "remove's group outlives the rm");
+  assert.ok(groupOf(pgid).includes(String(pgid)), "the group of remove's git outlives the rm");
   assert.ok(fs.existsSync(wt) && fs.existsSync(path.join(STORE, 'runs', `${id}.json`)), 'the worktree and the record are still there');
-  assert.ok(killGroup(pgid), "remove's group is killed");
+  assert.ok(killGroup(pgid), "the group of remove's git is killed");
   await waitFor(() => groupOf(pgid).length === 0);
   const again = rmIn({ ...env, PATH: process.env.PATH });
   t.after(() => again.child.kill('SIGKILL'));

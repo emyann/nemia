@@ -25,6 +25,9 @@ import { promised } from './promised.ts';
 import { scratch } from './scratch.ts';
 import { TEAM, TEAM_DEV } from './team.ts';
 import { columnsListed, plantedGit } from './planted-git.ts';
+import { runGiven, runOver } from './placed.ts';
+import { placeOver, placeSplit, unreadBy } from './place-over.ts';
+import { gitPlace } from '../place/git/place.ts';
 
 const ROOT = scratch('wf-pass-reads-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -33,7 +36,19 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 process.env.WF_MAX_RUNS = '40';
 delete process.env.WF_MAX_CONCURRENT;
-const { advanceRun, approveRun, hold, retryRun, runWith, startRun, tickRun } = await import('../src/runner.ts');
+const {
+  advanceRun,
+  approveRun,
+  hold,
+  retryRun,
+  runWith: runEngine,
+  gitPlaceLayer,
+  shippedGitPlace,
+  startRun,
+  tickRun,
+} = await import('../src/runner.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
+const runPlaced = runGiven(gitPlaceLayer);
 const { acceptFile, askFile, asksDir, pruneFile, readAsks, readRun, roundAskFile, stepsOf } = await import('../src/record/record.store.ts');
 const { passRead } = await import('../src/cap/cap.verb.ts');
 const { checkoutHold } = await import('../src/ending/ending.verb.ts');
@@ -46,7 +61,7 @@ const { runsListed } = await import('../src/list/list.verb.ts');
 const { lsLines } = await import('../src/list/list.ts');
 const { NOTHING_READ, standingReader, standingSnapshot } = await import('../src/standing/standing.verb.ts');
 const { statusMemo } = await import('../src/place/landing.store.ts');
-const { RunPlace } = await import('../src/place/place.store.ts');
+const { PlaceService } = await import('../src/place/place.store.ts');
 
 const SIGNED = { outcome: 'done', summary: 'did the work', artifacts: [], needs: null };
 const SHIP_MD = fs.readFileSync(path.join(TEAM_DEV, 'ship.md'), 'utf8');
@@ -150,7 +165,7 @@ const board = () => {
 
 /** A run of `implement → ship` on `repo`, implement committed and signed: at the ending's gate. */
 const atTheGate = async (b: ReturnType<typeof board>, repo: string): Promise<Run> => {
-  const run = await Effect.runPromise(startRun({ brief: 'add sub', repo, workflowDir: shipFolder }));
+  const run = await runPlaced(startRun({ brief: 'add sub', repo, workflowDir: shipFolder }));
   await runWith(b.e, advanceRun(readRun(run.id)));
   const work = readRun(run.id).steps.implement;
   fs.appendFileSync(path.join(work.workspace!, 'add.ts'), `export const sub${run.id.slice(-4)} = 1;\n`);
@@ -163,7 +178,7 @@ const atTheGate = async (b: ReturnType<typeof board>, repo: string): Promise<Run
 
 /** A run of one step on `repo`, filed and settled `phase`. */
 const settledOne = async (b: ReturnType<typeof board>, repo: string, phase: TaskPhase): Promise<Run> => {
-  const run = await Effect.runPromise(startRun({ brief: 'one', repo, workflowDir: oneStep }));
+  const run = await runPlaced(startRun({ brief: 'one', repo, workflowDir: oneStep }));
   await runWith(b.e, advanceRun(readRun(run.id)));
   b.settle(`${run.id}-implement`, phase, phase === 'succeeded' ? SIGNED : undefined);
   await runWith(b.e, advanceRun(readRun(run.id)));
@@ -172,8 +187,8 @@ const settledOne = async (b: ReturnType<typeof board>, repo: string, phase: Task
 
 /** Two runs started `--after` `parent`, and one held until it. */
 const waitingOn = async (b: ReturnType<typeof board>, repo: string, parent: string) => {
-  for (let i = 0; i < 2; i++) await Effect.runPromise(startRun({ brief: `after ${i}`, repo, workflowDir: oneStep, after: [parent] }));
-  const held = await Effect.runPromise(startRun({ brief: 'held', repo, workflowDir: oneStep }));
+  for (let i = 0; i < 2; i++) await runPlaced(startRun({ brief: `after ${i}`, repo, workflowDir: oneStep, after: [parent] }));
+  const held = await runPlaced(startRun({ brief: 'held', repo, workflowDir: oneStep }));
   await runWith(b.e, hold(held.id, [parent]));
 };
 
@@ -257,7 +272,7 @@ test("a run's own claim on the checkout reads the slot its pass gave it, and the
       stepsOf(run),
       { read: { runs: [run], slots, parents: passParents(standingReader(NOTHING_READ)), standing: NOTHING_READ }, slot: undefined },
       process.env,
-      statusMemo(() => undefined),
+      statusMemo(() => undefined, shippedGitPlace),
     ),
   );
   assert.equal(hold, undefined, 'no other run claims the checkout in what the pass listed');
@@ -288,8 +303,8 @@ test("a pass's one standing for the repository asks of a finished run, a pruned 
   const pruned = await settledOne(b, repo, 'succeeded');
   const handed = await settledOne(b, repo, 'succeeded');
   const until = await atTheGate(b, repo);
-  await Effect.runPromise(startRun({ brief: 'handed one', repo, workflowDir: oneStep, context: [handed.id] }));
-  const held = await Effect.runPromise(startRun({ brief: 'held until one', repo, workflowDir: oneStep }));
+  await runPlaced(startRun({ brief: 'handed one', repo, workflowDir: oneStep, context: [handed.id] }));
+  const held = await runPlaced(startRun({ brief: 'held until one', repo, workflowDir: oneStep }));
   await runWith(b.e, hold(held.id, [until.id]));
   for (const r of [handed, until, pruned])
     fs.writeFileSync(pruneFile(r.id), JSON.stringify({ at: new Date().toISOString(), worktrees: [] }));
@@ -395,19 +410,8 @@ test('a forget drops the views of the tasks it forgets, and keeps the others the
   assert.deepEqual(asked, ['a', 'b', 'a'], 'the task forgotten is read again, and the other kept');
 });
 
-/** The place the package ships. */
-const GIT_PLACE = path.join(import.meta.dirname, '..', 'place', 'git');
-
-/** A copy of the place the package ships, its `standing` the script `source`. */
-function standingOf(source: string): string {
-  const dir = path.join(scratch('wf-pass-reads-place-'), 'git');
-  fs.cpSync(GIT_PLACE, dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, 'scripts', 'standing.ts'), source);
-  return dir;
-}
-
-/** The place the package ships, its `standing` a script that says `said` on stderr and exits 1: a reading never heard. */
-const standingUnread = (said: string): string => standingOf(`process.stderr.write(${JSON.stringify(`${said}\n`)});\nprocess.exit(1);\n`);
+/** The place the package ships, its `standing` not heard, in `said`. */
+const standingUnread = (said: string) => PlaceService.layer(placeOver(shippedGitPlace, { standing: () => unreadBy('standing', said) }));
 
 test('a pass asks one standing for each repository, place and base branch: a run on a second base branch adds exactly one', async () => {
   const { b, repo } = await theStore();
@@ -435,10 +439,10 @@ test('a pass asks one standing for each repository, place and base branch: a run
 test('REFUSED: a run waits on one whose standing is unread, though it has shipped, says why, and is filed once standing answers', async () => {
   const { b, repo } = await theStore();
   const parent = await atTheGate(b, repo);
-  const child = await Effect.runPromise(startRun({ brief: 'after it', repo, workflowDir: oneStep, after: [parent.id] }));
+  const child = await runPlaced(startRun({ brief: 'after it', repo, workflowDir: oneStep, after: [parent.id] }));
   git(repo, 'merge', '-q', '--no-ff', '-m', 'land it', parent.steps.implement.branch!);
   const unread = standingUnread('the standing broke');
-  const held = await runWith(b.e, tickRun({ memo: freshRestMemo() }).pipe(Effect.provideService(RunPlace, () => unread)));
+  const held = await runWith(b.e, tickRun({ memo: freshRestMemo() }).pipe(Effect.provide(unread)));
   assert.equal(readRun(child.id).steps.implement.taskId ?? undefined, undefined, 'nothing of it filed while its parent reads unread');
   assert.deepEqual(held.runs.find((r) => r.run.id === child.id)?.waiting, [
     { run: parent.id, unread: 'the place was not heard: the standing broke' },
@@ -475,7 +479,7 @@ test('REFUSED: a standing.json that is not the one the tick writes is refused, n
 
 test('a step that left its work uncommitted is handed off on the pass that finishes its run, and the tip that pass keeps is the hand-off', async () => {
   const { b, repo } = await theStore();
-  const run = await Effect.runPromise(startRun({ brief: 'left uncommitted', repo, workflowDir: oneStep }));
+  const run = await runPlaced(startRun({ brief: 'left uncommitted', repo, workflowDir: oneStep }));
   await runWith(b.e, advanceRun(readRun(run.id)));
   const work = readRun(run.id).steps.implement;
   fs.writeFileSync(path.join(work.workspace!, 'left.ts'), 'export const left = 1;\n');
@@ -486,23 +490,34 @@ test('a step that left its work uncommitted is handed off on the pass that finis
   assert.deepEqual(readRun(run.id).tips, { [work.branch!]: tip }, 'the tip kept is the one git has after the hand-off');
 });
 
-test('REFUSED: a run filed while its own standing is unread keeps the base it was started on, its parent read shipped off its own', async () => {
+test('REFUSED: a run filed on a pass whose standing read no head of its base keeps the base it was started on, its parent read shipped', async () => {
   const { b, repo } = await theStore();
   const parent = await atTheGate(b, repo);
-  const child = await Effect.runPromise(startRun({ brief: 'after it, unread', repo, workflowDir: oneStep, after: [parent.id] }));
+  const child = await runPlaced(startRun({ brief: 'after it, no head', repo, workflowDir: oneStep, after: [parent.id] }));
   git(repo, 'merge', '-q', '--no-ff', '-m', 'land it', parent.steps.implement.branch!);
-  const unread = standingUnread('the standing broke');
-  const placed = (run: { id: string }) => (run.id === child.id ? unread : GIT_PLACE);
-  await runWith(b.e, tickRun({ memo: freshRestMemo() }).pipe(Effect.provideService(RunPlace, placed)));
-  assert.ok(readRun(child.id).steps.implement.taskId, 'filed: its parent reads shipped off its own place');
+  const headless = PlaceService.layer(
+    placeOver(shippedGitPlace, {
+      standing: (request) => {
+        const read = shippedGitPlace.askNow('standing', request);
+        if (!('answer' in read)) return read;
+        const { main: _base, ...heads } = read.answer.heads;
+        return { answer: { ...read.answer, heads } };
+      },
+    }),
+  );
+  await runWith(b.e, tickRun({ memo: freshRestMemo() }).pipe(Effect.provide(headless)));
+  assert.ok(readRun(child.id).steps.implement.taskId, 'filed: its parent reads shipped');
   assert.notEqual(git(repo, 'rev-parse', 'main').trim(), child.baseRef, 'the base moved past where the child was started');
   assert.equal(readRun(child.id).baseRef, child.baseRef, 'and the child keeps the base it was started on: the pass read no head of it');
 });
 
-test('REFUSED at the shipped deadline: a standing that never answers is stopped at 15 s, and its repository reads unread on that pass', async () => {
+test('REFUSED at the shipped deadline: a standing whose git never answers is stopped at 15 s, and its repository reads unread on that pass', async () => {
   const { b } = await theStore();
-  const hung = standingOf('setInterval(() => {}, 1_000);\n');
-  await runWith(b.e, tickRun({ memo: freshRestMemo() }).pipe(Effect.provideService(RunPlace, () => hung)));
+  const bin = scratch('wf-pass-reads-hung-');
+  fs.writeFileSync(path.join(bin, 'git'), '#!/bin/sh\nexec sleep 600\n', { mode: 0o755 });
+  const deaf = gitPlace({ env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}` } });
+  const hung = PlaceService.layer(placeSplit(shippedGitPlace, deaf, ['standing']));
+  await runWith(b.e, tickRun({ memo: freshRestMemo() }).pipe(Effect.provide(hung)));
   const places = readStanding()?.places ?? [];
   assert.ok(places.length > 0, 'the pass read a repository');
   for (const p of places)

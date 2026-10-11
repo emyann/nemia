@@ -1,5 +1,5 @@
 /**
- * The git place's `inventory` and `remove` (`place/git/scripts/`), run through `runPlaceVerb` against scratch repositories: what a run
+ * The git place's `inventory` and `remove` (`place/git/verbs/`), asked of `gitPlace` against scratch repositories: what a run
  * left, read — each worktree inside `under` with its lock, its detached HEAD, whether git could prune it, what it holds uncommitted and
  * whether its HEAD is on a branch, and each branch under the prefix with whether it is merged — and taken away, never forced. Each with an
  * answer, a refusal or an empty answer, and an unread outcome, which is never an empty one. Git runs with no user or system configuration
@@ -10,14 +10,11 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { runPlaceVerb } from '../src/runner.ts';
+import { gitPlace } from '../place/git/place.ts';
 import type { PlaceOutcome, PlaceVerb } from '../src/runner.ts';
 import { scratch } from './scratch.ts';
 
-/** The git place the package ships. */
-const GIT_SKILL = path.join(import.meta.dirname, '..', 'place', 'git');
-
-/** The environment git and the scripts run in: this process's, without its git variables, with no configuration read and one identity. */
+/** The environment git runs in: this process's, without its git variables, with no configuration read and one identity. */
 const ENV: NodeJS.ProcessEnv = {
   ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))),
   GIT_CONFIG_GLOBAL: '/dev/null',
@@ -43,8 +40,7 @@ function repository(): string {
 }
 
 /** `verb` of the git place, in `ENV`, its request as given: one the contract's type refuses is how a malformed request is sent. */
-const run = <V extends PlaceVerb>(verb: V, request: object): PlaceOutcome<V> =>
-  runPlaceVerb(GIT_SKILL, verb, request as never, { env: ENV });
+const run = <V extends PlaceVerb>(verb: V, request: object): PlaceOutcome<V> => gitPlace({ env: ENV }).askNow(verb, request as never);
 
 /** The answer of an outcome, or a failure naming what it was instead. */
 function answerOf<V extends PlaceVerb>(outcome: PlaceOutcome<V>): Extract<PlaceOutcome<V>, { answer: unknown }>['answer'] {
@@ -158,7 +154,12 @@ test('REFUSED as unread, never as nothing to remove: an inventory of a directory
   const plain = scratch('wf-git-inventory-plain-');
   const outcome = run('inventory', { repo: plain, under: path.join(plain, 'x'), prefix: 'wf/x/', base: 'main' });
   assert.ok(!('answer' in outcome), `no answer, empty or not: ${JSON.stringify(outcome)}`);
-  assert.match(unreadOf(outcome), /not a git repository/);
+  assert.equal(
+    unreadOf(outcome),
+    'inventory threw before it answered: Command failed: git worktree list --porcelain / ' +
+      'fatal: not a git repository (or any of the parent directories): .git',
+    'one line: the command, and what git said',
+  );
 });
 
 test('inventory and remove are unread for a request they cannot read', () => {

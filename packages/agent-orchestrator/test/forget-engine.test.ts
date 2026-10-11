@@ -22,6 +22,7 @@ import { ForgetRefused, nameFor, Engine as EngineService, type RunnerOps, type S
 import { asyncOps, plainEngine, type AsyncRunner } from './promised.ts';
 import type { Engine } from '../src/runtime-client.ts';
 import { scratch } from './scratch.ts';
+import { runGiven, runOver } from './placed.ts';
 
 const ROOT = scratch('wf-forget-engine-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -30,7 +31,9 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 process.env.WF_MAX_CONCURRENT = '10';
 delete process.env.WF_MAX_RUNS;
-const { advanceRun, forgetRun, retryRun, runsForgetting, startRun, runWith } = await import('../src/runner.ts');
+const { advanceRun, forgetRun, retryRun, runsForgetting, startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
+const runPlaced = runGiven(gitPlaceLayer);
 const { readRun } = await import('../src/record/record.store.ts');
 const { runTasks } = await import('../src/record/record.ts');
 const { runStore } = await import('../src/record/files.store.ts');
@@ -129,7 +132,7 @@ const listed = async (): Promise<string[]> => (await Effect.runPromise(e.list())
 
 /** A run of `workflowDir` on `repo` started, its step filed and started, and signed with `closeout`. */
 const signed = async (workflowDir: string, closeout: object, repo = aRepo()) => {
-  const run = await Effect.runPromise(startRun({ brief: 'add a flag', repo, workflowDir }));
+  const run = await runPlaced(startRun({ brief: 'add a flag', repo, workflowDir }));
   assert.deepEqual((await pass(run.id)).filed, ['implement']);
   await pass(run.id);
   sign(`${run.id}-implement`, 1, closeout);
@@ -219,7 +222,7 @@ test('`nemia rm` of a folder run forgets its task on the engine as it removes it
 });
 
 test('REFUSED at shipped defaults: `nemia rm` of a run whose step is in flight writes no marker and asks the engine to forget nothing', async () => {
-  const run = await Effect.runPromise(startRun({ brief: 'still running', repo: aRepo(), workflowDir: oneStep('harness: codex') }));
+  const run = await runPlaced(startRun({ brief: 'still running', repo: aRepo(), workflowDir: oneStep('harness: codex') }));
   await pass(run.id);
   await pass(run.id);
   const before = forgets.length;
@@ -341,7 +344,7 @@ test('`nemia prune` of N runs asks the engine once, dry, over all their tasks to
 });
 
 test('`nemia prune` counts the tasks `nemia rm` forgets of a run as rm reads it, a step a pass filed and never wrote down among them', async () => {
-  const run = await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: oneStep('harness: codex') }));
+  const run = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: oneStep('harness: codex') }));
   const record = path.join(ROOT, 'runs', `${run.id}.json`);
   const unfiled = fs.readFileSync(record, 'utf8');
   assert.deepEqual((await pass(run.id)).filed, ['implement']);

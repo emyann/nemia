@@ -25,10 +25,10 @@ import {
   roundAskFile,
   roundRun,
   runStore,
-  runWith,
   type RunSummary,
   usedLines,
 } from 'agent-orchestrator';
+import { runWith } from './placed.ts';
 
 type RetryHow = import('agent-orchestrator').RetryHow;
 

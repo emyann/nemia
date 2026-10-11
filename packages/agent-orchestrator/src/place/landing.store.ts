@@ -14,7 +14,7 @@ import { isRepositoryRun, type RepositoryRun, type Run } from '../record/record.
 import type { PlaceSay } from './place.ts';
 import { landsOnCheck } from '../status/status.ts';
 import type { Workflow } from '../step/step.ts';
-import { placeDirOf, readPlaceJson, runPlaceVerb } from './place.store.ts';
+import type { Place } from './place.store.ts';
 
 /** The checkout as the place's `status` answered it, or why it gave no answer: an unread or refused `status` is never a verdict. */
 export type CheckoutRead = MergeState | { readonly unread: string };
@@ -22,35 +22,17 @@ export type CheckoutRead = MergeState | { readonly unread: string };
 /**
  * One pass's reading of its places: the answers of `status` it has had (`reads`), by checkout and the run that asked, whose tips it was
  * asked with, so a pass that asks twice of one checkout for one run starts one process; every branch of a run's repository and its commit
- * as its caller read them (`heads`), which a run's result tips are read off (`resultTips`); and the place it asks (`placeDir`), where one
- * is given in place of each run's own (`placeDirOf`). Owned by the pass and dropped with it; a `land` clears its reads, since the checkout
- * has changed.
+ * as its caller read them (`heads`), which a run's result tips are read off (`resultTips`); and the place it asks (`place`). Owned by the
+ * pass and dropped with it; a `land` clears its reads, since the checkout has changed.
  */
 export type StatusMemo = {
   readonly reads: Map<string, CheckoutRead>;
   readonly heads: (run: RepositoryRun) => Readonly<Record<string, string>> | undefined;
-  readonly placeDir?: string;
+  readonly place: Place;
 };
 
-/**
- * A new `StatusMemo` for one pass, with no answer yet, reading a run's heads through `heads`, asking `placeDir` where it is given, else
- * each run's own place.
- */
-export const statusMemo = (heads: StatusMemo['heads'], placeDir?: string): StatusMemo => ({
-  reads: new Map(),
-  heads,
-  ...(placeDir === undefined ? {} : { placeDir }),
-});
-
-/** The directory `run`'s place runs from (`placeDirOf`), or why there is none, in its words: an odd record stops its own run alone. */
-function placeOf(run: RepositoryRun, placeDir: string | undefined): { dir: string } | { unread: string } {
-  if (placeDir !== undefined) return { dir: placeDir };
-  try {
-    return { dir: placeDirOf(run) };
-  } catch (err) {
-    return { unread: (err as Error).message };
-  }
-}
+/** A new `StatusMemo` for one pass, with no answer yet, reading a run's heads through `heads` and asking `place`. */
+export const statusMemo = (heads: StatusMemo['heads'], place: Place): StatusMemo => ({ reads: new Map(), heads, place });
 
 /**
  * Whether a merge is staged in `run`'s checkout, as a `stat` of the file the place named at `open` (`stagedFile`) says, with no process.
@@ -62,23 +44,20 @@ export function stagedHere(run: Pick<RepositoryRun, 'stagedFile'>): boolean | un
 
 /**
  * `run`'s checkout as its place's `status` answers it, with the run's result tips off the heads `memo` reads (`resultTips`), asked once per
- * checkout and run within one pass, of the place `memo` names. A refusal, an unread answer, and a place `placeDirOf` will not name are
- * `{ unread }`, in words.
+ * checkout and run within one pass, of the place `memo` names. A refusal and an unread answer are `{ unread }`, in words.
  */
 export function checkoutStatus(run: RepositoryRun, memo: StatusMemo): CheckoutRead {
   const key = JSON.stringify([path.resolve(run.repo), run.id]);
   const known = memo.reads.get(key);
   if (known) return known;
-  const place = placeOf(run, memo.placeDir);
-  const read: CheckoutRead =
-    'unread' in place ? place : statusRead(place.dir, run.repo, resultTips(run, resultBranches(run), memo.heads(run)));
+  const read = statusRead(memo.place, run.repo, resultTips(run, resultBranches(run), memo.heads(run)));
   memo.reads.set(key, read);
   return read;
 }
 
-/** What the place in `dir` says of `checkout` against `tips`, or why it said nothing. */
-function statusRead(dir: string, checkout: string, tips: Readonly<Record<string, string>>): CheckoutRead {
-  const outcome = runPlaceVerb(dir, 'status', { checkout, tips });
+/** What `place` says of `checkout` against `tips`, or why it said nothing. */
+function statusRead(place: Place, checkout: string, tips: Readonly<Record<string, string>>): CheckoutRead {
+  const outcome = place.askNow('status', { checkout, tips });
   if ('answer' in outcome) return outcome.answer;
   if ('refused' in outcome) return { unread: `the place refused to read the checkout: ${outcome.refused}` };
   return { unread: `the place's status was not heard: ${outcome.unread.said}` };
@@ -109,54 +88,40 @@ export type LandedThrough =
   | { readonly unread: string };
 
 /**
- * Commit the merge staged in `run`'s checkout with `message`, or abort it, through its place's `land`, or the one `memo` names; the
- * pass's reads of `status` in `memo` are cleared, since the checkout has changed. The place's refusal in its words (`refused`: a hook, a
- * path still unmerged), or why it was not heard (`unread`, a place `placeDirOf` will not name among them).
+ * Commit the merge staged in `run`'s checkout with `message`, or abort it, through the place `memo` names (`land`); the pass's reads of
+ * `status` in `memo` are cleared, since the checkout has changed. The place's refusal in its words (`refused`: a hook, a path still
+ * unmerged), or why it was not heard (`unread`).
  */
 export function landThrough(
   run: RepositoryRun,
   act: { readonly act: 'commit'; readonly message: string } | { readonly act: 'abort' },
-  memo?: StatusMemo,
+  memo: StatusMemo,
 ): LandedThrough {
-  memo?.reads.clear();
-  const place = placeOf(run, memo?.placeDir);
-  if ('unread' in place) return place;
-  const outcome = runPlaceVerb(place.dir, 'land', { checkout: run.repo, ...act });
+  memo.reads.clear();
+  const outcome = memo.place.askNow('land', { checkout: run.repo, ...act });
   if ('answer' in outcome) return outcome.answer;
   if ('refused' in outcome) return { refused: outcome.refused };
   return { unread: `the place's land was not heard: ${outcome.unread.said}` };
 }
 
-/**
- * What a landing session of `run` is denied (`denyWhileLanding` in its place's `place.json`): none for a folder run, which lands nothing.
- * Refuses (`Invalid`) a place `placeDirOf` will not name, and a `place.json` that does not read (`readPlaceJson`).
- */
-export function landingDenies(run: Run, placeDir?: string): readonly string[] {
-  if (!isRepositoryRun(run)) return [];
-  return readPlaceJson(placeDir ?? placeDirOf(run)).denyWhileLanding;
+/** What a landing session of `run` is denied (`denyWhileLanding`, as `place` declares it): none for a folder run, which lands nothing. */
+export function landingDenies(run: Run, place: Place): readonly string[] {
+  return isRepositoryRun(run) ? place.declared.denyWhileLanding : [];
 }
 
 /**
- * What `step`, an ending of `run` that lands on its check, is told and denied by its place (`landingContract`): its `say.stage` with
+ * What `step`, an ending of `run` that lands on its check, is told and denied by `place` (`landingContract`): its `say.stage` with
  * `{repo}` and `{branches}` filled from the run's checkout and its result branches with a tip, recorded or among `heads` (`resultTips`),
- * and its denies. Undefined for any other step, whose place is not read. Refuses as `landingDenies` does.
+ * and its denies. Undefined for any other step.
  */
-export function landingWords(
-  run: Run,
-  step: Workflow,
-  placeDir?: string,
-  heads?: Readonly<Record<string, string>>,
-): LandingWords | undefined {
+export function landingWords(run: Run, step: Workflow, place: Place, heads?: Readonly<Record<string, string>>): LandingWords | undefined {
   if (!isRepositoryRun(run) || !landsOnCheck(step, run)) return undefined;
-  const declared = readPlaceJson(placeDir ?? placeDirOf(run));
+  const { declared } = place;
   const branches = Object.keys(resultTips(run, resultBranches(run), heads)).join(' ') || '<result branch>';
   return { stage: declared.say.stage.replaceAll('{repo}', run.repo).replaceAll('{branches}', branches), denied: declared.denyWhileLanding };
 }
 
-/**
- * The commands `run`'s place gives its steps' briefs (`say` in its `place.json`): none for a folder run, whose place is not read.
- * Refuses as `landingDenies` does.
- */
-export function placeSay(run: Run, placeDir?: string): PlaceSay | undefined {
-  return isRepositoryRun(run) ? readPlaceJson(placeDir ?? placeDirOf(run)).say : undefined;
+/** The commands `place` gives the briefs of `run`'s steps (its `say`): none for a folder run. */
+export function placeSay(run: Run, place: Place): PlaceSay | undefined {
+  return isRepositoryRun(run) ? place.declared.say : undefined;
 }

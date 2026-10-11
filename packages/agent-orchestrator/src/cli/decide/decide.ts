@@ -18,6 +18,8 @@ import {
   checkoutLine,
   decideRun,
   runWith,
+  shipped,
+  shippedGitPlace,
   dueNote,
   fromNote,
   holdAdvice,
@@ -135,8 +137,8 @@ export async function decideVerb(rest: string[], e: Engine): Promise<void> {
   if (rest[0].startsWith('--'))
     usage(`nemia decide takes the run first: nemia decide <runId> [--sensitive <globs>] — not ${rest[0]} before it.`);
   const { sensitive } = decideHow(rest.slice(1));
-  const decided = await runWith(e, decideRun(rest[0])).catch(async (err: unknown) => {
-    const unjudged = await runWith(e, unjudgedOf(e, runStore.runs.read(rest[0]), err, 'nemia decide'));
+  const decided = await runWith(e, shipped(decideRun(rest[0]))).catch(async (err: unknown) => {
+    const unjudged = await runWith(e, shipped(unjudgedOf(e, runStore.runs.read(rest[0]), err, 'nemia decide')));
     throw unjudged ? new Error(unjudged.said) : err;
   });
   const { run } = decided;
@@ -328,7 +330,7 @@ function changesRead(
     namesInOrder(git, steps).map((name) => git.steps[name].branch),
     git.isolate ? git.branch : undefined,
   );
-  const read = changesOf(git, [...toRead, ...branches], sensitive ?? CHECK_AFFECTING);
+  const read = changesOf(shippedGitPlace, git, [...toRead, ...branches], sensitive ?? CHECK_AFFECTING);
   const of = (branch: string) => read.find((c) => c.branch === branch)!;
   return { toRead: toRead.map(of), results: branches.map(of) };
 }
@@ -403,7 +405,12 @@ function printCloseout({ run, answering }: Decided, name: string, step: Steps[nu
   for (const line of step ? outputLines(step, c, owedFields(step, run, steps)) : []) console.log(`    ${line}`);
   if (c.needs) console.log(`    needs: ${c.needs}`);
   if (answering[name]) console.log(`    ${answering[name]}`);
-  const files = artifactLines(artifactsDir(run, name), missingArtifacts(run, name, c), artifactFiles(run, name), run.pruned);
+  const files = artifactLines(
+    artifactsDir(run, name),
+    missingArtifacts(shippedGitPlace, run, name, c),
+    artifactFiles(run, name),
+    run.pruned,
+  );
   for (const line of files) console.log(`    ${line}`);
 }
 

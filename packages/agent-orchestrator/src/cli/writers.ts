@@ -5,7 +5,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { HOME, Invalid, loadWorkflows, runWith, TABLE, templatedTree, type Args, type Command } from '../runner.ts';
+import { HOME, Invalid, loadWorkflows, runWith, shipped, TABLE, templatedTree, type Args, type Command } from '../runner.ts';
 import { agentDraftOf, frontmatterKey, isReadme, skillDraftOf } from '../workflow.ts';
 import { usage, type Engine } from './flags.ts';
 
@@ -45,7 +45,7 @@ function handedOf(command: Command, args: Args): Args {
 
 /** The entry `command` run in the store on the arguments `asked`, its paths left out (`handedOf`), and the lines it says printed. */
 async function ran(command: Command, asked: Args, e: Engine): Promise<void> {
-  const data = await runWith(e, command.handler(handedOf(command, asked), undefined, HOME));
+  const data = await runWith(e, shipped(command.handler(handedOf(command, asked), undefined, HOME)));
   for (const line of command.print(data, asked)) console.log(line);
 }
 

@@ -11,7 +11,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { RunDetail } from '../src/detail/detail.ts';
 import { app } from '../src/app.ts';
-import { addFactory, attachWorkflow, runWith, startRun, engine } from 'agent-orchestrator';
+import { addFactory, attachWorkflow, startRun, engine } from 'agent-orchestrator';
+import { runWith } from './placed.ts';
 import { scratch } from './scratch.ts';
 
 const WORKFLOWS = path.join(root, 'workflows');

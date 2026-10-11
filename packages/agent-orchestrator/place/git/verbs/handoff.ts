@@ -4,17 +4,16 @@
  * `{ commit }`, or `{ commit: null }` when nothing is uncommitted, so it may run on every pass. The repository's hooks and signing are
  * honoured: refuses, in git's words, when git will not commit — a hook that refused it, a signature that failed, no repository there.
  */
-import { failedWords, git, isDirectory, refused, serve, text } from './contract.ts';
+import { failedWords, git, isDirectory, refused, type Asking, type Reply } from '../git.ts';
+import type { PlaceRequests } from '../../../src/place/place.ts';
 
-serve((request) => {
-  const workspace = text(request, 'workspace');
-  const step = text(request, 'step');
-  const why = text(request, 'why');
+/** The verb's body. */
+export function* handoff({ workspace, step, why }: PlaceRequests['handoff']): Asking<Reply<'handoff'>> {
   if (!isDirectory(workspace)) return refused(`${workspace} is not a directory, so nothing of ${step} is there to hand off`);
   try {
-    if (!git(workspace, ['status', '--porcelain'])) return { commit: null };
-    git(workspace, ['add', '-A']);
-    git(workspace, [
+    if (!(yield* git(workspace, ['status', '--porcelain']))) return { commit: null };
+    yield* git(workspace, ['add', '-A']);
+    yield* git(workspace, [
       '-c',
       'user.email=wf@local',
       '-c',
@@ -23,8 +22,8 @@ serve((request) => {
       '-m',
       `${step}: hand off what was left uncommitted${why}`,
     ]);
-    return { commit: git(workspace, ['rev-parse', 'HEAD']) };
+    return { commit: yield* git(workspace, ['rev-parse', 'HEAD']) };
   } catch (err) {
     return refused(failedWords(err));
   }
-});
+}

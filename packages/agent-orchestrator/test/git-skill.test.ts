@@ -1,16 +1,15 @@
 /**
- * The git place the package ships (`place/git/`), its real scripts run through `runPlaceVerb` against scratch repositories: each verb's
- * answer, a refusal and an unread outcome, and a verb held past its deadline by a hook or a filter, which leaves neither running nor a
- * lock behind. `place.json` decodes, declares exactly the verbs `scripts/` holds, and denies a landing session the two commands that
- * commit a staged merge. Git runs with no user or system configuration and a fixed identity, so a machine's hooks, default branch or
- * signing change nothing here.
+ * The git place the package ships (`place/git/`), each verb asked of `gitPlace` against scratch repositories: its answer, a refusal and
+ * an unread outcome, and a verb held past its deadline by a hook or a filter, which leaves neither running nor a lock behind. What it
+ * declares denies a landing session the two commands that commit a staged merge. Git runs with no user or system configuration and a
+ * fixed identity, so a machine's hooks, default branch or signing change nothing here.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { readPlaceJson, runPlaceVerb } from '../src/runner.ts';
+import { gitPlace } from '../place/git/place.ts';
 import type { PlaceOutcome, PlaceVerb } from '../src/runner.ts';
 import { SKILL_SECTIONS, unknownHoles } from '../src/place/place.ts';
 import { running } from './running.ts';
@@ -20,7 +19,7 @@ import { scratch } from './scratch.ts';
 /** The git place the package ships. */
 const GIT_SKILL = path.join(import.meta.dirname, '..', 'place', 'git');
 
-/** The environment git and the scripts run in: this process's, without its git variables, with no configuration read and one identity. */
+/** The environment git runs in: this process's, without its git variables, with no configuration read and one identity. */
 const ENV: NodeJS.ProcessEnv = {
   ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))),
   GIT_CONFIG_GLOBAL: '/dev/null',
@@ -79,8 +78,7 @@ function staged(dir: string): string {
 const merging = (dir: string): boolean => gitOk(dir, 'rev-parse', '--verify', '--quiet', 'MERGE_HEAD');
 
 /** `verb` of the git place, in `ENV`, its request as given: one the contract's type refuses is how a malformed request is sent. */
-const run = <V extends PlaceVerb>(verb: V, request: object): PlaceOutcome<V> =>
-  runPlaceVerb(GIT_SKILL, verb, request as never, { env: ENV });
+const run = <V extends PlaceVerb>(verb: V, request: object): PlaceOutcome<V> => gitPlace({ env: ENV }).askNow(verb, request as never);
 
 /** The answer of an outcome, or a failure naming what it was instead. */
 function answerOf<V extends PlaceVerb>(outcome: PlaceOutcome<V>): Extract<PlaceOutcome<V>, { answer: unknown }>['answer'] {
@@ -107,61 +105,17 @@ function unreadOf(outcome: PlaceOutcome<PlaceVerb>): string {
   return outcome.unread.said;
 }
 
-test('place.json decodes, declares exactly the verbs scripts/ holds, and denies a landing the commands that commit its merge', () => {
-  const declared = readPlaceJson(GIT_SKILL);
-  const scripts = fs
-    .readdirSync(path.join(GIT_SKILL, 'scripts'))
-    .filter((f) => f !== 'contract.ts')
-    .map((f) => f.replace(/\.ts$/, ''));
-  assert.deepEqual([...declared.verbs].sort(), scripts.sort());
-  assert.deepEqual([...declared.verbs].sort(), [
-    'export',
-    'handoff',
-    'inventory',
-    'land',
-    'make',
-    'open',
-    'remove',
-    'report',
-    'seal',
-    'standing',
-    'status',
-    'trial',
-  ]);
-  assert.deepEqual(declared.denyWhileLanding, ['Bash(git commit:*)', 'Bash(git merge --continue:*)']);
+test('the place declares what a landing is denied, the commands that commit its merge, and its skill folder holds no script', () => {
+  assert.deepEqual(gitPlace().declared.denyWhileLanding, ['Bash(git commit:*)', 'Bash(git merge --continue:*)']);
+  for (const gone of ['scripts', 'place.json']) assert.equal(fs.existsSync(path.join(GIT_SKILL, gone)), false, gone);
+  assert.ok(fs.existsSync(path.join(GIT_SKILL, 'SKILL.md')), 'and it is still a skill');
 });
 
 test("SKILL.md holds the sections a brief told no command sends a step to, every template names only holes the code fills, and the skill forbids nothing a team's fence holds", () => {
   const skill = fs.readFileSync(path.join(GIT_SKILL, 'SKILL.md'), 'utf8');
   for (const section of Object.values(SKILL_SECTIONS)) assert.match(skill, new RegExp(`^## ${section}$`, 'm'), section);
   assert.doesNotMatch(skill, /never push/i);
-  assert.deepEqual(unknownHoles(readPlaceJson(GIT_SKILL).say), []);
-});
-
-test('a request that does not carry v 1 is refused by every script, exit 2, before it acts', () => {
-  for (const script of [
-    'open',
-    'make',
-    'handoff',
-    'status',
-    'land',
-    'trial',
-    'report',
-    'standing',
-    'export',
-    'seal',
-    'inventory',
-    'remove',
-  ]) {
-    const ran = spawnSync(process.execPath, [path.join(GIT_SKILL, 'scripts', `${script}.ts`)], {
-      input: JSON.stringify({ v: 2, root: '/' }),
-      encoding: 'utf8',
-      env: ENV,
-    });
-    assert.equal(ran.status, 2, script);
-    assert.equal(ran.stdout, '', script);
-    assert.equal(ran.stderr.trim(), 'the request carries v 2, and this place speaks v 1', script);
-  }
+  assert.deepEqual(unknownHoles(gitPlace().declared.say), []);
 });
 
 test('open answers the repository as given, the commit HEAD is at, the branch it is on, and the file a staged merge is named in', () => {
@@ -193,7 +147,7 @@ test("the place's stage words, run as said with the checkout and the branches fi
   const dir = repository();
   const a = branched(dir, 'wf/x/a', 'f', 'a\n');
   const b = branched(dir, 'wf/x/b', 'g', 'b\n');
-  const said = readPlaceJson(GIT_SKILL).say.stage.replaceAll('{repo}', dir).replaceAll('{branches}', 'wf/x/a wf/x/b');
+  const said = gitPlace().declared.say.stage.replaceAll('{repo}', dir).replaceAll('{branches}', 'wf/x/a wf/x/b');
   const ran = spawnSync('sh', ['-c', said], { env: ENV, encoding: 'utf8' });
   assert.equal(ran.status, 0, ran.stderr);
   assert.deepEqual(answerOf(run('status', { checkout: dir, tips: { 'wf/x/a': a, 'wf/x/b': b } })), {
@@ -393,7 +347,7 @@ test('a land held past its deadline by a hook leaves the hook running nowhere, t
   t.after(() => {
     for (const pid of running(hook)) process.kill(pid, 'SIGKILL');
   });
-  const outcome = runPlaceVerb(GIT_SKILL, 'land', { checkout: dir, act: 'commit', message: 'm' }, { env: ENV, deadlineMs: 3000 });
+  const outcome = gitPlace({ env: ENV }).askNow('land', { checkout: dir, act: 'commit', message: 'm' }, { deadlineMs: 3000 });
   assert.match(unreadOf(outcome), /^it gave no answer within 3 s, its deadline, and was stopped/);
   assert.ok(fs.existsSync(marker), 'git was in the hook at the deadline');
   assert.deepEqual(running(hook), [], 'the hook runs no more');
@@ -413,7 +367,7 @@ test('a handoff held past its deadline by a clean filter leaves no index.lock, a
   t.after(() => {
     for (const pid of running(filter)) process.kill(pid, 'SIGKILL');
   });
-  const outcome = runPlaceVerb(GIT_SKILL, 'handoff', { workspace: dir, step: 'build', why: '' }, { env: ENV, deadlineMs: 3000 });
+  const outcome = gitPlace({ env: ENV }).askNow('handoff', { workspace: dir, step: 'build', why: '' }, { deadlineMs: 3000 });
   assert.match(unreadOf(outcome), /^it gave no answer within 3 s, its deadline, and was stopped/);
   assert.ok(fs.existsSync(marker), 'git add was in the filter, holding the lock, at the deadline');
   assert.equal(fs.existsSync(path.join(dir, '.git', 'index.lock')), false, 'the lock is gone');
@@ -428,41 +382,40 @@ test('a handoff held past its deadline by a clean filter leaves no index.lock, a
 });
 
 /**
- * A place skill of one verb, `handoff`, whose script starts `/bin/sh` on a script of its own in its process group — `trap` set as `on`
- * says, then a marker touched and a long sleep waited on — and idles past any deadline. Its folder, the shell's script and the marker.
+ * A repository whose `handoff` is held: a clean filter runs `/bin/sh` on a script of its own in git's process group — `trap` set as `on`
+ * says, then a marker touched and a long sleep waited on — past any deadline. The repository, the shell's script and the marker.
  */
-function heldPlace(on: string): { skill: string; shell: string; marker: string } {
-  const skill = scratch('wf-place-held-');
-  const marker = path.join(skill, 'in-the-shell');
-  const shell = path.join(skill, 'held.sh');
+function heldPlace(on: string): { dir: string; shell: string; marker: string } {
+  const dir = repository();
+  const held = scratch('wf-place-held-');
+  const marker = path.join(held, 'in-the-shell');
+  const shell = path.join(held, 'held.sh');
   fs.writeFileSync(shell, `${on}\ntouch '${marker}'\nsleep 60 &\nwait\n`);
-  fs.mkdirSync(path.join(skill, 'scripts'));
-  fs.writeFileSync(
-    path.join(skill, 'scripts', 'handoff.ts'),
-    `import { spawn } from 'node:child_process';\nspawn('/bin/sh', [${JSON.stringify(shell)}], { stdio: 'ignore' });\nsetInterval(() => {}, 1000);\n`,
-  );
-  return { skill, shell, marker };
+  git(dir, 'config', 'filter.held.clean', `/bin/sh '${shell}'`);
+  fs.writeFileSync(path.join(dir, '.gitattributes'), 'f filter=held\n');
+  fs.writeFileSync(path.join(dir, 'f'), 'left by the step\n');
+  return { dir, shell, marker };
 }
 
 test('a group still cleaning up on SIGTERM is given its grace on a stepped wall clock', (t) => {
-  const { skill, shell, marker } = heldPlace(`trap 'sleep 0.3; exit 0' TERM`);
+  const { dir, shell, marker } = heldPlace(`trap 'sleep 0.3; exit 0' TERM`);
   t.after(() => {
     for (const pid of running(shell)) process.kill(pid, 'SIGKILL');
   });
   steppingClock(t, 60_000);
-  const outcome = runPlaceVerb(skill, 'handoff', { workspace: skill, step: 'build', why: '' }, { env: ENV, deadlineMs: 3000 });
+  const outcome = gitPlace({ env: ENV }).askNow('handoff', { workspace: dir, step: 'build', why: '' }, { deadlineMs: 3000 });
   assert.ok(fs.existsSync(marker), 'the shell had set its trap at the deadline');
   assert.equal(unreadOf(outcome), 'it gave no answer within 3 s, its deadline, and was stopped');
   assert.deepEqual(running(shell), [], 'the shell ended on SIGTERM');
 });
 
 test('REFUSED: a group that ignores SIGTERM is killed once its grace is over, on a stepped wall clock', (t) => {
-  const { skill, shell, marker } = heldPlace(`trap '' TERM`);
+  const { dir, shell, marker } = heldPlace(`trap '' TERM`);
   t.after(() => {
     for (const pid of running(shell)) process.kill(pid, 'SIGKILL');
   });
   steppingClock(t, 60_000);
-  const outcome = runPlaceVerb(skill, 'handoff', { workspace: skill, step: 'build', why: '' }, { env: ENV, deadlineMs: 3000 });
+  const outcome = gitPlace({ env: ENV }).askNow('handoff', { workspace: dir, step: 'build', why: '' }, { deadlineMs: 3000 });
   assert.ok(fs.existsSync(marker), 'the shell had set its trap at the deadline');
   assert.equal(
     unreadOf(outcome),

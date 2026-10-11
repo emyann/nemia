@@ -14,6 +14,7 @@ import { skillsFor } from '../skills/read.store.ts';
 import { renderedFlags, rendersAgent, unrendered } from '../agents/agents.ts';
 import type { LandingWords } from '../check/check.ts';
 import { landingWords, placeSay } from '../place/landing.store.ts';
+import type { Place } from '../place/place.store.ts';
 import type { PlaceSay } from '../place/place.ts';
 import { composeBrief } from '../brief/index.ts';
 import { artifactsDir, inputsDir } from '../record/record.store.ts';
@@ -63,23 +64,10 @@ export type PlaceTold = { readonly words: LandingWords | undefined; readonly say
 export type Told = ReturnType<typeof toldOf> & PlaceTold;
 
 /**
- * What `step` of `run` is told and denied by its place (`landingWords`, `placeSay`), read from `placeDir` or the run's own place
- * (`placeDirOf`), its branches named off `heads` where given; or undefined, with a note for `step` on `notes` saying why its place gives
- * none (`placeDirOf` or `readPlaceJson` refusing): the step is then not filed, and the pass goes on.
+ * What `step` of `run` is told and denied by `place` (`landingWords`, `placeSay`), its branches named off `heads` where given.
  */
-export function placeTold(
-  run: Run,
-  step: Workflow,
-  notes: string[],
-  placeDir?: string,
-  heads?: Readonly<Record<string, string>>,
-): PlaceTold | undefined {
-  try {
-    return { words: landingWords(run, step, placeDir, heads), say: placeSay(run, placeDir) };
-  } catch (err) {
-    notes.push(`${step.name}: not filed, for its place gives it no words: ${(err as Error).message}`);
-    return undefined;
-  }
+export function placeTold(run: Run, step: Workflow, place: Place, heads?: Readonly<Record<string, string>>): PlaceTold {
+  return { words: landingWords(run, step, place, heads), say: placeSay(run, place) };
 }
 
 /**
@@ -96,8 +84,8 @@ export const filedAt = (run: Pick<Run, 'id' | 'inputs'>): { runArtifacts: string
  * What `step` of `run`, not yet filed, would be told now from `steps` (`composeBrief`), with what its place says to it (`placeTold`):
  * what the board shows of a step to come. Where the place gives no words, the brief sends the step to its place's skill.
  */
-export function briefNow(step: Workflow, run: Run, steps: readonly Workflow[]): string {
-  const told = placeTold(run, step, []) ?? {};
+export function briefNow(step: Workflow, run: Run, steps: readonly Workflow[], place: Place): string {
+  const told = placeTold(run, step, place);
   const none = [undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined] as const;
   return composeBrief(step, run, steps, ...none, told);
 }

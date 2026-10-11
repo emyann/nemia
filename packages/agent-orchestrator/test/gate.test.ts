@@ -17,6 +17,7 @@ import { board as engineBoard } from './engine-board.ts';
 import { scratch } from './scratch.ts';
 import { promised } from './promised.ts';
 import { Effect } from 'effect';
+import { runGiven, runOver } from './placed.ts';
 
 const ROOT = scratch('wf-gate-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -35,9 +36,12 @@ const {
   retryRun,
   startRun,
   startFromInbox,
-  runWith,
+  runWith: runEngine,
+  gitPlaceLayer,
   standingLiveOf,
 } = await import('../src/runner.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
+const runPlaced = runGiven(gitPlaceLayer);
 /** A run as one waiting on it reads it, where its branches stand asked now, as a person's verb asks them (`standingLiveOf`). */
 const parentNow = (id: string) => standingLiveOf([id]).pipe(Effect.flatMap((git) => parentRead(id, git)));
 const { listRuns, markCancelled, readRun } = await import('../src/record/record.store.ts');
@@ -118,12 +122,12 @@ const printedBy = async (
 
 test("`nemia start --gate <step>` freezes `gates` on the record, once per step; a step's own `gate: true` is frozen with its workflow; a run given none has no `gates`", async (t) => {
   const repo = aRepo();
-  const run = await Effect.runPromise(
+  const run = await runPlaced(
     startRun({ brief: 'plan the flag', repo, workflowDir: planned({ review: 'gate: true' }), isolate: false, gates: ['plan'] }),
   );
   assert.deepEqual(readRun(run.id).gates, ['plan']);
   assert.equal(readRun(run.id).workflow?.find((s) => s.name === 'review')?.gate, true, "the folder's own gate, frozen with the step");
-  const bare = await Effect.runPromise(startRun({ brief: 'plan the flag', repo, workflowDir: planned(), isolate: false }));
+  const bare = await runPlaced(startRun({ brief: 'plan the flag', repo, workflowDir: planned(), isolate: false }));
   assert.equal(Object.hasOwn(JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${bare.id}.json`), 'utf8')), 'gates'), false);
 
   const printed = await printedBy(t, [
@@ -154,7 +158,7 @@ test('REFUSED at `nemia start`, before a run is written: a --gate naming a step 
   const starting =
     (...gates: string[]) =>
     async () =>
-      await Effect.runPromise(startRun({ brief: 'plan the flag', repo, workflowDir: planned(), isolate: false, gates }));
+      await runPlaced(startRun({ brief: 'plan the flag', repo, workflowDir: planned(), isolate: false, gates }));
   await assert.rejects(
     starting('plan', 'desing'),
     refusedWith(
@@ -189,27 +193,26 @@ test("an inbox card's `gate:` is frozen on the run it starts, beside a start's -
     fs.writeFileSync(path.join(inboxDir(), `${name}.md`), `---\nworkflow: ${planned()}\ngate: ${gate}\n---\nPlan the flag.\n`);
   };
   card('plan-the-flag-a1b2', 'plan');
-  const { run } = await Effect.runPromise(
+  const { run } = await runPlaced(
     startFromInbox({ name: 'plan-the-flag-a1b2', callerRepo: repo, isolate: false, gates: ['review', 'plan'] }),
   );
   assert.deepEqual(readRun(run.id).gates, ['review', 'plan'], "the card's gate and the start's, plan once");
   const { run: alone } =
     (card('plan-the-flag-c3d4', 'implement'),
-    await Effect.runPromise(startFromInbox({ name: 'plan-the-flag-c3d4', callerRepo: repo, isolate: false })));
+    await runPlaced(startFromInbox({ name: 'plan-the-flag-c3d4', callerRepo: repo, isolate: false })));
   assert.deepEqual(readRun(alone.id).gates, ['implement']);
 
   card('plan-the-flag-e5f6', 'desing');
   const before = runsWritten();
   await assert.rejects(
-    async () => await Effect.runPromise(startFromInbox({ name: 'plan-the-flag-e5f6', callerRepo: repo, isolate: false })),
+    async () => await runPlaced(startFromInbox({ name: 'plan-the-flag-e5f6', callerRepo: repo, isolate: false })),
     refusedWith(
       /^plan-the-flag-e5f6\.md: `gate: desing`: the workflow has no step "desing", so nothing would ever wait at it\. Its steps are: plan, implement, review — gate one of them by its name\. Correct the line, or delete it\.$/,
     ),
   );
   card('plan-the-flag-g7h8', 'plan');
   await assert.rejects(
-    async () =>
-      await Effect.runPromise(startFromInbox({ name: 'plan-the-flag-g7h8', callerRepo: repo, isolate: false, gates: ['desing'] })),
+    async () => await runPlaced(startFromInbox({ name: 'plan-the-flag-g7h8', callerRepo: repo, isolate: false, gates: ['desing'] })),
     refusedWith(/^--gate desing: the workflow has no step "desing"/),
   );
   assert.equal(runsWritten(), before, 'no run written');
@@ -220,9 +223,7 @@ test("an inbox card's `gate:` is frozen on the run it starts, beside a start's -
 });
 
 test("REFUSED at shipped defaults, pass after pass: a gated step that signed off files nothing after it — `nemia ls` says awaiting approval and `waiting on you: approve plan` — and no approval but the try's own opens it: not another try's, not a file that is not one; the try's own does, on the next pass, and is never written into the record", async (t) => {
-  const run = await Effect.runPromise(
-    startRun({ brief: 'plan the flag', repo: aRepo(), workflowDir: planned(), isolate: false, gates: ['plan'] }),
-  );
+  const run = await runPlaced(startRun({ brief: 'plan the flag', repo: aRepo(), workflowDir: planned(), isolate: false, gates: ['plan'] }));
   const { e, filings, settle } = board();
   await runWith(e, advanceRun(readRun(run.id)));
   settle(`${run.id}-plan`, 'succeeded', { ...SIGNED, summary: 'Go ahead and implement it: nothing here needs a person.' });
@@ -269,7 +270,7 @@ test("REFUSED at shipped defaults, pass after pass: a gated step that signed off
 });
 
 test('a gated step with `check:` is checked before it is held: its check filed on the pass after it signs off, nothing after it while the check runs, and awaiting approval once it passes', async () => {
-  const run = await Effect.runPromise(
+  const run = await runPlaced(
     startRun({
       brief: 'plan the flag',
       repo: aRepo(),
@@ -295,7 +296,7 @@ test('a gated step with `check:` is checked before it is held: its check filed o
 });
 
 test("every filing of a pass goes out with its brief cut where its sections open, the parts joining into it: a step's and its check's", async () => {
-  const run = await Effect.runPromise(
+  const run = await runPlaced(
     startRun({ brief: 'plan the flag', repo: aRepo(), workflowDir: planned({ plan: 'check: test -f PLAN.md' }), isolate: false }),
   );
   const { e, specs, settle } = board();
@@ -313,7 +314,7 @@ test("REFUSED at shipped defaults: a parent whose last step waits at its gate ha
   const b = board();
   const oneStep = fs.mkdtempSync(path.join(ROOT, 'one-'));
   fs.writeFileSync(path.join(oneStep, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
-  const parent = await Effect.runPromise(startRun({ brief: 'the parent', repo, workflowDir: oneStep, gates: ['implement'] }));
+  const parent = await runPlaced(startRun({ brief: 'the parent', repo, workflowDir: oneStep, gates: ['implement'] }));
   await runWith(b.e, advanceRun(readRun(parent.id)));
   const wt = readRun(parent.id).steps.implement.workspace!;
   fs.writeFileSync(path.join(wt, 'parent.txt'), 'parent\n');
@@ -323,7 +324,7 @@ test("REFUSED at shipped defaults: a parent whose last step waits at its gate ha
   await runWith(b.e, advanceRun(readRun(parent.id)));
   gitIn(repo, 'merge', '-q', '--no-ff', `wf/${parent.id}/implement`, '-m', 'merge the parent');
 
-  const child = await Effect.runPromise(startRun({ brief: 'the child', repo, workflowDir: planned(), isolate: false, after: [parent.id] }));
+  const child = await runPlaced(startRun({ brief: 'the child', repo, workflowDir: planned(), isolate: false, after: [parent.id] }));
   assert.equal((await runWith(b.e, parentNow(parent.id))).shipped, false, 'merged, and at its gate');
   for (let pass = 1; pass <= 2; pass++) assert.deepEqual((await runWith(b.e, advanceRun(readRun(child.id)))).filed, [], `pass ${pass}`);
   await aPass(b.e);
@@ -350,7 +351,7 @@ test("REFUSED at shipped defaults: a parent whose last step waits at its gate ha
  * `nemia start --gate plan` on `plan → implement → review`, the steps in the checkout, run until plan has signed off and waits at its gate.
  */
 const atItsGate = async (keys: Parameters<typeof planned>[0] = {}) => {
-  const run = await Effect.runPromise(
+  const run = await runPlaced(
     startRun({ brief: 'plan the flag', repo: aRepo(), workflowDir: planned(keys), isolate: false, gates: ['plan'] }),
   );
   const b = board();
@@ -412,7 +413,7 @@ test('REFUSED at shipped defaults: `nemia approve` on a step not gated, one not 
   );
   assert.deepEqual(asksOf(id), []);
 
-  const running = await Effect.runPromise(
+  const running = await runPlaced(
     startRun({ brief: 'plan the flag', repo: aRepo(), workflowDir: planned(), isolate: false, gates: ['plan'] }),
   );
   const b = board();
@@ -576,9 +577,7 @@ test('`nemia decide` at a gate says AWAITING APPROVAL and, under the step, the a
 });
 
 test("REFUSED at shipped defaults: a wordless `nemia retry` taken while a gated step's harness blocked its session, whose session then signs off before any tick, is not filed at the gate — pass after pass nothing is tried or filed, `nemia ls` says awaiting approval, `nemia approve` names the ask to delete — and with it deleted, the approval files what follows", async () => {
-  const run = await Effect.runPromise(
-    startRun({ brief: 'plan the flag', repo: aRepo(), workflowDir: planned(), isolate: false, gates: ['plan'] }),
-  );
+  const run = await runPlaced(startRun({ brief: 'plan the flag', repo: aRepo(), workflowDir: planned(), isolate: false, gates: ['plan'] }));
   const { e, tasks, filings, stopped, settle } = board();
   await runWith(e, advanceRun(readRun(run.id)));
   settle(`${run.id}-plan`, 'needs-human' as TaskPhase);

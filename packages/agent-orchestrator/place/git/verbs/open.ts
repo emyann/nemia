@@ -7,7 +7,8 @@
  * written (`worktreeInclude`), each line named, before anything of the run is written.
  */
 import path from 'node:path';
-import { flag, git, gitSays, isDirectory, readInclude, refusalLines, refused, serve, text } from './contract.ts';
+import { git, gitSays, isDirectory, readInclude, refusalLines, refused, type Asking, type Reply } from '../git.ts';
+import type { PlaceRequests } from '../../../src/place/place.ts';
 
 /** Why `root`'s `.worktreeinclude` cannot serve a run that cuts worktrees, in words that name the fix; undefined when it can. */
 function includeRefusal(root: string): string | undefined {
@@ -18,16 +19,15 @@ function includeRefusal(root: string): string | undefined {
   return `${path.join(root, '.worktreeinclude')}: ${refusalLines(lines).join('; ')}. Each line is a gitignored path inside the repository, relative to its root — fix or remove ${lines.length === 1 ? 'that line' : 'those lines'}.`;
 }
 
-serve((request) => {
-  const root = text(request, 'root');
-  const isolate = flag(request, 'isolate');
+/** The verb's body. */
+export function* open({ root, isolate }: PlaceRequests['open']): Asking<Reply<'open'>> {
   if (!isDirectory(root)) return refused(`${root} is not a directory: name a git repository with --repo`);
-  if (gitSays(root, ['rev-parse', '--git-dir']) === undefined)
+  if ((yield* gitSays(root, ['rev-parse', '--git-dir'])) === undefined)
     return refused(`${root} is not a git repository: run git init there and commit once, or name a repository with --repo`);
-  const baseRef = gitSays(root, ['rev-parse', '--verify', '--quiet', 'HEAD']);
+  const baseRef = yield* gitSays(root, ['rev-parse', '--verify', '--quiet', 'HEAD']);
   if (!baseRef) return refused(`${root} has no commit yet, so a run has nothing to start from: commit once there, then start again`);
   const include = isolate ? includeRefusal(root) : undefined;
   if (include) return refused(include);
-  const staged = path.resolve(root, git(root, ['rev-parse', '--git-path', 'MERGE_HEAD']));
-  return { repo: root, baseRef, branch: git(root, ['rev-parse', '--abbrev-ref', 'HEAD']), staged };
-});
+  const staged = path.resolve(root, yield* git(root, ['rev-parse', '--git-path', 'MERGE_HEAD']));
+  return { repo: root, baseRef, branch: yield* git(root, ['rev-parse', '--abbrev-ref', 'HEAD']), staged };
+}

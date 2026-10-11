@@ -14,6 +14,7 @@ import { Effect } from 'effect';
 import type { DaemonStanding } from '../daemon/daemon.ts';
 import type { Args } from '../command/command.ts';
 import { scratch } from '../../test/scratch.ts';
+import { runOver } from '../../test/placed.ts';
 
 const ROOT = fs.realpathSync(scratch('wf-upgrade-'));
 process.env.WF_ROOT = ROOT;
@@ -33,7 +34,9 @@ const { upgrade, RELEASES } = await import('./upgrade.verb.ts');
 const { currentRelease, releaseDir, releasesDir, runningAt } = await import('./release.store.ts');
 const { unitText } = await import('../service/service.ts');
 const { readPause } = await import('../pause/pause.store.ts');
-const { runWith } = await import('../runtime-client.ts');
+const { runWith: runEngine } = await import('../runtime-client.ts');
+const { gitPlaceLayer } = await import('../place/shipped.store.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
 const { TABLE } = await import('../command/commands.verb.ts');
 const { nemiaFence, widened } = await import('../admission/fence.ts');
 type ServiceHost = import('../service/service.verb.ts').ServiceHost;

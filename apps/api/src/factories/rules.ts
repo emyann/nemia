@@ -5,10 +5,11 @@
  * (`FACTORY_RULES_WORDS`).
  */
 import { Hono } from 'hono';
-import { FACTORY_RULES, factoryNameRefusal, runWith, type FactoryRules } from 'agent-orchestrator';
+import { FACTORY_RULES, factoryNameRefusal, type FactoryRules } from 'agent-orchestrator';
 import { valueAt } from '../body.ts';
 import type { Named, RouteWords } from '../commands/words.ts';
 import { type ApiEnv, served } from '../layer.ts';
+import { runPlaced } from '../store.ts';
 
 const RULES_PUT_SHAPE = '`{ "words": "<the factory\'s rules>" }`';
 
@@ -51,10 +52,10 @@ export const FACTORY_RULES_WORDS: RouteWords = {
  * (commands/routes.ts), guarded, each answered as the read.
  */
 export const factoryRules = new Hono<ApiEnv>().get('/api/factories/:factory/rules', (c) =>
-  served(c, async ({ e }) => {
+  served(c, async ({ e, placeService }) => {
     const { factory } = c.req.param();
     const wrong = factoryNameRefusal(factory);
     if (wrong !== undefined) return c.json({ error: `GET /api/factories/${factory}/rules: ${wrong}` }, 400);
-    return c.json((await runWith(e, FACTORY_RULES.handler({ factory }))) satisfies FactoryRules);
+    return c.json((await runPlaced(placeService, e, FACTORY_RULES.handler({ factory }))) satisfies FactoryRules);
   }),
 );

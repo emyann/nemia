@@ -7,7 +7,7 @@ import { decisionOf } from '../decide/decision.ts';
 import { detail, type RunDetail } from '../detail/index.ts';
 import { type ApiEnv, served } from '../layer.ts';
 import { workflowPageOf, type WorkflowPageAddress } from '../step/step.ts';
-import { findRun, noSuchRun } from '../store.ts';
+import { findRun, noSuchRun, runPlaced } from '../store.ts';
 
 /** A run as the list answers it: its summary, and the address of its workflow's page, null where the board pages none. */
 export type RunListing = RunSummary & { workflowPage: WorkflowPageAddress | null };
@@ -52,8 +52,9 @@ const CONCLUDED = COMMANDS.find((c) => c.name === 'concluded')!;
 
 export const runs = new Hono<ApiEnv>()
   .get('/api/runs', (c) =>
-    served(c, async ({ e, env, home, memo, repo }) => {
-      const summaries = (await runWith(
+    served(c, async ({ e, placeService, env, home, memo, repo }) => {
+      const summaries = (await runPlaced(
+        placeService,
         e,
         RUNS.handler({}, env, home, { runs: memo.resting, filings: memo.filings }),
       )) as unknown as RunSummary[];
@@ -63,7 +64,7 @@ export const runs = new Hono<ApiEnv>()
   .get('/api/runs/:id', (c) =>
     served(c, async (s) => {
       const id = c.req.param('id');
-      const { run } = (await runWith(s.e, RUN.handler({ id }))) as { run: Run | null };
+      const { run } = (await runPlaced(s.placeService, s.e, RUN.handler({ id }))) as { run: Run | null };
       if (!run) return c.json({ error: noSuchRun(id) }, 404);
       const full = await detail(run, s);
       if ('unjudged' in full) return c.json({ error: full.unjudged }, 502);
@@ -71,19 +72,21 @@ export const runs = new Hono<ApiEnv>()
     }),
   )
   .get('/api/runs/:runId/decision', (c) =>
-    served(c, async ({ e, home, env }) => {
+    served(c, async ({ e, placeService, home, env }) => {
       const id = c.req.param('runId');
       const run = findRun(id);
       if (!run) return c.json({ error: noSuchRun(id) }, 404);
       const { unreadable } = await runWith(e, viewsFor(e, [run]));
       const read = await runWith(
         e,
-        judgedUnlessUnreadable(run, unreadable, () => Effect.tryPromise({ try: () => decisionOf(run, e, home, env), catch: (err) => err })),
+        judgedUnlessUnreadable(run, unreadable, () =>
+          Effect.tryPromise({ try: () => decisionOf(run, e, placeService, home, env), catch: (err) => err }),
+        ),
       );
       if ('unreadable' in read) return c.json({ error: read.unreadable }, 502);
       return c.json(read.judged);
     }),
   )
   .get('/api/runs/:runId/concluded', (c) =>
-    served(c, async ({ e }) => c.json(await runWith(e, CONCLUDED.handler({ runId: c.req.param('runId') })))),
+    served(c, async ({ e, placeService }) => c.json(await runPlaced(placeService, e, CONCLUDED.handler({ runId: c.req.param('runId') })))),
   );

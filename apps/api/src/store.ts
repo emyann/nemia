@@ -13,6 +13,8 @@ import {
   judgedUnlessUnreadable,
   runStore,
   runWith,
+  PlaceService,
+  type EngineService,
   standingReader,
   standingSnapshot,
   standingsOf,
@@ -102,8 +104,15 @@ export function taskOfStep(id: string, step: string, home: string): { run: Run; 
  * read off `standing.json` (`standingSnapshot`): or, when its unfrozen folder does not load or a task it reads does not, why it is not
  * judged (`judgedUnlessUnreadable`). Rejects with what the engine's reads die of.
  */
-export const judgedOn = (e: Engine['Service'], run: Run, names: readonly string[], workflows: readonly Workflow[] | null) =>
-  runWith(
+export const judgedOn = (
+  e: Engine['Service'],
+  placeService: PlaceService['Service'],
+  run: Run,
+  names: readonly string[],
+  workflows: readonly Workflow[] | null,
+) =>
+  runPlaced(
+    placeService,
     e,
     Effect.gen(function* () {
       const { views, reader, unreadable } = yield* viewsFor(e, [run]);
@@ -114,3 +123,13 @@ export const judgedOn = (e: Engine['Service'], run: Run, names: readonly string[
       return { views, read };
     }),
   );
+
+/**
+ * A package program run for a request: over the engine `e` (`runWith`) and the place the app's layer gave (`Served.placeService`). Rejects
+ * with what the program failed with or died of, as `runWith` does.
+ */
+export const runPlaced = <A, E>(
+  place: PlaceService['Service'],
+  e: Engine['Service'],
+  program: Effect.Effect<A, E, EngineService | PlaceService>,
+): Promise<A> => runWith(e, program.pipe(Effect.provideService(PlaceService, place)));

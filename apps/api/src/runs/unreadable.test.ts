@@ -15,7 +15,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Ceilings } from '../factory/ceilings.ts';
 import { app } from '../app.ts';
-import { engine, passStanding, runStore, runWith, type RunSummary } from 'agent-orchestrator';
+import { engine, passStanding, runStore, type RunSummary } from 'agent-orchestrator';
+import { runWith } from '../../test/placed.ts';
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync(

@@ -8,7 +8,7 @@ import path from 'node:path';
 import { Effect } from 'effect';
 import type { Args } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
-import { runPlaceVerb, SHIPPED_PLACE } from '../place/place.store.ts';
+import { PlaceService, type Place } from '../place/place.store.ts';
 import type { PlaceOutcome, PlaceVerb } from '../place/place.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { tried } from '../runtime-client.ts';
@@ -80,10 +80,10 @@ function checked(tag: string, building: Building, env: NodeJS.ProcessEnv): void 
  * folder is taken away however it ends. Refused: a tag the repository lacks (`Missing`); one built at another commit, the tag moved, or a
  * release of it placed meanwhile (`Conflict`); a tag with no `release:check` script, or a command that fails (`Invalid`).
  */
-function prepared(tag: string, repo: string, root: string, env: NodeJS.ProcessEnv): { release: ReleaseFile; built: boolean } {
+function prepared(place: Place, tag: string, repo: string, root: string, env: NodeJS.ProcessEnv): { release: ReleaseFile; built: boolean } {
   const building = buildingOf(tag, new Date().toISOString().replace(/[:.]/g, '-'), root);
   try {
-    const { commit } = answered(tag, runPlaceVerb(SHIPPED_PLACE, 'export', { repo, tag, into: building.tree }));
+    const { commit } = answered(tag, place.askNow('export', { repo, tag, into: building.tree }));
     const had = releaseFileOf(releaseDir(tag, root));
     if (had?.commit === commit) return { release: had, built: false };
     if (had !== undefined)
@@ -95,7 +95,7 @@ function prepared(tag: string, repo: string, root: string, env: NodeJS.ProcessEn
         message: `${BY} ${tag}: the tag's package.json has no ${RELEASE_CHECK} script, so it cannot be checked as a release: tag a commit that has one.`,
       });
     checked(tag, building, env);
-    answered(tag, runPlaceVerb(SHIPPED_PLACE, 'seal', { tree: building.tree }));
+    answered(tag, place.askNow('seal', { tree: building.tree }));
     const release: ReleaseFile = { tag, commit, source: repo, builtAt: new Date().toISOString() };
     writeReleaseFile(building.tree, release);
     if (!placeRelease(building.tree, tag, root))
@@ -151,10 +151,11 @@ const restarted = Effect.fn('restarted')(function* (args: Args, host: ServiceHos
 export const upgrade = Effect.fn('upgrade')(function* (args: Args, host: ServiceHost = liveHost(), env: NodeJS.ProcessEnv = process.env) {
   const tag = typeof args.tag === 'string' ? args.tag : '';
   const root = host.roots().root;
+  const place = yield* PlaceService;
   const { release, built } = yield* tried(() => {
     const wrong = tagRefusal(tag);
     if (wrong !== null) throw new Invalid({ message: wrong });
-    const result = prepared(tag, repoOf(args, runningRelease()), root, env);
+    const result = prepared(place, tag, repoOf(args, runningRelease()), root, env);
     switchCurrent(tag, root);
     return result;
   });

@@ -5872,7 +5872,7 @@ counted off the feed). The birth at zero in `src/meter/step.test.ts` (two export
 Nothing in `src` asks git what a result branch changed: `nemia decide`, the api's decision and a declared file's branch ask the run's
 place, live, when a decision is read (`docs/design-2026-09-29-git-out.md`, open question 2):
 
-- **`report`** (`place/git/scripts/report.ts`) answers `Changes`: the base and each tip, each branch's files with their status and counts,
+- **`report`** (`place/git/verbs/report.ts`) answers `Changes`: the base and each tip, each branch's files with their status and counts,
   the diffs asked for and whether each path asked is on each branch, keyed by branch, and texts at the base. `changesOf` and `presentOn`
   (`src/branches/changes.store.ts`) read it; `radius` is pure over its files, with the workspaces out of `atBase['package.json']`.
 - **Nothing is kept.** No snapshot, no `runs/<id>/place/report.json`: a run in flight meets nothing stored that changed, and its next

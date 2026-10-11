@@ -13,13 +13,13 @@ import {
   engine,
   list,
   filingsRead,
-  runWith,
   runTokens,
   timeline,
   runStore,
   VERSION,
   type RunSummary,
 } from 'agent-orchestrator';
+import { runWith } from './placed.ts';
 import { claudeDetached, claudeOps } from 'agent-runtime';
 import { Effect } from 'effect';
 import { DEFAULT_ROUNDS } from 'agent-orchestrator/workflow';

@@ -14,7 +14,7 @@ import { parseCloseout, type Closeout } from '../closeout/closeout.ts';
 import { roundsDue } from '../round/round.ts';
 import { stepsOf } from '../record/record.store.ts';
 import { runStore } from '../record/files.store.ts';
-import { placeDirOf, trialMerges } from '../place/place.store.ts';
+import { PlaceService, trialMerges, type Place } from '../place/place.store.ts';
 import { mergeWordOf } from '../branches/index.ts';
 import { strayAsk } from '../say/say.verb.ts';
 import { closeoutAsked, closeoutReader, spendReader, taskPhasesRead } from '../views/views.verb.ts';
@@ -47,10 +47,10 @@ function mergeReads(
  * commit the base branch was at as the place tried it.
  */
 const trialOf =
-  (run: Run) =>
+  (run: Run, place: Place) =>
   (branch: string): Tried => {
     if (!isRepositoryRun(run)) return { trial: { error: 'no repository' }, base: null };
-    const { at, trials } = trialMerges(run.repo, [{ onto: run.branch, branch }], placeDirOf(run));
+    const { at, trials } = trialMerges(run.repo, [{ onto: run.branch, branch }], place);
     return { trial: mergeWordOf(trials[0]), base: at[run.branch] ?? null };
   };
 
@@ -61,6 +61,7 @@ const trialOf =
  * None on any other run.
  */
 export function mergeOffers(
+  place: Place,
   steps: readonly Workflow[],
   run: Run,
   d: Decision,
@@ -78,7 +79,7 @@ export function mergeOffers(
   return steps
     .filter((s) => s.loop)
     .flatMap((looping) => {
-      const answer = mergeAsk(steps, run, looping.name, reads, rounds, trialOf(run), at);
+      const answer = mergeAsk(steps, run, looping.name, reads, rounds, trialOf(run, place), at);
       return 'ask' in answer ? [mergeOffer(run, answer.ask)] : [];
     });
 }
@@ -105,7 +106,8 @@ export const mergeRun = Effect.fn('merge')(function* (id: string, stepName?: str
   const { views, phaseOf } = yield* taskPhasesRead(run);
   const reads = mergeReads(steps, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), spendReader(views));
   const at = new Date().toISOString();
-  const answer = (asks: readonly RoundAsk[]) => mergeAsk(steps, run, stepName, reads, asks, trialOf(run), at);
+  const place = yield* PlaceService;
+  const answer = (asks: readonly RoundAsk[]) => mergeAsk(steps, run, stepName, reads, asks, trialOf(run, place), at);
 
   const first = answer((yield* tried(() => runStore.asks.read(id))).rounds);
   if ('refusal' in first) return yield* Effect.fail(new Conflict({ message: first.refusal }));

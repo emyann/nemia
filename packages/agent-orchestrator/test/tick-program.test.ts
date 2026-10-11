@@ -22,6 +22,8 @@ import type { EngineService as Service } from '../src/runtime-client.ts';
 import type { Pass } from '../src/tick/tick.verb.ts';
 import { scratch } from './scratch.ts';
 import { plainEngine } from './promised.ts';
+import { runGiven, runOver } from './placed.ts';
+import type { PlaceService } from '../src/place/place.store.ts';
 
 const ROOT = scratch('wf-tick-program-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -30,7 +32,9 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_MAX_CONCURRENT = '10';
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
-const { startRun, runWith } = await import('../src/runner.ts');
+const { startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
+const runPlaced = runGiven(gitPlaceLayer);
 const { freshRestMemo, tickRun } = await import('../src/tick/tick.verb.ts');
 const { EngineService } = await import('../src/runtime-client.ts');
 const { Invalid } = await import('../src/refusal/refusal.ts');
@@ -104,7 +108,7 @@ const signAll = () => {
 
 /** `tickRun`, given `engine` as the service, run to a Promise as the face runs it. */
 const programOn = (engine: Engine, options: Parameters<typeof tickRun>[0] = {}) =>
-  Effect.runPromise(tickRun(options).pipe(Effect.provide(EngineService.layer(engine))));
+  runPlaced(tickRun(options).pipe(Effect.provide(EngineService.layer(engine))));
 
 /** The engine, but for a runtime pass that rejects with `err`. */
 const failingWith = (err: unknown): Engine => ({
@@ -113,7 +117,7 @@ const failingWith = (err: unknown): Engine => ({
 });
 
 test("the tick's program, given the engine as a service, answers what its plain face answers: the face runs the program and adds nothing", async () => {
-  const run = await Effect.runPromise(startRun({ brief: 'one run', repo: REPO, workflowDir: FOLDER }));
+  const run = await runPlaced(startRun({ brief: 'one run', repo: REPO, workflowDir: FOLDER }));
   for (let k = 0; k < 3; k++) await runWith(e, tickRun({ repo: ROOT }));
   signAll();
   const status = async () => (await runWith(e, tickRun({ repo: ROOT }))).runs.find((a) => a.run.id === run.id)?.status;
@@ -136,7 +140,7 @@ test("REFUSED: the tick's refusal is its program's typed failure, picked out by 
   const was = process.env.WF_MAX_CONCURRENT;
   process.env.WF_MAX_CONCURRENT = '-3';
   try {
-    const recovered = await Effect.runPromise(
+    const recovered = await runPlaced(
       tickRun({ repo: ROOT }).pipe(
         Effect.catchTag('Invalid', (r) => Effect.succeed(r.message)),
         Effect.provide(EngineService.layer(e)),
@@ -157,7 +161,7 @@ test("REFUSED: the tick's refusal is its program's typed failure, picked out by 
 
 test("REFUSED: what is not a refusal is a defect the tick's program dies of, recovered by no catch, and its face rethrows it as it was thrown", async () => {
   const boom = new Error('boom');
-  const caught = await Effect.runPromise(
+  const caught = await runPlaced(
     tickRun({ repo: ROOT }).pipe(
       Effect.catch(() => Effect.succeed('caught')),
       Effect.provide(EngineService.layer(failingWith(boom))),
@@ -176,13 +180,16 @@ test("REFUSED: what is not a refusal is a defect the tick's program dies of, rec
 });
 
 test("the tick's program says in its type what it needs and what it refuses: run without the engine, it does not typecheck, and a refusal is its failure", () => {
-  const typed: EffectOf<Pass, Refusal, Service> = tickRun();
+  const typed: EffectOf<Pass, Refusal, Service | PlaceService> = tickRun();
   // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
-  const infallible: EffectOf<Pass, never, Service> = tickRun();
+  const infallible: EffectOf<Pass, never, Service | PlaceService> = tickRun();
   const unprovided = () =>
     // @ts-expect-error -- tickRun requires EngineService, and runPromise takes no requirement
     Effect.runPromise(tickRun());
-  assert.deepEqual([typeof typed, typeof infallible, typeof unprovided], ['object', 'object', 'function']);
+  const unplaced = (e: Engine) =>
+    // @ts-expect-error -- a program that asks the place is given none: the engine alone does not give it
+    runEngine(e, tickRun());
+  assert.deepEqual([typeof typed, typeof infallible, typeof unprovided, typeof unplaced], ['object', 'object', 'function', 'function']);
 });
 
 test('a pass whose series cannot be written keeps its own cost and says so: the series are lost, never the pass; the quota read rides on it', async (t) => {
@@ -226,7 +233,7 @@ test('a check filed by a pass is kept with its labels among the recent passes, a
   const { DEFAULT_FACTORY } = await import('../src/factory/factory.ts');
   const folder = fs.mkdtempSync(path.join(ROOT, 'checked-'));
   fs.writeFileSync(path.join(folder, 'work.md'), '---\nplace: git\nharness: codex\ncheck: node -e 0\n---\nwork it\n');
-  const run = await Effect.runPromise(startRun({ brief: 'a checked run', repo: REPO, workflowDir: folder }));
+  const run = await runPlaced(startRun({ brief: 'a checked run', repo: REPO, workflowDir: folder }));
   const before = recentPasses().length;
   for (let k = 0; k < 8 && !readRun(run.id).steps.work?.check; k++) {
     await runWith(e, tickRun({ repo: ROOT }));

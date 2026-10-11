@@ -15,6 +15,7 @@ import { scratch } from './scratch.ts';
 const ROOT = scratch('wf-store root*-');
 process.env.WF_ROOT = ROOT;
 const { startRun } = await import('../src/start/start.verb.ts');
+const { gitPlaceLayer } = await import('../src/place/shipped.store.ts');
 
 /** A workflow folder `name` of `files`, each a step's file by its name. */
 function folder(name: string, files: Record<string, string>): string {
@@ -39,7 +40,9 @@ const runsWritten = (): string[] =>
 
 /** `startRun` of `workflowDir` in a repository of its own, given `inputs`: the run's id, or the refusal it failed with. */
 function started(workflowDir: string, inputs?: string[]): string {
-  const exit = Effect.runSyncExit(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir, ...(inputs ? { inputs } : {}) }));
+  const exit = Effect.runSyncExit(
+    startRun({ brief: 'add a flag', repo: aRepo(), workflowDir, ...(inputs ? { inputs } : {}) }).pipe(Effect.provide(gitPlaceLayer)),
+  );
   if (exit._tag === 'Success') return exit.value.id;
   throw Effect.runSync(Effect.flip(Effect.failCause(exit.cause)));
 }

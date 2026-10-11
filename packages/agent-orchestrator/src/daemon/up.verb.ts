@@ -4,6 +4,7 @@
  * `runMain` runs either as the process's command, a signal letting go of the lease before the process exits.
  */
 import { Cause, Effect, Exit, Fiber, type Scope } from 'effect';
+import type { PlaceService } from '../place/place.store.ts';
 import { over, quotaHarnesses, type Engine, type HarnessQuota } from '../runtime-client.ts';
 import { HOME } from '../record/record.store.ts';
 import { queueLine } from '../inbox/inbox.ts';
@@ -201,7 +202,7 @@ const saidStarted = ({ held, replaced }: TakenStore): Effect.Effect<void> =>
  * a third it delivers the store's subscriptions to the feed (`deliver`), on a fourth it keeps Nemia at the person's level (`keep`), and
  * on a fifth it brings each factory made from a template to it (`reconcile`).
  */
-export const up = (e: Engine, { every, repo, holder, onTaken }: UpOptions): Effect.Effect<never, unknown, Scope.Scope> =>
+export const up = (e: Engine, { every, repo, holder, onTaken }: UpOptions): Effect.Effect<never, unknown, Scope.Scope | PlaceService> =>
   Effect.gen(function* () {
     const taken = yield* Effect.acquireRelease(
       Effect.try({ try: () => takeStore({ every, cwd: repo, by: holder, release: leaseRelease(runningRelease()) }), catch: (err) => err }),

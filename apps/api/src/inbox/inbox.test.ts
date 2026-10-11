@@ -19,9 +19,9 @@ import {
   noCardLine,
   startFromInbox,
   runStore,
-  runWith,
   engine,
 } from 'agent-orchestrator';
+import { runWith } from '../../test/placed.ts';
 const repo = scratch('nemia-api-inbox-repo-');
 process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
@@ -741,7 +741,10 @@ test("a card whose start fails without a refusal — its repository's `.worktree
   } catch (err) {
     failure = err as Error & { exitCode?: unknown };
   }
-  assert.ok(failure && failure.exitCode !== 2 && failure.message.startsWith("the place's open was not heard: ELOOP"), failure?.message);
+  assert.ok(
+    failure && failure.exitCode !== 2 && failure.message.startsWith("the place's open was not heard: open threw before it answered: ELOOP"),
+    failure?.message,
+  );
   const res = await startCard({ workflow: 'dev', card: card.name, brief: 'Do it.' });
   assert.equal(res.status, 500);
   assert.equal(((await res.json()) as Refused).error, failure.message);

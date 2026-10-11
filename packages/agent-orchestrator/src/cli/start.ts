@@ -18,6 +18,7 @@ import {
   startFactory,
   startPlan,
   runWith,
+  shipped,
   workflowAt,
   workflowFolder,
   type Args,
@@ -96,7 +97,7 @@ export async function startRun(args: Args, e: Engine): Promise<void> {
   const arg = textOf(args, 'brief') ?? '';
   const card = inboxNameAt(arg);
   const asked = card !== null ? cardArgs(card, args) : briefArgs(arg, args);
-  const data = await runWith(e, START.handler(asked));
+  const data = await runWith(e, shipped(START.handler(asked)));
   for (const line of START.print(data, asked)) console.log(line);
 }
 
@@ -107,7 +108,7 @@ export async function startRun(args: Args, e: Engine): Promise<void> {
 export async function planRun(args: Args, e: Engine): Promise<void> {
   const { factory, repo } = placeOfStart(args);
   const plan = { dir: path.resolve(textOf(args, 'folder') ?? ''), repo: path.resolve(repo) };
-  const { started, stopped, folderOf } = await runWith(e, startPlan({ ...plan, ...(factory !== undefined ? { factory } : {}) }));
+  const { started, stopped, folderOf } = await runWith(e, shipped(startPlan({ ...plan, ...(factory !== undefined ? { factory } : {}) })));
   for (const line of planLines(started)) console.log(line);
   if (stopped) {
     const told = planStopped({ card: stopped.card, why: stopped.error.message, rest: stopped.rest }, started, { ...plan, folderOf });
@@ -136,7 +137,7 @@ export async function inboxAddRun(args: Args, e: Engine): Promise<void> {
     workflow: workflow === undefined ? undefined : workflowAt(workflow, process.cwd()),
     repo: repo === undefined ? undefined : path.resolve(repo),
   };
-  const data = await runWith(e, INBOX_ADD.handler(asked));
+  const data = await runWith(e, shipped(INBOX_ADD.handler(asked)));
   for (const line of INBOX_ADD.print(data, asked)) console.log(line);
 }
 
@@ -146,6 +147,6 @@ export async function inboxAddRun(args: Args, e: Engine): Promise<void> {
 export async function inboxQueueRun(args: Args, e: Engine): Promise<void> {
   const workflow = textOf(args, 'workflow');
   const asked: Args = { ...args, workflow: workflow === undefined ? undefined : workflowAt(workflow, process.cwd()) };
-  const data = await runWith(e, INBOX_QUEUE.handler(asked));
+  const data = await runWith(e, shipped(INBOX_QUEUE.handler(asked)));
   for (const line of INBOX_QUEUE.print(data, asked)) console.log(line);
 }

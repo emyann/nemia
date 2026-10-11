@@ -153,7 +153,11 @@ version, and the version above must be the pin. An upgrade re-measures the table
   (`tickRun`), whose pass is metered through `meteredPass` over the module-global meter. A command's `handler` is a program too. An
   engine refusal a controller answers itself is read off the raw verb: `toldBy` in `say.verb.ts` turns the runtime's refusal into a
   `Conflict`, and a journal that does not read is told by `unreadableJournal`.
-- A controller that reads no engine requires nothing: `startRun` and `unhold`, run with `Effect.runPromise` or `runWith` alike.
+- A controller that reads no engine requires none: `unhold`, run with `Effect.runPromise` or `runWith` alike.
+- A controller that asks where a run's work lives requires the place (`PlaceService` in
+  `packages/agent-orchestrator/src/place/place.store.ts`, a service with no default): `startRun` requires it alone, `tickRun` beside the
+  engine. `runWith` removes the engine's requirement only, so whoever runs the program gives the place by name
+  (`Effect.provide(gitPlaceLayer)`, `shipped(program)`), and a program given none does not compile.
 
 ## Logs and traces
 

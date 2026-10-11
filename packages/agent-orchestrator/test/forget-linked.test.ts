@@ -10,14 +10,16 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { scratch } from './scratch.ts';
 import { promised } from './promised.ts';
-import { Effect } from 'effect';
+import { runGiven, runOver } from './placed.ts';
 
 const REAL = scratch('wf-linked-');
 const ROOT = path.join(scratch('wf-link-'), 'store');
 fs.mkdirSync(path.join(REAL, 'store'));
 fs.symlinkSync(path.join(REAL, 'store'), ROOT);
 process.env.WF_ROOT = ROOT;
-const { advanceRun, forgetRun, startRun, runWith } = await import('../src/runner.ts');
+const { advanceRun, forgetRun, startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
+const runPlaced = runGiven(gitPlaceLayer);
 const { readRun } = await import('../src/record/record.store.ts');
 
 const git = (cwd: string, ...args: string[]) =>
@@ -56,7 +58,7 @@ test("REFUSED before, now forgotten: a store under a link — git lists each wor
     }),
   });
 
-  const run = await Effect.runPromise(startRun({ brief: 'under a link', repo, workflowDir: folder }));
+  const run = await runPlaced(startRun({ brief: 'under a link', repo, workflowDir: folder }));
   await runWith(e, advanceRun(readRun(run.id)));
   const wt = readRun(run.id).steps.implement.workspace!;
   assert.ok(wt.startsWith(ROOT), 'the record names it through the link');

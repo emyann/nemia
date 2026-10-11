@@ -22,6 +22,7 @@ import { asyncOps, plainEngine, type AsyncRunner } from '../../test/promised.ts'
 import type { Run } from '../run.ts';
 import type { PassCost } from '../meter/meter.ts';
 import { scratch } from '../../test/scratch.ts';
+import { runGiven, runOver } from '../../test/placed.ts';
 
 const ROOT = scratch('wf-feed-reads-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -29,7 +30,9 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 process.env.WF_MAX_CONCURRENT = '10000';
 delete process.env.WF_MAX_RUNS;
-const { runWith, startRun, tickRun } = await import('../runner.ts');
+const { runWith: runEngine, gitPlaceLayer, startRun, tickRun } = await import('../runner.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
+const runPlaced = runGiven(gitPlaceLayer);
 const { listRuns } = await import('../record/record.store.ts');
 const { freshRestMemo } = await import('./tick.verb.ts');
 const { filingsRead } = await import('../views/views.verb.ts');
@@ -89,8 +92,8 @@ const ORIGIN = path.join(ROOT, 'engine');
 fs.mkdirSync(ORIGIN);
 const inFlight: Run[] = [];
 for (let k = 0; k < 3; k++)
-  inFlight.push(await Effect.runPromise(startRun({ brief: `in flight ${k}`, repo: REPO, workflowDir: ONE, isolate: false })));
-for (let k = 0; k < 10; k++) await Effect.runPromise(startRun({ brief: `run ${k}`, repo: REPO, workflowDir: ONE, isolate: false }));
+  inFlight.push(await runPlaced(startRun({ brief: `in flight ${k}`, repo: REPO, workflowDir: ONE, isolate: false })));
+for (let k = 0; k < 10; k++) await runPlaced(startRun({ brief: `run ${k}`, repo: REPO, workflowDir: ONE, isolate: false }));
 
 /** The store passed until every run but those in flight is answered from memory. */
 const toRest = async () => {

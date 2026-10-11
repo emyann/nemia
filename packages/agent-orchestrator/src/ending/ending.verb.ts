@@ -231,7 +231,7 @@ export function landEnding(
  * Commit the merge staged in `run`'s checkout with `message` through its place (`landThrough`), and abort it where the place refuses the
  * commit: what to write on the step's record, with its note, or why the next pass tries again.
  */
-function committedThrough(run: RepositoryRun, message: string, memo?: StatusMemo): { landed: Landed; note: string } | { again: string } {
+function committedThrough(run: RepositoryRun, message: string, memo: StatusMemo): { landed: Landed; note: string } | { again: string } {
   const made = landThrough(run, { act: 'commit', message }, memo);
   if ('commit' in made) return { landed: made, note: `its check passed on the merge, and ${landedWords(run, made)}` };
   if ('aborted' in made) return { again: 'the place answered an abort where the run asked a commit of its merge' };
@@ -243,7 +243,7 @@ function committedThrough(run: RepositoryRun, message: string, memo?: StatusMemo
 }
 
 /** Abort the merge staged in `run`'s checkout through its place (`landThrough`): undefined once it has, else why not, in words. */
-function abortedThrough(run: RepositoryRun, memo?: StatusMemo): string | undefined {
+function abortedThrough(run: RepositoryRun, memo: StatusMemo): string | undefined {
   const taken = landThrough(run, { act: 'abort' }, memo);
   if ('aborted' in taken) return undefined;
   if ('commit' in taken) return 'the place answered a commit where the run asked an abort';

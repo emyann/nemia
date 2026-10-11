@@ -22,13 +22,16 @@ import type { Run } from '../run.ts';
 import type { PassCost } from '../meter/meter.ts';
 import { scratch } from '../../test/scratch.ts';
 import { plainEngine } from '../../test/promised.ts';
+import { runGiven, runOver } from '../../test/placed.ts';
 
 const ROOT = scratch('wf-rest-reads-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 process.env.WF_ROOT = ROOT;
 process.env.WF_MAX_CONCURRENT = '10000';
 delete process.env.WF_MAX_RUNS;
-const { runWith, startRun, tickRun } = await import('../runner.ts');
+const { runWith: runEngine, gitPlaceLayer, startRun, tickRun } = await import('../runner.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
+const runPlaced = runGiven(gitPlaceLayer);
 const { listRuns } = await import('../record/record.store.ts');
 const { freshRestMemo } = await import('./tick.verb.ts');
 
@@ -81,7 +84,7 @@ const h = engine();
 const MEMO = freshRestMemo();
 const inFlight: Run[] = [];
 for (let k = 0; k < 3; k++)
-  inFlight.push(await Effect.runPromise(startRun({ brief: `in flight ${k}`, repo: REPO, workflowDir: ONE, isolate: false })));
+  inFlight.push(await runPlaced(startRun({ brief: `in flight ${k}`, repo: REPO, workflowDir: ONE, isolate: false })));
 const measured = async (): Promise<PassCost> => (await runWith(h.e, tickRun({ repo: ROOT, memo: MEMO, verifyRest: false }))).cost!;
 
 /** A word said to the task of each run in flight, which the runtime appends to its journal. */
@@ -95,7 +98,7 @@ const saidToInFlight = async () => {
  * pass at rest, measured.
  */
 const atRest = async (n: number): Promise<PassCost> => {
-  for (let k = 0; k < n; k++) await Effect.runPromise(startRun({ brief: `run ${k}`, repo: REPO, workflowDir: ONE, isolate: false }));
+  for (let k = 0; k < n; k++) await runPlaced(startRun({ brief: `run ${k}`, repo: REPO, workflowDir: ONE, isolate: false }));
   for (let k = 0; k < 12; k++) {
     await runWith(h.e, tickRun({ repo: ROOT, memo: MEMO, verifyRest: true }));
     h.signAll(inFlight);

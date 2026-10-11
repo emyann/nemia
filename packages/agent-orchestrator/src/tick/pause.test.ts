@@ -22,6 +22,7 @@ import type { Finishing } from '../pause/pause.ts';
 import { scratch } from '../../test/scratch.ts';
 import { until, WAITED } from '../../test/waits.ts';
 import { Effect } from 'effect';
+import { runGiven, runOver } from '../../test/placed.ts';
 
 const ROOT = scratch('wf-pause-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -33,7 +34,10 @@ delete process.env.WF_MAX_RUNS;
 const { addToInbox, approveRun, queueInInbox, readInbox, retryRun, startRun } = await import('../runner.ts');
 const { approvalFile, asksDir, readRun } = await import('../record/record.store.ts');
 const { tickRun, freshRestMemo } = await import('./tick.verb.ts');
-const { engineOf, runWith, storeAdmission } = await import('../runtime-client.ts');
+const { engineOf, runWith: runEngine, storeAdmission } = await import('../runtime-client.ts');
+const { gitPlaceLayer } = await import('../place/shipped.store.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
+const runPlaced = runGiven(gitPlaceLayer);
 const { resumePause, putPause } = await import('../pause/pause.store.ts');
 const { pauseNow } = await import('../pause/pause.verb.ts');
 const { pausedRead, runsListed } = await import('../list/list.verb.ts');
@@ -154,7 +158,7 @@ const MEMO = freshRestMemo();
 /** A pass as the daemon makes one, with the memo it keeps — or with none, as a restarted daemon's first pass. */
 const pass = (memo = MEMO) => runWith(h.e, tickRun({ repo: ROOT, memo, verifyRest: true }));
 const begun = async (workflowDir: string, more: Partial<Parameters<typeof startRun>[0]> = {}) =>
-  await Effect.runPromise(startRun({ brief: 'paused', repo: REPO, workflowDir, isolate: false, ...more }));
+  await runPlaced(startRun({ brief: 'paused', repo: REPO, workflowDir, isolate: false, ...more }));
 const taskOf = (run: Run, step: string): string | undefined => readRun(run.id).steps[step]?.taskId ?? undefined;
 /** The row `nemia ls` lists for `step` of `run`: its word and its note. */
 const rowOf = async (run: Run, step: string) => {

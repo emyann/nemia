@@ -527,6 +527,9 @@ test(
     const pass = runWith(b.e, tickRun({ memo: freshRestMemo() }).pipe(Effect.provide(hung), Effect.provide(clock.layer))).then(
       () => void (ended = true),
     );
+    t.after(async () => {
+      while (!ended) await clock.adjust(1_000);
+    });
     await until(t, () => clock.asked.length > 0, 'the standing is asked under its deadline', { bell: clock.bell });
     assert.deepEqual([...new Set(clock.asked)], [15_000], 'the deadline is the shipped fifteen seconds, for each repository');
     await clock.adjust(14_999);

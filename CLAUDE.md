@@ -217,5 +217,5 @@ What the `create-an-agent` skill, being generic, does not say here:
   `PYROSCOPE_SERVER_ADDRESS` is set, held by `agent-orchestrator/test/profile.test.ts`.
   `tools/observe/render/` draws a checkout's dashboards before they land: a throwaway stack under a name of its own, fake data, a
   picture and the text of every panel (`tools/observe/README.md`, *See a change rendered*), held by
-  `agent-orchestrator/test/observe-render.test.ts` on a stub `docker`, its seed by `observe.test.ts`.
+  `agent-orchestrator/test/observe-render.boundary.test.ts` on a stub `docker`, its seed by `observe.test.ts`.
 - `.codex/rules/git-commit.rules` — lets a Codex step commit its own work in a worktree.

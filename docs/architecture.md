@@ -60,7 +60,7 @@ runtime's, `testEngine()` behind `agent-runtime/testing`: it keeps `file`, `view
 there (`APART`), and a runtime test builds the real engine, never the stand-in (`takenBreaks`). Two things are given up on purpose. *A team's own place as a folder of scripts*: a
 place is no longer a skill's `scripts/<verb>.ts` declared by a `place.json` and run as a process a question, so a team cannot bring
 one as files; another place is code that implements `PlaceService`, given as a layer where the program is composed. *A place frozen
-per run*: a run copies no place and its record names none (`test/start-place.test.ts`), so a run in flight is answered by the place
+per run*: a run copies no place and its record names none (`test/start-place.boundary.test.ts`), so a run in flight is answered by the place
 of the process that asks, the release installed, and a change to the place reaches it at the next restart.
 
 **A loop's rounds** are the orchestrator's, counted off the looping step's tries that went `then: 'round'` (`roundIn`,

@@ -2257,7 +2257,7 @@ Tested in `src/demand/demand.test.ts` (each lease's plan, the switch, the servic
 start failing the test; the store's systemd unit and launchd agent started, another store's left alone; a child that ends, one that
 cannot spawn, another daemon taking the store, the switch), `test/demand-cli.test.ts` (each of the ten through `main` over a host that
 starts nothing, no read asking, and no `daemon.log` or lease in the store), `test/ambient.test.ts`, `src/command/command.test.ts`,
-`src/nemia/nemia.test.ts` and `src/daemon/run-main.test.ts`. Starting the daemon from the board is still to come.
+`src/nemia/nemia.test.ts` and `src/daemon/run-main.boundary.test.ts`. Starting the daemon from the board is still to come.
 
 ## Shipped: the daemon's log and traces (Nemia platform slice 5, part 1 of 3)
 
@@ -2276,7 +2276,7 @@ traces:
   its journal said at Debug.
 
 Tested in `src/telemetry/telemetry.test.ts` (no export without an endpoint, read off the context; a scratch collector posted the `tick`),
-`src/daemon/up.test.ts`, `test/up-lines.test.ts` (`nemia up` spawned, its line on stdout), `test/telemetry-nesting.test.ts`,
+`src/daemon/up.test.ts`, `test/up-lines.boundary.test.ts` (`nemia up` spawned, its line on stdout), `test/telemetry-nesting.test.ts`,
 `agent-runtime/src/core/engine/journal-said.test.ts` and `apps/api/test/main.test.ts` (the api's daemon exporting its `tick`).
 
 ## Shipped: one emission — `emitFeed` and `FeedHub` (Nemia platform slice 5, part 2 of 3)
@@ -5885,7 +5885,7 @@ place, live, when a decision is read (`docs/design-2026-09-29-git-out.md`, open 
   are `artifacts`, `readArtifact`, `touchedBy`, `workspacesOf` and `sensitiveDiff`. `.oxlintrc.json` is check-affecting.
 
 A decision read costs two node processes and a `git diff` per check-affecting path: 150 to 450 ms on this repository's branches, where
-the git calls it replaced took 20 to 120, the radii equal. Tested in `test/report.test.ts`, `test/radius.test.ts`, `test/decide.test.ts`
+the git calls it replaced took 20 to 120, the radii equal. Tested in `test/report.boundary.test.ts`, `test/radius.test.ts`, `test/decide.test.ts`
 and `test/store.test.ts` (a report not heard), `test/ship.test.ts` (a trial that read no base) and the api's `decide/decision.test.ts`.
 
 ## Shipped: one read of the feed, one message to a subscriber (2026-10-07)

@@ -24,7 +24,7 @@ down is in `docs/architecture.md`, *Who owns what*.
 - **The engine decides a task again in the pass that recorded its end**: a rule that stops or refuses (a deadline) never overrules an end
   on record. Test it with the end and the rule in one pass.
 - **A pass asks `claude agents` only for a session it expects that is no job** (`observeFor`), read off the world, never off
-  `config.background`; `agent-orchestrator/test/agents-calls.test.ts` counts the calls.
+  `config.background`; `agent-orchestrator/test/agents-calls.boundary.test.ts` counts the calls.
 - **An absence read off a failed look is not an absence**: `observeFor` answers `{ seen, unread }`, and an unread name is neither there
   nor gone (`UNREAD`). A new harness says which names a failed read left unread.
 - **XState's `transition` answers an event with no edge by staying**: `moveOn` asks `snapshot.can(event)` first and refuses. A new edge is

@@ -7,7 +7,7 @@
  * A fake `claude` and `codex` first on PATH run until the test opens their gate — a file named for the task's id, which is its brief — and
  * `claude agents` prints a registry and counts itself. The tasks are filed straight through the client, with no run record, so `advance`
  * views none of them: every `claude agents` call a pass makes is the runtime's observe, which asks it only for a session expected that
- * is not a job (`agents-calls.test.ts` has a run's steps, a background session and a restart).
+ * is not a job (`agents-calls.boundary.test.ts` has a run's steps, a background session and a restart).
  *
  * An admitted task starts on the runtime's next pass, so a freed slot is taken one pass after it is admitted into: each case ticks
  * once to admit and once to start.

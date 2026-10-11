@@ -48,19 +48,11 @@
         "query": "label_values(step_tries_total{service_name=\"$service\"}, factory)",
         "definition": "label_values(step_tries_total{service_name=\"$service\"}, factory)",
         "refresh": 2,
-        "includeAll": true,
-        "allValue": ".*",
-        "multi": true,
-        "current": {
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
-        },
+        "includeAll": false,
+        "multi": false,
         "sort": 1,
-        "hide": 0
+        "hide": 0,
+        "description": "One factory: two factories' workflows of one name would be averaged together."
       },
       {
         "name": "workflow",
@@ -70,8 +62,8 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "query": "label_values(step_tries_total{service_name=\"$service\", factory=~\"$factory\"}, workflow)",
-        "definition": "label_values(step_tries_total{service_name=\"$service\", factory=~\"$factory\"}, workflow)",
+        "query": "label_values(step_tries_total{service_name=\"$service\", factory=\"$factory\"}, workflow)",
+        "definition": "label_values(step_tries_total{service_name=\"$service\", factory=\"$factory\"}, workflow)",
         "refresh": 2,
         "includeAll": false,
         "multi": false,
@@ -143,7 +135,7 @@
           },
           "refId": "A",
           "queryType": "traceql",
-          "query": "{resource.service.name=\"$service\" && name=\"run.timeline\" && span.factory=~\"$factory\" && span.workflow=\"$workflow\" && span.outcome=~\"$outcome\" && span.of=~\"try|check\" && span.part=\"ran\"} | avg_over_time(span.value) by (span.row)",
+          "query": "{resource.service.name=\"$service\" && name=\"run.timeline\" && span.factory=\"$factory\" && span.workflow=\"$workflow\" && span.outcome=~\"$outcome\" && span.of=~\"try|check\" && span.part=\"ran\"} | avg_over_time(span.value) by (span.row)",
           "metricsQueryType": "instant",
           "limit": 20,
           "tableType": "traces"
@@ -238,7 +230,7 @@
           },
           "refId": "A",
           "queryType": "traceql",
-          "query": "{resource.service.name=\"$service\" && name=\"run.timeline\" && span.factory=~\"$factory\" && span.workflow=\"$workflow\" && span.outcome=~\"$outcome\" && span.of=~\"try|check\" && span.part=\"queued\"} | avg_over_time(span.value) by (span.row)",
+          "query": "{resource.service.name=\"$service\" && name=\"run.timeline\" && span.factory=\"$factory\" && span.workflow=\"$workflow\" && span.outcome=~\"$outcome\" && span.of=~\"try|check\" && span.part=\"queued\"} | avg_over_time(span.value) by (span.row)",
           "metricsQueryType": "instant",
           "limit": 20,
           "tableType": "traces"
@@ -333,7 +325,7 @@
           },
           "refId": "A",
           "queryType": "traceql",
-          "query": "{resource.service.name=\"$service\" && name=\"run.timeline\" && span.factory=~\"$factory\" && span.workflow=\"$workflow\" && span.outcome=~\"$outcome\" && span.of=\"step\" && span.part=\"tries\"} | avg_over_time(span.value) by (span.row)",
+          "query": "{resource.service.name=\"$service\" && name=\"run.timeline\" && span.factory=\"$factory\" && span.workflow=\"$workflow\" && span.outcome=~\"$outcome\" && span.of=\"step\" && span.part=\"tries\"} | avg_over_time(span.value) by (span.row)",
           "metricsQueryType": "instant",
           "limit": 20,
           "tableType": "traces"
@@ -428,7 +420,7 @@
           },
           "refId": "A",
           "queryType": "traceql",
-          "query": "{resource.service.name=\"$service\" && name=\"run.timeline\" && span.factory=~\"$factory\" && span.workflow=\"$workflow\" && span.outcome=~\"$outcome\" && span.of=\"try\" && span.part=\"cost\"} | avg_over_time(span.value) by (span.row)",
+          "query": "{resource.service.name=\"$service\" && name=\"run.timeline\" && span.factory=\"$factory\" && span.workflow=\"$workflow\" && span.outcome=~\"$outcome\" && span.of=\"try\" && span.part=\"cost\"} | avg_over_time(span.value) by (span.row)",
           "metricsQueryType": "instant",
           "limit": 20,
           "tableType": "traces"
@@ -523,7 +515,7 @@
           },
           "refId": "A",
           "queryType": "traceql",
-          "query": "{resource.service.name=\"$service\" && name=\"run.timeline\" && span.factory=~\"$factory\" && span.workflow=\"$workflow\" && span.outcome=~\"$outcome\" && span.of=\"round\" && span.part=\"wall\"} | avg_over_time(span.value) by (span.row)",
+          "query": "{resource.service.name=\"$service\" && name=\"run.timeline\" && span.factory=\"$factory\" && span.workflow=\"$workflow\" && span.outcome=~\"$outcome\" && span.of=\"round\" && span.part=\"wall\"} | avg_over_time(span.value) by (span.row)",
           "metricsQueryType": "instant",
           "limit": 20,
           "tableType": "traces"
@@ -618,7 +610,7 @@
           },
           "refId": "A",
           "queryType": "traceql",
-          "query": "{resource.service.name=\"$service\" && name=\"run.timeline\" && span.factory=~\"$factory\" && span.workflow=\"$workflow\" && span.outcome=~\"$outcome\" && span.of=\"run\"} | avg_over_time(span.value) by (span.part)",
+          "query": "{resource.service.name=\"$service\" && name=\"run.timeline\" && span.factory=\"$factory\" && span.workflow=\"$workflow\" && span.outcome=~\"$outcome\" && span.of=\"run\"} | avg_over_time(span.value) by (span.part)",
           "metricsQueryType": "instant",
           "limit": 20,
           "tableType": "traces"
@@ -727,7 +719,7 @@
           },
           "refId": "A",
           "queryType": "traceql",
-          "query": "{resource.service.name=\"$service\" && name=\"run.timeline\" && span.factory=~\"$factory\" && span.workflow=\"$workflow\" && span.outcome=~\"$outcome\" && span.of=\"run\" && span.part=\"wall\"} | count_over_time()",
+          "query": "{resource.service.name=\"$service\" && name=\"run.timeline\" && span.factory=\"$factory\" && span.workflow=\"$workflow\" && span.outcome=~\"$outcome\" && span.of=\"run\" && span.part=\"wall\"} | count_over_time()",
           "metricsQueryType": "instant",
           "limit": 20,
           "tableType": "traces"

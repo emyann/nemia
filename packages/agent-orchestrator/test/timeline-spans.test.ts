@@ -81,15 +81,15 @@ const engine = plainEngine(
   }),
 );
 
-/** Attempt 1 of session `taskId` signed off done, having cost `costUsd`. */
-const sign = (taskId: string, costUsd: number) => {
+/** Attempt 1 of session `taskId` signed off done, having cost `costUsd`, its closeout carrying `more` beside the four fields. */
+const sign = (taskId: string, costUsd: number, more: Record<string, unknown> = {}) => {
   const name = nameFor(taskId, 1);
   sessions.set(name, {
     ...sessions.get(name)!,
     state: 'completed',
     busy: false,
     usage: { costUsd, inputTokens: 1200, outputTokens: 300 },
-    closeout: { payload: { outcome: 'done', summary: 'did it', artifacts: [], needs: null }, at: Date.now() },
+    closeout: { payload: { outcome: 'done', summary: 'did it', artifacts: [], needs: null, ...more }, at: Date.now() },
   });
 };
 
@@ -177,6 +177,20 @@ const WAITED = folder('waited', {
 });
 /** One step, gated, that nothing waits on: an intake's shape. */
 const ALONE = folder('alone', { intake: '---\nplace: git\ngate: true\n---\nAsk.\n' });
+/** `build`, checked, then `review`, which sends the work back to `build` while its closeout says `again`. */
+const LOOPED = folder('looped', {
+  build: '---\nplace: git\ncheck: node -e 0\n---\nBuild it.\n',
+  review: '---\nafter: build\nplace: git\noutput: review.schema.json\nloop: build\n---\nReview it.\n',
+});
+fs.writeFileSync(
+  path.join(LOOPED, 'review.schema.json'),
+  JSON.stringify({
+    type: 'object',
+    properties: { findings: { type: 'array', items: { type: 'string' } }, again: { type: 'boolean' } },
+    required: ['findings', 'again'],
+    additionalProperties: false,
+  }),
+);
 /** One step, with no gate and no check. */
 const SOLO = folder('solo', { work: '---\nplace: git\n---\nDo it.\n' });
 
@@ -254,6 +268,61 @@ test("a finished run's timeline spans are its page's timeline, row for row, hand
   await tick(3, again);
   assert.ok(again.spans.length > 0, 'the daemon started again made its passes');
   assert.deepEqual(timelineSpans(run.id, again), [], 'REFUSED: a daemon started again reads the run timed on its record');
+});
+
+test("a loop's second round is handed over with the first: every try's session and check, and each round's wall, as the page has them", async (t) => {
+  const later = clockOf(t);
+  const run = await start(LOOPED);
+  const round = async (minutes: { build: number; check: number; review: number }, again: boolean, replies: Record<string, unknown>) => {
+    await tickUntil(() => {
+      const build = readRun(run.id).steps.build?.taskId;
+      return Boolean(build) && sessions.get(nameFor(build!, 1))?.state === 'working';
+    });
+    const build = readRun(run.id).steps.build.taskId!;
+    later(minutes.build);
+    sign(build, 2, replies);
+    await tickUntil(() => Boolean(readRun(run.id).steps.build.check));
+    const check = readRun(run.id).steps.build.check!.taskId;
+    await tickUntil(() => sessions.has(nameFor(check, 1)));
+    later(minutes.check);
+    exit(check);
+    await tickUntil(() => {
+      const review = readRun(run.id).steps.review?.taskId;
+      return Boolean(review) && sessions.get(nameFor(review!, 1))?.state === 'working';
+    });
+    later(minutes.review);
+    sign(readRun(run.id).steps.review.taskId!, 1, { findings: again ? ['rename it'] : [], again });
+    return { build, check };
+  };
+  const first = await round({ build: 10, check: 4, review: 3 }, true, {});
+  await tickUntil(() => (readRun(run.id).steps.build.tries?.length ?? 0) === 1);
+  assert.deepEqual(timelineSpans(run.id), [], 'none while the loop goes round');
+  const second = await round({ build: 6, check: 5, review: 2 }, false, {
+    replies: [{ finding: 'rename it', answer: 'fixed', why: 'renamed' }],
+  });
+  assert.notEqual(second.build, first.build, 'the second round is a task of its own');
+  await tickUntil(() => readRun(run.id).runTimed === true);
+
+  const spans = timelineSpans(run.id);
+  assert.deepEqual(spans.map(lineOf).sort(), (await pageRows(run.id)).map(lineOf).sort(), "each span is a row of the page's timeline");
+  const of = (row: string, part: string) => spans.filter((s) => s.row === row && s.part === part).map((s) => [s.try, s.value]);
+  assert.deepEqual(of('01 build', 'ran'), [
+    [1, 10 * MIN],
+    [2, 6 * MIN],
+  ]);
+  assert.deepEqual(
+    of('01 build check', 'ran'),
+    [
+      [1, 4 * MIN],
+      [2, 5 * MIN],
+    ],
+    "the first try's check among them, which no pass's own views hold",
+  );
+  assert.deepEqual(of('01 build', 'tries'), [[undefined, 2]]);
+  assert.deepEqual(of('review round 01', 'wall'), [[undefined, 17 * MIN]]);
+  assert.deepEqual(of('review round 02', 'wall'), [[undefined, 13 * MIN]]);
+  assert.deepEqual(of('run', 'wall'), [[undefined, 30 * MIN]]);
+  assert.deepEqual(of('run', 'check'), [[undefined, 9 * MIN]]);
 });
 
 test('a one-step gated run held open then approved, as an intake is, gives its queue, its session, its tries and its gate', async (t) => {

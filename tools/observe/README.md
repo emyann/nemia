@@ -132,8 +132,8 @@ Grafana cannot be saved, so edit the JSON here, and Grafana reads it again withi
 `packages/agent-orchestrator/test/observe.test.ts` holds them to the code: a query that names a metric, label, span, attribute or log field
 the code does not emit fails it, and so does a metric the code defines that System does not chart, a profile type the profiler does not
 send, a Tempo table naming a span that would show its trace's duration, a span name both layers emit, a server-side expression reading a
-query its panel has not, and a Timeline query that asks a row's `of` or `part` for a value the code gives none of, is not held to the one
-workflow picked, or whose workflow choice may hold several. What a session sends and what the span metrics write are no code of ours: the test lists them as measured below.
+query its panel has not, and a Timeline query that asks a row's `of` or `part` for a value the code gives none of or is not held to the one
+factory and the one workflow picked, and a Timeline factory or workflow choice that may hold several. What a session sends and what the span metrics write are no code of ours: the test lists them as measured below.
 `agent-orchestrator/test/observe-time.test.ts` holds the timing below: the command head and the test scope, each over a table of commands,
 the span metrics' dimensions, the retention and reach, and the mounts. `agent-orchestrator/test/profile.test.ts` holds the preload: with no
 endpoint, nothing loaded and nothing opened.

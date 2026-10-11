@@ -737,8 +737,8 @@ const askedOf = (query: string, key: string): string[] =>
 /**
  * What would make `dashboard` read a finished run's timeline (`TIMELINE_SPAN`) wrong, each said in a line: a query of it asking its `of`
  * or its `part` for a value the code gives none of (`TIMELINE_OF`, `TIMELINE_PARTS`), which would draw nothing and say so nowhere; a
- * query not held to the one workflow picked, whose rows would be averaged with another workflow's of the same name; and a `workflow`
- * choice that may hold more than one.
+ * query not held to the one factory and the one workflow picked, whose rows would be averaged with those of another workflow, or of a
+ * workflow of the same name in another factory; and a `factory` or a `workflow` choice that may hold more than one.
  */
 function timelineFaults(dashboard: Dashboard): string[] {
   const queries = queriesOf(dashboard).filter((q) => q.datasource === 'tempo' && traceNames(q.text).spans.includes(TIMELINE_SPAN));
@@ -749,13 +749,18 @@ function timelineFaults(dashboard: Dashboard): string[] {
         .filter((v) => !known.includes(v))
         .map((v) => `span.${key}="${v}" is no ${key} of a timeline`),
     );
-  const loose = queries.filter((q) => !q.text.includes('span.workflow="$workflow"')).map((q) => `not held to one workflow: ${q.text}`);
-  const workflow = dashboard.templating?.list.find((v) => v.name === 'workflow');
-  const picks = workflow?.includeAll === false && workflow.multi === false ? [] : ['its workflow choice may hold more than one workflow'];
+  const one = ['factory', 'workflow'];
+  const loose = one.flatMap((name) =>
+    queries.filter((q) => !q.text.includes(`span.${name}="$${name}"`)).map((q) => `not held to one ${name}: ${q.text}`),
+  );
+  const picks = one.flatMap((name) => {
+    const pick = dashboard.templating?.list.find((v) => v.name === name);
+    return pick?.includeAll === false && pick.multi === false ? [] : [`its ${name} choice may hold more than one ${name}`];
+  });
   return [...new Set([...strange('of', TIMELINE_OF), ...strange('part', TIMELINE_PARTS), ...loose, ...picks])];
 }
 
-test("Timeline reads a finished run's timeline by the values the code gives, for one workflow at a time", () => {
+test("Timeline reads a finished run's timeline by the values the code gives, for one workflow of one factory at a time", () => {
   for (const [file, d] of DASHBOARDS) assert.deepEqual(timelineFaults(d), [], file);
   const queries = queriesOf(dashboardTitled('Timeline')).filter((q) => q.datasource === 'tempo');
   assert.ok(queries.length > 0 && queries.every((q) => traceNames(q.text).spans.includes(TIMELINE_SPAN)), 'every panel reads the span');
@@ -764,7 +769,7 @@ test("Timeline reads a finished run's timeline by the values the code gives, for
   assert.deepEqual(asked('part'), ['cost', 'queued', 'ran', 'tries', 'wall'], "the run's check and gate are drawn by its part, unasked");
 });
 
-test('REFUSED: a Timeline query for a part or a kind the code gives none of, one of every workflow, and a choice of several', () => {
+test('REFUSED: a Timeline query for a part or a kind the code gives none of, one of every workflow or factory, and a choice of several', () => {
   const timeline = () => dashboardTitled('Timeline');
   assert.deepEqual(timelineFaults(withQuery(timeline(), 'tempo', 'span.part="ran"', 'span.part="run"')), [
     'span.part="run" is no part of a timeline',
@@ -775,11 +780,18 @@ test('REFUSED: a Timeline query for a part or a kind the code gives none of, one
   const every = withQuery(timeline(), 'tempo', 'span.workflow="$workflow"', 'span.workflow=~".*"');
   assert.equal(timelineFaults(every).length, 1);
   assert.match(timelineFaults(every)[0], /^not held to one workflow: /);
-  const several = timeline();
-  const pick = several.templating?.list.find((v) => v.name === 'workflow');
-  assert.ok(pick, 'Timeline picks a workflow');
-  pick.includeAll = true;
-  assert.deepEqual(timelineFaults(several), ['its workflow choice may hold more than one workflow']);
+  const allFactories = withQuery(timeline(), 'tempo', 'span.factory="$factory"', 'span.factory=~"$factory"');
+  assert.equal(timelineFaults(allFactories).length, 1);
+  assert.match(timelineFaults(allFactories)[0], /^not held to one factory: /);
+  for (const name of ['factory', 'workflow']) {
+    for (const key of ['includeAll', 'multi'] as const) {
+      const several = timeline();
+      const pick = several.templating?.list.find((v) => v.name === name);
+      assert.ok(pick, `Timeline picks a ${name}`);
+      pick[key] = true;
+      assert.deepEqual(timelineFaults(several), [`its ${name} choice may hold more than one ${name}`], `${name}: ${key} alone`);
+    }
+  }
 });
 
 /** The four choices a step is picked by across runs, each a variable of the dashboards and a label of a session. */

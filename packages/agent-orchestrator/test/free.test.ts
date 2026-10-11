@@ -1,8 +1,9 @@
 /**
  * The daemon's retention of worktrees (`freeOnce`, `free`): a run that is finished — landed by its ending, merged by hand, or cancelled —
  * has its worktrees removed by a sweep after the pass that found it at rest, and everything `nemia prune` keeps is kept. Walked through
- * the runtime itself, `plainEngine` over an in-memory journal and a harness the test signs by hand, with git for real, as
- * unreadable-journal.test.ts walks it. A file of its own, since `WF_ROOT` is read once, as the package loads.
+ * the runtime itself, `plainEngine` over an in-memory journal and a harness the test signs by hand, on one test place for the file, since
+ * its runs share one store and every pass reads them all. A file of its own, since `WF_ROOT` is read once, as the package loads. A
+ * worktree a person locked, and a checkout on no branch, are walked on git in free-held.boundary.test.ts.
  *
  * `WF_KEEP_WORKTREES` is deleted at its head, so the rule is read at its shipped default, and each sweep is handed the runs of its own
  * test alone: a sweep reads what it is given, and every test's runs share the one store.
@@ -11,12 +12,12 @@ import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { Effect, Fiber, Logger, References } from 'effect';
 import { Engine, type Sighting } from 'agent-runtime';
 import { asyncOps, asyncStore, plainEngine, type AsyncJournal, type AsyncRunner } from './promised.ts';
 import { scratch } from './scratch.ts';
 import { runGiven } from './placed.ts';
+import { testPlace } from '../place/memory/index.ts';
 import { until, WAITED } from './waits.ts';
 import type { PlaceRequests, PlaceVerb } from '../src/place/place.ts';
 
@@ -28,13 +29,15 @@ process.env.WF_MAX_CONCURRENT = '50';
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_KEEP_WORKTREES;
-const { approveRun, cancelRun, decideRun, startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
-const runPlaced = runGiven(gitPlaceLayer);
+const { approveRun, cancelRun, decideRun, startRun, runWith: runEngine } = await import('../src/runner.ts');
+const place = testPlace();
+const stand = () => place;
+const world = () => stand().world;
+const runPlaced = runGiven(() => stand().layer);
 const { readRun } = await import('../src/record/record.store.ts');
 const { runStore } = await import('../src/record/files.store.ts');
 const { tickRun, freshRestMemo } = await import('../src/tick/tick.verb.ts');
 const { PlaceService } = await import('../src/place/place.store.ts');
-const { shippedGitPlace } = await import('../src/place/shipped.store.ts');
 const { free, freeOnce, freshFreeMemory, FREE_A_SWEEP } = await import('../src/prune/free.verb.ts');
 const { EngineService } = await import('../src/runtime-client.ts');
 const { freeable, freeSaid, freeTurn } = await import('../src/prune/prune.ts');
@@ -44,21 +47,17 @@ const { main } = await import('../src/cli/main.ts');
 type Pass = Awaited<ReturnType<typeof tick>>;
 type Memory = ReturnType<typeof freshFreeMemory>;
 
-const git = (cwd: string, ...args: string[]) =>
-  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
-    cwd,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-  }).trim();
-
 /** A repository with one commit on main. */
 const aRepo = (): string => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-  git(repo, 'init', '-q', '-b', 'main');
-  fs.writeFileSync(path.join(repo, 'README.md'), 'readme\n');
-  git(repo, 'add', '-A');
-  git(repo, 'commit', '-q', '-m', 'base');
+  world().repository(repo, { 'README.md': 'readme\n' });
   return repo;
+};
+
+/** `branch` merged into `repo`'s checkout and committed under `message`, as a person or an ending's session merges it. */
+const mergedIn = (repo: string, branch: string, message: string): void => {
+  world().stage(repo, branch);
+  world().commit(repo, message);
 };
 
 /** A workflow of one step, `work`. */
@@ -136,22 +135,22 @@ const sign = (id: string, outcome: 'done' | 'blocked' = 'done') => {
 /** What the place was asked, verb by verb, and through which door: `ask`, off the loop, or `askNow`, which holds the process. */
 type Asked = Array<{ verb: PlaceVerb; request: PlaceRequests[PlaceVerb]; door: 'ask' | 'askNow' }>;
 
-/** The shipped git place, every question noted in `asked`, with its door, before it is answered. */
+/** The file's test place, every question noted in `asked`, with its door, before it is answered. */
 const counting = (asked: Asked) =>
   PlaceService.layer({
-    declared: shippedGitPlace.declared,
+    declared: stand().place.declared,
     ask: (verb, request, options) => {
       asked.push({ verb, request, door: 'ask' });
-      return shippedGitPlace.ask(verb, request, options);
+      return stand().place.ask(verb, request, options);
     },
     askNow: (verb, request, options) => {
       asked.push({ verb, request, door: 'askNow' });
-      return shippedGitPlace.askNow(verb, request, options);
+      return stand().place.askNow(verb, request, options);
     },
   });
 
 const tick = (memo?: ReturnType<typeof freshRestMemo>) =>
-  runEngine(e, tickRun({ repo: ROOT, ...(memo ? { memo } : {}) }).pipe(Effect.provide(gitPlaceLayer)));
+  runEngine(e, tickRun({ repo: ROOT, ...(memo ? { memo } : {}) }).pipe(Effect.provide(stand().layer)));
 
 /** Passes until `ok` holds of one, a dozen at most. */
 async function ticked(ok: (pass: Pass) => boolean, what: string): Promise<Pass> {
@@ -205,8 +204,7 @@ async function worked(id: string, outcome: 'done' | 'blocked' = 'done') {
   await ticked(() => atWork(id), `${id}'s work at work`);
   const at = lane(id);
   fs.writeFileSync(path.join(at, `${id}.txt`), 'work\n');
-  git(at, 'add', '-A');
-  git(at, 'commit', '-q', '-m', `work of ${id}`);
+  world().commit(at, `work of ${id}`);
   sign(id, outcome);
   return ticked((pass) => !atWork(id) && answerOf(pass, id)?.status !== 'running', `${id} past its work`);
 }
@@ -215,7 +213,7 @@ async function worked(id: string, outcome: 'done' | 'blocked' = 'done') {
 async function merged(repo = aRepo()) {
   const run = await started(WORK, repo);
   await worked(run.id);
-  git(repo, 'merge', '-q', '--no-ff', '-m', `merge ${run.id}`, readRun(run.id).steps.work.branch!);
+  mergedIn(repo, readRun(run.id).steps.work.branch!, `merge ${run.id}`);
   return run;
 }
 
@@ -227,9 +225,9 @@ async function land(id: string, repo: string) {
 
 /** The ending of a run whose work is done: approved, its merge made in the checkout, signed off; passes until the run rests, landed. */
 async function shipped(id: string, repo: string) {
-  await runEngine(e, approveRun(id, 'ship').pipe(Effect.provide(gitPlaceLayer)));
+  await runEngine(e, approveRun(id, 'ship').pipe(Effect.provide(stand().layer)));
   await ticked(() => atWork(id), `${id}'s ending at work`);
-  git(repo, 'merge', '-q', '--no-ff', '-m', `land ${id}`, readRun(id).steps.work.branch!);
+  mergedIn(repo, readRun(id).steps.work.branch!, `land ${id}`);
   sign(id);
   return ticked((pass) => rests(pass, id, 'succeeded'), `${id} landed and at rest`);
 }
@@ -238,7 +236,7 @@ const printedBy = async (t: TestContext, argv: string[]) => {
   const out: string[] = [];
   const log = t.mock.method(console, 'log', (...a: unknown[]) => void out.push(a.map(String).join(' ')));
   try {
-    await main(argv, e);
+    await main(argv, e, undefined, stand().place);
   } finally {
     log.mock.restore();
   }
@@ -250,6 +248,8 @@ test('a run lands by its ending, and a later sweep frees its worktree: marked, s
   await land(id, repo);
   const wt = lane(id);
   const branch = readRun(id).steps.work.branch!;
+  const tip = world().tip(repo, branch);
+  assert.ok(tip, 'the run has its branch');
   const record = fs.readFileSync(path.join(ROOT, 'runs', `${id}.json`), 'utf8');
   assert.ok(fs.existsSync(wt), 'landed, its worktree is still there: no pass removes it');
 
@@ -276,9 +276,9 @@ test('a run lands by its ending, and a later sweep frees its worktree: marked, s
   assert.deepEqual(done.verbs, ['inventory', 'standing', 'remove'], 'one inventory, one standing and one remove, every one off the loop');
 
   assert.equal(fs.readFileSync(path.join(ROOT, 'runs', `${id}.json`), 'utf8'), record, 'the sweep wrote nothing on the run record');
-  assert.equal(git(repo, 'branch', '--list', branch).replace(/^[*+ ]+/, ''), branch, 'its branch is kept');
+  assert.equal(world().tip(repo, branch), tip, 'its branch is kept');
   assert.ok(fs.existsSync(path.join(ROOT, 'runs', id)), 'and its files under runs/<id>/');
-  assert.equal((await runEngine(e, decideRun(id).pipe(Effect.provide(gitPlaceLayer)))).decision.kind, 'shipped');
+  assert.equal((await runEngine(e, decideRun(id).pipe(Effect.provide(stand().layer)))).decision.kind, 'shipped');
   const ls = await printedBy(t, ['ls']);
   assert.ok(
     ls.some((l) => l.startsWith(`${id}  `) && l.includes('(pruned)')),
@@ -341,55 +341,19 @@ test("REFUSED at shipped defaults: a run that succeeded with a person's merge le
   );
   assert.deepEqual([first.freed, first.said, first.logged, whole(id)], [[], [], [], true]);
 
-  git(repo, 'merge', '-q', '--no-ff', '-m', 'by hand', readRun(id).steps.work.branch!);
+  mergedIn(repo, readRun(id).steps.work.branch!, 'by hand');
   const done = await sweep(await tick(), [id], memory);
   assert.deepEqual([done.freed.map((p) => p.id), gone(id)], [[id], true], 'on its base now, it is finished');
-});
-
-test('REFUSED at shipped defaults: a landed run whose worktree holds a change, is locked, or is on no branch is left, and said once across seven sweeps; seen to, it is freed', async () => {
-  const repo = aRepo();
-  const [dirty, locked, detached] = [await merged(repo), await merged(repo), await merged(repo)];
-  fs.writeFileSync(path.join(lane(dirty.id), 'left.txt'), 'not committed\n');
-  git(repo, 'worktree', 'lock', lane(locked.id));
-  git(lane(detached.id), 'checkout', '-q', '--detach');
-  fs.writeFileSync(path.join(lane(detached.id), 'more.txt'), 'on no branch\n');
-  git(lane(detached.id), 'add', '-A');
-  git(lane(detached.id), 'commit', '-q', '-m', 'on no branch');
-  const ids = [dirty.id, locked.id, detached.id];
-  const memory = freshFreeMemory();
-  const logged: string[] = [];
-  for (let k = 0; k < 7; k++) {
-    const done = await sweep(await tick(), ids, memory);
-    assert.deepEqual(done.freed, []);
-    logged.push(...done.logged);
-  }
-  assert.deepEqual(ids.map(whole), [true, true, true]);
-  assert.equal(logged.length, 3, `each said once, though each was judged three times: ${logged.join('\n')}`);
-  assert.match(logged.find((l) => l.startsWith(`${dirty.id}  not freed: `)) ?? '', /holds changes no commit has \(left\.txt\)/);
-  assert.match(logged.find((l) => l.startsWith(`${locked.id}  not freed: `)) ?? '', /is locked, and git will not remove it/);
-  assert.match(logged.find((l) => l.startsWith(`${detached.id}  not freed: `)) ?? '', /is on no branch — its HEAD is detached/);
-
-  fs.rmSync(path.join(lane(dirty.id), 'left.txt'));
-  git(repo, 'worktree', 'unlock', lane(locked.id));
-  const freed: string[] = [];
-  for (let k = 0; k < 3; k++) freed.push(...(await sweep(await tick(), ids, memory)).freed.map((p) => p.id));
-  assert.deepEqual(new Set(freed), new Set([dirty.id, locked.id]), 'the same memory, and the two a person saw to are freed');
-  assert.deepEqual([gone(dirty.id), gone(locked.id), whole(detached.id)], [true, true, true]);
 });
 
 test("REFUSED at shipped defaults: a finished run that stays, judged while another merge is staged in its repository's checkout, has the checkout's status asked off the loop", async () => {
   const { id, repo } = await started(CHECKED);
   await worked(id);
   await runEngine(e, cancelRun(id));
-  git(repo, 'worktree', 'lock', lane(id));
-  git(repo, 'branch', 'other');
-  const other = fs.mkdtempSync(path.join(ROOT, 'other-'));
-  git(repo, 'worktree', 'add', '-q', other, 'other');
-  fs.writeFileSync(path.join(other, 'other.txt'), "another run's work\n");
-  git(other, 'add', '-A');
-  git(other, 'commit', '-q', '-m', 'other');
+  fs.writeFileSync(path.join(lane(id), 'left.txt'), 'not committed\n');
+  world().branch(repo, 'other', { 'other.txt': "another run's work\n" });
   const pass = await ticked((p) => rests(p, id, 'cancelled'), 'cancelled at its gate, and at rest');
-  git(repo, 'merge', '-q', '--no-ff', '--no-commit', 'other');
+  world().stage(repo, 'other');
   assert.ok(fs.existsSync(readRun(id).stagedFile!), "a merge is staged in the checkout, and it is not this run's");
 
   const done = await sweep(pass, [id], freshFreeMemory());
@@ -399,7 +363,7 @@ test("REFUSED at shipped defaults: a finished run that stays, judged while anoth
     'the checkout is read, once, and off the loop',
   );
   assert.deepEqual([done.freed, whole(id)], [[], true]);
-  git(repo, 'merge', '--abort');
+  world().takeBack(repo);
 });
 
 test('a restart between the landing and the sweep changes nothing: a daemon that remembers nothing frees the run on its first pass and sweep', async () => {
@@ -450,7 +414,7 @@ test('REFUSED at shipped defaults: a store with more finished runs than a sweep 
   const runs: string[] = [];
   for (let k = 0; k < 2 * FREE_A_SWEEP + 1; k++) runs.push((await merged(repo)).id);
   const kept = await merged(repo);
-  git(repo, 'worktree', 'lock', lane(kept.id));
+  fs.writeFileSync(path.join(lane(kept.id), 'left.txt'), 'not committed\n');
   const ids = [...runs, kept.id];
   const memory = freshFreeMemory();
   const sweeps: Awaited<ReturnType<typeof sweep>>[] = [];
@@ -462,7 +426,11 @@ test('REFUSED at shipped defaults: a store with more finished runs than a sweep 
     [runs.slice(0, FREE_A_SWEEP), runs.slice(FREE_A_SWEEP, 2 * FREE_A_SWEEP), runs.slice(2 * FREE_A_SWEEP), [], []],
     'a sweep frees FREE_A_SWEEP runs and no more',
   );
-  assert.deepEqual(count('inventory'), [FREE_A_SWEEP, FREE_A_SWEEP, 2, 1, 1], 'and judges no more: the locked run once a sweep after that');
+  assert.deepEqual(
+    count('inventory'),
+    [FREE_A_SWEEP, FREE_A_SWEEP, 2, 1, 1],
+    'and judges no more: the run that stays once a sweep after that',
+  );
   assert.deepEqual(count('remove'), [1, 1, 1, 0, 0], 'one remove a repository, whatever the runs');
   const first = sweeps[0].asked.find((a) => a.verb === 'remove')!.request as PlaceRequests['remove'];
   assert.deepEqual(
@@ -503,7 +471,7 @@ test('the daemon frees a finished run with no person: `up` forks the sweep besid
   const { id } = await merged();
   assert.ok(whole(id));
   const daemon = Effect.runFork(
-    Effect.scoped(up(e, { every: 20, repo: ROOT, holder: 'wf up' })).pipe(Effect.provide(gitPlaceLayer), Effect.provide(Logger.layer([]))),
+    Effect.scoped(up(e, { every: 20, repo: ROOT, holder: 'wf up' })).pipe(Effect.provide(stand().layer), Effect.provide(Logger.layer([]))),
   );
   t.after(() => Effect.runPromise(Fiber.interrupt(daemon)));
   await until(t, () => gone(id), `the daemon frees ${id}`, { everyMs: 50 });
@@ -528,7 +496,7 @@ test(
     const loop = Effect.runFork(
       free(answers, '5 millis').pipe(
         Effect.provide(EngineService.layer(e)),
-        Effect.provide(gitPlaceLayer),
+        Effect.provide(stand().layer),
         Effect.provide(Logger.layer([keeper])),
       ),
     );

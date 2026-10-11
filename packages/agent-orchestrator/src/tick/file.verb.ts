@@ -53,7 +53,7 @@ import { handedOf } from '../brief/handed.verb.ts';
 import type { BranchReader } from '../branches/branches.store.ts';
 import { roundBriefed, roundFiled, roundFiledNote } from '../round/round.ts';
 import { closeoutsAfterMerge } from '../merge/merge.verb.ts';
-import { filedConfig, filedFolders, tryModel } from '../filed/filed.ts';
+import { filedConfig, tryModel } from '../filed/filed.ts';
 import { closeoutSchemaOf, parseCloseout, type Closeout } from '../closeout/closeout.ts';
 import { modeWord, nextTry, sessionModel, tryWord, type Retry, type RetryAsk } from '../retry/index.ts';
 import { artifactsDir, inputsDir } from '../record/record.store.ts';
@@ -68,7 +68,7 @@ import { costsRead } from '../costs/costs.verb.ts';
 import { answerHeld, stopAsked } from './held.verb.ts';
 import { forStep } from '../telemetry/telemetry.store.ts';
 import { stepLabels } from '../telemetry/telemetry.ts';
-import { filedAt, placeTold, toldOf, type PlaceTold, type Told } from './told.verb.ts';
+import { filedAt, foldersTold, lacksTold, placeTold, toldOf, type PlaceTold, type Told } from './told.verb.ts';
 
 /**
  * What a filing says of how its session runs — the harness's arguments, a session to continue, a hold and a closing statement's schema —
@@ -255,7 +255,7 @@ const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: Workflow
         undefined,
         inputsDir(run),
         checked,
-        filedFolders(told.step, reads.steps, filedAt(run)),
+        foldersTold(run, reads, told.step),
         yield* costsFor(f, step, Boolean(resumeFrom)),
         { words: told.words, say: told.say },
       );
@@ -313,6 +313,7 @@ const tryTold = (
   status: t.status,
   ...(t.refusal ? { refusal: t.refusal } : {}),
   ...(t.status === 'denied' ? { denied: f.reads.spendOf(record.taskId!)?.denied ?? [] } : {}),
+  ...(t.status === 'unsigned' ? lacksTold(f.run, r.step, record) : {}),
   ...(r.back?.length ? { ending: endingSaid(f, stepNamed(f, r.back[0])) } : {}),
 });
 
@@ -436,7 +437,7 @@ function roundSpec(
       undefined,
       inputsDir(run),
       undefined,
-      filedFolders(told.step, reads.steps, filedAt(run)),
+      foldersTold(run, reads, told.step),
       said.costs,
       { words: said.words, say: said.say },
     ),
@@ -602,7 +603,7 @@ function readySpec(
           step.after.length ? undefined : parents,
           inputsDir(run),
           said.checked,
-          filedFolders(told.step, reads.steps, filedAt(run)),
+          foldersTold(run, reads, told.step),
           said.costs,
           { words: said.words, say: said.say },
           place.merge,

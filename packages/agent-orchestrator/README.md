@@ -1308,7 +1308,7 @@ gated ship runs the line whole on the merged tree.
 | `waiting on r-xyz` | not filed: the run was started `--after` a run that has not shipped, by hand or as a card of `wf plan` — `(cancelled)`, `(no such run)` or `(<branch> gone)` beside one that never will without a person ([below](#a-run-that-waits-on-a-run-wf-start---after)) | — |
 | `waiting for a run slot (2 of 2 in flight)` | not filed: `WF_MAX_RUNS` runs are in flight, and the tick files this run's roots once one settles, oldest held first ([below](#how-much-runs-at-once-wf_max_concurrent-and-wf_max_runs)) | — |
 | the engine's word: `running (working)`, `needs-human` — and, beside a `needs-human`, what its harness says it waits for: `needs-human: waiting for a permission prompt` | still going — `needs-human` with no closeout is a session its harness blocked, which `wf retry` takes ([below](#trying-again-retries-and-wf-retry)) | waits |
-| `unsigned` | it ended without the closeout it was asked for — its session went quiet, or its harness said `done`, and the engine recorded no statement (`stated: false`; a journal from before stage 4a says `failed`, `unsigned`, and one from before 2026-09-19 may say `succeeded`) — or without a field its `output:` declares | **never runs** — the run nudges it once a round first, below |
+| `unsigned` | it ended without the closeout it was asked for — its session went quiet, or its harness said `done`, and the engine recorded no statement (`stated: false`; a journal from before stage 4a says `failed`, `unsigned`, and one from before 2026-09-19 may say `succeeded`) — or without a field its `output:` declares, or its closeout named a file the run does not have | **never runs** — the run nudges it once a round first, below |
 | `succeeded · BLOCKED` | it signed off `blocked` | **never runs** |
 | `checking` | signed off; its check is due or running | waits |
 | `verified ✓` | its check exited 0 | is filed |
@@ -1381,6 +1381,22 @@ retries: 1
   engine allowance was per task, so a person's try would earn another in the same round; each engine attempt got the
   whole cap; and it restarted a session the harness failed too. The runtime makes one attempt per start since
   2026-09-23, and `maxAttempts:` is refused.
+- **A closeout that names a file the run does not have is refused, and is no check.** On the pass that first reads a step's
+  task signed, after it collected what the closeout named and before it judges the run, the tick reads each file of
+  `artifacts` off the disk (`filesLacked`), once a task, and keeps on the step's record that it read them and each the run
+  does not have (`filesRead`). A step whose current task has one reads `unsigned` (`ownStatus`, off the record, never the disk): no check
+  is filed, so a suite is never spent on it, and nothing after it starts. Six reasons refuse, each the step's to answer by
+  writing the file where its brief says or taking the name off: `not there`, `missing`, `directory`, `escapes`, `outside`,
+  `configuration`. Two never do, being the run's own: `not collected` (a file in the workspace whose copy the run did not
+  make) and `not known` (the place did not say); `wf decide` says them as before. The run nudges such a step under the same
+  one nudge a round as a session that gave no closeout (`then: 'signoff'`): its session continued, told in `## Try <n>` each
+  file, why, a near name its files directory holds (the same last name in another case or folder), and the two fixes. A
+  nudged try that names a missing file again leaves the step `unsigned`, on you: `wf decide` names each file and why under
+  `UNSIGNED`, and `wf retry` tries it again. A task is read once (`filesDue`, by the record's `filesRead`), so a file
+  its check, its gate's wait or a later step removes after its closeout was accepted unsigns nothing, and a recheck, the
+  same task, reads none again; nor is a task read that signed before this rule (its settle counted in `settlesCounted`, a
+  record that counts none, or its check filed already). A step on a remote agent is asked nothing. And the step after is told, for each folder handed to it,
+  which of the files its step named are there as it is filed, by absolute path, and how many are not, which it does not name.
 - **A check that did not finish did not refuse.** A check refuses when it runs to its end and exits non-zero:
   the engine settles it `failed`, with an exit code. One that was `stopped` (killed, never started), or
   `failed` without an exit code (stopped at its deadline, or lost), said nothing about the work. `retries`
@@ -3646,7 +3662,7 @@ holding a concurrency slot forever.
 | `src/standing/standing.verb.ts` | where a pass's repositories stand, read once a pass (`passStanding`): one `standing` of the run's place for each repository, place and base branch, of the result branches of every run waited on there, within 15 s (`STANDING_DEADLINE_MS`); the reader the pass's `shippedBy`, `parentOf`, `runReady` and holds ask through (`standingReader`), and the heads its memo of runs at rest, its tips and a filed run's base are read from (`headsFor`), read afresh for a run that handed off on the pass. An unread `standing` reads as not shipped, and the waiting run says why |
 | `src/standing/standing.store.ts` | `standing.json`, what the last pass read of where the branches stand, written whole by the tick alone (`writeStanding`), and decoded by its schema, a file that does not decode refused (`Invalid`) naming it (`readStanding`) |
 | `src/branches/changes.store.ts` | what a repository run's branches changed, as its place's `report` says on each read (`changesOf`), and what is at a path on a branch (`presentOn`): nothing kept between reads, and an answer the place does not give said as not known |
-| `src/artifacts/artifacts.store.ts` | the files a step hands over, copied out of its workspace (`collectArtifacts`), each it named that the run does not have (`missingArtifacts`), what its files directory holds (`artifactFiles`), a landed ending's check pictures removed (`dropLandedPictures`), and one file of that directory or of a step's folder, read by its name and never by a path (`artifactFile`, `fileIn`) |
+| `src/artifacts/artifacts.store.ts` | the files a step hands over, copied out of its workspace (`collectArtifacts`), each it named that the run does not have (`missingArtifacts`; off the disk alone as the step signs off, `filesLacked`; those there for the step after, `filesHanded`), what its files directory holds (`artifactFiles`), a landed ending's check pictures removed (`dropLandedPictures`), and one file of that directory or of a step's folder, read by its name and never by a path (`artifactFile`, `fileIn`) |
 | `src/folder/write.store.ts` | what the board's builder writes: a workflow folder from its steps (`writeWorkflow`), refused where it is no place the board lists (`workflowPlaceRefusal`) |
 | `src/skills/skills.store.ts` | what the board's skill picker and skill page write: a skill copied from another folder of skills (`copySkill`), and a skill made or changed (`writeSkill`), refused as `Missing`, `Conflict` or `Invalid` |
 | `src/skills/read.store.ts` | the skills read: where a workflow's agents and skills are looked for (`lookupRoots`), each skill an agent may give (`skillsFor`, with the place skills the package ships, `PLACE_SKILLS`), a skill's rules (`readSkillRules`), its version (`skillVersion`), an agent card's entries (`cardSkills`) and whether a skill is told whole (`preloads`); at the bottom of the store's tree |

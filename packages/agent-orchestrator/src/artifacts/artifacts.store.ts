@@ -1,6 +1,7 @@
 /**
  * The files a step hands over: each one its closeout names, copied out of its workspace into the step's files directory
- * (`collectArtifacts`), each it named that the run does not have, and why (`missingArtifacts`), and what that directory holds
+ * (`collectArtifacts`), each it named that the run does not have, and why (`missingArtifacts`; `filesLacked`, off the disk alone, as the
+ * step signs off; `filesHanded`, those that are there for the step after), and what that directory holds
  * (`artifactFiles`), and the pictures an ending's check took of the merged tree, removed once it has landed (`dropLandedPictures`); and
  * one file of that directory or of a step's folder, read by its name and never by a path (`artifactFile`, `fileIn`).
  *
@@ -12,8 +13,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Closeout } from '../closeout/closeout.ts';
 import { inside } from '../workspace/workspace.ts';
-import { artifactPlace, sizeOf, type ArtifactFile, type MissingArtifact } from './artifacts.ts';
-import { isRepositoryRun, type Run } from '../record/record.ts';
+import { artifactPlace, sizeOf, type ArtifactFile, type HandedFiles, type MissingArtifact } from './artifacts.ts';
+import { isRepositoryRun, type LackedFile, type Run } from '../record/record.ts';
 import { artifactsDir, lstatOf } from '../record/record.store.ts';
 import { presentOn } from '../branches/changes.store.ts';
 import type { Place } from '../place/place.store.ts';
@@ -48,18 +49,69 @@ export function missingArtifacts(
   );
   const missing: MissingArtifact[] = [];
   for (const file of closeout.artifacts) {
-    const place = artifactPlace(file, dir);
-    const why =
-      place === 'outside' || place === 'escapes' || place === 'configuration'
-        ? { why: place }
-        : place === 'files'
-          ? isFileIn(file, dir)
-            ? undefined
-            : { why: 'missing' as const }
-          : workspaceArtifact(run, stepName, file, dir, onBranch);
+    const placed = placedWhy(file, dir);
+    const why = placed === 'workspace' ? workspaceArtifact(run, stepName, file, dir, onBranch) : placed && { why: placed };
     if (why) missing.push({ path: file, ...why });
   }
   return missing;
+}
+
+/**
+ * Why a declared file is one the run does not have, as far as its name and the step's files directory `dir` say: refused by its name
+ * (`artifactPlace`), or `missing` from `dir`, which an absolute path in it names — undefined for one that is a file there, and
+ * `workspace` for a path from the workspace root, which the workspace answers.
+ */
+function placedWhy(file: string, dir: string): 'outside' | 'escapes' | 'configuration' | 'missing' | 'workspace' | undefined {
+  const place = artifactPlace(file, dir);
+  if (place !== 'files') return place;
+  return isFileIn(file, dir) ? undefined : 'missing';
+}
+
+/**
+ * The files a step's closeout names that the run does not have as the step signs off, each with why, off the disk alone: what refuses the
+ * closeout (`REFUSING` in artifacts.ts), read once by the tick after it collected what the closeout named (`collectArtifacts`). Unlike
+ * `missingArtifacts` it asks the run's place nothing, so it never answers `not known`, nor `not collected`: a path from the workspace
+ * root is had where its copy is in the step's files directory or its file is in the workspace, whatever became of the copy, and is not
+ * judged where the record names no workspace or the workspace is not on disk. In a workspace that is there, a path with nothing at it is
+ * `not there`, a directory is `directory`, and a link that leads out is `escapes`.
+ */
+export function filesLacked(run: Run, stepName: string, closeout: Closeout | undefined): LackedFile[] {
+  if (!closeout) return [];
+  const dir = artifactsDir(run, stepName);
+  const { workspace } = run.steps[stepName] ?? {};
+  const lacked: LackedFile[] = [];
+  for (const file of closeout.artifacts) {
+    const placed = placedWhy(file, dir);
+    const why = placed === 'workspace' ? workspaceLacks(workspace, path.normalize(file), dir) : placed;
+    if (why) lacked.push({ path: file, why });
+  }
+  return lacked;
+}
+
+/** Why a path from the workspace root is not a file the run has, off the disk alone (`filesLacked`), or undefined where it has it. */
+function workspaceLacks(workspace: string | undefined, rel: string, dir: string): 'not there' | 'directory' | 'escapes' | undefined {
+  if (isFileIn(path.join(dir, rel), dir) || !workspace || !fs.existsSync(workspace)) return undefined;
+  const at = inWorkspace(workspace, rel);
+  if (at.kind === 'file') return undefined;
+  return at.kind === 'outside' ? 'escapes' : at.kind === 'directory' ? 'directory' : 'not there';
+}
+
+/**
+ * Which of the files a step's closeout named are in its files directory now, each by its absolute path there, and how many are not: what
+ * the brief of a step filed after it lists (`mountsLine`), so it is handed no name with no file behind it. A path from the workspace
+ * root is looked for where the run collected it.
+ */
+export function filesHanded(run: Pick<Run, 'id'>, stepName: string, closeout: Closeout | undefined): HandedFiles {
+  const dir = artifactsDir(run, stepName);
+  const there: string[] = [];
+  let gone = 0;
+  for (const file of closeout?.artifacts ?? []) {
+    const place = artifactPlace(file, dir);
+    const at = place === 'files' ? path.resolve(file) : place === 'workspace' ? path.join(dir, path.normalize(file)) : undefined;
+    if (at && isFileIn(at, dir)) there.push(at);
+    else gone += 1;
+  }
+  return { there, gone };
 }
 
 /**

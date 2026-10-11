@@ -28,12 +28,10 @@ const Kept = <const F extends Schema.Struct.Fields>(fields: F) => Schema.StructW
 
 const Strings = Schema.mutable(Schema.Array(Schema.String));
 
-const TaskRef = Schema.StructWithRest(Schema.Struct({ taskId: Schema.String }), Rest);
-
 /** A try a step had before the one it is on (`EarlierTry`), as any version of the tick writes one. */
 const EarlierTrySchema = Kept({
   taskId: Schema.String,
-  check: Schema.optional(TaskRef),
+  check: Schema.optional(Kept({ taskId: Schema.String })),
   then: Schema.Literals(['retries', 'signoff', 'nudge', 'fresh', 'recheck', 'round', 'merge', 'back']),
   model: Schema.optional(Schema.String),
   budget: Schema.optional(Schema.Finite),
@@ -50,10 +48,11 @@ const StepRecordSchema = Kept({
   taskId: Schema.NullOr(Schema.String),
   workspace: Schema.optional(Schema.String),
   branch: Schema.optional(Schema.String),
-  check: Schema.optional(TaskRef),
+  check: Schema.optional(Kept({ taskId: Schema.String })),
   tries: Schema.optional(Schema.mutable(Schema.Array(EarlierTrySchema))),
   handedOff: Schema.optional(Schema.String),
   landed: Schema.optional(LandedSchema),
+  filesRead: Schema.optional(Kept({ taskId: Schema.String, lacked: Schema.Record(Schema.String, Schema.String) })),
 });
 
 /**

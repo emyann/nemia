@@ -41,6 +41,8 @@ The run's check of this step is given the same directory as `WF_ARTIFACTS`. Refu
 path anywhere else, and a path that climbs out of the workspace with `..`. A directory is not collected, nor a
 file that is not there: name each file.
 
+A closeout that names a file the run does not then have is refused: nothing that waits on you starts, and you are asked again, told each such name.
+
 A file whose path passes through `.claude`, a folder a harness reads as its own configuration, is
 refused, and not handed over: the steps after you read your files in a folder of theirs, and would take it as their own.
 
@@ -56,7 +58,8 @@ asks you for it in the required shape when you finish — in Claude Code, by cal
 - `artifacts`: files you wrote for someone else to read, such as `RESPONSE.md`. Leave them in this
   workspace: when you finish, the run commits whatever you left, so the next step receives it.
   Commit your own work if you can. If you cannot — some sandboxes keep git read-only — that is
-  **not** a reason to block. A file you list that does not exist is reported as missing.
+  **not** a reason to block. A file you list that the run does not then have refuses this closeout:
+  you are asked again, told which.
 - `needs`: when blocked, what a person has to settle; otherwise `null`.
 - `findings`, `again`: what this step declares (`output: review.schema.json`), in the shape the session
   asks for. It is handed, as data, to a step that reads it; your `summary` is not. A closeout

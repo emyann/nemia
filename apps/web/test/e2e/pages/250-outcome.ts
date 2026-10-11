@@ -85,7 +85,8 @@ const write = (file: string, text: string | Buffer) => {
 /**
  * Writes the run, its folder, its engine tasks and its one image into the store at `root`; answers every path written, to take back. Each
  * task ran once and ended with the statement it gave, or none; one asked for a statement says whether it came. `quiet` ends as the runtime
- * records a session that gave none — done, `stated: false`, succeeded — which the orchestrator calls `unsigned` (`endWords`); `garbled`
+ * records a session that gave none — done, `stated: false`, succeeded — which the orchestrator calls `unsigned` (`endWords`), on its
+ * second try, the run's one nudge behind it, so it waits on a person; `garbled`
  * ends on a statement cut off mid-string: no closeout, and still what the agent said.
  */
 function writeRun(root: string): string[] {
@@ -184,6 +185,7 @@ function writeRun(root: string): string[] {
   ran('review', signed, said('Three findings, none worth another round.', { findings: OUTCOME.findings, again: false }));
   ran('ask', signed, said('Half of it is drawn.', { needs: OUTCOME.needs }, 'blocked'));
   ran('quiet', { observed: 'done', reason: 'harness', settled: 'succeeded', stated: false });
+  ran('quiet-first', { observed: 'done', reason: 'harness', settled: 'succeeded', stated: false });
   ran(
     'odd',
     signed,
@@ -218,7 +220,10 @@ function writeRun(root: string): string[] {
         workflowDir: dir,
         workflow: steps.map((step) => ({ after: [], body: `Do ${step.name}.`, harness: 'claude', ...step })),
         createdAt: ago(10),
-        steps: Object.fromEntries(steps.map((step) => [step.name, { taskId: `${id}-${step.name}` }])),
+        steps: {
+          ...Object.fromEntries(steps.map((step) => [step.name, { taskId: `${id}-${step.name}` }])),
+          quiet: { taskId: `${id}-quiet`, tries: [{ taskId: `${id}-quiet-first`, then: 'signoff' }] },
+        },
       },
       null,
       2,
@@ -271,6 +276,13 @@ export default {
     try {
       await page.goto(new URL(`/runs/${OUTCOME.id}`, page.url()).href, { waitUntil: 'load' });
       await idle(page);
+
+      const again = page.locator('section[aria-label="Answer"] [data-offer="try-again"][data-step="quiet"]');
+      await expectVisible(
+        again.filter({ hasText: 'quiet gave no closeout the run accepts — none, one short of a field it declares, or one naming a file' }),
+        'the row that offers a try of an unsigned step says the three ways a closeout is not accepted, and where to read which',
+      );
+      await photograph(again, path.join(OUT, `outcome-unsigned-offer-${await themeOf(page)}.png`));
 
       const review = await outputOf(page, 'review');
       await expectVisible(review.locator('[data-outcome="done"][data-by="agent"]'), 'review opens on its outcome, done, said by the agent');

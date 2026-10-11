@@ -10,6 +10,7 @@ import type { Workflow } from '../step/step.ts';
 import type { Mount, Run } from '../record/record.ts';
 import { stepMounts } from '../factory/factory.ts';
 import type { FiledFolders } from '../filed/filed.ts';
+import type { HandedFiles } from '../artifacts/artifacts.ts';
 
 /**
  * A file `nemia start --input` was given, as start.verb.ts found it: the path as typed, where it resolves, and what is there. What
@@ -75,10 +76,24 @@ const pathsOf = (mounts: readonly Mount[]): string => mounts.map((m) => `\`${m.p
 
 /**
  * What a brief says of the folders the steps before it handed over (`handed`, each read-only): each by its absolute path and its step,
- * the folder's name, and that it is listed under its own path, since the run's artifacts folder above it is not mounted.
+ * the folder's name, and that it is listed under its own path, since the run's artifacts folder above it is not mounted; then, of the
+ * files each of those steps named, those that are there (`namedWords`, off `named`).
  */
-const handedLine = (handed: readonly Mount[]): string =>
-  `Folders the steps before you handed over, which you may read and must not write: ${handed.map((m) => `\`${m.path}\` (${path.basename(m.path)}'s)`).join(', ')}. Each is mounted on its own path, and the run's artifacts folder above them is not: list one with Glob under its own path, as \`${handed[0].path}/**\`.`;
+const handedLine = (handed: readonly Mount[], named: FiledFolders['named'] = {}): string =>
+  `Folders the steps before you handed over, which you may read and must not write: ${handed.map((m) => `\`${m.path}\` (${path.basename(m.path)}'s)`).join(', ')}. Each is mounted on its own path, and the run's artifacts folder above them is not: list one with Glob under its own path, as \`${handed[0].path}/**\`.${handed.map((m) => namedWords(path.basename(m.path), named[m.path])).join('')}`;
+
+/**
+ * What a brief says of the files a step before it named in its closeout (`HandedFiles`): each that is there now, by absolute path, and how
+ * many it named that are not — counted and never named, so the step is handed no name with no file behind it. Nothing for a step that
+ * named none, or whose files nobody read.
+ */
+function namedWords(step: string, files: HandedFiles | undefined): string {
+  if (!files || !(files.there.length + files.gone)) return '';
+  const gone =
+    files.gone === 1 ? '1 file it named is not there, and is not listed' : `${files.gone} files it named are not there, and are not listed`;
+  if (!files.there.length) return ` Of the files ${step} named, none is there: ${gone}.`;
+  return ` The files ${step} named that are there: ${files.there.map((file) => `\`${file}\``).join(', ')}.${files.gone ? ` ${gone[0].toUpperCase()}${gone.slice(1)}.` : ''}`;
+}
 
 /**
  * What a step's brief says of the folders its run mounts, under what was asked for: each by its absolute path, those its `writable:` names
@@ -110,7 +125,7 @@ export const mountsLine = (
           `Folders of this factory you may read, and must not write: ${pathsOf(reads)}. Each is mounted read-only; your own work stays in your workspace.`,
         ]
       : []),
-    ...(handed.length ? [handedLine(handed)] : []),
+    ...(handed.length ? [handedLine(handed, folders.named)] : []),
     ...(store.length
       ? [
           `Folders of the store you may read, and must not write, as this step's \`reads:\` names them: ${pathsOf(store)}. Each is mounted read-only; read it with Read, Grep and Glob.`,

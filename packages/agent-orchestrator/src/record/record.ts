@@ -281,7 +281,8 @@ export type Acceptance = { step: string; try: number; at: string; message: strin
  *   waiting          not filed
  *   running          filed, and not settled — or a task the engine cannot find
  *   blocked          it signed off `blocked`: it finished its session, not the work
- *   unsigned         it ended without the closeout it was asked for, or without a field its `output:` declares
+ *   unsigned         it ended without the closeout it was asked for, or without a field its `output:` declares, or its closeout
+ *                    named a file the run did not have (`StepRecord.filesRead`)
  *   checking         signed off, and its `check:` is due or running
  *   verified         its check exited 0
  *   unverified       signed off, and it declared no `check:` — nothing but its own word says it worked
@@ -395,7 +396,33 @@ export type StepRecord = {
    * for each try.
    */
   landed?: Landed;
+  /**
+   * What the run read of the files the closeout of a task of the step named (`FilesRead`): written by the tick on the pass that first
+   * read the task signed (`filesDue`), whether or not a file lacked, so the files of a task are read once. The step whose current task
+   * named a file the run did not have reads `unsigned` (`lackedOf`): a closeout the run does not accept. Gone with the try, as
+   * `handedOff` is, and kept by a recheck, which is the same task.
+   */
+  filesRead?: FilesRead;
 };
+
+/**
+ * A file a closeout named that the run did not have when the step signed off, and why, in a word of a declared file that is missing
+ * (`MissingArtifact`, artifacts.ts) — one of those the step can answer, by writing the file where its brief says or taking the name
+ * off (`REFUSING`). The record is decoded by its shape, so `why` is text here, and worded by `lackWords`.
+ */
+export type LackedFile = { path: string; why: string };
+
+/**
+ * That the files the closeout of task `taskId` named were read off the disk, and those the run did not have then: none, or why for each,
+ * by its path as the closeout gave it.
+ */
+export type FilesRead = { taskId: string; lacked: Readonly<Record<string, string>> };
+
+/** The files the closeout of the task a step is on named that the run did not have (`StepRecord.filesRead`): none of another task's. */
+export const lackedOf = (record: StepRecord | undefined): LackedFile[] =>
+  record?.filesRead && record.filesRead.taskId === record.taskId
+    ? Object.entries(record.filesRead.lacked).map(([path, why]) => ({ path, why }))
+    : [];
 
 /**
  * What the run did with an ending's staged merge (`landingDue`): committed it onto the base branch, or not — aborted, or found nothing to

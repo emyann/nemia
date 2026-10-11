@@ -75,7 +75,8 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
   `checks.ts`). An age a page asserts is written mid-minute, never on the minute the board floors to (`290-daemon.ts`).
 - A page that holds a read with `route` routes before its `goto`: the feed's replay reads the run again right after the load.
 - A page whose state changes at its end waits for what it reads again before its last assertion, or its picture is taken mid-read.
-- Name a page's own pictures `<name>-<what>-<theme>.png`; `<name>-<theme>.png` is the runner's and is overwritten.
+- Name a page's own pictures `<name>-<what>-<theme>.png`; `<name>-<theme>.png` is the runner's: a run
+  that pictures the page overwrites it, and a run that does not leaves an earlier run's where it is (`visitAll`, `test/e2e/visit.test.ts`).
 - Take every picture with `photograph` (`board.ts`), which stills every animation for the shot: an agent's face moves at all times.
   `e2e-pictures.test.ts` refuses a bare `.screenshot(`.
 - Chromium takes a full-page picture in the window's size, drawing the sticky header and footer and the fixed sidebar where the window

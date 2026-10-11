@@ -1,11 +1,12 @@
 /**
  * Files a step leaves for the steps after it and for the person who decides: what its brief says of them (`artifactsContract`), where a
- * file it names is found (`artifactPlace`), the folders a later step reads them in (`handedMounts`), and the lines that list them
- * (`artifactLines`). Pure: `artifacts.store.ts` copies them.
+ * file it names is found (`artifactPlace`), the folders a later step reads them in (`handedMounts`), the lines that list them
+ * (`artifactLines`), which steps have the files their closeout named read (`filesDue`), and what a missing one is said as
+ * (`lackLines`). Pure: `artifacts.store.ts` copies them.
  */
 import path from 'node:path';
 import { CONFIG_FOLDERS, configFolderIn } from 'agent-runtime/vocabulary';
-import { filesPrunedWords, type Mount, type Pruned } from '../record/record.ts';
+import { filesPrunedWords, type Mount, type Pruned, type Run, type TaskPhase } from '../record/record.ts';
 import { sandboxed, upstreamOf } from '../workflow/index.ts';
 import type { Workflow } from '../step/step.ts';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
@@ -52,6 +53,8 @@ export const artifactsContract = (dir: string, inMain = false, inFolder = false)
         'nobody to ask. Refused, and not read: an absolute path, and a path that climbs out of this folder with `..`.',
         'A directory is not collected, nor a file that is not there: name each file.',
         '',
+        LACKS_REFUSE,
+        '',
         ...configurationRefused('copied out'),
       ]
     : inMain
@@ -67,6 +70,8 @@ export const artifactsContract = (dir: string, inMain = false, inFolder = false)
           "not collected and not committed — it stays in a person's checkout, and `nemia decide` reads a path named from",
           'the workspace root as `not collected`. Name each file by its absolute path in that directory; a directory is',
           'not collected, nor a file that is not there.',
+          '',
+          LACKS_REFUSE,
         ]
       : [
           '',
@@ -85,9 +90,18 @@ export const artifactsContract = (dir: string, inMain = false, inFolder = false)
           'path anywhere else, and a path that climbs out of the workspace with `..`. A directory is not collected, nor a',
           'file that is not there: name each file.',
           '',
+          LACKS_REFUSE,
+          '',
           ...configurationRefused('handed over'),
         ]
   ).join('\n');
+
+/**
+ * The brief's line saying a closeout that names a file the run does not have is refused (`filesLacked` in artifacts.store.ts), and that
+ * the step answers it in its next try.
+ */
+const LACKS_REFUSE =
+  'A closeout that names a file the run does not then have is refused: nothing that waits on you starts, and you are asked again, told each such name.';
 
 /** The brief's lines saying a file through a configuration folder (`CONFIG_FOLDERS`) is refused, and not `done` with it, and why. */
 const configurationRefused = (done: string): string[] => [
@@ -193,6 +207,57 @@ export function artifactLines(dir: string, missing: readonly MissingArtifact[], 
   ];
 }
 
+/**
+ * The reasons a declared file is missing that refuse the closeout that named it (`filesLacked` in artifacts.store.ts): the step chose the
+ * name, and can write the file where its brief says or take the name off. Not `not collected`, a copy the run did not make, nor
+ * `not known`, where the run's place did not say: those are the run's own, and no refusal of the work.
+ */
+export const REFUSING: ReadonlySet<MissingArtifact['why']> = new Set([
+  'not there',
+  'missing',
+  'directory',
+  'escapes',
+  'outside',
+  'configuration',
+]);
+
+/** Why the run does not have a file a closeout named, said of that one file to the step that named it: `why` as `REFUSING` holds it. */
+export function lackWords(why: string, dir: string): string {
+  const words: Record<string, string> = {
+    'not there': 'nothing is at that path in the workspace',
+    missing: `it is not a file in \`${dir}\``,
+    directory: 'it is a directory, and a closeout names each file',
+    escapes: 'it leads out of the workspace, so it was not read',
+    outside: `it is an absolute path outside \`${dir}\`, so it was not read`,
+    configuration: `it passes through ${CONFIG_FOLDERS.map((f) => `\`${f}\``).join(' or ')}, a folder a harness reads as its own configuration, so it was not handed over`,
+  };
+  return words[why] ?? `the run does not have it (${why})`;
+}
+
+/**
+ * A file that is there under a name near the one a closeout gave: among `there`, the files of the step's directory by absolute path, the
+ * first with the same last name, letter case aside — in the folder named, spelled in another case, or in another folder. Undefined where
+ * none is, and where the file named is itself there.
+ */
+export function nearName(named: string, there: readonly string[]): string | undefined {
+  const last = path.basename(named).toLowerCase();
+  if (there.some((file) => file === named)) return undefined;
+  return there.find((file) => path.basename(file).toLowerCase() === last);
+}
+
+/**
+ * The lines that name each file a closeout lacked to whoever answers for it: the name as the closeout gave it, why the run does not have
+ * it (`lackWords`), and the near name where the step's directory `dir` holds one among `there` (`nearName`).
+ */
+export const lackLines = (lacked: readonly { path: string; why: string }[], dir: string, there: readonly string[]): string[] =>
+  lacked.map((file) => {
+    const near = nearName(path.isAbsolute(file.path) ? file.path : path.join(dir, file.path), there);
+    return `- \`${file.path}\`: ${lackWords(file.why, dir)}.${near ? ` There is \`${near}\`.` : ''}`;
+  });
+
+/** What a step's brief says of the files a step before it named: those that are there now, by absolute path, and how many are gone. */
+export type HandedFiles = { there: string[]; gone: number };
+
 /** Bytes, as a person reads them. */
 export const sizeOf = (bytes: number): string =>
   bytes < 1024
@@ -215,3 +280,30 @@ export const handedMounts = (step: Pick<Workflow, 'name' | 'harness'>, steps: re
   const upstream = upstreamOf(steps, step.name);
   return steps.filter((s) => upstream.has(s.name)).map((s) => ({ path: path.join(runArtifacts, s.name), readOnly: true }));
 };
+
+/**
+ * The steps whose closeout's files a pass reads off the disk now (`filesLacked` in artifacts.store.ts), each task once: a step on a
+ * local harness whose task reads `succeeded`, whose closeout names a file, and whose record does not say that task was read
+ * (`StepRecord.filesRead`), which the pass that reads it writes whether or not a file lacked. So a file a check, a gate's wait or a
+ * later step removes after the closeout was accepted unsigns nothing, of a task held open as of one settled. Nor is a task read that
+ * signed under a tick that read no files: one whose settle the run has counted (`Run.settlesCounted`), any of a record that counts no
+ * settle, and one whose check is filed already. None of a pruned run, whose files may be gone.
+ */
+export function filesDue(
+  steps: readonly Workflow[],
+  run: Run,
+  phaseOf: (taskId: string) => TaskPhase,
+  closeoutOf: (step: string) => { artifacts: readonly string[] } | undefined,
+): string[] {
+  const counted = run.settlesCounted;
+  if (run.pruned || !counted) return [];
+  return steps
+    .filter((step) => !isRemoteHarness(step.harness))
+    .filter(({ name }) => {
+      const record = run.steps[name];
+      const taskId = record?.taskId;
+      if (!taskId || counted.includes(taskId) || record.check || record.filesRead?.taskId === taskId) return false;
+      return phaseOf(taskId) === 'succeeded' && Boolean(closeoutOf(name)?.artifacts.length);
+    })
+    .map(({ name }) => name);
+}

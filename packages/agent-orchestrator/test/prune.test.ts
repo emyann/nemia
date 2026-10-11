@@ -163,12 +163,9 @@ const aFinished = async (
   fs.mkdirSync(path.join(wt, 'node_modules', 'big'), { recursive: true });
   if (!fs.existsSync(path.join(wt, 'node_modules', 'big', 'index.js')))
     fs.linkSync(path.join(repo, 'node_modules', 'big', 'index.js'), path.join(wt, 'node_modules', 'big', 'index.js'));
-  b.settle(
-    `${run.id}-implement`,
-    'succeeded',
-    typeof closeout === 'function' ? closeout(run.id) : closeout,
-    costUsd === undefined ? undefined : { costUsd },
-  );
+  const said = typeof closeout === 'function' ? closeout(run.id) : closeout;
+  for (const named of (said as { artifacts?: string[] }).artifacts ?? []) if (path.isAbsolute(named)) aShot(run.id, path.basename(named));
+  b.settle(`${run.id}-implement`, 'succeeded', said, costUsd === undefined ? undefined : { costUsd });
   await runWith(b.e, advanceRun(readRun(run.id)));
   const branch = `wf/${run.id}/implement`;
   if (merged) git(repo, 'merge', '-q', '--no-ff', '-m', 'merge', branch);

@@ -1,11 +1,17 @@
 /**
  * A step as the tick tells it (`toldOf`): the step its brief is composed for, the harness's own arguments it is filed with (`ownOf`), and
- * what its place says to it (`placeTold`). A controller: it reads the run's rendered agent folder, the skills where a start of
+ * what its place says to it (`placeTold`); the files its last closeout lacked (`lacksTold`), and which files the steps before it named
+ * are there (`foldersTold`). A controller: it reads the run's rendered agent folder, the skills where a start of
  * the run's folder finds them, and the run's place.
  */
 import path from 'node:path';
 import type { ClaudeFlags, CodexArgs } from '../runtime-client.ts';
-import type { Run } from '../record/record.ts';
+import { lackedOf, type Run, type StepRecord } from '../record/record.ts';
+import type { Closeout } from '../closeout/closeout.ts';
+import { filedFolders, type FiledFolders } from '../filed/filed.ts';
+import { artifactFiles, filesHanded } from '../artifacts/artifacts.store.ts';
+import { lackLines } from '../artifacts/artifacts.ts';
+import type { RetryBriefing } from '../brief/index.ts';
 import type { Workflow } from '../step/step.ts';
 import { realRepoOf } from '../workspace/worktree.store.ts';
 import { agentFilesDir, renderedIn, skillsAgain } from '../agents/agents.store.ts';
@@ -89,3 +95,31 @@ export function briefNow(step: Workflow, run: Run, steps: readonly Workflow[], p
   const none = [undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined] as const;
   return composeBrief(step, run, steps, ...none, told);
 }
+
+/**
+ * The files the closeout of the try that ended named that the run did not have (`lackedOf`), as its next try is told them: a line each,
+ * with a near name off what the step's files directory holds now (`lackLines`). Nothing for a try that lacked none.
+ */
+export const lacksTold = (run: Run, name: string, record: StepRecord): Pick<RetryBriefing, 'lacks'> => {
+  const lacked = lackedOf(record);
+  if (!lacked.length) return {};
+  const there = artifactFiles(run, name).map((file) => file.path);
+  return { lacks: lackLines(lacked, artifactsDir(run, name), there) };
+};
+
+/**
+ * The folders a step is filed with and its brief names (`filedFolders`), and for each a step before it handed over, which of the files
+ * that step's closeout named are there now (`filesHanded`): the brief lists those, and hands on no name with no file.
+ */
+export const foldersTold = (
+  run: Run,
+  reads: { steps: readonly Workflow[]; signedOff: (step: string) => Closeout | undefined },
+  step: Workflow,
+): FiledFolders => {
+  const folders = filedFolders(step, reads.steps, filedAt(run));
+  const named = folders.handed.map((m) => {
+    const from = path.basename(m.path);
+    return [m.path, filesHanded(run, from, reads.signedOff(from))] as const;
+  });
+  return { ...folders, named: Object.fromEntries(named) };
+};

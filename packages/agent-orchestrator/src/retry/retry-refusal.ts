@@ -3,7 +3,16 @@
  * a person is told them. Pure; what may be tried is `retry.ts`'s (`retryable`, `retriesDue`).
  */
 import type { Workflow } from '../step/step.ts';
-import { refusedCheck, satisfiesAfter, tryOf, type CloseoutAsked, type Run, type StepStatus, type TaskPhase } from '../record/record.ts';
+import {
+  lackedOf,
+  refusedCheck,
+  satisfiesAfter,
+  tryOf,
+  type CloseoutAsked,
+  type Run,
+  type StepStatus,
+  type TaskPhase,
+} from '../record/record.ts';
 import type { Closeout } from '../closeout/closeout.ts';
 import {
   aboveWord,
@@ -394,7 +403,10 @@ function runTriesItself(c: Judged): string | undefined {
     (r) => r.step === name,
   );
   if (itself?.by === 'signoff') {
-    return `the run nudges ${name} itself: its session ended without the closeout it was asked for, and the run continues it once a round, told to sign off, before it waits on you — the next tick files try ${next}. Wait for it: nemia ls ${run.id}.`;
+    const why = lackedOf(run.steps[name]).length
+      ? 'its closeout named a file the run does not have'
+      : 'its session ended without the closeout it was asked for';
+    return `the run nudges ${name} itself: ${why}, and the run continues it once a round, told to sign off, before it waits on you — the next tick files try ${next}. Wait for it: nemia ls ${run.id}.`;
   }
   if (itself) {
     const left = (step.retries ?? 0) - retriesSpent(run.steps[name]);

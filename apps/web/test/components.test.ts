@@ -2445,7 +2445,10 @@ test("the answers: a box for a step that asks, Try again for a refused check wit
   );
   assert.match(rows.get('lint')!.html, /placeholder="A recheck runs the check again and files no session: there is nobody to tell\."/);
   assert.deepEqual([closed('implement'), closed('theme'), closed('docs')], [false, false, false]);
-  assert.equal(said('docs'), 'docs ended without the closeout it was asked for');
+  assert.equal(
+    said('docs'),
+    "docs gave no closeout the run accepts — none, one short of a field it declares, or one naming a file the run does not have; the CLI's decide says which",
+  );
   assert.deepEqual(radios('docs'), [
     ['nudge', true],
     ['fresh', false],

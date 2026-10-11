@@ -12,6 +12,7 @@ import type { TaskClock } from '../timeline/index.ts';
 import { declaredOutput, isLoopTarget, type Closeout } from '../closeout/closeout.ts';
 import type { Retry, RetryHow } from '../retry/index.ts';
 import {
+  lackedOf,
   refusedCheck,
   satisfiesAfter,
   SETTLED,
@@ -217,7 +218,7 @@ export function endingStopped(
  * past, and is spent (`spentApprovals`). Pure.
  */
 export function sentBack(record: StepRecord): StepRecord {
-  const { check, tries = [], taskId, handedOff: _, landed: __, ...rest } = record;
+  const { check, tries = [], taskId, handedOff: _, landed: __, filesRead: ___, ...rest } = record;
   return { ...rest, taskId: null, tries: [...tries, { taskId: taskId!, ...(check ? { check } : {}), then: 'back' }] };
 }
 
@@ -300,6 +301,10 @@ export const resultOnBase = (standings: readonly BranchStanding[]): boolean =>
  * closeout lacks one did not say what it was asked to say, and a step that reads it would be handed
  * less than its file promised — so it is `unsigned` too, and nothing that waits on it is filed. Its
  * own file asked, so it is held to that whatever the engine recorded of the filing.
+ *
+ * **So are the files it names.** A closeout whose `artifacts` names a file the run did not have when the step signed off
+ * (`StepRecord.filesRead`, read off the disk once by the tick, `filesDue`) is `unsigned` too, before any check: the step after would be
+ * handed a name with no file behind it. Read off the record, never the disk: a file a check or a prune removes later unsigns nothing.
  *
  * **The check's own phase is the verdict.** The detached worker maps the command's exit code to
  * `done` or `failed`; the exit code its attempt recorded is the number shown to a person, and
@@ -460,8 +465,7 @@ export function ownStatus(
   if (phase === 'failed' || phase === 'stopped') return phase;
   if (phase !== 'succeeded') return 'running';
   if (!said && (asked || step.output)) return 'unsigned';
-  if (said && declaredOutput(step, said, owedFields(step, run, steps)).missing.length) return 'unsigned';
-  if (said && step.loop && typeof said.output?.again !== 'boolean') return 'unsigned';
+  if (said && unaccepted(step, run, steps, said)) return 'unsigned';
   if (step.denials === 'fail' && spendOf(st.taskId)?.denied?.length) return 'denied';
   const signed = (s: 'verified' | 'unverified'): StepStatus =>
     askedAgain(step, run, closeoutOf) && roundOf(run, step.name) >= capOf(step) ? 'exhausted' : s;
@@ -476,6 +480,16 @@ export function ownStatus(
   }
   return check === 'succeeded' ? signed('verified') : check === 'failed' || check === 'stopped' ? 'failed (check)' : 'checking';
 }
+
+/**
+ * Whether a closeout a step gave is one the run does not accept, which reads `unsigned`: short of a field the step owes (`owedFields`), a
+ * looping step's with no yes or no for `again`, or one that named a file the run did not have when it signed off, as the tick read it
+ * (`lackedOf`).
+ */
+const unaccepted = (step: Workflow, run: Run, steps: readonly Workflow[], said: Closeout): boolean =>
+  declaredOutput(step, said, owedFields(step, run, steps)).missing.length > 0 ||
+  (Boolean(step.loop) && typeof said.output?.again !== 'boolean') ||
+  lackedOf(run.steps[step.name]).length > 0;
 
 /**
  * What sessions cost, as the engine measured them: the dollars of the attempts that ended with a cost on them, how many did (`measured`),

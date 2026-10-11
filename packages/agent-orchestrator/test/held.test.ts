@@ -42,9 +42,10 @@ const {
 const stand = eachTest(testPlace);
 const runWith = runOver(runEngine, () => stand().layer);
 const runPlaced = runGiven(() => stand().layer);
-const { readAsks, readRun } = await import('../src/record/record.store.ts');
+const { artifactsDir, readAsks, readRun } = await import('../src/record/record.store.ts');
 const { closeoutAsked, closeoutOf, deniedOf } = await import('../src/views/views.verb.ts');
 const { phaseOfView } = await import('../src/views/views-words.ts');
+const { lackedOf } = await import('../src/record/record.ts');
 
 /** A repository with one commit, so `nemia start` has a base to record. */
 const aRepo = (): string => {
@@ -655,4 +656,30 @@ test("a step's closeout, its denials and whether its closeout was asked for are 
   assert.equal(phaseOfView(waiting.get('t')), 'succeeded', 'waiting reads settled, as it signed');
   assert.equal(closeoutAsked(new Map([['t', view([unsigned], 1)]]))('t'), true, "an unsigned attempt of the last turn is not this turn's");
   assert.equal(closeoutAsked(new Map([['t', view([unsigned], 0)]]))('t'), 'unsigned', 'and of this turn, it is');
+});
+
+test('the files a task held open named are read once: one removed after its closeout was accepted, under its check or at its gate, unsigns nothing', async () => {
+  for (const [check, gates] of [['check: true'], ['check: true', ['plan']], [undefined, ['plan']]] as const) {
+    const how = `${check ? 'checked' : 'no check'}, ${gates ? 'gated' : 'ungated'}`;
+    const workflowDir = folder(check ? { plan: check } : {});
+    const run = await runPlaced(
+      startRun({ brief: 'add a flag', repo: aRepo(), workflowDir, isolate: false, ...(gates ? { gates: [...gates] } : {}) }),
+    );
+    const { e, pass, sign } = engine();
+    await pass(run.id);
+    await pass(run.id);
+    const shot = path.join(artifactsDir(run, 'plan'), 'shot.png');
+    fs.mkdirSync(path.dirname(shot), { recursive: true });
+    fs.writeFileSync(shot, 'png');
+    sign(`${run.id}-plan`, 1, { ...SIGNED, artifacts: [shot] });
+    assert.deepEqual((await pass(run.id)).checked, check ? ['plan'] : [], `${how}: its closeout is accepted`);
+    assert.equal((await stateOf(e, `${run.id}-plan`)).state.settled, null, `${how}: held open, and not settled as the next pass reads it`);
+
+    fs.rmSync(shot);
+    for (let n = 0; n < 3; n++) {
+      assert.deepEqual((await pass(run.id)).tried, [], `${how}: no nudge for a file gone since`);
+      assert.deepEqual(lackedOf(readRun(run.id).steps.plan), [], `${how}: and nothing is kept as lacked`);
+      assert.doesNotMatch((await statuses(e, run.id)).plan, /unsigned/, how);
+    }
+  }
 });

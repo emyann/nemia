@@ -618,7 +618,7 @@ test('REFUSED to hide why a step stopped past its budget: `nemia decide` on a st
       'unsigned',
       'succeeded',
       () =>
-        '  UNSIGNED: implement  — ended without the closeout it was asked for, or without a field its output: declares; nothing after it ran',
+        '  UNSIGNED: implement  — ended without the closeout it was asked for, or without a field its output: declares, or its closeout named a file the run does not have; nothing after it ran',
     ],
   ] as const;
   for (const [own, phase, banner] of cases) {
@@ -657,7 +657,7 @@ test("UNSIGNED after the run's own nudge: `nemia decide` and `nemia ls` say the 
   const lines = await screen(t, e, run.id);
   indexOf(
     lines,
-    '  UNSIGNED: implement (nudged to sign off once by the run, and unsigned again)  — ended without the closeout it was asked for, or without a field its output: declares; nothing after it ran',
+    '  UNSIGNED: implement (nudged to sign off once by the run, and unsigned again)  — ended without the closeout it was asked for, or without a field its output: declares, or its closeout named a file the run does not have; nothing after it ran',
   );
   const out: string[] = [];
   const log = t.mock.method(console, 'log', (...args: unknown[]) => {
@@ -1300,7 +1300,7 @@ test('the whole screen of a run the run nudged to sign off, unsigned again, and 
   assert.deepEqual(await whole(t, e, run.id), [
     '<id>  add sub, unsigned',
     '',
-    '  UNSIGNED: implement (nudged to sign off once by the run, and unsigned again)  — ended without the closeout it was asked for, or without a field its output: declares; nothing after it ran',
+    '  UNSIGNED: implement (nudged to sign off once by the run, and unsigned again)  — ended without the closeout it was asked for, or without a field its output: declares, or its closeout named a file the run does not have; nothing after it ran',
     '',
     '  once more, on the next tick:',
     '    implement: unsigned. Continue its session, told what happened:  nemia retry <id> implement  (--fresh, or --model <m>, for a new session)',

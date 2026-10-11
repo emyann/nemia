@@ -5,7 +5,7 @@ import { filedAllows, filedDenies } from '../ending/ending.ts';
 import { sessionModel, type RetryHow } from '../retry/index.ts';
 import type { Mount, Run, StepRecord } from '../record/record.ts';
 import { stepMounts } from '../factory/factory.ts';
-import { handedMounts } from '../artifacts/artifacts.ts';
+import { handedMounts, type HandedFiles } from '../artifacts/artifacts.ts';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 
 /**
@@ -49,9 +49,10 @@ export const filedConfig = <Own extends object>(
 
 /**
  * The folders a step is filed with beyond its factory's, each read-only: those the steps before it handed over, then the store's, then
- * the run's inputs folder.
+ * the run's inputs folder. And `named`, for its brief alone and no part of the filing: by the path of a handed folder, which of the
+ * files its step's closeout named are there as the step is filed (`HandedFiles`), where the tick read them.
  */
-export type FiledFolders = { handed: Mount[]; store: Mount[]; inputs: Mount[] };
+export type FiledFolders = { handed: Mount[]; store: Mount[]; inputs: Mount[]; named?: Readonly<Record<string, HandedFiles>> };
 
 /**
  * The folders a step is filed with beyond its factory's, the one source of the filing's (`filedConfig`) and of what its brief names

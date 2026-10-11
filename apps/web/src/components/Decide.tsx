@@ -167,7 +167,7 @@ function offerSaid(offer: Exclude<Answer, { kind: 'asked' | 'raise' }>): string 
       return 'signed off blocked, and said nothing of what it needs';
     case 'try-again':
       return !offer.recheck
-        ? 'ended without the closeout it was asked for'
+        ? "gave no closeout the run accepts — none, one short of a field it declares, or one naming a file the run does not have; the CLI's decide says which"
         : offer.unfinished
           ? 'has a check that did not finish: no verdict on the work'
           : 'was refused by its check';

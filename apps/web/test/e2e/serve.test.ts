@@ -37,7 +37,8 @@ async function board(verb: string, folder = dir, env: NodeJS.ProcessEnv = {}): P
   return { code, stdout, stderr };
 }
 
-const status = (): string => execFileSync('git', ['status', '--porcelain'], { cwd: REPO, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+const status = (): string =>
+  execFileSync('git', ['status', '--porcelain'], { cwd: REPO, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 
 /** What the first serve printed, and the workspace's status before it. */
 let first: Ended;
@@ -86,7 +87,12 @@ test(
     const stopped = await board('stop');
     assert.equal(stopped.code, 0, stopped.stderr);
     assert.match(stopped.stdout, /^the board on http:\/\/127\.0\.0\.1:\d+ is stopped\n$/);
-    await until(t, () => runningIn([dir]).length === 0, () => `no process in ${dir}: ${JSON.stringify(runningIn([dir]))}`, { everyMs: 100 });
+    await until(
+      t,
+      () => runningIn([dir]).length === 0,
+      () => `no process in ${dir}: ${JSON.stringify(runningIn([dir]))}`,
+      { everyMs: 100 },
+    );
     assert.equal(fs.existsSync(dir), false, 'the folder, its store and its build are gone');
     const none = await board('stop');
     assert.deepEqual([none.code, none.stdout], [0, 'no board is served from this workspace\n']);
@@ -98,6 +104,11 @@ test('a holder whose time is up ends by itself, stops both servers and removes i
   fs.cpSync(built, path.join(own, 'dist'), { recursive: true });
   const held = await board('hold', own, { BOARD_HOLD_MS: '1' });
   assert.equal(held.code, 0, held.stderr + held.stdout);
-  await until(t, () => runningIn([own]).length === 0, () => `no process in ${own}: ${JSON.stringify(runningIn([own]))}`, { everyMs: 100 });
+  await until(
+    t,
+    () => runningIn([own]).length === 0,
+    () => `no process in ${own}: ${JSON.stringify(runningIn([own]))}`,
+    { everyMs: 100 },
+  );
   assert.equal(fs.existsSync(own), false);
 });

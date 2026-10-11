@@ -228,8 +228,8 @@ export async function stopServers(): Promise<void> {
 
 /**
  * Starts the api over the store the environment names (`apiEnv`), ticking nothing, and `vite preview` of the built app proxying `/api`
- * to it, each on a free port, and fills `seat` in as each says where it listens, answering both once they do. The app served is the one built into `dist`, or into
- * the web app's own `dist/` when none is given.
+ * to it, each on a free port, and fills `seat` in as each says where it listens, answering both once they do. The app served is the
+ * one built into `dist`, or into the web app's own `dist/` when none is given.
  */
 export async function startServers(seat: Served, dist?: string): Promise<Required<Served>> {
   const vite = fromNodeModules(path.join('vite', 'bin', 'vite.js'));

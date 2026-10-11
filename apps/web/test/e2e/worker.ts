@@ -57,7 +57,6 @@ function argsOf(argv: readonly string[]): { worker: number; store: string; resul
   return { worker, store: own['--store'], result: own['--result'], rest };
 }
 
-
 /**
  * The next page run.ts hands this worker, or null when it has none left: asked over the channel run.ts opened with it. A channel run.ts
  * closed, as it does when it ends, has none left either.

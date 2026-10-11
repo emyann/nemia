@@ -2125,9 +2125,17 @@ test("`disallowedBy`: the step's own deny rule that may have denied a call, whic
   );
   assert.equal(disallowedBy('Skill(look)', ['Skill(look)']), 'Skill(look)');
   const live = 'mcp__playwright__browser_navigate(url:*:8787*)';
-  assert.equal(disallowedBy('mcp__playwright__browser_navigate', ['Bash(cd:*)', live]), live, "an MCP call keeps its name alone, so its tool's parameter rule may be it");
+  assert.equal(
+    disallowedBy('mcp__playwright__browser_navigate', ['Bash(cd:*)', live]),
+    live,
+    "an MCP call keeps its name alone, so its tool's parameter rule may be it",
+  );
   assert.equal(disallowedBy('mcp__playwright__browser_click', [live]), undefined, 'not by a rule on another MCP tool');
-  assert.equal(disallowedBy('SendMessage', ['SendMessage(to:*)']), undefined, 'nor a bare call of a tool that is no MCP tool by a rule that names more');
+  assert.equal(
+    disallowedBy('SendMessage', ['SendMessage(to:*)']),
+    undefined,
+    'nor a bare call of a tool that is no MCP tool by a rule that names more',
+  );
   assert.equal(disallowedBy('Bash(pytest)', ['Bash(npm run build)', 'SendMessage']), undefined, 'not by a rule on another command');
   assert.equal(disallowedBy('Bash(npm)', ['Read']), undefined, 'nor on another tool');
   assert.equal(disallowedBy('Write(/tmp/x)', ['Edit(//etc/**)']), undefined, 'nor on another path');

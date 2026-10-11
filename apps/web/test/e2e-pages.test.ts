@@ -49,7 +49,7 @@ test('the runner and its workers visit what loadPages reads, and no list of thei
   );
   assert.match(
     worker,
-    /visitAll\(browser, seat\.base, \[page\], OUT, \{\s*store: root,\s*themes: plan\.themes,\s*pictured: plan\.pictured,/,
+    /visitAll\(browser, base, \[page\], OUT, \{\s*store: root,\s*themes: plan\.themes,\s*pictured: plan\.pictured,/,
     'a worker visits each page, and hands the store its api serves too, so a store swept from under the e2e is said, not blamed on a page (`storeGone`)',
   );
   for (const [file, text] of [

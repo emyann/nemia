@@ -90,20 +90,29 @@ const folder = (): string => process.env.BOARD_SERVE_DIR || folderOf(REPO, os.tm
 
 /** Resolves once `ok` answers truthy, asked every `PACE_MS`; rejects with `late()` when it has not within `ms`. */
 function awaited<T>(ok: () => T | undefined | false, ms: number, late: () => string): Promise<T> {
-  const started = performance.now();
   return new Promise((resolve, reject) => {
-    const look = () => {
-      const got = ok();
-      if (got) return resolve(got);
-      if (performance.now() - started > ms) return reject(new Refusal(late()));
-      setTimeout(look, PACE_MS);
+    const end = (settle: () => void) => {
+      clearInterval(pace);
+      clearTimeout(bound);
+      settle();
     };
+    const look = () => {
+      try {
+        const got = ok();
+        if (got) end(() => resolve(got));
+      } catch (err) {
+        end(() => reject(err));
+      }
+    };
+    const pace = setInterval(look, PACE_MS);
+    const bound = setTimeout(() => end(() => reject(new Refusal(late()))), ms);
     look();
   });
 }
 
 /** What `git status` says of the workspace, a line a file. */
-const status = (): string => execFileSync('git', ['status', '--porcelain'], { cwd: REPO, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+const status = (): string =>
+  execFileSync('git', ['status', '--porcelain'], { cwd: REPO, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 
 /**
  * Builds the web app into `dist`, outside the workspace, and leaves the workspace as it was: the route tree the build regenerates is put
@@ -131,7 +140,9 @@ function build(dist: string): void {
   if (after !== before) {
     const had = new Set(before.split('\n'));
     const changed = after.split('\n').filter((line) => line && !had.has(line));
-    throw new Refusal(`the build changed the workspace, which a served board never does: ${changed.join(', ') || 'a change went'}. Put it back.`);
+    throw new Refusal(
+      `the build changed the workspace, which a served board never does: ${changed.join(', ') || 'a change went'}. Put it back.`,
+    );
   }
 }
 
@@ -189,14 +200,15 @@ async function hold(dir: string): Promise<void> {
   fs.writeFileSync(path.join(dir, 'served.json.new'), `${JSON.stringify(served)}\n`);
   fs.renameSync(path.join(dir, 'served.json.new'), path.join(dir, 'served.json'));
   const holdMs = Number(process.env.BOARD_HOLD_MS) || HOLD_MS;
-  const started = performance.now();
   const gone = (): boolean => servers.some(({ child }) => child.exitCode !== null || child.signalCode !== null);
   await new Promise<void>((resolve) => {
-    const look = setInterval(() => {
-      if (!fs.existsSync(path.join(dir, 'stop')) && performance.now() - started < holdMs && !gone()) return;
+    const end = () => {
       clearInterval(look);
+      clearTimeout(bound);
       resolve();
-    }, PACE_MS);
+    };
+    const look = setInterval(() => (fs.existsSync(path.join(dir, 'stop')) || gone() ? end() : undefined), PACE_MS);
+    const bound = setTimeout(end, holdMs);
   });
   await stopServers();
 }

@@ -36,7 +36,7 @@ const WHOLE_SUITE = [
   'Bash(npx turbo run test --continue --force)',
 ];
 
-/** What a step given the browser denies itself: the unsafe tool its agent denies, and the live board by its two ports, in the tab or a new one. */
+/** What a step given the browser denies itself: the unsafe tool its agent denies, and the live board's ports, in the tab or a new one. */
 const BROWSER_FENCE = [
   'mcp__playwright__browser_run_code_unsafe',
   'mcp__playwright__browser_navigate(url:*:8787*)',

@@ -359,9 +359,9 @@ test('the matcher reads a rule on a browser tool by the address it opens, as wri
   for (const url of ['http://127.0.0.1:8787/', 'localhost:8787', 'http://[::1]:8787/runs', 'http://localhost:8787'])
     assert.equal(reaches(live, to(url)), true, url);
   assert.equal(reaches(live, to('http://127.0.0.1:41234/')), false, 'another port');
-  assert.equal(reaches(live, to('http://127.0.0.1:18787/')), false, 'the colon is the port\'s');
+  assert.equal(reaches(live, to('http://127.0.0.1:18787/')), false, "the colon is the port's");
   assert.equal(reaches(live, to()), false, 'a call that gives no address is matched by no parameter rule');
-  assert.equal(reaches(live, { tool: 'mcp__playwright__browser_tabs', url: 'http://127.0.0.1:8787/' }), false, 'a rule is one tool\'s');
+  assert.equal(reaches(live, { tool: 'mcp__playwright__browser_tabs', url: 'http://127.0.0.1:8787/' }), false, "a rule is one tool's");
   assert.equal(reaches('mcp__playwright__browser_navigate', to('http://127.0.0.1:8787/')), true, 'a bare name is every call of it');
   assert.equal(reaches('mcp__playwright', to('http://127.0.0.1:8787/')), true);
   assert.equal(shown(to('http://127.0.0.1:8787/')), 'mcp__playwright__browser_navigate(url:http://127.0.0.1:8787/)');
@@ -696,13 +696,7 @@ function shippedWith(agent: string, workflow: string, key: 'allowedTools' | 'dis
  * The step of the shipped `workflow` that `agent` runs, read from a scratch copy of the shipped team in which `edit` rewrote each file
  * of `of`, the agent's alone by default. Fails, saying which file has no `what`, when the edit changes nothing in one.
  */
-function shippedEdited(
-  agent: string,
-  workflow: string,
-  what: string,
-  edit: (text: string) => string,
-  ...of: string[]
-): Step {
+function shippedEdited(agent: string, workflow: string, what: string, edit: (text: string) => string, ...of: string[]): Step {
   const root = scratch(`wf-fences-${agent}-`);
   fs.cpSync(SHIPPED_HOLDERS[0], root, { recursive: true });
   for (const name of of.length ? of : [`agents/${agent}.md`]) {
@@ -780,7 +774,7 @@ const wholeServers = (step: Step): string[] =>
 test('Seldon and Agora drive the browser by their own allow, each tool by name, on a served board, and are refused the live board by address', () => {
   const tools = BROWSER_TOOLS.map((tool) => ({ tool }));
   assert.equal(BROWSER_TOOLS.length, 23);
-  for (const { agent } of BROWSERS) {
+  for (const { agent, workflow, file } of BROWSERS) {
     const step = shippedStepOf(agent);
     assert.equal(step.permissionMode, 'dontAsk', agent);
     assert.ok(step.agent?.mcp?.includes('playwright'), `${agent}'s step loads the browser's server, or its allows reach no tool`);
@@ -788,6 +782,11 @@ test('Seldon and Agora drive the browser by their own allow, each tool by name, 
     assert.deepEqual(runs(step, SERVED_BOARD, {}, []), SERVED_BOARD.map(shown), `${agent} opens a served board`);
     assert.deepEqual(unfenced(step, SETTINGS, LIVE_BOARD), [], `${agent} is refused the live board`);
     assert.deepEqual(unfenced(step), [], agent);
+    const hired = shippedEdited(agent, workflow, 'a deny line of its own', (text) => text.replace(/^disallowedTools: .*\n/m, ''), file);
+    assert.ok(
+      hired.disallowedTools?.includes('mcp__playwright__browser_run_code_unsafe'),
+      `${agent}'s own file denies browser_run_code_unsafe by name, for a step that hires it and denies nothing itself`,
+    );
   }
   assert.deepEqual(
     shipped().flatMap(({ step }) => wholeServers(step)),
@@ -842,7 +841,9 @@ test('REFUSED: a whole server allowed on an agent is named, in either spelling, 
     ['mcp__playwright__browser_click', false],
     ['mcp__playwright__browser_navigate(url:*:8787*)', false],
   ] as const) {
-    const step = shippedEdited('agora', 'build', 'an allowedTools line', (text) => text.replace(/^allowedTools: (.*)$/m, `allowedTools: $1, ${rule}`));
+    const step = shippedEdited('agora', 'build', 'an allowedTools line', (text) =>
+      text.replace(/^allowedTools: (.*)$/m, `allowedTools: $1, ${rule}`),
+    );
     assert.deepEqual(wholeServers(step), named ? [`review: ${rule}`] : [], rule);
   }
 });

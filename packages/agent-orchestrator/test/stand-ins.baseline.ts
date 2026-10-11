@@ -119,7 +119,6 @@ export const REAL_REACH: Baseline = {
   'packages/agent-orchestrator/test/unreadable-journal.test.ts': ['engine'],
   'packages/agent-orchestrator/test/unreadable-list.test.ts': ['git', 'process', 'place', 'engine'],
   'packages/agent-orchestrator/test/wait-metrics.test.ts': ['engine'],
-  'packages/agent-orchestrator/test/writers-cli.test.ts': ['hand'],
   'packages/agent-runtime/src/harness/admission.test.ts': ['process'],
   'packages/agent-runtime/test/brief.test.ts': ['process'],
   'packages/agent-runtime/test/claude-code.test.ts': ['process'],

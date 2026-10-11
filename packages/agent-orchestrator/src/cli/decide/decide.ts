@@ -18,7 +18,6 @@ import {
   checkoutLine,
   decideRun,
   runWith,
-  placedIn,
   type Place,
   dueNote,
   fromNote,
@@ -53,7 +52,7 @@ import {
   waitWord,
 } from '../../runner.ts';
 import type { BranchChanges, CheckReport, DecideCommand, Decided, RepositoryRun } from '../../runner.ts';
-import { HELP, usage, type Engine } from '../flags.ts';
+import { HELP, placedIn, usage, type Engine } from '../flags.ts';
 
 export const DECIDE_HELP = `nemia decide <runId> [--sensitive <globs>]
 

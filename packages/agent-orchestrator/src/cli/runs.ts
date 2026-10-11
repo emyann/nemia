@@ -21,7 +21,6 @@ import {
   runStore,
   runsForgetting,
   runWith,
-  placedIn,
   type Place,
   sizeOf,
   TABLE,
@@ -30,7 +29,7 @@ import {
   type Pruning,
   type Turned,
 } from '../runner.ts';
-import { HELP, usage, confirmed, type Engine } from './flags.ts';
+import { HELP, placedIn, usage, confirmed, type Engine } from './flags.ts';
 
 /** The runs a command line named, in the order given, each once (the many positional of `RM`, and of `nemia prune`). */
 const idsOf = (args: Args): readonly string[] => (Array.isArray(args.runId) ? args.runId : []);

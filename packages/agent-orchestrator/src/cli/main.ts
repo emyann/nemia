@@ -32,7 +32,6 @@ import {
   runMain,
   tickRun,
   runWith,
-  placedIn,
   shippedGitPlace,
   PlaceService,
   type Place,
@@ -53,7 +52,7 @@ import {
   liveDemandHost,
   type DemandHost,
 } from '../runner.ts';
-import { HELP, usage, WF_HINT, type Engine, type Verb } from './flags.ts';
+import { HELP, placedIn, usage, WF_HINT, type Engine, type Verb } from './flags.ts';
 import { decideVerb } from './decide/decide.ts';
 import { admitRun, agentsCustomRun, autoProposeRun, factoryInstructRun, factoryRulesRun, pruneVerb, rmVerb } from './runs.ts';
 import { inboxAddRun, inboxQueueRun, planRun, startRun } from './start.ts';

@@ -16,7 +16,7 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
   `runOver(runEngine, () => stand().layer)` at a test's head (`test/placed.ts`). A program given none does not compile. A test answers
   a verb itself with `placeOver` (`test/place-over.ts`), never a planted folder.
 - **`main` is handed its place as its engine and its demand host, the git place where it is handed none** (`src/cli/main.ts`), and
-  each command gives it to its program (`placedIn(place, program)`): a test that types a command hands the test's,
+  each command gives it to its program (`placedIn`, `src/cli/flags.ts`): a test that types a command hands the test's,
   `main(argv, e, undefined, stand().place)`, and `test/cli-place.test.ts` refuses a file of `src/cli` that names the git place.
 - **The git place's code is `place/git/` (`place.ts`, `git.ts`, `verbs/`), behind one door, `src/place/shipped.store.ts`**
   (`placeBreaks` in `test/boundary.test.ts`): a verb is a generator that yields each git command, so one body answers `ask` (off the

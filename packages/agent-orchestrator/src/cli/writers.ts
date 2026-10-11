@@ -5,9 +5,9 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { HOME, Invalid, loadWorkflows, placedIn, runWith, TABLE, type Place, templatedTree, type Args, type Command } from '../runner.ts';
+import { HOME, Invalid, loadWorkflows, runWith, TABLE, type Place, templatedTree, type Args, type Command } from '../runner.ts';
 import { agentDraftOf, frontmatterKey, isReadme, skillDraftOf } from '../workflow.ts';
-import { usage, type Engine } from './flags.ts';
+import { usage, placedIn, type Engine } from './flags.ts';
 
 /** The table's entry named `name`. */
 const entryOf = (name: string): Command => TABLE.find((c) => c.name === name) as Command;

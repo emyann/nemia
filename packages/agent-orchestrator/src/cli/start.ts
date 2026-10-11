@@ -18,13 +18,12 @@ import {
   startFactory,
   startPlan,
   runWith,
-  placedIn,
   type Place,
   workflowAt,
   workflowFolder,
   type Args,
 } from '../runner.ts';
-import { usage, type Engine } from './flags.ts';
+import { usage, placedIn, type Engine } from './flags.ts';
 
 /** The text under `key`, or undefined where none was given. */
 const textOf = (args: Args, key: string): string | undefined => {

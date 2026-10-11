@@ -1,11 +1,16 @@
 /**
- * What the CLI's verbs and runners share: the help, a verb's shape, a usage refusal, a person's yes.
+ * What the CLI's verbs and runners share: the help, a verb's shape, how a program is given its place, a usage refusal, a person's yes.
  */
 import readline from 'node:readline/promises';
-import { CLI_VERBS, Invalid, TABLE, helpOf, type engine, type Place } from '../runner.ts';
+import { Effect } from 'effect';
+import { CLI_VERBS, Invalid, PlaceService, TABLE, helpOf, type engine, type Place } from '../runner.ts';
 
 /** The engine the verbs talk to: the board under `WF_ROOT`, unless a test hands one of its own. */
 export type Engine = ReturnType<typeof engine>;
+
+/** `program` given `place`, and still to be run: how a command gives its program the place `main` was handed. */
+export const placedIn = <A, E, R>(place: Place, program: Effect.Effect<A, E, R>): Effect.Effect<A, E, Exclude<R, PlaceService>> =>
+  Effect.provide(program, PlaceService.layer(place));
 
 /** A verb: it takes what follows it on the command line, the engine and the place, and prints what it did, or throws a refusal. */
 export type Verb = (rest: string[], e: Engine, place: Place) => void | Promise<void>;

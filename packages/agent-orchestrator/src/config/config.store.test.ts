@@ -7,7 +7,16 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import os from 'node:os';
 import path from 'node:path';
-import { maxConcurrent, maxRuns, metricsHourDays, metricsMinuteDays, verifiesRest, wfRoot, type Env } from './config.store.ts';
+import {
+  keepsWorktrees,
+  maxConcurrent,
+  maxRuns,
+  metricsHourDays,
+  metricsMinuteDays,
+  verifiesRest,
+  wfRoot,
+  type Env,
+} from './config.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 
 /** That `read` refuses `env` with `Invalid`, exit 2, and exactly `message`. */
@@ -61,6 +70,19 @@ test('REFUSED at shipped defaults: a WF_VERIFY_REST that is neither 1 nor 0 — 
       { WF_VERIFY_REST: value },
       `WF_VERIFY_REST=${value} is neither 1 nor 0. It judges in full each run a pass answers from its memo of runs at rest, which costs all the memo saves: WF_VERIFY_REST=1 — or 0, or unset, for off.`,
     );
+});
+
+test('REFUSED at shipped defaults: a WF_KEEP_WORKTREES that is neither 1 nor 0; 1 keeps the worktrees, and 0, empty or unset frees them', () => {
+  for (const value of ['yes', 'true', '2', ' 1'])
+    refuses(
+      keepsWorktrees,
+      { WF_KEEP_WORKTREES: value },
+      `WF_KEEP_WORKTREES=${value} is neither 1 nor 0. It keeps the worktrees of every finished run, which the daemon otherwise removes: WF_KEEP_WORKTREES=1 — or 0, or unset, to have them freed.`,
+    );
+  assert.deepEqual(
+    [{ WF_KEEP_WORKTREES: '1' }, { WF_KEEP_WORKTREES: '0' }, { WF_KEEP_WORKTREES: '' }, {}].map((env) => keepsWorktrees(env)),
+    [true, false, false, false],
+  );
 });
 
 test('unset, each variable reads its default: the home store, 2 sessions per pool, no cap on runs, and no full judgement at rest', () => {

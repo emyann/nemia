@@ -26,6 +26,7 @@ here and read its page.
 | task | primitive | page |
 | --- | --- | --- |
 | Tell every listener of one event: a feed, a watcher, a page kept live | `PubSub.unbounded`, `PubSub.subscribe` | `node_modules/effect/ai-docs/src/01_effect/07_pubsub/10_pubsub.ts` |
+| Do the same work over many items, a bounded number at once: a batch of reads, of removals, of processes | `Effect.forEach`, its concurrency option | `node_modules/effect/dist/Effect.d.ts` |
 | Hand work from one fiber to another, bounded, the writer waiting when it is full | `Queue.bounded`, `Queue.take` | `node_modules/effect/dist/Queue.d.ts` |
 | Read a sequence over time: the lines of a file, the events of a feed, the pages of a listing | `Stream.callback`, `Stream.fromQueue` | `node_modules/effect/ai-docs/src/03_stream/10_creating-streams.ts` |
 | Keep a registry of running fibers, one per key, the old one interrupted when the key runs again | `FiberMap.make`, `FiberMap.run` | `node_modules/effect/dist/FiberMap.d.ts` |

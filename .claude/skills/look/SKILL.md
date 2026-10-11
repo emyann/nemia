@@ -30,8 +30,8 @@ picture goes outside it.
 - **A step that only reads gives no `filename` at all.** A design or a review step is refused one on every
   browser tool that takes it (`browser_take_screenshot`, `browser_snapshot`, `browser_console_messages`,
   `browser_network_requests`, `browser_network_request`, `browser_evaluate`), since a file named could be
-  the workspace's. Called without one, the tool saves under `/tmp/playwright-mcp` and says where: read it
-  there, and name that path in what you report.
+  the workspace's. Called without one, the tool saves under `/tmp/playwright-mcp`, says where, and
+  answers with the picture itself: judge that, and name the path in what you report.
 - **The e2e too:** run it with `WF_ARTIFACTS` set. Without it, it writes its pictures into `.e2e/` at the
   repository root.
 

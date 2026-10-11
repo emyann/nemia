@@ -55,7 +55,7 @@ class PageFailure extends Error {
  * One page in one theme: loaded, held to its spec, and photographed as a person would see it, once whatever the last assertion started has
  * settled, when it is pictured (`photographing`). Resolves with the screenshot, or nothing when it is not pictured, and the time each
  * phase took (`PHASES`, timing.ts) by `performance.now()`; rejects with a `PageFailure` and a picture of the page as it failed, which is
- * taken whether or not the page is pictured.
+ * taken whether or not the page is pictured. A page that is not pictured keeps the picture an earlier run took of it, failed or not.
  */
 async function visit(
   context: BrowserContext,
@@ -88,7 +88,7 @@ async function visit(
     if (seen.length) throw new Refused(`no console error and no failed request — ${seen.length} seen:\n    ${seen.join('\n    ')}`);
     return { shot: photographing ? shot : undefined, phases };
   } catch (err) {
-    fs.rmSync(shot, { force: true });
+    if (photographing) fs.rmSync(shot, { force: true });
     const failed = path.join(out, `${spec.name}-${theme}-failed.png`);
     await photograph(page, failed, { fullPage: true, always: true }).catch(() => {});
     throw new PageFailure(where(spec, theme), err, failed, store !== undefined && !fs.existsSync(store) ? storeGone(store) : undefined);
@@ -104,6 +104,9 @@ async function visit(
  * fails, naming the page, the theme and the assertion, with its picture — or, once the `store` the api serves is gone, saying so in place
  * of the assertion (`storeGone`), and visiting no page after it. Every page a theme's browser opens, a page's second page too, has its
  * requests counted from its first, for `idle`.
+ *
+ * Before any visit it removes from `out` what this run will take again, and nothing else: every page's `-failed.png`, and the picture of
+ * a page `pictured` names, in the themes visited. A run that pictures no page leaves the pictures an earlier run took where they are.
  */
 export async function visitAll(
   browser: Browser,
@@ -119,10 +122,8 @@ export async function visitAll(
 ): Promise<{ shots: string[]; timings: PageTiming[] }> {
   fs.mkdirSync(out, { recursive: true });
   for (const spec of pages) {
-    for (const theme of THEMES) {
-      for (const name of [`${spec.name}-${theme}.png`, `${spec.name}-${theme}-failed.png`])
-        fs.rmSync(path.join(out, name), { force: true });
-    }
+    for (const theme of THEMES) fs.rmSync(path.join(out, `${spec.name}-${theme}-failed.png`), { force: true });
+    if (pictured(spec.name)) for (const theme of themes) fs.rmSync(path.join(out, `${spec.name}-${theme}.png`), { force: true });
   }
   const shots: string[] = [];
   const timings: PageTiming[] = [];

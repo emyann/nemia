@@ -16,8 +16,27 @@ import { PHASES, type PageTiming } from './timing.ts';
 type Ended = { code: number | null; stdout: string; stderr: string; shots: string[] };
 
 /** broken-page.ts, run to its end with `flags` after its two arguments, with the screenshots it wrote. */
-async function e2eOn(how: string, ...flags: string[]): Promise<Ended> {
-  const out = scratch('nemia-e2e-refusal-');
+const e2eOn = (how: string, ...flags: string[]): Promise<Ended> => e2eIn(scratch('nemia-e2e-refusal-'), how, ...flags);
+
+/** A folder of pictures an earlier run left: each of `names`, holding `PLANTED`. */
+function planted(...names: string[]): string {
+  const out = scratch('nemia-e2e-planted-');
+  for (const name of names) fs.writeFileSync(path.join(out, name), PLANTED);
+  return out;
+}
+
+/** What a planted picture holds: no picture the runner takes holds it. */
+const PLANTED = 'an earlier run took this';
+
+/** The files of `out` that still hold what was planted. */
+const stillPlanted = (out: string): string[] =>
+  fs
+    .readdirSync(out)
+    .sort()
+    .filter((name) => fs.readFileSync(path.join(out, name), 'utf8') === PLANTED);
+
+/** broken-page.ts, run to its end into the folder `out`, with `flags` after its two arguments, and the files `out` then holds. */
+async function e2eIn(out: string, how: string, ...flags: string[]): Promise<Ended> {
   const child = spawn(process.execPath, [path.join(import.meta.dirname, 'broken-page.ts'), how, out, ...flags], {
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -196,5 +215,33 @@ test(
       'a timing for each theme visited',
     );
     phasesWithin(timings, said(ended));
+  },
+);
+
+test("a run that pictures no page leaves the runner's pictures an earlier run took of it", { timeout: 60_000 }, async () => {
+  const out = planted('none-dark.png', 'none-light.png');
+  const ended = await e2eIn(out, 'none');
+  assert.equal(ended.code, 0, said(ended));
+  assert.deepEqual(ended.shots, ['none-dark.png', 'none-light.png'], said(ended));
+  assert.deepEqual(stillPlanted(out), ['none-dark.png', 'none-light.png'], said(ended));
+});
+
+test("a run that pictures a page takes the runner's pictures of it again, in the themes it visits", { timeout: 60_000 }, async () => {
+  const out = planted('none-dark.png', 'none-light.png');
+  const ended = await e2eIn(out, 'none', '--photos');
+  assert.equal(ended.code, 0, said(ended));
+  assert.deepEqual(ended.shots, ['none-dark.png', 'none-light.png', 'none-own-dark.png', 'none-own-light.png'], said(ended));
+  assert.deepEqual(stillPlanted(out), [], said(ended));
+});
+
+test(
+  'a failing page that is not pictured leaves its failure pictured, and the picture an earlier run took of it',
+  { timeout: 60_000 },
+  async () => {
+    const out = planted('covered-dark.png', 'covered-dark-failed.png');
+    const ended = await e2eIn(out, 'covered');
+    assert.notEqual(ended.code, 0, said(ended));
+    assert.deepEqual(ended.shots, ['covered-dark-failed.png', 'covered-dark.png'], said(ended));
+    assert.deepEqual(stillPlanted(out), ['covered-dark.png'], said(ended));
   },
 );

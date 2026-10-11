@@ -9,8 +9,9 @@ import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { testEngine } from 'agent-runtime/testing';
+import { eachTest } from './placed.ts';
 import { scratch } from './scratch.ts';
-import { promised } from './promised.ts';
 import { TEAM } from './team.ts';
 
 const ROOT = scratch('wf-writers-cli-');
@@ -22,8 +23,10 @@ const { TABLE } = await import('../src/runner.ts');
 type Args = import('../src/command/command.ts').Args;
 type Command = import('../src/command/entry.verb.ts').Command;
 
-/** An engine with no task: every run it is asked of has filed nothing yet. */
-const NO_TASKS = promised({ list: async () => ({ views: [], unreadable: [] }), view: async () => undefined });
+const { engineOf } = await import('../src/runtime-client.ts');
+
+/** The engine's stand-in, new for each test and with no task: every run it is asked of has filed nothing yet. */
+const engine = eachTest(testEngine);
 
 const YOURS = path.join(ROOT, 'workflows');
 const DRAFTS = scratch('wf-writers-cli-drafts-');
@@ -34,7 +37,7 @@ async function typed(t: TestContext, ...argv: string[]): Promise<{ out: string; 
   const log = t.mock.method(console, 'log', (...args: unknown[]) => void out.push(args.join(' ')));
   const err = t.mock.method(console, 'error', () => undefined);
   try {
-    await main(argv, NO_TASKS);
+    await main(argv, engineOf(engine().layer));
     return { out: out.join('\n') };
   } catch (e) {
     return { out: out.join('\n'), refused: (e as Error).message };

@@ -8,9 +8,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
-import { promised } from '../../test/promised.ts';
+import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
+import { heldUnasked } from '../../test/unasked.ts';
 
 const ROOT = scratch('wf-instruction-');
 const FACTORIES = path.join(ROOT, 'factories');
@@ -32,8 +33,12 @@ const { main: cli } = await import('../cli/main.ts');
 /** `nemia`, as a person types it, its commands given this test's place. */
 const main = (argv: string[], e?: Parameters<typeof cli>[1]) => cli(argv, e, undefined, stand().place);
 
-/** No verb here asks the engine anything. */
-const NO_ENGINE = promised({});
+const { engineOf } = await import('../runtime-client.ts');
+const engine = eachTest(testEngine);
+heldUnasked(engine);
+
+/** The engine of this test: the stand-in, which no command here files on, stops, says to or forgets from (`heldUnasked`). */
+const noEngine = () => engineOf(engine().layer);
 
 /** Refused by kind, exit 2, and the message — never `String(err)`, which starts with `Error: `. */
 const refusedWith = (tag: 'Missing' | 'Conflict' | 'Invalid', pattern: RegExp) => (err: Error & { exitCode?: number; _tag?: string }) =>
@@ -48,7 +53,7 @@ const printedBy = async (t: Mocker, ...argv: string[]): Promise<string[]> => {
     printed.push(args.join(' '));
   });
   try {
-    await main(argv, NO_ENGINE);
+    await main(argv, noEngine());
   } finally {
     log.mock.restore();
   }
@@ -142,7 +147,7 @@ test('REFUSED: two places at once, by the check, before anything is read or writ
   filed();
   const before = fs.readFileSync(recordOf('pipao'));
   await assert.rejects(
-    main(['factory', 'instruction', 'pipao', '--path', 'X.md', '--store'], NO_ENGINE),
+    main(['factory', 'instruction', 'pipao', '--path', 'X.md', '--store'], noEngine()),
     refusedWith('Invalid', /takes one of --path, --store and --clear/),
   );
   assert.equal(FACTORY_INSTRUCTION.check!({ factory: 'pipao', clear: false }) !== null, true, 'a put that names no place is refused');
@@ -152,7 +157,7 @@ test('REFUSED: two places at once, by the check, before anything is read or writ
 test("REFUSED: words for an instruction kept in the factory's folder — Conflict, naming the file, and no store folder made", async () => {
   const repo = filed();
   await assert.rejects(
-    runWith(NO_ENGINE, FACTORY_INSTRUCT.handler({ factory: 'pipao', words: 'x', clear: false })),
+    runWith(noEngine(), FACTORY_INSTRUCT.handler({ factory: 'pipao', words: 'x', clear: false })),
     refusedWith(
       'Conflict',
       new RegExp(`read from ${path.join(repo, 'NEMIA.md')}.*nemia factory instruction pipao --store\\. Nothing was written\\.$`),
@@ -160,7 +165,7 @@ test("REFUSED: words for an instruction kept in the factory's folder — Conflic
   );
   assert.ok(!fs.existsSync(storeFolder('pipao')), 'no store folder');
   setInstruction({ factory: 'pipao', at: { store: true } });
-  const written = await runWith(NO_ENGINE, FACTORY_INSTRUCT.handler({ factory: 'pipao', words: '  Ship small.  ', clear: false }));
+  const written = await runWith(noEngine(), FACTORY_INSTRUCT.handler({ factory: 'pipao', words: '  Ship small.  ', clear: false }));
   assert.equal(written.words, 'Ship small.\n');
   assert.equal(fs.readFileSync(path.join(storeFolder('pipao'), 'NEMIA.md'), 'utf8'), 'Ship small.\n');
 });
@@ -233,17 +238,17 @@ test('nemia factory rm removes the store folder after the record and says so; wi
   assert.deepEqual(await printedBy(t, 'factory', 'rm', 'pipao'), [`pipao  removed — ${recordOf('pipao')}`]);
   fs.mkdirSync(storeFolder('orphan'), { recursive: true });
   fs.writeFileSync(path.join(storeFolder('orphan'), 'NEMIA.md'), 'kept\n');
-  await assert.rejects(main(['factory', 'rm', 'orphan'], NO_ENGINE), refusedWith('Missing', /no factory orphan/));
+  await assert.rejects(main(['factory', 'rm', 'orphan'], noEngine()), refusedWith('Missing', /no factory orphan/));
   assert.ok(fs.existsSync(path.join(storeFolder('orphan'), 'NEMIA.md')), 'a refused rm leaves the folder');
 });
 
 test('REFUSED: the default factory, by both verbs, as a Conflict', async () => {
   await assert.rejects(
-    runWith(NO_ENGINE, FACTORY_INSTRUCTION.handler({ factory: 'default' })),
+    runWith(noEngine(), FACTORY_INSTRUCTION.handler({ factory: 'default' })),
     refusedWith('Conflict', /nemia factory instruction does not take it/),
   );
   await assert.rejects(
-    runWith(NO_ENGINE, FACTORY_INSTRUCT.handler({ factory: 'default', words: 'x', clear: false })),
+    runWith(noEngine(), FACTORY_INSTRUCT.handler({ factory: 'default', words: 'x', clear: false })),
     refusedWith('Conflict', /nemia factory instruct does not take it/),
   );
 });

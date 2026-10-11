@@ -10,9 +10,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Run } from '../record/record.ts';
 import { scratch } from '../../test/scratch.ts';
-import { promised } from '../../test/promised.ts';
+import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven } from '../../test/placed.ts';
+import { heldUnasked } from '../../test/unasked.ts';
 
 const ROOT = scratch('wf-inbox-');
 const INBOX = path.join(ROOT, 'inbox');
@@ -30,8 +31,12 @@ const { main: cli } = await import('../cli/main.ts');
 /** `nemia`, as a person types it, its commands given this test's place. */
 const main = (argv: string[], e?: Parameters<typeof cli>[1]) => cli(argv, e, undefined, stand().place);
 
-/** No verb here asks the engine anything. */
-const NO_ENGINE = promised({});
+const { engineOf } = await import('../runtime-client.ts');
+const engine = eachTest(testEngine);
+heldUnasked(engine);
+
+/** The engine of this test: the stand-in, which no command here files on, stops, says to or forgets from (`heldUnasked`). */
+const noEngine = () => engineOf(engine().layer);
 
 /** Refused by name: exit 2, and the message — never `String(err)`, which starts with `Error: `. */
 const refusedWith = (pattern: RegExp) => (err: Error & { exitCode?: number }) => err.exitCode === 2 && pattern.test(err.message);
@@ -47,7 +52,7 @@ const printedBy = async (
     printed.push(args.join(' '));
   });
   try {
-    await main(argv, NO_ENGINE);
+    await main(argv, noEngine());
   } finally {
     log.mock.restore();
   }
@@ -226,7 +231,7 @@ test("`nemia inbox add --factory` files a card that names its factory, over the 
     refusedWith(/^the idea: `factory: Pipao` — `Pipao` is not a factory's name: .* — pipao, say\. /),
   );
   await assert.rejects(
-    main(['inbox', 'add', 'an idea', '--factory', 'pipao', '--factory', 'nemia'], NO_ENGINE),
+    main(['inbox', 'add', 'an idea', '--factory', 'pipao', '--factory', 'nemia'], noEngine()),
     refusedWith(/^nemia inbox add takes --factory once: a card names one factory\.$/),
   );
   assert.deepEqual(inInbox(), [], 'nothing filed');
@@ -252,7 +257,7 @@ test('`nemia inbox rm` drops a card without starting it — a name with no card 
 
 test('REFUSED by name at shipped defaults: `nemia inbox add` with no idea, an empty one, a directory, a file whose card has `after:`, a repo that is not a directory, a flag with no value or twice — and `nemia inbox rm` with a name that would leave the inbox, a hidden one, none, or two; nothing filed, nothing removed', async () => {
   emptyInbox();
-  const add = (...argv: string[]) => main(['inbox', 'add', ...argv], NO_ENGINE);
+  const add = (...argv: string[]) => main(['inbox', 'add', ...argv], noEngine());
   await assert.rejects(
     add(),
     refusedWith(
@@ -311,7 +316,7 @@ test('REFUSED by name at shipped defaults: `nemia inbox add` with no idea, an em
   assert.deepEqual(inInbox(), [], 'nothing filed');
 
   const { card, file } = addToInbox({ text: 'Stay where you are' });
-  const rm = (...argv: string[]) => main(['inbox', 'rm', ...argv], NO_ENGINE);
+  const rm = (...argv: string[]) => main(['inbox', 'rm', ...argv], noEngine());
   writeRecord('r-outside');
   for (const name of ['../runs/r-outside.json', '../runs/r-outside', 'sub/card', '..']) {
     await assert.rejects(
@@ -335,7 +340,7 @@ test('REFUSED by name at shipped defaults: `nemia inbox add` with no idea, an em
     refusedWith(/^nemia inbox rm drops one card, and another is a second: nemia inbox rm <name>, once per card\.$/),
   );
   await assert.rejects(
-    main(['inbox', 'list'], NO_ENGINE),
+    main(['inbox', 'list'], noEngine()),
     refusedWith(
       /^nemia inbox does not take list\. It lists the inbox — nemia inbox — files a card with nemia inbox add "<idea>", queues one with nemia inbox queue <name>, and drops one with nemia inbox rm <name>/,
     ),
@@ -387,7 +392,7 @@ test('`nemia start <inbox>/<name>`, the name as `nemia inbox` lists it, starts t
   const { card, file } = addToInbox({ text: 'Cache the views between passes', workflow: 'dev', repo });
   const other = addToInbox({ text: 'Show the flag', workflow: 'dev', repo });
   const before = runsWritten();
-  const starting = (...argv: string[]) => main(['start', ...argv], NO_ENGINE);
+  const starting = (...argv: string[]) => main(['start', ...argv], noEngine());
 
   await assert.rejects(
     starting(path.join(INBOX, 'cache-the-views'), '--repo', repo),
@@ -554,7 +559,7 @@ test('REFUSED by name at shipped defaults, before a run is written and with the 
   const repo = aRepoWith('dev', 'ui');
   const kept = addToInbox({ text: 'Cache the views', repo });
   const before = runsWritten();
-  const starting = (...argv: string[]) => main(['start', ...argv], NO_ENGINE);
+  const starting = (...argv: string[]) => main(['start', ...argv], noEngine());
 
   await assert.rejects(
     starting(path.join(INBOX, 'cache-the-view.md')),
@@ -687,7 +692,7 @@ test(
     );
 
     await assert.rejects(
-      main(['start', file], NO_ENGINE),
+      main(['start', file], noEngine()),
       refusedWith(
         new RegExp(
           `^${escaped(card.file)}: this card was started as ${escaped(id)} — that run's record says so — and is still in the inbox because its removal failed\\. Drop it with nemia inbox rm ${escaped(card.name)};`,

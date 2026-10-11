@@ -12,13 +12,15 @@ import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { Engine, type Sighting } from 'agent-runtime';
 import { Effect } from 'effect';
 import { asyncStore, type AsyncJournal, asyncOps, type AsyncRunner, plainEngine } from './promised.ts';
 import { scratch } from './scratch.ts';
 import { runGiven, runOver } from './placed.ts';
+import { testPlace } from '../place/memory/index.ts';
 
+const place = testPlace();
+const stand = () => place;
 const ROOT = scratch('wf-unloaded-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
@@ -26,9 +28,9 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_MAX_CONCURRENT = '10';
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
-const { startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
-const runPlaced = runGiven(gitPlaceLayer);
+const { startRun, runWith: runEngine } = await import('../src/runner.ts');
+const runWith = runOver(runEngine, () => stand().layer);
+const runPlaced = runGiven(() => stand().layer);
 const { readRun, runFile } = await import('../src/record/record.store.ts');
 const { tickRun } = await import('../src/tick/tick.verb.ts');
 const { slotsRead } = await import('../src/cap/cap.verb.ts');
@@ -40,16 +42,8 @@ const { judgedNow } = await import('../src/summary/summary.verb.ts');
 const { workflowsOf } = await import('../src/summary/reads.verb.ts');
 const { loadWorkflows } = await import('../src/folder/folder.store.ts');
 
-const git = (repo: string, ...args: string[]) =>
-  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
-    cwd: repo,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-  }).trim();
-
 const REPO = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-git(REPO, 'init', '-q');
-git(REPO, 'commit', '-q', '--allow-empty', '-m', 'base');
+stand().world.repository(REPO, {});
 
 const PLACED = '---\nplace: git\nharness: codex\n---\nwork it\n';
 const FOLDER = fs.mkdtempSync(path.join(ROOT, 'wf-'));
@@ -104,7 +98,7 @@ const printedBy = async (t: TestContext, argv: string[], engine = e) => {
   const error = t.mock.method(console, 'error', (...a: unknown[]) => void err.push(a.map(String).join(' ')));
   let threw: unknown;
   try {
-    await main(argv, engine);
+    await main(argv, engine, undefined, stand().place);
   } catch (caught) {
     threw = caught;
   } finally {

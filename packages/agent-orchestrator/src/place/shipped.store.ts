@@ -1,7 +1,8 @@
 /**
- * The place this package ships, as a layer: `gitPlaceLayer`, the git place (`place/git`) for whoever composes a program — the daemon, a
- * command, the api, a test that is about git. The one file of `src` that imports the place's code. Each question is counted in the
- * pass's `place` phase while a pass is metered: its time, and each process the place starts for it (`countSpawn`).
+ * The place this package ships, as a layer: `gitPlaceLayer`, the git place (`place/git`) for whoever composes a program — the daemon,
+ * the api, `main` where it is handed no place, a test that is about git. The one file of `src` that imports the place's code. Each
+ * question is counted in the pass's `place` phase while a pass is metered: its time, and each process the place starts for it
+ * (`countSpawn`).
  */
 import path from 'node:path';
 import { Effect } from 'effect';
@@ -26,6 +27,9 @@ export const shippedGitPlace: Place = meteredPlace(gitPlace({ started: countSpaw
 /** `shippedGitPlace` as the layer a program is given it by. */
 export const gitPlaceLayer = PlaceService.layer(shippedGitPlace);
 
-/** `program` given `shippedGitPlace`, and still to be run: how a command of the CLI gives its program the place, by name. */
+/**
+ * `program` given `shippedGitPlace`, and still to be run: the git place by name, for a caller outside the package that builds no layer
+ * of its own. The api's tests call it, and the board's e2e seed does from a string no typecheck reads.
+ */
 export const shipped = <A, E, R>(program: Effect.Effect<A, E, R>): Effect.Effect<A, E, Exclude<R, PlaceService>> =>
   Effect.provide(program, gitPlaceLayer);

@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
+import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
 
@@ -16,8 +17,10 @@ process.env.WF_ROOT = ROOT;
 const { clearRules, readRules, rulesAt, rulesFolder, writeRules } = await import('./rules.store.ts');
 const { addFactory } = await import('../factory/factory.store.ts');
 const { FACTORIES } = await import('../factory/factory.verb.ts');
-const { runWith: runEngine, engine } = await import('../runner.ts');
+const { runWith: runEngine } = await import('../runner.ts');
+const { engineOf } = await import('../runtime-client.ts');
 const stand = eachTest(testPlace);
+const engine = eachTest(testEngine);
 const runWith = runOver(runEngine, () => stand().layer);
 
 /** Refused by kind, exit 2, and the message — never `String(err)`, which starts with `Error: `. */
@@ -98,7 +101,7 @@ test('`nemia factory rm` leaves no rules behind: the folder the store keeps for 
   addFactory({ name: 'gone', repos: [repo] });
   const file = writeRules({ name: 'gone' }, 'Be kind.');
   const rm = FACTORIES.find((c) => c.name === 'factory rm')!;
-  await runWith(engine(), rm.handler({ factory: 'gone' }));
+  await runWith(engineOf(engine().layer), rm.handler({ factory: 'gone' }));
   assert.equal(fs.existsSync(file), false);
   assert.equal(fs.existsSync(path.dirname(file)), false);
 });

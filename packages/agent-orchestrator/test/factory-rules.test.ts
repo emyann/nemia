@@ -14,14 +14,17 @@ import { parseAgent, parseWorkflow, type Agents, type Workflow } from '../src/wo
 import { briefBody, renderedFlags, renderedPrompt, rendersAgent, unrendered } from '../src/agents/agents.ts';
 import { scratch } from './scratch.ts';
 import { teamCopy } from './team.ts';
+import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from './placed.ts';
 
 const ROOT = scratch('wf-factory-rules-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
-const { addFactory, attachWorkflow, engine, runWith: runEngine, startRun } = await import('../src/runner.ts');
+const { addFactory, attachWorkflow, runWith: runEngine, startRun } = await import('../src/runner.ts');
+const { engineOf } = await import('../src/runtime-client.ts');
 const stand = eachTest(testPlace);
+const engine = eachTest(testEngine);
 const runWith = runOver(runEngine, () => stand().layer);
 const runPlaced = runGiven(() => stand().layer);
 const { readRun } = await import('../src/record/record.store.ts');
@@ -220,7 +223,7 @@ test("a factory's page of a step loads it with the factory's rules, and leaves o
   const here = fresh();
   const step = async (): Promise<Workflow> => {
     const args = { from: 'yours', name: 'dev', step: 'implement', dir: here.dev, factory: 'pipao' };
-    return (await runWith(engine(), WORKFLOWS_STEP.handler(args, undefined, ROOT))).step!;
+    return (await runWith(engineOf(engine().layer), WORKFLOWS_STEP.handler(args, undefined, ROOT))).step!;
   };
   assert.equal((await step()).agent?.factoryRules, undefined);
   writeRules({ name: 'pipao' }, RULES);

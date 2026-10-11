@@ -22,7 +22,7 @@ Each layer reaches exactly the one below it, and nothing reaches up or skips one
 - the web reaches the api over HTTP alone (`apps/web/test/structure.test.ts`, and the web's lint block);
 - the api reaches the orchestrator's public entries alone (the entries: `packages/agent-orchestrator/test/contract.test.ts` and the
   api's lint block; that its source imports no runtime: the api's lint block, proven by
-  `packages/agent-orchestrator/test/imports.test.ts`). The api's source reaches only the orchestrator; its tests may import the
+  `packages/agent-orchestrator/test/imports.boundary.test.ts`). The api's source reaches only the orchestrator; its tests may import the
   runtime's public entries to build fakes;
 - the orchestrator reaches the runtime's behaviour through its one client, `src/runtime-client.ts` (`CLIENT` in
   `packages/agent-orchestrator/test/boundary.test.ts`), and its vocabulary through its pure door, `agent-runtime/vocabulary`, from
@@ -54,7 +54,7 @@ fails a walk and a verb with no walk is named. A test is given the stand-in, and
 `<what>.boundary.test.ts`: `test/stand-ins.test.ts` reads the runtime's, the orchestrator's and the api's test files and refuses git,
 a process, the real place, the real engine and a hand-made engine in any other, against a baseline that only shrinks
 (`test/stand-ins.baseline.ts`), and refuses a stand-in whose contract no boundary test walks whole. The engine's stand-in is the
-runtime's, `testEngine()` behind `agent-runtime/testing`: it keeps `file`, `view`, `stop`, `logs`, `feed`, `output`, `say` and
+runtime's, `testEngine()` behind `agent-runtime/testing`: it keeps `file`, `view`, `list`, `stop`, `logs`, `feed`, `output`, `say` and
 `forget` by hand, and one table of walks (`packages/agent-runtime/test/engine-walks.ts`) holds it to the real engine, asked of
 `Engine.layer` in `engine-contract.boundary.test.ts` and of the stand-in in `engine-contract.test.ts`; what it cannot say is declared
 there (`APART`), and a runtime test builds the real engine, never the stand-in (`takenBreaks`). Two things are given up on purpose. *A team's own place as a folder of scripts*: a
@@ -242,7 +242,7 @@ through its three entries alone, and no runtime or harness SDK; the orchestrator
 layer above it. A harness SDK (`@anthropic-ai/claude-agent-sdk`, `@a2a-js/sdk`) is the runtime's alone.
 
 Tests: `packages/agent-runtime/test/contract.test.ts`, `packages/agent-orchestrator/test/contract.test.ts`,
-`packages/agent-runtime/test/xstate-boundary.test.ts`, and `packages/agent-orchestrator/test/imports.test.ts`, which runs oxlint
+`packages/agent-runtime/test/xstate-boundary.test.ts`, and `packages/agent-orchestrator/test/imports.boundary.test.ts`, which runs oxlint
 with the layers' blocks on planted files.
 
 **2. Inside the orchestrator, every file is of one of four kinds**, held by

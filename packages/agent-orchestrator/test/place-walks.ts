@@ -491,6 +491,67 @@ const STANDING: readonly Walk[] = [
     },
   },
   {
+    name: 'a base put back on the commit before a landing no longer holds the result: the branch is ahead again, the checkout as it was',
+    walk: (side, area) => {
+      const { root, base, main, work } = forked(side, area);
+      const asked = [{ branch: 'work', baseRef: base }];
+      side.world.stage(root, 'work');
+      side.place.askNow('land', { checkout: root, act: 'commit', message: 'land work' });
+      fs.writeFileSync(path.join(root, 'a.txt'), 'an edit left uncommitted\n');
+      fs.writeFileSync(path.join(root, 'kept.txt'), 'a file no commit knows\n');
+      const landed = stand(side, root, asked);
+      side.world.putBack(root, main);
+      const read = () => ({
+        standing: stand(side, root, asked),
+        head: side.world.head(root),
+        tip: side.world.tip(root, 'main'),
+        files: filesIn(root),
+        changes: side.world.changes(root),
+        staged: side.world.staged(root),
+      });
+      const putBack = read();
+      side.world.stage(root, 'clash');
+      side.world.putBack(root, main);
+      return { main, work, landed, putBack, overStaged: read() };
+    },
+    says: {
+      landed: {
+        answer: {
+          branches: [{ ahead: 0, branch: 'work', onBase: 'yes', pastBase: true, tip: 'commit-1' }],
+          heads: { clash: 'commit-2', main: 'commit-3', work: 'commit-1' },
+        },
+      },
+      main: 'commit-4',
+      overStaged: {
+        changes: ['kept.txt'],
+        files: { 'a.txt': 'ours\n', 'kept.txt': 'a file no commit knows\n' },
+        head: 'commit-4',
+        staged: null,
+        standing: {
+          answer: {
+            branches: [{ ahead: 1, branch: 'work', onBase: 'no', pastBase: null, tip: 'commit-1' }],
+            heads: { clash: 'commit-2', main: 'commit-4', work: 'commit-1' },
+          },
+        },
+        tip: 'commit-4',
+      },
+      putBack: {
+        changes: ['kept.txt'],
+        files: { 'a.txt': 'ours\n', 'kept.txt': 'a file no commit knows\n' },
+        head: 'commit-4',
+        staged: null,
+        standing: {
+          answer: {
+            branches: [{ ahead: 1, branch: 'work', onBase: 'no', pastBase: null, tip: 'commit-1' }],
+            heads: { clash: 'commit-2', main: 'commit-4', work: 'commit-1' },
+          },
+        },
+        tip: 'commit-4',
+      },
+      work: 'commit-1',
+    },
+  },
+  {
     name: 'a branch the repository no longer has is asked of by the tip its run recorded, and is unknown with none',
     walk: (side, area) => {
       const { root, base, work } = forked(side, area);
@@ -602,6 +663,81 @@ const STATUS: readonly Walk[] = [
       none: { answer: { conflicted: false, head: 'commit-2', merging: 'other', missing: [] } },
       other: { answer: { conflicted: false, head: 'commit-2', merging: 'other', missing: ['clash'] } },
       ours: { answer: { conflicted: false, head: 'commit-2', merging: 'ours', missing: [] } },
+      work: 'commit-3',
+    },
+  },
+  {
+    name: 'a merge a person stages is read by the commit it merges; taken back, nothing is staged, the checkout is clean and no merge is read',
+    walk: (side, area) => {
+      const { root, main, work, clash } = forked(side, area);
+      const read = () => ({
+        staged: side.world.staged(root),
+        changes: side.world.changes(root),
+        head: side.world.head(root),
+        files: Object.keys(filesIn(root)),
+        ours: filesIn(root)['a.txt'] === 'ours\n',
+        opened: opened(side, root),
+        status: side.place.askNow('status', { checkout: root, tips: { work } }),
+      });
+      side.world.takeBack(root);
+      const nothingTaken = read();
+      side.world.stage(root, 'work');
+      const clean = read();
+      side.world.takeBack(root);
+      const cleanBack = read();
+      side.world.stage(root, 'clash');
+      const conflicted = read();
+      side.world.takeBack(root);
+      return { main, work, clash, nothingTaken, clean, cleanBack, conflicted, conflictedBack: read() };
+    },
+    says: {
+      clash: 'commit-1',
+      clean: {
+        changes: ['b.txt'],
+        files: ['a.txt', 'b.txt'],
+        head: 'commit-2',
+        opened: { baseRef: 'commit-2', branch: 'main', repo: '<area>/repo', staged: true },
+        ours: true,
+        staged: 'commit-3',
+        status: { answer: { conflicted: false, head: 'commit-2', merging: 'ours', missing: [] } },
+      },
+      cleanBack: {
+        changes: [],
+        files: ['a.txt'],
+        head: 'commit-2',
+        opened: { baseRef: 'commit-2', branch: 'main', repo: '<area>/repo', staged: false },
+        ours: true,
+        staged: null,
+        status: { answer: { conflicted: false, head: 'commit-2', merging: 'none', missing: ['work'] } },
+      },
+      conflicted: {
+        changes: ['a.txt'],
+        files: ['a.txt'],
+        head: 'commit-2',
+        opened: { baseRef: 'commit-2', branch: 'main', repo: '<area>/repo', staged: true },
+        ours: false,
+        staged: 'commit-1',
+        status: { answer: { conflicted: true, head: 'commit-2', merging: 'other', missing: ['work'] } },
+      },
+      conflictedBack: {
+        changes: [],
+        files: ['a.txt'],
+        head: 'commit-2',
+        opened: { baseRef: 'commit-2', branch: 'main', repo: '<area>/repo', staged: false },
+        ours: true,
+        staged: null,
+        status: { answer: { conflicted: false, head: 'commit-2', merging: 'none', missing: ['work'] } },
+      },
+      main: 'commit-2',
+      nothingTaken: {
+        changes: [],
+        files: ['a.txt'],
+        head: 'commit-2',
+        opened: { baseRef: 'commit-2', branch: 'main', repo: '<area>/repo', staged: false },
+        ours: true,
+        staged: null,
+        status: { answer: { conflicted: false, head: 'commit-2', merging: 'none', missing: ['work'] } },
+      },
       work: 'commit-3',
     },
   },

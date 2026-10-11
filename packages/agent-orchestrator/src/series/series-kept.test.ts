@@ -7,7 +7,9 @@
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { promised } from '../../test/promised.ts';
+import { testEngine } from 'agent-runtime/testing';
+import { eachTest } from '../../test/placed.ts';
+import { heldUnasked } from '../../test/unasked.ts';
 import { scratch } from '../../test/scratch.ts';
 
 process.env.WF_ROOT = scratch('wf-series-kept-');
@@ -20,8 +22,12 @@ const { appendLines, dayFile, days, dropDay, keepSeries, rangeOf, readDay, serie
 const { seriesMemo } = await import('./series.ts');
 type RecentPass = import('../meter/meter.ts').RecentPass;
 
-/** No pass is run: the engine is never asked. */
-const NO_ENGINE = promised({});
+const { engineOf } = await import('../runtime-client.ts');
+const engine = eachTest(testEngine);
+heldUnasked(engine);
+
+/** The engine of this test: the stand-in, which no command here files on, stops, says to or forgets from (`heldUnasked`). */
+const noEngine = () => engineOf(engine().layer);
 
 const pass = (at: string, ms: number): RecentPass => ({
   at,
@@ -115,7 +121,7 @@ const typed = async (t: TestContext, argv: string[]) => {
     printed.push(args.map(String).join(' '));
   });
   try {
-    await main(argv, NO_ENGINE);
+    await main(argv, noEngine());
   } finally {
     log.mock.restore();
   }
@@ -131,7 +137,7 @@ test('`nemia series --json` is the answer the api serves; REFUSED: a --range it 
   );
   assert.deepEqual(answer.series, JSON.parse(JSON.stringify(seriesRead('all').series)));
   assert.equal(rangeOf(undefined), '24h');
-  await assert.rejects(main(['series', '--range', '2w'], NO_ENGINE), (err: Error & { exitCode?: number }) => {
+  await assert.rejects(main(['series', '--range', '2w'], noEngine()), (err: Error & { exitCode?: number }) => {
     assert.equal(err.exitCode, 2);
     assert.equal(err.message, '--range takes 24h, 7d, 30d, all: nemia series --range 7d, not "2w".');
     return true;

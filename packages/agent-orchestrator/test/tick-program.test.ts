@@ -11,7 +11,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { nameFor, Engine as RuntimeEngine, type Sighting } from 'agent-runtime';
 import { asyncStore, type AsyncJournal, asyncOps, type AsyncRunner } from './promised.ts';
 import type { Engine } from '../src/runtime-client.ts';
@@ -23,8 +22,11 @@ import type { Pass } from '../src/tick/tick.verb.ts';
 import { scratch } from './scratch.ts';
 import { plainEngine } from './promised.ts';
 import { runGiven, runOver } from './placed.ts';
+import { testPlace } from '../place/memory/index.ts';
 import type { PlaceService } from '../src/place/place.store.ts';
 
+const place = testPlace();
+const stand = () => place;
 const ROOT = scratch('wf-tick-program-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
@@ -32,25 +34,17 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_MAX_CONCURRENT = '10';
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
-const { startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
-const runPlaced = runGiven(gitPlaceLayer);
+const { startRun, runWith: runEngine } = await import('../src/runner.ts');
+const runWith = runOver(runEngine, () => stand().layer);
+const runPlaced = runGiven(() => stand().layer);
 const { freshRestMemo, tickRun } = await import('../src/tick/tick.verb.ts');
 const { EngineService } = await import('../src/runtime-client.ts');
 const { Invalid } = await import('../src/refusal/refusal.ts');
 const { PHASES, passCost } = await import('../src/meter/meter.ts');
 const { recentPasses, recordRecentPass } = await import('../src/daemon/daemon.store.ts');
 
-const git = (repo: string, ...args: string[]) =>
-  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
-    cwd: repo,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-  }).trim();
-
 const REPO = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-git(REPO, 'init', '-q');
-git(REPO, 'commit', '-q', '--allow-empty', '-m', 'base');
+stand().world.repository(REPO, {});
 
 const FOLDER = fs.mkdtempSync(path.join(ROOT, 'wf-'));
 fs.writeFileSync(path.join(FOLDER, 'work.md'), '---\nplace: git\nharness: codex\n---\nwork it\n');

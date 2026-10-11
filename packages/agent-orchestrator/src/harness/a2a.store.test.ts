@@ -16,14 +16,16 @@ import { parseFolder } from '../folder/folder.ts';
 import { parseAgent, type Agents } from '../agents/agents.ts';
 import { envNameOf, readRemoteAgents } from './a2a.store.ts';
 import { scratch } from '../../test/scratch.ts';
-import { promised } from '../../test/promised.ts';
+import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from '../../test/placed.ts';
 
 const ROOT = scratch('wf-a2a-agents-');
 process.env.WF_ROOT = ROOT;
 const { advanceRun, remoteAgents, retryRun, startRun, runWith: runEngine } = await import('../runner.ts');
+const { engineOf } = await import('../runtime-client.ts');
 const stand = eachTest(testPlace);
+const engine = eachTest(testEngine);
 const runWith = runOver(runEngine, () => stand().layer);
 const runPlaced = runGiven(() => stand().layer);
 const { readRun } = await import('../record/record.store.ts');
@@ -335,56 +337,11 @@ test("a loop's target on a remote agent is refused; a step inside the loop may b
   assert.equal(inside.find((s) => s.name === 'ask')!.harness, 'a2a:second-opinion');
 });
 
-type Filed = { id: string; brief: string; cwd: string; harness?: string } & Record<string, unknown>;
-
-/** Just enough engine: what each task is doing and how it signed off, and every task's spec as it was filed. */
+/** The engine stand-in, with what each task is doing and how it signed off settled by hand, and every task's spec as it was filed. */
 const board = () => {
-  const tasks = new Map<string, { spec: Filed; phase: string; closeout?: unknown }>();
-  const e = promised({
-    view: async (id: string) => {
-      const t = tasks.get(id);
-      const settled = t && ['succeeded', 'failed', 'stopped'].includes(t.phase) ? t.phase : null;
-      return {
-        id,
-        phase: t?.phase ?? 'pending',
-        sessionId: t ? 's' : null,
-        state: {
-          brief: t?.spec.brief ?? '',
-          settled,
-          stopRequested: false,
-          said: [],
-          attempts:
-            !t || t.phase === 'pending'
-              ? []
-              : [
-                  {
-                    n: 1,
-                    ended: null,
-                    nativeId: `native-${id}`,
-                    closeout: t.closeout,
-                    exitCode: null,
-                    usage: null,
-                    startedAt: '2026-09-25T10:00:00Z',
-                    spawnedAt: null,
-                    endedAt: null,
-                    reason: null,
-                  },
-                ],
-        },
-      };
-    },
-    file: async (spec: Filed) => {
-      tasks.set(spec.id, { spec, phase: 'pending' });
-      return spec.id;
-    },
-    stop: async () => {},
-    logs: async () => '',
-    feed: async () => ({ entries: [], cursor: 0 }),
-  });
-  const settle = (id: string, phase: string, closeout?: unknown) => {
-    tasks.set(id, { ...tasks.get(id)!, phase, closeout });
-  };
-  return { e, tasks, settle };
+  const held = engine();
+  const settle = (id: string, phase: string, closeout?: unknown) => held.settle(id, phase, closeout === undefined ? {} : { closeout });
+  return { e: engineOf(held.layer), tasks: held.tasks, settle };
 };
 
 function team(name: string, steps: Record<string, string>): string {

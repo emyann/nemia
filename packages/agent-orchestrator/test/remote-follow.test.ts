@@ -13,13 +13,16 @@ import { Effect, Exit, Layer, Logger, ManagedRuntime, References, Stream } from 
 import { a2aServer } from './a2a-server.ts';
 import { scratch } from './scratch.ts';
 import { bell, until, WAITED } from './waits.ts';
+import { testPlace } from '../place/memory/index.ts';
+import { eachTest } from './placed.ts';
 
+const stand = eachTest(testPlace);
 const ROOT = scratch('wf-remote-follow-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
-const { EngineService, engine, feedHubLayer, followStep, gitPlaceLayer, tickRun } = await import('../src/runner.ts');
+const { EngineService, engine, feedHubLayer, followStep, tickRun } = await import('../src/runner.ts');
 const { main } = await import('../src/cli/main.ts');
 
 type Engine = ReturnType<typeof engine>;
@@ -37,7 +40,7 @@ async function started(agent: string, url: string): Promise<string> {
   console.log = (...args: unknown[]) => void lines.push(args.join(' '));
   process.chdir(ROOT);
   try {
-    await main(['start', `a note for ${agent}`, '--workflows', dir]);
+    await main(['start', `a note for ${agent}`, '--workflows', dir], undefined, undefined, stand().place);
   } finally {
     console.log = log;
     process.chdir(cwd);
@@ -52,7 +55,7 @@ function runtimeOf(t: TestContext, e: Engine) {
       feedHubLayer(),
       Logger.layer([]),
       EngineService.layer(e),
-      gitPlaceLayer,
+      stand().layer,
       Layer.succeed(References.MinimumLogLevel, 'Warn'),
     ),
   );

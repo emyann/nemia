@@ -7,7 +7,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { codex, CODEX_SANDBOXES } from 'agent-runtime';
 import { CLAUDE_AUTO_DROPPED } from 'agent-runtime/vocabulary';
@@ -19,13 +18,15 @@ import { SHIPPED_PLACE } from '../src/place/shipped.store.ts';
 import { briefBody, noCodingStyle, pluginOf, renderedFlags, renderedPrompt, rendersAgent, unrendered } from '../src/agents/agents.ts';
 import { scratch } from './scratch.ts';
 import { promised } from './promised.ts';
-import { runGiven, runOver } from './placed.ts';
+import { testPlace } from '../place/memory/index.ts';
+import { eachTest, runGiven, runOver } from './placed.ts';
 
 const ROOT = scratch('wf-render-');
 process.env.WF_ROOT = ROOT;
-const { advanceRun, startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
-const runPlaced = runGiven(gitPlaceLayer);
+const stand = eachTest(testPlace);
+const { advanceRun, startRun, runWith: runEngine } = await import('../src/runner.ts');
+const runWith = runOver(runEngine, () => stand().layer);
+const runPlaced = runGiven(() => stand().layer);
 const { readRun } = await import('../src/record/record.store.ts');
 const { agentFilesDir } = await import('../src/agents/agents.store.ts');
 
@@ -678,15 +679,10 @@ test('a rendered step whose plugin is under another name, as a start before the 
 
 test("a repository run's step whose folder is gone is told a skill from the run's repository too, as its start found it", async () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-  const git = (...args: string[]) => execFileSync('git', args, { cwd: repo, stdio: ['ignore', 'pipe', 'pipe'] });
-  git('init', '-q', '-b', 'main');
   fs.mkdirSync(path.join(repo, '.claude', 'skills', 'mind-the-tone'), { recursive: true });
-  fs.writeFileSync(
-    path.join(repo, '.claude', 'skills', 'mind-the-tone', 'SKILL.md'),
-    SKILL('mind-the-tone', 'preload: true\n').replace('How to', 'In this repository, how to'),
-  );
-  git('add', '-A');
-  git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'skills');
+  const skill = SKILL('mind-the-tone', 'preload: true\n').replace('How to', 'In this repository, how to');
+  fs.writeFileSync(path.join(repo, '.claude', 'skills', 'mind-the-tone', 'SKILL.md'), skill);
+  stand().world.repository(repo, { '.claude/skills/mind-the-tone/SKILL.md': skill });
   const dir = storeTeam('lost-git', { write: '---\nplace: git\nagent: scribe\n---\nWrite about tides.\n' });
   const run = await runPlaced(startRun({ brief: 'a note on tides', repo, workflowDir: dir, isolate: false }));
   fs.rmSync(agentFilesDir(run, 'write'), { recursive: true });

@@ -13,7 +13,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import type { Engine } from '../src/runtime-client.ts';
 import type { Run, TaskPhase } from '../src/run.ts';
 import { queueLine } from '../src/inbox/inbox.ts';
@@ -22,7 +21,8 @@ import { TEAM } from './team.ts';
 import { decideScreen } from './screens.ts';
 import { promised } from './promised.ts';
 import { Effect } from 'effect';
-import { runGiven, runOver } from './placed.ts';
+import { testPlace } from '../place/memory/index.ts';
+import { eachTest, runGiven, runOver } from './placed.ts';
 
 const ROOT = scratch('wf-queue-');
 const RUNS = path.join(ROOT, 'runs');
@@ -43,12 +43,13 @@ const {
   startFromInbox,
   tickRun,
   runWith: runEngine,
-  gitPlaceLayer,
 } = await import('../src/runner.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
-const runPlaced = runGiven(gitPlaceLayer);
+const stand = eachTest(testPlace);
+const runWith = runOver(runEngine, () => stand().layer);
+const runPlaced = runGiven(() => stand().layer);
 const { listRuns, readRun } = await import('../src/record/record.store.ts');
-const { main } = await import('../src/cli/main.ts');
+const { main: typed } = await import('../src/cli/main.ts');
+const main = (argv: string[], e: Engine) => typed(argv, e, undefined, stand().place);
 const { filesStore } = await import('../src/record/files.store.ts');
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
@@ -157,10 +158,7 @@ const emptyStore = (cap: string | undefined) => {
 /** A repository with one commit, so a start has a base to record. */
 const aRepo = (): string => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-  const git = (...args: string[]) =>
-    execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: 'ignore' });
-  git('init', '-q');
-  git('commit', '-q', '--allow-empty', '-m', 'base');
+  stand().world.repository(repo, {});
   return repo;
 };
 
@@ -917,158 +915,6 @@ test('REFUSED at shipped defaults: a queued card whose `repo:` folder was delete
   );
 });
 
-test('a queued card whose start fails without a refusal — its `.worktreeinclude` a link to itself, which its place cannot read, say — is not written off: tried again on every pass, where it keeps its place and the card behind it waits, said once on `nemia up`, and started once the failure clears', async (t) => {
-  emptyStore(undefined);
-  const b = board();
-  const repo = aRepoWith('dev');
-  const broken = aRepoWith('dev');
-  fs.symlinkSync('.worktreeinclude', path.join(broken, '.worktreeinclude'));
-  aCard('odd-include-a1b2', { workflow: 'dev', repo: broken, queued: '2026-09-16T09:00:00.000Z' }, 'Its include file is a link to itself');
-  aCard('behind-c3d4', { workflow: 'dev', repo, queued: '2026-09-16T09:05:00.000Z' }, 'Behind it');
-
-  const first = await runWith(b.e, tickRun());
-  assert.ok(first.queue && 'failed' in first.queue, JSON.stringify(first.queue));
-  assert.deepEqual([first.queue.card, first.queue.again], ['odd-include-a1b2', false]);
-  assert.match(
-    first.queue.failed,
-    /^the place's open was not heard: open threw before it answered: ELOOP: too many symbolic links encountered, stat '.*\.worktreeinclude'\. Nothing was started: start it again$/,
-    "a repository whose `.worktreeinclude` is a link to itself: the place's open cannot read it, and an open not heard is no refusal",
-  );
-  const written = JSON.parse(fs.readFileSync(path.join(ROOT, 'queue', 'odd-include-a1b2.json'), 'utf8'));
-  assert.deepEqual([written.refused, written.repo, written.why], [false, broken, first.queue.failed]);
-  const listed = (await printedBy(t, b.e, 'inbox')).find((l) => l.startsWith('odd-include-a1b2'))!;
-  assert.match(
-    listed,
-    / {2}queued 1 of 2 — failed at \S+: the place's open was not heard: open threw before it answered: ELOOP: too many symbolic links encountered.* — not a refusal: the tick tries it again on every pass, where it keeps its place$/,
-  );
-
-  const up = board();
-  let passes = 0;
-  const stop = new Error('the test stops the daemon');
-  const inner = up.e.tick;
-  retick(up.e, () => {
-    if (++passes > 2) return Effect.die(stop);
-    return inner();
-  });
-  const printed: string[] = [];
-  const log = t.mock.method(console, 'log', (...args: unknown[]) => {
-    printed.push(args.join(' '));
-  });
-  try {
-    await assert.rejects(main(['up', '1'], up.e), (err) => err === stop);
-  } finally {
-    log.mock.restore();
-  }
-  const named = printed.filter((l) => l.includes('odd-include-a1b2'));
-  assert.equal(
-    named.length,
-    1,
-    `\`nemia up\` over two passes says the failure once, on its first pass, though it is \`again\`: the \`tick\` above wrote it down and this daemon never printed its line, and a person restarting \`nemia up\` to see why cards stopped starting is told by it:\n${printed.join('\n')}`,
-  );
-  assert.match(
-    named[0],
-    /^\d\d:\d\d:\d\d  odd-include-a1b2 not started: the place's open was not heard: open threw before it answered: ELOOP: too many symbolic links encountered.* — not a refusal: tried again on the next pass, where it keeps its place, and said again only if it fails otherwise$/,
-  );
-  const again = await runWith(b.e, tickRun());
-  assert.deepEqual(
-    [again.queue && 'failed' in again.queue && again.queue.again, listRuns()],
-    [true, []],
-    'tried again, and nothing started behind it',
-  );
-  assert.equal(JSON.parse(fs.readFileSync(path.join(ROOT, 'queue', 'odd-include-a1b2.json'), 'utf8')).at, written.at, 'not written again');
-
-  fs.rmSync(path.join(broken, '.worktreeinclude'));
-  const cleared = await runWith(b.e, tickRun());
-  const [run] = fromCard('odd-include-a1b2');
-  assert.deepEqual(cleared.queue, { card: 'odd-include-a1b2', run: run.id, removed: true }, 'the link gone: the next pass starts it');
-  const behind = await runWith(b.e, tickRun());
-  assert.deepEqual(
-    [behind.queue && 'run' in behind.queue && behind.queue.card, fs.readdirSync(path.join(ROOT, 'queue'))],
-    ['behind-c3d4', []],
-    'and the pass after removes its try, then starts the card behind it',
-  );
-});
-
-test("REFUSED at shipped defaults: a queued card whose `repo:` is no git repository, in the place's words, left queued; and the daemon's own stderr is left alone: git's words are not passed through", async (t) => {
-  emptyStore(undefined);
-  const b = board();
-  const bare = fs.mkdtempSync(path.join(ROOT, 'bare-'));
-  fs.mkdirSync(path.join(bare, 'workflows', 'dev'), { recursive: true });
-  fs.writeFileSync(path.join(bare, 'workflows', 'dev', 'implement.md'), '---\nplace: git\n---\nimplement it\n');
-  aCard('no-git-a1b2', { workflow: 'dev', repo: bare, queued: '2026-09-16T09:00:00.000Z' }, 'Its repository has no git');
-
-  const said: string[] = [];
-  const stderr = t.mock.method(process.stderr, 'write', (chunk: string | Uint8Array) => {
-    said.push(String(chunk));
-    return true;
-  });
-  let pass: Effect.Success<ReturnType<typeof tickRun>>;
-  try {
-    pass = await runWith(b.e, tickRun());
-  } finally {
-    stderr.mock.restore();
-  }
-  assert.deepEqual(
-    said,
-    [],
-    "git writes `fatal:` on its stderr, and that stderr is not the daemon's: a pass every four seconds would print it every four seconds",
-  );
-
-  assert.ok(pass.queue && 'refused' in pass.queue, JSON.stringify(pass.queue));
-  assert.ok(
-    queueLine(pass.queue).startsWith(
-      `no-git-a1b2 not started: ${bare} is not a git repository: run git init there and commit once, or name a repository with --repo — left queued as it is`,
-    ),
-    `the place's open refuses it, and the card is said once with its name on it: ${queueLine(pass.queue)}`,
-  );
-  assert.deepEqual(listRuns(), [], 'and no run');
-});
-
-test('a `nemia up` at a cap of 1 names the card its queue is stuck on once a slot frees, though its first pass read no queue at all: a daemon says what it has not said, not what the store has not written', async (t) => {
-  emptyStore('1');
-  const b = board();
-  const broken = aRepoWith('dev');
-  fs.symlinkSync('.worktreeinclude', path.join(broken, '.worktreeinclude'));
-  aCard('odd-include-a1b2', { workflow: 'dev', repo: broken, queued: '2026-09-16T09:00:00.000Z' }, 'Its include file is a link to itself');
-  const before = await runWith(b.e, tickRun());
-  assert.ok(
-    before.queue && 'failed' in before.queue && !before.queue.again,
-    `a card whose start fails without a refusal, tried and written down by a pass of its own, the daemon that is gone: ${JSON.stringify(before.queue)}`,
-  );
-
-  const busy = await started('holds the slot', at(1));
-  let passes = 0;
-  const stop = new Error('the test stops the daemon');
-  const inner = b.e.tick;
-  retick(b.e, () => {
-    if (++passes > 2) return Effect.die(stop);
-    if (passes === 2) b.settle(`${busy.id}-implement`, 'succeeded', SIGNED);
-    return inner();
-  });
-  const printed: string[] = [];
-  const log = t.mock.method(console, 'log', (...args: unknown[]) => {
-    printed.push(args.join(' '));
-  });
-  try {
-    await assert.rejects(main(['up', '1'], b.e), (err) => err === stop);
-  } finally {
-    log.mock.restore();
-  }
-
-  const named = printed.filter((l) => l.includes('odd-include-a1b2'));
-  assert.equal(
-    named.length,
-    1,
-    `a run holds the one slot, so the daemon's first pass reads no queue, and its second tries the card and fails as the pass above did, \`again\`, never said by this daemon:\n${printed.join('\n')}`,
-  );
-  assert.match(
-    named[0],
-    /^\d\d:\d\d:\d\d  odd-include-a1b2 not started: the place's open was not heard: open threw before it answered: ELOOP: too many symbolic links/,
-  );
-  const filed = printed.findIndex((l) => l.includes(`${busy.id}  filed implement`));
-  assert.ok(filed >= 0 && filed < printed.indexOf(named[0]), `the pass that held the slot came first: ${printed.join('\n')}`);
-});
-
 test("REFUSED at shipped defaults, on the repository it was tried on: a queued card that names no repository, refused on the daemon's — no such workflow there — is passed over by every pass there, and started by a pass in a repository that has its workflow", async (t) => {
   emptyStore(undefined);
   const b = board();
@@ -1242,7 +1088,7 @@ test('the whole screen of a run held by the cap on runs in flight', async (t) =>
   await started('first', at(1));
   const held = await started('second', at(2));
   await runWith(b.e, tickRun());
-  assert.deepEqual(await decideScreen(t, b.e, [held.id], { '<id>': held.id, '<root>': ROOT }), [
+  assert.deepEqual(await decideScreen(t, b.e, [held.id], { '<id>': held.id, '<root>': ROOT }, stand().place), [
     '<id>  second',
     '',
     '  waiting for a run slot (1 of 1 in flight)',

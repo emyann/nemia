@@ -8,7 +8,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
-import { promised } from './promised.ts';
+import { testEngine } from 'agent-runtime/testing';
+import { eachTest } from './placed.ts';
+import { heldUnasked } from './unasked.ts';
 
 const ROOT = scratch('wf-demand-cli-');
 process.env.WF_ROOT = ROOT;
@@ -22,8 +24,12 @@ type DemandHost = import('../src/demand/demand.verb.ts').DemandHost;
 const NOWHERE = scratch('wf-demand-cli-nowhere-');
 const { [DEMAND_OFF]: _off, ...ON } = process.env;
 
-/** An engine none of these commands reaches: each verb dies naming itself. */
-const NO_ENGINE = promised({});
+const { engineOf } = await import('../src/runtime-client.ts');
+const engine = eachTest(testEngine);
+heldUnasked(engine);
+
+/** The engine of this test: the stand-in, which no command here files on, stops, says to or forgets from (`heldUnasked`). */
+const noEngine = () => engineOf(engine().layer);
 
 /** Each command that ticks, typed with arguments it parses and its check lets through, on runs, cards and folders that are not there. */
 const TICKING: Record<string, string[]> = {
@@ -69,7 +75,7 @@ async function typed(t: TestContext, argv: string[], host: () => DemandHost): Pr
   t.mock.method(console, 'log', () => undefined);
   t.mock.method(console, 'error', () => undefined);
   try {
-    await main(argv, NO_ENGINE, host);
+    await main(argv, noEngine(), host);
   } catch {
     return;
   } finally {

@@ -1,7 +1,8 @@
 /**
  * What changes a repository the test place holds, in memory and in its directories together: a checkout found by its directory
  * (`checkoutAt`), a commit of what a checkout holds (`committed`), a branch merged into a checkout (`mergedIn`), a path of a staged
- * merge resolved (`resolved`), a staged merge taken back (`takenBack`), and a commit made of files alone (`commitMade`). The verbs
+ * merge resolved (`resolved`), a staged merge taken back (`takenBack`), a branch put back on a commit (`putBackOn`), and a commit made of
+ * files alone (`commitMade`). The verbs
  * (`reads.ts`, `writes.ts`) and the handle a test holds (`handle.ts`) act through these, so a workspace a verb cut and a commit a test
  * made are one repository.
  */
@@ -107,4 +108,17 @@ export function takenBack({ repo, checkout }: Found): void {
   writeChanges(checkout.dir, checkout.staged.tree, treeOf(repo, checkout));
   markStaged(checkout.dir, false);
   delete checkout.staged;
+}
+
+/**
+ * The branch of `found`'s checkout put back on the commit `id`, which the repository holds: each file its commit, a merge staged there or
+ * `id` knows is as `id` has it, every other file left as it is, and nothing staged.
+ */
+export function putBackOn({ repo, checkout }: Found, id: string): void {
+  const [to, has] = [commitOf(repo, id).tree, readTree(checkout.dir)];
+  const known = new Set([...Object.keys(treeOf(repo, checkout)), ...Object.keys(checkout.staged?.tree ?? {}), ...Object.keys(to)]);
+  writeChanges(checkout.dir, Object.fromEntries(Object.entries(has).filter(([file]) => known.has(file))), to);
+  if (checkout.staged) markStaged(checkout.dir, false);
+  delete checkout.staged;
+  repo.branches.set(checkout.branch, id);
 }

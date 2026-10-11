@@ -16,8 +16,12 @@ import type { EngineShape } from '../src/index.ts';
 /** Where a walk moves a task: at work, or settled. */
 export type Moved = 'running (working)' | 'succeeded' | 'failed' | 'stopped';
 
-/** What a session ended with: its process's exit code, and what it stated. */
-export type End = { readonly exitCode?: number; readonly closeout?: unknown };
+/** What a session ended with: its process's exit code, what it stated, and the text it printed, stream by stream. */
+export type End = {
+  readonly exitCode?: number;
+  readonly closeout?: unknown;
+  readonly printed?: { readonly stdout?: string; readonly stderr?: string };
+};
 
 /**
  * One side of the contract: an engine, and `settle`, which leaves the task `id` in `moved` — on the real engine by moving its session
@@ -283,6 +287,106 @@ const OUTPUT: readonly Walk[] = [
     },
     says: [null, null],
   },
+  {
+    name: 'a stream of a settled task is the text its session printed on it, whole or its last bytes, and no text for a stream it left empty',
+    walk: async ({ engine, settle }) => {
+      await asked(engine.file(task('a')));
+      await asked(engine.file(task('b')));
+      await settle('a', 'succeeded', { exitCode: 0, printed: { stdout: 'one\ntwo\n', stderr: 'warned\n' } });
+      await settle('b', 'failed', { exitCode: 1, printed: { stderr: 'broke\n' } });
+      return [
+        await asked(engine.output('a', 'stdout')),
+        await asked(engine.output('a', 'stderr')),
+        await asked(engine.output('a', 'stdout', 4)),
+        await asked(engine.output('a', 'stdout', 400)),
+        await asked(engine.output('b', 'stdout')),
+        await asked(engine.output('b', 'stderr')),
+      ];
+    },
+    says: ['one\ntwo\n', 'warned\n', 'two\n', 'one\ntwo\n', null, 'broke\n'],
+  },
+  {
+    name: 'a stream of a task at work is the text its session has printed so far',
+    walk: async ({ engine, settle }) => {
+      await asked(engine.file(task('a')));
+      await settle('a', 'running (working)', { printed: { stdout: 'so far\n' } });
+      return asked(engine.output('a', 'stdout'));
+    },
+    says: 'so far\n',
+  },
+  {
+    name: 'a stream that is neither, and a count of bytes that is none, are refused',
+    walk: async ({ engine, settle }) => {
+      await asked(engine.file(task('a')));
+      await settle('a', 'succeeded', { exitCode: 0, printed: { stdout: 'one\n' } });
+      return [
+        await asked(engine.output('a', 'both' as never)),
+        await asked(engine.output('a', 'stdout', 0)),
+        await asked(engine.output('a', 'stdout', 1.5)),
+      ];
+    },
+    says: [{ refused: 'OutputRefused' }, { refused: 'OutputRefused' }, { refused: 'OutputRefused' }],
+  },
+  {
+    name: 'a stream of a task forgotten is refused',
+    walk: async ({ engine, settle }) => {
+      await asked(engine.file(task('a')));
+      await settle('a', 'succeeded', { exitCode: 0, printed: { stdout: 'one\n' } });
+      await asked(engine.forget(['a'], { yes: true }));
+      return asked(engine.output('a', 'stdout'));
+    },
+    says: { refused: 'OutputRefused' },
+  },
+];
+
+const LIST: readonly Walk[] = [
+  {
+    name: 'an engine nothing was filed on lists no task, and none unreadable',
+    walk: ({ engine }) => asked(engine.list()),
+    says: { views: [], unreadable: [] },
+  },
+  {
+    name: 'every task is listed as it is viewed, and the ids given list theirs, in the order given and each once',
+    walk: async ({ engine, settle }) => {
+      await asked(engine.file(task('b')));
+      await asked(engine.file(task('a')));
+      await asked(engine.file({ ...task('c'), queued: true }));
+      await settle('a', 'succeeded', { exitCode: 0, closeout: { ok: 1 } });
+      await settle('b', 'running (working)');
+      const every = await Effect.runPromise(engine.list());
+      const viewed: boolean[] = [];
+      for (const view of every.views)
+        viewed.push(JSON.stringify(told(view)) === JSON.stringify(told(await Effect.runPromise(engine.view(view.id)))));
+      const some = await Effect.runPromise(engine.list(['c', 'a', 'c']));
+      return {
+        every: every.views.map((view) => `${view.id} ${view.phase}`).sort(),
+        unreadable: every.unreadable,
+        asViewed: viewed,
+        some: some.views.map((view) => `${view.id} ${view.phase} ${view.admission ?? ''}`),
+        none: await asked(engine.list([])),
+      };
+    },
+    says: {
+      every: ['a succeeded', 'b running (working)', 'c pending'],
+      unreadable: [],
+      asViewed: [true, true, true],
+      some: ['c pending queued', 'a succeeded '],
+      none: { views: [], unreadable: [] },
+    },
+  },
+  {
+    name: 'an id nothing was filed under is listed as it is viewed',
+    walk: async ({ engine }) => {
+      await asked(engine.file(task('a')));
+      return asked(engine.list(['nope', 'a']));
+    },
+    says: { views: [blank('nope'), { id: 'a', state: filed('a'), phase: 'pending', sessionId: null }], unreadable: [] },
+  },
+  {
+    name: 'a list handed something other than task ids is refused',
+    walk: async ({ engine }) => [await asked(engine.list('a' as never)), await asked(engine.list([1] as never))],
+    says: [{ refused: 'ListRefused' }, { refused: 'ListRefused' }],
+  },
 ];
 
 const SAY: readonly Walk[] = [
@@ -336,7 +440,17 @@ const FORGET: readonly Walk[] = [
 ];
 
 /** The contract: every kept verb's walks. */
-export const WALKS = { file: FILE, view: VIEW, stop: STOP, logs: LOGS, feed: FEED, output: OUTPUT, say: SAY, forget: FORGET } as const;
+export const WALKS = {
+  file: FILE,
+  view: VIEW,
+  stop: STOP,
+  logs: LOGS,
+  feed: FEED,
+  output: OUTPUT,
+  list: LIST,
+  say: SAY,
+  forget: FORGET,
+} as const;
 
 /** A verb the stand-in keeps. */
 export type Kept = keyof typeof WALKS;
@@ -345,7 +459,6 @@ export type Kept = keyof typeof WALKS;
 export const UNKEPT = [
   'tick',
   'admit',
-  'list',
   'transcript',
   'follow',
   'path',

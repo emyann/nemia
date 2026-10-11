@@ -30,6 +30,7 @@ const LIES: { readonly [V in Kept]: (answer: Answer) => Answer } = {
   logs: Effect.map(() => 'elsewhere'),
   feed: Effect.map((feed) => ({ ...(feed as object), cursor: 1 })),
   output: Effect.catch(() => Effect.succeed('elsewhere')),
+  list: Effect.map((list) => ({ ...(list as object), unreadable: [{ taskId: 'elsewhere', why: 'elsewhere' }] })),
   say: Effect.map((said) => ({ ...(said as object), attempt: 2 })),
   forget: Effect.map((report) => ({ ...(report as object), forgotten: !(report as { forgotten: boolean }).forgotten })),
 };

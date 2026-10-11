@@ -86,7 +86,7 @@ stops once none is. Her levels, her machine and what she may do are on [her page
 (`followFeed`). Its process is the store's daemon, unless it is started to tick nothing (`apps/api/src/main.ts`).
 
 **It never touches** the runtime: its source imports the orchestrator's three entries alone, and no runtime or harness library
-(`packages/agent-orchestrator/test/imports.test.ts`).
+(`packages/agent-orchestrator/test/imports.boundary.test.ts`).
 
 **It is reached through** its routes. It is the system's public interface. A refusal from the orchestrator comes back with one status
 per kind (`REFUSAL_STATUS` in `apps/api/src/app.ts`).

@@ -13,7 +13,6 @@ import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { nameFor, type Sighting } from 'agent-runtime';
 import { asyncStore, type AsyncJournal, asyncOps, type AsyncRunner } from '../../test/promised.ts';
 import { Engine } from 'agent-runtime';
@@ -22,6 +21,7 @@ import type { Finishing } from '../pause/pause.ts';
 import { scratch } from '../../test/scratch.ts';
 import { until, WAITED } from '../../test/waits.ts';
 import { Effect } from 'effect';
+import { testPlace } from '../../place/memory/index.ts';
 import { runGiven, runOver } from '../../test/placed.ts';
 
 const ROOT = scratch('wf-pause-');
@@ -35,9 +35,10 @@ const { addToInbox, approveRun, queueInInbox, readInbox, retryRun, startRun } = 
 const { approvalFile, asksDir, readRun } = await import('../record/record.store.ts');
 const { tickRun, freshRestMemo } = await import('./tick.verb.ts');
 const { engineOf, runWith: runEngine, storeAdmission } = await import('../runtime-client.ts');
-const { gitPlaceLayer } = await import('../place/shipped.store.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
-const runPlaced = runGiven(gitPlaceLayer);
+const place = testPlace();
+const stand = () => place;
+const runWith = runOver(runEngine, () => stand().layer);
+const runPlaced = runGiven(() => stand().layer);
 const { resumePause, putPause } = await import('../pause/pause.store.ts');
 const { pauseNow } = await import('../pause/pause.verb.ts');
 const { pausedRead, runsListed } = await import('../list/list.verb.ts');
@@ -45,18 +46,10 @@ const { PAUSE_WAIT } = await import('../list/list.ts');
 const { COMMANDS } = await import('../command/commands.verb.ts');
 const { pausedLines, pausedWords } = await import('../pause/pause.ts');
 
-const git = (repo: string, ...args: string[]) =>
-  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
-    cwd: repo,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-  }).trim();
-
 /** A repository with one commit, so `nemia start` has a base to record. */
 const aRepo = (): string => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-  git(repo, 'init', '-q');
-  git(repo, 'commit', '-q', '--allow-empty', '-m', 'base');
+  stand().world.repository(repo, {});
   return repo;
 };
 
@@ -190,22 +183,17 @@ const CHECKED = folder(['work'], () => 'check: "true"\n');
 const SHIP = folder(['work', 'ship'], (name) => (name === 'ship' ? 'harness: claude\ngate: true\nworkspace: main\ncheck: "true"\n' : ''));
 const LANDS = aRepo();
 
-/** A file left in the worktree of `branch` of `repo`, for the step at work there to hand off, as a session leaves its work. */
-const worked = (repo: string, branch: string) => {
-  const lines = git(repo, 'worktree', 'list', '--porcelain').split('\n');
-  const at = lines.indexOf(`branch refs/heads/${branch}`);
-  assert.ok(at > 0, `${branch} has a worktree`);
-  fs.writeFileSync(path.join(lines[at - 2].replace(/^worktree /, ''), 'work.txt'), 'work\n');
+/** A file left in the workspace of `run`'s step `work`, for the step at work there to hand off, as a session leaves its work. */
+const worked = (run: string) => {
+  const { workspace } = readRun(run).steps.work;
+  assert.ok(workspace, `${run} has a workspace`);
+  fs.writeFileSync(path.join(workspace, 'work.txt'), 'work\n');
 };
 
 /** The merge staged in `repo`'s checkout, uncommitted, as a landing's session leaves it for its check. */
 const staged = (repo: string) => {
-  git(repo, 'checkout', '-q', '-b', 'side');
-  fs.writeFileSync(path.join(repo, 'side.txt'), 'side\n');
-  git(repo, 'add', '-A');
-  git(repo, 'commit', '-q', '-m', 'side');
-  git(repo, 'checkout', '-q', '-');
-  git(repo, 'merge', '-q', '--no-ff', '--no-commit', 'side');
+  stand().world.branch(repo, 'side', { 'side.txt': 'side\n' });
+  stand().world.stage(repo, 'side');
 };
 
 test('while the store is paused nothing new starts and what runs finishes; the pass after the lift files what waits', WAITED, async (t) => {
@@ -216,7 +204,7 @@ test('while the store is paused nothing new starts and what runs finishes; the p
   const landing = await begun(SHIP, { repo: LANDS, isolate: true });
   for (let k = 0; k < 6; k++) {
     await pass();
-    if (k === 0) worked(LANDS, readRun(landing.id).steps.work.branch!);
+    if (k === 0) worked(landing.id);
     h.signAll([running, checked], [refused]);
   }
   await atGate(t, landing, 'ship');
@@ -370,7 +358,7 @@ test(
     const ended = await begun(ONE);
     const landing = await begun(SHIP, { repo: lands, isolate: true });
     await pass();
-    worked(lands, readRun(landing.id).steps.work.branch!);
+    worked(landing.id);
     await pass();
     await pass();
     h.signAll([session, ended]);

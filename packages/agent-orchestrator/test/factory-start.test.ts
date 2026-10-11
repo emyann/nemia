@@ -17,36 +17,33 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { scratch } from './scratch.ts';
 import { teamCopy } from './team.ts';
-import { promised } from './promised.ts';
-import { runGiven } from './placed.ts';
+import { testEngine } from 'agent-runtime/testing';
+import { testPlace } from '../place/memory/index.ts';
+import { eachTest, runGiven } from './placed.ts';
 
 const ROOT = scratch('wf-factory-start-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 const { addFactory, attachWorkflow, hireAgent, inboxDir, parseArgv, repoFor, START, startRun, startFromInbox } =
   await import('../src/runner.ts');
-const { gitPlaceLayer } = await import('../src/place/shipped.store.ts');
-const runPlaced = runGiven(gitPlaceLayer);
+const stand = eachTest(testPlace);
+const engine = eachTest(testEngine);
+const runPlaced = runGiven(() => stand().layer);
 const { readRun } = await import('../src/record/record.store.ts');
 const { main } = await import('../src/cli/main.ts');
+const { engineOf } = await import('../src/runtime-client.ts');
 const { nemiaDefinition } = await import('../src/nemia/level.store.ts');
 
 /** Refused by kind, exit 2, and the message — never `String(err)`, which starts with `Error: `. */
 const refusedWith = (tag: 'Missing' | 'Invalid', pattern: RegExp) => (err: Error & { exitCode?: number; _tag?: string }) =>
   err._tag === tag && err.exitCode === 2 && pattern.test(err.message);
 
-/** A git repository with one commit on `main`, for a run with no worktree to stand on. */
+/** A repository with one commit on `main`, for a run with no worktree to stand on. */
 function aRepo(): string {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-  const git = (...args: string[]) =>
-    execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: ['ignore', 'pipe', 'pipe'] });
-  git('init', '-q', '-b', 'main');
-  fs.writeFileSync(path.join(repo, 'README.md'), 'x\n');
-  git('add', '-A');
-  git('commit', '-q', '-m', 'base');
+  stand().world.repository(repo, { 'README.md': 'x\n' });
   return repo;
 }
 
@@ -253,7 +250,7 @@ async function typedFrom(cwd: string, argv: string[]): Promise<string[]> {
   };
   process.chdir(cwd);
   try {
-    await main(argv, promised({}));
+    await main(argv, engineOf(engine().layer), undefined, stand().place);
   } finally {
     process.chdir(was);
     console.log = log;
@@ -493,9 +490,22 @@ function filed(name: string, ...repos: string[]): void {
   hired(name);
 }
 
-/** The worktrees git lists for `repo`, its own checkout among them. */
-const worktrees = (repo: string): string =>
-  execFileSync('git', ['worktree', 'list', '--porcelain'], { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+/** The workspaces the place lists under the store's worktrees for `repo`, as a string to compare. */
+const worktrees = (repo: string): string => {
+  const read = stand().place.askNow('inventory', { repo, under: path.join(ROOT, 'worktrees'), prefix: 'wf/', base: 'main' });
+  assert.ok('answer' in read, 'the place answered');
+  return JSON.stringify(read.answer.workspaces.map((w) => w.path));
+};
+
+test('the workspaces a refused start is compared by are read off the place: one cut under the store lists, and the reading changes', () => {
+  const repo = aRepo();
+  const none = worktrees(repo);
+  const at = path.join(ROOT, 'worktrees', 'cut-by-hand', 'implement');
+  const made = stand().place.askNow('make', { repo, at, name: 'wf/cut-by-hand/implement', from: 'main', also: [] });
+  assert.ok('answer' in made, JSON.stringify(made));
+  assert.notEqual(worktrees(repo), none, 'a workspace cut since is a reading that differs');
+  assert.deepEqual(JSON.parse(worktrees(repo)), [fs.realpathSync(at)]);
+});
 
 test('REFUSED as shipped: nemia start with no --factory in a folder two factories hold, naming each and the fix, with nothing written; --factory picks one', async (t) => {
   asShipped(t);
@@ -526,7 +536,7 @@ test('REFUSED as shipped: nested repositories of two factories are two holders, 
   const outer = aRepo();
   const inner = path.join(outer, 'inner');
   fs.mkdirSync(inner);
-  execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: inner, stdio: ['ignore', 'pipe', 'pipe'] });
+  stand().world.repository(inner, {});
   filed('outer', outer);
   filed('inner', inner);
   const before = runsWritten();

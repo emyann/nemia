@@ -12,7 +12,8 @@ import path from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { parse } from 'yaml';
 import { scratch } from '../../test/scratch.ts';
-import { promised } from '../../test/promised.ts';
+import { testEngine } from 'agent-runtime/testing';
+import { eachTest } from '../../test/placed.ts';
 import { rawTar } from '../../test/tar.ts';
 import { teamCopy } from '../../test/team.ts';
 import { packArchive } from '../archive/archive.ts';
@@ -23,6 +24,8 @@ const { checkTemplateAt, exportTemplate, packTemplate, problemLine, readTemplate
 const { addFactory, attachWorkflow, hireAgent } = await import('../runner.ts');
 const { writeRules } = await import('../rules/rules.store.ts');
 const { main } = await import('../cli/main.ts');
+const { engineOf } = await import('../runtime-client.ts');
+const engine = eachTest(testEngine);
 const { factoryRulesOf, instructionOf } = await import('./template.verb.ts');
 
 /** The factory `name`, as `--factory` names it to an export. */
@@ -306,7 +309,7 @@ test('nemia template check prints that a folder passes, and refuses one that doe
     printed.push(args.join(' '));
   });
   try {
-    await main(['template', 'check', dir], promised({}));
+    await main(['template', 'check', dir], engineOf(engine().layer));
   } finally {
     log.mock.restore();
   }
@@ -314,7 +317,7 @@ test('nemia template check prints that a folder passes, and refuses one that doe
   assert.match(printed[1], /^digest of the content: sha256:[0-9a-f]{64}$/);
   fs.writeFileSync(path.join(dir, 'nemia.yaml'), fs.readFileSync(path.join(dir, 'nemia.yaml'), 'utf8').replace('v1alpha1', 'v2'));
   await assert.rejects(
-    main(['template', 'check', dir], promised({})),
+    main(['template', 'check', dir], engineOf(engine().layer)),
     refusedWith('Invalid', /does not pass, with 1 problem:\nnemia\.yaml:1:\d+: apiVersion is "nemia\.dev\/v2"/),
   );
 });
@@ -467,11 +470,11 @@ test('check reads an archive as the folder it holds, every problem at its line; 
   const archive = path.join(scratch('wf-template-pack-'), 'bad.tgz');
   fs.writeFileSync(archive, packArchive('team', files).archive);
   await assert.rejects(
-    main(['template', 'check', archive], promised({})),
+    main(['template', 'check', archive], engineOf(engine().layer)),
     refusedWith('Invalid', /bad\.tgz does not pass, with 1 problem:\nnemia\.yaml:1:\d+: apiVersion is "nemia\.dev\/v2"/),
   );
   await assert.rejects(
-    main(['template', 'check', path.join(dir, 'none')], promised({})),
+    main(['template', 'check', path.join(dir, 'none')], engineOf(engine().layer)),
     refusedWith('Missing', /is neither a folder nor a file: name a template's folder[^]*or an archive/),
   );
 });
@@ -495,8 +498,8 @@ test('nemia template pack and unpack print what they wrote, the digest of its co
     printed.push(args.join(' '));
   });
   try {
-    await main(['template', 'pack', dir, '--out', out], promised({}));
-    await main(['template', 'unpack', out, parent], promised({}));
+    await main(['template', 'pack', dir, '--out', out], engineOf(engine().layer));
+    await main(['template', 'unpack', out, parent], engineOf(engine().layer));
   } finally {
     log.mock.restore();
   }

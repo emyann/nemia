@@ -3,17 +3,17 @@
  * `release:check` that are node one-liners and a lockfile with no dependency, so `npm ci` installs nothing and needs no network. Each tag
  * is upgraded to, rolled back to and refused as the command does it, and the daemon restarted through a fake machine: a host whose lease,
  * unit, signal and start are the test's, as `service.verb.test.ts`'s are, so no test starts a service or signals a process. `WF_ROOT` is
- * set before the import, since the pause's store reads it as it loads; git runs with no configuration of the machine's and one identity.
+ * set before the import, since the pause's store reads it as it loads; the repository is the test place's.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import type { DaemonStanding } from '../daemon/daemon.ts';
 import type { Args } from '../command/command.ts';
 import { scratch } from '../../test/scratch.ts';
+import { testPlace } from '../../place/memory/index.ts';
 import { runOver } from '../../test/placed.ts';
 
 const ROOT = fs.realpathSync(scratch('wf-upgrade-'));
@@ -21,22 +21,14 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
-for (const key of Object.keys(process.env).filter((k) => k.startsWith('GIT_'))) delete process.env[key];
-Object.assign(process.env, {
-  GIT_CONFIG_GLOBAL: '/dev/null',
-  GIT_CONFIG_NOSYSTEM: '1',
-  GIT_AUTHOR_NAME: 'Test',
-  GIT_AUTHOR_EMAIL: 'test@local',
-  GIT_COMMITTER_NAME: 'Test',
-  GIT_COMMITTER_EMAIL: 'test@local',
-});
 const { upgrade, RELEASES } = await import('./upgrade.verb.ts');
 const { currentRelease, releaseDir, releasesDir, runningAt } = await import('./release.store.ts');
 const { unitText } = await import('../service/service.ts');
 const { readPause } = await import('../pause/pause.store.ts');
 const { runWith: runEngine } = await import('../runtime-client.ts');
-const { gitPlaceLayer } = await import('../place/shipped.store.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
+const place = testPlace();
+const stand = () => place;
+const runWith = runOver(runEngine, () => stand().layer);
 const { TABLE } = await import('../command/commands.verb.ts');
 const { nemiaFence, widened } = await import('../admission/fence.ts');
 type ServiceHost = import('../service/service.verb.ts').ServiceHost;
@@ -57,10 +49,6 @@ const ENV: NodeJS.ProcessEnv = {
   SEEN_FILE: SEEN,
 };
 
-/** Git in `dir`, its stdout trimmed. */
-const git = (dir: string, ...args: string[]): string =>
-  execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-
 /** The check a tag's `release:check` runs: it writes the stores it was handed into `SEEN_FILE`, then exits `exit`. */
 const CHECK = (exit: number) =>
   `node -e "require('fs').writeFileSync(process.env.SEEN_FILE, JSON.stringify({WF_ROOT: process.env.WF_ROOT, AE_ROOT: process.env.AE_ROOT, HKB_REPO: process.env.HKB_REPO ?? null})); process.exit(${exit})"`;
@@ -74,12 +62,15 @@ const scripts = ({ build = 0, check = 0 }: { build?: number; check?: number | nu
 /** The fixture repository: a package with no dependency, committed on main. */
 const REPO = (() => {
   const dir = scratch('wf-upgrade-repo-');
-  git(dir, 'init', '-q', '-b', 'main');
   fs.writeFileSync(
     path.join(dir, 'package-lock.json'),
     `${JSON.stringify({ name: 'fx', version: '1.0.0', lockfileVersion: 3, requires: true, packages: { '': { name: 'fx', version: '1.0.0' } } }, null, 2)}\n`,
   );
   fs.writeFileSync(path.join(dir, '.gitignore'), 'node_modules/\n');
+  stand().world.repository(dir, {
+    'package-lock.json': fs.readFileSync(path.join(dir, 'package-lock.json'), 'utf8'),
+    '.gitignore': 'node_modules/\n',
+  });
   return dir;
 })();
 
@@ -90,10 +81,9 @@ function tagged(tag: string, marker: string, given: Record<string, string> = scr
     `${JSON.stringify({ name: 'fx', version: '1.0.0', private: true, scripts: given }, null, 2)}\n`,
   );
   fs.writeFileSync(path.join(REPO, 'marker.txt'), `${marker}\n`);
-  git(REPO, 'add', '-A');
-  git(REPO, 'commit', '-q', '-m', marker);
-  git(REPO, 'tag', '-f', tag);
-  return git(REPO, 'rev-parse', 'HEAD');
+  const commit = stand().world.commit(REPO, marker);
+  stand().world.tag(REPO, tag, commit);
+  return commit;
 }
 
 /**
@@ -295,7 +285,7 @@ test('REFUSED: a built tag that now names another commit is a Conflict, and the 
   );
   assert.equal(currentRelease()?.tag, 'v1');
   assert.equal(currentRelease()?.commit, V1);
-  git(REPO, 'tag', '-f', 'v2', V2);
+  stand().world.tag(REPO, 'v2', V2);
 });
 
 test('REFUSED: a tag the repository lacks, and a tag that names no release folder, before anything is built', async () => {

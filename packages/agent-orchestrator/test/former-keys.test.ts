@@ -7,14 +7,20 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { scratch } from './scratch.ts';
-import { promised } from './promised.ts';
+import { testEngine } from 'agent-runtime/testing';
+import { testPlace } from '../place/memory/index.ts';
+import { eachTest } from './placed.ts';
+import { heldUnasked } from './unasked.ts';
 
+const stand = eachTest(testPlace);
+const engine = eachTest(testEngine);
+heldUnasked(engine);
 const ROOT = scratch('wf-former-keys-');
 process.env.WF_ROOT = ROOT;
 const { readRun } = await import('../src/record/record.store.ts');
 const { main } = await import('../src/cli/main.ts');
+const { engineOf } = await import('../src/runtime-client.ts');
 
 type Mock = { mock: { method: (o: object, m: string, f: (...a: unknown[]) => void) => { mock: { restore: () => void } } } };
 
@@ -25,7 +31,7 @@ const printedBy = async (t: Mock, argv: string[]): Promise<string[]> => {
     out.push(args.join(' '));
   });
   try {
-    await main(argv, promised({}));
+    await main(argv, engineOf(engine().layer), undefined, stand().place);
   } finally {
     log.mock.restore();
   }
@@ -35,10 +41,7 @@ const printedBy = async (t: Mock, argv: string[]): Promise<string[]> => {
 /** A repository with one commit, so `nemia start` has a base to record. */
 const aRepo = (): string => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-  const git = (...args: string[]) =>
-    execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: 'ignore' });
-  git('init', '-q');
-  git('commit', '-q', '--allow-empty', '-m', 'base');
+  stand().world.repository(repo, {});
   return repo;
 };
 

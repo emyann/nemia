@@ -25,7 +25,7 @@ import { CLOSEOUT_SCHEMA, closeoutSchemaOf } from '../src/closeout/closeout.ts';
 import type { Workflow } from '../src/workflow.ts';
 import { scratch } from './scratch.ts';
 import { TEAM } from './team.ts';
-import { promised } from './promised.ts';
+import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from './placed.ts';
 
@@ -33,7 +33,9 @@ const ROOT = scratch('wf-cache-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 process.env.WF_ROOT = ROOT;
 const { advanceRun, retryRun, startRun, stepsOf, runWith: runEngine } = await import('../src/runner.ts');
+const { engineOf } = await import('../src/runtime-client.ts');
 const stand = eachTest(testPlace);
+const engine = eachTest(testEngine);
 const runWith = runOver(runEngine, () => stand().layer);
 const runPlaced = runGiven(() => stand().layer);
 const { readRun } = await import('../src/record/record.store.ts');
@@ -78,50 +80,16 @@ const aRepo = (): string => {
   return repo;
 };
 
-/** An engine board the walk settles by hand, keeping each task as it was filed. Each task's session is its own, `native-<id>`. */
+/** The engine stand-in the walk settles by hand, keeping each task as it was filed. Each task's session is its own, `native-<id>`. */
 const board = () => {
-  const tasks = new Map<string, { spec: Filed; phase: TaskPhase; closeout?: unknown; exitCode?: number; reason?: string }>();
-  const e = promised({
-    view: async (id: string) => {
-      const t = tasks.get(id);
-      const settled = t && ['succeeded', 'failed', 'stopped'].includes(t.phase) ? t.phase : null;
-      return {
-        id,
-        phase: t?.phase ?? 'pending',
-        sessionId: t ? 's' : null,
-        state: {
-          brief: (t?.spec.brief as string | undefined) ?? '',
-          closeoutSchema: t?.spec.closeoutSchema,
-          settled,
-          stopRequested: false,
-          said: [],
-          attempts:
-            !t || t.phase === 'pending'
-              ? []
-              : [
-                  {
-                    n: 1,
-                    ended: null,
-                    nativeId: `native-${id}`,
-                    closeout: t.closeout,
-                    exitCode: t.exitCode ?? null,
-                    usage: null,
-                    reason: t.reason,
-                  },
-                ],
-        },
-      };
-    },
-    file: async (spec: Filed) => {
-      tasks.set(spec.id, { spec, phase: 'pending' });
-      return spec.id;
-    },
-    stop: async () => {},
-    logs: async () => '',
-  });
+  const held = engine();
   const settle = (id: string, phase: TaskPhase, closeout?: unknown, exitCode?: number, reason?: string) =>
-    Object.assign(tasks.get(id)!, { phase, closeout, exitCode, reason });
-  return { e, tasks, settle };
+    held.settle(id, phase, {
+      ...(closeout !== undefined && { closeout }),
+      ...(exitCode !== undefined && { exitCode }),
+      ...(reason !== undefined && { reason }),
+    } as never);
+  return { e: engineOf(held.layer), tasks: held.tasks, settle };
 };
 
 /**

@@ -12,7 +12,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
-import { promised } from './promised.ts';
+import { testEngine } from 'agent-runtime/testing';
+import { eachTest } from './placed.ts';
+import { heldUnasked } from './unasked.ts';
 
 const ROOT = scratch('wf-stray-flags-');
 process.env.WF_ROOT = ROOT;
@@ -21,8 +23,12 @@ const { FACTORY_HELP } = await import('../src/factory/factory.verb.ts');
 const { INBOX_HELP } = await import('../src/inbox/commands.verb.ts');
 const { PLAN_HELP } = await import('../src/start/commands.verb.ts');
 
-/** No command here reaches the engine: each is refused, or prints its help, before anything is read. */
-const NO_ENGINE = promised({});
+const { engineOf } = await import('../src/runtime-client.ts');
+const engine = eachTest(testEngine);
+heldUnasked(engine);
+
+/** The engine of this test: the stand-in, which no command here files on, stops, says to or forgets from (`heldUnasked`). */
+const noEngine = () => engineOf(engine().layer);
 
 const INBOX_SAYS =
   'It lists the inbox — nemia inbox — files a card with nemia inbox add "<idea>", queues one with nemia inbox queue <name>, and drops one with ' +
@@ -127,7 +133,7 @@ const MISSING: Readonly<Record<string, string>> = {
 /** `main` on `argv`, refused: its words and its exit code. */
 async function refusalOf(argv: string[]): Promise<{ message: string; exitCode?: number }> {
   try {
-    await main(argv, NO_ENGINE);
+    await main(argv, noEngine());
   } catch (err) {
     return { message: (err as Error).message, exitCode: (err as { exitCode?: number }).exitCode };
   }
@@ -160,7 +166,7 @@ test('nemia inbox --help, nemia factory --help and nemia plan --help print their
       out.push(args.join(' '));
     });
     try {
-      await main([...argv], NO_ENGINE);
+      await main([...argv], noEngine());
     } finally {
       log.mock.restore();
     }

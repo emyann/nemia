@@ -13,7 +13,6 @@ import path from 'node:path';
 import type { Engine } from '../src/runtime-client.ts';
 import { testEngine } from 'agent-runtime/testing';
 import { scratch } from './scratch.ts';
-import { promised } from './promised.ts';
 import { Effect } from 'effect';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from './placed.ts';
@@ -79,8 +78,9 @@ const planned = (keys: { plan?: string; implement?: string; review?: string } = 
  * The engine's stand-in (`testEngine`), the engine the controllers take over it, as `nemia` builds one over the runtime, and `settle`
  * taking what the attempt ended with as its closeout and its exit code.
  */
+const engine = eachTest(testEngine);
 const board = () => {
-  const b = testEngine();
+  const b = engine();
   const settle = (id: string, phase: string, closeout?: unknown, exitCode?: number) =>
     b.settle(id, phase, { ...(closeout === undefined ? {} : { closeout }), ...(exitCode === undefined ? {} : { exitCode }) });
   return { ...b, settle, e: engineOf(b.layer) };
@@ -108,7 +108,7 @@ const printedBy = async (
     printed.push(args.join(' '));
   });
   try {
-    await main(argv, e ?? promised({}));
+    await main(argv, e ?? engineOf(engine().layer));
   } finally {
     log.mock.restore();
   }

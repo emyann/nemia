@@ -74,7 +74,13 @@ test('a run started, read and removed through `main` is answered by the place `m
   fs.writeFileSync(path.join(workspace, 'flag.ts'), 'export const flag = true;\n');
   engine().settle(`${id}-implement`, 'failed', {});
   await advanced(id);
-  assert.match((await typed(t, 'decide', id)).join('\n'), new RegExp(`^${id}`), 'nemia decide read the run on the place it was handed');
+  const decided = (await typed(t, 'decide', id)).join('\n').split('\n');
+  assert.match(decided[0], new RegExp(`^${id}`), 'nemia decide read the run');
+  assert.ok(
+    decided.includes(`  branch    wf/${id}/implement is ahead of main by 1 commit`),
+    `where the branch stands is the handed place's answer: git never made this repository\n${decided.join('\n')}`,
+  );
+  assert.ok(decided.includes(`  wf/${id}/implement  — 1 file: +1 −0`), `and what it changed is too\n${decided.join('\n')}`);
 
   await typed(t, 'rm', id);
   assert.equal(fs.existsSync(path.join(ROOT, 'runs', `${id}.json`)), false, 'nemia rm forgot the run');

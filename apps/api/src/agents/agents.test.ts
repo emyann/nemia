@@ -616,6 +616,38 @@ test("an agent is written and listed with the skills it is given and what become
   }
 });
 
+test('an agent is written and listed with the MCP servers its sessions load, as its line writes them, and unset by null', async () => {
+  const made = await send('POST', '/api/agents/yours', { ...scribe, mcp: ' playwright,docs ' });
+  const saved = (await made.json()) as AgentSaved;
+  assert.equal(made.status, 201, JSON.stringify(saved));
+  let version = saved.agent.version;
+  try {
+    assert.match(fs.readFileSync(path.join(AGENTS, 'scribe.md'), 'utf8'), /^mcp: playwright,docs$/m);
+    assert.equal(saved.agent.mcp, 'playwright, docs', 'listed as the parser read it');
+    assert.equal(Object.hasOwn(saved.agent.keys, 'mcp'), false, 'not a role key: a step has no mcp line of its own');
+    const unset = await send('PUT', '/api/agents/yours/scribe', { ...scribe, version, mcp: null });
+    const again = (await unset.json()) as AgentSaved;
+    assert.equal(unset.status, 200, JSON.stringify(again));
+    version = again.agent.version;
+    assert.equal(again.agent.mcp, null);
+    assert.doesNotMatch(fs.readFileSync(path.join(AGENTS, 'scribe.md'), 'utf8'), /^mcp:/m);
+  } finally {
+    await send('DELETE', '/api/agents/yours/scribe', { version });
+  }
+});
+
+test("REFUSED at shipped defaults: MCP servers not written as text, in the route's words, and names the package will not read, in its own", async () => {
+  await refused(
+    send('POST', '/api/agents/yours', { ...scribe, mcp: 3 }),
+    400,
+    /^POST \/api\/agents\/yours: `mcp` is the MCP servers the agent's sessions load, by the names the checkout's `\.mcp\.json` gives them/,
+  );
+  await refused(send('POST', '/api/agents/yours', { ...scribe, mcp: ['a'] }), 400, /`mcp` is the MCP servers/);
+  await refused(send('POST', '/api/agents/yours', { ...scribe, mcp: 'a, b c' }), 422, /has `b c`, which is not a server's name/);
+  await refused(send('POST', '/api/agents/yours', { ...scribe, mcp: 'a, a' }), 422, /names `a` twice/);
+  assert.equal(fs.existsSync(path.join(AGENTS, 'scribe.md')), false, 'nothing was written');
+});
+
 test("REFUSED at shipped defaults: skills or a harness prompt not written as text, ones the package will not read, and skills the agent's tools could not load", async () => {
   await refused(send('POST', '/api/agents/yours', { ...scribe, skills: ['a'] }), 400, /`skills` is the skills the agent is given, by name/);
   await refused(

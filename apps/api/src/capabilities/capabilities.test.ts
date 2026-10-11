@@ -535,9 +535,10 @@ const stepsRepo = () =>
     '.mcp.json': { mcpServers: { fixture: fixture() } },
     '.claude/skills/review/SKILL.md': '---\nname: code-review\ndescription: Review a diff.\n---\n',
     'workflows/dev/implement.md':
-      '---\nplace: git\nharness: claude\ndisallowedTools: SendMessage, CronCreate, mcp__fixture__echo, Bash(npm run build)\n---\nImplement it.\n',
+      '---\nplace: git\nagent: reader\nharness: claude\ndisallowedTools: SendMessage, CronCreate, mcp__fixture__echo, Bash(npm run build)\n---\nImplement it.\n',
     'workflows/dev/review.md':
-      '---\nplace: git\nharness: claude\nafter: implement\ntools: Read, Grep, Glob, Bash\npermissionMode: dontAsk\nallowedTools: Edit(**)\neffort: high\n---\nReview it.\n',
+      '---\nplace: git\nagent: reader\nharness: claude\nafter: implement\ntools: Read, Grep, Glob, Bash\npermissionMode: dontAsk\nallowedTools: Edit(**)\neffort: high\n---\nReview it.\n',
+    'workflows/agents/reader.md': '---\nmcp: fixture\n---\nYou read.\n',
     'workflows/codexed/plan.md': '---\nplace: git\nharness: codex\nsandbox: read-only\n---\nPlan it.\n',
   });
 
@@ -598,7 +599,7 @@ test("a step with `tools:` gets exactly those — no skill without Skill, the to
       permissionMode: 'dontAsk',
       sandbox: null,
       effort: 'high',
-      mcp: null,
+      mcp: ['fixture'],
     },
     'its `allowedTools:` among them: in dontAsk what a rule allows is the difference between a step that can do its work and one that cannot',
   );
@@ -614,6 +615,33 @@ test("a step with `tools:` gets exactly those — no skill without Skill, the to
     review.mcp.map((s: { server: string }) => s.server),
     ['fixture'],
   );
+});
+
+test('a step reaches the servers its agent names and no other: none for a step with no agent, and a name the checkout does not declare said with why', async () => {
+  const repo = repoWith({
+    '.claude/settings.json': { enabledMcpjsonServers: ['fixture', 'other'] },
+    '.mcp.json': { mcpServers: { fixture: fixture(), other: fixture() } },
+    'workflows/dev/bare.md': '---\nplace: git\nharness: claude\n---\nDo it.\n',
+    'workflows/dev/quiet.md': '---\nplace: git\nagent: quiet\n---\nDo it.\n',
+    'workflows/dev/one.md': '---\nplace: git\nagent: one\n---\nDo it.\n',
+    'workflows/dev/lost.md': '---\nplace: git\nagent: lost\n---\nDo it.\n',
+    'workflows/agents/quiet.md': '---\nharness: claude\n---\nYou work.\n',
+    'workflows/agents/one.md': '---\nharness: claude\nmcp: other\n---\nYou work.\n',
+    'workflows/agents/lost.md': '---\nharness: claude\nmcp: fixture, ghost\n---\nYou work.\n',
+  });
+  const steps = await claudeStepsOf(repo);
+  const servers = (step: string) => steps[`dev/${step}`].mcp.map((s) => s.server);
+  assert.deepEqual([steps['dev/bare'].fence.mcp, servers('bare')], [[], []], 'a step with no agent loads no server');
+  assert.deepEqual([steps['dev/quiet'].fence.mcp, servers('quiet')], [[], []], 'nor does one whose agent names none');
+  assert.deepEqual([steps['dev/one'].fence.mcp, servers('one')], [['other'], ['other']], 'one of the two the checkout enables');
+  assert.ok(steps['dev/one'].mcp[0].tools?.length, 'with the tools it listed');
+  assert.deepEqual(steps['dev/lost'].fence.mcp, ['fixture', 'ghost']);
+  assert.deepEqual(servers('lost'), ['fixture', 'ghost']);
+  assert.deepEqual(steps['dev/lost'].mcp[1], {
+    server: 'ghost',
+    tools: null,
+    why: "The checkout's .mcp.json declares no server named ghost: a session of this step is refused at its start. Declare the server there, or take the name off the agent's `mcp:` line.",
+  });
 });
 
 test("a step without `tools:` gets the harness's own set — what was measured, with its date and version and never claimed current, and what was only inferred marked so — and every skill, with Skill in it", async () => {
@@ -642,7 +670,7 @@ test("a step without `tools:` gets the harness's own set — what was measured, 
     permissionMode: null,
     sandbox: null,
     effort: null,
-    mcp: null,
+    mcp: ['fixture'],
   });
 });
 
@@ -871,7 +899,7 @@ test('a Codex step shows its fence, and nothing it was not measured to get or do
     permissionMode: null,
     sandbox: 'read-only',
     effort: null,
-    mcp: null,
+    mcp: [],
   });
   assert.deepEqual(plan.allowed, {
     rules: [],
@@ -910,8 +938,9 @@ test('REFUSED: a deny of a whole MCP server takes back an allow of one of its to
       },
     },
     '.mcp.json': { mcpServers: { fixture: fixture() } },
-    'workflows/dev/shut.md': '---\nplace: git\nharness: claude\ndisallowedTools: mcp__fixture\n---\nWork.\n',
-    'workflows/dev/open.md': '---\nplace: git\nharness: claude\n---\nWork.\n',
+    'workflows/dev/shut.md': '---\nplace: git\nagent: reader\nharness: claude\ndisallowedTools: mcp__fixture\n---\nWork.\n',
+    'workflows/dev/open.md': '---\nplace: git\nagent: reader\nharness: claude\n---\nWork.\n',
+    'workflows/agents/reader.md': '---\nmcp: fixture\n---\nYou read.\n',
   });
   const { 'dev/shut': shut, 'dev/open': open } = await claudeStepsOf(repo);
   const settings = (rule: string) => ({ rule, source: SETTINGS });
@@ -1153,7 +1182,8 @@ test("REFUSED: an ask rule over a server's tool makes it ask — not allowed, th
       permissions: { allow: ['mcp__fixture'], ask: ['mcp__fixture__echo', 'mcp__fixture__wipe'], deny: ['mcp__fixture__wipe'] },
     },
     '.mcp.json': { mcpServers: { fixture: fixture() } },
-    'workflows/dev/review.md': '---\nplace: git\nharness: claude\npermissionMode: dontAsk\n---\nReview it.\n',
+    'workflows/dev/review.md': '---\nplace: git\nagent: reader\nharness: claude\npermissionMode: dontAsk\n---\nReview it.\n',
+    'workflows/agents/reader.md': '---\nmcp: fixture\n---\nYou read.\n',
   });
   const { 'dev/review': review } = await claudeStepsOf(repo);
   assert.deepEqual(review.mcp[0].tools, [
@@ -1169,7 +1199,8 @@ test("REFUSED: an ask rule over a server's tool makes it ask — not allowed, th
   const whole = repoWith({
     '.claude/settings.json': { enabledMcpjsonServers: ['fixture'], permissions: { allow: ['mcp__fixture__echo'], ask: ['mcp__fixture'] } },
     '.mcp.json': { mcpServers: { fixture: fixture() } },
-    'workflows/dev/review.md': '---\nplace: git\nharness: claude\npermissionMode: dontAsk\n---\nReview it.\n',
+    'workflows/dev/review.md': '---\nplace: git\nagent: reader\nharness: claude\npermissionMode: dontAsk\n---\nReview it.\n',
+    'workflows/agents/reader.md': '---\nmcp: fixture\n---\nYou read.\n',
   });
   const { 'dev/review': asked } = await claudeStepsOf(whole);
   assert.deepEqual(

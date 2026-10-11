@@ -103,7 +103,7 @@ export type AgentCardAnswer = { card: AgentCardShape; servedOverA2A: false; why:
 export type AgentSaved = { agent: AgentListing; written: string[]; removed: string[] };
 
 const DRAFT =
-  '"role"?: "<the job it holds>", "description"?: "<use this when…>", "skills"?: "<skill>, <skill>", "harnessPrompt"?: "keep" | "no-coding" | "replace", "keys": { "model": "opus", "effort": "high", "tools": "Read, Grep", … }, "body": "<its instructions>", "schema"?: { "file": "<name>.schema.json", "text": "<a JSON Schema>" }';
+  '"role"?: "<the job it holds>", "description"?: "<use this when…>", "skills"?: "<skill>, <skill>", "harnessPrompt"?: "keep" | "no-coding" | "replace", "mcp"?: "<server>, <server>", "keys": { "model": "opus", "effort": "high", "tools": "Read, Grep", … }, "body": "<its instructions>", "schema"?: { "file": "<name>.schema.json", "text": "<a JSON Schema>" }';
 const POST_SHAPE = `\`{ "name": "<agent>", ${DRAFT} }\`, a key unset as null or left out`;
 const PUT_SHAPE = `\`{ "version": "<as GET /api/agents lists it>", "name"?: "<its new name>", ${DRAFT} }\`, a key unset as null or left out`;
 const DELETE_SHAPE = '`{ "version": "<as GET /api/agents lists it>" }`';
@@ -129,6 +129,7 @@ const DRAFT_FIELDS = {
   skills: Schema.optionalKey(Schema.NullOr(Schema.String)),
   systemPrompt: Schema.optionalKey(Schema.Never),
   harnessPrompt: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  mcp: Schema.optionalKey(Schema.NullOr(Schema.String)),
   keys: Schema.optionalKey(Schema.Record(Schema.String, Schema.NullOr(Schema.String))),
   body: Schema.optionalKey(Schema.String),
   schema: Schema.optionalKey(Schema.NullOr(Schema.Struct({ file: Schema.String, text: Schema.String }))),
@@ -162,6 +163,10 @@ function draftWords(route: string, shape: string): Words {
         '`systemPrompt` is now `harnessPrompt`, what becomes of Claude Code\'s own prompt: `"keep"`, `"no-coding"` or `"replace"`, where it said `"default"`, `"no-coding"` or `"own"`. A page that sends it is stale: reload it, and save again',
       );
     if (key === 'harnessPrompt') return wrong('`harnessPrompt` is `"keep"`, `"no-coding"` or `"replace"`, or null');
+    if (key === 'mcp')
+      return wrong(
+        '`mcp` is the MCP servers the agent\'s sessions load, by the names the checkout\'s `.mcp.json` gives them, as its line writes them — `"playwright, docs"` — or null',
+      );
     if (key === 'keys' && inner !== undefined)
       return wrong(`\`keys.${String(inner)}\` is written as a string, as its line in the file is — ${JSON.stringify(input)} is not one`);
     if (key === 'keys') return wrong('`keys` is an object of the role keys the agent sets');
@@ -216,6 +221,7 @@ function draftOf(body: Omit<typeof POST_BODY.Type, 'name'>, name: string): { dra
       description: line(body.description),
       skills: line(body.skills),
       harnessPrompt: line(body.harnessPrompt),
+      mcp: line(body.mcp),
       keys: Object.fromEntries(Object.entries(body.keys ?? {}).map(([key, value]) => [key, line(value)])),
       body: body.body ?? '',
     },

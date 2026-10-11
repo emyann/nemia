@@ -5,7 +5,8 @@
  *
  * What a Claude Code step has is read as the harness gives it, as far as it was measured: its `tools:` exactly, or the harness's own set
  * (`MEASURED_TOOLS`, what was inferred marked so); the Skill tool before any skill; every server of the checkout's `.mcp.json` that the
- * settings enable, whatever its tools; the settings' deny rules and its own `disallowedTools:`; the settings' ask rules; Claude Code's
+ * settings enable and its agent names (`mcp:`), whatever its tools; the settings' deny rules and its own `disallowedTools:`; the
+ * settings' ask rules; Claude Code's
  * read-only commands, which ask for no rule in any mode (`READ_ONLY_COMMANDS`) unless an ask rule names one; and in `dontAsk`, only what
  * the settings allow of what asks. What asks is denied without a prompt in `dontAsk`, and on a job (`claude -p`, every step but one that
  * says `background: true`), which asks nobody in any mode measured (`askDenierOf`); on a background session in another mode it prompts.
@@ -108,7 +109,8 @@ export type StepReach = {
   /** Whether it runs on Claude Code, whose set was measured. Every field below that says null says it is not. */
   claudeCode: boolean;
   /**
-   * The fence as its file declares it, null where it declares none. A step names no MCP server: `mcp:` is not a key a step has.
+   * The fence as its file declares it, null where it declares none. `mcp` is the servers its sessions load, as its agent's `mcp:` line
+   * names them: empty where the agent names none and for a step with no agent, whose sessions load no server.
    * `permissionMode` is Claude Code's, `sandbox` Codex's: a step has at most one of the two.
    */
   fence: {
@@ -118,7 +120,7 @@ export type StepReach = {
     permissionMode: string | null;
     sandbox: string | null;
     effort: string | null;
-    mcp: null;
+    mcp: string[];
   };
   /**
    * The built-in tools it has: its `tools:` exactly (`declared`), or the harness's own set (`measured`), less what a deny rule removes.
@@ -127,7 +129,10 @@ export type StepReach = {
   tools: { from: 'declared' | 'measured'; names: string[]; inferred: string[]; removed: RemovedTool[] } | null;
   /** The repository's skills it can load — every one, with the Skill tool; none without it, and why. */
   skills: { names: string[]; why: string | null } | null;
-  /** Each server the checkout enables, with the tools it listed, or why there are none to show. */
+  /**
+   * Each server the step's agent names (`fence.mcp`): one the checkout enables with the tools it listed, or why there are none to show;
+   * and one no `.mcp.json` of the checkout declares with no tools and why, since a session of the step is refused at its start.
+   */
   mcp: Array<{ server: string; tools: ReachedMcpTool[] | null; why: string | null }> | null;
   /** Every deny rule that holds for it: the settings', then its own. None for a step whose harness reads no settings. */
   denied: DeniedRule[];
@@ -252,7 +257,9 @@ export function reachOf(
   capabilities: Pick<Capabilities, 'skills' | 'mcp' | 'denied' | 'asked' | 'allowed'>,
   workflows: readonly WorkflowListing[],
 ): StepReach[] {
-  return workflows.filter((w) => w.error === null).flatMap((w) => w.steps.map(({ name, spec }) => stepReach(capabilities, w, name, spec)));
+  return workflows
+    .filter((w) => w.error === null)
+    .flatMap((w) => w.steps.map(({ name, spec, mcp }) => stepReach(capabilities, w, name, spec, mcp)));
 }
 
 /**
@@ -269,11 +276,22 @@ export function reachOf(
  *   that denies what asks (in `dontAsk`, or a job) denies it. A deny naming Bash whole has taken the tool, and an ask rule naming it whole
  *   makes every command ask. `git`'s read-only forms are not listed, so only a rule of every `git` command is known to take them.
  */
+/** A row for each server `named` that the checkout's `.mcp.json` does not declare (`declared`): no tools, and why. */
+const undeclared = (named: readonly string[], declared: Capabilities['mcp']): NonNullable<StepReach['mcp']> =>
+  named
+    .filter((name) => !declared.some((server) => server.name === name))
+    .map((server) => ({
+      server,
+      tools: null,
+      why: `The checkout's .mcp.json declares no server named ${server}: a session of this step is refused at its start. Declare the server there, or take the name off the agent's \`mcp:\` line.`,
+    }));
+
 function stepReach(
   capabilities: Pick<Capabilities, 'skills' | 'mcp' | 'denied' | 'asked' | 'allowed'>,
   workflow: WorkflowListing,
   step: string,
   spec: WorkflowStepSpec,
+  named: readonly string[],
 ): StepReach {
   const harness = spec.harness ?? Object.keys(HARNESSES)[0];
   const dontAsk = spec.permissionMode === 'dontAsk';
@@ -290,7 +308,7 @@ function stepReach(
       permissionMode: spec.permissionMode,
       sandbox: spec.sandbox,
       effort: spec.effort,
-      mcp: null,
+      mcp: [...named],
     },
   };
   if (!CLAUDE_CODE.has(harness)) {
@@ -392,8 +410,8 @@ function stepReach(
         return { command, measured, denied: by ?? (askDenier ? asks : null), asks };
       });
 
-  const mcp = capabilities.mcp
-    .filter((server) => server.enabled)
+  const loaded = capabilities.mcp
+    .filter((server) => server.enabled && named.includes(server.name))
     .map((server) => ({
       server: server.name,
       tools:
@@ -409,6 +427,7 @@ function stepReach(
         }) ?? null,
       why: server.tools ? null : (server.error ?? server.notAsked ?? 'It did not list its tools.'),
     }));
+  const mcp = [...loaded, ...undeclared(named, capabilities.mcp)];
 
   return {
     ...reach,

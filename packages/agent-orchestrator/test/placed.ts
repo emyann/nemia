@@ -7,8 +7,8 @@
  *
  * and git, for a file about git: `const runWith = runOver(runEngine, gitPlaceLayer);`, a line that belongs to a file named
  * `<what>.boundary.test.ts`, since `stand-ins.test.ts` refuses the git place named in any other. A place is given as its layer, or
- * as a function that answers it, asked at each run. This file loads no part of the package, so a test that sets its environment before it imports the
- * package still does.
+ * as a function that answers it, asked at each run. This file loads no part of the package, so a test that sets its environment
+ * before it imports the package still does.
  */
 import { afterEach, beforeEach } from 'node:test';
 import { Effect, type Layer } from 'effect';

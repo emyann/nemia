@@ -36,6 +36,7 @@ export {
   queueWait,
   roundsGranted,
   settledFacts,
+  settledOnce,
   settledWaits,
   stepKeys,
   timelineFacts,

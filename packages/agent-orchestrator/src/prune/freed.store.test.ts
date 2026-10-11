@@ -1,14 +1,15 @@
 /**
  * What a removal frees (`freedBytes`): a file with a name outside the folders counts nothing, one with every name inside counts once, a
- * link is never followed, and a folder that is gone is zero. Every expected number is read off the fixture's own files with `lstat`.
+ * link is never followed, and a folder that is gone is zero. Every expected number is read off the fixture's own files with `lstat`. And
+ * that a walk longer than a burst (`WALK_BURST`) lets the process's other work run.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Effect } from 'effect';
+import { Effect, Fiber } from 'effect';
 import { scratch } from '../../test/scratch.ts';
-import { freedBytes } from './freed.store.ts';
+import { freedBytes, WALK_BURST } from './freed.store.ts';
 
 const ROOT = scratch('wf-freed-');
 
@@ -65,4 +66,20 @@ test('a folder that is gone frees nothing, beside one that is there', async () =
   const dir = path.join(ROOT, 'there');
   const own = file(path.join(dir, 'own.bin'));
   assert.deepEqual(await freed(path.join(ROOT, 'gone'), dir), [0, held(dir) + held(own)]);
+});
+
+test('a walk of more names than WALK_BURST lets a fiber started after it run before it ends', async () => {
+  const dir = path.join(ROOT, 'many');
+  fs.mkdirSync(dir, { recursive: true });
+  for (let k = 0; k <= WALK_BURST; k++) fs.writeFileSync(path.join(dir, `f${k}`), '');
+  const ended: string[] = [];
+  await Effect.runPromise(
+    Effect.gen(function* () {
+      const walk = yield* Effect.forkChild(freedBytes([dir]).pipe(Effect.tap(() => Effect.sync(() => ended.push('walk')))));
+      const other = yield* Effect.forkChild(Effect.sync(() => ended.push('other')));
+      yield* Fiber.join(walk);
+      yield* Fiber.join(other);
+    }),
+  );
+  assert.deepEqual(ended, ['other', 'walk']);
 });

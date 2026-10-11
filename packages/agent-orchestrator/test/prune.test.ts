@@ -14,7 +14,11 @@ import { decideScreen } from './screens.ts';
 import { promised } from './promised.ts';
 import { Effect } from 'effect';
 import { runGiven, runOver } from './placed.ts';
-import { placeOver, unreadBy } from './place-over.ts';
+import { placeHeld, placeOver, unreadBy } from './place-over.ts';
+import { until, WAITED } from './waits.ts';
+import type { Place } from '../src/place/place.store.ts';
+import type { PlaceRequests, PlaceVerb } from '../src/place/place.ts';
+import type { Turned } from '../src/runner.ts';
 
 const ROOT = scratch('wf-prune-');
 process.env.WF_ROOT = ROOT;
@@ -40,7 +44,7 @@ const runWith = runOver(runEngine, gitPlaceLayer);
 const runPlaced = runGiven(gitPlaceLayer);
 const { listRuns, readRun } = await import('../src/record/record.store.ts');
 const { runStore } = await import('../src/record/files.store.ts');
-const { freeing, judging, sized } = await import('../src/prune/prune.verb.ts');
+const { freeing, freeingMany, judging, judgingMany, PRUNE_A_TURN, sized } = await import('../src/prune/prune.verb.ts');
 const { PlaceService } = await import('../src/place/place.store.ts');
 const { shippedGitPlace } = await import('../src/place/shipped.store.ts');
 const { main } = await import('../src/cli/main.ts');
@@ -1034,3 +1038,180 @@ test('the mark of a run whose removal was not heard and removed all the same: th
   );
   assert.equal((await runWith(b.e, prune(run.id))).kind, 'nothing', 'and the next prune has nothing to do');
 });
+
+/** Finished merged runs, `count` of them, each in the repository `repos` names in its turn: their ids, and their worktrees by id. */
+const finishedIn = async (b: ReturnType<typeof board>, repos: readonly string[], count: number) => {
+  const ids: string[] = [];
+  const wts = new Map<string, string>();
+  for (let k = 0; k < count; k++) {
+    const { run, wt } = await aFinished(b, { merged: true, repo: repos[k % repos.length], work: `fix-${ids.length}-${k}.ts` });
+    ids.push(run.id);
+    wts.set(run.id, wt);
+  }
+  return { ids, wts };
+};
+
+/** What a place was asked, verb by verb, in order. */
+type Asked = Array<{ verb: PlaceVerb; request: PlaceRequests[PlaceVerb] }>;
+
+/** `place`, every question noted in `asked` before it is answered. */
+const counting = (place: Place, asked: Asked): Place => ({
+  declared: place.declared,
+  ask: (verb, request, options) => {
+    asked.push({ verb, request });
+    return place.ask(verb, request, options);
+  },
+  askNow: (verb, request, options) => {
+    asked.push({ verb, request });
+    return place.askNow(verb, request, options);
+  },
+});
+
+/** The run each `inventory` in `asked` was asked of, by the folder of worktrees it named. */
+const inventoried = (asked: Asked): string[] =>
+  asked.flatMap((a) => (a.verb === 'inventory' ? [path.basename((a.request as PlaceRequests['inventory']).under)] : []));
+
+/** Each `remove` in `asked`, as it was asked. */
+const removes = (asked: Asked): PlaceRequests['remove'][] =>
+  asked.flatMap((a) => (a.verb === 'remove' ? [a.request as PlaceRequests['remove']] : []));
+
+const kindsOf = (turned: readonly Turned[]) => turned.map((d) => ('failed' in d ? 'failed' : d.pruning.kind));
+
+test(
+  '`judgingMany` over more runs than its bound: no more than PRUNE_A_TURN inventories are asked at once, one a run, and the runs are answered in the order named whatever order they ended in',
+  WAITED,
+  async (t) => {
+    const b = board();
+    const { ids } = await finishedIn(b, [aRepo()], 2 * PRUNE_A_TURN + 1);
+    const held = placeHeld(shippedGitPlace, 'inventory');
+    const judged = runEngine(b.e, judgingMany(ids).pipe(Effect.provide(PlaceService.layer(held.place))));
+    for (let left = ids.length; left > 0; left--) {
+      const due = Math.min(PRUNE_A_TURN, left);
+      await until(
+        t,
+        () => held.waiting() >= due,
+        () => `${due} inventories asked at once, ${left} runs left: ${held.waiting()} wait`,
+        {
+          bell: held.bell,
+        },
+      );
+      held.letGo();
+    }
+    const listed = await judged;
+    assert.equal(held.most(), PRUNE_A_TURN, 'the bound is met, and never passed');
+    assert.deepEqual(
+      held.requests.map((r) => path.basename(r.under)),
+      [...ids.slice(0, PRUNE_A_TURN), ...ids.slice(PRUNE_A_TURN)],
+      'each run is asked its inventory once, in the order named',
+    );
+    assert.deepEqual(
+      listed.map((l) => l.id),
+      ids,
+      'the last asked was let go first each time, and the answers are in the order named all the same',
+    );
+    assert.ok(
+      listed.every((l) => 'ready' in l && l.ready && l.pruning.kind === 'prunable'),
+      'each ready, sized',
+    );
+  },
+);
+
+test('under --yes a run is judged once, and the ready runs of one repository go by one `remove` with every worktree; of two repositories in a turn, by two, and the turn is told in the order listed', async () => {
+  const b = board();
+  const one = await finishedIn(b, [aRepo()], 3);
+  const asked: Asked = [];
+  const place = PlaceService.layer(counting(shippedGitPlace, asked));
+  const listed = await runEngine(b.e, judgingMany(one.ids).pipe(Effect.provide(place)));
+  const done = await runEngine(b.e, freeingMany(listed, { yes: true }).pipe(Effect.provide(place)));
+  assert.deepEqual(kindsOf(done), ['pruned', 'pruned', 'pruned']);
+  assert.deepEqual(inventoried(asked), one.ids, 'one inventory a run: the listing is the judgement the removal goes on');
+  assert.equal(removes(asked).length, 1, 'one remove for the three runs');
+  assert.deepEqual(
+    [removes(asked)[0].workspaces, removes(asked)[0].branches],
+    [one.ids.map((id) => one.wts.get(id)), []],
+    'with the worktree of each, and no branch',
+  );
+  assert.ok(one.ids.every((id) => !fs.existsSync(one.wts.get(id)!) && readRun(id).pruned?.worktrees.length === 1));
+
+  const repos = [aRepo(), aRepo()];
+  const two = await finishedIn(b, repos, 3);
+  asked.length = 0;
+  const told: string[][] = [];
+  const mixed = await runEngine(b.e, judgingMany(two.ids).pipe(Effect.provide(place)));
+  const freed = await runEngine(
+    b.e,
+    freeingMany(mixed, { yes: true }, (turn) => void told.push(turn.map((d) => d.id))).pipe(Effect.provide(place)),
+  );
+  assert.deepEqual(
+    removes(asked).map((r) => [r.repo, r.workspaces]),
+    [
+      [repos[0], [two.wts.get(two.ids[0]), two.wts.get(two.ids[2])]],
+      [repos[1], [two.wts.get(two.ids[1])]],
+    ],
+    'a remove a repository, each with its own worktrees',
+  );
+  assert.deepEqual(told, [two.ids], 'one turn, told once, in the order listed and not by repository');
+  assert.deepEqual(
+    freed.map((d) => d.id),
+    two.ids,
+  );
+  assert.deepEqual(kindsOf(freed), ['pruned', 'pruned', 'pruned']);
+});
+
+test('after a prompt each run is judged again before its removal: one whose worktree was detached on a commit no branch has since the listing is refused and kept, and the other is pruned', async () => {
+  const b = board();
+  const { ids, wts } = await finishedIn(b, [aRepo()], 2);
+  const asked: Asked = [];
+  const place = PlaceService.layer(counting(shippedGitPlace, asked));
+  const listed = await runEngine(b.e, judgingMany(ids).pipe(Effect.provide(place)));
+  const wt = wts.get(ids[0])!;
+  git(wt, 'checkout', '-q', '--detach');
+  fs.writeFileSync(path.join(wt, 'lost.ts'), 'lost\n');
+  git(wt, 'add', '-A');
+  git(wt, 'commit', '-q', '-m', 'on no branch');
+
+  const done = await runEngine(b.e, freeingMany(listed, { yes: false }).pipe(Effect.provide(place)));
+  assert.deepEqual(kindsOf(done), ['refused', 'pruned']);
+  assert.match('pruning' in done[0] ? (done[0].pruning.refusal ?? '') : '', /is on no branch/);
+  assert.ok(fs.existsSync(wt) && !under('runs', `${ids[0]}.pruned`), 'the detached worktree stands, and its run is not marked');
+  assert.ok(!fs.existsSync(wts.get(ids[1])!));
+  assert.deepEqual(inventoried(asked).sort(), [...ids, ...ids].sort(), 'each run judged for the listing, and again for its removal');
+  assert.equal(removes(asked).length, 1);
+  assert.deepEqual(removes(asked)[0].workspaces, [wts.get(ids[1])], 'the run refused is in no remove');
+});
+
+test(
+  'more ready runs of one repository than a turn carries: a `remove` of PRUNE_A_TURN runs, then one of the rest once the first has answered, never two at once',
+  WAITED,
+  async (t) => {
+    const b = board();
+    const { ids, wts } = await finishedIn(b, [aRepo()], PRUNE_A_TURN + 1);
+    const held = placeHeld(shippedGitPlace, 'remove');
+    const listed = await runEngine(b.e, judgingMany(ids).pipe(Effect.provide(PlaceService.layer(held.place))));
+    const told: string[][] = [];
+    const freed = runEngine(
+      b.e,
+      freeingMany(listed, { yes: true }, (turn) => void told.push(turn.map((d) => d.id))).pipe(
+        Effect.provide(PlaceService.layer(held.place)),
+      ),
+    );
+    await until(t, () => held.waiting() >= 1, 'the first remove asked', { bell: held.bell });
+    assert.deepEqual(
+      held.requests.map((r) => r.workspaces),
+      [ids.slice(0, PRUNE_A_TURN).map((id) => wts.get(id))],
+      'the first turn alone is asked while it has not answered',
+    );
+    assert.deepEqual(told, [], 'and no turn is told before it ends');
+    held.letGo();
+    await until(t, () => held.waiting() >= 1, 'the second remove asked', { bell: held.bell });
+    assert.deepEqual(told, [ids.slice(0, PRUNE_A_TURN)], 'the first turn is told as it ends, before the second is asked');
+    held.letGo();
+    assert.deepEqual(
+      kindsOf(await freed),
+      ids.map(() => 'pruned'),
+    );
+    assert.deepEqual(held.requests[1].workspaces, [wts.get(ids[PRUNE_A_TURN])]);
+    assert.equal(held.most(), 1);
+    assert.deepEqual(told, [ids.slice(0, PRUNE_A_TURN), ids.slice(PRUNE_A_TURN)]);
+  },
+);

@@ -137,8 +137,9 @@ type Query = { datasource: string; text: string; profileType?: string };
 
 /**
  * A panel's query, as far as the checker reads it: PromQL in `expr`, TraceQL or LogQL in `query`, Pyroscope's in `labelSelector` and
- * `profileTypeId`, the rows a Tempo table shows in `tableType`: a row per span, or per trace when it is `traces` or missing; and a
- * server-side expression's `expression`, which reads the panel's other queries by their `refId`.
+ * `profileTypeId`, the rows a Tempo table shows in `tableType`: a row per span, or per trace when it is `traces` or missing; a
+ * server-side expression's `expression`, which reads the panel's other queries by their `refId`; and of a Loki query its `queryType`,
+ * `instant` or, when it is `range` or missing, a range, and the `legendFormat` its series are named by where Grafana draws one.
  */
 type Target = {
   datasource?: { uid?: string };
@@ -149,19 +150,24 @@ type Target = {
   labelSelector?: string;
   profileTypeId?: string;
   tableType?: string;
+  queryType?: string;
+  legendFormat?: string;
 };
 
 /** A panel's transformation, as far as the checker reads it: a `sortBy`'s fields among its options. */
 type Transformation = { id: string; options?: { sort?: { field?: string }[] } };
 
-/** A panel of a dashboard, as far as the checker reads it. */
+/**
+ * A panel of a dashboard, as far as the checker reads it: of a bar gauge, in `reduceOptions`, whether it draws a bar for each row its
+ * query answers (`values`) or one for each field, and how many rows at most (`limit`).
+ */
 type Panel = {
   type: string;
   title?: string;
   datasource?: { uid?: string };
   targets?: Target[];
   panels?: Panel[];
-  options?: { content?: string };
+  options?: { content?: string; reduceOptions?: { values?: boolean; limit?: number } };
   transformations?: Transformation[];
 };
 
@@ -387,12 +393,48 @@ function logNames(query: string): string[] {
   return [...labels, ...fields.map(([, f]) => f), ...grouped.filter(Boolean)];
 }
 
+/** The labels a LogQL query counts by: its first, outermost `by (…)` list. */
+const countedBy = (query: string): string[] =>
+  (/\bby\s*\(([^)]*)\)/.exec(query.replace(/"(?:[^"\\]|\\.)*"/g, '""'))?.[1] ?? '')
+    .split(',')
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+/**
+ * What would draw one nameless bar where `dashboard` means a bar for each series, each said in a line that starts with its panel's
+ * title, for every bar gauge whose query is sent to Loki (as measured, `tools/observe/README.md`, *Counting a session's errors*).
+ * Grafana hands the gauge an instant query's answer as one table, a row for each series: a gauge that does not read each row
+ * (`values`) reduces the table to one value; a count by several labels names a bar by every label's value; a `legendFormat` is never
+ * drawn; a gauge with no `limit` draws only the first rows; and a range query's last point is not the range's count.
+ */
+function lokiGaugeFaults(dashboard: Dashboard): string[] {
+  const faults: string[] = [];
+  for (const p of lokiGauges(dashboard)) {
+    for (const t of lokiTargets(p)) {
+      if (t.queryType !== 'instant') faults.push(`${p.title}: a range query, whose last point is not the range's count`);
+      const by = countedBy(t.expr ?? '');
+      if (by.length !== 1) faults.push(`${p.title}: counts by ${by.join(', ') || 'no label'}, not by one label`);
+      if (t.legendFormat !== undefined) faults.push(`${p.title}: a legendFormat, which Grafana never draws here`);
+    }
+    if (p.options?.reduceOptions?.values !== true) faults.push(`${p.title}: reduces Loki's table to one value`);
+    if (typeof p.options?.reduceOptions?.limit !== 'number') faults.push(`${p.title}: no limit on the rows it draws`);
+  }
+  return faults;
+}
+
 /** The labels a Pyroscope label selector names, each with the value it asks for. */
 const profileLabelsOf = (selector: string): [string, string][] =>
   [...selector.matchAll(/([A-Za-z_]\w*)\s*(?:=~|!~|!=|=)\s*"([^"]*)"/g)].map(([, label, value]) => [label, value]);
 
 /** Every panel of `panels`, a row's own among them. */
 const allPanels = (panels: Panel[]): Panel[] => panels.flatMap((p) => [p, ...allPanels(p.panels ?? [])]);
+
+/** The targets of `panel` sent to Loki: by their own datasource, else the panel's. */
+const lokiTargets = (panel: Panel): Target[] => (panel.targets ?? []).filter((t) => (t.datasource?.uid ?? panel.datasource?.uid) === 'loki');
+
+/** The bar gauges of `dashboard` with a query sent to Loki, in the dashboard's order. */
+const lokiGauges = (dashboard: Dashboard): Panel[] =>
+  allPanels(dashboard.panels).filter((p) => p.type === 'bargauge' && lokiTargets(p).length > 0);
 
 /** The text a variable's query names: a PromQL query as written, a Tempo tag-values query as the `span.` key whose values it reads. */
 const variableText = (query: unknown): string => {
@@ -605,6 +647,14 @@ test('the dashboards name only what the code emits', () => {
     'System draws the CPU and the heap in use',
   );
   for (const q of profiles) assert.deepEqual(profileLabelsOf(q.text), [['service_name', '$service']], q.text);
+});
+
+test('a bar gauge over Loki reads each row of an instant query, named by one label', () => {
+  for (const [file, d] of DASHBOARDS) assert.deepEqual(lokiGaugeFaults(d), [], file);
+  assert.deepEqual(
+    lokiGauges(dashboardTitled('Steps')).map((p) => p.title),
+    ['Tool errors', 'Failed skill loads', 'Tool errors, across runs', 'Failed skill loads, across runs'],
+  );
 });
 
 /** The values a dashboard's PromQL queries ask of the pass's `phase` label, each alternative of a regex its own. */

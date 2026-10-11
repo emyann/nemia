@@ -40,6 +40,13 @@ doc or a workflow file, cannot land on a pass turbo replays from its cache.
 Implement's check runs the tests forced too (`npm test -- --force`): it is the round's one run of the whole suite, its session running
 only the tests of what it changed, and a round that changes only such a file must not pass on the last round's replay.
 
+Implement merges the base into its branch before each sign-off (`git merge main-worktree/HEAD`: the tip of the branch the repository's
+own checkout is on, whatever it is called), so its check runs on the merged tree, and measures again what its change wrote by a measure.
+Review says in its summary whether the branch holds the base as it is then, and sends back a branch behind only where the base moved
+under the change: a file both changed, a file the change reads, or a measure it wrote. The landing's check on the merged tree stays the
+guard for the rest. Land's note says nothing of it: the ending signs off before the run executes its check. On a merge round
+(`## Merge` in the brief) the step merges the commit the brief names instead.
+
 Start it after the intake run whose intent it builds: `wf start "<the intent's title>" --workflows build --after <intake-run>`. Its
 first step, design, is told the intent under *From run*; the steps after it read the spec.
 

@@ -218,7 +218,7 @@ export function endingStopped(
  * past, and is spent (`spentApprovals`). Pure.
  */
 export function sentBack(record: StepRecord): StepRecord {
-  const { check, tries = [], taskId, handedOff: _, landed: __, lacks: ___, ...rest } = record;
+  const { check, tries = [], taskId, handedOff: _, landed: __, filesRead: ___, ...rest } = record;
   return { ...rest, taskId: null, tries: [...tries, { taskId: taskId!, ...(check ? { check } : {}), then: 'back' }] };
 }
 
@@ -303,7 +303,7 @@ export const resultOnBase = (standings: readonly BranchStanding[]): boolean =>
  * own file asked, so it is held to that whatever the engine recorded of the filing.
  *
  * **So are the files it names.** A closeout whose `artifacts` names a file the run did not have when the step signed off
- * (`StepRecord.lacks`, read off the disk once by the tick, `filesDue`) is `unsigned` too, before any check: the step after would be
+ * (`StepRecord.filesRead`, read off the disk once by the tick, `filesDue`) is `unsigned` too, before any check: the step after would be
  * handed a name with no file behind it. Read off the record, never the disk: a file a check or a prune removes later unsigns nothing.
  *
  * **The check's own phase is the verdict.** The detached worker maps the command's exit code to

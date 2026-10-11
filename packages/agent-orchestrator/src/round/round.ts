@@ -136,7 +136,7 @@ export function roundFiled(steps: readonly Workflow[], run: Run, r: Round, taskI
   const next = { ...run.steps };
   const then = r.by === 'merge' ? 'merge' : 'round';
   for (const name of looping ? loopSpan(steps, looping) : []) {
-    const { check, tries = [], handedOff: _, landed: __, lacks: ___, ...rest } = run.steps[name] ?? { taskId: null };
+    const { check, tries = [], handedOff: _, landed: __, filesRead: ___, ...rest } = run.steps[name] ?? { taskId: null };
     const raised = r.budget !== undefined && r.raise?.includes(name) ? { budget: r.budget } : {};
     const over: EarlierTry[] = rest.taskId ? [{ taskId: rest.taskId, ...(check ? { check } : {}), then, ...raised }] : [];
     next[name] = { ...rest, taskId: name === r.target ? taskId : null, tries: [...tries, ...over] };

@@ -75,11 +75,11 @@ function placedWhy(file: string, dir: string): 'outside' | 'escapes' | 'configur
  * judged where the record names no workspace or the workspace is not on disk. In a workspace that is there, a path with nothing at it is
  * `not there`, a directory is `directory`, and a link that leads out is `escapes`.
  */
-export function filesLacked(run: Run, stepName: string, closeout: Closeout | undefined): Omit<LackedFile, 'taskId'>[] {
+export function filesLacked(run: Run, stepName: string, closeout: Closeout | undefined): LackedFile[] {
   if (!closeout) return [];
   const dir = artifactsDir(run, stepName);
   const { workspace } = run.steps[stepName] ?? {};
-  const lacked: Omit<LackedFile, 'taskId'>[] = [];
+  const lacked: LackedFile[] = [];
   for (const file of closeout.artifacts) {
     const placed = placedWhy(file, dir);
     const why = placed === 'workspace' ? workspaceLacks(workspace, path.normalize(file), dir) : placed;

@@ -282,12 +282,12 @@ export const handedMounts = (step: Pick<Workflow, 'name' | 'harness'>, steps: re
 };
 
 /**
- * The steps whose closeout's files a pass reads off the disk now (`filesLacked` in artifacts.store.ts), each once: a step on a local
- * harness whose task settled `succeeded`, whose closeout names a file, and whose record holds nothing read of that task
- * (`StepRecord.lacks`) — on the pass that first reads the task settled, which the run's mark of the settles it has counted
- * (`Run.settlesCounted`) does not hold yet and holds from the write that keeps what was read. So a task an earlier pass read settled is
- * never read back into a refusal: not one settled under a tick that read no files, whose record has no such mark or holds the task, nor
- * one whose check or follower has run since and may have removed a file. None of a pruned run, whose files may be gone.
+ * The steps whose closeout's files a pass reads off the disk now (`filesLacked` in artifacts.store.ts), each task once: a step on a
+ * local harness whose task reads `succeeded`, whose closeout names a file, and whose record does not say that task was read
+ * (`StepRecord.filesRead`), which the pass that reads it writes whether or not a file lacked. So a file a check, a gate's wait or a
+ * later step removes after the closeout was accepted unsigns nothing, of a task held open as of one settled. Nor is a task read that
+ * signed under a tick that read no files: one whose settle the run has counted (`Run.settlesCounted`), any of a record that counts no
+ * settle, and one whose check is filed already. None of a pruned run, whose files may be gone.
  */
 export function filesDue(
   steps: readonly Workflow[],
@@ -300,9 +300,10 @@ export function filesDue(
   return steps
     .filter((step) => !isRemoteHarness(step.harness))
     .filter(({ name }) => {
-      const taskId = run.steps[name]?.taskId;
-      if (!taskId || counted.includes(taskId) || phaseOf(taskId) !== 'succeeded') return false;
-      return !run.steps[name].lacks?.some((file) => file.taskId === taskId) && Boolean(closeoutOf(name)?.artifacts.length);
+      const record = run.steps[name];
+      const taskId = record?.taskId;
+      if (!taskId || counted.includes(taskId) || record.check || record.filesRead?.taskId === taskId) return false;
+      return phaseOf(taskId) === 'succeeded' && Boolean(closeoutOf(name)?.artifacts.length);
     })
     .map(({ name }) => name);
 }

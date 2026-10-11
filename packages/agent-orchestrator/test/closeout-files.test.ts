@@ -2,7 +2,7 @@
  * A closeout that names a file the run does not have is refused, at shipped defaults: the step reads `unsigned` before any check of it
  * is filed, the run nudges it once a round with each file, why and what to do, and past that nudge it waits on a person, whose
  * `nemia decide` names the files. A closeout whose files are all there, and one that names none, pass as before. The step after is told
- * the named files that are there, and no name with no file. A task an earlier pass read settled is never read back into a refusal.
+ * the named files that are there, and no name with no file. A task is read once, and one an earlier tick left unread never is.
  *
  * Walked on the test place and the engine's stand-in, over a folder of two steps, `implement` with a `check:` and `review` after it.
  * `WF_ROOT` is set before the runner is imported, which reads it as it loads.
@@ -117,7 +117,11 @@ test('the refusal is answered as a refused check is: a next closeout whose files
   const pass = await advanced(id);
   assert.deepEqual(pass.checked, ['implement'], 'its check is filed');
   assert.deepEqual(pass.tried, []);
-  assert.equal(readRun(id).steps.implement.lacks, undefined, 'and the record holds nothing of the first closeout');
+  assert.deepEqual(
+    readRun(id).steps.implement.filesRead,
+    { taskId: `${task}-try2`, lacked: {} },
+    'and the record holds nothing of the first closeout',
+  );
 
   engine().settle(`${task}-try2-check`, 'succeeded', { exitCode: 0 });
   assert.deepEqual((await advanced(id)).filed, ['review']);
@@ -132,7 +136,7 @@ test('REFUSED once a round: a nudged try that names the missing file again leave
 
   const pass = await advanced(id);
   assert.deepEqual([pass.tried, pass.checked, pass.filed], [[], [], []], 'no second nudge in the round, no check, nothing after it');
-  assert.deepEqual(readRun(id).steps.implement.lacks, [{ taskId: `${task}-try2`, path: gone, why: 'missing' }]);
+  assert.deepEqual(readRun(id).steps.implement.filesRead, { taskId: `${task}-try2`, lacked: { [gone]: 'missing' } });
 
   for (let n = 0; n < 3; n++) assert.deepEqual((await advanced(id)).tried, [], 'nor on a later pass');
   assert.equal(engine().tasks.has(`${task}-try3`), false);
@@ -157,7 +161,11 @@ test('a closeout whose files are all there, and one that names none, pass as bef
     engine().settle(task, 'succeeded', signed(...artifacts.map((name) => (name === 'in-files' ? path.join(files, name) : name))));
     const pass = await advanced(id);
     assert.deepEqual([pass.checked, pass.tried], [['implement'], []]);
-    assert.equal(readRun(id).steps.implement.lacks, undefined, 'no mark is kept where nothing lacks');
+    assert.deepEqual(
+      readRun(id).steps.implement.filesRead,
+      artifacts.length ? { taskId: task, lacked: {} } : undefined,
+      'read, where it names a file',
+    );
     assert.equal(JSON.parse(before).taskId, readRun(id).steps.implement.taskId);
   }
 });
@@ -174,7 +182,7 @@ test('a task an earlier pass read settled is not read back into a refusal: its s
 
     const pass = await advanced(id);
     assert.deepEqual([pass.checked, pass.tried], [['implement'], []], 'it goes on to its check, as it would have');
-    assert.equal(readRun(id).steps.implement.lacks, undefined);
+    assert.equal(readRun(id).steps.implement.filesRead, undefined);
   }
 });
 
@@ -195,7 +203,7 @@ test('the step after is told the named files that are there by absolute path, an
     brief,
   );
   assert.ok(!brief.includes('removed-dark.png'), `a name with no file is handed to no one\n${brief}`);
-  assert.equal(readRun(id).steps.implement.lacks, undefined, 'and the step that named it, verified since, is not unsigned for it');
+  assert.deepEqual(lackedOf(readRun(id).steps.implement), [], 'and the step that named it, verified since, is not unsigned for it');
 });
 
 const STEPS = [
@@ -207,9 +215,11 @@ const STEPS = [
 const runOf = (record: Partial<StepRecord> = {}, counted: string[] | null = []): Run =>
   ({ id: 'r-1', steps: { implement: { taskId: 't1', ...record } }, ...(counted ? { settlesCounted: counted } : {}) }) as unknown as Run;
 
-test('the files of a step are read once, on the pass that first reads its task settled, and never of a remote step or a pruned run', () => {
-  const naming = () => ({ artifacts: ['a.md'] });
-  const succeeded = (): 'succeeded' => 'succeeded';
+const NAMING = () => ({ artifacts: ['a.md'] });
+const SUCCEEDED = (): 'succeeded' => 'succeeded';
+
+test('the files of a task are read once, on the pass that first reads it signed, and never of one an earlier tick left unread', () => {
+  const [naming, succeeded] = [NAMING, SUCCEEDED];
   assert.deepEqual(filesDue(STEPS, runOf(), succeeded, naming), ['implement']);
   assert.deepEqual(
     filesDue(STEPS, runOf(), () => 'running', naming),
@@ -231,22 +241,45 @@ test('the files of a step are read once, on the pass that first reads its task s
   );
   assert.deepEqual(filesDue(STEPS, runOf({}, ['t1']), succeeded, naming), [], 'a settle an earlier pass counted');
   assert.deepEqual(filesDue(STEPS, runOf({}, null), succeeded, naming), [], 'a record that counts no settle');
-  assert.deepEqual(filesDue(STEPS, runOf({ lacks: [{ taskId: 't1', path: 'a.md', why: 'not there' }] }), succeeded, naming), []);
-  assert.deepEqual(filesDue(STEPS, { ...runOf(), pruned: { at: '2026-01-01T00:00:00Z' } } as unknown as Run, succeeded, naming), []);
-  const remote: Workflow[] = [{ ...STEPS[0], harness: 'a2a:elsewhere' }, STEPS[1]];
-  assert.deepEqual(filesDue(remote, runOf(), succeeded, naming), [], 'a step on a remote agent has no local file');
+  assert.deepEqual(filesDue(STEPS, runOf({ filesRead: { taskId: 't1', lacked: {} } }), succeeded, naming), [], 'read, and nothing lacked');
+  assert.deepEqual(filesDue(STEPS, runOf({ filesRead: { taskId: 't1', lacked: { 'a.md': 'not there' } } }), succeeded, naming), []);
+  assert.deepEqual(filesDue(STEPS, runOf({ filesRead: { taskId: 't0', lacked: {} } }), succeeded, naming), ['implement'], 'another task');
+  assert.deepEqual(filesDue(STEPS, runOf({ check: { taskId: 't1-check' } }), succeeded, naming), [], 'a check filed before any read');
 });
 
-test('a new try, a new round and a send-back drop what the closeout before lacked, and another task’s mark unsigns nothing', () => {
-  const record: StepRecord = { taskId: 't1', lacks: [{ taskId: 't1', path: 'a.md', why: 'not there' }] };
-  assert.equal(lackedOf(record).length, 1);
-  assert.deepEqual(lackedOf({ ...record, taskId: 't2' }), [], 'a mark of another task is inert');
-  assert.equal(nextTry(record, { step: 'implement', try: 2, mode: 'nudge', by: 'signoff' }, 't2').lacks, undefined);
-  assert.equal(nextTry(record, { step: 'implement', try: 2, mode: 'fresh', by: 'ask' }, 't2').lacks, undefined);
-  assert.equal(sentBack(record).lacks, undefined);
+test('a pruned run has no file read', () => {
+  const pruned = { ...runOf(), pruned: { at: '2026-01-01T00:00:00Z' } } as unknown as Run;
+  assert.deepEqual(filesDue(STEPS, pruned, SUCCEEDED, NAMING), []);
+});
+
+test('a step on a remote agent has no file read', () => {
+  const remote: Workflow[] = [{ ...STEPS[0], harness: 'a2a:elsewhere' }, STEPS[1]];
+  assert.deepEqual(filesDue(remote, runOf(), SUCCEEDED, NAMING), []);
+});
+
+const LACKING: StepRecord = { taskId: 't1', filesRead: { taskId: 't1', lacked: { 'a.md': 'not there' } } };
+
+test('what a closeout lacked is its own task’s: a mark of another task unsigns nothing', () => {
+  assert.deepEqual(lackedOf(LACKING), [{ path: 'a.md', why: 'not there' }]);
+  assert.deepEqual(lackedOf({ ...LACKING, taskId: 't2' }), []);
+  assert.deepEqual(lackedOf({ taskId: 't1', filesRead: { taskId: 't1', lacked: {} } }), []);
+  assert.deepEqual(lackedOf(undefined), []);
+});
+
+test('a new try drops what was read of the closeout before, and a recheck, the same task, keeps it', () => {
+  assert.equal(nextTry(LACKING, { step: 'implement', try: 2, mode: 'nudge', by: 'signoff' }, 't2').filesRead, undefined);
+  assert.equal(nextTry(LACKING, { step: 'implement', try: 2, mode: 'fresh', by: 'ask' }, 't2').filesRead, undefined);
+  const rechecked = nextTry({ ...LACKING, check: { taskId: 't1-check' } }, { step: 'implement', try: 2, mode: 'recheck', by: 'ask' });
+  assert.deepEqual([rechecked.taskId, rechecked.filesRead, rechecked.check], ['t1', LACKING.filesRead, undefined]);
+});
+
+test('a send-back drops what was read of the closeout before', () => {
+  assert.equal(sentBack(LACKING).filesRead, undefined);
+});
+
+test('a new round drops what was read of the closeout before', () => {
   const round = { step: 'review', target: 'implement', round: 2, by: 'loop' } as unknown as Parameters<typeof roundFiled>[2];
-  const next = roundFiled(STEPS, runOf(record), round, 't1-try2');
-  assert.equal(next.implement.lacks, undefined);
+  assert.equal(roundFiled(STEPS, runOf(LACKING), round, 't1-try2').implement.filesRead, undefined);
 });
 
 test('a near name is one with the same last name, letter case aside, in the folder named or in another', () => {

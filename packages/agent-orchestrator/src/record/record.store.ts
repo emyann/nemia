@@ -52,7 +52,7 @@ const StepRecordSchema = Kept({
   tries: Schema.optional(Schema.mutable(Schema.Array(EarlierTrySchema))),
   handedOff: Schema.optional(Schema.String),
   landed: Schema.optional(LandedSchema),
-  lacks: Schema.optional(Schema.mutable(Schema.Array(Kept({ taskId: Schema.String, path: Schema.String, why: Schema.String })))),
+  filesRead: Schema.optional(Kept({ taskId: Schema.String, lacked: Schema.Record(Schema.String, Schema.String) })),
 });
 
 /**

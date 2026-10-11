@@ -170,10 +170,11 @@ const askedWord = (r: Retry): string =>
 
 /**
  * A step's record once a try is filed: the current try moved behind, with what replaced it, and the new one in
- * its place — the re-filed step's task, or for a recheck the same task, with its check still to file. Pure.
+ * its place — the re-filed step's task, or for a recheck the same task, with its check still to file and what was read of its files
+ * (`StepRecord.filesRead`) kept. Pure.
  */
 export function nextTry(record: StepRecord, retry: Retry, taskId?: string): StepRecord {
-  const { check, tries = [], handedOff: _, landed: __, lacks: ___, ...rest } = record;
+  const { check, tries = [], handedOff: _, landed: __, filesRead, ...rest } = record;
   const over: EarlierTry = {
     taskId: record.taskId!,
     ...(check ? { check } : {}),
@@ -182,7 +183,8 @@ export function nextTry(record: StepRecord, retry: Retry, taskId?: string): Step
     ...(retry.model ? { model: retry.model } : {}),
     ...(retry.budget !== undefined ? { budget: retry.budget } : {}),
   };
-  return { ...rest, taskId: retry.mode === 'recheck' ? record.taskId : taskId!, tries: [...tries, over] };
+  const same = retry.mode === 'recheck';
+  return { ...rest, ...(same && filesRead ? { filesRead } : {}), taskId: same ? record.taskId : taskId!, tries: [...tries, over] };
 }
 
 /**

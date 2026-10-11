@@ -7,13 +7,17 @@ loop: implement
 rounds: 3
 budget: 16
 tally: findings, findings.kind=placement, mutants.proves
-skills: effect, shadcn, change-the-board, look
+skills: effect, shadcn, change-the-board, look, see-a-dashboard
 output: review.schema.json
 disallowedTools: Bash(cd:*), Bash(npm run build), Bash(npm run e2e), Bash(npm test), Bash(npx turbo run test), Bash(npx turbo run test --force), Bash(npx turbo run test --continue), Bash(npx turbo run test --force --continue), Bash(npx turbo run test --continue --force)
 ---
 When the change touches `apps/web`, read the pictures the implement step named in its `artifacts`, from its handed files your brief
 lists, in light and dark, with the `look` skill. A page or a state the change touches with no picture of it is a finding.
 When the change touches `apps/web`, read `.claude/skills/shadcn/SKILL.md` with Read for how the board's components are meant to be used.
+
+When the change touches `tools/observe`, read each dashboard's picture and text the implement step named in its `artifacts`,
+`dashboard-<name>.png` and `dashboard-<name>.txt`, with the `see-a-dashboard` skill: the text first. A dashboard the change touches
+with no picture and text of it is a finding. You do not render one yourself: your fence refuses the command and Docker.
 
 Implement's check ran the whole test suite on this round's tree, forced, and your brief hands you its exit and the end of its output
 under `## What implement's check said`. That run is the floor, and a run of yours on the same tree would only say it again, and your

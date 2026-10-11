@@ -2,7 +2,7 @@
 
 A Grafana to watch how Nemia runs while we build it: one `grafana/otel-lgtm` container holding the OpenTelemetry collector, Tempo, Loki,
 Prometheus, Pyroscope and Grafana, with five dashboards loaded from `dashboards/`. It is a tool of this repository and never ships: no
-package, `bin` or workflow refers to it. The daemon sends nothing anywhere unless it is given an endpoint, and the stack listens on this
+package or `bin` refers to it; the build workflow's check asks a change here for its dashboards rendered (*See a change rendered*). The daemon sends nothing anywhere unless it is given an endpoint, and the stack listens on this
 machine alone (`127.0.0.1`).
 
 ## Up and down
@@ -132,6 +132,59 @@ query its panel has not. What a session sends and what the span metrics write ar
 `agent-orchestrator/test/observe-time.test.ts` holds the timing below: the command head and the test scope, each over a table of commands,
 the span metrics' dimensions, the retention and reach, and the mounts. `agent-orchestrator/test/profile.test.ts` holds the preload: with no
 endpoint, nothing loaded and nothing opened.
+
+## See a change rendered
+
+The stack above mounts the main checkout and holds what a landed daemon sent: a dashboard, a collector rule or a span that exists only
+in a worktree is drawn by nothing there. `render/` draws it, from the checkout it is run in:
+
+```sh
+node tools/observe/render/render.ts [--dashboards <name,…>] [--out <dir>] [--wait <seconds>] [--hold [<seconds>]]
+node tools/observe/render/render.ts --stop <name>
+```
+
+- **A throwaway stack** (`render/stack.ts`): one container of the image `compose.yaml` pins, with its environment and its bind
+  mounts, read-only, taken from this checkout's `tools/observe`; named `nemia-render-<pid>-<random>`; Grafana and OTLP/HTTP published on
+  loopback ports Docker picks; no named volume, so what it stores dies with it. It never names `nemia-lgtm`, its volume or its ports.
+  It is removed by its exact name (`docker rm -f -v <name>`) when the command ends, on a signal and on any error.
+- **Fake data** (`render/seed.ts`): fixtures written by hand, posted as OTLP/HTTP JSON to the throwaway's own collector, stamped inside
+  the last minute: the daemon's passes, a run's filings and appends, the waits and the denied calls of two steps (`build / implement ·
+  ada`, `build / review · agora`, in the run `seeded-run-1`), every metric System charts, and two sessions' turns with their failed
+  `tool_result` events, one with no `tool_name`. Every panel that draws series is met by two; the two profile panels are not seeded
+  (`UNSEEDED`). Fixtures and not the code's emitters: a tool imports no package's `src`. `observe.test.ts` refuses a name here the code
+  does not emit, and a panel the seed does not meet: a change that adds a span, an attribute or a metric adds its fixture.
+- **What it writes**, into `--out`, else `$WF_ARTIFACTS`, else `.observe/` at the root (ignored by git): for each dashboard,
+  `dashboard-<name>.png`, the whole page at 1600 pixels wide, and `dashboard-<name>.txt`, the text of every panel as the page drew it
+  (`render/panels.ts`): each bar's name and value, a bar with no name as `(no name)`, a chart's series, a table's rows, `no data`, or
+  the error a query answered. The window is made as tall as the dashboard: Grafana loads a panel's data only once the window reaches
+  it. The `see-a-dashboard` skill says how to read them.
+- **One at a time** (`render/lock.ts`): about 0.8 GiB and a minute and a half, so a second render waits for the first, `--wait`
+  seconds (600), and is refused naming the holder. The lock is a file in the system's temp directory; one left by a process that is
+  gone is stale, and the next render removes the container it names first.
+- **Held for a browser** (`render/hold.ts`, `render/reap.ts`): `--hold` writes the same files, then leaves the stack up, 600 seconds
+  unless told and 1800 at most, and prints where Grafana listens and each dashboard's address. A detached reaper removes the container
+  by its name when the time ends, counted on a monotonic clock; `--stop <name>` removes it sooner, and refuses any name but a held
+  render's. A held stack holds the one slot: stop it when done.
+
+Who runs it: the build workflow's implement step, whose check refuses a change under `tools/observe` a dashboard reads without the
+picture and the text of each dashboard it changed (`workflows/build/pictures.ts`). Design and review are refused the command and
+Docker (`RENDERS` in `agent-orchestrator/test/agent-fences.test.ts`); review reads the files. It needs `docker` and Playwright's
+Chromium (`npx playwright install chromium`), and is never run by the suite: `agent-orchestrator/test/observe-render.test.ts` holds it
+on a stub `docker`.
+
+What it waits for, each bounded at 180 s and none a length of time: the container's own health, Grafana listing the dashboards, then
+the seed answering a query in each store, asked through Grafana. Tempo's generator writes a span-metric series a while after the
+spans, at its first value, so a panel that reads an increase would see none: once the series is there the sessions' turns are posted
+a second time, and the wait ends when the increase is above zero. Measured on this machine, 2026-10-11, as floors: the stack ready
+after 31 s; the first span-metric series 21 s after the post; the increase 18 s after the second post; five dashboards rendered in
+80 s in all.
+
+What a step with a browser and no render of its own would need, none of it given today: the browser tools reaching a loopback
+address; the two forms `--hold` and `--stop` allowed on its own step, and no `docker`; `RENDERS` moved with them; a workspace at the
+change's head; and a user that reaches Docker. A held stack is not passed between steps: its time ends it.
+
+After moving the image, render once and read the text: what a panel's text is read from is Grafana's own markup (13.2.2), which no
+test in the suite sees.
 
 ## Timing a step
 

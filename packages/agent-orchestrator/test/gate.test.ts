@@ -4,7 +4,8 @@
  * This is the part that is not: the record `nemia start` writes, the files a person writes beside it, and a tick that reads both on every
  * pass.
  *
- * `WF_ROOT` is set before the runner is imported, which reads it as it loads.
+ * `WF_ROOT` is set before the runner is imported, which reads it as it loads, and `WF_DEFAULT_FACTORY_STARTS` beside it: its runs start
+ * in scratch repositories no factory holds.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -24,6 +25,7 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 process.env.WF_ROOT = ROOT;
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
+process.env.WF_DEFAULT_FACTORY_STARTS = '1';
 const {
   advanceRun,
   approveRun,

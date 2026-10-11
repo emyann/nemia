@@ -1,8 +1,9 @@
 /**
  * A landing, read and acted on through the run's place: whether a merge is staged in the repository's checkout (`stagedHere`, a `stat` of
- * the file the place named at `open`, with no process), how it stands (`checkoutStatus`, the place's `status`; `askCheckoutStatus`, the same off the loop), its commit or its abort
- * (`landThrough`, the place's `land`), and what a landing session is denied and told (`landingDenies`, `landingWords`). An answer the
- * place did not give, or refused, is never a verdict: it is folded into words, and the caller acts on none.
+ * the file the place named at `open`, with no process), how it stands (`checkoutStatus`, the place's `status`; `askCheckoutStatus`, the
+ * same off the loop), its commit or its abort (`landThrough`, the place's `land`), and what a landing session is denied and told
+ * (`landingDenies`, `landingWords`). An answer the place did not give, or refused, is never a verdict: it is folded into words, and the
+ * caller acts on none.
  */
 import fs from 'node:fs';
 import path from 'node:path';

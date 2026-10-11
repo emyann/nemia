@@ -877,7 +877,7 @@
       "id": 16,
       "type": "bargauge",
       "title": "Bash: exited non-zero, across runs",
-      "description": "The Bash tool's failed tool_result events over the range: a command that exited non-zero, which is often an answer and no error (a search that found nothing, a file that is not there, a test asked to fail). The event carries no exit code and no stderr. A count, by step. By factory, workflow, step and agent. A bar named `unlabelled / <step>` counts sessions started before they carried their factory, workflow and agent, read only while all three choices are All.",
+      "description": "The Bash tool's failed tool_result events over the range: a command that exited non-zero, which is often an answer and no error (a search that found nothing, a file that is not there, a test asked to fail). The event carries no exit code and no stderr. A count, by factory, workflow, step and agent. A bar named `unlabelled / <step>` counts sessions started before they carried their factory, workflow and agent, read only while all three choices are All.",
       "datasource": {
         "type": "loki",
         "uid": "loki"

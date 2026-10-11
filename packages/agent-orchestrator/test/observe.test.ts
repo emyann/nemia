@@ -1437,7 +1437,7 @@ test('REFUSED: a query the seed does not meet, a panel left with one series, an 
   assert.deepEqual(unmet(spanless, 'steps', SEED).slice(0, 1), ['Denied calls: step.refused']);
   const oneStep = SEED.map((said) => ({
     ...said,
-    logs: said.logs.filter((log) => log.attributes.step !== 'review' && log.attributes.tool_name === 'Bash'),
+    logs: said.logs.filter((log) => log.attributes.step !== 'review' && log.attributes.tool_name === 'Read'),
   }));
   const few = unmet(dashboardTitled('Steps'), 'steps', oneStep).filter((why) => why.startsWith('Tool errors: one series by '));
   assert.equal(few.length, 1, 'one step and one tool leave Tool errors one series');

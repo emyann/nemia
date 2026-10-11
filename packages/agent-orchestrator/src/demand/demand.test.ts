@@ -63,6 +63,8 @@ test("the daemon's environment is the service's and the login's: nothing else of
     WF_MAX_CONCURRENT: '50',
     NEMIA_ON_INSTALLED: '1',
     NEMIA_DAEMON_START: 'on',
+    OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:9',
+    OTEL_SERVICE_NAME: 'probe',
   };
   assert.deepEqual(daemonEnv(shell, '/store', '/usr/bin:/bin'), {
     HOME: '/srv/ann',

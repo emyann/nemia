@@ -230,7 +230,8 @@ export const railSaid = (
 
 /**
  * When something of a run happened, as a person reads it where they are, to the minute: the time alone on the day of `now`
- * (`13:11`), the day and the month before it on another (`11 Oct 13:11`), and the year too in another year.
+ * (`13:11`), the day and the month before it on another (`11 Oct 13:11`), and in another year the day alone, with its year
+ * (`31 Dec 2025`).
  */
 export function whenWords(at: Date, now: Date, timeZone?: string): string {
   const time = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone }).format(at);
@@ -239,5 +240,5 @@ export function whenWords(at: Date, now: Date, timeZone?: string): string {
   if (day(at) === day(now)) return time;
   const year = part(at, { year: 'numeric' });
   const date = part(at, { day: 'numeric', month: 'short' });
-  return year === part(now, { year: 'numeric' }) ? `${date} ${time}` : `${date} ${year} ${time}`;
+  return year === part(now, { year: 'numeric' }) ? `${date} ${time}` : `${date} ${year}`;
 }

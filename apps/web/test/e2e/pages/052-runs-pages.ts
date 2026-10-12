@@ -1,7 +1,8 @@
 import type { Locator, Page } from 'playwright';
 import { FINISHED_SIZE } from '../../../src/lib/api/runs.ts';
+import { whenWords } from '../../../src/lib/runWords.ts';
 import { photographBothWidths } from '../board.ts';
-import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
+import { expectCount, expectNone, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { FACTORIES, FOLDER, seedFinished } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
@@ -88,11 +89,73 @@ async function pastTheLast(page: Page): Promise<void> {
   await expectCount(rowsOf(page), 1, 'Newer leads to the last page');
 }
 
+/** A run that finished in another year than this one, whenever the e2e runs: four hundred days ago. */
+const LONG_AGO = { id: 'finished-another-year-e2py', title: 'Finished another year', factory: FACTORY, finishedAgo: 400 * 24 * 60 };
+
+/** The longest words `whenWords` writes for a time of `year` read in the year `from`: the longest month's, on a day of two digits. */
+const longestWhen = (year: number, from: number): string =>
+  Array.from({ length: 12 }, (_, month) => whenWords(new Date(year, month, 28, 23, 58), new Date(from, 0, 1))).reduce((longest, words) =>
+    words.length > longest.length ? words : longest,
+  );
+
+/** The words that say when, in the finished table: a created and a finished of each row. */
+const whensOf = (page: Page): Locator => rowsOf(page).locator('td[data-created] time, td[data-finished] time');
+
+/** Every date of the finished table ends inside its cell's own room, short of the cell's padding: none reaches the next column. */
+async function expectRoom(page: Page, assertion: string): Promise<void> {
+  await expectNone(async () => {
+    const over = await whensOf(page).evaluateAll((all) =>
+      all.flatMap((time) => {
+        const cell = time.closest('td')!;
+        const room = cell.getBoundingClientRect().right - parseFloat(getComputedStyle(cell).paddingRight);
+        const by = Math.round(time.getBoundingClientRect().right - room);
+        return by > 0 ? [`"${time.textContent}" by ${by} px`] : [];
+      }),
+    );
+    if (!(await whensOf(page).count())) return 'no date to look at';
+    return over.length ? `${over.join(', ')} past its room` : null;
+  }, assertion);
+}
+
+/**
+ * A date has its room in its column: a run finished in another year says its day and its year, uncut, and so do the longest words a
+ * date of this year takes, written into every date cell and taken out again.
+ */
+async function datesFit(page: Page): Promise<void> {
+  const back = seedFinished(store!, LONG_AGO);
+  try {
+    await visit(page, `/runs?factory=${FACTORY}`);
+    const old = rowsOf(page).filter({ has: page.locator(`[data-run-id][title="${LONG_AGO.id}"]`) });
+    await expectTexts(
+      old.locator('td[data-finished]'),
+      [whenWords(new Date(Date.now() - LONG_AGO.finishedAgo * 60_000), new Date())],
+      'a run finished in another year says its day and its year',
+    );
+    if (!/^\d{1,2} \w+ \d{4}$/.test((await old.locator('td[data-created]').innerText()).trim()))
+      throw new Refused('and the day it was created, with its year');
+    await expectRoom(page, "each date of the finished table has its column's room");
+    const year = new Date().getFullYear();
+    const times = whensOf(page);
+    const said = await times.allInnerTexts();
+    try {
+      for (const longest of [longestWhen(year, year), longestWhen(year - 1, year)]) {
+        await times.evaluateAll((all, words) => all.forEach((time) => (time.firstChild!.nodeValue = words)), longest);
+        await expectRoom(page, `and so have the longest words a date takes, "${longest}"`);
+      }
+    } finally {
+      await times.evaluateAll((all, was) => all.forEach((time, i) => (time.firstChild!.nodeValue = was[i] ?? '')), said);
+    }
+  } finally {
+    back();
+  }
+}
+
 export default {
   /**
    * The finished runs a page at a time, the page in the address beside the factory: eighteen finished runs written into one factory
    * make it three pages; page 3 loaded by its address, and loaded again, is page 3 of that factory; Newer and Older move a page,
-   * by the pointer and by the keyboard; a page past the last says so. The runs are taken back, and the page left on the seed's.
+   * by the pointer and by the keyboard; a page past the last says so; and a date of another year, as the longest a date takes, has its
+   * column's room. The runs are taken back, and the page left on the seed's.
    */
   name: 'runs-pages',
   route: `/runs?factory=${FACTORY}`,
@@ -108,6 +171,7 @@ export default {
     } finally {
       for (const back of takeBack.reverse()) back();
     }
+    await datesFit(page);
     await visit(page, `/runs?factory=${FACTORY}`);
     await expectCount(rowsOf(page), 1, 'the runs taken back, the factory holds its one finished run again');
   },

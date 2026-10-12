@@ -1,6 +1,7 @@
 import type { Page } from 'playwright';
 import { photographBothWidths } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, settled } from '../checks.ts';
+import { contrastHolds } from '../runs-contrast.ts';
 import { FACTORIES } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
@@ -33,6 +34,7 @@ async function loading(page: Page): Promise<void> {
     await expectCount(other.locator('[data-plate]'), 0, 'and draws no part yet');
     await settled(other);
     await photographBothWidths(other, OUT, 'runs-states', 'loading');
+    await contrastHolds(other, ['h1', '[role="status"]']);
     release();
     await expectCount(other.locator('[data-runs-page="loaded"] [data-plate]'), 3, 'let go, it draws its three parts');
     await idle(other);
@@ -45,8 +47,8 @@ async function loading(page: Page): Promise<void> {
 export default {
   /**
    * The states nobody drew, built plain: with nothing to show, a factory that holds no run, each part says so under a quiet plate that
-   * counts none; and while its reads are on their way the page says it is loading. Each pictured at 1280 and at 390 wide. Writes
-   * nothing.
+   * counts none; and while its reads are on their way the page says it is loading. Each pictured at 1280 and at 390 wide, and no text
+   * pair of either is under 4.5:1 in either scheme. Writes nothing.
    */
   name: 'runs-states',
   route: `/runs?factory=${EMPTY}`,
@@ -65,6 +67,7 @@ export default {
     await expectCount(page.locator('[data-runs-page] table, [data-runs-page] [data-pager]'), 0, 'no table and no pager for nothing');
     await settled(page);
     await photographBothWidths(page, OUT, 'runs-states', 'nothing');
+    await contrastHolds(page, ['[data-nothing]']);
     await loading(page);
   },
 } satisfies PageSpec;

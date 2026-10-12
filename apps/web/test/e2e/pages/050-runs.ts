@@ -6,7 +6,7 @@ import { titleOf } from '../../../src/lib/factory.ts';
 import { endedWords, waitSentence, waitTag } from '../../../src/lib/runWords.ts';
 import { answered, photograph, photographBothWidths, SECTIONS, sectionsOf, sidebar, themeOf } from '../board.ts';
 import { expectBeneath, expectCount, expectNone, expectTexts, expectVisible, idle, literal, Refused, WAIT_MS } from '../checks.ts';
-import { measure, ratioOf, under } from '../contrast.ts';
+import { contrastHolds } from '../runs-contrast.ts';
 import { COSTLY } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
@@ -318,35 +318,6 @@ async function narrow(page: Page): Promise<void> {
   }
 }
 
-/** Each text pair under 4.5:1 on the page as it is, said as the report says a pair. */
-async function failingPairs(page: Page): Promise<string[]> {
-  const { pairs, scheme } = await measure(page.locator('[data-runs-page]'));
-  if (pairs.filter((pair) => pair.state === 'measured').length < 10)
-    throw new Refused(`the contrast of the page's texts is measured in ${scheme}`);
-  return pairs.filter(under).map((pair) => `${ratioOf(pair)}:1 "${pair.text}" (${pair.classes}) in ${scheme}`);
-}
-
-/**
- * No text pair of the page is under 4.5:1, in the scheme the visit is in and in the other, the browser's preference turned and put
- * back, each once the rows' colours have made their turn; and the measure sees a pair that is: an ink dimmed on purpose fails it.
- */
-async function contrast(page: Page): Promise<void> {
-  const scheme = (await themeOf(page)) as 'light' | 'dark';
-  const other = scheme === 'dark' ? 'light' : 'dark';
-  for (const turned of [scheme, other, scheme] as const) {
-    await page.emulateMedia({ colorScheme: turned });
-    await expectNone(async () => ((await themeOf(page)) === turned ? null : 'the scheme has not turned'), `the page is in ${turned}`);
-    await expectNone(
-      async () => (await failingPairs(page)).join('; ') || null,
-      `no text pair of the Runs page is under 4.5:1 in ${turned}, once its colours have turned`,
-    );
-  }
-  const dim = await page.addStyleTag({ content: '[data-sentence] { opacity: 0.4 }' });
-  const low = await failingPairs(page);
-  await dim.evaluate((style) => (style as HTMLStyleElement).remove());
-  if (!low.length) throw new Refused('the contrast check sees a pair under 4.5:1 — a sentence dimmed on purpose passed it');
-}
-
 export default {
   /**
    * The runs page, "Your move first": on two reads and never the whole list, a card for every run that waits on a person and no row
@@ -372,7 +343,7 @@ export default {
     await finger(page, open, finished);
     await rowsSay(page, open, finished);
     await narrow(page);
-    await contrast(page);
+    await contrastHolds(page, ['[data-sentence]']);
 
     await enterOnPlace(page, 'Inbox', '/inbox');
     await expectVisible(

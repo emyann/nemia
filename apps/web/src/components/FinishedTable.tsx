@@ -70,10 +70,10 @@ export function FinishedTable({ page }: { page: FinishedPage }) {
               <Column id="factory" className="w-24">
                 Factory
               </Column>
-              <Column id="created" className="w-28">
+              <Column id="created" className="w-32">
                 Created
               </Column>
-              <Column id="finished" className="w-28">
+              <Column id="finished" className="w-32">
                 Finished
               </Column>
               <Column id="clock" align="end" className="w-20">

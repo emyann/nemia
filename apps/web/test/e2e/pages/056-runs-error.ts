@@ -1,5 +1,6 @@
 import { photographBothWidths } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, watch } from '../checks.ts';
+import { contrastHolds } from '../runs-contrast.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
 
@@ -11,7 +12,7 @@ export default {
    * The page when a read fails: a visit of its own whose read of the finished runs is answered with a failure says, under the page's
    * name, that the runs could not be loaded and why, in the api's words, and draws no part; the frame around it stands. Its one
    * failure is the point, so that visit counts exactly it: the answer, the browser's line for it, and the router's for the loader.
-   * Pictured at 1280 and at 390 wide. Writes nothing.
+   * Pictured at 1280 and at 390 wide, and no text pair of it is under 4.5:1 in either scheme. Writes nothing.
    */
   name: 'runs-error',
   route: '/runs',
@@ -35,6 +36,7 @@ export default {
       await expectVisible(other.locator('header[data-frame-header] button[data-bell]'), 'the frame around it stands');
       await settled(other);
       await photographBothWidths(other, OUT, 'runs-error', 'error');
+      await contrastHolds(other, ['[role="alert"] p:first-child', '[data-error-reason]']);
       const seen = problems();
       const refused = /^request answered 500: GET .*\/api\/runs-finished\?/;
       const said = new RegExp(`^console error: \\w+: ${WHY}\\b`);

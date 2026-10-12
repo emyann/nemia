@@ -2,7 +2,7 @@
 import type { ReactNode } from 'react';
 import { Link } from '@tanstack/react-router';
 import { workflowNameOf, type InboxEntry } from '../lib/api';
-import { hasPage, triedLine, unassigned, type CardRefusal } from '../lib/inbox';
+import { hasPage, queueable, queueNeedsFactory, triedLine, unassigned, type CardRefusal } from '../lib/inbox';
 import { FactoryTag } from './FactoryTag';
 
 /** A button that does what its form or card is for. */
@@ -44,6 +44,52 @@ export function CardMeta({ entry }: { entry: InboxEntry }) {
         </time>
       )}
     </p>
+  );
+}
+
+/**
+ * Why a card offers no Queue, for the card that would have one but for its factory (`queueNeedsFactory`), and the way to give it one;
+ * nothing for any other card.
+ */
+export function NoQueue({ entry }: { entry: InboxEntry }) {
+  if (!queueNeedsFactory(entry)) return null;
+  return (
+    <p data-no-queue className="text-xs text-muted-foreground">
+      No Queue: a queued card starts on its own, in the factory it names, and this one names none. Start gives it one.
+    </p>
+  );
+}
+
+/**
+ * A card's Queue, offered where it may be queued (`queueable`), and its Unqueue, on a queued card; `onQueue` is told which, true for
+ * taking it off, and both wait while `pending`.
+ */
+export function QueueButtons({ entry, pending, onQueue }: { entry: InboxEntry; pending: boolean; onQueue: (off: boolean) => void }) {
+  return (
+    <>
+      {queueable(entry) && (
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => onQueue(false)}
+          className={SECONDARY}
+          title="Start it on its own, in its factory and on its workflow, when a run slot frees"
+        >
+          {pending ? 'Queueing…' : 'Queue'}
+        </button>
+      )}
+      {entry.queued && (
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => onQueue(true)}
+          className={SECONDARY}
+          title="Take it off the queue: it waits for you to start it"
+        >
+          {pending ? 'Unqueueing…' : 'Unqueue'}
+        </button>
+      )}
+    </>
   );
 }
 

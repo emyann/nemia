@@ -9,7 +9,7 @@ import { factoriesQuery, factoryWorkflowsQuery, fileCard, storeQuery, type Facto
 import { keptBy } from '../lib/factories';
 import { cardFiling, factoriesOffered, factoryPreset, workflowKey } from '../lib/inbox';
 import { PRIMARY } from './InboxParts';
-import { FIELD, WorkflowOptions } from './WorkflowOptions';
+import { FIELD, WorkflowOptions, WorkflowsUnread } from './WorkflowOptions';
 
 const code = (text: string) => <code className="font-mono text-xs">{text}</code>;
 
@@ -62,6 +62,7 @@ export function FileCard({ shown }: { shown: string | undefined }) {
       <IdeaField idea={idea} onIdea={setIdea} />
       <FactoryField
         offered={offered}
+        read={factories.data !== undefined}
         picked={picks.factory}
         error={factories.error}
         onPick={(name) => {
@@ -71,7 +72,13 @@ export function FileCard({ shown }: { shown: string | undefined }) {
         }}
       />
       {factory && (
-        <InFactory factory={factory} picks={picks} onRepo={setRepo} onWorkflow={setWorkflow}>
+        <InFactory
+          factory={factory}
+          picks={picks}
+          onRepo={setRepo}
+          onWorkflow={setWorkflow}
+          unread={<WorkflowsUnread workflows={listed} />}
+        >
           {workflows.error ? (
             <p className="text-xs text-failure">Could not list the workflows: {workflows.error.message}</p>
           ) : (
@@ -137,16 +144,18 @@ function placeOf(factory: Pick<Factory, 'name' | 'repos'> | null, repo: string):
 }
 
 /**
- * The Factory list: "No factory" first, then each factory offered; under no factory, what that means for the card — and, when the store
- * has no factory to offer, the line that files one.
+ * The Factory list: "No factory" first, then each factory offered; under no factory, what that means for the card. Until the factories
+ * are read (`read`), that they are being read; once read, when the store has none to offer, the line that files one.
  */
 function FactoryField({
   offered,
+  read,
   picked,
   error,
   onPick,
 }: {
   offered: readonly Pick<Factory, 'name'>[];
+  read: boolean;
   picked: string;
   error: Error | null;
   onPick: (name: string) => void;
@@ -172,7 +181,12 @@ function FactoryField({
           Parked with no factory: it gets its factory, workflow and repository when you start it.
         </p>
       )}
-      {!error && offered.length === 0 && store && (
+      {!error && !read && (
+        <p data-reading-factories className="text-xs text-muted-foreground">
+          Reading the factories…
+        </p>
+      )}
+      {!error && read && offered.length === 0 && store && (
         <p data-no-factory className="text-xs text-muted-foreground">
           The store has no factory yet: file one with {code(store.fileFactory)}.
         </p>
@@ -183,19 +197,22 @@ function FactoryField({
 
 /**
  * Under a factory: its repository, said as text when it has one and picked from a list when it has several, "None: chosen at start"
- * first and nothing preset; and its Workflow list, whose options are `children`, once the repository they are read on is known.
+ * first and nothing preset; and its Workflow list, whose options are `children`, once the repository they are read on is known, with
+ * the workflows left out of it said under it (`unread`).
  */
 function InFactory({
   factory,
   picks,
   onRepo,
   onWorkflow,
+  unread,
   children,
 }: {
   factory: Pick<Factory, 'name' | 'repos'>;
   picks: Picks;
   onRepo: (repo: string) => void;
   onWorkflow: (key: string) => void;
+  unread: ReactNode;
   children: ReactNode;
 }) {
   const ids = { repo: useId(), workflow: useId() };
@@ -217,6 +234,7 @@ function InFactory({
           <option value="">None: chosen at start</option>
           {children}
         </select>
+        {unread}
         {!known && several && (
           <p data-needs-repo className="text-xs text-muted-foreground">
             Pick a repository to choose among the workflows {code(factory.name)} offers on it.

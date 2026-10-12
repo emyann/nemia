@@ -228,11 +228,25 @@ export const queueOf = (entries: readonly InboxEntry[]): InboxEntry[] =>
   entries.filter((e) => e.queued?.place).sort((a, b) => a.queued!.place! - b.queued!.place!);
 
 /**
- * Whether the page offers Queue on a card: it names a workflow — a queued card starts on its own, on the workflow it names — it reads, it
- * is not queued, and no record says it was started. What the api would refuse otherwise, in the package's words.
+ * Whether a card could be queued were its factory not asked: it names a workflow, it reads, it is not queued, and no record says it was
+ * started.
  */
-export const queueable = (entry: InboxEntry): boolean =>
+const queueableButFactory = (entry: InboxEntry): boolean =>
   entry.workflow !== null && entry.error === null && !entry.queued && entry.startedAs.length === 0;
+
+/**
+ * Whether the page offers Queue on a card: it names a factory (`unassigned`) and a workflow — a queued card starts on its own, in the
+ * factory and on the workflow it names — it reads, it is not queued, and no record says it was started. What the api would refuse
+ * otherwise, in the package's words.
+ */
+export const queueable = (entry: InboxEntry): boolean => !unassigned(entry) && queueableButFactory(entry);
+
+/** Whether a card has no Queue for its factory alone: it names none (`unassigned`), and would be `queueable` with one. */
+export const queueNeedsFactory = (entry: InboxEntry): boolean => unassigned(entry) && queueableButFactory(entry);
+
+/** The workflows a list of options leaves out: those that do not read, each with why (`error`). */
+export const unreadWorkflows = <T extends Pick<WorkflowListing, 'error'>>(workflows: readonly T[]): Array<T & { error: string }> =>
+  workflows.filter((w): w is T & { error: string } => w.error !== null);
 
 /**
  * What the tick's last try of a queued card's start says, as the CLI's `inbox` says it beside the card: refused, it waits for a person, not

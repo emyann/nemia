@@ -969,7 +969,7 @@ const asShipped = (t: { after: (f: () => void) => void }): void => {
   });
 };
 
-test("REFUSED as shipped: `nemia inbox queue` of a card that names no factory, and of one that names default, writes nothing and names the fix; `--off` still takes back one queued by hand, and a card of a factory queues", async (t) => {
+test('REFUSED as shipped: `nemia inbox queue` of a card that names no factory, and of one that names default, writes nothing and names the fix; `--off` still takes back one queued by hand, and a card of a factory queues', async (t) => {
   asShipped(t);
   emptyStore(undefined);
   const b = board();

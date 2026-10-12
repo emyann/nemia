@@ -45,9 +45,17 @@ function Stage() {
   );
 }
 
-/** A router of the story's own, standing on `at` in a history kept in memory. */
+/** What the router draws for a story that threw: nothing of its own, the error thrown on to whatever holds the story. */
+function Rethrown({ error }: { error: unknown }): never {
+  throw error;
+}
+
+/** A router of the story's own, standing on `at` in a history kept in memory; a story that throws is its host's to say. */
 const routerAt = (at: string) =>
-  createRouter({ routeTree: createRootRoute({ component: Stage }), history: createMemoryHistory({ initialEntries: [at] }) });
+  createRouter({
+    routeTree: createRootRoute({ component: Stage, errorComponent: Rethrown }),
+    history: createMemoryHistory({ initialEntries: [at] }),
+  });
 
 /** One story under a router of its own, made once for as long as the story is drawn. */
 function Routed({ Story, at, marked }: Drawn & { at: string }) {

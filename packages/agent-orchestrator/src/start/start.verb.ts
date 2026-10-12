@@ -51,8 +51,8 @@ import { Context, Effect } from 'effect';
 
 /**
  * A workflow folder's steps, as a run in `factory` runs them: each step its hires fill (`factoryFills`, by the folder's name) resolved
- * against the agent hired, as if its file named it. Refused: first, a workflow the factory has not attached (`unattachedRefusal`), before its
- * folder is read, since a factory offers only its workflows; then every step left with no agent (`unfilledRefusal`), since a factory's
+ * against the agent hired, as if its file named it. Refused: first, a workflow the factory has not attached (`unattachedRefusal`), before
+ * its folder is read, since a factory offers only its workflows; then every step left with no agent (`unfilledRefusal`), since a factory's
  * steps are filled by its hires; and a hire into a step whose file names its own agent (`parseWorkflow`). With no factory — the default —
  * every workflow is offered, and a step that names no agent is a plain session, as it always was.
  *

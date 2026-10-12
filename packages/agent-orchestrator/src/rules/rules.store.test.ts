@@ -1,7 +1,8 @@
 /**
  * A factory's rules on disk (`rules.store.ts`): written trimmed and read back, cleared, a link neither read nor written through, the
  * refusals of a write — blank words, a frontmatter block, a tree not rendered yet — each writing nothing, and the folder gone with its
- * factory; and what a read of a factory's workflow folder is handed (`factoryFills`). `WF_ROOT` is set before the import, since the store reads it as it loads.
+ * factory; and what a read of a factory's workflow folder is handed (`factoryFills`). `WF_ROOT` is set before the import, since the
+ * store reads it as it loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

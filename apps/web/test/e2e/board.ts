@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from './checks.ts';
+import { instantWhole, instantWords } from '../../src/lib/instant.ts';
 import { DIAMOND } from './seed.ts';
 import { measure } from './contrast.ts';
 import { API, measuring, photographing, store } from './world.ts';
@@ -406,6 +407,25 @@ export async function openDebug(page: Page, taskId: string): Promise<{ panel: Lo
   await panel.getByRole('button', { name: /Debug$/ }).click();
   await expectVisible(panel.locator(`[data-path="${taskId}"]`), `opened, the Debug panel draws the path of ${taskId}`);
   return { panel, lifecycle: panel.locator('[data-machine="lifecycle"]') };
+}
+
+/**
+ * Refuses a `<time>` that does not say its instant as the board writes one where the browser is: `words` of its `datetime` as its
+ * text (`instantWords` by default, against now), and on hover `about`, a colon, then the instant whole (`instantWhole`). `what` names
+ * the time in the refusal.
+ */
+export async function expectInstant(
+  time: Locator,
+  about: string,
+  what: string,
+  words: (at: Date, timeZone: string) => string = (at, timeZone) => instantWords(at, new Date(), timeZone),
+): Promise<void> {
+  const timeZone = await time.page().evaluate(() => new Intl.DateTimeFormat().resolvedOptions().timeZone);
+  const [at, text, title] = [await time.getAttribute('datetime'), await time.textContent(), await time.getAttribute('title')];
+  if (!at) throw new Refused(`${what} is a time with its instant — it has no datetime`);
+  const [said, whole] = [words(new Date(at), timeZone), `${about}${instantWhole(new Date(at), timeZone)}`];
+  if (text !== said) throw new Refused(`${what} reads as the board writes it, ${said} — it reads ${JSON.stringify(text)}`);
+  if (title !== whole) throw new Refused(`${what} says the whole instant on hover, ${whole} — its title is ${JSON.stringify(title)}`);
 }
 
 /** What the api answers at `pathname`, read apart from the page: the page's own requests do not count it. */

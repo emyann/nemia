@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page, Response } from 'playwright';
-import { photograph, PLACES_SAID, sidebar, themeOf } from '../board.ts';
+import { expectInstant, photograph, PLACES_SAID, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import {
   CARDS,
@@ -15,7 +15,6 @@ import {
   unfactoredWhy,
   WORKFLOWS,
 } from '../seed.ts';
-import { instantWhole, instantWords } from '../../../src/lib/instant.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
@@ -138,7 +137,11 @@ async function visit(page: Page): Promise<void> {
         [`queued · ${PLACES_SAID[i]}`],
         `${card.name} says its place in the queue (queued · ${PLACES_SAID[i]})`,
       );
-      await expectVisible(item.locator('time[data-queued-at]'), 'and when it was queued');
+      await expectInstant(
+        item.locator('time[data-queued-at]'),
+        'When it was queued, which orders the queue: ',
+        `when ${card.name} was queued`,
+      );
       await expectVisible(item.getByRole('button', { name: 'Unqueue' }), 'and offers Unqueue');
       await expectCount(item.getByRole('button', { name: 'Queue', exact: true }), 0, 'and not Queue: it is queued');
     }
@@ -287,13 +290,7 @@ async function visit(page: Page): Promise<void> {
         shown: await filedTime.textContent(),
       });
       const before = await shownAs();
-      const timeZone = await page.evaluate(() => new Intl.DateTimeFormat().resolvedOptions().timeZone);
-      const words = instantWords(new Date(before.filedAt ?? ''), new Date(), timeZone);
-      if (before.shown !== words)
-        throw new Refused(`${planned.name} says when it was filed as the board writes an instant, ${words} — it says ${before.shown}`);
-      const whole = `When its file was last written: ${instantWhole(new Date(before.filedAt ?? ''), timeZone)}`;
-      const title = await filedTime.getAttribute('title');
-      if (title !== whole) throw new Refused(`and on hover the whole instant, ${whole} — its title is ${title}`);
+      await expectInstant(filedTime, 'When its file was last written: ', `when ${planned.name} was filed`);
       if (before.order.indexOf(planned.name) === 0)
         throw new Refused(`${planned.name} is not the newest card, so a move would show — it is listed first`);
       const unmoved = async (when: string) => {

@@ -2941,6 +2941,16 @@ test('an instant on a page: its words against now, and on hover the whole instan
   assert.match(renderToStaticMarkup(createElement(Instant, { at: today })), />\d{1,2}:\d\d [AP]M<\/time>$/, 'the time alone today');
 });
 
+test("REFUSED: a queued card's last try says when as the board writes an instant, its date before its time on another day", async () => {
+  const { Tried } = await import('../src/components/InboxParts.tsx');
+  const tried = { at: new Date(Date.now() - 3 * 24 * 60 * 60_000).toISOString(), refused: true, why: 'no such workflow', repo: '/r' };
+  const entry = { repo: '/r', factory: null, error: null, tried };
+  const html = renderToStaticMarkup(createElement(Tried, { entry: entry as never }));
+  const words = instantWords(new Date(tried.at), new Date());
+  assert.ok(textsOf(html).join(' ').startsWith(`Not started at ${words}: no such workflow.`), html);
+  assert.match(words, /^\d{1,2} [A-Z][a-z]{2} (\d{4}, )?\d{1,2}:\d\d [AP]M$/, 'three days ago is another day: never its time alone');
+});
+
 test('the approval under a step: the try, when, and the words as they were written — or that there were none', () => {
   const words = 'Ship the second reading.\nKeep the flag <b>off</b> by default.';
   const html = renderToStaticMarkup(createElement(Gates.Approved, { step: 'plan', approval: { try: 2, at, message: words } }));

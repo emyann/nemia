@@ -2762,8 +2762,8 @@ $ wf start "add a flag" --workflows build
   names no repository to run `wf up` in for it.
 - **An agent's try is the one start in the default factory**: it is made before any factory hires the agent, on no repository.
 - **`WF_DEFAULT_FACTORY_STARTS=1` is the tests' switch**, off as shipped: with it, a start no factory holds, and a card that names
-  none, go to the default factory, as the package's and the api's tests start runs in scratch folders. A start that names `default`
-  and a folder two factories hold are refused all the same.
+  none, go to the default factory, as the package's and the api's tests start runs in scratch folders, and such a card is queued. A
+  start or a queue that names `default`, and a folder two factories hold, are refused all the same.
 
 ### A factory's other folders: read-only, and `writable:`
 
@@ -3033,7 +3033,10 @@ up — every 4000ms, ^C to stop
   names the refusal, and `--off` takes it back.
 - **Refused by name**, exit 2, before anything is written: a name with no card, naming the cards there are; a card with no
   `workflow:` and no `--workflow` — `--workflow <w>` writes both; a card already queued, with its place, and `--off` to take it
-  back first; a card a run was started from; and `--off` beside `--workflow`. `--off` on a card not queued says so, exit 0.
+  back first; a card a run was started from; a card that names no factory, or `default`, as its start would be refused
+  (`queueFactoryRefusal`): the line says `factory: <name>` to write on the card and the factories there are; and `--off` beside
+  `--workflow`. `--off` on a card not queued says so, exit 0, and is never refused for a factory: a card queued before this rule,
+  or by hand, leaves the queue, and the tick refuses its start until then.
 
 ## A task the runtime cannot move: `stalled`
 
@@ -3635,6 +3638,7 @@ holding a concurrency slot forever.
 | `src/folder/folder.store.ts` | the format read from disk: a folder's steps (`loadWorkflows`), the steps of a folder of workflows that name an agent (`agentUsers`, beside `workflowsIn`, since it reads step files, not agents), its README's first paragraph (`workflowDescription`) and its whole text (`workflowReadme`), the workflows a folder holds (`workflowsIn`), and a workflow folder found by a path or by its name under `<repo>/workflows/` (`workflowFolder`) |
 | `src/plan/plan.ts` | a plan — pure: parse a folder of cards, and refuse a key a card does not have, a card with no workflow or no brief, and an `after:` that dangles or goes round; the order `wf plan` starts the cards in, and what it prints |
 | `src/inbox/inbox.ts` | the inbox — pure: an inbox card, and refuse a key it does not have, a key set to nothing, a `repo:` that is not an absolute directory and a `queued:` that is not a time or has no workflow; the card `wf inbox add` writes, and the one `wf inbox queue` writes (`queuedText`, `queueRefusal`); a name that would leave the folder; what `wf inbox` lists, `started as` composed from the records and a queued card's place and refusal; the queue's order (`queueOrder`, `nextQueued`); and which path is a card of the inbox |
+| `src/inbox/queue-factory.ts` | the factory a queued card asks for — pure: why `wf inbox queue` refuses a card that names no factory, or `default`, as its start would be (`queueFactoryRefusal`) |
 | `src/factory/factory.ts` | a factory — pure: its name, a lowercase slug (`FACTORY_NAME`, `factoryNameRefusal`), the one default factory, which is no file and is read, never written (`DEFAULT_FACTORY`, `defaultFactoryRefusal`), what `wf factory ls` prints (`factoryLines`, `noFactoryLine`), the workflows it offers: a workflow's name (`workflowNameRefusal`) and a start of one not attached (`unattachedRefusal`), and its hires: their shape (`hireRefusal`), one workflow's (`fillsOf`), and the steps they leave unfilled (`unfilledRefusal`) |
 | `src/run.ts` | the entry `agent-orchestrator/run` — pure: each name it exports re-exported by name from the folders below, and nothing else |
 | `src/tick/assess.ts` | **`assess`** — pure: which steps are ready, due a check, another try or another round, blocked, done, off each step's standing (`stepStatus`, `status/status.ts`), and what stopped a finished run (`stoppedOnWord`) |

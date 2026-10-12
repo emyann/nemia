@@ -2866,8 +2866,8 @@ What was built, the cards:
   a `queued:` carried in by a file: a card is queued once it is in the inbox.
 - **`wf inbox queue <name> [--workflow <w>] [--off]`** (`queueInInbox`) writes the key, `--workflow` writing `workflow:` too, and `--off`
   takes it back, the file written whole through a hidden file renamed over it (`queuedText`). Refused by name, exit 2 (`queueRefusal`): a name
-  with no card, a card with no workflow and no `--workflow` — which writes both — one already queued, one a run was started from, and `--off`
-  beside `--workflow`. `wf inbox rm` takes a card back too.
+  with no card, a card with no workflow and no `--workflow` — which writes both — one already queued, one a run was started from, one that
+  names no factory, or `default` (`queueFactoryRefusal`, which `--off` never asks), and `--off` beside `--workflow`. `wf inbox rm` takes a card back too.
 - **The tick starts the next card** once every run has been advanced, while a run slot is free — always, with no cap (`slotFree`): the
   oldest by `queued:`, then name (`queueOrder`), a card a record names as started left out, through `startFromInbox` with the card's
   `workflow:` and its `repo:` or else the daemon's repository (`tick(e, { repo })`; `wf up` and `wf tick` hand it `.`). One card a pass, so
@@ -5476,6 +5476,7 @@ queue's start and `POST /api/runs`. The README's *Every run in a factory* has th
 - **A card names its factory**, by `factory:` or `--factory`/`?factory=`, never inferred (`unfactoredCardRefusal`); in the queue the
   refusal lasts while the card reads the same.
 - **The try stays in the default factory**, the one exception. `WF_DEFAULT_FACTORY_STARTS=1`, the tests' switch, is off as shipped.
+  With it a card that names no factory is queued too, as it is started.
 
 Next: 2c, a workflow that marks a mount writable on purpose.
 

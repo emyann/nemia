@@ -38,7 +38,7 @@ export function RunSteps({
       role="img"
       aria-label={railSaid(steps, cancelled, held)}
       data-run-steps
-      className="grid gap-1.5 text-[11px] leading-4 font-semibold tracking-widest uppercase"
+      className="grid gap-1.5 text-label-small uppercase"
       style={{ gridTemplateColumns: `repeat(${Math.max(1, drawn.length)}, minmax(0, 1fr))` }}
     >
       {drawn.map((step) => (

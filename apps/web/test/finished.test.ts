@@ -49,7 +49,7 @@ const refusal = (value: unknown): Promise<string> =>
     (err: Error) => err.message,
   );
 
-test("the finished read decodes the api's answer, and drops when it was read and a key the board does not know", async () => {
+test("the finished read decodes the api's answer, when it was read included, and drops a key the board does not know", async () => {
   const page = await read(answer());
   assert.deepEqual([page.total, page.page, page.size, page.pages], [634, 3, 9, 71]);
   assert.deepEqual(
@@ -59,7 +59,7 @@ test("the finished read decodes the api's answer, and drops when it was read and
       ['r-1', 'succeeded', 1_660_000, '2026-09-13T00:27:40.000Z'],
     ],
   );
-  assert.equal('asOf' in page, false);
+  assert.equal(page.asOf, '2026-09-13T01:00:00.000Z', 'the instant every time on the page is said against');
   assert.equal('somethingNew' in page.runs[0], false);
   assert.equal(page.runs[0].steps[0].name, 'plan', "a row keeps the list's own keys");
 });
@@ -69,6 +69,7 @@ test('REFUSED: an outcome the board has no word for, a row that does not say whe
   const { finishedAt: _dropped, ...unfinished } = row('r-1');
   assert.match(await refusal(answer({ runs: [unfinished] })), /finishedAt/);
   assert.match(await refusal(answer({ pages: '71' })), /pages/);
+  assert.match(await refusal(answer({ asOf: undefined })), /asOf/);
   assert.equal(await refusal(answer()), 'decoded');
 });
 

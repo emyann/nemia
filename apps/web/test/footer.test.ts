@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { QuotaWindow, RunSummary } from '../src/lib/api.ts';
+import { listed, waitingRun } from './run-fixtures.ts';
 import { atWork, atWorkWords, daemonDot, feedWords, footerParts, quotaShort, staleFrameHeights, versionWords } from '../src/lib/footer.ts';
 import { daemon, quota } from './factory-fixtures.ts';
 
@@ -74,8 +75,8 @@ const run = (statuses: readonly string[], extra: Partial<RunSummary> = {}): RunS
 /** A light answer holding `waiting` and `inFlight`, its counts their lengths. */
 const light = (waiting: RunSummary[], inFlight: RunSummary[]) => ({
   counts: { waiting: waiting.length, inFlight: inFlight.length, finished: 0 },
-  waiting,
-  inFlight,
+  waiting: waiting.map((row) => waitingRun(row)),
+  inFlight: inFlight.map((row) => listed(row)),
 });
 
 test('at work: the runs the api counts in flight, and each step working or checking', () => {

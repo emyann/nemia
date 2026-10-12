@@ -3,7 +3,7 @@
  * steps from `step`), a run's row in a list (`summary`), its decision (`decidable`), a step's conversation (`transcript`) and its try's
  * path (`stepPath`). Each takes keys to put over its own.
  */
-import type { Decidable, RunDetail, RunSummary, StepPath, StepTranscript, StepUsed, TimelineTotal } from '../src/lib/api.ts';
+import type { Decidable, ListedRun, RunDetail, RunSummary, WaitingRun, StepPath, StepTranscript, StepUsed, TimelineTotal } from '../src/lib/api.ts';
 
 type Step = RunDetail['steps'][number];
 
@@ -381,5 +381,16 @@ export const summary = (steps: ReadonlyArray<readonly [string, string]>, extra: 
   holding: null,
   toDecide: null,
   unreadable: null,
+  ...extra,
+});
+
+/** `run` as the light answer lists one in flight: its wall time, and no end. */
+export const listed = (run: RunSummary, wallMs = 0): ListedRun => ({ ...run, wallMs, finishedAt: null });
+
+/** `run` as the light answer lists one that waits on a person: listed, with the breakdowns `extra` gives, none by default. */
+export const waitingRun = (run: RunSummary, extra: Partial<Pick<WaitingRun, 'wallMs' | 'clock' | 'stepCosts'>> = {}): WaitingRun => ({
+  ...listed(run),
+  clock: null,
+  stepCosts: null,
   ...extra,
 });

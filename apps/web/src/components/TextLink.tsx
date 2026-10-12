@@ -6,8 +6,8 @@ import { routeLink } from './routeLink';
 export const TEXT_LINK =
   'rounded-sm text-on-surface underline decoration-outline underline-offset-4 outline-none hover:decoration-on-surface data-focus-visible:ring-2 data-focus-visible:ring-ring';
 
-/** React Aria's link, drawn as the board's text link. */
-function Underlined({ className, ...props }: Omit<LinkProps, 'className'> & { className?: string }) {
+/** React Aria's link, drawn as the board's text link; a `title` says whole what a cut link shows a part of. */
+function Underlined({ className, ...props }: Omit<LinkProps, 'className'> & { className?: string; title?: string }) {
   return <AriaLink {...props} data-text-link className={cn(TEXT_LINK, className)} />;
 }
 

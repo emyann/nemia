@@ -240,13 +240,13 @@ function fileOf(texts: ReadonlyMap<string, string>, file: string, mod: string): 
 }
 
 /**
- * The files the root route reaches through its imports, itself among them, in order: the frame. Not entered: the mirror of the api, and
+ * The files the root route, or the file `from`, reaches through its imports, itself among them, in order: the frame. Not entered: the mirror of the api, and
  * the pickers of `OPENED`, each named when reached.
  */
-function frameReach(texts: ReadonlyMap<string, string>): { frame: string[]; opened: string[] } {
+function frameReach(texts: ReadonlyMap<string, string>, from = ROOT): { frame: string[]; opened: string[] } {
   const seen = new Set<string>();
   const opened = new Set<string>();
-  const next = texts.has(ROOT) ? [ROOT] : [];
+  const next = texts.has(from) ? [from] : [];
   while (next.length) {
     const file = next.pop()!;
     if (seen.has(file)) continue;
@@ -297,8 +297,32 @@ test('REFUSED: a read of the whole list in a file of the frame, or in one a file
   assert.deepEqual(wholeListBreaks(through), [`src/components/x.tsx ${why}`]);
   const said = new Map([...texts, [footer, `${texts.get(footer)!}\n/** Not \`runsQuery\`: the light answer. */\nexport const y = 1;\n`]]);
   assert.deepEqual(wholeListBreaks(said), []);
-  assert.match(texts.get('src/routes/runs.index.tsx')!, /\brunsQuery\b/, 'a page the root does not reach keeps the whole list');
-  assert.ok(!frameReach(texts).frame.includes('src/routes/runs.index.tsx'));
+  assert.match(texts.get('src/routes/index.tsx')!, /\brunsQuery\b/, 'a page the root does not reach keeps the whole list');
+  assert.ok(!frameReach(texts).frame.includes('src/routes/index.tsx'));
+});
+
+/** The Runs page's route. */
+const RUNS = 'src/routes/runs.index.tsx';
+
+/** Each file the Runs page reaches through its imports, itself among them, that names the read of the whole list outside a comment. */
+const runsPageBreaks = (texts: ReadonlyMap<string, string>): string[] =>
+  frameReach(texts, RUNS)
+    .frame.filter((file) => /\brunsQuery\b/.test(withoutComments(texts.get(file)!)))
+    .map((file) => `${file} names runsQuery: the Runs page reads the light answer and a page of the finished runs, never the whole list`);
+
+test('REFUSED: a read of the whole list on the Runs page, or in a part it draws', () => {
+  const texts = sourceTexts();
+  const reach = frameReach(texts, RUNS).frame;
+  for (const file of ['src/components/WaitingCard.tsx', 'src/components/FlightTable.tsx', 'src/components/FinishedTable.tsx'])
+    assert.ok(reach.includes(file), `the scan reaches ${file} from ${RUNS}`);
+  assert.match(withoutComments(texts.get(RUNS)!), /\bopenRunsQuery\b[\s\S]*\bfinishedRunsQuery\b/, 'the page asks its two reads');
+  assert.deepEqual(runsPageBreaks(texts), []);
+  const why = 'names runsQuery: the Runs page reads the light answer and a page of the finished runs, never the whole list';
+  const direct = new Map([...texts, [RUNS, `${texts.get(RUNS)!}\nimport { runsQuery } from '../lib/api';\nvoid runsQuery;\n`]]);
+  assert.deepEqual(runsPageBreaks(direct), [`${RUNS} ${why}`]);
+  const card = 'src/components/WaitingCard.tsx';
+  const through = new Map([...texts, [card, `${texts.get(card)!}\nimport { runsQuery } from '@/lib/api';\nvoid runsQuery;\n`]]);
+  assert.deepEqual(runsPageBreaks(through), [`${card} ${why}`]);
 });
 
 test(`only ${STREAMS.join(' and ')} open an EventSource`, () => {

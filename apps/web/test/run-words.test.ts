@@ -8,6 +8,7 @@ import type { RunSummary } from '../src/lib/api.ts';
 import { stateMeaning, type StepState } from '../src/lib/status.ts';
 import {
   endedWords,
+  nowOf,
   railSaid,
   sentenceOf,
   sinceCreated,
@@ -17,6 +18,9 @@ import {
   waitOf,
   WAITS,
   waitSentence,
+  waitTag,
+  WAITS_TAG,
+  whenWords,
   type WaitKind,
 } from '../src/lib/runWords.ts';
 import { summary } from './run-fixtures.ts';
@@ -160,7 +164,12 @@ test('REFUSED: no sentence says a word of git or of a command line, though the r
   const words = /\bgit\b|\bbranch|\bmerge|\bcommit|worktree|`|--|\bwf |\bnemia /i;
   assert.match(COMMAND, words, 'the pattern finds the command the rows carry');
   for (const kind of WAIT_KINDS) assert.doesNotMatch(waitSentence(ROWS[kind].row), words, kind);
-  assert.doesNotMatch(WAITS, words);
+  for (const kind of WAIT_KINDS) assert.doesNotMatch(waitTag(ROWS[kind].row), words, `the tag of ${kind}`);
+  for (const kind of WAIT_KINDS) {
+    const now = nowOf(ROWS[kind].row, 120_000);
+    assert.doesNotMatch(`${now?.word} ${now?.note}`, words, `the note of ${kind}`);
+  }
+  assert.doesNotMatch(`${WAITS} ${WAITS_TAG}`, words);
   for (const outcome of ['succeeded', 'failed', 'cancelled', 'undecided'] as const) {
     assert.doesNotMatch(`${endedWords(outcome).word} ${endedWords(outcome).title}`, words, outcome);
   }
@@ -199,4 +208,41 @@ test('the rail says each step and its word, in the run’s order', () => {
     ),
     'a at work, b to come',
   );
+});
+
+test("a waiting card's tag says what is asked in two or three words, the step where the person acts on one", () => {
+  const tags: Record<WaitKind, string> = {
+    approve: 'approve land',
+    blocked: 'answer land',
+    check: 'check refused',
+    unfinished: 'check unfinished',
+    unsigned: 'not signed',
+    denied: 'tool refused',
+    rounds: 'out of rounds',
+    budget: 'past budget',
+    hold: 'held by you',
+    after: 'waits on a run',
+  };
+  for (const kind of WAIT_KINDS) assert.equal(waitTag(ROWS[kind].row), tags[kind], kind);
+  assert.equal(waitTag(summary([['plan', 'pondering']], { waitingOnYou: ['plan'] })), WAITS_TAG);
+  assert.equal(WAITS_TAG, 'waits on you');
+});
+
+test('what a run in flight does now: its first step not done, its place among its steps, and how long it has been at work', () => {
+  const working = summary([...DONE.slice(0, 1), ['implement', 'running (working)'], ['review', 'waiting'], ['land', 'waiting']]);
+  assert.deepEqual(nowOf(working, 2 * 60_000 + 59_000), { word: 'at work', note: 'implement (2 of 4), 2m' });
+  assert.deepEqual(nowOf(working, null), { word: 'at work', note: 'implement (2 of 4)' }, 'no time where the api gives none');
+  const checking = summary([...DONE.slice(0, 1), ['implement', 'checking']]);
+  assert.deepEqual(nowOf(checking, 60_000), { word: 'being checked', note: 'implement (2 of 2)' }, 'a time only for a session at work');
+  const queued = summary([['design', 'waiting']]);
+  assert.deepEqual(nowOf(queued, null), { word: 'to come', note: 'design (1 of 1)' });
+  assert.equal(nowOf(summary([...DONE]), null), null, 'every step done: nothing to say');
+});
+
+test('when something happened: the time alone on the same day, the day before it on another, the year in another year', () => {
+  const now = new Date('2026-10-11T17:38:00.000Z');
+  assert.equal(whenWords(new Date('2026-10-11T17:11:59.000Z'), now, 'America/Montreal'), '13:11');
+  assert.equal(whenWords(new Date('2026-10-11T03:59:00.000Z'), now, 'America/Montreal'), '10 Oct 23:59', 'the day is the reader\'s');
+  assert.equal(whenWords(new Date('2026-08-03T13:05:00.000Z'), now, 'UTC'), '3 Aug 13:05');
+  assert.equal(whenWords(new Date('2025-12-31T23:05:00.000Z'), now, 'UTC'), '31 Dec 2025 23:05');
 });

@@ -115,6 +115,50 @@ export function waitSentence(row: WaitingRow): string {
   return wait ? sentenceOf(wait) : WAITS;
 }
 
+/** What a waiting card's tag says of each kind of wait, in two or three words; `approve` and `blocked` name the step. */
+const TAGS: Record<WaitKind, (wait: Wait) => string> = {
+  approve: (wait) => (wait.step ? `approve ${wait.step}` : 'approve'),
+  blocked: (wait) => (wait.step ? `answer ${wait.step}` : 'answer'),
+  check: () => 'check refused',
+  unfinished: () => 'check unfinished',
+  unsigned: () => 'not signed',
+  denied: () => 'tool refused',
+  rounds: () => 'out of rounds',
+  budget: () => 'past budget',
+  hold: () => 'held by you',
+  after: () => 'waits on a run',
+};
+
+/** What a waiting card's tag says of a wait the board has no kind for. */
+export const WAITS_TAG = 'waits on you';
+
+/** The few words of a waiting run's tag: what is asked of the person (`approve land`). */
+export function waitTag(row: WaitingRow): string {
+  const wait = waitOf(row);
+  return wait ? TAGS[wait.kind](wait) : WAITS_TAG;
+}
+
+/** What a row in flight says it does now: the word of the step it is on, and a note of which step, its place, and how long. */
+export type Now = { word: string; note: string };
+
+/** The states of a step a run is past. */
+const PAST: readonly StepState[] = ['verified', 'unverified'];
+
+/**
+ * What a run in flight does now: its first step not done, by the rail's word for its state, its name and its place among the run's
+ * steps (`implement (2 of 4)`), then how long the run has been at work without a stop, to the minute, where `workingMs` gives it.
+ * None for a run whose every step is done.
+ */
+export function nowOf(row: WaitingRow, workingMs: number | null): Now | null {
+  const states = railStates(row.steps, Boolean(row.cancelledAt), row.holding != null);
+  const at = states.findIndex((step) => !PAST.includes(step.state));
+  const step = states[at];
+  if (!step) return null;
+  const place = `${step.name} (${at + 1} of ${states.length})`;
+  const timed = step.state === 'working' && workingMs !== null;
+  return { word: railWord[step.state], note: timed ? `${place}, ${sinceWords(workingMs)}` : place };
+}
+
 /** How a finished run ended, as the page says it: a word, its whole sentence, and the hue it is drawn in. */
 export type Ended = { word: string; title: string; hue: Hue };
 
@@ -180,3 +224,17 @@ export const railSaid = (
   railStates(steps, cancelled, held)
     .map((step) => `${step.name} ${railWord[step.state]}`)
     .join(', ');
+
+/**
+ * When something of a run happened, as a person reads it where they are, to the minute: the time alone on the day of `now`
+ * (`13:11`), the day and the month before it on another (`11 Oct 13:11`), and the year too in another year.
+ */
+export function whenWords(at: Date, now: Date, timeZone?: string): string {
+  const time = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone }).format(at);
+  const part = (date: Date, options: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat('en-GB', { ...options, timeZone }).format(date);
+  const day = (date: Date) => part(date, { year: 'numeric', month: '2-digit', day: '2-digit' });
+  if (day(at) === day(now)) return time;
+  const year = part(at, { year: 'numeric' });
+  const date = part(at, { day: 'numeric', month: 'short' });
+  return year === part(now, { year: 'numeric' }) ? `${date} ${time}` : `${date} ${year} ${time}`;
+}

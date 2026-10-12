@@ -18,7 +18,7 @@ import { acceptStepOf, barOf, changeOf, decidableRun, decisionStamp, diffLine, i
 import { cn } from '../lib/utils';
 import { BUTTON, MODES, Refusal, TEXTAREA, useAccept, useAsk } from './Ask';
 import { CopyButton } from './CopyButton';
-import { Facts, pathRow, readRows, TrialMerges } from './Facts';
+import { Facts, HEADING, pathRow, readRows, TrialMerges } from './Facts';
 import { Asks, QuestionsForm } from './Questions';
 import { RaiseRow } from './Raise';
 
@@ -125,9 +125,7 @@ function DecisionParts({ runId, decision, run = null }: DecisionProps) {
       {!inFolders && <InFull sensitive={sensitive} touched={touched} />}
 
       <section aria-label="Used" className="space-y-1">
-        <h3 className="text-xs font-medium text-muted-foreground">
-          Used, over every step's current try — and what every try of the run cost
-        </h3>
+        <h3 className={HEADING}>Used, over every step's current try — and what every try of the run cost</h3>
         <Facts rows={[['used', total.used], ['cost', total.cost], ...readRows(total), ['every try', cost]]} />
       </section>
 
@@ -144,9 +142,7 @@ function DecisionParts({ runId, decision, run = null }: DecisionProps) {
 export function Offers({ runId, offers }: { runId: string; offers: readonly Answer[] }) {
   return (
     <section aria-label="Answer" className="space-y-2">
-      <h3 className="text-xs font-medium text-muted-foreground">
-        Answer — each asks for a try of its step, or a round of its loop, as the command line would
-      </h3>
+      <h3 className={HEADING}>Answer — each asks for a try of its step, or a round of its loop, as the command line would</h3>
       <ul className="space-y-3">
         {offers.map((offer) =>
           offer.kind === 'raise' ? (
@@ -484,9 +480,7 @@ export function LessonChip({ lesson }: { lesson: Lesson }) {
 function InFull({ sensitive, touched }: { sensitive: readonly SensitiveDiff[]; touched: readonly Touched[] }) {
   return (
     <section aria-label="In full" className="space-y-2">
-      <h3 className="text-xs font-medium text-muted-foreground">
-        In full: the check-affecting files — what a change could edit to make its check pass
-      </h3>
+      <h3 className={HEADING}>In full: the check-affecting files — what a change could edit to make its check pass</h3>
       {sensitive.map(({ branch, files, error }) => (
         <div key={branch} className="space-y-1.5">
           {sensitive.length > 1 && <p className="break-all font-mono text-xs text-muted-foreground">{branch}</p>}
@@ -572,9 +566,7 @@ export function DiffFileView({ file, counts }: { file: DiffFile; counts?: { adde
 export function Commands({ runId, commands }: { runId: string; commands: readonly DecideCommand[] }) {
   return (
     <section aria-label="Commands" className="space-y-2">
-      <h3 className="text-xs font-medium text-muted-foreground">
-        Commands — copy one to run it; the board runs only accept, with your reason
-      </h3>
+      <h3 className={HEADING}>Commands — copy one to run it; the board runs only accept, with your reason</h3>
       {commands.length ? (
         <ul className="space-y-2">
           {commands.map((c) => {

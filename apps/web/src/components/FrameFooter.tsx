@@ -114,7 +114,9 @@ export function FrameFooter({ feed }: { feed: FeedStatus }) {
       <span className="flex-1" />
       <Part title={short.title} data={{ 'data-quota-short': short.text, 'data-marked': short.marked ? '' : undefined }}>
         {short.marked && <TriangleAlert aria-hidden className="size-3 text-money" />}
-        <span className={`truncate ${short.stale ? 'italic' : ''} ${short.marked ? 'text-money' : ''}`}>quota {short.text}</span>
+        <span className={`truncate ${short.stale ? 'text-foreground opacity-70' : short.marked ? 'text-money' : ''}`}>
+          quota {short.text}
+        </span>
       </Part>
       {parts.includes('version') && <VersionPart />}
     </footer>

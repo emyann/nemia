@@ -8,6 +8,9 @@ import { cn } from '../lib/utils';
 import { RouteLink } from './AgentParts';
 import { CopyButton } from './CopyButton';
 
+/** A section's quiet heading: small, medium weight, in the muted ink. */
+export const HEADING = 'text-xs font-medium text-muted-foreground';
+
 /** A link's look in a fact's words. */
 export const LINK =
   'rounded-sm underline decoration-neutral-400 underline-offset-2 outline-none hover:decoration-neutral-700 focus-visible:ring-2 focus-visible:ring-ring/50 dark:decoration-neutral-500 dark:hover:decoration-neutral-300';

@@ -30,7 +30,10 @@ export function QuotaLine({ quota, error }: { quota: Quota | undefined; error: E
           <Lead /> {quota.said}
         </p>
         {last && (
-          <p data-quota-last className="mt-0.5 flex flex-wrap items-baseline gap-x-3 italic">
+          <p
+            data-quota-last
+            className="mt-0.5 flex flex-wrap items-baseline gap-x-3 text-foreground opacity-70 [&_[data-marked]]:text-foreground"
+          >
             {last.windows.map((w) => (
               <Window key={w.key} words={w} markAt={quota.markAt} data={{ 'data-quota-last-window': w.key }} />
             ))}

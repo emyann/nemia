@@ -7,6 +7,7 @@ import {
   type DecideCommand,
   type DiffFile,
   type Group,
+  type Lesson,
   type RetryMode,
   type RunDetail,
   type SensitiveDiff,
@@ -16,12 +17,11 @@ import { answersOf, askedSaid, type Answer } from '../lib/asks';
 import { acceptStepOf, barOf, changeOf, decidableRun, decisionStamp, diffLine, isDecidable, mostLines, type DiffLine } from '../lib/decide';
 import { cn } from '../lib/utils';
 import { BUTTON, MODES, Refusal, TEXTAREA, useAccept, useAsk } from './Ask';
-import { CopyButton } from './CopyButton';
-import { LessonChip } from './LessonChip';
+import { CommandLine } from './CommandLine';
 import { Facts, HEADING, pathRow, readRows, TrialMerges } from './Facts';
 import { Asks, QuestionsForm } from './Questions';
 import { RaiseRow } from './Raise';
-import { container, hairline, ringed } from '../lib/meaning';
+import { container, dashed, hairline, ringed } from '../lib/meaning';
 
 /**
  * The Decide section of a run's page: the answer each step waiting on you can be given (`answersOf`), then what the CLI's `decide` shows a
@@ -511,6 +511,27 @@ export function DiffFileView({ file, counts }: { file: DiffFile; counts?: { adde
   );
 }
 
+/** The lesson line: sage when the run wrote where the next agent reads, a grey ring when it wrote nothing, dashed when nobody can say. */
+export function LessonChip({ lesson }: { lesson: Lesson }) {
+  const [text, title, className] =
+    lesson.state === 'written'
+      ? [`lesson · ${lesson.said}`, 'The run changed a file where the next agent reads.', container.sage]
+      : lesson.state === 'nothing'
+        ? [lesson.said, 'What this run learned is written nowhere the next agent reads (CLAUDE.md, "When you miss").', ringed.grey]
+        : [`lesson ${lesson.said}`, 'A branch could not be read, so nobody can say what it wrote.', dashed.grey];
+  return (
+    <p>
+      <span
+        data-lesson={lesson.state}
+        title={title}
+        className={cn('inline-block rounded px-2 py-0.5 font-mono text-body-small', className)}
+      >
+        {text}
+      </span>
+    </p>
+  );
+}
+
 /**
  * Ship it, drop it, once more: each command on a line of its own with a button that copies it. Nothing here runs one but the CLI's
  * `accept`, which a person who never opens a terminal has no other way to give: its row also takes their reason and presses it
@@ -537,22 +558,6 @@ export function Commands({ runId, commands }: { runId: string; commands: readonl
         <p className="text-body-medium text-muted-foreground">None yet: the run is still moving.</p>
       )}
     </section>
-  );
-}
-
-/** A command's words, then its label, the command and the button that copies it. */
-function CommandLine({ command: c }: { command: DecideCommand }) {
-  return (
-    <>
-      {c.said && <p className="text-body-small text-muted-foreground">{c.said.replace(`:  ${c.command}`, '')}</p>}
-      <div className="flex items-center gap-2">
-        <span className="w-16 shrink-0 text-body-small text-muted-foreground">{c.label}</span>
-        <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap rounded bg-muted px-2 py-1 font-mono text-body-small">
-          {c.command}
-        </code>
-        <CopyButton text={c.command} />
-      </div>
-    </>
   );
 }
 

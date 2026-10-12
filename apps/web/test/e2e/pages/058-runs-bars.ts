@@ -177,7 +177,8 @@ export default {
    * The runs page's tables and scroll bars, as a browser that draws scroll bars shows them: no table's box is taller inside than its
    * content, the last row of each draws no line and the pager stands under its own, or under none past the last page, and the page
    * is marked while it scrolls; in a browser whose bars take room, which the page opens itself, no table shows an upright bar, the
-   * page and the sidebar's list keep the look's lane, and the narrow table scrolls sideways. Pictured in that browser and in one whose bars float. Writes nothing.
+   * page and the sidebar's list keep the look's lane, and the narrow table scrolls sideways. Pictured in that browser and in one
+   * whose bars float. Writes nothing.
    */
   name: 'runs-bars',
   route: '/runs',

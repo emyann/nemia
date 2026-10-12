@@ -45,10 +45,28 @@ async function lastRowsClose(page: Page): Promise<void> {
   if (over !== '1px') throw new Refused(`the pager stands under a line of its own — its top line is ${over}`);
 }
 
+/**
+ * A page of the finished runs past the last, in a tab of its own: it holds no row, so no table is drawn, and the pager, which says
+ * why, stands under no line: nothing is there to part it from.
+ */
+async function noRowsNoLine(page: Page): Promise<void> {
+  const other = await page.context().newPage();
+  try {
+    await other.goto(new URL('/runs?page=99', page.url()).href, { waitUntil: 'load' });
+    await idle(other);
+    await expectCount(other.locator('section[data-section="finished"] [data-pager-box]'), 1, 'past the last page, the pager is drawn');
+    await expectCount(other.locator('section[data-section="finished"] table'), 0, 'and no table, for no row');
+    const over = await other.locator('[data-pager-box]').evaluate((box) => getComputedStyle(box).borderTopWidth);
+    if (over !== '0px') throw new Refused(`with no row the pager stands under no line — its top line is ${over}`);
+  } finally {
+    await other.close();
+  }
+}
+
 /** The mark on the page's root, awaited until it reads `word`. */
 const rootMarked = (page: Page, word: string, what: string): Promise<void> =>
   expectNone(async () => {
-    const found = await page.locator('html').getAttribute('data-bar');
+    const found = await page.locator('html').getAttribute('data-scroll-bar');
     return found === word ? null : `the root's mark reads ${found}`;
   }, what);
 
@@ -118,16 +136,17 @@ async function barsTakeTheLooksRoom(from: Page): Promise<void> {
 /** Marks what `selector` finds as scrolling, as the frame's listener does, once any mark of its own has come to rest. */
 async function shown(page: Page, selector: string): Promise<void> {
   await expectNone(
-    async () => ((await page.locator(selector).getAttribute('data-bar')) === 'shown' ? 'it is still marked by a scroll of its own' : null),
+    async () =>
+      (await page.locator(selector).getAttribute('data-scroll-bar')) === 'shown' ? 'it is still marked by a scroll of its own' : null,
     `${selector} is at rest`,
   );
-  await page.locator(selector).evaluate((found) => found.setAttribute('data-bar', 'shown'));
+  await page.locator(selector).evaluate((found) => found.setAttribute('data-scroll-bar', 'shown'));
 }
 
 /**
  * The page's pictures in a browser whose bars are `kind`, each bar marked as scrolling so that it is seen: the window with the
- * page's own bar; its top-right corner four times as large, the thumb and the lane beside the scan lines; and, 390 wide, the table
- * in flight with its sideways bar.
+ * page's own bar; 390 wide, the table in flight with its sideways bar; in a window 300 tall, the sidebar's list with its bar; and the
+ * window's top-right corner four times as large, the thumb and the lane beside the scan lines.
  */
 async function pictured(from: Page, kind: Bars): Promise<void> {
   const browser = await launch(kind);
@@ -142,6 +161,9 @@ async function pictured(from: Page, kind: Bars): Promise<void> {
     await shown(page, 'html');
     await shown(page, BOXES[0][0]);
     await photograph(page, fileOf('table'));
+    const short = await sameIn(browser, from, 1280, 300);
+    await shown(short, '[data-slot="sidebar-content"]');
+    await photograph(short, fileOf('sidebar'));
     const large = await sameIn(browser, from, 1280, 800, 4);
     await shown(large, 'html');
     await photograph(large, fileOf('lane'), { clip: { x: 1280 - 200, y: 0, width: 200, height: 260 } });
@@ -153,8 +175,8 @@ async function pictured(from: Page, kind: Bars): Promise<void> {
 export default {
   /**
    * The runs page's tables and scroll bars, as a browser that draws scroll bars shows them: no table's box is taller inside than its
-   * content, the last row of each draws no line and the pager stands under its own, and the page is marked while it scrolls; in a
-   * browser whose bars take room, which the page opens itself, no table shows an upright bar, the page and the sidebar's list keep
+   * content, the last row of each draws no line and the pager stands under its own, or under none past the last page, and the page
+   * is marked while it scrolls; in a browser whose bars take room, which the page opens itself, no table shows an upright bar, the page and the sidebar's list keep
    * the look's lane, and the narrow table scrolls sideways. Pictured in that browser and in one whose bars float. Writes nothing.
    */
   name: 'runs-bars',
@@ -162,6 +184,7 @@ export default {
   expect: async (page) => {
     await boxesFit(page);
     await lastRowsClose(page);
+    await noRowsNoLine(page);
     await pageIsMarked(page);
     await barsTakeTheLooksRoom(page);
     if (photographing) for (const kind of ['classic', 'overlay'] as const) await pictured(page, kind);

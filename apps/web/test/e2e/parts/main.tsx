@@ -10,7 +10,7 @@ import { RouterProvider as AriaRouterProvider } from 'react-aria-components';
 import '../../../src/styles.css';
 import { CutButton } from '../../../src/components/CutButton.tsx';
 import { CopyId } from '../../../src/components/CopyId.tsx';
-import { CutFrame, FRAMED_BOX, FRAMED_ROW, FRAMED_TABLE } from '../../../src/components/CutFrame.tsx';
+import { CutFrame, FRAMED_BOX, FRAMED_END, FRAMED_ROW, FRAMED_TABLE } from '../../../src/components/CutFrame.tsx';
 import { Pager } from '../../../src/components/Pager.tsx';
 import { PageName, Plate } from '../../../src/components/Plate.tsx';
 import { RunSteps } from '../../../src/components/RunSteps.tsx';
@@ -104,7 +104,7 @@ function Framed({ name, rows, width }: { name: string; rows: readonly string[]; 
     <div data-ground="other" data-framed={name} style={GROUND}>
       <div style={{ width }}>
         <CutFrame size={24}>
-          <div data-table-box className={FRAMED_BOX}>
+          <div data-table-box className={`${FRAMED_BOX} ${FRAMED_END}`}>
             <Table aria-label={`A framed table: ${name}`} density="dense" className={FRAMED_TABLE} style={{ minWidth: 520 }}>
               <TableHeader>
                 <Column id="run" isRowHeader>

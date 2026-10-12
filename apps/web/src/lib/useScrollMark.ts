@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 export const LINGER_MS = 900;
 
 /** The attribute that says whether what scrolls is scrolling, which the board's styles draw its scroll bar from. */
-export const BAR = 'data-bar';
+export const BAR = 'data-scroll-bar';
 
 /** Runs `run` once `ms` have passed, and returns what takes that back. */
 export type Later = (run: () => void, ms: number) => () => void;
@@ -29,8 +29,8 @@ function scrollerOf(target: unknown): Marked | null {
 
 /**
  * Marks what scrolls under `source` while it scrolls: every scroll heard there, of the page or of any element, on its way down,
- * writes `data-bar="shown"` on what scrolled, and `data-bar="rest"` once `LINGER_MS` have passed with no scroll of it. The attribute
- * is written only when it changes. Scrolling itself is left to the browser: the listener is passive.
+ * writes `data-scroll-bar="shown"` on what scrolled, and `data-scroll-bar="rest"` once `LINGER_MS` have passed with no scroll of
+ * it. The attribute is written only when it changes. Scrolling itself is left to the browser: the listener is passive.
  *
  * @param source where scrolls are heard, a document
  * @param later what runs a function after a time, a timer unless a test steps it by hand

@@ -50,7 +50,9 @@ async function pictured(page: Page, selector: string, name: string): Promise<voi
 
 /** Writes on what `selector` finds the mark of what scrolls, as the board's listener does, or takes it off. */
 const mark = (page: Page, selector: string, word: 'shown' | null): Promise<void> =>
-  page.locator(selector).evaluate((found, word) => (word ? found.setAttribute('data-bar', word) : found.removeAttribute('data-bar')), word);
+  page
+    .locator(selector)
+    .evaluate((found, word) => (word ? found.setAttribute('data-scroll-bar', word) : found.removeAttribute('data-scroll-bar')), word);
 
 /** Pictures the bottom-left corner and the right edge of the one-row framed table, as `parts-bars-corner-` and `-edge-<tail>`. */
 async function framedCorners(page: Page, tail: string): Promise<void> {

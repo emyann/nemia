@@ -99,9 +99,12 @@ async function cutSpills(kind: Bars, page: Page, name: string, shot: string): Pr
   return [...new Set(spilled)];
 }
 
+/** The framed tables with a ground of their own under the header's cells and the rows, as the kit draws a row by default. */
+const GROUNDED = '[data-part="framed-table"] :is(th, tbody tr) { background-color: var(--md-sys-color-surface) !important; }';
+
 for (const theme of THEMES) {
   test(
-    `REFUSED: nothing of a framed table is painted in its frame's cut corners, ${theme}; the last row's line put back is seen`,
+    `REFUSED: nothing of a framed table is painted in its frame's cut corners, ${theme}; a line put back and a ground are each seen`,
     WAITED,
     async () => {
       const page = await openParts(browsers.classic, built, theme);
@@ -112,11 +115,18 @@ for (const theme of THEMES) {
             [],
             `${name}: the ground shows through both cuts`,
           );
-        await page.addStyleTag({ content: LINED });
+        const lined = await page.addStyleTag({ content: LINED });
         assert.deepEqual(
           await cutSpills('classic', page, 'one', `cut-lined-${theme}`),
           ['the bottom-left cut'],
           'the line put back crosses the cut',
+        );
+        await lined.evaluate((style) => (style as HTMLStyleElement).remove());
+        await page.addStyleTag({ content: GROUNDED });
+        assert.deepEqual(
+          await cutSpills('classic', page, 'one', `cut-grounded-${theme}`),
+          ['the bottom-left cut', 'the top-right cut'],
+          'a ground under the header and the row paints both cuts over',
         );
       } finally {
         await page.context().close();
@@ -186,7 +196,9 @@ const inkOf = (page: Page, role: string): Promise<Rgb> =>
 
 /** Writes the mark of what scrolls on what `selector` finds, as the board's listener does while it scrolls, or takes it off. */
 const mark = (page: Page, selector: string, word: 'shown' | 'rest' | null): Promise<void> =>
-  page.locator(selector).evaluate((found, word) => (word ? found.setAttribute('data-bar', word) : found.removeAttribute('data-bar')), word);
+  page
+    .locator(selector)
+    .evaluate((found, word) => (word ? found.setAttribute('data-scroll-bar', word) : found.removeAttribute('data-scroll-bar')), word);
 
 /**
  * Waits until the page, brought to a part by a scroll of the test's own, is marked as scrolling no more: two frames, in which a scroll
@@ -195,7 +207,7 @@ const mark = (page: Page, selector: string, word: 'shown' | 'rest' | null): Prom
 async function pageAtRest(page: Page): Promise<void> {
   await page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))));
   await expectNone(
-    async () => ((await page.locator('html').getAttribute('data-bar')) === 'shown' ? 'its root is still marked shown' : null),
+    async () => ((await page.locator('html').getAttribute('data-scroll-bar')) === 'shown' ? 'its root is still marked shown' : null),
     'the page comes to rest',
   );
 }
@@ -248,6 +260,10 @@ async function barFaults(kind: Bars, page: Page, shot: string): Promise<string[]
   says('shown: the thumb', shown.thumb, outline);
   says("shown: the thumb's side", shown.side, rest.ground);
   says('shown: the lane under the thumb', shown.lane, rest.ground);
+  await page.locator(SCROLLER).evaluate((box) => box.setAttribute('data-autoscrolling', ''));
+  const following = await read(kind, page, `${shot}-following`, points);
+  says('following: the thumb of a box that follows its stream', following.thumb, rest.ground);
+  await page.locator(SCROLLER).evaluate((box) => box.removeAttribute('data-autoscrolling'));
   await page.mouse.move(...points.thumb);
   const pointed = await read(kind, page, `${shot}-pointer`, points);
   says('pointer: the thumb', pointed.thumb, variant);
@@ -285,7 +301,7 @@ for (const kind of KINDS) {
 /** The mark on what `selector` finds, awaited until it reads `word`. */
 const marked = (page: Page, selector: string, word: string, what: string): Promise<void> =>
   expectNone(async () => {
-    const found = await page.locator(selector).getAttribute('data-bar');
+    const found = await page.locator(selector).getAttribute('data-scroll-bar');
     return found === word ? null : `its mark reads ${found}`;
   }, what);
 
@@ -320,8 +336,12 @@ test(
       await marked(page, 'html', 'rest', 'and at rest once it scrolls no more');
       await unmarked.locator(SCROLLER).scrollIntoViewIfNeeded();
       await wheelOver(unmarked, SCROLLER);
-      assert.equal(await unmarked.locator(SCROLLER).getAttribute('data-bar'), null, 'nothing listening, a box that scrolled has no mark');
-      assert.equal(await unmarked.locator('html').getAttribute('data-bar'), null, 'nor has the page');
+      assert.equal(
+        await unmarked.locator(SCROLLER).getAttribute('data-scroll-bar'),
+        null,
+        'nothing listening, a box that scrolled has no mark',
+      );
+      assert.equal(await unmarked.locator('html').getAttribute('data-scroll-bar'), null, 'nor has the page');
     } finally {
       await page.context().close();
       await unmarked.context().close();

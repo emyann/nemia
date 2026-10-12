@@ -6,7 +6,7 @@ import { ink } from '@/lib/meaning';
 import { nowOf, sinceShort } from '@/lib/runWords';
 import { CopyId } from './CopyId';
 import { cn } from '@/components/ui/ds/utils';
-import { CutFrame, CutTag, FRAMED_BOX, FRAMED_ROW, FRAMED_TABLE } from './CutFrame';
+import { CutFrame, CutTag, FRAMED_BOX, FRAMED_END, FRAMED_ROW, FRAMED_TABLE } from './CutFrame';
 import { RunSteps } from './RunSteps';
 import { TextLink } from './TextLink';
 
@@ -49,7 +49,7 @@ function Now({ run, asOf }: { run: ListedRun; asOf: Date }) {
 export function FlightTable({ runs, asOf }: { runs: readonly ListedRun[]; asOf: Date }) {
   return (
     <CutFrame hue="alive" size={24}>
-      <div data-table-box className={FRAMED_BOX}>
+      <div data-table-box className={cn(FRAMED_BOX, FRAMED_END)}>
         <Table aria-label="Runs in flight" density="dense" className={cn('min-w-[920px] table-fixed', FRAMED_TABLE)}>
           <TableHeader>
             <Column id="run" isRowHeader className={HEAD}>

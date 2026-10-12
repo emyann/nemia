@@ -50,7 +50,7 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
   the cut over, so it is given none (`bg-transparent`). `test/e2e/parts.test.ts` reads each in a picture, pixel by pixel.
 - A control's touch target under a table's last row makes an `overflow-x-auto` box scroll upright: a table in a cut frame wears
   `FRAMED_BOX`, `FRAMED_TABLE` and `FRAMED_ROW` (`CutFrame.tsx`), which also drop the last row's line; `test/e2e/bars.test.ts`.
-- A scroll bar is drawn by `src/styles.css` from `data-bar`, which `markScrolls` (`lib/useScrollMark.ts`) writes on what scrolls. The
+- A scroll bar is drawn by `src/styles.css` from `data-scroll-bar`, which `markScrolls` (`lib/useScrollMark.ts`) writes on what scrolls. The
   window's bar takes its parts from `body` and no selector on the root's attribute reaches it: the thumb reads an inherited property
   (`--bar-ink`). A bar already laid out keeps its track under a style added later.
 - The look's small caps are its three label roles: `DESIGN.md` gives them their weight and tracking, and a text writes the role and

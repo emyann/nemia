@@ -97,8 +97,8 @@
 
   /*
    * The look's scroll bar, wherever something scrolls: an 8-pixel square lane with no arrows, the ground showing through, and a thumb
-   * that is not seen at rest. What scrolls is marked while it scrolls (`data-bar`, written by `markScrolls`): its thumb is then drawn
-   * 4 pixels wide in `outline`, and leaves by a fade once it is at rest; under the pointer the thumb takes the lane's whole width in
+   * that is not seen at rest. What scrolls is marked while it scrolls (`data-scroll-bar`, written by `markScrolls`): its thumb is then
+   * drawn 4 pixels wide in `outline`, and leaves by a fade once it is at rest; under the pointer the thumb takes the lane's whole width in
    * `on-surface-variant`, and `on-surface` while it is held. A conversation that follows its stream (`data-autoscrolling`) shows none.
    * The ink is an inherited property, which a thumb reads off what it scrolls: the window's own bar is drawn from the body, which
    * takes the root's. What a marked thing holds takes the ink back, so that a page that scrolls lights no bar inside it.
@@ -123,15 +123,15 @@
     :where([data-autoscrolling])::-webkit-scrollbar-thumb {
       background-color: transparent;
     }
-    :where([data-bar]:not(:root)) > *,
-    :where(:root[data-bar]) > body > * {
+    :where([data-scroll-bar]:not(:root)) > *,
+    :where(:root[data-scroll-bar]) > body > * {
       --bar-ink: transparent;
     }
-    [data-bar] {
+    [data-scroll-bar] {
       --bar-ink: transparent;
       transition: --bar-ink var(--md3-duration-medium-4) linear;
     }
-    [data-bar='shown'] {
+    [data-scroll-bar='shown'] {
       --bar-ink: var(--md-sys-color-outline);
       transition-duration: 0s;
     }
@@ -144,7 +144,7 @@
       background-color: var(--md-sys-color-on-surface);
     }
     @media (prefers-reduced-motion: reduce) {
-      [data-bar] {
+      [data-scroll-bar] {
         transition: none;
       }
     }
@@ -155,7 +155,7 @@
       scrollbar-width: thin;
       scrollbar-color: transparent transparent;
     }
-    [data-bar='shown'] {
+    [data-scroll-bar='shown'] {
       scrollbar-color: var(--md-sys-color-outline) transparent;
     }
   }

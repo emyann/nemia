@@ -30,16 +30,21 @@ const SAID: ReadonlyArray<{ what: string; where: 'parts' | 'others' | 'styles'; 
     where: 'parts',
     says: /::-webkit-scrollbar-thumb\s*\{[^}]*background-color:\s*var\(--bar-ink\);[^}]*\}/,
   },
-  { what: 'no ink at rest', where: 'parts', says: /\[data-bar\]\s*\{\s*--bar-ink:\s*transparent;/ },
+  {
+    what: 'no thumb on a conversation that follows its stream',
+    where: 'parts',
+    says: /:where\(\[data-autoscrolling\]\)::-webkit-scrollbar-thumb\s*\{\s*background-color:\s*transparent;\s*\}/,
+  },
+  { what: 'no ink at rest', where: 'parts', says: /\[data-scroll-bar\]\s*\{\s*--bar-ink:\s*transparent;/ },
   {
     what: 'the ink taken back by what a marked thing holds',
     where: 'parts',
-    says: /:where\(\[data-bar\]:not\(:root\)\)\s*>\s*\*,\s*:where\(:root\[data-bar\]\)\s*>\s*body\s*>\s*\*\s*\{\s*--bar-ink:\s*transparent;/,
+    says: /:where\(\[data-scroll-bar\]:not\(:root\)\)\s*>\s*\*,\s*:where\(:root\[data-scroll-bar\]\)\s*>\s*body\s*>\s*\*\s*\{\s*--bar-ink:\s*transparent;/,
   },
   {
     what: 'the thumb in outline while it scrolls',
     where: 'parts',
-    says: /\[data-bar='shown'\]\s*\{\s*--bar-ink:\s*var\(--md-sys-color-outline\);/,
+    says: /\[data-scroll-bar='shown'\]\s*\{\s*--bar-ink:\s*var\(--md-sys-color-outline\);/,
   },
   {
     what: 'the thumb in on-surface-variant under the pointer',
@@ -54,13 +59,13 @@ const SAID: ReadonlyArray<{ what: string; where: 'parts' | 'others' | 'styles'; 
   {
     what: 'no fade when nothing may move',
     where: 'parts',
-    says: /prefers-reduced-motion:\s*reduce\)\s*\{\s*\[data-bar\]\s*\{\s*transition:\s*none;/,
+    says: /prefers-reduced-motion:\s*reduce\)\s*\{\s*\[data-scroll-bar\]\s*\{\s*transition:\s*none;/,
   },
   { what: 'a thin bar where the parts are unknown', where: 'others', says: /scrollbar-width:\s*thin;/ },
   {
     what: 'its ink while it scrolls where the parts are unknown',
     where: 'others',
-    says: /\[data-bar='shown'\]\s*\{\s*scrollbar-color:\s*var\(--md-sys-color-outline\)\s+transparent;/,
+    says: /\[data-scroll-bar='shown'\]\s*\{\s*scrollbar-color:\s*var\(--md-sys-color-outline\)\s+transparent;/,
   },
   { what: 'the ink as an inherited colour', where: 'styles', says: /@property --bar-ink\s*\{\s*syntax:\s*'<color>';\s*inherits:\s*true;/ },
   { what: 'both colour schemes on the root', where: 'styles', says: /:root\s*\{\s*color-scheme:\s*light dark;/ },
@@ -97,7 +102,7 @@ test("REFUSED: the look's scroll bar rule is in the board's styles; with a block
     'the others cut out: each is named',
   );
   assert.deepEqual(unsaid(STYLES.replace('color-scheme: light dark;', '')), ['both colour schemes on the root'], 'the schemes cut out');
-  assert.deepEqual(unsaid(STYLES.replace("[data-bar='shown'] {\n      --bar-ink", "[data-bar='lit'] {\n      --bar-ink")), [
+  assert.deepEqual(unsaid(STYLES.replace("[data-scroll-bar='shown'] {\n      --bar-ink", "[data-scroll-bar='lit'] {\n      --bar-ink")), [
     'the thumb in outline while it scrolls',
   ]);
 });
@@ -192,4 +197,19 @@ test('undone, nothing listens, and what was shown is at rest with no rest left d
   assert.equal(calls.at(-1), 'remove scroll');
   assert.deepEqual(box.written, [`${BAR}=shown`, `${BAR}=rest`], 'what was shown is put at rest');
   assert.deepEqual(waits(), [], 'and no rest is left due');
+});
+
+/** The text of the board's file at `file`, from `from` to `to`, two names it must hold in that order. */
+function sliceOf(file: string, from: string, to: string): string {
+  const text = fs.readFileSync(path.resolve(import.meta.dirname, '..', 'src', file), 'utf8');
+  const [start, end] = [text.indexOf(from), text.indexOf(to, text.indexOf(from) + from.length)];
+  assert.ok(start >= 0 && end > start, `${file} holds ${from}, then ${to}`);
+  return text.slice(start, end);
+}
+
+test("the frame marks what scrolls once, in its root, and the sidebar's list hides no scroll bar", () => {
+  assert.match(sliceOf('routes/__root.tsx', 'function Root()', 'return ('), /\n\s*useScrollMark\(\);/, 'Root calls the hook');
+  const list = sliceOf('components/ui/sidebar.tsx', 'function SidebarContent(', 'function SidebarGroup(');
+  assert.match(list, /overflow-auto/, 'the list scrolls');
+  assert.doesNotMatch(list, /no-scrollbar/, 'and wears nothing that hides its bar');
 });

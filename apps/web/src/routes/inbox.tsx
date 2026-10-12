@@ -1,24 +1,13 @@
-import { useId, useState } from 'react';
-import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
-import { FactoryCardStart } from '../components/FactoryCardStart';
+import { FactoryCardStart, UnassignedStart } from '../components/FactoryCardStart';
+import { FileCard } from '../components/FileCard';
 import { CardMeta, GoneItem, PageLink, PRIMARY, Refused, SECONDARY, Tried } from '../components/InboxParts';
 import { CardFrom } from '../components/CardFrom';
-import { StartRun } from '../components/StartRun';
-import { FIELD, WorkflowOptions } from '../components/WorkflowOptions';
-import { dropCard, fileCard, inboxQuery, queueCard, repositoryQuery, workflowsQuery, type InboxEntry, type Started } from '../lib/api';
+import { dropCard, inboxQuery, queueCard, type InboxEntry, type Started } from '../lib/api';
 import { factorySearch, keptBy, shownIn } from '../lib/factories';
-import {
-  cardLines,
-  namedElsewhere,
-  newestCardsFirst,
-  presetOf,
-  queueable,
-  queuedWord,
-  queueOf,
-  workflowKey,
-  type CardRefusal,
-} from '../lib/inbox';
+import { cardLines, newestCardsFirst, queueable, queuedWord, queueOf, unassigned, type CardRefusal } from '../lib/inbox';
 
 export const Route = createFileRoute('/inbox')({
   validateSearch: factorySearch,
@@ -39,8 +28,9 @@ const code = (text: string) => <code className="font-mono text-xs">{text}</code>
  * refusal stays where it was listed until dismissed. A refusal is kept by the entry's file, as `cardLines` matches them: a card and a stray
  * file beside it answer to one name, and a refusal is of one of them.
  *
- * Every factory's cards are listed, each tagged with its own; the factory the sidebar picks, kept in the address as `?factory=<name>`,
- * keeps only its own: the counts are of the cards it keeps, and a factory that keeps none says so and how to show every factory's.
+ * Every factory's cards are listed, each tagged with its own, and a card that names none says so; the factory the sidebar picks, kept in
+ * the address as `?factory=<name>`, keeps only its own, and is the one the box files into until a person picks another: the counts are of
+ * the cards it keeps, and a factory that keeps none says so and how to show every factory's.
  */
 function InboxPage() {
   const { data: entries } = useSuspenseQuery(inboxQuery);
@@ -61,7 +51,7 @@ function InboxPage() {
         on its own, on the workflow it names, when the daemon — this api, or the command line&apos;s — has a run slot free: the oldest
         queued first.
       </p>
-      <FileCard />
+      <FileCard shown={factory} />
       <section aria-label="Cards" className="space-y-3">
         <h2 className="flex items-baseline gap-2 text-sm font-semibold">
           Cards{' '}
@@ -105,109 +95,8 @@ function InboxPage() {
 }
 
 /**
- * The box that files a card, as the CLI's `inbox add "<idea>" --workflow <name> --repo <path>` does: the idea; what runs it, when it is
- * known; and the repository it is about, the api's own until a person changes it — empty, for a card that names none. Then the api's
- * refusal in full, with the idea kept to send again. A workflow whose every step works in a folder (`folderTeam`) looks at no repository,
- * and the api refuses a card for one that names one: once it is picked, the box goes, and no repository is sent, whatever a person typed
- * before.
- */
-function FileCard() {
-  const queryClient = useQueryClient();
-  const workflows = useQuery(workflowsQuery);
-  const repository = useQuery(repositoryQuery);
-  const [idea, setIdea] = useState('');
-  const [workflow, setWorkflow] = useState('');
-  const [repo, setRepo] = useState<string | null>(null);
-  const about = repo ?? repository.data?.repo ?? '';
-  const picked = workflows.data?.find((w) => workflowKey(w) === workflow) ?? null;
-  const inFolders = picked?.folderTeam ?? false;
-  const file = useMutation({
-    mutationFn: () =>
-      fileCard({
-        body: idea,
-        ...(picked ? { workflow: picked.name, from: picked.from } : {}),
-        ...(!inFolders && about.trim() ? { repo: about.trim() } : {}),
-      }),
-    onSuccess: () => {
-      setIdea('');
-      setWorkflow('');
-      void queryClient.invalidateQueries({ queryKey: ['inbox'] });
-    },
-  });
-  const ids = { idea: useId(), workflow: useId(), repo: useId() };
-
-  return (
-    <form
-      aria-label="File a card"
-      className="space-y-3 rounded-lg border border-outline-variant bg-card p-4 shadow-sm"
-      onSubmit={(event) => {
-        event.preventDefault();
-        file.mutate();
-      }}
-    >
-      <div className="space-y-1.5">
-        <label htmlFor={ids.idea} className="block text-sm font-medium">
-          An idea
-        </label>
-        <textarea
-          id={ids.idea}
-          value={idea}
-          onChange={(event) => setIdea(event.target.value)}
-          rows={3}
-          placeholder="What it is about: its first line names the card, and the rest is its body."
-          className={`${FIELD} resize-y`}
-        />
-      </div>
-      <div className="grid gap-3 sm:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]">
-        <div className="space-y-1.5">
-          <label htmlFor={ids.workflow} className="block text-sm font-medium">
-            Workflow
-          </label>
-          <select id={ids.workflow} value={workflow} onChange={(event) => setWorkflow(event.target.value)} className={FIELD}>
-            <option value="">None: chosen at start</option>
-            {workflows.data && <WorkflowOptions workflows={workflows.data} />}
-          </select>
-          {workflows.error && <p className="text-xs text-failure">Could not list the workflows: {workflows.error.message}</p>}
-        </div>
-        <div className="space-y-1.5">
-          <label htmlFor={ids.repo} className="block text-sm font-medium">
-            {inFolders ? 'Where its work goes' : 'Repository'}
-          </label>
-          {inFolders ? (
-            <p data-in-folders className="text-xs text-muted-foreground">
-              {picked!.name} works in folders the run makes for it, and looks at no repository. The card names none, and the run says where
-              the work is.
-            </p>
-          ) : (
-            <input
-              id={ids.repo}
-              value={about}
-              onChange={(event) => setRepo(event.target.value)}
-              placeholder="None: the repository its start names"
-              className={`${FIELD} font-mono text-xs`}
-            />
-          )}
-        </div>
-      </div>
-      <div className="flex flex-wrap items-center gap-3">
-        <button type="submit" disabled={!idea.trim() || file.isPending} className={PRIMARY}>
-          {file.isPending ? 'Filing…' : 'File'}
-        </button>
-        <span className="text-xs text-muted-foreground">Parked, not started: nothing runs until you start it.</span>
-      </div>
-      {file.isError && (
-        <div data-refused className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
-          <p className="text-sm font-medium text-on-failure-container">Not filed. The api refused it:</p>
-          <p className="font-mono text-xs whitespace-pre-wrap break-words text-on-failure-container">{file.error.message}</p>
-        </div>
-      )}
-    </form>
-  );
-}
-
-/**
  * A card: its first line, linked to its page, and under it its name, factory, workflow, repository and filing time (`CardMeta`); Start,
- * which opens its start form, and Remove. Queue on a card that names a workflow (`queueable`), and on a queued card its place and when it
+ * which opens its start, in its factory or in one picked there, and Remove. Queue on a card that names a workflow (`queueable`), and on a queued card its place and when it
  * was queued, and Unqueue; and, when the tick tried its start and did not make it, why — a card refused stays queued, as the package keeps
  * it. A card a run's record names — started, its removal failed — links to its run and offers Remove only. An entry that does not read as a
  * card shows why, with its file for a title, and offers Remove when it is a card's file, which the CLI's `inbox rm` can drop.
@@ -379,8 +268,8 @@ function StartedAs({ startedAs, kept }: { startedAs: readonly string[]; kept: { 
 }
 
 /**
- * A card's start: in the factory it names (`FactoryCardStart`), or, for a card of the default factory, on the api's repository
- * (`StartHere`). A start the api took opens the run's page — unless the card stayed in the inbox, which `onKept` is told of, with why, and
+ * A card's start: in the factory it names (`FactoryCardStart`), or, for a card that names none (`unassigned`), in the factory a person
+ * picks first (`UnassignedStart`). A start the api took opens the run's page — unless the card stayed in the inbox, which `onKept` is told of, with why, and
  * the page stays. A refusal is `onRefused`'s to show, since the form may not outlive it.
  */
 function StartCard({
@@ -397,78 +286,9 @@ function StartCard({
     if (started.removed === false) onKept({ id: started.id, why: started.why ?? 'the api did not say why' });
     else void navigate({ to: '/runs/$runId', params: { runId: started.id } });
   };
-  return entry.factory !== null && entry.factory !== 'default' ? (
-    <FactoryCardStart entry={entry} onStarted={onStarted} onRefused={onRefused} />
+  return unassigned(entry) ? (
+    <UnassignedStart entry={entry} onStarted={onStarted} onRefused={onRefused} />
   ) : (
-    <StartHere entry={entry} onStarted={onStarted} onRefused={onRefused} />
-  );
-}
-
-/**
- * A card's start on the api's repository: the workflow, preset from the card and changeable, and `StartRun` with the brief prefilled from
- * its body. The workflows listed are those of the api's repository: a card about another repository names a workflow of that one, and
- * presets none of these.
- */
-function StartHere({
-  entry,
-  onStarted,
-  onRefused,
-}: {
-  entry: InboxEntry;
-  onStarted: (started: Started) => void;
-  onRefused: (message: string | null) => void;
-}) {
-  const workflows = useQuery(workflowsQuery);
-  const repository = useQuery(repositoryQuery);
-  const here = repository.data?.repo;
-  const [picked, setPicked] = useState<string | null>(null);
-  const preset = workflows.data && here !== undefined ? presetOf(entry.workflow, entry.repo, here, workflows.data) : null;
-  const key = picked ?? (preset ? workflowKey(preset) : '');
-  const workflow = workflows.data?.find((w) => w.error === null && workflowKey(w) === key) ?? null;
-  const field = useId();
-
-  return (
-    <div data-start-card className="space-y-3 border-t border-outline-variant pt-4">
-      <div className="space-y-1.5">
-        <label htmlFor={field} className="block text-sm font-medium">
-          Workflow
-        </label>
-        {workflows.error || repository.error ? (
-          <p className="text-xs text-failure">
-            Could not list the workflows to start it on: {(workflows.error ?? repository.error)!.message}
-          </p>
-        ) : !workflows.data || here === undefined ? (
-          <p className="text-xs text-muted-foreground">Reading the workflows…</p>
-        ) : (
-          <select id={field} value={key} onChange={(event) => setPicked(event.target.value)} className={`${FIELD} sm:max-w-xs`}>
-            <option value="" disabled>
-              Pick what runs it
-            </option>
-            <WorkflowOptions workflows={workflows.data} />
-          </select>
-        )}
-        {entry.workflow && workflows.data && here !== undefined && !preset && (
-          <p data-unlisted className="text-xs text-yours">
-            {namedElsewhere(entry.workflow, entry.repo, here) ? (
-              <>
-                The card names {code(entry.workflow)}, a workflow of {code(entry.repo!)}, and the workflows here are {code(here)}&apos;s:
-                pick the one to run it on, or start it from the command line, which finds that one.
-              </>
-            ) : (
-              <>The card names {code(entry.workflow)}, which is not a workflow here that reads: pick the one to run it on.</>
-            )}
-          </p>
-        )}
-      </div>
-      {workflow && (
-        <StartRun
-          workflow={workflow}
-          card={{ name: entry.name, body: entry.body ?? '' }}
-          {...(entry.repo ? { repo: entry.repo } : {})}
-          onStarted={onStarted}
-          onRefused={onRefused}
-        />
-      )}
-    </div>
+    <FactoryCardStart entry={entry} onStarted={onStarted} onRefused={onRefused} />
   );
 }

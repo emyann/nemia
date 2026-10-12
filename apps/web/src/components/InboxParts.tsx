@@ -2,8 +2,7 @@
 import type { ReactNode } from 'react';
 import { Link } from '@tanstack/react-router';
 import { workflowNameOf, type InboxEntry } from '../lib/api';
-import { factoryOf } from '../lib/factories';
-import { hasPage, triedLine, type CardRefusal } from '../lib/inbox';
+import { hasPage, triedLine, unassigned, type CardRefusal } from '../lib/inbox';
 import { FactoryTag } from './FactoryTag';
 
 /** A button that does what its form or card is for. */
@@ -14,14 +13,21 @@ export const SECONDARY =
   'rounded border border-outline px-3 py-1.5 text-sm font-medium hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40';
 
 /**
- * A card's line under its title: its name, the factory it is in, linked to its floor — `default`, muted and not linked, for one naming none
- * — its workflow and repository when it names them, and when it was filed.
+ * A card's line under its title: its name; the factory it names, linked to its floor, or, for a card that names none (`unassigned`),
+ * that it has no factory yet, and never a tag; its workflow and repository when it names them; and when it was filed. An entry that does
+ * not read as a card says nothing of a factory.
  */
 export function CardMeta({ entry }: { entry: InboxEntry }) {
   return (
     <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
       <span className="font-mono">{entry.name}</span>
-      <FactoryTag name={factoryOf(entry)} linked />
+      {entry.error !== null ? null : unassigned(entry) ? (
+        <span data-unassigned title="It names no factory: Start gives it one.">
+          no factory yet
+        </span>
+      ) : (
+        <FactoryTag name={entry.factory!} linked />
+      )}
       {entry.workflow && (
         <span data-workflow={entry.workflow} title={entry.workflow}>
           workflow <span className="font-mono text-foreground">{workflowNameOf(entry.workflow)}</span>

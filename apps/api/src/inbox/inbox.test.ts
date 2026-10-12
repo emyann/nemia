@@ -823,7 +823,7 @@ const factoryRefusal = (name: string): string => {
   return assert.fail(`the factory ${name} reads, and should have been refused`);
 };
 
-test("POST /api/inbox with `factory` files the card in it, as `nemia inbox add --factory` does: its `factory:` key, its workflow as a start in the factory finds it, and no `repo:` nobody sent — and GET /api/inbox lists it with its factory", async () => {
+test('POST /api/inbox with `factory` files the card in it, as `nemia inbox add --factory` does: its `factory:` key, its workflow as a start in the factory finds it, and no `repo:` nobody sent — and GET /api/inbox lists it with its factory', async () => {
   clear();
   const res = await file({ body: 'Mill the views', factory: 'mill', workflow: 'dev', from: 'repo' });
   assert.equal(res.status, 201, await res.clone().text());
@@ -870,7 +870,10 @@ test('REFUSED at shipped defaults: a `factory` that is not text, or is `default`
   for (const factory of [7, null, ['mill']]) {
     const res = await file({ body: 'An idea', factory });
     assert.equal(res.status, 400, JSON.stringify(factory));
-    assert.ok(((await res.json()) as Refused).error.startsWith('`factory` names the factory the card is filed in'), JSON.stringify(factory));
+    assert.ok(
+      ((await res.json()) as Refused).error.startsWith('`factory` names the factory the card is filed in'),
+      JSON.stringify(factory),
+    );
   }
   const res = await file({ body: 'An idea', factory: 'default' });
   assert.equal(res.status, 400);

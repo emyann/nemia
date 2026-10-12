@@ -3,7 +3,7 @@
  * harness's `HarnessHandler`, in this process, with no HTTP between them.
  *
  * `spawn`, `observe`, `stop` and `say` go through the client, as A2A's own calls; `find`, `logs`, `release`, the
- * transcript, `observeFor`, `quota` and `forget`, which A2A has no call for, through the runtime extension's methods on the same transport.
+ * transcript, `observeFor`, `quota`, `forget` and `kept`, which A2A has no call for, through the runtime extension's methods on the same transport.
  * One reaches the driver directly: `refuses`, which is no call to a session but the harness judging a task before any is
  * filed. Nothing the engine reads changes: a harness's words come back as the same `RunnerError`, `refused` where the
  * harness vouched nothing started, and a driver's defect as the defect it is.
@@ -42,6 +42,7 @@ import {
   type Observation,
   type RunnerOps,
   type SessionForgotten,
+  type SessionKept,
   type SpawnRequest,
   type Transcript,
   type TranscriptCursor,
@@ -52,6 +53,7 @@ import {
   HarnessHandler,
   MOST_PER_PAGE,
   type ForgetRequest,
+  type KeptRequest,
   type RuntimeExtensionParams,
   type SessionMethods,
   type OutputRequest,
@@ -157,6 +159,10 @@ export class InProcessTransport implements Transport {
   forgetSession(params: ForgetRequest): Promise<SessionForgotten> {
     return this.handler.forgetSession(params, new ServerCallContext());
   }
+
+  sessionKept(params: KeptRequest): Promise<Record<string, SessionKept>> {
+    return this.handler.sessionKept(params, new ServerCallContext());
+  }
 }
 
 /** One harness's seam: its card, a client over its handler in this process, and the transport the extension's methods take. */
@@ -203,6 +209,12 @@ const forgetThrough =
   (session: { name: string; nativeId?: string }, options: { dry: boolean }): Effect.Effect<SessionForgotten, RunnerError> =>
     call('forget', () => transport.forgetSession({ session, dry: options.dry }));
 
+/** `kept` through the seam: where the harness keeps what it has of each session asked, by the session's name. */
+const keptThrough =
+  (transport: InProcessTransport) =>
+  (sessions: readonly { name: string; nativeId?: string }[]): Effect.Effect<Record<string, SessionKept>, RunnerError> =>
+    call('kept', () => transport.sessionKept({ sessions }));
+
 /** `output` through the seam: one stream of the session under a name, whole or its last bytes; `undefined` when none was kept. */
 const outputThrough =
   (transport: InProcessTransport) =>
@@ -235,6 +247,7 @@ const askedOfTransport = (offered: RuntimeExtensionParams, transport: InProcessT
   ...(offered.methods.includes('sessionOutput') ? { output: outputThrough(transport) } : {}),
   ...(offered.methods.includes('harnessQuota') ? { quota: call('quota', () => transport.harnessQuota({})) } : {}),
   ...(offered.methods.includes('forgetSession') ? { forget: forgetThrough(transport) } : {}),
+  ...(offered.methods.includes('sessionKept') ? { kept: keptThrough(transport) } : {}),
 });
 
 /**

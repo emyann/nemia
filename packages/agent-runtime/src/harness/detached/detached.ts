@@ -25,7 +25,7 @@ import { fileURLToPath } from 'node:url';
 import type { Denial, Sighting, Usage } from '../../core/index.ts';
 import { RunnerError, type McpServer, type RunnerOps, type SpawnRequest, type TranscriptEvent } from '../seam.ts';
 import { sessionMcp, writeMcpConfig } from '../mcp.ts';
-import { forgetFiles } from '../forget.ts';
+import { forgetFiles, keptOf } from '../forget.ts';
 import { withoutTelemetry } from '../telemetry.ts';
 import { readTranscript } from '../transcript.ts';
 import { countRead, countSpawn, readText } from '../../core/engine/tally.ts';
@@ -79,10 +79,13 @@ export type HarnessSpec = {
    * for a harness that keeps one. `file` is given the harness's own session id, the run's `nativeId`,
    * and may read the disk to find it, as `prepare` does; `events` is pure, given the line parsed, the
    * byte offset it starts at, and the file, for a refusal to name. Absent, the runner has no `transcript`, and `logs` is what it gives.
+   * `records`, optional, finds the record of many sessions in one pass, each id's paths, where `file` asked once an id would
+   * list the harness's folders once an id.
    */
   transcript?: {
     file: (nativeId: string) => string | undefined;
     events: (entry: unknown, offset: number, file: string) => TranscriptEvent[];
+    records?: (nativeIds: readonly string[]) => Map<string, string[]>;
   };
   /**
    * Why a session of this harness cannot be told anything while it runs, in its own words and saying what to
@@ -478,28 +481,56 @@ const outputOps = (spec: HarnessSpec, dir: string): Pick<RunnerOps, 'output'> =>
     : {};
 
 /**
+ * What a detached runner keeps of a session, off one listing of its run folder: `files`, the session's run file and every file
+ * beside it, each named by the run's name and an end after a dot; and `records`, by session name, the harness's own record of
+ * each of the sessions given, when the spec keeps one, found in one pass where the spec has one (`transcript.records`).
+ */
+const sessionFilesOf = (spec: HarnessSpec, root: string) => {
+  const dir = path.join(root, 'runs', spec.name);
+  const listed = fs.existsSync(dir) ? fs.readdirSync(dir) : [];
+  const byRun = new Map<string, string[]>();
+  for (const f of listed) {
+    const run = f.slice(0, f.indexOf('.'));
+    byRun.set(run, [...(byRun.get(run) ?? []), path.join(dir, f)]);
+  }
+  return {
+    files: (name: string): string[] => byRun.get(safe(name)) ?? [],
+    records: (sessions: readonly { name: string; nativeId?: string }[]): Map<string, string[]> => {
+      const reader = spec.transcript;
+      const ids = sessions.flatMap((s) => (s.nativeId ? [s.nativeId] : []));
+      if (!reader || !ids.length) return new Map();
+      const found = reader.records?.(ids);
+      const of = (id: string) => {
+        if (found) return found.get(id) ?? [];
+        const file = reader.file(id);
+        return file ? [file] : [];
+      };
+      return new Map(sessions.flatMap((s) => (s.nativeId ? [[s.name, of(s.nativeId)] as const] : [])));
+    },
+  };
+};
+
+/**
  * A detached runner's `forget`: the session's run file and every file beside it, each named by the run's name and an end
  * after a dot; the harness's own record of its conversation, when the spec keeps one, left and named.
  */
 const forgetRunOf =
   (spec: HarnessSpec, root: string): NonNullable<RunnerOps['forget']> =>
-  (session, { dry }) => {
-    const dir = path.join(root, 'runs', spec.name);
-    const transcript = () => {
-      const file = session.nativeId ? spec.transcript?.file(session.nativeId) : undefined;
-      return file ? [file] : [];
-    };
-    return Effect.suspend(() => {
-      const prefix = `${safe(session.name)}.`;
-      const files = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.startsWith(prefix)) : [];
-      return forgetFiles(
-        spec.name,
-        files.map((f) => path.join(dir, f)),
-        transcript,
-        dry,
-      );
+  (session, { dry }) =>
+    Effect.suspend(() => {
+      const keeps = sessionFilesOf(spec, root);
+      return forgetFiles(spec.name, keeps.files(session.name), () => keeps.records([session]).get(session.name) ?? [], dry);
     });
-  };
+
+/** A detached runner's `kept`: what `forgetRunOf` would remove of each session, and the record it leaves, off one listing. */
+const keptRunOf =
+  (spec: HarnessSpec, root: string): NonNullable<RunnerOps['kept']> =>
+  (sessions) =>
+    Effect.suspend(() => {
+      const keeps = sessionFilesOf(spec, root);
+      const records = keeps.records(sessions);
+      return keptOf(spec.name, sessions, ({ name }) => ({ files: keeps.files(name), records: records.get(name) ?? [] }));
+    });
 
 /**
  * A detached runner's `transcript`, for a spec that keeps one: read from the harness's own record, found by the run's `nativeId`
@@ -547,11 +578,12 @@ const followOps = (spec: HarnessSpec, root: string, dir: string): Pick<RunnerOps
   };
 };
 
-/** The verbs of a detached runner over the files beside a run's: its streams (`outputOps`, `followOps`), and `forget`. */
+/** The verbs of a detached runner over the files beside a run's: its streams (`outputOps`, `followOps`), `forget` and `kept`. */
 const runFileOps = (spec: HarnessSpec, root: string, dir: string) => ({
   ...outputOps(spec, dir),
   ...followOps(spec, root, dir),
   forget: forgetRunOf(spec, root),
+  kept: keptRunOf(spec, root),
 });
 
 /**

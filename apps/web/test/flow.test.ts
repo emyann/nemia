@@ -1,8 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import type { GraphEdge, RunGraph } from '../src/lib/api.ts';
 import type { EdgeStep } from '../src/lib/canvas.ts';
 import { railOf, RAIL_WIDTH, tilesOf, TILE, UNGRAPHED, windowOf, type Flow } from '../src/lib/flow.ts';
+import { CHAR_WIDTH } from '../src/lib/machine.ts';
 import type { StepState } from '../src/lib/status.ts';
 
 const after = (from: string, to: string): GraphEdge => ({ from, to, kind: 'after' });
@@ -234,4 +237,26 @@ test('opened, every step is a tile, nothing folded or counted', () => {
   assert.ok(flow.pills.every((p) => p.kind === 'step' && p.width === TILE.width && p.height === TILE.height));
   assert.equal(flow.width, 6 * TILE.width + 5 * TILE.gap);
   assert.equal(flow.height, 5 * TILE.height + 4 * TILE.lane);
+});
+
+/** What a pill keeps of its width from its name: its padding (`px-0.5`, two pixels a side) and its border, a pixel a side. */
+const PILL_EDGES = 6;
+
+test("REFUSED: a four-column rail whose pills cannot hold a nine-letter name: the pill's room is its width less its padding and border", () => {
+  const chain = ['design', 'implement', 'review', 'land'];
+  const flow = railOf(
+    chain,
+    graphOf(...chain.slice(1).map((name, i) => after(chain[i] ?? name, name))),
+    stepsOf({ design: 'working' }),
+    false,
+  );
+  assert.deepEqual(read(flow), [['design'], ['implement'], ['review'], ['land']]);
+  for (const pill of flow.pills)
+    assert.ok(pill.width - PILL_EDGES >= 'implement'.length * CHAR_WIDTH, `${pill.label}: ${pill.width} wide holds no nine letters`);
+  const rail = fs.readFileSync(path.join(import.meta.dirname, '..', 'src', 'components', 'StepRail.tsx'), 'utf8');
+  assert.match(
+    rail,
+    /rounded-full\s+px-0\.5\s+font-mono\s+text-body-small/,
+    'the pill pads its name by two pixels a side, in mono at the small body role',
+  );
 });

@@ -84,7 +84,7 @@ export function StepRail({ run, flow }: { run: RunSummary; flow: Flow }) {
               }
               style={at(pill)}
               className={[
-                'absolute flex items-center justify-center rounded-full px-1.5 font-mono text-body-small leading-none',
+                'absolute flex items-center justify-center rounded-full px-0.5 font-mono text-body-small leading-none',
                 pill.state ? stateClass[pill.state] : 'border border-dashed border-outline bg-background text-muted-foreground',
                 pill.live ? 'ring-2 ring-alive/60 ring-offset-1 ring-offset-background' : '',
               ].join(' ')}

@@ -9,6 +9,7 @@ import { stateMeaning, type StepState } from '../src/lib/status.ts';
 import {
   endedWords,
   nowOf,
+  openWord,
   presentWait,
   railSaid,
   sentenceOf,
@@ -22,6 +23,7 @@ import {
   waitSentence,
   waitTag,
   WAITS_TAG,
+  whenColumn,
   whenWords,
   type WaitKind,
 } from '../src/lib/runWords.ts';
@@ -48,26 +50,37 @@ const waiting = {
   onYou: true,
 };
 
-/** One row of the light answer per kind of wait, and the sentence it says. */
-const ROWS: Record<WaitKind, { row: RunSummary; says: string }> = {
-  approve: { row: landing('awaiting approval'), says: 'Three steps are done. Land waits for your approval.' },
-  blocked: { row: landing('succeeded · BLOCKED'), says: 'Land stopped and needs your word to go on.' },
-  check: { row: landing('failed ✗ check (exit 1)'), says: "The check refused Land's work. Try it again or call the run off." },
+/** One row of the light answer per kind of wait, the sentence it says, and the words of its card's button. */
+const ROWS: Record<WaitKind, { row: RunSummary; says: string; opens: string }> = {
+  approve: { row: landing('awaiting approval'), says: 'Three steps are done. Land waits for your approval.', opens: 'Read the land' },
+  blocked: { row: landing('succeeded · BLOCKED'), says: 'Land stopped and needs your word to go on.', opens: 'Read the question' },
+  check: {
+    row: landing('failed ✗ check (exit 1)'),
+    says: "The check refused Land's work. Try it again or call the run off.",
+    opens: 'Read the check',
+  },
   unfinished: {
     row: landing('failed ✗ check (unfinished)'),
     says: "Land's check did not finish, so nothing judged its work. Run the check again.",
+    opens: 'Read the check',
   },
-  unsigned: { row: landing('unsigned'), says: 'Land ended without signing its work. Try it again.' },
-  denied: { row: landing('denied'), says: 'Land was refused a tool it called. Try it again.' },
-  rounds: { row: landing('rounds exhausted'), says: 'Land is out of rounds. Give it another or decide its result.' },
-  budget: { row: landing('over budget $4.25 of $3'), says: 'Land is past its budget. Say whether it may spend more.' },
+  unsigned: { row: landing('unsigned'), says: 'Land ended without signing its work. Try it again.', opens: 'Open the run' },
+  denied: { row: landing('denied'), says: 'Land was refused a tool it called. Try it again.', opens: 'Open the run' },
+  rounds: { row: landing('rounds exhausted'), says: 'Land is out of rounds. Give it another or decide its result.', opens: 'Open the run' },
+  budget: {
+    row: landing('over budget $4.25 of $3'),
+    says: 'Land is past its budget. Say whether it may spend more.',
+    opens: 'Open the run',
+  },
   hold: {
     row: summary([['design', 'waiting']], { moving: false, holding }),
     says: 'You hold this run. It moves once you lift the hold.',
+    opens: 'Open the run',
   },
   after: {
     row: summary([['design', 'waiting on r-0 (cancelled)']], { moving: false, waiting }),
     says: 'It waits on a run that will not finish without you.',
+    opens: 'Open the run',
   },
 };
 
@@ -77,6 +90,39 @@ test('each kind of wait says its one sentence, over a row of the light answer', 
     assert.equal(waitOf(row)?.kind, kind, `the row of ${kind} is read as that kind`);
     assert.equal(waitSentence(row), says, kind);
   }
+});
+
+test("each kind of wait says its button's words: what there is to read where there is one thing, else that it opens the run", () => {
+  for (const kind of WAIT_KINDS) assert.equal(openWord(ROWS[kind].row), ROWS[kind].opens, kind);
+  assert.equal(openWord(summary([['plan', 'pondering']], { waitingOnYou: ['plan'] })), 'Open the run', 'a wait the board has no kind for');
+});
+
+/** `row` with the task of its step `name` set to `taskId`. */
+const tasked = (row: RunSummary, name: string, taskId: string | null): RunSummary => ({
+  ...row,
+  steps: row.steps.map((step) => (step.name === name ? { ...step, taskId } : step)),
+});
+
+test("REFUSED: a gate's button names the step whose work there is to read: the gated step's own, or the one done before it", () => {
+  const steps = [
+    ['review', 'verified ✓'],
+    ['land', 'awaiting approval'],
+  ] as const;
+  const gate = summary(steps, { waitingOnYou: ['land'] });
+  assert.equal(openWord(tasked(gate, 'land', 't-9')), 'Read the land', 'a gated step that has run is what there is to read');
+  assert.equal(openWord(tasked(gate, 'land', null)), 'Read the review', 'a gate held before its step is filed reads the step before');
+  const design = summary([['design', 'awaiting approval'], ...steps.slice(0, 1)], { waitingOnYou: ['design'] });
+  assert.equal(openWord(design), 'Read the design');
+  assert.equal(openWord(tasked(design, 'design', null)), 'Open the run', 'no work of its own and none done before it: nothing to name');
+  const skipped = summary(
+    [
+      ['design', 'unverified'],
+      ['implement', 'waiting'],
+      ['land', 'awaiting approval'],
+    ],
+    { waitingOnYou: ['land'] },
+  );
+  assert.equal(openWord(tasked(skipped, 'land', null)), 'Read the design', 'the last step done before it, not the step beside it');
 });
 
 test('REFUSED: a kind with no sentence fails rather than printing nothing', () => {
@@ -211,8 +257,13 @@ test('the present wait is said since the instant it began, to the minute, and no
 });
 
 test('the rail says each step and its word, in the run’s order', () => {
-  assert.equal(railSaid(landing('awaiting approval').steps, false, false), 'design done, implement done, review done, land waits for you');
-  assert.equal(railSaid(landing('awaiting approval').steps, false, true), 'design done, implement done, review done, land held');
+  const mixed = summary([
+    ['design', 'verified ✓'],
+    ['implement', 'unverified'],
+    ['land', 'awaiting approval'],
+  ]).steps;
+  assert.equal(railSaid(mixed, false, false), 'design verified, implement done, land waits for you', 'a check is told from a word');
+  assert.equal(railSaid(mixed, false, true), 'design verified, implement done, land held');
   assert.equal(
     railSaid(
       summary([
@@ -255,10 +306,41 @@ test('what a run in flight does now: its first step not done, its place among it
   assert.equal(nowOf(summary([...DONE]), null), null, 'every step done: nothing to say');
 });
 
+/** No character but printable ASCII: a narrow no-break space before AM or PM is refused. */
+const PLAIN = /^[ -~]+$/;
+
 test('when something happened: the time alone on the same day, the day before it on another, the day and its year in another year', () => {
   const now = new Date('2026-10-11T17:38:00.000Z');
-  assert.equal(whenWords(new Date('2026-10-11T17:11:59.000Z'), now, 'America/Montreal'), '13:11');
-  assert.equal(whenWords(new Date('2026-10-11T03:59:00.000Z'), now, 'America/Montreal'), '10 Oct 23:59', "the day is the reader's");
-  assert.equal(whenWords(new Date('2026-08-03T13:05:00.000Z'), now, 'UTC'), '3 Aug 13:05');
-  assert.equal(whenWords(new Date('2025-12-31T23:05:00.000Z'), now, 'UTC'), '31 Dec 2025');
+  const said = [
+    [whenWords(new Date('2026-10-11T17:11:59.000Z'), now, 'America/Montreal'), '1:11 PM'],
+    [whenWords(new Date('2026-10-11T03:59:00.000Z'), now, 'America/Montreal'), '10 Oct 11:59 PM'],
+    [whenWords(new Date('2026-08-03T13:05:00.000Z'), now, 'UTC'), '3 Aug 1:05 PM'],
+    [whenWords(new Date('2025-12-31T23:05:00.000Z'), now, 'UTC'), '31 Dec 2025'],
+    [whenWords(new Date('2026-10-11T12:00:00.000Z'), now, 'UTC'), '12:00 PM'],
+    [whenWords(new Date('2026-10-11T00:05:00.000Z'), now, 'UTC'), '12:05 AM'],
+  ];
+  for (const [words, want] of said) {
+    assert.equal(words, want);
+    assert.match(words, PLAIN, 'plain spaces only');
+  }
+});
+
+test("REFUSED: a finished row's time carries its date on the day itself, each of its day and its hour two characters wide", () => {
+  const now = new Date('2026-10-11T17:38:00.000Z');
+  const today = whenColumn(new Date('2026-10-11T17:11:59.000Z'), now, 'America/Montreal');
+  assert.equal(today, '11 Oct  1:11 PM', 'today says its date too');
+  assert.equal(
+    whenColumn(new Date('2026-08-03T13:05:00.000Z'), now, 'UTC'),
+    ' 3 Aug  1:05 PM',
+    'a day and an hour of one digit are padded',
+  );
+  assert.equal(whenColumn(new Date('2026-10-11T03:59:00.000Z'), now, 'America/Montreal'), '10 Oct 11:59 PM');
+  assert.equal(whenColumn(new Date('2026-01-01T00:05:00.000Z'), now, 'UTC'), ' 1 Jan 12:05 AM');
+  assert.equal(whenColumn(new Date('2025-12-31T23:05:00.000Z'), now, 'UTC'), '31 Dec 2025', 'another year: the day and its year');
+  assert.equal(whenColumn(new Date('2025-01-03T23:05:00.000Z'), now, 'UTC'), ' 3 Jan 2025');
+  for (let hour = 0; hour < 24 * 365; hour += 7) {
+    const words = whenColumn(new Date(Date.UTC(2026, 0, 1, hour, 7)), now, 'UTC');
+    assert.equal(words.length, 15, words);
+    assert.match(words, PLAIN, words);
+  }
 });

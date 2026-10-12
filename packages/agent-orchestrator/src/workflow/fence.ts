@@ -119,8 +119,8 @@ export function fenceRefusal(step: string, agent: Agent, own: Partial<Record<Ste
 
 /**
  * Why step `step` may not add the skills `added` to its agent's, its line written as `line`, or `undefined` when it may: the first one the
- * agent does not give whose load the agent's own fence refuses — a `tools:` list with no `Skill`, or a deny covering `Skill(<skill>)`, the skill by its bare name
- * (`bareSkillOf`), as a session calls it.
+ * agent does not give whose load the agent's own fence refuses — a `tools:` list with no `Skill`, or a deny covering `Skill(<skill>)`,
+ * the skill by its bare name (`bareSkillOf`), as a session calls it.
  * Loading a skill is a call of `Skill`, so adding one past the agent's fence would widen it. A step on a sandboxed harness or a remote
  * agent is left to `composedRefusal`, which refuses skills there. The refusal names the step, the skill, the agent's file and both fixes.
  */

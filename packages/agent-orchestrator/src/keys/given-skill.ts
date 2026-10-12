@@ -42,7 +42,7 @@ export function sameBareIn(names: readonly string[]): [string, string] | undefin
 /** The two forms of a name on a `skills:` line, said after a refusal of one that is neither. */
 export const GIVEN_SKILL_FORMS =
   "Each is a skill's name — its folder in skills/, lowercase words joined by dashes — or `folder:name`, the skill `name` of the " +
-  "repository's folder `folder`, read from its `.claude/skills/`: `apps/web:ds-build`. Comma-separated: `skills: review-a-change, apps/web:ds-build`.";
+  "repository's folder `folder`, read from that folder's own skills: `apps/web:ds-build`. Comma-separated: `skills: review-a-change, apps/web:ds-build`.";
 
 /** Why one session cannot hold two skills of one bare name, said after a refusal that names both. */
 export const ONE_BARE_NAME = 'A session loads a skill by its bare name, so one step holds one skill of a name.';

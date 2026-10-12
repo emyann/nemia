@@ -58,8 +58,9 @@ export const renderedIn = (dir: string, step: Workflow): boolean =>
 
 /**
  * Render every step of `steps` whose agent is rendered (`rendersAgent`) into its folder (`agentFilesDir`): its prompt, its skills copied
- * whole from where the load found them (`skills`), each under its bare name (`bareSkillOf`), as the prompt names it, and its style. Written once, at `nemia start`, so an edit of an agent or a skill after
- * it reaches no run already started, as an edit of its workflow does not. A skill is copied as its files, never a link, and one holding
+ * whole from where the load found them (`skills`), each under its bare name (`bareSkillOf`), as the prompt names it, and its style.
+ * Written once, at `nemia start`, so an edit of an agent or a skill after it reaches no run already started, as an edit of its workflow
+ * does not. A skill is copied as its files, never a link, and one holding
  * a link that is not followed is refused (`copySkillFiles`): the folder is the step's own.
  */
 export function writeAgentFiles(run: Pick<Run, 'id'>, steps: readonly Workflow[], skills: SkillsFound): void {
@@ -93,9 +94,9 @@ export function writeAgentFiles(run: Pick<Run, 'id'>, steps: readonly Workflow[]
 }
 
 /**
- * The version (`skillVersion`) of each skill `nemia start` rendered for a step of `run` (`writeAgentFiles`), by the name its line writes, read off its copy
- * in the step's folder (`agentFilesDir`): a skill whose copy is not there — a step whose agent is not rendered, a folder gone — is left
- * out.
+ * The version (`skillVersion`) of each skill `nemia start` rendered for a step of `run` (`writeAgentFiles`), by the name its line writes,
+ * read off its copy, filed under its bare name, in the step's folder (`agentFilesDir`): a skill whose copy is not there — a step whose
+ * agent is not rendered, a folder gone — is left out.
  */
 export function renderedSkillVersions(run: Pick<Run, 'id'>, step: Workflow): Map<string, string> {
   const agent = step.agent;
@@ -110,9 +111,9 @@ export function renderedSkillVersions(run: Pick<Run, 'id'>, step: Workflow): Map
 }
 
 /**
- * The rules (`readSkillRules`) each skill `nemia start` rendered for a step of `run` declares, by the name the skill's line writes, read off its copy in
- * the step's folder (`agentFilesDir`): a skill whose copy is not there, that declares none, or whose `rules.json` does not read is left
- * out.
+ * The rules (`readSkillRules`) each skill `nemia start` rendered for a step of `run` declares, by the name the skill's line writes, read
+ * off its copy in the step's folder (`agentFilesDir`): a skill whose copy is not there, that declares none, or whose `rules.json` does not
+ * read is left out.
  */
 export function renderedSkillRules(run: Pick<Run, 'id'>, step: Workflow): Map<string, SkillRule[]> {
   const agent = step.agent;
@@ -132,8 +133,9 @@ export function renderedSkillRules(run: Pick<Run, 'id'>, step: Workflow): Map<st
 }
 
 /**
- * The paths of the work (`appliesOf`) each skill `nemia start` rendered for a step of `run` declares, by the name the skill's line writes, read off its
- * copy's SKILL.md in the step's folder (`agentFilesDir`): a skill whose copy is not there, or that declares none, is left out.
+ * The paths of the work (`appliesOf`) each skill `nemia start` rendered for a step of `run` declares, by the name the skill's line writes,
+ * read off its copy's SKILL.md in the step's folder (`agentFilesDir`): a skill whose copy is not there, or that declares none, is left
+ * out.
  */
 export function renderedSkillApplies(run: Pick<Run, 'id'>, step: Workflow): Map<string, string[]> {
   const agent = step.agent;

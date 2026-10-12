@@ -123,11 +123,12 @@ function realOf(at: string): string | undefined {
 }
 
 /**
- * The skill `written` (`folder:name`, read as `given`) of the repository `repo`: the folder it is, `<repo>/<folder>/.claude/skills/<name>`
- * holding a `SKILL.md`, or why it cannot be used, each naming the skill as written. Refused: with no repository, since none is read; a
- * folder reached through a link that leaves the repository, by real path, which is never opened; a folder that holds no such skill,
- * naming where it was looked for; and as a skill of the roots is, a link in it that is not followed (`skillLinkRefusal`) — one that
- * leaves said with the folder that bounds it, the one the line names — and rules that do not read.
+ * The skill `written` (`folder:name`, read as `given`) of the repository `repo`: the folder it is, the skill `name` of the own skills
+ * (`REPOSITORY_HOLDER`) of the repository's folder `folder`, holding a `SKILL.md`, or why it cannot be used, each naming the skill as
+ * written. Refused: with no repository, since none is read; a folder reached through a link that leaves the repository, by real path,
+ * which is never opened; a folder that holds no such skill, naming where it was looked for; and as a skill of the roots is, a link in it
+ * that is not followed (`skillLinkRefusal`) — one that leaves said with the folder that bounds it, the one the line names — and rules that
+ * do not read.
  */
 function folderSkill(written: string, given: Required<GivenSkill>, repo: string | undefined): string | WorkflowError {
   const named = `\`${written}\` is the skill \`${given.name}\` of the repository's folder \`${given.folder}\``;

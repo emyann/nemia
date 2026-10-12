@@ -75,7 +75,7 @@ async function startUnassigned(page: Page, name: string, theme: string): Promise
     await item.getByRole('combobox', { name: 'Workflow' }).selectOption({ label: WORKFLOWS.good.name });
     await expectVisible(form.getByRole('button', { name: 'Start' }), `with ${factory} and ${WORKFLOWS.good.name} picked, the start form`);
     await settled(other);
-    await photograph(item, path.join(OUT, `inbox-file-unassigned-${theme}.png`));
+    await photograph(other, path.join(OUT, `inbox-file-unassigned-${theme}.png`), { fullPage: true });
     const [started] = await Promise.all([
       other.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/runs', { timeout: WAIT_MS }),
       form.getByRole('button', { name: 'Start' }).click(),
@@ -205,7 +205,7 @@ export default {
       await open(page, '/inbox');
       await expectCount(page.locator('section[aria-label="Cards"] [data-factory-tag="default"]'), 0, 'no card wears a default tag');
       await settled(page);
-      await photograph(page.locator('section[aria-label="Cards"]'), path.join(OUT, `inbox-file-lines-${theme}.png`));
+      await photograph(page, path.join(OUT, `inbox-file-lines-${theme}.png`), { fullPage: true });
       await startUnassigned(page, bare.name, theme);
     } finally {
       for (const file of written) fs.rmSync(file, { force: true });

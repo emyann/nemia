@@ -189,7 +189,7 @@ export function StepTiles({
                 )}
               </span>
               {need && (
-                <span data-need={need.kind} title={needText(need)} className={`truncate text-[11px] ${'text-yours'}`}>
+                <span data-need={need.kind} title={needText(need)} className="truncate text-[11px] text-yours">
                   {tileNeed(need, gate)}
                 </span>
               )}

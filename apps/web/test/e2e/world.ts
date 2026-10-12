@@ -44,6 +44,14 @@ export let photographing = false;
 export function setPhotographing(to: boolean): void {
   photographing = to;
 }
+/**
+ * Whether what is pictured is measured too: `photograph` writes each picture's text pairs beside it while it is true (`measure`,
+ * contrast.ts). Set by `visitAll` from the run's plan: false unless the e2e was run with `--photos --contrast`.
+ */
+export let measuring = false;
+export function setMeasuring(to: boolean): void {
+  measuring = to;
+}
 /** Every line draft's stand-in inbox (SAYING, INBOX) has been sent, in order: what the `say` page holds its words to. */
 export const heard: unknown[] = [];
 

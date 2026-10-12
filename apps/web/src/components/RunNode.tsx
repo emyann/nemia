@@ -143,7 +143,7 @@ export function RunNode({
                   hash={stepAnchor(need.step)}
                   data-need={need.kind}
                   data-step={need.step}
-                  className={`nodrag hover:underline ${'text-yours'}`}
+                  className="nodrag text-yours hover:underline"
                 >
                   {needLine(need)}
                 </RouteLink>

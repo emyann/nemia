@@ -112,6 +112,7 @@ async function main(seat: WorkerResult, rest: readonly string[]): Promise<void> 
         store: root,
         themes: plan.themes,
         pictured: plan.pictured,
+        measured: plan.measured,
         worker: seat.worker,
       });
       seat.timings.push(...timings);

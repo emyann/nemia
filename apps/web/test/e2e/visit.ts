@@ -7,9 +7,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
-import { expectTheme, idle, Refused, settled, track, watch } from './checks.ts';
+import { expectTheme, facesLoaded, idle, Refused, settled, track, watch } from './checks.ts';
 import { photograph } from './board.ts';
-import { photographing, setPhotographing } from './world.ts';
+import { photographing, setMeasuring, setPhotographing } from './world.ts';
 import { costLine, PHASES, type PageTiming, type Phase } from './timing.ts';
 
 export const THEMES = ['light', 'dark'] as const;
@@ -75,7 +75,10 @@ async function visit(
     phases[phase] += performance.now() - from;
   };
   try {
-    await timed('load', () => page.goto(base + spec.route, { waitUntil: 'load' }));
+    await timed('load', async () => {
+      await page.goto(base + spec.route, { waitUntil: 'load' });
+      await facesLoaded(page);
+    });
     if (!spec.follows) await timed('idle', () => idle(page));
     await timed('expect', async () => {
       await expectTheme(page, theme);
@@ -99,7 +102,8 @@ async function visit(
 
 /**
  * The pages given, in each of `themes` in turn, each in a 1280 × 800 browser; a screenshot into `out` of each page `pictured` names, which
- * alone take their own pictures too (`setPhotographing`). Says each page passed with its time and its phases. Resolves with the
+ * alone take their own pictures too (`setPhotographing`), each with its text pairs beside it when `measured` (`setMeasuring`). Says each
+ * page passed with its time and its phases. Resolves with the
  * screenshots, and what each page took in each theme, stamped with `worker`, the worker that visited it. Rejects on the first page that
  * fails, naming the page, the theme and the assertion, with its picture — or, once the `store` the api serves is gone, saying so in place
  * of the assertion (`storeGone`), and visiting no page after it. Every page a theme's browser opens, a page's second page too, has its
@@ -117,8 +121,9 @@ export async function visitAll(
     store,
     themes,
     pictured,
+    measured = false,
     worker = 0,
-  }: { store?: string; themes: readonly Theme[]; pictured: (name: string) => boolean; worker?: number },
+  }: { store?: string; themes: readonly Theme[]; pictured: (name: string) => boolean; measured?: boolean; worker?: number },
 ): Promise<{ shots: string[]; timings: PageTiming[] }> {
   fs.mkdirSync(out, { recursive: true });
   for (const spec of pages) {
@@ -134,6 +139,7 @@ export async function visitAll(
       for (const spec of pages) {
         if (store !== undefined && !fs.existsSync(store)) throw new Error(`before ${where(spec, theme)}: ${storeGone(store)}`);
         setPhotographing(pictured(spec.name));
+        setMeasuring(measured && pictured(spec.name));
         const from = performance.now();
         const { shot, phases } = await visit(context, base, spec, theme, out, store);
         const timing = { name: spec.name, theme, worker, ms: performance.now() - from, phases };
@@ -143,6 +149,7 @@ export async function visitAll(
       }
     } finally {
       setPhotographing(false);
+      setMeasuring(false);
       await context.close();
     }
   }

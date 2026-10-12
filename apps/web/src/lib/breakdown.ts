@@ -20,9 +20,9 @@ export type Breakdown = { head: string; rows: BreakdownRow[]; foot: string };
 export function shared(parts: readonly number[], unit: number, total: number): number[] {
   const floors = parts.map((part) => Math.floor(part / unit));
   const owed = total - floors.reduce((sum, n) => sum + n, 0);
-  const lost = (part: number, i: number): number => Math.round((part / unit - floors[i]!) * 1e6);
+  const lost = (part: number, i: number): number => Math.round((part / unit - floors[i]) * 1e6);
   const byLoss = parts.map((part, i) => ({ i, lost: lost(part, i) })).sort((a, b) => b.lost - a.lost || a.i - b.i);
-  for (const { i } of byLoss.slice(0, Math.max(0, owed))) floors[i]! += 1;
+  for (const { i } of byLoss.slice(0, Math.max(0, owed))) floors[i] += 1;
   return floors;
 }
 
@@ -52,7 +52,7 @@ export function clockBreakdown(clock: RunClock, from: string): Breakdown {
   );
   return {
     head: sinceCreated(clock.wallMs),
-    rows: parts.map(([what, ms], i) => ({ what, amount: ms, said: minutesSaid(ms, minutes[i]!), none: ms <= 0 })),
+    rows: parts.map(([what, ms], i) => ({ what, amount: ms, said: minutesSaid(ms, minutes[i]), none: ms <= 0 })),
     foot: `Wall time, from ${from}.`,
   };
 }
@@ -80,7 +80,7 @@ export function costBreakdown(cost: Spent, steps: readonly StepCost[]): Breakdow
     rows: parts.map((part, i) => ({
       what: part.what,
       amount: part.usd,
-      said: part.run ? dollars(cents[i]!) : 'none measured',
+      said: part.run ? dollars(cents[i]) : 'none measured',
       none: !part.run,
     })),
     foot: cost.unmeasured > 0 ? 'A session that ended with no cost on it is counted in none of these.' : '',

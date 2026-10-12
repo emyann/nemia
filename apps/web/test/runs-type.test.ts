@@ -55,7 +55,7 @@ test('every file that draws the Runs page is on the list: each part the route an
     const file = next.pop()!;
     const text = fs.readFileSync(path.join(SRC, file), 'utf8');
     for (const [, mod] of text.matchAll(/from\s*'((?:\.\.?\/|@\/components\/)[^']+)'/g)) {
-      const at = mod!.startsWith('@/') ? mod!.slice(2) : path.posix.normalize(path.posix.join(path.posix.dirname(file), mod!));
+      const at = mod.startsWith('@/') ? mod.slice(2) : path.posix.normalize(path.posix.join(path.posix.dirname(file), mod));
       const found = `${at}.tsx`;
       if (!at.startsWith('components/') || at.startsWith('components/ui/') || !fs.existsSync(path.join(SRC, found))) continue;
       if (!reached.has(found)) next.push(found);

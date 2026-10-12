@@ -10,7 +10,8 @@ export default {
   /**
    * The page when a read fails: a visit of its own whose read of the finished runs is answered with a failure says, under the page's
    * name, that the runs could not be loaded and why, in the api's words, and draws no part; the frame around it stands. Its one
-   * failure is the point, so that visit counts exactly it: the answer, the browser's line for it, and the router's for the loader. Pictured at 1280 and at 390 wide. Writes nothing.
+   * failure is the point, so that visit counts exactly it: the answer, the browser's line for it, and the router's for the loader.
+   * Pictured at 1280 and at 390 wide. Writes nothing.
    */
   name: 'runs-error',
   route: '/runs',

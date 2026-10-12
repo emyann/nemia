@@ -43,6 +43,7 @@ export function StatTile({ hue, label, value, breakdown }: { hue: Hue; label: st
       <Focusable>
         <span
           role="group"
+          // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- the keyboard opens the tooltip by focusing the tile
           tabIndex={0}
           aria-label={`${label} ${value}`}
           data-stat-tile={name}

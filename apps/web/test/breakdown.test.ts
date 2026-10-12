@@ -75,7 +75,7 @@ async function decoded(): Promise<WaitingRun> {
   globalThis.fetch = async () => new Response(JSON.stringify(open), { status: 200, headers: { 'content-type': 'application/json' } });
   const client = new QueryClient();
   try {
-    return (await client.fetchQuery(openRunsQuery())).waiting[0]!;
+    return (await client.fetchQuery(openRunsQuery())).waiting[0];
   } finally {
     client.clear();
     globalThis.fetch = before;

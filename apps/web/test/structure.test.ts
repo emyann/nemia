@@ -240,8 +240,8 @@ function fileOf(texts: ReadonlyMap<string, string>, file: string, mod: string): 
 }
 
 /**
- * The files the root route, or the file `from`, reaches through its imports, itself among them, in order: the frame. Not entered: the mirror of the api, and
- * the pickers of `OPENED`, each named when reached.
+ * The files the root route, or the file `from`, reaches through its imports, itself among them, in order: the frame. Not entered: the
+ * mirror of the api, and the pickers of `OPENED`, each named when reached.
  */
 function frameReach(texts: ReadonlyMap<string, string>, from = ROOT): { frame: string[]; opened: string[] } {
   const seen = new Set<string>();

@@ -16,9 +16,9 @@ export default {
   /**
    * A task journal holding an entry no runtime wrote costs the runs that read it, never the list: the run whose session still works says,
    * on its row, where a row says what it does now, that its record reads and its task does not, and why in the runtime's words, and
-   * every run is drawn still. Its step's bar on the rail is `unreadable`. The run waiting on it is answered from the api's memo, since nothing of its own moved and a hand edit writes
-   * no feed entry (the api's src/runs/unreadable.test.ts judges it afresh). The journal is put back before the page ends, and said on the
-   * feed.
+   * every run is drawn still. Its step's bar on the rail is `unreadable`. The run waiting on it is answered from the api's memo, since
+   * nothing of its own moved and a hand edit writes no feed entry (the api's src/runs/unreadable.test.ts judges it afresh). The journal
+   * is put back before the page ends, and said on the feed.
    */
   name: 'unreadable',
   route: '/runs',

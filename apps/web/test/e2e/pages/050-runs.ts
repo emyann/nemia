@@ -169,7 +169,7 @@ async function byKeyboard(page: Page, run: WaitingRun): Promise<void> {
     if (tile === 'cost')
       await expectTexts(
         tooltip(page).locator('dt'),
-        [...(run.stepCosts ?? []).map((step) => step.step)],
+        (run.stepCosts ?? []).map((step) => step.step),
         'the cost is broken down by step, in the run’s order',
       );
     else if ((await tooltip(page).locator('[data-breakdown-row]').count()) < 2) throw new Refused(`the ${tile} tooltip has its rows`);
@@ -191,7 +191,7 @@ async function byKeyboard(page: Page, run: WaitingRun): Promise<void> {
  * pointer.
  */
 async function tableByKeyboard(page: Page, finished: FinishedPage): Promise<void> {
-  const run = finished.runs[0]!;
+  const run = finished.runs[0];
   const row = section(page, 'finished').locator(`tr[data-run="${run.id}"]`);
   await row.scrollIntoViewIfNeeded();
   await section(page, 'in-flight').locator('tr[data-run]').last().focus();
@@ -222,10 +222,10 @@ const missed = (control: Locator, across: number, up: number, down: number): Pro
       const box = button.getBoundingClientRect();
       const [cx, cy] = [box.left + box.width / 2, box.top + box.height / 2];
       const points: Array<[number, number]> = [
-        [cx - dx!, cy],
-        [cx + dx!, cy],
-        [cx, cy - above!],
-        [cx, cy + below!],
+        [cx - dx, cy],
+        [cx + dx, cy],
+        [cx, cy - above],
+        [cx, cy + below],
       ];
       return points.flatMap(([x, y]) =>
         document.elementFromPoint(x, y)?.closest('button') === button ? [] : [`${Math.round(x - cx)},${Math.round(y - cy)}`],
@@ -241,9 +241,9 @@ const missed = (control: Locator, across: number, up: number, down: number): Pro
  */
 async function finger(page: Page, open: OpenRuns, finished: FinishedPage): Promise<void> {
   const controls: Array<[Locator, number, string]> = [
-    [cardOf(page, open.waiting[0]!.id).locator('[data-copy-id] button'), 23, 'a card'],
+    [cardOf(page, open.waiting[0].id).locator('[data-copy-id] button'), 23, 'a card'],
     [section(page, 'in-flight').locator('tr[data-run] [data-copy-id] button').first(), 15, 'a row in flight'],
-    [section(page, 'finished').locator(`tr[data-run="${finished.runs[1]!.id}"] [data-copy-id] button`), 15, 'a finished row'],
+    [section(page, 'finished').locator(`tr[data-run="${finished.runs[1].id}"] [data-copy-id] button`), 15, 'a finished row'],
   ];
   for (const [control, down, where] of controls) {
     await control.scrollIntoViewIfNeeded();
@@ -254,7 +254,7 @@ async function finger(page: Page, open: OpenRuns, finished: FinishedPage): Promi
       );
   }
   const clip = await page.addStyleTag({ content: '[data-copy-id] { overflow: hidden }' });
-  const off = await missed(controls[2]![0], 23, 23, 15);
+  const off = await missed(controls[2][0], 23, 23, 15);
   await clip.evaluate((style) => (style as HTMLStyleElement).remove());
   if (!off.length) throw new Refused('the probe refuses a copy control whose target is clipped — it found nothing cut');
 }

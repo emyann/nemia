@@ -173,7 +173,10 @@ export const runsQuery = queryOptions({
   refetchInterval: () => pace(5_000),
 });
 
-/** Mirrors `ListedRun` in agent-orchestrator: the list's own row, its wall time (`wallMs`), and when its work stopped, null while it has not. */
+/**
+ * Mirrors `ListedRun` in agent-orchestrator: the list's own row, its wall time (`wallMs`), and when its work stopped, null while it has
+ * not.
+ */
 export type ListedRun = RunSummary & { wallMs: number; finishedAt: string | null };
 
 /**
@@ -256,8 +259,8 @@ export type RunOutcome = 'succeeded' | 'failed' | 'cancelled' | 'undecided';
 export type FinishedRun = RunSummary & { wallMs: number; finishedAt: string; outcome: RunOutcome };
 
 /**
- * Mirrors `FinishedListing`: one page of the finished runs, newest finished first, read at `asOf`. `total` rows in all, `page` from 1 of `pages`, at
- * least one, of `size` rows each. A page past the last is answered with no row, and says the `pages` there are.
+ * Mirrors `FinishedListing`: one page of the finished runs, newest finished first, read at `asOf`. `total` rows in all, `page` from 1
+ * of `pages`, at least one, of `size` rows each. A page past the last is answered with no row, and says the `pages` there are.
  */
 export type FinishedPage = { asOf: string; total: number; page: number; size: number; pages: number; runs: FinishedRun[] };
 

@@ -159,7 +159,7 @@ const ringOf = (page: Page): Promise<Rgb | null> =>
   page.evaluate(() => {
     const shadow = getComputedStyle(document.activeElement!).boxShadow;
     const colours = [...shadow.matchAll(/rgba?\(([^)]+)\)/g)].map((m) => m[1].split(/[\s,/]+/).map(Number));
-    const solid = colours.findLast((c) => c.length === 3 || c[3] > 0);
+    const solid = colours.filter((c) => c.length === 3 || c[3] > 0).at(-1);
     return solid ? (solid.slice(0, 3) as [number, number, number]) : null;
   });
 

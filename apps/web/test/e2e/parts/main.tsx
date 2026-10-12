@@ -8,6 +8,7 @@ import { createRoot } from 'react-dom/client';
 import { createRootRoute, createRouter, RouterProvider, useRouter, useSearch } from '@tanstack/react-router';
 import { RouterProvider as AriaRouterProvider } from 'react-aria-components';
 import '../../../src/styles.css';
+import { CutButton } from '../../../src/components/CutButton.tsx';
 import { CutFrame } from '../../../src/components/CutFrame.tsx';
 import { Pager } from '../../../src/components/Pager.tsx';
 import { Plate } from '../../../src/components/Plate.tsx';
@@ -125,6 +126,11 @@ function Parts({ page, row }: { page: number; row: WaitingRow }) {
                 </TextLink>
               </div>
             </CutFrame>
+          </div>
+          <div style={{ display: 'inline-block', padding: 16, marginTop: 16, background: 'var(--card)' }}>
+            <CutButton to="." search={{ read: 'button' }}>
+              Open the run
+            </CutButton>
           </div>
         </Part>
         <Part name="sticker">

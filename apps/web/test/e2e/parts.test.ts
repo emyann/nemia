@@ -151,12 +151,15 @@ async function coloursAt(file: string, points: ReadonlyArray<readonly [number, n
   }
 }
 
-/** The colour of the ring drawn around what has the focus, off its computed shadow: the one that is not transparent. */
+/**
+ * The colour of the ring drawn around what has the focus, off its computed shadow: the last one that is not transparent, the ring
+ * itself where a ground-coloured offset is drawn before it.
+ */
 const ringOf = (page: Page): Promise<Rgb | null> =>
   page.evaluate(() => {
     const shadow = getComputedStyle(document.activeElement!).boxShadow;
     const colours = [...shadow.matchAll(/rgba?\(([^)]+)\)/g)].map((m) => m[1].split(/[\s,/]+/).map(Number));
-    const solid = colours.find((c) => c.length === 3 || c[3] > 0);
+    const solid = colours.findLast((c) => c.length === 3 || c[3] > 0);
     return solid ? (solid.slice(0, 3) as [number, number, number]) : null;
   });
 
@@ -185,6 +188,58 @@ async function ringGaps(page: Page, name: string): Promise<string[]> {
   );
 }
 
+/**
+ * Where the ring of the focused cut button is missing, a side each, none when it is drawn on all four: read in a picture of the window,
+ * in the middle of the ring's own band, three pixels outside each side of the button, the top's and the right's beside the top-right
+ * cut corner, the bottom's and the left's beside the bottom-left one.
+ */
+async function buttonRingGaps(page: Page, name: string): Promise<string[]> {
+  const ring = await ringOf(page);
+  assert.ok(ring, 'the focused button has a ring, by its computed shadow');
+  const box = await page.locator('[data-part="ring"] [data-cut-button]').boundingBox();
+  assert.ok(box, 'the button is drawn');
+  const [left, top, right, bottom] = [box.x, box.y, box.x + box.width, box.y + box.height].map(Math.round);
+  const sides: Record<string, readonly [number, number]> = {
+    top: [right - 4, top - 3],
+    right: [right + 2, top + 4],
+    bottom: [left + 4, bottom + 2],
+    left: [left - 3, bottom - 4],
+  };
+  const file = path.join(built, `${name}.png`);
+  await photograph(page, file, { always: true });
+  const found = await coloursAt(file, Object.values(sides));
+  const near = (a: Rgb, b: Rgb) => a.every((channel, i) => Math.abs(channel - b[i]) <= 3);
+  return Object.keys(sides).flatMap((side, i) =>
+    near(found[i], ring) ? [] : [`${side}: ${found[i].join(' ')}, the ring is ${ring.join(' ')}`],
+  );
+}
+
+/** The cut button as a clip would cut it: its two corners, and with them whatever is drawn outside its box. */
+const CLIPPED_BUTTON = `[data-part="ring"] [data-cut-button] {
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+}`;
+
+test(
+  'REFUSED: the cut button keeps its focus ring whole beside both cut corners, and a button cut by a clip loses it',
+  WAITED,
+  async () => {
+    const page = await openParts(browser, built, 'dark');
+    try {
+      await tabTo(page, 'cutButton');
+      const button = page.locator('[data-part="ring"] [data-cut-button]');
+      assert.equal(await button.locator('[data-cut-corner]').count(), 2, 'its two corners are cut by overlays');
+      const cut = await button.evaluate((link) => [getComputedStyle(link).clipPath, getComputedStyle(link).overflow]);
+      assert.deepEqual(cut, ['none', 'visible'], 'and nothing of it clips');
+      assert.deepEqual(await buttonRingGaps(page, 'button-ring-whole'), [], 'the ring is whole on its four sides');
+      await page.addStyleTag({ content: CLIPPED_BUTTON });
+      const gaps = (await buttonRingGaps(page, 'button-ring-clipped')).map((gap) => gap.split(':')[0]);
+      assert.deepEqual(gaps, ['top', 'right', 'bottom', 'left'], 'cut by a clip, the ring is lost: the check sees it');
+    } finally {
+      await page.context().close();
+    }
+  },
+);
+
 /** The frame as the look's source cut it: by a clip, which cuts off whatever it holds too. */
 const CLIPPED = `[data-part="ring"] [data-cut-frame] {
   clip-path: polygon(0 0, calc(100% - 28px) 0, 100% 28px, 100% 100%, 28px 100%, 0 calc(100% - 28px));
@@ -197,7 +252,7 @@ test(
     const page = await openParts(browser, built, 'dark');
     try {
       await tabTo(page, 'ringProbe');
-      const corner = page.locator('[data-part="ring"] [data-cut-corner="top-right"]');
+      const corner = page.locator('[data-part="ring"] [data-cut-frame] > [data-cut-corner="top-right"]');
       const [link, cut] = [await page.locator('[data-ring-probe]').boundingBox(), await corner.boundingBox()];
       assert.ok(link && cut);
       assert.ok(link.x + link.width > cut.x && link.y < cut.y + cut.height, 'the link stands in the cut corner');

@@ -14,8 +14,8 @@ export default {
    * A finished run pruned on the board, as `wf prune <run> --unmerged --artifacts --yes` prunes it (`POST /api/runs/:id/prune`): UNMERGED,
    * its branch ahead of main and nobody has merged it, given a worktree on that branch and a file in its files directory for the visit. Its
    * page offers three choices, the first two unavailable since nobody merged it, and the third said plainly as leaving its branch the only
-   * copy of its work; the prune is asked twice. Then the worktree and the files are gone, the branch stays, and the run's page, its row on
-   * Runs and its card on the Factory say pruned. What the api refuses — a run not over, one already pruned, one nobody merged without the
+   * copy of its work; the prune is asked twice. Then the worktree and the files are gone, the branch stays, and the run's page and its card
+   * on the Factory say pruned; its row on Runs stays, and says how it ended alone. What the api refuses — a run not over, one already pruned, one nobody merged without the
    * third choice — is proven in its own tests (`apps/api/src/runs/prune.test.ts`), since the e2e's watch counts every 4xx.
    */
   name: 'prune',
@@ -102,19 +102,9 @@ export default {
 
       await page.goto(new URL('/runs', page.url()).href, { waitUntil: 'load' });
       await idle(page);
-      const row = page.locator('li', { has: page.locator(`a[href="/runs/${id}"]`) });
-      const mark = row.locator('[data-pruned]', { hasText: /^pruned$/ });
-      await expectVisible(mark, `${id}'s row on Runs says pruned`);
-      const said = await mark.getAttribute('title');
-      if (
-        !/^pruned at \S+ — its worktrees were removed \(nemia prune\), and its files were removed at .* \(nemia prune --artifacts\); its branches and record are kept$/.test(
-          said ?? '',
-        )
-      ) {
-        throw new Refused(`the row says on hover what went and what was kept, as wf ls says it — its title is ${JSON.stringify(said)}`);
-      }
-      await settled(page);
-      await photograph(row, path.join(OUT, `prune-row-${theme}.png`));
+      const row = page.locator(`[data-runs-page] tr[data-run="${id}"]`);
+      await expectVisible(row.locator('[data-ended]'), `pruned, ${id} keeps its row on Runs, which says how it ended`);
+      await expectCount(page.locator('[data-runs-page] [data-pruned]'), 0, 'and nothing of what was removed: its page says that');
 
       await page.goto(new URL('/factories/default', page.url()).href, { waitUntil: 'load' });
       await idle(page);

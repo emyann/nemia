@@ -96,7 +96,8 @@ function InboxPage() {
 
 /**
  * A card: its first line, linked to its page, and under it its name, factory, workflow, repository and filing time (`CardMeta`); Start,
- * which opens its start, in its factory or in one picked there, and Remove. Queue on a card that names a workflow (`queueable`), and on a queued card its place and when it
+ * which opens its start, in its factory or in one picked there, and Remove. Queue on a card that names a workflow (`queueable`), and on
+ * a queued card its place and when it
  * was queued, and Unqueue; and, when the tick tried its start and did not make it, why — a card refused stays queued, as the package keeps
  * it. A card a run's record names — started, its removal failed — links to its run and offers Remove only. An entry that does not read as a
  * card shows why, with its file for a title, and offers Remove when it is a card's file, which the CLI's `inbox rm` can drop.
@@ -269,7 +270,8 @@ function StartedAs({ startedAs, kept }: { startedAs: readonly string[]; kept: { 
 
 /**
  * A card's start: in the factory it names (`FactoryCardStart`), or, for a card that names none (`unassigned`), in the factory a person
- * picks first (`UnassignedStart`). A start the api took opens the run's page — unless the card stayed in the inbox, which `onKept` is told of, with why, and
+ * picks first (`UnassignedStart`). A start the api took opens the run's page — unless the card stayed in the inbox, which `onKept` is
+ * told of, with why, and
  * the page stays. A refusal is `onRefused`'s to show, since the form may not outlive it.
  */
 function StartCard({

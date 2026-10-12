@@ -66,7 +66,11 @@ export const LEFT: Left[] = [
   { file: 'src/components/Facts.tsx', count: 1, why: WHOLE },
   { file: 'src/components/InboxParts.tsx', count: 2, why: WHOLE },
   { file: 'src/components/QueueLane.tsx', count: 1, why: WHOLE },
-  { file: 'src/components/Timeline.tsx', count: 2, why: "a log line's instant to the second, and its date in the title: data read as a log's" },
+  {
+    file: 'src/components/Timeline.tsx',
+    count: 2,
+    why: "a log line's instant to the second, and its date in the title: data read as a log's",
+  },
   { file: 'src/lib/factory.ts', count: 3, why: WHOLE },
   { file: 'src/routes/inbox.tsx', count: 1, why: WHOLE },
   { file: 'src/routes/inbox_.$name.tsx', count: 1, why: WHOLE },
@@ -90,7 +94,8 @@ export function refusals(files: Record<string, string>, left: Left[] = LEFT): st
       return [
         `${file} writes ${found.length} instants as the browser does (${found.map((f) => f.at).join(', ')}), ${allowed} are left to it: take the time from timeOfDay (${WRITER})`,
       ];
-    if (found.length < allowed) return [`${file} writes ${found.length} instants as the browser does, LEFT says ${allowed}: lower the list`];
+    if (found.length < allowed)
+      return [`${file} writes ${found.length} instants as the browser does, LEFT says ${allowed}: lower the list`];
     return [];
   });
   return [...options, ...instants];
@@ -164,7 +169,10 @@ test('REFUSED: one more instant written as the browser does than the list leaves
 test("the board's source has one writer of an hour, and no instant in the browser's form but the ones left", () => {
   const files = sources(WEB);
   assert.ok(Object.keys(files).length > 100, `the source is read: ${Object.keys(files).length} files`);
-  assert.ok(foundAt(files[WRITER] ?? '', OPTIONS).some((found) => found.words === 'hour12'), `${WRITER} is read, and holds the option`);
+  assert.ok(
+    foundAt(files[WRITER] ?? '', OPTIONS).some((found) => found.words === 'hour12'),
+    `${WRITER} is read, and holds the option`,
+  );
   assert.equal(
     LEFT.every((l) => l.why.trim()),
     true,

@@ -73,8 +73,14 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
 - The copy control's glyph is the look's own, 12 pixels whatever size the kit hands it, and its button is pulled in around it
   (`look/CopyId.tsx`): its target reaches what stands 4 pixels over it, so a card's title is raised (`relative z-10`) to keep its box
   (`titleKeepsItsBox`, same page), and a row in flight keeps 16 pixels between its title and its id.
-- A time on the runs page is `whenWords`, or `whenColumn` in a table (`lib/runWords.ts`), built from `formatToParts` and joined with
-  plain spaces; `expectTexts` trims, so a padded time is compared trimmed or by its `textContent`.
+- A time of day in words has one writer, `timeOfDay` (`lib/timeOfDay.ts`): 12-hour (`1:11 PM`), built from `formatToParts` and joined
+  with plain spaces. `clockWord`, `whenWords`, `whenColumn` and `fireWord` each decide their day and take the time from it, and
+  `test/time-of-day.test.ts` refuses a second writer of an hour in `src`; the whole instants still written as the browser does are its
+  `LEFT`, by file and count, which only shrinks.
+- A time on the runs page is `whenWords`, or `whenColumn` in a table (`lib/runWords.ts`); its date is `dateParts`, which a schedule's
+  far fire reads too (`14 Oct 12:00 PM`). `expectTexts` trims, so a padded time is compared trimmed or by its `textContent`.
+- A foot's button needs `ml-auto` only once the foot wraps: two children under `justify-between` stand apart on one line without it,
+  so its proof draws the card narrow (`WaitingCard.stories.tsx`, `test/e2e/parts.test.ts`).
 - A kit `Cell truncate` shows its children again in a tooltip: a cut cell that holds a link cuts the link itself (`block truncate`, a
   `title`), never the cell.
 
@@ -99,6 +105,8 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
   beside it (`<Part>.stories.tsx`), one a state, and `test/look.test.ts` refuses a part with none, an import past the door, and a
   part `change-the-board` does not name. A story lays out with inline styles, never a class of its own, and a node test imports a
   part by its own file: the door loads the kit's folder, which Node refuses.
+- A component of the board that needs a state proven in a browser has its stories beside it too (`src/components/<Name>.stories.tsx`,
+  `WaitingCard`'s): both hosts read that folder beside the look's, and `test/e2e/parts.test.ts` is a file a mutant can name.
 - The stories are the one place the parts are shown, in two hosts under one decorator (`.storybook/preview.tsx`: the look's ground,
   a router of the story's own in memory, `data-at` where it stands). `npm run storybook`, from `apps/web`, is a person's, on port
   6007, in no check; dark follows the system alone, so its toolbar switches nothing. The checks read the stories' page,
@@ -133,7 +141,8 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
 - The watch counts every 4xx against a page: a refusal made on purpose gets a page of its own whose watch expects exactly it.
 - A run added to the seed shifts every count asserted about the store (the Factory's tally, the Runs rows and headings): run the e2e to
   its end. A test about the pages reads the pages that exist, never a hard-coded last page.
-- An expectation about a time of day decides as `clockWord` does (same calendar day or not), never a hard-coded form.
+- An expectation about a time of day decides as `clockWord` does (same calendar day or not) and writes its time with `timeOfDay`
+  (`lib/timeOfDay.ts`) in the browser's time zone, never a hard-coded form (`030-quota.ts`).
 - A page that waits for a state polls through `expectNone` (`checks.ts`), never a loop of its own: `DEADLINES` (`test/waits.test.ts`)
   allows a deadline in `checks.ts`'s assertions alone.
 - Wait with `idle(page)` (`checks.ts`), never `networkidle`: the feed stream never ends. A page that edits the store by hand where the

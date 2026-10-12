@@ -1,11 +1,13 @@
 /**
  * A factory's rules on disk: `RULES.md` in the folder the store keeps for the factory (`rulesFolder`), or in its tree when it was made from
  * a template (`rulesFile`) — read (`readRules`), written (`writeRules`) and cleared (`clearRules`), this file being its one writer. The
- * folder is removed whole with its factory, by `nemia factory rm`.
+ * folder is removed whole with its factory, by `nemia factory rm`. And what a read of one of the factory's workflow folders is handed
+ * (`factoryFills`): its hires for that workflow and its rules, built here for the start, the board's listing and a run's read alike.
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { factoryNameRefusal, type Factory } from '../factory/factory.ts';
+import { factoryNameRefusal, fillsOf, type Factory } from '../factory/factory.ts';
+import type { Fills } from '../folder/folder.ts';
 import { Conflict, Invalid } from '../refusal/refusal.ts';
 import { HOME } from '../record/record.store.ts';
 import { factoryRulesRefusal, rulesFile } from './rules.ts';
@@ -42,6 +44,17 @@ export function readRules(file: string): RulesRead {
   } catch (err) {
     return { words: null, error: `${file} does not read: ${(err as Error).message}` };
   }
+}
+
+/**
+ * What a read of the folder of `workflow` in `factory` is handed (`Fills`), read now: the agents the factory hires into its steps
+ * (`fillsOf`), and its rules where their file reads and is not blank. `error` is why the rules file cannot be told (`readRules`), null
+ * where it can or there is none: a start refuses on it, and a read that only loads leaves the rules out. Nothing is thrown.
+ */
+export function factoryFills(factory: Pick<Factory, 'name' | 'hires' | 'tree'>, workflow: string): { fills: Fills; error: string | null } {
+  const { words, error } = readRules(rulesAt(factory));
+  const rules = error === null && words !== null ? { rules: words } : {};
+  return { fills: { factory: factory.name, workflow, agents: fillsOf(factory.hires, workflow), ...rules }, error };
 }
 
 /**

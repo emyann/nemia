@@ -823,6 +823,7 @@ test('a run that froze its workflow draws from it when its folder does not read:
   assert.match(run.warning, /no longer reads as a workflow/);
   assert.match(run.warning, /someNewerKey/);
   assert.match(run.warning, /the workflow the run froze/);
+  assert.ok(!run.warning.includes('..'), run.warning);
   assert.deepEqual(
     run.steps.map((s) => [s.name, s.spec, s.body]),
     [
@@ -851,6 +852,7 @@ test('a run that froze its workflow draws from it when its folder does not read:
   const gone = await detailOf('r-41');
   assert.ok(gone.warning);
   assert.match(gone.warning, /is gone\. Nothing here is read from it/);
+  assert.ok(!gone.warning.includes('..'), gone.warning);
   assert.deepEqual(
     gone.steps.map((s) => s.spec),
     [frozenSpecs.implement, frozenSpecs.review],

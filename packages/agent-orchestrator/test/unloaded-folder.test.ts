@@ -249,8 +249,9 @@ test("REFUSED: an unfrozen run whose folder does not load is warned in the folde
   })();
   assert.deepEqual(workflowsOf(run, ROOT), {
     steps: null,
-    warning: `The workflow folder ${UNPLACED} no longer reads as a workflow: ${loaded}.`,
+    warning: `The workflow folder ${UNPLACED} no longer reads as a workflow: ${/[.!?]$/.test(loaded) ? loaded : `${loaded}.`}`,
   });
+  assert.ok(!workflowsOf(run, ROOT).warning?.includes('..'), String(workflowsOf(run, ROOT).warning));
   const gone = path.join(ROOT, 'no-such-folder');
   assert.deepEqual(workflowsOf({ ...run, workflowDir: gone }, ROOT), { steps: null, warning: `The workflow folder ${gone} is gone.` });
 });
@@ -260,4 +261,18 @@ test('the run goes on once its folder is mended, on the next pass, with nothing 
   const pass = await runWith(e, tickRun({ repo: ROOT }));
   assert.deepEqual(pass.runs.find((a) => a.run.id === bad.id)?.filed, ['work']);
   assert.ok(!pass.unreadable?.some((w) => w.startsWith(LEFT_OUT(bad.id))), JSON.stringify(pass.unreadable));
+});
+
+test("an unfrozen run whose step names an agent only its repository's `.claude/agents/` holds is read with its places, and filed", async () => {
+  const named = fs.mkdtempSync(path.join(ROOT, 'named-'));
+  fs.writeFileSync(path.join(named, 'work.md'), '---\nplace: git\nagent: repo-only\n---\nwork it\n');
+  fs.mkdirSync(path.join(REPO, '.claude', 'agents'), { recursive: true });
+  fs.writeFileSync(path.join(REPO, '.claude', 'agents', 'repo-only.md'), '---\nharness: codex\n---\nYou work.\n');
+  assert.throws(() => loadWorkflows(named), 'the folder alone does not read: nothing beside it holds the agent');
+  const run = await started('the agent is the repository own');
+  unfrozen(run.id, named);
+
+  const pass = await runWith(e, tickRun({ repo: ROOT }));
+  assert.ok(!pass.unreadable?.some((w) => w.startsWith(LEFT_OUT(run.id))), JSON.stringify(pass.unreadable));
+  assert.deepEqual(pass.runs.find((a) => a.run.id === run.id)?.filed, ['work']);
 });

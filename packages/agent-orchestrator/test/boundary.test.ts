@@ -97,7 +97,7 @@ const STORE_BOTTOM = ['src/record/places.store.ts', 'src/skills/read.store.ts', 
 /**
  * The store files another store file may import, each with the store files it may import itself: the bottom, the skills read
  * (`skills/read.store.ts`) among it, then the agents read on it with a person's custom instructions (`agents/read.store.ts`), the folders
- * on both (`folder.store.ts`), a run's steps on the folders (`steps.store.ts`), the run store on them and the store's pause on the bottom,
+ * on both (`folder.store.ts`), a run's steps on the folders and the configuration (`steps.store.ts`), the run store on them and the store's pause on the bottom,
  * the schedules' cron and tries on the run store, a templated factory's tree, base and status on it (`applied.store.ts`), the factories on
  * the run store and both, and the run store's files on them (`runStore`), what a place is and how its processes are stopped, on no store
  * file (`place.store.ts`), then a step's workspace, cut by the place, a workflow folder written on the run store, the two reads and the
@@ -114,7 +114,7 @@ const STORE_SHARED: Record<string, readonly string[]> = {
   'src/config/config.store.ts': [],
   'src/agents/read.store.ts': ['src/skills/read.store.ts'],
   'src/folder/folder.store.ts': ['src/agents/read.store.ts', 'src/skills/read.store.ts'],
-  'src/record/steps.store.ts': ['src/folder/folder.store.ts'],
+  'src/record/steps.store.ts': ['src/config/config.store.ts', 'src/folder/folder.store.ts'],
   'src/record/record.store.ts': [...STORE_BOTTOM, 'src/folder/folder.store.ts', 'src/record/steps.store.ts'],
   'src/pause/pause.store.ts': STORE_BOTTOM,
   'src/schedule/schedule.store.ts': ['src/record/record.store.ts'],

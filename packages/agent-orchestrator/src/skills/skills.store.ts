@@ -30,7 +30,7 @@ export type SkillRead = {
 
 /**
  * The skill `name` whose folder is `dir`, read now. A link in it that is not followed is refused unread (`skillLinkRefusal`): any link
- * of the store's library or a team's own folder, and one of a checkout's `.claude/skills/` whose target leaves the checkout, where a
+ * of the store's library or a team's own folder, and one of a checkout's own skills whose target leaves the checkout, where a
  * link that stays inside is read through. A SKILL.md that cannot be read says why; one the card reader refuses (`skillEntryOf`) has its
  * refusal as `error`, and its cost all the same.
  */

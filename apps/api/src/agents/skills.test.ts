@@ -165,6 +165,37 @@ test('a skill whose SKILL.md is no card entry is listed with the refusal, and a 
   }
 });
 
+test('a repository skill linked inside the repository lists under repo, read, with its page; one linked outside lists there unread', async () => {
+  fs.mkdirSync(path.join(repo, 'kept'), { recursive: true });
+  skill(path.join(repo, 'kept'), 'inside', '---\ndescription: Kept inside.\n---\nInside.\n');
+  const outside = scratch('nemia-api-skills-outside-');
+  skill(outside, 'apart', '---\ndescription: Kept apart.\n---\nSecret.\n');
+  fs.symlinkSync('../../kept/inside', path.join(THEIRS, 'inside'));
+  fs.symlinkSync(path.join(outside, 'apart'), path.join(THEIRS, 'apart'));
+  try {
+    const places = await listed();
+    const inside = rowOf(places, 'repo', 'inside')!;
+    assert.equal(inside.error, null);
+    assert.equal(inside.entry?.description, 'Kept inside.');
+    const page = await skillDetail(engine(), shippedGitPlace, 'repo', 'inside', repo, root);
+    assert.equal(page?.skill.entry?.description, 'Kept inside.');
+    assert.match(page?.version ?? '', /^[0-9a-f]{16}$/);
+
+    assert.equal(rowOf(places, 'yours', 'apart'), undefined, 'listed where its folder is');
+    const apart = rowOf(places, 'repo', 'apart')!;
+    assert.equal(apart.entry, null);
+    assert.equal(apart.cost, null, 'nothing of what it points at is read');
+    assert.match(apart.error ?? '', /^apart is a link, and what it points at is outside the folder of skills/);
+    const refused = await skillDetail(engine(), shippedGitPlace, 'repo', 'apart', repo, root);
+    assert.equal(refused?.skill.entry, null);
+    assert.doesNotMatch(JSON.stringify(refused), /Secret/, 'and its page reads none of it either');
+  } finally {
+    fs.rmSync(path.join(THEIRS, 'inside'));
+    fs.rmSync(path.join(THEIRS, 'apart'));
+    fs.rmSync(path.join(repo, 'kept'), { recursive: true });
+  }
+});
+
 test('a shipped skill says where an agent of yours already finds its name: in your library, in the repository, or nowhere yet', async () => {
   const places = await listSkills(engine(), shippedGitPlace, repo, root, TEAM_SKILLS);
   assert.equal(rowOf(places, 'shipped', inLibrary)!.found, 'yours');

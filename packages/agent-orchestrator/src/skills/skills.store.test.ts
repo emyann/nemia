@@ -55,6 +55,49 @@ test('REFUSED unread: a skill folder that is a link', () => {
   );
 });
 
+/** A checkout holding the real skill `skills/x` and an empty `.claude/skills/`; the folder its given skill `x` goes in. */
+function checkoutSkill(): { repo: string; at: string } {
+  const repo = scratch('wf-skills-checkout-');
+  skillAt(path.join(repo, 'skills'), 'x', SKILL);
+  fs.mkdirSync(path.join(repo, '.claude', 'skills'), { recursive: true });
+  return { repo, at: path.join(repo, '.claude', 'skills', 'x') };
+}
+
+test("a skill of a checkout's .claude/skills/ linked inside the checkout is read through the link: its entry, its cost, its text", () => {
+  const { at } = checkoutSkill();
+  fs.symlinkSync('../../skills/x', at);
+  const read = skillRead('x', at);
+  assert.equal(read.error, null);
+  assert.equal(read.entry?.id, 'x');
+  assert.ok(read.cost !== null && read.cost.perTurn > 0, JSON.stringify(read.cost));
+  assert.equal(skillText(at), SKILL);
+});
+
+test("REFUSED unread: a skill of a checkout's .claude/skills/ linked outside the checkout, its text unread too", () => {
+  const { at } = checkoutSkill();
+  fs.symlinkSync(skillAt(scratch('wf-skills-outside-'), 'x', SKILL), at);
+  assert.deepEqual(skillRead('x', at), {
+    entry: null,
+    error: 'x is a link, and what it points at is outside the folder of skills: make it a folder of its own.',
+    preload: false,
+    cost: null,
+  });
+  assert.equal(skillText(at), '');
+});
+
+test('REFUSED unread: a library skill with a file under it that is a link', () => {
+  const dir = skillAt(scratch('wf-skills-'), 'tidy', SKILL);
+  const outside = path.join(scratch('wf-skills-outside-'), 'notes.txt');
+  fs.writeFileSync(outside, 'Not the skill.\n');
+  fs.symlinkSync(outside, path.join(dir, 'notes.txt'));
+  assert.deepEqual(skillRead('tidy', dir), {
+    entry: null,
+    error: 'tidy/notes.txt is a link, and what it points at is outside the folder of skills: make it a folder of its own.',
+    preload: false,
+    cost: null,
+  });
+});
+
 test('REFUSED: a skill folder with no SKILL.md says it cannot be read, naming the file', () => {
   const dir = path.join(scratch('wf-skills-'), 'tidy');
   fs.mkdirSync(dir);

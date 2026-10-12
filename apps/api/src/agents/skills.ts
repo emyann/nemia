@@ -175,7 +175,11 @@ export async function listSkills(
     const dir = dirOf([name, at]);
     if (at instanceof WorkflowError) {
       const from = sourceOf(dir, repo, home) === 'repo' ? 'repo' : 'yours';
-      places[from === 'yours' ? 0 : 1].skills.push({ ...skillRow(name, dir, from, reads[dir], usedBy(name)), entry: null, error: at.message });
+      places[from === 'yours' ? 0 : 1].skills.push({
+        ...skillRow(name, dir, from, reads[dir], usedBy(name)),
+        entry: null,
+        error: at.message,
+      });
       where.set(name, from);
       continue;
     }

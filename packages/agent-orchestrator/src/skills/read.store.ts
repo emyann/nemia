@@ -1,10 +1,10 @@
 /**
  * The skills read from disk: where a workflow's agents and skills are looked for beside its own folder (`lookupRoots`), each skill an
  * agent may give (`skillsFor`), its rules, its version, its card's entries and whether it is told whole. And the one rule for a link in a
- * skill's folder, which every reader asks (`skillFiles`): a skill of a checkout's `.claude/skills/` is read through a link that stays
- * inside the checkout's folder, by real path, and any other link, there or in any other folder of skills, is refused by name
- * (`skillLinkRefusal`), never opened; a skill is copied as its files, never a link (`copySkillFiles`). A store file at the bottom of the
- * tree beneath the controllers: it imports no other (`test/boundary.test.ts`), so the agents read (`agents/read.store.ts`), the
+ * skill's folder, which every reader asks (`skillFiles`): a skill of a checkout's own skills (`REPOSITORY_HOLDER`) is read through a
+ * link that stays inside the checkout's folder, by real path, and any other link, there or in any other folder of skills, is refused by
+ * name (`skillLinkRefusal`), never opened; a skill is copied as its files, never a link (`copySkillFiles`). A store file at the bottom
+ * of the tree beneath the controllers: it imports no other (`test/boundary.test.ts`), so the agents read (`agents/read.store.ts`), the
  * workflow folder read (`folder/folder.store.ts`) and the place (`place/place.store.ts`) all read through it.
  */
 import { createHash } from 'node:crypto';
@@ -24,6 +24,9 @@ import { skillEntryOf, type AgentSkill, type SkillRule } from './skills.ts';
  */
 export type Places = { repo?: string; home?: string };
 
+/** The folder of a repository that holds its own `agents/` and `skills/`, which a session there reads too. */
+const REPOSITORY_HOLDER = '.claude';
+
 /**
  * The folders a workflow's agents and skills are looked for in, each holding an `agents/` and a `skills/`, in the order a name is found:
  * the workflow's own root (the folder beside it, `agentsDir`'s parent), then the repository's `.claude/`, then the store's `workflows/`.
@@ -31,7 +34,7 @@ export type Places = { repo?: string; home?: string };
  */
 export function lookupRoots(workflowDir: string, places: Places = {}): string[] {
   const roots = [path.dirname(agentsDir(workflowDir))];
-  if (places.repo) roots.push(path.join(path.resolve(places.repo), '.claude'));
+  if (places.repo) roots.push(path.join(path.resolve(places.repo), REPOSITORY_HOLDER));
   if (places.home) roots.push(path.join(path.resolve(places.home), 'workflows'));
   return [...new Set(roots)];
 }
@@ -74,6 +77,18 @@ function oneFolder(a: string, b: string): boolean {
 }
 
 /**
+ * The refusal of the skill `name` found in the root `first` and again in `root`, where the two are one repository's two places for skills
+ * (`sameRepository`) and two folders; nothing for two roots of different places, where the first wins, and for one folder under both.
+ */
+function inBoth(name: string, first: string, root: string): WorkflowError | undefined {
+  const [before, at] = [first, root].map((r) => path.join(r, SKILLS_FOLDER, name));
+  if (!sameRepository(first, root) || oneFolder(before, at)) return undefined;
+  return new WorkflowError(
+    `${name} is a skill in both ${before} and ${at}, one repository's two places for skills, and nothing says which a session is given. Keep one of them.`,
+  );
+}
+
+/**
  * Every skill a workflow's agents may give (`lookupRoots`): each name, the folder it is — `<root>/skills/<name>`, holding a `SKILL.md` — or
  * its refusal: a link in it that is not followed (`skillLinkRefusal`), rules that do not read, or a name one repository has in both
  * `workflows/skills/` and `.claude/skills/` as two folders. One folder under both, the one a link to the other, is one skill, given from
@@ -94,15 +109,8 @@ export function skillsFor(workflowDir: string, places: Places = {}): SkillsFound
         found.set(name, { at: root, dir: skillLinkRefusal(at) ?? rulesRefusal(at) ?? at });
         continue;
       }
-      const before = path.join(first.at, SKILLS_FOLDER, name);
-      if (sameRepository(first.at, root) && !oneFolder(before, at)) {
-        found.set(name, {
-          at: first.at,
-          dir: new WorkflowError(
-            `${name} is a skill in both ${before} and ${at}, one repository's two places for skills, and nothing says which a session is given. Keep one of them.`,
-          ),
-        });
-      }
+      const twice = inBoth(name, first.at, root);
+      if (twice) found.set(name, { at: first.at, dir: twice });
     }
   }
   for (const name of placeSkills().sort()) {
@@ -122,15 +130,16 @@ const LEAVES = 'is a link, and what it points at is outside the folder of skills
 type Walked = { name: string; checkout: string | undefined };
 
 /**
- * The checkout whose `.claude/skills/` the skill folder `dir` is in, by real path: the folder a link there may stay inside. None for a
- * folder of skills anywhere else, the store's library and a team's own among them, nor for a checkout that cannot be reached.
+ * The checkout whose own skills (`REPOSITORY_HOLDER`) the skill folder `dir` is in, by real path: the folder a link there may stay
+ * inside. None for a folder of skills anywhere else, the store's library and a team's own among them, nor for a checkout that cannot be
+ * reached.
  */
 function checkoutOf(dir: string): string | undefined {
   const skills = path.dirname(path.resolve(dir));
-  const claude = path.dirname(skills);
-  if (path.basename(skills) !== SKILLS_FOLDER || path.basename(claude) !== '.claude') return undefined;
+  const holder = path.dirname(skills);
+  if (path.basename(skills) !== SKILLS_FOLDER || path.basename(holder) !== REPOSITORY_HOLDER) return undefined;
   try {
-    return fs.realpathSync(path.dirname(claude));
+    return fs.realpathSync(path.dirname(holder));
   } catch {
     return undefined;
   }
@@ -147,7 +156,12 @@ function insideOf(checkout: string, real: string): boolean {
  * checkout holds, one whose target is outside the checkout or cannot be reached, and one that points back at a folder of `held`, the
  * folders the walk is in. A refused link's target is never opened.
  */
-function followed(walk: Walked, at: string, named: string, held: readonly string[]): { real: string; folder: boolean } | { refused: string } {
+function followed(
+  walk: Walked,
+  at: string,
+  named: string,
+  held: readonly string[],
+): { real: string; folder: boolean } | { refused: string } {
   if (walk.checkout === undefined) return { refused: `${named} ${LEAVES}` };
   let real: string;
   try {
@@ -187,9 +201,9 @@ function folderOf(walk: Walked, dir: string): { real: string } | { refused: stri
 
 /**
  * Every file of the skill folder `dir`, sorted by its path in the skill, each with the real file it is read from or the refusal of the
- * link there: the one rule every reader of a skill asks. A skill of a checkout's `.claude/skills/` — a folder at
- * `<checkout>/.claude/skills/<name>` — has its links followed while their real path stays inside the checkout's folder, the skill's own
- * folder, its SKILL.md and every file beneath, a followed folder's included; an ignored folder of the checkout is inside. Any other
+ * link there: the one rule every reader of a skill asks. A skill of a checkout's own skills — a folder `skills/<name>` of its
+ * `REPOSITORY_HOLDER` — has its links followed while their real path stays inside the checkout's folder, the skill's own folder, its
+ * SKILL.md and every file beneath, a followed folder's included; an ignored folder of the checkout is inside. Any other
  * skill folder has every link refused. A refused link is named from the folder of skills (`x`, `x/SKILL.md`), with what to do, and what
  * it points at is never opened; the folder itself refused is the one entry, under the path ''. Throws where a folder cannot be read.
  */

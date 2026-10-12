@@ -1,15 +1,16 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { FINISHED_SIZE, type FinishedPage, type OpenRuns, type WaitingRun } from '../../../src/lib/api/runs.ts';
 import { rowsSaid } from '../../../src/lib/finished.ts';
 import { titleOf } from '../../../src/lib/factory.ts';
 import { endedWords, presentWait, waitSentence, waitTag } from '../../../src/lib/runWords.ts';
-import { answered, photograph, photographBothWidths, SECTIONS, sectionsOf, sidebar, themeOf } from '../board.ts';
+import { answered, fed, photograph, photographBothWidths, SECTIONS, sectionsOf, sidebar, themeOf } from '../board.ts';
 import { expectBeneath, expectCount, expectNone, expectTexts, expectVisible, idle, literal, Refused, WAIT_MS } from '../checks.ts';
 import { contrastHolds } from '../runs-contrast.ts';
-import { COSTLY, REGATED } from '../seed.ts';
+import { COSTLY, REGATED, writeRegated } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT } from '../world.ts';
+import { OUT, store } from '../world.ts';
 
 /**
  * A place in the menu pressed with Enter, as from the keyboard: the page is not loaded again, and the history has one entry more, as after
@@ -148,7 +149,7 @@ const minutesIn = (said: string): number => {
 
 /**
  * REGATED, at its second gate: its card says the present wait, minutes long, while the row of its Clock tile's tooltip keeps every wait
- * on a person summed, over twenty minutes. A card that read the sum would say the row's figure.
+ * on a person summed, over twenty minutes. A card that read the sum would say the row's figure. The open tooltip is photographed.
  */
 async function secondGate(page: Page, open: OpenRuns): Promise<void> {
   const run = open.waiting.find((waiting) => waiting.id === REGATED.id);
@@ -169,6 +170,7 @@ async function secondGate(page: Page, open: OpenRuns): Promise<void> {
   await card.locator('[data-stat-tile="clock"]').focus();
   await expectVisible(tooltip(page), "its Clock tile's tooltip opens on focus");
   const row = (await tooltip(page).locator('[data-breakdown-row="Waiting on you"] dd').innerText()).trim();
+  await photograph(page, path.join(OUT, `runs-tooltip-second-gate-${await themeOf(page)}.png`));
   await page.keyboard.press('Escape');
   await expectCount(tooltip(page), 0, 'Escape closes it');
   if (minutesIn(row) < 20)
@@ -504,18 +506,36 @@ async function narrow(page: Page): Promise<void> {
   }
 }
 
+/**
+ * REGATED written into the worker's store and said on the feed, the page loaded again on it; answers what takes it back: each file
+ * removed, the feed told, and the card gone from the page.
+ */
+async function regated(page: Page): Promise<() => Promise<void>> {
+  const made = writeRegated(store!, Date.now());
+  fed(REGATED.id, 'build', 'awaiting approval');
+  await page.reload({ waitUntil: 'load' });
+  await idle(page);
+  await expectCount(cardOf(page, REGATED.id), 1, `${REGATED.id}, written at its second gate, has its card`);
+  return async () => {
+    for (const file of made) fs.rmSync(file, { recursive: true, force: true });
+    fed(REGATED.id, 'gone');
+    await expectCount(cardOf(page, REGATED.id), 0, `${REGATED.id} taken back, its card goes`);
+  };
+}
+
 export default {
   /**
    * The runs page, "Your move first": on two reads and never the whole list, a card for every run that waits on a person and no row
    * of it, the runs in flight and one page of the finished as quiet tables, each under a plate that says the api's count. A card says
    * its plain words, how long it has waited this time, and opens its run; its tiles open their breakdowns, and its id is copied, from the keyboard; a finger finds the
    * copy control; 390 wide breaks nothing; and no text pair is under 4.5:1 in either scheme. The menu's places are reached with Enter
-   * in the page, to the Inbox and back.
+   * in the page, to the Inbox and back. It writes REGATED, the run at its second gate, for itself, and takes it back at its end.
    */
   name: 'runs',
   route: '/runs',
   expect: async (page) => {
     await sidebar(page);
+    const takenBack = await regated(page);
     const open = await answered<OpenRuns>(page, '/api/runs-open');
     const finished = await answered<FinishedPage>(page, `/api/runs-finished?page=1&size=${FINISHED_SIZE}`);
     await twoReads(page);
@@ -547,5 +567,6 @@ export default {
       open.counts.waiting,
       'back on Runs with Enter, its cards are drawn',
     );
+    await takenBack();
   },
 } satisfies PageSpec;

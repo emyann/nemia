@@ -435,15 +435,15 @@ export const GATED = {
 } as const;
 
 /**
- * A run at its second gate: `plan → build`, both gated. plan signed off half an hour ago and waited some twenty minutes for its approval,
- * the file `nemia approve` writes beside the record; build then ran, signed off a few minutes ago, and awaits its own. So the run's present
- * wait on a person is minutes long while all its waits on one, summed, are over twenty: the `runs` page tells the two apart. The oldest
- * of the seeded runs, and no page writes to it.
+ * A run at its second gate: `plan → build → ship`, the first two gated. plan signed off half an hour ago and waited some twenty minutes for its approval,
+ * the file `nemia approve` writes beside the record; build then ran, signed off a few minutes ago, and awaits its own; ship is not filed, so the run's result is nobody's to decide yet. So the run's present
+ * wait on a person is minutes long while all its waits on one, summed, are over twenty: the `runs` page tells the two apart. No
+ * seeded run: the Factory lays its cards out by age, so the `runs` page writes it for itself (`writeRegated`) and takes it back.
  */
 export const REGATED = {
   id: 'wait-at-the-second-gate-e2e12',
   title: 'Wait at the second gate',
-  steps: ['plan', 'build'],
+  steps: ['plan', 'build', 'ship'],
   /** Minutes ago, each mid-minute: plan signed off, a person approved it, and build signed off. */
   planEnded: 30.5,
   approved: 8.5,
@@ -1900,12 +1900,17 @@ export function seedFeed(root: string): void {
   write(path.join(root, 'engine', 'feed.jsonl'), lines(entries));
 }
 
-/** REGATED into `root`: its workflow folder, its record, plan's approval beside it, and the journals of its two tasks. */
-function seedRegated(root: string, ago: (minutes: number) => string): void {
+/**
+ * REGATED into `root`, its times minutes before `now`: its workflow folder, its record, plan's approval beside it, and the journals of
+ * its two tasks. Answers each path it made, for the page that takes them back.
+ */
+export function writeRegated(root: string, now: number): string[] {
+  const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
   const { id, title, planEnded, approved, buildEnded } = REGATED;
   const dir = path.join(root, 'workflow-regated');
   write(path.join(dir, 'plan.md'), '---\nplace: git\nharness: claude\n---\nPlan it.\n');
   write(path.join(dir, 'build.md'), '---\nplace: git\nharness: claude\nafter: plan\n---\nBuild the plan.\n');
+  write(path.join(dir, 'ship.md'), '---\nplace: git\nharness: claude\nafter: build\n---\nShip what was built.\n');
   const lane = (step: string) => path.join(root, 'worktrees', id, step);
   const record = (step: string) => ({ taskId: `${id}-${step}`, workspace: lane(step), branch: `wf/${id}/${step}` });
   write(
@@ -1923,10 +1928,11 @@ function seedRegated(root: string, ago: (minutes: number) => string): void {
         workflow: [
           { name: 'plan', after: [], body: 'Plan it.', harness: 'claude' },
           { name: 'build', after: ['plan'], body: 'Build the plan.', harness: 'claude' },
+          { name: 'ship', after: ['build'], body: 'Ship what was built.', harness: 'claude' },
         ],
         gates: ['plan', 'build'],
         createdAt: ago(planEnded + 1),
-        steps: { plan: record('plan'), build: record('build') },
+        steps: { plan: record('plan'), build: record('build'), ship: { taskId: null } },
       },
       null,
       2,
@@ -1954,10 +1960,17 @@ function seedRegated(root: string, ago: (minutes: number) => string): void {
     );
   journal('plan', planEnded + 1, planEnded, 'The plan, in two steps.');
   journal('build', approved, buildEnded, 'Built as planned.');
+  return [
+    dir,
+    path.join(root, 'runs', `${id}.json`),
+    path.join(root, 'runs', `${id}.asks`),
+    path.join(root, 'engine', 'tasks', `${id}-plan.jsonl`),
+    path.join(root, 'engine', 'tasks', `${id}-build.jsonl`),
+  ];
 }
 
 /**
- * Write the fake run into `root`, which becomes the api's WF_ROOT, with NEIGHBOUR, LOOPING, HELD, GATED, REGATED, COSTLY, and last the
+ * Write the fake run into `root`, which becomes the api's WF_ROOT, with NEIGHBOUR, LOOPING, HELD, GATED, COSTLY, and last the
  * three runs whose result is a decision (`seedDecisions`), newest, whose cards take the cells after every other run's. Times are minutes before
  * `now`. A task's end records the session's own id (`nativeId`) for a harness that has one, which the engine reads a transcript by.
  *
@@ -2436,8 +2449,6 @@ export function seed(root: string, now = Date.now()): void {
       { kind: 'settled', at: ago(1.1), outcome: 'succeeded' },
     ]),
   );
-
-  seedRegated(root, ago);
 
   const costDir = path.join(root, 'workflow-cost');
   write(path.join(costDir, 'implement.md'), '---\nplace: git\nharness: claude\nbudget: 2\n---\nImplement it.\n');

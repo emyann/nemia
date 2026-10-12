@@ -6,7 +6,6 @@
 import type { ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { daemonQuery, openRunsQuery, quotaQuery, versionQuery } from '@/lib/api';
-import { openRows } from '@/lib/factory';
 import type { FeedStatus } from '@/lib/feed';
 import { atWork, atWorkWords, feedWords, versionWords } from '@/lib/footer';
 import { DaemonLine } from './DaemonLine';
@@ -53,7 +52,7 @@ export function GaugesBar({ feed }: { feed: FeedStatus }) {
         <Gauge name="At work">
           <p data-at-work-sentence className="text-sm">
             {runs.data
-              ? atWorkWords(atWork(openRows(runs.data))).title
+              ? atWorkWords(atWork(runs.data)).title
               : runs.error
                 ? `The runs could not be read: ${runs.error.message}`
                 : 'Reading the runs…'}

@@ -5940,6 +5940,26 @@ test("the picker offers the factories Home lists, then the address's own when th
   assert.equal(pickerFactories(alone, false, undefined).length, 0, 'and not while it holds none');
 });
 
+test("REFUSED: the picker offers only All factories until the default's light answer arrives, though the address picks the default", async () => {
+  const { pickerOffer } = await import('../src/components/FactoryPicker.tsx');
+  const alone = [filed('default', { default: true, workflows: null })];
+  const counts = (finished: number) => ({ counts: { waiting: 0, inFlight: 0, finished } });
+  assert.deepEqual(pickerOffer(alone, undefined, 'default'), [], 'the light answer unread: nothing is offered');
+  assert.deepEqual(pickerOffer(undefined, counts(1), 'default'), [], 'the factories unread: nothing is offered');
+  assert.deepEqual(
+    pickerOffer(alone, counts(1), 'default').map((item) => item.name),
+    ['default'],
+    'read, and holding a run: the default is offered',
+  );
+  assert.equal(pickerOffer(alone, counts(1), 'default')[0].factory, alone[0], 'as the factory the api lists, not a bare name');
+  const named = [...alone, filed('nemia')];
+  assert.deepEqual(
+    pickerOffer(named, undefined, undefined).map((item) => item.name),
+    ['nemia'],
+    'once a factory is named, no light answer is waited for',
+  );
+});
+
 test("a factory in the picker reads its repositories by their folders' names, whole in the tooltip, and why its file does not read", async () => {
   const { FactoryItemBody } = await import('../src/components/FactoryPicker.tsx');
   const broken = filed('nemia', { repos: ['/code/nemia', '/code/web'], error: '/wf/factories/nemia.json is not JSON' });

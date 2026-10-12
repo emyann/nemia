@@ -1,7 +1,7 @@
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { atWork, atWorkWords, versionWords } from '../../../src/lib/footer.ts';
-import type { RunSummary } from '../../../src/lib/api/runs.ts';
+import type { OpenRuns } from '../../../src/lib/api/runs.ts';
 import type { Version } from '../../../src/lib/api/version.ts';
 import { photograph, railOf, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectUncut, expectVisible, feedAnswered, idle, Refused, settled } from '../checks.ts';
@@ -52,8 +52,8 @@ async function groups(page: Page): Promise<void> {
   await expectVisible(bar.locator('[data-daemon-dot="none"][data-tone="down"]'), "the daemon's dot: the e2e's api ticks nothing");
   await feedAnswered(page);
   await expectTexts(bar.locator('[data-feed-word="open"]'), ['feed live'], 'whether the board follows the feed');
-  const work = atWorkWords(atWork(await answer<RunSummary[]>(page, '/api/runs')));
-  if (work.text.startsWith('0 runs')) throw new Refused(`the seeded store has a run in flight — the api's runs make ${work.text}`);
+  const work = atWorkWords(atWork(await answer<OpenRuns>(page, '/api/runs-open')));
+  if (work.text.startsWith('0 runs')) throw new Refused(`the seeded store has a run in flight — the api's light answer makes ${work.text}`);
   await expectTexts(bar.locator('[data-at-work]'), [work.text], 'what is at work across every factory, as the api lists the runs');
   if ((await bar.locator('[data-at-work]').getAttribute('title')) !== work.title)
     throw new Refused(`its hover says it whole, ${JSON.stringify(work.title)}`);

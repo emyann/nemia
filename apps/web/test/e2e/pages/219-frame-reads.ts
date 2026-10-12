@@ -4,7 +4,7 @@ import type { OpenRuns, RunSummary } from '../../../src/lib/api/runs.ts';
 import { barValue } from '../../../src/lib/bar.ts';
 import { bellCount } from '../../../src/lib/bell.ts';
 import { openBlockOf, runsOf } from '../../../src/lib/factories.ts';
-import { openRows, titleOf } from '../../../src/lib/factory.ts';
+import { titleOf } from '../../../src/lib/factory.ts';
 import { atWork, atWorkWords } from '../../../src/lib/footer.ts';
 import { sidebarOf } from '../board.ts';
 import { expectNone, expectTexts, idle, Refused } from '../checks.ts';
@@ -37,7 +37,7 @@ async function frameSays(page: Page, open: OpenRuns, starred: Pick<RunSummary, '
     open.counts.waiting ? [bellCount(open.counts.waiting)] : [],
     `${where}: the bell counts what the api says waits`,
   );
-  const work = atWorkWords(atWork(openRows(open))).text;
+  const work = atWorkWords(atWork(open)).text;
   await expectTexts(page.locator('footer[data-frame-footer] [data-at-work]'), [work], `${where}: the footer says what is at work`);
   const links = sidebarOf(page).locator('[data-favorites]').getByRole('link');
   await expectTexts(links, [titleOf(starred)], `${where}: a starred finished run keeps its title`);

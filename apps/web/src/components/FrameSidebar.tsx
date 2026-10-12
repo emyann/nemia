@@ -18,9 +18,9 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { inboxQuery, openRunsQuery, runGone, runQuery, workflowsQuery } from '@/lib/api';
+import { inboxQuery, openRunsQuery, runQuery, workflowsQuery } from '@/lib/api';
 import { openRows } from '@/lib/factory';
-import { favoriteRows, type Favorite, type FavoriteRow, type OwnRead } from '@/lib/favorites';
+import { favoriteRows, ownReads, type Favorite, type FavoriteRow } from '@/lib/favorites';
 import { inboxBadgeTitle, notStarted } from '@/lib/inbox';
 import { toggleFavorite, useFavorites } from '@/lib/useFavorites';
 import { FactoryPicker } from './FactoryPicker';
@@ -119,13 +119,7 @@ function useFavoriteRows(favorites: readonly Favorite[]): FavoriteRow[] {
   const apart = settled ? starred.filter((id) => !rows?.some((row) => row.id === id)) : [];
   const own = useQueries({
     queries: apart.map((id) => ({ ...runQuery(id), refetchInterval: false as const })),
-    combine: (results) =>
-      new Map(
-        results.flatMap((result, i): Array<[string, OwnRead]> => {
-          if (result.data) return [[apart[i], result.data]];
-          return runGone(result.error) ? [[apart[i], 'gone']] : [];
-        }),
-      ),
+    combine: (results) => ownReads(apart, results),
   });
   return favoriteRows(favorites, rows, own, workflows.data);
 }

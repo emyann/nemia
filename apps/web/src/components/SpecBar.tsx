@@ -49,7 +49,7 @@ export function SpecBar({ from, workflow, step }: { from: 'repo' | 'yours'; work
 /** What the bar holds where the address's factory lists no workflows: why, or that it reads on one of its repositories, none named. */
 function Nowhere({ where }: { where: ListPlace }) {
   return (
-    <p data-unplaced className="text-sm text-yours">
+    <p data-unplaced className="text-body-medium text-yours">
       {where.kind === 'refused'
         ? where.why
         : where.kind === 'pick'
@@ -64,9 +64,9 @@ function Nowhere({ where }: { where: ListPlace }) {
  * that it reads.
  */
 function Unread({ workflow, error, read }: { workflow: string; error: Error | null; read: boolean }) {
-  if (error) return <p className="text-sm text-failure">Could not read the workflows: {error.message}</p>;
-  if (read) return <p className="text-sm text-yours">No workflow is named {workflow}.</p>;
-  return <p className="text-xs text-muted-foreground">Reading the workflows…</p>;
+  if (error) return <p className="text-body-medium text-failure">Could not read the workflows: {error.message}</p>;
+  if (read) return <p className="text-body-medium text-yours">No workflow is named {workflow}.</p>;
+  return <p className="text-body-small text-muted-foreground">Reading the workflows…</p>;
 }
 
 /**
@@ -78,13 +78,13 @@ export function SpecBody({ listing, step: name }: { listing: WorkflowListing; st
   const step = listing.steps.find((s) => s.name === name);
   if (listing.error)
     return (
-      <p className="text-sm text-failure">
+      <p className="text-body-medium text-failure">
         {listing.name} does not read as a workflow: {listing.error}
       </p>
     );
   if (!step)
     return (
-      <p className="text-sm text-yours">
+      <p className="text-body-medium text-yours">
         {listing.name} has no step named {name}.
       </p>
     );
@@ -93,13 +93,13 @@ export function SpecBody({ listing, step: name }: { listing: WorkflowListing; st
   return (
     <>
       <section aria-label="Runs on" className="space-y-1">
-        <h3 className="text-xs font-medium text-muted-foreground">Runs on</h3>
+        <h3 className="text-label-medium text-muted-foreground">Runs on</h3>
         <p className="font-mono" data-runs-on>
           {runsOn(step.spec)}
         </p>
       </section>
       <section aria-label="Keys" className="space-y-1">
-        <h3 className="text-xs font-medium text-muted-foreground">Keys</h3>
+        <h3 className="text-label-medium text-muted-foreground">Keys</h3>
         <dl className="space-y-1">
           {specLines(step.spec).map(([label, value, whole = value]) => (
             <div key={label} className="flex min-w-0 gap-2">
@@ -110,7 +110,7 @@ export function SpecBody({ listing, step: name }: { listing: WorkflowListing; st
         </dl>
       </section>
       <section aria-label="Waits on" className="space-y-1">
-        <h3 className="text-xs font-medium text-muted-foreground">Waits on</h3>
+        <h3 className="text-label-medium text-muted-foreground">Waits on</h3>
         <p data-waits-on>{waits.length ? <span className="font-mono">{waits.join(', ')}</span> : 'nothing: it starts first'}</p>
       </section>
     </>

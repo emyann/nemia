@@ -15,7 +15,7 @@ export type MachineFlowNode = Node<StateBox & { lit?: boolean; pressable?: boole
  */
 export function ByActionList({ list, children }: { list: readonly ByAction[]; children?: ReactNode }) {
   return (
-    <div className="px-2.5 py-1 font-mono text-[11px] leading-4 whitespace-nowrap">
+    <div className="px-2.5 py-1 font-mono text-body-small leading-4 whitespace-nowrap">
       {list.map((group) => (
         <div key={group.action} data-action={group.action}>
           {group.events.map((event, i) => (
@@ -65,8 +65,8 @@ export function MachineNode({ data }: NodeProps<MachineFlowNode>) {
     >
       <Handle type="target" position={Position.Top} isConnectable={false} className="opacity-0" />
       <div className="px-2.5 pt-1.5">
-        <p className={`font-mono text-[10px] uppercase tracking-wider text-muted-foreground`}>{kindOf(data)}</p>
-        <p data-state-name className="text-sm font-semibold">
+        <p className={`text-label-small uppercase text-muted-foreground`}>{kindOf(data)}</p>
+        <p data-state-name className="text-body-medium font-semibold">
           {data.id}
         </p>
       </div>

@@ -48,10 +48,10 @@ function NewAgentPage() {
     <article className="space-y-6">
       <BackToAgents />
       <header className="space-y-1">
-        <h1 className="text-base font-semibold">New agent</h1>
-        <p className="text-sm text-muted-foreground">
-          Written to <code className="font-mono text-xs">{store.agents}/&lt;name&gt;.md</code>, beside your workflows. A node of one of them
-          takes it with <code className="font-mono text-xs">agent: &lt;name&gt;</code>.
+        <h1 className="text-title-medium">New agent</h1>
+        <p className="text-body-medium text-muted-foreground">
+          Written to <code className="font-mono text-body-small">{store.agents}/&lt;name&gt;.md</code>, beside your workflows. A node of one
+          of them takes it with <code className="font-mono text-body-small">agent: &lt;name&gt;</code>.
         </p>
         {hireInto && <HiredInto place={hireInto} />}
       </header>
@@ -70,13 +70,13 @@ function NewAgentPage() {
 /** The step the agent will be hired into once written, linked to its page in the factory. */
 function HiredInto({ place: { factory, workflow, step } }: { place: HirePlace }) {
   return (
-    <p data-hire-into={`${workflow}/${step}`} className="text-sm text-muted-foreground">
+    <p data-hire-into={`${workflow}/${step}`} className="text-body-medium text-muted-foreground">
       Once created, {factory} hires it into{' '}
       <RouteLink
         to="/workflows/$from/$workflow/$step"
         params={{ from: 'yours', workflow, step }}
         search={{ factory }}
-        className="font-mono text-xs text-foreground underline underline-offset-2"
+        className="font-mono text-body-small text-foreground underline underline-offset-2"
       >
         {workflow}/{step}
       </RouteLink>
@@ -95,13 +95,13 @@ function Unhired({ place: { factory, workflow, step }, agent, why }: { place: Hi
       ref={intoView}
       role="alert"
       data-hire-unhired
-      className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2 text-sm text-on-failure-container"
+      className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2 text-body-medium text-on-failure-container"
     >
       <p className="font-medium">
         {agent} is created, but not hired into {workflow}/{step}:
       </p>
-      <p className="text-xs whitespace-pre-wrap">{why}</p>
-      <p className="text-xs">
+      <p className="text-body-small whitespace-pre-wrap">{why}</p>
+      <p className="text-body-small">
         <RouteLink
           to="/workflows/$from/$workflow/$step"
           params={{ from: 'yours', workflow, step }}
@@ -124,7 +124,7 @@ export function BackToAgents() {
   return (
     <RouteLink
       to="/agents"
-      className="rounded-sm text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+      className="rounded-sm text-body-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
     >
       ← Agents
     </RouteLink>

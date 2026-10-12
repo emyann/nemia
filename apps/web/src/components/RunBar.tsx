@@ -24,7 +24,7 @@ export function RunBar({ run: id }: { run: string }) {
   return (
     <FloatingBar
       title={run ? titleOf(run) : id}
-      description={<span className="font-mono text-xs">{id}</span>}
+      description={<span className="font-mono text-body-small">{id}</span>}
       actions={<FavoriteStar favorite={{ kind: 'run', run: id }} name={run ? titleOf(run) : id} className="-mt-0.5" />}
     >
       <RunBody id={id} run={run} error={error} />
@@ -47,7 +47,7 @@ export function RunBody({ id, run, error }: { id: string; run: RunDetail | undef
       <ToDecideBanner run={run} onStep={onStep} />
       <NeedsBanner run={run} onStep={onStep} />
       <section aria-label="Steps" className="space-y-1">
-        <h3 className="text-xs font-medium text-muted-foreground">Steps</h3>
+        <h3 className="text-label-medium text-muted-foreground">Steps</h3>
         <ul className="space-y-0.5">
           {run.steps.map((step) => (
             <li key={step.name}>
@@ -57,7 +57,7 @@ export function RunBody({ id, run, error }: { id: string; run: RunDetail | undef
                 onClick={() => onStep(step.name)}
                 className="flex w-full items-center justify-between gap-3 rounded px-2 py-1 text-left hover:bg-muted"
               >
-                <span className="min-w-0 truncate font-mono text-xs">{step.name}</span>
+                <span className="min-w-0 truncate font-mono text-body-small">{step.name}</span>
                 <StatusChip status={step.status} runCancelled={run.cancelledAt !== null} runHeld={run.holding != null} />
               </button>
             </li>
@@ -65,8 +65,8 @@ export function RunBody({ id, run, error }: { id: string; run: RunDetail | undef
         </ul>
       </section>
       <section aria-label="Brief" className="space-y-1">
-        <h3 className="text-xs font-medium text-muted-foreground">Brief</h3>
-        <Markdown className="text-sm">{run.brief}</Markdown>
+        <h3 className="text-label-medium text-muted-foreground">Brief</h3>
+        <Markdown className="text-body-medium">{run.brief}</Markdown>
       </section>
     </>
   );

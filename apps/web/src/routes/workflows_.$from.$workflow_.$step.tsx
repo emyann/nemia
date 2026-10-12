@@ -19,7 +19,7 @@ export const Route = createFileRoute('/workflows_/$from/$workflow_/$step')({
   errorComponent: ({ error }) => (
     <div className="space-y-3">
       <BackToWorkflow />
-      <p className="text-sm text-failure">Could not load this step: {error instanceof Error ? error.message : String(error)}</p>
+      <p className="text-body-medium text-failure">Could not load this step: {error instanceof Error ? error.message : String(error)}</p>
     </div>
   ),
 });
@@ -41,13 +41,13 @@ function StepPage() {
 
       <header className="space-y-1">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <h1 className="font-mono text-base font-semibold">{page.step}</h1>
-          <span className="text-xs text-muted-foreground">
+          <h1 className="font-mono text-body-large font-semibold">{page.step}</h1>
+          <span className="text-body-small text-muted-foreground">
             a step of <span className="font-mono text-foreground">{page.workflow}</span>
           </span>
           <span
             data-from={page.from}
-            className={`rounded-full px-2 py-0.5 text-[11px] leading-none font-medium ${
+            className={`rounded-full px-2 py-0.5 text-body-small leading-none font-medium ${
               page.from === 'yours' ? container.grey : 'bg-muted text-muted-foreground'
             }`}
           >
@@ -76,7 +76,7 @@ function BackToWorkflow() {
       to="/workflows/$from/$workflow"
       params={{ from, workflow }}
       search={place}
-      className="font-mono text-sm text-muted-foreground hover:text-foreground"
+      className="font-mono text-body-medium text-muted-foreground hover:text-foreground"
     >
       ← {workflow}
     </Link>

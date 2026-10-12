@@ -7,7 +7,6 @@ import {
   type DecideCommand,
   type DiffFile,
   type Group,
-  type Lesson,
   type RetryMode,
   type RunDetail,
   type SensitiveDiff,
@@ -18,10 +17,11 @@ import { acceptStepOf, barOf, changeOf, decidableRun, decisionStamp, diffLine, i
 import { cn } from '../lib/utils';
 import { BUTTON, MODES, Refusal, TEXTAREA, useAccept, useAsk } from './Ask';
 import { CopyButton } from './CopyButton';
+import { LessonChip } from './LessonChip';
 import { Facts, HEADING, pathRow, readRows, TrialMerges } from './Facts';
 import { Asks, QuestionsForm } from './Questions';
 import { RaiseRow } from './Raise';
-import { container, dashed, hairline, ringed } from '../lib/meaning';
+import { container, hairline, ringed } from '../lib/meaning';
 
 /**
  * The Decide section of a run's page: the answer each step waiting on you can be given (`answersOf`), then what the CLI's `decide` shows a
@@ -37,7 +37,7 @@ export function Decide({ run }: { run: RunDetail }) {
   const answers = offers.length > 0 ? <Offers runId={run.id} offers={offers} /> : null;
   const body =
     decidable && error ? (
-      <p className="text-sm text-failure">
+      <p className="text-body-medium text-failure">
         Could not read what there is to decide: {error.message} <code>{run.decide}</code> reads it from the command line.
       </p>
     ) : decidable && isDecidable(data) ? (
@@ -58,7 +58,7 @@ function DecideFrame({ children }: { children: ReactNode }) {
     <section aria-label="Decide" id="decide" className="scroll-mt-4 space-y-5 rounded border border-outline-variant p-4">
       <div className="space-y-1">
         <h2 className="font-semibold">Decide</h2>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-body-small text-muted-foreground">
           What there is to decide on this run. Copy a command to run it yourself; the board runs one of them, accepting a loop's work as it
           stands with your reason. An answer given here asks for a try, or a round; each row says what the tick does with it.
         </p>
@@ -93,7 +93,7 @@ function DecisionParts({ runId, decision, run = null }: DecisionProps) {
   return (
     <>
       {overBudget && (
-        <p data-over-budget className={`rounded px-3 py-2 font-mono text-xs break-words ${container.yours}`}>
+        <p data-over-budget className={`rounded px-3 py-2 font-mono text-body-small break-words ${container.yours}`}>
           {overBudget}
         </p>
       )}
@@ -101,7 +101,7 @@ function DecisionParts({ runId, decision, run = null }: DecisionProps) {
       <div className="space-y-4">
         {inFolders ? (
           <div data-in-folders className="space-y-1">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-body-medium text-muted-foreground">
               Worked in folders of its own, and changed nothing anywhere else: what it made is there, to keep or to forget.
             </p>
             <Facts rows={[['work', pathRow(run.work)]]} />
@@ -109,7 +109,7 @@ function DecisionParts({ runId, decision, run = null }: DecisionProps) {
         ) : touched.length ? (
           touched.map((t) => <TouchedBranch key={t.branch} touched={t} />)
         ) : (
-          <p className="text-sm text-muted-foreground">No branch to read: no step worked on one.</p>
+          <p className="text-body-medium text-muted-foreground">No branch to read: no step worked on one.</p>
         )}
         {!inFolders && <LessonChip lesson={lesson} />}
       </div>
@@ -194,9 +194,9 @@ export function OfferRow({ runId, offer }: { runId: string; offer: Exclude<Answe
 
   if (offer.kind === 'asked' || ask.isSuccess) {
     return (
-      <li data-offer="asked" data-step={offer.step} className="rounded border border-outline-variant px-3 py-2 text-sm">
+      <li data-offer="asked" data-step={offer.step} className="rounded border border-outline-variant px-3 py-2 text-body-medium">
         <strong>{offer.step}</strong>{' '}
-        <span data-note className="font-mono text-xs text-muted-foreground">
+        <span data-note className="font-mono text-body-small text-muted-foreground">
           {offer.kind === 'asked' ? (offer.note ?? `try ${offer.try} asked`) : ask.isSuccess ? askedSaid(ask.data) : null}
         </span>
       </li>
@@ -210,7 +210,7 @@ export function OfferRow({ runId, offer }: { runId: string; offer: Exclude<Answe
         ? ['fresh', 'nudge']
         : ['nudge', 'fresh'];
   return (
-    <li data-offer={offer.kind} data-step={offer.step} className="space-y-2 rounded border border-yours bg-card p-3 text-sm">
+    <li data-offer={offer.kind} data-step={offer.step} className="space-y-2 rounded border border-yours bg-card p-3 text-body-medium">
       {offer.kind === 'answer' && offer.needs ? (
         <Asks data-said step={offer.step} needs={offer.needs} />
       ) : (
@@ -246,7 +246,7 @@ export function OfferRow({ runId, offer }: { runId: string; offer: Exclude<Answe
           className={cn(TEXTAREA, 'disabled:cursor-not-allowed disabled:opacity-50')}
         />
         {rechecking && message.trim() && (
-          <p data-recheck-note className="text-xs text-muted-foreground">
+          <p data-recheck-note className="text-body-small text-muted-foreground">
             Not sent with a recheck: it files no session to read it. Choose a session to send it.
           </p>
         )}
@@ -254,7 +254,7 @@ export function OfferRow({ runId, offer }: { runId: string; offer: Exclude<Answe
           <button type="submit" disabled={ask.isPending || (offer.kind === 'answer' && !message.trim())} className={BUTTON}>
             {ask.isPending ? 'Asking…' : offer.kind === 'answer' ? 'Answer and continue' : 'Try again'}
           </button>
-          <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+          <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-body-small">
             <legend className="sr-only">How to try {offer.step} again</legend>
             {modes.map((m) => (
               <label key={m} className="flex cursor-pointer items-center gap-1.5">
@@ -283,7 +283,7 @@ export function Continue({ runId, step, line }: { runId: string; step: string; l
   const ask = useAsk(runId, step, () => setMessage(''));
   if (ask.isSuccess) {
     return (
-      <p data-asked className="font-mono text-xs">
+      <p data-asked className="font-mono text-body-small">
         {askedSaid(ask.data)}
       </p>
     );
@@ -313,7 +313,7 @@ export function Continue({ runId, step, line }: { runId: string; step: string; l
           <button type="submit" disabled={ask.isPending} className={BUTTON}>
             {ask.isPending ? 'Asking…' : 'Continue'}
           </button>
-          <p className="text-xs">
+          <p className="text-body-small">
             as <code>{line}</code> asks it: the next tick stops its session, and files the try once it has stopped
           </p>
         </div>
@@ -330,19 +330,19 @@ export function Continue({ runId, step, line }: { runId: string; step: string; l
 export function TouchedBranch({ touched: { branch, radius } }: { touched: Touched }) {
   return (
     <div data-touched={branch} className="space-y-2">
-      <p className="text-sm">
+      <p className="text-body-medium">
         <span className="text-muted-foreground">touched </span>
-        <span className="break-all font-mono text-xs">{branch}</span>
+        <span className="break-all font-mono text-body-small">{branch}</span>
       </p>
       {'error' in radius ? (
-        <p className="text-sm text-failure">{radius.error}</p>
+        <p className="text-body-medium text-failure">{radius.error}</p>
       ) : radius.changes.length ? (
         <>
           <GroupRows groups={radius.groups} />
           <Chips agentFacing={radius.agentFacing} checkAffecting={radius.checkAffecting} />
         </>
       ) : (
-        <p className="text-sm text-muted-foreground">nothing — the branch changed no file against the base</p>
+        <p className="text-body-medium text-muted-foreground">nothing — the branch changed no file against the base</p>
       )}
     </div>
   );
@@ -353,7 +353,7 @@ function GroupRows({ groups }: { groups: readonly Group[] }) {
   return (
     <ul
       aria-label="Groups"
-      className="grid grid-cols-[minmax(0,max-content)_max-content_minmax(3rem,1fr)_max-content] items-center gap-x-3 gap-y-1 text-xs"
+      className="grid grid-cols-[minmax(0,max-content)_max-content_minmax(3rem,1fr)_max-content] items-center gap-x-3 gap-y-1 text-body-small"
     >
       {groups.map((g) => {
         const counted = g.files - g.binary;
@@ -415,7 +415,7 @@ export function Chips({ agentFacing, checkAffecting }: { agentFacing: readonly s
             key={file}
             data-chip={kind}
             title={title}
-            className={cn('break-all rounded px-1.5 py-0.5 font-mono text-[11px]', className)}
+            className={cn('break-all rounded px-1.5 py-0.5 font-mono text-body-small', className)}
           >
             {file}
           </span>
@@ -423,27 +423,10 @@ export function Chips({ agentFacing, checkAffecting }: { agentFacing: readonly s
       </p>
     );
   return (
-    <div className="space-y-1.5 text-xs">
+    <div className="space-y-1.5 text-body-small">
       {row('agent-facing', agentFacing, 'agent-facing', AGENT_FACING, hairline)}
       {row('check-affecting', checkAffecting, 'check-affecting', CHECK_AFFECTING, ringed.yours)}
     </div>
-  );
-}
-
-/** The lesson line: sage when the run wrote where the next agent reads, a grey ring when it wrote nothing, dashed when nobody can say. */
-export function LessonChip({ lesson }: { lesson: Lesson }) {
-  const [text, title, className] =
-    lesson.state === 'written'
-      ? [`lesson · ${lesson.said}`, 'The run changed a file where the next agent reads.', container.sage]
-      : lesson.state === 'nothing'
-        ? [lesson.said, 'What this run learned is written nowhere the next agent reads (CLAUDE.md, "When you miss").', ringed.grey]
-        : [`lesson ${lesson.said}`, 'A branch could not be read, so nobody can say what it wrote.', dashed.grey];
-  return (
-    <p>
-      <span data-lesson={lesson.state} title={title} className={cn('inline-block rounded px-2 py-0.5 font-mono text-xs', className)}>
-        {text}
-      </span>
-    </p>
   );
 }
 
@@ -454,9 +437,9 @@ function InFull({ sensitive, touched }: { sensitive: readonly SensitiveDiff[]; t
       <h3 className={HEADING}>In full: the check-affecting files — what a change could edit to make its check pass</h3>
       {sensitive.map(({ branch, files, error }) => (
         <div key={branch} className="space-y-1.5">
-          {sensitive.length > 1 && <p className="break-all font-mono text-xs text-muted-foreground">{branch}</p>}
+          {sensitive.length > 1 && <p className="break-all font-mono text-body-small text-muted-foreground">{branch}</p>}
           {error ? (
-            <p className="text-sm text-failure">{error}</p>
+            <p className="text-body-medium text-failure">{error}</p>
           ) : files.length ? (
             files.map((file) => (
               <DiffFileView
@@ -469,7 +452,7 @@ function InFull({ sensitive, touched }: { sensitive: readonly SensitiveDiff[]; t
               />
             ))
           ) : (
-            <p className="text-sm text-muted-foreground">none</p>
+            <p className="text-body-medium text-muted-foreground">none</p>
           )}
         </div>
       ))}
@@ -492,7 +475,7 @@ const LINE_CLASS: Record<DiffLine, string> = {
 export function DiffFileView({ file, counts }: { file: DiffFile; counts?: { added: number | null; removed: number | null } }) {
   return (
     <details data-diff={file.path} className="group rounded border border-outline-variant">
-      <summary className="flex cursor-pointer items-center gap-2 px-2 py-1 text-xs hover:bg-accent">
+      <summary className="flex cursor-pointer items-center gap-2 px-2 py-1 text-body-small hover:bg-accent">
         <ChevronRight aria-hidden className="size-3.5 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
         <span className="min-w-0 flex-1 truncate font-mono" title={file.path}>
           {file.path}
@@ -509,7 +492,7 @@ export function DiffFileView({ file, counts }: { file: DiffFile; counts?: { adde
           </span>
         )}
       </summary>
-      <pre className="max-h-96 overflow-auto border-t border-outline-variant py-1 font-mono text-[11px] leading-snug">
+      <pre className="max-h-96 overflow-auto border-t border-outline-variant py-1 font-mono text-body-small leading-snug">
         {file.lines.map((line, i) => {
           const kind = diffLine(line);
           return (
@@ -520,7 +503,7 @@ export function DiffFileView({ file, counts }: { file: DiffFile; counts?: { adde
         })}
       </pre>
       {file.cut > 0 && (
-        <p data-cut={file.cut} className="border-t border-outline-variant px-2 py-1 text-xs text-muted-foreground">
+        <p data-cut={file.cut} className="border-t border-outline-variant px-2 py-1 text-body-small text-muted-foreground">
           {file.cut} more line{file.cut === 1 ? '' : 's'} — the command line&apos;s decide prints them all
         </p>
       )}
@@ -551,7 +534,7 @@ export function Commands({ runId, commands }: { runId: string; commands: readonl
           })}
         </ul>
       ) : (
-        <p className="text-sm text-muted-foreground">None yet: the run is still moving.</p>
+        <p className="text-body-medium text-muted-foreground">None yet: the run is still moving.</p>
       )}
     </section>
   );
@@ -561,10 +544,12 @@ export function Commands({ runId, commands }: { runId: string; commands: readonl
 function CommandLine({ command: c }: { command: DecideCommand }) {
   return (
     <>
-      {c.said && <p className="text-xs text-muted-foreground">{c.said.replace(`:  ${c.command}`, '')}</p>}
+      {c.said && <p className="text-body-small text-muted-foreground">{c.said.replace(`:  ${c.command}`, '')}</p>}
       <div className="flex items-center gap-2">
-        <span className="w-16 shrink-0 text-xs text-muted-foreground">{c.label}</span>
-        <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap rounded bg-muted px-2 py-1 font-mono text-xs">{c.command}</code>
+        <span className="w-16 shrink-0 text-body-small text-muted-foreground">{c.label}</span>
+        <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap rounded bg-muted px-2 py-1 font-mono text-body-small">
+          {c.command}
+        </code>
         <CopyButton text={c.command} />
       </div>
     </>
@@ -587,7 +572,7 @@ export function AcceptCommand({ runId, step, command }: { runId: string; step: s
         <CommandLine command={command} />
       </div>
       {accept.isSuccess ? (
-        <p data-accepted className="pl-18 font-mono text-xs">
+        <p data-accepted className="pl-18 font-mono text-body-small">
           try {accept.data.try} of {step} accepted as it stands — what waits on it is filed on the next tick
         </p>
       ) : (

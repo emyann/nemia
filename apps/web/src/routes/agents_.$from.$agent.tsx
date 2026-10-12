@@ -34,12 +34,12 @@ export const Route = createFileRoute('/agents_/$from/$agent')({
   errorComponent: ({ error }) => (
     <div className="space-y-3">
       <BackToAgents />
-      <p className="text-sm text-failure">Could not load this agent: {error instanceof Error ? error.message : String(error)}</p>
+      <p className="text-body-medium text-failure">Could not load this agent: {error instanceof Error ? error.message : String(error)}</p>
     </div>
   ),
 });
 
-const code = (text: string) => <code className="font-mono text-xs">{text}</code>;
+const code = (text: string) => <code className="font-mono text-body-small">{text}</code>;
 
 /**
  * One agent: the nodes it is attached to, each linked, and its form — to edit, when it is yours; to read, with its Source, when it is the
@@ -141,7 +141,7 @@ function FormIn({ agent, mine, children }: { agent: AgentListing; mine: boolean;
     );
   return (
     <>
-      <p className="border-b border-outline-variant pb-2 font-mono text-[11px] break-all text-muted-foreground">{agent.file}</p>
+      <p className="border-b border-outline-variant pb-2 font-mono text-body-small break-all text-muted-foreground">{agent.file}</p>
       {children}
     </>
   );
@@ -151,8 +151,10 @@ function FormIn({ agent, mine, children }: { agent: AgentListing; mine: boolean;
 function Unread({ error }: { error: string }) {
   return (
     <div data-agent-error className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
-      <p className="text-sm font-medium text-on-failure-container">Does not read as an agent, so no run can start a node that names it:</p>
-      <p className="font-mono text-xs whitespace-pre-wrap break-words text-on-failure-container">{error}</p>
+      <p className="text-body-medium font-medium text-on-failure-container">
+        Does not read as an agent, so no run can start a node that names it:
+      </p>
+      <p className="font-mono text-body-small whitespace-pre-wrap break-words text-on-failure-container">{error}</p>
     </div>
   );
 }
@@ -168,18 +170,18 @@ function AgentHeader({ agent, mine }: { agent: AgentListing; mine: boolean }) {
         <AgentFace name={agent.name} size={96} follows plate />
         <div className="min-w-0 space-y-1">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <h1 className="text-lg font-semibold">{personOf(agent.name)}</h1>
+            <h1 className="text-title-large">{personOf(agent.name)}</h1>
             <FromBadge from={agent.from} />
           </div>
-          <p data-agent-role className="text-sm text-muted-foreground">
-            {agent.role ?? 'No role yet'} · <span className="font-mono text-xs">agent: {agent.name}</span>
+          <p data-agent-role className="text-body-medium text-muted-foreground">
+            {agent.role ?? 'No role yet'} · <span className="font-mono text-body-small">agent: {agent.name}</span>
           </p>
         </div>
       </div>
-      {agent.description && <p className="text-sm text-foreground">{agent.description}</p>}
+      {agent.description && <p className="text-body-medium text-foreground">{agent.description}</p>}
       <UsedBy listing={agent} />
       {!mine && (
-        <p data-read-only className="text-xs text-muted-foreground">
+        <p data-read-only className="text-body-small text-muted-foreground">
           The repository's agents are read here, not written: they change with the repository, in a commit.
           {agent.untried?.copy && <> To start one of yours from this one, {code(agent.untried.copy)}.</>}
         </p>
@@ -202,7 +204,7 @@ function Remove({ agent, pending, onRemove }: { agent: AgentListing; pending: bo
       </Button>
     );
   return (
-    <span data-remove-asks className="ml-auto flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+    <span data-remove-asks className="ml-auto flex flex-wrap items-center gap-2 text-body-small text-muted-foreground">
       Remove {code(`agents/${agent.name}.md`)}
       {beside.length > 0 && (
         <>

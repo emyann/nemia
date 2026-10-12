@@ -15,10 +15,10 @@ export const MODES: Record<RetryMode, string> = {
 };
 
 export const BUTTON =
-  'rounded bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-primary';
+  'rounded bg-primary px-3 py-1.5 text-body-medium font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-primary';
 
 export const TEXTAREA =
-  'block w-full resize-y rounded border border-outline bg-background px-2 py-1.5 text-sm placeholder:text-muted-foreground focus:border-on-surface-variant focus:outline-none';
+  'block w-full resize-y rounded border border-outline bg-background px-2 py-1.5 text-body-medium placeholder:text-muted-foreground focus:border-on-surface-variant focus:outline-none';
 
 /**
  * An ask for a step's next try through the api (`askTry`), and the run read again once the api has it: its own record alone (`exact`),
@@ -88,8 +88,8 @@ export function useRound(runId: string) {
 export function Refusal({ error, not = 'Not asked' }: { error: Error; not?: string }) {
   return (
     <div data-refused className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
-      <p className="text-sm font-medium text-on-failure-container">{not}. The api refused it:</p>
-      <p className="font-mono text-xs whitespace-pre-wrap break-words text-on-failure-container">{error.message}</p>
+      <p className="text-body-medium font-medium text-on-failure-container">{not}. The api refused it:</p>
+      <p className="font-mono text-body-small whitespace-pre-wrap break-words text-on-failure-container">{error.message}</p>
     </div>
   );
 }

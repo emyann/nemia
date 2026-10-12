@@ -1,4 +1,4 @@
-import { cn } from 'cn';
+import { cn } from '@/lib/utils';
 import { composeRenderProps, Switch as SwitchPrimitive, type SwitchProps as SwitchPrimitiveProps } from 'react-aria-components';
 
 function Switch({

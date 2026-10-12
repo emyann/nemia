@@ -32,7 +32,7 @@ export function DebugPanel({ run, step }: { run: RunDetail; step: Step }) {
       <Collapsible>
         {({ isExpanded }) => (
           <>
-            <CollapsibleTrigger className="w-full px-4 py-1.5 text-left text-xs text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50">
+            <CollapsibleTrigger className="w-full px-4 py-1.5 text-left text-body-small text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50">
               {isExpanded ? '▾' : '▸'} Debug
             </CollapsibleTrigger>
             <CollapsibleContent>{isExpanded && <DebugBody run={run} step={step} />}</CollapsibleContent>
@@ -47,9 +47,9 @@ export function DebugPanel({ run, step }: { run: RunDetail; step: Step }) {
 function DebugBody({ run, step }: { run: RunDetail; step: Step }) {
   const machine = useQuery(machineQuery(LIFECYCLE));
   if (machine.error) {
-    return <p className="px-4 pb-3 text-sm text-failure">Could not read the lifecycle's graph: {machine.error.message}</p>;
+    return <p className="px-4 pb-3 text-body-medium text-failure">Could not read the lifecycle's graph: {machine.error.message}</p>;
   }
-  if (!machine.data) return <p className="px-4 pb-3 text-sm text-muted-foreground">Reading the lifecycle…</p>;
+  if (!machine.data) return <p className="px-4 pb-3 text-body-medium text-muted-foreground">Reading the lifecycle…</p>;
   return <PathOf run={run} step={step} machine={machine.data} />;
 }
 
@@ -77,7 +77,7 @@ function PathOf({ run, step, machine }: { run: RunDetail; step: Step; machine: M
 
   return (
     <div className="max-h-[60svh] space-y-2 overflow-y-auto px-4 pb-3">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-body-small text-muted-foreground">
         <span>
           {PATH_TITLE}
           {read.data?.taskId ? (
@@ -93,11 +93,11 @@ function PathOf({ run, step, machine }: { run: RunDetail; step: Step; machine: M
         {step.tries.length > 1 && <TryPicker step={step} shown={tryNumber ?? current} onPick={pick} />}
       </div>
       {read.error ? (
-        <p className="text-sm text-failure">Could not read the path: {read.error.message}</p>
+        <p className="text-body-medium text-failure">Could not read the path: {read.error.message}</p>
       ) : !read.data ? (
-        <p className="text-sm text-muted-foreground">Reading the path…</p>
+        <p className="text-body-medium text-muted-foreground">Reading the path…</p>
       ) : read.data.taskId === null ? (
-        <p className="text-sm text-muted-foreground">Not filed yet, so there is no path to show.</p>
+        <p className="text-body-medium text-muted-foreground">Not filed yet, so there is no path to show.</p>
       ) : (
         <div
           data-path={read.data.taskId}
@@ -127,7 +127,7 @@ function TryPicker({ step, shown, onPick }: { step: Step; shown: number; onPick:
         <ToggleButton
           key={t.try}
           id={String(t.try)}
-          className="rounded border px-1.5 py-0.5 text-[11px] outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 data-selected:border-alive data-selected:text-foreground"
+          className="rounded border px-1.5 py-0.5 text-body-small outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 data-selected:border-alive data-selected:text-foreground"
         >
           {t.current ? `try ${t.try} (current)` : `try ${t.try}`}
         </ToggleButton>
@@ -166,7 +166,7 @@ function WideGraph({
         <SheetHeader className="gap-2 border-b border-outline-variant pr-14">
           <SheetTitle>{PATH_TITLE}</SheetTitle>
           <SheetDescription>
-            <code className="font-mono text-xs">{taskId}</code>
+            <code className="font-mono text-body-small">{taskId}</code>
           </SheetDescription>
           <div className="max-w-xl">
             <Scrubber path={path} at={at} onScrub={onScrub} />
@@ -229,7 +229,7 @@ function Scrubber({ path, at, onScrub }: { path: readonly LifecycleStep[]; at: n
           <SliderThumb className="top-1/2 size-4 rounded-full border-2 border-alive bg-card outline-none focus-visible:ring-2 focus-visible:ring-ring/50" />
         </SliderTrack>
       </Slider>
-      <p data-shown className="text-xs text-muted-foreground">
+      <p data-shown className="text-body-small text-muted-foreground">
         Entry {at + 1} of {path.length}
         {at === path.length - 1 ? ', the newest' : ''}
       </p>
@@ -255,11 +255,11 @@ function Timeline({
 }) {
   const now = new Date(useNow(60_000));
   const routes = new Set(machine.edges.map((e) => `${e.from}->${e.to}`));
-  if (path.length === 0) return <p className="text-sm text-muted-foreground">Its journal has nothing on it yet.</p>;
+  if (path.length === 0) return <p className="text-body-medium text-muted-foreground">Its journal has nothing on it yet.</p>;
   return (
     <div className="space-y-2">
       <Scrubber path={path} at={at} onScrub={onScrub} />
-      <ol aria-label="The path" className="space-y-0.5 font-mono text-[11px]">
+      <ol aria-label="The path" className="space-y-0.5 font-mono text-body-small">
         {path.map((s, i) => {
           const verb = byPerson(path, i, machine.verbs);
           const offGraph = !verb && i > 0 && path[i - 1].state !== s.state && !routes.has(`${path[i - 1].state}->${s.state}`);

@@ -1,4 +1,4 @@
-import { cn } from 'cn';
+import { cn } from '@/lib/utils';
 import { CheckIcon } from 'lucide-react';
 import { Checkbox as CheckboxPrimitive, composeRenderProps, type CheckboxProps } from 'react-aria-components';
 
@@ -8,7 +8,7 @@ function Checkbox({ className, children, ...props }: CheckboxProps) {
       data-slot="checkbox"
       className={composeRenderProps(className, (className) =>
         cn(
-          'group/checkbox flex items-center gap-2 text-sm outline-none data-disabled:cursor-not-allowed data-disabled:opacity-50',
+          'group/checkbox flex items-center gap-2 text-body-medium outline-none data-disabled:cursor-not-allowed data-disabled:opacity-50',
           className,
         ),
       )}

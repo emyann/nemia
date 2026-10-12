@@ -90,7 +90,7 @@ export function FrameFooter({ feed }: { feed: FeedStatus }) {
     <footer
       data-feed={feed}
       data-frame-footer
-      className="sticky bottom-0 z-30 flex h-8 shrink-0 items-center gap-1 overflow-hidden border-t bg-background px-2 text-xs"
+      className="sticky bottom-0 z-30 flex h-8 shrink-0 items-center gap-1 overflow-hidden border-t bg-background px-2 text-body-small"
     >
       <Part
         label={narrow ? `Daemon ${dot.word}` : undefined}

@@ -33,7 +33,7 @@ export function CardFrom({
 
   return (
     <div data-card-from className="space-y-2">
-      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-body-small text-muted-foreground">
         {entry.from.length ? (
           <span data-from={entry.from.join(' ')}>
             reads{' '}
@@ -51,7 +51,12 @@ export function CardFrom({
           <span>reads no run as context</span>
         )}
         {editable && (
-          <button type="button" aria-expanded={editing} onClick={() => setEditing(!editing)} className={`${SECONDARY} px-2 py-0.5 text-xs`}>
+          <button
+            type="button"
+            aria-expanded={editing}
+            onClick={() => setEditing(!editing)}
+            className={`${SECONDARY} px-2 py-0.5 text-body-small`}
+          >
             {editing ? 'Done' : 'Change'}
           </button>
         )}

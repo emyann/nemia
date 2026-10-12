@@ -30,7 +30,7 @@ function StepBody({ id, name, run, error }: { id: string; name: string; run: Run
   const step = run.steps.find((s) => s.name === name);
   if (!step) {
     return (
-      <p data-no-step className="text-sm text-yours">
+      <p data-no-step className="text-body-medium text-yours">
         {titleOf(run)} has no step named {name}.
       </p>
     );
@@ -41,10 +41,10 @@ function StepBody({ id, name, run, error }: { id: string; name: string; run: Run
 /** A bar's body for the run `id` not read yet: that it is read, or, with `error`, why the read failed. */
 export function Unread({ id, error }: { id: string; error: unknown }) {
   return error ? (
-    <p className="text-sm text-failure">
+    <p className="text-body-medium text-failure">
       Could not read the run {id}: {error instanceof Error ? error.message : 'the api gave no reason'}
     </p>
   ) : (
-    <p className="text-xs text-muted-foreground">Reading the run…</p>
+    <p className="text-body-small text-muted-foreground">Reading the run…</p>
   );
 }

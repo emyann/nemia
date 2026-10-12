@@ -45,7 +45,7 @@ const icons: Record<ToolState, ReactNode> = {
 };
 
 const getStatusBadge = (status: ToolState) => (
-  <Badge className="gap-1.5 rounded-full text-xs" data-tool-state={status} variant="secondary">
+  <Badge className="gap-1.5 rounded-full text-body-small" data-tool-state={status} variant="secondary">
     {icons[status]}
     {labels[status]}
   </Badge>
@@ -56,9 +56,9 @@ export const ToolHeader = ({ className, title, detail, state, ...props }: ToolHe
   <CollapsibleTrigger className={cn('group flex w-full items-center justify-between gap-4 p-3 text-left', className)} {...props}>
     <div className="flex min-w-0 items-center gap-2">
       <WrenchIcon className="size-4 shrink-0 text-muted-foreground" />
-      <span className="shrink-0 font-medium text-sm">{title}</span>
+      <span className="shrink-0 font-medium text-body-medium">{title}</span>
       {detail && (
-        <span className="min-w-0 truncate font-mono text-muted-foreground text-xs" title={detail}>
+        <span className="min-w-0 truncate font-mono text-muted-foreground text-body-small" title={detail}>
           {detail}
         </span>
       )}
@@ -95,7 +95,7 @@ export type ToolInputProps = ComponentProps<'div'> & {
 
 export const ToolInput = ({ className, input, ...props }: ToolInputProps) => (
   <div className={cn('space-y-2 overflow-hidden p-4', className)} {...props}>
-    <h4 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">Parameters</h4>
+    <h4 className="text-muted-foreground text-label-medium uppercase">Parameters</h4>
     <div className="rounded-md bg-muted/50">
       <CodeBlock code={JSON.stringify(input ?? null, null, 2)} language="json" />
     </div>
@@ -111,10 +111,10 @@ export type ToolOutputProps = ComponentProps<'div'> & {
 
 export const ToolOutput = ({ className, output, isError, language = 'text', ...props }: ToolOutputProps) => (
   <div className={cn('space-y-2 p-4', className)} {...props}>
-    <h4 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">{isError ? 'Error' : 'Result'}</h4>
+    <h4 className="text-muted-foreground text-label-medium uppercase">{isError ? 'Error' : 'Result'}</h4>
     <div
       className={cn(
-        'max-h-96 overflow-auto rounded-md text-xs [&_table]:w-full',
+        'max-h-96 overflow-auto rounded-md text-body-small [&_table]:w-full',
         isError ? 'bg-destructive/10 text-destructive' : 'bg-muted/50 text-foreground',
       )}
     >

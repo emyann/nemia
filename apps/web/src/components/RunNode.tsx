@@ -104,7 +104,7 @@ export function RunNode({
       <div className="flex w-88 shrink-0 flex-col gap-3">
         <div className="min-w-0 px-3">
           <CardTitle run={run} title={title} open={open} onToggle={onToggle} />
-          <p className="mt-0.5 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+          <p className="mt-0.5 flex items-center justify-between gap-2 text-body-small text-muted-foreground">
             <span className="truncate font-mono" title={run.id}>
               {run.id}
             </span>
@@ -124,7 +124,7 @@ export function RunNode({
             <p
               data-holding={run.holding.onYou ? 'on-you' : 'on-runs'}
               title={`${run.holding.word}\n${run.holding.advice}`}
-              className={`mt-1 line-clamp-2 font-mono text-[11px] break-words ${run.holding.onYou ? 'text-yours' : 'text-muted-foreground'}`}
+              className={`mt-1 line-clamp-2 font-mono text-body-small break-words ${run.holding.onYou ? 'text-yours' : 'text-muted-foreground'}`}
             >
               {run.holding.word}
             </p>
@@ -134,7 +134,7 @@ export function RunNode({
         <StepRail run={run} flow={rail} />
 
         {needs.length > 0 && (
-          <ul aria-label="Needs" className="space-y-0.5 px-3 text-[11px]">
+          <ul aria-label="Needs" className="space-y-0.5 px-3 text-body-small">
             {needs.map((need) => (
               <li key={need.step} title={needLine(need)} className="line-clamp-2 break-words">
                 <RouteLink
@@ -153,7 +153,7 @@ export function RunNode({
         )}
 
         {said ? (
-          <p data-taken className="px-3 text-[11px] break-words text-muted-foreground">
+          <p data-taken className="px-3 text-body-small break-words text-muted-foreground">
             {said}
           </p>
         ) : gate ? (
@@ -167,7 +167,7 @@ export function RunNode({
         ) : null}
 
         {decide?.kind === 'result' && !cancelled && (
-          <p title={decide.said} className="line-clamp-2 px-3 text-[11px] break-words">
+          <p title={decide.said} className="line-clamp-2 px-3 text-body-small break-words">
             <RouteLink
               to="/runs/$runId"
               params={{ runId: run.id }}
@@ -182,7 +182,7 @@ export function RunNode({
 
         {open && run.waitingOnYou.length > 0 && <TouchedLine run={run} />}
 
-        {open && trouble && <p className="px-3 text-[11px] text-failure">{trouble}</p>}
+        {open && trouble && <p className="px-3 text-body-small text-failure">{trouble}</p>}
 
         <div className="flex min-h-6 flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t px-3 pt-2">
           <Took run={run} clock={clock} />
@@ -210,7 +210,7 @@ function CardTitle({ run, title, open, onToggle }: { run: RunSummary; title: str
         params={{ runId: run.id }}
         preload={false}
         title={title}
-        className="nodrag block min-w-0 flex-1 truncate text-sm font-semibold hover:underline"
+        className="nodrag block min-w-0 flex-1 truncate text-body-medium font-semibold hover:underline"
       >
         {title}
       </Link>
@@ -262,7 +262,7 @@ function WaitingLine({ waiting, ghost }: { waiting: RunWaiting; ghost: boolean }
     <p
       data-waiting={waiting.onYou ? 'on-you' : 'on-runs'}
       title={waiting.advice}
-      className={`mt-1 line-clamp-2 font-mono text-[11px] break-words ${waiting.onYou ? 'text-yours' : 'text-muted-foreground'}`}
+      className={`mt-1 line-clamp-2 font-mono text-body-small break-words ${waiting.onYou ? 'text-yours' : 'text-muted-foreground'}`}
     >
       {ghost ? (
         <>
@@ -293,7 +293,7 @@ function TouchedLine({ run }: { run: RunSummary }) {
   const { data, error } = useQuery(decisionQuery(run.id, decisionStamp(run)));
   if (error) {
     return (
-      <p className="truncate px-3 text-[11px] text-failure" title={error.message}>
+      <p className="truncate px-3 text-body-small text-failure" title={error.message}>
         touched: not read — {error.message}
       </p>
     );
@@ -301,7 +301,7 @@ function TouchedLine({ run }: { run: RunSummary }) {
   if (!isDecidable(data)) return null;
   const line = touchedSummary(data.touched);
   return (
-    <p data-touched-line className="truncate px-3 font-mono text-[11px] text-muted-foreground" title={line}>
+    <p data-touched-line className="truncate px-3 font-mono text-body-small text-muted-foreground" title={line}>
       {line}
     </p>
   );
@@ -313,7 +313,7 @@ function TouchedLine({ run }: { run: RunSummary }) {
  */
 function Took({ run, clock }: { run: RunSummary; clock: ReturnType<typeof runClock> }) {
   return (
-    <span className="flex min-w-0 items-baseline gap-1.5 font-mono text-[11px] text-muted-foreground">
+    <span className="flex min-w-0 items-baseline gap-1.5 font-mono text-body-small text-muted-foreground">
       <time dateTime={clock.at} title={clock.title} className="truncate">
         {clock.words}
       </time>

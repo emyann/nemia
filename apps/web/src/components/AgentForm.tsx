@@ -117,12 +117,12 @@ export function AgentForm({
       <Identity form={form} setForm={setForm} listing={listing} readOnly={readOnly} />
 
       <fieldset className="space-y-3">
-        <legend className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">What it can do</legend>
+        <legend className="mb-2 text-label-medium text-muted-foreground uppercase">What it can do</legend>
         <GeneratedCard listing={listing} />
       </fieldset>
 
       <fieldset className="space-y-3">
-        <legend className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">How its sessions run</legend>
+        <legend className="mb-2 text-label-medium text-muted-foreground uppercase">How its sessions run</legend>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {choice('harness')}
           {text('model')}
@@ -148,10 +148,10 @@ export function AgentForm({
       <ResultSchema form={form} setForm={setForm} listing={listing} readOnly={readOnly} />
 
       <fieldset className="space-y-4">
-        <legend className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">What its sessions are told</legend>
+        <legend className="mb-2 text-label-medium text-muted-foreground uppercase">What its sessions are told</legend>
         {readOnly ? (
           <div className="space-y-2">
-            <p className="text-xs font-medium">Skills</p>
+            <p className="text-body-small font-medium">Skills</p>
             <GivenSkills rows={listing?.given ?? []} none="It gives no skills." />
           </div>
         ) : (
@@ -191,7 +191,7 @@ export function AgentForm({
               Discard changes
             </Button>
           )}
-          <p className="text-xs text-muted-foreground">
+          <p className="text-body-small text-muted-foreground">
             A save changes what a run started later freezes. A run already started keeps the agent it froze.
           </p>
           {footer}
@@ -211,20 +211,20 @@ function GeneratedCard({ listing }: { listing: AgentListing | null }) {
     'Generated from its skills: an entry for each, read off its SKILL.md — title, description, tags and examples — or one from its description when it gives none.';
   if (!listing)
     return (
-      <p data-card-generated className="text-xs text-muted-foreground">
+      <p data-card-generated className="text-body-small text-muted-foreground">
         {how} Shown once it is saved.
       </p>
     );
   return (
     <div data-card className="space-y-2">
       {listing.cardError !== null ? (
-        <p data-card-error className="font-mono text-xs whitespace-pre-wrap break-words text-failure">
+        <p data-card-error className="font-mono text-body-small whitespace-pre-wrap break-words text-failure">
           {listing.cardError}
         </p>
       ) : (
         <Skills skills={listing.card} none={listing.error !== null ? 'Nothing, while its file does not read.' : undefined} />
       )}
-      <p className="text-xs text-muted-foreground">{how} To change it, change its skills.</p>
+      <p className="text-body-small text-muted-foreground">{how} To change it, change its skills.</p>
     </div>
   );
 }
@@ -246,7 +246,7 @@ function ResultSchema({
 }) {
   return (
     <fieldset className="space-y-3">
-      <legend className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">Result schema</legend>
+      <legend className="mb-2 text-label-medium text-muted-foreground uppercase">Result schema</legend>
       <div className="grid gap-4 sm:grid-cols-3">
         <Field
           label="Schema file"
@@ -351,11 +351,11 @@ export function Field({
   className?: string;
 }) {
   if (markdown && readOnly) return <MarkdownField label={label} hint={hint} value={value} className={className} />;
-  const font = mono || markdown ? 'font-mono text-xs md:text-xs' : '';
+  const font = mono || markdown ? 'font-mono text-body-small md:text-body-small' : '';
   const quiet = readOnly ? READ_ONLY : '';
   return (
     <TextField value={value} onChange={onChange} isReadOnly={readOnly} className={`space-y-1.5 ${className ?? ''}`}>
-      <Label className="text-xs">{label}</Label>
+      <Label className="text-body-small">{label}</Label>
       {area ? (
         <Textarea placeholder={readOnly ? undefined : placeholder} className={`${font} ${area} ${quiet} leading-relaxed`} />
       ) : (
@@ -369,7 +369,7 @@ export function Field({
 const READ_ONLY = 'border-dashed bg-surface-container focus-visible:ring-0';
 
 const Hint = ({ children }: { children: ReactNode }) => (
-  <Text slot="description" className="block text-[11px] leading-snug text-muted-foreground">
+  <Text slot="description" className="block text-body-small leading-snug text-muted-foreground">
     {children}
   </Text>
 );
@@ -388,11 +388,11 @@ function MarkdownField({
 }) {
   return (
     <section aria-label={label} data-field-markdown className={`space-y-1.5 ${className ?? ''}`}>
-      <p className="text-xs leading-none font-medium">{label}</p>
+      <p className="text-body-small leading-none font-medium">{label}</p>
       {value.trim() ? (
-        <Markdown className={`rounded-md border px-3 py-2 text-sm ${READ_ONLY}`}>{value}</Markdown>
+        <Markdown className={`rounded-md border px-3 py-2 text-body-medium ${READ_ONLY}`}>{value}</Markdown>
       ) : (
-        <p className={`rounded-md border px-3 py-2 text-sm text-muted-foreground italic ${READ_ONLY}`}>Nothing written</p>
+        <p className={`rounded-md border px-3 py-2 text-body-medium text-muted-foreground italic ${READ_ONLY}`}>Nothing written</p>
       )}
       {hint && <Hint>{hint}</Hint>}
     </section>
@@ -426,8 +426,8 @@ function Choice({
       isDisabled={readOnly}
       className="w-full space-y-1.5"
     >
-      <Label className="text-xs">{label}</Label>
-      <SelectTrigger className="font-mono text-xs">
+      <Label className="text-body-small">{label}</Label>
+      <SelectTrigger className="font-mono text-body-small">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -435,13 +435,13 @@ function Choice({
           <span className="text-muted-foreground">unset</span>
         </SelectItem>
         {words.map((word) => (
-          <SelectItem key={word} id={word} className="font-mono text-xs">
+          <SelectItem key={word} id={word} className="font-mono text-body-small">
             {word}
           </SelectItem>
         ))}
       </SelectContent>
       {hint && (
-        <Text slot="description" className="block text-[11px] leading-snug text-muted-foreground">
+        <Text slot="description" className="block text-body-small leading-snug text-muted-foreground">
           {hint}
         </Text>
       )}
@@ -459,7 +459,7 @@ function SkillToolNote({ form, setKey }: { form: Form; setKey: (key: AgentRoleKe
   return (
     <div
       data-skill-tool-note
-      className="flex flex-wrap items-center gap-3 rounded border border-outline-variant bg-surface-container-highest px-3 py-2 text-xs text-on-surface-variant"
+      className="flex flex-wrap items-center gap-3 rounded border border-outline-variant bg-surface-container-highest px-3 py-2 text-body-small text-on-surface-variant"
     >
       <p className="min-w-0 flex-1">
         {gap === 'tools' ? (
@@ -505,24 +505,24 @@ function HarnessPrompt({ value, onChange, readOnly }: { value: string; onChange:
     <Radio key={choice.value} value={choice.value} className={RADIO} data-harness-prompt={choice.value}>
       <span aria-hidden className={DOT} />
       <span className="space-y-0.5">
-        <span className="block text-xs font-medium">{choice.label}</span>
-        <span className="block text-[11px] leading-snug text-muted-foreground">{choice.says}</span>
+        <span className="block text-body-small font-medium">{choice.label}</span>
+        <span className="block text-body-small leading-snug text-muted-foreground">{choice.says}</span>
       </span>
     </Radio>
   );
   return (
     <RadioGroup value={known ? shown : null} onChange={onChange} isDisabled={readOnly} className="space-y-2">
-      <Label className="text-xs">Claude Code&apos;s prompt</Label>
+      <Label className="text-body-small">Claude Code&apos;s prompt</Label>
       <div className="grid gap-2 sm:grid-cols-2">{HARNESS_PROMPT_CHOICES.filter((choice) => !choice.expert).map(radio)}</div>
       {!known && (
-        <p className="text-[11px] text-failure">
+        <p className="text-body-small text-failure">
           Its file says <code className="font-mono">harnessPrompt: {value}</code>, which is none of these.
         </p>
       )}
       <Collapsible defaultExpanded={shown === 'replace'}>
         {({ isExpanded }) => (
           <>
-            <CollapsibleTrigger className="rounded-sm text-[11px] text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50">
+            <CollapsibleTrigger className="rounded-sm text-body-small text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50">
               {isExpanded ? '▾' : '▸'} For experts
             </CollapsibleTrigger>
             <CollapsibleContent>
@@ -533,7 +533,7 @@ function HarnessPrompt({ value, onChange, readOnly }: { value: string; onChange:
           </>
         )}
       </Collapsible>
-      <Text slot="description" className="block text-[11px] leading-snug text-muted-foreground">
+      <Text slot="description" className="block text-body-small leading-snug text-muted-foreground">
         <code className="font-mono">harnessPrompt:</code> — how much of Claude Code&apos;s own prompt its sessions keep, before the
         instructions below.
       </Text>

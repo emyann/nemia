@@ -83,10 +83,10 @@ export function PromptBox({ runId, step, line, sayable, onSaid }: Props) {
                 ? 'There is no session in flight to say anything to.'
                 : `Say something to ${step}'s session. It goes on the step's record.`
             }
-            className="field-sizing-content block max-h-48 min-h-20 w-full resize-none bg-transparent px-4 pt-3 pb-12 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
+            className="field-sizing-content block max-h-48 min-h-20 w-full resize-none bg-transparent px-4 pt-3 pb-12 text-body-medium outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
           />
           <div className="pointer-events-none absolute inset-x-3 bottom-2.5 flex items-center justify-between gap-3">
-            <p className="min-w-0 truncate pl-1 text-xs text-muted-foreground">
+            <p className="min-w-0 truncate pl-1 text-body-small text-muted-foreground">
               as <code className="font-mono">{line}</code>
             </p>
             <Button
@@ -105,7 +105,7 @@ export function PromptBox({ runId, step, line, sayable, onSaid }: Props) {
         <p
           id={`${field}-closed`}
           data-closed
-          className="mx-auto mt-2 flex w-full max-w-3xl items-start gap-1.5 text-xs text-muted-foreground"
+          className="mx-auto mt-2 flex w-full max-w-3xl items-start gap-1.5 text-body-small text-muted-foreground"
         >
           <LockIcon className="mt-0.5 size-3.5 shrink-0" />
           <span>{sayable.why}</span>
@@ -116,8 +116,8 @@ export function PromptBox({ runId, step, line, sayable, onSaid }: Props) {
           data-refused
           className="mx-auto mt-2 w-full max-w-3xl space-y-1 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2"
         >
-          <p className="text-sm font-medium text-destructive">Not said. The api refused it:</p>
-          <p className="font-mono text-xs whitespace-pre-wrap break-words text-destructive">{send.error.message}</p>
+          <p className="text-body-medium font-medium text-destructive">Not said. The api refused it:</p>
+          <p className="font-mono text-body-small whitespace-pre-wrap break-words text-destructive">{send.error.message}</p>
         </div>
       )}
     </section>

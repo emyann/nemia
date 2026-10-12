@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import type { ReadOnlyCommands, StepReach } from '../lib/api';
 import { container, dashed } from '../lib/meaning';
 
-export const CHIP = 'inline-flex items-center rounded px-1.5 py-0.5 font-mono text-[11px] leading-none whitespace-nowrap';
+export const CHIP = 'inline-flex items-center rounded px-1.5 py-0.5 font-mono text-body-small leading-none whitespace-nowrap';
 export const PLAIN = 'bg-muted text-foreground';
 export const STRUCK = `${container.grey} line-through decoration-outline`;
 /** A command that runs without asking. */
@@ -16,7 +16,7 @@ export const ASKS = container.yours;
 export function Reach({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-[8rem_minmax(0,1fr)]">
-      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      <p className="text-body-small font-medium text-muted-foreground">{label}</p>
       <div className="min-w-0 space-y-1">{children}</div>
     </div>
   );
@@ -45,17 +45,17 @@ export function AllowedReach({
     <Reach label={allowed.dontAsk ? 'Bash it may run' : 'Allowed without asking'}>
       {allowed.dontAsk ? (
         allowed.why ? (
-          <p data-no-bash className="text-xs text-muted-foreground">
+          <p data-no-bash className="text-body-small text-muted-foreground">
             {allowed.why}
           </p>
         ) : (
           <>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-body-small text-muted-foreground">
               In dontAsk, a command that asks is denied without a prompt unless a rule allows it.{' '}
               {runsReadOnly && `${commands.harness}'s read-only commands do not ask:`}
             </p>
             {runsReadOnly && <ReadOnly readOnly={readOnly} commands={commands} askDenier={askDenier} />}
-            <p className="text-xs text-muted-foreground">Of the commands that ask, the settings allow it:</p>
+            <p className="text-body-small text-muted-foreground">Of the commands that ask, the settings allow it:</p>
             {allowed.bash.length ? (
               <span className="flex flex-wrap gap-x-3 gap-y-1">
                 {allowed.bash.map((b) => (
@@ -68,7 +68,7 @@ export function AllowedReach({
                 ))}
               </span>
             ) : (
-              <p data-none-allowed className="text-xs text-muted-foreground">
+              <p data-none-allowed className="text-body-small text-muted-foreground">
                 None.
               </p>
             )}
@@ -88,14 +88,14 @@ export function AllowedReach({
               ))}
             </span>
           ) : (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-body-small text-muted-foreground">
               Nothing: no allow rule of the settings reaches it, so what asks is its permission mode&apos;s to decide
               {askDenier === 'a job' ? ', and what would still ask is denied: a job asks nobody.' : '.'}
             </p>
           )}
           {runsReadOnly && (
             <>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-body-small text-muted-foreground">
                 And, in every mode, {commands.harness}&apos;s read-only commands, which ask for no rule:
               </p>
               <ReadOnly readOnly={readOnly} commands={commands} askDenier={askDenier} />
@@ -104,7 +104,7 @@ export function AllowedReach({
         </>
       )}
       {allowed.takenBack.length > 0 && (
-        <p className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+        <p className="flex flex-wrap items-center gap-1 text-body-small text-muted-foreground">
           Taken back by a deny, which beats an allow:
           {allowed.takenBack.map(({ rule, by }) => (
             <code key={rule} data-taken-back={rule} title={`Denied by ${by.rule} (${by.source})`} className={`${CHIP} ${STRUCK}`}>
@@ -114,7 +114,7 @@ export function AllowedReach({
         </p>
       )}
       {allowed.asked.length > 0 && (
-        <p className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+        <p className="flex flex-wrap items-center gap-1 text-body-small text-muted-foreground">
           {askDenier
             ? `Taken back by an ask rule, which beats an allow, and ${askDenier} denies what asks:`
             : 'Taken back by an ask rule, which beats an allow: these ask.'}
@@ -131,7 +131,7 @@ export function AllowedReach({
         </p>
       )}
       {allowed.unused.length > 0 && (
-        <p className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+        <p className="flex flex-wrap items-center gap-1 text-body-small text-muted-foreground">
           Of a tool its tools: do not have:
           {allowed.unused.map((rule) => (
             <code key={rule} data-unused={rule} className={`${CHIP} text-muted-foreground ring-1 ring-outline-variant ring-inset`}>
@@ -162,12 +162,12 @@ function Exceptions({
   return (
     <>
       {except.length > 0 && (
-        <span data-except={of} className="text-[11px] text-muted-foreground">
+        <span data-except={of} className="text-body-small text-muted-foreground">
           except {except.join(', ')}
         </span>
       )}
       {asks.length > 0 && (
-        <span data-asks={of} className="text-[11px] text-muted-foreground">
+        <span data-asks={of} className="text-body-small text-muted-foreground">
           {except.length > 0 ? 'and ' : ''}asks for {asks.join(', ')}
           {askDenier ? `, which ${askDenier} denies` : ''}
         </span>
@@ -221,7 +221,7 @@ function ReadOnly({
         ))}
       </span>
       {taken.length > 0 && (
-        <p data-read-only-taken className="text-xs text-muted-foreground">
+        <p data-read-only-taken className="text-body-small text-muted-foreground">
           {taken
             .map(({ command, denied, asks }) =>
               asks
@@ -232,7 +232,7 @@ function ReadOnly({
           .
         </p>
       )}
-      <p data-read-only-measured={commands.measuredAt} className="text-xs text-muted-foreground">
+      <p data-read-only-measured={commands.measuredAt} className="text-body-small text-muted-foreground">
         The solid ones were measured on {commands.measuredAt} with {commands.version} ({commands.source}): that day, under that day&apos;s
         settings, they ran with no rule allowing them. The dashed ones are named by its docs ({commands.docs}), which say the set includes
         them, not that it is all of it; git is its read-only forms. A deny covering one still refuses it, and an ask rule covering one makes

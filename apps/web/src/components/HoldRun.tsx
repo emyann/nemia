@@ -52,7 +52,7 @@ function HoldRead({ run, onClose }: { run: RunDetail; onClose: () => void }) {
   }
   if (!data)
     return (
-      <p data-hold-reading className="text-xs text-muted-foreground">
+      <p data-hold-reading className="text-body-small text-muted-foreground">
         Reading the runs to wait on…
       </p>
     );
@@ -84,7 +84,7 @@ function HoldForm({ id, runs, onClose }: { id: string; runs: RunSummary[]; onClo
       }}
     >
       <Heading slot="title" className="font-semibold">{`Hold ${id}`}</Heading>
-      <p className="text-xs text-muted-foreground">
+      <p className="text-body-small text-muted-foreground">
         Nothing more of it is filed, and nothing is asked of you, until every run ticked has shipped. What runs now finishes.
       </p>
       <WaitFor
@@ -106,7 +106,7 @@ function HoldForm({ id, runs, onClose }: { id: string; runs: RunSummary[]; onClo
         isDisabled={hold.isPending}
         className="flex flex-col gap-1"
       >
-        <Label className="text-xs">Why (optional)</Label>
+        <Label className="text-body-small">Why (optional)</Label>
         <Input data-hold-why placeholder="merge conflicts with the run it waits on" />
       </TextField>
       {hold.isError && (
@@ -140,9 +140,9 @@ function WaitFor({
 }) {
   return (
     <CheckboxGroup value={until} onChange={onChange} isDisabled={isDisabled} className="space-y-1.5">
-      <AriaLabel className="text-xs font-medium">Wait for</AriaLabel>
+      <AriaLabel className="text-body-small font-medium">Wait for</AriaLabel>
       {runs.length === 0 ? (
-        <Text slot="description" data-hold-none className="block text-xs text-muted-foreground">
+        <Text slot="description" data-hold-none className="block text-body-small text-muted-foreground">
           No other run of its repository may still ship.
         </Text>
       ) : (
@@ -150,10 +150,10 @@ function WaitFor({
           {runs.map((r) => (
             <Checkbox key={r.id} value={r.id} data-hold-run={r.id} className="items-start">
               <span className="min-w-0">
-                <span className="block truncate text-xs" title={titleOf(r)}>
+                <span className="block truncate text-body-small" title={titleOf(r)}>
                   {titleOf(r)}
                 </span>
-                <span className="block font-mono text-[11px] text-muted-foreground">{r.id}</span>
+                <span className="block font-mono text-body-small text-muted-foreground">{r.id}</span>
               </span>
             </Checkbox>
           ))}

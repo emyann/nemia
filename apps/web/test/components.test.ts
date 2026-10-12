@@ -20,7 +20,8 @@ const { flowSteps, railOf, tilesOf } = await import('../src/lib/flow.ts');
 const { StateEdge } = await import('../src/components/StateEdge.tsx');
 const { CanvasLegend } = await import('../src/components/CanvasLegend.tsx');
 const { edgeStroke, LOOP_SOURCE, LOOP_TARGET, TRAVEL_SECONDS } = await import('../src/lib/canvas.ts');
-const { Chips, DecideSection, DiffFileView, GroupBar, LessonChip, TouchedBranch } = await import('../src/components/Decide.tsx');
+const { Chips, DecideSection, DiffFileView, GroupBar, TouchedBranch } = await import('../src/components/Decide.tsx');
+const { LessonChip } = await import('../src/components/LessonChip.tsx');
 const { ReactFlowProvider } = await import('@xyflow/react');
 const { AllowedReach } = await import('../src/components/Reach.tsx');
 const { TemplateCard } = await import('../src/components/TemplateCard.tsx');
@@ -2687,7 +2688,7 @@ test("the banner continues a session the harness blocked: Continue, and a box fo
   const review = items.get('review')!;
   assert.match(
     review,
-    /^<p [^>]*>[\s\S]*?<\/p><p data-advice="true" class="break-words text-xs">answer it in Claude Code: claude agents, session ae\/t-1\/1<\/p><div data-continue="true"[^>]*><form aria-label="Continue review"/,
+    /^<p [^>]*>[\s\S]*?<\/p><p data-advice="true" class="break-words text-body-small">answer it in Claude Code: claude agents, session ae\/t-1\/1<\/p><div data-continue="true"[^>]*><form aria-label="Continue review"/,
     'under the wait, where a person answers it, which this board does not; then a form that asks the tick for another try, and nothing else',
   );
   assert.deepEqual(
@@ -2708,7 +2709,7 @@ test("the banner continues a session the harness blocked: Continue, and a box fo
   const held = { ...base.steps[0], note, asked: { try: 2, mode: 'nudge' as const, model: null, message: null, stopFirst: true } };
   const asked = bannerMarkup({ ...run, steps: [asks, held] });
   assert.ok(
-    asked.includes(`<p data-note="true" class="font-mono text-xs">${note}</p></li>`),
+    asked.includes(`<p data-note="true" class="font-mono text-body-small">${note}</p></li>`),
     `asked: what the tick does with it, in \`wf ls\`'s words\n${asked}`,
   );
   assert.doesNotMatch(/<li data-need="harness"[\s\S]*?<\/li>/.exec(asked)![0], /<form|<button|<textarea/, 'and nothing to press');
@@ -3605,7 +3606,10 @@ test("the inspector's Details say what every try cost of its cap — `spent`, re
   const over = { ...step, ...priced(4.25, 3, true) };
   assert.equal(rows(over).spent, '$4.25 of $3');
   assert.match(markup(over), /<span data-spent="over" class="[^"]*\btext-money\b[^"]*">\$4\.25 of \$3<\/span>/);
-  assert.match(markup({ ...step, ...priced(1.2, 3) }), /<span data-spent="within" class="font-mono text-xs ">\$1\.20 of \$3<\/span>/);
+  assert.match(
+    markup({ ...step, ...priced(1.2, 3) }),
+    /<span data-spent="within" class="font-mono text-body-small ">\$1\.20 of \$3<\/span>/,
+  );
   assert.equal(rows({ ...step, ...priced(null, 3) }).spent, 'budget $3');
   assert.equal(
     Object.hasOwn(rows({ ...step, ...priced(1.2, null) }), 'spent'),
@@ -3781,7 +3785,7 @@ test('what sessions read, by price: beside the cost, the peak marked at a cap or
   const plain = markup(createElement(Read, { said: 'read 21.4M · wrote 412k · peak 167k', peak: null, rebuilt: 0 }));
   assert.match(
     plain,
-    /<span class="font-mono text-xs"><span>read 21\.4M<\/span><span> · wrote 412k<\/span><span> · peak 167k<\/span><\/span>/,
+    /<span class="font-mono text-body-small"><span>read 21\.4M<\/span><span> · wrote 412k<\/span><span> · peak 167k<\/span><\/span>/,
   );
   assert.doesNotMatch(plain, /data-peak|data-rebuilt/, 'under its cap, and resumed from a warm cache: nothing marked');
 
@@ -3804,7 +3808,7 @@ test('what sessions read, by price: beside the cost, the peak marked at a cap or
   );
   assert.match(
     capped,
-    /<span data-rebuilt="1" class="block text-xs [^"]*" title="[^"]*the cache was rebuilt\.">a resumed session wrote its context to the cache again instead of reading it<\/span>/,
+    /<span data-rebuilt="1" class="block text-body-small [^"]*" title="[^"]*the cache was rebuilt\.">a resumed session wrote its context to the cache again instead of reading it<\/span>/,
   );
 
   const large = markup(
@@ -3828,7 +3832,7 @@ test('what sessions read, by price: beside the cost, the peak marked at a cap or
   const html = renderToStaticMarkup(createElement(DecideSection, { runId: 'r-1', decision }));
   assert.match(
     html,
-    /<dt[^>]*>cost<\/dt><dd[^>]*>\$3\.01<\/dd><\/div><div[^>]*class="contents"><dt[^>]*>read<\/dt><dd[^>]*><span data-read="true" class="block"><span class="font-mono text-xs"><span>read 7\.3M<\/span>/,
+    /<dt[^>]*>cost<\/dt><dd[^>]*>\$3\.01<\/dd><\/div><div[^>]*class="contents"><dt[^>]*>read<\/dt><dd[^>]*><span data-read="true" class="block"><span class="font-mono text-body-small"><span>read 7\.3M<\/span>/,
     "on the Decide section, beside the total's cost",
   );
 });
@@ -5449,7 +5453,7 @@ test("the run bar: the run's title and id, what it asks of a person, its steps e
   const run = { ...base, steps: [base.steps[0], theme] };
   const html = await pagedWith(createElement(RunBar, { run: run.id }), [[['runs', run.id], run]]);
   assert.ok(html.includes(`>${runTitle(run)}</h2>`), html);
-  assert.ok(html.includes(`<span class="font-mono text-xs">${run.id}</span>`), html);
+  assert.ok(html.includes(`<span class="font-mono text-body-small">${run.id}</span>`), html);
   assert.match(html, /<section aria-label="Waiting on you"/);
   assert.match(html, /<button type="button" data-approve="review"/, "a step the banner names opens that step's bar");
   const steps = /<section aria-label="Steps"[\s\S]*?<\/section>/.exec(html)![0];
@@ -5694,7 +5698,7 @@ test("a tab's page is drawn under a strip of its place's tabs, each a link to it
   );
   assert.doesNotMatch(
     /<div[^>]*role="tabpanel"[^>]*>/.exec(html)?.[0] ?? '',
-    /\btext-sm\b/,
+    /\btext-body-medium\b/,
     "the panel leaves the page's text its own size",
   );
 });
@@ -6077,7 +6081,7 @@ test('REFUSED: the bell counts what the api says waits, never a count of its own
 
 test("the header reads the section's name alone: a floor reads Floor, with no factory's crumb and no start of a run", async () => {
   const html = await headerWith(openWith([]));
-  assert.match(html, /<span class="text-sm font-medium">Floor<\/span>/);
+  assert.match(html, /<span class="text-body-medium font-medium">Floor<\/span>/);
   assert.doesNotMatch(html, /Start a run|aria-label="Factory"|<h1/);
 });
 
@@ -7183,7 +7187,7 @@ test('REFUSED: a card that names a workflow and no factory says it has no Queue 
   for (const factory of [null, 'default']) {
     assert.equal(
       note({ factory, workflow: 'dev' }),
-      '<p data-no-queue="true" class="text-xs text-muted-foreground">No Queue: a queued card starts on its own, in the factory it names, and this one names none. Start gives it one.</p>',
+      '<p data-no-queue="true" class="text-body-small text-muted-foreground">No Queue: a queued card starts on its own, in the factory it names, and this one names none. Start gives it one.</p>',
       String(factory),
     );
   }
@@ -7208,7 +7212,7 @@ test('the workflows a list leaves out are said under it, each by name with why i
   );
   assert.equal(
     html,
-    '<div data-workflows-unread="true" class="space-y-1 text-xs text-yours"><p>Not offered until it reads:</p><p data-unread="dev" class="whitespace-pre-wrap break-words"><span class="font-mono">dev</span>: implement: `agent: implementer` fills this step</p></div>',
+    '<div data-workflows-unread="true" class="space-y-1 text-body-small text-yours"><p>Not offered until it reads:</p><p data-unread="dev" class="whitespace-pre-wrap break-words"><span class="font-mono">dev</span>: implement: `agent: implementer` fills this step</p></div>',
   );
   assert.equal(renderToStaticMarkup(createElement(WorkflowsUnread, { workflows: [listing('ok', null)] })), '');
 });

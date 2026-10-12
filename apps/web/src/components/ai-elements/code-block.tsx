@@ -56,7 +56,7 @@ const CodeBlockContext = createContext<CodeBlockContextType>({
 });
 
 const PRE =
-  'overflow-auto [&>pre]:m-0 [&>pre]:bg-background! [&>pre]:p-4 [&>pre]:text-foreground! [&>pre]:text-sm [&_code]:font-mono [&_code]:text-sm';
+  'overflow-auto [&>pre]:m-0 [&>pre]:bg-background! [&>pre]:p-4 [&>pre]:text-foreground! [&>pre]:text-body-medium [&_code]:font-mono [&_code]:text-body-medium';
 
 /**
  * A block of `code` in `language`, highlighted once shiki has it: the highlight is kept with the code and language it was made for, and

@@ -51,7 +51,9 @@ export const Route = createFileRoute('/workflows_/$from/$workflow')({
   errorComponent: ({ error }) => (
     <div className="space-y-3">
       <BackToWorkflows />
-      <p className="text-sm text-failure">Could not load this workflow: {error instanceof Error ? error.message : String(error)}</p>
+      <p className="text-body-medium text-failure">
+        Could not load this workflow: {error instanceof Error ? error.message : String(error)}
+      </p>
     </div>
   ),
 });
@@ -151,7 +153,7 @@ function InFactory({ from, name, address, place, building, factory }: Asked & { 
         why === null ? (
           <StartRun workflow={workflow} repo={place.repo} place={place} />
         ) : (
-          <p data-why-not className="text-sm whitespace-pre-wrap break-words text-yours">
+          <p data-why-not className="text-body-medium whitespace-pre-wrap break-words text-yours">
             {why}
           </p>
         )
@@ -228,7 +230,7 @@ function Workflow({
         <>
           <WorkflowCanvas workflow={workflow} place={address} />
           <section className="space-y-2">
-            <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Steps</h2>
+            <h2 className="text-label-medium text-muted-foreground uppercase">Steps</h2>
             {children}
           </section>
           {start}
@@ -262,24 +264,28 @@ function WorkflowHeader({
   return (
     <header className="space-y-1">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <h1 className="font-mono text-base font-semibold">{name}</h1>
+        <h1 className="font-mono text-body-large font-semibold">{name}</h1>
         <FavoriteStar favorite={{ kind: 'workflow', from, workflow: name }} name={from === 'yours' ? `${name} (yours)` : name} />
         <FromBadge from={from} factory={factory} />
         <FactoryTags names={tags} linked />
         {!error && (
-          <span className="text-xs text-muted-foreground">
+          <span className="text-body-small text-muted-foreground">
             {steps.length} {steps.length === 1 ? 'step' : 'steps'}
           </span>
         )}
         {(onBuild || removable) && <span aria-hidden className="ml-auto" />}
         {onBuild && (
-          <button type="button" onClick={onBuild} className="rounded border border-outline px-2 py-0.5 text-xs font-medium hover:bg-accent">
+          <button
+            type="button"
+            onClick={onBuild}
+            className="rounded border border-outline px-2 py-0.5 text-body-small font-medium hover:bg-accent"
+          >
             Build
           </button>
         )}
         {removable && <RemoveWorkflow workflow={removable} onRemoved={onRemoved} />}
       </div>
-      <p data-folder className="font-mono text-[11px] break-all text-muted-foreground">
+      <p data-folder className="font-mono text-body-small break-all text-muted-foreground">
         {dir}
       </p>
       <NoBuilder workflow={workflow} factory={factory} />
@@ -295,13 +301,13 @@ function NotOffered({ name, place, address, attach }: { name: string; place: Pla
   return (
     <div className="space-y-3">
       <BackToWorkflows place={address} />
-      <p data-not-offered={place.factory} className="text-sm text-muted-foreground">
-        {place.factory} does not offer {name} on <span className="font-mono text-xs break-all">{place.repo}</span>, so nothing of it is read
-        here and it hires no agent into its steps: attach the workflow to {place.factory} first
+      <p data-not-offered={place.factory} className="text-body-medium text-muted-foreground">
+        {place.factory} does not offer {name} on <span className="font-mono text-body-small break-all">{place.repo}</span>, so nothing of it
+        is read here and it hires no agent into its steps: attach the workflow to {place.factory} first
         {attach ? (
           <>
             {' '}
-            with <code className="font-mono text-xs">{attach}</code>
+            with <code className="font-mono text-body-small">{attach}</code>
           </>
         ) : null}
         .
@@ -314,13 +320,13 @@ function NotOffered({ name, place, address, attach }: { name: string; place: Pla
 function Readme({ text }: { text: string | null }) {
   return (
     <section aria-label="README" className="space-y-2 rounded-lg border border-outline-variant bg-card p-4">
-      <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">README</h2>
+      <h2 className="text-label-medium text-muted-foreground uppercase">README</h2>
       {text?.trim() ? (
-        <Markdown className="text-sm">{text}</Markdown>
+        <Markdown className="text-body-medium">{text}</Markdown>
       ) : (
-        <p className="text-sm text-muted-foreground">
-          No README: a <code className="font-mono text-xs">README.md</code> in the folder says what the workflow is for, its first paragraph
-          its description.
+        <p className="text-body-medium text-muted-foreground">
+          No README: a <code className="font-mono text-body-small">README.md</code> in the folder says what the workflow is for, its first
+          paragraph its description.
         </p>
       )}
     </section>
@@ -331,8 +337,8 @@ function Readme({ text }: { text: string | null }) {
 function Refused({ error }: { error: string }) {
   return (
     <div className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
-      <p className="text-sm font-medium text-on-failure-container">Does not read as a workflow, so it cannot start:</p>
-      <p className="font-mono text-xs whitespace-pre-wrap break-words text-on-failure-container">{error}</p>
+      <p className="text-body-medium font-medium text-on-failure-container">Does not read as a workflow, so it cannot start:</p>
+      <p className="font-mono text-body-small whitespace-pre-wrap break-words text-on-failure-container">{error}</p>
     </div>
   );
 }
@@ -342,7 +348,7 @@ function NotListed({ from, name }: { from: string; name: string }) {
   return (
     <div className="space-y-3">
       <BackToWorkflows />
-      <p data-not-listed className="text-sm text-muted-foreground">
+      <p data-not-listed className="text-body-medium text-muted-foreground">
         No workflow <span className="font-mono">{name}</span> is listed {from === 'yours' ? 'among yours' : "in this repository's"}: it may
         have been removed or renamed.
       </p>
@@ -353,7 +359,7 @@ function NotListed({ from, name }: { from: string; name: string }) {
 /** Back to the Workflows page, in `place`, the place this page is read in. */
 function BackToWorkflows({ place = {} }: { place?: PagePlace }) {
   return (
-    <Link to="/workflows" search={place} className="text-sm text-muted-foreground hover:text-foreground">
+    <Link to="/workflows" search={place} className="text-body-medium text-muted-foreground hover:text-foreground">
       ← Workflows
     </Link>
   );

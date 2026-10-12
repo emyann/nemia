@@ -138,7 +138,7 @@ const rowName = ({ favorite, title }: FavoriteRow): string =>
  * starred says so. A press on a link runs `onPick`.
  */
 export function FavoriteLinks({ rows, onPick }: { rows: readonly FavoriteRow[]; onPick?: () => void }) {
-  if (!rows.length) return <p className="px-2 text-xs text-muted-foreground">Nothing starred yet.</p>;
+  if (!rows.length) return <p className="px-2 text-body-small text-muted-foreground">Nothing starred yet.</p>;
   return (
     <SidebarMenu aria-label="Favorites">
       {rows.map((row) => (
@@ -182,7 +182,7 @@ function FavoriteLink({ row: { favorite, title }, onPick }: { row: FavoriteRow; 
 function GoneRow({ row }: { row: FavoriteRow }) {
   const Icon = row.favorite.kind === 'run' ? List : Waypoints;
   return (
-    <div className="flex h-7 items-center gap-2 p-2 pr-8 text-xs text-muted-foreground [&_svg]:size-4 [&_svg]:shrink-0">
+    <div className="flex h-7 items-center gap-2 p-2 pr-8 text-body-small text-muted-foreground [&_svg]:size-4 [&_svg]:shrink-0">
       <Icon />
       <span className="min-w-0 truncate line-through decoration-muted-foreground/50">{rowName(row)}</span>
       <span className="shrink-0">gone</span>

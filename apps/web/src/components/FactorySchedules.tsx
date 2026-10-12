@@ -18,7 +18,7 @@ const RouterLinkButton = routeLink(LinkButton);
 function CommandText({ text }: { text: string }) {
   return (
     <div className="flex w-full min-w-0 items-center gap-2">
-      <code className="min-w-0 flex-1 rounded bg-muted px-2 py-1 text-left font-mono text-xs [overflow-wrap:anywhere]">{text}</code>
+      <code className="min-w-0 flex-1 rounded bg-muted px-2 py-1 text-left font-mono text-body-small [overflow-wrap:anywhere]">{text}</code>
       <CopyButton text={text} />
     </div>
   );
@@ -38,8 +38,8 @@ function ScheduleRow({ schedule: s, now }: { schedule: FactorySchedule; now: Dat
         </Badge>
         {s.tz && <Badge variant="outline">{s.tz}</Badge>}
       </div>
-      <p className="text-sm text-muted-foreground">{s.brief}</p>
-      <dl className="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-1 text-sm">
+      <p className="text-body-medium text-muted-foreground">{s.brief}</p>
+      <dl className="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-1 text-body-medium">
         <dt className="text-muted-foreground">Next run</dt>
         <dd data-schedule-next title={s.next ?? undefined}>
           {s.next ? fireWord(new Date(s.next), now) : 'none: its cron never fires'}
@@ -60,7 +60,7 @@ function ScheduleRow({ schedule: s, now }: { schedule: FactorySchedule; now: Dat
         {s.repo && (
           <>
             <dt className="text-muted-foreground">Repository</dt>
-            <dd className="truncate font-mono text-xs">{s.repo}</dd>
+            <dd className="truncate font-mono text-body-small">{s.repo}</dd>
           </>
         )}
       </dl>

@@ -144,12 +144,12 @@ export function FloatingBar({
       data-floating-bar
       data-bar={open ? barValue(open) : undefined}
       style={narrow ? undefined : { width }}
-      className={`fixed top-12 right-0 bottom-8 z-40 flex flex-col bg-popover text-sm text-popover-foreground shadow-lg outline-none ${narrow ? 'left-0' : 'border-l'}`}
+      className={`fixed top-12 right-0 bottom-8 z-40 flex flex-col bg-popover text-body-medium text-popover-foreground shadow-lg outline-none ${narrow ? 'left-0' : 'border-l'}`}
     >
       {!narrow && <ResizeEdge width={width} most={most} onWidth={setWidth} />}
       <div className="flex items-start gap-2 border-b p-4">
         <div className="min-w-0 flex-1 space-y-0.5">
-          <h2 id={heading} className="font-heading text-base font-medium text-foreground">
+          <h2 id={heading} className="font-heading text-title-medium text-foreground">
             {title}
           </h2>
           {description && <div className="text-muted-foreground">{description}</div>}

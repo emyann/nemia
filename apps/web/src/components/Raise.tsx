@@ -10,7 +10,7 @@ import { BUTTON, MODES, Refusal, TEXTAREA, useAsk, useRound } from './Ask';
 import { answersFrom, Asks, QuestionFields, RecommendButton, unanswered, type Draft } from './Questions';
 
 const AMOUNT =
-  'w-24 rounded border border-outline bg-background px-2 py-1 font-mono text-sm focus:border-on-surface-variant focus:outline-none';
+  'w-24 rounded border border-outline bg-background px-2 py-1 font-mono text-body-medium focus:border-on-surface-variant focus:outline-none';
 
 /**
  * A step past its budget — over it, ended at it, or a check that did not finish past it — and the raise of its cap the package takes
@@ -53,7 +53,12 @@ export function RaiseRow({ runId, offer }: { runId: string; offer: Extract<Answe
   if (taken) return <RaiseAsked step={offer.step} said={taken} />;
 
   return (
-    <li data-offer="raise" data-step={offer.step} data-by={offer.by} className="space-y-2 rounded border border-yours bg-card p-3 text-sm">
+    <li
+      data-offer="raise"
+      data-step={offer.step}
+      data-by={offer.by}
+      className="space-y-2 rounded border border-yours bg-card p-3 text-body-medium"
+    >
       <RaiseHead offer={offer} asks={asks} />
       <form
         aria-label={`Raise ${offer.step}'s budget`}
@@ -105,7 +110,7 @@ function RaiseHead({ offer, asks }: { offer: Extract<Answer, { kind: 'raise' }>;
   return (
     <>
       <p className="break-words">
-        <strong>{offer.step}</strong> <span className="font-mono text-xs">{offer.status}</span>
+        <strong>{offer.step}</strong> <span className="font-mono text-body-small">{offer.status}</span>
       </p>
       {asks &&
         (offer.needs ? (
@@ -115,7 +120,7 @@ function RaiseHead({ offer, asks }: { offer: Extract<Answer, { kind: 'raise' }>;
             signed off blocked, and said nothing of what it needs
           </p>
         ))}
-      <p className="text-xs break-words text-muted-foreground">
+      <p className="text-body-small break-words text-muted-foreground">
         The run spends nothing more on it until its cap is raised above <span className="font-mono">{offer.said}</span>
         {offer.by === 'round' ? ", with its loop's next round" : ''}: the button below raises it.
         {offer.modes.includes('recheck') && ' Its check again costs nothing, and needs no raise.'}
@@ -139,7 +144,7 @@ function AmountBox({
   disabled: boolean;
 }) {
   return (
-    <label htmlFor={field} className="flex items-center gap-1 text-xs">
+    <label htmlFor={field} className="flex items-center gap-1 text-body-small">
       <span className="sr-only">{`The cap to raise ${step} to, in dollars`}</span>
       <span aria-hidden className="font-mono">
         $
@@ -173,7 +178,7 @@ function RaiseModes({
   onMode: (next: RetryMode) => void;
 }) {
   return (
-    <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+    <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-body-small">
       <legend className="sr-only">How to try {step} again</legend>
       {modes.map((m) => (
         <label key={m} className="flex cursor-pointer items-center gap-1.5">
@@ -188,9 +193,9 @@ function RaiseModes({
 /** A raise once the api has its ask, as the row says it until the run is read again: the try or the round asked. */
 function RaiseAsked({ step, said }: { step: string; said: string }) {
   return (
-    <li data-offer="asked" data-step={step} className="rounded border border-outline-variant px-3 py-2 text-sm">
+    <li data-offer="asked" data-step={step} className="rounded border border-outline-variant px-3 py-2 text-body-medium">
       <strong>{step}</strong>{' '}
-      <span data-note className="font-mono text-xs text-muted-foreground">
+      <span data-note className="font-mono text-body-small text-muted-foreground">
         {said}
       </span>
     </li>

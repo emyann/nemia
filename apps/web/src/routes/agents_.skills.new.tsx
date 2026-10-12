@@ -29,10 +29,10 @@ function NewSkillPage() {
     <article className="space-y-6">
       <BackToAgents />
       <header className="space-y-1">
-        <h1 className="text-base font-semibold">New skill</h1>
-        <p className="text-sm text-muted-foreground">
-          Written to <code className="font-mono text-xs">{store.skills}/&lt;name&gt;/SKILL.md</code>, your library. An agent of yours gives
-          it by its name, from its page's skills.
+        <h1 className="text-title-medium">New skill</h1>
+        <p className="text-body-medium text-muted-foreground">
+          Written to <code className="font-mono text-body-small">{store.skills}/&lt;name&gt;/SKILL.md</code>, your library. An agent of
+          yours gives it by its name, from its page's skills.
         </p>
       </header>
       <SkillForm

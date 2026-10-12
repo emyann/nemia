@@ -15,7 +15,7 @@ export function QuotaLine({ quota, error }: { quota: Quota | undefined; error: E
   const now = new Date(useNow(30_000));
   if (error) {
     return (
-      <p data-quota="error" className="max-w-md basis-full truncate text-xs text-failure" title={error.message}>
+      <p data-quota="error" className="max-w-md basis-full truncate text-body-small text-failure" title={error.message}>
         The quota could not be read: {error.message}
       </p>
     );
@@ -25,7 +25,7 @@ export function QuotaLine({ quota, error }: { quota: Quota | undefined; error: E
   if (quota.state !== 'fresh') {
     const last = lastWords(quota, now);
     return (
-      <div data-quota={quota.state} title={title} className="max-w-2xl basis-full text-xs text-muted-foreground">
+      <div data-quota={quota.state} title={title} className="max-w-2xl basis-full text-body-small text-muted-foreground">
         <p>
           <Lead /> {quota.said}
         </p>
@@ -45,13 +45,17 @@ export function QuotaLine({ quota, error }: { quota: Quota | undefined; error: E
   }
   const age = quota.askedAt ? agoWord(now.getTime() - Date.parse(quota.askedAt)) : null;
   return (
-    <p data-quota="fresh" title={title} className="flex basis-full flex-wrap items-baseline gap-x-3 gap-y-1 text-sm text-muted-foreground">
+    <p
+      data-quota="fresh"
+      title={title}
+      className="flex basis-full flex-wrap items-baseline gap-x-3 gap-y-1 text-body-medium text-muted-foreground"
+    >
       <Lead />
       {quota.windows.map((w) => (
         <Window key={w.key} words={windowWords(w, now)} markAt={quota.markAt} data={{ 'data-quota-window': w.key }} emphasis />
       ))}
       {age && (
-        <span data-quota-age className="text-xs">
+        <span data-quota-age className="text-body-small">
           read {age}
         </span>
       )}
@@ -84,7 +88,7 @@ function Window({
       >
         {words.used}
       </span>
-      {words.resets && <span className="text-xs"> · {words.resets}</span>}
+      {words.resets && <span className="text-body-small"> · {words.resets}</span>}
     </span>
   );
 }

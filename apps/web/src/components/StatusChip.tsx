@@ -32,7 +32,7 @@ export function StatusChip({
     <span
       title={note ? `${stateMeaning[state]}\n${note}` : stateMeaning[state]}
       data-state={state}
-      className={`inline-flex max-w-full min-w-0 items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 font-mono text-[11px] leading-none ${stateClass[state]}`}
+      className={`inline-flex max-w-full min-w-0 items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 font-mono text-body-small leading-none ${stateClass[state]}`}
     >
       {state === 'unverified' && <CircleDashed aria-hidden strokeWidth={2.5} className="size-2.5 shrink-0" />}
       <span className="truncate">{status}</span>
@@ -44,7 +44,7 @@ export function StatusChip({
 export function StepNote({ note }: { note: string | null }) {
   if (!note) return null;
   return (
-    <p data-note className="font-mono text-[11px] leading-snug text-muted-foreground">
+    <p data-note className="font-mono text-body-small leading-snug text-muted-foreground">
       {note}
     </p>
   );

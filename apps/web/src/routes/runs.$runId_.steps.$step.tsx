@@ -23,10 +23,10 @@ export const Route = createFileRoute('/runs/$runId_/steps/$step')({
   component: SessionPage,
   errorComponent: ({ error }) => (
     <div className="space-y-3 p-4">
-      <Link to="/runs" className="text-sm text-muted-foreground hover:text-foreground">
+      <Link to="/runs" className="text-body-medium text-muted-foreground hover:text-foreground">
         ← Runs
       </Link>
-      <p className="text-sm text-failure">Could not load this run: {error instanceof Error ? error.message : String(error)}</p>
+      <p className="text-body-medium text-failure">Could not load this run: {error instanceof Error ? error.message : String(error)}</p>
     </div>
   ),
 });
@@ -42,7 +42,7 @@ function SessionPage() {
   if (Route.useLoaderData().gone) {
     return (
       <div className="space-y-3 p-4">
-        <Link to="/runs" className="text-sm text-muted-foreground hover:text-foreground">
+        <Link to="/runs" className="text-body-medium text-muted-foreground hover:text-foreground">
           ← Runs
         </Link>
         <RunGone id={runId} />
@@ -63,7 +63,7 @@ function SessionRead({ runId, name }: { runId: string; name: string }) {
   if (runGone(error)) {
     return (
       <div className="space-y-3 p-4">
-        <Link to="/runs" className="text-sm text-muted-foreground hover:text-foreground">
+        <Link to="/runs" className="text-body-medium text-muted-foreground hover:text-foreground">
           ← Runs
         </Link>
         <RunGone run={run} />
@@ -75,7 +75,7 @@ function SessionRead({ runId, name }: { runId: string; name: string }) {
     return (
       <div className="space-y-3 p-4">
         <BackToRun run={run} />
-        <p className="text-sm text-failure">
+        <p className="text-body-medium text-failure">
           Run {run.id} has no step '{name}'. Its page lists the steps it has.
         </p>
       </div>
@@ -111,7 +111,7 @@ function Session({ run, step }: { run: RunDetail; step: Step }) {
             <span
               data-following
               data-streamed={following.streamed || undefined}
-              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
+              className="inline-flex items-center gap-1.5 text-body-small text-muted-foreground"
             >
               <span aria-hidden className="size-1.5 animate-pulse rounded-full bg-alive" />
               following live
@@ -119,7 +119,7 @@ function Session({ run, step }: { run: RunDetail; step: Step }) {
           )}
         </div>
         <StepNote note={step.note} />
-        {following.error && <p className="text-sm text-failure">{following.error}</p>}
+        {following.error && <p className="text-body-medium text-failure">{following.error}</p>}
       </header>
       <DebugPanel run={run} step={step} />
       <div className="flex min-h-0 flex-1 flex-col">
@@ -139,7 +139,7 @@ function Session({ run, step }: { run: RunDetail; step: Step }) {
 }
 
 /** A quiet line in the session's place: why there is no conversation to draw, or that it is being read. */
-const quiet = (text: string) => <p className="p-6 text-sm text-muted-foreground">{text}</p>;
+const quiet = (text: string) => <p className="p-6 text-body-medium text-muted-foreground">{text}</p>;
 
 /**
  * The session's conversation, `turns` folded off what `following` read, and the message being written after them: or why there is none —
@@ -160,7 +160,11 @@ function SessionBody({ step, following, turns }: { step: Step; following: Follow
 
 function BackToRun({ run }: { run: RunDetail }) {
   return (
-    <Link to="/runs/$runId" params={{ runId: run.id }} className="block truncate text-sm text-muted-foreground hover:text-foreground">
+    <Link
+      to="/runs/$runId"
+      params={{ runId: run.id }}
+      className="block truncate text-body-medium text-muted-foreground hover:text-foreground"
+    >
       ← {titleOf(run)}
     </Link>
   );

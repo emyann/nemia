@@ -46,11 +46,11 @@ const FIT = { padding: 0.2, maxZoom: 1 };
 const UNDER_ROOM = 100;
 
 const BUTTON =
-  'rounded border border-outline px-2.5 py-1 text-sm font-medium hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent';
+  'rounded border border-outline px-2.5 py-1 text-body-medium font-medium hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent';
 const PRIMARY =
-  'rounded bg-primary px-3 py-1 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-primary';
+  'rounded bg-primary px-3 py-1 text-body-medium font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-primary';
 const INPUT =
-  'block w-full rounded border border-outline bg-background px-2 py-1 text-sm placeholder:text-muted-foreground focus:border-on-surface-variant focus:outline-none';
+  'block w-full rounded border border-outline bg-background px-2 py-1 text-body-medium placeholder:text-muted-foreground focus:border-on-surface-variant focus:outline-none';
 
 /**
  * A folder of yours, built on the board: its steps as blocks with handles, drawn left to right by `after`. Drag from a block's right-hand
@@ -197,7 +197,7 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
 
       {refusal && <SaveRefused refusal={refusal} rereading={reread.isPending} onReread={() => reread.mutate()} />}
       {saved && !dirty && (
-        <p data-saved className="text-xs text-muted-foreground">
+        <p data-saved className="text-body-small text-muted-foreground">
           Saved to <code className="font-mono break-all">{saved.workflow.dir}</code>: {fileLine(saved)}.
         </p>
       )}
@@ -261,9 +261,9 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
 
         <aside aria-label="Step" className="min-w-0 rounded border border-outline-variant p-3">
           {form.error ? (
-            <p className="text-xs text-failure">Could not read the keys a step may set: {form.error.message}</p>
+            <p className="text-body-small text-failure">Could not read the keys a step may set: {form.error.message}</p>
           ) : !form.data ? (
-            <p className="text-xs text-muted-foreground">Reading the keys a step may set…</p>
+            <p className="text-body-small text-muted-foreground">Reading the keys a step may set…</p>
           ) : step ? (
             <StepForm
               key={`${step.name}:${version}`}
@@ -305,7 +305,7 @@ function BuilderToolbar(props: {
     <div role="toolbar" aria-label={`Build ${name}`} className="flex flex-wrap items-center gap-2">
       <span
         data-unsaved={dirty || undefined}
-        className={`rounded-full px-2 py-0.5 text-xs font-medium ${dirty ? ringed.yours : 'bg-muted text-muted-foreground'}`}
+        className={`rounded-full px-2 py-0.5 text-body-small font-medium ${dirty ? ringed.yours : 'bg-muted text-muted-foreground'}`}
       >
         {dirty ? 'Unsaved changes' : 'Saved'}
       </span>
@@ -334,7 +334,7 @@ function ReadmeField({ text, changed, onChange }: { text: string; changed: boole
   const id = useId();
   return (
     <div className="space-y-1">
-      <label htmlFor={id} className="flex items-baseline gap-2 text-xs font-medium text-foreground">
+      <label htmlFor={id} className="flex items-baseline gap-2 text-body-small font-medium text-foreground">
         README
         <span className="font-normal text-muted-foreground">what the workflow is for, its first paragraph its description</span>
         {changed && (
@@ -349,7 +349,7 @@ function ReadmeField({ text, changed, onChange }: { text: string; changed: boole
         onChange={(e) => onChange(e.target.value)}
         rows={Math.min(Math.max(text.split('\n').length, 3), 12)}
         placeholder="What this workflow is for, in markdown."
-        className={`${INPUT} font-mono text-xs`}
+        className={`${INPUT} font-mono text-body-small`}
       />
     </div>
   );
@@ -369,7 +369,7 @@ export function SaveRefused({ refusal, rereading, onReread }: { refusal: BuildRe
   const nothingWritten = refusal.status !== null && refusal.status < 500;
   return (
     <div data-refused className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
-      <p className="text-sm font-medium text-on-failure-container">
+      <p className="text-body-medium font-medium text-on-failure-container">
         {nothingWritten ? (
           <>
             Not saved, and nothing written. The api refused it
@@ -383,13 +383,13 @@ export function SaveRefused({ refusal, rereading, onReread }: { refusal: BuildRe
           </>
         )}
       </p>
-      <p className="font-mono text-xs whitespace-pre-wrap break-words text-on-failure-container">{refusal.message}</p>
+      <p className="font-mono text-body-small whitespace-pre-wrap break-words text-on-failure-container">{refusal.message}</p>
       {(!nothingWritten || refusal.status === 409) && (
         <div className="flex flex-wrap items-center gap-2 pt-1">
           <button type="button" disabled={rereading} onClick={onReread} className={BUTTON}>
             {rereading ? 'Reading…' : 'Read the folder again'}
           </button>
-          <span className="text-xs text-yours">The changes drawn here are let go; copy what you need first.</span>
+          <span className="text-body-small text-yours">The changes drawn here are let go; copy what you need first.</span>
         </div>
       )}
     </div>
@@ -433,7 +433,7 @@ function AddStep({
     >
       <div className="grid gap-2 sm:grid-cols-[12rem_minmax(0,1fr)]">
         <div className="space-y-1">
-          <label htmlFor={nameId} className="block text-xs font-medium">
+          <label htmlFor={nameId} className="block text-body-small font-medium">
             Step name
           </label>
           <input
@@ -443,10 +443,10 @@ function AddStep({
             placeholder="review"
             className={`${INPUT} font-mono`}
           />
-          {refused && <p className="text-xs text-failure">{refused}</p>}
+          {refused && <p className="text-body-small text-failure">{refused}</p>}
         </div>
         <div className="space-y-1">
-          <label htmlFor={bodyId} className="block text-xs font-medium">
+          <label htmlFor={bodyId} className="block text-body-small font-medium">
             What it is told
           </label>
           <textarea id={bodyId} value={body} rows={3} onChange={(event) => setBody(event.target.value)} className={`${INPUT} resize-y`} />
@@ -471,7 +471,7 @@ const layersOf = (listing: WorkflowListing, name: string): StepLayers | null =>
 /** The aside while no step is picked: how to pick one, and how to wire two. */
 function NoStepPicked() {
   return (
-    <p className="text-xs text-muted-foreground">
+    <p className="text-body-small text-muted-foreground">
       Click a step to set its keys. Drag from a step&apos;s right-hand dot to another&apos;s left-hand dot to have it wait; from the violet
       dot underneath, to loop back.
     </p>

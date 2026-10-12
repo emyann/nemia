@@ -18,10 +18,10 @@ export const Route = createFileRoute('/capabilities')({
   loader: ({ context }) => context.queryClient.ensureQueryData(capabilitiesQuery),
   component: CapabilitiesPage,
   pendingComponent: () => (
-    <p className="text-sm text-muted-foreground">Reading the repository, and asking each MCP server it enables for its tools…</p>
+    <p className="text-body-medium text-muted-foreground">Reading the repository, and asking each MCP server it enables for its tools…</p>
   ),
   errorComponent: ({ error }) => (
-    <p className="text-sm text-failure">
+    <p className="text-body-medium text-failure">
       Could not load the capabilities: {error instanceof Error ? error.message : String(error)}. Is the api running (
       <code>npm run dev</code>)?
     </p>
@@ -35,13 +35,13 @@ function CapabilitiesPage() {
 
   return (
     <article className="space-y-8">
-      <p className="text-sm text-muted-foreground">
-        What this repository offers a step, read from <code className="font-mono text-xs">{repo}</code>. What a step was actually given is
-        on its run's page.
+      <p className="text-body-medium text-muted-foreground">
+        What this repository offers a step, read from <code className="font-mono text-body-small">{repo}</code>. What a step was actually
+        given is on its run's page.
       </p>
 
       {warnings.map((warning) => (
-        <p key={warning} className="rounded bg-surface-container-highest px-3 py-2 text-sm text-on-surface-variant">
+        <p key={warning} className="rounded bg-surface-container-highest px-3 py-2 text-body-medium text-on-surface-variant">
           {warning}
         </p>
       ))}
@@ -93,7 +93,8 @@ function CapabilitiesPage() {
         count={denied.length}
         empty={
           <>
-            Nothing denied: <Path path=".claude/settings.json" /> has no <code className="font-mono text-xs">permissions.deny</code>.
+            Nothing denied: <Path path=".claude/settings.json" /> has no <code className="font-mono text-body-small">permissions.deny</code>
+            .
           </>
         }
       >
@@ -107,7 +108,8 @@ function CapabilitiesPage() {
         count={asked.length}
         empty={
           <>
-            Nothing asks by a rule: <Path path=".claude/settings.json" /> has no <code className="font-mono text-xs">permissions.ask</code>.
+            Nothing asks by a rule: <Path path=".claude/settings.json" /> has no{' '}
+            <code className="font-mono text-body-small">permissions.ask</code>.
           </>
         }
       >
@@ -136,11 +138,11 @@ function CapabilitiesPage() {
 function Section({ title, count, empty, children }: { title: string; count: number; empty: ReactNode; children: ReactNode }) {
   return (
     <section aria-label={title} className="space-y-3">
-      <h2 className="flex items-center gap-2 text-sm font-medium">
+      <h2 className="flex items-center gap-2 text-title-small">
         {title}
         <span
           data-count
-          className="rounded-full bg-muted px-2 py-0.5 font-mono text-[11px] leading-none tabular-nums text-muted-foreground"
+          className="rounded-full bg-muted px-2 py-0.5 font-mono text-body-small leading-none tabular-nums text-muted-foreground"
         >
           {count}
         </span>
@@ -148,14 +150,14 @@ function Section({ title, count, empty, children }: { title: string; count: numb
       {count > 0 ? (
         <ul className="divide-y divide-outline-variant rounded-lg border border-outline-variant">{children}</ul>
       ) : (
-        <p className="text-sm text-muted-foreground">{empty}</p>
+        <p className="text-body-medium text-muted-foreground">{empty}</p>
       )}
     </section>
   );
 }
 
 /** Where a thing was read from, relative to the repository. */
-const Path = ({ path }: { path: string }) => <code className="font-mono text-[11px] text-muted-foreground">{path}</code>;
+const Path = ({ path }: { path: string }) => <code className="font-mono text-body-small text-muted-foreground">{path}</code>;
 
 function DescribedRow({ item }: { item: Described }) {
   return (
@@ -165,9 +167,9 @@ function DescribedRow({ item }: { item: Described }) {
         <Path path={item.source} />
       </div>
       {item.description ? (
-        <p className="text-sm text-muted-foreground">{item.description}</p>
+        <p className="text-body-medium text-muted-foreground">{item.description}</p>
       ) : (
-        <p className="text-sm italic text-muted-foreground">No description</p>
+        <p className="text-body-medium italic text-muted-foreground">No description</p>
       )}
     </li>
   );
@@ -186,20 +188,20 @@ function ServerRow({ server }: { server: McpServer }) {
         >
           {enabled ? 'enabled' : 'not enabled'}
         </span>
-        {tools && <span className="text-xs text-muted-foreground">{tools.length === 1 ? '1 tool' : `${tools.length} tools`}</span>}
+        {tools && <span className="text-body-small text-muted-foreground">{tools.length === 1 ? '1 tool' : `${tools.length} tools`}</span>}
         <span className="ml-auto">
           <Path path={server.source} />
         </span>
       </div>
 
-      <p className="break-all font-mono text-xs text-foreground">
+      <p className="break-all font-mono text-body-small text-foreground">
         {server.command ? [server.command, ...server.args].join(' ') : server.url}
       </p>
 
-      {notAsked && <p className="text-sm text-muted-foreground">{notAsked}</p>}
+      {notAsked && <p className="text-body-medium text-muted-foreground">{notAsked}</p>}
 
       {error && (
-        <pre className="whitespace-pre-wrap break-words rounded bg-failure-container p-2 font-mono text-[11px] leading-snug text-on-failure-container">
+        <pre className="whitespace-pre-wrap break-words rounded bg-failure-container p-2 font-mono text-body-small leading-snug text-on-failure-container">
           {error}
         </pre>
       )}
@@ -213,7 +215,7 @@ function ServerRow({ server }: { server: McpServer }) {
                 data-denied={tool.denied ?? undefined}
                 className="grid grid-cols-1 gap-x-4 py-1 sm:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]"
               >
-                <span className="flex min-w-0 items-center gap-2 font-mono text-xs" title={`mcp__${name}__${tool.name}`}>
+                <span className="flex min-w-0 items-center gap-2 font-mono text-body-small" title={`mcp__${name}__${tool.name}`}>
                   <span className={tool.denied ? 'truncate line-through decoration-outline' : 'truncate'}>{tool.name}</span>
                   {tool.denied && (
                     <span className={`${CHIP} ${container.grey}`} title={`Denied by ${tool.denied} in .claude/settings.json`}>
@@ -221,18 +223,18 @@ function ServerRow({ server }: { server: McpServer }) {
                     </span>
                   )}
                 </span>
-                <span className="truncate text-sm text-muted-foreground" title={tool.description ?? undefined}>
+                <span className="truncate text-body-medium text-muted-foreground" title={tool.description ?? undefined}>
                   {tool.description?.split('\n')[0] ?? '—'}
                 </span>
               </li>
             ))}
           </ul>
         ) : (
-          <p className="text-sm text-muted-foreground">It lists no tools.</p>
+          <p className="text-body-medium text-muted-foreground">It lists no tools.</p>
         ))}
 
       {checkedAt && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-body-small text-muted-foreground">
           Asked {when(checkedAt)}. The api asks each server once while it runs: restart it, or change the server's entry in{' '}
           <Path path=".mcp.json" />, to ask again.
         </p>
@@ -252,9 +254,9 @@ const refusedBy = (mcp: Capabilities['mcp'], rule: string): string[] =>
 function RuleRow({ rule, source, refuses = [] }: { rule: string; source: string; refuses?: string[] }) {
   return (
     <li className="flex flex-wrap items-baseline gap-x-4 gap-y-0.5 px-3 py-2">
-      <span className="break-all font-mono text-xs">{rule}</span>
+      <span className="break-all font-mono text-body-small">{rule}</span>
       {refuses.length > 0 && (
-        <span className="text-xs text-muted-foreground">
+        <span className="text-body-small text-muted-foreground">
           refuses {refuses.length > 3 ? `${refuses.length} listed tools` : refuses.join(', ')}
         </span>
       )}
@@ -290,7 +292,7 @@ function StepRow({ step, measured, readOnly }: { step: StepReach; measured: Meas
         {step.from === 'yours' && <span className={`${CHIP} ${container.grey}`}>yours</span>}
       </div>
 
-      <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-0.5 text-xs">
+      <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-0.5 text-body-small">
         {(
           [
             ['tools', fence.tools ? fence.tools.join(', ') || 'none' : `${OWN} set`],
@@ -309,7 +311,7 @@ function StepRow({ step, measured, readOnly }: { step: StepReach; measured: Meas
       </dl>
 
       {!step.claudeCode ? (
-        <p data-not-claimed className="text-sm text-muted-foreground">
+        <p data-not-claimed className="text-body-medium text-muted-foreground">
           Runs on {step.harness}, which has no tool list: its fence is its sandbox, the step's <span className="font-mono">sandbox:</span>.
           What a {step.harness} session is given was not measured, so no tool, skill or server is claimed for it. {allowed.why}
         </p>
@@ -344,7 +346,7 @@ function StepRow({ step, measured, readOnly }: { step: StepReach; measured: Meas
                 ))}
               </span>
               {tools.from === 'measured' && (
-                <p data-measured={measured.measuredAt} className="text-xs text-muted-foreground">
+                <p data-measured={measured.measuredAt} className="text-body-small text-muted-foreground">
                   {measured.harness}'s own set. The solid ones as measured on {measured.measuredAt} with {measured.version} (
                   {measured.source}), which found it without {measured.lacks.join(' or ')}. The dashed ones are inferred, not measured: each
                   says why. Not asked again: a later version may give another.
@@ -356,7 +358,7 @@ function StepRow({ step, measured, readOnly }: { step: StepReach; measured: Meas
           {skills && (
             <Reach label="Skills">
               {skills.why ? (
-                <p className="text-xs text-muted-foreground">{skills.why}</p>
+                <p className="text-body-small text-muted-foreground">{skills.why}</p>
               ) : skills.names.length ? (
                 <span className="flex flex-wrap gap-1">
                   {skills.names.map((name) => (
@@ -366,7 +368,7 @@ function StepRow({ step, measured, readOnly }: { step: StepReach; measured: Meas
                   ))}
                 </span>
               ) : (
-                <p className="text-xs text-muted-foreground">The repository has no skill.</p>
+                <p className="text-body-small text-muted-foreground">The repository has no skill.</p>
               )}
             </Reach>
           )}
@@ -376,7 +378,7 @@ function StepRow({ step, measured, readOnly }: { step: StepReach; measured: Meas
               {mcp.length ? (
                 mcp.map((server) => (
                   <div key={server.server} data-server={server.server} className="space-y-1">
-                    <p className="font-mono text-xs">{server.server}</p>
+                    <p className="font-mono text-body-small">{server.server}</p>
                     {server.tools ? (
                       <span className="flex flex-wrap gap-1">
                         {server.tools.map((tool) => {
@@ -408,12 +410,12 @@ function StepRow({ step, measured, readOnly }: { step: StepReach; measured: Meas
                         })}
                       </span>
                     ) : (
-                      <p className="text-xs text-muted-foreground">{server.why}</p>
+                      <p className="text-body-small text-muted-foreground">{server.why}</p>
                     )}
                   </div>
                 ))
               ) : (
-                <p className="text-xs text-muted-foreground">No server is named for it: its sessions load none.</p>
+                <p className="text-body-small text-muted-foreground">No server is named for it: its sessions load none.</p>
               )}
             </Reach>
           )}
@@ -422,13 +424,13 @@ function StepRow({ step, measured, readOnly }: { step: StepReach; measured: Meas
             {denied.length ? (
               <span className="flex flex-wrap gap-x-3 gap-y-0.5">
                 {denied.map(({ rule, source }) => (
-                  <span key={`${source}:${rule}`} className="font-mono text-xs" title={source}>
+                  <span key={`${source}:${rule}`} className="font-mono text-body-small" title={source}>
                     {rule} <span className="text-muted-foreground">· {source}</span>
                   </span>
                 ))}
               </span>
             ) : (
-              <p className="text-xs text-muted-foreground">Nothing: the settings deny nothing, and neither does the step.</p>
+              <p className="text-body-small text-muted-foreground">Nothing: the settings deny nothing, and neither does the step.</p>
             )}
           </Reach>
 
@@ -436,12 +438,12 @@ function StepRow({ step, measured, readOnly }: { step: StepReach; measured: Meas
             <Reach label="Asks">
               <span className="flex flex-wrap gap-x-3 gap-y-0.5">
                 {asked.map(({ rule, source }) => (
-                  <span key={rule} data-ask-rule={rule} className="font-mono text-xs" title={source}>
+                  <span key={rule} data-ask-rule={rule} className="font-mono text-body-small" title={source}>
                     {rule} <span className="text-muted-foreground">· {source}</span>
                   </span>
                 ))}
               </span>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-body-small text-muted-foreground">
                 What these match asks, whatever an allow or the harness&apos;s own leave says
                 {allowed.askDenier ? `, and ${allowed.askDenier} denies it without a prompt` : ''}.
               </p>

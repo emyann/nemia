@@ -22,8 +22,8 @@ function SettingsPage() {
   return (
     <article data-settings className="mx-auto flex max-w-3xl flex-col gap-8">
       <header className="flex flex-col gap-1">
-        <h1 className="text-lg font-semibold">Settings</h1>
-        <p className="text-sm text-muted-foreground">What is set for the whole store, across every factory.</p>
+        <h1 className="text-title-large">Settings</h1>
+        <p className="text-body-medium text-muted-foreground">What is set for the whole store, across every factory.</p>
       </header>
       <NemiaSettings />
     </article>

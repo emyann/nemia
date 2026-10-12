@@ -36,8 +36,8 @@ export function AutoRules({ agent }: { agent: string }) {
   };
   return (
     <div data-auto-rules className="flex flex-col gap-3 border-t pt-4">
-      <h3 className="text-sm font-medium">Her rules at Auto</h3>
-      <p className="text-xs text-muted-foreground">
+      <h3 className="text-title-small">Her rules at Auto</h3>
+      <p className="text-body-small text-muted-foreground">
         In a factory at Auto, an answer these rules allow in the run's state is given without asking you; anything else is asked, as at
         Semi-auto. She proposes rules from your custom instruction, and none is in force until you confirm it here.
       </p>
@@ -45,14 +45,14 @@ export function AutoRules({ agent }: { agent: string }) {
       {data ? (
         <AutoParts list={data} pending={write.isPending} onAsk={ask} />
       ) : (
-        <p className="text-sm text-muted-foreground">
+        <p className="text-body-medium text-muted-foreground">
           {error instanceof Error ? `Could not read her rules: ${error.message}` : 'Reading her rules…'}
         </p>
       )}
       {write.error && (
         <div data-auto-refused className="flex flex-col gap-1 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2">
-          <p className="text-sm font-medium text-destructive">Not written:</p>
-          <p className="font-mono text-xs break-words whitespace-pre-wrap text-destructive">{write.error.message}</p>
+          <p className="text-body-medium font-medium text-destructive">Not written:</p>
+          <p className="font-mono text-body-small break-words whitespace-pre-wrap text-destructive">{write.error.message}</p>
         </div>
       )}
     </div>
@@ -73,7 +73,7 @@ function AutoParts({ list, pending, onAsk }: { list: AutoList; pending: boolean;
 function Sub({ heading, children, ...data }: { heading: string; children: ReactNode } & Record<`data-${string}`, string | boolean>) {
   return (
     <div {...data} className="flex flex-col gap-1.5">
-      <h4 className="text-xs font-medium text-muted-foreground">{heading}</h4>
+      <h4 className="text-label-medium text-muted-foreground">{heading}</h4>
       {children}
     </div>
   );
@@ -83,7 +83,7 @@ function Sub({ heading, children, ...data }: { heading: string; children: ReactN
 function Rule({ rule, children }: { rule: AutoRule; children?: ReactNode }) {
   return (
     <li data-auto-rule={rule.id} className="flex flex-wrap items-start justify-between gap-2 rounded-lg border px-3 py-2">
-      <span data-auto-words className="min-w-0 flex-1 text-sm">
+      <span data-auto-words className="min-w-0 flex-1 text-body-medium">
         {rule.words}
       </span>
       <span className="flex items-center gap-2">{children}</span>
@@ -111,7 +111,7 @@ function InForce({ list, pending, onAsk }: { list: AutoList; pending: boolean; o
           ))}
         </ul>
       ) : (
-        <p data-auto-none className="text-sm text-muted-foreground">
+        <p data-auto-none className="text-body-medium text-muted-foreground">
           None: at Auto, every answer is asked of you, as at Semi-auto.
         </p>
       )}
@@ -139,14 +139,14 @@ function Proposed({ list, pending, onAsk }: { list: AutoList; pending: boolean; 
   if (proposed === null)
     return (
       <Sub heading="Proposed" data-auto-proposed={false}>
-        <p className="text-sm text-muted-foreground">She has proposed none: ask her to, from your custom instruction.</p>
+        <p className="text-body-medium text-muted-foreground">She has proposed none: ask her to, from your custom instruction.</p>
       </Sub>
     );
   return (
     <>
       <Sub heading={`Proposed at ${clockWord(new Date(proposed.at), new Date(now))}`} data-auto-proposed>
         {proposed.stale && (
-          <p data-auto-stale className="text-xs text-muted-foreground">
+          <p data-auto-stale className="text-body-small text-muted-foreground">
             Your custom instruction changed since she proposed these: ask her to propose again.
           </p>
         )}
@@ -173,12 +173,12 @@ function Proposed({ list, pending, onAsk }: { list: AutoList; pending: boolean; 
       </Sub>
       {proposed.guidance.length > 0 && (
         <Sub heading="Kept as guidance" data-auto-guidance>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-body-small text-muted-foreground">
             Words of yours the machinery cannot hold as a rule: she reads them, and nothing enforces them.
           </p>
           <ul className="flex flex-col gap-1">
             {proposed.guidance.map((words) => (
-              <li key={words} className="text-sm">
+              <li key={words} className="text-body-medium">
                 {words}
               </li>
             ))}

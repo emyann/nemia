@@ -94,12 +94,12 @@ export function CustomInstructions({ name, reach = HIRED }: { name: string; reac
       className="space-y-3 border-t border-outline-variant pt-4"
     >
       <div className="space-y-1">
-        <h2 className="text-sm font-semibold">Custom instructions</h2>
-        <p className="text-xs text-muted-foreground">{reach.told(<code className="font-mono">{name}</code>)}</p>
+        <h2 className="text-title-small">Custom instructions</h2>
+        <p className="text-body-small text-muted-foreground">{reach.told(<code className="font-mono">{name}</code>)}</p>
         <p
           data-custom-frozen={reach.takes.mark === 'frozen' || undefined}
           data-custom-told={reach.takes.mark === 'told' || undefined}
-          className="text-xs text-muted-foreground"
+          className="text-body-small text-muted-foreground"
         >
           {reach.takes.words}
         </p>
@@ -120,12 +120,12 @@ export function CustomInstructions({ name, reach = HIRED }: { name: string; reac
           }}
         />
       ) : (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-body-small text-muted-foreground">
           {error instanceof Error ? `Could not read the custom instructions: ${error.message}` : 'Reading the custom instructions…'}
         </p>
       )}
       {done && (
-        <p data-custom-done className="text-xs text-muted-foreground">
+        <p data-custom-done className="text-body-small text-muted-foreground">
           {done}
         </p>
       )}
@@ -169,18 +169,18 @@ function CustomForm({
         if (draft.trim() && !unchanged) onSave(draft);
       }}
     >
-      <p data-custom-file className="font-mono text-[11px] break-all text-muted-foreground">
+      <p data-custom-file className="font-mono text-body-small break-all text-muted-foreground">
         {custom.file}
         {!held && ' — none yet'}
       </p>
       {custom.error !== null && (
         <div data-custom-error className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
-          <p className="text-sm font-medium text-on-failure-container">{reach.unread(custom.name)}</p>
-          <p className="font-mono text-xs whitespace-pre-wrap break-words text-on-failure-container">{custom.error}</p>
+          <p className="text-body-medium font-medium text-on-failure-container">{reach.unread(custom.name)}</p>
+          <p className="font-mono text-body-small whitespace-pre-wrap break-words text-on-failure-container">{custom.error}</p>
         </div>
       )}
       <TextField value={draft} onChange={setDraft} className="space-y-1.5">
-        <Label className="text-xs">Words</Label>
+        <Label className="text-body-small">Words</Label>
         <Textarea placeholder={reach.placeholder(custom.name)} className="min-h-24 leading-relaxed" />
       </TextField>
       <div className="flex flex-wrap items-center gap-2">
@@ -225,7 +225,7 @@ function Clear({
       </Button>
     );
   return (
-    <span data-custom-clear-asks className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+    <span data-custom-clear-asks className="flex flex-wrap items-center gap-2 text-body-small text-muted-foreground">
       {asks}
       <Button variant="destructive" onPress={onClear} isDisabled={pending}>
         {pending ? 'Clearing…' : 'Clear'}

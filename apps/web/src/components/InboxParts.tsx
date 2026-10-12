@@ -7,10 +7,10 @@ import { FactoryTag } from './FactoryTag';
 
 /** A button that does what its form or card is for. */
 export const PRIMARY =
-  'rounded bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-primary';
+  'rounded bg-primary px-3 py-1.5 text-body-medium font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-primary';
 /** A button beside it. */
 export const SECONDARY =
-  'rounded border border-outline px-3 py-1.5 text-sm font-medium hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40';
+  'rounded border border-outline px-3 py-1.5 text-body-medium font-medium hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40';
 
 /**
  * A card's line under its title: its name; the factory it names, linked to its floor, or, for a card that names none (`unassigned`),
@@ -19,7 +19,7 @@ export const SECONDARY =
  */
 export function CardMeta({ entry }: { entry: InboxEntry }) {
   return (
-    <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+    <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-body-small text-muted-foreground">
       <span className="font-mono">{entry.name}</span>
       {entry.error !== null ? null : unassigned(entry) ? (
         <span data-unassigned title="It names no factory: Start gives it one.">
@@ -54,7 +54,7 @@ export function CardMeta({ entry }: { entry: InboxEntry }) {
 export function NoQueue({ entry }: { entry: InboxEntry }) {
   if (!queueNeedsFactory(entry)) return null;
   return (
-    <p data-no-queue className="text-xs text-muted-foreground">
+    <p data-no-queue className="text-body-small text-muted-foreground">
       No Queue: a queued card starts on its own, in the factory it names, and this one names none. Start gives it one.
     </p>
   );
@@ -123,7 +123,7 @@ export function GoneItem({ entry, refusal, onDismiss }: { entry: InboxEntry; ref
           <p data-title className="font-medium break-words text-muted-foreground">
             {entry.title ?? entry.file}
           </p>
-          <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          <p className="flex flex-wrap gap-x-3 gap-y-1 text-body-small text-muted-foreground">
             <span className="font-mono">{entry.name}</span>
             <span>Gone from the inbox since this page listed it.</span>
           </p>
@@ -146,7 +146,7 @@ export function Tried({ entry }: { entry: InboxEntry & { tried: NonNullable<Inbo
   return (
     <p
       data-tried={refused ? 'refused' : 'failed'}
-      className={`rounded border px-3 py-2 text-xs break-words ${refused ? 'border-failure bg-failure-container text-on-failure-container' : 'border-outline-variant text-muted-foreground'}`}
+      className={`rounded border px-3 py-2 text-body-small break-words ${refused ? 'border-failure bg-failure-container text-on-failure-container' : 'border-outline-variant text-muted-foreground'}`}
     >
       {triedLine(entry, new Date(entry.tried.at).toLocaleString())}
     </p>
@@ -165,8 +165,8 @@ const NOT_DONE: Record<CardRefusal['action'], string> = {
 export function Refused({ refusal }: { refusal: CardRefusal }) {
   return (
     <div data-refused={refusal.action} className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
-      <p className="text-sm font-medium text-on-failure-container">{NOT_DONE[refusal.action]}. The api refused it:</p>
-      <p className="font-mono text-xs whitespace-pre-wrap break-words text-on-failure-container">{refusal.message}</p>
+      <p className="text-body-medium font-medium text-on-failure-container">{NOT_DONE[refusal.action]}. The api refused it:</p>
+      <p className="font-mono text-body-small whitespace-pre-wrap break-words text-on-failure-container">{refusal.message}</p>
     </div>
   );
 }

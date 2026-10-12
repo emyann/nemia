@@ -23,11 +23,11 @@ export function FactoryBlockNode({ data: block }: NodeProps<FactoryFlowNode>) {
       data-factory={block.name}
       data-inspected={block.inspected || undefined}
       style={BLOCK_SIZE}
-      className={`flex cursor-pointer flex-col gap-2 rounded-xl bg-card p-4 text-sm text-card-foreground shadow-sm ${block.inspected ? 'ring-2 ring-ring' : 'ring-1 ring-foreground/10 hover:ring-foreground/30 in-focus-visible:ring-2 in-focus-visible:ring-ring'}`}
+      className={`flex cursor-pointer flex-col gap-2 rounded-xl bg-card p-4 text-body-medium text-card-foreground shadow-sm ${block.inspected ? 'ring-2 ring-ring' : 'ring-1 ring-foreground/10 hover:ring-foreground/30 in-focus-visible:ring-2 in-focus-visible:ring-ring'}`}
     >
       <span className="flex items-center gap-2">
         <FactoryIcon className="size-4 shrink-0 text-muted-foreground" />
-        <span className="truncate text-base font-semibold" title={block.name}>
+        <span className="truncate text-body-large font-semibold" title={block.name}>
           {block.name}
         </span>
         {block.default && <Badge variant="secondary">default</Badge>}

@@ -49,9 +49,9 @@ export function FactoryBar({ factory: name }: { factory: string }) {
  * reads.
  */
 function Unread({ name, error, read }: { name: string; error: Error | null; read: boolean }) {
-  if (error) return <p className="text-sm text-failure">Could not read the factories and their runs: {error.message}</p>;
-  if (read) return <p className="text-sm text-yours">No factory is named {name}.</p>;
-  return <p className="text-xs text-muted-foreground">Reading the factories…</p>;
+  if (error) return <p className="text-body-medium text-failure">Could not read the factories and their runs: {error.message}</p>;
+  if (read) return <p className="text-body-medium text-yours">No factory is named {name}.</p>;
+  return <p className="text-body-small text-muted-foreground">Reading the factories…</p>;
 }
 
 /**
@@ -70,13 +70,13 @@ function FactoryBody({ block, factory }: { block: FactoryBlock; factory: Factory
     <>
       {factory && <FactoryTrust factory={factory} />}
       <section aria-label="Runs" className="space-y-1">
-        <h3 className="text-xs font-medium text-muted-foreground">Runs</h3>
+        <h3 className="text-label-medium text-muted-foreground">Runs</h3>
         <p className="font-medium" data-runs>
           {runsOf(block)}
         </p>
       </section>
       <section aria-label="Offers" className="space-y-1">
-        <h3 className="text-xs font-medium text-muted-foreground">Offers</h3>
+        <h3 className="text-label-medium text-muted-foreground">Offers</h3>
         <p data-offer>{offerOf(block)}</p>
       </section>
     </>

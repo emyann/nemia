@@ -16,8 +16,8 @@ import { RepoPicker } from './FactoryCardStart';
 import { FloatingBar } from './FloatingBar';
 import { StartRun } from './StartRun';
 
-const code = (text: string) => <code className="font-mono text-xs">{text}</code>;
-const path = (text: string) => <code className="font-mono text-xs break-all">{text}</code>;
+const code = (text: string) => <code className="font-mono text-body-small">{text}</code>;
+const path = (text: string) => <code className="font-mono text-body-small break-all">{text}</code>;
 
 /**
  * The sidebar's 'Start a run' in the factory `name`, or in none yet, which asks which first, that opens the bar on its start, pressed while
@@ -68,15 +68,15 @@ function StartIn({ name }: { name: string }) {
       description="A run of one of the workflows the factory offers, with its hires, on one of its repositories; it shows on its floor."
     >
       {factories.error ? (
-        <p className="text-sm text-failure">Could not read the factories: {factories.error.message}</p>
+        <p className="text-body-medium text-failure">Could not read the factories: {factories.error.message}</p>
       ) : !factories.data ? (
-        <p className="text-xs text-muted-foreground">Reading the factories…</p>
+        <p className="text-body-small text-muted-foreground">Reading the factories…</p>
       ) : place === null ? (
-        <p data-unplaced className="text-sm text-yours">
+        <p data-unplaced className="text-body-medium text-yours">
           {factory ? 'The default factory starts no run from here: start one from the Workflows page.' : `No factory is named ${name}.`}
         </p>
       ) : 'why' in place ? (
-        <p data-unplaced className="text-sm text-yours">
+        <p data-unplaced className="text-body-medium text-yours">
           {place.why}
         </p>
       ) : (
@@ -92,9 +92,9 @@ function AskFactory() {
   return (
     <FloatingBar title="Start a run" description="A run starts in a factory: pick the one it starts in, then its repository and workflow.">
       {factories.error ? (
-        <p className="text-sm text-failure">Could not read the factories: {factories.error.message}</p>
+        <p className="text-body-medium text-failure">Could not read the factories: {factories.error.message}</p>
       ) : !factories.data ? (
-        <p className="text-xs text-muted-foreground">Reading the factories…</p>
+        <p className="text-body-small text-muted-foreground">Reading the factories…</p>
       ) : (
         <FactoryChoice factories={factories.data} />
       )}
@@ -116,11 +116,11 @@ export function FactoryChoice({ factories }: { factories: readonly Factory[] }) 
   });
   return (
     <fieldset aria-labelledby={legend} className="space-y-1.5">
-      <legend id={legend} className="text-sm font-medium">
+      <legend id={legend} className="text-body-medium font-medium">
         Factory
       </legend>
       {!places.length ? (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-body-small text-muted-foreground">
           No factory is filed to start a run in: a run in none starts from the Workflows page.
         </p>
       ) : (
@@ -137,7 +137,11 @@ export function FactoryChoice({ factories }: { factories: readonly Factory[] }) 
                 {name}
               </Button>
               {why && (
-                <span id={`${legend}-${name}`} data-why-not className="block px-2 pb-1 text-xs whitespace-pre-wrap break-words text-yours">
+                <span
+                  id={`${legend}-${name}`}
+                  data-why-not
+                  className="block px-2 pb-1 text-body-small whitespace-pre-wrap break-words text-yours"
+                >
                   {why}
                 </span>
               )}
@@ -167,7 +171,7 @@ function OnRepo({ place }: { place: { factory: string; repos: string[]; repo: st
           }
         />
       ) : (
-        <p data-repo className="text-sm">
+        <p data-repo className="text-body-medium">
           On {path(place.repo)}
         </p>
       )}
@@ -192,17 +196,17 @@ function Workflows({ place }: { place: Place }) {
   return (
     <>
       <fieldset aria-labelledby={legend} className="space-y-1.5">
-        <legend id={legend} className="text-sm font-medium">
+        <legend id={legend} className="text-body-medium font-medium">
           Workflow
         </legend>
         {workflows.error ? (
-          <p className="text-xs text-failure">
+          <p className="text-body-small text-failure">
             Could not list the workflows of the factory {code(place.factory)}: {workflows.error.message}
           </p>
         ) : !workflows.data ? (
-          <p className="text-xs text-muted-foreground">Reading the workflows…</p>
+          <p className="text-body-small text-muted-foreground">Reading the workflows…</p>
         ) : !workflows.data.length ? (
-          <p className="text-xs text-muted-foreground">
+          <p className="text-body-small text-muted-foreground">
             No workflow the factory attaches is on {path(place.repo)}: attach one there{attach ? <> with {code(attach)}</> : null}.
           </p>
         ) : (
@@ -234,7 +238,9 @@ function WorkflowRow({
   const why = whyNotStarted(workflow);
   return (
     <li data-workflow={key}>
-      <label className={`flex items-baseline gap-2 px-2 py-1.5 text-sm ${why ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-accent'}`}>
+      <label
+        className={`flex items-baseline gap-2 px-2 py-1.5 text-body-medium ${why ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-accent'}`}
+      >
         <input
           type="radio"
           name={group}
@@ -249,9 +255,9 @@ function WorkflowRow({
             {workflow.name}
             {workflow.from === 'yours' && <span className="font-normal text-muted-foreground"> (yours)</span>}
           </span>
-          {workflow.description && <span className="block text-xs text-muted-foreground">{workflow.description}</span>}
+          {workflow.description && <span className="block text-body-small text-muted-foreground">{workflow.description}</span>}
           {why && (
-            <span data-why-not className="block text-xs whitespace-pre-wrap break-words text-yours">
+            <span data-why-not className="block text-body-small whitespace-pre-wrap break-words text-yours">
               {why}
             </span>
           )}

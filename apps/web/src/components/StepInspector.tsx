@@ -61,7 +61,7 @@ export function StepTabs({ run, step, className }: { run: RunDetail; step: Step;
             role="tab"
             aria-selected={tab === t}
             onClick={() => setTab(t)}
-            className={`-mb-px border-b-2 px-2 py-1.5 text-xs ${
+            className={`-mb-px border-b-2 px-2 py-1.5 text-body-small ${
               tab === t ? 'border-foreground font-medium' : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -85,7 +85,7 @@ export function StepTabs({ run, step, className }: { run: RunDetail; step: Step;
         {tab === 'Output' && (
           <>
             {gateOfStep(run, step) && (
-              <p data-answer-at="Details" className="text-xs text-yours">
+              <p data-answer-at="Details" className="text-body-small text-yours">
                 {step.name} waits at its gate on you: read what it handed on, then{' '}
                 <button type="button" onClick={() => setTab('Details')} className="font-medium underline underline-offset-2">
                   approve it or send it back
@@ -166,7 +166,7 @@ function Details({ run, step, state, runCancelled, current, selected, onSelect }
       {step.check && <Check check={step.check} />}
       {spec ? (
         <section className="space-y-1">
-          <h3 className="text-xs font-medium text-muted-foreground">Spec</h3>
+          <h3 className="text-label-medium text-muted-foreground">Spec</h3>
           <Facts rows={specRows(spec, step.filed)} />
         </section>
       ) : (
@@ -225,7 +225,7 @@ function Activity({ run, step }: { run: RunDetail; step: Step }) {
 
   return (
     <>
-      <div className="flex items-baseline justify-between gap-2 text-xs text-muted-foreground">
+      <div className="flex items-baseline justify-between gap-2 text-body-small text-muted-foreground">
         <p>
           {following.loading ? 'Reading its conversation…' : following.live ? 'Followed as it runs.' : 'Not running, so not followed.'}
           {tail.length < turns.length && ` The last ${tail.length} of ${turns.length}.`}
@@ -238,7 +238,7 @@ function Activity({ run, step }: { run: RunDetail; step: Step }) {
           Open the session
         </Link>
       </div>
-      {following.error && <p className="text-xs text-failure">{following.error}</p>}
+      {following.error && <p className="text-body-small text-failure">{following.error}</p>}
       {!following.loading &&
         (tail.length ? (
           <Suspense fallback={<p className="text-muted-foreground">Reading its conversation…</p>}>

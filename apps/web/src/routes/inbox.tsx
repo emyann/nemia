@@ -14,13 +14,13 @@ export const Route = createFileRoute('/inbox')({
   loader: ({ context }) => context.queryClient.ensureQueryData(inboxQuery),
   component: InboxPage,
   errorComponent: ({ error }) => (
-    <p className="text-sm text-failure">
+    <p className="text-body-medium text-failure">
       Could not load the inbox: {error instanceof Error ? error.message : String(error)}. Is the api running (<code>npm run dev</code>)?
     </p>
   ),
 });
 
-const code = (text: string) => <code className="font-mono text-xs">{text}</code>;
+const code = (text: string) => <code className="font-mono text-body-small">{text}</code>;
 
 /**
  * The inbox: a box that files a card, and the cards, newest first, each startable and removable. The page keeps what a start or a drop was
@@ -45,7 +45,7 @@ function InboxPage() {
 
   return (
     <article className="space-y-6">
-      <p className="text-sm text-muted-foreground">
+      <p className="text-body-medium text-muted-foreground">
         An idea parked as a card until you start a workflow on it: a file each in the store&apos;s {code('inbox/')}, as the box below or the
         command line parks one. Starting a card writes its run&apos;s record as any start does, and removes the card. A card queued starts
         on its own, on the workflow it names, when the daemon — this api, or the command line&apos;s — has a run slot free: the oldest
@@ -53,13 +53,13 @@ function InboxPage() {
       </p>
       <FileCard shown={factory} />
       <section aria-label="Cards" className="space-y-3">
-        <h2 className="flex items-baseline gap-2 text-sm font-semibold">
+        <h2 className="flex items-baseline gap-2 text-title-small">
           Cards{' '}
-          <span data-count className="text-xs font-normal text-muted-foreground">
+          <span data-count className="text-body-small font-normal text-muted-foreground">
             {cards.length}
           </span>
           {queue > 0 && (
-            <span data-queue-count className="text-xs font-normal text-muted-foreground">
+            <span data-queue-count className="text-body-small font-normal text-muted-foreground">
               · {queue} queued
             </span>
           )}
@@ -76,7 +76,7 @@ function InboxPage() {
           </ul>
         )}
         {cards.length === 0 && all.length > 0 && (
-          <p data-filtered-out className="text-sm text-muted-foreground">
+          <p data-filtered-out className="text-body-medium text-muted-foreground">
             No card of the factory <span className="font-mono">{factory}</span>.{' '}
             <Link to="/inbox" search={{}} replace className="underline underline-offset-2">
               Show every factory&apos;s
@@ -85,7 +85,7 @@ function InboxPage() {
           </p>
         )}
         {all.length === 0 && (
-          <p data-empty className="text-sm text-muted-foreground">
+          <p data-empty className="text-body-medium text-muted-foreground">
             The inbox is empty. File an idea in the box above, or from the command line.
           </p>
         )}
@@ -159,7 +159,7 @@ function CardItem({
               </PageLink>
             </p>
           ) : (
-            <p className="font-mono text-sm break-all">
+            <p className="font-mono text-body-medium break-all">
               <PageLink entry={entry} entries={entries}>
                 {entry.file}
               </PageLink>
@@ -169,7 +169,7 @@ function CardItem({
           <CardFrom entry={entry} editable={startable} onRefused={onRefused} />
           <NoQueue entry={entry} />
           {entry.queued && (
-            <p className="flex flex-wrap items-baseline gap-x-2 text-xs text-muted-foreground">
+            <p className="flex flex-wrap items-baseline gap-x-2 text-body-small text-muted-foreground">
               <span
                 data-queued={entry.queued.place ?? ''}
                 className="rounded-full border border-outline-variant bg-surface-container-highest px-2 py-0.5 font-medium text-on-surface-variant"
@@ -209,8 +209,8 @@ function CardItem({
       {entry.queued && entry.tried && <Tried entry={{ ...entry, tried: entry.tried }} />}
       {entry.error !== null && (
         <div className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
-          <p className="text-sm font-medium text-on-failure-container">Does not read as a card, so it cannot start:</p>
-          <p className="font-mono text-xs whitespace-pre-wrap break-words text-on-failure-container">{entry.error}</p>
+          <p className="text-body-medium font-medium text-on-failure-container">Does not read as a card, so it cannot start:</p>
+          <p className="font-mono text-body-small whitespace-pre-wrap break-words text-on-failure-container">{entry.error}</p>
         </div>
       )}
       {starting && startable && (
@@ -228,7 +228,7 @@ function CardItem({
 /** The runs a card still in the inbox was started as, each linked, and why its removal failed where this page was told (`kept`). */
 function StartedAs({ startedAs, kept }: { startedAs: readonly string[]; kept: { why: string } | null }) {
   return (
-    <p data-started-as className="text-sm text-yours">
+    <p data-started-as className="text-body-medium text-yours">
       Started as{' '}
       {startedAs.map((id, i) => (
         <span key={id}>
@@ -240,7 +240,7 @@ function StartedAs({ startedAs, kept }: { startedAs: readonly string[]; kept: { 
       ))}
       , and still here because its removal failed. Remove drops it; to run the idea again, file it again.
       {kept && (
-        <span data-kept className="mt-1 block font-mono text-xs break-all">
+        <span data-kept className="mt-1 block font-mono text-body-small break-all">
           {kept.why}
         </span>
       )}

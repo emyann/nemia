@@ -20,8 +20,8 @@ import { AgentLayers, PolicyLayer } from './StepLayers';
 export type DraftUpdate = (change: (steps: DraftStep[]) => DraftStep[]) => void;
 
 const INPUT =
-  'block w-full rounded border border-outline bg-background px-2 py-1 text-sm placeholder:text-muted-foreground focus:border-on-surface-variant focus:outline-none';
-const MONO_INPUT = `${INPUT} font-mono text-xs`;
+  'block w-full rounded border border-outline bg-background px-2 py-1 text-body-medium placeholder:text-muted-foreground focus:border-on-surface-variant focus:outline-none';
+const MONO_INPUT = `${INPUT} font-mono text-body-small`;
 
 /** The option of a `schema` field that opens the box a schema is pasted into: no schema's file, which ends in .json. */
 const PASTE = '(paste)';
@@ -64,7 +64,7 @@ export function StepForm({
   );
   const note = (
     <>
-      <label htmlFor={body} className="block text-xs font-medium">
+      <label htmlFor={body} className="block text-body-small font-medium">
         {agent === null ? 'What it is told' : 'Its words'}
       </label>
       <textarea
@@ -116,9 +116,9 @@ function StepHead({
   return (
     <>
       <div className="flex items-baseline justify-between gap-2">
-        <h3 className="min-w-0 truncate font-mono text-sm font-semibold" title={name}>
+        <h3 className="min-w-0 truncate font-mono text-body-medium font-semibold" title={name}>
           {name}
-          <span className="font-sans text-xs font-normal text-muted-foreground">.md</span>
+          <span className="font-sans text-body-small font-normal text-muted-foreground">.md</span>
         </h3>
         <button
           type="button"
@@ -126,7 +126,7 @@ function StepHead({
             update((all) => removeStep(all, name));
             onRemoved();
           }}
-          className="shrink-0 rounded border border-outline px-2 py-0.5 text-xs text-muted-foreground hover:border-on-surface-variant hover:text-foreground"
+          className="shrink-0 rounded border border-outline px-2 py-0.5 text-body-small text-muted-foreground hover:border-on-surface-variant hover:text-foreground"
         >
           Remove step
         </button>
@@ -134,8 +134,8 @@ function StepHead({
 
       {refused && (
         <div data-refused-here className="space-y-1 rounded border border-failure bg-failure-container px-2 py-1.5">
-          <p className="text-xs font-medium text-on-failure-container">The last save was refused for {name}:</p>
-          <p className="font-mono text-[11px] whitespace-pre-wrap break-words text-on-failure-container">{refused}</p>
+          <p className="text-body-small font-medium text-on-failure-container">The last save was refused for {name}:</p>
+          <p className="font-mono text-body-small whitespace-pre-wrap break-words text-on-failure-container">{refused}</p>
         </div>
       )}
     </>
@@ -183,7 +183,7 @@ function KeyInput({
       control = others.length ? (
         <div className="flex flex-wrap gap-x-3 gap-y-1">
           {others.map((name) => (
-            <label key={name} className="flex items-center gap-1.5 font-mono text-xs">
+            <label key={name} className="flex items-center gap-1.5 font-mono text-body-small">
               <input
                 type="checkbox"
                 checked={chosen.includes(name)}
@@ -194,11 +194,11 @@ function KeyInput({
           ))}
         </div>
       ) : (
-        <p className="text-xs text-muted-foreground">No other step to name.</p>
+        <p className="text-body-small text-muted-foreground">No other step to name.</p>
       );
       return (
         <fieldset data-field={key} className="space-y-1">
-          <legend className="font-mono text-xs font-medium">{key}</legend>
+          <legend className="font-mono text-body-small font-medium">{key}</legend>
           {control}
           <Meaning>{meaning}</Meaning>
         </fieldset>
@@ -299,7 +299,7 @@ function KeyInput({
     case 'flag':
       control =
         (field.choices ?? []).length === 1 ? (
-          <label className="flex items-center gap-1.5 text-xs">
+          <label className="flex items-center gap-1.5 text-body-small">
             <input
               id={id}
               type="checkbox"
@@ -327,7 +327,7 @@ function KeyInput({
 
   return (
     <div data-field={key} className="space-y-1">
-      <label htmlFor={id} className="block font-mono text-xs font-medium">
+      <label htmlFor={id} className="block font-mono text-body-small font-medium">
         {key}
       </label>
       {control}
@@ -348,7 +348,7 @@ function givenText(key: keyof WorkflowStepSpec, value: WorkflowStepSpec[keyof Wo
 }
 
 function Meaning({ children }: { children: string }) {
-  return <Markdown className="text-[11px] leading-snug text-muted-foreground">{children}</Markdown>;
+  return <Markdown className="text-body-small leading-snug text-muted-foreground">{children}</Markdown>;
 }
 
 const asIs = (value: string) => value;
@@ -478,7 +478,7 @@ function SchemaInput({
       </select>
       {pasted && (
         <div className="space-y-1 rounded border border-dashed border-outline p-2">
-          <label htmlFor={file} className="block text-[11px] text-muted-foreground">
+          <label htmlFor={file} className="block text-body-small text-muted-foreground">
             Written on save as
           </label>
           <input
@@ -487,7 +487,7 @@ function SchemaInput({
             onChange={(event) => update((all) => setSchema(all, step.name, { ...pasted, file: event.target.value }))}
             className={MONO_INPUT}
           />
-          <label htmlFor={text} className="block text-[11px] text-muted-foreground">
+          <label htmlFor={text} className="block text-body-small text-muted-foreground">
             The JSON Schema{schemas.includes(pasted.file) ? `, replacing ${pasted.file}` : ''}
           </label>
           <textarea

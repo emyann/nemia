@@ -20,7 +20,7 @@ export function FromBadge({ from }: { from: AgentListing['from'] }) {
     <span
       data-from={from}
       className={cn(
-        'rounded-full px-2 py-0.5 text-[11px] leading-none font-medium',
+        'rounded-full px-2 py-0.5 text-body-small leading-none font-medium',
         from === 'yours' ? container.grey : 'bg-muted text-muted-foreground',
       )}
     >
@@ -36,7 +36,7 @@ export function NodeLink({ user }: { user: AgentUser }) {
       to="/workflows/$from/$workflow/$step"
       params={{ from: user.from, workflow: user.workflow, step: user.step }}
       data-node={`${user.workflow}/${user.step}`}
-      className={cn('font-mono text-xs text-foreground', LINK)}
+      className={cn('font-mono text-body-small text-foreground', LINK)}
     >
       {user.workflow} <span className="text-muted-foreground">›</span> {user.step}
     </RouteLink>
@@ -46,7 +46,7 @@ export function NodeLink({ user }: { user: AgentUser }) {
 /** The nodes that name an agent, each linked — or that none does. */
 export function UsedBy({ listing, className }: { listing: Pick<AgentListing, 'usedBy'>; className?: string }) {
   return (
-    <p data-used-by className={cn('flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs text-muted-foreground', className)}>
+    <p data-used-by className={cn('flex flex-wrap items-baseline gap-x-2 gap-y-1 text-body-small text-muted-foreground', className)}>
       {listing.usedBy.length ? (
         <>
           <span>Attached to</span>
@@ -81,7 +81,7 @@ export function Skills({
   compact?: boolean;
   className?: string;
 }) {
-  if (!skills?.length) return none ? <p className="text-xs text-muted-foreground">{none}</p> : null;
+  if (!skills?.length) return none ? <p className="text-body-small text-muted-foreground">{none}</p> : null;
   return (
     <ul data-skills className={cn('space-y-1.5', className)}>
       {skills.map((skill) => (compact ? <CompactSkill key={skill.id} skill={skill} /> : <FullSkill key={skill.id} skill={skill} />))}
@@ -92,12 +92,12 @@ export function Skills({
 /** One skill as an agent's page shows it: its name, what it is for, and its tags, on a line. */
 function FullSkill({ skill }: { skill: AgentSkill }) {
   return (
-    <li data-agent-skill={skill.id} className="text-xs leading-snug">
+    <li data-agent-skill={skill.id} className="text-body-small leading-snug">
       <span className="font-medium text-foreground">{skill.name}</span> <span className="text-muted-foreground">{skill.description}</span>
       {skill.tags.length > 0 && (
         <span className="ml-1 inline-flex flex-wrap gap-1 align-middle">
           {skill.tags.map((tag) => (
-            <span key={tag} className="rounded bg-muted px-1 py-px font-mono text-[10px] text-muted-foreground">
+            <span key={tag} className="rounded bg-muted px-1 py-px font-mono text-body-small text-muted-foreground">
               {tag}
             </span>
           ))}
@@ -110,9 +110,9 @@ function FullSkill({ skill }: { skill: AgentSkill }) {
 /** One skill as a character card shows it: its name, and what it is for cut to two lines. */
 function CompactSkill({ skill }: { skill: AgentSkill }) {
   return (
-    <li data-agent-skill={skill.id} className="text-sm leading-snug">
+    <li data-agent-skill={skill.id} className="text-body-medium leading-snug">
       <span className="block font-semibold text-foreground">{skill.name}</span>{' '}
-      <span className="line-clamp-2 text-xs text-muted-foreground">{skill.description}</span>
+      <span className="line-clamp-2 text-body-small text-muted-foreground">{skill.description}</span>
     </li>
   );
 }
@@ -208,10 +208,10 @@ export function AgentRefused({
 }) {
   return (
     <div role="alert" data-agent-refused className="space-y-1.5 rounded border border-failure bg-failure-container px-3 py-2">
-      <p className="text-sm font-medium text-on-failure-container">{verb}:</p>
-      <p className="font-mono text-xs whitespace-pre-wrap break-words text-on-failure-container">{message}</p>
+      <p className="text-body-medium font-medium text-on-failure-container">{verb}:</p>
+      <p className="font-mono text-body-small whitespace-pre-wrap break-words text-on-failure-container">{message}</p>
       {users.length > 0 && (
-        <p className="flex flex-wrap gap-x-2 text-xs text-on-failure-container">
+        <p className="flex flex-wrap gap-x-2 text-body-small text-on-failure-container">
           <span>Open</span>
           {users.map((user) => {
             const [workflow = '', step = ''] = user.split('/');
@@ -227,8 +227,8 @@ export function AgentRefused({
 export function SkillRefused({ message }: { message: string }) {
   return (
     <div role="alert" data-skill-refused className="space-y-1.5 rounded border border-failure bg-failure-container px-3 py-2">
-      <p className="text-sm font-medium text-on-failure-container">Not written:</p>
-      <p className="font-mono text-xs whitespace-pre-wrap break-words text-on-failure-container">{message}</p>
+      <p className="text-body-medium font-medium text-on-failure-container">Not written:</p>
+      <p className="font-mono text-body-small whitespace-pre-wrap break-words text-on-failure-container">{message}</p>
     </div>
   );
 }
@@ -256,7 +256,7 @@ export function SkillSourceBadge({ from }: { from: SkillSource | null }) {
     <span
       data-skill-from={from ?? 'none'}
       className={cn(
-        'shrink-0 rounded-full px-2 py-0.5 text-[11px] leading-none font-medium',
+        'shrink-0 rounded-full px-2 py-0.5 text-body-small leading-none font-medium',
         from === 'yours' && container.grey,
         from === 'repo' && 'bg-muted text-muted-foreground',
         from === 'shipped' && hairline,
@@ -284,7 +284,7 @@ export function GivenSkills({
 }) {
   if (!rows.length)
     return (
-      <p data-given-none className="text-xs text-muted-foreground">
+      <p data-given-none className="text-body-small text-muted-foreground">
         {none}
       </p>
     );
@@ -295,20 +295,20 @@ export function GivenSkills({
           <div className="min-w-0 flex-1 space-y-0.5">
             <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
               {row.from ? (
-                <SkillLink from={row.from} name={row.name} className="text-xs font-medium text-foreground" />
+                <SkillLink from={row.from} name={row.name} className="text-body-small font-medium text-foreground" />
               ) : (
-                <span className="font-mono text-xs font-medium text-foreground">{row.name}</span>
+                <span className="font-mono text-body-small font-medium text-foreground">{row.name}</span>
               )}
               <SkillSourceBadge from={row.from} />
             </p>
-            {row.entry && <p className="text-xs text-muted-foreground">{row.entry.description}</p>}
+            {row.entry && <p className="text-body-small text-muted-foreground">{row.entry.description}</p>}
             {row.error !== null && (
-              <p data-given-error className="font-mono text-[11px] whitespace-pre-wrap break-words text-failure">
+              <p data-given-error className="font-mono text-body-small whitespace-pre-wrap break-words text-failure">
                 {row.error}
               </p>
             )}
             {row.cost && (
-              <p data-skill-cost className="text-[11px] text-muted-foreground">
+              <p data-skill-cost className="text-body-small text-muted-foreground">
                 {costWords(row.cost)}
               </p>
             )}

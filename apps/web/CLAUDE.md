@@ -29,7 +29,8 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
   (`Archivo Variable`, `--font-label`) is the board's own. No face comes from a font service (the e2e's `typefaces` page).
 - Mono text is `font-mono`, which reads the theme's `--font-mono`, the face `typography.mono` names in `DESIGN.md`; `code`, `kbd`,
   `samp` and `pre` follow it. No `--font-mono` in `@theme inline`: it would win over the theme's (the `typefaces` page refuses it).
-  The face has one weight: a weight class on mono text is drawn by the browser.
+  The face has one weight: a weight class on mono text is drawn by the browser, so mono text takes a body role whole (`font-mono
+  text-body-small`), its tracking included, never a label or title role, which carry one (`monoWeighted`, `test/type.test.ts`).
 - The kit's corners (`rounded-shape-*`) follow `DESIGN.md`; shadcn's (`--radius`) are the board's own. shadcn's `secondary` reads a
   neutral surface, not the theme's `secondary`: that green is `alive`, a session at work. The chart colours are not the theme's.
 - A colour says one thing: `yours` (waits on a person), `alive`, `money` (an amount), `rest` (grey, and sage for done) and `failure`.
@@ -38,6 +39,11 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
 - `test/palette.test.ts` refuses a palette colour (`bg-amber-100`, `text-white`, `--color-neutral-400`) in `src` outside the kit: a ground
   or an outline reads a role (`bg-card`, `border-outline`), one class for both schemes, no `dark:` twin. A use that means none of the
   five is rest; a caution is failure for a write refused, yours drawn light for what a person weighs, rest for a note.
+- `test/type.test.ts` refuses a text size written by hand in `src` outside the kit (`text-sm`, `text-[11px]`, `leading-[18px]`, a
+  `fontSize`): 12, 14 and 16px are `text-body-small`, `-medium` and `-large`, small caps a label role and `uppercase`, a heading a
+  title role with no weight beside it. The sizes no role gives are its `OUTSIDE`, each in its file alone, with its reason.
+- Classes merge through `cn` of `src/lib/utils.ts`, built from the kit's `twMergeConfig`: the package's own `cn` reads a role as an
+  ink and drops it beside one (`roleBlind`, same test). A `leading-*` written before a role in one merge is dropped: write it after.
 - A text that stands on `ScanLines` is `unmeasured` by the contrast measure, its ground being an image, and an unmeasured text is
   never refused: a page of the look measures through `contrastHolds` (`test/e2e/runs-contrast.ts`), which flattens the ground first.
 - A table cell's `scrollWidth` does not grow with a `nowrap` text that runs out of it: measure the text's right edge against the

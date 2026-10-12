@@ -21,7 +21,7 @@ export function WorkflowsUnread({ workflows }: { workflows: readonly WorkflowLis
   const unread = unreadWorkflows(workflows);
   if (unread.length === 0) return null;
   return (
-    <div data-workflows-unread className="space-y-1 text-xs text-yours">
+    <div data-workflows-unread className="space-y-1 text-body-small text-yours">
       <p>Not offered until {unread.length === 1 ? 'it reads' : 'they read'}:</p>
       {unread.map((w) => (
         <p key={workflowKey(w)} data-unread={w.name} className="whitespace-pre-wrap break-words">
@@ -35,4 +35,4 @@ export function WorkflowsUnread({ workflows }: { workflows: readonly WorkflowLis
 
 /** A select's field, as the inbox draws its inputs. */
 export const FIELD =
-  'block w-full rounded border border-outline bg-background px-2 py-1.5 text-sm placeholder:text-muted-foreground focus:border-on-surface-variant focus:outline-none';
+  'block w-full rounded border border-outline bg-background px-2 py-1.5 text-body-medium placeholder:text-muted-foreground focus:border-on-surface-variant focus:outline-none';

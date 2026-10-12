@@ -28,9 +28,9 @@ export function Artifacts({
   size?: boolean;
   none?: string;
 }) {
-  if (!artifacts.length) return <p className="text-xs text-muted-foreground">{none}</p>;
+  if (!artifacts.length) return <p className="text-body-small text-muted-foreground">{none}</p>;
   return (
-    <ul className="mt-1 space-y-2 text-xs">
+    <ul className="mt-1 space-y-2 text-body-small">
       {artifacts.map((artifact, i) => (
         <li key={`${i}:${artifact.path}`} className="break-all">
           <ArtifactView artifact={artifact} size={size} />

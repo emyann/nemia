@@ -19,7 +19,7 @@ export function CanvasLegend({ className = '', cards = false }: { className?: st
     <Panel
       position="bottom-left"
       aria-label="Legend"
-      className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground ${className}`}
+      className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-body-small text-muted-foreground ${className}`}
     >
       <Item sample={<Sample state="to-come" />}>to come</Item>
       <Item

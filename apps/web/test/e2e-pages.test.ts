@@ -255,6 +255,21 @@ test('--pages visits only the pages named, in the order of the pages, and --phot
   assert.deepEqual(picturedOf(planOf(['--pages', 'a,c', '--photos'], ABC)), ['a', 'c'], 'in either order of the flags');
 });
 
+test('--contrast measures what --photos pictures, and is refused without it, saying to add --photos', () => {
+  assert.equal(planOf(['--photos', '--contrast'], ABC).measured, true);
+  assert.deepEqual(planOf(['--contrast', '--photos', '--pages', 'b'], ABC).themes, ['light', 'dark']);
+  assert.equal(planOf(['--photos'], ABC).measured, false);
+  assert.equal(planOf([], ABC).measured, false);
+  assert.throws(
+    () => planOf(['--contrast'], ABC),
+    (e: Error) => /^--contrast measures what is pictured.*npm run e2e -- --photos --contrast$/.test(e.message),
+  );
+  assert.throws(
+    () => planOf(['--contrast', '--pages', 'b'], ABC),
+    (e: Error) => e.message.includes('--photos'),
+  );
+});
+
 test('only a run of every page in the dark theme is whole, the run a check makes and holds to its bound', () => {
   assert.equal(planOf([], ABC).whole, true);
   assert.equal(planOf(['--workers', '2'], ABC).whole, true, 'however many workers');
@@ -298,10 +313,10 @@ test('REFUSED: --pages with no page after it', () => {
 test('REFUSED: a flag the e2e does not know', () => {
   assert.throws(
     () => planOf(['--colour'], ABC),
-    (e: Error) => /^the e2e takes --photos, --pages <name,…> and --workers <n>, not --colour\b/.test(e.message),
+    (e: Error) => /^the e2e takes --photos, --contrast, --pages <name,…> and --workers <n>, not --colour\b/.test(e.message),
   );
   assert.throws(
     () => planOf(['b'], ABC),
-    (e: Error) => /^the e2e takes --photos, --pages <name,…> and --workers <n>, not b\b/.test(e.message),
+    (e: Error) => /^the e2e takes --photos, --contrast, --pages <name,…> and --workers <n>, not b\b/.test(e.message),
   );
 });

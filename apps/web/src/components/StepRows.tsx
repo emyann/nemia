@@ -41,10 +41,10 @@ function StepRow({ step, workflow, place, hiring }: { step: ListedStep; workflow
         >
           {step.name}
         </RouteLink>
-        <span className="text-xs text-neutral-500">
+        <span className="text-xs text-muted-foreground">
           {agent ? (
             <>
-              Its agent: <AgentLink from={workflow.from} name={agent} className="text-neutral-700 dark:text-neutral-300" />
+              Its agent: <AgentLink from={workflow.from} name={agent} className="text-foreground" />
             </>
           ) : (
             'No agent: its own words are all it is told'
@@ -56,7 +56,9 @@ function StepRow({ step, workflow, place, hiring }: { step: ListedStep; workflow
           {words}
         </Markdown>
       ) : (
-        <p className="text-xs text-neutral-500 italic">No words of its own{agent ? `: ${agent}'s instructions are all it is told` : ''}</p>
+        <p className="text-xs text-muted-foreground italic">
+          No words of its own{agent ? `: ${agent}'s instructions are all it is told` : ''}
+        </p>
       )}
       {step.layers ? (
         <>

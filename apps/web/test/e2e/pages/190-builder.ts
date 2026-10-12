@@ -195,7 +195,7 @@ export default {
       const buildKeys = builder.locator('[data-step-form="build"]');
       await drawEdge(refused, builder, 'build', 'plan', true);
       if ((await buildKeys.locator('[data-field="loop"] select').inputValue()) !== 'plan')
-        throw new Refused("the loop drawn from build's violet dot sets build's loop: plan in its form");
+        throw new Refused("the loop drawn from build's loop dot sets build's loop: plan in its form");
       if ((await buildKeys.locator('[data-field="rounds"] input').inputValue()) !== '3') throw new Refused('and its rounds, the default 3');
       await builder.getByRole('button', { name: "Remove build's loop back to plan" }).click();
       await expectCount(builder.locator('.react-flow__edge'), 1, "the loop's button takes it away");

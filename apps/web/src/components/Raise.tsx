@@ -120,7 +120,7 @@ function RaiseHead({ offer, asks }: { offer: Extract<Answer, { kind: 'raise' }>;
             signed off blocked, and said nothing of what it needs
           </p>
         ))}
-      <p className="text-xs break-words text-neutral-600 dark:text-neutral-400">
+      <p className="text-xs break-words text-muted-foreground">
         The run spends nothing more on it until its cap is raised above <span className="font-mono">{offer.said}</span>
         {offer.by === 'round' ? ", with its loop's next round" : ''}: the button below raises it.
         {offer.modes.includes('recheck') && ' Its check again costs nothing, and needs no raise.'}
@@ -183,7 +183,7 @@ function RaiseModes({
       {modes.map((m) => (
         <label key={m} className="flex cursor-pointer items-center gap-1.5">
           <input type="radio" name={name} value={m} checked={mode === m} onChange={() => onMode(m)} />
-          {MODES[m]} <code className="text-neutral-500">--{m}</code>
+          {MODES[m]} <code className="text-muted-foreground">--{m}</code>
         </label>
       ))}
     </fieldset>
@@ -195,7 +195,7 @@ function RaiseAsked({ step, said }: { step: string; said: string }) {
   return (
     <li data-offer="asked" data-step={step} className="rounded border border-neutral-200 px-3 py-2 text-sm dark:border-neutral-800">
       <strong>{step}</strong>{' '}
-      <span data-note className="font-mono text-xs text-neutral-600 dark:text-neutral-400">
+      <span data-note className="font-mono text-xs text-muted-foreground">
         {said}
       </span>
     </li>

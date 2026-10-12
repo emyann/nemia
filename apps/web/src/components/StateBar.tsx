@@ -37,7 +37,7 @@ export function StateBar({ machine, state }: { machine: string; state: string })
             Could not read the machine {machine}: {graph.error.message}
           </p>
         ) : (
-          <p className="text-xs text-neutral-500">Reading the machine…</p>
+          <p className="text-xs text-muted-foreground">Reading the machine…</p>
         )}
       </div>
     </FloatingBar>
@@ -53,7 +53,7 @@ export function StateBody({ graph, state }: { graph: MachineGraph; state: string
   const facts = stateFacts(graph, state);
   if (!facts)
     return (
-      <p className="text-sm text-amber-700 dark:text-amber-400">
+      <p className="text-sm text-yours">
         {graph.title} has no state named {state}.
       </p>
     );

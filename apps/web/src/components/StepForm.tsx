@@ -20,7 +20,7 @@ import { AgentLayers, PolicyLayer } from './StepLayers';
 export type DraftUpdate = (change: (steps: DraftStep[]) => DraftStep[]) => void;
 
 const INPUT =
-  'block w-full rounded border border-neutral-300 bg-white px-2 py-1 text-sm placeholder:text-neutral-400 focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:placeholder:text-neutral-500 dark:focus:border-neutral-400';
+  'block w-full rounded border border-neutral-300 bg-white px-2 py-1 text-sm placeholder:text-muted-foreground focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:focus:border-neutral-400';
 const MONO_INPUT = `${INPUT} font-mono text-xs`;
 
 /** The option of a `schema` field that opens the box a schema is pasted into: no schema's file, which ends in .json. */
@@ -118,7 +118,7 @@ function StepHead({
       <div className="flex items-baseline justify-between gap-2">
         <h3 className="min-w-0 truncate font-mono text-sm font-semibold" title={name}>
           {name}
-          <span className="font-sans text-xs font-normal text-neutral-500">.md</span>
+          <span className="font-sans text-xs font-normal text-muted-foreground">.md</span>
         </h3>
         <button
           type="button"
@@ -126,7 +126,7 @@ function StepHead({
             update((all) => removeStep(all, name));
             onRemoved();
           }}
-          className="shrink-0 rounded border border-neutral-300 px-2 py-0.5 text-xs text-neutral-600 hover:border-red-400 hover:text-red-700 dark:border-neutral-700 dark:text-neutral-400 dark:hover:border-red-500 dark:hover:text-red-400"
+          className="shrink-0 rounded border border-neutral-300 px-2 py-0.5 text-xs text-muted-foreground hover:border-red-400 hover:text-red-700 dark:border-neutral-700 dark:hover:border-red-500 dark:hover:text-red-400"
         >
           Remove step
         </button>
@@ -197,7 +197,7 @@ function KeyInput({
           ))}
         </div>
       ) : (
-        <p className="text-xs text-neutral-500">No other step to name.</p>
+        <p className="text-xs text-muted-foreground">No other step to name.</p>
       );
       return (
         <fieldset data-field={key} className="space-y-1">
@@ -351,7 +351,7 @@ function givenText(key: keyof WorkflowStepSpec, value: WorkflowStepSpec[keyof Wo
 }
 
 function Meaning({ children }: { children: string }) {
-  return <Markdown className="text-[11px] leading-snug text-neutral-500 dark:text-neutral-400">{children}</Markdown>;
+  return <Markdown className="text-[11px] leading-snug text-muted-foreground">{children}</Markdown>;
 }
 
 const asIs = (value: string) => value;
@@ -481,7 +481,7 @@ function SchemaInput({
       </select>
       {pasted && (
         <div className="space-y-1 rounded border border-dashed border-neutral-300 p-2 dark:border-neutral-700">
-          <label htmlFor={file} className="block text-[11px] text-neutral-500">
+          <label htmlFor={file} className="block text-[11px] text-muted-foreground">
             Written on save as
           </label>
           <input
@@ -490,7 +490,7 @@ function SchemaInput({
             onChange={(event) => update((all) => setSchema(all, step.name, { ...pasted, file: event.target.value }))}
             className={MONO_INPUT}
           />
-          <label htmlFor={text} className="block text-[11px] text-neutral-500">
+          <label htmlFor={text} className="block text-[11px] text-muted-foreground">
             The JSON Schema{schemas.includes(pasted.file) ? `, replacing ${pasted.file}` : ''}
           </label>
           <textarea

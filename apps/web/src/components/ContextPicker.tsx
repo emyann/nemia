@@ -31,16 +31,16 @@ export function ContextPicker({
       <legend id={legend} className="text-sm font-medium">
         {label}
       </legend>
-      <p className="text-xs text-neutral-500">
+      <p className="text-xs text-muted-foreground">
         Reads what it concluded: it does not wait. A run still in flight hands what it has when the steps are filed, not shipped, not
         judged.
       </p>
       {runs.error ? (
         <p className="text-xs text-red-700 dark:text-red-400">Could not list the runs to read: {runs.error.message}</p>
       ) : !listed ? (
-        <p className="text-xs text-neutral-500">Reading the runs…</p>
+        <p className="text-xs text-muted-foreground">Reading the runs…</p>
       ) : !listed.length ? (
-        <p className="text-xs text-neutral-500">No run to read.</p>
+        <p className="text-xs text-muted-foreground">No run to read.</p>
       ) : (
         <ul
           aria-label="Runs to read"
@@ -60,8 +60,8 @@ export function ContextPicker({
                 <span data-run-title className="min-w-0 flex-1 break-words [overflow-wrap:anywhere]" title={titleOf(run)}>
                   {titleOf(run)}
                 </span>
-                <span className="hidden shrink-0 font-mono text-[11px] text-neutral-500 sm:inline">{run.id}</span>
-                <span data-standing className="shrink-0 text-[11px] text-neutral-500" title={run.waiting?.advice}>
+                <span className="hidden shrink-0 font-mono text-[11px] text-muted-foreground sm:inline">{run.id}</span>
+                <span data-standing className="shrink-0 text-[11px] text-muted-foreground" title={run.waiting?.advice}>
                   {standingOf(run)}
                 </span>
               </label>
@@ -84,7 +84,7 @@ export function ConcludedPreview({ run }: { run: string }) {
   const concluded = useQuery(concludedQuery(run));
   return (
     <section data-concluded={run} className="space-y-1 rounded border border-neutral-200 p-2 dark:border-neutral-800">
-      <h4 className="flex flex-wrap items-center gap-2 text-xs text-neutral-500">
+      <h4 className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
         <span>
           What <span className="font-mono">{run}</span> hands
         </span>
@@ -97,7 +97,7 @@ export function ConcludedPreview({ run }: { run: string }) {
       {concluded.error ? (
         <p className="text-xs text-red-700 dark:text-red-400">Could not read what it concluded: {concluded.error.message}</p>
       ) : !concluded.data ? (
-        <p className="text-xs text-neutral-500">Reading what it concluded…</p>
+        <p className="text-xs text-muted-foreground">Reading what it concluded…</p>
       ) : (
         <Markdown level={5} className="max-h-60 overflow-y-auto rounded bg-muted/60 p-2 text-xs">
           {concluded.data.section}

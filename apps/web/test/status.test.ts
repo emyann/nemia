@@ -1,6 +1,21 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { isGate, satisfiesAfter, stateClass, stateMeaning, stepState, type StepState } from '../src/lib/status.ts';
+import fs from 'node:fs';
+import path from 'node:path';
+import {
+  brokenMeanings,
+  classOf,
+  isGate,
+  satisfiesAfter,
+  stateClass,
+  stateDrawn,
+  stateMeaning,
+  statePaint,
+  stepState,
+  type Drawn,
+  type StepState,
+} from '../src/lib/status.ts';
+import { meaningOf } from '../src/lib/meaning.ts';
 import { isLive, movingInto } from '../src/lib/canvas.ts';
 
 test("each word wf ls prints reads as the state a person acts on: waiting, rounds exhausted, the run's verdicts, and the engine's own word for the step's task with how it signed off beside it", () => {
@@ -95,7 +110,7 @@ test('a step yet to start on a cancelled run reads cancelled, not waiting', () =
   );
 });
 
-test('a loop out of rounds waits on a person, in amber like a step that signed off blocked, and says so on hover', () => {
+test('a loop out of rounds waits on a person, in the yellow of the look like a step that signed off blocked, and says so on hover', () => {
   assert.equal(stepState('rounds exhausted', false, false), 'exhausted');
   assert.notEqual(
     stepState('rounds exhausted', false, false),
@@ -103,7 +118,7 @@ test('a loop out of rounds waits on a person, in amber like a step that signed o
     'its own state, not `blocked`: nothing was left unfinished, the loop asked for more than its workflow allows',
   );
   assert.equal(stateClass.exhausted, stateClass.blocked);
-  assert.match(stateClass.exhausted, /\bbg-amber-100\b/);
+  assert.match(stateClass.exhausted, /\bbg-yours\b/);
   assert.equal(
     stateMeaning.exhausted,
     'rounds exhausted: the reviewer asked for another round on the last one rounds: allows; a person decides — another round, or accepting what is there to go on with it',
@@ -134,7 +149,7 @@ test('a word the board does not know reads as working, on purpose: never as done
   }
 });
 
-test('a step past its budget waits on a person in amber, as a loop out of rounds does, and says on hover what raises its cap', () => {
+test('a step past its budget waits on a person in the yellow of the look, as a loop out of rounds does, and says on hover what raises its cap', () => {
   for (const state of ['over-budget', 'budget-exhausted'] as const) {
     assert.equal(stateClass[state], stateClass.exhausted, state);
     assert.equal(satisfiesAfter(state), false, `${state} is not work done`);
@@ -184,7 +199,7 @@ test('a human gate is a step a person decides: signed off blocked, a loop out of
     );
 });
 
-test('a step waiting at its gate waits on a person in amber, as a step signed off blocked does — a human gate, not work done — and says on hover how to approve it or send it back', () => {
+test('a step waiting at its gate waits on a person in the yellow of the look, as a step signed off blocked does — a human gate, not work done — and says on hover how to approve it or send it back', () => {
   assert.equal(stepState('awaiting approval', false, false), 'awaiting-approval');
   assert.equal(
     stepState('awaiting approval', true, false),
@@ -288,4 +303,77 @@ test('on a run a person holds (`wf hold`), a step not filed and a step at a huma
   assert.match(stateMeaning.held, /^held: a person holds the run until other runs ship/);
   assert.notEqual(stateClass.held, stateClass.waiting, 'a person stops it, not the order of the steps');
   assert.notEqual(stateClass.held, stateClass.blocked, 'it asks nobody, as a gate does');
+});
+
+const web = path.resolve(import.meta.dirname, '..');
+const given = (state: StepState, drawn: Drawn): Record<StepState, Drawn> => ({ ...stateDrawn, [state]: drawn });
+
+test('a colour says one thing: a state that waits on a person is yours, a failure is failure and nothing else is, and no state is money', () => {
+  assert.equal(brokenMeanings(stateDrawn).length, 0, brokenMeanings(stateDrawn).join('; '));
+  const states = Object.keys(stateDrawn) as StepState[];
+  for (const state of states.filter((s) => isGate(s, false))) assert.equal(meaningOf(stateDrawn[state].hue), 'yours', state);
+  assert.deepEqual(
+    states.filter((s) => meaningOf(stateDrawn[s].hue) === 'failure'),
+    ['failed', 'failed-check', 'unreadable'],
+  );
+  assert.equal(meaningOf(stateDrawn.working.hue), 'alive');
+  for (const state of states) assert.equal(stateClass[state], classOf(stateDrawn[state]), `${state}'s chip is drawn from the table`);
+
+  assert.deepEqual(brokenMeanings(given('blocked', { hue: 'money', form: 'filled' })), [
+    'blocked is money: amber is an amount, never a state',
+  ]);
+  assert.deepEqual(brokenMeanings(given('awaiting-approval', { hue: 'alive', form: 'filled' })), [
+    'awaiting-approval waits on a person and is alive, not yours',
+  ]);
+  assert.deepEqual(brokenMeanings(given('waiting', { hue: 'failure', form: 'container' })), ['waiting is no failure and is drawn as one']);
+  assert.deepEqual(brokenMeanings(given('failed', { hue: 'grey', form: 'container' })), ['failed is a failure and is rest']);
+  assert.deepEqual(brokenMeanings(given('verified', { hue: 'yours', form: 'filled' })), ['verified waits on nobody and is yours']);
+});
+
+const ROLE_OF = { yours: 'primary', alive: 'secondary', money: 'tertiary', failure: 'error' } as const;
+const readsRole = (css: string, meaning: keyof typeof ROLE_OF): boolean =>
+  new RegExp(`--meaning-${meaning}:\\s*var\\(\\s*--md-sys-color-${ROLE_OF[meaning]}\\s*\\)\\s*;`).test(css);
+
+test("the meanings are the look's: each reads its role of the theme once, and the look writes yellow, amber and terracotta", () => {
+  const css = fs.readFileSync(path.join(web, 'src', 'styles.css'), 'utf8');
+  for (const meaning of Object.keys(ROLE_OF) as Array<keyof typeof ROLE_OF>) {
+    assert.equal(readsRole(css, meaning), true, `--meaning-${meaning} reads --md-sys-color-${ROLE_OF[meaning]}`);
+    assert.equal(css.split(`--meaning-${meaning}:`).length, 2, `--meaning-${meaning} has one writer`);
+  }
+  const swapped = '--meaning-yours: var(--md-sys-color-tertiary);\n--meaning-money:\n  var(--md-sys-color-tertiary);';
+  assert.equal(readsRole(swapped, 'yours'), false, 'a wait read from the amber role is refused');
+  assert.equal(readsRole(swapped, 'money'), true, 'across a line break too');
+
+  const look = fs.readFileSync(path.join(web, 'DESIGN.md'), 'utf8');
+  const front = look.slice(0, look.indexOf('\n---', 4));
+  for (const written of ['primary: "#f5e61a"', 'tertiary: "#e0a15e"', 'error: "#e8695b"', 'secondary: "#39ff5a"'])
+    assert.ok(front.includes(`\n  ${written}\n`), written);
+});
+
+const HUE = /\b(?:sky|blue|orange|amber|yellow|emerald|green|red|violet)-\d{2,3}\b/;
+const STATE_DRAWERS = [
+  'StepNode.tsx',
+  'StepRail.tsx',
+  'RunNode.tsx',
+  'CanvasLegend.tsx',
+  'MachineNode.tsx',
+  'MachineEdge.tsx',
+  'FactoryCanvas.tsx',
+  'QueueLane.tsx',
+];
+
+test('no hand-picked hue says a state: the chips, the minimap and the canvases draw the meanings alone', () => {
+  assert.match('border-2 border-amber-500', HUE, 'the pattern names a hand-picked hue');
+  assert.match('var(--color-sky-500)', HUE);
+  assert.doesNotMatch('border-2 border-yours bg-alive-container', HUE);
+  for (const state of Object.keys(stateDrawn) as StepState[]) {
+    assert.doesNotMatch(stateClass[state], HUE, state);
+    assert.match(statePaint[state], /^var\(--meaning-(?:yours|alive|failure|rest|sage)\)$/, state);
+  }
+  for (const file of STATE_DRAWERS) {
+    const lines = fs.readFileSync(path.join(web, 'src', 'components', file), 'utf8').split('\n');
+    assert.ok(lines.length > 10, file);
+    const found = lines.flatMap((line, at) => (HUE.test(line) ? [`${file}:${at + 1}`] : []));
+    assert.equal(found.length, 0, found.join(', '));
+  }
 });

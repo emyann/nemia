@@ -19,14 +19,14 @@ export function CanvasLegend({ className = '', cards = false }: { className?: st
     <Panel
       position="bottom-left"
       aria-label="Legend"
-      className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-neutral-500 dark:text-neutral-400 ${className}`}
+      className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground ${className}`}
     >
       <Item sample={<Sample state="to-come" />}>to come</Item>
       <Item
         sample={
           <>
             <Sample state="running" />
-            <span className="size-2.5 animate-spin rounded-full border-2 border-sky-500 border-t-transparent" />
+            <span className="size-2.5 animate-spin rounded-full border-2 border-alive border-t-transparent" />
           </>
         }
       >
@@ -44,8 +44,8 @@ export function CanvasLegend({ className = '', cards = false }: { className?: st
           reads what it concluded
         </Item>
       )}
-      <Item sample={<span className="size-2.5 rounded-sm border-2 border-amber-500" />}>human gate</Item>
-      {cards && <Item sample={<span className="size-2.5 rounded-sm ring-1 ring-emerald-500" />}>to decide</Item>}
+      <Item sample={<span className="size-2.5 rounded-sm border-2 border-yours" />}>human gate</Item>
+      {cards && <Item sample={<span className="size-2.5 rounded-sm ring-1 ring-yours" />}>to decide</Item>}
     </Panel>
   );
 }

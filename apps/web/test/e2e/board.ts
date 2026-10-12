@@ -4,7 +4,8 @@ import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from './checks.ts';
 import { DIAMOND } from './seed.ts';
-import { API, photographing, store } from './world.ts';
+import { measure } from './contrast.ts';
+import { API, measuring, photographing, store } from './world.ts';
 
 /** The sidebar's sections under All factories, in their order: the Inbox first. */
 export const SECTIONS = ['Inbox', 'Runs', 'Workflows'] as const;
@@ -136,7 +137,8 @@ export const themeOf = (page: Page): Promise<string> =>
  * sidebar are drawn once, where a person sees them, never where the window was; the window and the scroll are put back after the shot,
  * whether it was taken or refused. A page that fits its window, and a locator, are taken as Playwright takes them.
  * Takes none, and writes nothing, unless the page being visited is pictured (`photographing`) or the picture is taken `always`: a
- * failure's.
+ * failure's. While the run measures (`measuring`), writes the text pairs of what it pictured beside the picture, as
+ * `<file>.contrast.json`; never for a failure's.
  */
 export async function photograph(
   target: Page | Locator,
@@ -147,6 +149,7 @@ export async function photograph(
   const putBack = options.fullPage && 'viewportSize' in target ? await grownToPage(target, file) : undefined;
   try {
     await target.screenshot({ ...options, path: file, animations: 'disabled' });
+    if (measuring && !always) fs.writeFileSync(`${file}.contrast.json`, `${JSON.stringify(await measure(target))}\n`);
   } finally {
     await putBack?.();
   }

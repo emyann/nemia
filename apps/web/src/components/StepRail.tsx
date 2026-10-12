@@ -14,7 +14,7 @@ type SummaryStep = RunSummary['steps'][number];
 
 /**
  * The arrows of a flow, in one SVG under its boxes: each as the canvases draw an edge — dashed and still to come, solid done, in the
- * running colour with a dot travelling it while work moves along it (`Travelling`, still where a person asked for reduced motion), violet
+ * running colour with a dot travelling it while work moves along it (`Travelling`, still where a person asked for reduced motion), its own
  * looping back. With `rounds`, a loop past its first round says the round it is on under its curve, as the run's page labels the edge: the
  * open card's tiles have the room, and the rail at rest leaves it to the pill's hover. The round is drawn after the dot, ringed in the
  * card's colour over the curve, so the dot passes under it and not over its words.
@@ -88,7 +88,7 @@ export function StepRail({ run, flow }: { run: RunSummary; flow: Flow }) {
                 pill.state
                   ? stateClass[pill.state]
                   : 'border border-dashed border-neutral-400 bg-background text-muted-foreground dark:border-neutral-600',
-                pill.live ? 'ring-2 ring-sky-500/60 ring-offset-1 ring-offset-background dark:ring-sky-400/60' : '',
+                pill.live ? 'ring-2 ring-alive/60 ring-offset-1 ring-offset-background' : '',
               ].join(' ')}
             >
               <span className="truncate">{pill.label}</span>
@@ -97,7 +97,7 @@ export function StepRail({ run, flow }: { run: RunSummary; flow: Flow }) {
         </ul>
       </div>
       {flow.error && (
-        <p title={flow.error} className="mt-1 line-clamp-2 text-[11px] text-red-600 dark:text-red-400">
+        <p title={flow.error} className="mt-1 line-clamp-2 text-[11px] text-failure">
           {flow.error}
         </p>
       )}
@@ -165,11 +165,7 @@ export function StepTiles({
               style={at(pill)}
               className={[
                 'nodrag absolute flex cursor-pointer flex-col items-stretch gap-1 overflow-hidden rounded-md bg-card px-2 py-1.5 text-left shadow-xs outline-none',
-                gated
-                  ? 'border-2 border-amber-500 dark:border-amber-400'
-                  : state === 'working'
-                    ? 'border border-sky-500 ring-2 ring-sky-500/25 dark:border-sky-400 dark:ring-sky-400/20'
-                    : 'border',
+                gated ? 'border-2 border-yours' : state === 'working' ? 'border border-alive ring-2 ring-alive/25' : 'border',
                 selected === name
                   ? 'outline-2 outline-offset-2 outline-foreground'
                   : 'data-[focus-visible]:outline-2 data-[focus-visible]:outline-offset-2 data-[focus-visible]:outline-ring',
@@ -186,18 +182,14 @@ export function StepTiles({
                 {cost && read && (
                   <span
                     data-cost={pastBudget(read) ? 'over' : 'within'}
-                    className={`truncate ${pastBudget(read) ? 'font-semibold text-red-700 dark:text-red-400' : ''}`}
+                    className={`truncate ${pastBudget(read) ? 'font-semibold text-money' : ''}`}
                   >
                     · {cost}
                   </span>
                 )}
               </span>
               {need && (
-                <span
-                  data-need={need.kind}
-                  title={needText(need)}
-                  className={`truncate text-[11px] ${need.kind === 'harness' ? 'text-orange-800 dark:text-orange-300' : 'text-amber-800 dark:text-amber-300'}`}
-                >
+                <span data-need={need.kind} title={needText(need)} className="truncate text-[11px] text-yours">
                   {tileNeed(need, gate)}
                 </span>
               )}
@@ -205,7 +197,7 @@ export function StepTiles({
           );
         })}
       </div>
-      {flow.error && <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{flow.error}</p>}
+      {flow.error && <p className="mt-1 text-[11px] text-failure">{flow.error}</p>}
     </section>
   );
 }

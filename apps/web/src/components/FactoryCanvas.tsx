@@ -53,6 +53,7 @@ import {
   type Span,
 } from '@/lib/factory';
 import { flowSteps, tilesOf } from '@/lib/flow';
+import { paint } from '@/lib/meaning';
 import { anyInView, boxesOf, revealView, sized, sizeOf, type Box, type Size, type Transform } from '@/lib/frame';
 import { queuedIn, type FactoryPlace } from '@/lib/factories';
 import { capLine, queueOf } from '@/lib/inbox';
@@ -132,17 +133,12 @@ const revealIn = (frame: HTMLElement, box: Box, transform: Transform) =>
 const HANDFUL = 5;
 
 /**
- * A card's colour on the minimap, in the cards' terms: to decide, else waiting on you, else finished, else still going. A run whose
+ * A card's colour on the minimap, in the look's meanings: yours when to decide or waiting on you, else sage once finished, else
+ * alive. A run whose
  * result nobody has decided, and one stopped at a step that needs a person, are both over, and both still want finding.
  */
 const minimapFill = (node: RunFlowNode) =>
-  toDecideOf(node.data.run)
-    ? 'var(--color-emerald-500)'
-    : waitsOnYou(node.data.run)
-      ? 'var(--color-amber-500)'
-      : node.data.finished
-        ? 'var(--color-neutral-400)'
-        : 'var(--color-sky-500)';
+  toDecideOf(node.data.run) ? paint.yours : waitsOnYou(node.data.run) ? paint.yours : node.data.finished ? paint.sage : paint.alive;
 
 /**
  * Every run in flight of `factory`, given as `runs`, a card each, on a floor a person can arrange, each with its steps as a small
@@ -200,7 +196,7 @@ function FloorCounts({ runs, flying }: { runs: readonly RunSummary[]; flying: nu
     <p className="text-sm text-muted-foreground">
       <span className="font-medium text-foreground">{flying}</span> in flight
       {finished > 0 && ` · ${finished} finished`}
-      {toDecide > 0 && <span className="text-emerald-700 dark:text-emerald-400"> · {toDecide} to decide</span>}
+      {toDecide > 0 && <span className="text-yours"> · {toDecide} to decide</span>}
       {waiting > 0 && ` · ${waiting} waiting on you`}
     </p>
   );
@@ -556,7 +552,7 @@ function CapLine({ queued, queueError }: { queued: number; queueError: Error | n
   const now = new Date(useNow(60_000));
   if (error || queueError) {
     return (
-      <p data-cap-error className="max-w-md truncate text-xs text-red-600 dark:text-red-400" title={(error ?? queueError)!.message}>
+      <p data-cap-error className="max-w-md truncate text-xs text-failure" title={(error ?? queueError)!.message}>
         {error ? 'The cap on runs in flight' : 'The queue'} could not be read: {(error ?? queueError)!.message}
       </p>
     );

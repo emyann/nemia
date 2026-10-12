@@ -233,6 +233,12 @@ export async function settled(page: Page, timeout = 3_000): Promise<void> {
 }
 
 /**
+ * Resolves once every face the page has asked for is loaded: a face that swaps in after a width was measured moves what was measured.
+ * The faces are the board's own files, so the wait ends with their requests.
+ */
+export const facesLoaded = (page: Page): Promise<void> => page.evaluate(async () => void (await document.fonts.ready));
+
+/**
  * The page is in the theme asked for: the browser prefers it, and the page's ground is dark in the dark
  * and light in the light. Without the second half, both screenshots of a page could be the same picture. The ground's colour is read
  * back as sRGB off a pixel painted with it, whatever its space (Tailwind's are oklch); a ground nobody painted is the browser's white.

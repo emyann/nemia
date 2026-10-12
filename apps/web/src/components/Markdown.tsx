@@ -13,8 +13,8 @@ const HEADING = {
   h2: 'text-[1.08em]',
   h3: 'text-[1em]',
   h4: 'text-[1em]',
-  h5: 'text-[0.95em] text-neutral-600 dark:text-neutral-400',
-  h6: 'text-[0.95em] text-neutral-600 dark:text-neutral-400',
+  h5: 'text-[0.95em] text-muted-foreground',
+  h6: 'text-[0.95em] text-muted-foreground',
 } as const;
 
 const TAGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] as const;
@@ -31,8 +31,7 @@ const heading = (written: (typeof TAGS)[number], Tag: (typeof TAGS)[number]) =>
 const headingsAt = (level: Level): Components =>
   Object.fromEntries(TAGS.map((written, i) => [written, heading(written, TAGS[Math.min(level - 1 + i, TAGS.length - 1)])]));
 
-const LINK =
-  'font-medium text-neutral-900 underline underline-offset-2 break-words hover:text-neutral-600 dark:text-neutral-100 dark:hover:text-neutral-300';
+const LINK = 'font-medium text-foreground underline underline-offset-2 break-words hover:text-neutral-600 dark:hover:text-neutral-300';
 
 /**
  * How each element of a text is drawn: the board's type in both themes, and three rules.
@@ -97,7 +96,7 @@ const COMPONENTS: Components = {
   input: ({ node: _node, className, ...props }) => <input {...props} disabled className={cn('mr-1.5 align-[-1px]', className)} />,
   blockquote: ({ node: _node, className, ...props }) => (
     <blockquote
-      className={cn('my-2 border-l-2 border-neutral-300 pl-3 text-neutral-600 dark:border-neutral-700 dark:text-neutral-400', className)}
+      className={cn('my-2 border-l-2 border-neutral-300 pl-3 text-muted-foreground dark:border-neutral-700', className)}
       {...props}
     />
   ),

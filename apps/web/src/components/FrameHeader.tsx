@@ -62,7 +62,7 @@ function BellButton() {
         <span
           aria-hidden
           data-bell-count
-          className="absolute top-0.5 right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] leading-none font-semibold text-amber-950 tabular-nums"
+          className="absolute top-0.5 right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-yours px-1 text-[10px] leading-none font-semibold text-on-yours tabular-nums"
         >
           {shown}
         </span>

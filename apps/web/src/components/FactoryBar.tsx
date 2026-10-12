@@ -48,8 +48,8 @@ export function FactoryBar({ factory: name }: { factory: string }) {
  */
 function Unread({ name, error, read }: { name: string; error: Error | null; read: boolean }) {
   if (error) return <p className="text-sm text-red-700 dark:text-red-400">Could not read the factories and their runs: {error.message}</p>;
-  if (read) return <p className="text-sm text-amber-700 dark:text-amber-400">No factory is named {name}.</p>;
-  return <p className="text-xs text-neutral-500">Reading the factories…</p>;
+  if (read) return <p className="text-sm text-yours">No factory is named {name}.</p>;
+  return <p className="text-xs text-muted-foreground">Reading the factories…</p>;
 }
 
 /**

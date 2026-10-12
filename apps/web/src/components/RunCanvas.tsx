@@ -112,7 +112,7 @@ function useRefit(frame: RefObject<HTMLDivElement | null>, { open, resets }: { o
 }
 
 const button =
-  'rounded border border-neutral-300 bg-white px-2 py-1 text-xs text-neutral-700 shadow-sm hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:disabled:hover:bg-neutral-900';
+  'rounded border border-neutral-300 bg-white px-2 py-1 text-xs text-foreground shadow-sm hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white dark:border-neutral-700 dark:bg-neutral-900 dark:hover:bg-neutral-800 dark:disabled:hover:bg-neutral-900';
 
 /**
  * The run as the graph it froze: a node per step, an edge per `after`, and the edge back that `loop:` makes — as the api's
@@ -300,7 +300,7 @@ function Canvas({ run, computed }: Props & { computed: ReadonlyMap<string, Point
         fitViewOptions={FIT}
         minZoom={LEAST_ZOOM}
       >
-        <Panel position="top-left" className="text-[11px] text-neutral-500">
+        <Panel position="top-left" className="text-[11px] text-muted-foreground">
           Drag to arrange · kept in this browser
         </Panel>
         <Buttons frame={frame} running={running} onReset={resetLayout} />

@@ -22,7 +22,7 @@ export function FromBadge({ from }: { from: AgentListing['from'] }) {
         'rounded-full px-2 py-0.5 text-[11px] leading-none font-medium',
         from === 'yours'
           ? 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300'
-          : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300',
+          : 'bg-neutral-100 text-muted-foreground dark:bg-neutral-800',
       )}
     >
       {from === 'yours' ? 'yours' : 'this repository'}
@@ -37,9 +37,9 @@ export function NodeLink({ user }: { user: AgentUser }) {
       to="/workflows/$from/$workflow/$step"
       params={{ from: user.from, workflow: user.workflow, step: user.step }}
       data-node={`${user.workflow}/${user.step}`}
-      className={cn('font-mono text-xs text-neutral-700 dark:text-neutral-300', LINK)}
+      className={cn('font-mono text-xs text-foreground', LINK)}
     >
-      {user.workflow} <span className="text-neutral-400">›</span> {user.step}
+      {user.workflow} <span className="text-muted-foreground">›</span> {user.step}
     </RouteLink>
   );
 }
@@ -47,7 +47,7 @@ export function NodeLink({ user }: { user: AgentUser }) {
 /** The nodes that name an agent, each linked — or that none does. */
 export function UsedBy({ listing, className }: { listing: Pick<AgentListing, 'usedBy'>; className?: string }) {
   return (
-    <p data-used-by className={cn('flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs text-neutral-500', className)}>
+    <p data-used-by className={cn('flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs text-muted-foreground', className)}>
       {listing.usedBy.length ? (
         <>
           <span>Attached to</span>
@@ -82,7 +82,7 @@ export function Skills({
   compact?: boolean;
   className?: string;
 }) {
-  if (!skills?.length) return none ? <p className="text-xs text-neutral-500">{none}</p> : null;
+  if (!skills?.length) return none ? <p className="text-xs text-muted-foreground">{none}</p> : null;
   return (
     <ul data-skills className={cn('space-y-1.5', className)}>
       {skills.map((skill) => (compact ? <CompactSkill key={skill.id} skill={skill} /> : <FullSkill key={skill.id} skill={skill} />))}
@@ -94,15 +94,11 @@ export function Skills({
 function FullSkill({ skill }: { skill: AgentSkill }) {
   return (
     <li data-agent-skill={skill.id} className="text-xs leading-snug">
-      <span className="font-medium text-neutral-800 dark:text-neutral-200">{skill.name}</span>{' '}
-      <span className="text-neutral-600 dark:text-neutral-400">{skill.description}</span>
+      <span className="font-medium text-foreground">{skill.name}</span> <span className="text-muted-foreground">{skill.description}</span>
       {skill.tags.length > 0 && (
         <span className="ml-1 inline-flex flex-wrap gap-1 align-middle">
           {skill.tags.map((tag) => (
-            <span
-              key={tag}
-              className="rounded bg-neutral-100 px-1 py-px font-mono text-[10px] text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400"
-            >
+            <span key={tag} className="rounded bg-neutral-100 px-1 py-px font-mono text-[10px] text-muted-foreground dark:bg-neutral-800">
               {tag}
             </span>
           ))}
@@ -116,8 +112,8 @@ function FullSkill({ skill }: { skill: AgentSkill }) {
 function CompactSkill({ skill }: { skill: AgentSkill }) {
   return (
     <li data-agent-skill={skill.id} className="text-sm leading-snug">
-      <span className="block font-semibold text-neutral-900 dark:text-neutral-100">{skill.name}</span>{' '}
-      <span className="line-clamp-2 text-xs text-neutral-600 dark:text-neutral-400">{skill.description}</span>
+      <span className="block font-semibold text-foreground">{skill.name}</span>{' '}
+      <span className="line-clamp-2 text-xs text-muted-foreground">{skill.description}</span>
     </li>
   );
 }
@@ -271,7 +267,7 @@ export function SkillSourceBadge({ from }: { from: SkillSource | null }) {
       className={cn(
         'shrink-0 rounded-full px-2 py-0.5 text-[11px] leading-none font-medium',
         from === 'yours' && 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300',
-        from === 'repo' && 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300',
+        from === 'repo' && 'bg-neutral-100 text-muted-foreground dark:bg-neutral-800',
         from === 'shipped' && 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300',
         from === null && 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300',
       )}
@@ -297,7 +293,7 @@ export function GivenSkills({
 }) {
   if (!rows.length)
     return (
-      <p data-given-none className="text-xs text-neutral-500">
+      <p data-given-none className="text-xs text-muted-foreground">
         {none}
       </p>
     );
@@ -311,13 +307,13 @@ export function GivenSkills({
           <div className="min-w-0 flex-1 space-y-0.5">
             <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
               {row.from ? (
-                <SkillLink from={row.from} name={row.name} className="text-xs font-medium text-neutral-800 dark:text-neutral-200" />
+                <SkillLink from={row.from} name={row.name} className="text-xs font-medium text-foreground" />
               ) : (
-                <span className="font-mono text-xs font-medium text-neutral-800 dark:text-neutral-200">{row.name}</span>
+                <span className="font-mono text-xs font-medium text-foreground">{row.name}</span>
               )}
               <SkillSourceBadge from={row.from} />
             </p>
-            {row.entry && <p className="text-xs text-neutral-600 dark:text-neutral-400">{row.entry.description}</p>}
+            {row.entry && <p className="text-xs text-muted-foreground">{row.entry.description}</p>}
             {row.error !== null && (
               <p data-given-error className="font-mono text-[11px] whitespace-pre-wrap break-words text-red-700 dark:text-red-400">
                 {row.error}

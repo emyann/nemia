@@ -116,9 +116,7 @@ function Run({ run }: { run: RunDetail }) {
       <HeldUntil run={run} />
 
       {run.warning && (
-        <p className="rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-600 dark:border-neutral-700 dark:text-neutral-400">
-          {run.warning}
-        </p>
+        <p className="rounded border border-neutral-300 px-3 py-2 text-sm text-muted-foreground dark:border-neutral-700">{run.warning}</p>
       )}
 
       <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
@@ -127,7 +125,7 @@ function Run({ run }: { run: RunDetail }) {
           <RunTook run={run} />
           {run.cost && (
             <p data-run-cost title={spentTitle(run.cost, "the run's tries")} className="text-sm">
-              <span className="text-neutral-500">cost </span>
+              <span className="text-muted-foreground">cost </span>
               <span className="font-mono">{run.cost.said}</span>
             </p>
           )}
@@ -142,7 +140,7 @@ function Run({ run }: { run: RunDetail }) {
           )}
           {run.tokens && (
             <p data-run-tokens className="text-sm">
-              <span className="font-mono">{run.tokens.said}</span> <span className="text-neutral-500">({run.tokens.split})</span>
+              <span className="font-mono">{run.tokens.said}</span> <span className="text-muted-foreground">({run.tokens.split})</span>
             </p>
           )}
           <StartedFrom run={run} />
@@ -161,7 +159,7 @@ function Run({ run }: { run: RunDetail }) {
       <section className="space-y-4">
         <Markdown>{run.brief}</Markdown>
         {run.fromNote && (
-          <p data-from={run.from?.inbox} className="text-sm text-neutral-500">
+          <p data-from={run.from?.inbox} className="text-sm text-muted-foreground">
             {run.fromNote}
           </p>
         )}
@@ -275,7 +273,7 @@ function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; 
       <Markdown>{closeout.summary}</Markdown>
       {closeout.needs && <ClosedNeeds needs={closeout.needs} />}
       {closeout.artifacts.length > 0 && (
-        <div aria-label="Artifacts" className="text-xs text-neutral-500">
+        <div aria-label="Artifacts" className="text-xs text-muted-foreground">
           Artifacts:
           <Artifacts artifacts={closeout.artifacts} />
         </div>
@@ -317,7 +315,7 @@ function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; 
       />
 
       {run.place === 'folder' && step.taskId !== null && (
-        <div aria-label="Files" data-files className="text-xs text-neutral-500">
+        <div aria-label="Files" data-files className="text-xs text-muted-foreground">
           {step.filesError === null ? (
             <>
               Files in its folder:
@@ -413,7 +411,7 @@ function WaitingOnRuns({ run }: { run: RunDetail }) {
       className={`space-y-1 rounded px-3 py-2 text-sm ${
         waiting.onYou
           ? 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200'
-          : 'bg-neutral-100 text-neutral-700 dark:bg-neutral-900 dark:text-neutral-300'
+          : 'bg-neutral-100 text-foreground dark:bg-neutral-900'
       }`}
     >
       <p className="font-mono">{waiting.word}</p>
@@ -479,7 +477,7 @@ function HeldUntil({ run }: { run: RunDetail }) {
 function RunHeading({ run }: { run: RunDetail }) {
   return (
     <div className="flex items-center gap-1">
-      <h1 className="font-mono text-sm text-neutral-500">{run.id}</h1>
+      <h1 className="font-mono text-sm text-muted-foreground">{run.id}</h1>
       <FavoriteStar favorite={{ kind: 'run', run: run.id }} name={titleOf(run)} />
     </div>
   );
@@ -487,7 +485,7 @@ function RunHeading({ run }: { run: RunDetail }) {
 
 function BackToRuns() {
   return (
-    <Link to="/runs" className="text-sm text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100">
+    <Link to="/runs" className="text-sm text-muted-foreground hover:text-foreground">
       ← Runs
     </Link>
   );

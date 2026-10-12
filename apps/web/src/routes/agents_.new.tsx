@@ -49,7 +49,7 @@ function NewAgentPage() {
       <BackToAgents />
       <header className="space-y-1">
         <h1 className="text-base font-semibold">New agent</h1>
-        <p className="text-sm text-neutral-500">
+        <p className="text-sm text-muted-foreground">
           Written to <code className="font-mono text-xs">{store.agents}/&lt;name&gt;.md</code>, beside your workflows. A node of one of them
           takes it with <code className="font-mono text-xs">agent: &lt;name&gt;</code>.
         </p>
@@ -70,13 +70,13 @@ function NewAgentPage() {
 /** The step the agent will be hired into once written, linked to its page in the factory. */
 function HiredInto({ place: { factory, workflow, step } }: { place: HirePlace }) {
   return (
-    <p data-hire-into={`${workflow}/${step}`} className="text-sm text-neutral-500">
+    <p data-hire-into={`${workflow}/${step}`} className="text-sm text-muted-foreground">
       Once created, {factory} hires it into{' '}
       <RouteLink
         to="/workflows/$from/$workflow/$step"
         params={{ from: 'yours', workflow, step }}
         search={{ factory }}
-        className="font-mono text-xs text-neutral-700 underline underline-offset-2 dark:text-neutral-300"
+        className="font-mono text-xs text-foreground underline underline-offset-2"
       >
         {workflow}/{step}
       </RouteLink>
@@ -124,7 +124,7 @@ export function BackToAgents() {
   return (
     <RouteLink
       to="/agents"
-      className="rounded-sm text-sm text-neutral-500 outline-none hover:text-neutral-900 focus-visible:ring-2 focus-visible:ring-ring/50 dark:hover:text-neutral-100"
+      className="rounded-sm text-sm text-muted-foreground outline-none hover:text-neutral-900 focus-visible:ring-2 focus-visible:ring-ring/50 dark:hover:text-neutral-100"
     >
       ← Agents
     </RouteLink>

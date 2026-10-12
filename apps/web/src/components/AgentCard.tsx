@@ -43,7 +43,7 @@ export function AgentCard({ agent }: { agent: AgentListing & { factories?: reado
             <FactoryTags names={agent.factories ?? []} linked className="relative z-10" />
           </div>
         </header>
-        {agent.description && <p className="text-center text-sm text-neutral-700 dark:text-neutral-300">{agent.description}</p>}
+        {agent.description && <p className="text-center text-sm text-foreground">{agent.description}</p>}
         {agent.error === null &&
           (agent.cardError !== null ? (
             <p data-card-error className="font-mono text-xs break-words text-red-700 dark:text-red-400">
@@ -72,7 +72,7 @@ function Stats({ keys }: { keys: AgentListing['keys'] }) {
       {set.map((key) => (
         <div key={key} className="flex items-center gap-1 rounded-md bg-neutral-100 px-1.5 py-1 dark:bg-neutral-800">
           <dt className="text-muted-foreground">{key}</dt>
-          <dd className="font-mono font-medium text-neutral-800 dark:text-neutral-200">{keys[key]}</dd>
+          <dd className="font-mono font-medium text-foreground">{keys[key]}</dd>
         </div>
       ))}
     </dl>

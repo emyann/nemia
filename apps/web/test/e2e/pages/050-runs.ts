@@ -236,7 +236,7 @@ export default {
     );
     await expectVisible(
       costly.locator('[data-state="over-budget"]', { hasText: COSTLY.over.status }),
-      `the row shows ${COSTLY.over.step} over its budget as an amber chip, with the amounts (${COSTLY.over.status})`,
+      `the row shows ${COSTLY.over.step} over its budget as a chip that waits on a person, with the amounts (${COSTLY.over.status})`,
     );
     await expectVisible(costly.getByText(`waiting on you: ${COSTLY.steps.join(', ')}`), 'and says every step past its budget waits on you');
     await tookOnTheRow(page, costly);
@@ -252,7 +252,7 @@ export default {
     );
     await expectVisible(
       gatedRow.locator('[data-state="awaiting-approval"]', { hasText: 'awaiting approval' }),
-      'and shows its step as awaiting approval, an amber chip',
+      'and shows its step as awaiting approval, a chip that waits on a person',
     );
     const loop = page.locator(`li a[href="/runs/${LOOPING.id}"]`);
     await expectVisible(
@@ -261,7 +261,7 @@ export default {
     );
     await expectVisible(
       loop.locator(`[data-state="exhausted"][title$="${LOOPING.notes.review}"]`, { hasText: 'rounds exhausted' }),
-      `the row shows ${LOOPING.exhausted} as an amber chip, its note after what that means on hover`,
+      `the row shows ${LOOPING.exhausted} as a chip that waits on a person, its note after what that means on hover`,
     );
 
     await ticksOnTheRows(page);

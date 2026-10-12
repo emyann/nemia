@@ -50,7 +50,7 @@ function WorkflowsPage() {
   return (
     <article className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <p className="min-w-0 flex-1 text-sm text-neutral-500">
+        <p className="min-w-0 flex-1 text-sm text-muted-foreground">
           A workflow is a folder of steps:{' '}
           {where.kind === 'every' ? (
             <>
@@ -105,7 +105,7 @@ function Every({ address }: { address: PagePlace }) {
         />
       ))}
       {all.length === 0 && (
-        <p className="text-sm text-neutral-500">
+        <p className="text-sm text-muted-foreground">
           No workflows. Add a folder of steps under {folder} in the repository —{' '}
           <code className="font-mono text-xs">workflows/dev/implement.md</code>, say — or under <YoursFolder />.
         </p>
@@ -123,7 +123,7 @@ function InFactory({ place, address }: { place: Place; address: PagePlace }) {
   return (
     <>
       {listed.length === 0 && (
-        <p data-filtered-out className="text-sm text-neutral-500">
+        <p data-filtered-out className="text-sm text-muted-foreground">
           No workflow is in the factory <span className="font-mono">{place.factory}</span>. {everyFactory}.
         </p>
       )}
@@ -179,7 +179,7 @@ function WorkflowCard({
         <FromBadge from={from} factory={factory} />
         <FactoryTags names={tags} linked />
         {!error && (
-          <span className="text-xs text-neutral-500">
+          <span className="text-xs text-muted-foreground">
             {steps.length} {steps.length === 1 ? 'step' : 'steps'}
           </span>
         )}
@@ -187,7 +187,7 @@ function WorkflowCard({
       {description ? (
         <Markdown className="text-sm">{description}</Markdown>
       ) : (
-        <p className="text-sm text-neutral-500">
+        <p className="text-sm text-muted-foreground">
           No description: the first paragraph of a <code className="font-mono text-xs">README.md</code> in the folder is one.
         </p>
       )}

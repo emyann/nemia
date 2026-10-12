@@ -47,7 +47,7 @@ export const answersFrom = (questions: readonly Question[], draft: Draft): Quest
 function OptionText({ q, label, meaning }: { q: Question; label: string; meaning: string }) {
   return (
     <span className="min-w-0">
-      <strong className="font-medium">{label}</strong> <span className="text-neutral-600 dark:text-neutral-400">— {meaning}</span>
+      <strong className="font-medium">{label}</strong> <span className="text-muted-foreground">— {meaning}</span>
       {q.recommended === label && (
         <span
           data-recommended
@@ -64,15 +64,15 @@ function OptionText({ q, label, meaning }: { q: Question; label: string; meaning
 export function Questions({ field, questions }: { field: string; questions: readonly Question[] }) {
   return (
     <section data-questions={field} aria-label={field} className="min-w-0 space-y-2">
-      <h4 className="font-mono text-xs text-neutral-500">{field}</h4>
+      <h4 className="font-mono text-xs text-muted-foreground">{field}</h4>
       <ol className="space-y-3 text-sm">
         {questions.map((q, i) => (
           <li key={q.title} data-question={q.title} className="space-y-1">
             <p className="font-medium">
               {i + 1}. {q.title}
-              {q.multiple && <span className="font-normal text-neutral-500"> (any of them)</span>}
+              {q.multiple && <span className="font-normal text-muted-foreground"> (any of them)</span>}
             </p>
-            <Markdown className="text-neutral-700 dark:text-neutral-300">{q.body}</Markdown>
+            <Markdown className="text-foreground">{q.body}</Markdown>
             <ul className="list-disc space-y-0.5 pl-5">
               {q.options.map((o) => (
                 <li key={o.label} data-option={o.label}>
@@ -95,9 +95,9 @@ export function QuestionField({ q, n, draft, onDraft }: { q: Question; n: number
     <fieldset data-question={q.title} className="space-y-1.5 rounded border border-neutral-200 p-2 dark:border-neutral-800">
       <legend className="px-1 font-medium">
         {n}. {q.title}
-        {q.multiple && <span className="font-normal text-neutral-500"> (choose any)</span>}
+        {q.multiple && <span className="font-normal text-muted-foreground"> (choose any)</span>}
       </legend>
-      <Markdown className="text-neutral-700 dark:text-neutral-300">{q.body}</Markdown>
+      <Markdown className="text-foreground">{q.body}</Markdown>
       {q.options.map((o) => (
         <label key={o.label} data-option={o.label} className="flex cursor-pointer items-start gap-2">
           <input
@@ -177,7 +177,7 @@ export function RecommendButton({
       onClick={() => onDraft(recommendedDraft(questions, draft))}
       className={cn(
         BUTTON,
-        'bg-white text-neutral-900 ring-1 ring-neutral-300 hover:bg-neutral-100 dark:bg-neutral-900 dark:text-neutral-100 dark:ring-neutral-700 dark:hover:bg-neutral-800',
+        'bg-white text-foreground ring-1 dark:text-foreground ring-neutral-300 hover:bg-neutral-100 dark:bg-neutral-900 dark:ring-neutral-700 dark:hover:bg-neutral-800',
       )}
     >
       Choose the recommended answers
@@ -190,7 +190,7 @@ function AskedRow({ step, said }: { step: string; said: string }) {
   return (
     <li data-offer="asked" data-step={step} className="rounded border border-neutral-200 px-3 py-2 text-sm dark:border-neutral-800">
       <strong>{step}</strong>{' '}
-      <span data-note className="font-mono text-xs text-neutral-600 dark:text-neutral-400">
+      <span data-note className="font-mono text-xs text-muted-foreground">
         {said}
       </span>
     </li>
@@ -205,7 +205,7 @@ function ModeChoice({ name, step, mode, onMode }: { name: string; step: string; 
       {(['nudge', 'fresh'] as const).map((m) => (
         <label key={m} className="flex cursor-pointer items-center gap-1.5">
           <input type="radio" name={name} value={m} checked={mode === m} onChange={() => onMode(m)} />
-          {MODES[m]} <code className="text-neutral-500">--{m}</code>
+          {MODES[m]} <code className="text-muted-foreground">--{m}</code>
         </label>
       ))}
     </fieldset>
@@ -235,7 +235,7 @@ export function QuestionsForm({ runId, offer }: { runId: string; offer: Extract<
     >
       <p data-said>
         <strong>{offer.step}</strong> asks {offer.questions.length === 1 ? 'a question' : `${offer.questions.length} questions`}
-        {offer.needs && <span className="text-neutral-600 dark:text-neutral-400">: {offer.needs}</span>}
+        {offer.needs && <span className="text-muted-foreground">: {offer.needs}</span>}
       </p>
       <form
         aria-label={`Answer ${offer.step}`}

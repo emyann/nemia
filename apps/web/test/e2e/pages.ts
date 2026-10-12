@@ -121,34 +121,46 @@ export async function loadPages(dir = PAGES_DIR): Promise<PageSpec[]> {
  * page is `pictured`; how many `workers` it asks for, if it does; and whether it is `whole` — every page, in the dark theme alone, the run
  * a check makes, which is held to the e2e's bound (`overBound`, timing.ts). With no flag, every page in the dark theme, pictured by none:
  * the assertions alone. `--photos` visits light, then dark, and pictures each page visited; `--pages <name,…>` visits only the pages
- * named, in the order of the pages, and with `--photos` pictures them; `--workers <n>` sets how many workers visit them. Refuses a flag it
+ * named, in the order of the pages, and with `--photos` pictures them; `--contrast`, with `--photos`, has each picture's text pairs
+ * `measured` beside it (contrast.ts), and is refused without it; `--workers <n>` sets how many workers visit them. Refuses a flag it
  * does not know, a name that is no page (listing the pages there are), `--pages` with no name after it, and `--workers` with no whole
  * number of one or more.
  */
 export function planOf<P extends { name: string }>(
   argv: readonly string[],
   pages: readonly P[],
-): { visit: P[]; themes: Theme[]; pictured: (name: string) => boolean; workers?: number; whole: boolean } {
+): { visit: P[]; themes: Theme[]; pictured: (name: string) => boolean; measured: boolean; workers?: number; whole: boolean } {
   let photos = false;
+  let measured = false;
   let named: string[] | undefined;
   let workers: number | undefined;
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--photos') photos = true;
+    else if (argv[i] === '--contrast') measured = true;
     else if (argv[i] === '--pages') named = namesAfter(argv[++i]);
     else if (argv[i] === '--workers') workers = workersAfter(argv[++i]);
     else
       throw new Error(
-        `the e2e takes --photos, --pages <name,…> and --workers <n>, not ${argv[i]}: npm run e2e -- --photos --pages <name,…>`,
+        `the e2e takes --photos, --contrast, --pages <name,…> and --workers <n>, not ${argv[i]}: npm run e2e -- --photos --pages <name,…>`,
       );
   }
+  if (measured && !photos)
+    throw new Error('--contrast measures what is pictured, and nothing is without --photos: npm run e2e -- --photos --contrast');
   const themes: Theme[] = photos ? ['light', 'dark'] : ['dark'];
-  if (!named) return { visit: [...pages], themes, pictured: () => photos, workers, whole: !photos };
+  if (!named) return { visit: [...pages], themes, pictured: () => photos, measured, workers, whole: !photos };
   const all = pages.map((p) => p.name);
   const unknown = named.filter((name) => !all.includes(name));
   if (unknown.length)
     throw new Error(`the e2e has no page ${unknown.join(', ')}: name pages there are, as pages/NAMES lists them: ${all.join(', ')}`);
   const chosen = new Set(named);
-  return { visit: pages.filter((p) => chosen.has(p.name)), themes, pictured: (name) => photos && chosen.has(name), workers, whole: false };
+  return {
+    visit: pages.filter((p) => chosen.has(p.name)),
+    themes,
+    pictured: (name) => photos && chosen.has(name),
+    measured,
+    workers,
+    whole: false,
+  };
 }
 
 /** The number `--workers` is given: a whole number, one or more; refuses anything else, and a flag in its place. */

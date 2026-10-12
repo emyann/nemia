@@ -8,6 +8,9 @@ import { cn } from '../lib/utils';
 import { RouteLink } from './AgentParts';
 import { CopyButton } from './CopyButton';
 
+/** A section's quiet heading: small, medium weight, in the muted ink. */
+export const HEADING = 'text-xs font-medium text-muted-foreground';
+
 /** A link's look in a fact's words. */
 export const LINK =
   'rounded-sm underline decoration-neutral-400 underline-offset-2 outline-none hover:decoration-neutral-700 focus-visible:ring-2 focus-visible:ring-ring/50 dark:decoration-neutral-500 dark:hover:decoration-neutral-300';
@@ -34,7 +37,7 @@ export function FactList({
     <dl aria-label={label} className={cn('grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-xs', className)}>
       {facts.map((fact, i) => (
         <div key={`${fact.label}-${i}`} className="contents">
-          <dt className="text-neutral-500">{fact.label}</dt>
+          <dt className="text-muted-foreground">{fact.label}</dt>
           <dd data-fact={fact.label} data-state={fact.state} className={cn('min-w-0 break-words', STATE[fact.state ?? 'none'])}>
             <FactWords runId={runId} fact={fact} />
           </dd>
@@ -61,7 +64,7 @@ function FactWords({ runId, fact }: { runId: string; fact: GateFact }) {
 export function TrialMerges({ runId, collisions }: { runId: string; collisions: Collisions }) {
   return (
     <section aria-label="Trial merges" className="space-y-1">
-      <h3 className="text-xs font-medium text-neutral-500">
+      <h3 className="text-xs font-medium text-muted-foreground">
         Trial merges, as git says them now: onto {collisions.onto}, and onto each run in flight on it
       </h3>
       <FactList runId={runId} facts={collisionFacts(collisions)} label="What the trial merges say" />
@@ -75,7 +78,7 @@ export function Facts({ rows }: { rows: Array<[label: string, value: ReactNode]>
     <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
       {rows.map(([label, value]) => (
         <div key={label} data-fact={label} className="contents">
-          <dt className="text-neutral-500">{label}</dt>
+          <dt className="text-muted-foreground">{label}</dt>
           <dd className="min-w-0 break-words">{value ?? '—'}</dd>
         </div>
       ))}
@@ -248,7 +251,7 @@ function Marked({ value, mark, word = false, title }: { value: string; mark: str
   return (
     <span data-mark={mark} title={title}>
       <span className={word ? undefined : 'font-mono text-xs'}>{value}</span>
-      <span className="text-neutral-500"> · {mark}</span>
+      <span className="text-muted-foreground"> · {mark}</span>
     </span>
   );
 }
@@ -283,11 +286,7 @@ export function spentRows(step: Priced): Array<[string, ReactNode]> {
   return [
     [
       'spent',
-      <span
-        key="spent"
-        data-spent={over ? 'over' : 'within'}
-        className={`font-mono text-xs ${over ? 'font-semibold text-red-700 dark:text-red-400' : ''}`}
-      >
+      <span key="spent" data-spent={over ? 'over' : 'within'} className={`font-mono text-xs ${over ? 'font-semibold text-money' : ''}`}>
         {text}
       </span>,
     ],
@@ -318,7 +317,7 @@ export const unreadRows = (words: string | null): Array<[string, ReactNode]> =>
       ]
     : [];
 
-const WARN = 'text-amber-700 dark:text-amber-400';
+const WARN = 'text-money';
 
 /**
  * What sessions read, by price: the counts — `read 21.4M · wrote 412k · peak 167k` — and, beneath, a resumed session that wrote its
@@ -372,7 +371,7 @@ const REBUILT_TITLE =
 export function Check({ check: { command, refused } }: { check: StepCheck }) {
   return (
     <section aria-label="Check" className="space-y-2">
-      <h3 className="text-xs font-medium text-neutral-500">Check</h3>
+      <h3 className="text-xs font-medium text-muted-foreground">Check</h3>
       <Facts
         rows={[
           ['command', code(command)],
@@ -397,10 +396,10 @@ export function Check({ check: { command, refused } }: { check: StepCheck }) {
 
 /** One of a refused check's streams, as the api cut it: its last lines, and whether there were more. */
 function Stream({ name, log }: { name: string; log: StepLog }) {
-  if (!log.lines.length) return <p className="text-xs text-neutral-500">No {name}.</p>;
+  if (!log.lines.length) return <p className="text-xs text-muted-foreground">No {name}.</p>;
   return (
     <div className="space-y-1">
-      <p className="text-xs text-neutral-500">{log.truncated ? `The last ${log.lines.length} lines of its ${name}` : `Its ${name}`}</p>
+      <p className="text-xs text-muted-foreground">{log.truncated ? `The last ${log.lines.length} lines of its ${name}` : `Its ${name}`}</p>
       <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded bg-neutral-100 p-2 font-mono text-[11px] leading-snug dark:bg-neutral-950">
         {log.lines.join('\n')}
       </pre>

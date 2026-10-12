@@ -151,7 +151,7 @@ function InFactory({ from, name, address, place, building, factory }: Asked & { 
         why === null ? (
           <StartRun workflow={workflow} repo={place.repo} place={place} />
         ) : (
-          <p data-why-not className="text-sm whitespace-pre-wrap break-words text-amber-700 dark:text-amber-400">
+          <p data-why-not className="text-sm whitespace-pre-wrap break-words text-yours">
             {why}
           </p>
         )
@@ -228,7 +228,7 @@ function Workflow({
         <>
           <WorkflowCanvas workflow={workflow} place={address} />
           <section className="space-y-2">
-            <h2 className="text-xs font-medium tracking-wide text-neutral-500 uppercase">Steps</h2>
+            <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Steps</h2>
             {children}
           </section>
           {start}
@@ -267,7 +267,7 @@ function WorkflowHeader({
         <FromBadge from={from} factory={factory} />
         <FactoryTags names={tags} linked />
         {!error && (
-          <span className="text-xs text-neutral-500">
+          <span className="text-xs text-muted-foreground">
             {steps.length} {steps.length === 1 ? 'step' : 'steps'}
           </span>
         )}
@@ -283,7 +283,7 @@ function WorkflowHeader({
         )}
         {removable && <RemoveWorkflow workflow={removable} onRemoved={onRemoved} />}
       </div>
-      <p data-folder className="font-mono text-[11px] break-all text-neutral-500">
+      <p data-folder className="font-mono text-[11px] break-all text-muted-foreground">
         {dir}
       </p>
       <NoBuilder workflow={workflow} factory={factory} />
@@ -299,7 +299,7 @@ function NotOffered({ name, place, address, attach }: { name: string; place: Pla
   return (
     <div className="space-y-3">
       <BackToWorkflows place={address} />
-      <p data-not-offered={place.factory} className="text-sm text-neutral-500">
+      <p data-not-offered={place.factory} className="text-sm text-muted-foreground">
         {place.factory} does not offer {name} on <span className="font-mono text-xs break-all">{place.repo}</span>, so nothing of it is read
         here and it hires no agent into its steps: attach the workflow to {place.factory} first
         {attach ? (
@@ -321,11 +321,11 @@ function Readme({ text }: { text: string | null }) {
       aria-label="README"
       className="space-y-2 rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950"
     >
-      <h2 className="text-xs font-medium tracking-wide text-neutral-500 uppercase">README</h2>
+      <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">README</h2>
       {text?.trim() ? (
         <Markdown className="text-sm">{text}</Markdown>
       ) : (
-        <p className="text-sm text-neutral-500">
+        <p className="text-sm text-muted-foreground">
           No README: a <code className="font-mono text-xs">README.md</code> in the folder says what the workflow is for, its first paragraph
           its description.
         </p>
@@ -349,7 +349,7 @@ function NotListed({ from, name }: { from: string; name: string }) {
   return (
     <div className="space-y-3">
       <BackToWorkflows />
-      <p data-not-listed className="text-sm text-neutral-500">
+      <p data-not-listed className="text-sm text-muted-foreground">
         No workflow <span className="font-mono">{name}</span> is listed {from === 'yours' ? 'among yours' : "in this repository's"}: it may
         have been removed or renamed.
       </p>
@@ -360,7 +360,7 @@ function NotListed({ from, name }: { from: string; name: string }) {
 /** Back to the Workflows page, in `place`, the place this page is read in. */
 function BackToWorkflows({ place = {} }: { place?: PagePlace }) {
   return (
-    <Link to="/workflows" search={place} className="text-sm text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100">
+    <Link to="/workflows" search={place} className="text-sm text-muted-foreground hover:text-foreground">
       ← Workflows
     </Link>
   );

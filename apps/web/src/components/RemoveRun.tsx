@@ -22,7 +22,7 @@ export function RemoveRun({ id }: { id: string }) {
     },
   });
   return (
-    <span data-remove-run className="flex flex-wrap items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">
+    <span data-remove-run className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
       {asking ? (
         <>
           Remove this try, its record and its folders?

@@ -41,15 +41,15 @@ function StepPage() {
       <header className="space-y-1">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <h1 className="font-mono text-base font-semibold">{page.step}</h1>
-          <span className="text-xs text-neutral-500">
-            a step of <span className="font-mono text-neutral-700 dark:text-neutral-300">{page.workflow}</span>
+          <span className="text-xs text-muted-foreground">
+            a step of <span className="font-mono text-foreground">{page.workflow}</span>
           </span>
           <span
             data-from={page.from}
             className={`rounded-full px-2 py-0.5 text-[11px] leading-none font-medium ${
               page.from === 'yours'
                 ? 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300'
-                : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300'
+                : 'bg-neutral-100 text-muted-foreground dark:bg-neutral-800'
             }`}
           >
             {fromWord(page.from, place.factory)}
@@ -77,7 +77,7 @@ function BackToWorkflow() {
       to="/workflows/$from/$workflow"
       params={{ from, workflow }}
       search={place}
-      className="font-mono text-sm text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100"
+      className="font-mono text-sm text-muted-foreground hover:text-foreground"
     >
       ← {workflow}
     </Link>

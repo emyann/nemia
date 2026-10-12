@@ -49,7 +49,7 @@ const BUTTON =
 const PRIMARY =
   'rounded bg-neutral-900 px-3 py-1 text-sm font-medium text-white hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-neutral-900 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300 dark:disabled:hover:bg-neutral-100';
 const INPUT =
-  'block w-full rounded border border-neutral-300 bg-white px-2 py-1 text-sm placeholder:text-neutral-400 focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:placeholder:text-neutral-500 dark:focus:border-neutral-400';
+  'block w-full rounded border border-neutral-300 bg-white px-2 py-1 text-sm placeholder:text-muted-foreground focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:focus:border-neutral-400';
 
 /**
  * A folder of yours, built on the board: its steps as blocks with handles, drawn left to right by `after`. Drag from a block's right-hand
@@ -196,7 +196,7 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
 
       {refusal && <SaveRefused refusal={refusal} rereading={reread.isPending} onReread={() => reread.mutate()} />}
       {saved && !dirty && (
-        <p data-saved className="text-xs text-neutral-500">
+        <p data-saved className="text-xs text-muted-foreground">
           Saved to <code className="font-mono break-all">{saved.workflow.dir}</code>: {fileLine(saved)}.
         </p>
       )}
@@ -262,7 +262,7 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
           {form.error ? (
             <p className="text-xs text-red-700 dark:text-red-400">Could not read the keys a step may set: {form.error.message}</p>
           ) : !form.data ? (
-            <p className="text-xs text-neutral-500">Reading the keys a step may set…</p>
+            <p className="text-xs text-muted-foreground">Reading the keys a step may set…</p>
           ) : step ? (
             <StepForm
               key={`${step.name}:${version}`}
@@ -307,7 +307,7 @@ function BuilderToolbar(props: {
         className={`rounded-full px-2 py-0.5 text-xs font-medium ${
           dirty
             ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-            : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300'
+            : 'bg-neutral-100 text-muted-foreground dark:bg-neutral-800'
         }`}
       >
         {dirty ? 'Unsaved changes' : 'Saved'}
@@ -337,11 +337,11 @@ function ReadmeField({ text, changed, onChange }: { text: string; changed: boole
   const id = useId();
   return (
     <div className="space-y-1">
-      <label htmlFor={id} className="flex items-baseline gap-2 text-xs font-medium text-neutral-700 dark:text-neutral-300">
+      <label htmlFor={id} className="flex items-baseline gap-2 text-xs font-medium text-foreground">
         README
-        <span className="font-normal text-neutral-500">what the workflow is for, its first paragraph its description</span>
+        <span className="font-normal text-muted-foreground">what the workflow is for, its first paragraph its description</span>
         {changed && (
-          <span data-readme-unsaved className="font-normal text-amber-700 dark:text-amber-400">
+          <span data-readme-unsaved className="font-normal text-yours">
             unsaved
           </span>
         )}
@@ -474,7 +474,7 @@ const layersOf = (listing: WorkflowListing, name: string): StepLayers | null =>
 /** The aside while no step is picked: how to pick one, and how to wire two. */
 function NoStepPicked() {
   return (
-    <p className="text-xs text-neutral-500">
+    <p className="text-xs text-muted-foreground">
       Click a step to set its keys. Drag from a step&apos;s right-hand dot to another&apos;s left-hand dot to have it wait; from the violet
       dot underneath, to loop back.
     </p>

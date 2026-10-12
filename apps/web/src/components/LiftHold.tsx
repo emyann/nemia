@@ -92,7 +92,7 @@ export function CardLift({ id }: { id: string }) {
           data-lift={id}
           className={cn(
             SMALL,
-            'bg-white text-neutral-900 ring-1 ring-neutral-300 ring-inset hover:bg-neutral-100 dark:bg-neutral-900 dark:text-neutral-100 dark:ring-neutral-700 dark:hover:bg-neutral-800',
+            'bg-white text-foreground ring-1 dark:text-foreground ring-neutral-300 ring-inset hover:bg-neutral-100 dark:bg-neutral-900 dark:ring-neutral-700 dark:hover:bg-neutral-800',
           )}
         >
           Lift…
@@ -113,7 +113,7 @@ function LiftForm({ id, onClose }: { id: string; onClose: () => void }) {
   return (
     <div className="space-y-2">
       <Heading slot="title" className="font-semibold">{`Lift the hold on ${id}?`}</Heading>
-      <p className="text-xs text-neutral-600 dark:text-neutral-400">{LIFTS}</p>
+      <p className="text-xs text-muted-foreground">{LIFTS}</p>
       <div className="flex items-center gap-2">
         <button type="button" onClick={() => lift.mutate()} disabled={lift.isPending} className={cn(BUTTON, 'px-2.5 py-1 text-xs')}>
           {lift.isPending ? 'Lifting…' : 'Lift'}

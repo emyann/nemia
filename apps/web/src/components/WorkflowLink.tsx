@@ -2,7 +2,7 @@ import { Link } from '@tanstack/react-router';
 import { workflowNameOf, type WorkflowPageAddress } from '../lib/api';
 import { placeOfAddress } from '../lib/factories';
 
-const LABEL = 'text-xs text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100';
+const LABEL = 'text-xs text-muted-foreground hover:text-foreground';
 
 /**
  * The workflow a run was started from, by its folder's name, the folder in full on hover: linked to its page in the run's place where the
@@ -13,7 +13,7 @@ export function WorkflowLink({ dir, page }: { dir: string; page: WorkflowPageAdd
   const label = (
     <>
       workflow{' '}
-      <span className="font-mono text-neutral-700 underline decoration-neutral-300 underline-offset-2 dark:text-neutral-300 dark:decoration-neutral-600">
+      <span className="font-mono text-foreground underline decoration-neutral-300 underline-offset-2 dark:decoration-neutral-600">
         {name}
       </span>
     </>

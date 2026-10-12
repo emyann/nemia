@@ -44,7 +44,7 @@ export function StatusChip({
 export function StepNote({ note }: { note: string | null }) {
   if (!note) return null;
   return (
-    <p data-note className="font-mono text-[11px] leading-snug text-neutral-500 dark:text-neutral-400">
+    <p data-note className="font-mono text-[11px] leading-snug text-muted-foreground">
       {note}
     </p>
   );

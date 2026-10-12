@@ -49,7 +49,7 @@ export function SpecBar({ from, workflow, step }: { from: 'repo' | 'yours'; work
 /** What the bar holds where the address's factory lists no workflows: why, or that it reads on one of its repositories, none named. */
 function Nowhere({ where }: { where: ListPlace }) {
   return (
-    <p data-unplaced className="text-sm text-amber-700 dark:text-amber-400">
+    <p data-unplaced className="text-sm text-yours">
       {where.kind === 'refused'
         ? where.why
         : where.kind === 'pick'
@@ -65,8 +65,8 @@ function Nowhere({ where }: { where: ListPlace }) {
  */
 function Unread({ workflow, error, read }: { workflow: string; error: Error | null; read: boolean }) {
   if (error) return <p className="text-sm text-red-700 dark:text-red-400">Could not read the workflows: {error.message}</p>;
-  if (read) return <p className="text-sm text-amber-700 dark:text-amber-400">No workflow is named {workflow}.</p>;
-  return <p className="text-xs text-neutral-500">Reading the workflows…</p>;
+  if (read) return <p className="text-sm text-yours">No workflow is named {workflow}.</p>;
+  return <p className="text-xs text-muted-foreground">Reading the workflows…</p>;
 }
 
 /**
@@ -84,7 +84,7 @@ export function SpecBody({ listing, step: name }: { listing: WorkflowListing; st
     );
   if (!step)
     return (
-      <p className="text-sm text-amber-700 dark:text-amber-400">
+      <p className="text-sm text-yours">
         {listing.name} has no step named {name}.
       </p>
     );

@@ -122,8 +122,8 @@
      `primitives/Typography.tsx` applies the right one per variant.
      Set from the project's DESIGN.md by `npm run theme:generate` (the family
      of the display/headline/title tokens, and of the body/label tokens). */
-  --md-sys-typescale-brand-font: var(--font-orbitron-variable);
-  --md-sys-typescale-plain-font: var(--font-geist-variable);
+  --md-sys-typescale-brand-font: var(--font-michroma);
+  --md-sys-typescale-plain-font: var(--font-chakra-petch);
 
   /* ---- MD3 type scale ----
      Values set from the `typography` tokens of the project's DESIGN.md by
@@ -181,28 +181,20 @@
      Values set from the `rounded` tokens of the project's DESIGN.md by
      `npm run theme:generate`: edit them there, not here. */
   --md-sys-shape-corner-extra-small: 0;
-  --md-sys-shape-corner-small: 2px;
-  --md-sys-shape-corner-medium: 2px;
-  --md-sys-shape-corner-large: 4px;
-  --md-sys-shape-corner-extra-large: 4px;
-  --md-sys-shape-corner-full: 2px;
+  --md-sys-shape-corner-small: 0;
+  --md-sys-shape-corner-medium: 0;
+  --md-sys-shape-corner-large: 0;
+  --md-sys-shape-corner-extra-large: 0;
+  --md-sys-shape-corner-full: 0;
 
   /* ---- MD3 elevation ----
      Values set from the reference block of the project's DESIGN.md by
      `npm run theme:generate`: edit them there, not here. */
-  --md-sys-elevation-1: 0 0 0 1px --alpha(var(--md-sys-color-primary) / 30%);
-  --md-sys-elevation-2:
-    0 0 0 1px --alpha(var(--md-sys-color-primary) / 45%),
-    0 0 12px 0 --alpha(var(--md-sys-color-primary) / 22%);
-  --md-sys-elevation-3:
-    0 0 0 1px --alpha(var(--md-sys-color-secondary) / 55%),
-    0 0 18px 0 --alpha(var(--md-sys-color-secondary) / 28%);
-  --md-sys-elevation-4:
-    0 0 0 1px --alpha(var(--md-sys-color-secondary) / 65%),
-    0 0 26px 2px --alpha(var(--md-sys-color-secondary) / 32%);
-  --md-sys-elevation-5:
-    0 0 0 1px --alpha(var(--md-sys-color-tertiary) / 70%),
-    0 0 34px 4px --alpha(var(--md-sys-color-tertiary) / 30%);
+  --md-sys-elevation-1: 0 0 0 1px --alpha(var(--md-sys-color-outline-variant) / 100%);
+  --md-sys-elevation-2: 0 0 0 1px --alpha(var(--md-sys-color-primary) / 45%);
+  --md-sys-elevation-3: 0 0 0 1px --alpha(var(--md-sys-color-primary) / 70%);
+  --md-sys-elevation-4: 0 0 0 1px --alpha(var(--md-sys-color-secondary) / 60%);
+  --md-sys-elevation-5: 0 0 0 1px --alpha(var(--md-sys-color-secondary) / 85%);
 
   /* ---- MD3 state-layer opacities ----
      How loud interaction feedback is. Material's own numbers, under Material's
@@ -229,7 +221,7 @@
   --md-sys-motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
   --md-sys-motion-easing-standard-accelerate: cubic-bezier(0.3, 0, 1, 1);
   --md-sys-motion-easing-standard-decelerate: cubic-bezier(0, 0, 0, 1);
-  --md-sys-motion-easing-emphasized: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --md-sys-motion-easing-emphasized: cubic-bezier(0.2, 0, 0, 1);
   --md-sys-motion-easing-emphasized-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15);
   --md-sys-motion-easing-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
 
@@ -373,14 +365,14 @@
      `duration-<name>` utilities are declared explicitly below.
      Values set from the reference block of the project's DESIGN.md by
      `npm run theme:generate`: edit them there, not here. */
-  --md3-duration-short-1: 40ms;
-  --md3-duration-short-2: 70ms;
-  --md3-duration-short-3: 100ms;
-  --md3-duration-short-4: 130ms;
-  --md3-duration-medium-1: 160ms;
-  --md3-duration-medium-2: 200ms;
-  --md3-duration-medium-3: 240ms;
-  --md3-duration-medium-4: 280ms;
+  --md3-duration-short-1: 50ms;
+  --md3-duration-short-2: 100ms;
+  --md3-duration-short-3: 150ms;
+  --md3-duration-short-4: 110ms;
+  --md3-duration-medium-1: 250ms;
+  --md3-duration-medium-2: 180ms;
+  --md3-duration-medium-3: 350ms;
+  --md3-duration-medium-4: 400ms;
   --md3-duration-long-1: 450ms;
   --md3-duration-long-2: 500ms;
   --md3-duration-long-3: 550ms;

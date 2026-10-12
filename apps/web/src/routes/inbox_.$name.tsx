@@ -29,12 +29,12 @@ function CardPage() {
       <BackToInbox />
 
       <header className="space-y-1">
-        <h1 className="font-mono text-sm text-neutral-500">{card.name}</h1>
-        <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-neutral-500">
+        <h1 className="font-mono text-sm text-muted-foreground">{card.name}</h1>
+        <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
           <span>{card.error === null ? 'inbox card' : 'in the inbox, not a card'}</span>
           {card.workflow && (
             <span data-workflow={card.workflow} title={card.workflow}>
-              workflow <span className="font-mono text-neutral-700 dark:text-neutral-300">{workflowNameOf(card.workflow)}</span>
+              workflow <span className="font-mono text-foreground">{workflowNameOf(card.workflow)}</span>
             </span>
           )}
           {card.filedAt && (
@@ -46,7 +46,7 @@ function CardPage() {
       </header>
 
       {card.startedAs.length > 0 && (
-        <p data-started-as className="text-sm text-amber-700 dark:text-amber-400">
+        <p data-started-as className="text-sm text-yours">
           Started as{' '}
           {card.startedAs.map((id, i) => (
             <span key={id}>
@@ -82,7 +82,7 @@ function CardPage() {
 
 function BackToInbox() {
   return (
-    <Link to="/inbox" className="text-sm text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100">
+    <Link to="/inbox" className="text-sm text-muted-foreground hover:text-foreground">
       ← Inbox
     </Link>
   );

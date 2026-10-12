@@ -67,7 +67,7 @@ export default {
     const node = graph.locator(`.react-flow__node[data-id="${gated}"]`);
     await expectVisible(
       node.locator('[data-state="awaiting-approval"]', { hasText: 'awaiting approval' }),
-      `${gated}'s chip reads awaiting approval, amber`,
+      `${gated}'s chip reads awaiting approval, as a wait on a person`,
     );
     await expectVisible(
       node.locator('[data-need="approve"]', { hasText: `approve ${gated}` }),

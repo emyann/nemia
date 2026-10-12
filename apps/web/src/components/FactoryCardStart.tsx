@@ -30,9 +30,9 @@ export function FactoryCardStart({ entry, onStarted, onRefused }: { entry: Inbox
       {factories.error ? (
         <p className="text-xs text-red-700 dark:text-red-400">Could not read the factories to start it in: {factories.error.message}</p>
       ) : !place ? (
-        <p className="text-xs text-neutral-500">Reading the factory…</p>
+        <p className="text-xs text-muted-foreground">Reading the factory…</p>
       ) : 'why' in place ? (
-        <p data-unplaced className="text-xs text-amber-700 dark:text-amber-400">
+        <p data-unplaced className="text-xs text-yours">
           {place.why}
         </p>
       ) : (
@@ -86,7 +86,7 @@ export function RepoPicker({
           </option>
         ))}
       </select>
-      <p className="text-xs text-neutral-500">{note}</p>
+      <p className="text-xs text-muted-foreground">{note}</p>
     </div>
   );
 }
@@ -114,7 +114,7 @@ function InFactory({ entry, place, onStarted, onRefused }: { entry: InboxEntry; 
             Could not list the workflows of the factory {code(place.factory)}: {workflows.error.message}
           </p>
         ) : !workflows.data ? (
-          <p className="text-xs text-neutral-500">Reading the workflows…</p>
+          <p className="text-xs text-muted-foreground">Reading the workflows…</p>
         ) : (
           <select id={field} value={key} onChange={(event) => setPicked(event.target.value)} className={`${FIELD} sm:max-w-xs`}>
             <option value="" disabled>
@@ -123,12 +123,12 @@ function InFactory({ entry, place, onStarted, onRefused }: { entry: InboxEntry; 
             <WorkflowOptions workflows={workflows.data} />
           </select>
         )}
-        <p className="text-xs text-neutral-500">
+        <p className="text-xs text-muted-foreground">
           The workflows the factory {code(place.factory)} offers on {code(place.repo)}, with its hires.
         </p>
       </div>
       {workflow?.unfilled ? (
-        <p data-unfilled className="text-xs whitespace-pre-wrap break-words text-amber-700 dark:text-amber-400">
+        <p data-unfilled className="text-xs whitespace-pre-wrap break-words text-yours">
           {workflow.unfilled}
         </p>
       ) : (

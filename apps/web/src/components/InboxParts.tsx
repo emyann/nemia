@@ -19,12 +19,12 @@ export const SECONDARY =
  */
 export function CardMeta({ entry }: { entry: InboxEntry }) {
   return (
-    <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500">
+    <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
       <span className="font-mono">{entry.name}</span>
       <FactoryTag name={factoryOf(entry)} linked />
       {entry.workflow && (
         <span data-workflow={entry.workflow} title={entry.workflow}>
-          workflow <span className="font-mono text-neutral-700 dark:text-neutral-300">{workflowNameOf(entry.workflow)}</span>
+          workflow <span className="font-mono text-foreground">{workflowNameOf(entry.workflow)}</span>
         </span>
       )}
       {entry.repo && (
@@ -68,10 +68,10 @@ export function GoneItem({ entry, refusal, onDismiss }: { entry: InboxEntry; ref
     >
       <div className="flex flex-wrap items-start gap-3 sm:flex-nowrap">
         <div className="min-w-0 flex-1 space-y-1">
-          <p data-title className="font-medium break-words text-neutral-500">
+          <p data-title className="font-medium break-words text-muted-foreground">
             {entry.title ?? entry.file}
           </p>
-          <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-neutral-500">
+          <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
             <span className="font-mono">{entry.name}</span>
             <span>Gone from the inbox since this page listed it.</span>
           </p>
@@ -94,7 +94,7 @@ export function Tried({ entry }: { entry: InboxEntry & { tried: NonNullable<Inbo
   return (
     <p
       data-tried={refused ? 'refused' : 'failed'}
-      className={`rounded border px-3 py-2 text-xs break-words ${refused ? 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200' : 'border-neutral-200 text-neutral-600 dark:border-neutral-800 dark:text-neutral-400'}`}
+      className={`rounded border px-3 py-2 text-xs break-words ${refused ? 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200' : 'border-neutral-200 text-muted-foreground dark:border-neutral-800'}`}
     >
       {triedLine(entry, new Date(entry.tried.at).toLocaleString())}
     </p>

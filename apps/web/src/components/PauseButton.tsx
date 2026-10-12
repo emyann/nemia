@@ -150,7 +150,7 @@ function PauseFacts({
         {words.line}
       </p>
       <Lines lines={words.finishing} data="data-pause-finishing" />
-      <Lines lines={words.staged} data="data-pause-staged" className="text-amber-700 dark:text-amber-400" />
+      <Lines lines={words.staged} data="data-pause-staged" className="text-yours" />
       <Lines lines={words.held} data="data-pause-held" />
       <ul data-pause-actions className="flex flex-col gap-1">
         {words.state === 'running' && (

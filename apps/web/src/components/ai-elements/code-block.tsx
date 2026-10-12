@@ -21,7 +21,7 @@ const highlighterOf = () =>
   (highlighter ??= Promise.all([import('shiki/core'), import('shiki/engine/javascript')]).then(
     ([{ createHighlighterCore }, { createJavaScriptRegexEngine }]) =>
       createHighlighterCore({
-        themes: [import('shiki/themes/one-light.mjs'), import('shiki/themes/one-dark-pro.mjs')],
+        themes: [import('shiki/themes/github-light-high-contrast.mjs'), import('shiki/themes/one-dark-pro.mjs')],
         langs: [
           import('shiki/langs/json.mjs'),
           import('shiki/langs/bash.mjs'),
@@ -37,7 +37,7 @@ const highlighterOf = () =>
 export async function highlightCode(code: string, language: Exclude<CodeLanguage, 'text'>) {
   const shiki = await highlighterOf();
   return [
-    shiki.codeToHtml(code, { lang: language, theme: 'one-light' }),
+    shiki.codeToHtml(code, { lang: language, theme: 'github-light-high-contrast' }),
     shiki.codeToHtml(code, { lang: language, theme: 'one-dark-pro' }),
   ] as const;
 }

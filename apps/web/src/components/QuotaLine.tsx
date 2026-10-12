@@ -30,7 +30,10 @@ export function QuotaLine({ quota, error }: { quota: Quota | undefined; error: E
           <Lead /> {quota.said}
         </p>
         {last && (
-          <p data-quota-last className="mt-0.5 flex flex-wrap items-baseline gap-x-3 opacity-60">
+          <p
+            data-quota-last
+            className="mt-0.5 flex flex-wrap items-baseline gap-x-3 text-foreground opacity-70 [&_[data-marked]]:text-foreground"
+          >
             {last.windows.map((w) => (
               <Window key={w.key} words={w} markAt={quota.markAt} data={{ 'data-quota-last-window': w.key }} />
             ))}
@@ -71,7 +74,7 @@ function Window({
   emphasis?: boolean;
 }) {
   return (
-    <span {...data} data-marked={words.marked || undefined} className={words.marked ? 'text-amber-700 dark:text-amber-400' : undefined}>
+    <span {...data} data-marked={words.marked || undefined} className={words.marked ? 'text-money' : undefined}>
       {words.marked && <TriangleAlert aria-label={`${markAt}% or more used`} className="mr-1 inline size-3.5 -translate-y-px" />}
       {words.label}{' '}
       <span

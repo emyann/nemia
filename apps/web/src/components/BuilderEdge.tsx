@@ -43,7 +43,7 @@ export function BuilderEdge({
             aria-label={`Remove ${data.said}`}
             title={`Remove ${data.said}`}
             style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
-            className="nodrag nopan pointer-events-auto absolute flex size-5 items-center justify-center rounded-full border border-neutral-300 bg-white text-neutral-500 shadow-sm hover:border-red-400 hover:text-red-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-400 dark:hover:border-red-500 dark:hover:text-red-400"
+            className="nodrag nopan pointer-events-auto absolute flex size-5 items-center justify-center rounded-full border border-neutral-300 bg-white text-muted-foreground shadow-sm hover:border-red-400 hover:text-red-600 dark:border-neutral-700 dark:bg-neutral-900 dark:hover:border-red-500 dark:hover:text-red-400"
           >
             <X className="size-3" aria-hidden />
           </button>

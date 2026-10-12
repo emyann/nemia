@@ -254,19 +254,18 @@ test("an edge is drawn from what it says: in the running colour while it moves, 
   );
 });
 
-test('every edge colour is given in both themes — a colour named and never given draws no line at all', () => {
+test('every edge colour is given once, from a name that follows the scheme — a colour named and never given draws no line at all', () => {
   const css = fs.readFileSync(path.resolve(import.meta.dirname, '..', 'src', 'styles.css'), 'utf8');
   const blocks = [...css.matchAll(/\.react-flow \{([^}]*)\}/g)];
-  assert.equal(blocks.length, 2, 'one .react-flow block per theme: the light one, then again under the dark query');
-  const [light, dark] = blocks as [RegExpExecArray, RegExpExecArray];
-  assert.match(css.slice(light.index, dark.index), /@media \(prefers-color-scheme: dark\) \{\s*$/, 'the second is the dark theme');
+  assert.equal(blocks.length, 1, "one .react-flow block: its colours are the theme's roles, which change with the scheme themselves");
+  const [palette] = blocks as [RegExpExecArray];
   const named = (['to-come', 'done', 'running'] as const).flatMap((state) => [edgeStroke(state, false), edgeStroke(state, true)]);
   for (const colour of new Set(named)) {
     const name = /^var\((--[\w-]+)\)$/.exec(colour)?.[1];
     assert.ok(name, colour);
-    assert.ok(light[1].includes(`${name}:`), `${name} in the light theme`);
-    assert.ok(dark[1].includes(`${name}:`), `${name} in the dark theme`);
+    assert.match(palette[1], new RegExp(`${name}:\\s*var\\(--(?:md-sys-color|meaning)-[\\w-]+\\);`), `${name} read from the theme`);
   }
+  assert.doesNotMatch(palette[1], /var\(--color-/, 'no colour of one scheme alone');
 });
 
 test("a loop's path runs from under the looping step, beneath both, and up into its target, its label at the lowest point", () => {

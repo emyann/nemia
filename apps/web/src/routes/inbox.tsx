@@ -55,7 +55,7 @@ function InboxPage() {
 
   return (
     <article className="space-y-6">
-      <p className="text-sm text-neutral-500">
+      <p className="text-sm text-muted-foreground">
         An idea parked as a card until you start a workflow on it: a file each in the store&apos;s {code('inbox/')}, as the box below or the
         command line parks one. Starting a card writes its run&apos;s record as any start does, and removes the card. A card queued starts
         on its own, on the workflow it names, when the daemon — this api, or the command line&apos;s — has a run slot free: the oldest
@@ -65,11 +65,11 @@ function InboxPage() {
       <section aria-label="Cards" className="space-y-3">
         <h2 className="flex items-baseline gap-2 text-sm font-semibold">
           Cards{' '}
-          <span data-count className="text-xs font-normal text-neutral-500">
+          <span data-count className="text-xs font-normal text-muted-foreground">
             {cards.length}
           </span>
           {queue > 0 && (
-            <span data-queue-count className="text-xs font-normal text-neutral-500">
+            <span data-queue-count className="text-xs font-normal text-muted-foreground">
               · {queue} queued
             </span>
           )}
@@ -86,7 +86,7 @@ function InboxPage() {
           </ul>
         )}
         {cards.length === 0 && all.length > 0 && (
-          <p data-filtered-out className="text-sm text-neutral-500">
+          <p data-filtered-out className="text-sm text-muted-foreground">
             No card of the factory <span className="font-mono">{factory}</span>.{' '}
             <Link to="/inbox" search={{}} replace className="underline underline-offset-2">
               Show every factory&apos;s
@@ -95,7 +95,7 @@ function InboxPage() {
           </p>
         )}
         {all.length === 0 && (
-          <p data-empty className="text-sm text-neutral-500">
+          <p data-empty className="text-sm text-muted-foreground">
             The inbox is empty. File an idea in the box above, or from the command line.
           </p>
         )}
@@ -176,7 +176,7 @@ function FileCard() {
             {inFolders ? 'Where its work goes' : 'Repository'}
           </label>
           {inFolders ? (
-            <p data-in-folders className="text-xs text-neutral-600 dark:text-neutral-400">
+            <p data-in-folders className="text-xs text-muted-foreground">
               {picked!.name} works in folders the run makes for it, and looks at no repository. The card names none, and the run says where
               the work is.
             </p>
@@ -195,7 +195,7 @@ function FileCard() {
         <button type="submit" disabled={!idea.trim() || file.isPending} className={PRIMARY}>
           {file.isPending ? 'Filing…' : 'File'}
         </button>
-        <span className="text-xs text-neutral-500">Parked, not started: nothing runs until you start it.</span>
+        <span className="text-xs text-muted-foreground">Parked, not started: nothing runs until you start it.</span>
       </div>
       {file.isError && (
         <div data-refused className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40">
@@ -280,7 +280,7 @@ function CardItem({
           <CardMeta entry={entry} />
           <CardFrom entry={entry} editable={startable} onRefused={onRefused} />
           {entry.queued && (
-            <p className="flex flex-wrap items-baseline gap-x-2 text-xs text-neutral-500">
+            <p className="flex flex-wrap items-baseline gap-x-2 text-xs text-muted-foreground">
               <span
                 data-queued={entry.queued.place ?? ''}
                 className="rounded-full border border-sky-300 bg-sky-50 px-2 py-0.5 font-medium text-sky-900 dark:border-sky-800 dark:bg-sky-950/60 dark:text-sky-200"
@@ -360,7 +360,7 @@ function CardItem({
 /** The runs a card still in the inbox was started as, each linked, and why its removal failed where this page was told (`kept`). */
 function StartedAs({ startedAs, kept }: { startedAs: readonly string[]; kept: { why: string } | null }) {
   return (
-    <p data-started-as className="text-sm text-amber-700 dark:text-amber-400">
+    <p data-started-as className="text-sm text-yours">
       Started as{' '}
       {startedAs.map((id, i) => (
         <span key={id}>
@@ -440,7 +440,7 @@ function StartHere({
             Could not list the workflows to start it on: {(workflows.error ?? repository.error)!.message}
           </p>
         ) : !workflows.data || here === undefined ? (
-          <p className="text-xs text-neutral-500">Reading the workflows…</p>
+          <p className="text-xs text-muted-foreground">Reading the workflows…</p>
         ) : (
           <select id={field} value={key} onChange={(event) => setPicked(event.target.value)} className={`${FIELD} sm:max-w-xs`}>
             <option value="" disabled>
@@ -450,7 +450,7 @@ function StartHere({
           </select>
         )}
         {entry.workflow && workflows.data && here !== undefined && !preset && (
-          <p data-unlisted className="text-xs text-amber-700 dark:text-amber-400">
+          <p data-unlisted className="text-xs text-yours">
             {namedElsewhere(entry.workflow, entry.repo, here) ? (
               <>
                 The card names {code(entry.workflow)}, a workflow of {code(entry.repo!)}, and the workflows here are {code(here)}&apos;s:

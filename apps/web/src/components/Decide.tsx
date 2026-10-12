@@ -18,7 +18,7 @@ import { acceptStepOf, barOf, changeOf, decidableRun, decisionStamp, diffLine, i
 import { cn } from '../lib/utils';
 import { BUTTON, MODES, Refusal, TEXTAREA, useAccept, useAsk } from './Ask';
 import { CopyButton } from './CopyButton';
-import { Facts, pathRow, readRows, TrialMerges } from './Facts';
+import { Facts, HEADING, pathRow, readRows, TrialMerges } from './Facts';
 import { Asks, QuestionsForm } from './Questions';
 import { RaiseRow } from './Raise';
 
@@ -61,7 +61,7 @@ function DecideFrame({ children }: { children: ReactNode }) {
     >
       <div className="space-y-1">
         <h2 className="font-semibold">Decide</h2>
-        <p className="text-xs text-neutral-500">
+        <p className="text-xs text-muted-foreground">
           What there is to decide on this run. Copy a command to run it yourself; the board runs one of them, accepting a loop's work as it
           stands with your reason. An answer given here asks for a try, or a round; each row says what the tick does with it.
         </p>
@@ -107,7 +107,7 @@ function DecisionParts({ runId, decision, run = null }: DecisionProps) {
       <div className="space-y-4">
         {inFolders ? (
           <div data-in-folders className="space-y-1">
-            <p className="text-sm text-neutral-500">
+            <p className="text-sm text-muted-foreground">
               Worked in folders of its own, and changed nothing anywhere else: what it made is there, to keep or to forget.
             </p>
             <Facts rows={[['work', pathRow(run.work)]]} />
@@ -115,7 +115,7 @@ function DecisionParts({ runId, decision, run = null }: DecisionProps) {
         ) : touched.length ? (
           touched.map((t) => <TouchedBranch key={t.branch} touched={t} />)
         ) : (
-          <p className="text-sm text-neutral-500">No branch to read: no step worked on one.</p>
+          <p className="text-sm text-muted-foreground">No branch to read: no step worked on one.</p>
         )}
         {!inFolders && <LessonChip lesson={lesson} />}
       </div>
@@ -125,7 +125,7 @@ function DecisionParts({ runId, decision, run = null }: DecisionProps) {
       {!inFolders && <InFull sensitive={sensitive} touched={touched} />}
 
       <section aria-label="Used" className="space-y-1">
-        <h3 className="text-xs font-medium text-neutral-500">Used, over every step's current try — and what every try of the run cost</h3>
+        <h3 className={HEADING}>Used, over every step's current try — and what every try of the run cost</h3>
         <Facts rows={[['used', total.used], ['cost', total.cost], ...readRows(total), ['every try', cost]]} />
       </section>
 
@@ -142,9 +142,7 @@ function DecisionParts({ runId, decision, run = null }: DecisionProps) {
 export function Offers({ runId, offers }: { runId: string; offers: readonly Answer[] }) {
   return (
     <section aria-label="Answer" className="space-y-2">
-      <h3 className="text-xs font-medium text-neutral-500">
-        Answer — each asks for a try of its step, or a round of its loop, as the command line would
-      </h3>
+      <h3 className={HEADING}>Answer — each asks for a try of its step, or a round of its loop, as the command line would</h3>
       <ul className="space-y-3">
         {offers.map((offer) =>
           offer.kind === 'raise' ? (
@@ -204,7 +202,7 @@ export function OfferRow({ runId, offer }: { runId: string; offer: Exclude<Answe
     return (
       <li data-offer="asked" data-step={offer.step} className="rounded border border-neutral-200 px-3 py-2 text-sm dark:border-neutral-800">
         <strong>{offer.step}</strong>{' '}
-        <span data-note className="font-mono text-xs text-neutral-600 dark:text-neutral-400">
+        <span data-note className="font-mono text-xs text-muted-foreground">
           {offer.kind === 'asked' ? (offer.note ?? `try ${offer.try} asked`) : ask.isSuccess ? askedSaid(ask.data) : null}
         </span>
       </li>
@@ -258,7 +256,7 @@ export function OfferRow({ runId, offer }: { runId: string; offer: Exclude<Answe
           className={cn(TEXTAREA, 'disabled:cursor-not-allowed disabled:opacity-50')}
         />
         {rechecking && message.trim() && (
-          <p data-recheck-note className="text-xs text-neutral-500">
+          <p data-recheck-note className="text-xs text-muted-foreground">
             Not sent with a recheck: it files no session to read it. Choose a session to send it.
           </p>
         )}
@@ -271,7 +269,7 @@ export function OfferRow({ runId, offer }: { runId: string; offer: Exclude<Answe
             {modes.map((m) => (
               <label key={m} className="flex cursor-pointer items-center gap-1.5">
                 <input type="radio" name={`${field}-mode`} value={m} checked={mode === m} onChange={() => setMode(m)} />
-                {MODES[m]} <code className="text-neutral-500">--{m}</code>
+                {MODES[m]} <code className="text-muted-foreground">--{m}</code>
               </label>
             ))}
           </fieldset>
@@ -343,7 +341,7 @@ export function TouchedBranch({ touched: { branch, radius } }: { touched: Touche
   return (
     <div data-touched={branch} className="space-y-2">
       <p className="text-sm">
-        <span className="text-neutral-500">touched </span>
+        <span className="text-muted-foreground">touched </span>
         <span className="break-all font-mono text-xs">{branch}</span>
       </p>
       {'error' in radius ? (
@@ -354,7 +352,7 @@ export function TouchedBranch({ touched: { branch, radius } }: { touched: Touche
           <Chips agentFacing={radius.agentFacing} checkAffecting={radius.checkAffecting} />
         </>
       ) : (
-        <p className="text-sm text-neutral-500">nothing — the branch changed no file against the base</p>
+        <p className="text-sm text-muted-foreground">nothing — the branch changed no file against the base</p>
       )}
     </div>
   );
@@ -374,7 +372,7 @@ function GroupRows({ groups }: { groups: readonly Group[] }) {
             <span className="truncate font-mono" title={g.name}>
               {g.name}
             </span>
-            <span className="text-right tabular-nums text-neutral-500">
+            <span className="text-right tabular-nums text-muted-foreground">
               {g.files} file{g.files === 1 ? '' : 's'}
             </span>
             <GroupBar group={g} most={most} />
@@ -385,7 +383,7 @@ function GroupRows({ groups }: { groups: readonly Group[] }) {
                   <span className="text-red-700 dark:text-red-400">−{g.removed}</span>
                 </>
               )}
-              {g.binary > 0 && <span className="text-neutral-500">{counted > 0 ? ` · ${g.binary} binary` : 'binary'}</span>}
+              {g.binary > 0 && <span className="text-muted-foreground">{counted > 0 ? ` · ${g.binary} binary` : 'binary'}</span>}
             </span>
           </li>
         );
@@ -422,7 +420,7 @@ export function Chips({ agentFacing, checkAffecting }: { agentFacing: readonly s
   const row = (label: string, files: readonly string[], kind: string, title: string, className: string) =>
     files.length > 0 && (
       <p className="flex flex-wrap items-center gap-1.5">
-        <span className="w-28 shrink-0 text-neutral-500">{label}</span>
+        <span className="w-28 shrink-0 text-muted-foreground">{label}</span>
         {files.map((file) => (
           <span
             key={file}
@@ -467,7 +465,7 @@ export function LessonChip({ lesson }: { lesson: Lesson }) {
         : [
             `lesson ${lesson.said}`,
             'A branch could not be read, so nobody can say what it wrote.',
-            'border border-dashed border-neutral-300 text-neutral-600 dark:border-neutral-700 dark:text-neutral-400',
+            'border border-dashed border-neutral-300 text-muted-foreground dark:border-neutral-700',
           ];
   return (
     <p>
@@ -482,12 +480,10 @@ export function LessonChip({ lesson }: { lesson: Lesson }) {
 function InFull({ sensitive, touched }: { sensitive: readonly SensitiveDiff[]; touched: readonly Touched[] }) {
   return (
     <section aria-label="In full" className="space-y-2">
-      <h3 className="text-xs font-medium text-neutral-500">
-        In full: the check-affecting files — what a change could edit to make its check pass
-      </h3>
+      <h3 className={HEADING}>In full: the check-affecting files — what a change could edit to make its check pass</h3>
       {sensitive.map(({ branch, files, error }) => (
         <div key={branch} className="space-y-1.5">
-          {sensitive.length > 1 && <p className="break-all font-mono text-xs text-neutral-500">{branch}</p>}
+          {sensitive.length > 1 && <p className="break-all font-mono text-xs text-muted-foreground">{branch}</p>}
           {error ? (
             <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
           ) : files.length ? (
@@ -502,7 +498,7 @@ function InFull({ sensitive, touched }: { sensitive: readonly SensitiveDiff[]; t
               />
             ))
           ) : (
-            <p className="text-sm text-neutral-500">none</p>
+            <p className="text-sm text-muted-foreground">none</p>
           )}
         </div>
       ))}
@@ -511,7 +507,7 @@ function InFull({ sensitive, touched }: { sensitive: readonly SensitiveDiff[]; t
 }
 
 const LINE_CLASS: Record<DiffLine, string> = {
-  meta: 'font-semibold text-neutral-500',
+  meta: 'font-semibold text-muted-foreground',
   hunk: 'bg-sky-50 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300',
   added: 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300',
   removed: 'bg-red-50 text-red-800 dark:bg-red-950/50 dark:text-red-300',
@@ -526,7 +522,7 @@ export function DiffFileView({ file, counts }: { file: DiffFile; counts?: { adde
   return (
     <details data-diff={file.path} className="group rounded border border-neutral-200 dark:border-neutral-800">
       <summary className="flex cursor-pointer items-center gap-2 px-2 py-1 text-xs hover:bg-neutral-50 dark:hover:bg-neutral-900">
-        <ChevronRight aria-hidden className="size-3.5 shrink-0 text-neutral-500 transition-transform group-open:rotate-90" />
+        <ChevronRight aria-hidden className="size-3.5 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
         <span className="min-w-0 flex-1 truncate font-mono" title={file.path}>
           {file.path}
         </span>
@@ -554,7 +550,7 @@ export function DiffFileView({ file, counts }: { file: DiffFile; counts?: { adde
         })}
       </pre>
       {file.cut > 0 && (
-        <p data-cut={file.cut} className="border-t border-neutral-200 px-2 py-1 text-xs text-neutral-500 dark:border-neutral-800">
+        <p data-cut={file.cut} className="border-t border-neutral-200 px-2 py-1 text-xs text-muted-foreground dark:border-neutral-800">
           {file.cut} more line{file.cut === 1 ? '' : 's'} — the command line&apos;s decide prints them all
         </p>
       )}
@@ -570,7 +566,7 @@ export function DiffFileView({ file, counts }: { file: DiffFile; counts?: { adde
 export function Commands({ runId, commands }: { runId: string; commands: readonly DecideCommand[] }) {
   return (
     <section aria-label="Commands" className="space-y-2">
-      <h3 className="text-xs font-medium text-neutral-500">Commands — copy one to run it; the board runs only accept, with your reason</h3>
+      <h3 className={HEADING}>Commands — copy one to run it; the board runs only accept, with your reason</h3>
       {commands.length ? (
         <ul className="space-y-2">
           {commands.map((c) => {
@@ -585,7 +581,7 @@ export function Commands({ runId, commands }: { runId: string; commands: readonl
           })}
         </ul>
       ) : (
-        <p className="text-sm text-neutral-500">None yet: the run is still moving.</p>
+        <p className="text-sm text-muted-foreground">None yet: the run is still moving.</p>
       )}
     </section>
   );
@@ -595,9 +591,9 @@ export function Commands({ runId, commands }: { runId: string; commands: readonl
 function CommandLine({ command: c }: { command: DecideCommand }) {
   return (
     <>
-      {c.said && <p className="text-xs text-neutral-500">{c.said.replace(`:  ${c.command}`, '')}</p>}
+      {c.said && <p className="text-xs text-muted-foreground">{c.said.replace(`:  ${c.command}`, '')}</p>}
       <div className="flex items-center gap-2">
-        <span className="w-16 shrink-0 text-xs text-neutral-500">{c.label}</span>
+        <span className="w-16 shrink-0 text-xs text-muted-foreground">{c.label}</span>
         <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap rounded bg-neutral-100 px-2 py-1 font-mono text-xs dark:bg-neutral-950">
           {c.command}
         </code>

@@ -103,8 +103,8 @@ export function Gate({
             aria-label={`What ${step} handed on`}
             className="min-w-0 space-y-2 rounded border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900"
           >
-            <h3 className="text-xs font-medium text-neutral-500">
-              What <span className="font-semibold text-neutral-700 dark:text-neutral-300">{step}</span> handed on, which you approve
+            <h3 className="text-xs font-medium text-muted-foreground">
+              What <span className="font-semibold text-foreground">{step}</span> handed on, which you approve
             </h3>
             <HandedOn closeout={closeout} answeredBeside={questions.length > 0} />
           </section>
@@ -315,7 +315,7 @@ const RETRY_MODES = ['nudge', 'fresh'] as const;
 /** A send-back's mode as its radio says it: what it does, and the CLI's flag for it. */
 const modeLabel = (m: RetryMode): ReactNode => (
   <>
-    {MODES[m]} <code className="text-neutral-500">--{m}</code>
+    {MODES[m]} <code className="text-muted-foreground">--{m}</code>
   </>
 );
 
@@ -417,7 +417,7 @@ function GateTaken({ step, taken }: { step: string; taken: { named: string; said
       className="rounded border border-neutral-200 px-3 py-2 text-sm dark:border-neutral-800"
     >
       <strong>{taken.named}</strong>{' '}
-      <span data-note className="font-mono text-xs text-neutral-600 dark:text-neutral-400">
+      <span data-note className="font-mono text-xs text-muted-foreground">
         {taken.said}
       </span>
     </section>
@@ -474,19 +474,19 @@ export function ActsOn({ run, step }: { run: RunDetail; step: RunDetail['steps']
       className="min-w-0 space-y-3 rounded border border-neutral-200 p-3 text-sm dark:border-neutral-800"
     >
       <div className="space-y-1">
-        <h3 className="text-xs font-medium text-neutral-500">The result it would act on</h3>
+        <h3 className="text-xs font-medium text-muted-foreground">The result it would act on</h3>
         {standings.map((s) => (
           <p key={s.branch} data-standing={s.where} className="break-words">
             <span className="font-mono text-xs">{s.said}</span>
             {s.stat && (
-              <span data-stat className="block font-mono text-xs text-neutral-500">
+              <span data-stat className="block font-mono text-xs text-muted-foreground">
                 {s.stat}
               </span>
             )}
           </p>
         ))}
         {!standings.length && (
-          <p className="text-xs text-neutral-500">
+          <p className="text-xs text-muted-foreground">
             {error
               ? `The branch could not be read: ${error.message}`
               : isDecidable(data)
@@ -498,16 +498,16 @@ export function ActsOn({ run, step }: { run: RunDetail; step: RunDetail['steps']
 
       {work.map((one) => (
         <div key={one.name} className="min-w-0 space-y-2 border-t border-neutral-200 pt-3 dark:border-neutral-800">
-          <h3 className="text-xs font-medium text-neutral-500">
-            What <span className="font-semibold text-neutral-700 dark:text-neutral-300">{one.name}</span> handed on
+          <h3 className="text-xs font-medium text-muted-foreground">
+            What <span className="font-semibold text-foreground">{one.name}</span> handed on
           </h3>
           {one.closeout ? (
             <Markdown>{one.closeout.summary}</Markdown>
           ) : (
-            <p className="text-xs text-neutral-500">It signed off with nothing to read.</p>
+            <p className="text-xs text-muted-foreground">It signed off with nothing to read.</p>
           )}
           {one.closeout && (
-            <div aria-label={`Artifacts of ${one.name}`} className="text-xs text-neutral-500">
+            <div aria-label={`Artifacts of ${one.name}`} className="text-xs text-muted-foreground">
               Artifacts:
               <Artifacts artifacts={one.closeout.artifacts} />
             </div>
@@ -549,7 +549,7 @@ export function Approved({ step, approval, ends = false }: { step: string; appro
     >
       <p>
         <span className="font-medium text-emerald-800 dark:text-emerald-300">Approved</span>{' '}
-        <span className="text-neutral-600 dark:text-neutral-400">
+        <span className="text-muted-foreground">
           try {approval.try}, {when(approval.at)} —{' '}
           {ends
             ? `your approval filed it, and the step is handed ${approval.message === null ? 'it' : 'these words'} as the terms it acts on`
@@ -557,7 +557,7 @@ export function Approved({ step, approval, ends = false }: { step: string; appro
         </span>
       </p>
       {approval.message === null ? (
-        <p data-words="none" className="text-neutral-500">
+        <p data-words="none" className="text-muted-foreground">
           with no words
         </p>
       ) : (
@@ -571,7 +571,7 @@ export function Approved({ step, approval, ends = false }: { step: string; appro
 
 /** The look of a gate's second button: outlined, beside the filled one that answers. */
 export const SECONDARY =
-  'bg-white text-neutral-900 ring-1 ring-neutral-300 ring-inset hover:bg-neutral-100 disabled:hover:bg-white dark:bg-neutral-900 dark:text-neutral-100 dark:ring-neutral-700 dark:hover:bg-neutral-800 dark:disabled:hover:bg-neutral-900';
+  'bg-white text-foreground ring-1 dark:text-foreground ring-neutral-300 ring-inset hover:bg-neutral-100 disabled:hover:bg-white dark:bg-neutral-900 dark:ring-neutral-700 dark:hover:bg-neutral-800 dark:disabled:hover:bg-neutral-900';
 
 /**
  * An approval of a step at its gate through the api (`approveStep`), and the run read again once the api has it — its detail, and the

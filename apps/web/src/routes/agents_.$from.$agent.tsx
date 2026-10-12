@@ -141,7 +141,7 @@ function FormIn({ agent, mine, children }: { agent: AgentListing; mine: boolean;
     );
   return (
     <>
-      <p className="border-b border-neutral-200 pb-2 font-mono text-[11px] break-all text-neutral-500 dark:border-neutral-800">
+      <p className="border-b border-neutral-200 pb-2 font-mono text-[11px] break-all text-muted-foreground dark:border-neutral-800">
         {agent.file}
       </p>
       {children}
@@ -175,15 +175,15 @@ function AgentHeader({ agent, mine }: { agent: AgentListing; mine: boolean }) {
             <h1 className="text-lg font-semibold">{personOf(agent.name)}</h1>
             <FromBadge from={agent.from} />
           </div>
-          <p data-agent-role className="text-sm text-neutral-600 dark:text-neutral-400">
+          <p data-agent-role className="text-sm text-muted-foreground">
             {agent.role ?? 'No role yet'} · <span className="font-mono text-xs">agent: {agent.name}</span>
           </p>
         </div>
       </div>
-      {agent.description && <p className="text-sm text-neutral-700 dark:text-neutral-300">{agent.description}</p>}
+      {agent.description && <p className="text-sm text-foreground">{agent.description}</p>}
       <UsedBy listing={agent} />
       {!mine && (
-        <p data-read-only className="text-xs text-neutral-500">
+        <p data-read-only className="text-xs text-muted-foreground">
           The repository's agents are read here, not written: they change with the repository, in a commit.
           {agent.untried?.copy && <> To start one of yours from this one, {code(agent.untried.copy)}.</>}
         </p>
@@ -206,7 +206,7 @@ function Remove({ agent, pending, onRemove }: { agent: AgentListing; pending: bo
       </Button>
     );
   return (
-    <span data-remove-asks className="ml-auto flex flex-wrap items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">
+    <span data-remove-asks className="ml-auto flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
       Remove {code(`agents/${agent.name}.md`)}
       {beside.length > 0 && (
         <>

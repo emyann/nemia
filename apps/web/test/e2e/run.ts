@@ -1,7 +1,7 @@
 /**
  * `npm run e2e`: the web app, built, served against seeded stores, and looked at in a browser, by workers in parallel.
  *
- *     npm run e2e [-- [--photos] [--pages <name,…>] [--workers <n>]]
+ *     npm run e2e [-- [--photos [--contrast]] [--pages <name,…>] [--workers <n>]]
  *
  *  0. Reads its plan from its command line (`planOf`, pages.ts), refusing a flag or a page it does not know before anything else.
  *  1. Builds the web app, once.
@@ -153,7 +153,7 @@ async function main(): Promise<void> {
   });
   apart(seats);
   console.log(`e2e: ${plan.visit.length} pages over ${n} worker${n > 1 ? 's' : ''} (${Math.round(os.freemem() / 2 ** 20)} MB free)`);
-  const flags = plan.themes.length > 1 ? ['--photos'] : [];
+  const flags = [...(plan.themes.length > 1 ? ['--photos'] : []), ...(plan.measured ? ['--contrast'] : [])];
   results = await Promise.all(seats.map((seat) => runWorker(seat.worker, seat.store, flags, dir, queue)));
   apart(results);
   const order = plan.visit.map((p) => p.name);

@@ -139,7 +139,7 @@ export const LOOP_TARGET = 'loop-in';
 
 /**
  * An edge's colour, its arrow's and its travelling dot's too, each theme's in styles.css: the running colour while work moves
- * along it — a loop's edge back too, while its round is due — else violet for a loop, and the greys for work done and to come.
+ * along it — a loop's edge back too, while its round is due — else a loop's own, and the rest's for work done and to come.
  */
 export function edgeStroke(state: EdgeState, loop: boolean): string {
   if (state === 'running') return 'var(--edge-running)';

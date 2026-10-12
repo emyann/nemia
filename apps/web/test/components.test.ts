@@ -285,14 +285,14 @@ function nodeMarkup(run: RunDetail): string {
   return renderToStaticMarkup(createElement(ReactFlowProvider, null, createElement(StepNode, props)));
 }
 
-const gateDrawn = (html: string) => />human gate</.test(html) || />waiting on you</.test(html) || /border-amber-500/.test(html);
+const gateDrawn = (html: string) => />human gate</.test(html) || />waiting on you</.test(html) || /border-yours/.test(html);
 
 test('a loop out of rounds is drawn as a human gate on the canvas, as a blocked step is — and on a cancelled run, not', () => {
   for (const status of ['rounds exhausted', 'succeeded · BLOCKED']) {
     const gate = nodeMarkup(runOf(status, { waitingOnYou: ['review'] }));
     assert.match(gate, />human gate</, status);
     assert.match(gate, />waiting on you</, status);
-    assert.match(gate, /border-amber-500/, status);
+    assert.match(gate, /border-yours/, status);
 
     for (const waitingOnYou of [[], ['review']]) {
       const cancelled = nodeMarkup(runOf(status, { waitingOnYou, cancelledAt: at }));
@@ -2661,7 +2661,7 @@ test('the tries say `your answer` beside a try a person answered, and above its 
   );
   assert.ok(
     rounds.includes(
-      `<p data-your-answer="true" title="${answer}" class="line-clamp-2 break-words"><span class="text-neutral-500">your answer </span>${answer}</p>`,
+      `<p data-your-answer="true" title="${answer}" class="line-clamp-2 break-words"><span class="text-muted-foreground">your answer </span>${answer}</p>`,
     ),
     rounds,
   );
@@ -2853,7 +2853,7 @@ const withClient = (element: ReturnType<typeof createElement>) =>
 test('a step at its gate is a human gate on the canvas, and its node says what is asked of you — `approve review` after `waiting on you` — and on a run called off, not', () => {
   const html = nodeMarkup(atGate());
   assert.match(html, />human gate</);
-  assert.match(html, /border-amber-500/);
+  assert.match(html, /border-yours/);
   assert.match(html, /data-state="awaiting-approval"/);
   const footer = /<p title="([^"]*)" class="truncate [^"]*">([\s\S]*?)<\/p>/.exec(html);
   assert.ok(footer, html);
@@ -3349,7 +3349,7 @@ test("the Factory's legend adds the edge between two cards, dashed and still as 
     ['to come', 'running', 'done', 'loops back', 'waits until it ships', 'reads what it concluded', 'human gate', 'to decide'],
     'the edge between cards, the line of what a card reads, and the ring round a card whose result nobody has decided, which only the Factory draws',
   );
-  assert.match(items.get('to decide')!, /ring-1 ring-emerald-500/);
+  assert.match(items.get('to decide')!, /ring-1 ring-yours/);
   const html = legendOf(true);
   assert.match(html, /title="A run that has started draws no line from its waits\."[^>]*>[\s\S]*?waits until it ships/);
   const reads = items.get('reads what it concluded')!;
@@ -3577,12 +3577,12 @@ const pricedRun = (
   return { ...run, steps: [{ ...run.steps[0], ...cost }] };
 };
 
-test("a step's node says what its tries cost, of its cap where it has one — red once they cost it or more — and a step past its budget is a human gate", () => {
+test("a step's node says what its tries cost, of its cap where it has one — in money's amber once they cost it or more — and a step past its budget is a human gate", () => {
   const over = nodeMarkup(pricedRun('over budget $4.25 of $3', priced(4.25, 3, true), ['review']));
   const costOf = (html: string) => /<p data-cost="(\w+)"[^>]*class="([^"]*)"><span[^>]*>cost <\/span>([^<]*)<\/p>/.exec(html);
   const [, state, className, said] = costOf(over) ?? [];
   assert.deepEqual([state, said], ['over', '$4.25 of $3'], over);
-  assert.match(className, /\btext-red-700\b/);
+  assert.match(className, /\btext-money\b/);
   assert.equal(gateDrawn(over), true, 'over budget waits on you: a human gate');
   assert.equal(
     gateDrawn(nodeMarkup(pricedRun('budget exhausted $3.02 of $3', priced(3.02, 3, true), ['review']))),
@@ -3591,7 +3591,7 @@ test("a step's node says what its tries cost, of its cap where it has one — re
   );
 
   const within = costOf(nodeMarkup(pricedRun('verified ✓', priced(1.2, 3))));
-  assert.deepEqual([within?.[1], within?.[3], /\btext-red-700\b/.test(within?.[2] ?? '')], ['within', '$1.20 of $3', false]);
+  assert.deepEqual([within?.[1], within?.[3], /\btext-money\b/.test(within?.[2] ?? '')], ['within', '$1.20 of $3', false]);
   assert.equal(costOf(nodeMarkup(pricedRun('verified ✓', priced(1.2, null))))?.[3], '$1.20', 'no cap: what its tries cost');
   assert.equal(
     costOf(nodeMarkup(pricedRun('running (working)', priced(null, 3))))?.[3],
@@ -3629,7 +3629,7 @@ test("the inspector's Details say what every try cost of its cap — `spent`, re
   const step = run.steps[0];
   const over = { ...step, ...priced(4.25, 3, true) };
   assert.equal(rows(over).spent, '$4.25 of $3');
-  assert.match(markup(over), /<span data-spent="over" class="[^"]*\btext-red-700\b[^"]*">\$4\.25 of \$3<\/span>/);
+  assert.match(markup(over), /<span data-spent="over" class="[^"]*\btext-money\b[^"]*">\$4\.25 of \$3<\/span>/);
   assert.match(markup({ ...step, ...priced(1.2, 3) }), /<span data-spent="within" class="font-mono text-xs ">\$1\.20 of \$3<\/span>/);
   assert.equal(rows({ ...step, ...priced(null, 3) }).spent, 'budget $3');
   assert.equal(
@@ -3818,7 +3818,7 @@ test('what sessions read, by price: beside the cost, the peak marked at a cap or
   );
   assert.match(
     capped,
-    /<span data-peak="cap" class="[^"]*text-amber-700[^"]*" title="It reached the step&#x27;s context: cap: Claude Code compacted[^"]*">peak 174k, compacted twice at its 200k cap<\/span>/,
+    /<span data-peak="cap" class="[^"]*text-money[^"]*" title="It reached the step&#x27;s context: cap: Claude Code compacted[^"]*">peak 174k, compacted twice at its 200k cap<\/span>/,
   );
   const unpeaked = markup(createElement(Read, { said: 'read 900k · wrote 20k · compacted at its 100k cap', peak: 'cap', rebuilt: 0 }));
   assert.match(
@@ -5145,7 +5145,7 @@ test('REFUSED: the Debug panel is closed by default, and reads and draws nothing
   assert.equal(client.getQueryCache().getAll().length, 0, 'and nothing read: no machine and no path');
 });
 
-test('a lifecycle state lit is marked data-lit and filled amber; a route taken is drawn heavier in --edge-taken, and marked data-taken', async () => {
+test('a lifecycle state lit is marked data-lit and filled as alive; a route taken is drawn heavier in --edge-taken, and marked data-taken', async () => {
   const { MachineNode } = await import('../src/components/MachineNode.tsx');
   const { MachineEdge } = await import('../src/components/MachineEdge.tsx');
   const { drawMachine } = await import('../src/lib/machine.ts');
@@ -5160,9 +5160,9 @@ test('a lifecycle state lit is marked data-lit and filled amber; a route taken i
     renderToStaticMarkup(
       createElement(ReactFlowProvider, null, createElement(MachineNode, { data: { ...drawing.states[0], lit } } as never)),
     );
-  assert.match(node(true), /data-state="a"[^>]*data-lit="true"[^>]*class="[^"]*ring-amber-400/);
+  assert.match(node(true), /data-state="a"[^>]*data-lit="true"[^>]*class="[^"]*ring-alive/);
   assert.match(node(false), /<p data-state-name="true"[^>]*>a<\/p>/, 'the name marked for the e2e to measure its size');
-  assert.doesNotMatch(node(false), /data-lit|ring-amber/);
+  assert.doesNotMatch(node(false), /data-lit|ring-alive/);
   const edge = (taken: boolean) =>
     renderToStaticMarkup(
       createElement(ReactFlowProvider, null, createElement(MachineEdge, { data: { ...drawing.routes[0], taken } } as never)),

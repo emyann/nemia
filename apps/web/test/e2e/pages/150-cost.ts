@@ -98,7 +98,7 @@ export default {
     ] as const) {
       await expectVisible(
         node(name).locator('[data-state="over-budget"]', { hasText: status }),
-        `${name}'s chip on the graph says ${status}, amber`,
+        `${name}'s chip on the graph says ${status}, as a wait on a person`,
       );
       await expectVisible(node(name).getByText('human gate'), `${name}, past a budget, is drawn as a human gate`);
     }

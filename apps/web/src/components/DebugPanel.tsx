@@ -269,7 +269,7 @@ function Timeline({
             <li key={i} data-entry={i} data-state-at={s.state} aria-current={i === at ? 'step' : undefined}>
               <AriaButton
                 onPress={() => onScrub(i)}
-                className={`flex w-full items-baseline gap-2 rounded px-1.5 py-0.5 text-left outline-none hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-ring/50 dark:hover:bg-neutral-800 ${i === at ? 'bg-amber-100 dark:bg-amber-950' : ''} ${i > at ? 'text-neutral-400 dark:text-neutral-600' : ''}`}
+                className={`flex w-full items-baseline gap-2 rounded px-1.5 py-0.5 text-left outline-none hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-ring/50 dark:hover:bg-neutral-800 ${i === at ? 'bg-amber-100 dark:bg-amber-950' : ''} ${i > at ? 'text-muted-foreground' : ''}`}
               >
                 <span className="flex min-w-0 flex-1 flex-wrap gap-x-2 *:whitespace-nowrap">
                   <span data-said>

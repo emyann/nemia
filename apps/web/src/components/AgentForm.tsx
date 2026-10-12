@@ -522,7 +522,7 @@ function HarnessPrompt({ value, onChange, readOnly }: { value: string; onChange:
       <Collapsible defaultExpanded={shown === 'replace'}>
         {({ isExpanded }) => (
           <>
-            <CollapsibleTrigger className="rounded-sm text-[11px] text-neutral-500 outline-none hover:text-neutral-900 focus-visible:ring-2 focus-visible:ring-ring/50 dark:hover:text-neutral-100">
+            <CollapsibleTrigger className="rounded-sm text-[11px] text-muted-foreground outline-none hover:text-neutral-900 focus-visible:ring-2 focus-visible:ring-ring/50 dark:hover:text-neutral-100">
               {isExpanded ? '▾' : '▸'} For experts
             </CollapsibleTrigger>
             <CollapsibleContent>

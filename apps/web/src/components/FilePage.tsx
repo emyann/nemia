@@ -12,11 +12,11 @@ export function KeyTable({ rows, note }: { rows: readonly KeyRow[]; note?: React
     <section aria-label="Keys" className="space-y-2">
       <div className="space-y-0.5">
         <h2 className="text-sm font-semibold">Keys</h2>
-        {note && <p className="text-xs text-neutral-500">{note}</p>}
+        {note && <p className="text-xs text-muted-foreground">{note}</p>}
       </div>
       <div className="overflow-x-auto rounded border border-neutral-200 dark:border-neutral-800">
         <table className="w-full min-w-[36rem] border-collapse text-left text-sm">
-          <thead className="bg-neutral-50 text-xs text-neutral-500 dark:bg-neutral-900">
+          <thead className="bg-neutral-50 text-xs text-muted-foreground dark:bg-neutral-900">
             <tr>
               <th scope="col" className="px-3 py-1.5 font-medium">
                 key
@@ -37,16 +37,13 @@ export function KeyTable({ rows, note }: { rows: readonly KeyRow[]; note?: React
                 data-set={value !== null}
                 className="border-t border-neutral-200 align-top dark:border-neutral-800"
               >
-                <th scope="row" className={cn('w-36 px-3 py-1.5 font-mono text-xs font-medium', value === null && 'text-neutral-500')}>
+                <th scope="row" className={cn('w-36 px-3 py-1.5 font-mono text-xs font-medium', value === null && 'text-muted-foreground')}>
                   {key}
                 </th>
                 <td data-value className="w-56 px-3 py-1.5 font-mono text-xs break-all">
-                  {value ?? <span className="font-sans text-neutral-400 dark:text-neutral-500">not set</span>}
+                  {value ?? <span className="font-sans text-muted-foreground">not set</span>}
                 </td>
-                <td
-                  data-meaning
-                  className={cn('px-3 py-1.5 text-xs', value === null ? 'text-neutral-500' : 'text-neutral-700 dark:text-neutral-300')}
-                >
+                <td data-meaning className={cn('px-3 py-1.5 text-xs', value === null ? 'text-muted-foreground' : 'text-foreground')}>
                   <Markdown>{meaning}</Markdown>
                 </td>
               </tr>
@@ -67,7 +64,7 @@ export function AsWritten({ file, source, children }: { file: string; source: st
   return (
     <section aria-label="The file" className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-neutral-200 pb-2 dark:border-neutral-800">
-        <p className="min-w-0 font-mono text-[11px] break-all text-neutral-500">{file}</p>
+        <p className="min-w-0 font-mono text-[11px] break-all text-muted-foreground">{file}</p>
         <button
           type="button"
           aria-pressed={shown}

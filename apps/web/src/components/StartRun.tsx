@@ -98,7 +98,7 @@ export function StartRun({
         onChange={(event) => setBrief(event.target.value)}
         rows={card ? 5 : 3}
         placeholder="What to do: the brief each step is told, under “What was asked for”."
-        className="block w-full resize-y rounded border border-neutral-300 bg-white px-2 py-1.5 text-sm placeholder:text-neutral-400 focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:placeholder:text-neutral-500 dark:focus:border-neutral-400"
+        className="block w-full resize-y rounded border border-neutral-300 bg-white px-2 py-1.5 text-sm placeholder:text-muted-foreground focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:focus:border-neutral-400"
       />
       {!inFolders && <AfterPicker selected={after} onChange={setAfter} repo={repo} />}
       <ContextPicker selected={context} onChange={setContext} />
@@ -113,7 +113,7 @@ export function StartRun({
         <Where workflow={workflow} repo={repo} factory={place?.factory} card={!!card} />
       </div>
       {ignored && (
-        <p data-ignored-repo className="text-xs text-amber-700 dark:text-amber-400">
+        <p data-ignored-repo className="text-xs text-yours">
           {ignored}
         </p>
       )}
@@ -157,7 +157,7 @@ function StartedLine({ id, after }: { id: string; after: readonly string[] }) {
  */
 function Where({ workflow, repo, factory, card }: { workflow: WorkflowListing; repo?: string; factory?: string; card: boolean }) {
   return (
-    <span className="min-w-0 text-xs text-neutral-500">
+    <span className="min-w-0 text-xs text-muted-foreground">
       {workflow.folderTeam ? (
         'Works in folders it makes for each step'
       ) : (
@@ -203,15 +203,15 @@ export function AfterPicker({
       <legend id={legend} className="text-sm font-medium">
         After
       </legend>
-      <p className="text-xs text-neutral-500">
+      <p className="text-xs text-muted-foreground">
         Waits until it ships: nothing of it is filed until each has shipped, and it is handed what each concluded.
       </p>
       {error ? (
         <p className="text-xs text-red-700 dark:text-red-400">Could not list the runs to wait on: {error.message}</p>
       ) : !onRepo ? (
-        <p className="text-xs text-neutral-500">Reading the runs…</p>
+        <p className="text-xs text-muted-foreground">Reading the runs…</p>
       ) : !onRepo.length ? (
-        <p className="text-xs text-neutral-500">No run on this repository to wait on.</p>
+        <p className="text-xs text-muted-foreground">No run on this repository to wait on.</p>
       ) : (
         <ul
           aria-label="Runs to wait on"
@@ -230,8 +230,8 @@ export function AfterPicker({
                 <span data-run-title className="min-w-0 flex-1 break-words [overflow-wrap:anywhere]" title={titleOf(run)}>
                   {titleOf(run)}
                 </span>
-                <span className="hidden shrink-0 font-mono text-[11px] text-neutral-500 sm:inline">{run.id}</span>
-                <span data-standing className="shrink-0 text-[11px] text-neutral-500" title={run.waiting?.advice}>
+                <span className="hidden shrink-0 font-mono text-[11px] text-muted-foreground sm:inline">{run.id}</span>
+                <span data-standing className="shrink-0 text-[11px] text-muted-foreground" title={run.waiting?.advice}>
                   {standingOf(run)}
                 </span>
               </label>

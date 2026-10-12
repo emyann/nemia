@@ -34,131 +34,131 @@
   color: var(--md-sys-color-on-surface);
 
   /* Accent roles */
-  --md-sys-color-primary: hsl(310 100% 34%);
+  --md-sys-color-primary: hsl(56 100% 20%);
   --md-sys-color-on-primary: hsl(0 0% 100%);
-  --md-sys-color-primary-container: hsl(326 100% 92%);
-  --md-sys-color-on-primary-container: hsl(310 100% 26%);
-  --md-sys-color-secondary: hsl(187 100% 23%);
+  --md-sys-color-primary-container: hsl(56 92% 53%);
+  --md-sys-color-on-primary-container: hsl(56 100% 15%);
+  --md-sys-color-secondary: hsl(134 100% 22%);
   --md-sys-color-on-secondary: hsl(0 0% 100%);
-  --md-sys-color-secondary-container: hsl(189 100% 81%);
-  --md-sys-color-on-secondary-container: hsl(186 100% 17%);
-  --md-sys-color-tertiary: hsl(56 100% 20%);
+  --md-sys-color-secondary-container: hsl(121 100% 72%);
+  --md-sys-color-on-secondary-container: hsl(132 100% 16%);
+  --md-sys-color-tertiary: hsl(33 71% 31%);
   --md-sys-color-on-tertiary: hsl(0 0% 100%);
-  --md-sys-color-tertiary-container: hsl(57 100% 48%);
-  --md-sys-color-on-tertiary-container: hsl(56 100% 15%);
-  --md-sys-color-error: hsl(344 100% 37%);
+  --md-sys-color-tertiary-container: hsl(28 100% 87%);
+  --md-sys-color-on-tertiary-container: hsl(35 100% 20%);
+  --md-sys-color-error: hsl(4 62% 42%);
   --md-sys-color-on-error: hsl(0 0% 100%);
-  --md-sys-color-error-container: hsl(0 100% 93%);
-  --md-sys-color-on-error-container: hsl(345 100% 29%);
+  --md-sys-color-error-container: hsl(7 100% 92%);
+  --md-sys-color-on-error-container: hsl(3 74% 31%);
 
   /* Surfaces */
-  --md-sys-color-background: hsl(283 100% 99%);
-  --md-sys-color-on-background: hsl(252 40% 15%);
-  --md-sys-color-surface: hsl(283 100% 99%);
-  --md-sys-color-on-surface: hsl(252 40% 15%);
-  --md-sys-color-surface-variant: hsl(256 100% 94%);
-  --md-sys-color-on-surface-variant: hsl(252 31% 35%);
-  --md-sys-color-surface-dim: hsl(254 95% 91%);
-  --md-sys-color-surface-bright: hsl(283 100% 99%);
+  --md-sys-color-background: hsl(131 89% 96%);
+  --md-sys-color-on-background: hsl(143 28% 9%);
+  --md-sys-color-surface: hsl(131 89% 96%);
+  --md-sys-color-on-surface: hsl(143 28% 9%);
+  --md-sys-color-surface-variant: hsl(132 36% 86%);
+  --md-sys-color-on-surface-variant: hsl(139 17% 25%);
+  --md-sys-color-surface-dim: hsl(131 20% 84%);
+  --md-sys-color-surface-bright: hsl(131 89% 96%);
   --md-sys-color-surface-container-lowest: hsl(0 0% 100%);
-  --md-sys-color-surface-container-low: hsl(266 100% 97%);
-  --md-sys-color-surface-container: hsl(261 100% 96%);
-  --md-sys-color-surface-container-high: hsl(258 100% 95%);
-  --md-sys-color-surface-container-highest: hsl(255 100% 94%);
-  --md-sys-color-surface-tint: hsl(310 100% 34%);
+  --md-sys-color-surface-container-low: hsl(131 55% 94%);
+  --md-sys-color-surface-container: hsl(128 38% 92%);
+  --md-sys-color-surface-container-high: hsl(131 30% 89%);
+  --md-sys-color-surface-container-highest: hsl(131 26% 87%);
+  --md-sys-color-surface-tint: hsl(56 100% 20%);
 
   /* Outlines, shadow, scrim */
-  --md-sys-color-outline: hsl(252 26% 55%);
-  --md-sys-color-outline-variant: hsl(252 100% 87%);
+  --md-sys-color-outline: hsl(136 10% 44%);
+  --md-sys-color-outline-variant: hsl(135 19% 75%);
   --md-sys-color-shadow: hsl(0 0% 0%);
   --md-sys-color-scrim: hsl(0 0% 0%);
 
   /* Inverse */
-  --md-sys-color-inverse-surface: hsl(251 27% 24%);
-  --md-sys-color-inverse-on-surface: hsl(261 100% 97%);
-  --md-sys-color-inverse-primary: hsl(321 100% 84%);
+  --md-sys-color-inverse-surface: hsl(141 16% 18%);
+  --md-sys-color-inverse-on-surface: hsl(131 46% 93%);
+  --md-sys-color-inverse-primary: hsl(56 100% 42%);
 
   /* Fixed roles */
-  --md-sys-color-primary-fixed: hsl(326 100% 92%);
-  --md-sys-color-on-primary-fixed: hsl(312 100% 12%);
-  --md-sys-color-primary-fixed-dim: hsl(321 100% 84%);
-  --md-sys-color-on-primary-fixed-variant: hsl(310 100% 26%);
-  --md-sys-color-secondary-fixed: hsl(189 100% 81%);
-  --md-sys-color-on-secondary-fixed: hsl(188 100% 7%);
-  --md-sys-color-secondary-fixed-dim: hsl(186 100% 48%);
-  --md-sys-color-on-secondary-fixed-variant: hsl(186 100% 17%);
-  --md-sys-color-tertiary-fixed: hsl(57 100% 48%);
-  --md-sys-color-on-tertiary-fixed: hsl(54 100% 6%);
-  --md-sys-color-tertiary-fixed-dim: hsl(57 100% 42%);
-  --md-sys-color-on-tertiary-fixed-variant: hsl(56 100% 15%);
+  --md-sys-color-primary-fixed: hsl(56 92% 53%);
+  --md-sys-color-on-primary-fixed: hsl(54 100% 6%);
+  --md-sys-color-primary-fixed-dim: hsl(56 100% 42%);
+  --md-sys-color-on-primary-fixed-variant: hsl(56 100% 15%);
+  --md-sys-color-secondary-fixed: hsl(121 100% 72%);
+  --md-sys-color-on-secondary-fixed: hsl(125 100% 7%);
+  --md-sys-color-secondary-fixed-dim: hsl(136 100% 45%);
+  --md-sys-color-on-secondary-fixed-variant: hsl(132 100% 16%);
+  --md-sys-color-tertiary-fixed: hsl(28 100% 87%);
+  --md-sys-color-on-tertiary-fixed: hsl(30 100% 9%);
+  --md-sys-color-tertiary-fixed-dim: hsl(30 96% 72%);
+  --md-sys-color-on-tertiary-fixed-variant: hsl(35 100% 20%);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     color: var(--md-sys-color-on-surface);
 
-    --md-sys-color-primary: hsl(312 100% 58%);
-    --md-sys-color-on-primary: hsl(309 100% 5%);
-    --md-sys-color-primary-container: hsl(310 100% 26%);
-    --md-sys-color-on-primary-container: hsl(326 100% 92%);
-    --md-sys-color-secondary: hsl(186 100% 50%);
-    --md-sys-color-on-secondary: hsl(188 100% 7%);
-    --md-sys-color-secondary-container: hsl(186 100% 17%);
-    --md-sys-color-on-secondary-container: hsl(189 100% 81%);
-    --md-sys-color-tertiary: hsl(57 98% 51%);
-    --md-sys-color-on-tertiary: hsl(56 100% 6%);
-    --md-sys-color-tertiary-container: hsl(56 100% 15%);
-    --md-sys-color-on-tertiary-container: hsl(57 100% 48%);
-    --md-sys-color-error: hsl(358 100% 85%);
-    --md-sys-color-on-error: hsl(346 100% 20%);
-    --md-sys-color-error-container: hsl(345 100% 29%);
-    --md-sys-color-on-error-container: hsl(0 100% 93%);
+    --md-sys-color-primary: hsl(56 92% 53%);
+    --md-sys-color-on-primary: hsl(57 100% 4%);
+    --md-sys-color-primary-container: hsl(56 100% 15%);
+    --md-sys-color-on-primary-container: hsl(56 92% 53%);
+    --md-sys-color-secondary: hsl(130 100% 61%);
+    --md-sys-color-on-secondary: hsl(138 100% 6%);
+    --md-sys-color-secondary-container: hsl(132 100% 16%);
+    --md-sys-color-on-secondary-container: hsl(121 100% 72%);
+    --md-sys-color-tertiary: hsl(31 68% 62%);
+    --md-sys-color-on-tertiary: hsl(31 70% 6%);
+    --md-sys-color-tertiary-container: hsl(35 100% 20%);
+    --md-sys-color-on-tertiary-container: hsl(28 100% 87%);
+    --md-sys-color-error: hsl(6 75% 63%);
+    --md-sys-color-on-error: hsl(4 83% 7%);
+    --md-sys-color-error-container: hsl(3 74% 31%);
+    --md-sys-color-on-error-container: hsl(7 100% 92%);
 
-    --md-sys-color-background: hsl(249 37% 4%);
-    --md-sys-color-on-background: hsl(247 100% 95%);
-    --md-sys-color-surface: hsl(246 33% 6%);
-    --md-sys-color-on-surface: hsl(247 100% 95%);
-    --md-sys-color-surface-variant: hsl(252 31% 35%);
-    --md-sys-color-on-surface-variant: hsl(252 100% 87%);
-    --md-sys-color-surface-dim: hsl(252 53% 12%);
-    --md-sys-color-surface-bright: hsl(251 24% 27%);
-    --md-sys-color-surface-container-lowest: hsl(252 63% 10%);
-    --md-sys-color-surface-container-low: hsl(252 40% 15%);
-    --md-sys-color-surface-container: hsl(252 36% 17%);
-    --md-sys-color-surface-container-high: hsl(251 30% 21%);
-    --md-sys-color-surface-container-highest: hsl(251 26% 25%);
-    --md-sys-color-surface-tint: hsl(321 100% 84%);
+    --md-sys-color-background: hsl(140 38% 3%);
+    --md-sys-color-on-background: hsl(102 29% 91%);
+    --md-sys-color-surface: hsl(140 36% 5%);
+    --md-sys-color-on-surface: hsl(102 29% 91%);
+    --md-sys-color-surface-variant: hsl(139 17% 25%);
+    --md-sys-color-on-surface-variant: hsl(135 19% 75%);
+    --md-sys-color-surface-dim: hsl(143 42% 6%);
+    --md-sys-color-surface-bright: hsl(141 13% 21%);
+    --md-sys-color-surface-container-lowest: hsl(143 62% 4%);
+    --md-sys-color-surface-container-low: hsl(143 28% 9%);
+    --md-sys-color-surface-container: hsl(141 25% 11%);
+    --md-sys-color-surface-container-high: hsl(141 18% 15%);
+    --md-sys-color-surface-container-highest: hsl(141 14% 19%);
+    --md-sys-color-surface-tint: hsl(56 100% 42%);
 
-    --md-sys-color-outline: hsl(253 35% 65%);
-    --md-sys-color-outline-variant: hsl(252 31% 35%);
+    --md-sys-color-outline: hsl(136 10% 54%);
+    --md-sys-color-outline-variant: hsl(139 17% 25%);
     --md-sys-color-shadow: hsl(0 0% 0%);
     --md-sys-color-scrim: hsl(0 0% 0%);
 
-    --md-sys-color-inverse-surface: hsl(255 100% 94%);
-    --md-sys-color-inverse-on-surface: hsl(251 27% 24%);
-    --md-sys-color-inverse-primary: hsl(310 100% 34%);
+    --md-sys-color-inverse-surface: hsl(90 3% 66%);
+    --md-sys-color-inverse-on-surface: hsl(120 11% 5%);
+    --md-sys-color-inverse-primary: hsl(56 100% 11%);
 
-    --md-sys-color-primary-fixed: hsl(326 100% 92%);
-    --md-sys-color-on-primary-fixed: hsl(312 100% 12%);
-    --md-sys-color-primary-fixed-dim: hsl(321 100% 84%);
-    --md-sys-color-on-primary-fixed-variant: hsl(310 100% 26%);
-    --md-sys-color-secondary-fixed: hsl(189 100% 81%);
-    --md-sys-color-on-secondary-fixed: hsl(188 100% 7%);
-    --md-sys-color-secondary-fixed-dim: hsl(186 100% 48%);
-    --md-sys-color-on-secondary-fixed-variant: hsl(186 100% 17%);
-    --md-sys-color-tertiary-fixed: hsl(57 100% 48%);
-    --md-sys-color-on-tertiary-fixed: hsl(54 100% 6%);
-    --md-sys-color-tertiary-fixed-dim: hsl(57 100% 42%);
-    --md-sys-color-on-tertiary-fixed-variant: hsl(56 100% 15%);
+    --md-sys-color-primary-fixed: hsl(56 92% 53%);
+    --md-sys-color-on-primary-fixed: hsl(54 100% 6%);
+    --md-sys-color-primary-fixed-dim: hsl(56 100% 42%);
+    --md-sys-color-on-primary-fixed-variant: hsl(56 100% 15%);
+    --md-sys-color-secondary-fixed: hsl(121 100% 72%);
+    --md-sys-color-on-secondary-fixed: hsl(125 100% 7%);
+    --md-sys-color-secondary-fixed-dim: hsl(136 100% 45%);
+    --md-sys-color-on-secondary-fixed-variant: hsl(132 100% 16%);
+    --md-sys-color-tertiary-fixed: hsl(28 100% 87%);
+    --md-sys-color-on-tertiary-fixed: hsl(30 100% 9%);
+    --md-sys-color-tertiary-fixed-dim: hsl(30 96% 72%);
+    --md-sys-color-on-tertiary-fixed-variant: hsl(35 100% 20%);
   }
 }
 
-/* Typeface. The type scale is set in Orbitron Variable and Geist Variable, as DESIGN.md writes it.
-   `--font-orbitron-variable` and `--font-geist-variable` is the hook a host app fills with its own loaded face (Next:
+/* Typeface. The type scale is set in Michroma and Chakra Petch, as DESIGN.md writes it.
+   `--font-michroma` and `--font-chakra-petch` is the hook a host app fills with its own loaded face (Next:
    `localFont({ variable: "--font-…" })` on <body> wins over this root default
    by inheritance); without one, the named family resolves to a locally
    installed or web-loaded face, then the stack behind it. */
 :root {
-  --font-orbitron-variable: "Orbitron Variable", ui-sans-serif, system-ui, sans-serif;
-  --font-geist-variable: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-michroma: "Michroma", ui-sans-serif, system-ui, sans-serif;
+  --font-chakra-petch: "Chakra Petch", ui-sans-serif, system-ui, sans-serif;
 }

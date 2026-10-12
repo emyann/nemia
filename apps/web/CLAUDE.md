@@ -20,10 +20,16 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
   each time, and that is taken back out: a second `tw-animate-css` import, names that point at themselves in `@theme inline`
   (`--ring: var(--ring)`), a `.dark` block, `--radius`. The message it prints, to import the kit's default theme, is not for us.
 - `theme/` is generated, never edited: change `DESIGN.md`, then `npx tsx src/components/ui/ds/tokens/generate-theme.mjs DESIGN.md --out
-  theme` from `apps/web`, and read the warnings in `theme/DESIGN.resolved.md`. A font the DESIGN.md names is loaded by `src/styles.css`,
-  under the exact family its package registers (`Orbitron Variable`).
-- The kit's corners (`rounded-shape-*`) follow `DESIGN.md`; shadcn's (`--radius`) are the board's own. shadcn's `secondary` reads the
-  theme's filled `secondary`, louder than the kit's tonal button. The chart colours are not the theme's.
+  theme` from `apps/web`, and read the warnings in `theme/DESIGN.resolved.md`; `test/theme.test.ts` refuses a theme that is not the
+  generator's. A face the DESIGN.md names is loaded by `src/styles.css` from its npm package, under the exact family the package
+  registers (`Michroma`, `Chakra Petch`), and given to the theme's hook (`--font-michroma`); the label face (`Archivo Variable`,
+  `--font-label`) is the board's own. No face comes from a font service (the e2e's `typefaces` page).
+- The kit's corners (`rounded-shape-*`) follow `DESIGN.md`; shadcn's (`--radius`) are the board's own. shadcn's `secondary` reads a
+  neutral surface, not the theme's `secondary`: that green is `alive`, a session at work. The chart colours are not the theme's.
+- A colour says one thing: `yours` (waits on a person), `alive`, `money` (an amount), `rest` (grey, and sage for done) and `failure`.
+  `src/styles.css` reads each from a theme role once (`--meaning-*`, `bg-yours`); `lib/meaning.ts` holds the drawn forms, each class a
+  whole literal; `test/status.test.ts` holds the table and refuses a hand-picked hue in the files that draw a state.
+- Text dimmed by an `opacity` falls under 4.5:1: sink a card into the floor (`bg-background`) or use the muted ink instead.
 - The kit has no adapter for TanStack Router: an `href` on one of its buttons, chips or menu items loads the page whole.
 
 ## Build and e2e
@@ -32,6 +38,8 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
 - For every change here, run `npm run build` and `npm run e2e -- --pages <the pages the change touches>` (`--photos` too when pictures
   are due), its assertions in the dark theme; never the whole suite in a session but to measure it. Implement's round check runs it
   whole, and the landing's again on the merged tree. A whole run over `E2E_BOUND_MS` (`e2e/timing.ts`) fails, naming its slowest pages.
+- `npm run e2e -- --photos --contrast` writes each picture's text pairs beside it (`e2e/contrast.ts`); `node test/e2e/contrast-report.ts
+  <dir>` makes `contrast.md` and `look.html` there and exits 1 on a pair under 4.5:1. A measure, never a check of every run.
 - `npm run e2e` hands its pages to workers one at a time (`queueOf`, `e2e/workers.ts`), each a process with its own seeded store, api,
   `vite preview` and Chromium (`e2e/worker.ts`); `--workers <n>` sets how many, else the machine does (`workersFor`).
 - Once per machine, install each Playwright's browser through the checkout's own `node_modules`, never from an `npx` download (an install
@@ -139,8 +147,8 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
   `formKeyOf` in `lib/agents.ts`).
 - A held run is `running` whatever its steps say: the board takes one that waits on a person out by name (`inFlight`, `waitsOnYou` in
   `lib/factory.ts`).
-- A new step status is drawn as `working` until `stepState` (`lib/status.ts`) knows it: add the word there, with its meaning, class,
-  `stepGraph`'s fill and `offersOf`, in the same change.
+- A new step status is drawn as `working` until `stepState` (`lib/status.ts`) knows it: add the word there, with its meaning and its
+  drawing (`stateDrawn`, whose hue gives the chip's class and the minimap's fill) and `offersOf`, in the same change.
 - A page that must agree with a verb's refusal reads the package's decision (`Decidable.awaiting`), never the list's `toDecide`.
 - A read decodes with `get` (`lib/api/read.ts`) through a schema beside its plain type (`satisfies Schema.Schema<T>`), which the barrel
   never exports (`export type *`): every key the board reads required, an unknown key dropped. `satisfies` misses a schema narrower than

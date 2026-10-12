@@ -1,139 +1,149 @@
 ---
 version: alpha
-name: Nemia
-description: Nemia's board in a cyberpunk look — near-black violet surfaces, neon magenta for what acts, cyan for what informs, acid yellow for what warns, hairlines and glows instead of shadows, sharp corners.
+name: Nemia, Cyberpunk Blend
+description: Nemia's board between two cyberpunks — a green-black night with acid yellow for what a person does and neon green for what runs, and on it the printed labels of a retro spec sheet in amber, terracotta and grey with black ink.
 scheme: dark
 colors:
-  seed: "#7b2cff"
-  primary-key: "#ff2bd6"
-  secondary-key: "#00e5ff"
-  tertiary-key: "#fcee0a"
-  neutral-key: "#2b2545"
-  neutral-variant-key: "#3a2f66"
-  error-key: "#ff3355"
-  primary: "#ff2bd6"
-  on-primary: "#1a0016"
-  secondary: "#00e5ff"
-  on-secondary: "#001f24"
-  tertiary: "#fcee0a"
-  on-tertiary: "#1f1d00"
-  background: "#07060d"
-  on-background: "#e9e6ff"
-  surface: "#0b0a14"
-  on-surface: "#e9e6ff"
+  seed: "#1f7a36"
+  primary-key: "#f5e61a"
+  secondary-key: "#2bff4f"
+  tertiary-key: "#e0a15e"
+  neutral-key: "#25332a"
+  neutral-variant-key: "#2e4335"
+  error-key: "#e0584b"
+  primary: "#f5e61a"
+  on-primary: "#141300"
+  secondary: "#39ff5a"
+  on-secondary: "#00210a"
+  tertiary: "#e0a15e"
+  on-tertiary: "#1c1105"
+  error: "#e8695b"
+  on-error: "#210503"
+  background: "#050b07"
+  on-background: "#e6efe2"
+  surface: "#08110b"
+  on-surface: "#e6efe2"
+  inverse-surface: "#a9aca6"
+  inverse-on-surface: "#0c0f0c"
+  inverse-primary: "#3a3600"
 typography:
   display-large:
-    fontFamily: Orbitron Variable
+    fontFamily: Michroma
   display-medium:
-    fontFamily: Orbitron Variable
+    fontFamily: Michroma
   display-small:
-    fontFamily: Orbitron Variable
+    fontFamily: Michroma
   headline-large:
-    fontFamily: Orbitron Variable
+    fontFamily: Michroma
   headline-medium:
-    fontFamily: Orbitron Variable
+    fontFamily: Michroma
   headline-small:
-    fontFamily: Orbitron Variable
+    fontFamily: Michroma
   title-large:
-    fontFamily: Orbitron Variable
+    fontFamily: Michroma
   title-medium:
-    fontFamily: Orbitron Variable
+    fontFamily: Michroma
   title-small:
-    fontFamily: Orbitron Variable
+    fontFamily: Michroma
   body-large:
-    fontFamily: Geist Variable
+    fontFamily: Chakra Petch
   body-medium:
-    fontFamily: Geist Variable
+    fontFamily: Chakra Petch
   body-small:
-    fontFamily: Geist Variable
+    fontFamily: Chakra Petch
   label-large:
-    fontFamily: Geist Variable
+    fontFamily: Chakra Petch
   label-medium:
-    fontFamily: Geist Variable
+    fontFamily: Chakra Petch
   label-small:
-    fontFamily: Geist Variable
+    fontFamily: Chakra Petch
 rounded:
   extra-small: 0
-  small: 2px
-  medium: 2px
-  large: 4px
-  extra-large: 4px
-  full: 2px
+  small: 0
+  medium: 0
+  large: 0
+  extra-large: 0
+  full: 0
 ---
 
 ## Overview
 
-Nemia is a board for running teams of agents: runs, steps, gates, costs. The
-look is cyberpunk, a control room at night. The page is nearly black with a
-violet cast, and colour is kept for meaning: magenta is what a person can act
-on, cyan is what the machine reports, yellow is what needs a look.
+Two cyberpunks, blended. From the night-city one: a ground that is nearly
+black with a green cast, frames with a cut corner and a hairline, acid yellow
+on whatever a person can press, neon green on whatever is alive. From the
+retro one: the printed label. An instrument is a flat matte tile, amber,
+terracotta or grey, with black ink, a wide machine lettering and a boxed
+readout, as stuck on the equipment by whoever built it.
 
-The board is dark by nature. The dark scheme is the one written here; the
-light scheme is derived from the same keys for a person whose system asks for
-it, and is checked by eye, not designed.
+The rule that holds the blend together: hardware is cut, labels are stuck on.
+A frame, a button and a tag have hard corners or a cut one. A tile that
+carries a number is a sticker, and only a sticker is rounded.
+
+The dark scheme is the one written here. The light scheme is derived from the
+same keys and is checked by eye, not designed.
 
 ## Colors
 
-- **Seed (`seed`):** an electric violet. The neutrals lean towards it.
-- **Primary (`primary-key`, `primary`):** neon magenta, `#ff2bd6`, written as
-  a role so a filled button is exactly that colour, with near-black text on it.
-- **Secondary (`secondary-key`, `secondary`):** cyan, `#00e5ff`, for what
-  informs: the focus ring, a selected tab, a running step.
-- **Tertiary (`tertiary-key`, `tertiary`):** acid yellow, `#fcee0a`, for what
-  needs a look.
-- **Neutrals (`neutral-key`, `neutral-variant-key`):** a dark violet, so every
-  surface and outline carries the cast, in both schemes.
+A colour says one thing, on every page.
+
+- **Seed (`seed`):** a deep green. The neutrals lean towards it, so every
+  surface and outline carries the cast.
+- **Primary (`primary-key`, `primary`):** acid yellow, `#f5e61a`, with black
+  on it. It is yours: a gate that waits on a person, and the one filled
+  button.
+- **Secondary (`secondary-key`, `secondary`):** neon green, `#39ff5a`, for
+  what is alive: a session at work, a selected filter.
+- **Tertiary (`tertiary-key`, `tertiary`):** the amber of a printed label,
+  `#e0a15e`, with black ink on it. It is money: what a run cost.
+- **Inverse (`inverse-surface`, `inverse-on-surface`):** the label's grey,
+  with black ink, for what is at rest: a count, a clock, a finished run.
+- **Outline (`outline`):** a sage grey. Filled, it is a step that is done, a
+  check that runs, a wait on another run.
+- **Error (`error-key`, `error`):** the label's terracotta, kept for what
+  failed. A board where nothing failed does not show it.
 - **Surfaces (`background`, `surface`):** written, because the derived dark
-  surface is a grey and the board wants a near-black.
-- **Error (`error-key`):** a hot red, kept apart from the magenta by its hue.
+  surface is a grey and the board wants a green-black.
 
 ## Typography
 
-Two faces. Orbitron for the brand face (display, headline, title): wide,
-geometric, a machine's lettering. Geist for the plain face (body, label), the
-face the board already reads in. Sizes, weights and tracking are Material's.
+Michroma for the brand face (display, headline, title): wide, thin, square
+lettering, the face of a head-up display, set in capitals on the hardware.
+Chakra Petch for the plain face (body, label): squared, with cut terminals,
+readable small and at home in capitals.
+
+The kit carries two faces and this look wants four. The board sets the other
+two beside the kit: a printed label's numerals in Archivo at its widest and
+heavy (width 125, weight 800), black ink on the label's stock; and
+identifiers, commands and readouts in Share Tech Mono. Sizes, weights and
+tracking of the kit's roles are Material's.
 
 ## Shape
 
-Sharp. Nothing is a pill: `full` is 2px, so a button, a chip and a switch are
-cut like the panels around them.
+Every corner of the kit is square: all six radii are 0. A cut corner and a
+rounded sticker are not radii; the board draws them around the kit's
+components.
 
 ## Elevation and motion
 
-No shadow: a surface is lifted by a hairline in the primary colour, then by a
-glow that grows with the level. Motion is short and decisive.
+No shadow. A raised surface is a hairline in yellow, then in green as it
+rises. Motion is short and decisive.
 
 ## Reference CSS
 
 ```css
 :root {
   --md3-dark-mode: system;
-  --md-sys-elevation-1: 0 0 0 1px --alpha(var(--md-sys-color-primary) / 30%);
-  --md-sys-elevation-2:
-    0 0 0 1px --alpha(var(--md-sys-color-primary) / 45%),
-    0 0 12px 0 --alpha(var(--md-sys-color-primary) / 22%);
-  --md-sys-elevation-3:
-    0 0 0 1px --alpha(var(--md-sys-color-secondary) / 55%),
-    0 0 18px 0 --alpha(var(--md-sys-color-secondary) / 28%);
-  --md-sys-elevation-4:
-    0 0 0 1px --alpha(var(--md-sys-color-secondary) / 65%),
-    0 0 26px 2px --alpha(var(--md-sys-color-secondary) / 32%);
-  --md-sys-elevation-5:
-    0 0 0 1px --alpha(var(--md-sys-color-tertiary) / 70%),
-    0 0 34px 4px --alpha(var(--md-sys-color-tertiary) / 30%);
+  --md-sys-elevation-1: 0 0 0 1px --alpha(var(--md-sys-color-outline-variant) / 100%);
+  --md-sys-elevation-2: 0 0 0 1px --alpha(var(--md-sys-color-primary) / 45%);
+  --md-sys-elevation-3: 0 0 0 1px --alpha(var(--md-sys-color-primary) / 70%);
+  --md-sys-elevation-4: 0 0 0 1px --alpha(var(--md-sys-color-secondary) / 60%);
+  --md-sys-elevation-5: 0 0 0 1px --alpha(var(--md-sys-color-secondary) / 85%);
   --md-sys-state-hover-state-layer-opacity: 10%;
   --md-sys-state-focus-state-layer-opacity: 14%;
   --md-sys-state-pressed-state-layer-opacity: 18%;
   --md-sys-state-dragged-state-layer-opacity: 22%;
   --md-sys-motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
-  --md-sys-motion-easing-emphasized: cubic-bezier(0.05, 0.7, 0.1, 1);
-  --md3-duration-short-1: 40ms;
-  --md3-duration-short-2: 70ms;
-  --md3-duration-short-3: 100ms;
-  --md3-duration-short-4: 130ms;
-  --md3-duration-medium-1: 160ms;
-  --md3-duration-medium-2: 200ms;
-  --md3-duration-medium-3: 240ms;
-  --md3-duration-medium-4: 280ms;
+  --md3-duration-short-4: 110ms;
+  --md3-duration-medium-2: 180ms;
 }
 ```

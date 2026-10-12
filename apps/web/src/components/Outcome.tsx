@@ -11,7 +11,7 @@ const BADGE: Record<Outcome['by'] | 'blocked', string> = {
   blocked: 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300',
   machine: 'bg-red-100 text-red-900 dark:bg-red-950 dark:text-red-300',
   unreadable: 'bg-red-100 text-red-900 dark:bg-red-950 dark:text-red-300',
-  nobody: 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300',
+  nobody: 'bg-neutral-100 text-foreground dark:bg-neutral-800',
 };
 
 const BY: Record<Outcome['by'], string> = {
@@ -34,13 +34,13 @@ export function OutcomeHead({ outcome, aside }: { outcome: Outcome; aside?: Reac
           <Badge className={cn('text-sm', BADGE[outcome.by === 'agent' && outcome.outcome === 'blocked' ? 'blocked' : outcome.by])}>
             {word}
           </Badge>{' '}
-          <span className="text-xs text-neutral-500">{BY[outcome.by]}</span>
+          <span className="text-xs text-muted-foreground">{BY[outcome.by]}</span>
         </p>
         {aside}
       </div>
       {outcome.by === 'agent' && outcome.cut && <p className="text-xs text-red-700 dark:text-red-400">… {outcome.cut}.</p>}
       {outcome.by !== 'agent' && (
-        <p data-reason className="text-neutral-600 dark:text-neutral-400">
+        <p data-reason className="text-muted-foreground">
           {outcome.words}
         </p>
       )}
@@ -70,7 +70,7 @@ export function FieldView({
   const kind = outputKind(schema, value, images);
   return (
     <section data-field={name} data-kind={kind} aria-label={name} className="min-w-0 space-y-1">
-      {named && <h4 className="font-mono text-xs text-neutral-500">{name}</h4>}
+      {named && <h4 className="font-mono text-xs text-muted-foreground">{name}</h4>}
       <KindView kind={kind} schema={schema} value={value} artifacts={artifacts} />
     </section>
   );
@@ -111,7 +111,7 @@ function KindView({
 
 const artifactAt = (artifacts: readonly StepArtifact[], path: string): StepArtifact => artifacts.find((a) => a.path === path) ?? { path };
 
-const None = () => <p className="text-xs text-neutral-500">none</p>;
+const None = () => <p className="text-xs text-muted-foreground">none</p>;
 
 type Place = (record: Record<string, unknown>) => { place: string; rest: string[] };
 
@@ -149,7 +149,7 @@ function Records({ kind, records, place }: { kind: 'findings' | 'table'; records
                 scope="row"
                 data-place
                 title={where}
-                className="block break-all text-left font-mono text-xs font-medium text-neutral-900 underline decoration-neutral-300 decoration-dotted underline-offset-2 dark:text-neutral-100 dark:decoration-neutral-600"
+                className="block break-all text-left font-mono text-xs font-medium text-foreground underline decoration-neutral-300 decoration-dotted underline-offset-2 dark:decoration-neutral-600"
               >
                 {where}
               </th>
@@ -158,7 +158,7 @@ function Records({ kind, records, place }: { kind: 'findings' | 'table'; records
                   <div key={key} data-cell={key}>
                     {rest.length > 1 && (
                       <>
-                        <span className="font-mono text-[11px] text-neutral-500">{key}</span>{' '}
+                        <span className="font-mono text-[11px] text-muted-foreground">{key}</span>{' '}
                       </>
                     )}
                     {typeof record[key] === 'string' ? (
@@ -179,7 +179,7 @@ function Records({ kind, records, place }: { kind: 'findings' | 'table'; records
 
 const ANSWER: Record<string, string> = {
   fixed: 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-300',
-  "won't fix": 'bg-neutral-200 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200',
+  "won't fix": 'bg-neutral-200 text-foreground dark:bg-neutral-800',
 };
 
 /**
@@ -195,7 +195,7 @@ function Replies({ replies }: { replies: Array<Record<string, unknown>> }) {
         return (
           <li key={i} data-answer={answer} className="space-y-0.5">
             <Markdown>{text(reply.finding ?? '')}</Markdown>{' '}
-            <div className="flex items-start gap-1.5 text-neutral-500">
+            <div className="flex items-start gap-1.5 text-muted-foreground">
               <span className="shrink-0">
                 → <Badge className={ANSWER[answer] ?? ANSWER["won't fix"]}>{answer}</Badge>
               </span>
@@ -223,7 +223,7 @@ function YesNo({ yes, description }: { yes: boolean; description: string | null 
       {description && (
         <>
           {' '}
-          <span className="text-xs text-neutral-500">— {description}</span>
+          <span className="text-xs text-muted-foreground">— {description}</span>
         </>
       )}
     </p>

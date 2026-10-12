@@ -11,7 +11,7 @@ import './tsx.ts';
 
 const { CutFrame, CutTag } = await import('../src/components/CutFrame.tsx');
 const { Pager } = await import('../src/components/Pager.tsx');
-const { Plate } = await import('../src/components/Plate.tsx');
+const { PageName, Plate } = await import('../src/components/Plate.tsx');
 const { RunSteps } = await import('../src/components/RunSteps.tsx');
 const { ScanLines } = await import('../src/components/ScanLines.tsx');
 const { Sticker } = await import('../src/components/Sticker.tsx');
@@ -99,12 +99,15 @@ test('REFUSED: the pager at an end offers no link there, and from a page past th
   assert.match(tagWith(past, 'data-pager-older'), /aria-disabled="true"/);
 });
 
-test('the text link is a link to its route, underlined, with a ring for the keyboard', async () => {
+test('the text link is a link to its route, underlined under the pointer and the keyboard alone, with a ring for the keyboard', async () => {
   const html = await drawn(createElement(TextLink, { to: '/', search: { factory: 'nemia' } } as never, 'Read the review'));
   const link = tagWith(html, 'data-text-link');
   assert.match(link, /^<a /);
   assert.match(link, /href="\/\?factory=nemia"/);
-  assert.match(link, / underline /, 'underlined, not only offset');
+  assert.match(link, / no-underline /, 'no line at rest: a title reads as a title');
+  assert.match(link, / hover:underline /, 'underlined under the pointer');
+  assert.match(link, / focus-visible:underline /, 'and with the keyboard on it');
+  assert.doesNotMatch(link, /(?<![\w:-])underline(?![\w-])/, 'never underlined at rest');
   assert.match(
     link,
     /outline-none focus-visible:ring-3 focus-visible:ring-ring focus-visible:ring-offset-2/,
@@ -243,4 +246,34 @@ test('REFUSED: the cut frame clips what it holds: only its shape, which holds no
   assert.ok(shape, 'the shape is a span that holds its two layers and nothing else');
   assert.equal(clips(shape[0]).length, 2, 'each layer of the shape is cut');
   assert.deepEqual(clips(html.replace(shape[0], '')), [], 'and nothing else of the frame is: not the frame, not what holds its content');
+});
+
+test('a step done is filled in the rail whether a check says so or its own word does, and a step to come stays hollow', async () => {
+  const steps = [
+    { name: 'design', status: 'unverified' },
+    { name: 'implement', status: 'verified ✓' },
+    { name: 'review', status: 'waiting' },
+  ];
+  const html = await drawn(createElement(RunSteps, { steps, cancelled: false, held: false }));
+  const classOf = (step: string) => tagWith(html, `data-step="${step}"`).match(/class="([^"]*)"/)?.[1];
+  assert.match(tagWith(html, 'data-step="design"'), /data-state="unverified"/, 'the state is still said as it is');
+  assert.equal(classOf('design'), classOf('implement'), 'done on its own word is drawn as done on a check');
+  assert.match(classOf('design') ?? '', /bg-sage /, 'filled');
+  assert.notEqual(classOf('review'), classOf('design'), 'a step to come is not drawn as one done');
+  assert.match(html, /aria-label="design done, implement done, review to come"/, 'read aloud, both are done');
+});
+
+test("a page's name stands over a rule whose first 140 pixels are lit in the hue of a session at work", async () => {
+  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
+  const html = await drawn(createElement(PageName, { children: 'Runs' }));
+  const [name, rule] = [tagWith(html, 'data-page-name'), tagWith(html, 'data-page-rule')];
+  assert.match(name, /^<h1 /);
+  assert.match(name, /\bpb-4\.5\b/, '18 pixels under the name');
+  assert.doesNotMatch(name, /border-b|style=/, 'the name carries no rule of its own, nor an image a contrast measure cannot read');
+  assert.match(rule, /aria-hidden="true"/);
+  assert.match(rule, /\bh-px\b/);
+  assert.match(
+    rule,
+    /background-image:linear-gradient\(to right, var\(--meaning-alive\) 0 140px, var\(--md-sys-color-outline-variant\) 140px\)/,
+  );
 });

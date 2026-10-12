@@ -15,11 +15,15 @@ function nameInk(state: StepState): string {
 const isLitGate = (state: StepState): boolean => stateDrawn[state].hue === 'yours';
 
 /**
- * A step's bar: its state's drawing on every page (`stateClass`), but the rail's two lit bars. The step at work is filled in its hue,
- * and the step that waits on a person's word is hollow, edged in its hue; `barGlow` lights both.
+ * A step's bar: its state's drawing on every page (`stateClass`), but three. A step done is filled whether a check says so or its own
+ * word does, the step at work is filled in its hue, and the step that waits on a person's word is hollow, edged in its hue;
+ * `barGlow` lights the last two.
  */
-const barClass = (state: StepState): string =>
-  state === 'working' ? filled.alive : isLitGate(state) ? 'bg-transparent' : stateClass[state];
+function barClass(state: StepState): string {
+  if (state === 'working') return filled.alive;
+  if (isLitGate(state)) return 'bg-transparent';
+  return stateClass[state === 'unverified' ? 'verified' : state];
+}
 
 /** What lights a bar: the gate's edge and its glow, the glow of the step at work, and nothing for any other. */
 function barGlow(state: StepState): CSSProperties | undefined {

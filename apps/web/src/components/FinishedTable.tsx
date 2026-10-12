@@ -88,7 +88,7 @@ export function FinishedTable({ page }: { page: FinishedPage }) {
               <Column id="outcome" className={cn(HEAD, 'w-24')}>
                 Outcome
               </Column>
-              <Column id="id" align="end" className={cn(HEAD, 'w-24')}>
+              <Column id="id" align="end" className={cn(HEAD, 'w-28')}>
                 Id
               </Column>
             </TableHeader>

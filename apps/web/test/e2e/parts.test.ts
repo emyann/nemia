@@ -468,3 +468,70 @@ test(
     }
   },
 );
+
+const TITLE = '[data-plain-link]';
+
+/** Whether the link `TITLE` finds is underlined as it stands now. */
+const underlined = (page: Page): Promise<boolean> =>
+  page.locator(TITLE).evaluate((link) => getComputedStyle(link).textDecorationLine.includes('underline'));
+
+/**
+ * Where a text link is underlined when it must not be, or not when it must, none when it is right: with the pointer away and the
+ * keyboard elsewhere, under the pointer, and with the keyboard on it.
+ */
+async function lineFaults(page: Page): Promise<string[]> {
+  const faults: string[] = [];
+  await page.mouse.move(0, 0);
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  if (await underlined(page)) faults.push('underlined at rest');
+  await page.locator(TITLE).hover();
+  if (!(await underlined(page))) faults.push('no line under the pointer');
+  await page.mouse.move(0, 0);
+  await tabTo(page, 'plainLink');
+  if (!(await underlined(page))) faults.push('no line with the keyboard on it');
+  if (!(await ringOf(page))) faults.push('no ring with the keyboard on it');
+  return faults;
+}
+
+/** The link as it was drawn before: underlined at rest. */
+const ALWAYS_LINED = `${TITLE} { text-decoration-line: underline !important; }`;
+
+/** The link as plain text: no line, whatever is on it. */
+const NEVER_LINED = `${TITLE} { text-decoration-line: none !important; }`;
+
+test(
+  'REFUSED: a text link is underlined under the pointer and with the keyboard on it, never at rest; each fault is seen',
+  WAITED,
+  async () => {
+    const page = await openParts(browser, built, 'dark');
+    try {
+      assert.deepEqual(await lineFaults(page), [], 'no line at rest, a line under the pointer and on focus, and the ring');
+      const always = await page.addStyleTag({ content: ALWAYS_LINED });
+      assert.deepEqual(await lineFaults(page), ['underlined at rest'], 'underlined at rest: the check sees it');
+      await always.evaluate((style) => (style as HTMLStyleElement).remove());
+      await page.addStyleTag({ content: NEVER_LINED });
+      assert.deepEqual(
+        await lineFaults(page),
+        ['no line under the pointer', 'no line with the keyboard on it'],
+        'never underlined: the check sees both',
+      );
+    } finally {
+      await page.context().close();
+    }
+  },
+);
+
+test('a short id stands in a hairline box with six pixels of room, and a whole id in none', WAITED, async () => {
+  const page = await openParts(browser, built, 'dark');
+  try {
+    const boxes = await page.locator('[data-part="copy-id"] [data-run-id]').evaluateAll((all) =>
+      all.map((id) => {
+        const style = getComputedStyle(id);
+        return `${id.textContent}: ${style.borderTopWidth}, ${style.paddingLeft} ${style.paddingRight}, ${id.getBoundingClientRect().height}px tall`;
+      }),
+    );
+    assert.deepEqual(boxes, ['2e13: 1px, 6px 6px, 20px tall', 'lay-the-diamond-top-e2e4: 0px, 0px 0px, 16px tall']);
+  } finally {
+    await page.context().close();
+  }
+});

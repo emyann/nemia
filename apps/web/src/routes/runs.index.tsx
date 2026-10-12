@@ -3,7 +3,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
 import { FinishedTable } from '../components/FinishedTable';
 import { FlightTable } from '../components/FlightTable';
-import { Plate } from '../components/Plate';
+import { PageName, Plate } from '../components/Plate';
 import { ScanLines } from '../components/ScanLines';
 import { WaitingCard } from '../components/WaitingCard';
 import { finishedRunsQuery, openRunsQuery } from '../lib/api';
@@ -29,7 +29,7 @@ function Page({ state, children }: { state: string; children: ReactNode }) {
   return (
     <ScanLines className="min-h-full px-4 py-6 sm:px-8">
       <article data-runs-page={state} className="mx-auto flex w-full max-w-[1360px] flex-col gap-10">
-        <h1 className="m-0 border-b border-outline-variant pb-4 font-brand text-display-small text-on-surface uppercase">Runs</h1>
+        <PageName>Runs</PageName>
         {children}
       </article>
     </ScanLines>

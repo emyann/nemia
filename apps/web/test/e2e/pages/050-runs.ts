@@ -216,6 +216,12 @@ async function tableByKeyboard(page: Page, finished: FinishedPage): Promise<void
   await reach(row.locator('[data-copy-id] button'), 'the copy control');
   await page.keyboard.press('Enter');
   await expectVisible(row.locator('[data-copy-id][data-copied]'), 'Enter on the copy control of a finished row copies its id');
+  const edges = await page
+    .locator('section[data-section="finished"] [data-run-id]')
+    .evaluateAll((all) => all.map((id) => `${id.closest('[data-copied]') ? 'copied' : 'rest'} ${getComputedStyle(id).borderTopColor}`));
+  const [lit, rest] = [edges.filter((edge) => edge.startsWith('copied')), new Set(edges.filter((edge) => edge.startsWith('rest')))];
+  if (lit.length !== 1 || rest.size !== 1 || rest.has(lit[0].replace('copied', 'rest')))
+    throw new Refused(`the box of the id just copied takes another colour than the others, for a moment — ${edges.join(' | ')}`);
   const copied = await page.evaluate(() => navigator.clipboard.readText());
   if (copied !== run.id)
     throw new Refused(`a finished row shows its id's end and copies it whole, ${run.id} — the clipboard holds "${copied}"`);
@@ -337,6 +343,42 @@ async function expectDrawn(page: Page, marks: string, fact: 'tracking' | 'cut', 
 
 const TAG_CUT = 'polygon(0px 0px, calc(100% - 7px) 0px, 100% 7px, 100% 100%, 0px 100%)';
 
+/** What the browser draws of a run's titles, the short ids' boxes, the rule under the page's name and the bars of steps done. */
+async function lookRules(page: Page): Promise<void> {
+  await page.mouse.move(0, 0);
+  const titles = await page
+    .locator('[data-runs-page] [data-text-link]')
+    .evaluateAll((all) => all.map((link) => getComputedStyle(link).textDecorationLine));
+  if (!titles.length || titles.some((line) => line !== 'none'))
+    throw new Refused(`a run's title carries no line at rest — ${titles.join(', ') || 'no title'}`);
+  const ids = await page
+    .locator('section[data-section="finished"] [data-run-id]')
+    .evaluateAll((all) => all.map((id) => `${getComputedStyle(id).borderTopWidth} ${getComputedStyle(id).paddingLeft}`));
+  if (!ids.length || ids.some((box) => box !== '1px 6px')) throw new Refused(`a short id stands in its box — ${ids.join(', ') || 'no id'}`);
+  const whole = await page
+    .locator('section[data-section="waiting"] [data-run-id]')
+    .evaluateAll((all) => all.map((id) => getComputedStyle(id).borderTopWidth));
+  if (!whole.length || whole.some((width) => width !== '0px'))
+    throw new Refused(`a card's whole id stands in no box — ${whole.join(', ')}`);
+  const rule = await page.locator('[data-page-rule]').evaluate((line) => {
+    const [style, name] = [getComputedStyle(line), getComputedStyle(line.parentElement!)];
+    const lit = style.backgroundImage.includes('140px') ? 'lit for 140px' : style.backgroundImage;
+    return `${lit}, ${style.height} thick, ${name.paddingBottom} under the name`;
+  });
+  if (rule !== 'lit for 140px, 1px thick, 18px under the name')
+    throw new Refused(`the rule under the page's name is lit at its start — ${rule}`);
+  const done = await page
+    .locator('[data-runs-page] [data-step]')
+    .evaluateAll((all) =>
+      all
+        .filter((bar) => ['verified', 'unverified'].includes((bar as HTMLElement).dataset.state ?? ''))
+        .map((bar) => `${(bar as HTMLElement).dataset.state} ${getComputedStyle(bar).backgroundColor}`),
+    );
+  const fills = new Set(done.map((bar) => bar.split(' ').slice(1).join(' ')));
+  if (!done.some((bar) => bar.startsWith('unverified')) || fills.size !== 1 || fills.has('rgba(0, 0, 0, 0)'))
+    throw new Refused(`a step done is filled, on a check or on its own word — ${done.join(' | ') || 'no step done in a rail'}`);
+}
+
 /**
  * The details of the look, as the browser draws them: each label role's tracking where it is written, the two tags that say a state
  * cut and the factory's whole, a barcode of its own on each plate, the pager's buttons in the face of a heading, and the rail's lit bars.
@@ -373,6 +415,7 @@ async function lookDetails(page: Page): Promise<void> {
     if (!glows.length || glows.some((glow) => glow === 'none' || (state !== 'working' && !glow.includes('inset'))))
       throw new Refused(`${what} — ${glows.join(' | ') || `no step ${state} in a rail`}`);
   }
+  await lookRules(page);
   const rest = (await drawnOf(page, '[data-step]:not([data-state="working"])')).map((drawn) => drawn.glow);
   if (!rest.includes('none') || rest.some((glow) => glow !== 'none' && !glow.includes('inset')))
     throw new Refused(`a step that neither works nor waits on a person carries no glow — ${rest.join(' | ')}`);

@@ -360,7 +360,7 @@ function CardItem({
 /** The runs a card still in the inbox was started as, each linked, and why its removal failed where this page was told (`kept`). */
 function StartedAs({ startedAs, kept }: { startedAs: readonly string[]; kept: { why: string } | null }) {
   return (
-    <p data-started-as className="text-sm text-amber-700 dark:text-amber-400">
+    <p data-started-as className="text-sm text-yours">
       Started as{' '}
       {startedAs.map((id, i) => (
         <span key={id}>
@@ -450,7 +450,7 @@ function StartHere({
           </select>
         )}
         {entry.workflow && workflows.data && here !== undefined && !preset && (
-          <p data-unlisted className="text-xs text-amber-700 dark:text-amber-400">
+          <p data-unlisted className="text-xs text-yours">
             {namedElsewhere(entry.workflow, entry.repo, here) ? (
               <>
                 The card names {code(entry.workflow)}, a workflow of {code(entry.repo!)}, and the workflows here are {code(here)}&apos;s:

@@ -571,7 +571,7 @@ export function Approved({ step, approval, ends = false }: { step: string; appro
 
 /** The look of a gate's second button: outlined, beside the filled one that answers. */
 export const SECONDARY =
-  'bg-white text-foreground ring-1 ring-neutral-300 ring-inset hover:bg-neutral-100 disabled:hover:bg-white dark:bg-neutral-900 dark:ring-neutral-700 dark:hover:bg-neutral-800 dark:disabled:hover:bg-neutral-900';
+  'bg-white text-foreground ring-1 dark:text-foreground ring-neutral-300 ring-inset hover:bg-neutral-100 disabled:hover:bg-white dark:bg-neutral-900 dark:ring-neutral-700 dark:hover:bg-neutral-800 dark:disabled:hover:bg-neutral-900';
 
 /**
  * An approval of a step at its gate through the api (`approveStep`), and the run read again once the api has it — its detail, and the

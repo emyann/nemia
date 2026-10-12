@@ -32,7 +32,7 @@ export function FactoryCardStart({ entry, onStarted, onRefused }: { entry: Inbox
       ) : !place ? (
         <p className="text-xs text-muted-foreground">Reading the factory…</p>
       ) : 'why' in place ? (
-        <p data-unplaced className="text-xs text-amber-700 dark:text-amber-400">
+        <p data-unplaced className="text-xs text-yours">
           {place.why}
         </p>
       ) : (
@@ -128,7 +128,7 @@ function InFactory({ entry, place, onStarted, onRefused }: { entry: InboxEntry; 
         </p>
       </div>
       {workflow?.unfilled ? (
-        <p data-unfilled className="text-xs whitespace-pre-wrap break-words text-amber-700 dark:text-amber-400">
+        <p data-unfilled className="text-xs whitespace-pre-wrap break-words text-yours">
           {workflow.unfilled}
         </p>
       ) : (

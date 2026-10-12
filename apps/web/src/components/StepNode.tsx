@@ -31,7 +31,7 @@ export type StepFlowNode = Node<StepNodeData, 'step'>;
  * - It is drawn as a human gate when it is one (`isGate`), a step that signed off blocked or a loop out of rounds, and the run's
  *   `waitingOnYou` names it: a step a person has sent round or asked to retry keeps its word until the tick files what they asked for,
  *   and is no gate from the moment they ask, as the page's banner says.
- * - What its tries have cost, of its cap where it has one, in money's amber once they have cost it or more. It is held on its budget only when its
+ * - What its tries have cost, of its cap where it has one, in amber once they have cost it or more. It is held on its budget only when its
  *   word says so: past the cap alone, a finished step holds nothing, since its harness ends a job at its cap, a little past it where a
  *   call was under way.
  * - A gate's line, and what it waits for when the step said (`nodeNeed`), on one line whole on hover, so the node is no taller than

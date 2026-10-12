@@ -237,7 +237,7 @@ function DeclaredFields({ closeout, fold = false, answered = false }: { closeout
       {Object.entries(closeout.output).map(([name, value], i) => field(name, value, i === 0))}
       {closeout.replies && field('replies', closeout.replies)}
       {closeout.missing.length > 0 && (
-        <p data-missing className="text-xs text-amber-700 dark:text-amber-400">
+        <p data-missing className="text-xs text-yours">
           declared and not given: {closeout.missing.join(', ')}
         </p>
       )}
@@ -288,7 +288,7 @@ export function HandedOn({ closeout, answeredBeside = false }: { closeout: StepC
 /** What a step that signed off blocked needs, under its word, as its agent wrote it. */
 export function ClosedNeeds({ needs }: { needs: string }) {
   return (
-    <div data-needs className="text-amber-700 dark:text-amber-400">
+    <div data-needs className="text-yours">
       <p className="font-medium">Needs:</p> <Markdown>{needs}</Markdown>
     </div>
   );

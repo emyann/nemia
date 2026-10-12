@@ -120,7 +120,7 @@ function PruneForm({ id, offer, onClose }: { id: string; offer: PruneOffer; onCl
               >
                 {c.says}
               </span>
-              {c.unavailable && <span className="block text-[11px] leading-snug text-amber-700 dark:text-amber-400">{c.unavailable}</span>}
+              {c.unavailable && <span className="block text-[11px] leading-snug text-yours">{c.unavailable}</span>}
             </span>
           </Radio>
         ))}

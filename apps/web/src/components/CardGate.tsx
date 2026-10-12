@@ -141,7 +141,7 @@ function Answer({
           SMALL,
           primary
             ? 'bg-neutral-900 text-white hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300'
-            : 'bg-white text-foreground ring-1 ring-neutral-300 ring-inset hover:bg-neutral-100 dark:bg-neutral-900 dark:ring-neutral-700 dark:hover:bg-neutral-800',
+            : 'bg-white text-foreground ring-1 dark:text-foreground ring-neutral-300 ring-inset hover:bg-neutral-100 dark:bg-neutral-900 dark:ring-neutral-700 dark:hover:bg-neutral-800',
         )}
       >
         {primary ? label : `${label}…`}

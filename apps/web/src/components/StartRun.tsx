@@ -113,7 +113,7 @@ export function StartRun({
         <Where workflow={workflow} repo={repo} factory={place?.factory} card={!!card} />
       </div>
       {ignored && (
-        <p data-ignored-repo className="text-xs text-amber-700 dark:text-amber-400">
+        <p data-ignored-repo className="text-xs text-yours">
           {ignored}
         </p>
       )}

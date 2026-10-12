@@ -86,7 +86,7 @@ export function Unplaced({
     );
   if (where.kind === 'refused')
     return (
-      <p data-unplaced={where.factory} className="text-sm text-amber-700 dark:text-amber-400">
+      <p data-unplaced={where.factory} className="text-sm text-yours">
         {where.why} {back}.
       </p>
     );

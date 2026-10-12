@@ -72,11 +72,11 @@ function StartIn({ name }: { name: string }) {
       ) : !factories.data ? (
         <p className="text-xs text-muted-foreground">Reading the factories…</p>
       ) : place === null ? (
-        <p data-unplaced className="text-sm text-amber-700 dark:text-amber-400">
+        <p data-unplaced className="text-sm text-yours">
           {factory ? 'The default factory starts no run from here: start one from the Workflows page.' : `No factory is named ${name}.`}
         </p>
       ) : 'why' in place ? (
-        <p data-unplaced className="text-sm text-amber-700 dark:text-amber-400">
+        <p data-unplaced className="text-sm text-yours">
           {place.why}
         </p>
       ) : (
@@ -137,11 +137,7 @@ export function FactoryChoice({ factories }: { factories: readonly Factory[] }) 
                 {name}
               </Button>
               {why && (
-                <span
-                  id={`${legend}-${name}`}
-                  data-why-not
-                  className="block px-2 pb-1 text-xs whitespace-pre-wrap break-words text-amber-700 dark:text-amber-400"
-                >
+                <span id={`${legend}-${name}`} data-why-not className="block px-2 pb-1 text-xs whitespace-pre-wrap break-words text-yours">
                   {why}
                 </span>
               )}
@@ -257,7 +253,7 @@ function WorkflowRow({
           </span>
           {workflow.description && <span className="block text-xs text-muted-foreground">{workflow.description}</span>}
           {why && (
-            <span data-why-not className="block text-xs whitespace-pre-wrap break-words text-amber-700 dark:text-amber-400">
+            <span data-why-not className="block text-xs whitespace-pre-wrap break-words text-yours">
               {why}
             </span>
           )}

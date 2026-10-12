@@ -27,7 +27,7 @@ function WaitingRow({ row }: { row: BellRow }) {
         </span>
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
           <FactoryTag name={row.factory} />{' '}
-          <span data-waits-for className="text-amber-700 dark:text-amber-400">
+          <span data-waits-for className="text-yours">
             {row.waitsFor.join(' · ')}
           </span>{' '}
           <span className="font-mono">{row.run}</span>

@@ -210,7 +210,7 @@ function Closeout({ turn }: { turn: CloseoutTurn }) {
         <>
           <Markdown>{closeout.summary}</Markdown>
           {closeout.needs && (
-            <div data-needs className="text-amber-700 dark:text-amber-400">
+            <div data-needs className="text-yours">
               <p className="font-medium">Needs:</p>
               <Markdown>{closeout.needs}</Markdown>
             </div>

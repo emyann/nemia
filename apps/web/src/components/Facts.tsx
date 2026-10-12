@@ -317,7 +317,7 @@ export const unreadRows = (words: string | null): Array<[string, ReactNode]> =>
       ]
     : [];
 
-const WARN = 'text-amber-700 dark:text-amber-400';
+const WARN = 'text-money';
 
 /**
  * What sessions read, by price: the counts — `read 21.4M · wrote 412k · peak 167k` — and, beneath, a resumed session that wrote its

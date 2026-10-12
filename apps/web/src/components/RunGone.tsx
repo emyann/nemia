@@ -10,7 +10,7 @@ import { titleOf } from '@/lib/factory';
 export function RunGone(props: { run: RunDetail } | { id: string }) {
   const id = 'run' in props ? props.run.id : props.id;
   return (
-    <p data-run-gone={id} role="status" className="max-w-3xl text-sm text-amber-700 dark:text-amber-400">
+    <p data-run-gone={id} role="status" className="max-w-3xl text-sm text-yours">
       <CircleSlash aria-hidden className="mr-1 inline size-3.5 -translate-y-px" />
       {'run' in props
         ? `${titleOf(props.run)} is no longer in this store: it was removed while this page was open.`

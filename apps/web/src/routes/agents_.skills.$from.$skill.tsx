@@ -257,9 +257,7 @@ function Preload({
         {reachWords(detail.users)}
       </p>
       {mine && changed && (
-        <p className="text-xs text-amber-700 dark:text-amber-400">
-          Save or discard the changes below first: the switch writes the file as it is on disk.
-        </p>
+        <p className="text-xs text-yours">Save or discard the changes below first: the switch writes the file as it is on disk.</p>
       )}
     </fieldset>
   );

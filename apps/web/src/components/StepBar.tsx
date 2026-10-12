@@ -30,7 +30,7 @@ function StepBody({ id, name, run, error }: { id: string; name: string; run: Run
   const step = run.steps.find((s) => s.name === name);
   if (!step) {
     return (
-      <p data-no-step className="text-sm text-amber-700 dark:text-amber-400">
+      <p data-no-step className="text-sm text-yours">
         {titleOf(run)} has no step named {name}.
       </p>
     );

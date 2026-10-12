@@ -341,7 +341,7 @@ function ReadmeField({ text, changed, onChange }: { text: string; changed: boole
         README
         <span className="font-normal text-muted-foreground">what the workflow is for, its first paragraph its description</span>
         {changed && (
-          <span data-readme-unsaved className="font-normal text-amber-700 dark:text-amber-400">
+          <span data-readme-unsaved className="font-normal text-yours">
             unsaved
           </span>
         )}

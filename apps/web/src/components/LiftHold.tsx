@@ -92,7 +92,7 @@ export function CardLift({ id }: { id: string }) {
           data-lift={id}
           className={cn(
             SMALL,
-            'bg-white text-foreground ring-1 ring-neutral-300 ring-inset hover:bg-neutral-100 dark:bg-neutral-900 dark:ring-neutral-700 dark:hover:bg-neutral-800',
+            'bg-white text-foreground ring-1 dark:text-foreground ring-neutral-300 ring-inset hover:bg-neutral-100 dark:bg-neutral-900 dark:ring-neutral-700 dark:hover:bg-neutral-800',
           )}
         >
           Lift…

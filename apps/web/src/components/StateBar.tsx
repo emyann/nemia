@@ -53,7 +53,7 @@ export function StateBody({ graph, state }: { graph: MachineGraph; state: string
   const facts = stateFacts(graph, state);
   if (!facts)
     return (
-      <p className="text-sm text-amber-700 dark:text-amber-400">
+      <p className="text-sm text-yours">
         {graph.title} has no state named {state}.
       </p>
     );

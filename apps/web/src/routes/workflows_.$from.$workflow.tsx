@@ -151,7 +151,7 @@ function InFactory({ from, name, address, place, building, factory }: Asked & { 
         why === null ? (
           <StartRun workflow={workflow} repo={place.repo} place={place} />
         ) : (
-          <p data-why-not className="text-sm whitespace-pre-wrap break-words text-amber-700 dark:text-amber-400">
+          <p data-why-not className="text-sm whitespace-pre-wrap break-words text-yours">
             {why}
           </p>
         )

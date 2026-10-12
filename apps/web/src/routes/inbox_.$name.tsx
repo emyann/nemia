@@ -46,7 +46,7 @@ function CardPage() {
       </header>
 
       {card.startedAs.length > 0 && (
-        <p data-started-as className="text-sm text-amber-700 dark:text-amber-400">
+        <p data-started-as className="text-sm text-yours">
           Started as{' '}
           {card.startedAs.map((id, i) => (
             <span key={id}>

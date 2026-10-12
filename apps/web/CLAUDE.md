@@ -29,6 +29,9 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
 - A colour says one thing: `yours` (waits on a person), `alive`, `money` (an amount), `rest` (grey, and sage for done) and `failure`.
   `src/styles.css` reads each from a theme role once (`--meaning-*`, `bg-yours`); `lib/meaning.ts` holds the drawn forms, each class a
   whole literal; `test/status.test.ts` holds the table and refuses a hand-picked hue in the files that draw a state.
+- `test/palette.test.ts` refuses a palette colour (`bg-amber-100`, `text-white`, `--color-neutral-400`) in `src` outside the kit: a ground
+  or an outline reads a role (`bg-card`, `border-outline`), one class for both schemes, no `dark:` twin. A use that means none of the
+  five is rest; a caution is failure for a write refused, yours drawn light for what a person weighs, rest for a note.
 - Text dimmed by an `opacity` falls under 4.5:1: sink a card into the floor (`bg-background`) or use the muted ink instead.
 - The kit has no adapter for TanStack Router: an `href` on one of its buttons, chips or menu items loads the page whole.
 

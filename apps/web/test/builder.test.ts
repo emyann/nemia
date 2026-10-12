@@ -242,6 +242,7 @@ test("a step's servers are a list of its own: unset as none added, put back as s
 test('what is typed into a list or a number field, as the listing has it', () => {
   assert.deepEqual(listOf('Read, Grep,  Bash(npm test) ,'), ['Read', 'Grep', 'Bash(npm test)']);
   assert.deepEqual(listOf('  '), []);
+  assert.deepEqual(listOf('review, apps/site:lay-out'), ['review', 'apps/site:lay-out'], 'a skill named with its folder is kept whole');
   assert.equal(numberOf(''), null);
   assert.equal(numberOf(' 900 '), 900);
   assert.equal(numberOf('2.50'), 2.5);

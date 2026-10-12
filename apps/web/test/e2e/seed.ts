@@ -1271,6 +1271,64 @@ function writeSkill(skills: string, skill: { id: string; name: string; descripti
 }
 
 /**
+ * What the `folder-skills` page writes and takes back, none of it seeded: a folder of the checkout, `folder`, with two skills of its own;
+ * an agent of yours that gives the first named with its folder, and a workflow of yours whose one step names the agent and adds the
+ * second; and two skills of the checkout's own that are links, `inside` to a folder the checkout keeps, `apart` to one outside it.
+ */
+export const FOLDER_SKILLS = {
+  folder: 'apps/site',
+  agentSkill: { id: 'lay-out', name: 'Lay out', description: 'Lays a page out on its grid.', tags: ['layout'] },
+  stepSkill: { id: 'set-type', name: 'Set type', description: 'Sets a page in its faces.', tags: ['type'] },
+  agent: 'typesetter',
+  workflow: 'typeset',
+  step: 'compose',
+  inside: { id: 'linked-inside', name: 'Linked inside', description: 'Kept in a folder of the checkout, and linked.', tags: ['link'] },
+  apart: { id: 'linked-apart', name: 'Linked apart', description: 'Kept outside the checkout, and linked.', tags: ['link'] },
+} as const;
+
+/** A FOLDER_SKILLS skill as its line writes it, `folder:name`, and the folder it is read from, by its path in the checkout. */
+export const folderSkill = (skill: { id: string }): { written: string; foundIn: string } => ({
+  written: `${FOLDER_SKILLS.folder}:${skill.id}`,
+  foundIn: `${FOLDER_SKILLS.folder}/.claude/skills/${skill.id}`,
+});
+
+/** Every path `writeFolderSkills` makes in the store at `root`, files, links and folders: what the page removes, whatever was written. */
+export function folderSkillsPaths(root: string): string[] {
+  const { folder, agent, workflow, inside, apart } = FOLDER_SKILLS;
+  const repo = path.join(root, 'checkout');
+  return [
+    path.join(repo, folder.split('/')[0]),
+    path.join(repo, 'kept'),
+    path.join(root, 'apart'),
+    path.join(repo, '.claude', 'skills', inside.id),
+    path.join(repo, '.claude', 'skills', apart.id),
+    path.join(root, 'workflows', 'agents', `${agent}.md`),
+    path.join(root, 'workflows', workflow),
+  ];
+}
+
+/** Writes FOLDER_SKILLS into the store at `root` and its checkout (`folderSkillsPaths`). */
+export function writeFolderSkills(root: string): void {
+  const { folder, agentSkill, stepSkill, agent, workflow, step, inside, apart } = FOLDER_SKILLS;
+  const repo = path.join(root, 'checkout');
+  const own = path.join(repo, '.claude', 'skills');
+  writeSkill(path.join(repo, folder, '.claude', 'skills'), agentSkill);
+  writeSkill(path.join(repo, folder, '.claude', 'skills'), stepSkill);
+  writeSkill(path.join(repo, 'kept'), inside);
+  writeSkill(path.join(root, 'apart'), apart);
+  fs.symlinkSync(path.join('..', '..', 'kept', inside.id), path.join(own, inside.id));
+  fs.symlinkSync(path.join(root, 'apart', apart.id), path.join(own, apart.id));
+  write(
+    path.join(root, 'workflows', 'agents', `${agent}.md`),
+    `---\ndescription: Sets a page.\nskills: ${folderSkill(agentSkill).written}\nharness: claude\nmodel: opus\n---\nYou set pages.\n`,
+  );
+  write(
+    path.join(root, 'workflows', workflow, `${step}.md`),
+    `---\nplace: git\nagent: ${agent}\nskills: ${folderSkill(stepSkill).written}\n---\nCompose the page.\n`,
+  );
+}
+
+/**
  * The inbox the Inbox page lists: three cards in the store's `inbox/`, as `wf inbox add` writes them. `planned` names the checkout's `dev`
  * and the checkout as the repository it is about, and was filed an hour ago; `bare` names neither, and was filed ten minutes ago, so it is
  * listed first; `rich`, between them, names `dev` and is written in markdown — a heading, a list, a table, a code block, a line of raw HTML

@@ -535,6 +535,48 @@ test("a folder whose agent's skill is in the repository's `.claude/skills/` is l
   }
 });
 
+test("a step's `skills:` naming a skill with its folder is saved as sent and listed as written; REFUSED: a folder that holds no such skill, naming the step, and nothing is written", async () => {
+  write(path.join(repo, '.claude', 'skills', 'review', 'SKILL.md'), '---\ndescription: Reviews a change.\n---\nReview it.\n');
+  write(
+    path.join(repo, 'apps', 'site', '.claude', 'skills', 'lay-out', 'SKILL.md'),
+    '---\ndescription: Lays a page out.\n---\nLay it out.\n',
+  );
+  const dir = path.join(STORE, 'typeset');
+  write(path.join(STORE, 'agents', 'typesetter.md'), '---\ntools: Read, Skill\n---\nYou set type.\n');
+  write(path.join(dir, 'compose.md'), '---\nplace: git\nagent: typesetter\n---\nCompose.\n');
+  try {
+    const [compose] = await listedSteps('typeset');
+    const given = { ...compose, spec: { ...compose.spec, skills: ['review', 'apps/site:lay-out'] } };
+    let res = await put('typeset', { steps: [given] });
+    assert.equal(res.status, 200, await res.clone().text());
+    const saved = (await res.json()) as WorkflowSaved;
+    assert.deepEqual(saved.workflow.steps[0].spec.skills, ['review', 'apps/site:lay-out']);
+    const file = fs.readFileSync(path.join(dir, 'compose.md'), 'utf8');
+    assert.ok(file.split('\n').includes('skills: review, apps/site:lay-out'), `the line as sent: ${file}`);
+    const [again] = await listedSteps('typeset');
+    res = await put('typeset', { steps: [again] });
+    assert.equal(res.status, 200, await res.clone().text());
+    assert.equal(fs.readFileSync(path.join(dir, 'compose.md'), 'utf8'), file, 'and a save of the listing writes it back unchanged');
+
+    const before = snapshot(dir);
+    res = await put('typeset', { steps: [{ ...again, spec: { ...again.spec, skills: ['apps/site:no-such'] } }] });
+    const refused = (await res.json()) as BuildRefused;
+    assert.equal(res.status, 422, refused.error);
+    assert.ok(
+      refused.error.includes("`apps/site:no-such` is the skill `no-such` of the repository's folder `apps/site`"),
+      `in the package's words: ${refused.error}`,
+    );
+    assert.ok(refused.error.includes('holds no SKILL.md'), refused.error);
+    assert.deepEqual(refused.steps, ['compose']);
+    assert.deepEqual(snapshot(dir), before, 'nothing written');
+  } finally {
+    fs.rmSync(path.join(repo, '.claude'), { recursive: true, force: true });
+    fs.rmSync(path.join(repo, 'apps'), { recursive: true, force: true });
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(path.join(STORE, 'agents', 'typesetter.md'));
+  }
+});
+
 test("a skill only a step's own `skills:` adds moves the folder's version when its folder is edited, as the agent's own skills do; another skill does not", () => {
   const dir = path.join(STORE, 'step-skilled');
   const added = path.join(STORE, 'skills', 'mind-the-index', 'SKILL.md');

@@ -4779,6 +4779,7 @@ const composing = {
     {
       name: 'gone',
       from: null,
+      foundIn: null,
       entry: null,
       error: 'No skills folder has `gone` — looked in /store/workflows/skills, /repo/.claude/skills.',
       preload: false,
@@ -4786,6 +4787,30 @@ const composing = {
     },
   ],
 };
+
+test("a skill an agent gives named with its folder is a row as written, the repository's, with the folder it is read from and no link; one found nowhere still says so", async () => {
+  const { GivenSkills } = await import('../src/components/AgentParts.tsx');
+  const rows = [
+    {
+      name: 'apps/site:lay-out',
+      from: null,
+      foundIn: 'apps/site/.claude/skills/lay-out',
+      entry: null,
+      error: null,
+      preload: false,
+      cost: null,
+    },
+    { ...composing.given[0] },
+  ];
+  const html = await routedWith(createElement(GivenSkills, { rows, none: 'None.' }));
+  const [folder, gone] = html.split('data-given-skill="gone"');
+  assert.match(folder, /data-given-skill="apps\/site:lay-out"[^]*<span[^>]*font-mono[^>]*>apps\/site:lay-out<\/span>/);
+  assert.match(folder, /data-skill-from="folder"[^>]*bg-muted text-muted-foreground[^>]*>this repository</);
+  assert.match(folder, /data-found-in[^>]*>Read from\s*<code[^>]*>apps\/site\/\.claude\/skills\/lay-out<\/code>/);
+  assert.doesNotMatch(folder, /data-skill-link|href="\/agents\/skills\/|not found/);
+  assert.match(gone, /data-skill-from="none"[^>]*>not found</);
+  assert.doesNotMatch(gone, /data-found-in/);
+});
 
 test('an agent of yours lists the skills it gives, each with where it is found and what it costs a turn, and a Remove each; one found nowhere says so', async () => {
   const html = await agentFormWith(composing);
@@ -6201,12 +6226,37 @@ const hiredPage = async (extra: Record<string, unknown> = {}) => {
     layers: { ...LAYERS, task: null },
     hired: 'writer',
     skillsFrom: [
-      { name: 'alpha', from: 'yours' },
-      { name: 'gamma', from: null },
+      { name: 'alpha', from: 'yours', foundIn: null },
+      { name: 'gamma', from: null, foundIn: null },
     ],
     ...extra,
   });
 };
+
+test("on a step's page, a skill named with its folder is drawn as written, the repository's, with where it was found and no link", async () => {
+  const { StepTold } = await import('../src/components/StepParts.tsx');
+  const page = await hiredPage({
+    layers: { ...LAYERS, task: null, addedSkills: ['apps/site:set-type', 'gamma'] },
+    skillsFrom: [
+      { name: 'alpha', from: 'yours', foundIn: null },
+      { name: 'apps/site:set-type', from: null, foundIn: 'apps/site/.claude/skills/set-type' },
+      { name: 'gamma', from: null, foundIn: null },
+    ],
+  });
+  const html = await routedWith(createElement(StepTold, { page, place: { factory: 'hiring' } }));
+  const chip = (name: string): string =>
+    new RegExp(`data-skill="${name}"[^>]*>[^]*?</span>(?=\\s*(<span[^>]*data-skill=|</))`).exec(html)?.[0] ?? '';
+  assert.match(chip('alpha'), /<a[^>]*href="\/agents\/skills\/yours\/alpha"/, 'one with a page stays linked');
+  const folder = chip('apps/site:set-type');
+  assert.match(
+    folder,
+    /data-skill-found-in="apps\/site\/\.claude\/skills\/set-type"\s*title="apps\/site\/\.claude\/skills\/set-type"[^>]*>apps\/site:set-type\s*<span[^>]*>· this repository</,
+  );
+  assert.doesNotMatch(folder, /<a\b/, 'no link: it has no page');
+  assert.doesNotMatch(html, /href="\/agents\/skills\/[^"]*(:|%3A)/i, 'and no address of a page that would be refused');
+  assert.match(html, /data-skill="gamma"[^>]*>gamma</, 'one found nowhere: its name alone');
+  assert.doesNotMatch(chip('gamma'), /data-skill-found-in/);
+});
 
 test("on a step's page, what it will be told is drawn open, each layer beside where it is edited, the agent's words folded and the task left to the brief", async () => {
   const { StepTold } = await import('../src/components/StepParts.tsx');

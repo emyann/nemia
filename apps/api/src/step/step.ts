@@ -23,7 +23,7 @@ import {
 import type { AgentReading, AgentsRead, Factory, FactoryListing } from 'agent-orchestrator';
 import { toldLayers, type Run, type ToldLayers } from 'agent-orchestrator/run';
 import type { AgentSkill, SkillsFound, Workflow } from 'agent-orchestrator/workflow';
-import { sourceOf, type SkillSource } from '../agents/skills.ts';
+import { foundInOf, sourceOf, type SkillSource } from '../agents/skills.ts';
 import { type ApiEnv, served } from '../layer.ts';
 import { agentSkillsOf, folderOf, keyRows, placesOf, stepSourceOf, type KeyRow, type WorkflowSource } from '../workflows/workflows.ts';
 import { runPlaced } from '../store.ts';
@@ -40,8 +40,11 @@ export type WorkflowPageAddress = { from: WorkflowSource; workflow: string; fact
 /** A factory that hires an agent into a step: the factory's name and the agent's. */
 export type HiredIn = { factory: string; agent: string };
 
-/** A skill a step's layers give, and where it is found: yours, the repository's or shipped; null where no place the board pages has it. */
-export type SkillFrom = { name: string; from: SkillSource | null };
+/**
+ * A skill a step's layers give, named as its line writes it, and where it is found: `from`, yours, the repository's or shipped, null
+ * where no place the board pages has it; and then `foundIn`, where the repository has it (`foundInOf`), null for one found nowhere.
+ */
+export type SkillFrom = { name: string; from: SkillSource | null; foundIn: string | null };
 
 /** An agent a step may be hired: its name, and what it is for, null where its file says nothing. */
 export type HireableAgent = { name: string; description: string | null };
@@ -181,11 +184,12 @@ export async function hiringOf(
   );
 }
 
-/** Each skill `layers` gives, the agent's then the step's, once each, with where `found` has it (`sourceOf`). */
+/** Each skill `layers` gives, the agent's then the step's, once each, with where `found` has it (`sourceOf`, `foundInOf`). */
 export function skillsFromOf(layers: ToldLayers, found: SkillsFound, repo: string, home: string): SkillFrom[] {
   return [...new Set([...layers.agentSkills, ...layers.addedSkills])].map((name) => {
     const at = found.at.get(name);
-    return { name, from: typeof at === 'string' ? sourceOf(at, repo, home) : null };
+    if (typeof at !== 'string') return { name, from: null, foundIn: null };
+    return { name, from: sourceOf(at, repo, home), foundIn: foundInOf(at, repo, home) };
   });
 }
 

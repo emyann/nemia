@@ -69,7 +69,7 @@ const holdsSkill = (dir: string): boolean => fs.statSync(path.join(dir, 'SKILL.m
 const placeSkills = (): string[] => entriesOf(PLACE_SKILLS).filter((name) => holdsSkill(path.join(PLACE_SKILLS, name)));
 
 /** Whether the folders `a` and `b` are one folder by real path; false where either cannot be reached. */
-function oneFolder(a: string, b: string): boolean {
+export function oneFolder(a: string, b: string): boolean {
   try {
     return fs.realpathSync(a) === fs.realpathSync(b);
   } catch {

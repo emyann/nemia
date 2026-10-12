@@ -249,29 +249,33 @@ export function SkillLink({ from, name, className }: { from: SkillSource; name: 
 
 /**
  * Where a skill an agent is given is found: your library, the repository, what Nemia ships — or nowhere, which the package refuses on
- * save.
+ * save. One with no page that the repository has all the same (`foundIn`, a skill named with its folder) is the repository's too,
+ * marked `folder`.
  */
-export function SkillSourceBadge({ from }: { from: SkillSource | null }) {
+export function SkillSourceBadge({ from, foundIn = null }: { from: SkillSource | null; foundIn?: string | null }) {
+  const folder = from === null && foundIn !== null;
+  const lost = from === null && !folder;
   return (
     <span
-      data-skill-from={from ?? 'none'}
+      data-skill-from={folder ? 'folder' : (from ?? 'none')}
       className={cn(
         'shrink-0 rounded-full px-2 py-0.5 text-body-small leading-none font-medium',
         from === 'yours' && container.grey,
-        from === 'repo' && 'bg-muted text-muted-foreground',
+        (from === 'repo' || folder) && 'bg-muted text-muted-foreground',
         from === 'shipped' && hairline,
-        from === null && container.failure,
+        lost && container.failure,
       )}
     >
-      {from ? SOURCE_BADGES[from] : 'not found'}
+      {folder ? SOURCE_BADGES.repo : from ? SOURCE_BADGES[from] : 'not found'}
     </span>
   );
 }
 
 /**
- * The skills an agent gives, one row each in its order: its name, linked to its page where it is found, where it is found, what it is for,
- * and what it costs a turn — or why no session can be given it, in the package's words. `action` draws what a row offers beside it (the
- * picker's Remove); read-only, nothing.
+ * The skills an agent gives, one row each in its order: its name, linked to its page where it has one and as its line writes it where
+ * it has none, where it is found — for one named with its folder, the folder it is read from — what it is for, and what it costs a
+ * turn — or why no session can be given it, in the package's words. `action` draws what a row offers beside it (the picker's Remove);
+ * read-only, nothing.
  */
 export function GivenSkills({
   rows,
@@ -299,8 +303,13 @@ export function GivenSkills({
               ) : (
                 <span className="font-mono text-body-small font-medium text-foreground">{row.name}</span>
               )}
-              <SkillSourceBadge from={row.from} />
+              <SkillSourceBadge from={row.from} foundIn={row.foundIn} />
             </p>
+            {row.from === null && row.foundIn !== null && (
+              <p data-found-in className="text-body-small text-muted-foreground">
+                Read from <code className="font-mono break-all">{row.foundIn}</code>
+              </p>
+            )}
             {row.entry && <p className="text-body-small text-muted-foreground">{row.entry.description}</p>}
             {row.error !== null && (
               <p data-given-error className="font-mono text-body-small whitespace-pre-wrap break-words text-failure">

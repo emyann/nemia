@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import { WorkflowError } from '../step/step.ts';
-import { copySkillFiles, skillFiles, skillLinkRefusal, skillsFor, skillVersion } from './read.store.ts';
+import { copySkillFiles, oneFolder, skillFiles, skillLinkRefusal, skillsFor, skillVersion } from './read.store.ts';
 
 const SKILL = '---\nname: x\ndescription: Do the thing.\n---\nDo it.\n';
 
@@ -331,4 +331,16 @@ test('a nested skill’s link is followed inside the folder its line names; REFU
     refusalOf(skillsFor(path.join(repo, 'workflows', 'dev'), { repo }).at.get('app:y')),
     `y/far.md${LEAVES} The links of \`app:y\` stay inside ${path.join(repo, 'app')}, the folder its line names.`,
   );
+});
+
+test('one folder: a link and the folder it points at; REFUSED for two folders, and for one that is not there', () => {
+  const repo = checkout();
+  const real = path.join(repo, 'skills', 'x');
+  const link = linked('../../skills/x', path.join(repo, '.claude', 'skills', 'x'));
+  assert.equal(oneFolder(link, real), true);
+  assert.equal(oneFolder(real, real), true);
+  written(repo, { 'skills/y/SKILL.md': SKILL });
+  assert.equal(oneFolder(real, path.join(repo, 'skills', 'y')), false);
+  assert.equal(oneFolder(link, path.join(repo, 'skills', 'gone')), false);
+  assert.equal(oneFolder(path.join(repo, 'skills', 'gone'), path.join(repo, 'skills', 'gone')), false);
 });

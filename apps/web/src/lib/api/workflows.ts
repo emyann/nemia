@@ -149,8 +149,11 @@ export const workflowsInQuery = (place: Place | null) => (place === null ? workf
 /** Mirrors `RecentRun` in apps/api/src/step/step.ts: one of a step's newest runs, and whether the step was filed in it. */
 export type RecentRun = { id: string; brief: string; createdAt: string; factory: string | null; filed: boolean };
 
-/** Mirrors `SkillFrom` in apps/api/src/step/step.ts: a skill a step's layers give, and where its page is; null where none is. */
-export type SkillFrom = { name: string; from: 'yours' | 'repo' | 'shipped' | null };
+/**
+ * Mirrors `SkillFrom` in apps/api/src/step/step.ts: a skill a step's layers give, named as its line writes it, and where its page is
+ * (`from`), null where it has none; and then where this repository has it (`foundIn`), null for one found nowhere.
+ */
+export type SkillFrom = { name: string; from: 'yours' | 'repo' | 'shipped' | null; foundIn: string | null };
 
 /**
  * Mirrors `Hiring` in apps/api/src/step/step.ts: why no agent can be hired into a step in the factory it is read in, null where one can;
@@ -206,7 +209,13 @@ const WorkflowStepPageSchema = Schema.Struct({
     agents: Schema.mutable(Schema.Array(Schema.Struct({ name: Schema.String, description: Schema.NullOr(Schema.String) }))),
   }),
   skillsFrom: Schema.mutable(
-    Schema.Array(Schema.Struct({ name: Schema.String, from: Schema.NullOr(Schema.Literals(['yours', 'repo', 'shipped'])) })),
+    Schema.Array(
+      Schema.Struct({
+        name: Schema.String,
+        from: Schema.NullOr(Schema.Literals(['yours', 'repo', 'shipped'])),
+        foundIn: Schema.NullOr(Schema.String),
+      }),
+    ),
   ),
   recentRuns: Schema.mutable(
     Schema.Array(

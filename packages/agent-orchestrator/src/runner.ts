@@ -170,7 +170,7 @@ export {
   workflowReadme,
   workflowsIn,
 } from './folder/folder.store.ts';
-export { cardSkills, isShippedPlace, lookupRoots, preloads, skillsFor, skillVersion } from './skills/read.store.ts';
+export { cardSkills, isShippedPlace, lookupRoots, oneFolder, preloads, skillsFor, skillVersion } from './skills/read.store.ts';
 export type { Places } from './skills/read.store.ts';
 export { agentsFor, agentVersion, customInstructionsFile, loadAgents, readCustomInstructions } from './agents/read.store.ts';
 export { clearCustomInstructions, customInstructionsFor, writeCustomInstructions } from './agents/custom.store.ts';

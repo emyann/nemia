@@ -9,7 +9,7 @@ import type { Command, Ran } from '../command/entry.verb.ts';
 import { endingSteps } from '../ending/ending.ts';
 import { writersOf } from '../factory/factory.ts';
 import { formerKeyLines } from '../folder/folder.store.ts';
-import { ignoredRepoLine } from '../inbox/inbox.ts';
+import { ignoredRepoLine } from '../inbox/index.ts';
 import { startFromInbox } from '../inbox/inbox.verb.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
 import { inputsDir, stepsOf } from '../record/record.store.ts';

@@ -268,6 +268,39 @@ test("REFUSED at shipped defaults: a queue of a card with no workflow, or that d
   assert.deepEqual(inboxAsIs(), before);
 });
 
+test("REFUSED as shipped: a queue of a card that names no factory is a 422 in the package's sentence, and nothing is written; a card of a factory is queued in it, and an unfactored card queued before the rule is still taken back", async (t) => {
+  const was = process.env.WF_DEFAULT_FACTORY_STARTS;
+  delete process.env.WF_DEFAULT_FACTORY_STARTS;
+  t.after(() => {
+    if (was !== undefined) process.env.WF_DEFAULT_FACTORY_STARTS = was;
+  });
+  clear();
+  fs.mkdirSync(inbox, { recursive: true });
+  fs.writeFileSync(path.join(inbox, 'loose.md'), '---\nworkflow: dev\n---\nSomewhere.\n');
+  fs.writeFileSync(path.join(inbox, 'placed.md'), '---\nworkflow: dev\nfactory: mill\n---\nIn the mill.\n');
+  fs.writeFileSync(path.join(inbox, 'older.md'), '---\nworkflow: dev\nqueued: 2026-09-16T09:01:00.000Z\n---\nQueued before the rule.\n');
+  const before = inboxAsIs();
+
+  const refused = await queue('loose');
+  assert.equal(refused.status, 422);
+  const { error } = (await refused.json()) as { error: string };
+  assert.equal(error, refusalOf('loose'));
+  assert.match(
+    error,
+    /inbox\/loose\.md: this card names no factory, and a queued card is started on its own only in the factory named for it\. .* then queue it again: nemia inbox queue loose\. Nothing was queued\.$/,
+  );
+  assert.deepEqual(inboxAsIs(), before);
+
+  const placed = await queue('placed');
+  assert.equal(placed.status, 200, await placed.clone().text());
+  const entry = (await listed()).find((e) => e.name === 'placed')!;
+  assert.deepEqual([entry.factory, entry.queued?.place], ['mill', 2]);
+
+  const back = await unqueue('older');
+  assert.equal(back.status, 200, await back.clone().text());
+  assert.doesNotMatch(fs.readFileSync(path.join(inbox, 'older.md'), 'utf8'), /queued:/);
+});
+
 test("REFUSED at shipped defaults: a queue of a name that is not a card's is a 400 in the package's words, and a body that is not none or `{}` a 400 in the api's — a workflow sent among them — before the card is read, and nothing written", async () => {
   clear();
   const { card } = addToInbox({ text: 'No workflow named' });

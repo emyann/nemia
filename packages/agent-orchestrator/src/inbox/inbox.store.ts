@@ -19,12 +19,13 @@ import {
   type InboxCard,
   type InboxListing,
 } from './inbox.ts';
+import { queueFactoryRefusal } from './queue-factory.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 import { workRoot } from '../record/places.store.ts';
 import { WorkflowError, type Workflow } from '../step/step.ts';
 import { isFolderTeam } from '../workflow/index.ts';
 import { loadWorkflows, workflowFolder } from '../folder/folder.store.ts';
-import { treeOf } from '../factory/factory.store.ts';
+import { defaultStartsAllowed, factoryNames, treeOf } from '../factory/factory.store.ts';
 import { HOME, isDirectory, runId, runsDir } from '../record/record.store.ts';
 import { runStore } from '../record/files.store.ts';
 
@@ -108,6 +109,19 @@ const queueRefused = (why: string, card: InboxCard, startedAs: readonly string[]
   startedAs.length || card.queued !== undefined ? new Conflict({ message: why }) : new WorkflowError(why);
 
 /**
+ * Throws what refuses the queue of `card`, in `file`, on `workflow` when one is given: `queueRefusal`'s reasons by their kind
+ * (`queueRefused`), then its factory's (`queueFactoryRefusal`), an `Invalid`, by the factories on file and `defaultStartsAllowed`.
+ */
+function refuseQueue(card: InboxCard, file: string, workflow: string | undefined): void {
+  const listed = readInbox().find((l) => l.name === card.name);
+  const startedAs = listed?.startedAs ?? [];
+  const why = queueRefusal(card, file, startedAs, listed?.queued?.place ?? null, workflow);
+  if (why) throw queueRefused(why, card, startedAs);
+  const whyFactory = queueFactoryRefusal(card, file, factoryNames(), defaultStartsAllowed());
+  if (whyFactory) throw new WorkflowError(whyFactory);
+}
+
+/**
  * `nemia inbox queue <name>`: the card marked to start on its own, `queued:` the time now, and `workflow:` written over its own when given;
  * `off` takes the mark back, whatever the card's `repo:` names: a card whose repository is gone leaves the queue as any card does. The
  * card's file is written whole, through a hidden file renamed over it, so a pass never reads half a card — and the file keeps the time it
@@ -117,7 +131,8 @@ const queueRefused = (why: string, card: InboxCard, startedAs: readonly string[]
  *
  * Refused by name, exit 2, before anything is written: a name that is not a card's (`inboxNameRefusal`), a name with no card (`Missing`) —
  * naming the cards there are — a card that does not read, and what `queueRefusal` refuses: a card a run's record names and one already
- * queued (`Conflict`), and one with no workflow and none given. A `workflow` given, queued or taken back, is written over the card's own,
+ * queued (`Conflict`), and one with no workflow and none given; then a card that names no factory, unless `defaultStartsAllowed`, or names
+ * the default one (`refuseQueue`), which `off` never asks. A `workflow` given, queued or taken back, is written over the card's own,
  * and refused onto a folder team for a card that names a repository (`cardRepoRefusal`); with none given, the card's `repo:` is not judged.
  * `off` on a card not queued writes nothing, and says so.
  */
@@ -134,12 +149,7 @@ export function queueInInbox(name: string, how: { off?: boolean; workflow?: stri
   const exists = how.off ? () => true : isDirectory;
   const card = parseInboxCard(`${name}.md`, text, exists);
   if (how.off && card.queued === undefined) return { card, file, was: 'not queued' };
-  if (!how.off) {
-    const listed = readInbox().find((l) => l.name === name);
-    const startedAs = listed?.startedAs ?? [];
-    const why = queueRefusal(card, file, startedAs, listed?.queued?.place ?? null, how.workflow);
-    if (why) throw queueRefused(why, card, startedAs);
-  }
+  if (!how.off) refuseQueue(card, file, how.workflow);
   if (how.workflow !== undefined) {
     const refusedRepo = cardRepoRefusal({ workflow: how.workflow, repo: card.repo, factory: card.factory });
     if (refusedRepo) throw new WorkflowError(refusedRepo);

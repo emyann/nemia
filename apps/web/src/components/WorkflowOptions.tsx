@@ -1,5 +1,5 @@
 import type { WorkflowListing } from '../lib/api';
-import { workflowKey } from '../lib/inbox';
+import { unreadWorkflows, workflowKey } from '../lib/inbox';
 
 /** The workflows a card can name, as a select's options: those that read, in the order listed, yours marked, each by `workflowKey`. */
 export function WorkflowOptions({ workflows }: { workflows: readonly WorkflowListing[] }) {
@@ -11,6 +11,26 @@ export function WorkflowOptions({ workflows }: { workflows: readonly WorkflowLis
         {w.from === 'yours' ? ' (yours)' : ''}
       </option>
     ));
+}
+
+/**
+ * The workflows `WorkflowOptions` leaves out of the list, each by name with why it does not read; nothing when every one reads. Drawn as
+ * what a person weighs: the workflow is theirs to correct before it is offered.
+ */
+export function WorkflowsUnread({ workflows }: { workflows: readonly WorkflowListing[] }) {
+  const unread = unreadWorkflows(workflows);
+  if (unread.length === 0) return null;
+  return (
+    <div data-workflows-unread className="space-y-1 text-xs text-yours">
+      <p>Not offered until {unread.length === 1 ? 'it reads' : 'they read'}:</p>
+      {unread.map((w) => (
+        <p key={workflowKey(w)} data-unread={w.name} className="whitespace-pre-wrap break-words">
+          <span className="font-mono">{w.name}</span>
+          {w.from === 'yours' ? ' (yours)' : ''}: {w.error}
+        </p>
+      ))}
+    </div>
+  );
 }
 
 /** A select's field, as the inbox draws its inputs. */

@@ -9,7 +9,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { Schema } from 'effect';
 import { pauseFile, readPause } from '../pause/pause.store.ts';
 import type { Pause } from '../pause/pause.ts';
-import { inboxNameOf, type QueueTry } from '../inbox/inbox.ts';
+import { inboxNameOf, type QueueTry } from '../inbox/index.ts';
 import type { AskKey, AskKind, AsksRead, AskWritten, PersonAsk, Pruned, Run, RunStore } from './record.ts';
 import type { RetryAsk } from '../retry/index.ts';
 import type { RoundAsk } from '../status/status.ts';

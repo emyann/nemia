@@ -2,6 +2,7 @@
  * An inbox is cards before they are started: the card, and what `nemia inbox` makes of the folder and the run records — pure, as data.
  */
 import { test } from 'node:test';
+import { queueFactoryRefusal } from './queue-factory.ts';
 import assert from 'node:assert/strict';
 import {
   fromText,
@@ -880,4 +881,25 @@ test("`from:` names the runs a card's run is handed as context, in the order wri
   assert.throws(() => read('---\nfrom: a-1x2y, \n---\nx\n'), refusedWith(/`from:` names runs by id, comma-separated/));
   assert.throws(() => read('---\nfrom: a-1x2y, a-1x2y\n---\nx\n'), refusedWith(/names a-1x2y twice/));
   assert.throws(() => read('---\nafter: a-1x2y\n---\nx\n'), refusedWith(/`after` is not a key an inbox card has/));
+});
+
+test('REFUSED: `queueFactoryRefusal` refuses a card that names no factory, naming those on file or how one is filed, and one that names default whatever is allowed — a card of a factory passes, and one of none where unfactored starts are allowed', () => {
+  const file = '/s/inbox/a.md';
+  const loose = { name: 'a', factory: undefined };
+  assert.equal(
+    queueFactoryRefusal(loose, file, ['pipao', 'abc'], false),
+    '/s/inbox/a.md: this card names no factory, and a queued card is started on its own only in the factory named for it. Write `factory: <name>` in its frontmatter — one of abc, pipao, then queue it again: nemia inbox queue a. Nothing was queued.',
+  );
+  assert.match(
+    queueFactoryRefusal(loose, file, [], false) ?? '',
+    / — once one is filed: nemia factory add <name> --repo <root>, then queue it again: nemia inbox queue a\. Nothing was queued\.$/,
+  );
+  for (const allowed of [false, true]) {
+    const history = queueFactoryRefusal({ name: 'a', factory: 'default' }, file, ['pipao'], allowed) ?? '';
+    assert.match(history, /^`default` is the default factory: .* Name a factory — `factory: <name>` in \/s\/inbox\/a\.md, one of pipao\. /);
+    assert.match(history, / Nothing was queued\.$/);
+    assert.doesNotMatch(history, /Nothing was started/);
+    assert.equal(queueFactoryRefusal({ name: 'a', factory: 'pipao' }, file, ['pipao'], allowed), null);
+  }
+  assert.equal(queueFactoryRefusal(loose, file, ['pipao'], true), null);
 });

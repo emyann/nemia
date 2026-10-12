@@ -3,11 +3,11 @@ import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-q
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { FactoryCardStart, UnassignedStart } from '../components/FactoryCardStart';
 import { FileCard } from '../components/FileCard';
-import { CardMeta, GoneItem, PageLink, PRIMARY, Refused, SECONDARY, Tried } from '../components/InboxParts';
+import { CardMeta, GoneItem, NoQueue, PageLink, QueueButtons, PRIMARY, Refused, SECONDARY, Tried } from '../components/InboxParts';
 import { CardFrom } from '../components/CardFrom';
 import { dropCard, inboxQuery, queueCard, type InboxEntry, type Started } from '../lib/api';
 import { factorySearch, keptBy, shownIn } from '../lib/factories';
-import { cardLines, newestCardsFirst, queueable, queuedWord, queueOf, unassigned, type CardRefusal } from '../lib/inbox';
+import { cardLines, newestCardsFirst, queuedWord, queueOf, unassigned, type CardRefusal } from '../lib/inbox';
 
 export const Route = createFileRoute('/inbox')({
   validateSearch: factorySearch,
@@ -96,9 +96,9 @@ function InboxPage() {
 
 /**
  * A card: its first line, linked to its page, and under it its name, factory, workflow, repository and filing time (`CardMeta`); Start,
- * which opens its start, in its factory or in one picked there, and Remove. Queue on a card that names a workflow (`queueable`), and on
- * a queued card its place and when it
- * was queued, and Unqueue; and, when the tick tried its start and did not make it, why — a card refused stays queued, as the package keeps
+ * which opens its start, in its factory or in one picked there, and Remove. Queue on a card that names a factory and a workflow, and
+ * Unqueue on a queued one (`QueueButtons`), with why not on a card that names a workflow alone (`NoQueue`); on a queued card its place
+ * and when it was queued; and, when the tick tried its start and did not make it, why — a card refused stays queued, as the package keeps
  * it. A card a run's record names — started, its removal failed — links to its run and offers Remove only. An entry that does not read as a
  * card shows why, with its file for a title, and offers Remove when it is a card's file, which the CLI's `inbox rm` can drop.
  *
@@ -167,6 +167,7 @@ function CardItem({
           )}
           <CardMeta entry={entry} />
           <CardFrom entry={entry} editable={startable} onRefused={onRefused} />
+          <NoQueue entry={entry} />
           {entry.queued && (
             <p className="flex flex-wrap items-baseline gap-x-2 text-xs text-muted-foreground">
               <span
@@ -195,28 +196,7 @@ function CardItem({
               {starting ? 'Close' : 'Start'}
             </button>
           )}
-          {queueable(entry) && (
-            <button
-              type="button"
-              disabled={queue.isPending}
-              onClick={() => queue.mutate(false)}
-              className={SECONDARY}
-              title="Start it on its own, on its workflow, when a run slot frees"
-            >
-              {queue.isPending ? 'Queueing…' : 'Queue'}
-            </button>
-          )}
-          {entry.queued && (
-            <button
-              type="button"
-              disabled={queue.isPending}
-              onClick={() => queue.mutate(true)}
-              className={SECONDARY}
-              title="Take it off the queue: it waits for you to start it"
-            >
-              {queue.isPending ? 'Unqueueing…' : 'Unqueue'}
-            </button>
-          )}
+          <QueueButtons entry={entry} pending={queue.isPending} onQueue={(off) => queue.mutate(off)} />
           {entry.file.endsWith('.md') && (
             <button type="button" disabled={remove.isPending} onClick={() => remove.mutate()} className={SECONDARY}>
               {remove.isPending ? 'Removing…' : 'Remove'}

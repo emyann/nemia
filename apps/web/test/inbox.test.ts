@@ -23,11 +23,13 @@ import {
   ordinal,
   presetOf,
   queueable,
+  queueNeedsFactory,
   queuedWord,
   queueOf,
   startPlace,
   triedLine,
   unassigned,
+  unreadWorkflows,
   workflowKey,
   type CardRefusal,
 } from '../src/lib/inbox.ts';
@@ -432,20 +434,44 @@ test("the queue is every card with a place, in its place's order, whatever order
   assert.deepEqual(queueOf([]), []);
 });
 
-test('Queue is offered on a card that names a workflow, reads, is not queued and was not started', () => {
-  assert.equal(queueable(entry('named', null, { workflow: 'dev' })), true);
+test('Queue is offered on a card that names a factory and a workflow, reads, is not queued and was not started', () => {
+  assert.equal(queueable(entry('named', null, { factory: 'solo', workflow: 'dev' })), true);
+  assert.equal(queueNeedsFactory(entry('named', null, { factory: 'solo', workflow: 'dev' })), false);
 });
 
-test("REFUSED: no Queue on a card that names no workflow, one queued already, one a record says was started, or one that does not read — each a refusal of the package's", () => {
+test('REFUSED: no Queue on a card that names no factory, or default — it says its factory is what it lacks, and no other card does', () => {
   const at = '2026-09-16T10:00:00.000Z';
-  assert.equal(queueable(entry('bare', null)), false, 'no workflow');
-  assert.equal(queueable(entry('queued', null, { workflow: 'dev', queued: { at, place: 1 } })), false, 'queued already');
-  assert.equal(queueable(entry('started', null, { workflow: 'dev', startedAs: ['r-1'] })), false, 'started');
+  for (const factory of [null, 'default']) {
+    const loose = (name: string, extra: Partial<InboxEntry> = {}) => entry(name, null, { factory, ...extra });
+    assert.equal(queueable(loose('loose', { workflow: 'dev' })), false, String(factory));
+    assert.equal(queueNeedsFactory(loose('loose', { workflow: 'dev' })), true, String(factory));
+    assert.equal(queueNeedsFactory(loose('bare')), false, 'no workflow: Start gives it both');
+    assert.equal(queueNeedsFactory(loose('queued', { workflow: 'dev', queued: { at, place: 1 } })), false, 'queued: Unqueue');
+    assert.equal(queueNeedsFactory(loose('started', { workflow: 'dev', startedAs: ['r-1'] })), false, 'started');
+    assert.equal(queueNeedsFactory(loose('broken', { workflow: 'dev', error: 'broken.md: not a card.' })), false, 'unread');
+  }
+});
+
+test("REFUSED: no Queue on a card of a factory that names no workflow, one queued already, one a record says was started, or one that does not read — each a refusal of the package's", () => {
+  const at = '2026-09-16T10:00:00.000Z';
+  const solo = (name: string, extra: Partial<InboxEntry> = {}) => entry(name, null, { factory: 'solo', ...extra });
+  assert.equal(queueable(solo('bare')), false, 'no workflow');
+  assert.equal(queueable(solo('queued', { workflow: 'dev', queued: { at, place: 1 } })), false, 'queued already');
+  assert.equal(queueable(solo('started', { workflow: 'dev', startedAs: ['r-1'] })), false, 'started');
   assert.equal(
-    queueable(entry('broken', null, { workflow: 'dev', error: 'broken.md: `after` is not a key an inbox card has.' })),
+    queueable(solo('broken', { workflow: 'dev', error: 'broken.md: `after` is not a key an inbox card has.' })),
     false,
     'does not read',
   );
+});
+
+test('the workflows a list leaves out are those that do not read, each with why', () => {
+  const listed = [
+    { name: 'dev', error: null },
+    { name: 'bad', error: 'bad: no step' },
+  ];
+  assert.deepEqual(unreadWorkflows(listed), [{ name: 'bad', error: 'bad: no step' }]);
+  assert.equal(unreadWorkflows([listed[0]]).length, 0);
 });
 
 test("a start the tick tried and did not make says so as `wf inbox` does: refused, it stays queued and waits for you; failed, it is tried again — the repository named for a card of a factory that names none, never for one that names no factory, and a why the card's own refusal says not said twice", () => {
@@ -646,6 +672,7 @@ test("the box is preset to the address's factory when it is offered, else to no 
   const offered = factoriesOffered(FACTORIES);
   assert.equal(factoryPreset('solo', offered), 'solo');
   for (const shown of ['gone', 'default', undefined]) assert.equal(factoryPreset(shown, offered), '', String(shown));
+  assert.equal(factoryPreset('solo', []), '', 'shown, and not offered');
 });
 
 const SOLO = { name: 'solo', repos: ['/r/a'] };

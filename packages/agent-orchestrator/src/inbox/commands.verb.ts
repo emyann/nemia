@@ -58,7 +58,7 @@ saying true, a factory: that is not a factory's name — and, at start, a gate: 
 card that names no factory and is started with no --factory, never one taken from its folder or its repo:, a
 factory: the store does not have, default, or one that does not offer the workflow — an add with no idea, and a name that would
 leave the folder; and a queue of a name with no card, of a card with no workflow and no --workflow, of one
-already queued, and of one a run was started from; a from: naming a run the store does not have, or one twice.`;
+already queued, of one a run was started from, and of one that names no factory, or default; a from: naming a run the store does not have, or one twice.`;
 
 /** The text under `key`, or undefined where none was given. */
 const textOf = (args: Args, key: string): string | undefined => {

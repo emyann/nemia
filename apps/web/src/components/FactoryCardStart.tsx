@@ -8,7 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { factoriesQuery, factoryWorkflowsQuery, storeQuery, type InboxEntry, type Place, type Started } from '../lib/api';
 import { cardPlace, factoriesOffered, presetOf, startPlace, workflowKey, type CardPlace } from '../lib/inbox';
 import { StartRun } from './StartRun';
-import { FIELD, WorkflowOptions } from './WorkflowOptions';
+import { FIELD, WorkflowOptions, WorkflowsUnread } from './WorkflowOptions';
 
 const code = (text: string) => <code className="font-mono text-xs">{text}</code>;
 
@@ -183,6 +183,7 @@ function InFactory({ entry, place, onStarted, onRefused }: { entry: InboxEntry; 
             <WorkflowOptions workflows={workflows.data} />
           </select>
         )}
+        {workflows.data && <WorkflowsUnread workflows={workflows.data} />}
         <p className="text-xs text-muted-foreground">
           The workflows the factory {code(place.factory)} offers on {code(place.repo)}, with its hires.
         </p>

@@ -9,7 +9,7 @@ import type { Verdict } from '../check/check.ts';
 import type { Workflow } from '../step/step.ts';
 import type { EarlierTry, RetryAsk } from '../retry/index.ts';
 import type { MergeOf, RoundAsk } from '../status/status.ts';
-import type { QueueTry } from '../inbox/inbox.ts';
+import type { QueueTry } from '../inbox/index.ts';
 import type { Pause } from '../pause/pause.ts';
 
 /**

@@ -7178,6 +7178,41 @@ test('REFUSED: a card that names no factory wears no default tag — its line sa
   assert.doesNotMatch(unread, /data-factory-tag|data-unassigned/);
 });
 
+test('REFUSED: a card that names a workflow and no factory says it has no Queue and that Start gives it a factory — and no other card says it', async () => {
+  const note = (extra: Record<string, unknown>) => renderToStaticMarkup(createElement(InboxParts.NoQueue, { entry: inboxCard(extra) }));
+  for (const factory of [null, 'default']) {
+    assert.equal(
+      note({ factory, workflow: 'dev' }),
+      '<p data-no-queue="true" class="text-xs text-muted-foreground">No Queue: a queued card starts on its own, in the factory it names, and this one names none. Start gives it one.</p>',
+      String(factory),
+    );
+  }
+  assert.equal(note({ factory: 'solo', workflow: 'dev' }), '', 'a card of a factory has its Queue');
+  assert.equal(note({ factory: null }), '', 'no workflow: nothing to queue it on');
+  assert.equal(note({ factory: null, workflow: 'dev', queued: { at: '2026-09-16T10:00:00.000Z', place: 1 } }), '', 'queued: Unqueue');
+});
+
+test('REFUSED: the box says the factories are being read until they are, and never that the store has none', async () => {
+  const html = await routedWith(createElement(FileCard, { shown: 'solo' }), [STORE_ANSWER]);
+  assert.match(html, /data-reading-factories="true"[^>]*>Reading the factories…<\/p>/);
+  assert.doesNotMatch(html, /data-no-factory/);
+  const read = await routedWith(createElement(FileCard, { shown: 'solo' }), [[['factories'], LISTED], STORE_ANSWER]);
+  assert.doesNotMatch(read, /data-reading-factories/);
+});
+
+test('the workflows a list leaves out are said under it, each by name with why it does not read — and nothing when every one reads', async () => {
+  const { WorkflowsUnread } = await import('../src/components/WorkflowOptions.tsx');
+  const listing = (name: string, error: string | null, from = 'repo') => ({ name, from, error }) as never;
+  const html = renderToStaticMarkup(
+    createElement(WorkflowsUnread, { workflows: [listing('ok', null), listing('dev', 'implement: `agent: implementer` fills this step')] }),
+  );
+  assert.equal(
+    html,
+    '<div data-workflows-unread="true" class="space-y-1 text-xs text-yours"><p>Not offered until it reads:</p><p data-unread="dev" class="whitespace-pre-wrap break-words"><span class="font-mono">dev</span>: implement: `agent: implementer` fills this step</p></div>',
+  );
+  assert.equal(renderToStaticMarkup(createElement(WorkflowsUnread, { workflows: [listing('ok', null)] })), '');
+});
+
 test('the box that files a card lists No factory and each factory offered; under No factory it draws no Workflow and no Repository control, and says the card is parked', async () => {
   const html = await routedWith(createElement(FileCard, { shown: undefined }), [[['factories'], LISTED], STORE_ANSWER]);
   assert.deepEqual(

@@ -530,8 +530,7 @@
     {
       "files": ["apps/web/src/routes/inbox.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 128, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 23 }]
+        "max-lines-per-function": ["error", { "max": 108, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
@@ -558,7 +557,7 @@
     {
       "files": ["packages/agent-orchestrator/src/inbox/inbox.store.ts"],
       "rules": {
-        "sonarjs/cognitive-complexity": ["error", 22]
+        "sonarjs/cognitive-complexity": ["error", 19]
       }
     },
     {

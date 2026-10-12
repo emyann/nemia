@@ -7,7 +7,7 @@ import { Cause, Deferred, Effect, Exit, Fiber, type Scope } from 'effect';
 import type { PlaceService } from '../place/place.store.ts';
 import { over, quotaHarnesses, type Engine, type HarnessQuota } from '../runtime-client.ts';
 import { HOME } from '../record/record.store.ts';
-import { queueLine } from '../inbox/inbox.ts';
+import { queueLine } from '../inbox/index.ts';
 import { scheduleLine } from '../schedule/schedule.ts';
 import { addPass, summaryDue, summaryLine, type Interval, type Reading } from '../meter/index.ts';
 import { heldLines, pausedWords, RESUMED } from '../pause/pause.ts';

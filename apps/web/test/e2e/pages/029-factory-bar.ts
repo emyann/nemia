@@ -207,9 +207,9 @@ async function others(page: Page): Promise<void> {
   await bar.getByRole('button', { name: 'Close', exact: true }).click();
   await expectNoBar(page, 'its Close closes it');
 
-  const ghost = page.locator(`aside[aria-label="Queued cards"] a[data-ghost="${QUEUE.first.name}"]`);
+  const ghost = page.locator(`aside[aria-label="Queued cards"] a[data-ghost="${QUEUE.third.name}"]`);
   await ghost.click();
-  await expectAt(page, `/inbox/${QUEUE.first.name}`, "a click on a queue's ghost opens its card's page");
+  await expectAt(page, `/inbox/${QUEUE.third.name}`, "a click on a queue's ghost opens its card's page");
   await expectNoBar(page, 'and shows nothing in the bar');
   await visit(page, FLOOR);
 }

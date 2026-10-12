@@ -3,7 +3,18 @@ import path from 'node:path';
 import type { Locator, Page, Response } from 'playwright';
 import { photograph, PLACES_SAID, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
-import { CARDS, DIAMOND_RUNS, FACTORIES, hiringStarts, QUEUE, QUEUED, queuedCardText, refusedWhy, WORKFLOWS } from '../seed.ts';
+import {
+  CARDS,
+  DIAMOND_RUNS,
+  FACTORIES,
+  hiringStarts,
+  QUEUE,
+  QUEUED,
+  queuedCardText,
+  refusedWhy,
+  unfactoredWhy,
+  WORKFLOWS,
+} from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
@@ -33,6 +44,12 @@ async function startIn(p: Page, name: string): Promise<Locator> {
   await pick.selectOption(FACTORY);
   return item;
 }
+
+/**
+ * A seeded card's text with `factory: FACTORY` as its frontmatter's last line: the card a queue leg queues, which the seed leaves with no
+ * factory for the legs that start it.
+ */
+const inFactory = (text: string): string => text.replace('\n---\n', `\nfactory: ${FACTORY}\n---\n`);
 
 /** Refuses unless `answered`, a start's answer, was sent to FACTORY on `repo`, in its query: no start of this page names no factory. */
 function expectInFactory(answered: Response, repo: string): void {
@@ -130,18 +147,44 @@ async function visit(page: Page): Promise<void> {
       `${QUEUE.refused.name}, whose start the tick refused, says why in the package's words`,
     );
     await expectVisible(refusedTry.getByText('It stays queued', { exact: false }), 'and that it stays queued');
+    await expectVisible(
+      cardIn(page, QUEUE.third.name).locator('[data-tried="refused"]').getByText(unfactoredWhy(store!), { exact: false }),
+      `${QUEUE.third.name}, queued before a queue asked for a factory, says the tick refused its start for naming none`,
+    );
+    for (const card of [QUEUE.first, QUEUE.refused]) {
+      await expectVisible(
+        cardIn(page, card.name).locator(`[data-factory-tag="${FACTORY}"]`),
+        `${card.name}, a queued card, names its factory (${FACTORY})`,
+      );
+    }
     await expectCount(cardIn(page, QUEUE.first.name).locator('[data-tried]'), 0, 'a card the tick has not tried says nothing of a try');
     for (const card of [planned, rich]) {
-      await expectVisible(
-        cardIn(page, card.name).getByRole('button', { name: 'Queue', exact: true }),
-        `${card.name}, which names a workflow, offers Queue`,
+      const item = cardIn(page, card.name);
+      await expectCount(
+        item.getByRole('button', { name: 'Queue', exact: true }),
+        0,
+        `${card.name}, which names a workflow and no factory, offers no Queue`,
       );
+      await expectTexts(
+        item.locator('[data-no-queue]'),
+        ['No Queue: a queued card starts on its own, in the factory it names, and this one names none. Start gives it one.'],
+        'and says why, with the way to give it a factory',
+      );
+      await expectVisible(item.getByRole('button', { name: 'Start' }), 'beside its Start');
     }
     await expectCount(
       cardIn(page, bare.name).getByRole('button', { name: 'Queue', exact: true }),
       0,
       `${bare.name}, which names no workflow, offers no Queue`,
     );
+    await expectCount(cardIn(page, bare.name).locator('[data-no-queue]'), 0, 'and no word of a queue: it has no workflow to be queued on');
+    await expectCount(
+      page.locator('section[aria-label="Cards"] li[data-card]:has([data-factory-tag]) [data-no-queue]'),
+      0,
+      'no card of a factory says it has no Queue',
+    );
+    await settled(page);
+    await photograph(page, path.join(OUT, `inbox-no-queue-${await themeOf(page)}.png`), { fullPage: true });
 
     const box = page.locator('form[aria-label="File a card"]');
     const idea = box.getByRole('textbox', { name: 'An idea' });
@@ -229,7 +272,13 @@ async function visit(page: Page): Promise<void> {
     {
       const file = path.join(inbox, `${planned.name}.md`);
       const [text, mtime] = [fs.readFileSync(file, 'utf8'), fs.statSync(file).mtimeMs];
+      fs.writeFileSync(file, inFactory(text));
+      fs.utimesSync(file, new Date(mtime), new Date(mtime));
+      await page.reload({ waitUntil: 'load' });
+      await idle(page);
       const item = cardIn(page, planned.name);
+      await expectVisible(item.locator(`[data-factory-tag="${FACTORY}"]`), `${planned.name}, given the factory ${FACTORY}, names it`);
+      await expectCount(item.locator('[data-no-queue]'), 0, 'and no longer says it has no Queue');
       const filedTime = item.locator('time[title="When its file was last written"]');
       const shownAs = async () => ({
         order: await order(page),
@@ -267,6 +316,11 @@ async function visit(page: Page): Promise<void> {
         );
         await idle(page);
         await unmoved('queued');
+        const { queued: at } = (await queued.json()) as { queued: string };
+        if (fs.readFileSync(file, 'utf8') !== queuedCardText(planned, at, checkout, FACTORY))
+          throw new Refused(
+            `${planned.name} is queued in its factory, ${FACTORY}, which the tick starts it in — ${file} holds ${JSON.stringify(fs.readFileSync(file, 'utf8'))}`,
+          );
         await settled(page);
         await photograph(page, path.join(OUT, `inbox-queued-${await themeOf(page)}.png`), { fullPage: true });
         const [unqueued] = await Promise.all([
@@ -281,12 +335,15 @@ async function visit(page: Page): Promise<void> {
         await expectCount(item.locator('[data-queued]'), 0, `Unqueue takes ${planned.name} off the queue`);
         await idle(page);
         await unmoved('taken off the queue');
-        if (fs.readFileSync(file, 'utf8') !== text)
+        if (fs.readFileSync(file, 'utf8') !== inFactory(text))
           throw new Refused(`${planned.name} is written back as it was — ${file} holds ${JSON.stringify(fs.readFileSync(file, 'utf8'))}`);
       } finally {
         fs.writeFileSync(file, text);
         fs.utimesSync(file, new Date(mtime), new Date(mtime));
       }
+      await page.reload({ waitUntil: 'load' });
+      await idle(page);
+      await expectVisible(item.locator('[data-no-queue]'), `${planned.name}, written back with no factory, has no Queue again`);
     }
 
     const plannedItem = await startIn(page, planned.name);
@@ -806,6 +863,8 @@ async function visit(page: Page): Promise<void> {
     const plannedTime = fs.statSync(cardFile).mtime;
     const requeued = await page.context().newPage();
     try {
+      fs.writeFileSync(cardFile, inFactory(plannedText));
+      fs.utimesSync(cardFile, plannedTime, plannedTime);
       const { problems } = watch(requeued);
       await requeued.goto(page.url(), { waitUntil: 'load' });
       await idle(requeued);
@@ -820,7 +879,7 @@ async function visit(page: Page): Promise<void> {
       const { queued: behind } = (await elsewhere.json()) as { queued?: string };
       if (elsewhere.status !== 200 || !behind)
         throw new Refused(`another tab queues ${planned.name} through the api — it answered ${elsewhere.status}`);
-      if (fs.readFileSync(cardFile, 'utf8') !== queuedCardText(planned, behind, checkout))
+      if (fs.readFileSync(cardFile, 'utf8') !== queuedCardText(planned, behind, checkout, FACTORY))
         throw new Refused(
           `the card is queued behind the page's back — ${cardFile} holds ${JSON.stringify(fs.readFileSync(cardFile, 'utf8'))}`,
         );

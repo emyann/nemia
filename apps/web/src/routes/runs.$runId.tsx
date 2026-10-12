@@ -27,7 +27,7 @@ import { decidableRun } from '../lib/decide';
 import { duration } from '../lib/canvas';
 import { clockCounts, inFlight, runClock, titleOf, waitedMs } from '../lib/factory';
 import { useNow } from '../lib/useNow';
-import { container, filled, ink } from '../lib/meaning';
+import { container, ink } from '../lib/meaning';
 
 /**
  * `step`, the old address of one step of the run, opens that step in the frame's bar: the page is loaded again in place of that address,
@@ -430,7 +430,7 @@ function WaitingOnRuns({ run }: { run: RunDetail }) {
 
 /**
  * A person's hold on the run (the CLI's `hold`), as the CLI's `decide` says it: until which runs ship, what that means and how to lift it,
- * and each run it is held until, linked where it is there. In the rest grey the held chips are filled with, and in the yours container
+ * and each run it is held until, linked where it is there. At rest, in the grey container, and in the yours container
  * once only a person lifts it. While it stands no step offers an answer — the package refuses each — so this is the one thing on the page
  * asked of anyone.
  */
@@ -441,7 +441,7 @@ function HeldUntil({ run }: { run: RunDetail }) {
     <section
       aria-label="Held"
       data-on-you={holding.onYou}
-      className={`space-y-1 rounded px-3 py-2 text-sm ${holding.onYou ? container.yours : filled.grey}`}
+      className={`space-y-1 rounded px-3 py-2 text-sm ${holding.onYou ? container.yours : container.grey}`}
     >
       <p className="font-mono">{holding.word}</p>
       <p data-advice>{holding.advice}</p>

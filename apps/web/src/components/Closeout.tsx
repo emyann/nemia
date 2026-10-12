@@ -51,7 +51,10 @@ export function Rounds({ tries, selected, onSelect }: { tries: readonly StepTry[
               key={t.try}
               data-try={t.try}
               aria-current={chosen || undefined}
-              className={cn('space-y-0.5 rounded px-2 py-1 text-xs', chosen && 'bg-muted')}
+              className={cn(
+                'space-y-0.5 rounded px-2 py-1 text-xs',
+                chosen && 'bg-surface-container ring-1 ring-outline-variant ring-inset',
+              )}
             >
               <div className="flex items-baseline justify-between gap-2">
                 <span className="font-medium" title={t.note ?? undefined}>

@@ -27,8 +27,11 @@ export type WorkflowSource = {
 /** An agent found where the loader finds it: its file, as read, and its output schema's text where it names one. */
 export type AgentSource = { name: string; file: string; agent: Agent; output: string | undefined };
 
-/** Where a skill named is: its folder, a place skill nemia ships, or why it is not found (a refusal in the loader's words, or none). */
-export type SkillFound = { dir: string } | 'place' | { refused: string } | undefined;
+/**
+ * Where a skill named is: its folder, the folder of one named with its folder (`named`, which a template never carries), a place skill
+ * nemia ships, or why it is not found (a refusal in the loader's words, or none).
+ */
+export type SkillFound = { dir: string } | { named: string } | 'place' | { refused: string } | undefined;
 
 /**
  * A factory's parts the draft holds: its name, its file, its hires, and its instruction's words and its rules', each with the file they
@@ -257,11 +260,16 @@ function gatherAgents(source: Source, into: Gathered): void {
   }
 }
 
-/** The skills gathered, each carried whole, a place skill left out and said, or refused: none found, or the loader's refusal of it. */
+/**
+ * The skills gathered, each carried whole, a place skill left out and said, one named with its folder left out and said too, with where
+ * it was read, or refused: none found, or the loader's refusal of it.
+ */
 function gatherSkills(source: Source, into: Gathered): void {
   for (const [name, by] of [...into.skills].sort(([a], [b]) => a.localeCompare(b))) {
     const found = source.skill(name);
     if (found === 'place') into.from.push({ part: `skills/${name}/`, from: 'left out: a place skill nemia ships' });
+    else if (found !== undefined && 'named' in found)
+      into.from.push({ part: name, from: `left out: a skill of the repository's folder, named and not carried, read from ${found.named}` });
     else if (found === undefined || 'refused' in found)
       into.refusals.push(found?.refused ?? `${by} names the skill ${name}, and none is found: carry it, or remove the name.`);
     else {

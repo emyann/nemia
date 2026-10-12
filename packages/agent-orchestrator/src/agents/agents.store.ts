@@ -32,6 +32,7 @@ import {
   type SkillAgain,
 } from './agents.ts';
 import { frontmatterKey } from '../former/former.ts';
+import { bareSkillOf } from '../keys/index.ts';
 import { linkRefusal, takenAt } from '../folder/folder.ts';
 import { agentUsers } from '../folder/folder.store.ts';
 import { agentVersion } from './read.store.ts';
@@ -57,7 +58,7 @@ export const renderedIn = (dir: string, step: Workflow): boolean =>
 
 /**
  * Render every step of `steps` whose agent is rendered (`rendersAgent`) into its folder (`agentFilesDir`): its prompt, its skills copied
- * whole from where the load found them (`skills`), and its style. Written once, at `nemia start`, so an edit of an agent or a skill after
+ * whole from where the load found them (`skills`), each under its bare name (`bareSkillOf`), as the prompt names it, and its style. Written once, at `nemia start`, so an edit of an agent or a skill after
  * it reaches no run already started, as an edit of its workflow does not. A skill is copied as its files, never a link, and one holding
  * a link that is not followed is refused (`copySkillFiles`): the folder is the step's own.
  */
@@ -73,10 +74,11 @@ export function writeAgentFiles(run: Pick<Run, 'id'>, steps: readonly Workflow[]
         throw new Error(
           `${step.name}: the skill ${name} of ${agent.name} is not where the load found it${from ? ` — ${from.message}` : ''}.`,
         );
-      copySkillFiles(from, path.join(plugin, 'skills', name));
+      const bare = bareSkillOf(name);
+      copySkillFiles(from, path.join(plugin, 'skills', bare));
       return preloads(from)
-        ? { name, whole: splitFrontmatter(`${name}/SKILL.md`, fs.readFileSync(path.join(from, 'SKILL.md'), 'utf8')).body }
-        : { name };
+        ? { name: bare, whole: splitFrontmatter(`${name}/SKILL.md`, fs.readFileSync(path.join(from, 'SKILL.md'), 'utf8')).body }
+        : { name: bare };
     });
     if (namesPlugin(step)) {
       fs.mkdirSync(path.join(plugin, '.claude-plugin'), { recursive: true });
@@ -91,7 +93,7 @@ export function writeAgentFiles(run: Pick<Run, 'id'>, steps: readonly Workflow[]
 }
 
 /**
- * The version (`skillVersion`) of each skill `nemia start` rendered for a step of `run` (`writeAgentFiles`), by its name, read off its copy
+ * The version (`skillVersion`) of each skill `nemia start` rendered for a step of `run` (`writeAgentFiles`), by the name its line writes, read off its copy
  * in the step's folder (`agentFilesDir`): a skill whose copy is not there — a step whose agent is not rendered, a folder gone — is left
  * out.
  */
@@ -101,14 +103,14 @@ export function renderedSkillVersions(run: Pick<Run, 'id'>, step: Workflow): Map
   const skills = path.join(agentFilesDir(run, step.name), pluginOf(agent.name), 'skills');
   return new Map(
     agent.skills.flatMap((name) => {
-      const version = skillVersion(path.join(skills, name));
+      const version = skillVersion(path.join(skills, bareSkillOf(name)));
       return version === null ? [] : [[name, version] as const];
     }),
   );
 }
 
 /**
- * The rules (`readSkillRules`) each skill `nemia start` rendered for a step of `run` declares, by the skill's name, read off its copy in
+ * The rules (`readSkillRules`) each skill `nemia start` rendered for a step of `run` declares, by the name the skill's line writes, read off its copy in
  * the step's folder (`agentFilesDir`): a skill whose copy is not there, that declares none, or whose `rules.json` does not read is left
  * out.
  */
@@ -119,7 +121,7 @@ export function renderedSkillRules(run: Pick<Run, 'id'>, step: Workflow): Map<st
   return new Map(
     agent.skills.flatMap((name) => {
       try {
-        const rules = readSkillRules(path.join(skills, name));
+        const rules = readSkillRules(path.join(skills, bareSkillOf(name)));
         return rules.length ? [[name, rules] as const] : [];
       } catch (err) {
         if (err instanceof WorkflowError) return [];
@@ -130,7 +132,7 @@ export function renderedSkillRules(run: Pick<Run, 'id'>, step: Workflow): Map<st
 }
 
 /**
- * The paths of the work (`appliesOf`) each skill `nemia start` rendered for a step of `run` declares, by the skill's name, read off its
+ * The paths of the work (`appliesOf`) each skill `nemia start` rendered for a step of `run` declares, by the name the skill's line writes, read off its
  * copy's SKILL.md in the step's folder (`agentFilesDir`): a skill whose copy is not there, or that declares none, is left out.
  */
 export function renderedSkillApplies(run: Pick<Run, 'id'>, step: Workflow): Map<string, string[]> {
@@ -139,7 +141,7 @@ export function renderedSkillApplies(run: Pick<Run, 'id'>, step: Workflow): Map<
   const skills = path.join(agentFilesDir(run, step.name), pluginOf(agent.name), 'skills');
   return new Map(
     agent.skills.flatMap((name) => {
-      const file = path.join(skills, name, 'SKILL.md');
+      const file = path.join(skills, bareSkillOf(name), 'SKILL.md');
       const globs = fs.existsSync(file) ? appliesOf(fs.readFileSync(file, 'utf8')) : [];
       return globs.length ? [[name, globs] as const] : [];
     }),

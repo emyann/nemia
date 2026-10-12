@@ -22,7 +22,10 @@ import {
   backgroundOf,
   budgetOf,
   checkOf,
+  bareSkillOf,
   composedRefusal,
+  ONE_BARE_NAME,
+  sameBareIn,
   serversRefusal,
   contextOf,
   contextText,
@@ -142,6 +145,7 @@ export function parseWorkflow(
   refuseUnwritable(step, agent.name);
   const added = step.skills?.filter((skill) => !agent.skills?.includes(skill));
   const sessionSkills = [...(agent.skills ?? []), ...(added ?? [])];
+  oneBareName(name, agent, sessionSkills);
   const keys = STEP_KEYS.filter((key) => Object.hasOwn(meta, key));
   const given = Object.fromEntries(
     STEP_KEYS.flatMap((key) => {
@@ -163,6 +167,21 @@ export function parseWorkflow(
       mcp: sessionServers(agent, step),
     },
   };
+}
+
+/**
+ * Refuses step `name` whose session would hold two skills of one bare name (`sameBareIn`) among `skills`, its agent `agent`'s then those
+ * its own line adds: the refusal names the step, both skills and whose line each is on.
+ */
+function oneBareName(name: string, agent: Agent, skills: readonly string[]): void {
+  const same = sameBareIn(skills);
+  if (!same) return;
+  const [first, second] = same.map(
+    (skill) => `\`${skill}\`, on ${agent.skills?.includes(skill) ? `${AGENTS_FOLDER}/${agent.name}.md's \`skills:\`` : "this step's \`skills:\`"}`,
+  );
+  refuse(
+    `${name}: its session would be given ${first}, and ${second}: two skills named \`${bareSkillOf(same[1])}\`. ${ONE_BARE_NAME} Keep one of them here, and give the other to another step.`,
+  );
 }
 
 /** The refusal of an `mcp:` line, written as `line`, on step `name`, which has no agent whose servers it would add to. */

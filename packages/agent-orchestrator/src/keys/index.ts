@@ -19,7 +19,6 @@ export {
   SERVER_NAME,
   serverNamesOf,
   serversRefusal,
-  SKILL_NAME,
   skillNamesOf,
   writableNamesOf,
   readsNamesOf,
@@ -35,6 +34,8 @@ export {
   placeNamed,
   placeRequired,
 } from './keys.ts';
+export { bareSkillOf, givenSkillOf, ONE_BARE_NAME, SKILL_NAME, sameBareIn } from './given-skill.ts';
+export type { GivenSkill } from './given-skill.ts';
 export { ALLOW_EXAMPLE, allowRuleOf, DISALLOW_EXAMPLE, disallowedBy, rulesOf, TOOLS_EXAMPLE, toolsOf } from './tools.ts';
 export type { DeniedAt } from './tools.ts';
 export { FILED_AS, filedRefusal, lineOf } from './filed-as.ts';

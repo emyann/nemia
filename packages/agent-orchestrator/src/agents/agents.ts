@@ -32,7 +32,7 @@ import {
   type Workflow,
   type WorkflowError,
 } from '../step/step.ts';
-import { composedRefusal, serverNamesOf, serversRefusal, SKILL_NAME, skillNamesOf } from '../keys/index.ts';
+import { bareSkillOf, composedRefusal, serverNamesOf, serversRefusal, SKILL_NAME, skillNamesOf } from '../keys/index.ts';
 import {
   codexModeWritten,
   codexSandboxNamed,
@@ -145,12 +145,17 @@ export function skillTurnCost(id: string, text: string): SkillCost {
   return { preload, listed, body: told, perTurn: listed + (preload ? told : 0) };
 }
 
+/** A skill asked by the name a `skills:` line gives it: the folder it is, why it cannot be used, or nothing where no place has it. */
+export type SkillLookup = { get(name: string): string | WorkflowError | undefined };
+
 /**
- * Where the skills a workflow's agents name were found: each name, the folder it is (`<place>/skills/<name>`, holding `SKILL.md`) or why it
- * cannot be used — a name two places of one repository both have — and the places looked in, in order, for the refusal of a name none has.
- * `skillsFor` in `skills/read.store.ts` reads them.
+ * Where the skills a workflow's agents name were found. `at` answers a name as a `skills:` line writes it: the folder the skill is
+ * (`<place>/skills/<name>`, holding `SKILL.md`) or why it cannot be used — a name two places of one repository both have — and, for a
+ * skill named with its folder (`folder:name`), the folder it is in that folder's own skills, or why not, never nothing. `all` lists the
+ * skills of the places looked in, by bare name: no skill named with its folder is in it, since none is found but by its name. `looked`
+ * is those places, in order, for the refusal of a name none has. `skillsFor` in `skills/read.store.ts` reads them.
  */
-export type SkillsFound = { at: ReadonlyMap<string, string | WorkflowError>; looked: readonly string[] };
+export type SkillsFound = { at: SkillLookup; all: ReadonlyMap<string, string | WorkflowError>; looked: readonly string[] };
 
 /**
  * An agent: a file in `agents/`, its frontmatter the role keys it sets (`AGENT_KEYS`) and its body its instructions — what every step that
@@ -162,7 +167,10 @@ export type Agent = {
   /** The job it holds, in a few words (`role:`): `Product engineer`. Its name is its own, and a step names it by that. */
   role?: string;
   description?: string;
-  /** The skills its steps are given, by name (`skills:`), each a folder in a `skills/` the load finds (`SkillsFound`). */
+  /**
+   * The skills its steps are given, each as its `skills:` line names it: a folder in a `skills/` the load finds, or `folder:name`, a
+   * skill of the repository's folder `folder` (`SkillsFound`).
+   */
   skills?: string[];
   /** What becomes of Claude Code's own prompt (`HARNESS_PROMPTS`), a former line read as its word now; absent is `keep`. */
   harnessPrompt?: HarnessPrompt;
@@ -599,7 +607,10 @@ export const unrendered = (step: Workflow, skills: readonly SkillAgain[] = []): 
   };
 };
 
-/** A skill as the prompt tells it: by name, or whole — its SKILL.md's body — when it asks to be (`preload: true`). */
+/**
+ * A skill as the prompt tells it: by its bare name, as its copy is filed in the step's plugin, or whole — its SKILL.md's body — when it
+ * asks to be (`preload: true`).
+ */
 export type RenderedSkill = { name: string; whole?: string };
 
 /**
@@ -656,13 +667,15 @@ export const namesPlugin = (step: Workflow): boolean => Boolean(step.agent?.skil
 
 /**
  * The settings a rendered step's session is given (`--settings`), or `undefined` when it needs none: the style chosen (`no-coding`), and
- * every skill the agent names turned `off` by `skillOverrides`. Claude Code applies no override to a plugin's skills, so the session keeps
- * the frozen copy, `nemia-<agent>:<name>`, and loses any bare one of the same name — the repository's, a nested folder's or its own.
+ * every skill the agent names turned `off` by `skillOverrides`, under its bare name and, for one named with its folder, under the name
+ * its line writes too. Claude Code applies no override to a plugin's skills, so the session keeps the frozen copy,
+ * `nemia-<agent>:<bare name>`, and loses any other of that name — the repository's, a nested folder's or its own.
  */
 function sessionSettings(agent: StepAgent): string | undefined {
+  const hidden = [...new Set((agent.skills ?? []).flatMap((name) => [bareSkillOf(name), name]))];
   const settings = {
     ...(agent.harnessPrompt === 'no-coding' && { outputStyle: `${pluginOf(agent.name)}:${NO_CODING_STYLE}` }),
-    ...(agent.skills?.length && { skillOverrides: Object.fromEntries(agent.skills.map((name) => [name, 'off'])) }),
+    ...(hidden.length && { skillOverrides: Object.fromEntries(hidden.map((name) => [name, 'off'])) }),
   };
   return Object.keys(settings).length ? JSON.stringify(settings) : undefined;
 }

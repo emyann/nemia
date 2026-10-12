@@ -15,6 +15,7 @@ import { AGENTS_FOLDER, SKILLS_FOLDER, splitFrontmatter, WorkflowError } from '.
 import { frontmatterKey } from '../former/former.ts';
 import { agentsDir } from '../folder/folder.ts';
 import { ownSkill, type Agent, type SkillsFound } from '../agents/agents.ts';
+import { givenSkillOf, type GivenSkill } from '../keys/index.ts';
 import { skillEntryOf, type AgentSkill, type SkillRule } from './skills.ts';
 
 /**
@@ -88,16 +89,8 @@ function inBoth(name: string, first: string, root: string): WorkflowError | unde
   );
 }
 
-/**
- * Every skill a workflow's agents may give (`lookupRoots`): each name, the folder it is — `<root>/skills/<name>`, holding a `SKILL.md` — or
- * its refusal: a link in it that is not followed (`skillLinkRefusal`), rules that do not read, or a name one repository has in both
- * `workflows/skills/` and `.claude/skills/` as two folders. One folder under both, the one a link to the other, is one skill, given from
- * the first. The first root that has a name wins, and a place skill the package ships (`PLACE_SKILLS`) is found last, where no root has
- * its name. The roots and the package's place folder are named for the refusal of a name none has (`skillAt`).
- */
-export function skillsFor(workflowDir: string, places: Places = {}): SkillsFound {
-  const roots = lookupRoots(workflowDir, places);
-  const looked = [...roots.map((root) => path.join(root, SKILLS_FOLDER)), PLACE_SKILLS];
+/** The skills of the roots `roots`, by bare name, each the folder it is or its refusal, a place skill the package ships found last. */
+function rootSkills(roots: readonly string[]): Map<string, string | WorkflowError> {
   const found = new Map<string, { at: string; dir: string | WorkflowError }>();
   for (const root of roots) {
     const dir = path.join(root, SKILLS_FOLDER);
@@ -117,7 +110,71 @@ export function skillsFor(workflowDir: string, places: Places = {}): SkillsFound
     const at = path.join(PLACE_SKILLS, name);
     if (!found.has(name)) found.set(name, { at: PLACE_SKILLS, dir: skillLinkRefusal(at) ?? at });
   }
-  return { at: new Map([...found].map(([name, { dir }]) => [name, dir])), looked };
+  return new Map([...found].map(([name, { dir }]) => [name, dir]));
+}
+
+/** The real path of `at`, or nothing where it cannot be reached. */
+function realOf(at: string): string | undefined {
+  try {
+    return fs.realpathSync(at);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The skill `written` (`folder:name`, read as `given`) of the repository `repo`: the folder it is, `<repo>/<folder>/.claude/skills/<name>`
+ * holding a `SKILL.md`, or why it cannot be used, each naming the skill as written. Refused: with no repository, since none is read; a
+ * folder reached through a link that leaves the repository, by real path, which is never opened; a folder that holds no such skill,
+ * naming where it was looked for; and as a skill of the roots is, a link in it that is not followed (`skillLinkRefusal`) — one that
+ * leaves said with the folder that bounds it, the one the line names — and rules that do not read.
+ */
+function folderSkill(written: string, given: Required<GivenSkill>, repo: string | undefined): string | WorkflowError {
+  const named = `\`${written}\` is the skill \`${given.name}\` of the repository's folder \`${given.folder}\``;
+  if (!repo)
+    return new WorkflowError(
+      `${named}, and this is read with no repository: a skill named with its folder is read from the repository a run is started on. Start the run on that repository, or take \`${written}\` off the \`skills:\` line.`,
+    );
+  const root = path.resolve(repo);
+  const folder = path.join(root, given.folder);
+  const [inside, real] = [realOf(root), realOf(folder)];
+  if (inside !== undefined && real !== undefined && !insideOf(inside, real))
+    return new WorkflowError(
+      `${named}, and ${folder} is reached through a link whose target is outside the repository ${root}: make it a folder of the repository's own, or take \`${written}\` off the \`skills:\` line.`,
+    );
+  const dir = path.join(folder, REPOSITORY_HOLDER, SKILLS_FOLDER, given.name);
+  if (!holdsSkill(dir))
+    return new WorkflowError(
+      `${named}, and ${dir} holds no SKILL.md. A skill is a folder holding a SKILL.md: write ${path.join(dir, 'SKILL.md')}, or take \`${written}\` off the \`skills:\` line.`,
+    );
+  const link = skillLinkRefusal(dir);
+  if (link?.message.endsWith(LEAVES))
+    return new WorkflowError(`${link.message} The links of \`${written}\` stay inside ${folder}, the folder its line names.`);
+  return link ?? rulesRefusal(dir) ?? dir;
+}
+
+/**
+ * Every skill a workflow's agents may give. `all` is each name of the folders looked in (`lookupRoots`): the folder it is —
+ * `<root>/skills/<name>`, holding a `SKILL.md` — or its refusal: a link in it that is not followed (`skillLinkRefusal`), rules that do
+ * not read, or a name one repository has in both `workflows/skills/` and `.claude/skills/` as two folders. One folder under both, the
+ * one a link to the other, is one skill, given from the first. The first root that has a name wins, and a place skill the package ships
+ * (`PLACE_SKILLS`) is found last, where no root has its name. `at` answers a bare name from `all`, and a skill named with its folder
+ * (`givenSkillOf`) from that folder of the repository `places.repo` alone (`folderSkill`), read when it is first asked and never by a
+ * walk: a bare name is never a nested folder's. The roots and the package's place folder are named for the refusal of a name none has
+ * (`skillAt`).
+ */
+export function skillsFor(workflowDir: string, places: Places = {}): SkillsFound {
+  const roots = lookupRoots(workflowDir, places);
+  const looked = [...roots.map((root) => path.join(root, SKILLS_FOLDER)), PLACE_SKILLS];
+  const all = rootSkills(roots);
+  const nested = new Map<string, string | WorkflowError>();
+  const get = (name: string): string | WorkflowError | undefined => {
+    const given = givenSkillOf(name);
+    if (given?.folder === undefined) return name.includes(':') ? undefined : all.get(name);
+    if (!nested.has(name)) nested.set(name, folderSkill(name, { name: given.name, folder: given.folder }, places.repo));
+    return nested.get(name);
+  };
+  return { at: { get }, all, looked };
 }
 
 /** A file of a skill's folder, by its path in the skill: the real file it is read from, or why the link there is refused. */

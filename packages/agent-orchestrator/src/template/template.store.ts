@@ -15,7 +15,7 @@ import { workflowDescription, workflowsIn } from '../folder/folder.store.ts';
 import { stepFiles } from '../folder/folder.ts';
 import { placesOf } from '../folder/lookup.store.ts';
 import { readKeys } from '../former/former.ts';
-import { SKILL_NAME } from '../keys/index.ts';
+import { givenSkillOf, SKILL_NAME } from '../keys/index.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { copySkillFiles, entriesOf, isShippedPlace, lookupRoots, PLACE_SKILLS, skillsFor } from '../skills/read.store.ts';
 import { splitFrontmatter } from '../step/step.ts';
@@ -238,6 +238,7 @@ function lookups(root: string, from: string): Pick<Source, 'agent' | 'skill'> {
       const dir = skills.get(name);
       if (dir === undefined) return undefined;
       if (dir instanceof Error) return { refused: dir.message };
+      if (givenSkillOf(name)?.folder !== undefined) return { named: dir };
       return isShippedPlace(dir) ? 'place' : { dir };
     },
   };

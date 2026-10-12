@@ -10,7 +10,7 @@
  * and words each call with the runtime's `denialText`.
  */
 import { DEFAULT_HARNESS } from '../harness/harness.ts';
-import { disallowedBy } from '../keys/index.ts';
+import { bareSkillOf, disallowedBy } from '../keys/index.ts';
 import { appliesMatch, type SkillRule } from '../skills/skills.ts';
 import type { Workflow } from '../step/step.ts';
 import type { TaskSpan } from '../timeline/index.ts';
@@ -73,13 +73,16 @@ export type SkillsClock = { state: { attempts: ReadonlyArray<{ ended: unknown; s
 
 /**
  * Every skill a task's sessions loaded: each skill of each attempt that ended, in the order of the attempts, one per load — a skill loaded
- * twice is two; `[]` where every ended attempt loaded none. Null, not measured, for a task with no view, with no attempt ended, or with an
- * ended attempt whose end does not say its skills (an older journal, a `lost` end, a harness that cannot say).
+ * twice is two; `[]` where every ended attempt loaded none. A session says a skill by its bare name, and each is answered as `given`,
+ * the names the step's `skills:` gave its session, writes the skill of that bare name (`app:y` for a load of `y`), and as loaded where
+ * the step gave none. Null, not measured, for a task with no view, with no attempt ended, or with an ended attempt whose end does not
+ * say its skills (an older journal, a `lost` end, a harness that cannot say).
  */
-export function skillsLoadedOf(view: SkillsClock | undefined): string[] | null {
+export function skillsLoadedOf(view: SkillsClock | undefined, given: readonly string[]): string[] | null {
   const ends = (view?.state.attempts ?? []).filter((a) => a.ended !== null && a.ended !== undefined);
   if (!ends.length || !ends.every((a) => a.skills !== undefined)) return null;
-  return ends.flatMap((a) => [...(a.skills ?? [])]);
+  const written = new Map(given.map((name) => [bareSkillOf(name), name]));
+  return ends.flatMap((a) => (a.skills ?? []).map((skill) => written.get(skill) ?? skill));
 }
 
 /** What `filesTouchedOf` reads of a task's view: its attempts, whether each ended, and the files each touched, where its end says. */

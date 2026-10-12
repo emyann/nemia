@@ -5,7 +5,7 @@
  */
 import { HARNESS_KNOBS } from 'agent-runtime/vocabulary';
 import { DEFAULT_HARNESS, isRemoteHarness, REMOTE_PREFIX } from '../harness/harness.ts';
-import { PLACES, STORE_READS, WORKSPACES } from '../keys/index.ts';
+import { givenSkillOf, PLACES, STORE_READS, WORKSPACES } from '../keys/index.ts';
 import {
   documentFile,
   documentRefusals,
@@ -86,10 +86,13 @@ function hireRefusals(held: Held): Refusal[] {
   });
 }
 
-/** What a list of skills at `at` names that the folder lacks and no place skill is. */
+/**
+ * What a list of skills at `at` names that the folder lacks and no place skill is; a skill named with its folder (`givenSkillOf`) is
+ * the repository's a run is started on, which a template names and never carries, and passes.
+ */
 const skillRefusals = (file: string, at: At, skills: unknown, held: Held): Refusal[] =>
   stringsOf(skills)
-    .filter(([name]) => !held.skills.has(name))
+    .filter(([name]) => !held.skills.has(name) && givenSkillOf(name)?.folder === undefined)
     .map(([name, i]) => ({
       file,
       at: [...at, i],

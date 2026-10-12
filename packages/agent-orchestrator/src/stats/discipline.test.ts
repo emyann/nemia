@@ -86,17 +86,23 @@ test('every ended attempt gives each skill it loaded, one per load, in order; an
     { ended: 'done', skills: ['look', 'effect'] },
     { ended: null, skills: ['x'] },
   ];
-  assert.deepEqual(skillsLoadedOf({ state: { attempts } }), ['look', 'look', 'effect']);
+  assert.deepEqual(skillsLoadedOf({ state: { attempts } }, []), ['look', 'look', 'effect']);
   const empty = [{ ended: 'done', skills: [] }, { ended: null }];
-  assert.deepEqual(skillsLoadedOf({ state: { attempts: empty } }), [], 'a session that loaded none is a measured empty list');
+  assert.deepEqual(skillsLoadedOf({ state: { attempts: empty } }, []), [], 'a session that loaded none is a measured empty list');
+});
+
+test('a loaded skill is counted under the name the step’s line writes it, one named with its folder too; one the step did not give, as loaded', () => {
+  const attempts = [{ ended: 'done', skills: ['y', 'look', 'other', 'y'] }];
+  assert.deepEqual(skillsLoadedOf({ state: { attempts } }, ['app:y', 'look']), ['app:y', 'look', 'other', 'app:y']);
+  assert.deepEqual(skillsLoadedOf({ state: { attempts } }, []), ['y', 'look', 'other', 'y']);
 });
 
 test('a session is unmeasured where one ended attempt does not say its skills, where none ended, and with no view', () => {
   const unsaid = [{ ended: 'failed', skills: ['look'] }, { ended: 'done' }];
-  assert.equal(skillsLoadedOf({ state: { attempts: unsaid } }), null, 'one end without the key: not measured, never its others alone');
-  assert.equal(skillsLoadedOf({ state: { attempts: [{ ended: null, skills: ['look'] }] } }), null, 'no attempt ended');
-  assert.equal(skillsLoadedOf({ state: { attempts: [] } }), null);
-  assert.equal(skillsLoadedOf(undefined), null);
+  assert.equal(skillsLoadedOf({ state: { attempts: unsaid } }, []), null, 'one end without the key: not measured, never its others alone');
+  assert.equal(skillsLoadedOf({ state: { attempts: [{ ended: null, skills: ['look'] }] } }, ['look']), null, 'no attempt ended');
+  assert.equal(skillsLoadedOf({ state: { attempts: [] } }, []), null);
+  assert.equal(skillsLoadedOf(undefined, ['app:y']), null);
 });
 
 test("a task's files are each file its ended attempts touched, once, in the order first touched; unmeasured where one end does not say", () => {

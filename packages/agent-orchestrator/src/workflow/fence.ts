@@ -10,7 +10,7 @@
  */
 import { AGENTS_FOLDER, refuse, type StepKey, type Workflow } from '../step/step.ts';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
-import { rulesOf, toolsOf } from '../keys/index.ts';
+import { bareSkillOf, rulesOf, toolsOf } from '../keys/index.ts';
 import type { Agent } from '../agents/agents.ts';
 import { fenceReach, type FenceReach } from 'agent-runtime/vocabulary';
 
@@ -119,7 +119,8 @@ export function fenceRefusal(step: string, agent: Agent, own: Partial<Record<Ste
 
 /**
  * Why step `step` may not add the skills `added` to its agent's, its line written as `line`, or `undefined` when it may: the first one the
- * agent does not give whose load the agent's own fence refuses — a `tools:` list with no `Skill`, or a deny covering `Skill(<skill>)`.
+ * agent does not give whose load the agent's own fence refuses — a `tools:` list with no `Skill`, or a deny covering `Skill(<skill>)`, the skill by its bare name
+ * (`bareSkillOf`), as a session calls it.
  * Loading a skill is a call of `Skill`, so adding one past the agent's fence would widen it. A step on a sandboxed harness or a remote
  * agent is left to `composedRefusal`, which refuses skills there. The refusal names the step, the skill, the agent's file and both fixes.
  */
@@ -137,7 +138,7 @@ export function addedSkillsRefusal(
   const denies = agentRules(agent, file, 'disallowedTools');
   const untooled = tools !== undefined && !tools.includes('Skill');
   for (const skill of added.filter((name) => !agent.skills?.includes(name))) {
-    const deny = denies.find((rule) => covers(rule, `Skill(${skill})`));
+    const deny = denies.find((rule) => covers(rule, `Skill(${bareSkillOf(skill)})`));
     if (!untooled && deny === undefined) continue;
     const why = untooled ? `gives it \`tools: ${(tools ?? []).join(', ')}\`, with no \`Skill\`` : `denies it \`${deny}\``;
     const fix = untooled ? `Give ${agent.name} \`Skill\` in its \`tools:\`` : `Take \`${deny}\` off its \`disallowedTools:\``;

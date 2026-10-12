@@ -73,7 +73,7 @@ const runFacts = Effect.fnUntraced(function* (e: Engine, run: Run, steps: Workfl
     verdictOf: (taskId) => verdictOf(everyTry.get(taskId)),
     closeoutOf: closeoutReader(views, run),
     deniedOf: (taskId) => deniedCallsOf(everyTry.get(taskId)).map(denialText),
-    skillsOf: (taskId) => skillsLoadedOf(everyTry.get(taskId)),
+    skillsOf: (taskId, given) => skillsLoadedOf(everyTry.get(taskId), given),
     filesOf: (taskId) => filesTouchedOf(everyTry.get(taskId)),
     rulesOf: (step) => renderedSkillRules(run, step),
     appliesOf: (step) => renderedSkillApplies(run, step),

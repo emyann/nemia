@@ -126,7 +126,7 @@ export type RunRead = {
   verdictOf: (checkTaskId: string) => CheckVerdict | null;
   closeoutOf: (step: string) => Closeout | undefined;
   deniedOf: (taskId: string) => string[];
-  skillsOf: (taskId: string) => string[] | null;
+  skillsOf: (taskId: string, given: readonly string[]) => string[] | null;
   filesOf: (taskId: string) => string[] | null;
   rulesOf: (step: Workflow) => ReadonlyMap<string, readonly SkillRule[]>;
   appliesOf: (step: Workflow) => ReadonlyMap<string, readonly string[]>;
@@ -179,7 +179,7 @@ function tryFactsOf(r: RunRead): TryFact[] {
           check: t.check ? r.verdictOf(t.check.taskId) : null,
           gateWaitMs: gateWaitOf(r.run, r.timeline, step, t),
           denied,
-          skills: t.session ? r.skillsOf(t.session.taskId) : null,
+          skills: t.session ? r.skillsOf(t.session.taskId, step.agent?.skills ?? []) : null,
           due: t.session ? skillsDueOf(r.filesOf(t.session.taskId), r.appliesOf(step)) : null,
           rules: rulesOfTry(denied, r.rulesOf(step)),
           tallies: (step.tally ?? []).map((tally) => ({

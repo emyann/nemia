@@ -10,7 +10,7 @@ import { BUTTON, MODES, Refusal, TEXTAREA, useAsk, useRound } from './Ask';
 import { answersFrom, Asks, QuestionFields, RecommendButton, unanswered, type Draft } from './Questions';
 
 const AMOUNT =
-  'w-24 rounded border border-neutral-300 bg-white px-2 py-1 font-mono text-sm focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:focus:border-neutral-400';
+  'w-24 rounded border border-outline bg-background px-2 py-1 font-mono text-sm focus:border-on-surface-variant focus:outline-none';
 
 /**
  * A step past its budget — over it, ended at it, or a check that did not finish past it — and the raise of its cap the package takes
@@ -53,12 +53,7 @@ export function RaiseRow({ runId, offer }: { runId: string; offer: Extract<Answe
   if (taken) return <RaiseAsked step={offer.step} said={taken} />;
 
   return (
-    <li
-      data-offer="raise"
-      data-step={offer.step}
-      data-by={offer.by}
-      className="space-y-2 rounded border border-amber-300 bg-amber-50/60 p-3 text-sm dark:border-amber-900 dark:bg-amber-950/30"
-    >
+    <li data-offer="raise" data-step={offer.step} data-by={offer.by} className="space-y-2 rounded border border-yours bg-card p-3 text-sm">
       <RaiseHead offer={offer} asks={asks} />
       <form
         aria-label={`Raise ${offer.step}'s budget`}
@@ -193,7 +188,7 @@ function RaiseModes({
 /** A raise once the api has its ask, as the row says it until the run is read again: the try or the round asked. */
 function RaiseAsked({ step, said }: { step: string; said: string }) {
   return (
-    <li data-offer="asked" data-step={step} className="rounded border border-neutral-200 px-3 py-2 text-sm dark:border-neutral-800">
+    <li data-offer="asked" data-step={step} className="rounded border border-outline-variant px-3 py-2 text-sm">
       <strong>{step}</strong>{' '}
       <span data-note className="font-mono text-xs text-muted-foreground">
         {said}

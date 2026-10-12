@@ -63,13 +63,9 @@ export function StepNode({
   return (
     <div
       className={[
-        'w-56 overflow-hidden rounded-md bg-white text-foreground shadow-sm dark:bg-neutral-900',
-        gate
-          ? 'border-2 border-yours'
-          : running
-            ? 'border border-alive ring-4 ring-alive/25'
-            : 'border border-neutral-300 dark:border-neutral-700',
-        selected ? 'outline-2 outline-offset-2 outline-neutral-900 dark:outline-neutral-100' : '',
+        'w-56 overflow-hidden rounded-md bg-card text-foreground shadow-sm',
+        gate ? 'border-2 border-yours' : running ? 'border border-alive ring-4 ring-alive/25' : 'border border-outline',
+        selected ? 'outline-2 outline-offset-2 outline-foreground' : '',
       ].join(' ')}
     >
       <Handle type="target" position={targetPosition} isConnectable={false} className="opacity-0" />
@@ -93,7 +89,7 @@ export function StepNode({
         <p className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">{spec ? runsOn(spec) : 'no spec'}</p>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t border-neutral-200 px-3 py-1.5 dark:border-neutral-800">
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t border-outline-variant px-3 py-1.5">
         <StatusChip status={step.status} runCancelled={runCancelled} runHeld={runHeld} note={step.note} />
         <span className="font-mono text-[11px] text-muted-foreground">
           {attemptLine(step.attempts, live, now) ?? (step.taskId === null ? 'not filed yet' : 'no attempt yet')}
@@ -108,7 +104,7 @@ export function StepNode({
               ? `What its tries have cost of its ${step.budget.said} budget${over ? (held ? ': the cap or more, so the run spends nothing more on it until a person raises it' : ': the cap or more — its harness ends a job at its cap, a little past it where a call was under way, and this step finished; nothing waits on a raise') : ''}`
               : 'What its tries have cost'
           }
-          className={`truncate border-t border-neutral-200 px-3 py-1 font-mono text-[11px] dark:border-neutral-800 ${over ? 'font-semibold text-money' : 'text-muted-foreground'}`}
+          className={`truncate border-t border-outline-variant px-3 py-1 font-mono text-[11px] ${over ? 'font-semibold text-money' : 'text-muted-foreground'}`}
         >
           <span className="font-sans font-normal">cost </span>
           {cost}
@@ -142,7 +138,7 @@ export function StepNode({
         <p
           data-denied
           title={step.denied.words}
-          className="truncate border-t border-neutral-200 px-3 py-1 font-mono text-[11px] text-failure dark:border-neutral-800"
+          className="truncate border-t border-outline-variant px-3 py-1 font-mono text-[11px] text-failure"
         >
           {deniedNodeText(step.denied.calls)}
         </p>
@@ -239,7 +235,7 @@ export function SpecNode({
     <div
       data-spec
       data-inspected={inspected || undefined}
-      className={`w-56 cursor-pointer overflow-hidden rounded-md border border-neutral-300 bg-white text-foreground shadow-sm dark:border-neutral-700 dark:bg-neutral-900 ${inspected ? 'ring-2 ring-ring' : 'hover:border-neutral-400 in-focus-visible:ring-2 in-focus-visible:ring-ring dark:hover:border-neutral-500'}`}
+      className={`w-56 cursor-pointer overflow-hidden rounded-md border border-outline bg-card text-foreground shadow-sm ${inspected ? 'ring-2 ring-ring' : 'hover:border-on-surface-variant in-focus-visible:ring-2 in-focus-visible:ring-ring'}`}
     >
       <Handle type="target" position={targetPosition} isConnectable={false} className="opacity-0" />
 
@@ -252,7 +248,7 @@ export function SpecNode({
       </div>
 
       {lines.length > 0 && (
-        <dl className="space-y-0.5 border-t border-neutral-200 px-3 py-1.5 text-[11px] dark:border-neutral-800">
+        <dl className="space-y-0.5 border-t border-outline-variant px-3 py-1.5 text-[11px]">
           {lines.map(([label, value, title = value]) => (
             <div key={label} className="flex min-w-0 gap-1.5">
               <dt className="shrink-0 text-muted-foreground">{label}</dt>
@@ -272,7 +268,7 @@ export function SpecNode({
 }
 
 /** A handle a person drags from or to while building: a dot on the node's edge, in the colour of the edge it draws. */
-const HANDLE = '!size-3 !border-2 !border-white dark:!border-neutral-900';
+const HANDLE = '!size-3 !border-2 !border-card';
 
 /**
  * The spec node while the builder has it: the same head and lines, with handles a person draws edges with. Drag from the right-hand dot to
@@ -304,9 +300,9 @@ function BuildingNode({
       data-unsaved-step={build.unsaved || undefined}
       data-refused-step={build.refused || undefined}
       className={[
-        'w-56 cursor-pointer rounded-md bg-white text-foreground shadow-sm dark:bg-neutral-900',
-        build.refused ? 'border-2 border-failure' : 'border border-neutral-300 dark:border-neutral-700',
-        build.selected ? 'outline-2 outline-offset-2 outline-neutral-900 dark:outline-neutral-100' : '',
+        'w-56 cursor-pointer rounded-md bg-card text-foreground shadow-sm',
+        build.refused ? 'border-2 border-failure' : 'border border-outline',
+        build.selected ? 'outline-2 outline-offset-2 outline-foreground' : '',
       ].join(' ')}
     >
       <Handle
@@ -314,7 +310,7 @@ function BuildingNode({
         position={targetPosition}
         isConnectableStart={false}
         title={`Drop an edge here: ${name} waits on the step it comes from`}
-        className={`${HANDLE} !bg-neutral-500`}
+        className={`${HANDLE} !bg-outline`}
       />
 
       <div className="px-3 pt-2 pb-2">
@@ -331,7 +327,7 @@ function BuildingNode({
       </div>
 
       {lines.length > 0 && (
-        <dl className="space-y-0.5 border-t border-neutral-200 px-3 py-1.5 text-[11px] dark:border-neutral-800">
+        <dl className="space-y-0.5 border-t border-outline-variant px-3 py-1.5 text-[11px]">
           {lines.map(([label, value, title = value]) => (
             <div key={label} className="flex min-w-0 gap-1.5">
               <dt className="shrink-0 text-muted-foreground">{label}</dt>
@@ -343,12 +339,7 @@ function BuildingNode({
         </dl>
       )}
 
-      <Handle
-        type="source"
-        position={sourcePosition}
-        title={`Drag to a step that waits on ${name}`}
-        className={`${HANDLE} !bg-neutral-500`}
-      />
+      <Handle type="source" position={sourcePosition} title={`Drag to a step that waits on ${name}`} className={`${HANDLE} !bg-outline`} />
       <Handle
         id={LOOP_SOURCE}
         type="source"

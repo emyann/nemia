@@ -25,7 +25,7 @@ export const Route = createFileRoute('/workflows')({
   loader: ({ context, deps }) => Promise.all([loadWorkflowsIn(context.queryClient, deps), context.queryClient.ensureQueryData(storeQuery)]),
   component: WorkflowsPage,
   errorComponent: ({ error }) => (
-    <p className="text-sm text-red-600">
+    <p className="text-sm text-failure">
       Could not load the workflows: {error instanceof Error ? error.message : String(error)}. Is the api running (<code>npm run dev</code>)?{' '}
       {everyFactory}.
     </p>
@@ -162,7 +162,7 @@ function WorkflowCard({
     <section
       aria-label={`Workflow ${name}`}
       data-from={from}
-      className="space-y-2 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950"
+      className="space-y-2 rounded-lg border border-outline-variant bg-card p-4 shadow-sm"
     >
       <header className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <h2 className="font-mono text-base font-semibold">
@@ -170,7 +170,7 @@ function WorkflowCard({
             to="/workflows/$from/$workflow"
             params={{ from, workflow: name }}
             search={address}
-            className="rounded-sm underline decoration-neutral-300 underline-offset-2 outline-none hover:decoration-neutral-900 focus-visible:ring-2 focus-visible:ring-ring/50 dark:decoration-neutral-600 dark:hover:decoration-neutral-100"
+            className="rounded-sm underline decoration-outline underline-offset-2 outline-none hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
           >
             {name}
           </RouteLink>
@@ -192,7 +192,7 @@ function WorkflowCard({
         </p>
       )}
       {error && (
-        <p data-refusal className="text-xs text-red-700 dark:text-red-400">
+        <p data-refusal className="text-xs text-failure">
           Does not read as a workflow, so it cannot start: its page says why.
         </p>
       )}

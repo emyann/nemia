@@ -16,7 +16,7 @@ export const Route = createFileRoute('/machines')({
   staticData: { fullBleed: true },
   pendingComponent: () => <p className="px-6 py-6 text-sm text-muted-foreground">Reading the state machines off their code…</p>,
   errorComponent: ({ error }) => (
-    <p className="px-6 py-6 text-sm text-red-600">
+    <p className="px-6 py-6 text-sm text-failure">
       Could not load the state machines: {error instanceof Error ? error.message : String(error)}. Is the api running (
       <code>npm run dev</code>)?
     </p>

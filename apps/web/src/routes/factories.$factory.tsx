@@ -23,7 +23,7 @@ export const Route = createFileRoute('/factories/$factory')({
   staticData: { fullBleed: true },
   component: FactoryPage,
   errorComponent: ({ error }) => (
-    <p className="p-4 text-sm text-red-600">
+    <p className="p-4 text-sm text-failure">
       Could not load the factories and their runs: {error instanceof Error ? error.message : String(error)}. Is the api running (
       <code>npm run dev</code>)?
     </p>

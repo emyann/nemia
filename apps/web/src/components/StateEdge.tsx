@@ -49,7 +49,7 @@ export function StateEdge({
 
 /** A line of what a run reads as context: faint and dotted, beneath every wait. */
 export const READ_LINE = {
-  stroke: 'var(--color-neutral-400)',
+  stroke: 'var(--md-sys-color-outline)',
   strokeWidth: 1.25,
   strokeDasharray: '1 5',
   strokeLinecap: 'round',

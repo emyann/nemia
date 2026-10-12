@@ -26,9 +26,9 @@ export function FactoryCardStart({ entry, onStarted, onRefused }: { entry: Inbox
   const repo = place && 'repos' in place ? (place.repo ?? picked) : null;
 
   return (
-    <div data-start-card className="space-y-3 border-t border-neutral-200 pt-4 dark:border-neutral-800">
+    <div data-start-card className="space-y-3 border-t border-outline-variant pt-4">
       {factories.error ? (
-        <p className="text-xs text-red-700 dark:text-red-400">Could not read the factories to start it in: {factories.error.message}</p>
+        <p className="text-xs text-failure">Could not read the factories to start it in: {factories.error.message}</p>
       ) : !place ? (
         <p className="text-xs text-muted-foreground">Reading the factory…</p>
       ) : 'why' in place ? (
@@ -110,7 +110,7 @@ function InFactory({ entry, place, onStarted, onRefused }: { entry: InboxEntry; 
           Workflow
         </label>
         {workflows.error ? (
-          <p className="text-xs text-red-700 dark:text-red-400">
+          <p className="text-xs text-failure">
             Could not list the workflows of the factory {code(place.factory)}: {workflows.error.message}
           </p>
         ) : !workflows.data ? (

@@ -20,6 +20,7 @@ import {
   type Turn,
 } from '@/lib/transcript';
 import { cn } from '@/lib/utils';
+import { container } from '../../lib/meaning';
 
 /**
  * One turn of a step's conversation, as `foldTranscript` gives it. `live` is whether the session may still add to it; `last`,
@@ -197,9 +198,7 @@ function Closeout({ turn }: { turn: CloseoutTurn }) {
             data-outcome={closeout.outcome}
             className={cn(
               'rounded-full px-2 py-0.5 font-mono text-xs',
-              closeout.outcome === 'blocked'
-                ? 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200'
-                : 'bg-secondary text-secondary-foreground',
+              closeout.outcome === 'blocked' ? container.yours : 'bg-secondary text-secondary-foreground',
             )}
           >
             {closeout.outcome}

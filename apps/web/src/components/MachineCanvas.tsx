@@ -101,7 +101,7 @@ export function MachineCanvas({
       }}
       aria-label={`${machine.title} as a graph`}
       data-machine={machine.name}
-      className="overflow-hidden rounded border border-neutral-200 dark:border-neutral-800"
+      className="overflow-hidden rounded border border-outline-variant"
       style={{ height: Math.ceil(drawn.height * zoom) + 2 }}
     >
       {frameWidth > 0 && (

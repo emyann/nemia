@@ -5,13 +5,14 @@ import { descriptionOf, type Outcome, outcomeWord, type OutputKind, outputKind }
 import { cn } from '../lib/utils';
 import { ArtifactView } from './Artifacts';
 import { Markdown } from './Markdown';
+import { container } from '../lib/meaning';
 
 const BADGE: Record<Outcome['by'] | 'blocked', string> = {
-  agent: 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-300',
-  blocked: 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300',
-  machine: 'bg-red-100 text-red-900 dark:bg-red-950 dark:text-red-300',
-  unreadable: 'bg-red-100 text-red-900 dark:bg-red-950 dark:text-red-300',
-  nobody: 'bg-neutral-100 text-foreground dark:bg-neutral-800',
+  agent: container.sage,
+  blocked: container.yours,
+  machine: container.failure,
+  unreadable: container.failure,
+  nobody: 'bg-muted text-foreground',
 };
 
 const BY: Record<Outcome['by'], string> = {
@@ -38,7 +39,7 @@ export function OutcomeHead({ outcome, aside }: { outcome: Outcome; aside?: Reac
         </p>
         {aside}
       </div>
-      {outcome.by === 'agent' && outcome.cut && <p className="text-xs text-red-700 dark:text-red-400">… {outcome.cut}.</p>}
+      {outcome.by === 'agent' && outcome.cut && <p className="text-xs text-failure">… {outcome.cut}.</p>}
       {outcome.by !== 'agent' && (
         <p data-reason className="text-muted-foreground">
           {outcome.words}
@@ -144,12 +145,12 @@ function Records({ kind, records, place }: { kind: 'findings' | 'table'; records
         {records.map((record, i) => {
           const { place: where, rest } = place(record);
           return (
-            <tr key={i} className="block border-t border-neutral-200 py-1.5 first:border-t-0 first:pt-0 dark:border-neutral-800">
+            <tr key={i} className="block border-t border-outline-variant py-1.5 first:border-t-0 first:pt-0">
               <th
                 scope="row"
                 data-place
                 title={where}
-                className="block break-all text-left font-mono text-xs font-medium text-foreground underline decoration-neutral-300 decoration-dotted underline-offset-2 dark:decoration-neutral-600"
+                className="block break-all text-left font-mono text-xs font-medium text-foreground underline decoration-outline decoration-dotted underline-offset-2"
               >
                 {where}
               </th>
@@ -178,8 +179,8 @@ function Records({ kind, records, place }: { kind: 'findings' | 'table'; records
 }
 
 const ANSWER: Record<string, string> = {
-  fixed: 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-300',
-  "won't fix": 'bg-neutral-200 text-foreground dark:bg-neutral-800',
+  fixed: container.sage,
+  "won't fix": 'bg-surface-container-highest text-foreground',
 };
 
 /**
@@ -237,7 +238,7 @@ function YesNo({ yes, description }: { yes: boolean; description: string | null 
 function StringList({ items, artifacts }: { items: string[]; artifacts: readonly StepArtifact[] }) {
   if (!items.length) return <None />;
   return (
-    <ul className="list-disc space-y-1 pl-4 marker:text-neutral-400">
+    <ul className="list-disc space-y-1 pl-4 marker:text-muted-foreground">
       {items.map((item, i) => {
         const artifact = artifacts.find((a) => a.path === item && 'url' in a && a.kind === 'image');
         return artifact ? (
@@ -259,7 +260,7 @@ export function Json({ value, ...data }: { value: unknown; 'data-raw'?: boolean 
   return (
     <pre
       {...data}
-      className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded bg-neutral-100 p-2 font-mono text-[11px] leading-snug dark:bg-neutral-950"
+      className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded bg-muted p-2 font-mono text-[11px] leading-snug"
     >
       {typeof value === 'string' ? value : JSON.stringify(value, null, 2)}
     </pre>

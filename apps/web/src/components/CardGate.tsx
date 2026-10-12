@@ -14,8 +14,7 @@ import { SECONDARY, useApprove } from './Gate';
 export type Taken = { said: string; stamp: string; next?: string };
 
 export const SMALL = 'h-6 rounded px-2 text-[11px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring/50';
-export const POPOVER =
-  'z-50 w-72 rounded-lg border border-neutral-200 bg-white p-3 text-sm text-foreground shadow-lg outline-none dark:border-neutral-800 dark:bg-neutral-900';
+export const POPOVER = 'z-50 w-72 rounded-lg border border-outline-variant bg-card p-3 text-sm text-foreground shadow-lg outline-none';
 
 /**
  * A gate on the Factory's card: what approving does and where a send-back goes, in one row whatever the names (`gateCardLine`), since a
@@ -59,7 +58,7 @@ export function CardGate({
         data-to-decide={gate.ends ? 'approve' : undefined}
         data-gate-line={gate.step}
         title={`${line}\n${title}`}
-        className="truncate text-[11px] text-amber-800 dark:text-amber-300"
+        className="truncate text-[11px] text-yours"
       >
         {line}
       </p>
@@ -112,7 +111,7 @@ export function CardGate({
           params={{ runId }}
           {...('step' in read ? { search: { bar: barValue({ kind: 'step', run: runId, step: read.step }) } } : { hash: read.hash })}
           data-read={gate.step}
-          className="ml-auto min-w-0 truncate rounded-sm text-[11px] font-medium text-foreground underline decoration-neutral-400 underline-offset-2 outline-none hover:decoration-neutral-700 focus-visible:ring-2 focus-visible:ring-ring/50 dark:decoration-neutral-500 dark:hover:decoration-neutral-300"
+          className="ml-auto min-w-0 truncate rounded-sm text-[11px] font-medium text-foreground underline decoration-outline underline-offset-2 outline-none hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
         >
           {read.words}
         </RouteLink>
@@ -140,8 +139,8 @@ function Answer({
         className={cn(
           SMALL,
           primary
-            ? 'bg-neutral-900 text-white hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300'
-            : 'bg-white text-foreground ring-1 dark:text-foreground ring-neutral-300 ring-inset hover:bg-neutral-100 dark:bg-neutral-900 dark:ring-neutral-700 dark:hover:bg-neutral-800',
+            ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+            : 'bg-card text-foreground ring-1 ring-outline ring-inset hover:bg-accent',
         )}
       >
         {primary ? label : `${label}…`}

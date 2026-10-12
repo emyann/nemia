@@ -54,9 +54,9 @@ function GateBrief({ run, step }: { run: RunDetail; step: Step }) {
     <section
       aria-label={`What ${step.name} asks of you`}
       data-asked="approve"
-      className="space-y-3 rounded border border-amber-300 bg-amber-50/60 p-3 dark:border-amber-900 dark:bg-amber-950/30"
+      className="space-y-3 rounded border border-yours bg-card p-3"
     >
-      <h3 className="text-xs font-semibold tracking-wide text-amber-900 uppercase dark:text-amber-200">Waiting on you</h3>
+      <h3 className="text-xs font-semibold tracking-wide text-yours uppercase">Waiting on you</h3>
       <p data-brief="waits" className="break-words">
         {brief.waits}
       </p>
@@ -66,9 +66,9 @@ function GateBrief({ run, step }: { run: RunDetail; step: Step }) {
       <p data-brief="sending-back" className="break-words">
         {brief.sendingBack}
       </p>
-      <FactList runId={run.id} facts={facts} label="What to decide on" className="border-t border-amber-200 pt-2 dark:border-amber-900" />
+      <FactList runId={run.id} facts={facts} label="What to decide on" className="border-t border-outline-variant pt-2" />
       <StepPolicy layers={step.layers} />
-      <div className="border-t border-amber-200 pt-3 dark:border-amber-900">
+      <div className="border-t border-outline-variant pt-3">
         <Gate
           runId={run.id}
           step={step.name}
@@ -102,12 +102,8 @@ function Waits({
   children?: ReactNode;
 }) {
   return (
-    <section
-      aria-label="What the run asks of you"
-      data-asked={kind}
-      className="space-y-2 rounded border border-amber-300 bg-amber-50/60 p-3 dark:border-amber-900 dark:bg-amber-950/30"
-    >
-      <h3 className="text-xs font-semibold tracking-wide text-amber-900 uppercase dark:text-amber-200">Waiting on you</h3>
+    <section aria-label="What the run asks of you" data-asked={kind} className="space-y-2 rounded border border-yours bg-card p-3">
+      <h3 className="text-xs font-semibold tracking-wide text-yours uppercase">Waiting on you</h3>
       {children ?? <p className="break-words whitespace-pre-wrap">{said}</p>}
       <RouteLink
         to="/runs/$runId"

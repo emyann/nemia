@@ -23,7 +23,7 @@ export const Route = createFileRoute('/factories/$factory_/settings')({
   },
   component: SettingsPage,
   errorComponent: ({ error }) => (
-    <p className="p-4 text-sm text-red-600">Could not load the factories: {error instanceof Error ? error.message : String(error)}</p>
+    <p className="p-4 text-sm text-failure">Could not load the factories: {error instanceof Error ? error.message : String(error)}</p>
   ),
 });
 

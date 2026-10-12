@@ -41,7 +41,7 @@ function StepBody({ id, name, run, error }: { id: string; name: string; run: Run
 /** A bar's body for the run `id` not read yet: that it is read, or, with `error`, why the read failed. */
 export function Unread({ id, error }: { id: string; error: unknown }) {
   return error ? (
-    <p className="text-sm text-red-700 dark:text-red-400">
+    <p className="text-sm text-failure">
       Could not read the run {id}: {error instanceof Error ? error.message : 'the api gave no reason'}
     </p>
   ) : (

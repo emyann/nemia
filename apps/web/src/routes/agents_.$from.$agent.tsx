@@ -34,7 +34,7 @@ export const Route = createFileRoute('/agents_/$from/$agent')({
   errorComponent: ({ error }) => (
     <div className="space-y-3">
       <BackToAgents />
-      <p className="text-sm text-red-600">Could not load this agent: {error instanceof Error ? error.message : String(error)}</p>
+      <p className="text-sm text-failure">Could not load this agent: {error instanceof Error ? error.message : String(error)}</p>
     </div>
   ),
 });
@@ -141,9 +141,7 @@ function FormIn({ agent, mine, children }: { agent: AgentListing; mine: boolean;
     );
   return (
     <>
-      <p className="border-b border-neutral-200 pb-2 font-mono text-[11px] break-all text-muted-foreground dark:border-neutral-800">
-        {agent.file}
-      </p>
+      <p className="border-b border-outline-variant pb-2 font-mono text-[11px] break-all text-muted-foreground">{agent.file}</p>
       {children}
     </>
   );
@@ -152,11 +150,9 @@ function FormIn({ agent, mine, children }: { agent: AgentListing; mine: boolean;
 /** Why the agent's file does not read as an agent, in the parser's words: no run can start a node that names it. */
 function Unread({ error }: { error: string }) {
   return (
-    <div data-agent-error className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40">
-      <p className="text-sm font-medium text-red-800 dark:text-red-300">
-        Does not read as an agent, so no run can start a node that names it:
-      </p>
-      <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{error}</p>
+    <div data-agent-error className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
+      <p className="text-sm font-medium text-on-failure-container">Does not read as an agent, so no run can start a node that names it:</p>
+      <p className="font-mono text-xs whitespace-pre-wrap break-words text-on-failure-container">{error}</p>
     </div>
   );
 }

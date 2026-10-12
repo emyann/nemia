@@ -11,7 +11,7 @@ export const Route = createFileRoute('/inbox_/$name')({
   errorComponent: ({ error }) => (
     <div className="space-y-3">
       <BackToInbox />
-      <p className="text-sm text-red-600">Could not load this card: {error instanceof Error ? error.message : String(error)}</p>
+      <p className="text-sm text-failure">Could not load this card: {error instanceof Error ? error.message : String(error)}</p>
     </div>
   ),
 });
@@ -61,9 +61,9 @@ function CardPage() {
       )}
 
       {card.error !== null && (
-        <div className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40">
-          <p className="text-sm font-medium text-red-800 dark:text-red-300">Does not read as a card, so it cannot start:</p>
-          <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{card.error}</p>
+        <div className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
+          <p className="text-sm font-medium text-on-failure-container">Does not read as a card, so it cannot start:</p>
+          <p className="font-mono text-xs whitespace-pre-wrap break-words text-on-failure-container">{card.error}</p>
         </div>
       )}
 

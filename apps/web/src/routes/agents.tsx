@@ -17,7 +17,7 @@ export const Route = createFileRoute('/agents')({
     ]),
   component: AgentsPage,
   errorComponent: ({ error }) => (
-    <p className="text-sm text-red-600">
+    <p className="text-sm text-failure">
       Could not load the agents: {error instanceof Error ? error.message : String(error)}. Is the api running (<code>npm run dev</code>)?
     </p>
   ),
@@ -109,7 +109,7 @@ function SkillPlaces({ places, library }: { places: readonly SkillPlace[]; libra
                 <li key={skill.name} data-skill-row={skill.name} className="min-w-0 text-xs leading-snug">
                   <SkillLink from={skill.from} name={skill.name} className="font-medium text-foreground" />{' '}
                   {skill.error !== null ? (
-                    <span className="text-red-700 dark:text-red-400">does not read</span>
+                    <span className="text-failure">does not read</span>
                   ) : (
                     <span className="text-muted-foreground">{skill.entry?.description}</span>
                   )}

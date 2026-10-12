@@ -6,12 +6,13 @@ import type { AgentListing, AgentSkill, AgentUser, GivenSkill, SkillSource } fro
 import { costWords, SOURCE_BADGES } from '../lib/skills';
 import { cn } from '../lib/utils';
 import { routeLink } from './routeLink';
+import { container, hairline } from '../lib/meaning';
 
 /** A link to a route, as React Aria draws one (`routeLink`): what the Agents pages link a node and an agent with. */
 export const RouteLink = routeLink(AriaLink);
 
 const LINK =
-  'rounded-sm underline decoration-neutral-300 underline-offset-2 outline-none hover:decoration-neutral-600 focus-visible:ring-2 focus-visible:ring-ring/50 dark:decoration-neutral-600 dark:hover:decoration-neutral-300';
+  'rounded-sm underline decoration-outline underline-offset-2 outline-none hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring/50';
 
 /** Where an agent is read from, as the Workflows page badges a workflow: yours, or this repository's. */
 export function FromBadge({ from }: { from: AgentListing['from'] }) {
@@ -20,9 +21,7 @@ export function FromBadge({ from }: { from: AgentListing['from'] }) {
       data-from={from}
       className={cn(
         'rounded-full px-2 py-0.5 text-[11px] leading-none font-medium',
-        from === 'yours'
-          ? 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300'
-          : 'bg-neutral-100 text-muted-foreground dark:bg-neutral-800',
+        from === 'yours' ? container.grey : 'bg-muted text-muted-foreground',
       )}
     >
       {from === 'yours' ? 'yours' : 'this repository'}
@@ -98,7 +97,7 @@ function FullSkill({ skill }: { skill: AgentSkill }) {
       {skill.tags.length > 0 && (
         <span className="ml-1 inline-flex flex-wrap gap-1 align-middle">
           {skill.tags.map((tag) => (
-            <span key={tag} className="rounded bg-neutral-100 px-1 py-px font-mono text-[10px] text-muted-foreground dark:bg-neutral-800">
+            <span key={tag} className="rounded bg-muted px-1 py-px font-mono text-[10px] text-muted-foreground">
               {tag}
             </span>
           ))}
@@ -124,7 +123,7 @@ export const personOf = (name: string): string => {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 };
 
-const FACE = 'shrink-0 rounded-full bg-neutral-100 dark:bg-neutral-800';
+const FACE = 'shrink-0 rounded-full bg-muted';
 
 const PLATE = 'shrink-0 dark:[&>path]:opacity-25';
 
@@ -208,15 +207,11 @@ export function AgentRefused({
   verb?: string;
 }) {
   return (
-    <div
-      role="alert"
-      data-agent-refused
-      className="space-y-1.5 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40"
-    >
-      <p className="text-sm font-medium text-red-800 dark:text-red-300">{verb}:</p>
-      <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{message}</p>
+    <div role="alert" data-agent-refused className="space-y-1.5 rounded border border-failure bg-failure-container px-3 py-2">
+      <p className="text-sm font-medium text-on-failure-container">{verb}:</p>
+      <p className="font-mono text-xs whitespace-pre-wrap break-words text-on-failure-container">{message}</p>
       {users.length > 0 && (
-        <p className="flex flex-wrap gap-x-2 text-xs text-red-800 dark:text-red-300">
+        <p className="flex flex-wrap gap-x-2 text-xs text-on-failure-container">
           <span>Open</span>
           {users.map((user) => {
             const [workflow = '', step = ''] = user.split('/');
@@ -231,13 +226,9 @@ export function AgentRefused({
 /** A write of a skill refused, in the package's words. */
 export function SkillRefused({ message }: { message: string }) {
   return (
-    <div
-      role="alert"
-      data-skill-refused
-      className="space-y-1.5 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40"
-    >
-      <p className="text-sm font-medium text-red-800 dark:text-red-300">Not written:</p>
-      <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{message}</p>
+    <div role="alert" data-skill-refused className="space-y-1.5 rounded border border-failure bg-failure-container px-3 py-2">
+      <p className="text-sm font-medium text-on-failure-container">Not written:</p>
+      <p className="font-mono text-xs whitespace-pre-wrap break-words text-on-failure-container">{message}</p>
     </div>
   );
 }
@@ -266,10 +257,10 @@ export function SkillSourceBadge({ from }: { from: SkillSource | null }) {
       data-skill-from={from ?? 'none'}
       className={cn(
         'shrink-0 rounded-full px-2 py-0.5 text-[11px] leading-none font-medium',
-        from === 'yours' && 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300',
-        from === 'repo' && 'bg-neutral-100 text-muted-foreground dark:bg-neutral-800',
-        from === 'shipped' && 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300',
-        from === null && 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300',
+        from === 'yours' && container.grey,
+        from === 'repo' && 'bg-muted text-muted-foreground',
+        from === 'shipped' && hairline,
+        from === null && container.failure,
       )}
     >
       {from ? SOURCE_BADGES[from] : 'not found'}
@@ -298,10 +289,7 @@ export function GivenSkills({
       </p>
     );
   return (
-    <ul
-      data-given-skills
-      className="divide-y divide-neutral-200 rounded border border-neutral-200 dark:divide-neutral-800 dark:border-neutral-800"
-    >
+    <ul data-given-skills className="divide-y divide-outline-variant rounded border border-outline-variant">
       {rows.map((row) => (
         <li key={row.name} data-given-skill={row.name} className="flex items-start gap-3 px-3 py-2">
           <div className="min-w-0 flex-1 space-y-0.5">
@@ -315,7 +303,7 @@ export function GivenSkills({
             </p>
             {row.entry && <p className="text-xs text-muted-foreground">{row.entry.description}</p>}
             {row.error !== null && (
-              <p data-given-error className="font-mono text-[11px] whitespace-pre-wrap break-words text-red-700 dark:text-red-400">
+              <p data-given-error className="font-mono text-[11px] whitespace-pre-wrap break-words text-failure">
                 {row.error}
               </p>
             )}

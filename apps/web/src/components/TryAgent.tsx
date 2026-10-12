@@ -44,7 +44,7 @@ function TryForm({ agent }: { agent: AgentListing }) {
   const held = tryHeld(brief, latest);
 
   return (
-    <section aria-label="Try it" data-try-agent className="space-y-3 border-t border-neutral-200 pt-4 dark:border-neutral-800">
+    <section aria-label="Try it" data-try-agent className="space-y-3 border-t border-outline-variant pt-4">
       <div className="space-y-1">
         <h2 className="text-sm font-semibold">Try it</h2>
         <p data-try-fence className="text-xs text-muted-foreground">
@@ -68,13 +68,13 @@ function TryForm({ agent }: { agent: AgentListing }) {
           onChange={(event) => setBrief(event.target.value)}
           rows={3}
           placeholder="A short brief to try it on: what it is told, in a folder of its own."
-          className="block w-full resize-y rounded border border-neutral-300 bg-white px-2 py-1.5 text-sm placeholder:text-muted-foreground focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:focus:border-neutral-400"
+          className="block w-full resize-y rounded border border-outline bg-background px-2 py-1.5 text-sm placeholder:text-muted-foreground focus:border-on-surface-variant focus:outline-none"
         />
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="submit"
             disabled={held !== null || start.isPending}
-            className="rounded bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-neutral-900 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300 dark:disabled:hover:bg-neutral-100"
+            className="rounded bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {start.isPending ? 'Starting…' : 'Try it'}
           </button>
@@ -118,7 +118,7 @@ export function TryRun({ id, listed }: { id: string; listed?: RunSummary }) {
   const step = run.steps[0];
   const spent = step ? costText(step) : null;
   return (
-    <div data-try={id} className="space-y-2 rounded border border-neutral-200 px-3 py-2 dark:border-neutral-800">
+    <div data-try={id} className="space-y-2 rounded border border-outline-variant px-3 py-2">
       <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
         <span>The latest try, {link}:</span>
         {step && <StatusChip status={step.status} runCancelled={run.cancelledAt !== null} runHeld={run.holding != null} />}
@@ -157,7 +157,7 @@ function Untried({ untried, yours = false }: { untried: NonNullable<AgentListing
       aria-label="Try it"
       data-try-yours={yours ? '' : undefined}
       data-try-untried
-      className="space-y-1 border-t border-neutral-200 pt-4 dark:border-neutral-800"
+      className="space-y-1 border-t border-outline-variant pt-4"
     >
       <h2 className="text-sm font-semibold">Try it</h2>
       <p className="text-xs text-muted-foreground">{untried.why}</p>

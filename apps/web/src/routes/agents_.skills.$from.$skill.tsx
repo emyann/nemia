@@ -20,7 +20,7 @@ export const Route = createFileRoute('/agents_/skills/$from/$skill')({
   errorComponent: ({ error }) => (
     <div className="space-y-3">
       <BackToAgents />
-      <p className="text-sm text-red-600">Could not load this skill: {error instanceof Error ? error.message : String(error)}</p>
+      <p className="text-sm text-failure">Could not load this skill: {error instanceof Error ? error.message : String(error)}</p>
     </div>
   ),
 });
@@ -90,18 +90,13 @@ function SkillPage() {
       </header>
 
       {skill.error !== null && (
-        <div
-          data-skill-error
-          className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40"
-        >
-          <p className="text-sm font-medium text-red-800 dark:text-red-300">Does not read as a skill, so no agent can be given it:</p>
-          <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{skill.error}</p>
+        <div data-skill-error className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
+          <p className="text-sm font-medium text-on-failure-container">Does not read as a skill, so no agent can be given it:</p>
+          <p className="font-mono text-xs whitespace-pre-wrap break-words text-on-failure-container">{skill.error}</p>
         </div>
       )}
 
-      <p className="border-b border-neutral-200 pb-2 font-mono text-[11px] break-all text-muted-foreground dark:border-neutral-800">
-        {skill.dir}/SKILL.md
-      </p>
+      <p className="border-b border-outline-variant pb-2 font-mono text-[11px] break-all text-muted-foreground">{skill.dir}/SKILL.md</p>
       <SkillForm
         key={shown.version}
         detail={shown}
@@ -157,11 +152,8 @@ function SkillPage() {
  */
 function Moved({ file, onReadAgain }: { file: string; onReadAgain: () => void }) {
   return (
-    <div
-      data-skill-moved
-      className="flex flex-wrap items-center gap-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 dark:border-amber-900 dark:bg-amber-950/40"
-    >
-      <p className="min-w-0 flex-1 text-sm text-amber-900 dark:text-amber-200">
+    <div data-skill-moved className="flex flex-wrap items-center gap-3 rounded border border-failure bg-failure-container px-3 py-2">
+      <p className="min-w-0 flex-1 text-sm text-on-failure-container">
         {file} has changed since this form was drawn, so a save of it would write over that change and is refused. What you typed stays here
         until you read it again, which draws the form from the file as it now reads and drops it: copy out what you want to keep first.
       </p>
@@ -237,7 +229,7 @@ function Preload({
   const { skill } = detail;
   const mine = skill.from === 'yours';
   return (
-    <fieldset data-preload className="space-y-2 rounded border border-neutral-200 px-3 py-3 dark:border-neutral-800">
+    <fieldset data-preload className="space-y-2 rounded border border-outline-variant px-3 py-3">
       <legend className="px-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">Every turn, or when needed</legend>
       <div className="flex items-center gap-2 text-sm">
         <Switch id={id} isSelected={skill.preload} onChange={onSwitch} isDisabled={!mine || changed || pending} />

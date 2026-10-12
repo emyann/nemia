@@ -12,6 +12,7 @@ import {
   type ReadOnlyCommands,
   type StepReach,
 } from '../lib/api';
+import { container, hairline } from '../lib/meaning';
 
 export const Route = createFileRoute('/capabilities')({
   loader: ({ context }) => context.queryClient.ensureQueryData(capabilitiesQuery),
@@ -20,7 +21,7 @@ export const Route = createFileRoute('/capabilities')({
     <p className="text-sm text-muted-foreground">Reading the repository, and asking each MCP server it enables for its tools…</p>
   ),
   errorComponent: ({ error }) => (
-    <p className="text-sm text-red-600">
+    <p className="text-sm text-failure">
       Could not load the capabilities: {error instanceof Error ? error.message : String(error)}. Is the api running (
       <code>npm run dev</code>)?
     </p>
@@ -40,7 +41,7 @@ function CapabilitiesPage() {
       </p>
 
       {warnings.map((warning) => (
-        <p key={warning} className="rounded bg-amber-100 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+        <p key={warning} className="rounded bg-surface-container-highest px-3 py-2 text-sm text-on-surface-variant">
           {warning}
         </p>
       ))}
@@ -139,15 +140,13 @@ function Section({ title, count, empty, children }: { title: string; count: numb
         {title}
         <span
           data-count
-          className="rounded-full bg-neutral-100 px-2 py-0.5 font-mono text-[11px] leading-none tabular-nums text-muted-foreground dark:bg-neutral-800"
+          className="rounded-full bg-muted px-2 py-0.5 font-mono text-[11px] leading-none tabular-nums text-muted-foreground"
         >
           {count}
         </span>
       </h2>
       {count > 0 ? (
-        <ul className="divide-y divide-neutral-200 rounded-lg border border-neutral-200 dark:divide-neutral-800 dark:border-neutral-800">
-          {children}
-        </ul>
+        <ul className="divide-y divide-outline-variant rounded-lg border border-outline-variant">{children}</ul>
       ) : (
         <p className="text-sm text-muted-foreground">{empty}</p>
       )}
@@ -182,7 +181,7 @@ function ServerRow({ server }: { server: McpServer }) {
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <span className="font-medium">{name}</span>
         <span
-          className={`${CHIP} ${enabled ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-neutral-100 text-muted-foreground dark:bg-neutral-800'}`}
+          className={`${CHIP} ${enabled ? container.sage : hairline}`}
           title={enabled ? 'Enabled by .claude/settings.json' : 'Not enabled by .claude/settings.json'}
         >
           {enabled ? 'enabled' : 'not enabled'}
@@ -200,14 +199,14 @@ function ServerRow({ server }: { server: McpServer }) {
       {notAsked && <p className="text-sm text-muted-foreground">{notAsked}</p>}
 
       {error && (
-        <pre className="whitespace-pre-wrap break-words rounded bg-red-50 p-2 font-mono text-[11px] leading-snug text-red-800 dark:bg-red-950/60 dark:text-red-300">
+        <pre className="whitespace-pre-wrap break-words rounded bg-failure-container p-2 font-mono text-[11px] leading-snug text-on-failure-container">
           {error}
         </pre>
       )}
 
       {tools &&
         (tools.length > 0 ? (
-          <ul className="divide-y divide-neutral-100 dark:divide-neutral-900">
+          <ul className="divide-y divide-outline-variant">
             {tools.map((tool) => (
               <li
                 key={tool.name}
@@ -215,12 +214,9 @@ function ServerRow({ server }: { server: McpServer }) {
                 className="grid grid-cols-1 gap-x-4 py-1 sm:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]"
               >
                 <span className="flex min-w-0 items-center gap-2 font-mono text-xs" title={`mcp__${name}__${tool.name}`}>
-                  <span className={tool.denied ? 'truncate line-through decoration-red-500' : 'truncate'}>{tool.name}</span>
+                  <span className={tool.denied ? 'truncate line-through decoration-outline' : 'truncate'}>{tool.name}</span>
                   {tool.denied && (
-                    <span
-                      className={`${CHIP} bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300`}
-                      title={`Denied by ${tool.denied} in .claude/settings.json`}
-                    >
+                    <span className={`${CHIP} ${container.grey}`} title={`Denied by ${tool.denied} in .claude/settings.json`}>
                       denied
                     </span>
                   )}
@@ -290,10 +286,8 @@ function StepRow({ step, measured, readOnly }: { step: StepReach; measured: Meas
         <span className="font-medium">
           {step.workflow} <span className="text-muted-foreground">·</span> {step.step}
         </span>
-        <span className={`${CHIP} bg-neutral-100 text-muted-foreground dark:bg-neutral-800`}>{step.harness}</span>
-        {step.from === 'yours' && (
-          <span className={`${CHIP} bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300`}>yours</span>
-        )}
+        <span className={`${CHIP} bg-muted text-muted-foreground`}>{step.harness}</span>
+        {step.from === 'yours' && <span className={`${CHIP} ${container.grey}`}>yours</span>}
       </div>
 
       <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-0.5 text-xs">
@@ -332,7 +326,7 @@ function StepRow({ step, measured, readOnly }: { step: StepReach; measured: Meas
                       data-tool={name}
                       data-inferred={inferred || undefined}
                       title={inferred ? `Inferred, not measured. ${whyInferred.get(name) ?? ''}` : undefined}
-                      className={`${CHIP} ${inferred ? 'border border-dashed border-neutral-400 text-muted-foreground dark:border-neutral-500' : PLAIN}`}
+                      className={`${CHIP} ${inferred ? 'border border-dashed border-outline text-muted-foreground' : PLAIN}`}
                     >
                       {name}
                     </span>

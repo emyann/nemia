@@ -47,9 +47,7 @@ export function DebugPanel({ run, step }: { run: RunDetail; step: Step }) {
 function DebugBody({ run, step }: { run: RunDetail; step: Step }) {
   const machine = useQuery(machineQuery(LIFECYCLE));
   if (machine.error) {
-    return (
-      <p className="px-4 pb-3 text-sm text-red-600 dark:text-red-400">Could not read the lifecycle's graph: {machine.error.message}</p>
-    );
+    return <p className="px-4 pb-3 text-sm text-failure">Could not read the lifecycle's graph: {machine.error.message}</p>;
   }
   if (!machine.data) return <p className="px-4 pb-3 text-sm text-muted-foreground">Reading the lifecycle…</p>;
   return <PathOf run={run} step={step} machine={machine.data} />;
@@ -95,7 +93,7 @@ function PathOf({ run, step, machine }: { run: RunDetail; step: Step; machine: M
         {step.tries.length > 1 && <TryPicker step={step} shown={tryNumber ?? current} onPick={pick} />}
       </div>
       {read.error ? (
-        <p className="text-sm text-red-600 dark:text-red-400">Could not read the path: {read.error.message}</p>
+        <p className="text-sm text-failure">Could not read the path: {read.error.message}</p>
       ) : !read.data ? (
         <p className="text-sm text-muted-foreground">Reading the path…</p>
       ) : read.data.taskId === null ? (
@@ -129,7 +127,7 @@ function TryPicker({ step, shown, onPick }: { step: Step; shown: number; onPick:
         <ToggleButton
           key={t.try}
           id={String(t.try)}
-          className="rounded border px-1.5 py-0.5 text-[11px] outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 data-selected:border-amber-500 data-selected:text-foreground dark:data-selected:border-amber-400"
+          className="rounded border px-1.5 py-0.5 text-[11px] outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 data-selected:border-alive data-selected:text-foreground"
         >
           {t.current ? `try ${t.try} (current)` : `try ${t.try}`}
         </ToggleButton>
@@ -165,7 +163,7 @@ function WideGraph({
         Full width
       </Button>
       <Sheet className="data-[side=right]:w-full data-[side=right]:sm:max-w-none">
-        <SheetHeader className="gap-2 border-b border-neutral-200 pr-14 dark:border-neutral-800">
+        <SheetHeader className="gap-2 border-b border-outline-variant pr-14">
           <SheetTitle>{PATH_TITLE}</SheetTitle>
           <SheetDescription>
             <code className="font-mono text-xs">{taskId}</code>
@@ -227,8 +225,8 @@ function Scrubber({ path, at, onScrub }: { path: readonly LifecycleStep[]; at: n
         className="px-2"
       >
         <SliderTrack className="relative h-5 w-full">
-          <div className="absolute top-1/2 h-1 w-full -translate-y-1/2 rounded bg-neutral-200 dark:bg-neutral-800" />
-          <SliderThumb className="top-1/2 size-4 rounded-full border-2 border-amber-500 bg-white outline-none focus-visible:ring-2 focus-visible:ring-ring/50 dark:border-amber-400 dark:bg-neutral-900" />
+          <div className="absolute top-1/2 h-1 w-full -translate-y-1/2 rounded bg-surface-container-highest" />
+          <SliderThumb className="top-1/2 size-4 rounded-full border-2 border-alive bg-card outline-none focus-visible:ring-2 focus-visible:ring-ring/50" />
         </SliderTrack>
       </Slider>
       <p data-shown className="text-xs text-muted-foreground">
@@ -269,14 +267,14 @@ function Timeline({
             <li key={i} data-entry={i} data-state-at={s.state} aria-current={i === at ? 'step' : undefined}>
               <AriaButton
                 onPress={() => onScrub(i)}
-                className={`flex w-full items-baseline gap-2 rounded px-1.5 py-0.5 text-left outline-none hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-ring/50 dark:hover:bg-neutral-800 ${i === at ? 'bg-amber-100 dark:bg-amber-950' : ''} ${i > at ? 'text-muted-foreground' : ''}`}
+                className={`flex w-full items-baseline gap-2 rounded px-1.5 py-0.5 text-left outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring/50 ${i === at ? 'bg-alive-container text-on-alive-container' : ''} ${i > at ? 'text-muted-foreground' : ''}`}
               >
                 <span className="flex min-w-0 flex-1 flex-wrap gap-x-2 *:whitespace-nowrap">
                   <span data-said>
                     <span className="font-semibold">{s.state}</span> <span className="text-muted-foreground">← {s.event}</span>
                   </span>
                   {verb && (
-                    <span data-by-person={verb} className="text-violet-700 italic dark:text-violet-300">
+                    <span data-by-person={verb} className="text-muted-foreground italic">
                       (by a person: {verb})
                     </span>
                   )}

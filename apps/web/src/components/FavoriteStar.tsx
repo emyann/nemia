@@ -29,7 +29,7 @@ export function FavoriteStar({ favorite, name, className }: { favorite: Favorite
         title={on ? 'Starred: take it off Favorites' : 'Star: list it under Favorites'}
         className="flex size-full items-center justify-center"
       >
-        <Star aria-hidden className={on ? 'fill-amber-400 text-amber-500 dark:fill-amber-300 dark:text-amber-300' : undefined} />
+        <Star aria-hidden className={on ? 'fill-foreground text-foreground' : undefined} />
       </span>
     </ToggleButton>
   );

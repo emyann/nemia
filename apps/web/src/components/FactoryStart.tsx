@@ -68,7 +68,7 @@ function StartIn({ name }: { name: string }) {
       description="A run of one of the workflows the factory offers, with its hires, on one of its repositories; it shows on its floor."
     >
       {factories.error ? (
-        <p className="text-sm text-red-700 dark:text-red-400">Could not read the factories: {factories.error.message}</p>
+        <p className="text-sm text-failure">Could not read the factories: {factories.error.message}</p>
       ) : !factories.data ? (
         <p className="text-xs text-muted-foreground">Reading the factories…</p>
       ) : place === null ? (
@@ -92,7 +92,7 @@ function AskFactory() {
   return (
     <FloatingBar title="Start a run" description="A run starts in a factory: pick the one it starts in, then its repository and workflow.">
       {factories.error ? (
-        <p className="text-sm text-red-700 dark:text-red-400">Could not read the factories: {factories.error.message}</p>
+        <p className="text-sm text-failure">Could not read the factories: {factories.error.message}</p>
       ) : !factories.data ? (
         <p className="text-xs text-muted-foreground">Reading the factories…</p>
       ) : (
@@ -124,7 +124,7 @@ export function FactoryChoice({ factories }: { factories: readonly Factory[] }) 
           No factory is filed to start a run in: a run in none starts from the Workflows page.
         </p>
       ) : (
-        <ul className="divide-y divide-neutral-200 rounded border border-neutral-300 dark:divide-neutral-800 dark:border-neutral-700">
+        <ul className="divide-y divide-outline-variant rounded border border-outline">
           {places.map(({ name, why }) => (
             <li key={name} data-start-factory={name} className="px-1 py-1">
               <Button
@@ -196,7 +196,7 @@ function Workflows({ place }: { place: Place }) {
           Workflow
         </legend>
         {workflows.error ? (
-          <p className="text-xs text-red-700 dark:text-red-400">
+          <p className="text-xs text-failure">
             Could not list the workflows of the factory {code(place.factory)}: {workflows.error.message}
           </p>
         ) : !workflows.data ? (
@@ -206,7 +206,7 @@ function Workflows({ place }: { place: Place }) {
             No workflow the factory attaches is on {path(place.repo)}: attach one there{attach ? <> with {code(attach)}</> : null}.
           </p>
         ) : (
-          <ul className="divide-y divide-neutral-200 rounded border border-neutral-300 dark:divide-neutral-800 dark:border-neutral-700">
+          <ul className="divide-y divide-outline-variant rounded border border-outline">
             {workflows.data.map((w) => (
               <WorkflowRow key={workflowKey(w)} workflow={w} group={legend} picked={picked} onPick={setPicked} />
             ))}
@@ -234,9 +234,7 @@ function WorkflowRow({
   const why = whyNotStarted(workflow);
   return (
     <li data-workflow={key}>
-      <label
-        className={`flex items-baseline gap-2 px-2 py-1.5 text-sm ${why ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-900'}`}
-      >
+      <label className={`flex items-baseline gap-2 px-2 py-1.5 text-sm ${why ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-accent'}`}>
         <input
           type="radio"
           name={group}

@@ -91,19 +91,13 @@ export function Gate({
     <section
       aria-label={`The gate of ${step}`}
       data-gate="awaiting"
-      className={cn(
-        'space-y-4 text-sm',
-        framed && 'rounded border border-amber-300 bg-amber-50/60 p-3 dark:border-amber-900 dark:bg-amber-950/30',
-      )}
+      className={cn('space-y-4 text-sm', framed && 'rounded border border-yours bg-card p-3')}
     >
       {framed && <GateSentence step={step} back={back} acts={acts} />}
 
       <div className={cn('space-y-4', closeout && 'lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0')}>
         {closeout && (
-          <section
-            aria-label={`What ${step} handed on`}
-            className="min-w-0 space-y-2 rounded border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900"
-          >
+          <section aria-label={`What ${step} handed on`} className="min-w-0 space-y-2 rounded border border-outline-variant bg-card p-3">
             <h3 className="text-xs font-medium text-muted-foreground">
               What <span className="font-semibold text-foreground">{step}</span> handed on, which you approve
             </h3>
@@ -228,7 +222,7 @@ function ApproveForm({
         </p>
       </div>
       {confirming && (
-        <p data-confirm className="text-xs font-medium text-amber-900 dark:text-amber-200">
+        <p data-confirm className="text-xs font-medium text-yours">
           {`This runs ${step} in the repository's own checkout, and it cannot be taken back: press Run ${step} now to approve it.`}
         </p>
       )}
@@ -268,7 +262,7 @@ function SendBackForm({
   return (
     <form
       aria-label={`Send ${backName} back`}
-      className="space-y-2 border-t border-amber-200 pt-3 dark:border-amber-900"
+      className="space-y-2 border-t border-outline-variant pt-3"
       onSubmit={(event) => {
         event.preventDefault();
         sendBack.mutate(body);
@@ -412,11 +406,7 @@ export const sendBackBody = ({
 /** A gate once a person's word is taken (`takenOf`): the step it was about, and what the next tick does with it. */
 function GateTaken({ step, taken }: { step: string; taken: { named: string; said: string } }) {
   return (
-    <section
-      aria-label={`The gate of ${step}`}
-      data-gate="taken"
-      className="rounded border border-neutral-200 px-3 py-2 text-sm dark:border-neutral-800"
-    >
+    <section aria-label={`The gate of ${step}`} data-gate="taken" className="rounded border border-outline-variant px-3 py-2 text-sm">
       <strong>{taken.named}</strong>{' '}
       <span data-note className="font-mono text-xs text-muted-foreground">
         {taken.said}
@@ -470,10 +460,7 @@ export function ActsOn({ run, step }: { run: RunDetail; step: RunDetail['steps']
   const work = run.steps.filter((one) => waitsOn.has(one.name));
 
   return (
-    <section
-      aria-label={`What ${step.name} would act on`}
-      className="min-w-0 space-y-3 rounded border border-neutral-200 p-3 text-sm dark:border-neutral-800"
-    >
+    <section aria-label={`What ${step.name} would act on`} className="min-w-0 space-y-3 rounded border border-outline-variant p-3 text-sm">
       <div className="space-y-1">
         <h3 className="text-xs font-medium text-muted-foreground">The result it would act on</h3>
         {standings.map((s) => (
@@ -498,7 +485,7 @@ export function ActsOn({ run, step }: { run: RunDetail; step: RunDetail['steps']
       </div>
 
       {work.map((one) => (
-        <div key={one.name} className="min-w-0 space-y-2 border-t border-neutral-200 pt-3 dark:border-neutral-800">
+        <div key={one.name} className="min-w-0 space-y-2 border-t border-outline-variant pt-3">
           <h3 className="text-xs font-medium text-muted-foreground">
             What <span className="font-semibold text-foreground">{one.name}</span> handed on
           </h3>
@@ -546,10 +533,10 @@ export function Approved({ step, approval, ends = false }: { step: string; appro
     <section
       aria-label={`The approval of ${step}`}
       data-approval={approval.try}
-      className="space-y-1 rounded border border-emerald-300 bg-emerald-50/60 px-3 py-2 text-sm dark:border-emerald-900 dark:bg-emerald-950/30"
+      className="space-y-1 rounded border border-sage bg-surface-variant px-3 py-2 text-sm text-on-surface-variant"
     >
       <p>
-        <span className="font-medium text-emerald-800 dark:text-emerald-300">Approved</span>{' '}
+        <span className="font-medium text-foreground">Approved</span>{' '}
         <span className="text-muted-foreground">
           try {approval.try}, {when(approval.at)} —{' '}
           {ends
@@ -571,8 +558,7 @@ export function Approved({ step, approval, ends = false }: { step: string; appro
 }
 
 /** The look of a gate's second button: outlined, beside the filled one that answers. */
-export const SECONDARY =
-  'bg-white text-foreground ring-1 dark:text-foreground ring-neutral-300 ring-inset hover:bg-neutral-100 disabled:hover:bg-white dark:bg-neutral-900 dark:ring-neutral-700 dark:hover:bg-neutral-800 dark:disabled:hover:bg-neutral-900';
+export const SECONDARY = 'bg-card text-foreground ring-1 ring-outline ring-inset hover:bg-accent disabled:hover:bg-card';
 
 /**
  * An approval of a step at its gate through the api (`approveStep`), and the run read again once the api has it — its detail, and the

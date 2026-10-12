@@ -70,7 +70,7 @@ export function ArtifactView({ artifact, size = false }: { artifact: StepArtifac
           <img
             src={artifact.url}
             alt={artifact.name}
-            className="max-h-60 max-w-full rounded border border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-950"
+            className="max-h-60 max-w-full rounded border border-outline-variant bg-surface-container"
           />
         </a>
         <figcaption className="font-mono text-muted-foreground">

@@ -21,6 +21,7 @@ import { CopyButton } from './CopyButton';
 import { Facts, HEADING, pathRow, readRows, TrialMerges } from './Facts';
 import { Asks, QuestionsForm } from './Questions';
 import { RaiseRow } from './Raise';
+import { container, dashed, hairline, ringed } from '../lib/meaning';
 
 /**
  * The Decide section of a run's page: the answer each step waiting on you can be given (`answersOf`), then what the CLI's `decide` shows a
@@ -36,7 +37,7 @@ export function Decide({ run }: { run: RunDetail }) {
   const answers = offers.length > 0 ? <Offers runId={run.id} offers={offers} /> : null;
   const body =
     decidable && error ? (
-      <p className="text-sm text-red-600 dark:text-red-400">
+      <p className="text-sm text-failure">
         Could not read what there is to decide: {error.message} <code>{run.decide}</code> reads it from the command line.
       </p>
     ) : decidable && isDecidable(data) ? (
@@ -54,11 +55,7 @@ export function Decide({ run }: { run: RunDetail }) {
 /** The Decide section's frame: its heading, and what the board does from it and what it leaves to you. */
 function DecideFrame({ children }: { children: ReactNode }) {
   return (
-    <section
-      aria-label="Decide"
-      id="decide"
-      className="scroll-mt-4 space-y-5 rounded border border-neutral-200 p-4 dark:border-neutral-800"
-    >
+    <section aria-label="Decide" id="decide" className="scroll-mt-4 space-y-5 rounded border border-outline-variant p-4">
       <div className="space-y-1">
         <h2 className="font-semibold">Decide</h2>
         <p className="text-xs text-muted-foreground">
@@ -96,10 +93,7 @@ function DecisionParts({ runId, decision, run = null }: DecisionProps) {
   return (
     <>
       {overBudget && (
-        <p
-          data-over-budget
-          className="rounded bg-amber-100 px-3 py-2 font-mono text-xs break-words text-amber-900 dark:bg-amber-950 dark:text-amber-200"
-        >
+        <p data-over-budget className={`rounded px-3 py-2 font-mono text-xs break-words ${container.yours}`}>
           {overBudget}
         </p>
       )}
@@ -200,7 +194,7 @@ export function OfferRow({ runId, offer }: { runId: string; offer: Exclude<Answe
 
   if (offer.kind === 'asked' || ask.isSuccess) {
     return (
-      <li data-offer="asked" data-step={offer.step} className="rounded border border-neutral-200 px-3 py-2 text-sm dark:border-neutral-800">
+      <li data-offer="asked" data-step={offer.step} className="rounded border border-outline-variant px-3 py-2 text-sm">
         <strong>{offer.step}</strong>{' '}
         <span data-note className="font-mono text-xs text-muted-foreground">
           {offer.kind === 'asked' ? (offer.note ?? `try ${offer.try} asked`) : ask.isSuccess ? askedSaid(ask.data) : null}
@@ -216,11 +210,7 @@ export function OfferRow({ runId, offer }: { runId: string; offer: Exclude<Answe
         ? ['fresh', 'nudge']
         : ['nudge', 'fresh'];
   return (
-    <li
-      data-offer={offer.kind}
-      data-step={offer.step}
-      className="space-y-2 rounded border border-amber-300 bg-amber-50/60 p-3 text-sm dark:border-amber-900 dark:bg-amber-950/30"
-    >
+    <li data-offer={offer.kind} data-step={offer.step} className="space-y-2 rounded border border-yours bg-card p-3 text-sm">
       {offer.kind === 'answer' && offer.needs ? (
         <Asks data-said step={offer.step} needs={offer.needs} />
       ) : (
@@ -345,7 +335,7 @@ export function TouchedBranch({ touched: { branch, radius } }: { touched: Touche
         <span className="break-all font-mono text-xs">{branch}</span>
       </p>
       {'error' in radius ? (
-        <p className="text-sm text-red-700 dark:text-red-400">{radius.error}</p>
+        <p className="text-sm text-failure">{radius.error}</p>
       ) : radius.changes.length ? (
         <>
           <GroupRows groups={radius.groups} />
@@ -379,8 +369,7 @@ function GroupRows({ groups }: { groups: readonly Group[] }) {
             <span className="font-mono tabular-nums">
               {counted > 0 && (
                 <>
-                  <span className="text-emerald-700 dark:text-emerald-400">+{g.added}</span>{' '}
-                  <span className="text-red-700 dark:text-red-400">−{g.removed}</span>
+                  <span className="text-foreground">+{g.added}</span> <span className="text-muted-foreground">−{g.removed}</span>
                 </>
               )}
               {g.binary > 0 && <span className="text-muted-foreground">{counted > 0 ? ` · ${g.binary} binary` : 'binary'}</span>}
@@ -400,10 +389,10 @@ export function GroupBar({ group, most }: { group: Pick<Group, 'added' | 'remove
       data-bar
       role="img"
       aria-label={`+${group.added} −${group.removed}`}
-      className="flex h-2 w-full overflow-hidden rounded-sm bg-neutral-100 dark:bg-neutral-800"
+      className="flex h-2 w-full overflow-hidden rounded-sm bg-muted"
     >
-      <span data-added className="h-full bg-emerald-500" style={{ width: `${added}%` }} />
-      <span data-removed className="h-full bg-red-500" style={{ width: `${removed}%` }} />
+      <span data-added className="h-full bg-foreground" style={{ width: `${added}%` }} />
+      <span data-removed className="h-full bg-outline" style={{ width: `${removed}%` }} />
     </span>
   );
 }
@@ -435,38 +424,20 @@ export function Chips({ agentFacing, checkAffecting }: { agentFacing: readonly s
     );
   return (
     <div className="space-y-1.5 text-xs">
-      {row('agent-facing', agentFacing, 'agent-facing', AGENT_FACING, 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300')}
-      {row(
-        'check-affecting',
-        checkAffecting,
-        'check-affecting',
-        CHECK_AFFECTING,
-        'text-red-700 ring-1 ring-red-400 ring-inset dark:text-red-400 dark:ring-red-700',
-      )}
+      {row('agent-facing', agentFacing, 'agent-facing', AGENT_FACING, hairline)}
+      {row('check-affecting', checkAffecting, 'check-affecting', CHECK_AFFECTING, ringed.yours)}
     </div>
   );
 }
 
-/** The lesson line: green when the run wrote where the next agent reads, amber when it wrote nothing there, dashed when nobody can say. */
+/** The lesson line: sage when the run wrote where the next agent reads, a grey ring when it wrote nothing, dashed when nobody can say. */
 export function LessonChip({ lesson }: { lesson: Lesson }) {
   const [text, title, className] =
     lesson.state === 'written'
-      ? [
-          `lesson · ${lesson.said}`,
-          'The run changed a file where the next agent reads.',
-          'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
-        ]
+      ? [`lesson · ${lesson.said}`, 'The run changed a file where the next agent reads.', container.sage]
       : lesson.state === 'nothing'
-        ? [
-            lesson.said,
-            'What this run learned is written nowhere the next agent reads (CLAUDE.md, "When you miss").',
-            'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300',
-          ]
-        : [
-            `lesson ${lesson.said}`,
-            'A branch could not be read, so nobody can say what it wrote.',
-            'border border-dashed border-neutral-300 text-muted-foreground dark:border-neutral-700',
-          ];
+        ? [lesson.said, 'What this run learned is written nowhere the next agent reads (CLAUDE.md, "When you miss").', ringed.grey]
+        : [`lesson ${lesson.said}`, 'A branch could not be read, so nobody can say what it wrote.', dashed.grey];
   return (
     <p>
       <span data-lesson={lesson.state} title={title} className={cn('inline-block rounded px-2 py-0.5 font-mono text-xs', className)}>
@@ -485,7 +456,7 @@ function InFull({ sensitive, touched }: { sensitive: readonly SensitiveDiff[]; t
         <div key={branch} className="space-y-1.5">
           {sensitive.length > 1 && <p className="break-all font-mono text-xs text-muted-foreground">{branch}</p>}
           {error ? (
-            <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+            <p className="text-sm text-failure">{error}</p>
           ) : files.length ? (
             files.map((file) => (
               <DiffFileView
@@ -508,9 +479,9 @@ function InFull({ sensitive, touched }: { sensitive: readonly SensitiveDiff[]; t
 
 const LINE_CLASS: Record<DiffLine, string> = {
   meta: 'font-semibold text-muted-foreground',
-  hunk: 'bg-sky-50 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300',
-  added: 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300',
-  removed: 'bg-red-50 text-red-800 dark:bg-red-950/50 dark:text-red-300',
+  hunk: 'bg-muted text-muted-foreground',
+  added: 'bg-accent text-foreground',
+  removed: 'text-muted-foreground',
   context: '',
 };
 
@@ -520,8 +491,8 @@ const LINE_CLASS: Record<DiffLine, string> = {
  */
 export function DiffFileView({ file, counts }: { file: DiffFile; counts?: { added: number | null; removed: number | null } }) {
   return (
-    <details data-diff={file.path} className="group rounded border border-neutral-200 dark:border-neutral-800">
-      <summary className="flex cursor-pointer items-center gap-2 px-2 py-1 text-xs hover:bg-neutral-50 dark:hover:bg-neutral-900">
+    <details data-diff={file.path} className="group rounded border border-outline-variant">
+      <summary className="flex cursor-pointer items-center gap-2 px-2 py-1 text-xs hover:bg-accent">
         <ChevronRight aria-hidden className="size-3.5 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
         <span className="min-w-0 flex-1 truncate font-mono" title={file.path}>
           {file.path}
@@ -532,14 +503,13 @@ export function DiffFileView({ file, counts }: { file: DiffFile; counts?: { adde
               'binary'
             ) : (
               <>
-                <span className="text-emerald-700 dark:text-emerald-400">+{counts.added}</span>{' '}
-                <span className="text-red-700 dark:text-red-400">−{counts.removed}</span>
+                <span className="text-foreground">+{counts.added}</span> <span className="text-muted-foreground">−{counts.removed}</span>
               </>
             )}
           </span>
         )}
       </summary>
-      <pre className="max-h-96 overflow-auto border-t border-neutral-200 py-1 font-mono text-[11px] leading-snug dark:border-neutral-800">
+      <pre className="max-h-96 overflow-auto border-t border-outline-variant py-1 font-mono text-[11px] leading-snug">
         {file.lines.map((line, i) => {
           const kind = diffLine(line);
           return (
@@ -550,7 +520,7 @@ export function DiffFileView({ file, counts }: { file: DiffFile; counts?: { adde
         })}
       </pre>
       {file.cut > 0 && (
-        <p data-cut={file.cut} className="border-t border-neutral-200 px-2 py-1 text-xs text-muted-foreground dark:border-neutral-800">
+        <p data-cut={file.cut} className="border-t border-outline-variant px-2 py-1 text-xs text-muted-foreground">
           {file.cut} more line{file.cut === 1 ? '' : 's'} — the command line&apos;s decide prints them all
         </p>
       )}
@@ -594,9 +564,7 @@ function CommandLine({ command: c }: { command: DecideCommand }) {
       {c.said && <p className="text-xs text-muted-foreground">{c.said.replace(`:  ${c.command}`, '')}</p>}
       <div className="flex items-center gap-2">
         <span className="w-16 shrink-0 text-xs text-muted-foreground">{c.label}</span>
-        <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap rounded bg-neutral-100 px-2 py-1 font-mono text-xs dark:bg-neutral-950">
-          {c.command}
-        </code>
+        <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap rounded bg-muted px-2 py-1 font-mono text-xs">{c.command}</code>
         <CopyButton text={c.command} />
       </div>
     </>

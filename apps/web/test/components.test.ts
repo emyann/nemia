@@ -1326,7 +1326,7 @@ test("each group's bar is its share of the most lines a group changed: the large
   assert.match(html, /data-group="\(root\)"[\s\S]*?>−0<\/span><span[^>]*> · 1 binary<\/span>/);
 });
 
-test('the agent-facing chips are amber and the check-affecting ones outlined red, each titled with why — and neither is drawn when there are none', () => {
+test('the agent-facing chips are a hairline at rest and the check-affecting ones ringed in yours, each titled with why — and neither is drawn when there are none', () => {
   const both = renderToStaticMarkup(
     createElement(Chips, { agentFacing: ['CLAUDE.md'], checkAffecting: ['package.json', 'packages/x/test/add.test.ts'] }),
   );
@@ -1344,9 +1344,9 @@ test('the agent-facing chips are amber and the check-affecting ones outlined red
       ['check-affecting', 'could make its check pass', 'packages/x/test/add.test.ts'],
     ],
   );
-  assert.match(chips[0].cls, /\bbg-amber-100\b/);
+  assert.ok(holds(chips[0].cls, hairline), 'a note: at rest');
   for (const chip of chips.slice(1)) {
-    assert.match(chip.cls, /\bring-red-400\b/);
+    assert.ok(holds(chip.cls, ringed.yours), 'what a person weighs: yours, drawn light');
     assert.doesNotMatch(chip.cls, /\bbg-/, 'an outline, not a fill');
   }
 
@@ -1373,7 +1373,7 @@ test('the agent-facing chips are amber and the check-affecting ones outlined red
   assert.doesNotMatch(unread, /data-bar|data-group/, 'and draws no row');
 });
 
-test('the lesson chip is green with what was written, amber when nothing was, and dashed when a branch could not be read', () => {
+test('the lesson chip is sage with what was written, a grey ring when nothing was, and dashed when a branch could not be read', () => {
   const chip = (lesson: { said: string; state: 'written' | 'nothing' | 'unknown' }) => {
     const m = /<span data-lesson="(\w+)" title="[^"]*" class="([^"]+)">([^<]+)<\/span>/.exec(
       renderToStaticMarkup(createElement(LessonChip, { lesson })),
@@ -1383,18 +1383,18 @@ test('the lesson chip is green with what was written, amber when nothing was, an
   };
   const written = chip({ said: 'CLAUDE.md +2 −0', state: 'written' });
   assert.deepEqual([written.state, written.text], ['written', 'lesson · CLAUDE.md +2 −0']);
-  assert.match(written.cls, /\bbg-emerald-100\b/);
-  assert.doesNotMatch(written.cls, /amber/);
+  assert.ok(holds(written.cls, container.sage));
+  assert.doesNotMatch(written.cls, /\bring-/);
 
   const nothing = chip({ said: 'nothing written where the next agent reads', state: 'nothing' });
   assert.deepEqual([nothing.state, nothing.text], ['nothing', 'nothing written where the next agent reads']);
-  assert.match(nothing.cls, /\bbg-amber-100\b/);
-  assert.doesNotMatch(nothing.cls, /emerald/);
+  assert.ok(holds(nothing.cls, ringed.grey));
+  assert.doesNotMatch(nothing.cls, /\bbg-/);
 
   const unknown = chip({ said: 'not known — wf/gone could not be read', state: 'unknown' });
   assert.equal(unknown.text, 'lesson not known — wf/gone could not be read');
   assert.match(unknown.cls, /\bborder-dashed\b/);
-  assert.doesNotMatch(unknown.cls, /emerald|amber/);
+  assert.doesNotMatch(unknown.cls, /\bbg-|\bring-/);
 });
 
 test('a diff is folded under its file, coloured by line, and a capped one says how many more lines `wf decide` prints', () => {
@@ -1768,7 +1768,7 @@ test("the Output tab opens on the outcome and who said it, then draws each field
   );
   assert.match(
     html,
-    /→ <span data-slot="badge"[^>]*emerald[^>]*>fixed<\/span><\/span> <span aria-hidden="true">·<\/span> <div data-markdown="true"[^>]*><p[^>]*>Entries expire after the <strong>TTL<\/strong> now\.<\/p>/,
+    /→ <span data-slot="badge"[^>]*bg-surface-variant[^>]*>fixed<\/span><\/span> <span aria-hidden="true">·<\/span> <div data-markdown="true"[^>]*><p[^>]*>Entries expire after the <strong>TTL<\/strong> now\.<\/p>/,
     'its answer a badge, and its why markdown',
   );
   assert.match(html, /<span data-slot="badge"[^>]*>won&#x27;t fix<\/span>/);
@@ -2270,6 +2270,15 @@ test("a step filed bridged has a reach row: its session's web link to open in a 
 
 const Answering = await import('../src/components/Decide.tsx');
 const { NeedsBanner, ToDecideBanner } = await import('../src/components/Needs.tsx');
+const { container, hairline, ringed } = await import('../src/lib/meaning.ts');
+
+/** Whether the class list `cls` carries every class of the drawn form `form`. */
+const holds = (cls: string, form: string): boolean => form.split(' ').every((c) => cls.split(' ').includes(c));
+/** Whether the class list `cls` carries any class of the drawn form `form`. */
+const touches = (cls: string, form: string): boolean => form.split(' ').some((c) => cls.split(' ').includes(c));
+/** Whether `cls` is drawn as a wait on a person: the yours container whole, and nothing of an amount's or a failure's. */
+const drawnYours = (cls: string): boolean =>
+  holds(cls, container.yours) && !touches(cls, container.money) && !touches(cls, container.failure);
 const { decisionStamp } = await import('../src/lib/decide.ts');
 const Closeouts = await import('../src/components/Closeout.tsx');
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
@@ -3733,6 +3742,7 @@ test("the Decide section says why a step past its budget is held — `wf decide`
     html,
     /<p data-over-budget="true" class="[^"]*">OVER BUDGET, waiting on you: tokens \(\$4\.25 of \$3\) {2}— the run files nothing more for it on its own; nothing after it ran<\/p>/,
   );
+  assert.ok(drawnYours(/<p data-over-budget="true" class="([^"]*)"/.exec(html)![1]), 'a step held on its budget waits on a person: yours');
   assert.match(html, /<dt[^>]*>every try<\/dt><dd[^>]*>run \$6\.35 measured · 2 attempts not measured<\/dd>/);
   const none = renderToStaticMarkup(
     createElement(DecideSection, { runId: 'r-1', decision: { ...decision, overBudget: null, cost: null } }),
@@ -4134,11 +4144,11 @@ test('REFUSED: a read-only command an ask rule covers is drawn asking, with the 
   ]);
   assert.match(
     asking,
-    /<code data-read-only="cat" data-asks="Bash\(cat:\*\)" title="Asks by Bash\(cat:\*\) \(.claude\/settings.json\), which beats the harness&#x27;s own leave" class="[^"]*bg-amber-50/,
+    /<code data-read-only="cat" data-asks="Bash\(cat:\*\)" title="Asks by Bash\(cat:\*\) \(.claude\/settings.json\), which beats the harness&#x27;s own leave" class="[^"]*bg-yours-container text-on-yours-container/,
   );
   assert.doesNotMatch(
     asking.match(/<code data-read-only="cat"[^>]*>/)![0],
-    /line-through|emerald/,
+    /line-through|bg-surface-variant/,
     'on a background session, outside dontAsk, it asks: not struck, and not drawn as running',
   );
   assert.ok(
@@ -4196,7 +4206,7 @@ test('REFUSED: an allow an ask rule takes back is drawn apart, with the rule —
 
   const open = allowedMarkup(allowed(false), readOnlyReach());
   assert.ok(textsOf(open).includes('Taken back by an ask rule, which beats an allow: these ask.'), textsOf(open).join(' | '));
-  assert.match(open, /<code data-asked="Bash\(git diff:\*\)"[^>]*class="[^"]*bg-amber-50/);
+  assert.match(open, /<code data-asked="Bash\(git diff:\*\)"[^>]*class="[^"]*bg-yours-container text-on-yours-container/);
   assert.match(open, /data-except="Bash\(npx turbo run test:\*\)"[^>]*>except Bash\(npx turbo run test e2e\)</);
   assert.match(open, /data-asks="Bash\(npx turbo run test:\*\)"[^>]*>and asks for Bash\(npx turbo run test build\)</);
   assert.doesNotMatch(open, /dontAsk denies/);
@@ -5318,7 +5328,7 @@ test('REFUSED: a face on a plate stands on its own Blobatar backdrop, not the gr
   const backdrop = /<svg [^>]*>(?:<title>[^<]*<\/title>)?<path [^>]*><\/path><g class="mo-root/;
   const plated = renderToStaticMarkup(createElement(AgentFace, { name: 'iris', size: 112, follows: true, plate: true }));
   assert.match(plated, backdrop, 'a backdrop drawn under the face, in its own colours');
-  assert.doesNotMatch(plated, /rounded-full|bg-neutral-100/, 'and no grey round behind it');
+  assert.doesNotMatch(plated, /rounded-full|bg-muted/, 'and no grey round behind it');
   assert.match(
     plated,
     /^<svg [^>]*class="[^"]*dark:\[&amp;&gt;path\]:opacity-25/,
@@ -5326,11 +5336,8 @@ test('REFUSED: a face on a plate stands on its own Blobatar backdrop, not the gr
   );
   const bare = renderToStaticMarkup(createElement(AgentFace, { name: 'iris', size: 112, follows: true }));
   assert.doesNotMatch(bare, backdrop);
-  assert.match(bare, /class="[^"]*rounded-full bg-neutral-100/);
-  assert.match(
-    renderToStaticMarkup(createElement(AgentFace, { name: 'iris', size: 16 })),
-    /^<svg [^>]*class="[^"]*rounded-full bg-neutral-100/,
-  );
+  assert.match(bare, /class="[^"]*rounded-full bg-muted/);
+  assert.match(renderToStaticMarkup(createElement(AgentFace, { name: 'iris', size: 16 })), /^<svg [^>]*class="[^"]*rounded-full bg-muted/);
 });
 
 /** An agent as the Agents page lists it, one that sets every kind of key: what a character card is drawn from. */
@@ -7088,4 +7095,19 @@ test('REFUSED: a schedule whose latest fire was refused draws why, whole, under 
   assert.ok(dev.includes(why), `and why, whole: ${dev}`);
   assert.match(janitor, /href="\/runs\/read-the-stats-k2v9"/, "the started fire's row, its last run a link to the run's page");
   assert.doesNotMatch(janitor, /data-schedule-refused/, 'and no alert');
+});
+
+test("REFUSED: a banner that says a person is waited on is drawn in an amount's colour or a failure's — Waiting on you and To decide both read yours", () => {
+  const waiting = bannerMarkup(needing('needs-human', { blockedByHarness: true, waitingFor: WAIT, lastLine: LOGIN }, { waitingOnYou: [] }));
+  const decide = withClient(createElement(ToDecideBanner, { run: endingRun() }));
+  for (const [label, html] of [
+    ['Waiting on you', waiting],
+    ['To decide', decide],
+  ]) {
+    const m = new RegExp(`<section aria-label="${label}"[^>]*class="([^"]*)"`).exec(html);
+    assert.ok(m, `${label} is drawn`);
+    assert.equal(drawnYours(m[1]), true, `${label}: ${m[1]}`);
+  }
+  assert.equal(drawnYours(`rounded ${container.money}`), false, 'the amber of an amount is no wait');
+  assert.equal(drawnYours(`rounded ${container.yours} ${container.failure}`), false);
 });

@@ -49,7 +49,7 @@ function Ghost({ card, now }: { card: InboxEntry; now: number }) {
       data-ghost={card.name}
       data-place={place}
       aria-label={`Queued ${ordinal(place)}: ${title}`}
-      className="block rounded-lg border border-dashed border-neutral-400/70 bg-background/60 px-3 py-2 text-muted-foreground transition-colors hover:border-neutral-500 hover:bg-background hover:text-foreground dark:border-neutral-600"
+      className="block rounded-lg border border-dashed border-outline bg-background/60 px-3 py-2 text-muted-foreground transition-colors hover:border-on-surface-variant hover:bg-background hover:text-foreground"
     >
       <span className="flex items-center justify-between gap-2 text-[11px]">
         <span data-ghost-place className="rounded-full border border-dashed border-current px-1.5 font-medium">

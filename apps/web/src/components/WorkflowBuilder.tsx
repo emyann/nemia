@@ -33,6 +33,7 @@ import { rereadWorkflows } from '../lib/placed';
 import { BuilderEdge, type BuilderFlowEdge } from './BuilderEdge';
 import { StepForm, type DraftUpdate } from './StepForm';
 import { SpecNode, type SpecFlowNode } from './StepNode';
+import { ringed } from '../lib/meaning';
 
 /** The builder's node types for React Flow, one object for the module's life. */
 const nodeTypes = { spec: SpecNode };
@@ -45,11 +46,11 @@ const FIT = { padding: 0.2, maxZoom: 1 };
 const UNDER_ROOM = 100;
 
 const BUTTON =
-  'rounded border border-neutral-300 px-2.5 py-1 text-sm font-medium hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent dark:border-neutral-700 dark:hover:bg-neutral-900';
+  'rounded border border-outline px-2.5 py-1 text-sm font-medium hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent';
 const PRIMARY =
-  'rounded bg-neutral-900 px-3 py-1 text-sm font-medium text-white hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-neutral-900 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300 dark:disabled:hover:bg-neutral-100';
+  'rounded bg-primary px-3 py-1 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40';
 const INPUT =
-  'block w-full rounded border border-neutral-300 bg-white px-2 py-1 text-sm placeholder:text-muted-foreground focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:focus:border-neutral-400';
+  'block w-full rounded border border-outline bg-background px-2 py-1 text-sm placeholder:text-muted-foreground focus:border-on-surface-variant focus:outline-none';
 
 /**
  * A folder of yours, built on the board: its steps as blocks with handles, drawn left to right by `after`. Drag from a block's right-hand
@@ -225,7 +226,7 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <div
           aria-label={`The steps of ${base.name}, to draw`}
-          className="self-start overflow-hidden rounded border border-neutral-200 lg:sticky lg:top-4 dark:border-neutral-800"
+          className="self-start overflow-hidden rounded border border-outline-variant lg:sticky lg:top-4"
           style={{ height }}
         >
           <ReactFlow
@@ -258,9 +259,9 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
           </ReactFlow>
         </div>
 
-        <aside aria-label="Step" className="min-w-0 rounded border border-neutral-200 p-3 dark:border-neutral-800">
+        <aside aria-label="Step" className="min-w-0 rounded border border-outline-variant p-3">
           {form.error ? (
-            <p className="text-xs text-red-700 dark:text-red-400">Could not read the keys a step may set: {form.error.message}</p>
+            <p className="text-xs text-failure">Could not read the keys a step may set: {form.error.message}</p>
           ) : !form.data ? (
             <p className="text-xs text-muted-foreground">Reading the keys a step may set…</p>
           ) : step ? (
@@ -304,11 +305,7 @@ function BuilderToolbar(props: {
     <div role="toolbar" aria-label={`Build ${name}`} className="flex flex-wrap items-center gap-2">
       <span
         data-unsaved={dirty || undefined}
-        className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-          dirty
-            ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-            : 'bg-neutral-100 text-muted-foreground dark:bg-neutral-800'
-        }`}
+        className={`rounded-full px-2 py-0.5 text-xs font-medium ${dirty ? ringed.yours : 'bg-muted text-muted-foreground'}`}
       >
         {dirty ? 'Unsaved changes' : 'Saved'}
       </span>
@@ -371,8 +368,8 @@ function ReadmeField({ text, changed, onChange }: { text: string; changed: boole
 export function SaveRefused({ refusal, rereading, onReread }: { refusal: BuildRefusal; rereading: boolean; onReread: () => void }) {
   const nothingWritten = refusal.status !== null && refusal.status < 500;
   return (
-    <div data-refused className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40">
-      <p className="text-sm font-medium text-red-800 dark:text-red-300">
+    <div data-refused className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
+      <p className="text-sm font-medium text-on-failure-container">
         {nothingWritten ? (
           <>
             Not saved, and nothing written. The api refused it
@@ -386,13 +383,13 @@ export function SaveRefused({ refusal, rereading, onReread }: { refusal: BuildRe
           </>
         )}
       </p>
-      <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{refusal.message}</p>
+      <p className="font-mono text-xs whitespace-pre-wrap break-words text-on-failure-container">{refusal.message}</p>
       {(!nothingWritten || refusal.status === 409) && (
         <div className="flex flex-wrap items-center gap-2 pt-1">
           <button type="button" disabled={rereading} onClick={onReread} className={BUTTON}>
             {rereading ? 'Reading…' : 'Read the folder again'}
           </button>
-          <span className="text-xs text-red-800 dark:text-red-300">The changes drawn here are let go; copy what you need first.</span>
+          <span className="text-xs text-yours">The changes drawn here are let go; copy what you need first.</span>
         </div>
       )}
     </div>
@@ -428,7 +425,7 @@ function AddStep({
   return (
     <form
       aria-label="Add a step"
-      className="space-y-2 rounded border border-dashed border-neutral-300 p-3 dark:border-neutral-700"
+      className="space-y-2 rounded border border-dashed border-outline p-3"
       onSubmit={(event) => {
         event.preventDefault();
         if (!nameRefusal(steps, name) && body.trim()) onAdd(name, body);
@@ -446,7 +443,7 @@ function AddStep({
             placeholder="review"
             className={`${INPUT} font-mono`}
           />
-          {refused && <p className="text-xs text-red-700 dark:text-red-400">{refused}</p>}
+          {refused && <p className="text-xs text-failure">{refused}</p>}
         </div>
         <div className="space-y-1">
           <label htmlFor={bodyId} className="block text-xs font-medium">

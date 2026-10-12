@@ -52,7 +52,7 @@ export function SkillPicker({
             Add a skill
           </Button>
           <Sheet className="data-[side=right]:sm:max-w-xl">
-            <SheetHeader className="border-b border-neutral-200 dark:border-neutral-800">
+            <SheetHeader className="border-b border-outline-variant">
               <SheetTitle>Add a skill</SheetTitle>
               <SheetDescription>
                 A skill is a folder with a SKILL.md. Named, a session reads its name and description every turn and loads the rest when the
@@ -61,7 +61,7 @@ export function SkillPicker({
               </SheetDescription>
             </SheetHeader>
             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 pb-4">
-              {error && <p className="text-xs text-red-600">Could not list the skills: {error.message}</p>}
+              {error && <p className="text-xs text-failure">Could not list the skills: {error.message}</p>}
               {!places && !error && <p className="text-xs text-muted-foreground">Reading the skills…</p>}
               {places?.map((place) => (
                 <Place
@@ -121,7 +121,7 @@ function Place({
         <p
           role="alert"
           data-copy-refused
-          className="rounded border border-red-300 bg-red-50 px-2 py-1 font-mono text-[11px] whitespace-pre-wrap break-words text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300"
+          className="rounded border border-failure bg-failure-container px-2 py-1 font-mono text-[11px] whitespace-pre-wrap break-words text-on-failure-container"
         >
           {copy.error.message}
         </p>
@@ -129,7 +129,7 @@ function Place({
       {place.skills.length === 0 ? (
         <p className="text-xs text-muted-foreground">None here.</p>
       ) : (
-        <ul className="divide-y divide-neutral-200 rounded border border-neutral-200 dark:divide-neutral-800 dark:border-neutral-800">
+        <ul className="divide-y divide-outline-variant rounded border border-outline-variant">
           {place.skills.map((row) => (
             <Offered
               key={row.name}
@@ -174,7 +174,7 @@ function Offered({
         </p>
         {row.entry && <p className="text-xs text-muted-foreground">{row.entry.description}</p>}
         {offer.kind === 'refused' && (
-          <p data-offer-refused className="font-mono text-[11px] whitespace-pre-wrap break-words text-red-700 dark:text-red-400">
+          <p data-offer-refused className="font-mono text-[11px] whitespace-pre-wrap break-words text-failure">
             {offer.why}
           </p>
         )}

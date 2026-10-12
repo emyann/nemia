@@ -95,13 +95,13 @@ function Unhired({ place: { factory, workflow, step }, agent, why }: { place: Hi
       ref={intoView}
       role="alert"
       data-hire-unhired
-      className="space-y-1 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm dark:border-amber-900 dark:bg-amber-950/40"
+      className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2 text-sm text-on-failure-container"
     >
-      <p className="font-medium text-amber-900 dark:text-amber-200">
+      <p className="font-medium">
         {agent} is created, but not hired into {workflow}/{step}:
       </p>
-      <p className="text-xs whitespace-pre-wrap text-amber-900 dark:text-amber-200">{why}</p>
-      <p className="text-xs text-amber-900 dark:text-amber-200">
+      <p className="text-xs whitespace-pre-wrap">{why}</p>
+      <p className="text-xs">
         <RouteLink
           to="/workflows/$from/$workflow/$step"
           params={{ from: 'yours', workflow, step }}
@@ -124,7 +124,7 @@ export function BackToAgents() {
   return (
     <RouteLink
       to="/agents"
-      className="rounded-sm text-sm text-muted-foreground outline-none hover:text-neutral-900 focus-visible:ring-2 focus-visible:ring-ring/50 dark:hover:text-neutral-100"
+      className="rounded-sm text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
     >
       ← Agents
     </RouteLink>

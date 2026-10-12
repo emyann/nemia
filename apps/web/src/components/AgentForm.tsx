@@ -218,7 +218,7 @@ function GeneratedCard({ listing }: { listing: AgentListing | null }) {
   return (
     <div data-card className="space-y-2">
       {listing.cardError !== null ? (
-        <p data-card-error className="font-mono text-xs whitespace-pre-wrap break-words text-red-700 dark:text-red-400">
+        <p data-card-error className="font-mono text-xs whitespace-pre-wrap break-words text-failure">
           {listing.cardError}
         </p>
       ) : (
@@ -366,7 +366,7 @@ export function Field({
   );
 }
 
-const READ_ONLY = 'border-dashed bg-neutral-50 dark:bg-neutral-900/60 focus-visible:ring-0';
+const READ_ONLY = 'border-dashed bg-surface-container focus-visible:ring-0';
 
 const Hint = ({ children }: { children: ReactNode }) => (
   <Text slot="description" className="block text-[11px] leading-snug text-muted-foreground">
@@ -459,7 +459,7 @@ function SkillToolNote({ form, setKey }: { form: Form; setKey: (key: AgentRoleKe
   return (
     <div
       data-skill-tool-note
-      className="flex flex-wrap items-center gap-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
+      className="flex flex-wrap items-center gap-3 rounded border border-outline-variant bg-surface-container-highest px-3 py-2 text-xs text-on-surface-variant"
     >
       <p className="min-w-0 flex-1">
         {gap === 'tools' ? (
@@ -488,9 +488,9 @@ function SkillToolNote({ form, setKey }: { form: Form; setKey: (key: AgentRoleKe
 }
 
 export const RADIO =
-  'group flex cursor-default items-start gap-2.5 rounded border border-neutral-200 px-3 py-2 outline-none data-selected:border-neutral-900 data-focus-visible:ring-2 data-focus-visible:ring-ring/50 data-disabled:cursor-not-allowed dark:border-neutral-800 dark:data-selected:border-neutral-300';
+  'group flex cursor-default items-start gap-2.5 rounded border border-outline-variant px-3 py-2 outline-none data-selected:border-foreground data-focus-visible:ring-2 data-focus-visible:ring-ring/50 data-disabled:cursor-not-allowed';
 export const DOT =
-  'mt-0.5 size-3.5 shrink-0 rounded-full border border-neutral-400 group-data-selected:border-4 group-data-selected:border-neutral-900 dark:border-neutral-600 dark:group-data-selected:border-neutral-200';
+  'mt-0.5 size-3.5 shrink-0 rounded-full border border-outline group-data-selected:border-4 group-data-selected:border-foreground';
 
 /**
  * `harnessPrompt:`, as a choice of what the agent does: Claude Code's own prompt whole, less its coding section, or none — which drops its
@@ -515,14 +515,14 @@ function HarnessPrompt({ value, onChange, readOnly }: { value: string; onChange:
       <Label className="text-xs">Claude Code&apos;s prompt</Label>
       <div className="grid gap-2 sm:grid-cols-2">{HARNESS_PROMPT_CHOICES.filter((choice) => !choice.expert).map(radio)}</div>
       {!known && (
-        <p className="text-[11px] text-red-700 dark:text-red-400">
+        <p className="text-[11px] text-failure">
           Its file says <code className="font-mono">harnessPrompt: {value}</code>, which is none of these.
         </p>
       )}
       <Collapsible defaultExpanded={shown === 'replace'}>
         {({ isExpanded }) => (
           <>
-            <CollapsibleTrigger className="rounded-sm text-[11px] text-muted-foreground outline-none hover:text-neutral-900 focus-visible:ring-2 focus-visible:ring-ring/50 dark:hover:text-neutral-100">
+            <CollapsibleTrigger className="rounded-sm text-[11px] text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50">
               {isExpanded ? '▾' : '▸'} For experts
             </CollapsibleTrigger>
             <CollapsibleContent>

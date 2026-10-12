@@ -5,6 +5,7 @@ import { StepHire } from '../components/StepHire';
 import { RecentRuns, StepAgent, StepTold, StepWritten } from '../components/StepParts';
 import { stepQuery } from '../lib/api';
 import { fromWord, pagePlaceOf } from '../lib/factories';
+import { container } from '../lib/meaning';
 
 /**
  * The page of a workflow's step, at /workflows/$from/$workflow/$step: `workflows_` and `$workflow_` draw it on its own, not inside the
@@ -18,7 +19,7 @@ export const Route = createFileRoute('/workflows_/$from/$workflow_/$step')({
   errorComponent: ({ error }) => (
     <div className="space-y-3">
       <BackToWorkflow />
-      <p className="text-sm text-red-600">Could not load this step: {error instanceof Error ? error.message : String(error)}</p>
+      <p className="text-sm text-failure">Could not load this step: {error instanceof Error ? error.message : String(error)}</p>
     </div>
   ),
 });
@@ -47,9 +48,7 @@ function StepPage() {
           <span
             data-from={page.from}
             className={`rounded-full px-2 py-0.5 text-[11px] leading-none font-medium ${
-              page.from === 'yours'
-                ? 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300'
-                : 'bg-neutral-100 text-muted-foreground dark:bg-neutral-800'
+              page.from === 'yours' ? container.grey : 'bg-muted text-muted-foreground'
             }`}
           >
             {fromWord(page.from, place.factory)}

@@ -31,7 +31,7 @@ export function MachineEdge({ data, markerEnd }: EdgeProps<MachineFlowEdge>) {
           data-route={data.id}
           data-taken={data.taken || undefined}
           data-dashed={data.dashed || undefined}
-          className={`absolute overflow-hidden rounded border bg-white dark:bg-neutral-900 ${data.taken ? 'border-alive' : 'border-border'}`}
+          className={`absolute overflow-hidden rounded border bg-card ${data.taken ? 'border-alive' : 'border-border'}`}
           style={{
             width: label.width,
             height: label.height,

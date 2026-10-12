@@ -21,7 +21,7 @@ export function AgentCard({ agent }: { agent: AgentListing & { factories?: reado
       data-agent-card
       className="relative flex h-full flex-col overflow-hidden rounded-xl bg-card text-card-foreground shadow-sm ring-1 ring-foreground/10 transition-shadow hover:shadow-md hover:ring-foreground/20"
     >
-      <div className="flex justify-center bg-neutral-100/70 pt-6 pb-4 dark:bg-white/5">
+      <div className="flex justify-center bg-muted pt-6 pb-4">
         <AgentFace name={agent.name} size={112} follows plate className="drop-shadow-sm" />
       </div>
       <div className="flex flex-1 flex-col gap-3 px-4 pt-3 pb-4">
@@ -46,18 +46,14 @@ export function AgentCard({ agent }: { agent: AgentListing & { factories?: reado
         {agent.description && <p className="text-center text-sm text-foreground">{agent.description}</p>}
         {agent.error === null &&
           (agent.cardError !== null ? (
-            <p data-card-error className="font-mono text-xs break-words text-red-700 dark:text-red-400">
+            <p data-card-error className="font-mono text-xs break-words text-failure">
               {agent.cardError}
             </p>
           ) : (
             <Skills skills={agent.card} compact className="space-y-2" />
           ))}
-        {agent.error !== null ? (
-          <p className="font-mono text-xs break-words text-red-700 dark:text-red-400">{agent.error}</p>
-        ) : (
-          <Stats keys={agent.keys} />
-        )}
-        <UsedBy listing={agent} className="relative z-10 mt-auto border-t border-neutral-200 pt-3 dark:border-neutral-800" />
+        {agent.error !== null ? <p className="font-mono text-xs break-words text-failure">{agent.error}</p> : <Stats keys={agent.keys} />}
+        <UsedBy listing={agent} className="relative z-10 mt-auto border-t border-outline-variant pt-3" />
       </div>
     </section>
   );
@@ -70,7 +66,7 @@ function Stats({ keys }: { keys: AgentListing['keys'] }) {
   return (
     <dl data-agent-stats className="flex flex-wrap gap-1.5 text-[11px] leading-none">
       {set.map((key) => (
-        <div key={key} className="flex items-center gap-1 rounded-md bg-neutral-100 px-1.5 py-1 dark:bg-neutral-800">
+        <div key={key} className="flex items-center gap-1 rounded-md bg-muted px-1.5 py-1">
           <dt className="text-muted-foreground">{key}</dt>
           <dd className="font-mono font-medium text-foreground">{keys[key]}</dd>
         </div>

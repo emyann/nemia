@@ -5,8 +5,8 @@ import { cn } from '@/lib/utils';
 import { RouteLink } from './AgentParts';
 
 const TAG = 'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] leading-none font-medium whitespace-nowrap';
-const NAMED = 'border-sky-200 bg-sky-50 text-sky-900 dark:border-sky-900 dark:bg-sky-950/60 dark:text-sky-200';
-const MUTED = 'border-neutral-200 text-muted-foreground dark:border-neutral-800';
+const NAMED = 'border-sage bg-surface-variant text-on-surface-variant';
+const MUTED = 'border-outline-variant text-muted-foreground';
 
 /** A factory's mark, before its name on a tag, so it reads as a factory beside a repository or a place. */
 const mark = <Factory aria-hidden className="size-3 shrink-0" />;
@@ -39,11 +39,7 @@ export function FactoryTag({ name, linked = false }: { name: string; linked?: bo
       params={{ factory: name }}
       data-factory-tag={name}
       aria-label={`Factory ${name}`}
-      className={cn(
-        TAG,
-        NAMED,
-        'outline-none hover:border-sky-400 focus-visible:ring-2 focus-visible:ring-ring/50 dark:hover:border-sky-700',
-      )}
+      className={cn(TAG, NAMED, 'outline-none hover:border-on-surface-variant focus-visible:ring-2 focus-visible:ring-ring/50')}
     >
       {mark}
       {name}

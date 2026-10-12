@@ -112,7 +112,7 @@ function useRefit(frame: RefObject<HTMLDivElement | null>, { open, resets }: { o
 }
 
 const button =
-  'rounded border border-neutral-300 bg-white px-2 py-1 text-xs text-foreground shadow-sm hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white dark:border-neutral-700 dark:bg-neutral-900 dark:hover:bg-neutral-800 dark:disabled:hover:bg-neutral-900';
+  'rounded border border-outline bg-card px-2 py-1 text-xs text-foreground shadow-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-card';
 
 /**
  * The run as the graph it froze: a node per step, an edge per `after`, and the edge back that `loop:` makes — as the api's
@@ -134,11 +134,7 @@ export function RunCanvas(props: Props) {
   }, [names, edges]);
 
   if (computed instanceof Error) {
-    return (
-      <p className="rounded border border-red-300 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:text-red-400">
-        {computed.message}
-      </p>
-    );
+    return <p className="rounded border border-failure px-3 py-2 text-sm text-failure">{computed.message}</p>;
   }
   return (
     <ReactFlowProvider>
@@ -280,7 +276,7 @@ function Canvas({ run, computed }: Props & { computed: ReadonlyMap<string, Point
   useRefit(frame, { open: selected, resets }, flow);
 
   return (
-    <div ref={frame} className="h-[30rem] overflow-hidden rounded border border-neutral-200 dark:border-neutral-800">
+    <div ref={frame} className="h-[30rem] overflow-hidden rounded border border-outline-variant">
       <ReactFlow
         nodes={nodes}
         edges={edges}

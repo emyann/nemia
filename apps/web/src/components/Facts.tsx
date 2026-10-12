@@ -13,11 +13,11 @@ export const HEADING = 'text-xs font-medium text-muted-foreground';
 
 /** A link's look in a fact's words. */
 export const LINK =
-  'rounded-sm underline decoration-neutral-400 underline-offset-2 outline-none hover:decoration-neutral-700 focus-visible:ring-2 focus-visible:ring-ring/50 dark:decoration-neutral-500 dark:hover:decoration-neutral-300';
+  'rounded-sm underline decoration-outline underline-offset-2 outline-none hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring/50';
 
 const STATE = {
-  good: 'text-emerald-800 dark:text-emerald-300',
-  bad: 'text-red-700 dark:text-red-400',
+  good: 'text-foreground',
+  bad: 'text-failure',
   none: '',
 } as const;
 
@@ -379,7 +379,7 @@ export function Check({ check: { command, refused } }: { check: StepCheck }) {
             ? [
                 [
                   'refused',
-                  <span key="refused" className="font-mono text-xs font-semibold text-red-700 dark:text-red-400">
+                  <span key="refused" className="font-mono text-xs font-semibold text-failure">
                     {refused.exit}
                   </span>,
                 ] as [string, ReactNode],
@@ -387,7 +387,7 @@ export function Check({ check: { command, refused } }: { check: StepCheck }) {
             : []),
         ]}
       />
-      {refused?.unreadable && <p className="text-xs text-red-600 dark:text-red-400">{refused.unreadable}</p>}
+      {refused?.unreadable && <p className="text-xs text-failure">{refused.unreadable}</p>}
       {refused?.stdout && <Stream name="output" log={refused.stdout} />}
       {refused && refused.stderr.lines.length > 0 && <Stream name="stderr" log={refused.stderr} />}
     </section>
@@ -400,7 +400,7 @@ function Stream({ name, log }: { name: string; log: StepLog }) {
   return (
     <div className="space-y-1">
       <p className="text-xs text-muted-foreground">{log.truncated ? `The last ${log.lines.length} lines of its ${name}` : `Its ${name}`}</p>
-      <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded bg-neutral-100 p-2 font-mono text-[11px] leading-snug dark:bg-neutral-950">
+      <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded bg-muted p-2 font-mono text-[11px] leading-snug">
         {log.lines.join('\n')}
       </pre>
     </div>

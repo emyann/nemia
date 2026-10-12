@@ -64,7 +64,7 @@ function Nowhere({ where }: { where: ListPlace }) {
  * that it reads.
  */
 function Unread({ workflow, error, read }: { workflow: string; error: Error | null; read: boolean }) {
-  if (error) return <p className="text-sm text-red-700 dark:text-red-400">Could not read the workflows: {error.message}</p>;
+  if (error) return <p className="text-sm text-failure">Could not read the workflows: {error.message}</p>;
   if (read) return <p className="text-sm text-yours">No workflow is named {workflow}.</p>;
   return <p className="text-xs text-muted-foreground">Reading the workflows…</p>;
 }
@@ -78,7 +78,7 @@ export function SpecBody({ listing, step: name }: { listing: WorkflowListing; st
   const step = listing.steps.find((s) => s.name === name);
   if (listing.error)
     return (
-      <p className="text-sm text-red-700 dark:text-red-400">
+      <p className="text-sm text-failure">
         {listing.name} does not read as a workflow: {listing.error}
       </p>
     );

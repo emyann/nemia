@@ -91,7 +91,7 @@ export function CustomInstructions({ name, reach = HIRED }: { name: string; reac
       id="custom-instructions"
       aria-label="Custom instructions"
       data-custom-instructions
-      className="space-y-3 border-t border-neutral-200 pt-4 dark:border-neutral-800"
+      className="space-y-3 border-t border-outline-variant pt-4"
     >
       <div className="space-y-1">
         <h2 className="text-sm font-semibold">Custom instructions</h2>
@@ -174,12 +174,9 @@ function CustomForm({
         {!held && ' — none yet'}
       </p>
       {custom.error !== null && (
-        <div
-          data-custom-error
-          className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40"
-        >
-          <p className="text-sm font-medium text-red-800 dark:text-red-300">{reach.unread(custom.name)}</p>
-          <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{custom.error}</p>
+        <div data-custom-error className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
+          <p className="text-sm font-medium text-on-failure-container">{reach.unread(custom.name)}</p>
+          <p className="font-mono text-xs whitespace-pre-wrap break-words text-on-failure-container">{custom.error}</p>
         </div>
       )}
       <TextField value={draft} onChange={setDraft} className="space-y-1.5">

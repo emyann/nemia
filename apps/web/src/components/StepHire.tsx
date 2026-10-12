@@ -13,7 +13,7 @@ import { AgentLink, RouteLink } from './AgentParts';
 import { YoursFolder } from './WorkflowParts';
 
 const LINK =
-  'rounded-sm underline decoration-neutral-300 underline-offset-2 outline-none hover:decoration-neutral-600 focus-visible:ring-2 focus-visible:ring-ring/50 dark:decoration-neutral-600 dark:hover:decoration-neutral-300';
+  'rounded-sm underline decoration-outline underline-offset-2 outline-none hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring/50';
 
 /** What a person asks of a step's hire: an agent hired into it, or the one hired fired. */
 type Ask = { kind: 'hire'; agent: string } | { kind: 'fire' };
@@ -76,7 +76,7 @@ function Hiring({ page, where }: { page: WorkflowStepPage; where: 'page' | 'row'
       )}
       {hiring.refused === null && !hired && <NewAgent page={page} where={where} />}
       {write.error && (
-        <p role="alert" data-hire-write-refused className="text-xs text-red-700 dark:text-red-400">
+        <p role="alert" data-hire-write-refused className="text-xs text-failure">
           {write.variables?.kind === 'fire' ? 'Not fired' : 'Not hired'}: {write.error.message}
         </p>
       )}

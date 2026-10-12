@@ -61,11 +61,7 @@ export function LiftHold({ id }: { id: string }) {
         </Button>
       )}
       {lift.isError && (
-        <span
-          role="alert"
-          data-lift-refused
-          className="basis-full font-mono whitespace-pre-wrap break-words text-red-700 dark:text-red-400"
-        >
+        <span role="alert" data-lift-refused className="basis-full font-mono whitespace-pre-wrap break-words text-failure">
           {lift.error.message}
         </span>
       )}
@@ -86,13 +82,7 @@ export function CardLift({ id }: { id: string }) {
       onDoubleClick={(event) => event.stopPropagation()}
     >
       <DialogTrigger>
-        <AriaButton
-          data-lift={id}
-          className={cn(
-            SMALL,
-            'bg-white text-foreground ring-1 dark:text-foreground ring-neutral-300 ring-inset hover:bg-neutral-100 dark:bg-neutral-900 dark:ring-neutral-700 dark:hover:bg-neutral-800',
-          )}
-        >
+        <AriaButton data-lift={id} className={cn(SMALL, 'bg-card text-foreground ring-1 ring-outline ring-inset hover:bg-accent')}>
           Lift…
         </AriaButton>
         <Popover placement="bottom end" offset={6} className={POPOVER}>

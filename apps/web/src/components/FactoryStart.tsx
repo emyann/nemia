@@ -70,7 +70,7 @@ function StartIn({ name }: { name: string }) {
       {factories.error ? (
         <p className="text-sm text-red-700 dark:text-red-400">Could not read the factories: {factories.error.message}</p>
       ) : !factories.data ? (
-        <p className="text-xs text-neutral-500">Reading the factories…</p>
+        <p className="text-xs text-muted-foreground">Reading the factories…</p>
       ) : place === null ? (
         <p data-unplaced className="text-sm text-amber-700 dark:text-amber-400">
           {factory ? 'The default factory starts no run from here: start one from the Workflows page.' : `No factory is named ${name}.`}
@@ -94,7 +94,7 @@ function AskFactory() {
       {factories.error ? (
         <p className="text-sm text-red-700 dark:text-red-400">Could not read the factories: {factories.error.message}</p>
       ) : !factories.data ? (
-        <p className="text-xs text-neutral-500">Reading the factories…</p>
+        <p className="text-xs text-muted-foreground">Reading the factories…</p>
       ) : (
         <FactoryChoice factories={factories.data} />
       )}
@@ -120,7 +120,9 @@ export function FactoryChoice({ factories }: { factories: readonly Factory[] }) 
         Factory
       </legend>
       {!places.length ? (
-        <p className="text-xs text-neutral-500">No factory is filed to start a run in: a run in none starts from the Workflows page.</p>
+        <p className="text-xs text-muted-foreground">
+          No factory is filed to start a run in: a run in none starts from the Workflows page.
+        </p>
       ) : (
         <ul className="divide-y divide-neutral-200 rounded border border-neutral-300 dark:divide-neutral-800 dark:border-neutral-700">
           {places.map(({ name, why }) => (
@@ -202,9 +204,9 @@ function Workflows({ place }: { place: Place }) {
             Could not list the workflows of the factory {code(place.factory)}: {workflows.error.message}
           </p>
         ) : !workflows.data ? (
-          <p className="text-xs text-neutral-500">Reading the workflows…</p>
+          <p className="text-xs text-muted-foreground">Reading the workflows…</p>
         ) : !workflows.data.length ? (
-          <p className="text-xs text-neutral-500">
+          <p className="text-xs text-muted-foreground">
             No workflow the factory attaches is on {path(place.repo)}: attach one there{attach ? <> with {code(attach)}</> : null}.
           </p>
         ) : (
@@ -249,11 +251,11 @@ function WorkflowRow({
           className="translate-y-0.5 self-start"
         />
         <span className="min-w-0 flex-1 space-y-0.5">
-          <span className={`block font-medium ${why ? 'text-neutral-500' : ''}`}>
+          <span className={`block font-medium ${why ? 'text-muted-foreground' : ''}`}>
             {workflow.name}
-            {workflow.from === 'yours' && <span className="font-normal text-neutral-500"> (yours)</span>}
+            {workflow.from === 'yours' && <span className="font-normal text-muted-foreground"> (yours)</span>}
           </span>
-          {workflow.description && <span className="block text-xs text-neutral-500">{workflow.description}</span>}
+          {workflow.description && <span className="block text-xs text-muted-foreground">{workflow.description}</span>}
           {why && (
             <span data-why-not className="block text-xs whitespace-pre-wrap break-words text-amber-700 dark:text-amber-400">
               {why}

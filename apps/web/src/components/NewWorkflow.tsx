@@ -6,7 +6,7 @@ import { firstStep, listedWith } from '../lib/builder';
 import { rereadWorkflows } from '../lib/placed';
 
 const INPUT =
-  'block w-full rounded border border-neutral-300 bg-white px-2 py-1.5 text-sm placeholder:text-neutral-400 focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:placeholder:text-neutral-500 dark:focus:border-neutral-400';
+  'block w-full rounded border border-neutral-300 bg-white px-2 py-1.5 text-sm placeholder:text-muted-foreground focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:focus:border-neutral-400';
 
 /** Where a workflow's steps may work, each with the words a person chooses it by: none is chosen for them. */
 const PLACES: ReadonlyArray<{ place: NonNullable<WorkflowStepSpec['place']>; label: string; hint: string }> = [
@@ -42,7 +42,7 @@ function PlaceChoice({
               className="mt-1"
             />
             <span className="font-medium">{p.label}</span>
-            <span className="col-start-2 text-xs text-neutral-500">{p.hint}</span>
+            <span className="col-start-2 text-xs text-muted-foreground">{p.hint}</span>
           </label>
         ))}
       </div>
@@ -110,7 +110,7 @@ export function NewWorkflow({ folder, onCreated }: { folder: string; onCreated: 
     >
       <div className="space-y-0.5">
         <h2 className="text-sm font-semibold">New workflow</h2>
-        <p className="text-xs text-neutral-500">
+        <p className="text-xs text-muted-foreground">
           A folder of yours, under <code className="font-mono">{folder}/</code>, with its first step. Its page opens in its builder.
         </p>
       </div>

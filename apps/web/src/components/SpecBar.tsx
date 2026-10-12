@@ -66,7 +66,7 @@ function Nowhere({ where }: { where: ListPlace }) {
 function Unread({ workflow, error, read }: { workflow: string; error: Error | null; read: boolean }) {
   if (error) return <p className="text-sm text-red-700 dark:text-red-400">Could not read the workflows: {error.message}</p>;
   if (read) return <p className="text-sm text-amber-700 dark:text-amber-400">No workflow is named {workflow}.</p>;
-  return <p className="text-xs text-neutral-500">Reading the workflows…</p>;
+  return <p className="text-xs text-muted-foreground">Reading the workflows…</p>;
 }
 
 /**

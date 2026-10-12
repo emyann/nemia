@@ -95,11 +95,11 @@ export function CustomInstructions({ name, reach = HIRED }: { name: string; reac
     >
       <div className="space-y-1">
         <h2 className="text-sm font-semibold">Custom instructions</h2>
-        <p className="text-xs text-neutral-600 dark:text-neutral-400">{reach.told(<code className="font-mono">{name}</code>)}</p>
+        <p className="text-xs text-muted-foreground">{reach.told(<code className="font-mono">{name}</code>)}</p>
         <p
           data-custom-frozen={reach.takes.mark === 'frozen' || undefined}
           data-custom-told={reach.takes.mark === 'told' || undefined}
-          className="text-xs text-neutral-600 dark:text-neutral-400"
+          className="text-xs text-muted-foreground"
         >
           {reach.takes.words}
         </p>
@@ -120,12 +120,12 @@ export function CustomInstructions({ name, reach = HIRED }: { name: string; reac
           }}
         />
       ) : (
-        <p className="text-xs text-neutral-500">
+        <p className="text-xs text-muted-foreground">
           {error instanceof Error ? `Could not read the custom instructions: ${error.message}` : 'Reading the custom instructions…'}
         </p>
       )}
       {done && (
-        <p data-custom-done className="text-xs text-neutral-500">
+        <p data-custom-done className="text-xs text-muted-foreground">
           {done}
         </p>
       )}
@@ -169,7 +169,7 @@ function CustomForm({
         if (draft.trim() && !unchanged) onSave(draft);
       }}
     >
-      <p data-custom-file className="font-mono text-[11px] break-all text-neutral-500">
+      <p data-custom-file className="font-mono text-[11px] break-all text-muted-foreground">
         {custom.file}
         {!held && ' — none yet'}
       </p>
@@ -228,7 +228,7 @@ function Clear({
       </Button>
     );
   return (
-    <span data-custom-clear-asks className="flex flex-wrap items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">
+    <span data-custom-clear-asks className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
       {asks}
       <Button variant="destructive" onPress={onClear} isDisabled={pending}>
         {pending ? 'Clearing…' : 'Clear'}

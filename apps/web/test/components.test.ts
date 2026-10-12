@@ -2661,7 +2661,7 @@ test('the tries say `your answer` beside a try a person answered, and above its 
   );
   assert.ok(
     rounds.includes(
-      `<p data-your-answer="true" title="${answer}" class="line-clamp-2 break-words"><span class="text-neutral-500">your answer </span>${answer}</p>`,
+      `<p data-your-answer="true" title="${answer}" class="line-clamp-2 break-words"><span class="text-muted-foreground">your answer </span>${answer}</p>`,
     ),
     rounds,
   );

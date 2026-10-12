@@ -27,7 +27,7 @@ export function CopyButton({ text, what = 'the command' }: { text: string; what?
       onClick={copy}
       aria-label={`Copy: ${text}`}
       title={said === 'failed' ? 'Could not copy: select the line and copy it' : said === 'copied' ? 'Copied' : `Copy ${what}`}
-      className="shrink-0 rounded p-1 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
+      className="shrink-0 rounded p-1 text-muted-foreground hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
     >
       {said === 'copied' ? <Done aria-hidden className="size-3.5" /> : <Copy aria-hidden className="size-3.5" />}
     </button>

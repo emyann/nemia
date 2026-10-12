@@ -19,14 +19,14 @@ export function Timeline({ run }: { run: RunDetail }) {
   return (
     <section aria-label="Timeline" className="space-y-2">
       <h2 className="text-sm font-medium">Timeline</h2>
-      <p className="text-xs text-neutral-500">
+      <p className="text-xs text-muted-foreground">
         Queued is filed → spawned: the wait for a slot. Ran is spawned → ended. A total sums its tasks, so steps side by side add up to more
         than its wall, first filed → last ended. A round's counts only the steps its loop files again. Cost is what the harness priced each
         session at, once it ended; a check costs nothing.
       </p>
       <div className="overflow-x-auto rounded border border-neutral-200 dark:border-neutral-800">
         <table className="w-full text-left text-xs tabular-nums">
-          <thead className="bg-neutral-50 text-neutral-500 dark:bg-neutral-900 dark:text-neutral-400">
+          <thead className="bg-neutral-50 text-muted-foreground dark:bg-neutral-900">
             <tr>
               {['step', 'try', 'filed', 'spawned', 'ended', 'queued', 'ran', 'cost', 'used'].map((heading) => (
                 <th key={heading} scope="col" className="px-2 py-1.5 font-medium whitespace-nowrap">
@@ -80,7 +80,7 @@ function TryRow({ step, t }: { step: string; t: StepTimelineTry }) {
     <tr data-step={step} data-try={t.try} data-task="session" data-at="rechecked">
       <td className={`${CELL} font-medium`}>{step}</td>
       <td className={`${CELL} font-mono`}>{tryLabel(t)}</td>
-      <td colSpan={7} className={`${CELL} text-neutral-500`}>
+      <td colSpan={7} className={`${CELL} text-muted-foreground`}>
         its session is try {t.sessionOf}'s, checked again
       </td>
     </tr>
@@ -108,16 +108,11 @@ function SpanRow({
 }) {
   const lost = span.at === 'unknown';
   return (
-    <tr
-      data-step={step}
-      data-task={task}
-      data-at={span.at}
-      className={task === 'check' ? 'text-neutral-600 dark:text-neutral-400' : undefined}
-    >
+    <tr data-step={step} data-task={task} data-at={span.at} className={task === 'check' ? 'text-muted-foreground' : undefined}>
       <td className={`${CELL} font-medium`}>{task === 'session' ? step : ''}</td>
       <td className={`${CELL} font-mono`}>{label}</td>
       {lost ? (
-        <td colSpan={7} data-cell="lost" className={`${CELL} text-neutral-500`}>
+        <td colSpan={7} data-cell="lost" className={`${CELL} text-muted-foreground`}>
           the engine has no record of {span.taskId}
         </td>
       ) : (
@@ -131,10 +126,10 @@ function SpanRow({
           <td data-cell="ran" className={`${CELL} font-mono ${span.at === 'running' ? 'text-sky-700 dark:text-sky-400' : ''}`}>
             {span.ran}
           </td>
-          <td data-cell="cost" className={`${CELL} font-mono ${cost === 'not measured' ? 'text-neutral-500' : ''}`}>
+          <td data-cell="cost" className={`${CELL} font-mono ${cost === 'not measured' ? 'text-muted-foreground' : ''}`}>
             {cost ?? ''}
           </td>
-          <td data-cell="used" className={`${CELL} font-mono text-neutral-500`}>
+          <td data-cell="used" className={`${CELL} font-mono text-muted-foreground`}>
             {used ?? ''}
           </td>
         </>
@@ -168,7 +163,7 @@ function TotalRow({ total, named }: { total: TimelineTotal; named: boolean }) {
           {total.cost.said}
         </td>
       ) : (
-        <td data-cell="cost" className={`${CELL} font-mono text-neutral-500`}>
+        <td data-cell="cost" className={`${CELL} font-mono text-muted-foreground`}>
           not measured
         </td>
       )}
@@ -180,7 +175,7 @@ function TotalRow({ total, named }: { total: TimelineTotal; named: boolean }) {
 
 /** An instant the engine wrote down, in this browser's clock, whole on hover; `none` where there is none. */
 function instant(at: string | null, none: string): ReactNode {
-  if (at === null) return <span className="text-neutral-500">{none}</span>;
+  if (at === null) return <span className="text-muted-foreground">{none}</span>;
   const date = new Date(at);
   return (
     <time dateTime={at} title={date.toLocaleString()} className="font-mono">

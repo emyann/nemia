@@ -51,7 +51,7 @@ function HoldRead({ run, onClose }: { run: RunDetail; onClose: () => void }) {
   }
   if (!data)
     return (
-      <p data-hold-reading className="text-xs text-neutral-600 dark:text-neutral-400">
+      <p data-hold-reading className="text-xs text-muted-foreground">
         Reading the runs to wait on…
       </p>
     );
@@ -86,7 +86,7 @@ function HoldForm({ id, runs, onClose }: { id: string; runs: RunSummary[]; onClo
       }}
     >
       <Heading slot="title" className="font-semibold">{`Hold ${id}`}</Heading>
-      <p className="text-xs text-neutral-600 dark:text-neutral-400">
+      <p className="text-xs text-muted-foreground">
         Nothing more of it is filed, and nothing is asked of you, until every run ticked has shipped. What runs now finishes.
       </p>
       <WaitFor
@@ -144,7 +144,7 @@ function WaitFor({
     <CheckboxGroup value={until} onChange={onChange} isDisabled={isDisabled} className="space-y-1.5">
       <AriaLabel className="text-xs font-medium">Wait for</AriaLabel>
       {runs.length === 0 ? (
-        <Text slot="description" data-hold-none className="block text-xs text-neutral-600 dark:text-neutral-400">
+        <Text slot="description" data-hold-none className="block text-xs text-muted-foreground">
           No other run of its repository may still ship.
         </Text>
       ) : (
@@ -155,7 +155,7 @@ function WaitFor({
                 <span className="block truncate text-xs" title={titleOf(r)}>
                   {titleOf(r)}
                 </span>
-                <span className="block font-mono text-[11px] text-neutral-500">{r.id}</span>
+                <span className="block font-mono text-[11px] text-muted-foreground">{r.id}</span>
               </span>
             </Checkbox>
           ))}

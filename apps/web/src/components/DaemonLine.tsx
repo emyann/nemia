@@ -22,7 +22,7 @@ export function DaemonLine({ daemon, error }: { daemon: Daemon | undefined; erro
   const words = daemonWords(daemon, now);
   if (!words) return null;
   return (
-    <p data-daemon={daemon.kind} title={daemon.line} className="max-w-3xl basis-full text-sm text-amber-700 dark:text-amber-400">
+    <p data-daemon={daemon.kind} title={daemon.line} className="max-w-3xl basis-full text-sm text-yours">
       <TriangleAlert aria-hidden className="mr-1 inline size-3.5 -translate-y-px" />
       {words.before}
       <code className="font-medium">{words.command}</code>

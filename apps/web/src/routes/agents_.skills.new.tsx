@@ -30,7 +30,7 @@ function NewSkillPage() {
       <BackToAgents />
       <header className="space-y-1">
         <h1 className="text-base font-semibold">New skill</h1>
-        <p className="text-sm text-neutral-500">
+        <p className="text-sm text-muted-foreground">
           Written to <code className="font-mono text-xs">{store.skills}/&lt;name&gt;/SKILL.md</code>, your library. An agent of yours gives
           it by its name, from its page's skills.
         </p>

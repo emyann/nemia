@@ -9,7 +9,7 @@ import type { StepLayers } from '../lib/api';
 import { AgentLink } from './AgentParts';
 import { Layer, Skills, toldBefore, Words } from './Told';
 
-const LINE = 'text-[11px] leading-snug text-neutral-500 dark:text-neutral-400';
+const LINE = 'text-[11px] leading-snug text-muted-foreground';
 
 /**
  * What agent `agent` brings a step, from the listing's `layers`: its instructions, folded, with its skills, your custom instructions for

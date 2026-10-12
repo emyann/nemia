@@ -45,6 +45,6 @@ export function Unread({ id, error }: { id: string; error: unknown }) {
       Could not read the run {id}: {error instanceof Error ? error.message : 'the api gave no reason'}
     </p>
   ) : (
-    <p className="text-xs text-neutral-500">Reading the run…</p>
+    <p className="text-xs text-muted-foreground">Reading the run…</p>
   );
 }

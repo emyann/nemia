@@ -28,7 +28,7 @@ export function Artifacts({
   size?: boolean;
   none?: string;
 }) {
-  if (!artifacts.length) return <p className="text-xs text-neutral-500">{none}</p>;
+  if (!artifacts.length) return <p className="text-xs text-muted-foreground">{none}</p>;
   return (
     <ul className="mt-1 space-y-2 text-xs">
       {artifacts.map((artifact, i) => (
@@ -40,7 +40,7 @@ export function Artifacts({
   );
 }
 
-const linkClass = 'font-mono font-medium text-neutral-900 underline underline-offset-2 dark:text-neutral-100';
+const linkClass = 'font-mono font-medium text-foreground underline underline-offset-2';
 
 /**
  * One file a closeout named, drawn as `Artifacts` draws each: the Output tab draws an image a field names with it too. One gone with the
@@ -51,8 +51,8 @@ export function ArtifactView({ artifact, size = false }: { artifact: StepArtifac
   if ('pruned' in artifact) {
     return (
       <span data-artifact="pruned">
-        <span className="font-mono text-neutral-500">{artifact.path}</span>
-        <span className="text-neutral-500"> — its files were removed at {when(artifact.prunedAt)}, by a prune of its files</span>
+        <span className="font-mono text-muted-foreground">{artifact.path}</span>
+        <span className="text-muted-foreground"> — its files were removed at {when(artifact.prunedAt)}, by a prune of its files</span>
       </span>
     );
   }
@@ -73,7 +73,7 @@ export function ArtifactView({ artifact, size = false }: { artifact: StepArtifac
             className="max-h-60 max-w-full rounded border border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-950"
           />
         </a>
-        <figcaption className="font-mono text-neutral-500">
+        <figcaption className="font-mono text-muted-foreground">
           {artifact.name} · {bytesWord(artifact.size)}
         </figcaption>
       </figure>
@@ -84,7 +84,7 @@ export function ArtifactView({ artifact, size = false }: { artifact: StepArtifac
       <a href={artifact.url} target="_blank" rel="noreferrer" className={linkClass}>
         {artifact.name}
       </a>
-      {(size || artifact.kind === 'other') && <span className="text-neutral-500"> · {bytesWord(artifact.size)}</span>}
+      {(size || artifact.kind === 'other') && <span className="text-muted-foreground"> · {bytesWord(artifact.size)}</span>}
     </span>
   );
 }

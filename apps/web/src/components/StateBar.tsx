@@ -37,7 +37,7 @@ export function StateBar({ machine, state }: { machine: string; state: string })
             Could not read the machine {machine}: {graph.error.message}
           </p>
         ) : (
-          <p className="text-xs text-neutral-500">Reading the machine…</p>
+          <p className="text-xs text-muted-foreground">Reading the machine…</p>
         )}
       </div>
     </FloatingBar>

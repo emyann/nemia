@@ -46,7 +46,7 @@ function TryForm({ agent }: { agent: AgentListing }) {
     <section aria-label="Try it" data-try-agent className="space-y-3 border-t border-neutral-200 pt-4 dark:border-neutral-800">
       <div className="space-y-1">
         <h2 className="text-sm font-semibold">Try it</h2>
-        <p data-try-fence className="text-xs text-neutral-600 dark:text-neutral-400">
+        <p data-try-fence className="text-xs text-muted-foreground">
           {TRY_FENCE}: {TRY_TERMS}.
         </p>
       </div>
@@ -58,7 +58,7 @@ function TryForm({ agent }: { agent: AgentListing }) {
           if (!held) start.mutate(brief);
         }}
       >
-        <label htmlFor={field} className="block text-xs font-medium text-neutral-700 dark:text-neutral-300">
+        <label htmlFor={field} className="block text-xs font-medium text-foreground">
           Brief
         </label>
         <textarea
@@ -67,7 +67,7 @@ function TryForm({ agent }: { agent: AgentListing }) {
           onChange={(event) => setBrief(event.target.value)}
           rows={3}
           placeholder="A short brief to try it on: what it is told, in a folder of its own."
-          className="block w-full resize-y rounded border border-neutral-300 bg-white px-2 py-1.5 text-sm placeholder:text-neutral-400 focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:placeholder:text-neutral-500 dark:focus:border-neutral-400"
+          className="block w-full resize-y rounded border border-neutral-300 bg-white px-2 py-1.5 text-sm placeholder:text-muted-foreground focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:focus:border-neutral-400"
         />
         <div className="flex flex-wrap items-center gap-3">
           <button
@@ -78,7 +78,7 @@ function TryForm({ agent }: { agent: AgentListing }) {
             {start.isPending ? 'Starting…' : 'Try it'}
           </button>
           {held && (
-            <span data-try-held className="text-xs text-neutral-500">
+            <span data-try-held className="text-xs text-muted-foreground">
               {held}
             </span>
           )}
@@ -103,14 +103,14 @@ export function TryRun({ id, listed }: { id: string; listed?: RunSummary }) {
   );
   if (runGone(error)) {
     return (
-      <p data-try-gone className="text-xs text-neutral-500">
+      <p data-try-gone className="text-xs text-muted-foreground">
         The try {code(id)} was removed.
       </p>
     );
   }
   if (!run)
     return (
-      <p className="text-xs text-neutral-500">
+      <p className="text-xs text-muted-foreground">
         {error instanceof Error ? `Could not read the try ${id}: ${error.message}` : 'Reading the try…'}
       </p>
     );
@@ -118,7 +118,7 @@ export function TryRun({ id, listed }: { id: string; listed?: RunSummary }) {
   const spent = step ? costText(step) : null;
   return (
     <div data-try={id} className="space-y-2 rounded border border-neutral-200 px-3 py-2 dark:border-neutral-800">
-      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-600 dark:text-neutral-400">
+      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
         <span>The latest try, {link}:</span>
         {step && <StatusChip status={step.status} runCancelled={run.cancelledAt !== null} runHeld={run.holding != null} />}
         <span data-try-status>{tryStatusWord(run.status, listed)}</span>
@@ -129,7 +129,7 @@ export function TryRun({ id, listed }: { id: string; listed?: RunSummary }) {
         )}
       </p>
       {step && step.taskId !== null ? (
-        <div data-try-files className="text-xs text-neutral-500">
+        <div data-try-files className="text-xs text-muted-foreground">
           {step.filesError === null ? (
             <>
               Files it wrote:
@@ -140,7 +140,7 @@ export function TryRun({ id, listed }: { id: string; listed?: RunSummary }) {
           )}
         </div>
       ) : (
-        <p className="text-xs text-neutral-500">Not filed yet: nothing is filed until the daemon&apos;s next pass.</p>
+        <p className="text-xs text-muted-foreground">Not filed yet: nothing is filed until the daemon&apos;s next pass.</p>
       )}
     </div>
   );
@@ -159,9 +159,9 @@ function Untried({ untried, yours = false }: { untried: NonNullable<AgentListing
       className="space-y-1 border-t border-neutral-200 pt-4 dark:border-neutral-800"
     >
       <h2 className="text-sm font-semibold">Try it</h2>
-      <p className="text-xs text-neutral-600 dark:text-neutral-400">{untried.why}</p>
+      <p className="text-xs text-muted-foreground">{untried.why}</p>
       {untried.copy && (
-        <p className="flex flex-wrap items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">
+        <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           {code(untried.copy)}
           <CopyButton text={untried.copy} />
         </p>

@@ -15,7 +15,7 @@ const WIDE = { width: 1280, height: 800 };
  * A window so narrow the header over the floor wraps word by word and leaves the floor no height: what a full-page screenshot lays the
  * page out in for a moment, before it gives the window back.
  */
-const BLINK = { width: 100, height: 480 };
+const BLINK = { width: 100, height: 160 };
 
 /** The floor's frame. */
 const floorOf = (page: Page) => page.locator('.react-flow').first();

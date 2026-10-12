@@ -33,7 +33,7 @@ export function CardFrom({
 
   return (
     <div data-card-from className="space-y-2">
-      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-neutral-500">
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
         {entry.from.length ? (
           <span data-from={entry.from.join(' ')}>
             reads{' '}

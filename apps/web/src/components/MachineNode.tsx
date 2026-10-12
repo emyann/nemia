@@ -19,11 +19,11 @@ export function ByActionList({ list, children }: { list: readonly ByAction[]; ch
       {list.map((group) => (
         <div key={group.action} data-action={group.action}>
           {group.events.map((event, i) => (
-            <div key={i} data-edge-line className="text-neutral-800 dark:text-neutral-200">
+            <div key={i} data-edge-line className="text-foreground">
               {event}
             </div>
           ))}
-          <div className="text-neutral-500 dark:text-neutral-400">→ {group.action}</div>
+          <div className="text-muted-foreground">→ {group.action}</div>
         </div>
       ))}
       {children}

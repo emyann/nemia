@@ -14,7 +14,7 @@ export const Route = createFileRoute('/machines')({
   },
   component: MachinesPage,
   staticData: { fullBleed: true },
-  pendingComponent: () => <p className="px-6 py-6 text-sm text-neutral-500">Reading the state machines off their code…</p>,
+  pendingComponent: () => <p className="px-6 py-6 text-sm text-muted-foreground">Reading the state machines off their code…</p>,
   errorComponent: ({ error }) => (
     <p className="px-6 py-6 text-sm text-red-600">
       Could not load the state machines: {error instanceof Error ? error.message : String(error)}. Is the api running (
@@ -28,7 +28,7 @@ function MachinesPage() {
   const { data } = useSuspenseQuery(machinesQuery);
   return (
     <article className="space-y-8 px-6 py-6">
-      <div className="max-w-4xl space-y-2 text-sm text-neutral-600 dark:text-neutral-400">
+      <div className="max-w-4xl space-y-2 text-sm text-muted-foreground">
         <p>
           Each state machine as its code has it, drawn from the code and never by hand. A box is a state; an arrow joins two states, and
           lists the events that take it, each with its guard in brackets, and under them <span className="font-mono text-xs">→</span> the
@@ -58,11 +58,11 @@ function Machine({ listing }: { listing: MachineListing }) {
     <section aria-label={listing.title} className="space-y-3">
       <h2 className="text-sm font-medium">
         {listing.title}{' '}
-        <span className="font-normal text-neutral-500 dark:text-neutral-400">
+        <span className="font-normal text-muted-foreground">
           — drawn from <code className="font-mono text-xs">{listing.source}</code>
         </span>
       </h2>
-      <p className="text-xs text-neutral-500 dark:text-neutral-400">
+      <p className="text-xs text-muted-foreground">
         {data.states.length} states, {data.edges.length} edges; it starts in <span className="font-mono">{data.initial}</span> and ends in{' '}
         {data.final.map((state, i) => (
           <span key={state}>

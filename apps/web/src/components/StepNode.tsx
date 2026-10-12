@@ -63,7 +63,7 @@ export function StepNode({
   return (
     <div
       className={[
-        'w-56 overflow-hidden rounded-md bg-white text-neutral-900 shadow-sm dark:bg-neutral-900 dark:text-neutral-100',
+        'w-56 overflow-hidden rounded-md bg-white text-foreground shadow-sm dark:bg-neutral-900',
         gate
           ? 'border-2 border-yours'
           : running
@@ -90,12 +90,12 @@ export function StepNode({
         <p className="mt-0.5 truncate text-sm font-semibold" title={step.name}>
           {step.name}
         </p>
-        <p className="mt-0.5 truncate font-mono text-[11px] text-neutral-500 dark:text-neutral-400">{spec ? runsOn(spec) : 'no spec'}</p>
+        <p className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">{spec ? runsOn(spec) : 'no spec'}</p>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t border-neutral-200 px-3 py-1.5 dark:border-neutral-800">
         <StatusChip status={step.status} runCancelled={runCancelled} runHeld={runHeld} note={step.note} />
-        <span className="font-mono text-[11px] text-neutral-500 dark:text-neutral-400">
+        <span className="font-mono text-[11px] text-muted-foreground">
           {attemptLine(step.attempts, live, now) ?? (step.taskId === null ? 'not filed yet' : 'no attempt yet')}
         </span>
       </div>
@@ -239,24 +239,24 @@ export function SpecNode({
     <div
       data-spec
       data-inspected={inspected || undefined}
-      className={`w-56 cursor-pointer overflow-hidden rounded-md border border-neutral-300 bg-white text-neutral-900 shadow-sm dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 ${inspected ? 'ring-2 ring-ring' : 'hover:border-neutral-400 in-focus-visible:ring-2 in-focus-visible:ring-ring dark:hover:border-neutral-500'}`}
+      className={`w-56 cursor-pointer overflow-hidden rounded-md border border-neutral-300 bg-white text-foreground shadow-sm dark:border-neutral-700 dark:bg-neutral-900 ${inspected ? 'ring-2 ring-ring' : 'hover:border-neutral-400 in-focus-visible:ring-2 in-focus-visible:ring-ring dark:hover:border-neutral-500'}`}
     >
       <Handle type="target" position={targetPosition} isConnectable={false} className="opacity-0" />
 
       <div className="px-3 pt-2 pb-2">
-        <span className="font-mono text-[10px] uppercase tracking-wider text-neutral-500">{stepLabel(index)}</span>
+        <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{stepLabel(index)}</span>
         <p className="mt-0.5 truncate text-sm font-semibold" title={name}>
           {name}
         </p>
-        <p className="mt-0.5 truncate font-mono text-[11px] text-neutral-500 dark:text-neutral-400">{runsOn(spec)}</p>
+        <p className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">{runsOn(spec)}</p>
       </div>
 
       {lines.length > 0 && (
         <dl className="space-y-0.5 border-t border-neutral-200 px-3 py-1.5 text-[11px] dark:border-neutral-800">
           {lines.map(([label, value, title = value]) => (
             <div key={label} className="flex min-w-0 gap-1.5">
-              <dt className="shrink-0 text-neutral-500">{label}</dt>
-              <dd className="line-clamp-3 min-w-0 font-mono break-words text-neutral-700 dark:text-neutral-300" title={title}>
+              <dt className="shrink-0 text-muted-foreground">{label}</dt>
+              <dd className="line-clamp-3 min-w-0 font-mono break-words text-foreground" title={title}>
                 {value}
               </dd>
             </div>
@@ -304,7 +304,7 @@ function BuildingNode({
       data-unsaved-step={build.unsaved || undefined}
       data-refused-step={build.refused || undefined}
       className={[
-        'w-56 cursor-pointer rounded-md bg-white text-neutral-900 shadow-sm dark:bg-neutral-900 dark:text-neutral-100',
+        'w-56 cursor-pointer rounded-md bg-white text-foreground shadow-sm dark:bg-neutral-900',
         build.refused ? 'border-2 border-failure' : 'border border-neutral-300 dark:border-neutral-700',
         build.selected ? 'outline-2 outline-offset-2 outline-neutral-900 dark:outline-neutral-100' : '',
       ].join(' ')}
@@ -319,7 +319,7 @@ function BuildingNode({
 
       <div className="px-3 pt-2 pb-2">
         <div className="flex items-center justify-between gap-2">
-          <span className="font-mono text-[10px] uppercase tracking-wider text-neutral-500">{stepLabel(index)}</span>
+          <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{stepLabel(index)}</span>
           {build.unsaved && (
             <span className="rounded-full bg-yours-container px-1.5 text-[10px] font-medium text-on-yours-container">unsaved</span>
           )}
@@ -327,15 +327,15 @@ function BuildingNode({
         <p className="mt-0.5 truncate text-sm font-semibold" title={name}>
           {name}
         </p>
-        <p className="mt-0.5 truncate font-mono text-[11px] text-neutral-500 dark:text-neutral-400">{runsOn(spec)}</p>
+        <p className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">{runsOn(spec)}</p>
       </div>
 
       {lines.length > 0 && (
         <dl className="space-y-0.5 border-t border-neutral-200 px-3 py-1.5 text-[11px] dark:border-neutral-800">
           {lines.map(([label, value, title = value]) => (
             <div key={label} className="flex min-w-0 gap-1.5">
-              <dt className="shrink-0 text-neutral-500">{label}</dt>
-              <dd className="line-clamp-2 min-w-0 font-mono break-words text-neutral-700 dark:text-neutral-300" title={title}>
+              <dt className="shrink-0 text-muted-foreground">{label}</dt>
+              <dd className="line-clamp-2 min-w-0 font-mono break-words text-foreground" title={title}>
                 {value}
               </dd>
             </div>

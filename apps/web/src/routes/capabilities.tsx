@@ -17,7 +17,7 @@ export const Route = createFileRoute('/capabilities')({
   loader: ({ context }) => context.queryClient.ensureQueryData(capabilitiesQuery),
   component: CapabilitiesPage,
   pendingComponent: () => (
-    <p className="text-sm text-neutral-500">Reading the repository, and asking each MCP server it enables for its tools…</p>
+    <p className="text-sm text-muted-foreground">Reading the repository, and asking each MCP server it enables for its tools…</p>
   ),
   errorComponent: ({ error }) => (
     <p className="text-sm text-red-600">
@@ -34,7 +34,7 @@ function CapabilitiesPage() {
 
   return (
     <article className="space-y-8">
-      <p className="text-sm text-neutral-500">
+      <p className="text-sm text-muted-foreground">
         What this repository offers a step, read from <code className="font-mono text-xs">{repo}</code>. What a step was actually given is
         on its run's page.
       </p>
@@ -139,7 +139,7 @@ function Section({ title, count, empty, children }: { title: string; count: numb
         {title}
         <span
           data-count
-          className="rounded-full bg-neutral-100 px-2 py-0.5 font-mono text-[11px] leading-none tabular-nums text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
+          className="rounded-full bg-neutral-100 px-2 py-0.5 font-mono text-[11px] leading-none tabular-nums text-muted-foreground dark:bg-neutral-800"
         >
           {count}
         </span>
@@ -149,14 +149,14 @@ function Section({ title, count, empty, children }: { title: string; count: numb
           {children}
         </ul>
       ) : (
-        <p className="text-sm text-neutral-500">{empty}</p>
+        <p className="text-sm text-muted-foreground">{empty}</p>
       )}
     </section>
   );
 }
 
 /** Where a thing was read from, relative to the repository. */
-const Path = ({ path }: { path: string }) => <code className="font-mono text-[11px] text-neutral-500">{path}</code>;
+const Path = ({ path }: { path: string }) => <code className="font-mono text-[11px] text-muted-foreground">{path}</code>;
 
 function DescribedRow({ item }: { item: Described }) {
   return (
@@ -166,9 +166,9 @@ function DescribedRow({ item }: { item: Described }) {
         <Path path={item.source} />
       </div>
       {item.description ? (
-        <p className="text-sm text-neutral-600 dark:text-neutral-400">{item.description}</p>
+        <p className="text-sm text-muted-foreground">{item.description}</p>
       ) : (
-        <p className="text-sm italic text-neutral-400 dark:text-neutral-500">No description</p>
+        <p className="text-sm italic text-muted-foreground">No description</p>
       )}
     </li>
   );
@@ -182,22 +182,22 @@ function ServerRow({ server }: { server: McpServer }) {
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <span className="font-medium">{name}</span>
         <span
-          className={`${CHIP} ${enabled ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400'}`}
+          className={`${CHIP} ${enabled ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-neutral-100 text-muted-foreground dark:bg-neutral-800'}`}
           title={enabled ? 'Enabled by .claude/settings.json' : 'Not enabled by .claude/settings.json'}
         >
           {enabled ? 'enabled' : 'not enabled'}
         </span>
-        {tools && <span className="text-xs text-neutral-500">{tools.length === 1 ? '1 tool' : `${tools.length} tools`}</span>}
+        {tools && <span className="text-xs text-muted-foreground">{tools.length === 1 ? '1 tool' : `${tools.length} tools`}</span>}
         <span className="ml-auto">
           <Path path={server.source} />
         </span>
       </div>
 
-      <p className="break-all font-mono text-xs text-neutral-700 dark:text-neutral-300">
+      <p className="break-all font-mono text-xs text-foreground">
         {server.command ? [server.command, ...server.args].join(' ') : server.url}
       </p>
 
-      {notAsked && <p className="text-sm text-neutral-500">{notAsked}</p>}
+      {notAsked && <p className="text-sm text-muted-foreground">{notAsked}</p>}
 
       {error && (
         <pre className="whitespace-pre-wrap break-words rounded bg-red-50 p-2 font-mono text-[11px] leading-snug text-red-800 dark:bg-red-950/60 dark:text-red-300">
@@ -225,18 +225,18 @@ function ServerRow({ server }: { server: McpServer }) {
                     </span>
                   )}
                 </span>
-                <span className="truncate text-sm text-neutral-600 dark:text-neutral-400" title={tool.description ?? undefined}>
+                <span className="truncate text-sm text-muted-foreground" title={tool.description ?? undefined}>
                   {tool.description?.split('\n')[0] ?? '—'}
                 </span>
               </li>
             ))}
           </ul>
         ) : (
-          <p className="text-sm text-neutral-500">It lists no tools.</p>
+          <p className="text-sm text-muted-foreground">It lists no tools.</p>
         ))}
 
       {checkedAt && (
-        <p className="text-xs text-neutral-500">
+        <p className="text-xs text-muted-foreground">
           Asked {when(checkedAt)}. The api asks each server once while it runs: restart it, or change the server's entry in{' '}
           <Path path=".mcp.json" />, to ask again.
         </p>
@@ -258,7 +258,7 @@ function RuleRow({ rule, source, refuses = [] }: { rule: string; source: string;
     <li className="flex flex-wrap items-baseline gap-x-4 gap-y-0.5 px-3 py-2">
       <span className="break-all font-mono text-xs">{rule}</span>
       {refuses.length > 0 && (
-        <span className="text-xs text-neutral-500">
+        <span className="text-xs text-muted-foreground">
           refuses {refuses.length > 3 ? `${refuses.length} listed tools` : refuses.join(', ')}
         </span>
       )}
@@ -288,9 +288,9 @@ function StepRow({ step, measured, readOnly }: { step: StepReach; measured: Meas
     <li aria-label={`Step ${step.workflow} · ${step.step}`} data-step={`${step.workflow}/${step.step}`} className="space-y-3 px-3 py-3">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <span className="font-medium">
-          {step.workflow} <span className="text-neutral-400">·</span> {step.step}
+          {step.workflow} <span className="text-muted-foreground">·</span> {step.step}
         </span>
-        <span className={`${CHIP} bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300`}>{step.harness}</span>
+        <span className={`${CHIP} bg-neutral-100 text-muted-foreground dark:bg-neutral-800`}>{step.harness}</span>
         {step.from === 'yours' && (
           <span className={`${CHIP} bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300`}>yours</span>
         )}
@@ -308,14 +308,14 @@ function StepRow({ step, measured, readOnly }: { step: StepReach; measured: Meas
           ] as const
         ).map(([label, value]) => (
           <div key={label} className="contents">
-            <dt className="text-neutral-500">{label}</dt>
+            <dt className="text-muted-foreground">{label}</dt>
             <dd className="min-w-0 break-words font-mono">{value}</dd>
           </div>
         ))}
       </dl>
 
       {!step.claudeCode ? (
-        <p data-not-claimed className="text-sm text-neutral-500">
+        <p data-not-claimed className="text-sm text-muted-foreground">
           Runs on {step.harness}, which has no tool list: its fence is its sandbox, the step's <span className="font-mono">sandbox:</span>.
           What a {step.harness} session is given was not measured, so no tool, skill or server is claimed for it. {allowed.why}
         </p>
@@ -332,7 +332,7 @@ function StepRow({ step, measured, readOnly }: { step: StepReach; measured: Meas
                       data-tool={name}
                       data-inferred={inferred || undefined}
                       title={inferred ? `Inferred, not measured. ${whyInferred.get(name) ?? ''}` : undefined}
-                      className={`${CHIP} ${inferred ? 'border border-dashed border-neutral-400 text-neutral-600 dark:border-neutral-500 dark:text-neutral-400' : PLAIN}`}
+                      className={`${CHIP} ${inferred ? 'border border-dashed border-neutral-400 text-muted-foreground dark:border-neutral-500' : PLAIN}`}
                     >
                       {name}
                     </span>
@@ -350,7 +350,7 @@ function StepRow({ step, measured, readOnly }: { step: StepReach; measured: Meas
                 ))}
               </span>
               {tools.from === 'measured' && (
-                <p data-measured={measured.measuredAt} className="text-xs text-neutral-500">
+                <p data-measured={measured.measuredAt} className="text-xs text-muted-foreground">
                   {measured.harness}'s own set. The solid ones as measured on {measured.measuredAt} with {measured.version} (
                   {measured.source}), which found it without {measured.lacks.join(' or ')}. The dashed ones are inferred, not measured: each
                   says why. Not asked again: a later version may give another.
@@ -362,7 +362,7 @@ function StepRow({ step, measured, readOnly }: { step: StepReach; measured: Meas
           {skills && (
             <Reach label="Skills">
               {skills.why ? (
-                <p className="text-xs text-neutral-500">{skills.why}</p>
+                <p className="text-xs text-muted-foreground">{skills.why}</p>
               ) : skills.names.length ? (
                 <span className="flex flex-wrap gap-1">
                   {skills.names.map((name) => (
@@ -372,7 +372,7 @@ function StepRow({ step, measured, readOnly }: { step: StepReach; measured: Meas
                   ))}
                 </span>
               ) : (
-                <p className="text-xs text-neutral-500">The repository has no skill.</p>
+                <p className="text-xs text-muted-foreground">The repository has no skill.</p>
               )}
             </Reach>
           )}
@@ -414,12 +414,12 @@ function StepRow({ step, measured, readOnly }: { step: StepReach; measured: Meas
                         })}
                       </span>
                     ) : (
-                      <p className="text-xs text-neutral-500">{server.why}</p>
+                      <p className="text-xs text-muted-foreground">{server.why}</p>
                     )}
                   </div>
                 ))
               ) : (
-                <p className="text-xs text-neutral-500">No server is named for it: its sessions load none.</p>
+                <p className="text-xs text-muted-foreground">No server is named for it: its sessions load none.</p>
               )}
             </Reach>
           )}
@@ -429,12 +429,12 @@ function StepRow({ step, measured, readOnly }: { step: StepReach; measured: Meas
               <span className="flex flex-wrap gap-x-3 gap-y-0.5">
                 {denied.map(({ rule, source }) => (
                   <span key={`${source}:${rule}`} className="font-mono text-xs" title={source}>
-                    {rule} <span className="text-neutral-500">· {source}</span>
+                    {rule} <span className="text-muted-foreground">· {source}</span>
                   </span>
                 ))}
               </span>
             ) : (
-              <p className="text-xs text-neutral-500">Nothing: the settings deny nothing, and neither does the step.</p>
+              <p className="text-xs text-muted-foreground">Nothing: the settings deny nothing, and neither does the step.</p>
             )}
           </Reach>
 
@@ -443,11 +443,11 @@ function StepRow({ step, measured, readOnly }: { step: StepReach; measured: Meas
               <span className="flex flex-wrap gap-x-3 gap-y-0.5">
                 {asked.map(({ rule, source }) => (
                   <span key={rule} data-ask-rule={rule} className="font-mono text-xs" title={source}>
-                    {rule} <span className="text-neutral-500">· {source}</span>
+                    {rule} <span className="text-muted-foreground">· {source}</span>
                   </span>
                 ))}
               </span>
-              <p className="text-xs text-neutral-500">
+              <p className="text-xs text-muted-foreground">
                 What these match asks, whatever an allow or the harness&apos;s own leave says
                 {allowed.askDenier ? `, and ${allowed.askDenier} denies it without a prompt` : ''}.
               </p>

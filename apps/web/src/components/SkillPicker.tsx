@@ -62,7 +62,7 @@ export function SkillPicker({
             </SheetHeader>
             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 pb-4">
               {error && <p className="text-xs text-red-600">Could not list the skills: {error.message}</p>}
-              {!places && !error && <p className="text-xs text-neutral-500">Reading the skills…</p>}
+              {!places && !error && <p className="text-xs text-muted-foreground">Reading the skills…</p>}
               {places?.map((place) => (
                 <Place
                   key={place.from}
@@ -109,9 +109,9 @@ function Place({
     <section aria-label={PLACE_LABELS[place.from]} data-skill-place={place.from} className="space-y-2 pt-4">
       <header className="space-y-0.5">
         <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{PLACE_LABELS[place.from]}</h3>
-        <p className="font-mono text-[11px] break-all text-neutral-500">{place.dir}</p>
+        <p className="font-mono text-[11px] break-all text-muted-foreground">{place.dir}</p>
         {place.from === 'shipped' && (
-          <p data-copy-note className="text-[11px] text-neutral-600 dark:text-neutral-400">
+          <p data-copy-note className="text-[11px] text-muted-foreground">
             An agent of yours finds no skill here. Copy to my library writes the skill's folder into your library at once — a write of its
             own, kept there whether or not this agent is saved — and gives it to this agent.
           </p>
@@ -127,7 +127,7 @@ function Place({
         </p>
       )}
       {place.skills.length === 0 ? (
-        <p className="text-xs text-neutral-500">None here.</p>
+        <p className="text-xs text-muted-foreground">None here.</p>
       ) : (
         <ul className="divide-y divide-neutral-200 rounded border border-neutral-200 dark:divide-neutral-800 dark:border-neutral-800">
           {place.skills.map((row) => (
@@ -169,12 +169,10 @@ function Offered({
       <div className="min-w-0 flex-1 space-y-0.5">
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className="font-mono text-xs font-medium">{row.name}</span>
-          {row.entry && row.entry.name !== row.name && (
-            <span className="text-xs text-neutral-600 dark:text-neutral-400">{row.entry.name}</span>
-          )}
-          {row.usedBy.length > 0 && <span className="text-[11px] text-neutral-500">given by {row.usedBy.join(', ')}</span>}
+          {row.entry && row.entry.name !== row.name && <span className="text-xs text-muted-foreground">{row.entry.name}</span>}
+          {row.usedBy.length > 0 && <span className="text-[11px] text-muted-foreground">given by {row.usedBy.join(', ')}</span>}
         </p>
-        {row.entry && <p className="text-xs text-neutral-600 dark:text-neutral-400">{row.entry.description}</p>}
+        {row.entry && <p className="text-xs text-muted-foreground">{row.entry.description}</p>}
         {offer.kind === 'refused' && (
           <p data-offer-refused className="font-mono text-[11px] whitespace-pre-wrap break-words text-red-700 dark:text-red-400">
             {offer.why}
@@ -188,14 +186,14 @@ function Offered({
             Add
           </Button>
         )}
-        {offer.kind === 'given' && <span className="text-[11px] text-neutral-500">given</span>}
+        {offer.kind === 'given' && <span className="text-[11px] text-muted-foreground">given</span>}
         {offer.kind === 'copy' && (
           <Button size="xs" aria-label={`Copy ${row.name} to my library and add`} onPress={onCopy} isDisabled={busy}>
             {copying ? 'Copying…' : 'Copy to my library and add'}
           </Button>
         )}
         {offer.kind === 'found' && (
-          <span className="flex items-center gap-1.5 text-[11px] text-neutral-500">
+          <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
             {offer.where === 'yours' ? 'in' : 'given from'} <SkillSourceBadge from={offer.where} />
           </span>
         )}

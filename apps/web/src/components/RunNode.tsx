@@ -232,8 +232,8 @@ function CardTitle({ run, title, open, onToggle }: { run: RunSummary; title: str
   );
 }
 
-/** How a ghost's card is drawn: dashed and dimmed, as `QueueLane` draws a card not started, and clearer on hover. */
-const GHOST = 'border border-dashed border-neutral-400/70 opacity-60 shadow-none hover:opacity-90 dark:border-neutral-600';
+/** How a ghost's card is drawn: dashed and sunk into the floor, as `QueueLane` draws a card not started, its text as readable as any. */
+const GHOST = 'border border-dashed border-outline bg-background shadow-none';
 
 /** How a run's card is drawn: whether it is a ghost, its classes, and the marks a check reads it by, a ghost's and the one inspected. */
 type Look = { ghost: boolean; className: string; marks: { 'data-ghost-run'?: true; 'data-inspected'?: true } };
@@ -250,7 +250,7 @@ function lookOf(run: RunSummary, finished: boolean, inspected: boolean): Look {
   if (inspected) return { ghost, className: 'ring-2 ring-ring', marks };
   if (toDecideOf(run)) return { ghost: false, className: 'ring-1 ring-yours/60', marks: {} };
   if (ghost) return { ghost, className: GHOST, marks };
-  return { ghost, className: finished ? 'opacity-50 hover:opacity-80' : '', marks };
+  return { ghost, className: finished ? 'bg-background shadow-none' : '', marks };
 }
 
 /**
@@ -339,7 +339,7 @@ function Chips({ run, decide, cancelled, reads }: { run: RunSummary; decide: boo
   return (
     <span className="ml-auto flex items-center gap-1">
       {run.context.length > 0 && (
-        <Badge variant="outline" data-context title={reads.join('\n')} className="text-neutral-600 dark:text-neutral-300">
+        <Badge variant="outline" data-context title={reads.join('\n')} className="text-muted-foreground">
           ⧉ reads {run.context.length} {run.context.length === 1 ? 'run' : 'runs'}
         </Badge>
       )}

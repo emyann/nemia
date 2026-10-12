@@ -38,7 +38,7 @@ function Runs() {
 
   if (!runs.length) {
     return (
-      <p className="text-sm text-neutral-500">
+      <p className="text-sm text-muted-foreground">
         No runs yet. Start one from{' '}
         <Link to="/workflows" className="underline underline-offset-2">
           Workflows
@@ -56,7 +56,7 @@ function Runs() {
   return (
     <article className="space-y-8">
       {!ordered.length && (
-        <p data-filtered-out className="text-sm text-neutral-500">
+        <p data-filtered-out className="text-sm text-muted-foreground">
           No run of the factory <span className="font-mono">{factory}</span>.{' '}
           <Link to="/runs" search={{}} replace className="underline underline-offset-2">
             Show every factory&apos;s
@@ -84,12 +84,12 @@ function RunGroup({ group, title, about, runs }: { group: string; title: string;
     <section aria-label={title} data-group={group} className="space-y-1">
       <h2 className="flex flex-wrap items-baseline gap-x-2 text-sm font-semibold">
         {title}{' '}
-        <span data-count className="text-xs font-normal text-neutral-500">
+        <span data-count className="text-xs font-normal text-muted-foreground">
           {runs.length}
         </span>
-        <span className="text-xs font-normal text-neutral-500">
+        <span className="text-xs font-normal text-muted-foreground">
           {about}, newest first
-          {waiting > 0 && <span className="text-amber-600"> · {waiting} waiting on you</span>}
+          {waiting > 0 && <span className="text-yours"> · {waiting} waiting on you</span>}
         </span>
       </h2>
       <ul className="divide-y divide-neutral-200 dark:divide-neutral-800">
@@ -126,18 +126,18 @@ function RunRow({ run }: { run: RunSummary }) {
     >
       <Link to="/runs/$runId" params={{ runId: run.id }} className="block min-w-0 flex-1">
         <p className="truncate font-medium">{title}</p>
-        <p className="mt-1 flex flex-wrap gap-x-3 text-xs text-neutral-500">
+        <p className="mt-1 flex flex-wrap gap-x-3 text-xs text-muted-foreground">
           <span className="font-mono">{run.id}</span>
           <FactoryTag name={factoryOf(run)} />
           <span title={run.repo ?? 'Its steps work in folders the run made'}>{run.repo ?? 'folders'}</span>
-          {run.cancelledAt && <span className="text-amber-600">cancelled</span>}
+          {run.cancelledAt && <span className="text-muted-foreground">cancelled</span>}
           {run.pruned && (
             <span data-pruned title={run.pruned.said}>
               pruned
             </span>
           )}
           {waitsOnYou(run) && (onYouOf(run).length > 0 || run.waiting?.advice) && (
-            <span data-waiting-on-you className="font-medium text-amber-600">
+            <span data-waiting-on-you className="font-medium text-yours">
               waiting on you: {onYouOf(run).length ? onYouOf(run).join(', ') : run.waiting?.advice}
             </span>
           )}
@@ -145,7 +145,7 @@ function RunRow({ run }: { run: RunSummary }) {
             <span
               data-holding={run.holding.onYou ? 'on-you' : 'on-runs'}
               title={run.holding.advice}
-              className={`font-mono ${run.holding.onYou ? 'font-medium text-amber-600' : 'text-violet-700 dark:text-violet-400'}`}
+              className={`font-mono ${run.holding.onYou ? 'font-medium text-yours' : 'text-muted-foreground'}`}
             >
               {run.holding.word}
             </span>
@@ -164,7 +164,7 @@ function RunRow({ run }: { run: RunSummary }) {
         <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
           {run.steps.map((step) => (
             <li key={step.name} className="flex items-center gap-1.5">
-              <span className="text-neutral-700 dark:text-neutral-300">{step.name}</span>
+              <span className="text-foreground">{step.name}</span>
               <StatusChip status={step.status} runCancelled={run.cancelledAt !== null} runHeld={run.holding != null} note={step.note} />
             </li>
           ))}
@@ -180,7 +180,7 @@ function RowSide({ run, title }: { run: RunSummary; title: string }) {
   return (
     <div className="flex shrink-0 flex-col items-end gap-1 pt-0.5">
       <FavoriteStar favorite={{ kind: 'run', run: run.id }} name={title} className="-mt-0.5 -mr-1" />
-      <time className="text-xs text-neutral-500" dateTime={run.createdAt}>
+      <time className="text-xs text-muted-foreground" dateTime={run.createdAt}>
         {new Date(run.createdAt).toLocaleString()}
       </time>
       <RowClock run={run} />
@@ -204,7 +204,7 @@ function RowClock({ run }: { run: RunSummary }) {
   const now = useNow(rowClockEveryMs(run));
   const clock = runClock(run, now, !inFlight(run));
   return (
-    <span data-clock title={clock.title} className="font-mono text-xs text-neutral-500">
+    <span data-clock title={clock.title} className="font-mono text-xs text-muted-foreground">
       {clock.words}
     </span>
   );

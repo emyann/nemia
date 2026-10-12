@@ -15,7 +15,7 @@ export function FromBadge({ from, factory }: { from: WorkflowListing['from']; fa
       className={`rounded-full px-2 py-0.5 text-[11px] leading-none font-medium ${
         from === 'yours'
           ? 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300'
-          : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300'
+          : 'bg-neutral-100 text-muted-foreground dark:bg-neutral-800'
       }`}
     >
       {fromWord(from, factory)}
@@ -37,20 +37,20 @@ export function YoursFolder() {
 export function NoBuilder({ workflow: { from, error }, factory }: { workflow: WorkflowListing; factory?: string }) {
   if (from === 'repo' && factory !== undefined)
     return (
-      <p data-no-builder className="text-xs text-neutral-500">
+      <p data-no-builder className="text-xs text-muted-foreground">
         No builder: the board writes only yours, and nothing into a factory&apos;s folder.
       </p>
     );
   if (from === 'repo')
     return (
-      <p data-no-builder className="text-xs text-neutral-500">
+      <p data-no-builder className="text-xs text-muted-foreground">
         No builder: the board writes only yours, and nothing into this checkout. To build it, copy the folder into <YoursFolder />, build it
         there, and copy it back into the repository by hand.
       </p>
     );
   if (!error) return null;
   return (
-    <p data-no-builder className="text-xs text-neutral-500">
+    <p data-no-builder className="text-xs text-muted-foreground">
       No builder until the folder reads: the builder puts back the steps a folder reads as. Fix its files by hand first.
     </p>
   );
@@ -72,7 +72,7 @@ export function Unplaced({
 }) {
   if (where.kind === 'pick')
     return (
-      <p data-pick-repo={where.factory} className="text-sm text-neutral-500">
+      <p data-pick-repo={where.factory} className="text-sm text-muted-foreground">
         The factory <span className="font-mono">{where.factory}</span> works on {where.repos.length} repositories, and its workflows are
         read on one:{' '}
         {where.repos.map((repo, at) => (

@@ -41,7 +41,7 @@ function AgentsPage() {
   return (
     <article className="space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <p className="min-w-0 flex-1 text-sm text-neutral-500">
+        <p className="min-w-0 flex-1 text-sm text-muted-foreground">
           An agent is a file in the {code('agents/')} folder beside the workflows: what a node that names it ({code('agent: <name>')}) is
           told first, and how its sessions run. Yours are under {code(`${store.agents}/`)} and are edited here; this repository's are under{' '}
           {code('workflows/agents/')}, read-only. An edit changes what a run started later freezes, never a run already started.
@@ -79,7 +79,7 @@ function Place({ title, agents, empty }: { title: string; agents: LibraryAgent[]
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-neutral-500">{empty}</p>
+        <p className="text-sm text-muted-foreground">{empty}</p>
       )}
     </section>
   );
@@ -95,7 +95,7 @@ function SkillPlaces({ places, library }: { places: readonly SkillPlace[]; libra
     <section aria-label="Skills" className="space-y-4">
       <div className="space-y-1">
         <h2 className="text-sm font-semibold">Skills</h2>
-        <p className="text-sm text-neutral-500">
+        <p className="text-sm text-muted-foreground">
           A skill is a folder with a {code('SKILL.md')}: instructions an agent gives its sessions, by name. Yours are under{' '}
           {code(`${library}/`)} and are written here.
         </p>
@@ -107,17 +107,17 @@ function SkillPlaces({ places, library }: { places: readonly SkillPlace[]; libra
             <ul className="grid gap-x-6 gap-y-1.5 lg:grid-cols-2">
               {place.skills.map((skill) => (
                 <li key={skill.name} data-skill-row={skill.name} className="min-w-0 text-xs leading-snug">
-                  <SkillLink from={skill.from} name={skill.name} className="font-medium text-neutral-800 dark:text-neutral-200" />{' '}
+                  <SkillLink from={skill.from} name={skill.name} className="font-medium text-foreground" />{' '}
                   {skill.error !== null ? (
                     <span className="text-red-700 dark:text-red-400">does not read</span>
                   ) : (
-                    <span className="text-neutral-600 dark:text-neutral-400">{skill.entry?.description}</span>
+                    <span className="text-muted-foreground">{skill.entry?.description}</span>
                   )}
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-xs text-neutral-500">{place.from === 'yours' ? <>None yet. New skill writes one.</> : 'None.'}</p>
+            <p className="text-xs text-muted-foreground">{place.from === 'yours' ? <>None yet. New skill writes one.</> : 'None.'}</p>
           )}
         </section>
       ))}

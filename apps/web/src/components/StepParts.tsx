@@ -28,8 +28,8 @@ export function StepAgent({ page }: { page: WorkflowStepPage }) {
   const { from, workflow, step, factory, hired, hiredIn } = page;
   if (factory && hired) {
     return (
-      <p data-step-agent className="text-xs leading-6 text-neutral-500">
-        Its agent: <AgentLink from={from} name={hired} className="text-neutral-700 dark:text-neutral-300" />{' '}
+      <p data-step-agent className="text-xs leading-6 text-muted-foreground">
+        Its agent: <AgentLink from={from} name={hired} className="text-foreground" />{' '}
         <Badge variant="outline" data-hired={factory}>
           hired by {factory}
         </Badge>
@@ -40,18 +40,18 @@ export function StepAgent({ page }: { page: WorkflowStepPage }) {
   const named = page.keys.find((row) => row.key === 'agent')?.value ?? null;
   return (
     <div className="space-y-1">
-      <p data-step-agent className="text-xs text-neutral-500">
+      <p data-step-agent className="text-xs text-muted-foreground">
         {named ? (
           <>
-            Its agent: <AgentLink from={from} name={named} className="text-neutral-700 dark:text-neutral-300" />, named by its file, whose
-            instructions it is told first.
+            Its agent: <AgentLink from={from} name={named} className="text-foreground" />, named by its file, whose instructions it is told
+            first.
           </>
         ) : (
           'Its file names no agent.'
         )}
       </p>
       {!factory && hiredIn.length > 0 && (
-        <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-neutral-500">
+        <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
           Hired into this step by:
           {hiredIn.map((hire) => (
             <RouteLink
@@ -60,10 +60,10 @@ export function StepAgent({ page }: { page: WorkflowStepPage }) {
               params={{ from, workflow, step }}
               search={{ factory: hire.factory }}
               data-hired-in={hire.factory}
-              className={cn('text-neutral-700 dark:text-neutral-300', LINK)}
+              className={cn('text-foreground', LINK)}
             >
               {hire.factory}
-              <span className="text-neutral-500"> ({hire.agent})</span>
+              <span className="text-muted-foreground"> ({hire.agent})</span>
             </RouteLink>
           ))}
         </p>
@@ -177,9 +177,9 @@ export function RecentRuns({ page }: { page: WorkflowStepPage }) {
   const now = new Date(useNow(60_000));
   return (
     <section aria-label="Recent runs" data-recent-runs className="space-y-2">
-      <h2 className="text-xs font-medium tracking-wide text-neutral-500 uppercase">Recent runs</h2>
+      <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Recent runs</h2>
       {page.recentRuns.length === 0 ? (
-        <p className="text-sm text-neutral-500">No run holds this step yet{page.factory ? ` in ${page.factory}` : ''}.</p>
+        <p className="text-sm text-muted-foreground">No run holds this step yet{page.factory ? ` in ${page.factory}` : ''}.</p>
       ) : (
         <ul className="space-y-1.5">
           {page.recentRuns.map((run) => (
@@ -187,9 +187,9 @@ export function RecentRuns({ page }: { page: WorkflowStepPage }) {
               <RouteLink to="/runs/$runId" params={{ runId: run.id }} hash={stepAnchor(page.step)} className={cn('min-w-0 truncate', LINK)}>
                 {titleOf(run)}
               </RouteLink>
-              <span className="text-xs text-neutral-500">{clockWord(new Date(run.createdAt), now)}</span>
+              <span className="text-xs text-muted-foreground">{clockWord(new Date(run.createdAt), now)}</span>
               {run.factory && <FactoryTag name={run.factory} />}
-              <span className="text-xs text-neutral-500">{run.filed ? 'What it was told' : 'not reached yet'}</span>
+              <span className="text-xs text-muted-foreground">{run.filed ? 'What it was told' : 'not reached yet'}</span>
             </li>
           ))}
         </ul>

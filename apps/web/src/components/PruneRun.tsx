@@ -55,7 +55,7 @@ function PruneRead({ run, onClose }: { run: RunDetail; onClose: () => void }) {
   }
   if (decidable && (!data || isPlaceholderData)) {
     return (
-      <p data-prune-reading className="text-xs text-neutral-600 dark:text-neutral-400">
+      <p data-prune-reading className="text-xs text-muted-foreground">
         Reading whether it was merged…
       </p>
     );
@@ -98,7 +98,7 @@ function PruneForm({ id, offer, onClose }: { id: string; offer: PruneOffer; onCl
         isDisabled={asking || prune.isPending}
         className="space-y-2"
       >
-        <Text slot="description" className="block text-xs text-neutral-600 dark:text-neutral-400">
+        <Text slot="description" className="block text-xs text-muted-foreground">
           What to give back. Its record and its branches are kept: no branch is ever deleted.
         </Text>
         {offer.choices.map((c) => (
@@ -163,7 +163,7 @@ function PruneForm({ id, offer, onClose }: { id: string; offer: PruneOffer; onCl
         </div>
       )}
       {prune.data && prune.data.left > 0 && (
-        <pre data-prune-said className="overflow-x-auto font-mono text-[11px] whitespace-pre-wrap text-neutral-600 dark:text-neutral-400">
+        <pre data-prune-said className="overflow-x-auto font-mono text-[11px] whitespace-pre-wrap text-muted-foreground">
           {prune.data.lines.join('\n')}
         </pre>
       )}

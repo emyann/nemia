@@ -64,7 +64,7 @@ export function StepTabs({ run, step, className }: { run: RunDetail; step: Step;
             className={`-mb-px border-b-2 px-2 py-1.5 text-xs ${
               tab === t
                 ? 'border-neutral-900 font-medium dark:border-neutral-100'
-                : 'border-transparent text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
             {t}
@@ -136,7 +136,7 @@ function Details({ run, step, state, runCancelled, current, selected, onSelect }
         <StepNote note={step.note} />
       </div>
       {step.taskId === null ? (
-        <p data-unfiled className="text-neutral-500">
+        <p data-unfiled className="text-muted-foreground">
           {gated ? 'not filed yet: it waits at its gate' : 'not filed yet'}
         </p>
       ) : (
@@ -168,11 +168,11 @@ function Details({ run, step, state, runCancelled, current, selected, onSelect }
       {step.check && <Check check={step.check} />}
       {spec ? (
         <section className="space-y-1">
-          <h3 className="text-xs font-medium text-neutral-500">Spec</h3>
+          <h3 className="text-xs font-medium text-muted-foreground">Spec</h3>
           <Facts rows={specRows(spec, step.filed)} />
         </section>
       ) : (
-        <p className="text-neutral-500">
+        <p className="text-muted-foreground">
           No spec: the workflow the run is judged by does not have this step — the one it froze as it started, or on a record from before
           runs froze one, its folder.
         </p>
@@ -222,12 +222,12 @@ function Activity({ run, step }: { run: RunDetail; step: Step }) {
   const turns = useMemo(() => foldTranscript(following.events), [following.events]);
   const tail = turns.slice(-ACTIVITY_TURNS);
 
-  if (!step.taskId) return <p className="text-neutral-500">Not filed yet, so there is no conversation.</p>;
-  if (!sessionToRead(step)) return <p className="text-neutral-500">No session of it has started, so there is no conversation yet.</p>;
+  if (!step.taskId) return <p className="text-muted-foreground">Not filed yet, so there is no conversation.</p>;
+  if (!sessionToRead(step)) return <p className="text-muted-foreground">No session of it has started, so there is no conversation yet.</p>;
 
   return (
     <>
-      <div className="flex items-baseline justify-between gap-2 text-xs text-neutral-500">
+      <div className="flex items-baseline justify-between gap-2 text-xs text-muted-foreground">
         <p>
           {following.loading ? 'Reading its conversation…' : following.live ? 'Followed as it runs.' : 'Not running, so not followed.'}
           {tail.length < turns.length && ` The last ${tail.length} of ${turns.length}.`}
@@ -235,7 +235,7 @@ function Activity({ run, step }: { run: RunDetail; step: Step }) {
         <Link
           to="/runs/$runId/steps/$step"
           params={{ runId: run.id, step: step.name }}
-          className="shrink-0 font-medium text-neutral-900 underline-offset-2 hover:underline dark:text-neutral-100"
+          className="shrink-0 font-medium text-foreground underline-offset-2 hover:underline"
         >
           Open the session
         </Link>
@@ -243,12 +243,14 @@ function Activity({ run, step }: { run: RunDetail; step: Step }) {
       {following.error && <p className="text-xs text-red-600">{following.error}</p>}
       {!following.loading &&
         (tail.length ? (
-          <Suspense fallback={<p className="text-neutral-500">Reading its conversation…</p>}>
+          <Suspense fallback={<p className="text-muted-foreground">Reading its conversation…</p>}>
             <Conversation turns={tail} live={following.live} density="compact" className="min-h-0 flex-1" />
           </Suspense>
         ) : (
           !following.error && (
-            <p className="text-neutral-500">{following.live ? 'Nothing said yet.' : 'Its session said nothing the engine can read.'}</p>
+            <p className="text-muted-foreground">
+              {following.live ? 'Nothing said yet.' : 'Its session said nothing the engine can read.'}
+            </p>
           )
         ))}
     </>

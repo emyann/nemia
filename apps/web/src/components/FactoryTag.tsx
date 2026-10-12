@@ -6,7 +6,7 @@ import { RouteLink } from './AgentParts';
 
 const TAG = 'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] leading-none font-medium whitespace-nowrap';
 const NAMED = 'border-sky-200 bg-sky-50 text-sky-900 dark:border-sky-900 dark:bg-sky-950/60 dark:text-sky-200';
-const MUTED = 'border-neutral-200 text-neutral-500 dark:border-neutral-800 dark:text-neutral-400';
+const MUTED = 'border-neutral-200 text-muted-foreground dark:border-neutral-800';
 
 /** A factory's mark, before its name on a tag, so it reads as a factory beside a repository or a place. */
 const mark = <Factory aria-hidden className="size-3 shrink-0" />;

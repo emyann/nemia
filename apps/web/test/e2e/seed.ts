@@ -1901,11 +1901,20 @@ export function seedFeed(root: string): void {
   write(path.join(root, 'engine', 'feed.jsonl'), lines(entries));
 }
 
+/** Each path `writeRegated` makes in `root`, a folder or a file, for the page that takes them back, whether or not all were made. */
+export const regatedFiles = (root: string): string[] => [
+  path.join(root, 'workflow-regated'),
+  path.join(root, 'runs', `${REGATED.id}.json`),
+  path.join(root, 'runs', `${REGATED.id}.asks`),
+  path.join(root, 'engine', 'tasks', `${REGATED.id}-plan.jsonl`),
+  path.join(root, 'engine', 'tasks', `${REGATED.id}-build.jsonl`),
+];
+
 /**
  * REGATED into `root`, its times minutes before `now`: its workflow folder, its record, plan's approval beside it, and the journals of
- * its two tasks. Answers each path it made, for the page that takes them back.
+ * its two tasks (`regatedFiles`).
  */
-export function writeRegated(root: string, now: number): string[] {
+export function writeRegated(root: string, now: number): void {
   const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
   const { id, title, planEnded, approved, buildEnded } = REGATED;
   const dir = path.join(root, 'workflow-regated');
@@ -1961,13 +1970,6 @@ export function writeRegated(root: string, now: number): string[] {
     );
   journal('plan', planEnded + 1, planEnded, 'The plan, in two steps.');
   journal('build', approved, buildEnded, 'Built as planned.');
-  return [
-    dir,
-    path.join(root, 'runs', `${id}.json`),
-    path.join(root, 'runs', `${id}.asks`),
-    path.join(root, 'engine', 'tasks', `${id}-plan.jsonl`),
-    path.join(root, 'engine', 'tasks', `${id}-build.jsonl`),
-  ];
 }
 
 /**

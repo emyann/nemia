@@ -272,6 +272,26 @@ test('a run held until a person lifts the hold has waited since the hold was pla
   assert.equal(row.waitingSince, placed);
 });
 
+test('a run that waits on a run which never ships, held until one that will, waits on a person since no instant: its hold is nobody’s to lift', async (t) => {
+  seeded(t);
+  const parent = await started({ work: null }, [], true);
+  const ships = await anInFlight();
+  const { repo } = readRun(parent) as { repo: string };
+  const child = await runPlaced(startRun({ brief: 'after it', repo, workflowDir: folder({ work: null }), after: [parent] }));
+  cancelled(parent, T0 + MIN);
+  fs.writeFileSync(
+    path.join(RUNS_DIR, `${child.id}.hold`),
+    `${JSON.stringify({ at: new Date(T0 + 5 * MIN).toISOString(), until: [ships] })}\n`,
+  );
+  t.mock.timers.setTime(T0 + 20 * MIN);
+
+  const row = (await open()).waiting.find((run) => run.id === child.id);
+  assert.ok(row, 'it waits on a person: the run it waits on was called off');
+  assert.equal(row.waiting?.onYou, true);
+  assert.equal(row.holding?.onYou, false, 'and its hold lifts by itself, once the run it names ships');
+  assert.equal(row.waitingSince, null);
+});
+
 test('the finished runs page by when their work stopped, not by when they were created: a late cancellation is the last stop', async (t) => {
   seeded(t);
   const a = await started({ work: null });

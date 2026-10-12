@@ -8,7 +8,7 @@ import { endedWords, presentWait, waitSentence, waitTag } from '../../../src/lib
 import { answered, fed, photograph, photographBothWidths, SECTIONS, sectionsOf, sidebar, themeOf } from '../board.ts';
 import { expectBeneath, expectCount, expectNone, expectTexts, expectVisible, idle, literal, Refused, WAIT_MS } from '../checks.ts';
 import { contrastHolds } from '../runs-contrast.ts';
-import { COSTLY, REGATED, writeRegated } from '../seed.ts';
+import { COSTLY, REGATED, regatedFiles, writeRegated } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
@@ -507,21 +507,55 @@ async function narrow(page: Page): Promise<void> {
   }
 }
 
-/**
- * REGATED written into the worker's store and said on the feed, the page loaded again on it; answers what takes it back: each file
- * removed, the feed told, and the card gone from the page.
- */
-async function regated(page: Page): Promise<() => Promise<void>> {
-  const made = writeRegated(store!, Date.now());
+/** REGATED written into the worker's store and said on the feed, and the page loaded again on it. */
+async function regated(page: Page): Promise<void> {
+  writeRegated(store!, Date.now());
   fed(REGATED.id, 'build', 'awaiting approval');
   await page.reload({ waitUntil: 'load' });
   await idle(page);
   await expectCount(cardOf(page, REGATED.id), 1, `${REGATED.id}, written at its second gate, has its card`);
-  return async () => {
-    for (const file of made) fs.rmSync(file, { recursive: true, force: true });
-    fed(REGATED.id, 'gone');
-    await expectCount(cardOf(page, REGATED.id), 0, `${REGATED.id} taken back, its card goes`);
-  };
+}
+
+/** REGATED taken out of the worker's store, whatever of it was written, and the feed told. */
+function regatedBack(): void {
+  for (const file of regatedFiles(store!)) fs.rmSync(file, { recursive: true, force: true });
+  fed(REGATED.id, 'gone');
+}
+
+/** What the page asserts while REGATED is in the store, from its two reads to the menu's places and back. */
+async function withRegated(page: Page): Promise<void> {
+  await regated(page);
+  const open = await answered<OpenRuns>(page, '/api/runs-open');
+  const finished = await answered<FinishedPage>(page, `/api/runs-finished?page=1&size=${FINISHED_SIZE}`);
+  await twoReads(page);
+  await threeParts(page, open, finished);
+  for (const run of open.waiting) {
+    await cardSays(page, run);
+    await waitSaid(page, run, open.asOf);
+  }
+  const costly = open.waiting.find((run) => run.id === COSTLY.id);
+  if (!costly?.clock || !costly.stepCosts) throw new Refused(`${COSTLY.id} waits on you, and the api breaks its clock and its cost down`);
+  await photographBothWidths(page, OUT, 'runs', 'page');
+  await byKeyboard(page, costly);
+  await secondGate(page, open);
+  await tableByKeyboard(page, finished);
+  await finger(page, open, finished);
+  await rowsSay(page, open, finished);
+  await lookDetails(page);
+  await narrow(page);
+  await contrastHolds(page, ['[data-sentence]']);
+
+  await enterOnPlace(page, 'Inbox', '/inbox');
+  await expectVisible(
+    page.locator('[data-sidebar="sidebar"] a[data-active="true"]', { hasText: 'Inbox' }),
+    'reached with Enter, the Inbox is lit in the menu',
+  );
+  await enterOnPlace(page, 'Runs', '/runs');
+  await expectCount(
+    section(page, 'waiting').locator('article[data-run]'),
+    open.counts.waiting,
+    'back on Runs with Enter, its cards are drawn',
+  );
 }
 
 export default {
@@ -531,44 +565,17 @@ export default {
    * plain words, how long it has waited this time, and opens its run; its tiles open their breakdowns, and its id is copied, from the
    * keyboard; a finger finds the copy control; 390 wide breaks nothing; and no text pair is under 4.5:1 in either scheme. The menu's
    * places are reached with Enter in the page, to the Inbox and back. It writes REGATED, the run at its second gate, for itself, and
-   * takes it back at its end.
+   * takes it back at its end, on a refusal too.
    */
   name: 'runs',
   route: '/runs',
   expect: async (page) => {
     await sidebar(page);
-    const takenBack = await regated(page);
-    const open = await answered<OpenRuns>(page, '/api/runs-open');
-    const finished = await answered<FinishedPage>(page, `/api/runs-finished?page=1&size=${FINISHED_SIZE}`);
-    await twoReads(page);
-    await threeParts(page, open, finished);
-    for (const run of open.waiting) {
-      await cardSays(page, run);
-      await waitSaid(page, run, open.asOf);
+    try {
+      await withRegated(page);
+    } finally {
+      regatedBack();
     }
-    const costly = open.waiting.find((run) => run.id === COSTLY.id);
-    if (!costly?.clock || !costly.stepCosts) throw new Refused(`${COSTLY.id} waits on you, and the api breaks its clock and its cost down`);
-    await photographBothWidths(page, OUT, 'runs', 'page');
-    await byKeyboard(page, costly);
-    await secondGate(page, open);
-    await tableByKeyboard(page, finished);
-    await finger(page, open, finished);
-    await rowsSay(page, open, finished);
-    await lookDetails(page);
-    await narrow(page);
-    await contrastHolds(page, ['[data-sentence]']);
-
-    await enterOnPlace(page, 'Inbox', '/inbox');
-    await expectVisible(
-      page.locator('[data-sidebar="sidebar"] a[data-active="true"]', { hasText: 'Inbox' }),
-      'reached with Enter, the Inbox is lit in the menu',
-    );
-    await enterOnPlace(page, 'Runs', '/runs');
-    await expectCount(
-      section(page, 'waiting').locator('article[data-run]'),
-      open.counts.waiting,
-      'back on Runs with Enter, its cards are drawn',
-    );
-    await takenBack();
+    await expectCount(cardOf(page, REGATED.id), 0, `${REGATED.id} taken back, its card goes`);
   },
 } satisfies PageSpec;

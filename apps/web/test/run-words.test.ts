@@ -197,12 +197,16 @@ test('a time is a fact to the minute, wall time', () => {
   assert.deepEqual([0, 59 * S, M, 3 * H + 12 * M].map(sinceShort), ['under 1m', 'under 1m', '1m', '3h 12m'], 'short, where room is');
 });
 
-test('the present wait is said since the instant it began, to the minute, never negative, and not at all where none is dated', () => {
+test('the present wait is said since the instant it began, to the minute, and not at all where none is dated', () => {
   const asOf = new Date('2026-10-12T12:00:00.000Z');
   const since = (ms: number) => ({ waitingSince: new Date(asOf.getTime() - ms).toISOString() });
   assert.equal(presentWait(since(150_000), asOf), '2m');
   assert.equal(presentWait(since(30_000), asOf), 'under 1m');
-  assert.equal(presentWait(since(-300_000), asOf), 'under 1m', 'an instant after the answer was read');
+  assert.equal(
+    presentWait(since(-300_000), asOf),
+    'under 1m',
+    'an instant after the answer was read is under a minute, as `sinceShort` says any figure below one',
+  );
   assert.equal(presentWait({ waitingSince: null }, asOf), null);
 });
 

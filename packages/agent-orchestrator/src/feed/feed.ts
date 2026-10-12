@@ -208,8 +208,8 @@ export const feedPhase = (word: string): string =>
  *
  * Each step's word is its status as `nemia ls` prints it (`shownStatus`), and its note the note beside it there — the try due or on, the
  * gate and what answers it, how many times it was said to — which is where a person's writes show. Not its cost, which moves while nothing
- * is decided. A step that signed off blocked puts what it needs before that note (`needsNote`). The run's word is `assess`'s status — or,
- * for a run `failed` that nothing failed in, what stopped it (`stoppedOn`: `awaiting approval` at a gate, as `nemia decide` says it) —
+ * is decided. A step that signed off blocked puts what it needs before that note (`needsNote`). The run's word is `assess`'s status —
+ * `awaiting approval` at a gate, as `nemia decide` says it, and `failed` only where a step broke —
  * `(pruned)` beside it as `nemia ls` says it, and its note who it waits on you for (`onYouWords`) — or, on a held run, what it is held
  * until (`holdWord`), and nobody is waited on.
  *
@@ -225,14 +225,14 @@ export const feedPhase = (word: string): string =>
 export function feedWords(
   l: Listing,
   run: Pick<Run, 'pruned' | 'hold'>,
-  { status, stoppedOn }: Pick<Assessment, 'status' | 'stoppedOn'>,
+  { status }: Pick<Assessment, 'status'>,
   closeoutOf: (step: string) => Closeout | { error: string } | undefined = () => undefined,
   deniedOf: (step: string) => { ended: readonly string[]; running: readonly string[] } = () => ({ ended: [], running: [] }),
 ): FeedWords {
   const onYou = onYouWords(l);
   return {
     run: {
-      word: `${stoppedOn ?? status}${run.pruned ? ' (pruned)' : ''}`,
+      word: `${status}${run.pruned ? ' (pruned)' : ''}`,
       ...(run.hold && status !== 'cancelled'
         ? { note: holdWord(l.holding ?? [], run.hold) }
         : onYou.length

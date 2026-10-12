@@ -232,7 +232,7 @@ test("REFUSED at shipped defaults, pass after pass: a gated step that signed off
   settle(`${run.id}-plan`, 'succeeded', { ...SIGNED, summary: 'Go ahead and implement it: nothing here needs a person.' });
   for (let pass = 1; pass <= 3; pass++) {
     const after = await runWith(e, advanceRun(readRun(run.id)));
-    assert.deepEqual([after.filed, after.blocked, after.status], [[], ['implement'], 'failed'], `pass ${pass}`);
+    assert.deepEqual([after.filed, after.blocked, after.status], [[], ['implement'], 'awaiting approval'], `pass ${pass}`);
   }
   const l = await runWith(e, list(e, readRun(run.id)));
   assert.deepEqual([l.steps[0].status, l.waitingOnYou], ['awaiting approval', ['plan']]);

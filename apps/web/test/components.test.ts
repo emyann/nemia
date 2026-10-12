@@ -5032,11 +5032,11 @@ test('REFUSED: a second try while one moves — the button is held, and the late
   assert.match(html, /data-try-files[\s\S]*note\.md/);
 });
 
-test('a try stopped where no step broke says what stopped it, as the list words it, not a bare failed', async () => {
+test("a try stopped where no step broke says what stopped it, in its run's own word and with no row of the list, not a bare failed", async () => {
   const { TryAgent } = await import('../src/components/TryAgent.tsx');
   const html = await routedWith(createElement(TryAgent, { agent: composing as never }), [
-    [['runs'], [tried('r-t', { status: 'failed', stoppedOn: 'blocked' })]],
-    [['runs', 'r-t'], tryDetail({ status: 'failed' })],
+    [['runs'], [tried('r-t', { status: 'running' })]],
+    [['runs', 'r-t'], tryDetail({ status: 'blocked' })],
   ]);
   assert.match(html, /data-try-status[^>]*>blocked</);
 });
@@ -6059,8 +6059,8 @@ test("REFUSED: the header's bell counts the runs waiting on you, named in full; 
 
 test('REFUSED: the bell counts what the api says waits, never a count of its own over the rows', async () => {
   const atGate = summaryRun();
-  const blocked = { ...atGate, id: 'r-blocked', stoppedOn: 'blocked' as const, onYou: [] };
-  const movesAndWaits = { ...atGate, id: 'r-moves', status: 'running' as const, stoppedOn: null, moving: true };
+  const blocked = { ...atGate, id: 'r-blocked', status: 'blocked' as const, onYou: [] };
+  const movesAndWaits = { ...atGate, id: 'r-moves', status: 'running' as const, moving: true };
   const waiting = [atGate, blocked, movesAndWaits];
   const three = await headerWith({ ...openWith(waiting), counts: { waiting: 3, inFlight: 0, finished: 1 } });
   assert.match(

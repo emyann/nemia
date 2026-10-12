@@ -17,17 +17,21 @@ export type PlaceKind = 'repository' | 'folder';
 /** Decodes a `PlaceKind`. */
 export const PlaceKindSchema = Schema.Literals(['repository', 'folder']) satisfies Schema.Schema<PlaceKind>;
 
-/** Mirrors `RunStatus` in agent-orchestrator: where `assess` puts the run. */
-export type RunStatus = 'running' | 'succeeded' | 'failed' | 'cancelled';
+/**
+ * Mirrors `RunStatus` in agent-orchestrator: where `assess` puts the run. `failed` is a run in which a step broke; one a person alone
+ * stops is `awaiting approval`, at its gates, or `blocked`, on an answer.
+ */
+export type RunStatus = 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting approval' | 'blocked';
 
 /** Decodes a `RunStatus`. */
-export const RunStatusSchema = Schema.Literals(['running', 'succeeded', 'failed', 'cancelled']) satisfies Schema.Schema<RunStatus>;
-
-/** Mirrors `RunStoppedOn` in agent-orchestrator: what stopped a `failed` run no step broke, as the CLI's `decide` says it. */
-export type RunStoppedOn = 'awaiting approval' | 'blocked';
-
-/** Decodes a `RunStoppedOn`. */
-export const RunStoppedOnSchema = Schema.Literals(['awaiting approval', 'blocked']) satisfies Schema.Schema<RunStoppedOn>;
+export const RunStatusSchema = Schema.Literals([
+  'running',
+  'succeeded',
+  'failed',
+  'cancelled',
+  'awaiting approval',
+  'blocked',
+]) satisfies Schema.Schema<RunStatus>;
 
 /**
  * Mirrors `RunToDecide` in agent-orchestrator: what a person has to decide about a run's result, the fifth reason a run waits on

@@ -30,7 +30,7 @@ export type Assessment = {
   retry: Retry[];
   /** Loops to go round again: a looping step that said `again: true` with rounds left, or a person's `nemia round`. File these. */
   round: Round[];
-  /** Steps that can never run, because something they wait on is final without satisfying them. */
+  /** Steps that cannot run, because something they wait on stops what follows it (`stopsFollowers`). */
   blocked: string[];
   /**
    * Steps the repository's own checkout holds back on this pass (`heldByCheckout`): an ending a person's word would file, or a try of one,
@@ -38,26 +38,20 @@ export type Assessment = {
    * cap on runs in flight still counts it (`slotNeed`), as it counts a run whose next step the pass files.
    */
   held: string[];
-  status: 'running' | 'succeeded' | 'failed' | 'cancelled';
   /**
-   * A run `failed` that nothing failed in: what stopped it instead, as `nemia decide` tells the two apart (`Decision`'s `outcome`).
-   * `awaiting approval` when every step that stops what follows it waits at its gate, and `blocked` when a person's word is what stops it
-   * otherwise — a step that signed off blocked, or unsigned, a loop out of rounds, a cap reached. Absent where a step broke: its task
-   * failed or was stopped, or its check refused it or did not finish — that run is `failed` in every word — and on a run that is not
-   * `failed`.
-   *
-   * `status` stays `failed` for these, since everything that reads it (the cap on runs in flight, `nemia cancel`, `toDecide`) reads a run
-   * that stopped. This word is for what a person reads of it, so that the feed does not say `failed` of a run `nemia ls` and `nemia decide`
-   * say is awaiting approval.
+   * The run in one word. `failed` is a run in which a step broke: its task failed or was stopped, or its check refused it or did not
+   * finish. A run stopped on a person alone is not `failed`: `awaiting approval` when every step that stops what follows it waits at its
+   * gate, and `blocked` when a person's word is what stops it otherwise — a step that signed off blocked, or unsigned, a loop out of
+   * rounds, a cap reached (`stoppedOnWord`). Each of the three is a run that stopped: it is at rest, and no longer in flight.
    */
-  stoppedOn?: 'awaiting approval' | 'blocked';
+  status: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting approval' | 'blocked';
   /**
    * What a person has to decide about the run's result, when the run is at it and nobody has (`toDecide`). Absent while there is nothing.
    */
   toDecide?: ToDecide;
   /**
    * The runs a person holds this one until (`Run.hold`), while the hold stands: the run is `running`, and nothing is due — no step, check,
-   * try or round — nor asked of anyone (`stoppedOn`, `toDecide`). What is in flight runs on. Absent on a run nobody holds.
+   * try or round — nor asked of anyone (`toDecide`). What is in flight runs on. Absent on a run nobody holds.
    */
   heldUntil?: string[];
   /**
@@ -82,10 +76,10 @@ export type Assessment = {
  *   in one checkout collide: it goes to `held`, is filed once the other run's step settles, and a try of it stays `running`, so the run
  *   still counts against the cap on runs in flight.
  * - An ending held at its gate on work this pass files again (`unheld`) is `waiting`: its gate holds on what that work says.
- * - A check already filed is never filed twice; a step that waits on one final without satisfying `after` is `blocked`, never left to hang.
+ * - A check already filed is never filed twice; a step that waits on one that stops its followers is `blocked`, never left to hang.
  * - While the store is paused (`Run.pause`) nothing is due — no step, check, try or round, nor one the checkout holds — and what would
  *   be goes to `paused`; a person's asks are honoured as for any run, so a step asked for again is `running`, and its ask waits on its
- *   file for the lift. What a person decides (`toDecide`, `stoppedOn`) is still asked: a word given is kept for the next pass.
+ *   file for the lift. What a person decides (`toDecide`) is still asked: a word given is kept for the next pass.
  *
  * @param closeoutOf How each step signed off, when it left a closeout: a session that ends cleanly can still say `outcome: "blocked"`,
  *   which the engine cannot tell from finished work.
@@ -149,24 +143,12 @@ export function assess(
   const overall: Assessment['status'] = all.every(satisfiesAfter)
     ? 'succeeded'
     : blocked.length || all.some(stopsFollowers)
-      ? 'failed'
+      ? stoppedOnWord(steps.map((s) => ({ status: status.get(s.name)!, own: stood.get(s.name)!.own })))
       : 'running';
 
   if (run.hold) return { ready: [], check: [], retry: [], round: [], blocked, held: [], status: 'running', heldUntil: run.hold.until };
   const decide = toDecide(steps, run, overall, (name) => status.get(name) ?? 'waiting', standings);
-  const stoppedOn =
-    overall === 'failed' ? stoppedOnWord(steps.map((s) => ({ status: status.get(s.name)!, own: stood.get(s.name)!.own }))) : undefined;
-  const assessed: Assessment = {
-    ready,
-    check,
-    retry,
-    round,
-    blocked,
-    held,
-    status: overall,
-    ...(stoppedOn ? { stoppedOn } : {}),
-    ...(decide ? { toDecide: decide } : {}),
-  };
+  const assessed: Assessment = { ready, check, retry, round, blocked, held, status: overall, ...(decide ? { toDecide: decide } : {}) };
   return underPause(run, assessed);
 }
 
@@ -180,12 +162,12 @@ function underPause(run: Run, a: Assessment): Assessment {
 }
 
 /**
- * What stopped a `failed` run in which no step broke (`Assessment['stoppedOn']`) — or undefined where one did. Pure. Off each step's status
- * as the run reads it, and its own ending under that (`standing`), as `decision` reads it: a step whose task failed and that is over its
- * budget reads `over budget`, and it still broke. A step about to be tried again reads `running`, and stops nothing.
+ * The status of a run that stopped short of succeeding: `failed` where a step broke, else what it waits on a person for. Pure. Off each
+ * step's status as the run reads it, and its own ending under that (`standing`), as `decision` reads it: a step whose task failed and that
+ * is over its budget reads `over budget`, and it still broke. A step about to be tried again reads `running`, and stops nothing.
  */
-function stoppedOnWord(each: ReadonlyArray<{ status: StepStatus; own: StepStatus }>): Assessment['stoppedOn'] {
+function stoppedOnWord(each: ReadonlyArray<{ status: StepStatus; own: StepStatus }>): Assessment['status'] {
   const stops = each.filter((s) => stopsFollowers(s.status));
-  if (stops.some((s) => [s.status, s.own].some((w) => w === 'failed' || w === 'stopped' || w === 'failed (check)'))) return undefined;
+  if (stops.some((s) => [s.status, s.own].some((w) => w === 'failed' || w === 'stopped' || w === 'failed (check)'))) return 'failed';
   return stops.length && stops.every((s) => s.status === 'awaiting approval') ? 'awaiting approval' : 'blocked';
 }

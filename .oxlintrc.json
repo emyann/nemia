@@ -640,8 +640,8 @@
     {
       "files": ["packages/agent-orchestrator/src/tick/assess.ts"],
       "rules": {
-        "complexity": ["error", { "max": 32 }],
-        "sonarjs/cognitive-complexity": ["error", 27]
+        "complexity": ["error", { "max": 30 }],
+        "sonarjs/cognitive-complexity": ["error", 25]
       }
     },
     {

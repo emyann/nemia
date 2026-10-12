@@ -2024,8 +2024,8 @@ Where it departs from the card, and why:
   run `succeeded`, and `wf decide` says the rest.
 - **A step's check verdict is the tick's** (`exitVerdicts`, off the engine's attempt), where `wf ls` reads the check's log: the same
   number, read without a log.
-- **The run's word at a gate is `assess`'s `failed`**, as `wf tick` and the api's run status already say it, with `waiting on you:
-  approve plan` as its note. Renaming it is a change to the tick's vocabulary, not the feed's.
+- **The run's word at a gate is `assess`'s `awaiting approval`**, as `wf tick` and the api's run status say it, with `waiting on you:
+  approve plan` as its note; `blocked` where a step waits on an answer, and `failed` only where a step broke.
 - **Two writers were possible** — `wf tick` typed beside `wf up` — and each reads the other's lines before it writes, so a line is said
   twice only when both passes land between the same two reads. At least once, never lost. Since *one `wf up` per store*, below, a hand
   tick is refused while a daemon ticks the store, and a second `wf up` with it.
@@ -3435,8 +3435,8 @@ What it leaves:
   offers none once approved: that window lasts until the next tick.
 - **A gated step not yet signed off** says `holds once it has signed off` in its facts, and nothing on the canvas.
 - **A phone.** The gate is a form on a page served on this machine, and Remote Control (§2) is what reaches it from elsewhere.
-- **A run held at a mid-run gate reads `failed` on the wire** (`status`, with `moving: false`): `assess` sees a step that stops its followers
-  and nothing running. It should read as waiting on a person, neither running nor finished; the Factory keeps it on its floor meanwhile off `waitsOnYou` (`floorRuns`).
+- **A run held at a mid-run gate reads `awaiting approval` on the wire** (`status`, with `moving: false`), and `blocked` where a step
+  waits on an answer: waiting on a person, neither running nor failed; the Factory keeps it on its floor off `waitsOnYou` (`floorRuns`).
 
 ## Shipped: the workflow builder — steps and their edges drawn on the board, written back as the folder
 
@@ -4897,8 +4897,8 @@ in `dontAsk` denied the command it was told to run signed off all the same. A st
   `allowedTools:` is frozen on its record at `wf start`, so a try of the same run is denied the same call again: a retry the tick files by
   itself would spend every try on it and learn nothing. So a signed try that was denied anything reads `denied` (`ownStatus` in
   `status/status.ts`, read off `TaskSpend.denied`, which `spendReader` fills from the runtime's attempts): nothing after it is filed, its check
-  is not run, it is never in `retriesDue`, and the run waits on a person (`DENIED, waiting on you` in `wf decide`; `stoppedOn:
-  'blocked'`).
+  is not run, it is never in `retriesDue`, and the run waits on a person (`DENIED, waiting on you` in `wf decide`; the run's status is
+  `blocked`, as it is `awaiting approval` at a gate alone, and `failed` only where a step broke).
 - **The offer names both ways out** (`deniedOffer`): the rule to add to the folder's `allowedTools:` for a new run, worded as Claude Code
   matches it (`allowRuleOf` in `keys/tools.ts`: `Bash(npm:*)`; a denied Write, MultiEdit or NotebookEdit as `Edit(<path>)`; a path in
   the step's own directory from it, `Edit(notes.md)`, since the next run's worktree is named by its own id; any other absolute path

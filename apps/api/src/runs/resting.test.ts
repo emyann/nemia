@@ -275,14 +275,14 @@ test('a record rewritten is judged afresh', async () => {
   assert.equal((await unverified(() => listed('r-rest')))?.brief, 'Decide it again');
 });
 
-test('a file a person writes beside the run is judged afresh: a retry asked of a failed run', async () => {
+test('a file a person writes beside the run is judged afresh: a retry asked of a blocked run', async () => {
   aFinishedRun('r-ask');
   await aPass();
   blocked('r-ask-implement');
   await list();
   assert.ok(resting.runs.has('r-ask'));
   const before = await listed('r-ask');
-  assert.equal(before?.status, 'failed');
+  assert.equal(before?.status, 'blocked');
   write(path.join(root, 'runs', 'r-ask.asks', 'retry-implement-2'), JSON.stringify({ mode: 'fresh', at }));
   const after = await unverified(() => listed('r-ask'));
   assert.notDeepEqual(after, before, 'the ask moved the answer');
@@ -296,7 +296,7 @@ test("a line on the engine's feed for a task of the run is judged afresh: its jo
   assert.ok(resting.runs.has('r-fed'));
   blocked('r-fed-implement');
   fed('r-fed-implement');
-  assert.equal((await unverified(() => listed('r-fed')))?.status, 'failed');
+  assert.equal((await unverified(() => listed('r-fed')))?.status, 'blocked');
 });
 
 test("a journal changed with no line on the feed is not seen: the feed is what the memo watches, as the tick's does", async () => {
@@ -450,7 +450,7 @@ test('two requests at once: the first reads the feed and judges the run succeede
     !resting.runs.has('r-raced'),
     'kept nothing: the first request read the feed before the line; the second read on past it while the run was not kept, so took nothing out; and no request will read the line again',
   );
-  assert.equal((await unverified(() => listed('r-raced')))?.status, 'failed');
+  assert.equal((await unverified(() => listed('r-raced')))?.status, 'blocked');
 
   const alone = await runWith(e, restingRead(e, resting, false, await snapshotGit()));
   alone.keep(findRun('r-raced')!, judged, [], () => new Map());
@@ -523,8 +523,7 @@ test('a gated run read by the list at every event from being filed to being appr
   const gated = await read('settled');
   await read('settled, from memory');
   assert.deepEqual(keptAt, ['settled', 'settled, from memory'], 'kept once at rest at its gate, and at no event before');
-  assert.equal(gated.status, 'failed', "`assess`'s word for a run no follower of which can go on");
-  assert.equal(gated.stoppedOn, 'awaiting approval', 'and what stopped it, as `nemia decide` says it');
+  assert.equal(gated.status, 'awaiting approval', "`assess`'s word for a run stopped at its gate, as `nemia decide` says it");
   assert.equal(gated.moving, false);
   assert.deepEqual(gated.waitingOnYou, ['design']);
   assert.equal(gated.steps.find((s) => s.name === 'design')?.status, 'awaiting approval');
@@ -534,7 +533,7 @@ test('a gated run read by the list at every event from being filed to being appr
   assert.ok(!resting.runs.has(id), 'the approval takes it out');
   assert.equal(approved.moving, true, 'implement is due: the tick files it');
   assert.deepEqual(approved.waitingOnYou, []);
-  assert.deepEqual([approved.status, approved.stoppedOn], ['running', null]);
+  assert.equal(approved.status, 'running');
   assert.deepEqual(await unverified(() => listed(id)), approved, 'and the memo answers it as the fresh read did');
 });
 

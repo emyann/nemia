@@ -327,7 +327,7 @@ export type StepStatus =
 /** What a follower may be filed on. */
 export const satisfiesAfter = (s: StepStatus): boolean => s === 'verified' || s === 'unverified';
 
-/** Final without satisfying `after`: nothing waiting on a step in one of these can ever run. */
+/** A step in one of these stops what waits on it: for good where it broke, or until a person answers — a gate approved, a question met. */
 export const stopsFollowers = (s: StepStatus): boolean =>
   s === 'blocked' ||
   s === 'unsigned' ||

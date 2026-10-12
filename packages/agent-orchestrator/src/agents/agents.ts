@@ -586,8 +586,8 @@ export type SkillAgain = { name: string; text: string } | { name: string; missin
  * A step as it is told when its rendered folder is not there — removed by hand, or never written — with its agent's instructions in its
  * brief and no flags: filing it with a flag naming a file that is not there would end the session at
  * its start, and a brief without the instructions would tell it nothing of them. Nor without its skills: the instructions say to load
- * them, or that they follow, and with no plugin there is nothing to load, so each is told whole after the instructions, under its bare
- * name, as the instructions name it — or why it could not be read (`skills`, read again by the tick: an edit made since `nemia start`
+ * them, or that they follow, and with no plugin there is nothing to load, so each is told whole after the instructions, under the
+ * name its `skills:` line writes, with no plugin before it — or why it could not be read (`skills`, read again by the tick: an edit made since `nemia start`
  * reaches it).
  */
 export const unrendered = (step: Workflow, skills: readonly SkillAgain[] = []): Workflow => {

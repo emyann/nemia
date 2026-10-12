@@ -703,6 +703,44 @@ test("a repository run's step whose folder is gone is told a skill from the run'
   assert.match(write.brief, /\n## Skill `mind-the-tone`\n\nIn this repository, how to mind the tone\.\n/);
 });
 
+test('a step whose folder is gone is told a skill named with its folder under the name its line writes, or why the folder no longer holds it', async () => {
+  const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
+  const tone = SKILL('mind-the-tone');
+  const nested = SKILL('y').replace(/\n---\n[\s\S]*$/, '\n---\nOf the folder app.\n');
+  for (const [file, text] of [
+    ['.claude/skills/mind-the-tone/SKILL.md', tone],
+    ['app/.claude/skills/y/SKILL.md', nested],
+  ]) {
+    fs.mkdirSync(path.dirname(path.join(repo, file)), { recursive: true });
+    fs.writeFileSync(path.join(repo, file), text);
+  }
+  stand().world.repository(repo, { '.claude/skills/mind-the-tone/SKILL.md': tone, 'app/.claude/skills/y/SKILL.md': nested });
+  const dir = storeTeam('lost-nested', { write: '---\nplace: git\nagent: scribe\nskills: app:y\n---\nWrite about tides.\n' });
+  const told = async (): Promise<string> => {
+    const run = await runPlaced(startRun({ brief: 'a note on tides', repo, workflowDir: dir, isolate: false }));
+    fs.rmSync(agentFilesDir(run, 'write'), { recursive: true });
+    const { e, filed } = board();
+    await runWith(e, advanceRun(readRun(run.id)));
+    return filed.get(`${run.id}-write`)!.brief;
+  };
+  const brief = await told();
+  assert.match(brief, /\n## Skill `app:y`\n\nOf the folder app\.(\n|$)/);
+  assert.doesNotMatch(brief, /## Skill `y`/);
+  const run = await runPlaced(startRun({ brief: 'a note on tides', repo, workflowDir: dir, isolate: false }));
+  fs.rmSync(agentFilesDir(run, 'write'), { recursive: true });
+  fs.rmSync(path.join(repo, 'app'), { recursive: true });
+  const { e, filed } = board();
+  await runWith(e, advanceRun(readRun(run.id)));
+  const at = path.join(repo, 'app', '.claude', 'skills', 'y');
+  assert.ok(
+    filed
+      .get(`${run.id}-write`)!
+      .brief.includes(
+        `## Skill \`app:y\`\n\nNot told: \`app:y\` is the skill \`y\` of the repository's folder \`app\`, and ${at} holds no SKILL.md.`,
+      ),
+  );
+});
+
 test('REFUSED at shipped defaults: nemia start of a team whose agent gives a skill no place has, and nothing written', async () => {
   const dir = storeTeam('unskilled', { write: `---\nagent: scribe\n${FOLDER}---\nWrite.\n` });
   const runs = path.join(ROOT, 'runs');

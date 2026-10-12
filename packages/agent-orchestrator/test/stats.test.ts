@@ -239,10 +239,11 @@ function renderedForWrite(name: string, rules?: string) {
 renderedForWrite(RULED, JSON.stringify({ rules: RULES }));
 renderedForWrite('look');
 renderedForWrite('unread', '{ "rules": [{ "id": "x" }] }');
+renderedForWrite('y', JSON.stringify({ rules: [{ id: 'no-wget', says: 'Never download', breaks: ['Bash(wget:*)'] }] }));
 writeRun(
   'denied',
   [
-    { name: 'write', after: [], body: 'Write it.', agent: { ...agent('ada'), skills: [RULED, 'look', 'unread'] } },
+    { name: 'write', after: [], body: 'Write it.', agent: { ...agent('ada'), skills: [RULED, 'look', 'unread', 'app:y'] } },
     { name: 'codex', after: [], body: 'Do it.', harness: 'codex' },
     { name: 'bg', after: [], body: 'Do it.', background: true },
     { name: 'quiet', after: [], body: 'Do it.' },
@@ -475,9 +476,10 @@ test("nemia stats counts each rule a step's frozen skills declare, kept or broke
     [
       { skill: RULED, rule: 'no-rm', says: 'Never remove', kept: 1, broken: 1 },
       { skill: RULED, rule: 'no-write', says: 'Write nothing at the root', kept: 1, broken: 1 },
+      { skill: 'app:y', rule: 'no-wget', says: 'Never download', kept: 2, broken: 0 },
       { skill: RULED, rule: 'no-curl', says: 'Never fetch', kept: 2, broken: 0 },
     ],
-    "write's two sessions, its recheck not counted again; look declares none, and unread's rules.json does not read",
+    "write's two sessions, its recheck not counted again; look declares none, and unread's rules.json does not read; a skill named with its folder, frozen as `y`, has its rules said as its line writes it",
   );
   assert.deepEqual(s.all.steps.find((row) => row.step === 'quiet')?.rules, [], 'a step given no skill');
   const words = await printedBy(t, ['stats', ...range]);

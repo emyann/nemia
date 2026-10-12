@@ -4,6 +4,7 @@
  * harness's observes as the runtime reported them. `nemia up` says one line of it an interval (`summaryLine`), and `nemia up --stats` and
  * `nemia tick --stats` the last pass whole (`breakdownLines`).
  */
+import type { DiskReading } from '../disk/disk.ts';
 
 /**
  * The phases of a pass. `records`: the run records, with the cancellation, pruning and hold beside each. `asks`: a person's asks,
@@ -212,7 +213,8 @@ export const breakdownLines = (c: PassCostRead): string[] => {
 /**
  * One pass as the store keeps it among the recent (`tick-recent.json`): when, its time, what it saw (`Seen`, its wait and load absent from
  * a pass an older tick kept), the run records it read and the runs it answered from memory, its journal reads (`reads`, those of its
- * `journals` phase), and each phase's time; with them, the quota the daemon last read (`Reading`), and the labels of each check it filed.
+ * `journals` phase), and each phase's time; with them, the quota the daemon last read (`Reading`), the labels of each check it filed, and
+ * what the daemon's last sweep of the store's disk read (`disk`), none before any.
  */
 export type RecentPass = Omit<Seen, 'waitMs' | 'load'> &
   Partial<Pick<Seen, 'waitMs' | 'load'>> & {
@@ -224,6 +226,7 @@ export type RecentPass = Omit<Seen, 'waitMs' | 'load'> &
     phases: Record<Phase, number>;
     quota?: Reading;
     checks?: CheckLabels[];
+    disk?: DiskReading;
   };
 
 /** Each harness's quota as last read: harness, then the harness's own name for a window, then the percent of it used. */
@@ -232,8 +235,11 @@ export type Reading = Record<string, Record<string, number>>;
 /** A check filed, by what it belongs to: never its run, whose own detail stays in its record. */
 export type CheckLabels = { factory: string; workflow: string; step: string; agent: string };
 
-/** A pass's cost as it is kept among the recent passes (`RecentPass`), with the quota read and the checks filed in it. */
-export const recentOf = (c: PassCost, also: { quota?: Reading; checks?: readonly CheckLabels[] } = {}): RecentPass => ({
+/** What a pass is kept with beside its cost: the quota read, the checks filed in it, and the last reading of the store's disk. */
+export type AlsoKept = { quota?: Reading; checks?: readonly CheckLabels[]; disk?: DiskReading };
+
+/** A pass's cost as it is kept among the recent passes (`RecentPass`), with what it is kept with (`AlsoKept`). */
+export const recentOf = (c: PassCost, also: AlsoKept = {}): RecentPass => ({
   at: c.at,
   ms: c.ms,
   runs: c.runs,
@@ -248,6 +254,7 @@ export const recentOf = (c: PassCost, also: { quota?: Reading; checks?: readonly
   phases: Object.fromEntries(PHASES.map((p) => [p, c.phases[p].ms])) as Record<Phase, number>,
   ...(also.quota && Object.keys(also.quota).length ? { quota: also.quota } : {}),
   ...(also.checks?.length ? { checks: [...also.checks] } : {}),
+  ...(also.disk ? { disk: also.disk } : {}),
 });
 
 /** How many recent passes the store keeps: about ten minutes of a daemon ticking every four seconds. */

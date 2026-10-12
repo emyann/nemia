@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Fiber } from 'effect';
 import { scratch } from '../../test/scratch.ts';
-import { freedBytes, WALK_BURST } from './freed.store.ts';
+import { freedBytes, walk, WALK_BURST } from './freed.store.ts';
 
 const ROOT = scratch('wf-freed-');
 
@@ -82,4 +82,35 @@ test('a walk of more names than WALK_BURST lets a fiber started after it run bef
     }),
   );
   assert.deepEqual(ended, ['other', 'walk']);
+});
+
+test('a name that does not read is counted unread and holds no byte, and a folder asked that is gone did not read', async () => {
+  const dir = path.join(ROOT, 'unread');
+  const own = file(path.join(dir, 'own.bin'));
+  const shut = path.join(dir, 'shut');
+  file(path.join(shut, 'hidden.bin'), 64);
+  const heldShut = held(shut);
+  fs.chmodSync(shut, 0o000);
+  try {
+    const walked = await Effect.runPromise(walk([path.join(ROOT, 'never'), dir]));
+    assert.deepEqual(walked.read, [false, true]);
+    assert.deepEqual(walked.unread, [1, process.getuid?.() === 0 ? 0 : 1], 'the folder gone, and the folder that does not list');
+    if (process.getuid?.() !== 0) assert.deepEqual(walked.bytes, [0, held(dir) + held(own) + heldShut], 'nothing under what did not list');
+  } finally {
+    fs.chmodSync(shut, 0o755);
+  }
+});
+
+test('the walk says what it cost: every name it read, the folders asked among them, and a burst yielded each WALK_BURST of them', async () => {
+  const dir = path.join(ROOT, 'cost');
+  const other = path.join(ROOT, 'cost-other');
+  fs.mkdirSync(path.join(dir, 'sub'), { recursive: true });
+  fs.mkdirSync(other, { recursive: true });
+  const planted = 2 * WALK_BURST + 7;
+  for (let k = 0; k < planted; k++) fs.writeFileSync(path.join(k % 2 ? dir : path.join(dir, 'sub'), `f${k}`), '');
+  const walked = await Effect.runPromise(walk([dir, other]));
+  assert.equal(walked.names, planted + 1 + 2, 'the files, the folder under, and the two asked');
+  assert.equal(walked.bursts, Math.floor(walked.names / WALK_BURST));
+  assert.equal(walked.bursts, 2);
+  assert.deepEqual(walked.unread, [0, 0]);
 });

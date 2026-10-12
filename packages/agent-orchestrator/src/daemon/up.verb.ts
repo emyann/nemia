@@ -3,7 +3,7 @@
  * takes the store's lease in its scope and lets it go as the scope closes; `holdUrl` writes into the lease where the api serves; and
  * `runMain` runs either as the process's command, a signal letting go of the lease before the process exits.
  */
-import { Cause, Effect, Exit, Fiber, type Scope } from 'effect';
+import { Cause, Deferred, Effect, Exit, Fiber, type Scope } from 'effect';
 import type { PlaceService } from '../place/place.store.ts';
 import { over, quotaHarnesses, type Engine, type HarnessQuota } from '../runtime-client.ts';
 import { HOME } from '../record/record.store.ts';
@@ -20,6 +20,8 @@ import { emitDaemonStarted } from '../feed/feed.verb.ts';
 import { keep } from '../nemia/keep.verb.ts';
 import { reconcile } from '../applied/applied.verb.ts';
 import { free } from '../prune/free.verb.ts';
+import { disk } from '../disk/disk.verb.ts';
+import type { DiskReading } from '../disk/disk.ts';
 import { leaseRelease } from '../release/release.ts';
 import { runningRelease } from '../release/version.verb.ts';
 
@@ -202,7 +204,9 @@ const saidStarted = ({ held, replaced }: TakenStore): Effect.Effect<void> =>
  * `QUOTA_EVERY_MS` (`askedQuota`), and hands each pass the latest reading, which the pass keeps among the recent and so in the series. On
  * a third it delivers the store's subscriptions to the feed (`deliver`), on a fourth it keeps Nemia at the person's level (`keep`), on
  * a fifth it brings each factory made from a template to it (`reconcile`), and on a sixth it frees the worktrees of the runs the latest
- * pass answered finished (`free`), which no pass waits on.
+ * pass answered finished (`free`), which no pass waits on. On a seventh, once the first pass has answered and every `DISK_EVERY` after,
+ * it measures what the store takes on the disk (`disk`), and hands each pass the latest reading as it does the quota: no pass walks
+ * the store, and a sweep that failed leaves the passes none.
  */
 export const up = (e: Engine, { every, repo, holder, onTaken }: UpOptions): Effect.Effect<never, unknown, Scope.Scope | PlaceService> =>
   Effect.gen(function* () {
@@ -225,15 +229,28 @@ export const up = (e: Engine, { every, repo, holder, onTaken }: UpOptions): Effe
     yield* Effect.forkScoped(reconcile());
     let rested: Pass['runs'] = [];
     yield* Effect.forkScoped(over(e)(free(() => rested)));
+    const answered = yield* Deferred.make<void>();
+    let measured: DiskReading | undefined;
+    yield* Effect.forkScoped(
+      Deferred.await(answered).pipe(
+        Effect.andThen(
+          disk(
+            () => rested,
+            (read) => void (measured = read),
+          ),
+        ),
+      ),
+    );
     yield* saidStarted(taken);
     if (onTaken) yield* onTaken(taken);
     let said = NOTHING_SAID;
     for (;;) {
       const by = stillHeld(taken.held);
       if (by) return yield* Effect.fail(new Error(takenFromLine(by, HOME, holder)));
-      const pass = yield* tickRun({ repo, quota: () => reading }).pipe(over(e));
+      const pass = yield* tickRun({ repo, quota: () => reading, disk: () => measured }).pipe(over(e));
       passed(taken.held);
       rested = pass.runs;
+      yield* Deferred.succeed(answered, undefined);
       said = yield* logPass(pass, said);
       yield* Effect.sleep(every);
     }

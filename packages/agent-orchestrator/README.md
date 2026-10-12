@@ -594,6 +594,18 @@ is refused, naming both. A folder team, which has no repository, reads the `.cla
 `agentVersion` digests each skill it gives, every file of its folder, so an edit moves the agent's version and the board's save
 refuses a stale read.
 
+A name on `skills:`, an agent's or a step's, has a second form: `folder:name`, the skill `name` of the repository's folder `folder`, as
+the harness names a nested folder's skill (`apps/web:ds-build`). It is read from `<repository>/<folder>/.claude/skills/<name>` because
+the line says so: no folder is walked, nothing declares it, and a bare name is always a skill of the places above, never a nested
+folder's. It is refused by name where that folder holds no such skill, where the folder is reached through a link that leaves the
+repository, and where nothing is read with a repository; its links follow the one rule for a link, bounded by the folder its line names.
+The run freezes it as `skills/<name>` in the step's plugin and the session loads it as `nemia-<agent>:<name>`, while the frozen
+record, the versions, the rules, the stats' loaded skills and the brief of an unrendered step say it as its line writes it. A session
+loads a skill by its bare name, so one step holds one skill of a name, through its line, its agent's or both, and a second is refused at
+load naming both; two steps of one run may each hold one. `--settings` turns off the bare name and the line's name. A template names
+such a skill and never carries it: its check passes the name, its export leaves the skill out and says so, and a start on a repository
+that lacks it is refused by name; an agent copied into the library keeps the name, and no skill is filed for it.
+
 A step with an agent may write `skills:` too: skills this position asks of whoever fills it, added to its agent's. They are found
 where the agent's are, frozen with the step at `wf start`, and the session is given the agent's skills, then the step's, each once; a
 step never takes one of its agent's away, so naming a few of them changes nothing. `renderStep` writes the step's own line back as it

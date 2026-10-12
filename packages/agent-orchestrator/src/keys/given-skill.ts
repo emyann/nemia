@@ -21,11 +21,10 @@ export type GivenSkill = { name: string; folder?: string };
  * `folder:name` (`SKILL_FOLDER`, one `:`), and nothing for any other text.
  */
 export function givenSkillOf(written: string): GivenSkill | undefined {
-  const parts = written.split(':');
-  const name = parts.at(-1)!;
-  if (parts.length > 2 || !SKILL_NAME.test(name)) return undefined;
-  if (parts.length === 1) return { name };
-  return SKILL_FOLDER.test(parts[0]!) ? { folder: parts[0]!, name } : undefined;
+  const [first = '', second, ...more] = written.split(':');
+  if (more.length) return undefined;
+  if (second === undefined) return SKILL_NAME.test(first) ? { name: first } : undefined;
+  return SKILL_FOLDER.test(first) && SKILL_NAME.test(second) ? { folder: first, name: second } : undefined;
 }
 
 /** The bare name of a given skill, as a session loads it and its copy is filed: the text after the last `:` of `written`. */

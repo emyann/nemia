@@ -129,6 +129,45 @@ test('REFUSED: an export of a workflow given a skill whose link leaves the repos
   assert.equal(fs.existsSync(dir), false);
 });
 
+/** A repository holding the tests' team, its step `implement` given the nested skill `app:y`, which the repository holds when `held`. */
+function repoGivenNested(held = true): string {
+  const repo = repoWithTeam();
+  if (held) {
+    fs.mkdirSync(path.join(repo, 'app', '.claude', 'skills', 'y'), { recursive: true });
+    fs.writeFileSync(path.join(repo, 'app', '.claude', 'skills', 'y', 'SKILL.md'), '---\ndescription: Nested.\n---\nDo it.\n');
+  }
+  const implement = path.join(repo, 'workflows', 'dev', 'implement.md');
+  fs.writeFileSync(implement, fs.readFileSync(implement, 'utf8').replace('agent: implementer\n', 'agent: implementer\nskills: app:y\n'));
+  return repo;
+}
+
+test('an export names a skill named with its folder and never carries it: left out and said, its step keeps the name, and the check passes', () => {
+  const repo = repoGivenNested();
+  const dir = target();
+  const { from } = exportTemplate({ dir, from: repo });
+  assert.equal(
+    new Map(from.map(({ part, from: at }) => [part, at])).get('app:y'),
+    `left out: a skill of the repository's folder, named and not carried, read from ${path.join(repo, 'app', '.claude', 'skills', 'y')}`,
+  );
+  const carried = (fs.readdirSync(dir, { recursive: true }) as string[]).filter((entry) => /(^|\/)(y|app|app:y)(\/|$)/.test(entry));
+  assert.deepEqual(carried, []);
+  assert.deepEqual(stepsOf(dir, 'dev').get('implement')?.overrides, { skills: ['app:y'] });
+  assert.deepEqual(checkTemplateAt(dir), []);
+});
+
+test('REFUSED: an export of a workflow given a skill named with its folder that the repository lacks, by name, nothing written', () => {
+  const repo = repoGivenNested(false);
+  const dir = target();
+  assert.throws(
+    () => exportTemplate({ dir, from: repo }),
+    refusedWith(
+      'Invalid',
+      /`app:y` is the skill `y` of the repository's folder `app`, and \S+\/app\/\.claude\/skills\/y holds no SKILL\.md/,
+    ),
+  );
+  assert.equal(fs.existsSync(dir), false);
+});
+
 test('what export writes reads back as it was written, a long line whole, and a step with no fence of its own writes no overrides fence', () => {
   const repo = repoWithTeam();
   const long = `npm test && ${Array.from({ length: 12 }, (_, i) => `node "scripts/check-${i}.ts" --mode: 'strict' # ${i}`).join(' && ')}`;

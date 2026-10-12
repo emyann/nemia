@@ -177,7 +177,8 @@ function oneBareName(name: string, agent: Agent, skills: readonly string[]): voi
   const same = sameBareIn(skills);
   if (!same) return;
   const [first, second] = same.map(
-    (skill) => `\`${skill}\`, on ${agent.skills?.includes(skill) ? `${AGENTS_FOLDER}/${agent.name}.md's \`skills:\`` : "this step's \`skills:\`"}`,
+    (skill) =>
+      `\`${skill}\`, on ${agent.skills?.includes(skill) ? `${AGENTS_FOLDER}/${agent.name}.md's \`skills:\`` : "this step's `skills:`"}`,
   );
   refuse(
     `${name}: its session would be given ${first}, and ${second}: two skills named \`${bareSkillOf(same[1])}\`. ${ONE_BARE_NAME} Keep one of them here, and give the other to another step.`,

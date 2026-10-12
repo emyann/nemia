@@ -524,7 +524,8 @@ export function skillNamesOf(file: string, written: string | undefined): string[
   const twice = names.find((n, i) => names.indexOf(n) !== i);
   if (twice) refuse(`${named} names \`${twice}\` twice. Name it once.`);
   const same = sameBareIn(names);
-  if (same) refuse(`${named} gives \`${same[0]}\` and \`${same[1]}\`, two skills named \`${bareSkillOf(same[1])}\`. ${ONE_BARE_NAME} Keep one.`);
+  if (same)
+    refuse(`${named} gives \`${same[0]}\` and \`${same[1]}\`, two skills named \`${bareSkillOf(same[1])}\`. ${ONE_BARE_NAME} Keep one.`);
   return names;
 }
 

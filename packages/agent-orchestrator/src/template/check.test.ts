@@ -263,6 +263,26 @@ test("a skill the folder lacks is refused, an agent's or a step's, and a place s
     'skill nope',
   );
   assert.deepEqual(
+    refusalsOf((d) => {
+      d[AGENT].spec.skills.push('app:y');
+      d[workflow].spec.steps[1].overrides.skills.push('apps/web:ds-build');
+    }),
+    [],
+    'a skill named with its folder is the repository’s: named, never carried',
+  );
+  assertRefused(
+    refusalsOf((d) => d[AGENT].spec.skills.push('App:Y')),
+    AGENT,
+    ['spec', 'skills', 2],
+    'skill App:Y is not in skills/',
+  );
+  assertRefused(
+    refusalsOf((d) => d[AGENT].spec.skills.push('../app:y')),
+    AGENT,
+    ['spec', 'skills', 2],
+    'skill ../app:y is not in skills/',
+  );
+  assert.deepEqual(
     refusalsOf((d) => d[AGENT].spec.skills.push('git')),
     [],
   );

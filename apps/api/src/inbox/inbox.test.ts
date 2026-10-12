@@ -11,12 +11,14 @@ import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import { app } from '../app.ts';
 import {
+  addFactory,
   addToInbox,
   fromNote,
   INBOX_KEY_MEANINGS,
   inboxDir,
   inboxNameRefusal,
   noCardLine,
+  readFactory,
   startFromInbox,
   runStore,
   engine,
@@ -100,6 +102,7 @@ test("POST /api/inbox files a card as `nemia inbox add` does: the idea alone; a 
     file: path.join(inboxDir(), `${filed.name}.md`),
     workflow: null,
     repo: null,
+    factory: null,
     body: 'Cache the views between passes\n\nThe tick reads each task twice.',
   });
   assert.equal(
@@ -795,4 +798,123 @@ test('REFUSED at shipped defaults: a card start another site could make is refus
   assert.ok(((await type.json()) as Refused).error.includes('`"card": "<name>"`'), 'the shape it takes names `card`');
   assert.deepEqual(runFiles(), []);
   assert.deepEqual(cards(), [`${card.name}.md`]);
+});
+
+/**
+ * Two repositories that are not the api's, each with a `dev`, the second with a `solo` the first has not: `mill` works on the first,
+ * `pair` on both.
+ */
+const first = scratch('nemia-api-inbox-first-');
+const second = scratch('nemia-api-inbox-second-');
+for (const cwd of [first, second]) execFileSync('git', ['init', '-q', '-b', 'main'], { cwd });
+write(path.join(first, 'workflows', 'dev', 'implement.md'), '---\nplace: git\n---\nImplement it here.\n');
+write(path.join(second, 'workflows', 'dev', 'implement.md'), '---\nplace: git\n---\nImplement it there.\n');
+write(path.join(second, 'workflows', 'solo', 'implement.md'), '---\nplace: git\n---\nImplement it alone.\n');
+addFactory({ name: 'mill', repos: [first] });
+addFactory({ name: 'pair', repos: [first, second] });
+
+/** What `readFactory` refuses `name` with, a filing's words after it. */
+const factoryRefusal = (name: string): string => {
+  try {
+    readFactory(name, 'Nothing was filed.');
+  } catch (err) {
+    return (err as Error).message;
+  }
+  return assert.fail(`the factory ${name} reads, and should have been refused`);
+};
+
+test('POST /api/inbox with `factory` files the card in it, as `nemia inbox add --factory` does: its `factory:` key, its workflow as a start in the factory finds it, and no `repo:` nobody sent — and GET /api/inbox lists it with its factory', async () => {
+  clear();
+  const res = await file({ body: 'Mill the views', factory: 'mill', workflow: 'dev', from: 'repo' });
+  assert.equal(res.status, 201, await res.clone().text());
+  const filed = (await res.json()) as InboxFiled;
+  assert.deepEqual([filed.factory, filed.workflow, filed.repo], ['mill', 'dev', null]);
+  assert.equal(
+    fs.readFileSync(filed.file, 'utf8'),
+    '---\nworkflow: dev\nfactory: mill\n---\nMill the views\n',
+    "the factory's one repository is its own to give at start: the card writes no repo: line",
+  );
+  const entry = (await listed()).find((e) => e.name === filed.name)!;
+  assert.deepEqual([entry.factory, entry.repo, entry.workflow], ['mill', null, 'dev']);
+
+  const idea = (await (await file({ body: 'Mill it later', factory: 'mill' })).json()) as InboxFiled;
+  assert.equal(fs.readFileSync(idea.file, 'utf8'), '---\nfactory: mill\n---\nMill it later\n', 'a factory and no workflow');
+  const yours = (await (await file({ body: 'Mill mine', factory: 'mill', workflow: 'mine' })).json()) as InboxFiled;
+  assert.equal(yours.workflow, mine, 'yours: by its folder, in a factory as out of one');
+
+  const none = (await (await file({ body: 'No factory' })).json()) as InboxFiled;
+  assert.equal(none.factory, null, 'a filing with no factory answers none');
+  assert.equal(fs.readFileSync(none.file, 'utf8'), 'No factory\n');
+});
+
+test('POST /api/inbox in a factory on several repositories writes `repo:` only when one was sent, and a workflow only one of them has by its folder', async () => {
+  clear();
+  const sent = (await (await file({ body: 'There', factory: 'pair', workflow: 'dev', repo: `${second}/` })).json()) as InboxFiled;
+  assert.equal(
+    fs.readFileSync(sent.file, 'utf8'),
+    `---\nworkflow: dev\nrepo: ${second}\nfactory: pair\n---\nThere\n`,
+    'the repository sent, resolved, and its workflow by name',
+  );
+  const found = (await (await file({ body: 'Alone', factory: 'pair', workflow: 'solo' })).json()) as InboxFiled;
+  assert.deepEqual(
+    [found.workflow, found.repo],
+    [path.join(second, 'workflows', 'solo'), null],
+    'no repository sent: none written, and the one folder found is written whole, so a start on either repository finds it',
+  );
+  const bare = (await (await file({ body: 'Bare', factory: 'pair' })).json()) as InboxFiled;
+  assert.deepEqual([bare.factory, bare.repo, bare.workflow], ['pair', null, null]);
+});
+
+test('REFUSED at shipped defaults: a `factory` that is not text, or is `default`, is a 400 naming the key — and no card is written', async () => {
+  clear();
+  for (const factory of [7, null, ['mill']]) {
+    const res = await file({ body: 'An idea', factory });
+    assert.equal(res.status, 400, JSON.stringify(factory));
+    assert.ok(
+      ((await res.json()) as Refused).error.startsWith('`factory` names the factory the card is filed in'),
+      JSON.stringify(factory),
+    );
+  }
+  const res = await file({ body: 'An idea', factory: 'default' });
+  assert.equal(res.status, 400);
+  assert.equal(
+    ((await res.json()) as Refused).error,
+    '`factory` names the factory the card is filed in, and `default` is none to file into: it holds what names no factory. Leave `factory` out for a card that gets its factory when it is started.',
+  );
+  assert.deepEqual(cards(), []);
+});
+
+test("REFUSED at shipped defaults: a `factory` the store does not have is a 404, and a name that is no slug a 422, each the package's sentence word for word — and no card is written", async () => {
+  clear();
+  const unknown = await file({ body: 'An idea', factory: 'nobody' });
+  assert.equal(unknown.status, 404);
+  const said = ((await unknown.json()) as Refused).error;
+  assert.equal(said, factoryRefusal('nobody'));
+  assert.ok(said.endsWith('Its factories are: mill, pair. Nothing was filed.'), said);
+  const slug = await file({ body: 'An idea', factory: 'Not A Slug' });
+  assert.equal(slug.status, 422);
+  assert.equal(((await slug.json()) as Refused).error, factoryRefusal('Not A Slug'));
+  assert.deepEqual(cards(), []);
+});
+
+test("REFUSED at shipped defaults: a `repo` that is none of the factory's is a 422 naming those it works on, and a workflow two of its repositories have, with no `repo`, a 409 naming `repo` — and no card is written", async () => {
+  clear();
+  const outside = await file({ body: 'An idea', factory: 'mill', repo: second });
+  assert.equal(outside.status, 422);
+  assert.equal(
+    ((await outside.json()) as Refused).error,
+    `${second}: the factory mill works on ${first}, and this repository is not one of them. Send one of them as \`repo\`, or leave it out. Nothing was filed.`,
+  );
+  const relative = await file({ body: 'An idea', factory: 'mill', repo: 'code/myapp' });
+  assert.equal(relative.status, 422, 'a relative path is none of them either');
+  const two = await file({ body: 'An idea', factory: 'pair', workflow: 'dev' });
+  assert.equal(two.status, 409);
+  assert.equal(
+    ((await two.json()) as Refused).error,
+    `The factory pair works on ${[first, second].join(', ')}, and more than one has a workflow named 'dev' (${path.join(first, 'workflows', 'dev')} and ${path.join(second, 'workflows', 'dev')}). Say which with \`"repo": "<one of them>"\`.`,
+  );
+  const nowhere = await file({ body: 'An idea', factory: 'pair', workflow: 'nope' });
+  assert.equal(nowhere.status, 404);
+  assert.ok(((await nowhere.json()) as Refused).error.startsWith("No workflow 'nope' in "));
+  assert.deepEqual(cards(), []);
 });

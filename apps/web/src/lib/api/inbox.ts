@@ -18,7 +18,7 @@ export type InboxEntry = {
   /** As the card writes it: a workflow's name, or the absolute folder of one. */
   workflow: string | null;
   repo: string | null;
-  /** The factory the card names (`factory:`); null for a card of the default factory, and for an entry that does not read as a card. */
+  /** The factory the card names (`factory:`); null for a card that names none, and for an entry that does not read as a card. */
   factory: string | null;
   /** The runs its run is handed as context (`from:`), read and never waited on: none for a card without the line. */
   from: string[];
@@ -89,9 +89,10 @@ export const cardQuery = (name: string) =>
   });
 
 /**
- * File an idea as a card, as the CLI's `inbox add "<idea>" --workflow <name> --repo <path>` does. Resolves with the card's name; rejects
- * with the api's refusal in full — the package's words for an idea with nothing in it or a repository that is not an absolute path to a
- * directory, or the api's own about the request or a workflow it has none of.
+ * File an idea as a card, as the CLI's `inbox add "<idea>" --workflow <name> --repo <path> --factory <name>` does: in `factory` when it
+ * names one, in none when it is left out. Resolves with the card's name; rejects with the api's refusal in full — the package's words for
+ * an idea with nothing in it, a repository that is not an absolute path to a directory or a factory the store does not have, or the api's
+ * own about the request or a workflow it has none of.
  *
  * Sent as `application/json`, which the api requires of it, as of a start.
  */
@@ -100,6 +101,7 @@ export const fileCard = (card: {
   workflow?: string;
   from?: WorkflowListing['from'];
   repo?: string;
+  factory?: string;
 }): Promise<{ name: string }> =>
   send('POST', '/api/inbox', Schema.Struct({ name: Schema.String }), {
     body: card,

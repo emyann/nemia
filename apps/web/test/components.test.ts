@@ -7111,3 +7111,120 @@ test("REFUSED: a banner that says a person is waited on is drawn in an amount's 
   assert.equal(drawnYours(`rounded ${container.money}`), false, 'the amber of an amount is no wait');
   assert.equal(drawnYours(`rounded ${container.yours} ${container.failure}`), false);
 });
+
+const InboxParts = await import('../src/components/InboxParts.tsx');
+const { FileCard } = await import('../src/components/FileCard.tsx');
+const { UnassignedStart } = await import('../src/components/FactoryCardStart.tsx');
+
+/** A card as the inbox lists it, named `idea`, with `extra` over it. */
+const inboxCard = (extra: Record<string, unknown> = {}) =>
+  ({
+    name: 'idea',
+    file: 'idea.md',
+    title: 'An idea',
+    workflow: null,
+    repo: null,
+    factory: null,
+    from: [],
+    startedAs: [],
+    error: null,
+    body: 'An idea',
+    filedAt: null,
+    ...extra,
+  }) as never;
+
+/** A factory as the api lists it, on `repos`. */
+const listedFactory = (name: string, repos: string[], error: string | null = null) => ({
+  name,
+  default: name === 'default',
+  repos,
+  workflows: name === 'default' ? null : ['dev'],
+  hires: {},
+  error,
+  schedules: [],
+  commands: { attach: '', rm: '', add: '', schedule: '' },
+  template: null,
+});
+
+/** Your store, as the api answers it, with the line that files a factory. */
+const STORE_ANSWER: [readonly unknown[], unknown] = [
+  ['store'],
+  { workflows: '', agents: '', skills: '', fileFactory: 'nemia factory add <name> --repo <path>', turnOnNemia: '' },
+];
+const LISTED = [listedFactory('default', ['/code/app']), listedFactory('solo', ['/r/a']), listedFactory('pair', ['/r/a', '/r/b'])];
+
+test('REFUSED: a card that names no factory wears no default tag — its line says it has no factory yet; one naming a factory wears its tag, and an entry that does not read says neither', async () => {
+  const line = (extra: Record<string, unknown>) => routedWith(createElement(InboxParts.CardMeta, { entry: inboxCard(extra) }));
+  const tagged = await line({ factory: 'solo' });
+  assert.match(tagged, /data-factory-tag="solo"/);
+  assert.doesNotMatch(tagged, /data-unassigned/);
+  for (const factory of [null, 'default']) {
+    const bare = await line({ factory });
+    assert.match(
+      bare,
+      /<span data-unassigned="true" title="It names no factory: Start gives it one\.">no factory yet<\/span>/,
+      String(factory),
+    );
+    assert.doesNotMatch(bare, /data-factory-tag/, `${factory}: no tag, the default's least of all`);
+  }
+  const unread = await line({ error: 'idea.md: not a card' });
+  assert.doesNotMatch(unread, /data-factory-tag|data-unassigned/);
+});
+
+test('the box that files a card lists No factory and each factory offered; under No factory it draws no Workflow and no Repository control, and says the card is parked', async () => {
+  const html = await routedWith(createElement(FileCard, { shown: undefined }), [[['factories'], LISTED], STORE_ANSWER]);
+  assert.deepEqual(
+    [...html.matchAll(/<option value="([^"]*)"[^>]*>([^<]*)</g)].map((m) => [m[1], m[2]]),
+    [
+      ['', 'No factory: chosen at start'],
+      ['solo', 'solo'],
+      ['pair', 'pair'],
+    ],
+    'never the default factory',
+  );
+  assert.match(html, /data-parked="true"[^>]*>Parked with no factory: it gets its factory, workflow and repository when you start it\./);
+  assert.doesNotMatch(html, />Workflow<|>Repository<|<input/, 'nothing to type or pick but the idea and the factory');
+  assert.doesNotMatch(html, /data-no-factory/);
+});
+
+test('the box with no factory to offer has the one choice, and the line that files a factory', async () => {
+  const html = await routedWith(createElement(FileCard, { shown: 'default' }), [[['factories'], [LISTED[0]]], STORE_ANSWER]);
+  assert.equal([...html.matchAll(/<option /g)].length, 1);
+  assert.match(
+    html,
+    /data-no-factory="true"[^>]*>The store has no factory yet: file one with <code[^>]*>nemia factory add &lt;name&gt; --repo &lt;path&gt;<\/code>/,
+  );
+});
+
+test("the box preset to the address's factory says its one repository as text, and offers the repositories of a factory on several as a list with none chosen", async () => {
+  const solo = await routedWith(createElement(FileCard, { shown: 'solo' }), [[['factories'], LISTED], STORE_ANSWER]);
+  assert.match(solo, /<option value="solo" selected="">solo<\/option>/);
+  assert.match(solo, /data-factory-repo="true"[^>]*>\/r\/a<\/p>/);
+  assert.doesNotMatch(solo, /<input|data-parked/, 'no repository to type');
+  assert.match(solo, />Workflow<\/label>/);
+
+  const pair = await routedWith(createElement(FileCard, { shown: 'pair' }), [[['factories'], LISTED], STORE_ANSWER]);
+  assert.match(
+    pair,
+    />Repository<\/label><select[^>]*><option value="" selected="">None: chosen at start<\/option><option value="\/r\/a">\/r\/a<\/option><option value="\/r\/b">\/r\/b<\/option><\/select>/,
+  );
+  assert.match(pair, /data-needs-repo="true"/, 'its workflows are read once a repository is picked');
+});
+
+test('REFUSED: the start of a card that names no factory draws no start form before a factory is picked — a Factory list with nothing chosen; and with no factory to offer, the line that files one', async () => {
+  const start = (factories: unknown[]) =>
+    routedWith(createElement(UnassignedStart, { entry: inboxCard(), onStarted: () => {}, onRefused: () => {} }), [
+      [['factories'], factories],
+      STORE_ANSWER,
+    ]);
+  const html = await start(LISTED);
+  assert.match(html, /data-start-unassigned="true"/);
+  assert.match(
+    html,
+    /<option value="" disabled="" selected="">Pick the factory it runs in<\/option><option value="solo">solo<\/option><option value="pair">pair<\/option>/,
+  );
+  assert.doesNotMatch(html, /<form|>Workflow<|aria-label="Start idea"/);
+  const none = await start([LISTED[0]]);
+  assert.match(none, /data-no-factory="true"[^>]*>A card starts in a factory, and the store has none yet: file one with /);
+  assert.doesNotMatch(none, /<select|<form/);
+});

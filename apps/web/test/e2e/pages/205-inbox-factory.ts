@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { photograph, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
-import { FACTORIES, WORKFLOWS } from '../seed.ts';
+import { FACTORIES, hiringStarts, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
@@ -13,12 +13,6 @@ const CARD = 'hire-the-reviewer-in-the-factory-e2e0';
 const BODY = 'Hire the reviewer in the factory\n\nA card that names its factory, started from the Inbox.';
 /** The step of `dev` whose file names no agent, which leaves the workflow unfilled in a factory until it hires into it. */
 const UNFILLED = 'review';
-
-/**
- * The agent the page writes into the checkout's `workflows/agents/` for the factory to hire into `review`: the checkout's one agent gives
- * skills, which `review`'s `tools:` could not load.
- */
-const REVIEWER = 'reviewer-e2e';
 
 /**
  * The factory's file `text` with `hires` in place of the seed's, whose hire into `dev/implement`, a step whose file names its agent, leaves
@@ -56,10 +50,10 @@ export default {
     const factoryFile = path.join(store!, 'factories', `${factory}.json`);
     const factoryText = fs.readFileSync(factoryFile, 'utf8');
     const cardFile = path.join(inbox, `${CARD}.md`);
-    const reviewerFile = path.join(checkout, 'workflows', 'agents', `${REVIEWER}.md`);
     const runsBefore = fs.readdirSync(runsDir).sort();
     const theme = await themeOf(page);
     const other = await page.context().newPage();
+    let unhire = (): void => {};
     try {
       fs.writeFileSync(factoryFile, withHires(factoryText, {}));
       fs.writeFileSync(cardFile, `---\nworkflow: ${WORKFLOWS.good.name}\nfactory: ${factory}\n---\n${BODY}\n`);
@@ -84,8 +78,7 @@ export default {
       await settled(other);
       await photograph(other, path.join(OUT, `inbox-factory-unfilled-${theme}.png`), { fullPage: true });
 
-      fs.writeFileSync(reviewerFile, '---\ndescription: Use this when a change needs reviewing.\n---\nYou review the change.\n');
-      fs.writeFileSync(factoryFile, withHires(factoryText, { [`${WORKFLOWS.good.name}/${UNFILLED}`]: REVIEWER }));
+      unhire = hiringStarts(store!);
       item = await openStart(other);
       const form = item.locator(`form[aria-label="Start ${CARD}"]`);
       await expectVisible(form, `hired into ${UNFILLED}, the card's start offers Start`);
@@ -129,7 +122,7 @@ export default {
       for (const file of fs.readdirSync(runsDir))
         if (!runsBefore.includes(file)) fs.rmSync(path.join(runsDir, file), { recursive: true, force: true });
       fs.rmSync(cardFile, { force: true });
-      fs.rmSync(reviewerFile, { force: true });
+      unhire();
       fs.writeFileSync(factoryFile, factoryText);
     }
   },

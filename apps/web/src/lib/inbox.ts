@@ -1,5 +1,5 @@
 import type { Ceilings, Factory, InboxEntry, WorkflowListing } from './api';
-import { shownIn, startRepo } from './factories.ts';
+import { DEFAULT_NAME, shownIn, startRepo } from './factories.ts';
 
 /**
  * The inbox as the page lists it: the newest card first, by when its file was written (`filedAt`) — a card carries no time of its own —
@@ -96,10 +96,55 @@ export function presetOf(
   return readable.find((w) => w.from === 'repo' && w.name === workflow) ?? null;
 }
 
+/** Whether a card names no factory: it has no `factory:` line, or writes `default`, which is no factory to start in. */
+export const unassigned = (entry: Pick<InboxEntry, 'factory'>): boolean => entry.factory === null || entry.factory === DEFAULT_NAME;
+
+/** The factories a card can be filed or started in, in the api's order: each named one whose file reads, never the default factory. */
+export const factoriesOffered = <T extends Pick<Factory, 'default' | 'error'>>(factories: readonly T[]): T[] =>
+  factories.filter((f) => !f.default && f.error === null);
+
+/**
+ * The factory the box that files a card starts on: `shown`, the one the address names, when it is among `offered`; else `''`, no
+ * factory.
+ */
+export const factoryPreset = (shown: string | undefined, offered: readonly Pick<Factory, 'name'>[]): string =>
+  shown !== undefined && offered.some((f) => f.name === shown) ? shown : '';
+
+/**
+ * What the box that files a card holds when File is pressed: the idea; the factory now picked, null for none; `repo`, what its list of
+ * repositories was last set to, `''` for none; and the workflow picked among those listed now, null for none.
+ */
+export type FilingChoice = {
+  idea: string;
+  factory: Pick<Factory, 'name' | 'repos'> | null;
+  repo: string;
+  workflow: Pick<WorkflowListing, 'name' | 'from' | 'folderTeam'> | null;
+};
+
+/** A card as `fileCard` sends it. */
+export type CardFiling = { body: string; factory?: string; workflow?: string; from?: WorkflowListing['from']; repo?: string };
+
+/**
+ * What the box sends for `choice`, by what is offered now and never by what a list held before. With no factory, the idea alone: its
+ * workflow and repository come with the factory its start picks. In a factory, its name, and the workflow picked; and a repository only
+ * where a person chose one: the factory has several, the one picked is among them, and the workflow is no folder team, which looks at
+ * none. A factory's only repository is the factory's to give, and is never sent.
+ */
+export function cardFiling({ idea, factory, repo, workflow }: FilingChoice): CardFiling {
+  if (factory === null) return { body: idea };
+  const chosen = factory.repos.length > 1 && factory.repos.includes(repo) && !workflow?.folderTeam;
+  return {
+    body: idea,
+    factory: factory.name,
+    ...(workflow ? { workflow: workflow.name, from: workflow.from } : {}),
+    ...(chosen ? { repo } : {}),
+  };
+}
+
 /**
  * Where a card in a factory starts: the factory, its repositories, and the one it starts on (`startRepo`) — null while a person has it to
- * pick. Null for a card of the default factory, which starts as the api's repository has it. For a factory the store does not list, or
- * whose file does not read, why the card cannot start in it.
+ * pick. Null for a card that names no factory (`unassigned`), which starts once a person picks one (`startPlace`). For a factory the store
+ * does not list, or whose file does not read, why the card cannot start in it.
  */
 export type CardPlace = { factory: string; repos: string[]; repo: string | null } | { why: string };
 
@@ -109,7 +154,7 @@ export function cardPlace(
   factories: readonly Factory[],
   fileFactory: string,
 ): CardPlace | null {
-  if (entry.factory === null || entry.factory === 'default') return null;
+  if (unassigned(entry)) return null;
   const factory = factories.find((f) => f.name === entry.factory);
   if (!factory) {
     return {
@@ -118,6 +163,26 @@ export function cardPlace(
   }
   if (factory.error !== null) return { why: `The card names the factory ${factory.name}, whose file does not read: ${factory.error}` };
   return { factory: factory.name, repos: factory.repos, repo: startRepo(factory, entry.repo) };
+}
+
+/**
+ * Where a card that names no factory starts once a person picks `picked` among `factories`: null until one is picked (`''`); then the
+ * picked factory's place, as a card naming it has (`cardPlace`) — or, for a card whose `repo:` is none of that factory's repositories,
+ * why it cannot start there, naming both and the two ways out.
+ */
+export function startPlace(
+  entry: Pick<InboxEntry, 'repo'>,
+  picked: string,
+  factories: readonly Factory[],
+  fileFactory: string,
+): CardPlace | null {
+  if (picked === '') return null;
+  const place = cardPlace({ factory: picked, repo: entry.repo }, factories, fileFactory);
+  if (place === null || 'why' in place || entry.repo === null) return place;
+  if (place.repos.some((repo) => trimmed(repo) === trimmed(entry.repo!))) return place;
+  return {
+    why: `The card is about ${entry.repo}, and the factory ${picked} works on ${place.repos.join(', ') || 'no repository'}: pick a factory that works on it, or change the card's repo: line.`,
+  };
 }
 
 /**

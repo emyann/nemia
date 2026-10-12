@@ -46,17 +46,16 @@ export type FactoryBlock = {
 export type UntrustedPlace = { factory: string; trust: string; place: FactoryUntrusted };
 
 /**
- * The untrusted place the run `run` works on, among `factories`: the place of a factory that is the run's repository, in the factory
- * the run names where it names one, else in the first that lists it. Nothing for a run on no repository, on a place every harness
- * trusts, or in a factory that does not list its repository.
+ * The untrusted place the run `run` works on, among `factories`: the place of the first factory that lists the run's repository as
+ * untrusted. The factory the run names is not asked for: a harness keeps its trust for the folder, whichever factory lists it, so any
+ * factory's line that names the folder repairs it. Nothing for a run on no repository, or on a place every harness trusts.
  */
 export function untrustedFor(
   factories: readonly Pick<Factory, 'name' | 'untrusted' | 'commands'>[],
-  run: { repo: string | null; factory?: string | null },
+  run: { repo: string | null },
 ): UntrustedPlace | undefined {
   if (run.repo === null) return undefined;
   for (const factory of factories) {
-    if (run.factory !== undefined && run.factory !== factory.name) continue;
     const place = factory.untrusted.find((u) => u.place === run.repo);
     if (place) return { factory: factory.name, trust: factory.commands.trust, place };
   }

@@ -11,6 +11,8 @@ import { OUT, store } from '../world.ts';
 
 /** The factory the page gives an untrusted place: one that names only a folder in the seed. */
 const FACTORY = FACTORIES.bare;
+/** Its settings alone, no bar over them. */
+const ALONE = `/factories/${FACTORY}/settings`;
 /** Its settings, with its bar open beside them. */
 const SETTINGS = `/factories/${FACTORY}/settings?bar=${encodeURIComponent(barValue({ kind: 'factory', factory: FACTORY }))}`;
 /** The run one of whose steps was denied calls, and its page. */
@@ -25,9 +27,10 @@ async function visit(page: Page, to: string): Promise<void> {
 export default {
   /**
    * A factory one of whose places no harness trusts. The page files the seeded run's repository, where a step was denied two calls, as
-   * the place of a factory, which the seed's trust does not cover: the factory's settings and its bar then say the place, and the line
-   * that trusts it as the api answers it, and the run's denied row names the place as the likely cause. Once the harness's file trusts
-   * the place, none of the three says anything. The factory's file and the harness's are put back.
+   * the place of a factory, which the seed's trust does not cover: the factory's settings, pictured with no bar over them, and then
+   * its bar, each say the place and the line that trusts it as the api answers it, and the run's denied row names the place as the
+   * likely cause. Once the harness's file trusts the place, none of the three says anything. The factory's file and the harness's are
+   * put back.
    */
   name: 'factory-untrusted',
   route: SETTINGS,
@@ -41,7 +44,7 @@ export default {
     const denied = page.locator(`#step-${FAKE.refused} [data-fact="denied"]`);
     try {
       fs.writeFileSync(file, JSON.stringify({ repos: [place] }, null, 2));
-      await visit(page, SETTINGS);
+      await visit(page, ALONE);
       const answered = (await (await page.request.get(new URL('/api/factories', page.url()).href)).json()) as Factory[];
       const factory = answered.find((one) => one.name === FACTORY);
       if (factory?.untrusted.length !== 1 || factory.untrusted[0].place !== place)
@@ -50,10 +53,14 @@ export default {
       await expectVisible(caution.locator(`[data-untrusted-place="${place}"]`), "the factory's settings say the place that is not trusted");
       await expectVisible(caution.getByText(factory.untrusted[0].withheld), 'and what is withheld there, in the words the api gave');
       await expectTexts(caution.locator('[data-trust-command] code'), [trust], "with the line that trusts it, the api's");
+      await settled(page);
+      await photograph(page, path.join(OUT, `factory-untrusted-settings-${await themeOf(page)}.png`), { fullPage: true });
+
+      await visit(page, SETTINGS);
       await expectVisible(inBar.locator(`[data-untrusted-place="${place}"]`), "the factory's bar says the same place");
       await expectTexts(inBar.locator('[data-trust-command] code'), [trust], 'and the same line');
       await settled(page);
-      await photograph(page, path.join(OUT, `factory-untrusted-settings-${await themeOf(page)}.png`), { fullPage: true });
+      await photograph(page, path.join(OUT, `factory-untrusted-bar-${await themeOf(page)}.png`), { fullPage: true });
 
       await visit(page, RUN);
       const cause = denied.locator(`[data-denied-cause="${FACTORY}"]`);

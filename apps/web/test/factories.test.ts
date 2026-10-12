@@ -326,14 +326,12 @@ test('REFUSED: the default factory is shown only while no factory is named and i
   assert.deepEqual(names(factoriesShown([nemia, fallback], false)), ['nemia']);
 });
 
-test("a run's untrusted place: the factory's place that is its repository, in the factory it names; nothing for any other", () => {
+test("a run's untrusted place: a factory's untrusted place that is its repository, whichever factory lists it; nothing for another", () => {
   const place = { place: '/code/nemia', harness: 'A harness', withheld: 'its allow rules', never: null };
   const lacking = factory('nemia', { untrusted: [place] });
   const trusting = factory('pipao', { repos: ['/code/pipao'] });
   const found = { factory: 'nemia', trust: 'nemia factory trust nemia', place };
   assert.deepEqual(untrustedFor([trusting, lacking], { repo: '/code/nemia' }), found);
-  assert.deepEqual(untrustedFor([trusting, lacking], { repo: '/code/nemia', factory: 'nemia' }), found);
-  assert.equal(untrustedFor([trusting, lacking], { repo: '/code/nemia', factory: 'pipao' }), undefined, 'another factory');
   assert.equal(untrustedFor([trusting, lacking], { repo: '/code/pipao' }), undefined, 'another repository');
   assert.equal(untrustedFor([trusting, lacking], { repo: '/code/nemia/sub' }), undefined, 'a path beside it');
   assert.equal(untrustedFor([trusting, lacking], { repo: null }), undefined, 'a run on no repository');

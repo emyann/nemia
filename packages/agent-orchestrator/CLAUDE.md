@@ -137,6 +137,8 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
   pass goes into the stamps. Every test file that ticks a store sets `WF_VERIFY_REST=1`.
 - **The daemon frees a finished run's worktrees on a sweep beside its passes** (`freeOnce`, `src/prune/free.verb.ts`): a test that
   starts a daemon and reads a finished run's worktree afterwards sets `WF_KEEP_WORKTREES=1`.
+- **The daemon measures the store's disk on a sweep beside its passes** (`diskOnce`, `src/disk/disk.verb.ts`), after its first pass and
+  every `DISK_EVERY`: a test daemon walks its scratch store once, and a pass is handed the reading, never the walk.
 - **The test script loads `test/ambient.ts`**, which sets `WF_MAX_RUNS` and `WF_MAX_CONCURRENT` to a value their readers refuse: a
   test file that reads either sets or deletes it at its head, never the daemon's (`test/ambient.test.ts`). It deletes
   `OTEL_EXPORTER_OTLP_ENDPOINT` too: a test that exports sets the address of a collector it made (`test/check-export.boundary.test.ts`).

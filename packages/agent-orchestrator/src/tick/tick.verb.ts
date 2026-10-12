@@ -44,6 +44,7 @@ import { keepSeries } from '../series/series.store.ts';
 import { advancePass, type Advanced } from './advance.verb.ts';
 import { heldRead } from '../list/list.verb.ts';
 import { finishForgetting, type ForgettingLine } from '../forgetting/forgetting.verb.ts';
+import type { DiskReading } from '../disk/disk.ts';
 import { costOf, ioOf, meteredEngine, recordPassMetrics, recordStepMetrics, talliedIn } from '../meter/meter.verb.ts';
 
 /**
@@ -140,8 +141,17 @@ const seriesKept = (ring: readonly RecentPass[]): number => {
 /** The machine's load over the last minute, per core it has. */
 const loadNow = (): number => os.loadavg()[0] / os.availableParallelism();
 
-/** What a pass is handed from outside: where a queued card starts, the memo, whether it verifies, and the quota the daemon last read. */
-export type TickOptions = { repo?: string; memo?: RestMemo; verifyRest?: boolean; quota?: () => Reading | undefined };
+/**
+ * What a pass is handed from outside: where a queued card starts, the memo, whether it verifies, the quota the daemon last read, and
+ * what its last sweep of the store's disk read (`disk`), which the pass keeps and never measures.
+ */
+export type TickOptions = {
+  repo?: string;
+  memo?: RestMemo;
+  verifyRest?: boolean;
+  quota?: () => Reading | undefined;
+  disk?: () => DiskReading | undefined;
+};
 
 /**
  * Every run, advanced once, after one engine tick — then, with a run slot free, the queue's next card started. This is the whole daemon: an
@@ -162,9 +172,9 @@ export type TickOptions = { repo?: string; memo?: RestMemo; verifyRest?: boolean
  * while none of its inputs changed, and costs no read of the engine and no git of its own: see `restMemo`.
  *
  * Metered as it goes (`meteredPass`), and its cost written down (`recordPassCost`), kept among the recent passes (`recordRecentPass`) with
- * the quota `quota` reads and the checks the pass filed, rolled from there into the series (`keepSeries`), put into the pass's metrics
- * (`recordPassMetrics`) and returned. A pass run inside another's meter — a
- * test that meters its own — is counted as part of that one and carries no cost of its own. What each run's full pass read of its steps
+ * the quota `quota` reads, the disk's reading `disk` hands and the checks the pass filed, rolled from there into the series
+ * (`keepSeries`), put into the pass's metrics (`recordPassMetrics`) and returned. A pass run inside another's meter — a test that meters
+ * its own — is counted as part of that one and carries no cost of its own. What each run's full pass read of its steps
  * (`Advanced`'s `facts`) goes into the steps' metrics (`recordStepMetrics`), once, on every pass.
  *
  * `memo` is the memo to answer from and keep, the engine's own by default: a fresh one each pass (`freshRestMemo`) is a daemon restarted
@@ -173,7 +183,7 @@ export type TickOptions = { repo?: string; memo?: RestMemo; verifyRest?: boolean
  *
  * Fails with the refusal a read threw (`Refusal`: the ceilings, `WF_VERIFY_REST`, a record); dies of anything else.
  */
-export const tickRun = Effect.fn('tick')(function* ({ repo, memo, verifyRest, quota }: TickOptions = {}) {
+export const tickRun = Effect.fn('tick')(function* ({ repo, memo, verifyRest, quota, disk }: TickOptions = {}) {
   const e = yield* EngineService;
   const options: PassOptions = {
     repo: repo ?? process.cwd(),
@@ -197,7 +207,7 @@ export const tickRun = Effect.fn('tick')(function* ({ repo, memo, verifyRest, qu
     ...(value.unobserved ? { unobserved: value.unobserved } : {}),
   };
   const written = yield* tried(() => {
-    const recent = recordRecentPass(cost, RECENT_KEPT, { quota: quota?.(), checks: tallies.checks });
+    const recent = recordRecentPass(cost, RECENT_KEPT, { quota: quota?.(), checks: tallies.checks, disk: disk?.() });
     return recordPassCost(cost) + recent.ms + seriesKept(recent.kept);
   });
   yield* recordPassMetrics(cost);

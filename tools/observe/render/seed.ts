@@ -3,11 +3,11 @@
  * OTLP/HTTP JSON to the throwaway stack's own collector, never the live one.
  *
  * `SEED` holds what the daemon would say (the service `nemia`: its passes, a run's filings and appends, the waits and the denied calls
- * of two steps, that run's timeline once over, each number a span, its metrics and its logs) and what two steps' sessions would
- * (`claude-code`: a turn with its model request and tools, and their `tool_result` events). Every panel that draws series is met by
- * two at least, and one failed `tool_result` carries no `tool_name`, so a panel that drops a label shows it. The failed results are of
- * both kinds, each in both steps: the `Bash` tool's, a command that exited non-zero, and other tools'. What no fixture meets is listed
- * in `UNSEEDED`, with why.
+ * of two steps, that run's timeline once over, each number a span, the largest runs of a sweep of the disk, its metrics and its logs)
+ * and what two steps' sessions would (`claude-code`: a turn with its model request and tools, and their `tool_result` events). Every
+ * panel that draws series is met by two at least, and one failed `tool_result` carries no `tool_name`, so a panel that drops a label
+ * shows it. The failed results are of both kinds, each in both steps: the `Bash` tool's, a command that exited non-zero, and other
+ * tools'. What no fixture meets is listed in `UNSEEDED`, with why.
  * `packages/agent-orchestrator/test/observe.test.ts` holds the names here to those the code emits, and the dashboards to the seed.
  */
 import { asked, awaited } from './stack.ts';
@@ -133,6 +133,14 @@ const TIMELINE: SpanSeed[] = [
   number('run', 'run', 'gate', 120_000),
 ];
 
+/** One of the largest runs of a sweep of the store's disk, as the daemon's span of it: the run and the bytes it holds. */
+const largest = (run: string, value: number): SpanSeed => ({
+  name: 'disk.run',
+  ago: 20_000,
+  took: 0,
+  attributes: { factory: 'nemia', run, value },
+});
+
 /** A tool call of a session's turn, by its tool, with its command when it is a Bash call that says one, and its wait on a permission. */
 const tool = (labels: Record<string, string>, ago: number, took: number, name: string, command?: string): SpanSeed => ({
   name: 'claude_code.tool',
@@ -203,6 +211,8 @@ const DAEMON: ServiceSeed = {
     denied(REVIEW, 20_000, 'Bash', 'Bash(npm test)'),
     denied(REVIEW, 18_000, 'mcp__playwright__browser_navigate', 'mcp__playwright__browser_navigate'),
     ...TIMELINE,
+    largest(RUN, 269_000_000),
+    largest(OTHER_RUN, 41_500_000),
     wait('step.queue', IMPLEMENT, 58_000, 4_000, 'done'),
     wait('step.check', IMPLEMENT, 34_000, 9_000, 'refused'),
     wait('step.check', IMPLEMENT, 24_000, 8_000, 'passed'),
@@ -223,6 +233,29 @@ const DAEMON: ServiceSeed = {
     lone('sessions.admitted', 'gauge', 5),
     lone('admission.wait', 'gauge', 1500),
     lone('machine.load', 'gauge', 0.6),
+    {
+      name: 'disk.bytes',
+      kind: 'gauge',
+      series: [
+        [{ part: 'worktrees', factory: 'nemia' }, 2_900_000_000],
+        [{ part: 'runs', factory: 'nemia' }, 9_100_000_000],
+        [{ part: 'runs', factory: 'pipao' }, 600_000_000],
+        [{ part: 'engine' }, 5_500_000_000],
+        [{ part: 'checks' }, 118_000_000],
+        [{ part: 'series' }, 20_000_000],
+        [{ part: 'other' }, 4_000_000],
+      ],
+    },
+    {
+      name: 'disk.unread',
+      kind: 'gauge',
+      series: [
+        [{ part: 'runs' }, 0],
+        [{ part: 'engine' }, 2],
+      ],
+    },
+    lone('disk.free', 'gauge', 953_000_000_000),
+    lone('disk.size', 'gauge', 1_007_000_000_000),
     lone('feed.followers', 'gauge', 2),
     lone('feed.follow.beats', 'total', 40),
     lone('feed.follow.reads', 'total', 12),

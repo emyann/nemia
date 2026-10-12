@@ -7,10 +7,11 @@
  * A line is one series over one span: its start `t`, its series `s`, its labels `l`, how many samples `n`, their `sum`, `min`, `max` and
  * `last`, and for a histogram the counts of its buckets `b` with `p50` and `p95` — exact for a minute, to the bucket for a merged span.
  */
+import { unreadByPart, type DiskReading } from '../disk/disk.ts';
 import { PASS_BOUNDS, PHASES, READ_BOUNDS, type RecentPass } from '../meter/index.ts';
 
 /** The labels a line may carry: bounded keys, never a run id. A run's own detail stays in its record. */
-export const LABEL_KEYS = ['factory', 'workflow', 'step', 'agent', 'phase', 'harness', 'window'] as const;
+export const LABEL_KEYS = ['factory', 'workflow', 'step', 'agent', 'phase', 'harness', 'window', 'part'] as const;
 export type LabelKey = (typeof LABEL_KEYS)[number];
 export type Labels = Partial<Record<LabelKey, string>>;
 
@@ -20,7 +21,9 @@ export const LOAD_BOUNDS: readonly number[] = [0.1, 0.25, 0.5, 0.75, 1, 1.5, 2, 
 /**
  * The series kept, each a gauge or a histogram over its bounds: a pass's time and each phase's (`phase`), its journal reads, the runs in
  * the store, the sessions queued and admitted, how long the oldest queued session has waited, the machine's load per core at a pass and at
- * a check's start (`factory`, `workflow`, `step`, `agent`), and each harness's quota used, in percent, per `window`.
+ * a check's start (`factory`, `workflow`, `step`, `agent`), each harness's quota used, in percent, per `window`, and what the store takes
+ * on the disk as the daemon's last sweep read it: the bytes of each `part`, by `factory` where the part is kept by run, the names of
+ * each `part` that did not read, and the bytes free on the store's file system and its size.
  */
 export const SERIES = {
   'pass.ms': { kind: 'histogram', bounds: PASS_BOUNDS },
@@ -33,6 +36,10 @@ export const SERIES = {
   'machine.load': { kind: 'histogram', bounds: LOAD_BOUNDS },
   'check.load': { kind: 'histogram', bounds: LOAD_BOUNDS },
   'quota.used': { kind: 'gauge' },
+  'disk.bytes': { kind: 'gauge' },
+  'disk.unread': { kind: 'gauge' },
+  'disk.free': { kind: 'gauge' },
+  'disk.size': { kind: 'gauge' },
 } as const satisfies Record<string, { kind: 'gauge' } | { kind: 'histogram'; bounds: readonly number[] }>;
 export type SeriesName = keyof typeof SERIES;
 
@@ -72,6 +79,22 @@ export const dayOf = (t: string): string => t.slice(0, 10);
 export const strangeLabels = (l: Record<string, unknown>): string[] =>
   Object.keys(l).filter((k) => !(LABEL_KEYS as readonly string[]).includes(k));
 
+/**
+ * What a reading of the store's disk is sampled into: the bytes of each entry that read, by its part and its factory where it has one;
+ * each part's names that did not read, zero where all did; the bytes free and the size. An entry that did not read has no sample of
+ * bytes, never a zero.
+ */
+const diskSamples = (disk: DiskReading): Sample[] => [
+  ...disk.entries.flatMap((entry): Sample[] =>
+    entry.bytes === undefined
+      ? []
+      : [{ s: 'disk.bytes', l: { part: entry.part, ...(entry.factory === undefined ? {} : { factory: entry.factory }) }, v: entry.bytes }],
+  ),
+  ...unreadByPart(disk.entries).map(({ part, unread }): Sample => ({ s: 'disk.unread', l: { part }, v: unread })),
+  { s: 'disk.free', l: {}, v: disk.free },
+  { s: 'disk.size', l: {}, v: disk.size },
+];
+
 /** What one kept pass is sampled into: every series it carries a figure of, none for a figure an older tick did not keep. */
 export const samplesOf = (p: RecentPass): Sample[] => [
   { s: 'pass.ms', l: {}, v: p.ms },
@@ -86,6 +109,7 @@ export const samplesOf = (p: RecentPass): Sample[] => [
   ...Object.entries(p.quota ?? {}).flatMap(([harness, windows]) =>
     Object.entries(windows).map(([window, v]): Sample => ({ s: 'quota.used', l: { harness, window }, v })),
   ),
+  ...(p.disk === undefined ? [] : diskSamples(p.disk)),
 ];
 
 /** A series and its labels as one key, the labels in `LABEL_KEYS`' order. */

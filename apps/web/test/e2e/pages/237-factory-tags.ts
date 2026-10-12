@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { Page } from 'playwright';
 import { photograph, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled } from '../checks.ts';
-import { FACTORIES, FOLDER, WORKFLOWS } from '../seed.ts';
+import { FACTORIES, FOLDER, QUEUED_IN, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
@@ -122,13 +122,19 @@ export default {
         'the card is tagged with its factory, linked',
       );
       await expectCount(cards.locator('[data-factory-tag="default"]'), 0, 'no card wears the default factory for a tag');
-      await expectCount(cards.locator('[data-unassigned]'), filed - 1, 'and every other card says it has no factory yet');
+      const loose = filed - 1 - QUEUED_IN.hiring.length;
+      await expectCount(
+        cards.locator(`[data-factory-tag="${factory}"]`),
+        1 + QUEUED_IN.hiring.length,
+        `and so are the ${QUEUED_IN.hiring.length} queued cards the seed files in it`,
+      );
+      await expectCount(cards.locator('[data-unassigned]'), loose, 'and every other card says it has no factory yet');
       await shoot('inbox');
       await open(page, '/inbox?factory=default');
-      await expectCount(cards, filed - 1, 'with default picked, the Inbox keeps every card that names no factory');
+      await expectCount(cards, loose, 'with default picked, the Inbox keeps every card that names no factory');
       await expectCount(card, 0, 'and not the one filed in the factory');
-      if (Number(await page.locator('section[aria-label="Cards"] h2 [data-count]').textContent()) !== filed - 1)
-        throw new Refused(`the heading counts the cards the factory picked keeps, ${filed - 1}`);
+      if (Number(await page.locator('section[aria-label="Cards"] h2 [data-count]').textContent()) !== loose)
+        throw new Refused(`the heading counts the cards the factory picked keeps, ${loose}`);
     } finally {
       fs.rmSync(cardFile, { force: true });
     }

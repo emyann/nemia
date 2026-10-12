@@ -219,7 +219,13 @@ export const DENIED_SPAN_KEYS = ['run', 'task', 'tool', 'call'] as const satisfi
  * A span named `name` from `from` to `to`, a root of its own trace, carrying `own` and then `attributes`, refused if one of those is not a
  * step's (`boundedAttributes`): what it says spans passes or belongs to none, so no pass's span is its parent.
  */
-const rootSpan = (name: string, from: string, to: string, own: Record<string, string | number>, attributes: Record<string, string>) =>
+export const rootSpan = (
+  name: string,
+  from: string,
+  to: string,
+  own: Record<string, string | number>,
+  attributes: Record<string, string>,
+) =>
   Effect.gen(function* () {
     const bounded = boundedAttributes(attributes);
     const tracer = yield* Effect.tracer;

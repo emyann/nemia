@@ -108,7 +108,9 @@ holds `daemon.json` (its pid, `by` and the `url` an api serves at) and ticks. Th
 `--no-tick` (`apps/api/src/main.ts`), and `wf up` is it on a machine that serves no board; each refuses the other while it ticks. A board
 served by the daemon keeps its store ticking; a board served with `--no-tick` ticks nothing, and a run filed on it moves on the daemon's
 next pass. Beside its passes it frees the worktrees of finished runs (`free` in `src/prune/free.verb.ts`, forked by `up`), asking
-`nemia prune`'s own judgement of each, a few runs a sweep. A person may run it as a login service (`nemia service install`, `src/service/`), which runs the same daemon and hands the
+`nemia prune`'s own judgement of each, a few runs a sweep; and it measures what the store takes on the disk, part by part and by factory
+(`disk` in `src/disk/disk.verb.ts`, forked by `up`: a sweep of its own after the first pass and every ten minutes, whose reading each
+pass keeps in the series and no pass walks). A person may run it as a login service (`nemia service install`, `src/service/`), which runs the same daemon and hands the
 lease over only when told: from the checkout, or, run from an install, from `releases/current`. `nemia service restart`
 (`src/service/restart.verb.ts`) restarts the service's daemon as a take-over does (`takeOver`, `src/service/takeover.verb.ts`, shared with
 `nemia service install --take-over` and `nemia upgrade`): the store paused unless a person's pause stands, each landing check let
@@ -260,12 +262,12 @@ A file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or `CLIENT
 - **pure** imports no agent-runtime, no node:fs (nor fs/promises), no node:child_process, no node:http, node:https,
   node:net or node:os, reads neither `process.env` nor `fetch`, and imports no file of the other kinds: radius, rendering,
   retry, run and workflow at the top, and the folders' own — agents, artifacts, branches, cap,
-  check, closeout, daemon, ending, feed, folder, former, gate, harness, inbox, keys, level, merge, meter, plan, prune, record, refusal,
+  check, closeout, daemon, disk, ending, feed, folder, former, gate, harness, inbox, keys, level, merge, meter, plan, prune, record, refusal,
   rest, say, series, skills, status, step, subscription, timeline, views, wait, workflow, workspace.
 - **store** is the I/O beneath the controllers. It imports no agent-runtime, never a controller and not the client:
   branches and artifacts at the top, and record.store, folder.store, write.store, worktree.store, agents.store,
   custom.store, read.store (in agents and in skills), skills.store, plan.store, daemon.store, feed.store, inbox.store, tally.store,
-  places.store, config.store, series.store, subscription.store, level.store and a2a.store in the folders. They load as a tree. At
+  places.store, config.store, series.store, subscription.store, level.store, disk.store and a2a.store in the folders. They load as a tree. At
   the bottom are record/places.store.ts, skills/read.store.ts (where agents and skills are looked for, and the skills read there),
   meter/tally.store.ts (the pass's meter) and config/config.store.ts, which import no store file. agents/read.store.ts (the
   agents read, and a person's custom instructions) imports only skills/read.store.ts; folder/folder.store.ts imports only
@@ -277,7 +279,7 @@ A file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or `CLIENT
 - **controller** uses the runtime through the client: runner.ts, the package's root, which re-exports by name; the tick
   (tick.verb, advance.verb) and the verbs beneath it, one feature each (views.verb, file.verb, ending.verb, cap.verb,
   meter.verb, start.verb, plan.verb, inbox.verb, cancel.verb, retry.verb, gate.verb, say.verb, wait.verb, round.verb,
-  merge.verb, list.verb, decide.verb, forget.verb, prune.verb, free.verb); and src/cli/ and the bins,
+  merge.verb, list.verb, decide.verb, forget.verb, prune.verb, free.verb, disk.verb); and src/cli/ and the bins,
   bin/nemia.ts and its alias bin/wf.ts, above it. A verb reaches the client itself or through a controller it imports.
   src/cli/ reaches the package only through runner.ts, workflow.ts and its own files, and each bin only through cli/main.ts
   and cli/exit.ts. The client and

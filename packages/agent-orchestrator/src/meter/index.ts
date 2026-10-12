@@ -14,6 +14,7 @@ export {
   summaryLine,
 } from './meter.ts';
 export type {
+  AlsoKept,
   CheckLabels,
   HarnessCost,
   Interval,

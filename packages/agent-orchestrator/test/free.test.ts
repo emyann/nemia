@@ -7,6 +7,8 @@
  *
  * `WF_KEEP_WORKTREES` is deleted at its head, so the rule is read at its shipped default, and each sweep is handed the runs of its own
  * test alone: a sweep reads what it is given, and every test's runs share the one store.
+ *
+ * And the daemon's other sweep, of the store's disk (`disk`): that `up` forks it once its first pass answered and hands its reading on.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -43,6 +45,8 @@ const { free, freeOnce, freshFreeMemory, FREE_A_SWEEP } = await import('../src/p
 const { EngineService } = await import('../src/runtime-client.ts');
 const { freeable, freeSaid, freeTurn } = await import('../src/prune/prune.ts');
 const { up } = await import('../src/daemon/up.verb.ts');
+const { recentPasses } = await import('../src/daemon/daemon.store.ts');
+const { DEFAULT_FACTORY } = await import('../src/factory/factory.ts');
 const { main } = await import('../src/cli/main.ts');
 
 type Pass = Awaited<ReturnType<typeof tick>>;
@@ -478,6 +482,43 @@ test('the daemon frees a finished run with no person: `up` forks the sweep besid
   await until(t, () => gone(id), `the daemon frees ${id}`, { everyMs: 50 });
   assert.equal(readRun(id).pruned?.worktrees.length, 1);
 });
+
+test(
+  'the daemon measures the store with no person: `up` forks the sweep once its first pass answered, and hands each pass after its reading',
+  WAITED,
+  async (t) => {
+    const { id } = await started(WORK);
+    const from = new Date().toISOString();
+    const turn = Effect.promise(() => new Promise<void>((next) => setImmediate(next)));
+    const turns = Effect.forEach(Array.from({ length: 200 }), () => turn, { discard: true });
+    const daemon = Effect.runFork(
+      Effect.scoped(up(e, { every: 20, repo: ROOT, holder: 'wf up', onTaken: () => turns })).pipe(
+        Effect.provide(stand().layer),
+        Effect.provide(Logger.layer([])),
+      ),
+    );
+    t.after(() => Effect.runPromise(Fiber.interrupt(daemon)));
+    const kept = () => recentPasses().filter((pass) => pass.at >= from);
+    const read = await until(t, () => kept().find((pass) => pass.disk), 'a pass of the daemon keeps a reading of the disk', {
+      everyMs: 20,
+    });
+    const first = kept()[0];
+    assert.equal(
+      first.disk,
+      undefined,
+      'REFUSED: a sweep before the first pass answered, which the fibers forked had two hundred turns to start, and which knows no run and so no factory',
+    );
+    assert.ok(first.at < read.at);
+    const ours = read.disk!.entries.find((entry) => entry.part === 'runs' && entry.factory === DEFAULT_FACTORY);
+    assert.ok(ours?.bytes, `the runs the pass answered, ${id} among them, are their factory's: ${JSON.stringify(read.disk!.entries)}`);
+    assert.equal(
+      readRun(id).factory,
+      undefined,
+      'a run of no factory is the default factory’s once a pass answered it, and no factory’s before',
+    );
+    assert.ok(read.disk!.size >= read.disk!.free && read.disk!.free > 0, 'with the room on its file system');
+  },
+);
 
 test(
   'REFUSED at shipped defaults: a sweep that fails ends nothing — the loop warns once while its words stand, sweeps on, and frees once the cause is gone',

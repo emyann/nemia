@@ -15,11 +15,10 @@ import {
   PHASES,
   RECENT_KEPT,
   recentOf,
-  type CheckLabels,
+  type AlsoKept,
   type PassCost,
   type PassCostRead,
   type Phase,
-  type Reading,
   type RecentPass,
 } from '../meter/index.ts';
 import {
@@ -38,6 +37,7 @@ import {
   type Monotonic,
 } from './daemon.ts';
 import { Conflict } from '../refusal/refusal.ts';
+import { DISK_PARTS } from '../disk/disk.ts';
 
 /** The text as JSON, or undefined where it is not: a file half written, or another program's. */
 const jsonOr = (text: string): unknown => {
@@ -480,6 +480,21 @@ const isRecentPass = Schema.is(
       checks: Schema.optionalKey(
         Schema.Array(Schema.Struct({ factory: Schema.String, workflow: Schema.String, step: Schema.String, agent: Schema.String })),
       ),
+      disk: Schema.optionalKey(
+        Schema.Struct({
+          at: Schema.String,
+          free: Count,
+          size: Count,
+          entries: Schema.Array(
+            Schema.Struct({
+              part: Schema.Literals(DISK_PARTS),
+              factory: Schema.optionalKey(Schema.String),
+              bytes: Schema.optionalKey(Count),
+              unread: Count,
+            }),
+          ),
+        }),
+      ),
     }),
     Rest,
   ),
@@ -515,15 +530,11 @@ export function recentPasses(): RecentPass[] {
 }
 
 /**
- * The pass whose cost is `cost` kept among the recent (`recentOf`, with the quota read and the checks filed in it, `also`), after those
+ * The pass whose cost is `cost` kept among the recent (`recentOf`, with what it is kept with, `also`), after those
  * the file holds and the oldest left out past `keep`, written through a hidden file renamed over the last, as `recordPassCost` writes. A
  * store that cannot be written loses only this. Answers with the time it took, which is measuring's, and the passes kept, oldest first.
  */
-export function recordRecentPass(
-  cost: PassCost,
-  keep = RECENT_KEPT,
-  also: { quota?: Reading; checks?: readonly CheckLabels[] } = {},
-): { ms: number; kept: RecentPass[] } {
+export function recordRecentPass(cost: PassCost, keep = RECENT_KEPT, also: AlsoKept = {}): { ms: number; kept: RecentPass[] } {
   const t0 = performance.now();
   const text = recentText();
   const kept = [...(text === undefined ? [] : parseRecentPasses(text).passes), recentOf(cost, also)].slice(-keep);

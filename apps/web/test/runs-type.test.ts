@@ -80,3 +80,22 @@ test("REFUSED: the board's own cn in a file that draws the Runs page: it drops a
   assert.equal(kits('text-body-small', 'text-on-surface-variant'), 'text-body-small text-on-surface-variant');
   assert.equal(kits('text-on-surface', 'block text-title-small'), 'text-on-surface block text-title-small');
 });
+
+/** A focus ring written by hand: a ring or an outline class behind a focus state, which the kit's `focusRing` writes once for all. */
+const handRings = (text: string): string[] => text.match(/(?<![\w-])(?:data-)?focus(?:-visible|-within)?:(?:ring|outline)-[\w-]+/g) ?? [];
+
+/** The parts of the Runs page that take the focus as a box, each ringed by the kit. */
+const RINGED = ['components/StatTile.tsx', 'components/Pager.tsx', 'components/TextLink.tsx'];
+
+test("REFUSED: a focus ring written by hand in a file that draws the Runs page: a box that takes the focus takes the kit's ring", () => {
+  for (const file of FILES)
+    assert.deepEqual(handRings(fs.readFileSync(path.join(SRC, file), 'utf8')), [], `${file} writes a ring of its own: use focusRing()`);
+  for (const file of RINGED)
+    assert.match(fs.readFileSync(path.join(SRC, file), 'utf8'), /\bfocusRing\(\)/, `${file} takes the focus, and rings as the kit does`);
+  assert.deepEqual(handRings('className="outline-none focus-visible:ring-2 focus-visible:ring-ring data-focus-visible:ring-offset-2"'), [
+    'focus-visible:ring-2',
+    'focus-visible:ring-ring',
+    'data-focus-visible:ring-offset-2',
+  ]);
+  assert.deepEqual(handRings("cn('inline-flex rounded-[14px] group-data-focus-visible/cut:block', focusRing())"), []);
+});

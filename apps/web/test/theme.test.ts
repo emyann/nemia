@@ -77,3 +77,14 @@ test('the look names a mono face, and the theme reads it — a DESIGN.md that na
   assert.doesNotMatch(fs.readFileSync(path.join(out, 'theme.v4.css'), 'utf8'), hooked);
   assert.ok(stale(out).includes('theme.v4.css'), 'a look with no mono face generates another theme.v4.css');
 });
+
+test('each label role is tracked for what it mostly draws: a button and a tag by six hundredths of an em, a heading by a tenth', () => {
+  const theme = fs.readFileSync(path.join(web, 'theme', 'theme.v4.css'), 'utf8');
+  const tracked = Object.fromEntries(
+    ['large', 'medium', 'small'].map((size) => [
+      size,
+      theme.match(new RegExp(`--md-sys-typescale-label-${size}-tracking:\\s*([^;]+);`))?.[1],
+    ]),
+  );
+  assert.equal(JSON.stringify(tracked), JSON.stringify({ large: '0.06em', medium: '0.06em', small: '0.1em' }));
+});

@@ -113,6 +113,34 @@ export function monoWeighted(text: string): string[] {
     .filter((classes) => /(?<![\w-])font-mono(?![\w-])/.test(classes) && WEIGHTED.test(classes));
 }
 
+const LABELLED = /(?<![\w-])text-(?:label|title)-(?:small|medium|large)(?![\w-])/;
+const BY_HAND = /(?<![\w-])(?:font-(?:thin|extralight|light|normal|medium|semibold|bold|extrabold|black)|tracking-[\w.[\]-]+)(?![\w-])/;
+
+/** Each class string of `text` that writes a weight or a tracking beside a label or title role: the role gives both. */
+export function dressed(text: string): string[] {
+  return [...text.matchAll(/(["'`])([^"'`\n]*)\1/g)]
+    .map(([, , classes]) => classes ?? '')
+    .filter((classes) => LABELLED.test(classes) && BY_HAND.test(classes));
+}
+
+/** The class strings that keep a weight beside their role, each in its file alone, with its reason. */
+export const DRESSED: { file: string; classes: string; why: string }[] = [
+  {
+    file: 'src/components/look/Plate.tsx',
+    classes: 'm-0 font-label text-label-large font-extrabold uppercase',
+    why: "a plate's title stands beside its numeral in the label face (Archivo, weight 800), as the Runs page settled it",
+  },
+];
+
+/** Every class string under `root`'s `src` outside the kit that `dressed` finds and `kept` does not list for its file, as `file (classes)`. */
+export function dressedIn(root: string, kept = DRESSED): string[] {
+  return sources(root).flatMap((file) =>
+    dressed(fs.readFileSync(path.join(root, file), 'utf8'))
+      .filter((classes) => !kept.some((k) => k.file === file && k.classes === classes))
+      .map((classes) => `${file} (${classes})`),
+  );
+}
+
 /** Whether `text` takes a merge function that does not know the roles: the package's own, which reads `text-body-small` as an ink. */
 export const roleBlind = (text: string): boolean => /from\s*['"]cn['"]/.test(text);
 
@@ -222,6 +250,22 @@ test('REFUSED: mono text in a role that carries a weight: mono takes a body role
   assert.deepEqual(monoWeighted('<a className="font-monospace text-label-small"><b className="text-label-small">'), []);
   for (const file of sources(WEB))
     assert.deepEqual(monoWeighted(fs.readFileSync(path.join(WEB, file), 'utf8')), [], `${file}: mono text takes a body role`);
+});
+
+test('REFUSED: a weight or a tracking written beside a label or title role: the role gives both', () => {
+  assert.deepEqual(dressed('<a className="text-label-small font-semibold uppercase">'), ['text-label-small font-semibold uppercase']);
+  assert.deepEqual(dressed("cn('tracking-wide text-label-medium', x)"), ['tracking-wide text-label-medium']);
+  assert.deepEqual(dressed('<h2 className="text-title-small hover:font-bold tracking-[0.06em]">').length, 1);
+  assert.deepEqual(
+    dressed('<a className="text-label-small uppercase leading-none"><b className="text-body-small font-medium tracking-wide">'),
+    [],
+  );
+  const classes = 'text-label-large font-extrabold';
+  const root = boardOf({ 'src/a.tsx': `<a className="${classes}">\n`, 'src/b.tsx': `<a className="${classes}">\n` });
+  assert.deepEqual(dressedIn(root, [{ file: 'src/a.tsx', classes, why: 'a numeral' }]), [`src/b.tsx (${classes})`]);
+  assert.deepEqual(dressedIn(WEB), [], 'take the weight or the tracking off: the label and title roles carry their own');
+  for (const { file, classes: kept, why } of DRESSED)
+    assert.ok(why.trim() && dressed(fs.readFileSync(path.join(WEB, file), 'utf8')).includes(kept), `${file} no longer writes ${kept}`);
 });
 
 test("the board's cn knows the theme's roles as the kit's does: a role stays beside an ink and gives way to another role", async () => {

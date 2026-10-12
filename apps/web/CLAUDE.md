@@ -40,8 +40,9 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
   or an outline reads a role (`bg-card`, `border-outline`), one class for both schemes, no `dark:` twin. A use that means none of the
   five is rest; a caution is failure for a write refused, yours drawn light for what a person weighs, rest for a note.
 - `test/type.test.ts` refuses a text size written by hand in `src` outside the kit (`text-sm`, `text-[11px]`, `leading-[18px]`, a
-  `fontSize`): 12, 14 and 16px are `text-body-small`, `-medium` and `-large`, small caps a label role and `uppercase`, a heading a
-  title role with no weight beside it. The sizes no role gives are its `OUTSIDE`, each in its file alone, with its reason.
+  `fontSize`): 12, 14 and 16px are `text-body-small`, `-medium` and `-large`, small caps a label role and `uppercase`, a heading a title
+  role, and neither a label nor a title has a weight or a tracking beside it (`dressed`). The sizes no role gives are its `OUTSIDE`, each
+  in its file alone, with its reason.
 - Classes merge through `cn` of `src/lib/utils.ts`, built from the kit's `twMergeConfig`: the package's own `cn` reads a role as an
   ink and drops it beside one (`roleBlind`, same test). A `leading-*` written before a role in one merge is dropped: write it after.
 - A text that stands on `ScanLines` is `unmeasured` by the contrast measure, its ground being an image, and an unmeasured text is

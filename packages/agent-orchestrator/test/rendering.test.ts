@@ -135,6 +135,16 @@ test('the former `systemPrompt:` line is still read, each of its words as the on
   }
 });
 
+test("an agent's `skills:` takes a skill named with its folder; REFUSED: one that is neither form, and two of one bare name", () => {
+  assert.deepEqual(parseAgent('builder', '---\nskills: write-a-note, app:y\n---\nx\n').skills, ['write-a-note', 'app:y']);
+  const odd = refusal(() => parseAgent('builder', '---\nskills: write-a-note, ../app:y\n---\nx\n'));
+  assert.ok(odd.startsWith("agents/builder.md: `skills: write-a-note, ../app:y` has `../app:y`, which is not a skill's name."), odd);
+  assert.ok(odd.includes('`folder:name`'), odd);
+  assert.ok(
+    refusal(() => parseAgent('builder', '---\nskills: y, app:y\n---\nx\n')).includes('gives `y` and `app:y`, two skills named `y`'),
+  );
+});
+
 test('REFUSED at shipped defaults: a skill name that is none, a name given twice, an empty list, and a harness prompt that is not one of the three', () => {
   assert.match(
     refusal(() => parseAgent('builder', '---\nskills: Review A Change\n---\nx\n')),

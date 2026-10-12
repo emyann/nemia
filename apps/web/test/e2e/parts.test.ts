@@ -384,6 +384,53 @@ test(
   },
 );
 
+/** A part of each kind that wears a grain, in a story of its own: a card's ground, and the two labels. */
+const GRAINED = {
+  'a cut frame': `${story(ON.plain)} [data-ground="plain"] [data-cut-frame]`,
+  'a sticker': `${story('look-sticker--cost')} [data-sticker]`,
+  'a plate': `${story('look-plate--grey')} [data-plate]`,
+} as const;
+
+/**
+ * How many colours a strip of what `selector` finds is painted in: twenty-four pixels in a row, four under its top edge and
+ * twenty in from its left, where a part holds no text. One is a plain ground; a grain paints several.
+ */
+async function coloursAlong(page: Page, name: string, selector: string): Promise<number> {
+  const { out } = await edgesOf(page, selector);
+  const strip = Object.fromEntries(Array.from({ length: 24 }, (_, i) => [`${i}`, [out.left + 21 + i, out.top + 5] as const]));
+  const found = Object.values(await coloursOf(page, name, strip));
+  return new Set(found.map((colour) => colour.join(','))).size;
+}
+
+/** Every part drawn with no grain, whatever it names. */
+const NO_GRAIN = '[data-grain] { background-image: none !important; }';
+
+for (const scheme of ['dark', 'light'] as const)
+  test(
+    `REFUSED: a card's ground, a sticker or a plate drawn plain in ${scheme}: each wears its grain, and a cut button none`,
+    WAITED,
+    async () => {
+      const pages = {
+        'a cut frame': await openParts(browser, built, scheme, '?part=CutFrame'),
+        'a sticker': await openParts(browser, built, scheme, '?part=Sticker'),
+        'a plate': await openParts(browser, built, scheme, '?part=Plate'),
+      };
+      const button = await openParts(browser, built, scheme, BUTTONS);
+      try {
+        for (const [part, selector] of Object.entries(GRAINED) as Array<[keyof typeof GRAINED, string]>) {
+          const page = pages[part];
+          const grained = await coloursAlong(page, `grain-${scheme}`, selector);
+          assert.ok(grained >= 4, `${part} is grained in ${scheme}: its strip holds ${grained} colours`);
+          await page.addStyleTag({ content: NO_GRAIN });
+          assert.equal(await coloursAlong(page, `grain-none-${scheme}`, selector), 1, `${part} with no grain is one colour: seen`);
+        }
+        assert.equal(await coloursAlong(button, `grain-button-${scheme}`, BUTTON), 1, 'a cut button wears no grain');
+      } finally {
+        for (const page of [...Object.values(pages), button]) await page.context().close();
+      }
+    },
+  );
+
 /** The frame as the look's source cut it: by a clip, which cuts off whatever it holds too. */
 const CLIPPED = `${story(CORNER)} [data-cut-frame] {
   clip-path: polygon(0 0, calc(100% - 28px) 0, 100% 28px, 100% 100%, 28px 100%, 0 calc(100% - 28px));

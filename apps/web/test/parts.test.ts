@@ -232,6 +232,31 @@ test('the cut frame: a shape nobody reads or presses, before what the frame hold
   assert.doesNotMatch(tagWith(alive, 'data-cut-shape'), /filter/, 'nor one of a session at work');
 });
 
+/** How many elements of `markup` name a grain. */
+const grains = (markup: string): number => markup.split('data-grain=').length - 1;
+
+test("the grain: the cut frame's ground wears the surface's, a sticker and a plate a label's, a tag and a button none", async () => {
+  const child = createElement('button', { type: 'button' }, 'Approve');
+  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
+  const frame = await drawn(createElement(CutFrame, { hue: 'yours', children: child }));
+  assert.match(tagWith(frame, 'data-cut-ground'), /data-grain="surface"/);
+  assert.equal(grains(frame), 1, 'the ground alone: neither the edge, the shape that casts the glow, nor what the frame holds');
+  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
+  const sticker = await drawn(createElement(Sticker, { hue: 'money', label: 'Cost', children: '$4.25' }));
+  assert.match(tagWith(sticker, 'data-sticker'), /data-grain="label"/);
+  assert.equal(grains(sticker), 1);
+  for (const quiet of [false, true]) {
+    const plate = await drawn(createElement(Plate, { count: 2, title: 'Waiting on you', quiet }));
+    assert.match(tagWith(plate, 'data-plate='), /data-grain="label"/, quiet ? 'a quiet plate' : 'a loud plate');
+    assert.equal(grains(plate), 1, 'the barcode wears none');
+  }
+  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
+  assert.equal(grains(await drawn(createElement(CutTag, { children: 'YOUR WORD' }))), 0, 'a cut tag');
+  const { CutButton } = await import('../src/components/look/CutButton.tsx');
+  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
+  assert.equal(grains(await drawn(createElement(CutButton, { to: '/runs', children: 'Open' }))), 0, 'a cut button');
+});
+
 /** Each way `markup` would cut what an element holds off: a clip path, or an overflow that hides or clips. */
 const clips = (markup: string): string[] => [...markup.matchAll(/clip-?path|overflow-(?:hidden|clip)|overflow\s*:/gi)].map((m) => m[0]);
 

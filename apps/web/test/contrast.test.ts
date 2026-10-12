@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { BAR, failing, hex, lookOf, ratio, ratioOf, tableOf, under, type Pair, type Sheet } from './e2e/contrast.ts';
+import { BAR, GRAIN_TAIL, failing, grainedOf, hex, lookOf, ratio, ratioOf, tableOf, under, type Pair, type Sheet } from './e2e/contrast.ts';
 import { scratch } from './scratch.ts';
 
 const WHITE = [255, 255, 255] as const;
@@ -12,6 +12,7 @@ const pair = (ink: Pair['ink'], rest: Partial<Pair> = {}): Pair => ({
   ink,
   ground: WHITE,
   faded: false,
+  grained: false,
   text: 'a line of text',
   classes: 'text-neutral-500',
   count: 1,
@@ -64,6 +65,35 @@ test('the table names each failing pair once a scheme, worst first, with its col
   );
   assert.match(table, /\| runs \| dark \| runs-dark\.png \| 1 \| 18\.\d\d \| 0 \| 0 \| 0 \|/);
   assert.match(tableOf(sheets.slice(2)), /## Under the bar\n\nNone\./);
+});
+
+test('REFUSED: a pair under the bar at a grain’s far end: it fails as any measured pair, and the table says it is a grain’s', () => {
+  assert.equal(GRAIN_TAIL, 0.02);
+  const far = pair([0x6a, 0x6a, 0x6a], { ground: [0xc9, 0xc9, 0xc9], grained: true });
+  assert.equal(under(far), true);
+  assert.equal(under(pair([0x6a, 0x6a, 0x6a])), false, 'the same ink on the plain ground holds');
+  const sheets = [
+    sheet('runs-light.png', 'light', [
+      pair([0x6a, 0x6a, 0x6a]),
+      far,
+      pair([0, 0, 0], { ground: [0xc9, 0xc9, 0xc9], grained: true, count: 3 }),
+    ]),
+    sheet('gate-light.png', 'light', [far, pair([0, 0, 0], { ground: [0xc9, 0xc9, 0xc9], grained: true, state: 'exempt' })]),
+  ];
+  assert.deepEqual(
+    grainedOf(sheets).map((row) => [hex(row.pair.ink), hex(row.pair.ground), row.scheme, row.texts]),
+    [
+      ['#6a6a6a', '#c9c9c9', 'light', 2],
+      ['#000000', '#c9c9c9', 'light', 3],
+    ],
+    'each measured pair once, least first, with its texts',
+  );
+  const table = tableOf(sheets);
+  assert.match(table, /4 pairs, 2 under the bar \(1 distinct\)/);
+  assert.match(table, /4 at a grain's far end \(2 distinct\)\./);
+  assert.match(table, /\| 3\.\d\d \| light \| #6a6a6a \| #c9c9c9 \(grain\) \| a line of text \|/);
+  assert.match(table, /## On a grain\n\n\| ratio \|[^\n]*\n\|[- |]*\n\| 3\.\d\d \| light \| #6a6a6a \| #c9c9c9 \| 2 \| a line of text \|/);
+  assert.match(tableOf([sheet('runs-light.png', 'light', [pair([0, 0, 0])])]), /## On a grain\n\nNone\./);
 });
 
 test('the look sets each page’s light picture beside its dark one', () => {

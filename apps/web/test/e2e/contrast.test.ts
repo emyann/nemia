@@ -67,6 +67,80 @@ test('a ground drawn by a background-image is answered unmeasured, never passed 
   assert.equal(said(pairs, 'on its own ground').state, 'measured', 'an opaque ground over the image is read');
 });
 
+const tile = (frequency: number, matrix: string): string =>
+  `url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="220" height="220"><filter id="n" x="0" y="0" width="100%" ` +
+  `height="100%"><feTurbulence type="fractalNoise" baseFrequency="${frequency}" numOctaves="2" seed="7" stitchTiles="stitch"/>` +
+  `<feColorMatrix type="matrix" values="${matrix}"/></filter><rect width="220" height="220" filter="url(%23n)"/></svg>')`;
+const INK_SPECKS = tile(0.9, '0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0.62 0 0 0 -0.24');
+const LIGHT_SPECKS = tile(0.8, '0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0.3 0 0 0 -0.12');
+const rowsOf = (pairs: readonly Pair[], text: string): Pair[] => pairs.filter((pair) => pair.text === text);
+
+test('REFUSED: a text under the bar at the far end of a grain, its ground read plain and at the speck’s strongest 2%', async () => {
+  const { pairs } = await pairsOf(
+    `<style>.label{background-color:#fff;background-image:${INK_SPECKS};background-size:220px 220px}</style><div class="label">` +
+      '<p style="color:#6a6a6a">on a label</p><p style="color:#000">in ink</p></div><p style="color:#555">beside it</p>',
+  );
+  const [plain, far, ...more] = rowsOf(pairs, 'on a label');
+  assert.ok(plain && far && !more.length, 'a text on a grain has two rows');
+  assert.deepEqual([plain.state, plain.grained, hex(plain.ground), under(plain)], ['measured', false, '#ffffff', false]);
+  assert.deepEqual([far.state, far.grained, under(far)], ['measured', true, true], `refused at ${ratioOf(far)}:1`);
+  assert.ok(ratioOf(far) > 3 && ratioOf(far) < 3.6, `ink specks at about a fifth darken the white to ${hex(far.ground)}`);
+  assert.deepEqual(
+    rowsOf(pairs, 'in ink').map((pair) => [pair.grained, under(pair)]),
+    [
+      [false, false],
+      [true, false],
+    ],
+    'a text that holds at the far end passes both',
+  );
+  assert.deepEqual(
+    rowsOf(pairs, 'beside it').map((pair) => pair.grained),
+    [false],
+    'a text off the grain has one row',
+  );
+});
+
+test('a tile of more than one colour is no grain: its ground is answered unmeasured, as a gradient’s', async () => {
+  const two =
+    `url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><rect width="10" height="20" ` +
+    `fill="red" fill-opacity="0.2"/><rect x="10" width="10" height="20" fill="blue" fill-opacity="0.2"/></svg>')`;
+  const { pairs } = await pairsOf(
+    `<style>.pattern{background-image:${two}}</style><div class="pattern"><p style="color:#777">on a pattern</p></div>`,
+  );
+  const pattern = said(pairs, 'on a pattern');
+  assert.deepEqual([pattern.state, pattern.why, under(pattern)], ['unmeasured', 'its ground is a background-image', false]);
+  assert.equal(rowsOf(pairs, 'on a pattern').length, 1);
+});
+
+const framed = (ground: string, text: string): string =>
+  '<div style="background:#000;padding:8px"><div data-cut-frame="none" style="position:relative">' +
+  `<span data-cut-shape style="position:absolute;inset:0"><span data-cut-ground style="position:absolute;inset:0;${ground}"></span>` +
+  `</span><div style="position:relative">${text}</div></div></div>`;
+
+test('REFUSED: a text under the bar on a cut frame’s ground, a layer beside what the frame holds and no ancestor of it', async () => {
+  const { pairs } = await pairsOf(framed('background:#fff', '<p style="color:#777">in a frame</p>'));
+  const inside = said(pairs, 'in a frame');
+  assert.deepEqual([inside.state, hex(inside.ground), ratioOf(inside), under(inside)], ['measured', '#ffffff', 4.47, true]);
+  const nested = await pairsOf(
+    framed('background:#fff', `<p style="color:#777">outer</p>${framed('background:#000', '<p style="color:#777">inner</p>')}`),
+  );
+  assert.equal(hex(said(nested.pairs, 'outer').ground), '#ffffff', 'a frame reads its own layer, not one of a frame it holds');
+  assert.equal(hex(said(nested.pairs, 'inner').ground), '#000000');
+});
+
+test('REFUSED: a text that holds on a cut frame’s plain ground and falls under the bar at the far end of its grain', async () => {
+  const { pairs } = await pairsOf(
+    `<style>[data-cut-ground]{background-color:#000;background-image:${LIGHT_SPECKS};background-size:220px 220px}</style>` +
+      framed('', '<p style="color:#797979">on a card</p>'),
+    'dark',
+  );
+  const [plain, far, ...more] = rowsOf(pairs, 'on a card');
+  assert.ok(plain && far && !more.length, 'a text on a grained card has two rows');
+  assert.deepEqual([plain.grained, hex(plain.ground), under(plain)], [false, '#000000', false]);
+  assert.deepEqual([far.state, far.grained, under(far)], ['measured', true, true], `refused at ${ratioOf(far)}:1`);
+  assert.ok(ratioOf(far) > 3.8 && ratioOf(far) < 4.3, `light specks at about a tenth lift the black to ${hex(far.ground)}`);
+});
+
 test('a text nobody sees is not counted, a disabled control is exempt, and a faded text is measured blended', async () => {
   const { pairs } = await pairsOf(
     '<p style="display:none;color:#eee">hidden</p><p style="visibility:hidden;color:#eee">unseen</p>' +

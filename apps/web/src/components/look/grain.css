@@ -1,0 +1,25 @@
+/*
+ * The look's grain, each tile written once: noise the browser draws from an SVG filter, no image file, repeated every 220 pixels. A
+ * part of the look wears one by naming it, `data-grain="surface"` on the ground of a card or a framed table, `data-grain="label"` on
+ * a label. A surface's specks are ink in the light scheme and light in the dark one, at one weight; a label's are ink in both.
+ */
+:root {
+  --grain-surface: url('data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%22220%22%20height=%22220%22%3E%3Cfilter%20id=%22n%22%20x=%220%22%20y=%220%22%20width=%22100%25%22%20height=%22100%25%22%3E%3CfeTurbulence%20type=%22fractalNoise%22%20baseFrequency=%220.8%22%20numOctaves=%222%22%20seed=%227%22%20stitchTiles=%22stitch%22/%3E%3CfeColorMatrix%20type=%22matrix%22%20values=%220%200%200%200%200%20%200%200%200%200%200%20%200%200%200%200%200%20%200.3%200%200%200%20-0.12%22/%3E%3C/filter%3E%3Crect%20width=%22220%22%20height=%22220%22%20filter=%22url%28%23n%29%22/%3E%3C/svg%3E');
+  --grain-label: url('data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%22220%22%20height=%22220%22%3E%3Cfilter%20id=%22n%22%20x=%220%22%20y=%220%22%20width=%22100%25%22%20height=%22100%25%22%3E%3CfeTurbulence%20type=%22fractalNoise%22%20baseFrequency=%220.9%22%20numOctaves=%222%22%20seed=%227%22%20stitchTiles=%22stitch%22/%3E%3CfeColorMatrix%20type=%22matrix%22%20values=%220%200%200%200%200%20%200%200%200%200%200%20%200%200%200%200%200%20%200.62%200%200%200%20-0.24%22/%3E%3C/filter%3E%3Crect%20width=%22220%22%20height=%22220%22%20filter=%22url%28%23n%29%22/%3E%3C/svg%3E');
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --grain-surface: url('data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%22220%22%20height=%22220%22%3E%3Cfilter%20id=%22n%22%20x=%220%22%20y=%220%22%20width=%22100%25%22%20height=%22100%25%22%3E%3CfeTurbulence%20type=%22fractalNoise%22%20baseFrequency=%220.8%22%20numOctaves=%222%22%20seed=%227%22%20stitchTiles=%22stitch%22/%3E%3CfeColorMatrix%20type=%22matrix%22%20values=%220%200%200%200%201%20%200%200%200%200%201%20%200%200%200%200%201%20%200.3%200%200%200%20-0.12%22/%3E%3C/filter%3E%3Crect%20width=%22220%22%20height=%22220%22%20filter=%22url%28%23n%29%22/%3E%3C/svg%3E');
+  }
+}
+
+[data-grain='surface'] {
+  background-image: var(--grain-surface);
+  background-size: 220px 220px;
+}
+
+[data-grain='label'] {
+  background-image: var(--grain-label);
+  background-size: 220px 220px;
+}

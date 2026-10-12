@@ -56,7 +56,9 @@ export async function failingPairs(page: Page): Promise<string[]> {
         `every text of the Runs page is measured against its ground in ${scheme} — ` +
           (unread.map((pair) => `"${pair.text}": ${pair.why ?? 'unread'}`).join('; ') || 'it shows no text'),
       );
-    return pairs.filter(under).map((pair) => `${ratioOf(pair)}:1 "${pair.text}" (${pair.classes}) in ${scheme}`);
+    return pairs
+      .filter(under)
+      .map((pair) => `${ratioOf(pair)}:1 "${pair.text}" (${pair.classes}) in ${scheme}${pair.grained ? ", at its grain's far end" : ''}`);
   } finally {
     await restore();
   }

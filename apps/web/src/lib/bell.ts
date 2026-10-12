@@ -1,11 +1,11 @@
 /**
- * The header's bell, without React: the runs that wait on a person across every factory, as the floor counts them (`waitsOnYou`), each
+ * The header's bell, without React: the runs that wait on a person across every factory, as the api answers them, each
  * with its factory, what it waits for and the step at whose gate it waits; and how the bell says how many. Pure.
  */
 import type { RunSummary } from './api';
 import { stepAnchor } from './asks.ts';
 import { factoryOf } from './factories.ts';
-import { byAge, titleOf, waitsOnYou } from './factory.ts';
+import { byAge, titleOf } from './factory.ts';
 
 /**
  * A run the bell lists: its id, its title (`titleOf`), the factory it is in (`factoryOf`), what it waits for in the package's words, and
@@ -23,11 +23,11 @@ function waitsForOf(run: RunSummary): string[] {
 }
 
 /**
- * The runs of `runs` that wait on a person (`waitsOnYou`), oldest first (`byAge`), each as the bell lists it. Not a run held until or
- * started after runs that may still ship, nor a cancelled run, nor a finished one whose branch nobody merged: the floor's to-decide.
+ * The runs the api says wait on a person (`waiting`), oldest first (`byAge`), each as the bell lists it. Every one of them, and no other:
+ * which runs wait is the api's to say, and the board only orders and words them.
  */
-export const bellRuns = (runs: readonly RunSummary[]): BellRow[] =>
-  byAge(runs.filter(waitsOnYou)).map((run) => ({
+export const bellRows = (waiting: readonly RunSummary[]): BellRow[] =>
+  byAge(waiting).map((run) => ({
     run: run.id,
     title: titleOf(run),
     factory: factoryOf(run),

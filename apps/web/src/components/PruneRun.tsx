@@ -9,6 +9,7 @@ import { cn } from '../lib/utils';
 import { DOT, RADIO } from './AgentForm';
 import { POPOVER } from './CardGate';
 import { Refusal } from './Ask';
+import { runsMoved } from '@/lib/runWrites';
 
 /**
  * Prune, on a finished repository run's page: the button opens a popover with a choice of what to give back — its worktrees; its files
@@ -78,10 +79,7 @@ function PruneForm({ id, offer, onClose }: { id: string; offer: PruneOffer; onCl
     onSuccess: async (done) => {
       setAsking(false);
       if (done.left === 0) onClose();
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['runs', id], exact: true }),
-        queryClient.invalidateQueries({ queryKey: ['runs'], exact: true }),
-      ]);
+      await Promise.all([queryClient.invalidateQueries({ queryKey: ['runs', id], exact: true }), runsMoved(queryClient)]);
     },
   });
   return (

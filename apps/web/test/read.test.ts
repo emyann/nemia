@@ -11,7 +11,7 @@ import path from 'node:path';
 import ts from 'typescript';
 import * as api from '../src/lib/api.ts';
 import { ReadRefusal, UnreadAnswer } from '../src/lib/api/read.ts';
-import { runsQuery, type RunSummary } from '../src/lib/api/runs.ts';
+import { openRunsQuery, runsQuery, type OpenRuns, type RunSummary } from '../src/lib/api/runs.ts';
 
 const DIR = path.resolve(import.meta.dirname, '../src/lib/api');
 
@@ -126,6 +126,45 @@ const unread = (at: string, found: string) => (err: unknown) => {
   assert.equal(err.route, 'GET /api/runs');
   return true;
 };
+
+/** The light answer read for `factory`, or for every factory, with no context of a query's. */
+const readOpen = (factory?: string) => (openRunsQuery(factory).queryFn as unknown as () => Promise<OpenRuns>)();
+
+test('the light answer decodes what the api gives, asks for one factory by its name encoded, and keeps no key it does not read', async (t) => {
+  const asked: string[] = [];
+  const before = globalThis.fetch;
+  const answer = { counts: { waiting: 1, inFlight: 1, finished: 7 }, waiting: [row()], inFlight: [row({ id: 'r-2' })] };
+  const more = { wallMs: 5, finishedAt: null, clock: null, stepCosts: null };
+  globalThis.fetch = async (input) => {
+    asked.push(String(input));
+    return new Response(
+      JSON.stringify({ ...answer, asOf: 'now', waiting: [{ ...row(), ...more }], inFlight: [{ ...row({ id: 'r-2' }), ...more }] }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    );
+  };
+  t.after(() => {
+    globalThis.fetch = before;
+  });
+  assert.deepEqual(await readOpen(), answer);
+  assert.deepEqual(await readOpen('a b'), answer);
+  assert.deepEqual(asked, ['/api/runs-open', '/api/runs-open?ofFactory=a%20b']);
+  assert.deepEqual(openRunsQuery().queryKey, ['runs-open']);
+  assert.deepEqual(openRunsQuery('a b').queryKey, ['runs-open', 'a b']);
+});
+
+test('REFUSED: a light answer whose row lacks a key the board reads, or that lacks a count, is an unreadable answer', async (t) => {
+  const { waitingOnYou: _dropped, ...short } = row();
+  answering(t, { counts: { waiting: 1, inFlight: 0, finished: 0 }, waiting: [short], inFlight: [] });
+  const refused = (found: string) => (err: unknown) => {
+    assert.ok(err instanceof UnreadAnswer, String(err));
+    assert.ok(err.message.startsWith('GET /api/runs-open answered what this board does not read'), err.message);
+    assert.ok(err.message.includes(found), err.message);
+    return true;
+  };
+  await assert.rejects(readOpen(), refused('waiting[0].waitingOnYou'));
+  answering(t, { counts: { waiting: 1, inFlight: 0 }, waiting: [row()], inFlight: [] });
+  await assert.rejects(readOpen(), refused('counts.finished'));
+});
 
 test('the Runs list decodes an answer the api gives, each union in its every shape', async (t) => {
   const result = row({ toDecide: { kind: 'result', branches: ['wf/r-1/implement'], said: 'merge', command: 'git merge' } });

@@ -62,9 +62,9 @@ test('REFUSED: a list holding a favourite twice keeps it once, where it first st
   assert.deepEqual(favoritesOf(raw), [run('r-1'), flow('repo', 'dev'), run('r-2'), flow('yours', 'dev')]);
 });
 
-test('REFUSED: a favourite is gone only once its list is read and lacks it; a run reads its title, a workflow its name', () => {
+test('REFUSED: a workflow is gone only once its list is read and lacks it; a run reads its title, a workflow its name', () => {
   const favorites = [run('r-1'), run('r-9'), flow('repo', 'dev'), flow('yours', 'dev')];
-  const unread = favoriteRows(favorites, undefined, undefined);
+  const unread = favoriteRows(favorites, undefined, new Map(), undefined);
   assert.deepEqual(
     unread.map((row) => [row.title, row.gone]),
     [
@@ -73,11 +73,11 @@ test('REFUSED: a favourite is gone only once its list is read and lacks it; a ru
       ['dev', false],
       ['dev', false],
     ],
-    'before its list is read, or when the read failed, nothing is gone and a run reads its id',
+    'before anything is read, or when the read failed, nothing is gone and a run reads its id',
   );
-  const runs = [{ id: 'r-1', brief: '# Star the runs\n\nand the workflows' }];
+  const open = [{ id: 'r-1', brief: '# Star the runs\n\nand the workflows' }];
   const workflows = [{ from: 'repo' as const, name: 'dev' }];
-  const read = favoriteRows(favorites, runs, workflows);
+  const read = favoriteRows(favorites, open, new Map([['r-9', 'gone']]), workflows);
   assert.deepEqual(
     read.map((row) => [row.favorite, row.title, row.gone]),
     [
@@ -88,13 +88,32 @@ test('REFUSED: a favourite is gone only once its list is read and lacks it; a ru
     ],
   );
   assert.deepEqual(
-    favoriteRows(favorites, runs, undefined).map((row) => row.gone),
-    [false, true, false, false],
+    favoriteRows(favorites, open, new Map(), undefined).map((row) => row.gone),
+    [false, false, false, false],
     'the workflows unread, none of them is gone',
   );
+});
+
+test('REFUSED: a starred run the open runs lack is not gone: a finished one reads the title of its own read', () => {
+  const open = [{ id: 'r-moving', brief: '# Still going' }];
+  const finished = { id: 'r-done', brief: '\n# Shipped last week\n\nMore.' };
+  const rows = favoriteRows([run('r-moving'), run('r-done'), run('r-unread')], open, new Map([['r-done', finished]]), undefined);
   assert.deepEqual(
-    favoriteRows(favorites, undefined, workflows).map((row) => row.gone),
-    [false, false, false, true],
-    'the runs unread, none of them is gone',
+    rows.map((row) => [row.title, row.gone]),
+    [
+      ['Still going', false],
+      ['Shipped last week', false],
+      ['r-unread', false],
+    ],
+    'absent from the open runs alone is not gone; one whose own read is on its way, or failed otherwise, reads its id',
   );
+});
+
+test('REFUSED: a starred run whose own read found no such run is gone, and reads its id', () => {
+  const [row] = favoriteRows([run('r-forgotten')], [], new Map([['r-forgotten', 'gone']]), undefined);
+  assert.deepEqual([row.title, row.gone], ['r-forgotten', true]);
+  const [unread] = favoriteRows([run('r-forgotten')], undefined, new Map([['r-forgotten', 'gone']]), undefined);
+  assert.equal(unread.gone, true, 'the open runs unread, as when their read failed, the run is gone all the same');
+  const [back] = favoriteRows([run('r-back')], [{ id: 'r-back', brief: 'Back' }], new Map([['r-back', 'gone']]), undefined);
+  assert.deepEqual([back.title, back.gone], ['Back', false], 'a run the open runs hold is there, whatever an older read said');
 });

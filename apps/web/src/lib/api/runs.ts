@@ -174,6 +174,36 @@ export const runsQuery = queryOptions({
 });
 
 /**
+ * Mirrors `OpenListing` in apps/api/src/runs/runs.ts, by the keys the frame reads: the runs that wait on a person (`waiting`) and the runs
+ * in flight (`inFlight`), each run in one of the two, a run that moves and also waits among the waiting; and `counts` of each and of the
+ * finished runs, which the answer lists none of.
+ */
+export type OpenRuns = {
+  counts: { waiting: number; inFlight: number; finished: number };
+  waiting: RunSummary[];
+  inFlight: RunSummary[];
+};
+
+/** Decodes an `OpenRuns`: each row as the whole list's (`RunSummarySchema`), what the api says more of a row dropped. */
+const OpenRunsSchema = Schema.Struct({
+  counts: Schema.Struct({ waiting: Schema.Number, inFlight: Schema.Number, finished: Schema.Number }),
+  waiting: Schema.mutable(Schema.Array(RunSummarySchema)),
+  inFlight: Schema.mutable(Schema.Array(RunSummarySchema)),
+}) satisfies Schema.Schema<OpenRuns>;
+
+/**
+ * The light answer (`GET /api/runs-open`): the runs that wait and move with the counts, of every factory, or of `factory` alone
+ * (`?ofFactory=`), `default` naming the runs of none. What the board's frame reads on every page. Keyed `['runs-open']`, and
+ * `['runs-open', factory]` for one factory; read again on each event of the workflow feed (`useFeed`), and paced as `runsQuery` is.
+ */
+export const openRunsQuery = (factory?: string) =>
+  queryOptions({
+    queryKey: factory === undefined ? ['runs-open'] : ['runs-open', factory],
+    queryFn: () => get(`/api/runs-open${factory === undefined ? '' : `?ofFactory=${encodeURIComponent(factory)}`}`, OpenRunsSchema),
+    refetchInterval: () => pace(5_000),
+  });
+
+/**
  * What a run started now with this one as context would be handed of it, as the CLI's `concluded` prints it: the run, whether it has
  * shipped, and its section, in the words the run's steps would read.
  */

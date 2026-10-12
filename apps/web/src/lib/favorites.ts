@@ -1,7 +1,7 @@
 /**
  * The favourites this browser keeps: the runs and workflows a person starred, read from local storage under `FAVORITES_KEY`, in the order
- * they were starred; a star pressed again takes one off, and the sidebar's rows say each by its title, gone once its list lacks it. Pure,
- * for the sidebar and the stars, which draw them, and its node test.
+ * they were starred; a star pressed again takes one off, and the sidebar's rows say each by its title, a workflow gone once its list lacks
+ * it and a run once its own read finds none. Pure, for the sidebar and the stars, which draw them, and its node test.
  */
 import type { RunSummary, WorkflowListing } from './api';
 import { titleOf } from './factory.ts';
@@ -59,13 +59,18 @@ export function favoritesOf(raw: string | null): Favorite[] {
 /** A favourite as the sidebar lists it: a run by its title, a workflow by its name, and whether the api no longer lists it. */
 export type FavoriteRow = { favorite: Favorite; title: string; gone: boolean };
 
+/** What a starred run's own read answered: the run, by its id and brief, or `gone` where the store has no such run. */
+export type OwnRead = Pick<RunSummary, 'id' | 'brief'> | 'gone';
+
 /**
- * The sidebar's row of each of `favorites`, in their order, against `runs` and `workflows` as the api lists them: a run's title is its
- * brief's (`titleOf`), its id until it is read; a favourite is gone only once its list is read (not undefined) and lacks it.
+ * The sidebar's row of each of `favorites`, in their order. A run's title is its brief's (`titleOf`), read off `open`, the runs that wait
+ * or move, else off its own read in `own`, by its id; its id until either has it. A run is gone only once its own read found none: one
+ * `open` lacks may be finished. A workflow is gone only once `workflows`, the api's list, is read (not undefined) and lacks it.
  */
 export function favoriteRows(
   favorites: readonly Favorite[],
-  runs: ReadonlyArray<Pick<RunSummary, 'id' | 'brief'>> | undefined,
+  open: ReadonlyArray<Pick<RunSummary, 'id' | 'brief'>> | undefined,
+  own: ReadonlyMap<string, OwnRead>,
   workflows: ReadonlyArray<Pick<WorkflowListing, 'from' | 'name'>> | undefined,
 ): FavoriteRow[] {
   return favorites.map((favorite) => {
@@ -73,7 +78,7 @@ export function favoriteRows(
       const listed = workflows?.some((item) => item.from === favorite.from && item.name === favorite.workflow);
       return { favorite, title: favorite.workflow, gone: listed === false };
     }
-    const listed = runs?.find((item) => item.id === favorite.run);
-    return { favorite, title: listed ? titleOf(listed) : favorite.run, gone: runs !== undefined && !listed };
+    const read = open?.find((item) => item.id === favorite.run) ?? own.get(favorite.run);
+    return { favorite, title: read && read !== 'gone' ? titleOf(read) : favorite.run, gone: read === 'gone' };
   });
 }

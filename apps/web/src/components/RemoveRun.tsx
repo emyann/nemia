@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { removeRun } from '../lib/api';
+import { runsMoved } from '@/lib/runWrites';
 
 /**
  * Remove, on a try's page, asked twice: the first press asks, the second removes the run as the CLI's `rm` does — its record and the
@@ -18,7 +19,7 @@ export function RemoveRun({ id }: { id: string }) {
     onSuccess: async () => {
       await navigate({ to: '/runs' });
       queryClient.removeQueries({ queryKey: ['runs', id], exact: true });
-      await queryClient.invalidateQueries({ queryKey: ['runs'], exact: true });
+      await runsMoved(queryClient);
     },
   });
   return (

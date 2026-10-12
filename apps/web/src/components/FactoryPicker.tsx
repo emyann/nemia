@@ -7,8 +7,8 @@ import { useNavigate } from '@tanstack/react-router';
 import { Factory as FactoryIcon } from 'lucide-react';
 import type { Key } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { factoriesQuery, runsQuery, type Factory } from '@/lib/api';
-import { factoryBlocks } from '@/lib/factories';
+import { factoriesQuery, openRunsQuery, type Factory } from '@/lib/api';
+import { DEFAULT_NAME, factoriesShown } from '@/lib/factories';
 import { repoName } from '@/lib/factory';
 import { pickTo } from './nav';
 
@@ -19,21 +19,19 @@ const ALL = 0;
 export type PickerFactory = { name: string; factory?: Factory };
 
 /**
- * The factories the picker offers after All factories, from what the api answered: those Home lists (`factoryBlocks`), in its order, and
- * `picked`, the address's, after them when they leave it out — the default factory once one is filed, or a name no factory has.
+ * The factories the picker offers after All factories, from what the api answered: those Home lists (`factoriesShown`), in its order, the
+ * default one among them only while it holds a run (`held`), and `picked`, the address's, after them when they leave it out — the default
+ * factory once one is filed, or a name no factory has.
  */
-export function pickerFactories(
-  factories: readonly Factory[],
-  runs: Parameters<typeof factoryBlocks>[1],
-  picked: string | undefined,
-): PickerFactory[] {
-  const listed: PickerFactory[] = factoryBlocks(factories, runs).map((block) => ({
-    name: block.name,
-    factory: factories.find((f) => f.name === block.name),
-  }));
+export function pickerFactories(factories: readonly Factory[], held: boolean, picked: string | undefined): PickerFactory[] {
+  const listed: PickerFactory[] = factoriesShown(factories, held).map((factory) => ({ name: factory.name, factory }));
   if (picked === undefined || listed.some((item) => item.name === picked)) return listed;
   return [...listed, { name: picked, factory: factories.find((f) => f.name === picked) }];
 }
+
+/** Whether the default factory holds a run, by the counts of its light answer. */
+const holdsRuns = ({ counts }: { counts: { waiting: number; inFlight: number; finished: number } }): boolean =>
+  counts.waiting + counts.inFlight + counts.finished > 0;
 
 /** What a factory's item says under its name: the repositories it works on by their folders' names, or that it is on none. */
 const reposOf = (factory: Factory): string => (factory.repos.length ? `on ${factory.repos.map(repoName).join(', ')}` : 'on no repository');
@@ -68,8 +66,9 @@ export function FactoryItemBody({ item }: { item: PickerFactory }) {
 
 /**
  * The picker of the factory the page at `path` with `search` shows: `picked`, the address's (`pickedOf`), else All factories. Its trigger
- * holds the factory's repositories whole and why its file does not read in its tooltip. It reads the factories, and the runs without
- * polling them, as Home's list does; nothing but All factories is offered while either has no answer. A pick runs `onPick`, then goes
+ * holds the factory's repositories whole and why its file does not read in its tooltip. It reads the factories, and, only while none of
+ * them is named, whether the default factory holds a run (`openRunsQuery`), unpolled; nothing but All factories is offered while an
+ * answer it needs is missing. A pick runs `onPick`, then goes
  * where `pickTo` says, or nowhere.
  */
 export function FactoryPicker({
@@ -85,8 +84,10 @@ export function FactoryPicker({
 }) {
   const navigate = useNavigate();
   const factories = useQuery(factoriesQuery);
-  const runs = useQuery({ ...runsQuery, refetchInterval: false });
-  const items = factories.data && runs.data ? pickerFactories(factories.data, runs.data, picked) : [];
+  const unnamed = factories.data !== undefined && factories.data.every((f) => f.default);
+  const held = useQuery({ ...openRunsQuery(DEFAULT_NAME), refetchInterval: false, enabled: unnamed });
+  const answered = factories.data !== undefined && (!unnamed || held.data !== undefined);
+  const items = answered ? pickerFactories(factories.data, held.data !== undefined && holdsRuns(held.data), picked) : [];
   const shown = items.find((item) => item.name === picked);
   const choose = (key: Key | null) => {
     const target = pickTo(path, search, key === ALL || key === null ? undefined : String(key));

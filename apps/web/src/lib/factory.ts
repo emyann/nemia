@@ -29,6 +29,12 @@ import { layers, type Point } from './layout.ts';
 export const inFlight = (run: Pick<RunSummary, 'status' | 'moving'> & Held): boolean =>
   run.moving || (run.status === 'running' && !run.waiting?.onYou && !run.holding?.onYou);
 
+/**
+ * The runs of the light answer as one list: those that wait on a person, then those in flight, each run once. Every run the board calls
+ * in flight (`inFlight`) is among them, a run at its gate that still moves with the waiting.
+ */
+export const openRows = <T>(open: { waiting: readonly T[]; inFlight: readonly T[] }): T[] => [...open.waiting, ...open.inFlight];
+
 /** What `inFlight` and `waitsOnYou` read beside their own fields, each read as absent where a listing lacks it. */
 type Held = { waiting?: RunSummary['waiting']; holding?: RunSummary['holding']; cancelledAt?: string | null };
 

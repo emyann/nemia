@@ -1,11 +1,14 @@
 /**
- * The header's bell (src/lib/bell.ts): which runs wait on a person across every factory, in what order, what each waits for and where its
- * row opens; and how its badge says the count. `npm run e2e` presses the bell itself (`392-bell.ts`).
+ * The header's bell (src/lib/bell.ts): the rows of the runs that wait on a person across every factory, in what order, what each waits for
+ * and where its row opens; and how its badge says the count. Which runs wait is the api's to say (`bellRows` filters none): the rows are
+ * read here over the board's own rule (`waitsOnYou`), which the pages still on the whole list keep. `npm run e2e` presses the bell itself
+ * (`392-bell.ts`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { RunSummary } from '../src/lib/api.ts';
-import { bellCount, bellHash, bellLabel, bellRuns } from '../src/lib/bell.ts';
+import { bellCount, bellHash, bellLabel, bellRows } from '../src/lib/bell.ts';
+import { waitsOnYou } from '../src/lib/factory.ts';
 
 /** A run of the default factory with a step per name in `steps`, nobody waited on, and `extra` over it. */
 const run = (id: string, extra: Partial<RunSummary> = {}, steps: readonly string[] = ['plan', 'build', 'ship']): RunSummary => ({
@@ -66,6 +69,9 @@ const atGate = (id: string, extra: Partial<RunSummary> = {}): RunSummary => {
   });
   return { ...base, steps: base.steps.map((step) => (step.name === 'build' ? { ...step, approve: 'approve build' } : step)), ...extra };
 };
+
+/** The bell's rows of those of `runs` the board's own rule says wait on a person. */
+const bellRuns = (runs: readonly RunSummary[]) => bellRows(runs.filter(waitsOnYou));
 
 /** A hold on a run until `p` ships: one a person lifts alone when `onYou`. */
 const holdOn = (onYou: boolean): RunSummary['holding'] => ({
@@ -141,6 +147,15 @@ test('REFUSED: the bell lists its runs oldest first, whatever order the api answ
   assert.deepEqual(
     bellRuns([newer, middle, older]).map((row) => row.run),
     ['a-old', 'c-mid', 'b-new'],
+  );
+});
+
+test('REFUSED: the bell lists every run it is handed: which runs wait is the api’s to say, and no rule of the board drops one', () => {
+  const called = atGate('called', { cancelledAt: '2026-10-02T00:00:00.000Z' });
+  const quiet = run('quiet');
+  assert.deepEqual(
+    bellRows([called, quiet]).map((row) => row.run),
+    ['called', 'quiet'],
   );
 });
 

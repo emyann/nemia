@@ -11,6 +11,7 @@ import { holdable, holdCandidates } from '../lib/hold.ts';
 import { cn } from '../lib/utils';
 import { POPOVER } from './CardGate';
 import { Refusal } from './Ask';
+import { runsMoved } from '@/lib/runWrites';
 
 /**
  * Hold, on a run's page: the button opens a popover where a person ticks the runs to wait on and may say why, and the hold is put as the
@@ -70,10 +71,7 @@ function HoldForm({ id, runs, onClose }: { id: string; runs: RunSummary[]; onClo
     mutationFn: () => putHold(id, until, why),
     onSuccess: async () => {
       onClose();
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['runs', id], exact: true }),
-        queryClient.invalidateQueries({ queryKey: ['runs'], exact: true }),
-      ]);
+      await Promise.all([queryClient.invalidateQueries({ queryKey: ['runs', id], exact: true }), runsMoved(queryClient)]);
     },
   });
   return (

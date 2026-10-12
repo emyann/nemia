@@ -390,7 +390,7 @@
     {
       "files": ["apps/web/src/components/PruneRun.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 102, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 99, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {

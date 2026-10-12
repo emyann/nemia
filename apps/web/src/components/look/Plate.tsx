@@ -27,7 +27,7 @@ const WIDE: CSSProperties = { fontStretch: '125%' };
 export type PlateHue = 'yours' | 'alive' | 'grey';
 
 /**
- * The look's plate, a section's heading: its `count` large, its `title` as an `h2`, its `hue`'s barcode, on its ground. `quiet` is
+ * The look's plate, a section's heading: its `count` large, its `title` as an `h2`, its `hue`'s barcode, on its ground under a label's grain. `quiet` is
  * the plate of a section that holds nothing: in grey whatever its hue, and with no barcode.
  */
 export function Plate({ count, title, hue = 'yours', quiet = false }: { count: number; title: string; hue?: PlateHue; quiet?: boolean }) {
@@ -35,6 +35,7 @@ export function Plate({ count, title, hue = 'yours', quiet = false }: { count: n
     <div
       data-plate={quiet ? 'quiet' : 'loud'}
       data-plate-hue={quiet ? 'grey' : hue}
+      data-grain="label"
       className={cn('inline-flex items-center gap-3 rounded-[14px] px-3.5 py-2', quiet ? filled.grey : filled[hue])}
     >
       <span data-plate-count className="font-label text-[30px] leading-8 font-extrabold tracking-[-0.02em]" style={WIDE}>

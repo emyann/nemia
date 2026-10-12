@@ -22,7 +22,7 @@ const GLOW: Record<FrameHue, string | undefined> = {
 
 /**
  * The look's cut-corner frame: a shape of its own under what it holds, its top-right and bottom-left corners cut, an edge in `hue`
- * around the card's ground, and for what waits on a person a glow the shape casts. Outside the cut nothing is painted: the page's
+ * around the card's ground, which wears the surface's grain inside the cut, and for what waits on a person a glow the shape casts. Outside the cut nothing is painted: the page's
  * ground shows. Nothing of the frame cuts what it holds off: a focused child's ring is drawn whole, over a cut corner too. `size` is
  * its cut.
  */
@@ -41,7 +41,12 @@ export function CutFrame({
     <div data-cut-frame={hue} className={cn('relative p-px text-card-foreground', className)}>
       <span aria-hidden="true" data-cut-shape className="pointer-events-none absolute inset-0" style={{ filter: GLOW[hue] }}>
         <span data-cut-edge className="absolute inset-0" style={{ backgroundColor: EDGE[hue], clipPath: cutShape(size) }} />
-        <span data-cut-ground className="absolute inset-0 bg-card" style={{ clipPath: `polygon(${cutPoints(size, 1)})` }} />
+        <span
+          data-cut-ground
+          data-grain="surface"
+          className="absolute inset-0 bg-card"
+          style={{ clipPath: `polygon(${cutPoints(size, 1)})` }}
+        />
       </span>
       <div className="relative">{children}</div>
     </div>

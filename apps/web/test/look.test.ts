@@ -93,3 +93,48 @@ test('REFUSED: a part the door exports that the skill does not name', () => {
   for (const name of fs.readdirSync(LOOK).filter((name) => /^[A-Z]\w*\.tsx$/.test(name)))
     assert.ok(door.includes(`from './${name.slice(0, -4)}'`), `${name}, a part of the folder, is exported by the door`);
 });
+
+/** The one file that writes a grain's tile, by its path from `src`. */
+const GRAIN = 'components/look/grain.css';
+
+/** Each file of `sources`, texts by their path from `src`, that writes a noise tile and is not the look's grain. */
+export const tilesOutside = (sources: Readonly<Record<string, string>>): string[] =>
+  Object.keys(sources).filter((file) => file !== GRAIN && sources[file]?.includes('feTurbulence'));
+
+/**
+ * Whether `css`, an entry stylesheet, reads the look's grain: it imports it, above its first at-rule that is no import, under which
+ * the build drops an import without a word.
+ */
+export function readsGrain(css: string): boolean {
+  const at = css.search(/@import\s*['"]\.\/components\/look\/grain\.css['"]\s*;/);
+  const other = css.search(/^@(?!import\b)[a-z-]+/m);
+  return at !== -1 && (other === -1 || at < other);
+}
+
+test("REFUSED: a grain's tile written outside the look's grain, which holds three, each once", () => {
+  const sources = Object.fromEntries(
+    filesUnder(SRC)
+      .filter((file) => /\.(?:tsx?|css)$/.test(file) && !file.startsWith('components/ui/ds/'))
+      .map((file) => [file, fs.readFileSync(path.join(SRC, file), 'utf8')]),
+  );
+  assert.ok('styles.css' in sources && 'components/look/Sticker.tsx' in sources, 'the source is read');
+  assert.deepEqual(tilesOutside({ ...sources, 'components/WaitingCard.tsx': 'url(\'data:image/svg+xml,<feTurbulence/>\')' }), [
+    'components/WaitingCard.tsx',
+  ]);
+  assert.deepEqual(tilesOutside(sources), [], 'no page and no part writes a tile of its own');
+  const grain = sources[GRAIN] ?? '';
+  assert.equal(grain.split('feTurbulence').length - 1, 3, "the surface's in each scheme, and the label's");
+  for (const name of ['--grain-surface', '--grain-label'])
+    assert.equal(grain.split(`var(${name})`).length - 1, 1, `${name} is drawn by one rule`);
+  assert.equal(grain.split('--grain-label:').length - 1, 1, "a label's tile is the same in both schemes");
+  assert.equal(grain.split('--grain-surface:').length - 1, 2, "a surface's tile is written for each scheme");
+});
+
+test('REFUSED: an entry stylesheet that imports the grain under another at-rule, or not at all', () => {
+  const grain = "@import './components/look/grain.css';";
+  assert.equal(readsGrain(`@import 'tailwindcss';\n${grain}\n@custom-variant dark {\n}\n`), true);
+  assert.equal(readsGrain(`@import 'tailwindcss';\n@custom-variant dark {\n}\n${grain}\n`), false, 'the build drops it there');
+  assert.equal(readsGrain("@import 'tailwindcss';\n@layer base {\n}\n"), false, 'no import');
+  assert.equal(readsGrain("@import\n  './components/look/grain.css'\n;\n@layer base {\n}\n"), true, 'across line breaks');
+  assert.equal(readsGrain(fs.readFileSync(path.join(SRC, 'styles.css'), 'utf8')), true, 'the board reads it');
+});

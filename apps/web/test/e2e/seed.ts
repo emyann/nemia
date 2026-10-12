@@ -1376,7 +1376,10 @@ export const QUEUED = [QUEUE.first, QUEUE.refused, QUEUE.third] as const;
 /** The queued cards a factory's floor draws as ghosts: FACTORIES.hiring's, and the default floor's, which holds the card of no factory. */
 export const QUEUED_IN = { hiring: [QUEUE.first, QUEUE.refused], default: [QUEUE.third] } as const;
 
-/** Why the tick's start of QUEUE.refused was refused, in the package's words for a workflow its factory does not offer (`unattachedRefusal`). */
+/**
+ * Why the tick's start of QUEUE.refused was refused, in the package's words for a workflow its factory does not offer
+ * (`unattachedRefusal`).
+ */
 export const refusedWhy = (): string =>
   `${QUEUE.refused.workflow}: the factory ${QUEUE.refused.factory} does not offer this workflow — it offers: ${WORKFLOWS.good.name}. Attach it: nemia factory attach ${QUEUE.refused.factory} ${QUEUE.refused.workflow}. Nothing was started.`;
 

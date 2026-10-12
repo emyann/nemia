@@ -1274,9 +1274,12 @@ export const QUEUED = [QUEUE.first, QUEUE.refused, QUEUE.third] as const;
 export const refusedWhy = (root: string, repo: string): string =>
   `no workflow folder at ${path.join(root, 'inbox', QUEUE.refused.workflow)}, nor a workflow named ${QUEUE.refused.workflow} in ${path.join(repo, 'workflows')}. The repository's workflows are: broken, dev — name one, or give the path to a workflow folder.`;
 
-/** A queued card's text, as `wf inbox queue` writes it: its keys in their order, `queued:` last. */
+/**
+ * A queued card's text, as `wf inbox queue` writes it: its workflow and its repository, then `queued:`, then its factory when it names
+ * one.
+ */
 export const queuedCardText = (card: { workflow: string; body: string }, queued: string, repo?: string, factory?: string): string =>
-  `---\nworkflow: ${card.workflow}\n${repo ? `repo: ${repo}\n` : ''}${factory ? `factory: ${factory}\n` : ''}queued: ${queued}\n---\n${card.body}\n`;
+  `---\nworkflow: ${card.workflow}\n${repo ? `repo: ${repo}\n` : ''}queued: ${queued}\n${factory ? `factory: ${factory}\n` : ''}---\n${card.body}\n`;
 
 /**
  * What the daemon's last pass cost, as the tick writes it to `tick-stats.json` (`recordPassCost`): 212 ms over twelve run records, most of

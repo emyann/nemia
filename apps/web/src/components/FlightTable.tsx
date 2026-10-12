@@ -69,7 +69,7 @@ export function FlightTable({ runs, asOf }: { runs: readonly ListedRun[]; asOf: 
             {runs.map((run) => (
               <Row key={run.id} id={run.id} data-run={run.id} data-unreadable={run.unreadable ? '' : undefined} className={FRAMED_ROW}>
                 <Cell className="py-1">
-                  <span className="flex flex-col gap-2">
+                  <span className="flex flex-col gap-4 pb-2">
                     <TextLink to="/runs/$runId" params={{ runId: run.id }} title={titleOf(run)} className="block truncate text-title-small">
                       {titleOf(run)}
                     </TextLink>

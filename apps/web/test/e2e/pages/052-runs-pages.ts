@@ -1,6 +1,6 @@
 import type { Locator, Page } from 'playwright';
 import { FINISHED_SIZE } from '../../../src/lib/api/runs.ts';
-import { whenWords } from '../../../src/lib/runWords.ts';
+import { whenColumn } from '../../../src/lib/runWords.ts';
 import { photographBothWidths } from '../board.ts';
 import { expectCount, expectNone, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { FACTORIES, FOLDER, seedFinished } from '../seed.ts';
@@ -92,9 +92,9 @@ async function pastTheLast(page: Page): Promise<void> {
 /** A run that finished in another year than this one, whenever the e2e runs: four hundred days ago. */
 const LONG_AGO = { id: 'finished-another-year-e2py', title: 'Finished another year', factory: FACTORY, finishedAgo: 400 * 24 * 60 };
 
-/** The longest words `whenWords` writes for a time of `year` read in the year `from`: the longest month's, on a day of two digits. */
+/** The longest words `whenColumn` writes for a time of `year` read in the year `from`: the longest month's, on a day of two digits. */
 const longestWhen = (year: number, from: number): string =>
-  Array.from({ length: 12 }, (_, month) => whenWords(new Date(year, month, 28, 23, 58), new Date(from, 0, 1))).reduce((longest, words) =>
+  Array.from({ length: 12 }, (_, month) => whenColumn(new Date(year, month, 28, 23, 58), new Date(from, 0, 1))).reduce((longest, words) =>
     words.length > longest.length ? words : longest,
   );
 
@@ -128,10 +128,10 @@ async function datesFit(page: Page): Promise<void> {
     const old = rowsOf(page).filter({ has: page.locator(`[data-run-id][title="${LONG_AGO.id}"]`) });
     await expectTexts(
       old.locator('td[data-finished]'),
-      [whenWords(new Date(Date.now() - LONG_AGO.finishedAgo * 60_000), new Date())],
+      [whenColumn(new Date(Date.now() - LONG_AGO.finishedAgo * 60_000), new Date()).trim()],
       'a run finished in another year says its day and its year',
     );
-    if (!/^\d{1,2} \w+ \d{4}$/.test((await old.locator('td[data-created]').innerText()).trim()))
+    if (!/^\d{1,2} \w+ \d{4}$/.test(((await old.locator('td[data-created]').textContent()) ?? '').trim()))
       throw new Refused('and the day it was created, with its year');
     await expectRoom(page, "each date of the finished table has its column's room");
     await settled(page);

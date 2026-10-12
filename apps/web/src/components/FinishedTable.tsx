@@ -3,7 +3,7 @@ import type { FinishedPage } from '@/lib/api';
 import { factoryOf } from '@/lib/factories';
 import { titleOf } from '@/lib/factory';
 import { ink } from '@/lib/meaning';
-import { endedWords, sinceShort, whenWords } from '@/lib/runWords';
+import { endedWords, sinceShort, whenColumn } from '@/lib/runWords';
 import { cn } from '@/components/ui/ds/utils';
 import { CopyId, CutFrame, FRAMED_BOX, FRAMED_ROW, FRAMED_TABLE, Pager, TextLink } from './look';
 
@@ -12,6 +12,9 @@ const HEAD = 'text-label-small uppercase';
 
 /** A fact in the mono face, on one line. */
 const FACT = 'font-mono text-body-small whitespace-nowrap';
+
+/** A time as a column writes it (`whenColumn`), its padding kept so the column lines up. */
+const WHEN = 'font-mono text-body-small whitespace-pre';
 
 /** One finished run's row: its title as a link, then its facts, each plain. Times are said against `asOf`. */
 function FinishedRow({ run, asOf }: { run: FinishedPage['runs'][number]; asOf: Date }) {
@@ -26,11 +29,11 @@ function FinishedRow({ run, asOf }: { run: FinishedPage['runs'][number]; asOf: D
       <Cell truncate data-factory={factoryOf(run)} className="text-label-small uppercase text-on-surface-variant">
         {factoryOf(run)}
       </Cell>
-      <Cell data-created className={cn(FACT, 'text-on-surface-variant')}>
-        <time dateTime={run.createdAt}>{whenWords(new Date(run.createdAt), asOf)}</time>
+      <Cell data-created className={cn(WHEN, 'text-on-surface-variant')}>
+        <time dateTime={run.createdAt}>{whenColumn(new Date(run.createdAt), asOf)}</time>
       </Cell>
-      <Cell data-finished className={FACT}>
-        <time dateTime={run.finishedAt}>{whenWords(new Date(run.finishedAt), asOf)}</time>
+      <Cell data-finished className={WHEN}>
+        <time dateTime={run.finishedAt}>{whenColumn(new Date(run.finishedAt), asOf)}</time>
       </Cell>
       <Cell data-clock className={FACT}>
         {sinceShort(run.wallMs)}
@@ -52,10 +55,9 @@ function FinishedRow({ run, asOf }: { run: FinishedPage['runs'][number]; asOf: D
 
 /**
  * One page of the finished runs, newest finished first, as the kit's dense table in the look's cut frame, quiet: each run's title as a
- * link, its factory, when it was created and when it finished, its wall time and its cost, how it ended, and its id's end with a copy
- * control, the last row with no line under it; then the pager, under a line of its own. A page that holds no row draws no table and no
- * line, and the pager says why. Narrower than its columns, the table
- * scrolls sideways inside its frame.
+ * link, its factory, when it was created and when it finished, each with its date, its wall time and its cost, how it ended, and its
+ * id's end with a copy control, the last row with no line under it; then the pager, under a line of its own. A page that holds no row
+ * draws no table and no line, and the pager says why. Narrower than its columns, the table scrolls sideways inside its frame.
  */
 export function FinishedTable({ page }: { page: FinishedPage }) {
   const asOf = new Date(page.asOf);

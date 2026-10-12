@@ -2,19 +2,24 @@
  * The daemon's measure of the store's disk (`diskOnce`, `disk`) on a store of scratch whose files' sizes are read off the fixture with
  * `lstat`: each part and factory holds what was planted, every name of the store is in one entry, a name that does not read is unread
  * and never zero, the walk's cost is its names and bursts, a label set that is gone is said at zero once, the largest runs are spans,
- * and the loop rests its shipped ten minutes. `WF_ROOT` is set before the store is imported, which reads it as the module loads.
+ * and the loop rests its shipped ten minutes; and, on the runtime's stand-in with sizes planted, the engine's folder by factory and the
+ * sessions' records, absent where the runtime keeps none. `WF_ROOT` is set before the store is imported, which reads it as the module
+ * loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Fiber, Logger, Metric, Tracer } from 'effect';
+import { testEngine } from 'agent-runtime/testing';
+import { eachTest } from '../../test/placed.ts';
 import { scratch } from '../../test/scratch.ts';
 import { steeredClock } from '../../test/steered.ts';
 import { until, WAITED } from '../../test/waits.ts';
 import type { Answered } from '../prune/prune.ts';
 import type { RecentPass } from '../meter/meter.ts';
 import type { DiskEntry } from './disk.ts';
+import type { EngineService as EngineNeeded } from '../runtime-client.ts';
 
 const BASE = scratch('wf-disk-');
 const ROOT = path.join(BASE, 'store');
@@ -25,6 +30,8 @@ const { samplesOf } = await import('../series/series.ts');
 const { PHASES } = await import('../meter/meter.ts');
 const { storeRoots } = await import('./disk.store.ts');
 const { disk, DISK_METRICS, DISK_SPAN, DISK_SPAN_KEYS, diskOnce, freshDiskMemory } = await import('./disk.verb.ts');
+const { engineOf, EngineService } = await import('../runtime-client.ts');
+const engine = eachTest(testEngine);
 
 /** A file of `kb` kilobytes under the store. */
 const file = (at: string, kb = 8): string => {
@@ -45,9 +52,9 @@ const held = (at = ''): number => {
 /** The bytes a folder of the store holds for itself, the names under it left out. */
 const alone = (at = ''): number => fs.lstatSync(path.join(ROOT, at)).blocks * 512;
 
-/** A run a pass answered, as far as the sweep reads it. */
-const answered = (id: string, factory?: string): Answered => ({
-  run: { id, ...(factory ? { factory } : {}) } as never,
+/** A run a pass answered, as far as the sweep reads it: its id, its factory, and the tasks its one step filed. */
+const answered = (id: string, factory?: string, tasks: readonly string[] = []): Answered => ({
+  run: { id, ...(factory ? { factory } : {}), steps: { work: { tries: tasks.map((taskId) => ({ taskId })) } } } as never,
   status: 'running',
   feed: {},
 });
@@ -67,6 +74,9 @@ const PASS: RecentPass = {
 };
 
 const ANSWERS = [answered('a', 'nemia'), answered('b', 'pipao'), answered('c')];
+
+/** The parts said before the sessions, in the reading's order. */
+const DISK_PARTS_BEFORE: readonly string[] = ['worktrees', 'runs', 'engine'];
 
 /** The store afresh: runs `a` of nemia, `b` of pipao and `c` of no factory, a folder of no run, and every part with files of its own. */
 function planted(): void {
@@ -92,8 +102,8 @@ function planted(): void {
 const registryOf = (): Registry => new Map();
 type Registry = (typeof Metric.MetricRegistry)['Service'];
 
-/** `program` over `registry`, and each span it made. */
-const over = async <A>(registry: Registry, program: Effect.Effect<A, unknown>) => {
+/** `program` over `registry` and the test's engine, and each span it made. */
+const over = async <A>(registry: Registry, program: Effect.Effect<A, unknown, EngineNeeded>) => {
   const spans: Tracer.NativeSpan[] = [];
   const tracer = Tracer.make({
     span(options) {
@@ -102,7 +112,13 @@ const over = async <A>(registry: Registry, program: Effect.Effect<A, unknown>) =
       return span;
     },
   });
-  const value = await Effect.runPromise(program.pipe(Effect.provideService(Metric.MetricRegistry, registry), Effect.withTracer(tracer)));
+  const value = await Effect.runPromise(
+    program.pipe(
+      Effect.provideService(EngineService, engineOf(engine().layer)),
+      Effect.provideService(Metric.MetricRegistry, registry),
+      Effect.withTracer(tracer),
+    ),
+  );
   return { value, spans };
 };
 
@@ -172,6 +188,7 @@ test('a store with files of known sizes is read part by part and factory by fact
     'part=worktrees': 0,
     'part=runs': 0,
     'part=engine': 0,
+    'part=sessions': 0,
     'part=checks': 0,
     'part=series': 0,
     'part=other': 0,
@@ -244,6 +261,119 @@ test('a factory whose runs are gone is said at zero once, and not again', async 
   assert.equal('factory=pipao part=worktrees' in (await gauges(fresh, 'disk.bytes')), false, 'the third sweep does not say it again');
 });
 
+/** The runs of the kept fixtures: `a` of nemia with two tasks, `b` of pipao with one, `c` of no factory with one. */
+const TASKED = [answered('a', 'nemia', ['t-a1', 't-a2']), answered('b', 'pipao', ['t-b1']), answered('c', undefined, ['t-c1'])];
+
+/** Files the stand-in's tasks `ids`, in order. */
+const filed = async (ids: readonly string[]): Promise<void> => {
+  for (const id of ids) await Effect.runPromise(engineOf(engine().layer).file({ id, brief: 'b', cwd: '/r' }));
+};
+
+test('what the runtime keeps by task is said by factory: the engine, the rest of it alone, and the sessions, in the reading, the series and the gauges', async () => {
+  planted();
+  await filed(['t-a1', 't-a2', 't-b1', 't-c1', 't-of-no-run']);
+  engine().keeps('t-a1', { journal: 1000, bodies: 2000, files: 4000, records: 50_000 });
+  engine().keeps('t-a2', { journal: 500, records: 10_000 });
+  engine().keeps('t-b1', { journal: 300, files: 200 });
+  engine().keeps('t-c1', { files: 64, records: 128 });
+  engine().keeps('t-of-no-run', { journal: 9000, records: 7000 });
+  const registry = registryOf();
+  const { reading } = (await over(registry, diskOnce(TASKED, freshDiskMemory()))).value;
+  const whole = held('engine');
+  assert.deepEqual(
+    reading.entries.filter((entry) => entry.part === 'engine' || entry.part === 'sessions'),
+    [
+      { part: 'engine', bytes: whole - 7500 - 500 - 64, unread: 0 },
+      { part: 'engine', factory: 'nemia', bytes: 7500, unread: 0 },
+      { part: 'engine', factory: 'pipao', bytes: 500, unread: 0 },
+      { part: 'engine', factory: DEFAULT_FACTORY, bytes: 64, unread: 0 },
+      { part: 'sessions', bytes: 7000, unread: 0 },
+      { part: 'sessions', factory: 'nemia', bytes: 60_000, unread: 0 },
+      { part: 'sessions', factory: DEFAULT_FACTORY, bytes: 128, unread: 0 },
+    ],
+  );
+  const samples = samplesOf({ ...PASS, disk: reading }).filter((sample) => sample.s === 'disk.bytes');
+  assert.deepEqual(
+    samples.filter((sample) => sample.l.part === 'sessions' || (sample.l.part === 'engine' && sample.l.factory !== undefined)),
+    [
+      { s: 'disk.bytes', l: { part: 'engine', factory: 'nemia' }, v: 7500 },
+      { s: 'disk.bytes', l: { part: 'engine', factory: 'pipao' }, v: 500 },
+      { s: 'disk.bytes', l: { part: 'engine', factory: DEFAULT_FACTORY }, v: 64 },
+      { s: 'disk.bytes', l: { part: 'sessions' }, v: 7000 },
+      { s: 'disk.bytes', l: { part: 'sessions', factory: 'nemia' }, v: 60_000 },
+      { s: 'disk.bytes', l: { part: 'sessions', factory: DEFAULT_FACTORY }, v: 128 },
+    ],
+  );
+  const bytes = await gauges(registry, 'disk.bytes');
+  assert.deepEqual(
+    [bytes['factory=nemia part=engine'], bytes['factory=nemia part=sessions'], bytes['part=sessions'], bytes['part=engine']],
+    [7500, 60_000, 7000, whole - 8064],
+  );
+  assert.equal('factory=pipao part=sessions' in bytes, false, 'a factory whose tasks keep no record has no sessions series');
+});
+
+test('REFUSED: a runtime that keeps no record of any session leaves the reading, the series and the gauges with no sessions bytes', async () => {
+  planted();
+  await filed(['t-a1', 't-b1']);
+  engine().keeps('t-a1', { journal: 1000, files: 4000 });
+  const registry = registryOf();
+  const { reading } = (await over(registry, diskOnce(TASKED, freshDiskMemory()))).value;
+  assert.equal(entryOf(reading.entries, 'engine', 'nemia')?.bytes, 5000, 'the runtime was asked, and answered');
+  assert.deepEqual(
+    reading.entries.filter((entry) => entry.part === 'sessions'),
+    [],
+  );
+  const samples = samplesOf({ ...PASS, disk: reading });
+  assert.deepEqual(
+    samples.filter((sample) => sample.s === 'disk.bytes' && sample.l.part === 'sessions'),
+    [],
+  );
+  assert.deepEqual(
+    Object.keys(await gauges(registry, 'disk.bytes')).filter((labels) => labels.includes('part=sessions')),
+    [],
+  );
+});
+
+test('an engine whose kept fails leaves the engine whole under no factory and the sessions unread with no bytes, the other parts read as before', async () => {
+  planted();
+  const registry = registryOf();
+  const before = (await over(registry, diskOnce(TASKED, freshDiskMemory()))).value.reading.entries;
+  const failing = {
+    ...engineOf(engine().layer),
+    kept: () => Effect.fail({ _tag: 'JournalError', taskId: '*', message: 'the store does not list' }),
+  };
+  const { reading } = await Effect.runPromise(
+    diskOnce(TASKED, freshDiskMemory()).pipe(
+      Effect.provideService(EngineService, failing as never),
+      Effect.provideService(Metric.MetricRegistry, registry),
+    ),
+  );
+  assert.deepEqual(reading.entries, [
+    ...before.filter((entry) => DISK_PARTS_BEFORE.includes(entry.part)),
+    { part: 'sessions', unread: 1 },
+    ...before.filter((entry) => !DISK_PARTS_BEFORE.includes(entry.part)),
+  ]);
+  assert.deepEqual(entryOf(reading.entries, 'engine'), { part: 'engine', bytes: held('engine'), unread: 0 });
+  assert.equal((await gauges(registry, 'disk.unread'))['part=sessions'], 1);
+});
+
+test("a factory whose sessions' records are gone on the next sweep is said at zero once, and not again", async () => {
+  planted();
+  await filed(['t-a1']);
+  engine().keeps('t-a1', { records: 4096 });
+  const registry = registryOf();
+  const memory = freshDiskMemory();
+  await over(registry, diskOnce(TASKED, memory));
+  assert.equal((await gauges(registry, 'disk.bytes'))['factory=nemia part=sessions'], 4096);
+  engine().keeps('t-a1', {});
+  const second = (await over(registry, diskOnce(TASKED, memory))).value.reading;
+  assert.equal(entryOf(second.entries, 'sessions', 'nemia'), undefined);
+  assert.equal((await gauges(registry, 'disk.bytes'))['factory=nemia part=sessions'], 0);
+  const fresh = registryOf();
+  await over(fresh, diskOnce(TASKED, memory));
+  assert.equal('factory=nemia part=sessions' in (await gauges(fresh, 'disk.bytes')), false, 'the third sweep does not say it again');
+});
+
 test('each of the ten largest runs is a span of its own carrying its run, its bytes and its factory, and an eleventh run is none', async () => {
   planted();
   for (let k = 1; k <= 9; k++) file(`runs/more-${k}/artifacts/f.bin`, 200 + 8 * k);
@@ -290,7 +420,12 @@ test(
       disk(
         () => ANSWERS,
         (reading) => void kept.push(reading && `${reading.entries.length} entries`),
-      ).pipe(Effect.provideService(Metric.MetricRegistry, new Map()), Effect.provide(Logger.layer([keeper])), Effect.provide(clock.layer)),
+      ).pipe(
+        Effect.provideService(EngineService, engineOf(engine().layer)),
+        Effect.provideService(Metric.MetricRegistry, new Map()),
+        Effect.provide(Logger.layer([keeper])),
+        Effect.provide(clock.layer),
+      ),
     );
     t.after(() => Effect.runPromise(Fiber.interrupt(loop)));
     const ended = Effect.runPromise(Fiber.join(loop)).then(() => assert.fail('the loop ended'));

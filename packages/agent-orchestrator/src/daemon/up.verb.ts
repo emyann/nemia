@@ -205,8 +205,8 @@ const saidStarted = ({ held, replaced }: TakenStore): Effect.Effect<void> =>
  * a third it delivers the store's subscriptions to the feed (`deliver`), on a fourth it keeps Nemia at the person's level (`keep`), on
  * a fifth it brings each factory made from a template to it (`reconcile`), and on a sixth it frees the worktrees of the runs the latest
  * pass answered finished (`free`), which no pass waits on. On a seventh, once the first pass has answered and every `DISK_EVERY` after,
- * it measures what the store takes on the disk (`disk`), and hands each pass the latest reading as it does the quota: no pass walks
- * the store, and a sweep that failed leaves the passes none.
+ * it measures what the store takes on the disk (`disk`), asking the engine what it keeps by task, and hands each pass the latest
+ * reading as it does the quota: no pass walks the store, and a sweep that failed leaves the passes none.
  */
 export const up = (e: Engine, { every, repo, holder, onTaken }: UpOptions): Effect.Effect<never, unknown, Scope.Scope | PlaceService> =>
   Effect.gen(function* () {
@@ -239,6 +239,7 @@ export const up = (e: Engine, { every, repo, holder, onTaken }: UpOptions): Effe
             (read) => void (measured = read),
           ),
         ),
+        over(e),
       ),
     );
     yield* saidStarted(taken);

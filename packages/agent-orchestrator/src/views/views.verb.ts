@@ -194,6 +194,7 @@ const ENGINE_READS = new Set([
   'tallied',
   'start',
   'sweep',
+  'kept',
   'removeBody',
 ]);
 

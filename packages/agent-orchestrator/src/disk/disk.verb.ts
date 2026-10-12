@@ -1,24 +1,39 @@
 /**
- * The daemon's measure of what the store takes on the disk: one sweep (`diskOnce`) lists the store's root, walks it in bursts, and says
- * what each part holds, by factory where a part is kept by run, what did not read, what is free, and the runs that hold the most; `disk`
- * is the loop the daemon forks. A controller: it reads the disk on every sweep and decides on nothing it remembers.
+ * The daemon's measure of what the store takes on the disk: one sweep (`diskOnce`) asks the runtime what it keeps by task, lists the
+ * store's root, walks it in bursts, and says what each part holds, by factory where a part is kept by run or by task, what did not
+ * read, what is free, and the runs that hold the most; `disk` is the loop the daemon forks. A controller: it reads the disk and the
+ * engine on every sweep and decides on nothing it remembers.
  */
 import { Cause, Effect, Metric, type Duration } from 'effect';
 import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import { rootSpan } from '../meter/meter.verb.ts';
-import { tried } from '../runtime-client.ts';
+import { runTasks } from '../record/record.ts';
+import { EngineService, tried, type KeptReport } from '../runtime-client.ts';
 import { walk } from '../prune/freed.store.ts';
 import type { Answered } from '../prune/prune.ts';
 import { storeFree, storeRoots } from './disk.store.ts';
-import { entryKey, entryOf, largestOf, readingOf, unreadByPart, vanished, type DiskReading, type DiskRoot, type DiskRun } from './disk.ts';
+import {
+  entryKey,
+  entryOf,
+  largestOf,
+  readingOf,
+  unreadByPart,
+  vanished,
+  withKept,
+  type DiskReading,
+  type DiskRoot,
+  type DiskRun,
+  type TaskKept,
+} from './disk.ts';
 
 /** The sweep's pace, which no caller shortens: the disk moves slowly, and a sweep walks the whole store. */
 export const DISK_EVERY: Duration.Input = '10 minutes';
 
 /**
  * The metrics of the store's disk, in the registry of whoever runs the sweep: the bytes a part holds (`disk.bytes`, by `part`, and by
- * `factory` where the part is kept by run), the names that did not read and are in no byte (`disk.unread`, by `part`), and the bytes
- * free on the file system that holds the store and its size (`disk.free`, `disk.size`).
+ * `factory` where the part is kept by run or by task: `worktrees`, `runs`, `engine` and `sessions`), the names that did not read and
+ * are in no byte (`disk.unread`, by `part`), and the bytes free on the file system that holds the store and its size (`disk.free`,
+ * `disk.size`). `sessions` is kept outside the store, perhaps on another file system than the two describe.
  */
 export const DISK_METRICS = {
   bytes: Metric.gauge('disk.bytes', { description: 'the bytes a part of the store holds on disk, as the last sweep read them' }),
@@ -83,9 +98,33 @@ const named = (run: DiskRun, at: string): Effect.Effect<void> =>
     run.factory === undefined ? {} : { factory: run.factory },
   );
 
+/** What the runtime answered of each task, as the pure half takes it: its journal, bodies and files as `engine`, its records as `sessions`. */
+const keptOf = (report: KeptReport): TaskKept[] =>
+  report.tasks.map((task) => ({
+    taskId: task.taskId,
+    engine: task.journal + task.bodies + task.files,
+    ...(task.records === undefined ? {} : { sessions: task.records }),
+    unread: task.unread?.length ?? 0,
+  }));
+
+/**
+ * What the runtime keeps by task, asked once (`kept`), or undefined where the ask failed: the sweep then says the engine whole and the
+ * sessions unread, and measures the rest.
+ */
+const keptAsked = Effect.gen(function* () {
+  const e = yield* EngineService;
+  return yield* e.kept().pipe(
+    Effect.map(keptOf),
+    Effect.catch(() => Effect.succeed(undefined)),
+  );
+});
+
 /**
  * One sweep over the store, given the runs the latest pass answered (`answers`) and what this daemon's sweeps remember (`memory`):
  *
+ * - the runtime is asked what it keeps by task (`keptAsked`), each task its run's factory's (`runTasks`), or the default factory's: the
+ *   engine's folder is said by factory, what belongs to no run answered left in the part alone, and the records its sessions left
+ *   outside the store are the part `sessions` (`withKept`); a runtime that keeps no record of a session answers none, and none is said;
  * - the store's root is listed (`storeRoots`, or `given` where a caller listed it), each name under a part kept by run a root of its own;
  * - every root is walked in one walk (`walk`), a burst of names at a time, so a file with two names in the store is counted once, and
  *   one with a name outside it not at all;
@@ -100,6 +139,7 @@ const named = (run: DiskRun, at: string): Effect.Effect<void> =>
  * @returns The reading, the runs named, and the walk's cost.
  */
 export const diskOnce = Effect.fn('diskOnce')(function* (answers: readonly Answered[], memory: DiskMemory, given?: readonly DiskRoot[]) {
+  const kept = yield* keptAsked;
   const roots = given ?? (yield* tried(storeRoots));
   const factories = new Map(answers.map((a) => [a.run.id, a.run.factory ?? DEFAULT_FACTORY]));
   const runs = { ids: new Set(factories.keys()), factoryOf: (id: string) => factories.get(id) };
@@ -112,7 +152,9 @@ export const diskOnce = Effect.fn('diskOnce')(function* (answers: readonly Answe
     read.read[k] = walked.read[at];
   }
   const at = new Date().toISOString();
-  const reading = readingOf(roots, read, runs, yield* tried(storeFree), at);
+  const tasks = new Map(answers.flatMap((a) => runTasks(a.run).map((taskId) => [taskId, a.run.factory ?? DEFAULT_FACTORY])));
+  const walkedReading = readingOf(roots, read, runs, yield* tried(storeFree), at);
+  const reading = { ...walkedReading, entries: withKept(walkedReading.entries, kept, (taskId) => tasks.get(taskId)) };
   const largest = largestOf(roots, read, runs);
   yield* gauged(reading, memory);
   for (const run of largest) yield* named(run, at);

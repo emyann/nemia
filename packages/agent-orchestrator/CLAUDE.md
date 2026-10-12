@@ -133,8 +133,8 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
   run by its caller with `runWith` (`runtime-client.ts`), and reads the engine with `asked`. `await e.view(id)` compiles and answers
   the Effect itself, unrun: only `typescript/await-thenable` in `npm run lint` refuses it.
 - **Admission is the runtime's**: the orchestrator files a task `queued` with its `priority` (`stepMomentum`, `MOMENTUM`), and `engine()`
-  hands the runtime the ceiling and the pools. A new engine verb goes into `ENGINE_PHASES` and `ENGINE_WRITES`; an admitted task starts on
-  the runtime's next pass.
+  hands the runtime the ceiling and the pools. A new engine verb goes into `ENGINE_PHASES`, and into `ENGINE_WRITES`, or `ENGINE_READS`
+  where it changes no task (`views/views.verb.ts`); an admitted task starts on the runtime's next pass.
 - **A finished run is answered from memory while what it was judged on stands** (`restMemo`, `atRest`, `restStamps`): a new input of its
   pass goes into the stamps. A run whose stamp holds is not read off disk (`keptOf`), so an input the stamp misses is missed for good;
   `WF_VERIFY_REST` dies on it. Every test file that ticks a store sets `WF_VERIFY_REST=1`.
@@ -142,7 +142,8 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
 - **The daemon frees a finished run's worktrees on a sweep beside its passes** (`freeOnce`, `src/prune/free.verb.ts`): a test that
   starts a daemon and reads a finished run's worktree afterwards sets `WF_KEEP_WORKTREES=1`.
 - **The daemon measures the store's disk on a sweep beside its passes** (`diskOnce`, `src/disk/disk.verb.ts`), after its first pass and
-  every `DISK_EVERY`: a test daemon walks its scratch store once, and a pass is handed the reading, never the walk.
+  every `DISK_EVERY`: a test daemon walks its scratch store once, and a pass is handed the reading, never the walk. The sweep asks the
+  engine `kept`: a test of it plants sizes on the stand-in (`engine().keeps`), and a task is a factory's through its run's `steps`.
 - **The test script loads `test/ambient.ts`**, which sets `WF_MAX_RUNS` and `WF_MAX_CONCURRENT` to a value their readers refuse: a
   test file that reads either sets or deletes it at its head, never the daemon's (`test/ambient.test.ts`). It deletes
   `OTEL_EXPORTER_OTLP_ENDPOINT` too: a test that exports sets the address of a collector it made (`test/check-export.boundary.test.ts`).

@@ -3240,9 +3240,17 @@ written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on 
 - **What the store takes on the disk is measured on a sweep of the daemon's, never in a pass** (`disk`, `diskOnce` in
   `src/disk/disk.verb.ts`): once the first pass has answered and every 10 minutes after (`DISK_EVERY`), it lists the store's root and
   walks every name under it, a burst of `WALK_BURST` names at a time, with `lstat` and `readdir` and no process (`walk` in
-  `src/prune/freed.store.ts`). Each name is in one part: `worktrees`, `runs`, `engine` (the folder handed to the runtime, whole),
+  `src/prune/freed.store.ts`). Each name is in one part: `worktrees`, `runs`, `engine` (the folder handed to the runtime),
   `checks`, `series` (`metrics/`) or `other`; a name under `runs/` or `worktrees/` is its run's, and through it its factory's, the
-  default factory's for a run of none, and its part's alone for a folder of no run the last pass answered. A file hardlinked from
+  default factory's for a run of none, and its part's alone for a folder of no run the last pass answered. The sweep asks the runtime,
+  through the client, what it keeps by task (`kept`), and gives each task to the factory of the run that filed it (`runTasks`,
+  `withKept` in `src/disk/disk.ts`): `engine` is said by factory, a task's journal, the bodies it is first to name and its harness's
+  files, and `engine` alone is the walked whole less those, so what belongs to no run the last pass answered stays in no factory. A
+  seventh part, `sessions`, is no folder of the store: the records the runtime's sessions left where their harness keeps them, which
+  the runtime alone finds and measures, by factory, and alone for a task of no run answered. It may be on another file system than
+  `disk.free` describes. A runtime that keeps no record of a session answers none, and no `sessions` entry is made, never one at
+  zero; a record whose run was removed is named by no task and leaves the part, though it stays on the disk. An ask that fails leaves
+  `engine` whole and `sessions` unread, with no bytes. A file hardlinked from
   outside the store, as a worktree's packages are, counts nothing; a name that does not read is counted unread and is in no byte,
   never a zero. The reading is handed to each pass, which keeps it among the recent and so in the series: `disk.bytes` (by `part`, and
   `factory`), `disk.unread` (by `part`), `disk.free` and `disk.size`, the room on the file system that holds the store — under WSL

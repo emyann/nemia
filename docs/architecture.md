@@ -60,8 +60,8 @@ fails a walk and a verb with no walk is named. A test is given the stand-in, and
 `<what>.boundary.test.ts`: `test/stand-ins.test.ts` reads the runtime's, the orchestrator's and the api's test files and refuses git,
 a process, the real place, the real engine and a hand-made engine in any other, against a baseline that only shrinks
 (`test/stand-ins.baseline.ts`), and refuses a stand-in whose contract no boundary test walks whole. The engine's stand-in is the
-runtime's, `testEngine()` behind `agent-runtime/testing`: it keeps `file`, `view`, `list`, `stop`, `logs`, `feed`, `output`, `say` and
-`forget` by hand, and one table of walks (`packages/agent-runtime/test/engine-walks.ts`) holds it to the real engine, asked of
+runtime's, `testEngine()` behind `agent-runtime/testing`: it keeps `file`, `view`, `list`, `stop`, `logs`, `feed`, `output`, `say`,
+`forget` and `kept` by hand, and one table of walks (`packages/agent-runtime/test/engine-walks.ts`) holds it to the real engine, asked of
 `Engine.layer` in `engine-contract.boundary.test.ts` and of the stand-in in `engine-contract.test.ts`; what it cannot say is declared
 there (`APART`), and a runtime test builds the real engine, never the stand-in (`takenBreaks`). Two things are given up on purpose. *A team's own place as a folder of scripts*: a
 place is no longer a skill's `scripts/<verb>.ts` declared by a `place.json` and run as a process a question, so a team cannot bring
@@ -110,7 +110,8 @@ served by the daemon keeps its store ticking; a board served with `--no-tick` ti
 next pass. Beside its passes it frees the worktrees of finished runs (`free` in `src/prune/free.verb.ts`, forked by `up`), asking
 `nemia prune`'s own judgement of each, a few runs a sweep; and it measures what the store takes on the disk, part by part and by factory
 (`disk` in `src/disk/disk.verb.ts`, forked by `up`: a sweep of its own after the first pass and every ten minutes, whose reading each
-pass keeps in the series and no pass walks). A person may run it as a login service (`nemia service install`, `src/service/`), which runs the same daemon and hands the
+pass keeps in the series and no pass walks; it asks the runtime what it keeps by task, `kept`, and says the engine's folder and the
+sessions' records by the factory of the run that filed each task). A person may run it as a login service (`nemia service install`, `src/service/`), which runs the same daemon and hands the
 lease over only when told: from the checkout, or, run from an install, from `releases/current`. `nemia service restart`
 (`src/service/restart.verb.ts`) restarts the service's daemon as a take-over does (`takeOver`, `src/service/takeover.verb.ts`, shared with
 `nemia service install --take-over` and `nemia upgrade`): the store paused unless a person's pause stands, each landing check let
@@ -130,6 +131,10 @@ read and removed only by `sweep` (`agent-runtime/src/core/engine/bodies.ts`, `ae
 A task's journal, its session files and its feed lines are removed only by `forget` (`agent-runtime/src/service/forget.ts`,
 `ae forget`), and only of a settled task; a body still only by `sweep`. Which tasks a run removed had is the orchestrator's: `nemia rm`
 asks `forget` of every task its record names, and the tick asks again for one that had not settled (`src/forgetting/forgetting.verb.ts`).
+What all of it takes on the disk is the runtime's to say, by task (`kept`, `agent-runtime/src/service/kept.ts`): a task's journal, the
+bodies it is first to name, its harness's files, and the harness's own record of each session its journal names by id, never one
+found by its folder, where a person's own sessions live too. Which factory a task is of is the orchestrator's (`withKept`,
+`src/disk/disk.ts`). `forget` leaves a harness's record: once its task is forgotten no journal names it, and it is counted for no task.
 
 **Logs and traces**: each layer logs and spans in its own words — the runtime its task, kind and attempt (`appendFields` in
 `agent-runtime/src/core/engine/journal.ts`), the orchestrator its run and step (`advancePass`, `forStep`); each spans the work it does, never an item it looks at and skips, which it

@@ -130,7 +130,7 @@ type Pass = Effect.Success<ReturnType<typeof tickRun>>;
  * A run's line on `nemia tick`: its status, as the pass judged it — `awaiting approval` or `blocked` for one a person alone stops, `failed`
  * for one in which a step broke — and what the pass did to it.
  */
-export function tickRunLine(r: Pass['runs'][number]): string {
+function tickRunLine(r: Pass['runs'][number]): string {
   const filed = r.filed.length ? `  filed: ${r.filed.join(', ')}` : '';
   const tried = r.tried.length ? `  tried again: ${r.tried.join(', ')}` : '';
   const looped = r.looped.length ? `  round again: ${r.looped.join(', ')}` : '';

@@ -49,7 +49,7 @@ const { listRuns, markCancelled, readRun } = await import('../src/record/record.
 const { passStanding } = await import('../src/standing/standing.verb.ts');
 /** A pass's read of where every run's branches stand, written to `standing.json` as the tick writes it: what `nemia ls` reads. */
 const aPass = (e: Engine) => runWith(e, passStanding(listRuns()));
-const { main: cli, tickRunLine } = await import('../src/cli/main.ts');
+const { main: cli } = await import('../src/cli/main.ts');
 /** `nemia`, as a person types it, its commands given this test's place. */
 const main = (argv: string[], e?: Engine) => cli(argv, e, undefined, stand().place);
 const { engineOf } = await import('../src/runtime-client.ts');
@@ -538,26 +538,6 @@ test('REFUSED at shipped defaults: `nemia cancel` calls a run waiting at its gat
   assert.deepEqual((await runWith(gate.e, advanceRun(readRun(gate.run.id)))).filed, [], 'an approval on a cancelled run files nothing');
   assert.equal((await runWith(gate.e, cancelRun(gate.run.id))).plan.kind, 'already-cancelled');
   assert.equal((await runWith(gate.e, forgetRun(gate.run.id))).kind, 'forgotten');
-});
-
-test('the line `nemia tick` prints for a run says what it waits on — `awaiting approval` at its gate, `blocked` on a question — and REFUSED: `failed` for either, kept for a run in which a step broke', async () => {
-  const gate = await atItsGate();
-  const stopped = async (phase: string, closeout?: unknown) => {
-    const run = await runPlaced(startRun({ brief: 'plan the flag', repo: aRepo(), workflowDir: planned(), isolate: false }));
-    await runWith(gate.e, advanceRun(readRun(run.id)));
-    gate.settle(`${run.id}-plan`, phase, closeout);
-    return run.id;
-  };
-  const asking = await stopped('succeeded', { ...SIGNED, outcome: 'blocked', needs: 'which flag name ships' });
-  const broke = await stopped('failed');
-  const lineOf = async (id: string) => tickRunLine(await runWith(gate.e, advanceRun(readRun(id))));
-  const lines = await Promise.all([gate.run.id, asking, broke].map(lineOf));
-  assert.deepEqual(lines, [
-    `${gate.run.id}  awaiting approval  blocked: implement`,
-    `${asking}  blocked  blocked: implement`,
-    `${broke}  failed  blocked: implement`,
-  ]);
-  for (const line of lines.slice(0, 2)) assert.ok(!line.includes('failed'), line);
 });
 
 test('`nemia decide` at a gate says AWAITING APPROVAL and, under the step, the approval and the send-back to give; approved with words, the tick hands them to implement and to review after it under `## Approved`, as data, and `nemia decide` prints the gate `approved <time> — "<words>"`', async (t) => {

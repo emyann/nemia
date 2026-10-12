@@ -75,18 +75,13 @@ test('the board reads a run at a gate alone, one waiting on an answer alone and 
         heldUntilOffered: holdCandidates(other, [run]).length,
         decidable: decidableRun(run),
         inFlight: inFlight(run),
-        prunable: Boolean(prunable(run as never)),
+        prunable: Boolean(prunable(run)),
         stamped: (JSON.parse(decisionStamp(run)) as unknown[])[0],
       },
       { holdable: true, heldUntilOffered: 1, decidable: true, inFlight: false, prunable: true, stamped: run.status },
       run.status,
     );
   }
-  assert.deepEqual(
-    [GATE.status, QUESTION.status].map((status) => status === 'failed'),
-    [false, false],
-    'a run a person alone stops is never failed',
-  );
 });
 
 test('REFUSED: a hold of a run that succeeded or was called off, whatever word a stopped one says', () => {

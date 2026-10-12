@@ -573,6 +573,336 @@
       }
     },
     {
+      "id": 35,
+      "type": "row",
+      "title": "Disk",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 17
+      },
+      "panels": []
+    },
+    {
+      "id": 36,
+      "type": "timeseries",
+      "title": "On disk, by part",
+      "description": "disk.bytes: what each part of the store holds, as the daemon's last sweep read it, stacked: the runs' worktrees, their records and files, the folder handed to the runtime (engine), the checks' output, the series, and everything else under the store's root. A file hardlinked from outside the store, as a worktree's packages are, is the other name's and counts nothing.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 6,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A",
+          "expr": "sum by (part) (disk_bytes_ratio{service_name=\"$service\"})",
+          "legendFormat": "{{part}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "min": 0,
+          "custom": {
+            "fillOpacity": 30,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 37,
+      "type": "timeseries",
+      "title": "On disk, by factory",
+      "description": "disk.bytes of the parts kept by run, the worktrees and the runs' records and files, by the factory of each run the last pass answered, stacked. A folder of no run known is in no factory, and only in its part.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 18,
+        "w": 6,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A",
+          "expr": "sum by (factory) (disk_bytes_ratio{service_name=\"$service\", factory!=\"\"})",
+          "legendFormat": "{{factory}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "min": 0,
+          "custom": {
+            "fillOpacity": 30,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 38,
+      "type": "timeseries",
+      "title": "Free on the store's disk",
+      "description": "disk.free and disk.size: the bytes free on the file system that holds the store, and its size. Under WSL this is the Linux virtual disk, which is far larger than what it may take: the real limit is the Windows drive that holds its file, which is not read here, and space freed inside returns to it only when that file is compacted.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 18,
+        "w": 6,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A",
+          "expr": "disk_free_ratio{service_name=\"$service\"}",
+          "legendFormat": "free"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "B",
+          "expr": "disk_size_ratio{service_name=\"$service\"}",
+          "legendFormat": "size"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "min": 0,
+          "custom": {
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 39,
+      "type": "timeseries",
+      "title": "Names that did not read",
+      "description": "disk.unread: the names of each part the last sweep could not read, a folder gone or shut while it was walked. They are in no byte of the part: a part above zero here holds more than is drawn.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 18,
+        "w": 6,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A",
+          "expr": "sum by (part) (disk_unread_ratio{service_name=\"$service\"})",
+          "legendFormat": "{{part}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": {
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 40,
+      "type": "bargauge",
+      "title": "Largest runs now",
+      "description": "The ten runs that hold the most over their worktrees and their records and files, as the daemon's sweeps of the last 30 minutes read them: each run's largest reading. A folder of no run known is under its own name.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 26,
+        "w": 24,
+        "h": 14
+      },
+      "timeFrom": "30m",
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"$service\" && name=\"disk.run\"} | max_over_time(span.value) by (span.run)",
+          "metricsQueryType": "instant",
+          "limit": 20,
+          "tableType": "traces"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "decimals": 1,
+          "min": 0,
+          "color": {
+            "mode": "continuous-BlPu"
+          },
+          "noValue": "no sweep in the last 30 minutes"
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "top",
+        "sizing": "manual",
+        "minVizHeight": 36,
+        "maxVizHeight": 36,
+        "text": {
+          "titleSize": 12,
+          "valueSize": 14
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        }
+      },
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^(?:\\{span\\.run=\"(.*)\"\\}|(.*))$",
+            "renamePattern": "$1$2"
+          }
+        },
+        {
+          "id": "reduce",
+          "options": {
+            "reducers": [
+              "lastNotNull"
+            ],
+            "mode": "seriesToRows",
+            "includeTimeField": false,
+            "labelsToFields": false
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "Last *",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
       "id": 10,
       "type": "row",
       "title": "API",
@@ -581,7 +911,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 17
+        "y": 40
       },
       "panels": []
     },
@@ -596,7 +926,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 18,
+        "y": 41,
         "w": 8,
         "h": 8
       },
@@ -648,7 +978,7 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 18,
+        "y": 41,
         "w": 8,
         "h": 8
       },
@@ -700,7 +1030,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 18,
+        "y": 41,
         "w": 8,
         "h": 8
       },
@@ -750,7 +1080,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 26
+        "y": 49
       },
       "panels": []
     },
@@ -765,7 +1095,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 27,
+        "y": 50,
         "w": 8,
         "h": 9
       },
@@ -825,7 +1155,7 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 27,
+        "y": 50,
         "w": 8,
         "h": 9
       },
@@ -885,7 +1215,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 27,
+        "y": 50,
         "w": 8,
         "h": 9
       },
@@ -945,7 +1275,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 36,
+        "y": 59,
         "w": 8,
         "h": 9
       },
@@ -1016,7 +1346,7 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 36,
+        "y": 59,
         "w": 8,
         "h": 9
       },
@@ -1077,7 +1407,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 36,
+        "y": 59,
         "w": 8,
         "h": 9
       },
@@ -1138,7 +1468,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 45,
+        "y": 68,
         "w": 12,
         "h": 8
       },
@@ -1199,7 +1529,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 45,
+        "y": 68,
         "w": 12,
         "h": 8
       },
@@ -1270,7 +1600,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 53,
+        "y": 76,
         "w": 8,
         "h": 9
       },
@@ -1341,7 +1671,7 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 53,
+        "y": 76,
         "w": 8,
         "h": 9
       },
@@ -1412,7 +1742,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 53,
+        "y": 76,
         "w": 8,
         "h": 9
       },
@@ -1481,7 +1811,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 62
+        "y": 85
       },
       "panels": []
     },
@@ -1496,7 +1826,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 63,
+        "y": 86,
         "w": 6,
         "h": 7
       },
@@ -1548,7 +1878,7 @@
       },
       "gridPos": {
         "x": 6,
-        "y": 63,
+        "y": 86,
         "w": 6,
         "h": 7
       },
@@ -1609,7 +1939,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 63,
+        "y": 86,
         "w": 6,
         "h": 7
       },
@@ -1688,7 +2018,7 @@
       },
       "gridPos": {
         "x": 18,
-        "y": 63,
+        "y": 86,
         "w": 6,
         "h": 7
       },
@@ -1738,7 +2068,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 70
+        "y": 93
       },
       "panels": []
     },
@@ -1748,7 +2078,7 @@
       "title": "",
       "gridPos": {
         "x": 0,
-        "y": 71,
+        "y": 94,
         "w": 24,
         "h": 2
       },
@@ -1768,7 +2098,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 73,
+        "y": 96,
         "w": 12,
         "h": 16
       },
@@ -1797,7 +2127,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 73,
+        "y": 96,
         "w": 12,
         "h": 16
       },

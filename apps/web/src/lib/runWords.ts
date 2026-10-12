@@ -8,15 +8,19 @@ import type { Hue } from './meaning.ts';
 import { stepState, type StepState } from './status.ts';
 
 /** Every kind of wait on a person the page has a sentence for. */
-export const WAIT_KINDS = ['approve', 'asks', 'blocked', 'check', 'unsigned', 'denied', 'rounds', 'budget', 'hold', 'after'] as const;
+export const WAIT_KINDS = ['approve', 'blocked', 'check', 'unsigned', 'denied', 'rounds', 'budget', 'hold', 'after'] as const;
 
 /** A kind of wait on a person. */
 export type WaitKind = (typeof WAIT_KINDS)[number];
 
-/** The kind of wait each state of a step is, none for a state that waits on nobody. A held run's gate is the hold's, not an approval. */
+/**
+ * The kind of wait each state of a step is, none for a state the api lists no step in as waiting on a person: a session that asks is
+ * a run still in flight there, which the bell does not count, and a held run's steps are named by none of its rows, whose wait is the
+ * hold's own.
+ */
 export const waitKindOf: Record<StepState, WaitKind | null> = {
   working: null,
-  'needs-human': 'asks',
+  'needs-human': null,
   checking: null,
   verified: null,
   unverified: null,
@@ -31,7 +35,7 @@ export const waitKindOf: Record<StepState, WaitKind | null> = {
   'failed-check': 'check',
   waiting: null,
   'waiting-for-slot': null,
-  held: 'hold',
+  held: null,
   cancelled: null,
   unreadable: null,
   unknown: null,
@@ -50,16 +54,15 @@ const stateOn = (row: WaitingRow, status: string): StepState => stepState(status
 
 /**
  * What `row` waits on a person for: a hold only a person lifts first; then the first of its steps, in the run's order, that the api
- * says waits on a person or whose session asks, by its state's kind; then a run it waits on that never ships without a person. None
- * for a row that waits on nobody, and for one whose waiting step says a word the board has no kind for.
+ * says waits on a person (`waitingOnYou`), by its state's kind; then a run it waits on that never ships without a person. None for a
+ * row that waits on nobody, and for one whose waiting step says a word the board has no kind for.
  */
 export function waitOf(row: WaitingRow): Wait | null {
   const done = row.steps.filter((step) => ['verified', 'unverified'].includes(stateOn(row, step.status))).length;
   if (row.holding?.onYou) return { kind: 'hold', step: null, done };
   for (const step of row.steps) {
-    const state = stateOn(row, step.status);
-    const kind = waitKindOf[state];
-    if (kind && (row.waitingOnYou.includes(step.name) || state === 'needs-human')) return { kind, step: step.name, done };
+    const kind = waitKindOf[stateOn(row, step.status)];
+    if (kind && row.waitingOnYou.includes(step.name)) return { kind, step: step.name, done };
   }
   return row.waiting?.onYou ? { kind: 'after', step: null, done } : null;
 }
@@ -77,7 +80,6 @@ const named = (step: string | null): string => (step ? step.charAt(0).toUpperCas
 /** Each kind's sentence, from the wait. */
 const SENTENCES: Record<WaitKind, (wait: Wait) => string> = {
   approve: (wait) => `${doneSaid(wait.done)}${named(wait.step)} waits for your approval.`,
-  asks: (wait) => `${named(wait.step)} asks you a question while it works.`,
   blocked: (wait) => `${named(wait.step)} stopped and needs your word to go on.`,
   check: (wait) => `The check refused ${named(wait.step)}'s work. Try it again or call the run off.`,
   unsigned: (wait) => `${named(wait.step)} ended without signing its work. Try it again.`,

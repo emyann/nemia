@@ -17,17 +17,17 @@ const SRC = path.resolve(import.meta.dirname, '../src');
 
 const nemia = { name: 'nemia', default: false, repos: [], workflows: [], hires: {}, error: null } as unknown as Factory;
 
-/** A run that still moves while a step of it asks, a running run at its gate, and one run that only moves. */
-const asks = summary(
+/** A run that still moves while a step of it waits at its gate, a running run at its gate, and one run that only moves. */
+const both = summary(
   [
     ['design', 'running (working)'],
-    ['ask', 'needs-human'],
+    ['plan', 'awaiting approval'],
   ],
-  { id: 'r-asks', factory: 'nemia', waitingOnYou: ['ask'] },
+  { id: 'r-both', factory: 'nemia', waitingOnYou: ['plan'] },
 );
 const gate = summary([['plan', 'awaiting approval']], { id: 'r-gate', factory: 'nemia', moving: false, waitingOnYou: ['plan'] });
 const moving = summary([['build', 'checking']], { id: 'r-moving', factory: 'nemia' });
-const open = { counts: { waiting: 2, inFlight: 1, finished: 4 }, waiting: [asks, gate], inFlight: [moving] };
+const open = { counts: { waiting: 2, inFlight: 1, finished: 4 }, waiting: [both, gate], inFlight: [moving] };
 
 test('REFUSED: the footer, the gauges, the factory bar and the bell name the same runs on the same answer', () => {
   const footer = atWork(open);
@@ -43,7 +43,7 @@ test('REFUSED: the footer, the gauges, the factory bar and the bell name the sam
     3,
     "the whole list's rule counts a run that waits and moves, and a running run at its gate, in flight too: the frame would say 3",
   );
-  assert.equal(footer.sessions, 2, 'the session of the run that asks still works, and counts');
+  assert.equal(footer.sessions, 2, 'the session of the run that also waits still works, and counts');
 });
 
 /** `text` from the declaration of `from` up to the next exported declaration, or its end. */

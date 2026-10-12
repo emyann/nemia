@@ -45,10 +45,6 @@ const waiting = {
 /** One row of the light answer per kind of wait, and the sentence it says. */
 const ROWS: Record<WaitKind, { row: RunSummary; says: string }> = {
   approve: { row: landing('awaiting approval'), says: 'Three steps are done. Land waits for your approval.' },
-  asks: {
-    row: summary([['design', 'needs-human']], { waitingOnYou: ['design'] }),
-    says: 'Design asks you a question while it works.',
-  },
   blocked: { row: landing('succeeded · BLOCKED'), says: 'Land stopped and needs your word to go on.' },
   check: { row: landing('failed ✗ check (exit 1)'), says: "The check refused Land's work. Try it again or call the run off." },
   unsigned: { row: landing('unsigned'), says: 'Land ended without signing its work. Try it again.' },
@@ -81,7 +77,7 @@ test('REFUSED: a kind with no sentence fails rather than printing nothing', () =
   assert.deepEqual(Object.keys(ROWS).sort(), [...WAIT_KINDS].sort(), 'every kind has its row here');
 });
 
-test('every state that waits on a person has a kind, and no state that waits on nobody has one', () => {
+test('every state the api lists a step in as waiting on a person has a kind, and no other state has one', () => {
   const waits: StepState[] = [
     'blocked',
     'awaiting-approval',
@@ -91,8 +87,6 @@ test('every state that waits on a person has a kind, and no state that waits on 
     'exhausted',
     'over-budget',
     'budget-exhausted',
-    'needs-human',
-    'held',
   ];
   for (const state of Object.keys(stateMeaning) as StepState[]) {
     assert.equal(waitKindOf[state] !== null, waits.includes(state), state);
@@ -101,10 +95,25 @@ test('every state that waits on a person has a kind, and no state that waits on 
   assert.equal(waitOf(landing('budget exhausted'))?.kind, 'budget');
 });
 
-test("REFUSED: a held run's gate is the hold's, not an approval", () => {
-  const held = landing('awaiting approval', { holding: { ...holding, onYou: false } });
-  assert.equal(waitOf(held)?.kind, 'hold');
-  assert.equal(waitOf(landing('awaiting approval', { holding }))?.kind, 'hold', 'a hold only a person lifts comes first');
+test("REFUSED: a held run at its gate, as the api lists it with no step waiting, says the hold's sentence, not an approval's", () => {
+  const atGate = summary([...DONE, ['land', 'awaiting approval']], { status: 'running', moving: false, holding, waitingOnYou: [] });
+  assert.deepEqual(waitOf(atGate), { kind: 'hold', step: null, done: 3 });
+  assert.equal(waitSentence(atGate), 'You hold this run. It moves once you lift the hold.');
+  const liftsItself = { ...atGate, holding: { ...holding, onYou: false } };
+  assert.equal(waitOf(liftsItself), null, 'a hold the tick lifts waits on nobody');
+  assert.equal(waitOf({ ...liftsItself, waiting })?.kind, 'after', 'and such a run that waits on a run nobody will ship says that');
+});
+
+test("a run whose session asks while another step waits says the waiting step's sentence: the api lists no asking step", () => {
+  const both = summary(
+    [
+      ['design', 'needs-human'],
+      ['plan', 'awaiting approval'],
+    ],
+    { waitingOnYou: ['plan'] },
+  );
+  assert.equal(waitSentence(both), 'Plan waits for your approval.');
+  assert.equal(waitOf(summary([['design', 'needs-human']])), null, 'a run that only asks is in flight, and no row of the waiting');
 });
 
 test('the first waiting step in the run’s order is the one said, and only a step the api says waits', () => {
@@ -119,6 +128,13 @@ test('the first waiting step in the run’s order is the one said, and only a st
   assert.equal(waitSentence(two), 'Implement ended without signing its work. Try it again.');
   assert.equal(waitSentence({ ...two, waitingOnYou: ['review'] }), 'One step is done. Review waits for your approval.');
   assert.equal(waitSentence(summary([['plan', 'awaiting approval']], { waitingOnYou: ['plan'] })), 'Plan waits for your approval.');
+});
+
+test('REFUSED: a wait on runs that may still ship is no wait on a person, and a step that waits comes before a run waited on', () => {
+  const onRuns = summary([['design', 'waiting on r-0']], { moving: true, waiting: { ...waiting, onYou: false } });
+  assert.equal(waitOf(onRuns), null);
+  assert.equal(waitOf(landing('unsigned', { waiting }))?.kind, 'unsigned');
+  assert.equal(waitOf(landing('unsigned', { waiting, holding }))?.kind, 'hold');
 });
 
 test('REFUSED: a waiting row whose step says a word the board does not know says it waits on you, never nothing', () => {

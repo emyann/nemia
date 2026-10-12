@@ -96,7 +96,7 @@ test('the text link is a link to its route, underlined, with a ring for the keyb
   const link = tagWith(html, 'data-text-link');
   assert.match(link, /^<a /);
   assert.match(link, /href="\/\?factory=nemia"/);
-  assert.match(link, /underline/);
+  assert.match(link, / underline /, 'underlined, not only offset');
   assert.match(link, /data-focus-visible:ring-2/);
   assert.match(html, />Read the review</);
 });

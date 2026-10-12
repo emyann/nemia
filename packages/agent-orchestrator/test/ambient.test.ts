@@ -4,11 +4,13 @@
  * by `node --test` with the script's own flags, from the package, with the daemon's ceilings in their environment: one that relies on
  * a default fails naming the sentinel, and one that deletes the variable first passes. And a command that ticks, typed in such a file on a
  * store no daemon holds, starts none: the script turns the start off (`NEMIA_DAEMON_START=off`). And a collector the shell or the daemon
- * names is not one a test file exports to: the script drops `OTEL_EXPORTER_OTLP_ENDPOINT`.
+ * names is not one a test file exports to: the script drops `OTEL_EXPORTER_OTLP_ENDPOINT`. And a harness's own files are never the
+ * person's: the script sets `CLAUDE_CONFIG_DIR` to a scratch folder.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
@@ -162,4 +164,44 @@ test("REFUSED under the daemon's OTEL_EXPORTER_OTLP_ENDPOINT: a test file sees n
   assert.equal(seated.status, 0, `${seated.stdout}\n${seated.stderr}`);
   const bare = runExporter(false, JSON.stringify({ address: NAMED, exports: NAMED }));
   assert.equal(bare.status, 0, `without the hook the address is the shell's: ${bare.stdout}\n${bare.stderr}`);
+});
+
+/**
+ * A test file that says where a harness keeps its files, run from the package with the person's own folder named in its environment:
+ * with the flags `script` gives `node` before `--test` when `seated`, with none otherwise. Answers the run, and where it printed.
+ */
+function runConfigured(seated: boolean, own: string) {
+  const dir = scratch('wf-ambient-');
+  const file = path.join(dir, 'fixture.test.mjs');
+  const out = path.join(dir, 'seen.txt');
+  fs.writeFileSync(
+    file,
+    [
+      "import { test } from 'node:test';",
+      "import fs from 'node:fs';",
+      `test('the folder', () => fs.writeFileSync(${JSON.stringify(out)}, process.env.CLAUDE_CONFIG_DIR ?? ''));`,
+      '',
+    ].join('\n'),
+  );
+  const words = script.trim().split(/\s+/);
+  const flags = seated ? words.slice(1, words.indexOf('--test')) : [];
+  const env: Record<string, string | undefined> = { ...process.env, CLAUDE_CONFIG_DIR: own };
+  for (const key of ['NODE_TEST_CONTEXT', 'NODE_OPTIONS']) delete env[key];
+  const ran = spawnSync(process.execPath, [...flags, '--test', file], { cwd: PACKAGE, env, encoding: 'utf8', timeout: 60_000 });
+  return { ran, seen: fs.existsSync(out) ? fs.readFileSync(out, 'utf8') : undefined };
+}
+
+test("REFUSED under a person's own CLAUDE_CONFIG_DIR: a test file is given a scratch folder, and without the hook it would write theirs", () => {
+  const own = path.join(os.homedir(), '.claude');
+  const seated = runConfigured(true, own);
+  assert.equal(seated.ran.status, 0, `${seated.ran.stdout}\n${seated.ran.stderr}`);
+  assert.ok(seated.seen, 'the fixture said no folder');
+  assert.notEqual(seated.seen, own);
+  assert.ok(path.basename(seated.seen).startsWith('wf-ambient-claude-'), seated.seen);
+  assert.equal(path.relative(os.homedir(), seated.seen).startsWith('.claude'), false);
+  assert.equal(runConfigured(false, own).seen, own, 'without the hook the folder is the shell\'s');
+});
+
+test("this file's own process has the scratch folder too", () => {
+  assert.equal(path.basename(process.env.CLAUDE_CONFIG_DIR ?? '').startsWith('wf-ambient-claude-'), true);
 });

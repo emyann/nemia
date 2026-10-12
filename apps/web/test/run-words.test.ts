@@ -12,6 +12,7 @@ import {
   railSaid,
   sentenceOf,
   sinceCreated,
+  sinceShort,
   sinceWords,
   WAIT_KINDS,
   waitKindOf,
@@ -192,6 +193,7 @@ test('a time is a fact to the minute, wall time', () => {
   assert.equal(sinceWords(3 * H), '3h');
   assert.equal(sinceWords(2 * D), '2d');
   assert.equal(sinceWords(-5), 'under a minute');
+  assert.deepEqual([0, 59 * S, M, 3 * H + 12 * M].map(sinceShort), ['under 1m', 'under 1m', '1m', '3h 12m'], 'short, where room is');
 });
 
 test('the rail says each step and its word, in the run’s order', () => {

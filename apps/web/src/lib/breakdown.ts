@@ -64,7 +64,7 @@ const dollars = (cents: number): string => `${cents < 0 ? '-' : ''}$${(Math.abs(
 export const COST_REST = 'Outside its steps';
 
 /**
- * What each step cost, in the answer's order, `not run` for a step nothing was measured of, and a last line for what the run cost
+ * What each step cost, in the answer's order, `none measured` for a step no cost was measured of, and a last line for what the run cost
  * beyond its steps, absent under half a cent. The rows' dollars add up to the run's, and their cents to the tile's.
  */
 export function costBreakdown(cost: Spent, steps: readonly StepCost[]): Breakdown {
@@ -77,7 +77,7 @@ export function costBreakdown(cost: Spent, steps: readonly StepCost[]): Breakdow
   );
   return {
     head: `${cost.said} so far, by step`,
-    rows: parts.map((part, i) => ({ what: part.what, amount: part.usd, said: part.run ? dollars(cents[i]!) : 'not run', none: !part.run })),
+    rows: parts.map((part, i) => ({ what: part.what, amount: part.usd, said: part.run ? dollars(cents[i]!) : 'none measured', none: !part.run })),
     foot: cost.unmeasured > 0 ? 'A session that ended with no cost on it is counted in none of these.' : '',
   };
 }
@@ -123,7 +123,7 @@ export function tokensBreakdown(tokens: RunTokens): Breakdown {
   const parts = rest === 0 ? kinds : [...kinds, [TOKENS_REST, rest] as [string, number]];
   const fresh = tokens.cacheRead === null ? null : tokens.total - tokens.cacheRead;
   return {
-    head: `${tokens.said} counted${fresh === null ? '' : `, ${tokensSaid(fresh)} of them new`}`,
+    head: `${tokensSaid(tokens.total)} counted${fresh === null ? '' : `, ${tokensSaid(fresh)} of them new`}`,
     rows: parts.map(([what, count]) => ({ what, amount: count, said: tokensSaid(count), none: count === 0 })),
     foot: 'Each kind is billed at its own rate, reads from the cache at the lowest.',
   };

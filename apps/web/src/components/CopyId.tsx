@@ -26,7 +26,7 @@ export function CopyId({ id, short = false }: { id: string; short?: boolean }) {
   };
   return (
     <span data-copy-id={id} data-copied={said === 'copied' || undefined} className="inline-flex items-center gap-1">
-      <span data-run-id title={short ? id : undefined} className="font-mono text-body-small text-on-surface-variant">
+      <span data-run-id title={short ? id : undefined} className="font-mono text-body-small whitespace-nowrap text-on-surface-variant">
         {short ? id.slice(-4) : id}
       </span>
       <IconButton size="xsmall" icon={said === 'copied' ? Check : Copy} aria-label={`Copy the run id ${id}`} onPress={copy} />

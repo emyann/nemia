@@ -3,7 +3,7 @@ import type { FinishedPage } from '@/lib/api';
 import { factoryOf } from '@/lib/factories';
 import { titleOf } from '@/lib/factory';
 import { ink } from '@/lib/meaning';
-import { endedWords, sinceWords, whenWords } from '@/lib/runWords';
+import { endedWords, sinceShort, whenWords } from '@/lib/runWords';
 import { cn } from '@/lib/utils';
 import { CopyId } from './CopyId';
 import { CutFrame } from './CutFrame';
@@ -33,7 +33,7 @@ function FinishedRow({ run, asOf }: { run: FinishedPage['runs'][number]; asOf: D
         <time dateTime={run.finishedAt}>{whenWords(new Date(run.finishedAt), asOf)}</time>
       </Cell>
       <Cell data-clock className={FACT}>
-        {sinceWords(run.wallMs)}
+        {sinceShort(run.wallMs)}
       </Cell>
       <Cell data-cost className={cn(FACT, ink.money)}>
         {run.cost?.said}

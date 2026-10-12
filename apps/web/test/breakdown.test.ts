@@ -45,7 +45,7 @@ const answered = (): WaitingRun =>
           uncached: 86,
           measured: 5,
           unmeasured: 0,
-          said: '4.10M',
+          said: '4.10M tokens',
           split: '',
         },
       },
@@ -110,7 +110,7 @@ test('the last line is absent when the rest is nothing', async () => {
 /** The whole minutes a clock's row says, none for `none` and `under 1m`. */
 const minutesOf = (said: string): number => (/^\d+m$/.test(said) ? Number(said.slice(0, -1)) : 0);
 
-/** The cents a cost's row says, none for `not run`. */
+/** The cents a cost's row says, none for a step with none. */
 const centsOf = (said: string): number => (said.startsWith('$') ? Math.round(Number(said.slice(1)) * 100) : 0);
 
 test('REFUSED: rows that say a minute or a cent less than their tile: what plain rounding down would lose is shared out', async () => {
@@ -129,7 +129,7 @@ test('REFUSED: rows that say a minute or a cent less than their tile: what plain
   const cost = costBreakdown(run.cost!, run.stepCosts!);
   assert.deepEqual(
     cost.rows.map((row) => row.said),
-    ['$1.89', '$3.61', 'not run', '$0.13'],
+    ['$1.89', '$3.61', 'none measured', '$0.13'],
   );
   assert.equal(
     cost.rows.reduce((total, row) => total + centsOf(row.said), 0),
@@ -139,7 +139,7 @@ test('REFUSED: rows that say a minute or a cent less than their tile: what plain
   assert.deepEqual(shared([1.5, 1.5, 1], 1, 4), [2, 1, 1], 'among equals the earliest takes the unit owed');
 });
 
-test('a part of nothing says so, a step nothing was measured of says it was not run, and the headline and the note are plain', async () => {
+test('a part of nothing says so, a step nothing was measured of says so, and the headline and the note are plain', async () => {
   const run = await decoded();
   const clock = clockBreakdown({ wallMs: 6 * M, sessionsMs: 6 * M - 20 * S, checksMs: 0, personMs: 20 * S, slotMs: 0, restMs: 0 }, 'Tue 13:32');
   assert.deepEqual(
@@ -155,7 +155,7 @@ test('a part of nothing says so, a step nothing was measured of says it was not 
   assert.equal(clock.foot, 'Wall time, from Tue 13:32.');
   const cost = costBreakdown(run.cost!, run.stepCosts!);
   assert.equal(cost.head, '$5.63 so far, by step');
-  assert.deepEqual(cost.rows[2], { what: 'land', amount: 0, said: 'not run', none: true });
+  assert.deepEqual(cost.rows[2], { what: 'land', amount: 0, said: 'none measured', none: true });
   assert.equal(cost.foot, '');
   assert.match(costBreakdown({ ...run.cost!, unmeasured: 1 }, run.stepCosts!).foot, /no cost on it/);
   const tokens = tokensBreakdown(run.tokens!);

@@ -1,9 +1,9 @@
 import { Card, Tag } from '@/components/ui/ds';
 import type { WaitingRun } from '@/lib/api';
-import { clockBreakdown, costBreakdown, tokensBreakdown } from '@/lib/breakdown';
+import { clockBreakdown, costBreakdown, tokensBreakdown, tokensSaid } from '@/lib/breakdown';
 import { factoryOf } from '@/lib/factories';
 import { titleOf } from '@/lib/factory';
-import { sinceWords, waitSentence, waitTag, whenWords } from '@/lib/runWords';
+import { sinceShort, waitSentence, waitTag, whenWords } from '@/lib/runWords';
 import { CopyId } from './CopyId';
 import { CutButton } from './CutButton';
 import { CutFrame } from './CutFrame';
@@ -22,11 +22,11 @@ function Tiles({ run, asOf }: { run: WaitingRun; asOf: Date }) {
       <StatTile
         hue="grey"
         label="Clock"
-        value={sinceWords(clock?.wallMs ?? run.wallMs)}
+        value={sinceShort(clock?.wallMs ?? run.wallMs)}
         breakdown={clock && clockBreakdown(clock, whenWords(new Date(run.createdAt), asOf))}
       />
-      <StatTile hue="money" label="Cost" value={cost?.said ?? 'none yet'} breakdown={cost && stepCosts && costBreakdown(cost, stepCosts)} />
-      <StatTile hue="grey" label="Tokens" value={tokens?.said ?? 'none yet'} breakdown={tokens && tokensBreakdown(tokens)} />
+      <StatTile hue="money" label="Cost" value={cost?.said ?? 'none'} breakdown={cost && stepCosts && costBreakdown(cost, stepCosts)} />
+      <StatTile hue="grey" label="Tokens" value={tokens ? tokensSaid(tokens.total) : 'none'} breakdown={tokens && tokensBreakdown(tokens)} />
     </div>
   );
 }
@@ -46,7 +46,7 @@ export function WaitingCard({ run, asOf }: { run: WaitingRun; asOf: Date }) {
         aria-label={title}
         data-run={run.id}
         data-unreadable={run.unreadable ? '' : undefined}
-        className="overflow-visible rounded-none shadow-none"
+        className="overflow-visible rounded-none bg-transparent shadow-none"
         classNames={{ content: 'gap-3 p-6' }}
       >
         <div className="flex flex-wrap items-center gap-2">
@@ -58,11 +58,11 @@ export function WaitingCard({ run, asOf }: { run: WaitingRun; asOf: Date }) {
           </Tag>
           {run.clock && (
             <span data-waited className="ml-auto font-mono text-body-small text-on-surface-variant uppercase">
-              waiting {sinceWords(run.clock.personMs)}
+              waiting {sinceShort(run.clock.personMs)}
             </span>
           )}
         </div>
-        <div className="flex flex-col items-start gap-1">
+        <div className="flex flex-col items-start gap-2">
           <h3 className="m-0 text-title-medium">
             <TextLink to="/runs/$runId" params={{ runId: run.id }}>
               {title}

@@ -3,7 +3,7 @@ import type { ListedRun } from '@/lib/api';
 import { factoryOf } from '@/lib/factories';
 import { titleOf } from '@/lib/factory';
 import { ink } from '@/lib/meaning';
-import { nowOf, sinceWords } from '@/lib/runWords';
+import { nowOf, sinceShort } from '@/lib/runWords';
 import { CopyId } from './CopyId';
 import { CutFrame } from './CutFrame';
 import { RunSteps } from './RunSteps';
@@ -49,13 +49,13 @@ export function FlightTable({ runs, asOf }: { runs: readonly ListedRun[]; asOf: 
             <Column id="run" isRowHeader>
               Run
             </Column>
-            <Column id="steps" className="w-56">
+            <Column id="steps" className="w-40">
               Steps
             </Column>
-            <Column id="now" className="w-72">
+            <Column id="now" className="w-64">
               Now
             </Column>
-            <Column id="clock" align="end" className="w-24">
+            <Column id="clock" align="end" className="w-20">
               Clock
             </Column>
             <Column id="cost" align="end" className="w-24">
@@ -65,14 +65,16 @@ export function FlightTable({ runs, asOf }: { runs: readonly ListedRun[]; asOf: 
           <TableBody>
             {runs.map((run) => (
               <Row key={run.id} id={run.id} data-run={run.id} data-unreadable={run.unreadable ? '' : undefined} className="bg-transparent">
-                <Cell className="py-2">
-                  <TextLink to="/runs/$runId" params={{ runId: run.id }} title={titleOf(run)} className="block truncate text-title-small">
-                    {titleOf(run)}
-                  </TextLink>
-                  <span className="flex items-center gap-2">
-                    <CopyId id={run.id} />
-                    <span data-factory={factoryOf(run)} className="text-label-small text-on-surface-variant uppercase">
-                      {factoryOf(run)}
+                <Cell className="py-1">
+                  <span className="flex flex-col gap-2">
+                    <TextLink to="/runs/$runId" params={{ runId: run.id }} title={titleOf(run)} className="block truncate text-title-small">
+                      {titleOf(run)}
+                    </TextLink>
+                    <span className="flex items-center gap-2">
+                      <CopyId id={run.id} />
+                      <span data-factory={factoryOf(run)} className="text-label-small text-on-surface-variant uppercase">
+                        {factoryOf(run)}
+                      </span>
                     </span>
                   </span>
                 </Cell>
@@ -83,7 +85,7 @@ export function FlightTable({ runs, asOf }: { runs: readonly ListedRun[]; asOf: 
                   <Now run={run} asOf={asOf} />
                 </Cell>
                 <Cell data-clock className="font-mono text-body-small whitespace-nowrap">
-                  {sinceWords(run.wallMs)}
+                  {sinceShort(run.wallMs)}
                 </Cell>
                 <Cell data-cost className={`font-mono text-body-small whitespace-nowrap ${ink.money}`}>
                   {run.cost?.said}

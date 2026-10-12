@@ -118,7 +118,7 @@ test("REFUSED: a grain's tile written outside the look's grain, which holds thre
       .map((file) => [file, fs.readFileSync(path.join(SRC, file), 'utf8')]),
   );
   assert.ok('styles.css' in sources && 'components/look/Sticker.tsx' in sources, 'the source is read');
-  assert.deepEqual(tilesOutside({ ...sources, 'components/WaitingCard.tsx': 'url(\'data:image/svg+xml,<feTurbulence/>\')' }), [
+  assert.deepEqual(tilesOutside({ ...sources, 'components/WaitingCard.tsx': "url('data:image/svg+xml,<feTurbulence/>')" }), [
     'components/WaitingCard.tsx',
   ]);
   assert.deepEqual(tilesOutside(sources), [], 'no page and no part writes a tile of its own');

@@ -27,7 +27,11 @@ const both = summary(
 );
 const gate = summary([['plan', 'awaiting approval']], { id: 'r-gate', factory: 'nemia', moving: false, waitingOnYou: ['plan'] });
 const moving = summary([['build', 'checking']], { id: 'r-moving', factory: 'nemia' });
-const open = { counts: { waiting: 2, inFlight: 1, finished: 4 }, waiting: [both, gate].map((row) => waitingRun(row)), inFlight: [listed(moving)] };
+const open = {
+  counts: { waiting: 2, inFlight: 1, finished: 4 },
+  waiting: [both, gate].map((row) => waitingRun(row)),
+  inFlight: [listed(moving)],
+};
 
 test('REFUSED: the footer, the gauges, the factory bar and the bell name the same runs on the same answer', () => {
   const footer = atWork(open);

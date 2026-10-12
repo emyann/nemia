@@ -8,7 +8,12 @@ import { routeLink } from './routeLink';
  * React Aria's link drawn as the look's filled button, in the hue of what waits on a person: its top-right and bottom-left corners cut
  * by overlays painted in `on`, the ground it sits on, never by a clip, so its focus ring, drawn around its whole box, stays whole.
  */
-function Cut({ on = 'card', className, children, ...props }: Omit<LinkProps, 'className' | 'children'> & { on?: Ground; className?: string; children: string }) {
+function Cut({
+  on = 'card',
+  className,
+  children,
+  ...props
+}: Omit<LinkProps, 'className' | 'children'> & { on?: Ground; className?: string; children: string }) {
   return (
     <AriaLink
       {...props}

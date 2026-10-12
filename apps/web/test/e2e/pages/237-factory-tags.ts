@@ -20,8 +20,8 @@ export default {
   /**
    * Each item says which factory it is in. On Workflows, `dev` is tagged with the factory that attaches it on the checkout, linked to its
    * floor, and not with `broken`, whose file does not read, and the factory picked in the address keeps it alone, or none and says so; on
-   * Agents, the agent that factory hires is tagged with it. On Runs, FOLDER's row is tagged with its factory and every other row
-   * `default`; the factory picked in the address keeps its runs alone, says when it keeps none, and shows every factory's again. On the
+   * Agents, the agent that factory hires is tagged with it. On Runs, FOLDER's row says its factory and every other run `default`; the
+   * factory picked in the address keeps its runs alone, counted by the api, and each part says when it keeps none. On the
    * Inbox, a card filed in the factory is tagged with it, linked, every other card says it has no factory yet and wears no tag, and
    * `default` picked leaves the tagged one out. The card is taken back.
    */
@@ -34,31 +34,42 @@ export default {
       await settled(page);
       await photograph(page, path.join(OUT, `factory-tags-${what}-${theme}.png`), { fullPage: true });
     };
-    const rows = page.locator('li[data-in-flight]');
-    const total = await rows.count();
+    const runs = page.locator('[data-runs-page] [data-run]');
+    await expectVisible(runs.first(), 'Runs draws its runs: a card or a row each');
+    const total = await runs.count();
     await expectVisible(
-      page.locator(`li a[href="/runs/${FOLDER.id}"] span[data-factory-tag="${factory}"]`),
-      `${FOLDER.id}'s row is tagged with the factory it was started in, ${factory}, as text inside the row's link`,
+      page.locator(`tr[data-run="${FOLDER.id}"] [data-factory="${factory}"]`, { hasText: factory }),
+      `${FOLDER.id}'s row says the factory it was started in, ${factory}, in plain text`,
     );
-    await expectCount(page.locator('[data-factory-tag="default"]'), total - 1, 'and every other row with the default factory');
-    await expectCount(page.locator('li a [data-factory-tag] a, li a a[data-factory-tag]'), 0, 'no tag is a link inside the row');
+    await expectCount(page.locator('[data-run] [data-factory="default"]'), total - 1, 'and every other run says the default factory');
+    await expectCount(page.locator('[data-run] a[data-factory], [data-run] [data-factory] a'), 0, "no run's factory is a link");
     await open(page, `/runs?factory=${factory}`);
-    await expectCount(rows, 1, `with ${factory} picked, Runs keeps its one run`);
-    await expectVisible(page.locator(`li a[href="/runs/${FOLDER.id}"]`), `and that run is ${FOLDER.id}`);
+    await expectCount(runs, 1, `with ${factory} picked, Runs keeps its one run`);
+    await expectVisible(page.locator(`tr[data-run="${FOLDER.id}"]`), `and that run is ${FOLDER.id}`);
+    await expectTexts(
+      page.locator('[data-plate-count]'),
+      ['0', '0', '1'],
+      "and each plate says the factory's own count, as the api filtered it",
+    );
     await shoot('runs');
 
     await open(page, '/runs?factory=default');
-    await expectCount(rows, total - 1, "the page's address filtered by default keeps every run that names no factory");
-    await expectCount(page.locator(`li a[href="/runs/${FOLDER.id}"]`), 0, `and not ${FOLDER.id}`);
+    await expectCount(runs, total - 1, "the page's address filtered by default keeps every run that names no factory");
+    await expectCount(page.locator(`[data-run="${FOLDER.id}"]`), 0, `and not ${FOLDER.id}`);
 
     const empty = FACTORIES.others[0];
     await open(page, `/runs?factory=${empty}`);
-    await expectCount(rows, 0, `filtered by ${empty}, which holds no run, Runs lists none`);
-    const out = page.locator('[data-filtered-out]');
-    await expectVisible(out.filter({ hasText: `No run of the factory ${empty}.` }), 'and says so');
-    await out.getByRole('link', { name: "Show every factory's" }).click();
-    await page.waitForURL((url) => !url.searchParams.has('factory'));
-    await expectCount(rows, total, 'which shows every run again');
+    await expectCount(runs, 0, `filtered by ${empty}, which holds no run, Runs draws none`);
+    await expectTexts(
+      page.locator('[data-nothing]'),
+      ['Nothing waits on you.', 'Nothing is in flight.', 'No run has finished yet.'],
+      'and each part says so, plainly',
+    );
+    await expectCount(
+      page.getByRole('link', { name: "Show every factory's" }),
+      0,
+      "with no link of its own back: the sidebar's picker does that",
+    );
 
     await open(page, '/workflows');
     const dev = page.locator(`section[aria-label="Workflow ${WORKFLOWS.good.name}"]`);

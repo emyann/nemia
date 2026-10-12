@@ -26,7 +26,12 @@ function Tiles({ run, asOf }: { run: WaitingRun; asOf: Date }) {
         breakdown={clock && clockBreakdown(clock, whenWords(new Date(run.createdAt), asOf))}
       />
       <StatTile hue="money" label="Cost" value={cost?.said ?? 'none'} breakdown={cost && stepCosts && costBreakdown(cost, stepCosts)} />
-      <StatTile hue="grey" label="Tokens" value={tokens ? tokensSaid(tokens.total) : 'none'} breakdown={tokens && tokensBreakdown(tokens)} />
+      <StatTile
+        hue="grey"
+        label="Tokens"
+        value={tokens ? tokensSaid(tokens.total) : 'none'}
+        breakdown={tokens && tokensBreakdown(tokens)}
+      />
     </div>
   );
 }

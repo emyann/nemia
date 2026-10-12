@@ -121,7 +121,7 @@ async function cardSays(page: Page, run: WaitingRun): Promise<void> {
   await expectTexts(
     card.locator('[data-step-name]'),
     run.steps.map((step) => step.name),
-    "a rail of its own steps, each by its name",
+    'a rail of its own steps, each by its name',
   );
   await expectTexts(card.locator('[data-sticker] > span:first-child'), ['Clock', 'Cost', 'Tokens'], 'three tiles');
   await expectTexts(card.locator(`a[data-cut-button]${open}`), ['Open the run'], "one filled button, which opens the run's page");
@@ -182,7 +182,8 @@ async function byKeyboard(page: Page, run: WaitingRun): Promise<void> {
   await page.keyboard.press('Tab');
   await expectVisible(card.locator('a[data-cut-button]:focus'), 'then Tab reaches the button that opens the run');
   page.off('request', hear);
-  if (asked.length) throw new Refused(`a tooltip opens with no request: the light answer carries its rows — the page asked ${asked.join(', ')}`);
+  if (asked.length)
+    throw new Refused(`a tooltip opens with no request: the light answer carries its rows — the page asked ${asked.join(', ')}`);
 }
 
 /**
@@ -195,13 +196,10 @@ async function tableByKeyboard(page: Page, finished: FinishedPage): Promise<void
   await row.scrollIntoViewIfNeeded();
   await section(page, 'in-flight').locator('tr[data-run]').last().focus();
   await page.keyboard.press('Tab');
-  await expectNone(
-    async () => {
-      const at = await focused(page).evaluate((element) => element.closest('section')?.getAttribute('data-section') ?? null);
-      return at === 'finished' ? null : `the keyboard is in ${at}`;
-    },
-    'Tab from the table in flight reaches the finished table',
-  );
+  await expectNone(async () => {
+    const at = await focused(page).evaluate((element) => element.closest('section')?.getAttribute('data-section') ?? null);
+    return at === 'finished' ? null : `the keyboard is in ${at}`;
+  }, 'Tab from the table in flight reaches the finished table');
   const reach = async (target: Locator, what: string) => {
     for (let pressed = 0; pressed < 12 && (await target.evaluate((element) => element !== document.activeElement)); pressed += 1)
       await page.keyboard.press('ArrowRight');
@@ -213,7 +211,8 @@ async function tableByKeyboard(page: Page, finished: FinishedPage): Promise<void
   await page.keyboard.press('Enter');
   await expectVisible(row.locator('[data-copy-id][data-copied]'), 'Enter on the copy control of a finished row copies its id');
   const copied = await page.evaluate(() => navigator.clipboard.readText());
-  if (copied !== run.id) throw new Refused(`a finished row shows its id's end and copies it whole, ${run.id} — the clipboard holds "${copied}"`);
+  if (copied !== run.id)
+    throw new Refused(`a finished row shows its id's end and copies it whole, ${run.id} — the clipboard holds "${copied}"`);
 }
 
 /** The points `across` to each side of `control`'s centre, `up` above it and `down` below it that do not answer the control. */
@@ -307,7 +306,8 @@ async function narrow(page: Page): Promise<void> {
     const lefts = await section(page, 'waiting')
       .locator('article[data-run]')
       .evaluateAll((cards) => cards.map((card) => Math.round(card.getBoundingClientRect().left)));
-    if (new Set(lefts).size !== 1) throw new Refused(`at 390 wide the cards stack in one column — their left edges are ${lefts.join(', ')}`);
+    if (new Set(lefts).size !== 1)
+      throw new Refused(`at 390 wide the cards stack in one column — their left edges are ${lefts.join(', ')}`);
     const boxes = await page
       .locator('[data-table-box]')
       .evaluateAll((all) => all.map((box) => [box.scrollWidth, box.clientWidth, getComputedStyle(box).overflowX] as const));
@@ -321,7 +321,8 @@ async function narrow(page: Page): Promise<void> {
 /** Each text pair under 4.5:1 on the page as it is, said as the report says a pair. */
 async function failingPairs(page: Page): Promise<string[]> {
   const { pairs, scheme } = await measure(page.locator('[data-runs-page]'));
-  if (pairs.filter((pair) => pair.state === 'measured').length < 10) throw new Refused(`the contrast of the page's texts is measured in ${scheme}`);
+  if (pairs.filter((pair) => pair.state === 'measured').length < 10)
+    throw new Refused(`the contrast of the page's texts is measured in ${scheme}`);
   return pairs.filter(under).map((pair) => `${ratioOf(pair)}:1 "${pair.text}" (${pair.classes}) in ${scheme}`);
 }
 
@@ -379,6 +380,10 @@ export default {
       'reached with Enter, the Inbox is lit in the menu',
     );
     await enterOnPlace(page, 'Runs', '/runs');
-    await expectCount(section(page, 'waiting').locator('article[data-run]'), open.counts.waiting, 'back on Runs with Enter, its cards are drawn');
+    await expectCount(
+      section(page, 'waiting').locator('article[data-run]'),
+      open.counts.waiting,
+      'back on Runs with Enter, its cards are drawn',
+    );
   },
 } satisfies PageSpec;

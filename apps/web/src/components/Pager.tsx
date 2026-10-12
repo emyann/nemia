@@ -42,7 +42,10 @@ function PageButton({ page, which, children }: { page: number | null; which: 'ne
 export function Pager({ page, pages, total, size }: PageAt) {
   const at = { page, pages, total, size };
   return (
-    <div data-pager className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 font-mono text-body-small text-on-surface-variant">
+    <div
+      data-pager
+      className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 font-mono text-body-small text-on-surface-variant"
+    >
       <span data-pager-rows>{rowsSaid(at)}</span>
       <div role="group" aria-label="Pages of finished runs" className="flex items-center gap-3">
         <PageButton page={newerOf(page, pages)} which="newer">

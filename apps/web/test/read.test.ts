@@ -130,7 +130,7 @@ const unread = (at: string, found: string) => (err: unknown) => {
 /** The light answer read for `factory`, or for every factory, with no context of a query's. */
 const readOpen = (factory?: string) => (openRunsQuery(factory).queryFn as unknown as () => Promise<OpenRuns>)();
 
-test('the light answer decodes what the api gives, a waiting run with its clock and its steps\' costs, asks for one factory by its name encoded, and keeps no key it does not read', async (t) => {
+test("the light answer decodes what the api gives, a waiting run with its clock and its steps' costs, asks for one factory by its name encoded, and keeps no key it does not read", async (t) => {
   const asked: string[] = [];
   const before = globalThis.fetch;
   const clock = { wallMs: 5, sessionsMs: 1, checksMs: 1, personMs: 1, slotMs: 1, restMs: 1 };

@@ -77,7 +77,12 @@ export function costBreakdown(cost: Spent, steps: readonly StepCost[]): Breakdow
   );
   return {
     head: `${cost.said} so far, by step`,
-    rows: parts.map((part, i) => ({ what: part.what, amount: part.usd, said: part.run ? dollars(cents[i]!) : 'none measured', none: !part.run })),
+    rows: parts.map((part, i) => ({
+      what: part.what,
+      amount: part.usd,
+      said: part.run ? dollars(cents[i]!) : 'none measured',
+      none: !part.run,
+    })),
     foot: cost.unmeasured > 0 ? 'A session that ended with no cost on it is counted in none of these.' : '',
   };
 }

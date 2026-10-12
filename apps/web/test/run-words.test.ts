@@ -244,7 +244,7 @@ test('what a run in flight does now: its first step not done, its place among it
 test('when something happened: the time alone on the same day, the day before it on another, the year in another year', () => {
   const now = new Date('2026-10-11T17:38:00.000Z');
   assert.equal(whenWords(new Date('2026-10-11T17:11:59.000Z'), now, 'America/Montreal'), '13:11');
-  assert.equal(whenWords(new Date('2026-10-11T03:59:00.000Z'), now, 'America/Montreal'), '10 Oct 23:59', 'the day is the reader\'s');
+  assert.equal(whenWords(new Date('2026-10-11T03:59:00.000Z'), now, 'America/Montreal'), '10 Oct 23:59', "the day is the reader's");
   assert.equal(whenWords(new Date('2026-08-03T13:05:00.000Z'), now, 'UTC'), '3 Aug 13:05');
   assert.equal(whenWords(new Date('2025-12-31T23:05:00.000Z'), now, 'UTC'), '31 Dec 2025 23:05');
 });

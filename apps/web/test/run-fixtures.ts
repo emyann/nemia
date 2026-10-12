@@ -3,7 +3,17 @@
  * steps from `step`), a run's row in a list (`summary`), its decision (`decidable`), a step's conversation (`transcript`) and its try's
  * path (`stepPath`). Each takes keys to put over its own.
  */
-import type { Decidable, ListedRun, RunDetail, RunSummary, WaitingRun, StepPath, StepTranscript, StepUsed, TimelineTotal } from '../src/lib/api.ts';
+import type {
+  Decidable,
+  ListedRun,
+  RunDetail,
+  RunSummary,
+  WaitingRun,
+  StepPath,
+  StepTranscript,
+  StepUsed,
+  TimelineTotal,
+} from '../src/lib/api.ts';
 
 type Step = RunDetail['steps'][number];
 

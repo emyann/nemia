@@ -52,7 +52,14 @@ const answered = (): WaitingRun =>
     ),
     {
       wallMs: 27 * M + 30 * S,
-      clock: { wallMs: 27 * M + 30 * S, sessionsMs: 16 * M + 40 * S, checksMs: 6 * M + 40 * S, personMs: 2 * M + 40 * S, slotMs: 50 * S, restMs: 40 * S },
+      clock: {
+        wallMs: 27 * M + 30 * S,
+        sessionsMs: 16 * M + 40 * S,
+        checksMs: 6 * M + 40 * S,
+        personMs: 2 * M + 40 * S,
+        slotMs: 50 * S,
+        restMs: 40 * S,
+      },
       stepCosts: [
         { step: 'design', cost: spent(1.884) },
         { step: 'implement', cost: spent(3.614) },
@@ -141,7 +148,10 @@ test('REFUSED: rows that say a minute or a cent less than their tile: what plain
 
 test('a part of nothing says so, a step nothing was measured of says so, and the headline and the note are plain', async () => {
   const run = await decoded();
-  const clock = clockBreakdown({ wallMs: 6 * M, sessionsMs: 6 * M - 20 * S, checksMs: 0, personMs: 20 * S, slotMs: 0, restMs: 0 }, 'Tue 13:32');
+  const clock = clockBreakdown(
+    { wallMs: 6 * M, sessionsMs: 6 * M - 20 * S, checksMs: 0, personMs: 20 * S, slotMs: 0, restMs: 0 },
+    'Tue 13:32',
+  );
   assert.deepEqual(
     clock.rows.map((row) => [row.said, row.none]),
     [
@@ -164,7 +174,15 @@ test('a part of nothing says so, a step nothing was measured of says so, and the
     tokens.rows.map((row) => row.said),
     ['429k', '86', '73.9k', '3.60M', '14'],
   );
-  assert.deepEqual([0, 999, 1_000, 73_900, 999_499, 999_500, 4_103_000].map(tokensSaid), ['0', '999', '1.00k', '73.9k', '999k', '1.00M', '4.10M']);
+  assert.deepEqual([0, 999, 1_000, 73_900, 999_499, 999_500, 4_103_000].map(tokensSaid), [
+    '0',
+    '999',
+    '1.00k',
+    '73.9k',
+    '999k',
+    '1.00M',
+    '4.10M',
+  ]);
 });
 
 test('tokens a session gave no parts of are counted in and out, and still add up', async () => {

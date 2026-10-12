@@ -1,9 +1,9 @@
 /**
  * A run's page's reads as the api answers them, every key the board reads and each union in its shapes: a run's detail (`detail`, its
- * steps from `step`), its decision (`decidable`), a step's conversation (`transcript`) and its try's path (`stepPath`). Each takes keys to
- * put over its own.
+ * steps from `step`), a run's row in a list (`summary`), its decision (`decidable`), a step's conversation (`transcript`) and its try's
+ * path (`stepPath`). Each takes keys to put over its own.
  */
-import type { Decidable, RunDetail, StepPath, StepTranscript, StepUsed, TimelineTotal } from '../src/lib/api.ts';
+import type { Decidable, RunDetail, RunSummary, StepPath, StepTranscript, StepUsed, TimelineTotal } from '../src/lib/api.ts';
 
 type Step = RunDetail['steps'][number];
 
@@ -333,5 +333,53 @@ export const stepPath = (extra: Partial<StepPath> = {}): StepPath => ({
     { state: 'queued', event: 'filed', at: '2026-09-30T05:01:00.000Z' },
     { state: 'running', event: 'spawned', at: '2026-09-30T05:02:00.000Z' },
   ],
+  ...extra,
+});
+
+/** A run's row as a list answers it, in flight, with one step per `[name, status]`, and `extra` over it. */
+export const summary = (steps: ReadonlyArray<readonly [string, string]>, extra: Partial<RunSummary> = {}): RunSummary => ({
+  id: 'r-1',
+  repo: '/code/app',
+  factory: null,
+  place: 'repository',
+  work: null,
+  brief: 'Do the thing',
+  workflowDir: '/code/app/workflows/dev',
+  workflowPage: null,
+  try: null,
+  createdAt: '2026-09-13T00:00:00.000Z',
+  startedAt: null,
+  cancelledAt: null,
+  pruned: null,
+  status: 'running',
+  stoppedOn: null,
+  moving: true,
+  cost: null,
+  atWork: null,
+  tokens: null,
+  steps: steps.map(([name, status], i) => ({
+    name,
+    taskId: `t-${i}`,
+    branch: null,
+    status,
+    note: null,
+    roundDue: false,
+    needs: null,
+    blockedByHarness: false,
+    waitingFor: null,
+    approve: null,
+    denied: null,
+    sessionUnread: null,
+  })),
+  graph: { roots: [], edges: [] },
+  waitingOnYou: [],
+  onYou: [],
+  after: [],
+  waiting: null,
+  context: [],
+  heldUntil: [],
+  holding: null,
+  toDecide: null,
+  unreadable: null,
   ...extra,
 });

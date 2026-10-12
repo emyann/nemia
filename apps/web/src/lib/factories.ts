@@ -15,7 +15,7 @@ import type {
   WorkflowListing,
   WorkflowPageAddress,
 } from './api.ts';
-import { inFlight, openRows, repoName, waitsOnYou } from './factory.ts';
+import { inFlight, repoName, waitsOnYou } from './factory.ts';
 
 /** What the blocks read of a run: the factory it names, and what `inFlight` and `waitsOnYou` read. */
 export type FactoryRun = Pick<RunSummary, 'factory' | 'status' | 'moving' | 'waitingOnYou' | 'cancelledAt' | 'waiting' | 'holding'>;
@@ -74,21 +74,18 @@ export const blockOf = (factory: Factory, runs: readonly FactoryRun[]): FactoryB
   };
 };
 
-/** What a factory's block reads of its light answer: the three counts, and of each row what `inFlight` reads. */
-export type OpenBlock = Pick<OpenRuns, 'counts'> & {
-  waiting: ReadonlyArray<Pick<FactoryRun, 'status' | 'moving' | 'waiting' | 'holding'>>;
-  inFlight: ReadonlyArray<Pick<FactoryRun, 'status' | 'moving' | 'waiting' | 'holding'>>;
-};
+/** What a factory's block reads of its light answer: the three counts. */
+export type OpenBlock = Pick<OpenRuns, 'counts'>;
 
 /**
  * `factory` as its bar shows it, from `open`, the light answer asked for that factory alone: the runs it holds are the three counts
- * together, those that wait on you the api's count, and those in flight the board's word (`inFlight`) over the rows, a run at its gate
- * that still moves among them.
+ * together, and those that wait on you and those in flight the api's own counts, a run at its gate that still moves among the waiting
+ * alone.
  */
 export const openBlockOf = (factory: Factory, open: OpenBlock): FactoryBlock => ({
   ...blockOf(factory, []),
   runs: open.counts.waiting + open.counts.inFlight + open.counts.finished,
-  inFlight: openRows(open).filter(inFlight).length,
+  inFlight: open.counts.inFlight,
   waitsOnYou: open.counts.waiting,
 });
 

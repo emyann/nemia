@@ -294,7 +294,7 @@ test("a template's condition is amiss when Applied is not true, or ConflictsPend
   assert.equal(conditionAmiss({ type: 'ConflictsPending', status: 'True' }), true);
 });
 
-test("REFUSED: a factory's bar off its light answer counts every run by the counts, those waiting by the api, those in flight by the board", () => {
+test("REFUSED: a factory's bar off its light answer counts every run, those waiting and those in flight by the api's counts", () => {
   const holding = { at: 'x', runs: [], word: 'held until r-0 ships', advice: 'wait', onYou: false };
   const working = run('working', 'nemia', { status: 'running', moving: true });
   const held = run('held', 'nemia', { status: 'running', holding });
@@ -303,14 +303,16 @@ test("REFUSED: a factory's bar off its light answer counts every run by the coun
   const done = run('done', 'nemia');
   const open = { counts: { waiting: 2, inFlight: 2, finished: 1 }, waiting: [gate, stopped], inFlight: [working, held] };
   const block = openBlockOf(factory('nemia'), open);
-  assert.deepEqual(block, blockOf(factory('nemia'), [working, held, gate, stopped, done]), 'what the whole list says of the same runs');
-  assert.equal(runsOf(block), '3 in flight · 2 waiting on you · 5 runs');
+  assert.equal(runsOf(block), '2 in flight · 2 waiting on you · 5 runs');
+  assert.equal(
+    blockOf(factory('nemia'), [working, held, gate, stopped, done]).inFlight,
+    3,
+    'the whole list still counts a running run at its gate in flight: the pages that read it keep that rule',
+  );
   assert.equal(openBlockOf(factory('nemia'), { ...open, counts: { waiting: 4, inFlight: 2, finished: 30 } }).runs, 36);
   assert.equal(openBlockOf(factory('nemia'), { ...open, counts: { waiting: 4, inFlight: 2, finished: 30 } }).waitsOnYou, 4);
-  assert.equal(
-    runsOf(openBlockOf(factory('nemia'), { counts: { waiting: 0, inFlight: 0, finished: 0 }, waiting: [], inFlight: [] })),
-    'No runs yet',
-  );
+  assert.equal(openBlockOf(factory('nemia'), { ...open, counts: { waiting: 4, inFlight: 6, finished: 30 } }).inFlight, 6);
+  assert.equal(runsOf(openBlockOf(factory('nemia'), { counts: { waiting: 0, inFlight: 0, finished: 0 } })), 'No runs yet');
 });
 
 test('REFUSED: the default factory is shown only while no factory is named and it holds a run', () => {

@@ -1,6 +1,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { FAVORITES_KEY, favoriteRows, favoritesOf, isStarred, sameFavorite, toggled, type Favorite } from '../src/lib/favorites.ts';
+import { ReadRefusal } from '../src/lib/api/read.ts';
+import {
+  FAVORITES_KEY,
+  favoriteRows,
+  favoritesOf,
+  isStarred,
+  ownReads,
+  sameFavorite,
+  toggled,
+  type Favorite,
+} from '../src/lib/favorites.ts';
 
 test('the favourites are kept under one key of this browser', () => {
   assert.equal(FAVORITES_KEY, 'nemia:favorites');
@@ -116,4 +126,27 @@ test('REFUSED: a starred run whose own read found no such run is gone, and reads
   assert.equal(unread.gone, true, 'the open runs unread, as when their read failed, the run is gone all the same');
   const [back] = favoriteRows([run('r-back')], [{ id: 'r-back', brief: 'Back' }], new Map([['r-back', 'gone']]), undefined);
   assert.deepEqual([back.title, back.gone], ['Back', false], 'a run the open runs hold is there, whatever an older read said');
+});
+
+test("REFUSED: a starred run's own read that finds no such run reads as gone; one that failed another way, or is unanswered, as nothing", () => {
+  const own = ownReads(
+    ['r-kept', 'r-gone', 'r-broken', 'r-reading'],
+    [
+      { data: { id: 'r-kept', brief: 'Kept\nmore' }, error: null },
+      { error: new ReadRefusal('no such run', 404) },
+      { error: new ReadRefusal('the api failed', 500) },
+      { error: null },
+    ],
+  );
+  assert.deepEqual([...own.keys()], ['r-kept', 'r-gone']);
+  assert.equal(own.get('r-gone'), 'gone');
+  const rows = favoriteRows([run('r-kept'), run('r-gone'), run('r-broken')], [], own, undefined);
+  assert.deepEqual(
+    rows.map((row) => [row.title, row.gone]),
+    [
+      ['Kept', false],
+      ['r-gone', true],
+      ['r-broken', false],
+    ],
+  );
 });

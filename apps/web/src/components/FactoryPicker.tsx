@@ -33,6 +33,22 @@ export function pickerFactories(factories: readonly Factory[], held: boolean, pi
 const holdsRuns = ({ counts }: { counts: { waiting: number; inFlight: number; finished: number } }): boolean =>
   counts.waiting + counts.inFlight + counts.finished > 0;
 
+/**
+ * The factories the picker offers after All factories, from what is read so far: none while `factories` is unread, and none while no
+ * factory is named and `held`, the default factory's light answer, is unread — whether the default is shown is not known before it;
+ * else `pickerFactories`, the default among them only while its answer counts a run.
+ */
+export function pickerOffer(
+  factories: readonly Factory[] | undefined,
+  held: Parameters<typeof holdsRuns>[0] | undefined,
+  picked: string | undefined,
+): PickerFactory[] {
+  if (factories === undefined) return [];
+  const unnamed = factories.every((f) => f.default);
+  if (unnamed && held === undefined) return [];
+  return pickerFactories(factories, held !== undefined && holdsRuns(held), picked);
+}
+
 /** What a factory's item says under its name: the repositories it works on by their folders' names, or that it is on none. */
 const reposOf = (factory: Factory): string => (factory.repos.length ? `on ${factory.repos.map(repoName).join(', ')}` : 'on no repository');
 
@@ -86,8 +102,7 @@ export function FactoryPicker({
   const factories = useQuery(factoriesQuery);
   const unnamed = factories.data !== undefined && factories.data.every((f) => f.default);
   const held = useQuery({ ...openRunsQuery(DEFAULT_NAME), refetchInterval: false, enabled: unnamed });
-  const answered = factories.data !== undefined && (!unnamed || held.data !== undefined);
-  const items = answered ? pickerFactories(factories.data, held.data !== undefined && holdsRuns(held.data), picked) : [];
+  const items = pickerOffer(factories.data, held.data, picked);
   const shown = items.find((item) => item.name === picked);
   const choose = (key: Key | null) => {
     const target = pickTo(path, search, key === ALL || key === null ? undefined : String(key));

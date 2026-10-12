@@ -4,6 +4,7 @@
  * it and a run once its own read finds none. Pure, for the sidebar and the stars, which draw them, and its node test.
  */
 import type { RunSummary, WorkflowListing } from './api';
+import { runGone } from './api/detail.ts';
 import { titleOf } from './factory.ts';
 
 /** A favourite: a run by its id, or a workflow by its name and where it is read from, the repository's or yours. */
@@ -61,6 +62,21 @@ export type FavoriteRow = { favorite: Favorite; title: string; gone: boolean };
 
 /** What a starred run's own read answered: the run, by its id and brief, or `gone` where the store has no such run. */
 export type OwnRead = Pick<RunSummary, 'id' | 'brief'> | 'gone';
+
+/**
+ * What each starred run's own read answered, by its id: `results[i]` is the read of `ids[i]`. The run where it was read, `gone` where
+ * the read was refused because the store has no such run (`runGone`), and nothing while it is not answered or failed for another reason.
+ */
+export const ownReads = (
+  ids: readonly string[],
+  results: ReadonlyArray<{ data?: Pick<RunSummary, 'id' | 'brief'>; error: unknown }>,
+): Map<string, OwnRead> =>
+  new Map(
+    results.flatMap((result, i): Array<[string, OwnRead]> => {
+      if (result.data) return [[ids[i], result.data]];
+      return runGone(result.error) ? [[ids[i], 'gone']] : [];
+    }),
+  );
 
 /**
  * The sidebar's row of each of `favorites`, in their order. A run's title is its brief's (`titleOf`), read off `open`, the runs that wait

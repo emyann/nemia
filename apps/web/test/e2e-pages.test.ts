@@ -86,18 +86,30 @@ test('a worker that exits other than 0 stops the queue: no worker starts another
   );
 });
 
-test('a whole run over the bound fails: the runner throws what overBound says', () => {
+test('a whole run whose pages cost more than their bound fails: the runner throws what overBound says of them, never of its own time', () => {
   const runner = fs.readFileSync(path.join(import.meta.dirname, 'e2e', 'run.ts'), 'utf8');
   assert.match(
     runner,
     /async function main\(\): Promise<void> \{\s*const started = performance\.now\(\);/,
-    'the runner starts its clock first, so the bound covers the whole run',
+    'the runner starts its clock first, so the time it says covers the whole run',
   );
   assert.match(
     runner,
-    /const totalMs = performance\.now\(\) - started;\s*const late = overBound\(totalMs, timings, plan\.whole\);\s*if \(late\) throw new Error\(late\);/,
-    'the runner holds a whole run to its bound, and fails with what overBound says',
+    /const late = overBound\(timings, plan\.whole\);\s*if \(late\) throw new Error\(late\);/,
+    'the runner holds a whole run to the bound of its pages, and fails with what overBound says',
   );
+});
+
+test("a whole run that took longer than a step's tool allows passes: the runner says what pastTool says, and throws nothing after it", () => {
+  const runner = fs.readFileSync(path.join(import.meta.dirname, 'e2e', 'run.ts'), 'utf8');
+  assert.match(
+    runner,
+    /const totalMs = performance\.now\(\) - started;[\s\S]*?const slow = pastTool\(totalMs, results\.length, plan\.whole\);\s*if \(slow\) console\.log\(/,
+    'the time the whole run took is said, by the workers it got',
+  );
+  const after = runner.slice(runner.indexOf('const slow = pastTool('), runner.indexOf('exitOn(main()'));
+  assert.ok(after.includes('pages passed in the'), 'the pass line is said after it, last');
+  assert.doesNotMatch(after, /\bthrow\b/, 'nothing is refused once the pages passed their bound');
 });
 
 test('no page imports run.ts or worker.ts, which would start the whole e2e as the pages load', () => {

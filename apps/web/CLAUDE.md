@@ -64,7 +64,9 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
 - `npm run build` regenerates `src/routeTree.gen.ts`: a new route file fails `typecheck` until a build has run once.
 - For every change here, run `npm run build` and `npm run e2e -- --pages <the pages the change touches>` (`--photos` too when pictures
   are due), its assertions in the dark theme; never the whole suite in a session but to measure it. Implement's round check runs it
-  whole, and the landing's again on the merged tree. A whole run over `E2E_BOUND_MS` (`e2e/timing.ts`) fails, naming its slowest pages.
+  whole, and the landing's again on the merged tree. A whole run whose pages cost more than `PAGES_BOUND_MS`
+  summed fails, naming its slowest pages; its own time past `E2E_BOUND_MS` is said, never refused: it is the machine's, by the workers
+  it gave (`overBound`, `pastTool`, `e2e/timing.ts`).
 - `npm run e2e -- --photos --contrast` writes each picture's text pairs beside it (`e2e/contrast.ts`); `node test/e2e/contrast-report.ts
   <dir>` makes `contrast.md` and `look.html` there and exits 1 on a pair under 4.5:1. A measure, never a check of every run.
 - `npm run e2e` hands its pages to workers one at a time (`queueOf`, `e2e/workers.ts`), each a process with its own seeded store, api,

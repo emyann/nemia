@@ -16,5 +16,5 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src", ".storybook", "vite.config.ts", "test/*.ts"]
+  "include": ["src", ".storybook/*.ts", ".storybook/*.tsx", "vite.config.ts", "test/*.ts"]
 }

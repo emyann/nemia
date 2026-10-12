@@ -1,10 +1,10 @@
 /**
  * The look's scroll bars and a table in a cut frame, read in browsers that draw scroll bars, which the e2e's own hides: the page of
- * the look's stories (`parts/main.tsx`) opened in a browser whose bars take room (`classic`) and in one whose bars float
- * (`overlay`). The last row of a framed table draws no line and nothing of the table is painted in a cut corner; a table whose rows fit shows no upright bar and a
- * narrow one still scrolls sideways, its thumb off the cut; a bar is an 8-pixel lane the ground shows through, its thumb in the
- * look's inks while it scrolls, under the pointer and while held, in both kinds of browser and both schemes; and what scrolls is
- * marked while it scrolls. Each is refused for a fault put back. `npm run e2e` runs this first; it needs Chromium.
+ * the look's stories (`parts/main.tsx`) opened in a browser whose bars take room (`classic`) and in one whose bars float (`overlay`).
+ * The last row of a framed table draws no line and nothing of the table is painted in a cut corner; a table whose rows fit shows no
+ * upright bar and a narrow one still scrolls sideways, its thumb off the cut; a bar is an 8-pixel lane the ground shows through, its
+ * thumb in the look's inks while it scrolls, under the pointer and while held, in both kinds of browser and both schemes; and what
+ * scrolls is marked while it scrolls. Each is refused for a fault put back. `npm run e2e` runs this first; it needs Chromium.
  */
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';

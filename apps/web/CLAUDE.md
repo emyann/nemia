@@ -40,6 +40,12 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
   five is rest; a caution is failure for a write refused, yours drawn light for what a person weighs, rest for a note.
 - Text dimmed by an `opacity` falls under 4.5:1: sink a card into the floor (`bg-background`) or use the muted ink instead.
 - The kit has no adapter for TanStack Router: an `href` on one of its buttons, chips or menu items loads the page whole.
+- What a `CutFrame` holds stands above its cut corners: a ground on a child (the kit's `Card`, a table `Row`'s `bg-surface`) paints the
+  cut over, so it is given none (`bg-transparent`, `WaitingCard.tsx`, `FlightTable.tsx`).
+- The kit's `xsmall` icon button answers 8 pixels beyond its box, and of two targets that overlap the later in the document wins: in a
+  40-pixel row a copy control answers from 24 above its centre to 16 below (`finger` in `test/e2e/pages/050-runs.ts`).
+- A kit `Cell truncate` shows its children again in a tooltip: a cut cell that holds a link cuts the link itself (`block truncate`, a
+  `title`), never the cell.
 
 ## Build and e2e
 

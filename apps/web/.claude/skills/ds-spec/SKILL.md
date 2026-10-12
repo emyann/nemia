@@ -40,7 +40,9 @@ accessibility` (labels, keyboard, targets), then `tokens <c>` for exact
   touch target),
   states and color roles per state, every Do/Don't, every accessibility
   requirement. Link the pages from the component's doc comment and record
-  deliberate deviations there.
+  deliberate deviations there. A component whose doc comment says "Material 3
+  does not describe this component." has no page of its own: review it against
+  that doc comment, and against the pages it cites for the parts it borrows.
 - **Answering a design question** ("should this be a switch or a
   checkbox?"): the guidelines tabs carry the decision rules; cite them.
 - **Tokens and theming**: `page design-tokens` (foundations) explains roles

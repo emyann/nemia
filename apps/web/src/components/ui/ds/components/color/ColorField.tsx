@@ -15,6 +15,12 @@ interface ColorFieldProps extends AriaColorFieldProps {
   errorMessage?: string | ((validation: ValidationResult) => string);
 }
 
+/**
+ * A text field for a colour's value (hex by default), on React Aria `ColorField`.
+ * A part of `ColorPicker`.
+ *
+ * Material 3 does not describe this component.
+ */
 export function ColorField(props: ColorFieldProps) {
   const { label, description, errorMessage, ...rest } = props;
   return (

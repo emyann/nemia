@@ -41,6 +41,12 @@ const headerStyles = tv({
   base: "border-b border-outline-variant px-3 pt-2 pb-3 mb-1 text-on-surface",
 });
 
+/**
+ * MD3 menu: a trigger and the popover list of `MenuItem`s it opens, on React
+ * Aria `MenuTrigger`.
+ *
+ * Spec: https://m3.material.io/components/menus/{overview,specs,guidelines,accessibility}
+ */
 export function Menu(props: MenuProps) {
   const {
     items,

@@ -192,6 +192,11 @@ export type ButtonProps = Omit<AriaButtonProps, "className"> &
  * through the app's router provider — drawn exactly like the button, for
  * navigation that reads as an action ("Open app", "Skip"). `color="error"`
  * is the destructive button (see the styles).
+ *
+ * Spec: https://m3.material.io/components/buttons/{overview,specs,guidelines,accessibility};
+ * the `fab` variant:
+ * https://m3.material.io/components/floating-action-button/{overview,specs,guidelines,accessibility}
+ * and https://m3.material.io/components/extended-fab/{overview,specs,guidelines,accessibility}
  */
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   (props, ref) => {

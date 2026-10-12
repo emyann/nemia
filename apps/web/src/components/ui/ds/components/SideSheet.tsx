@@ -91,6 +91,8 @@ export type SideSheetProps = VariantProps<typeof styles> & {
  * returns focus to the trigger on close. Without it the sheet is a floating
  * panel the keyboard never reaches (#157). The standard form is inline
  * content, not an overlay, so it stays a plain element.
+ *
+ * Spec: https://m3.material.io/components/side-sheets/{overview,specs,guidelines,accessibility}
  */
 export default function SideSheet(props: SideSheetProps) {
   const {

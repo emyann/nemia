@@ -19,6 +19,8 @@ export type ModalDialogProps = BaseModalDialogProps & DialogProps;
  * `role="alertdialog"` also turns light-dismiss off: an alert dialog asks a
  * question that has to be answered, so clicking the scrim must not count as an
  * answer. Escape still closes, which is the platform contract for any modal.
+ *
+ * Spec: https://m3.material.io/components/dialogs/{overview,specs,guidelines,accessibility}
  */
 export function ModalDialog(props: ModalDialogProps) {
   const { isOpen, onClose, variant = "basic", ...dialogProps } = props;

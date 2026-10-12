@@ -19,7 +19,7 @@ import { tv } from "../utils";
  *     <PreviewCard className="w-96">…</PreviewCard>
  *   </PreviewTrigger>
  *
- * **Material 3 has no page for this component.** MD3 covers tooltips (plain
+ * **Material 3 does not describe this component.** MD3 covers tooltips (plain
  * and rich) and menus; a hover-opened card of arbitrary content is not in the
  * system, so there is nothing to cite and `npm run md3 -- page …` will not
  * find it. The surface is drawn as a Material *container* rather than
@@ -28,9 +28,9 @@ import { tv } from "../utils";
  * and the same `data-entering` / `data-exiting` motion as every other overlay
  * here. The nearest thing MD3 *does* define is the **rich tooltip**
  * (https://m3.material.io/components/tooltips/guidelines) — reach for the
- * kit's `Tooltip variant="rich"` when the content is a title, a paragraph and
- * at most a link, and for this when it is a list, a form or anything the
- * reader has to interact with.
+ * kit's `Tooltip variant="rich"` when the content is only read (a title, a
+ * paragraph, rows of label and value), and for this when the reader operates
+ * it: a link, a button, a form.
  *
  * Behaviour is React Aria's `PreviewTrigger`, which is the whole reason to
  * prefer it over a hand-rolled hover card: it opens on **focus** as well as

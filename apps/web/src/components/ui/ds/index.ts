@@ -71,7 +71,13 @@ export {
   default as SideSheet,
   type SideSheetProps,
 } from "./components/SideSheet";
-export { Tooltip, TooltipTrigger } from "./components/Tooltip";
+export {
+  Tooltip,
+  TooltipTrigger,
+  Focusable,
+  type TooltipProps,
+  type TooltipTriggerProps,
+} from "./components/Tooltip";
 export {
   PreviewTrigger,
   PreviewCard,

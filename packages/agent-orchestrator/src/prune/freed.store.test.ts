@@ -1,7 +1,8 @@
 /**
  * What a removal frees (`freedBytes`): a file with a name outside the folders counts nothing, one with every name inside counts once, a
  * link is never followed, and a folder that is gone is zero. Every expected number is read off the fixture's own files with `lstat`. And
- * that a walk longer than a burst (`WALK_BURST`) lets the process's other work run.
+ * that a walk longer than a burst (`WALK_BURST`) lets the process's other work run. And of the walk itself (`walk`): a name that does
+ * not read is counted unread, and its cost is the names it read and the bursts it yielded.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

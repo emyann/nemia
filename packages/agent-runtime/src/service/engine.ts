@@ -352,7 +352,8 @@ export type EngineShape = {
   /**
    * What is kept on the disk for the sessions this engine ran, in bytes, by task (`KeptReport`): each listed task's journal, the
    * bodies it is first to name, the files its harness keeps of its sessions, and the harness's own record of each session its
-   * journal names by id. Takes nothing, removes nothing and reads no body; a task at work is answered as a settled one is. A
+   * journal names by id. Takes nothing, removes nothing and reads no body; a task at work is answered, its `files` as a settled
+   * one's, and no record of an attempt still at work, whose id its journal names only once it has ended or the task settled. A
    * record whose task was forgotten is named by no journal, and is counted for none. What could not be measured of a task is said
    * on its `unread`, and stops no other. Refused — `KeptRefused`, nothing measured — for any argument.
    */

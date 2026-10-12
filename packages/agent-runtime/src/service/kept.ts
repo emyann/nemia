@@ -17,7 +17,8 @@ export class KeptRefused extends Schema.TaggedError<KeptRefused>()('KeptRefused'
  * What is kept on the disk for each task the store lists, in the store's order, in bytes as the file system counts them
  * (`lstat().blocks * 512`): `journal`, its journal's file; `bodies`, the bodies it is the first task to name; `files`, what its
  * harness keeps of its sessions and `forget` would remove; and `records`, the harness's own record of each session its journal
- * names by id, which `forget` leaves, absent where the harness keeps none or none was found. A path is counted once, for the
+ * names by id, which `forget` leaves, absent where the harness keeps none or none was found; an attempt still at work has no id
+ * on its journal yet, so its record is counted only once it has ended or its task settled. A path is counted once, for the
  * first task that names it. `unread` says, in words, what could not be measured of the task, and is absent when all was.
  */
 export type KeptReport = {

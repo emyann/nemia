@@ -589,7 +589,7 @@
       "id": 36,
       "type": "timeseries",
       "title": "On disk, by part",
-      "description": "disk.bytes: what each part of the store holds, as the daemon's last sweep read it, stacked: the runs' worktrees (worktrees), their records and files (runs), the folder handed to the runtime (engine), the records the runtime's sessions left where their harness keeps them (sessions), the checks' output (checks), the series (series), and everything else under the store's root (other). The sessions' records are outside the store, perhaps on another file system than the free room beside this panel describes, and only those a task still names are counted: a run removed leaves its records on the disk and out of this part. A file hardlinked from outside the store, as a worktree's packages are, is the other name's and counts nothing.",
+      "description": "disk.bytes: what each part of the store holds, as the daemon's last sweep read it, stacked: the runs' worktrees (worktrees), their records and files (runs), the folder handed to the runtime (engine), the records the runtime's sessions left where their harness keeps them (sessions), the checks' output (checks), the series (series), and everything else under the store's root (other). The sessions' records are outside the store, perhaps on another file system than the free room beside this panel describes, and only those a task still names are counted: a run removed leaves its records on the disk and out of this part, and a session still at work is counted once it has ended. A file hardlinked from outside the store, as a worktree's packages are, is the other name's and counts nothing.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"

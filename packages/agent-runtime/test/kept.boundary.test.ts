@@ -143,14 +143,73 @@ test('the parts of every task add up to no more than a walk of the root in the s
   assert.ok(parts <= diskBytesOf(root)!, `${parts} is no more than the root's ${diskBytesOf(root)}`);
 });
 
-test('a task at work is answered, where forget would refuse it', async () => {
+test('a task at work is answered, where forget would refuse it, and the record of an attempt still at work is in no byte yet', async () => {
   const root = scratch('ae-kept-root-');
   await journalled(root, 'w1', { settled: false });
   const running = plant(path.join(root, 'runs', HARNESS, 'ae_w1_1.stdout'));
+  plant(transcriptAt('-r', 'sess-w1'));
   const engine = engineOn(root);
-  assert.equal((await keptOf(engine, 'w1'))?.files, blocksOf(running));
+  const kept = await keptOf(engine, 'w1');
+  assert.deepEqual(kept, { taskId: 'w1', journal: blocksOf(path.join(root, 'tasks', 'w1.jsonl')), bodies: 0, files: blocksOf(running) });
   const refused = await Effect.runPromise(Effect.flip(engine.forget(['w1'])));
   assert.equal(refused._tag, 'ForgetRefused');
+});
+
+test('an attempt left open is counted by the id its task settled with: a session stopped by a person', async () => {
+  const root = scratch('ae-kept-root-');
+  const events: Event[] = [
+    { kind: 'filed', at, brief: 'do o1', cwd: '/r', harness: HARNESS },
+    { kind: 'starting', at, attempt: 1 },
+    { kind: 'settled', at, outcome: 'stopped', nativeId: 'sess-o1' },
+  ];
+  const append = Effect.forEach(events, (event) => Effect.flatMap(Journal, (j) => j.append('o1', event)), { discard: true });
+  await Effect.runPromise(append.pipe(Effect.provide(Journal.files(root))));
+  const transcript = plant(transcriptAt('-r', 'sess-o1'));
+  assert.equal((await keptOf(engineOn(root), 'o1'))?.records, blocksOf(transcript));
+});
+
+test('REFUSED: a name of the run folder with no dot is no file of a session whose name it starts with', async () => {
+  const root = scratch('ae-kept-root-');
+  await journalled(root, 'd1');
+  const own = plant(path.join(root, 'runs', HARNESS, 'ae_d1_1.stdout'), 4096);
+  const dotless = plant(path.join(root, 'runs', HARNESS, 'ae_d1_12'), 65536);
+  const engine = engineOn(root);
+  assert.equal((await keptOf(engine, 'd1'))?.files, blocksOf(own));
+  await Effect.runPromise(engine.forget(['d1'], { yes: true }));
+  assert.deepEqual([fs.existsSync(own), fs.existsSync(dotless)], [false, true], 'forget removes the session file, and leaves the other');
+});
+
+test("Claude Code's harness names what either mode keeps of a session once: a job's run file, a background session's file, the transcript", async () => {
+  const root = scratch('ae-kept-root-');
+  await journalled(root, 'c1', { harness: 'claude', nativeId: 'sess-c1' });
+  const job = plant(path.join(root, 'runs', 'claude', 'ae_c1_1.stdout'), 4096);
+  const parent = plant(path.join(root, 'parent', 'ae_c1_1.json'), 12000);
+  const transcript = plant(transcriptAt('-r', 'sess-c1'), 20000);
+  const engine = builtEngine(Engine.layer({ root, harnesses: { claude: 'claude' }, defaultHarness: 'claude' }));
+  assert.deepEqual(await keptOf(engine, 'c1'), {
+    taskId: 'c1',
+    journal: blocksOf(path.join(root, 'tasks', 'c1.jsonl')),
+    bodies: 0,
+    files: blocksOf(job) + blocksOf(parent),
+    records: blocksOf(transcript),
+  });
+});
+
+test("a remote harness names a session's entry, open or let go of, and no record", async () => {
+  const root = scratch('ae-kept-root-');
+  await journalled(root, 'r1', { harness: 'far', nativeId: 'context-1' });
+  await journalled(root, 'r2', { harness: 'far', nativeId: 'context-2' });
+  const open = plant(path.join(root, 'remote', `${encodeURIComponent('ae/r1/1')}.json`), 4096);
+  const done = plant(path.join(root, 'remote', 'done', `${encodeURIComponent('ae/r2/1')}.json`), 12000);
+  const engine = builtEngine(Engine.layer({ root, harnesses: { far: { url: 'http://127.0.0.1:9/' } }, defaultHarness: 'far' }));
+  const { tasks } = await Effect.runPromise(engine.kept());
+  assert.deepEqual(
+    tasks.map((t) => [t.taskId, t.files, Object.hasOwn(t, 'records'), t.unread]),
+    [
+      ['r1', blocksOf(open), false, undefined],
+      ['r2', blocksOf(done), false, undefined],
+    ],
+  );
 });
 
 test('a harness with no kept answers no records and no files, and its task is still named with its journal', async () => {

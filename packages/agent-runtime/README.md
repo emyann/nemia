@@ -2389,7 +2389,9 @@ no body is read to measure.
 Which record is the runtime's to count: only one found by a session id a task's journal names (an attempt's `nativeId`), never
 one found by its folder. Claude Code keeps every session of a folder together, a person's own beside a task's, so a
 transcript under an id no journal names is a person's and is never counted. A harness that keeps no record, or a session whose
-record was not found, answers no `records` key, never a zero. What could not be measured of a task is said on its `unread`.
+record was not found, answers no `records` key, never a zero. A journal names a session's id only on the attempt's end, or on the
+task's settling for an attempt left open: the record of an attempt still at work, a long-lived session's for as long as it runs, is
+in no `records` byte until then. What could not be measured of a task is said on its `unread`.
 
 What a forgotten task leaves: `forget` removes the journal and the harness's `files`, and leaves the harness's record. With
 its journal gone nothing names that record, so it is counted for no task from then on, though it is still on the disk:

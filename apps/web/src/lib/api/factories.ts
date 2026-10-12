@@ -56,10 +56,18 @@ const FactoryScheduleSchema = Schema.Struct({
 }) satisfies Schema.Schema<FactorySchedule>;
 
 /**
+ * Mirrors `UntrustedAnswer` in apps/api/src/factories/factories.ts: a place of a factory that a harness does not trust now, each word the
+ * api's — the place, the harness by the name a person reads, what is withheld from the place's own settings meanwhile, and why no trust
+ * can be kept for it (`never`), null where the factory's `commands.trust` gives it.
+ */
+export type FactoryUntrusted = { place: string; harness: string; withheld: string; never: string | null };
+
+/**
  * Mirrors `FactoryAnswer` in apps/api/src/factories/factories.ts: a factory's name, whether it is the default factory, the repositories it
  * works on, the workflows it offers — null for the default factory, which offers every workflow found — its hires, `<workflow>/<step>`
  * to an agent's name, and its schedules, none for the default factory. A factory whose file does not read has none of them, and `error`
- * says why, naming the file; null for every other. `template` is the template it is made from, null for one that is not.
+ * says why, naming the file; null for every other. `template` is the template it is made from, null for one that is not. `untrusted` is
+ * each of its places a harness does not trust now (`FactoryUntrusted`), none for the default factory.
  */
 export type Factory = {
   name: string;
@@ -69,9 +77,10 @@ export type Factory = {
   hires: Record<string, string>;
   error: string | null;
   schedules: FactorySchedule[];
-  /** The lines a person types for it: a workflow attached to it, its file removed, filed again, and a workflow scheduled. */
-  commands: { attach: string; rm: string; add: string; schedule: string };
+  /** The lines a person types for it: a workflow attached, its file removed, filed again, a workflow scheduled, its places trusted. */
+  commands: { attach: string; rm: string; add: string; schedule: string; trust: string };
   template: FactoryTemplate | null;
+  untrusted: FactoryUntrusted[];
 };
 
 /** Decodes a `Factory`. */
@@ -83,7 +92,18 @@ const FactorySchema = Schema.Struct({
   hires: Schema.Record(Schema.String, Schema.String),
   error: Schema.NullOr(Schema.String),
   schedules: Schema.mutable(Schema.Array(FactoryScheduleSchema)),
-  commands: Schema.Struct({ attach: Schema.String, rm: Schema.String, add: Schema.String, schedule: Schema.String }),
+  commands: Schema.Struct({
+    attach: Schema.String,
+    rm: Schema.String,
+    add: Schema.String,
+    schedule: Schema.String,
+    trust: Schema.String,
+  }),
+  untrusted: Schema.mutable(
+    Schema.Array(
+      Schema.Struct({ place: Schema.String, harness: Schema.String, withheld: Schema.String, never: Schema.NullOr(Schema.String) }),
+    ),
+  ),
   template: Schema.NullOr(
     Schema.Struct({
       source: Schema.String,

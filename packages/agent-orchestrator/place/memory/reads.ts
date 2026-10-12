@@ -1,6 +1,7 @@
 /**
- * The verbs of the test place that read and change nothing: `open`, `standing`, `report`, `trial`, `status` and `inventory`, each over
- * what the place holds (`Held`) and answering as its twin of the git place does for a repository it holds, refusing in its own words.
+ * The verbs of the test place that read and change nothing: `root`, `open`, `standing`, `report`, `trial`, `status` and `inventory`,
+ * each over what the place holds (`Held`) and answering as its twin of the git place does for a repository it holds, refusing in its
+ * own words.
  */
 import fs from 'node:fs';
 import { checkoutAt, dirty, headOf, repositoryAt, treeOf, type Found } from './acts.ts';
@@ -20,6 +21,15 @@ export const refused = (words: string): Refusal => ({ refused: words });
 /** How a directory the test place holds no repository in is said, with what makes one. */
 export const noRepository = (dir: string): string =>
   `${dir} is no repository this test place holds: make one there with world.repository, or ask the place that made it`;
+
+/** `root`: the root of the repository that holds a checkout at `dir` or above it, or null where the place holds none there. */
+export function root(held: Held, { dir }: PlaceRequests['root']): Reply<'root'> {
+  if (!isDirectory(dir)) return refused(`${dir} is not a directory, so it is in no repository: name a folder that is there`);
+  const at = real(dir);
+  for (const repo of held.repositories.values())
+    for (const checkout of repo.checkouts.values()) if (checkout.dir === at || inside(checkout.dir, at)) return { root: repo.root };
+  return { root: null };
+}
 
 /** `open`: the repository at `root`, the commit and the branch it is on, and the file a staged merge is marked by. */
 export function open(held: Held, { root }: PlaceRequests['open']): Reply<'open'> {

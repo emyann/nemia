@@ -558,7 +558,9 @@ const factoryOn = (name: string, repos: string[], error: string | null = null): 
     rm: `nemia factory rm ${name}`,
     add: `nemia factory add ${name} --repo <path>`,
     schedule: `nemia factory schedule ${name} <workflow> --cron <expr> --brief <text>`,
+    trust: `nemia factory trust ${name}`,
   },
+  untrusted: [],
   template: null,
 });
 const FACTORIES = [factoryOn('default', ['/code/app']), factoryOn('solo', ['/r/a']), factoryOn('pair', ['/r/a', '/r/b'])];

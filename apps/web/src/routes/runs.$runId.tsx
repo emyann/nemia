@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useSuspenseQuery } from '@tanstack/react-query';
+import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link, redirect } from '@tanstack/react-router';
 import { Artifacts, bytesWord, ClosedNeeds } from '../components/Closeout';
 import { Decide } from '../components/Decide';
@@ -19,7 +19,8 @@ import { RemoveRun } from '../components/RemoveRun';
 import { LiftHold } from '../components/LiftHold';
 import { HoldRun } from '../components/HoldRun';
 import { PruneRun } from '../components/PruneRun';
-import { loadRun, runGone, runQuery, type RunDetail } from '../lib/api';
+import { factoriesQuery, loadRun, runGone, runQuery, type RunDetail } from '../lib/api';
+import { untrustedFor, type UntrustedPlace } from '../lib/factories';
 import { answersOf, askedIn, gateOffered, stepAnchor } from '../lib/asks';
 import { barValue } from '../lib/bar';
 import { spentTitle } from '../lib/cost';
@@ -228,12 +229,38 @@ function Pruned({ pruned: { at, worktrees, artifacts } }: { pruned: NonNullable<
   );
 }
 
-/** What the harness denied a step's try, every call as a permission rule names it: `Skill(look), Bash(pytest)`. */
-const deniedRow = (calls: readonly string[]): ReactNode => (
-  <span data-denied className={`font-mono text-xs ${ink.yours}`}>
-    {calls.join(', ')}
+/**
+ * What the harness denied a step's try, every call as a permission rule names it: `Skill(look), Bash(pytest)`; and under it, where
+ * the run works on a place a harness does not trust (`cause`), that this is the likely cause, in the api's words, with the line that
+ * trusts it.
+ */
+const deniedRow = (calls: readonly string[], cause: UntrustedPlace | undefined): ReactNode => (
+  <span className="flex min-w-0 flex-col gap-1">
+    <span data-denied className={`font-mono text-xs ${ink.yours}`}>
+      {calls.join(', ')}
+    </span>
+    {cause && (
+      <span data-denied-cause={cause.factory} className="text-xs text-muted-foreground">
+        Likely cause: <span className="font-mono break-all">{cause.place.place}</span> is not trusted for {cause.place.harness}, which
+        withholds {cause.place.withheld}.{' '}
+        {cause.place.never ?? (
+          <>
+            Trust it: <code className="font-mono whitespace-nowrap text-foreground">{cause.trust}</code>
+          </>
+        )}
+      </span>
+    )}
   </span>
 );
+
+/**
+ * The place the run `run` works on that a harness does not trust, read off the factories' answer only where a step of it was denied a
+ * call (`asked`): nothing while that is read, and nothing where every place is trusted.
+ */
+function useDeniedCause(run: RunDetail, asked: boolean): UntrustedPlace | undefined {
+  const { data } = useQuery({ ...factoriesQuery, enabled: asked });
+  return asked && data ? untrustedFor(data, { repo: run.repo }) : undefined;
+}
 
 /**
  * One step's section: its state, its spec, its check, what it is told, its facts, its files, then its gate or what it handed on.
@@ -243,7 +270,8 @@ const deniedRow = (calls: readonly string[]): ReactNode => (
  *
  * Its facts: a folder step's folder, copyable, where a git step's branch goes; its task; its gate, where it has one — a person's word files
  * what follows it, or, for the step that ends the run, the step itself; what the harness denied its current try, every call as a permission
- * rule names it, which is what its work may be short of; why the runtime could not read its session alone, where it could not, in its
+ * rule names it, which is what its work may be short of, with its likely cause where the run's place is not trusted; why the runtime
+ * could not read its session alone, where it could not, in its
  * words — neither working nor gone, which its status does not say; what its current try consumed, in the CLI `decide`'s words,
  * `not measured` where nobody counted and never 0; what its sessions read, by price, where anything measured it, the peak and a rebuilt
  * cache marked; and what every try has cost together, and of its cap where it has one, red once past it.
@@ -264,6 +292,7 @@ const deniedRow = (calls: readonly string[]): ReactNode => (
  */
 function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; runCancelled: boolean }) {
   const { spec, closeout, gate } = step;
+  const cause = useDeniedCause(run, Boolean(step.denied));
   const atGate = gateOffered(step, runCancelled);
   const ends = endsTheRun(step);
   const acts = atGate && ends && step.taskId === null;
@@ -304,7 +333,7 @@ function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; 
           run.place === 'folder' ? ['folder', pathRow(step.workspace)] : ['branch', code(step.branch)],
           ['task', step.taskId ? code(step.taskId) : 'not filed'],
           ...(gate ? ([['gate', gateWord(gate, ends)]] satisfies Array<[string, string]>) : []),
-          ...(step.denied ? ([['denied', deniedRow(step.denied.calls)]] satisfies Array<[string, ReactNode]>) : []),
+          ...(step.denied ? ([['denied', deniedRow(step.denied.calls, cause)]] satisfies Array<[string, ReactNode]>) : []),
           ...unreadRows(step.sessionUnread),
           ['used', step.used?.used],
           ['cost', step.used?.cost],

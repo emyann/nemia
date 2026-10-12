@@ -7,8 +7,9 @@
  * place words itself, or unread, when it gave neither in time.
  */
 
-/** The verbs a place may answer, in the order a run meets them. */
+/** The verbs a place may answer, in the order a run meets them: `root` first, asked of a folder before any run. */
 export const PLACE_VERBS = [
+  'root',
   'open',
   'make',
   'handoff',
@@ -28,6 +29,7 @@ export type PlaceVerb = (typeof PLACE_VERBS)[number];
 
 /** How long a verb may take before it is unread, in milliseconds: two minutes, and ten for `make`, whose fan-in merge is slow. */
 export const PLACE_DEADLINE_MS: Readonly<Record<PlaceVerb, number>> = {
+  root: 120_000,
   open: 120_000,
   make: 600_000,
   handoff: 120_000,
@@ -41,6 +43,12 @@ export const PLACE_DEADLINE_MS: Readonly<Record<PlaceVerb, number>> = {
   export: 120_000,
   seal: 120_000,
 };
+
+/**
+ * What `root` answers of a folder: the root of the main checkout of the repository it is in, from that root, a folder inside it or a
+ * workspace cut from it alike, or null for a folder in no repository.
+ */
+export type Rooted = { readonly root: string | null };
 
 /**
  * What `open` answers at `nemia start`: the repository, the commit a run starts from, the line of work it is on, and, where the place
@@ -171,6 +179,7 @@ export type Sealed = { readonly removed: boolean };
 
 /** Each verb's answer. */
 export type PlaceAnswers = {
+  readonly root: Rooted;
   readonly open: Opened;
   readonly make: Made;
   readonly handoff: HandedOff;
@@ -187,6 +196,7 @@ export type PlaceAnswers = {
 
 /** Each verb's request, as the code hands it. */
 export type PlaceRequests = {
+  readonly root: { readonly dir: string };
   readonly open: { readonly root: string; readonly isolate: boolean };
   readonly make: {
     readonly repo: string;

@@ -18,6 +18,7 @@ const NO_COMMIT = 'f'.repeat(40);
 
 /** For each verb, an answer the git place would not give, made of the true one. */
 const LIES: { readonly [V in PlaceVerb]: (answer: PlaceAnswers[V]) => PlaceAnswers[V] } = {
+  root: (answer) => ({ root: answer.root === null ? '/elsewhere' : null }),
   open: (answer) => ({ ...answer, staged: `${answer.staged}.elsewhere` }),
   make: (answer) => ({ ...answer, conflicts: [] }),
   handoff: () => ({ commit: null }),

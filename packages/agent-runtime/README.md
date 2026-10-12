@@ -2148,7 +2148,7 @@ of pure code sits beside it.
 | `src/harness/config-folders.ts` | the folders a harness reads as its own configuration inside a folder it is given to read, `CONFIG_FOLDERS`, and the first a path passes through, `configFolderIn`: pure, for a caller that puts files into a mounted folder |
 | `src/harness/mounts.ts` | a task's mounts, `Mount`: the folders beyond its `cwd` a session may reach, each read-only or writable, and the check of their shape every harness shares (`mountsRefusalOf`) |
 | `src/harness/admission.ts` | a task's admission, `Admission`: the command run before each call to the tools it names, the call it reads and the answer it gives (`AdmissionCall`, `AdmissionAnswer`), and the check of its shape every harness shares (`admissionRefusalOf`) |
-| `src/harness/trust.ts` | whether a harness trusts a folder to run a background session in, `trustedFolder`: read off the harness's own file, `undefined` for a harness that keeps no trust |
+| `src/harness/trust.ts` | a harness's trust of a folder, off the harness's own file: whether it is given (`trustedFolder`), what it is in a person's words (`folderTrust`) and the act of giving it (`trustFolder`), each `undefined` for a harness that keeps no trust |
 | `src/harness/telemetry.ts` | where an engine's sessions export (`Telemetry`), the runner that tells each spawn (`telemetered`), the trace context of the span that filed a task (`traceparentOf`), and the variables no child inherits from the engine's process (`withoutTelemetry`) |
 | `src/harness/mcp.ts` | a task's MCP servers: what is refused, the configs written, and Claude Code's flags for them; for Codex, the server names its config already has and a task's servers as its `mcp_servers` table |
 | `src/harness/transcript.ts` | the one transcript reader behind every harness's `transcript`, and its cursor |
@@ -2158,7 +2158,7 @@ of pure code sits beside it.
 | `src/harness/claude/bg-follow.ts` | a `--bg` session followed live at message level (`bgFollowOf`): its transcript read on from a byte offset, each whole line once, its state from `claude agents`, read once a second for every follower (`sharedListing`), across its turns and Claude Code's respawns |
 | `src/harness/claude/quiet.ts` | when a working `--bg` session's transcript was first seen at its mtime, on the monotonic clock, per attempt under the root: written by a look only when the mtime or the boot differs, cleared at spawn, read fresh on every look |
 | `src/harness/claude/parent.ts` | what a resumed `--bg` session's spawn records of its parent: the id of the parent's last StructuredOutput call, and whose a statement is by it |
-| `src/harness/claude/trust.ts` | whether Claude Code trusts a folder (`claudeTrusts`), read, never written, off its `.claude.json` (`claudeConfigFile`, in `CLAUDE_CONFIG_DIR` when set) |
+| `src/harness/claude/trust.ts` | Claude Code's trust of a folder in its `.claude.json` (`claudeConfigFile`, in `CLAUDE_CONFIG_DIR` when set): read by `claudeTrusts`, and one key set by `claudeTrust`, which keeps every other key and a write that lands meanwhile |
 | `src/harness/claude/code.ts` | Claude Code as the engine runs it by default: a step as a job (`claude -p`), or a background session (`claude --bg`) when the task asks, each verb routed by the session id's shape; and `claude -p`'s argv and the `claude-detached` spec |
 | `src/harness/claude/quota.ts` | Claude Code's quota (`claudeQuota`): the `claude` on PATH asked `get_usage` with no prompt, and its answer read (`quotaOfResponse`) |
 | `src/harness/claude/registry.ts` | the rows `claude agents --all --json` prints, decoded: which are ours, and why a listing is refused; a row's state in A2A's names (`claudeStateOf`) |
@@ -2251,6 +2251,7 @@ of pure code sits beside it.
 | `test/driver-calls.test.ts` | a task taken through every verb the engine has, with the harness's A2A agent marked: no driver call is made outside an A2A call but `transcript` — made to refuse part 2's shape, which named four |
 | `src/a2a/map.test.ts` | a remote agent's Task in the runtime's words and a spawn in A2A's, pure: every state, where a statement is read, and none before completion |
 | `test/remote-agent.test.ts` | a remote agent end to end against the SDK's own server over HTTP (`test/remote-server.ts`), on each binding and in each order: every refusal at shipped defaults with nothing sent, a restart that never sends twice, the secret on no file, and what a pass costs |
+| `test/real-trust-file.test.ts` | the text that sets one folder's trust, run over this machine's own `.claude.json` in memory: equal but for the one key, nothing written |
 | `test/a2a-boundary.test.ts` | only `src/a2a/` imports the A2A SDK, its face left out, and neither entry exports an SDK name or value — each made to refuse planted source |
 | `test/journal-words.test.ts` | the journal's words for six runs through `builtEngine` (`test/engine.ts`), pinned: the seam beneath the harnesses changes none of them |
 | `test/readme.test.ts` | this file, held to the code |

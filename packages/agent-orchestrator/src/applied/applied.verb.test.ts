@@ -411,3 +411,42 @@ test("the writers' place factory writes a templated factory's tree; refused with
   assert.ok(fs.existsSync(path.join(tree, 'skills', 'tidy', 'SKILL.md')), "the skill is written into the tree's skills");
   assert.equal(fs.existsSync(path.join(ROOT, 'workflows', 'lean')), false, 'nothing of yours is written');
 });
+
+/** The folders the harness's file in `dir` says are trusted, in order. */
+const trustedIn = (dir: string): string[] => {
+  const file = path.join(dir, '.claude.json');
+  if (!fs.existsSync(file)) return [];
+  const { projects } = JSON.parse(fs.readFileSync(file, 'utf8')) as { projects: Record<string, { hasTrustDialogAccepted?: boolean }> };
+  return Object.keys(projects).filter((key) => projects[key].hasTrustDialogAccepted === true);
+};
+
+test('apply trusts the places it files, a workspace on the repository it was cut from, and says the place and the way back; --no-trust writes nothing', async (t) => {
+  const before = process.env.CLAUDE_CONFIG_DIR;
+  const config = scratch('wf-applied-harness-');
+  process.env.CLAUDE_CONFIG_DIR = config;
+  t.after(() => {
+    process.env.CLAUDE_CONFIG_DIR = before;
+  });
+  const printed: string[] = [];
+  t.mock.method(console, 'log', (...args: unknown[]) => printed.push(args.join(' ')));
+  const { dir, repo } = template();
+  const workspace = path.join(scratch('wf-applied-ws-'), 'one');
+  assert.ok('answer' in stand().place.askNow('make', { repo, at: workspace, name: 'wf/r/one', from: 'main', also: [] }));
+  const plain = scratch('wf-applied-plain-');
+
+  await apply('quiet', dir, repo, '--set', 'budget=3', '--no-trust');
+  assert.deepEqual(trustedIn(config), []);
+  assert.deepEqual(
+    printed.filter((l) => /trusted for|not trusted/.test(l)),
+    [],
+  );
+
+  await apply('trusting', dir, workspace, '--repo', plain, '--set', 'budget=3');
+  assert.deepEqual(trustedIn(config).sort(), [plain, repo].sort());
+  const lines = printed.join('\n').split('\n');
+  assert.ok(lines.includes(`trusted for Claude Code: ${workspace} (kept under ${repo})`), lines.join('\n'));
+  assert.ok(
+    lines.includes(`  take it back: set projects["${plain}"].hasTrustDialogAccepted to false in ${path.join(config, '.claude.json')}`),
+    lines.join('\n'),
+  );
+});

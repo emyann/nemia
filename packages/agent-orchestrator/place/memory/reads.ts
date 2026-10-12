@@ -1,6 +1,7 @@
 /**
- * The verbs of the test place that read and change nothing: `root`, `open`, `standing`, `report`, `trial`, `status` and `inventory`, each over
- * what the place holds (`Held`) and answering as its twin of the git place does for a repository it holds, refusing in its own words.
+ * The verbs of the test place that read and change nothing: `root`, `open`, `standing`, `report`, `trial`, `status` and `inventory`,
+ * each over what the place holds (`Held`) and answering as its twin of the git place does for a repository it holds, refusing in its
+ * own words.
  */
 import fs from 'node:fs';
 import { checkoutAt, dirty, headOf, repositoryAt, treeOf, type Found } from './acts.ts';

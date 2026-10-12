@@ -1,7 +1,7 @@
 /**
  * The real shape of Claude Code's `.claude.json`, walked: the text that sets one folder's trust (`claudeTrustText`) is run over this
- * machine's own file, read into memory, and must parse equal to it but for the one key. The function is handed text and writes nothing; a machine with no
- * such file skips the walk by name.
+ * machine's own file, read into memory, and must parse equal to it but for the one key. The function is handed text and writes
+ * nothing; a machine with no such file skips the walk by name.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

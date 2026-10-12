@@ -34,7 +34,7 @@ const INBOX_SAYS =
   'It lists the inbox — nemia inbox — files a card with nemia inbox add "<idea>", queues one with nemia inbox queue <name>, and drops one with ' +
   'nemia inbox rm <name> (nemia inbox --help).';
 const FACTORY_SAYS =
-  'It lists the factories — nemia factory ls — files one with nemia factory add <name> --repo <path>, attaches a workflow with ' +
+  'It lists the factories — nemia factory ls — files one with nemia factory add <name> --repo <path>, trusts its places again with nemia factory trust <name>, attaches a workflow with ' +
   'nemia factory attach <factory> <workflow>, detaches it with nemia factory detach <factory> <workflow>, hires an agent into a step with ' +
   'nemia factory hire <factory> <agent> --step <workflow>/<step>, fires it with nemia factory fire <factory> --step <workflow>/<step>, ' +
   "schedules a workflow's runs with nemia factory schedule <factory> <workflow> --cron <expr> --brief <text>, takes the schedule back " +
@@ -67,7 +67,7 @@ const REFUSALS: Array<[string[], string[], string]> = [
   [
     ['factory', 'add'],
     ['f'],
-    "nemia factory add does not take --nope. It takes the factory's name, then --repo <path>, once per repository.",
+    "nemia factory add does not take --nope. It takes the factory's name, then --repo <path>, once per repository, and --no-trust.",
   ],
   [
     ['factory', 'attach'],

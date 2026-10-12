@@ -78,7 +78,9 @@ test('nemia factory add files <name>.json under the store, each repository absol
   assert.deepEqual(filed(), ['pipao.json']);
   assert.deepEqual(reposIn('pipao'), [path.resolve(repo)]);
   assert.ok(!fs.existsSync(path.join(repo, '.git')));
-  assert.deepEqual(printed, [`pipao  ${path.resolve(repo)}`, `filed: ${path.join(FACTORIES, 'pipao.json')}`]);
+  assert.deepEqual(printed.slice(0, 2), [`pipao  ${path.resolve(repo)}`, `filed: ${path.join(FACTORIES, 'pipao.json')}`]);
+  assert.equal(printed[2], `trusted for Claude Code: ${path.resolve(repo)}`);
+  assert.equal(printed.length, 5, 'the place, what its trust grants, and the way back');
 });
 
 test('REFUSED: an add of a name already filed is a Conflict, and the file is left byte for byte', async () => {

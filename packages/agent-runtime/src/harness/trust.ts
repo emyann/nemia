@@ -39,7 +39,7 @@ export function folderTrust(harness: string, dir: string, file?: string, reposit
     harness: 'Claude Code',
     folder,
     file: at,
-    grants: `the allow rules of ${folder}/.claude/settings.json now apply to a session started there or in a worktree of it, and a background session may start there`,
+    grants: `the allow rules of ${folder}/.claude/settings.json, for a session started there or in a worktree of it, and the start of a background session there`,
     back: `set projects["${folder}"].hasTrustDialogAccepted to false in ${at}`,
     trusted: claudeTrusts(folder, at),
     never: claudeNeverKeeps(folder)

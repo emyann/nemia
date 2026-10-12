@@ -2251,7 +2251,7 @@ of pure code sits beside it.
 | `test/driver-calls.test.ts` | a task taken through every verb the engine has, with the harness's A2A agent marked: no driver call is made outside an A2A call but `transcript` — made to refuse part 2's shape, which named four |
 | `src/a2a/map.test.ts` | a remote agent's Task in the runtime's words and a spawn in A2A's, pure: every state, where a statement is read, and none before completion |
 | `test/remote-agent.test.ts` | a remote agent end to end against the SDK's own server over HTTP (`test/remote-server.ts`), on each binding and in each order: every refusal at shipped defaults with nothing sent, a restart that never sends twice, the secret on no file, and what a pass costs |
-| `test/trust-file.boundary.test.ts` | the text that sets one folder's trust, run over this machine's own `.claude.json` in memory: equal but for the one key, nothing written |
+| `test/real-trust-file.test.ts` | the text that sets one folder's trust, run over this machine's own `.claude.json` in memory: equal but for the one key, nothing written |
 | `test/a2a-boundary.test.ts` | only `src/a2a/` imports the A2A SDK, its face left out, and neither entry exports an SDK name or value — each made to refuse planted source |
 | `test/journal-words.test.ts` | the journal's words for six runs through `builtEngine` (`test/engine.ts`), pinned: the seam beneath the harnesses changes none of them |
 | `test/readme.test.ts` | this file, held to the code |

@@ -21,6 +21,14 @@ interface ColorPickerProps extends Omit<AriaColorPickerProps, "children"> {
   children?: React.ReactNode;
 }
 
+/**
+ * A swatch button that opens a popover to edit a colour, on React Aria
+ * `ColorPicker`. Without children the popover holds a `ColorArea`, a hue
+ * `ColorSlider` and a hex `ColorField`; the trigger is a `ColorSwatch`.
+ *
+ * Material 3 does not describe this component. MD3 has no colour control;
+ * this one and its four parts are the kit's own.
+ */
 export default function ColorPicker(props: ColorPickerProps) {
   const { label, children, ...rest } = props;
   return (

@@ -46,7 +46,8 @@ import { fieldStyles, type FieldVariantProps } from "./field-styles";
  * https://m3.material.io/components/text-fields/{specs,guidelines,accessibility}.
  * Container, floating label, icons, prefix / suffix, supporting text and the
  * error icon are the shared `./field-styles.ts` (same as `TextField`).
- * Deviations: MD3 has no number field or stepper, so the steppers are React
+ * Material 3 does not describe this component. The field is Material's text
+ * field; MD3 has no number field or stepper, so the steppers are React
  * Aria's increment / decrement buttons drawn as 40dp trailing icon buttons
  * (icon 12dp from the edge, like a trailing icon), out of the tab order
  * (keyboard users have the arrow keys) and labelled "Increment" /

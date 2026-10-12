@@ -37,7 +37,8 @@ import { focusRing, tv } from "../utils";
  *     <Disclosure id="b"> … </Disclosure>
  *   </DisclosureGroup>
  *
- * **Material 3 has no page for this component, so there is no spec to cite.**
+ * **Material 3 does not describe this component.** It has no page for it, so
+ * there is no spec to cite.
  * M2 had an "expansion panel"; M3 dropped it and never replaced it, and
  * m3.material.io has no accordion, disclosure or expansion-panel entry —
  * `npm run md3 -- page …` will not find one. The anatomy here is therefore

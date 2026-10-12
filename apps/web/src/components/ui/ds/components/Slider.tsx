@@ -47,6 +47,12 @@ const styles = tv({
   },
 });
 
+/**
+ * MD3 slider on React Aria `Slider`: one thumb for a number, one per value
+ * for an array (a range).
+ *
+ * Spec: https://m3.material.io/components/sliders/{overview,specs,guidelines,accessibility}
+ */
 function Slider<T extends number | number[]>({
   label,
   thumbLabels,

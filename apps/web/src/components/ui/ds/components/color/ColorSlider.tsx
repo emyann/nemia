@@ -13,6 +13,12 @@ interface ColorSliderProps extends AriaColorSliderProps {
   label?: string;
 }
 
+/**
+ * A slider for one channel of a colour, on React Aria `ColorSlider`.
+ * A part of `ColorPicker`.
+ *
+ * Material 3 does not describe this component.
+ */
 export function ColorSlider(props: ColorSliderProps) {
   const { label, ...rest } = props;
   return (

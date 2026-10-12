@@ -14,7 +14,8 @@ import { tv, type VariantProps } from "../utils";
  *   <Tag variant="filled" color="primary">Paid</Tag>
  *   <Tag variant="outlined">Required</Tag>
  *
- * Not a Material 3 component — the spec has no standalone label pill. The
+ * Material 3 does not describe this component. The spec has no standalone
+ * label pill. The
  * anatomy borrows from chips (small-shape 8dp corners, label-medium type,
  * 8dp side padding) at 24dp so it sits inside a line of body text; colours
  * are the tonal container pairs (`<color>-container` / `on-<color>-container`,

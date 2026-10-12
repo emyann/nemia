@@ -18,12 +18,18 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
   component the kit lacks is written beside it, under the board's own rules.
 - `npx shadcn add @ds/ds --overwrite -y`, from `apps/web`, takes an update: read `git diff`. The CLI also writes into `src/styles.css`
   each time, and that is taken back out: a second `tw-animate-css` import, names that point at themselves in `@theme inline`
-  (`--ring: var(--ring)`), a `.dark` block, `--radius`. The message it prints, to import the kit's default theme, is not for us.
+  (`--ring: var(--ring)`), a `.dark` block, `--radius`, and the bridge's `--secondary` and `--secondary-foreground`, which it sets to
+  the theme's green. The message it prints, to import the kit's default theme, is not for us. Then `node
+  src/components/ui/ds/changed.mjs`, from `apps/web`, says whether a kit file differs from the release's record (`RELEASE.json`): exit
+  0 none does, 1 some do, 2 it cannot tell; run it before an update too, since the update overwrites every file that differs.
 - `theme/` is generated, never edited: change `DESIGN.md`, then `npx tsx src/components/ui/ds/tokens/generate-theme.mjs DESIGN.md --out
   theme` from `apps/web`, and read the warnings in `theme/DESIGN.resolved.md`; `test/theme.test.ts` refuses a theme that is not the
   generator's. A face the DESIGN.md names is loaded by `src/styles.css` from its npm package, under the exact family the package
-  registers (`Michroma`, `Chakra Petch`), and given to the theme's hook (`--font-michroma`); the label face (`Archivo Variable`,
-  `--font-label`) is the board's own. No face comes from a font service (the e2e's `typefaces` page).
+  registers (`Michroma`, `Chakra Petch`, `Share Tech Mono`), and given to the theme's hook (`--font-michroma`); the label face
+  (`Archivo Variable`, `--font-label`) is the board's own. No face comes from a font service (the e2e's `typefaces` page).
+- Mono text is `font-mono`, which reads the theme's `--font-mono`, the face `typography.mono` names in `DESIGN.md`; `code`, `kbd`,
+  `samp` and `pre` follow it. No `--font-mono` in `@theme inline`: it would win over the theme's (the `typefaces` page refuses it).
+  The face has one weight: a weight class on mono text is drawn by the browser.
 - The kit's corners (`rounded-shape-*`) follow `DESIGN.md`; shadcn's (`--radius`) are the board's own. shadcn's `secondary` reads a
   neutral surface, not the theme's `secondary`: that green is `alive`, a session at work. The chart colours are not the theme's.
 - A colour says one thing: `yours` (waits on a person), `alive`, `money` (an amount), `rest` (grey, and sage for done) and `failure`.

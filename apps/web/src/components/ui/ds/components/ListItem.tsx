@@ -70,6 +70,12 @@ export type ListItemProps = VariantProps<typeof styles> & {
   isFocused?: boolean;
 };
 
+/**
+ * MD3 list item: a headline, optional supporting text, and a leading and a
+ * trailing element. It draws the row; `GridListItem` gives it its behaviour.
+ *
+ * Spec: https://m3.material.io/components/lists/{overview,specs,guidelines,accessibility}
+ */
 export default function ListItem(props: ListItemProps) {
   const {
     className,

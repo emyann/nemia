@@ -7,7 +7,10 @@ description: Give this project a look of its own on the MD3 kit. Write the proje
 
 The project decides its look in one file, `DESIGN.md` at its root. The kit's
 generator turns that file into the theme the components read. Nobody edits a
-generated file, and nobody edits the kit's own files to change a look.
+generated file: the next generation writes it again. And a look is not what
+a kit file is edited for: that edit is allowed but priced (the `ds-build`
+skill, "What a project may change"), and `DESIGN.md` reaches the look for
+free.
 
 `<kit>` below is the kit's folder in this project: the `ds` folder under the
 `ui` alias of `components.json` (`src/components/ui/ds` in most projects).
@@ -19,7 +22,7 @@ Find it once, then read every `<kit>/…` path with it.
 | `theme/theme.css`                 | project | Generated: the 49 colour roles in both schemes, the font hooks             |
 | `theme/theme.v4.css`              | project | Generated: the Tailwind mapping with the project's type, corners, motion   |
 | `theme/DESIGN.resolved.md`        | project | Generated: the complete DESIGN.md, every value filled in. Read it, never edit it |
-| `<kit>/DESIGN.md`                 | kit     | The kit's neutral default, the starting file. Never edited                 |
+| `<kit>/DESIGN.md`                 | kit     | The kit's neutral default, the starting file. Copied, not changed: an update rewrites it |
 | `<kit>/tokens/theme.css`          | kit     | The default theme, what the project shows until it generates its own       |
 | `<kit>/tokens/theme.v4.css`       | kit     | The default mapping, and the template the generator writes the project's from |
 | `<kit>/tokens/generate-theme.mjs` | kit     | The generator's command                                                    |
@@ -208,7 +211,37 @@ no record of what it installed, so it cannot tell a file the kit changed from
 a file the project edited. A plain `npx shadcn add @ds/ds` asks about the
 first kit file that differs, defaulting to No, even under `-y`; with no one to
 answer, it writes nothing at all, or waits for ever. So an update takes the
-kit's files whole and lets git show what moved:
+kit's files whole and lets git show what moved. **Before it, ask the kit which
+of its files the project changed:**
+
+```bash
+node <kit>/changed.mjs
+```
+
+It compares each kit file, and each skill, with the release it was installed
+from, which `<kit>/RELEASE.json` records. It writes nothing and merges
+nothing. Its exit code says which answer it gave:
+
+- **0**: no recorded file differs. Step 3 has nothing to put back.
+- **1**: it lists files in two groups. `changed`: the text differs, and step
+  2 loses that edit: these are the files to put back in step 3. `whitespace`:
+  the same text laid out differently, which is a formatter or an indent, and
+  also a change of spaces inside a string or a class list; step 2 puts the
+  kit's layout back. Keep the list.
+- **2**: it cannot tell, and says why. There is no `<kit>/RELEASE.json`: the
+  kit was installed before 0.3.0, and the update that follows brings the
+  record. Or `components.json` makes the CLI rewrite the files as it installs
+  them (`tsx: false`, a Tailwind prefix, `cssVariables: false`). Then the
+  update is as below, and `git diff` alone says what moved.
+
+What it cannot know: a recorded file that is not there is counted, not
+listed (4 after a whole install: the adapters and the preset it does not
+bring); a file the project wrote beside the kit is not looked at; and a
+formatter that moves more than whitespace (quotes, commas, parentheses)
+makes every file it touched `changed`, so keep `<kit>` out of the project's
+formatter. Nothing is set aside: a comment put at the top of a kit file
+(`// @ts-nocheck`) is listed like any edit. A project that has no `<kit>/changed.mjs` gets it alone, with no
+other file touched, by `npx shadcn add @ds/changed`.
 
 1. Commit, or stash, everything first. The working tree must be clean: the
    next step's diff is the update.
@@ -222,10 +255,10 @@ kit's files whole and lets git show what moved:
    `theme/` and the entry CSS's imports are no item's target and stay as they
    are.
 3. Read `git status` and `git diff`: it is what the update changed. A kit
-   file the project had forked (see the `ds-build` skill) shows the
-   project's own edit removed, mixed with the kit's changes: put the
-   project's edit back by hand, keeping the kit's changes. A file the project
-   never edited needs nothing.
+   file the project had edited (the ones the check listed under `changed`;
+   see the `ds-build` skill) shows the project's own edit removed, mixed with
+   the kit's changes: put the project's edit back by hand, keeping the kit's
+   changes. A file the project never edited needs nothing.
 
 Steps 4 and 5 are for a project that generated a theme of its own (it has a
 `DESIGN.md`, a `theme/` folder and the `theme:generate` script). A project
@@ -240,5 +273,5 @@ build, then commit.
 ## What this skill does not change
 
 A look that tokens cannot reach (a field's label position, a component's
-anatomy) is a fork of a kit file, at the project's cost: see the `ds-build`
+anatomy) is an edit of a kit file, allowed and priced: see the `ds-build`
 skill, "What a project may change".

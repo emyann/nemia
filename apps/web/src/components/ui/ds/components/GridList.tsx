@@ -11,6 +11,13 @@ import { tv } from "../utils";
 import { focusRing } from "../utils";
 import { composeTailwindRenderProps } from "../render-props";
 
+/**
+ * The collection an MD3 list is built on: React Aria `GridList`, which gives
+ * the rows their keyboard navigation, selection and actions. It draws
+ * nothing of its own; render a `ListItem` inside each `GridListItem`.
+ *
+ * Spec: https://m3.material.io/components/lists/{overview,specs,guidelines,accessibility}
+ */
 export function GridList<T extends object>({
   children,
   ...props

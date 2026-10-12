@@ -20,7 +20,9 @@
                   scheme is derived from the key colours alone. The `*-fixed*`
                   roles are the same in both schemes, so a written one applies
                   to both.
-     typography   the 15 Material type roles (`display-large` … `label-small`).
+     typography   the 15 Material type roles (`display-large` … `label-small`),
+                  and `mono`: the `fontFamily` of the face the project
+                  reaches for with `font-mono`. No kit component uses it.
      rounded      the 6 corners (`extra-small` … `full`).
 
    What the body means to the kit: under `## Reference CSS`, the first `css`
@@ -473,6 +475,15 @@ const FACES = {
 
 const FALLBACK_STACK = "ui-sans-serif, system-ui, sans-serif";
 
+/** The mono face is not Material's: a `typography.mono` token of the
+    project's, read for its family alone. The stack is Tailwind's own
+    `--font-mono`, so with no face named `font-mono` gives what it gave. */
+const MONO = "mono";
+const MONO_STACK =
+  'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+/** The variable the `font-mono` utility reads: never a hook. */
+const MONO_UTILITY = "--font-mono";
+
 const isMap = (value) =>
   value !== null && typeof value === "object" && !Array.isArray(value);
 
@@ -857,7 +868,7 @@ function deriveTypography(front, warnings) {
     }
   }
   for (const role of Object.keys(written)) {
-    if (!(role in TYPE_DEFAULTS)) {
+    if (!(role in TYPE_DEFAULTS) && role !== MONO) {
       warnings.push({
         kind: "ignored",
         token: `typography.${role}`,
@@ -895,10 +906,11 @@ const BARE_FAMILY =
   /^-?[\p{L}_][\p{L}\p{N}_-]*(?: +-?[\p{L}_][\p{L}\p{N}_-]*)*$/u;
 
 /** `Space Grotesk, Georgia, serif` → the host hook `--font-space-grotesk` and
-    its root default. A family written alone gets the platform sans behind it.
-    The first name is written as one CSS string, and so is a fallback that is
-    not a run of identifiers; `token` is the role the family was read from. */
-function fontHook(family, token) {
+    its root default. A family written alone gets `fallback` behind it, the
+    platform sans unless told. The first name is written as one CSS string,
+    and so is a fallback that is not a run of identifiers; `token` is the role
+    the family was read from. */
+function fontHook(family, token, fallback = FALLBACK_STACK) {
   const refuse = (
     kind = "a family name, with its fallbacks after commas (`Inter`, `Space Grotesk, Georgia, serif`)",
   ) =>
@@ -923,6 +935,13 @@ function fontHook(family, token) {
       "a family name whose first name holds a Latin letter or a digit, which its font hook is named after (`Inter` gives `--font-inter`)",
     );
   }
+  // `--font-mono: var(--md-sys-typescale-mono-font)` is in theme.v4.css: a
+  // hook of that name would be read by the token it feeds.
+  if (`--font-${slug}` === MONO_UTILITY) {
+    throw refuse(
+      `a family whose font hook is not \`${MONO_UTILITY}\`, the variable the \`font-mono\` utility reads: write the family's full name (\`JetBrains Mono\` gives \`--font-jetbrains-mono\`)`,
+    );
+  }
   return {
     hook: `--font-${slug}`,
     family: first,
@@ -931,7 +950,7 @@ function fontHook(family, token) {
         ? fallbacks
             .map((name) => (BARE_FAMILY.test(name) ? name : cssString(name)))
             .join(", ")
-        : FALLBACK_STACK
+        : fallback
     }`,
   };
 }
@@ -958,6 +977,34 @@ function deriveFaces(typography, warnings) {
   return faces;
 }
 
+/** The face a project reaches for with `font-mono`: `typography.mono`'s
+    family, or none. It has no size, weight or tracking of its own: the text
+    it is put on keeps its type role's. */
+function deriveMono(front, warnings) {
+  const token = section(front, "typography")[MONO];
+  if (token === undefined || token === null) return null;
+  if (!isMap(token)) {
+    throw new DesignMdError(
+      `DESIGN.md: typography.${MONO} is ${JSON.stringify(token)} — the kit reads a map with a \`fontFamily\` (\`mono: { fontFamily: JetBrains Mono }\`)`,
+    );
+  }
+  for (const property of Object.keys(token)) {
+    if (property !== "fontFamily") {
+      warnings.push({
+        kind: "unapplied",
+        token: `typography.${MONO}.${property}`,
+        message: `typography.${MONO}.${property}: the mono face is a family only, the text keeps its type role's — not applied`,
+      });
+    }
+  }
+  if (!Object.hasOwn(token, "fontFamily")) return null;
+  return fontHook(
+    token.fontFamily,
+    `typography.${MONO}.fontFamily`,
+    MONO_STACK,
+  );
+}
+
 /** Front matter + body → everything the three generated files are made of. */
 export function deriveTheme(text) {
   const { front, body } = parseDesignMd(text);
@@ -965,6 +1012,7 @@ export function deriveTheme(text) {
   deriveFront(front, warnings);
   const colors = deriveColors(front, warnings);
   const typography = deriveTypography(front, warnings);
+  const mono = deriveMono(front, warnings);
   const rounded = deriveRounded(front, warnings);
   const faces = deriveFaces(typography, warnings);
   const reference = deriveReference(body, warnings);
@@ -975,6 +1023,7 @@ export function deriveTheme(text) {
     typography,
     rounded,
     faces,
+    mono,
     reference,
     warnings,
   };
@@ -1083,6 +1132,13 @@ export function renderThemeCss(theme) {
   const hookNames = [...hooks.keys()]
     .map((hook) => `\`${hook}\``)
     .join(" and ");
+  // A hook a face of the scale already claimed keeps that face's stack.
+  const monoOwn = theme.mono && !hooks.has(theme.mono.hook);
+  if (monoOwn) hooks.set(theme.mono.hook, theme.mono);
+  const monoNote = theme.mono
+    ? `
+   The mono face, which \`font-mono\` gives, is ${theme.mono.family.replaceAll("*/", "* /")}, on \`${theme.mono.hook}\`${monoOwn ? "" : ", the hook it shares"}.`
+    : "";
   return `${themeCssHead(DARK_SWITCH[theme.reference.darkMode])}
 ${schemeBlock(":root", theme.colors.light, true)}
 ${darkBlock(theme)}
@@ -1090,7 +1146,7 @@ ${darkBlock(theme)}
    ${hookNames} is the hook a host app fills with its own loaded face (Next:
    \`localFont({ variable: "--font-…" })\` on <body> wins over this root default
    by inheritance); without one, the named family resolves to a locally
-   installed or web-loaded face, then the stack behind it. */
+   installed or web-loaded face, then the stack behind it.${monoNote} */
 :root {
 ${[...hooks.values()].map((face) => `  ${face.hook}: ${face.stack};`).join("\n")}
 }
@@ -1144,6 +1200,11 @@ export function applyThemeV4(v4Css, theme) {
   for (const [face, { hook }] of Object.entries(theme.faces)) {
     must(`md-sys-typescale-${face}-font`, `var(${hook})`);
   }
+  // Set on every run, so a face taken out of DESIGN.md leaves the theme too.
+  must(
+    `md-sys-typescale-${MONO}-font`,
+    theme.mono ? `var(${theme.mono.hook})` : MONO_STACK,
+  );
   for (const [role, token] of Object.entries(theme.typography)) {
     for (const [property, suffix] of Object.entries(TYPE_VARS)) {
       const value = String(token[property]);

@@ -50,6 +50,8 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
   the cut over, so it is given none (`bg-transparent`). `test/e2e/parts.test.ts` reads each in a picture, pixel by pixel.
 - The look's small caps are its three label roles: `DESIGN.md` gives them their weight and tracking, and a text writes the role and
   `uppercase` (`text-label-small uppercase`); a kit part's own label (`Tag`, a `Column`) follows the role. No class of the board's.
+- The kit's type primitives write Material's weight over the role's (`Label` draws 500 where `DESIGN.md` says 600, a `Tag`'s word
+  included): a label of the look writes the role class, and a text given a `background-image` is unmeasured (`PageName` in `Plate.tsx`).
 - A box the browser lays between two pixels is drawn from the next whole one, and `boundingBox` carries float noise: a test that reads
   a pixel beside an edge rounds past it (`edgesOf` in `test/e2e/parts.test.ts`).
 - The kit's `xsmall` icon button answers 8 pixels beyond its box, and of two targets that overlap the later in the document wins: in a

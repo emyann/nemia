@@ -270,7 +270,8 @@ function useDeniedCause(run: RunDetail, asked: boolean): UntrustedPlace | undefi
  *
  * Its facts: a folder step's folder, copyable, where a git step's branch goes; its task; its gate, where it has one — a person's word files
  * what follows it, or, for the step that ends the run, the step itself; what the harness denied its current try, every call as a permission
- * rule names it, which is what its work may be short of, with its likely cause where the run's place is not trusted; why the runtime could not read its session alone, where it could not, in its
+ * rule names it, which is what its work may be short of, with its likely cause where the run's place is not trusted; why the runtime
+ * could not read its session alone, where it could not, in its
  * words — neither working nor gone, which its status does not say; what its current try consumed, in the CLI `decide`'s words,
  * `not measured` where nobody counted and never 0; what its sessions read, by price, where anything measured it, the peak and a rebuilt
  * cache marked; and what every try has cost together, and of its cap where it has one, red once past it.

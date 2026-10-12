@@ -32,7 +32,8 @@ export const Route = createFileRoute('/factories/$factory_/settings')({
 const RouterLinkButton = routeLink(LinkButton);
 
 /**
- * What a person sets of one factory: first, a place of it that is not trusted, with the line that trusts it (`FactoryTrust`); its rules, what every agent hired into it is told (`FactoryRules`); its instruction, what Nemia is to
+ * What a person sets of one factory: first, a place of it that is not trusted, with the line that trusts it (`FactoryTrust`); its rules,
+ * what every agent hired into it is told (`FactoryRules`); its instruction, what Nemia is to
  * know about it (`FactoryInstruction`); then its schedules, shown as the factories' read answers them (`FactorySchedules`). The default
  * factory, and a name no factory has, have no settings to keep, and say so: neither the rules nor the instruction is read for them.
  */

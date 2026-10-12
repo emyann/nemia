@@ -57,8 +57,7 @@ export function folderTrust(harness: string, dir: string, file?: string, reposit
 export function trustFolder(harness: string, dir: string, file?: string, repository?: string): FolderTrusted | undefined {
   const before = folderTrust(harness, dir, file, repository);
   if (!before) return undefined;
-  if (before.trusted) return { ...before, wrote: false, refused: null };
-  if (before.never) return { ...before, wrote: false, refused: before.never };
+  if (before.never) return { ...before, wrote: false, refused: before.trusted ? null : before.never };
   const { wrote, refused } = claudeTrust(before.folder, before.file);
   return { ...before, trusted: wrote || refused === null, wrote, refused };
 }

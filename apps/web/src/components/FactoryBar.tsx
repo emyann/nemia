@@ -1,6 +1,7 @@
 /**
  * The frame's floating bar for a factory: what its block on the Factories canvas says, in a bar beside it — its name, its repositories,
- * what its runs are doing and what it offers, a place of it that is not trusted, or why its file does not read — read from the factories and the runs, which a read again
+ * what its runs are doing and what it offers, a place of it that is not trusted, or why its file does not read — read from the factories
+ * and the runs, which a read again
  * keeps current. Its floor, which Open visits, has its runs.
  */
 import { useQuery } from '@tanstack/react-query';

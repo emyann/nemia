@@ -1,6 +1,7 @@
 /**
  * The factories, for the board: the default factory and every factory in the store, each with the repositories it works on, the workflows
- * it offers, the agents it hires, its schedules and its places a harness does not trust. Read from the store on each request, by `nemia factory`'s entry (`FACTORY`), never
+ * it offers, the agents it hires, its schedules and its places a harness does not trust. Read from the store on each request, by `nemia
+ * factory`'s entry (`FACTORY`), never
  * written: `nemia factory` is the one writer of a factory's file.
  */
 import { Hono } from 'hono';
@@ -151,7 +152,8 @@ const answerOf = (listing: FactoryListing, listed: readonly ScheduleListed[], un
  *   then each factory in the store, by name (`FactoryAnswer`), a file that does not read listed with why, so it hides no other. A request
  *   is answered in one of them, on one of their repositories, by naming it: `?factory=<name>` and `?repo=<path>` on any route
  *   (factories/place.ts). Each factory's schedules are the package's listing of them (`schedulesListed`), read off the runs the store
- *   has, and its places not trusted are read now off the place and the harness's own file, in the entry's one answer. Served by hand, through the entry's handler (`FACTORY`), since the default factory is the api's to add.
+ *   has, and its places not trusted are read now off the place and the harness's own file, in the entry's one answer. Served by hand,
+ *   through the entry's handler (`FACTORY`), since the default factory is the api's to add.
  */
 export const factories = new Hono<ApiEnv>().get('/api/factories', (c) =>
   served(c, async ({ e, placeService, env, running }) => {

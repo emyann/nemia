@@ -55,6 +55,7 @@ test('a write that changes a run reads each page of the finished runs again', WA
   const total = () => page.getCurrentResult().data?.total;
   await until(t, () => total() === 1, 'the first read of the page', { bell: seen });
   await runsMoved(client);
+  assert.equal(asked.length, 2, 'the write has asked for the page again by the time it is done');
   await until(
     t,
     () => total() === 2,

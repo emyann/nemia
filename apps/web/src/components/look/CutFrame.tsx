@@ -23,8 +23,8 @@ const GLOW: Record<FrameHue, string | undefined> = {
 /**
  * The look's cut-corner frame: a shape of its own under what it holds, its top-right and bottom-left corners cut, an edge in `hue`
  * around the card's ground, which wears the surface's grain inside the cut, and for what waits on a person a glow the shape casts.
- * Outside the cut nothing is painted: the page's ground shows. Nothing of the frame cuts what it holds off: a focused child's ring is drawn whole, over a cut corner too. `size` is
- * its cut.
+ * Outside the cut nothing is painted: the page's ground shows. Nothing of the frame cuts what it holds off: a focused child's ring is
+ * drawn whole, over a cut corner too. `size` is its cut.
  */
 export function CutFrame({
   hue = 'none',

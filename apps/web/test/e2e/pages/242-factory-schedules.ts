@@ -79,8 +79,8 @@ async function photographNext(page: Page, next: Locator): Promise<void> {
 }
 
 /**
- * The card of the scheduled factory: its workflow, cron and time zone, brief, the next fire as the api answers it and as `fireWord` writes it, and the last run, a
- * link to the run's page; no refusal, since the kept try started its run.
+ * The card of the scheduled factory: its workflow, cron and time zone, brief, the next fire as the api answers it and as `fireWord`
+ * writes it, and the last run, a link to the run's page; no refusal, since the kept try started its run.
  */
 async function expectScheduled(page: Page): Promise<void> {
   const card = page.locator(`[data-factory-schedules="${FACTORY}"]`);

@@ -66,6 +66,11 @@ export { refusedText } from 'agent-runtime';
 export { configRefusal } from 'agent-runtime';
 /** Whether a harness trusts a folder to run a background session in: what `nemia level` asks before it lets the keeper file one there. */
 export { trustedFolder } from 'agent-runtime';
+/**
+ * A harness's trust of a folder a factory names, in the runtime's words: read as it is now (`folderTrust`), and given (`trustFolder`),
+ * under the repository the place answered for the folder; each `undefined` for a harness that keeps no trust.
+ */
+export { folderTrust, trustFolder, type FolderTrust, type FolderTrusted } from 'agent-runtime';
 
 /**
  * Why one task's journal does not read, in the runtime's words, when `err` is what a read of it rejected with — the runtime's

@@ -113,6 +113,42 @@ function forked(side: Side, area: string) {
   return { root, base, work, clash, main };
 }
 
+const ROOT: readonly Walk[] = [
+  {
+    name: 'a repository, a folder inside it and a workspace cut from it each answer the repository, and a folder in none answers null',
+    walk: (side, area) => {
+      const { root } = repoIn(side, area);
+      fs.mkdirSync(path.join(root, 'deep', 'er'), { recursive: true });
+      const { at } = cut(side, area, root, 'one');
+      fs.mkdirSync(path.join(at, 'inner'));
+      fs.mkdirSync(path.join(area, 'plain'));
+      const of = (dir: string) => side.place.askNow('root', { dir });
+      return {
+        itself: of(root),
+        inside: of(path.join(root, 'deep', 'er')),
+        workspace: of(at),
+        insideWorkspace: of(path.join(at, 'inner')),
+        plain: of(path.join(area, 'plain')),
+      };
+    },
+    says: {
+      inside: { answer: { root: '<area>/repo' } },
+      insideWorkspace: { answer: { root: '<area>/repo' } },
+      itself: { answer: { root: '<area>/repo' } },
+      plain: { answer: { root: null } },
+      workspace: { answer: { root: '<area>/repo' } },
+    },
+  },
+  {
+    name: 'REFUSED: a path that is no directory has no root',
+    walk: (side, area) => {
+      fs.writeFileSync(path.join(area, 'file'), '');
+      return [side.place.askNow('root', { dir: path.join(area, 'none') }), side.place.askNow('root', { dir: path.join(area, 'file') })];
+    },
+    says: [{ refused: true }, { refused: true }],
+  },
+];
+
 const OPEN: readonly Walk[] = [
   {
     name: 'a repository answers its root, the branch and the commit it is on, and a staged file that is not there',
@@ -1133,6 +1169,7 @@ const SEAL: readonly Walk[] = [
 
 /** The contract: every verb's walks. A verb of `PLACE_VERBS` with no entry does not compile, and one with none fails `unwalked`. */
 export const WALKS: { readonly [V in PlaceVerb]: readonly Walk[] } = {
+  root: ROOT,
   open: OPEN,
   make: MAKE,
   handoff: HANDOFF,

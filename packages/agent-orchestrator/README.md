@@ -2654,8 +2654,16 @@ $ wf factory rm pipao
   name file one. A key beside `repos` is kept when the file is read.
 - **The default factory is no file.** It holds everything that names no factory: `wf factory` lists it first, and `add` and
   `rm` refuse its name, `default`. A `default.json` written by hand is listed as a file to remove by hand, never as a factory.
-- **A repository is a directory**, resolved from where `wf` is typed, as `wf start --repo` records one, and named once. Git
-  is never asked.
+- **A repository is a directory**, resolved from where `wf` is typed, as `wf start --repo` records one, and named once.
+- **A place added to a factory is trusted for its steps' harness, then and there** (`trustPlaces`, `src/trust/trust.verb.ts`): `wf
+  factory add` and `wf factory apply` ask the place the repository each folder is in (its `root` verb: the main checkout's root, from
+  a subfolder or a worktree too, none for a plain folder), and the runtime gives that folder its trust for every harness that keeps
+  one (`trustFolder`), so the allow rules of the place's own settings apply to the steps' sessions. The add prints the place, what the
+  trust grants and how to take it back, and nothing for a place already trusted or a harness that keeps no trust; `--no-trust` files
+  the factory and trusts nothing. A trust that could not be given never refuses the add: the line says why. Nothing records that a
+  trust was given, and no pass gives one, which would overrule a person who took it back: the listing (`wf factory`, `GET
+  /api/factories`) reads the harness's file each time (`untrustedPlaces`) and says a place that is not trusted with the line that
+  repairs it, **`wf factory trust <name>`**. `wf factory rm` leaves the trust.
 - **Refused by name**, exit 2, and nothing written: a name that is not a lowercase slug (letters, digits, dashes, 40 at
   most); `default`; an add with no `--repo`, or with one that is not a directory, every such path named; an add of a name
   already filed; and an rm of a name with no factory, naming those there are. A file that does not read as a factory is

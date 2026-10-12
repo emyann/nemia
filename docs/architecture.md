@@ -39,6 +39,12 @@ runtime's.
 **Above the runtime by design**: run slots, checkout holds, worktrees and landing, what a check means, budgets across tries, gates, the
 inbox, factories, stats, agent definitions.
 
+**A harness's trust of a folder is the runtime's to read and to give** (`trustedFolder`, `folderTrust`, `trustFolder`,
+`agent-runtime/src/harness/trust.ts`: one key of the harness's own file, every other kept), and **the repository a folder is in is the
+place's to answer** (its `root` verb). The orchestrator asks both when a place joins a factory, from one function (`trustPlaces`,
+`src/trust/trust.verb.ts`), and says no harness's word of it: every sentence that names the harness, its file or its key is the
+runtime's, carried whole (`HARNESS_WORDS` in `packages/agent-orchestrator/test/words.test.ts`).
+
 **Where a run's work lives is the place's**, an interface the orchestrator owns and asks (`PlaceService`, `src/place/place.store.ts`:
 `ask(verb, request)` and `askNow`, over the contract of `src/place/place.ts`), required by every program that asks it and with no
 default: the daemon, a CLI command, the api's layer and each test give one by name, and a program given none does not compile

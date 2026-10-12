@@ -13,6 +13,7 @@ import { make } from './verbs/make.ts';
 import { open } from './verbs/open.ts';
 import { remove } from './verbs/remove.ts';
 import { report } from './verbs/report.ts';
+import { root } from './verbs/root.ts';
 import { seal } from './verbs/seal.ts';
 import { standing } from './verbs/standing.ts';
 import { status } from './verbs/status.ts';
@@ -22,6 +23,7 @@ import { PLACE_DEADLINE_MS, type PlaceRequests, type PlaceVerb } from '../../src
 
 /** Each verb's body. */
 const VERBS: { readonly [V in PlaceVerb]: (request: PlaceRequests[V]) => Asking<Reply<V>> } = {
+  root,
   open,
   make,
   handoff,

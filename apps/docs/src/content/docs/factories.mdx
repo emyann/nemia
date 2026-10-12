@@ -28,6 +28,13 @@ of its own. Every other repository of the factory is mounted for each step read-
 does not change. A step that must write one of them says so with `writable`, naming the folder; that widens where its writes reach,
 never what it may do.
 
+When you add a repository or a plain folder to a factory (`nemia factory add`, `nemia factory apply`), Nemia trusts it for the harness
+its steps run on, at that moment: for Claude Code, the folder's entry in Claude Code's own configuration file, on the repository's root. Without that
+trust the harness drops the allow rules of the folder's own project settings, and a step is refused commands the repository
+meant to allow. The command prints the place, what the trust grants and how to take it back; `--no-trust` adds the place without it.
+A place that is not trusted — added before, opted out, or taken back — is said by `nemia factory` and on the factory's page, with the
+line that trusts it: `nemia factory trust <name>`. A run's denied calls on such a place name it as the likely cause.
+
 ## Attached workflows
 
 A factory offers only the workflows attached to it, and none until one is. Attaching records the workflow's folder name in the

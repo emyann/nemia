@@ -4,6 +4,7 @@
  * from, which the api serves on a step's hire, `/api/factories/:factory/hires/:step`, the step as one segment, `build%2Fimplement`; and its
  * instruction's two verbs (instruction.verb.ts), which the api serves. Their handlers answer data, and the CLI prints it.
  */
+import { Effect } from 'effect';
 import { tried } from '../runtime-client.ts';
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
@@ -27,10 +28,12 @@ import { FACTORY_SCHEDULE, FACTORY_UNSCHEDULE } from '../schedule/schedule.verb.
 import { schedulesListed } from '../schedule/listed.store.ts';
 import type { ScheduleListed } from '../schedule/schedule.ts';
 import { runStore } from '../record/files.store.ts';
+import { trustedLines, type PlaceTrust, type Untrusted } from '../trust/trust.ts';
+import { FACTORY_TRUST, NO_TRUST, trustPlaces, untrustedPlaces } from '../trust/trust.verb.ts';
 
 export const FACTORY_HELP = `nemia factory [ls]
-nemia factory add <name> --repo <path> [--repo <path> ...]
-nemia factory apply <name> --template <folder|archive> --repo <path> [--repo <path> ...] [--set <key>=<value> ...]
+nemia factory add <name> --repo <path> [--repo <path> ...] [--no-trust]
+nemia factory apply <name> --template <folder|archive> --repo <path> [--repo <path> ...] [--set <key>=<value> ...] [--no-trust]
 nemia factory plan <name> --to <x.y.z> [--template <folder|archive>]
 nemia factory upgrade <name> --to <x.y.z> [--template <folder|archive>] [--downgrade]
 nemia factory resolve <name> <conflict> --ours|--theirs|--file <path>
@@ -43,6 +46,7 @@ nemia factory unschedule <factory> <workflow>
 nemia factory rules <name> [--file <path>|- | --clear]
 nemia factory instruction <name> [--path <path> | --store | --clear]
 nemia factory instruct <name> --file <path>|- | --clear
+nemia factory trust <name>
 nemia factory rm <name>
 
 A factory is a named grouping in the store: \${WF_ROOT:-~/.agent-workflows}/factories/, one <name>.json per
@@ -53,9 +57,15 @@ factory, naming the repositories its work is on, the workflows it offers and the
 
   nemia factory     lists the default factory first — every run and card that names no factory; it is no file,
                  and is read, never written — then each factory by name with its repositories. A file that
-                 does not read as a factory is listed with why.
+                 does not read as a factory is listed with why, and a place a harness does not trust with
+                 what is withheld there and the line that trusts it.
   nemia factory add files a factory: its name a lowercase slug (letters, digits, dashes; 40 at most), and one
-                 --repo at least, each a directory, written as an absolute path and named once. Git is not asked.
+                 --repo at least, each a directory, written as an absolute path and named once. Each place
+                 is then trusted for every harness that keeps a trust of a folder, under the repository it
+                 is in, so the place's own settings apply to the sessions of its steps: the place, what the
+                 trust grants and how to take it back are printed, and nothing for a place already trusted.
+                 --no-trust files the factory and trusts nothing. A trust that could not be given never
+                 refuses the add: the line says why, and what repairs it.
   nemia factory apply files a factory made from a template that passes its check (nemia template check), its
                  parameters given with --set, typed as nemia.yaml declares them, a default filling one not
                  given. Its file names the template; the daemon renders the template into
@@ -63,7 +73,8 @@ factory, naming the repositories its work is on, the workflows it offers and the
                  workflows, agents, skills, wiring (factory.json) and NEMIA.md the factory runs from, yours to
                  change after — and writes factories/<name>/status.json: the version, the digest and the
                  conditions Applied and ConflictsPending. Its attach, detach, hire, fire and instruct write the
-                 tree, and nemia workflows, agents and skills write into it with --factory <name>.
+                 tree, and nemia workflows, agents and skills write into it with --factory <name>. Its places
+                 are trusted as nemia factory add trusts them, unless --no-trust.
   nemia factory plan previews an upgrade of a templated factory to --to: the template, at its place or at --template,
                  rendered at that version with the factory's parameters and merged three ways — the base, your
                  tree, the render — each file whole first, factory.json by key, a step's frontmatter by key and
@@ -105,8 +116,11 @@ factory, naming the repositories its work is on, the workflows it offers and the
   nemia factory instruct writes the instruction the store keeps (--file <path>, - for stdin), or removes it
                  (--clear): only while the factory keeps its instruction in the store. A file in a
                  folder is edited there.
+  nemia factory trust trusts a factory's places again, as nemia factory add does: for a factory filed before
+                 places were trusted, one filed with --no-trust, or a trust taken back since.
   nemia factory rm  removes a factory's file, one that does not read included, then the instruction and the
-                 rules the store keeps for it.
+                 rules the store keeps for it. A trust given to its places is left: its line said how to
+                 take it back.
 
 nemia start --factory <name> starts a run in a factory, of a workflow attached to it: each step its hires fill runs
 as its agent, and the start is refused while a step names no agent and is hired none, or names its own agent
@@ -116,7 +130,7 @@ factory: line or --factory. The default factory holds the history of runs and ca
 agent's try; no start names it.
 
 Refused by name, and nothing written: a name that is not a slug, the name default, an add with no --repo or
-with a --repo that is not a directory, an add of a name already filed, an rm, attach, detach, hire or fire of a
+with a --repo that is not a directory, an add of a name already filed, an rm, trust, attach, detach, hire or fire of a
 name with no factory, rules or an instruction of the default factory, rules that are blank or open with a
 frontmatter block, two of --path, --store and --clear, a --path
 that is empty, absolute or climbs out of the folder, an instruct of an instruction kept in a folder or of blank
@@ -135,15 +149,21 @@ const textOf = (args: Args, key: string): string => {
   return typeof value === 'string' ? value : '';
 };
 
-/** The listing every factory shares: those of the store, as `readFactories` reads them, and their schedules as `schedulesListed` does. */
-type Listed = { factories: FactoryListing[]; schedules: ScheduleListed[] };
+/**
+ * The listing every factory shares: those of the store, as `readFactories` reads them, their schedules as `schedulesListed` does, and
+ * their places a harness does not trust now, as `untrustedPlaces` reads them.
+ */
+type Listed = { factories: FactoryListing[]; schedules: ScheduleListed[]; untrusted: Untrusted[] };
 
-/** The store's factories, and their schedules with the runs they started. */
-const listedNow = (): Listed => ({ factories: readFactories(), schedules: schedulesListed(runStore.runs.list()) });
+/** The store's factories, their schedules with the runs they started, and their places not trusted, each read now. */
+const listedNow = Effect.fn('listedNow')(function* () {
+  const { factories, schedules } = yield* tried(() => ({ factories: readFactories(), schedules: schedulesListed(runStore.runs.list()) }));
+  return { factories, schedules, untrusted: yield* untrustedPlaces(factories) } satisfies Listed;
+});
 
 /** The lines `nemia factory` prints of the store's factories, and how to file one or remove one. */
-const listed = ({ factories, schedules }: Listed): string[] => [
-  ...factoryLines(factories, schedules),
+const listed = ({ factories, schedules, untrusted }: Listed): string[] => [
+  ...factoryLines(factories, schedules, Date.now(), untrusted),
   `\nfile one: nemia factory add <name> --repo <path> — remove one: nemia factory rm <name> — in ${factoriesDir()}`,
 ];
 
@@ -160,13 +180,13 @@ export const FACTORY: Command<Listed> = {
     positionals: [],
     flags: [],
     unknown: (arg) =>
-      `nemia factory does not take ${arg}. It lists the factories — nemia factory ls — files one with nemia factory add <name> --repo <path>, attaches a workflow with nemia factory attach <factory> <workflow>, detaches it with nemia factory detach <factory> <workflow>, hires an agent into a step with nemia factory hire <factory> <agent> --step <workflow>/<step>, fires it with nemia factory fire <factory> --step <workflow>/<step>, schedules a workflow's runs with nemia factory schedule <factory> <workflow> --cron <expr> --brief <text>, takes the schedule back with nemia factory unschedule <factory> <workflow>, writes the rules its agents are told with nemia factory rules <name> --file <path>, says where Nemia's instruction for it is kept with nemia factory instruction <name>, writes it with nemia factory instruct <name> --file <path>, and removes one with nemia factory rm <name> (nemia factory --help).`,
+      `nemia factory does not take ${arg}. It lists the factories — nemia factory ls — files one with nemia factory add <name> --repo <path>, trusts its places again with nemia factory trust <name>, attaches a workflow with nemia factory attach <factory> <workflow>, detaches it with nemia factory detach <factory> <workflow>, hires an agent into a step with nemia factory hire <factory> <agent> --step <workflow>/<step>, fires it with nemia factory fire <factory> --step <workflow>/<step>, schedules a workflow's runs with nemia factory schedule <factory> <workflow> --cron <expr> --brief <text>, takes the schedule back with nemia factory unschedule <factory> <workflow>, writes the rules its agents are told with nemia factory rules <name> --file <path>, says where Nemia's instruction for it is kept with nemia factory instruction <name>, writes it with nemia factory instruct <name> --file <path>, and removes one with nemia factory rm <name> (nemia factory --help).`,
   },
   writes: false,
   nemia: 'read',
   route: { method: 'GET', path: '/api/factories', status: 200 },
   manual: FACTORY_HELP,
-  handler: () => tried(listedNow),
+  handler: () => listedNow(),
   print: listed,
 };
 
@@ -183,7 +203,7 @@ const FACTORY_LS: Command<Listed> = {
   writes: false,
   nemia: 'read',
   only: { side: 'cli', why: "the api lists the factories on nemia factory's route: ls is the command line's second name for it" },
-  handler: () => tried(listedNow),
+  handler: () => listedNow(),
   print: listed,
 };
 
@@ -196,36 +216,40 @@ const REPOS: Flag = {
   takes: "--repo takes a repository's directory: nemia factory add <name> --repo <path> [--repo <path> ...]",
 };
 
-/** `nemia factory add`'s spec: the factory's name, then `--repo` once per repository. */
+/** `nemia factory add`'s spec: the factory's name, then `--repo` once per repository, and `--no-trust`. */
 const ADD_SPEC: Spec = {
   positionals: [{ key: 'name', takes: 'required', kind: 'name' }],
-  flags: [REPOS],
+  flags: [REPOS, NO_TRUST],
   unknown: (arg) =>
     arg.startsWith('-')
-      ? `nemia factory add does not take ${arg}. It takes the factory's name, then --repo <path>, once per repository.`
+      ? `nemia factory add does not take ${arg}. It takes the factory's name, then --repo <path>, once per repository, and --no-trust.`
       : `nemia factory add files one factory, and ${arg} is a second: nemia factory add <name> --repo <path>, once per factory.`,
   apart: () => REPOS.takes!,
   missing:
     "nemia factory add takes the factory's name, first: nemia factory add <name> --repo <path> [--repo <path> ...]. Nothing was filed.",
 };
 
-/** `nemia factory add`: one factory filed, and where. */
-const FACTORY_ADD: Command<{ name: string; repos: readonly string[]; file: string }> = {
+/**
+ * `nemia factory add`: one factory filed, and where; then, unless `--no-trust`, each of its places trusted for the harnesses that keep
+ * a trust (`trustPlaces`), and what was done of it.
+ */
+const FACTORY_ADD: Command<{ name: string; repos: readonly string[]; file: string; trusts: readonly PlaceTrust[] }> = {
   name: 'factory add',
-  usage: '<name> --repo <path> [--repo <path> ...]',
-  help: ['file a factory: a lowercase slug naming one or more directories'],
+  usage: '<name> --repo <path> [--repo <path> ...] [--no-trust]',
+  help: ['file a factory: a lowercase slug naming one or more directories,', 'each trusted for its steps unless --no-trust'],
   spec: ADD_SPEC,
   check: (args) => leftOut(ADD_SPEC, args),
   writes: true,
   nemia: 'prompts',
   only: WRITTEN_HERE,
   handler: (args) =>
-    tried(() => {
+    Effect.gen(function* () {
       const repos = Array.isArray(args.repos) ? args.repos : [];
-      const { factory, file } = addFactory({ name: textOf(args, 'name'), repos });
-      return { name: factory.name, repos: factory.repos, file };
+      const { factory, file } = yield* tried(() => addFactory({ name: textOf(args, 'name'), repos }));
+      const trusts = args.noTrust === true ? [] : yield* trustPlaces(factory.repos);
+      return { name: factory.name, repos: factory.repos, file, trusts };
     }),
-  print: ({ name, repos, file }) => [`${name}  ${repos.join(', ')}`, `filed: ${file}`],
+  print: ({ name, repos, file, trusts }) => [`${name}  ${repos.join(', ')}`, `filed: ${file}`, ...trustedLines(name, trusts)],
 };
 
 /** `nemia factory attach`'s and `detach`'s spec: the factory, then the workflow, and no flag, refused as one wherever it stands. */
@@ -404,5 +428,6 @@ export const FACTORIES: readonly Command[] = [
   FACTORY_RULES,
   FACTORY_INSTRUCTION,
   FACTORY_INSTRUCT,
+  FACTORY_TRUST,
   FACTORY_RM,
 ] as readonly Command[];

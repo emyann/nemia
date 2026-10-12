@@ -35,6 +35,8 @@ import {
   type Status,
 } from './applied.store.ts';
 import { renderFactory, resolveParams, type Params } from './index.ts';
+import { trustedLines, type PlaceTrust } from '../trust/trust.ts';
+import { NO_TRUST, trustPlaces } from '../trust/trust.verb.ts';
 import { compose, conflictCut, mergeTrees, resolveLine, type Conflict } from '../upgrade/index.ts';
 
 /** A template rendered with a factory's parameters: its version, and the files of a tree, each with its bytes. */
@@ -325,10 +327,11 @@ const APPLY_SPEC: Spec = {
       many: true,
       takes: '--set takes a parameter of the template and its value: --set <key>=<value>',
     } satisfies Flag,
+    NO_TRUST,
   ],
   unknown: (arg) =>
     arg.startsWith('-')
-      ? `nemia factory apply does not take ${arg}. It takes the name, --template <folder|archive>, --repo <path> once per repository and --set <key>=<value> once per parameter.`
+      ? `nemia factory apply does not take ${arg}. It takes the name, --template <folder|archive>, --repo <path> once per repository, --set <key>=<value> once per parameter, and --no-trust.`
       : `nemia factory apply makes one factory, and ${arg} is a second name: nemia factory apply <name> --template <folder|archive> --repo <path>.`,
   missing:
     "nemia factory apply takes the new factory's name: nemia factory apply <name> --template <folder|archive> --repo <path> [--set <key>=<value> ...].",
@@ -361,10 +364,13 @@ function applied(args: Args): Applied {
   return { name: factory.name, repos: factory.repos, file, template, tree: treeDir(name) };
 }
 
-/** `nemia factory apply`: a factory filed from a template; the daemon renders its tree. */
-export const FACTORY_APPLY: Command<Applied> = {
+/**
+ * `nemia factory apply`: a factory filed from a template, its places then trusted as `nemia factory add` trusts them unless
+ * `--no-trust` (`trustPlaces`); the daemon renders its tree.
+ */
+export const FACTORY_APPLY: Command<Applied & { trusts: readonly PlaceTrust[] }> = {
   name: 'factory apply',
-  usage: '<name> --template <folder|archive> --repo <path> [--repo <path> ...] [--set <key>=<value> ...]',
+  usage: '<name> --template <folder|archive> --repo <path> [--repo <path> ...] [--set <key>=<value> ...] [--no-trust]',
   help: ['make a factory from a template that passes its check, its parameters', 'given with --set; the daemon renders its tree'],
   spec: APPLY_SPEC,
   check: (args) => leftOut(APPLY_SPEC, args),
@@ -372,10 +378,15 @@ export const FACTORY_APPLY: Command<Applied> = {
   nemia: 'prompts',
   asksAlways: true,
   only: HERE,
-  handler: (args) => tried(() => applied(args)),
-  print: ({ name, repos, file, template, tree }) => [
+  handler: (args) =>
+    Effect.gen(function* () {
+      const filed = yield* tried(() => applied(args));
+      return { ...filed, trusts: args.noTrust === true ? [] : yield* trustPlaces(filed.repos) };
+    }),
+  print: ({ name, repos, file, template, tree, trusts }) => [
     `${name}  ${repos.join(', ')}`,
     `filed: ${file}`,
     `made from ${template.source} at ${template.version}; the daemon renders its tree into ${tree} on its next pass (nemia up)`,
+    ...trustedLines(name, trusts),
   ],
 };

@@ -6,8 +6,8 @@ type Candidate = Pick<RunSummary, 'id' | 'place' | 'repo' | 'cancelledAt' | 'pru
 
 /**
  * Whether the run's page offers a hold, by what the run says of itself: a repository run, not called off, not pruned, nobody holding it,
- * and running or stopped on something, a person or a step that broke; a run that succeeded has nothing left to file. The rest — a run that has shipped, a circle, a run on
- * another base branch — is the package's to refuse (`holdRefusal`), in its words.
+ * and running or stopped on something, a person or a step that broke; a run that succeeded has nothing left to file. The rest — a run
+ * that has shipped, a circle, a run on another base branch — is the package's to refuse (`holdRefusal`), in its words.
  */
 export const holdable = (run: Holdable): boolean =>
   run.place === 'repository' &&

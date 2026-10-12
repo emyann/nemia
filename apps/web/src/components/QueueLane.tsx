@@ -80,14 +80,14 @@ function Ghost({ card, now }: { card: InboxEntry; now: number }) {
         <span
           data-ghost-tried={tried.refused ? 'refused' : 'failed'}
           title={tried.why}
-          className={`mt-1 line-clamp-2 text-[11px] break-words ${tried.refused ? 'text-amber-800 dark:text-amber-300' : 'text-muted-foreground'}`}
+          className={`mt-1 line-clamp-2 text-[11px] break-words ${tried.refused ? 'text-yours' : 'text-muted-foreground'}`}
         >
           {tried.refused ? 'not started, refused: ' : 'failed, tried again: '}
           {tried.why}
         </span>
       )}
       {!tried && card.error && (
-        <span data-ghost-error title={card.error} className="mt-1 line-clamp-2 text-[11px] break-words text-red-700 dark:text-red-400">
+        <span data-ghost-error title={card.error} className="mt-1 line-clamp-2 text-[11px] break-words text-failure">
           {card.error}
         </span>
       )}

@@ -351,7 +351,16 @@ test("the meanings are the look's: each reads its role of the theme once, and th
 });
 
 const HUE = /\b(?:sky|blue|orange|amber|yellow|emerald|green|red|violet)-\d{2,3}\b/;
-const STATE_DRAWERS = ['StepNode.tsx', 'StepRail.tsx', 'RunNode.tsx', 'CanvasLegend.tsx', 'MachineNode.tsx', 'MachineEdge.tsx'];
+const STATE_DRAWERS = [
+  'StepNode.tsx',
+  'StepRail.tsx',
+  'RunNode.tsx',
+  'CanvasLegend.tsx',
+  'MachineNode.tsx',
+  'MachineEdge.tsx',
+  'FactoryCanvas.tsx',
+  'QueueLane.tsx',
+];
 
 test('no hand-picked hue says a state: the chips, the minimap and the canvases draw the meanings alone', () => {
   assert.match('border-2 border-amber-500', HUE, 'the pattern names a hand-picked hue');

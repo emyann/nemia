@@ -82,6 +82,10 @@
     --edge-running: var(--meaning-alive);
     --edge-loop: var(--md-sys-color-on-surface-variant);
   }
+  /* React Flow's own credit, in the muted ink: its grey is under 4.5:1 on the look's light ground. */
+  .react-flow .react-flow__attribution a {
+    color: var(--md-sys-color-on-surface-variant);
+  }
   * {
     @apply border-border outline-ring/50;
   }

@@ -369,7 +369,7 @@
     {
       "files": ["apps/web/src/components/Decide.tsx"],
       "rules": {
-        "max-lines": ["error", { "max": 560, "skipBlankLines": true, "skipComments": true }],
+        "max-lines": ["error", { "max": 556, "skipBlankLines": true, "skipComments": true }],
         "max-lines-per-function": ["error", { "max": 92, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 26 }],
         "sonarjs/cognitive-complexity": ["error", 26]
@@ -443,7 +443,7 @@
     {
       "files": ["apps/web/src/components/StepNode.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 107, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 105, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 27 }],
         "sonarjs/cognitive-complexity": ["error", 19]
       }
@@ -451,7 +451,7 @@
     {
       "files": ["apps/web/src/components/StepRail.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 94, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 86, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {

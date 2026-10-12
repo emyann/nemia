@@ -1,48 +1,12 @@
 /**
  * The board's components, rendered to markup as a server renders them: what a person is shown, without a browser.
  *
- * Node runs a test's TypeScript as it is, and not a component's JSX. The hooks below hand it the app's `.tsx` compiled
- * by `typescript`, the compiler the app is typechecked with, and resolve an import as vite does — no extension, and
- * `@/` for `src/`. Registered before the components are imported, so every import below is dynamic. `npm run e2e`
- * looks at the same components on the pages.
+ * Node runs a test's TypeScript as it is, and not a component's JSX: `./tsx.ts` registers the hooks that load one. Registered before
+ * the components are imported, so every import of one below is dynamic. `npm run e2e` looks at the same components on the pages.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import { registerHooks } from 'node:module';
-import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
-import ts from 'typescript';
-
-const SRC = path.resolve(import.meta.dirname, '..', 'src');
-
-registerHooks({
-  resolve(specifier, context, nextResolve) {
-    const named = specifier.startsWith('@/') ? pathToFileURL(path.join(SRC, specifier.slice(2))).href : specifier;
-    if ((named.startsWith('.') || named.startsWith('file:')) && !path.extname(named)) {
-      for (const extension of ['.ts', '.tsx']) {
-        try {
-          return nextResolve(named + extension, context);
-        } catch {}
-      }
-    }
-    return nextResolve(named, context);
-  },
-  load(url, context, nextLoad) {
-    if (!url.endsWith('.tsx')) return nextLoad(url, context);
-    const fileName = fileURLToPath(url);
-    const { outputText } = ts.transpileModule(fs.readFileSync(fileName, 'utf8'), {
-      fileName,
-      compilerOptions: {
-        jsx: ts.JsxEmit.ReactJSX,
-        module: ts.ModuleKind.ESNext,
-        target: ts.ScriptTarget.ES2022,
-        verbatimModuleSyntax: true,
-      },
-    });
-    return { format: 'module', source: outputText, shortCircuit: true };
-  },
-});
+import './tsx.ts';
 
 const { createElement } = await import('react');
 const { renderToStaticMarkup } = await import('react-dom/server');

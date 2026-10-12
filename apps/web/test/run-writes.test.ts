@@ -55,7 +55,12 @@ test('a write that changes a run reads each page of the finished runs again', WA
   const total = () => page.getCurrentResult().data?.total;
   await until(t, () => total() === 1, 'the first read of the page', { bell: seen });
   await runsMoved(client);
-  await until(t, () => total() === 2, () => `the page read again: ${total()}`, { bell: seen });
+  await until(
+    t,
+    () => total() === 2,
+    () => `the page read again: ${total()}`,
+    { bell: seen },
+  );
   assert.deepEqual(asked, Array(2).fill('/api/runs-finished?page=2&size=9&ofFactory=harbour'));
 });
 

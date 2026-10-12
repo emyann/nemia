@@ -35,7 +35,12 @@ const landing = (status: string, extra: Partial<RunSummary> = {}): RunSummary =>
   summary([...DONE, ['land', status]], { status: 'failed', moving: false, waitingOnYou: ['land'], onYou: [COMMAND], ...extra });
 
 const holding = { at: '2026-09-30T05:00:00.000Z', runs: [], word: `held: ${COMMAND}`, advice: COMMAND, onYou: true };
-const waiting = { runs: [{ run: 'r-0', missing: false, cancelledAt: '2026-09-30T05:00:00.000Z', gone: [] }], word: 'waiting on r-0 (cancelled)', advice: COMMAND, onYou: true };
+const waiting = {
+  runs: [{ run: 'r-0', missing: false, cancelledAt: '2026-09-30T05:00:00.000Z', gone: [] }],
+  word: 'waiting on r-0 (cancelled)',
+  advice: COMMAND,
+  onYou: true,
+};
 
 /** One row of the light answer per kind of wait, and the sentence it says. */
 const ROWS: Record<WaitKind, { row: RunSummary; says: string }> = {
@@ -153,13 +158,17 @@ test('a time is a fact to the minute, wall time', () => {
 });
 
 test('the rail says each step and its word, in the run’s order', () => {
-  assert.equal(
-    railSaid(landing('awaiting approval').steps, false, false),
-    'design done, implement done, review done, land waits for you',
-  );
+  assert.equal(railSaid(landing('awaiting approval').steps, false, false), 'design done, implement done, review done, land waits for you');
   assert.equal(railSaid(landing('awaiting approval').steps, false, true), 'design done, implement done, review done, land held');
   assert.equal(
-    railSaid(summary([['a', 'running (working)'], ['b', 'waiting']]).steps, false, false),
+    railSaid(
+      summary([
+        ['a', 'running (working)'],
+        ['b', 'waiting'],
+      ]).steps,
+      false,
+      false,
+    ),
     'a at work, b to come',
   );
 });

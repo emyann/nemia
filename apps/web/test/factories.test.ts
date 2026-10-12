@@ -312,10 +312,7 @@ test("REFUSED: a factory's bar off its light answer counts every run, those wait
   assert.equal(openBlockOf(factory('nemia'), { ...open, counts: { waiting: 4, inFlight: 2, finished: 30 } }).runs, 36);
   assert.equal(openBlockOf(factory('nemia'), { ...open, counts: { waiting: 4, inFlight: 2, finished: 30 } }).waitsOnYou, 4);
   assert.equal(openBlockOf(factory('nemia'), { ...open, counts: { waiting: 4, inFlight: 6, finished: 30 } }).inFlight, 6);
-  assert.equal(
-    runsOf(openBlockOf(factory('nemia'), { counts: { waiting: 0, inFlight: 0, finished: 0 } })),
-    'No runs yet',
-  );
+  assert.equal(runsOf(openBlockOf(factory('nemia'), { counts: { waiting: 0, inFlight: 0, finished: 0 } })), 'No runs yet');
 });
 
 test('REFUSED: the default factory is shown only while no factory is named and it holds a run', () => {

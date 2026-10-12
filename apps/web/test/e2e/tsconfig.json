@@ -1,16 +1,20 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022", "DOM"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "jsx": "react-jsx",
     "allowImportingTsExtensions": true,
     "strict": true,
     "skipLibCheck": true,
     "noEmit": true,
     "verbatimModuleSyntax": true,
     "erasableSyntaxOnly": true,
-    "types": ["node"]
+    "types": ["node", "vite/client"],
+    "paths": {
+      "@/*": ["../../src/*"]
+    }
   },
-  "include": ["*.ts", "pages/*.ts", "../e2e-*.test.ts"]
+  "include": ["*.ts", "pages/*.ts", "parts/*.ts", "parts/*.tsx", "../e2e-*.test.ts"]
 }

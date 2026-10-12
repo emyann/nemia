@@ -219,7 +219,7 @@ export type FinishedRun = RunSummary & { wallMs: number; finishedAt: string; out
 export type FinishedPage = { total: number; page: number; size: number; pages: number; runs: FinishedRun[] };
 
 /** Decodes a `FinishedPage`: each row the list's (`RunSummarySchema`) with its three facts; when the answer was read is dropped. */
-export const FinishedPageSchema = Schema.Struct({
+const FinishedPageSchema = Schema.Struct({
   total: Schema.Number,
   page: Schema.Number,
   size: Schema.Number,

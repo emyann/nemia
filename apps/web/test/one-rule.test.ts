@@ -66,7 +66,11 @@ test("REFUSED: no reader of the frame applies the whole list's rule to the light
   const bar = declared(read('lib/factories.ts'), 'openBlockOf');
   assert.match(bar, /counts\.inFlight/, 'the slice holds the bar');
   assert.deepEqual(wholeListRule(bar), [], "openBlockOf reads the api's counts");
-  assert.equal(wholeListRule(declared(read('lib/factories.ts'), 'blockOf')).length, 2, 'the scan finds the rule where the whole list uses it');
+  assert.equal(
+    wholeListRule(declared(read('lib/factories.ts'), 'blockOf')).length,
+    2,
+    'the scan finds the rule where the whole list uses it',
+  );
   assert.deepEqual(wholeListRule('runs: runs.filter(inFlight).length, waitsOnYou(run)'), ['inFlight', 'waitsOnYou']);
   assert.deepEqual(wholeListRule('inFlight: open.counts.inFlight, more: block.waitsOnYou > 0, inFlight?: number'), []);
 });

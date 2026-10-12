@@ -23,10 +23,10 @@ export const REOPEN_MS = 5_000;
  * — `['runs', id, 'decision', stamp]` is keyed by the state it answers for, and read again under a key of its own when the run's record
  * moves (`decisionQuery`).
  *
- * A step's word moves the run's record, its row in the list, the light answer the frame reads and the pages of the finished runs. A run's own word does that, and moves
- * what counts against the cap, and may be a queued card started — the feed carries no card events, so the inbox is read again on it. A run
- * removed is gone from the list and from the cap, and its record is read again too: the read that finds none is how a page open on the
- * run learns it is gone (`runGone`).
+ * A step's word moves the run's record, its row in the list, the light answer the frame reads and the pages of the finished runs. A
+ * run's own word does that, and moves what counts against the cap, and may be a queued card started — the feed carries no card events,
+ * so the inbox is read again on it. A run removed is gone from the list and from the cap, and its record is read again too: the read
+ * that finds none is how a page open on the run learns it is gone (`runGone`).
  *
  * And every event reads again whether a daemon ticks the store (`daemonQuery`): a line on the feed is written by a tick, the
  * daemon's, so a daemon started while the board says none does is seen on its first line, not on the fallback a minute later.

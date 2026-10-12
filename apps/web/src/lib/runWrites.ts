@@ -7,6 +7,6 @@ import { filterOf } from './feed.ts';
  * and a factory's bar read again at once, without waiting for the feed.
  */
 export const runsMoved = (queryClient: QueryClient): Promise<void> =>
-  Promise.all(
-    [['runs'], ['runs-open'], ['runs-finished']].map((key) => queryClient.invalidateQueries(filterOf(key))),
-  ).then(() => undefined);
+  Promise.all([['runs'], ['runs-open'], ['runs-finished']].map((key) => queryClient.invalidateQueries(filterOf(key)))).then(
+    () => undefined,
+  );

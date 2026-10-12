@@ -1,7 +1,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ReadRefusal } from '../src/lib/api/read.ts';
-import { FAVORITES_KEY, favoriteRows, favoritesOf, isStarred, ownReads, sameFavorite, toggled, type Favorite } from '../src/lib/favorites.ts';
+import {
+  FAVORITES_KEY,
+  favoriteRows,
+  favoritesOf,
+  isStarred,
+  ownReads,
+  sameFavorite,
+  toggled,
+  type Favorite,
+} from '../src/lib/favorites.ts';
 
 test('the favourites are kept under one key of this browser', () => {
   assert.equal(FAVORITES_KEY, 'nemia:favorites');

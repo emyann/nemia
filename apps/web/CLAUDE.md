@@ -48,6 +48,9 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
 - Once per machine, install each Playwright's browser through the checkout's own `node_modules`, never from an `npx` download (an install
   deletes the builds of every Playwright it does not see): `npx playwright install chromium` for the e2e, and
   `node node_modules/@playwright/mcp/cli.js install-browser chromium` for the steps' `browser_*` tools.
+- A part no page mounts yet is drawn in the gallery, `test/e2e/parts/main.tsx`, built into a scratch folder by `buildParts` and never
+  by `npm run build`: `test/e2e/parts.test.ts` presses it, `node test/e2e/parts-photos.ts` pictures it, light then dark, and
+  `test/structure.test.ts` refuses a file of `src` that imports one of `test/`. Its layout is inline styles, never a class of its own.
 - `npm test` runs `test/*.test.ts`, never `test/e2e/*.test.ts` (those launch Chromium; only `npm run e2e` runs them). A web test that needs
   no browser sits in `test/`.
 - `components/ui` and `components/ai-elements` are registry code adapted to React Aria by hand: adding one again overwrites its edits
@@ -151,8 +154,10 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
 - Send what the current choice takes, not what hidden state holds (`afterFor`).
 - A form keyed on an agent's version is thrown away with its draft when a write beside the agent moves the version (`keptAfterCopy`,
   `formKeyOf` in `lib/agents.ts`).
-- A held run is `running` whatever its steps say: the board takes one that waits on a person out by name (`inFlight`, `waitsOnYou` in
-  `lib/factory.ts`).
+- The frame counts what waits and what is in flight by the api's `counts` (`atWork`, `openBlockOf`, the bell): `inFlight` and
+  `waitsOnYou` (`lib/factory.ts`) are the rule of the pages that read the whole list, and `test/one-rule.test.ts` keeps them off the
+  light answer. A held run is `running` whatever its steps say: that rule takes one that waits on a person out by name.
+- `['runs-finished']` stands for every page of the finished runs, each factory's (`filterOf`, `polled`, `runsMoved`).
 - A new step status is drawn as `working` until `stepState` (`lib/status.ts`) knows it: add the word there, with its meaning and its
   drawing (`stateDrawn`, whose hue gives the chip's class and the minimap's fill) and `offersOf`, in the same change.
 - A page that must agree with a verb's refusal reads the package's decision (`Decidable.awaiting`), never the list's `toDecide`.
@@ -179,6 +184,7 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
 - A test waits in its process with `until` (`test/waits.ts`, the runtime's copy, held by `test/waits.test.ts`), on a `bell` its event's
   source rings or at a pace, given `WAITED`; `DEADLINES` refuses a hand-written deadline.
 - A component that draws a `routeLink` renders under `RouterContextProvider` over a memory-history router (`components.test.ts`); the
-  markup spells React's props (`readOnly=""`).
+  markup spells React's props (`readOnly=""`). In a browser its Enter navigates only under React Aria's `RouterProvider`, the root's.
+- A node test that renders a component imports `./tsx.ts` first, then the component by `await import(…)`.
 - A package program the e2e runs from a string (`PASS` in `test/e2e/world.ts`) is read by no typecheck: after changing what a package's
   program requires, run `npm run e2e -- --pages runs`, which seeds through it.

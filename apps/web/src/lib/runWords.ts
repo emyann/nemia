@@ -37,8 +37,10 @@ export const waitKindOf: Record<StepState, WaitKind | null> = {
   unknown: null,
 };
 
-/** What the words read of a row of the light answer. */
-export type WaitingRow = Pick<RunSummary, 'steps' | 'cancelledAt' | 'holding' | 'waiting' | 'waitingOnYou'>;
+/** What the words read of a row of the light answer: of each step its name and its word, and of the run who it waits on. */
+export type WaitingRow = Pick<RunSummary, 'cancelledAt' | 'holding' | 'waiting' | 'waitingOnYou'> & {
+  steps: ReadonlyArray<Pick<RunSummary['steps'][number], 'name' | 'status'>>;
+};
 
 /** A wait: its kind, the step that waits, none for a wait of the run's own, and how many of the run's steps are done. */
 export type Wait = { kind: WaitKind; step: string | null; done: number };

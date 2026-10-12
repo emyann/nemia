@@ -5,8 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { QueryClient } from '@tanstack/react-query';
-import { Schema } from 'effect';
-import { FINISHED_SIZE, FinishedPageSchema, finishedRunsQuery } from '../src/lib/api/runs.ts';
+import { FINISHED_SIZE, finishedRunsQuery, type FinishedPage } from '../src/lib/api/runs.ts';
 import { finishedSearch, newerOf, olderOf, pageAt, pageSaid, pageSearch, pastLast, rowsSaid } from '../src/lib/finished.ts';
 import { summary } from './run-fixtures.ts';
 
@@ -30,18 +29,28 @@ const answer = (extra: Record<string, unknown> = {}) => ({
   ...extra,
 });
 
-/** Why `value` does not decode as a page, or that it does. */
-const refusal = (value: unknown): string => {
+/** The board's read of a page of the finished runs, the api answering `value`: the page decoded, or rejected with why it is not read. */
+async function read(value: unknown): Promise<FinishedPage> {
+  const before = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify(value), { status: 200, headers: { 'content-type': 'application/json' } });
+  const client = new QueryClient();
   try {
-    Schema.decodeUnknownSync(FinishedPageSchema)(value);
-    return 'decoded';
-  } catch (err) {
-    return (err as Error).message;
+    return await client.fetchQuery(finishedRunsQuery(undefined, 3));
+  } finally {
+    client.clear();
+    globalThis.fetch = before;
   }
-};
+}
 
-test("the finished read decodes the api's answer, and drops when it was read and a key the board does not know", () => {
-  const page = Schema.decodeUnknownSync(FinishedPageSchema)(answer());
+/** Why `value` is not read as a page, or that it is. */
+const refusal = (value: unknown): Promise<string> =>
+  read(value).then(
+    () => 'decoded',
+    (err: Error) => err.message,
+  );
+
+test("the finished read decodes the api's answer, and drops when it was read and a key the board does not know", async () => {
+  const page = await read(answer());
   assert.deepEqual([page.total, page.page, page.size, page.pages], [634, 3, 9, 71]);
   assert.deepEqual(
     page.runs.map((run) => [run.id, run.outcome, run.wallMs, run.finishedAt]),
@@ -55,12 +64,12 @@ test("the finished read decodes the api's answer, and drops when it was read and
   assert.equal(page.runs[0].steps[0].name, 'plan', "a row keeps the list's own keys");
 });
 
-test('REFUSED: an outcome the board has no word for, a row that does not say when it finished, and pages that are no number', () => {
-  assert.match(refusal(answer({ runs: [row('r-1', { outcome: 'shelved' })] })), /outcome/);
+test('REFUSED: an outcome the board has no word for, a row that does not say when it finished, and pages that are no number', async () => {
+  assert.match(await refusal(answer({ runs: [row('r-1', { outcome: 'shelved' })] })), /outcome/);
   const { finishedAt: _dropped, ...unfinished } = row('r-1');
-  assert.match(refusal(answer({ runs: [unfinished] })), /finishedAt/);
-  assert.match(refusal(answer({ pages: '71' })), /pages/);
-  assert.equal(refusal(answer()), 'decoded');
+  assert.match(await refusal(answer({ runs: [unfinished] })), /finishedAt/);
+  assert.match(await refusal(answer({ pages: '71' })), /pages/);
+  assert.equal(await refusal(answer()), 'decoded');
 });
 
 test('the address round-trips: a page and a factory in, the same out, and the first page is the bare address', () => {

@@ -1,5 +1,5 @@
 import type { RunSummary } from '@/lib/api';
-import { ink } from '@/lib/meaning';
+import { filled, ink } from '@/lib/meaning';
 import { railSaid, railStates } from '@/lib/runWords';
 import { stateClass, stateDrawn, type StepState } from '@/lib/status';
 import { cn } from '@/lib/utils';
@@ -11,7 +11,13 @@ function nameInk(state: StepState): string {
 }
 
 /**
- * A run's own steps as a rail: one bar a step, in the run's order, each drawn as its state is on every page (`stateClass`), and under
+ * A step's bar: its state's drawing on every page (`stateClass`), but the step at work in its hue's own fill, the one lit bar of the
+ * rail: a bar carries no text, and a container's tone alone is the dimmest fill on a dark ground.
+ */
+const barClass = (state: StepState): string => (state === 'working' ? filled.alive : stateClass[state]);
+
+/**
+ * A run's own steps as a rail: one bar a step, in the run's order, each drawn by its state (`barClass`), and under
  * the bars, with `names`, each step's name. Read aloud as one picture, each step and its word (`railSaid`). `cancelled` and `held` are
  * the run's, as `stepState` takes them.
  */
@@ -36,7 +42,7 @@ export function RunSteps({
       style={{ gridTemplateColumns: `repeat(${Math.max(1, drawn.length)}, minmax(0, 1fr))` }}
     >
       {drawn.map((step) => (
-        <span key={step.name} data-step={step.name} data-state={step.state} className={cn('block h-2', stateClass[step.state])} />
+        <span key={step.name} data-step={step.name} data-state={step.state} className={cn('block h-2', barClass(step.state))} />
       ))}
       {names &&
         drawn.map((step) => (

@@ -47,6 +47,10 @@ const ROWS: Record<WaitKind, { row: RunSummary; says: string }> = {
   approve: { row: landing('awaiting approval'), says: 'Three steps are done. Land waits for your approval.' },
   blocked: { row: landing('succeeded · BLOCKED'), says: 'Land stopped and needs your word to go on.' },
   check: { row: landing('failed ✗ check (exit 1)'), says: "The check refused Land's work. Try it again or call the run off." },
+  unfinished: {
+    row: landing('failed ✗ check (unfinished)'),
+    says: "Land's check did not finish, so nothing judged its work. Run the check again.",
+  },
   unsigned: { row: landing('unsigned'), says: 'Land ended without signing its work. Try it again.' },
   denied: { row: landing('denied'), says: 'Land was refused a tool it called. Try it again.' },
   rounds: { row: landing('rounds exhausted'), says: 'Land is out of rounds. Give it another or decide its result.' },
@@ -93,6 +97,14 @@ test('every state the api lists a step in as waiting on a person has a kind, and
   }
   assert.equal(waitKindOf['budget-exhausted'], 'budget');
   assert.equal(waitOf(landing('budget exhausted'))?.kind, 'budget');
+});
+
+test('REFUSED: a check that did not finish is said as no refusal, and nobody is told to call the run off', () => {
+  const row = landing('failed ✗ check (unfinished)');
+  assert.deepEqual(waitOf(row), { kind: 'unfinished', step: 'land', done: 3 });
+  assert.doesNotMatch(waitSentence(row), /refused|call the run off/);
+  assert.equal(waitOf(landing('failed ✗ check (exit 1)'))?.kind, 'check', 'a numeric exit is the refusal');
+  assert.equal(waitOf(landing('failed ✗ check (exit 137)'))?.kind, 'check');
 });
 
 test("REFUSED: a held run at its gate, as the api lists it with no step waiting, says the hold's sentence, not an approval's", () => {

@@ -60,7 +60,9 @@ test('the steps rail: one bar a step by its state, its names in the hue of what 
   assert.match(tagWith(html, 'data-step-name="review"'), /text-failure/);
   assert.match(tagWith(html, 'data-step-name="design"'), /text-on-surface-variant/);
   assert.match(tagWith(html, 'data-step="land"'), /bg-yours/);
-  assert.match(tagWith(html, 'data-step="implement"'), /bg-alive-container/);
+  assert.match(tagWith(html, 'data-step="implement"'), /bg-alive /, 'the step at work is the lit bar, in its hue itself');
+  assert.doesNotMatch(tagWith(html, 'data-step="implement"'), /bg-alive-container/);
+  assert.match(tagWith(html, 'data-step="review"'), /bg-failure-container/, 'every other bar is drawn as its state is on every page');
   const bare = await drawn(createElement(RunSteps, { steps: STEPS, cancelled: false, held: true }));
   assert.doesNotMatch(bare, /data-step-name/, 'no names unless asked');
   assert.match(tagWith(bare, 'data-step="land"'), /data-state="held"/, "a held run's gate is drawn held");

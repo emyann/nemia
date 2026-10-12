@@ -84,8 +84,7 @@ export const untrustedPlaces = Effect.fn('untrustedPlaces')(function* (factories
   const places = factories.flatMap((f) => ('error' in f ? [] : f.repos.map((dir) => ({ factory: f.name, dir }))));
   const read = yield* Effect.forEach(
     places,
-    ({ factory, dir }) =>
-      Effect.map(rootOf(place, dir), (rooted) => ('unasked' in rooted ? [] : lacking(factory, dir, rooted.root))),
+    ({ factory, dir }) => Effect.map(rootOf(place, dir), (rooted) => ('unasked' in rooted ? [] : lacking(factory, dir, rooted.root))),
     { concurrency: AT_ONCE },
   );
   return read.flat();
@@ -123,7 +122,8 @@ export const FACTORY_TRUST: Command<{ name: string; trusts: readonly PlaceTrust[
   spec: {
     positionals: [{ key: 'factory', takes: 'required', kind: 'name' }],
     flags: [],
-    unknown: (arg) => `nemia factory trust trusts one factory's places, and ${arg} is a second: nemia factory trust <name>, once per factory.`,
+    unknown: (arg) =>
+      `nemia factory trust trusts one factory's places, and ${arg} is a second: nemia factory trust <name>, once per factory.`,
     missing: 'nemia factory trust takes the name of the factory, as nemia factory ls lists it: nemia factory trust <name>.',
   },
   writes: true,

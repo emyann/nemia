@@ -2,6 +2,7 @@ import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { FactoryInstruction } from '@/components/FactoryInstruction';
 import { FactoryRules } from '@/components/FactoryRules';
+import { FactoryTrust } from '@/components/FactoryTrust';
 import { FactorySchedules } from '@/components/FactorySchedules';
 import { routeLink } from '@/components/routeLink';
 import { LinkButton } from '@/components/ui/button';
@@ -31,7 +32,7 @@ export const Route = createFileRoute('/factories/$factory_/settings')({
 const RouterLinkButton = routeLink(LinkButton);
 
 /**
- * What a person sets of one factory: its rules, what every agent hired into it is told (`FactoryRules`); its instruction, what Nemia is to
+ * What a person sets of one factory: first, a place of it that is not trusted, with the line that trusts it (`FactoryTrust`); its rules, what every agent hired into it is told (`FactoryRules`); its instruction, what Nemia is to
  * know about it (`FactoryInstruction`); then its schedules, shown as the factories' read answers them (`FactorySchedules`). The default
  * factory, and a name no factory has, have no settings to keep, and say so: neither the rules nor the instruction is read for them.
  */
@@ -62,6 +63,7 @@ function SettingsPage() {
         </p>
       ) : (
         <>
+          <FactoryTrust factory={factory} />
           <FactoryRules name={name} />
           <FactoryInstruction name={name} />
           <FactorySchedules factory={factory} />

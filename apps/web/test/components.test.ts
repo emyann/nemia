@@ -5756,7 +5756,9 @@ const filed = (name: string, extra: Partial<import('../src/lib/api.ts').Factory>
     rm: `nemia factory rm ${name}`,
     add: `nemia factory add ${name} --repo <path>`,
     schedule: `nemia factory schedule ${name} <workflow> --cron <expr> --brief <text>`,
+    trust: `nemia factory trust ${name}`,
   },
+  untrusted: [],
   template: null,
   ...extra,
 });
@@ -7110,4 +7112,23 @@ test("REFUSED: a banner that says a person is waited on is drawn in an amount's 
   }
   assert.equal(drawnYours(`rounded ${container.money}`), false, 'the amber of an amount is no wait');
   assert.equal(drawnYours(`rounded ${container.yours} ${container.failure}`), false);
+});
+
+test("FactoryTrust says each place that is not trusted, what is withheld and the api's line; nothing for a factory whose places are trusted", async () => {
+  const { FactoryTrust } = await import('../src/components/FactoryTrust.tsx');
+  assert.equal(renderToStaticMarkup(createElement(FactoryTrust, { factory: filed('nemia') })), '');
+  const place = { place: '/code/nemia', harness: 'A harness', withheld: 'the allow rules of its settings', never: null };
+  const one = renderToStaticMarkup(createElement(FactoryTrust, { factory: filed('nemia', { untrusted: [place] }) }));
+  assert.match(one, /data-untrusted="nemia"/);
+  assert.match(one, /A place is not trusted/);
+  assert.match(one, /data-untrusted-place="\/code\/nemia"/);
+  assert.match(one, /is not trusted for A harness\. Withheld:.*the allow rules of its settings\./);
+  assert.match(one, /Trust it:.*nemia factory trust nemia/);
+  const home = { ...place, place: '/home/me', never: 'No trust is kept for a home directory.' };
+  const never = renderToStaticMarkup(createElement(FactoryTrust, { factory: filed('nemia', { untrusted: [home] }) }));
+  assert.match(never, /No trust is kept for a home directory\./);
+  assert.doesNotMatch(never, /data-trust-command/, 'a place no line repairs is offered none');
+  const two = renderToStaticMarkup(createElement(FactoryTrust, { factory: filed('nemia', { untrusted: [place, home] }) }));
+  assert.match(two, /2 places are not trusted/);
+  assert.match(two, /Trust them:/);
 });

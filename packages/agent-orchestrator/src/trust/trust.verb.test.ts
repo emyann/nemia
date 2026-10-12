@@ -82,7 +82,10 @@ test('factory add trusts a repository on its root, a plain folder on itself, and
     lines.includes(`  take it back: set projects["${repo}"].hasTrustDialogAccepted to false in ${file}`),
     'the way back names the key and the file',
   );
-  assert.ok(lines.some((l) => l.startsWith('  it grants ') && l.includes(`${repo}/.claude/settings.json`)), lines.join('\n'));
+  assert.ok(
+    lines.some((l) => l.startsWith('  it grants ') && l.includes(`${repo}/.claude/settings.json`)),
+    lines.join('\n'),
+  );
   assert.equal(lines.filter((l) => l.startsWith('trusted for ')).length, 2, 'one line a place, whatever the harnesses that share it');
 
   fs.rmSync(file);
@@ -96,11 +99,17 @@ test('a place already trusted is left byte for byte and nothing is said of it; -
   await typed(t, ['factory', 'add', 'one', '--repo', repo]);
   const bytes = fs.readFileSync(file);
   const again = await typed(t, ['factory', 'add', 'two', '--repo', repo]);
-  assert.deepEqual(again.filter((l) => /trusted for|not trusted/.test(l)), []);
+  assert.deepEqual(
+    again.filter((l) => /trusted for|not trusted/.test(l)),
+    [],
+  );
   assert.ok(fs.readFileSync(file).equals(bytes));
 
   const without = await typed(t, ['factory', 'add', 'three', '--repo', plain, '--no-trust']);
-  assert.deepEqual(without.filter((l) => /trusted for|not trusted/.test(l)), []);
+  assert.deepEqual(
+    without.filter((l) => /trusted for|not trusted/.test(l)),
+    [],
+  );
   assert.ok(fs.readFileSync(file).equals(bytes));
   assert.deepEqual(trusted(), [repo]);
 });
@@ -118,7 +127,10 @@ test('the listing says a place that is not trusted with the line that trusts it,
   const done = await typed(t, ['factory', 'trust', 'one']);
   assert.deepEqual(trusted(), [plain, repo].sort());
   assert.ok(done.includes(`trusted for Claude Code: ${workspace} (kept under ${repo})`), done.join('\n'));
-  assert.deepEqual((await typed(t, ['factory', 'ls'])).filter((l) => l.includes('not trusted')), []);
+  assert.deepEqual(
+    (await typed(t, ['factory', 'ls'])).filter((l) => l.includes('not trusted')),
+    [],
+  );
   assert.deepEqual(await typed(t, ['factory', 'trust', 'one']), ['one  every place is trusted already: nothing was written']);
 
   takenBack(repo);
@@ -153,7 +165,10 @@ test('a place whose repository is not answered is neither trusted nor listed as 
     lines.includes(`not trusted: ${repo} was not asked of — the place did not answer in time. Ask again: nemia factory trust one`),
     lines.join('\n'),
   );
-  assert.deepEqual((await typed(t, ['factory', 'ls'], deaf)).filter((l) => l.includes('not trusted')), []);
+  assert.deepEqual(
+    (await typed(t, ['factory', 'ls'], deaf)).filter((l) => l.includes('not trusted')),
+    [],
+  );
 });
 
 test('a harness file that does not read refuses no add: the factory is filed, the file left as it is, and the line says what to do', async (t) => {

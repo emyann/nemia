@@ -446,18 +446,21 @@ test('GET /api/factories serves the default factory first, then each factory by 
       [repoS],
     );
     fs.rmSync(path.join(config, '.claude.json'));
-    assert.deepEqual({ ...body[2], untrusted: [] }, {
-      name: 'hired',
-      default: false,
-      repos: [repoR],
-      workflows: ['alpha'],
-      hires: { 'alpha/implement': 'ada' },
-      error: null,
-      schedules: [],
-      template: null,
-      untrusted: [],
-      commands: commandsOf('hired'),
-    });
+    assert.deepEqual(
+      { ...body[2], untrusted: [] },
+      {
+        name: 'hired',
+        default: false,
+        repos: [repoR],
+        workflows: ['alpha'],
+        hires: { 'alpha/implement': 'ada' },
+        error: null,
+        schedules: [],
+        template: null,
+        untrusted: [],
+        commands: commandsOf('hired'),
+      },
+    );
     assert.deepEqual(body[1].commands, commandsOf('broken'), 'a file that does not read is filed again by the same lines');
     assert.deepEqual(body[3].repos, [repoR, repoS]);
     assert.equal(body[1].default, false);

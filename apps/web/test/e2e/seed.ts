@@ -668,7 +668,11 @@ export const FACTORIES = {
   broken: 'broken',
 } as const;
 
-/** Write FACTORIES into the store at `root`: `hiring` on `repo`, the others each on a folder beside it, and `broken` with no `repos`. */
+/**
+ * Write FACTORIES into the store at `root`: `hiring` on `repo`, the others each on a folder beside it, and `broken` with no `repos`;
+ * and, in the harness's own file under the store's `claude/`, the trust of each place, as filing a factory gives it, so no page says a
+ * place is untrusted but the one that takes a trust away.
+ */
 export function seedFactories(root: string, repo: string): void {
   const dir = path.join(root, 'factories');
   const { hiring, bare, others, broken } = FACTORIES;
@@ -676,6 +680,9 @@ export function seedFactories(root: string, repo: string): void {
   write(path.join(dir, `${hiring.name}.json`), JSON.stringify({ repos: [repo], workflows: [WORKFLOWS.good.name], hires }, null, 2));
   for (const name of [bare, ...others]) write(path.join(dir, `${name}.json`), JSON.stringify({ repos: [path.join(root, name)] }, null, 2));
   write(path.join(dir, `${broken}.json`), JSON.stringify({ workflows: [WORKFLOWS.good.name] }, null, 2));
+  const places = [repo, ...[bare, ...others].map((name) => path.join(root, name))];
+  const projects = Object.fromEntries(places.map((place) => [place, { hasTrustDialogAccepted: true }]));
+  write(path.join(root, 'claude', '.claude.json'), `${JSON.stringify({ projects }, null, 2)}\n`);
 }
 
 /** The diamond's runs, oldest first. */

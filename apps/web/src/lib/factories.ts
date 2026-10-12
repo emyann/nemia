@@ -1,12 +1,13 @@
 /**
  * The machine split by factory, without React Flow: a block for each factory, with what it holds; the runs and the queued cards of one
  * factory; where a factory's floor starts a run; and, for the pages that list the whole machine, the factory each run or card is tagged
- * with, what the factory picked keeps, the factories a workflow listed with no factory is in, and where the address's place reads a list of
+ * with, the place of a run that a harness does not trust (`untrustedFor`), what the factory picked keeps, the factories a workflow listed with no factory is in, and where the address's place reads a list of
  * workflows. A run or a card belongs to the factory it names, and one naming none to the default factory. Pure.
  */
 import type {
   Factory,
   FactoryCondition,
+  FactoryUntrusted,
   InboxEntry,
   OpenRuns,
   PagePlace,
@@ -39,6 +40,27 @@ export type FactoryBlock = {
   hires: number;
   error: string | null;
 };
+
+/** A place a run works on that a harness does not trust: the place as the api said it, its factory, and the line that trusts it. */
+export type UntrustedPlace = { factory: string; trust: string; place: FactoryUntrusted };
+
+/**
+ * The untrusted place the run `run` works on, among `factories`: the place of a factory that is the run's repository, in the factory
+ * the run names where it names one, else in the first that lists it. Nothing for a run on no repository, on a place every harness
+ * trusts, or in a factory that does not list its repository.
+ */
+export function untrustedFor(
+  factories: readonly Pick<Factory, 'name' | 'untrusted' | 'commands'>[],
+  run: { repo: string | null; factory?: string | null },
+): UntrustedPlace | undefined {
+  if (run.repo === null) return undefined;
+  for (const factory of factories) {
+    if (run.factory !== undefined && run.factory !== factory.name) continue;
+    const place = factory.untrusted.find((u) => u.place === run.repo);
+    if (place) return { factory: factory.name, trust: factory.commands.trust, place };
+  }
+  return undefined;
+}
 
 /**
  * Whether the condition `condition` of a factory's template is amiss: `Applied` that is not true, or another (`ConflictsPending`) that

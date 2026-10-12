@@ -65,7 +65,7 @@ test('a folder nobody trusted is given the one key under its own path, and under
   assert.deepEqual(beside(file), ['.claude.json']);
 });
 
-test('only the one key changes: other projects, the entry\'s other keys and the top-level keys read back equal', () => {
+test("only the one key changes: other projects, the entry's other keys and the top-level keys read back equal", () => {
   const file = path.join(scratch('ae-trust-'), '.claude.json');
   const before = {
     numStartups: 12,
@@ -125,7 +125,10 @@ test('REFUSED: a file that changes under every write is left as its other writer
   };
   const answer = claudeTrust('/srv/mine', file, read);
   assert.equal(answer.wrote, false);
-  assert.match(answer.refused ?? '', /changed under each of 5 writes and was left as it is: ask again, or run Claude Code in \/srv\/mine once/);
+  assert.match(
+    answer.refused ?? '',
+    /changed under each of 5 writes and was left as it is: ask again, or run Claude Code in \/srv\/mine once/,
+  );
   assert.deepEqual(held(file), { projects: {}, n: reads });
   assert.deepEqual(beside(file), ['.claude.json']);
 });

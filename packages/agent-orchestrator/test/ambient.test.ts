@@ -199,7 +199,7 @@ test("REFUSED under a person's own CLAUDE_CONFIG_DIR: a test file is given a scr
   assert.notEqual(seated.seen, own);
   assert.ok(path.basename(seated.seen).startsWith('wf-ambient-claude-'), seated.seen);
   assert.equal(path.relative(os.homedir(), seated.seen).startsWith('.claude'), false);
-  assert.equal(runConfigured(false, own).seen, own, 'without the hook the folder is the shell\'s');
+  assert.equal(runConfigured(false, own).seen, own, "without the hook the folder is the shell's");
 });
 
 test("this file's own process has the scratch folder too", () => {

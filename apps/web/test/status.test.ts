@@ -334,7 +334,17 @@ const ROLE_OF = { yours: 'primary', alive: 'secondary', money: 'tertiary', failu
 const readsRole = (css: string, meaning: keyof typeof ROLE_OF): boolean =>
   new RegExp(`--meaning-${meaning}:\\s*var\\(\\s*--md-sys-color-${ROLE_OF[meaning]}\\s*\\)\\s*;`).test(css);
 
-test("the meanings are the look's: each reads its role of the theme once, and the look writes yellow, amber and terracotta", () => {
+const WRITTEN = { primary: '#f5e61a', secondary: '#eaf6f8', tertiary: '#e0a15e', error: '#ff7676' } as const;
+
+/** The roles of `WRITTEN` a look's front matter does not write at their value, by name. */
+const unwritten = (look: string): string[] => {
+  const front = look.slice(0, look.indexOf('\n---', 4));
+  return Object.entries(WRITTEN)
+    .filter(([role, value]) => !front.includes(`\n  ${role}: "${value}"\n`))
+    .map(([role]) => role);
+};
+
+test("the meanings are the look's: each reads its role of the theme once, and the look writes yellow, a pale ice, amber and red", () => {
   const css = fs.readFileSync(path.join(web, 'src', 'styles.css'), 'utf8');
   for (const meaning of Object.keys(ROLE_OF) as Array<keyof typeof ROLE_OF>) {
     assert.equal(readsRole(css, meaning), true, `--meaning-${meaning} reads --md-sys-color-${ROLE_OF[meaning]}`);
@@ -345,9 +355,11 @@ test("the meanings are the look's: each reads its role of the theme once, and th
   assert.equal(readsRole(swapped, 'money'), true, 'across a line break too');
 
   const look = fs.readFileSync(path.join(web, 'DESIGN.md'), 'utf8');
-  const front = look.slice(0, look.indexOf('\n---', 4));
-  for (const written of ['primary: "#f5e61a"', 'tertiary: "#e0a15e"', 'error: "#e8695b"', 'secondary: "#39ff5a"'])
-    assert.ok(front.includes(`\n  ${written}\n`), written);
+  assert.equal(unwritten(look).length, 0, `the look writes ${unwritten(look).join(', ')} at another value`);
+  const old = look.replace('  secondary: "#eaf6f8"\n', '  secondary: "#39ff5a"\n').replace('  error: "#ff7676"\n', '  error: "#e8695b"\n');
+  assert.deepEqual(unwritten(old), ['secondary', 'error'], 'the neon green and the terracotta put back are named');
+  const below = look.replace('  error: "#ff7676"\n', '').replace('\n---\n\n', '\n---\n\n  error: "#ff7676"\n');
+  assert.deepEqual(unwritten(below), ['error'], 'a value under the front matter is no written role');
 });
 
 const HUE = /\b(?:sky|blue|orange|amber|yellow|emerald|green|red|violet)-\d{2,3}\b/;

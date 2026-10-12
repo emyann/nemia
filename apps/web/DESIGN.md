@@ -1,30 +1,30 @@
 ---
 version: alpha
-name: Nemia, Cyberpunk Blend
-description: Nemia's board between two cyberpunks — a green-black night with acid yellow for what a person does and neon green for what runs, and on it the printed labels of a retro spec sheet in amber, terracotta and grey with black ink.
+name: Nemia, Graphite and Yellow
+description: Nemia's board between two cyberpunks — a graphite night, nearly black and neutral, with acid yellow for what waits on a person and a pale ice for what is alive, and on it the printed labels of a retro spec sheet in amber, red and grey with black ink, every card and label under a fine grain.
 scheme: dark
 colors:
-  seed: "#1f7a36"
+  seed: "#f5e61a"
   primary-key: "#f5e61a"
-  secondary-key: "#2bff4f"
+  secondary-key: "#5fa8b8"
   tertiary-key: "#e0a15e"
-  neutral-key: "#25332a"
-  neutral-variant-key: "#2e4335"
-  error-key: "#e0584b"
+  neutral-key: "#2a2b2c"
+  neutral-variant-key: "#34363a"
+  error-key: "#e5484d"
   primary: "#f5e61a"
   on-primary: "#141300"
-  secondary: "#39ff5a"
-  on-secondary: "#00210a"
+  secondary: "#eaf6f8"
+  on-secondary: "#0c1416"
   tertiary: "#e0a15e"
   on-tertiary: "#1c1105"
-  error: "#e8695b"
-  on-error: "#210503"
-  background: "#050b07"
-  on-background: "#e6efe2"
-  surface: "#08110b"
-  on-surface: "#e6efe2"
-  inverse-surface: "#a9aca6"
-  inverse-on-surface: "#0c0f0c"
+  error: "#ff7676"
+  on-error: "#2a0506"
+  background: "#0a0a0b"
+  on-background: "#e4e5e2"
+  surface: "#0e0f10"
+  on-surface: "#e4e5e2"
+  inverse-surface: "#a9aaa8"
+  inverse-on-surface: "#0d0d0d"
   inverse-primary: "#3a3600"
 typography:
   display-large:
@@ -82,11 +82,12 @@ rounded:
 ## Overview
 
 Two cyberpunks, blended. From the night-city one: a ground that is nearly
-black with a green cast, frames with a cut corner and a hairline, acid yellow
-on whatever a person can press, neon green on whatever is alive. From the
-retro one: the printed label. An instrument is a flat matte tile, amber,
-terracotta or grey, with black ink, a wide machine lettering and a boxed
-readout, as stuck on the equipment by whoever built it.
+black, a graphite with no cast, frames with a cut corner and a hairline, acid
+yellow on whatever a person can press, a pale ice on whatever is alive. From
+the retro one: the printed label. An instrument is a flat matte tile, amber,
+red or grey, with black ink, a wide machine lettering and a boxed readout, as
+stuck on the equipment by whoever built it. Cards and labels carry a fine
+grain, as a surface that was printed.
 
 The rule that holds the blend together: hardware is cut, labels are stuck on.
 A frame, a button and a tag have hard corners or a cut one. A tile that
@@ -99,23 +100,27 @@ same keys and is checked by eye, not designed.
 
 A colour says one thing, on every page.
 
-- **Seed (`seed`):** a deep green. The neutrals lean towards it, so every
-  surface and outline carries the cast.
+- **Seed (`seed`):** the acid yellow. The neutrals have keys of their own
+  (`neutral-key`, `neutral-variant-key`), two graphite greys, so no surface
+  and no outline carries a cast.
 - **Primary (`primary-key`, `primary`):** acid yellow, `#f5e61a`, with black
   on it. It is yours: a gate that waits on a person, and the one filled
   button.
-- **Secondary (`secondary-key`, `secondary`):** neon green, `#39ff5a`, for
-  what is alive: a session at work, a selected filter.
+- **Secondary (`secondary-key`, `secondary`):** a near white that carries an
+  ice hue, `#eaf6f8`, for what is alive: a session at work, a selected
+  filter. Its key is a teal, `#5fa8b8`, so the light scheme, derived, says
+  alive in teal, and a filled tag at work is a dark teal.
 - **Tertiary (`tertiary-key`, `tertiary`):** the amber of a printed label,
   `#e0a15e`, with black ink on it. It is money: what a run cost.
 - **Inverse (`inverse-surface`, `inverse-on-surface`):** the label's grey,
   with black ink, for what is at rest: a count, a clock, a finished run.
-- **Outline (`outline`):** a sage grey. Filled, it is a step that is done, a
+- **Outline (`outline`):** a cool grey. Filled, it is a step that is done, a
   check that runs, a wait on another run.
-- **Error (`error-key`, `error`):** the label's terracotta, kept for what
-  failed. A board where nothing failed does not show it.
-- **Surfaces (`background`, `surface`):** written, because the derived dark
-  surface is a grey and the board wants a green-black.
+- **Error (`error-key`, `error`):** a red, `#ff7676`, kept for what failed,
+  readable on every surface tier. A board where nothing failed does not show
+  it.
+- **Surfaces (`background`, `surface`):** written, because the board wants a
+  graphite that is nearly black, darker than the derived dark surface.
 
 ## Typography
 
@@ -149,7 +154,7 @@ components.
 
 ## Elevation and motion
 
-No shadow. A raised surface is a hairline in yellow, then in green as it
+No shadow. A raised surface is a hairline in yellow, then in pale ice as it
 rises. Motion is short and decisive.
 
 ## Scroll bars
@@ -171,6 +176,25 @@ The rule is the board's (`src/styles.css`), not the theme's: the kit's
 generator gives a scroll bar no token. What stays the system's: the list a
 native select opens, drawn in the page's scheme, and the bar of a browser
 that knows neither the parts nor `scrollbar-color`.
+
+## Grain
+
+The look's surfaces carry a grain: the ground of a cut frame (a card, a
+framed table) and the labels (a sticker, a stat tile, a plate). The page's
+ground keeps its scan lines and takes none; a tag and a button take none.
+
+No image carries it. A grain is a tile of noise the browser draws, 220
+pixels wide and repeated, in one colour whose specks come and go. On a card
+or a framed table the specks are light in the dark scheme and ink in the
+light one, at the same weight. On a label they are ink in both schemes,
+heavier, as a label printed on rough stock. The grain follows the cut:
+nothing of it shows in a cut corner, and the ring and the glow that follow
+the cut stay over it.
+
+The rule is the board's (`src/components/look/grain.css`), not the theme's:
+the kit's generator gives a grain no token. A part of the look wears one by
+naming it (`data-grain`). Text on a grain is measured against its far end,
+the speck at its strongest 2%.
 
 ## Reference CSS
 

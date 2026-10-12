@@ -115,7 +115,7 @@ export function sourceOf(dir: string, repo: string, home: string): SkillSource |
 
 /**
  * Where a skill with no page of the board's was found, as its folder's path from the repository's root, `/` between its parts: a skill
- * named with its folder (`apps/site/.claude/skills/lay-out`), or any other found beneath `repo` in a place the board lists nothing for.
+ * named with its folder, read from that folder's own skills, or any other found beneath `repo` in a place the board lists nothing for.
  * Null for a skill of a place the board pages (`sourceOf`), for the repository's own folder, and for a folder outside it.
  */
 export function foundInOf(dir: string, repo: string, home: string): string | null {

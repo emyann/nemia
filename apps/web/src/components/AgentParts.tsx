@@ -273,8 +273,9 @@ export function SkillSourceBadge({ from, foundIn = null }: { from: SkillSource |
 
 /**
  * The skills an agent gives, one row each in its order: its name, linked to its page where it has one and as its line writes it where
- * it has none, where it is found — for one named with its folder, the folder it is read from — what it is for, and what it costs a turn — or why no session can be given it, in the package's words. `action` draws what a row offers beside it (the
- * picker's Remove); read-only, nothing.
+ * it has none, where it is found — for one named with its folder, the folder it is read from — what it is for, and what it costs a
+ * turn — or why no session can be given it, in the package's words. `action` draws what a row offers beside it (the picker's Remove);
+ * read-only, nothing.
  */
 export function GivenSkills({
   rows,

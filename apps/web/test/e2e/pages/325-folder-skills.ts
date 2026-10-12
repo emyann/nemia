@@ -92,7 +92,7 @@ async function expectSave(page: Page): Promise<void> {
     if (!written.includes(said)) throw new Refused(`${step}.md says ${said} — it holds ${JSON.stringify(written)}`);
 }
 
-/** The repository's skills that are links: one that stays inside reads, with its page; one that leaves is refused, in the package's words. */
+/** The repository's skills that are links: one that stays inside reads, with its page; one that leaves is refused, in its words. */
 async function expectLinks(page: Page): Promise<void> {
   const { inside, apart } = FOLDER_SKILLS;
   await goto(page, '/agents');

@@ -259,6 +259,19 @@ test('a run at its second gate has waited since that gate was reached, while its
   assert.equal(Date.parse(light.asOf) - Date.parse(row.waitingSince), 25 * MIN);
 });
 
+test('a run held until a person lifts the hold has waited since the hold was placed', async (t) => {
+  seeded(t);
+  const id = await started({ work: null });
+  const placed = new Date(T0 + 5 * MIN).toISOString();
+  fs.writeFileSync(path.join(RUNS_DIR, `${id}.hold`), `${JSON.stringify({ at: placed, until: [] })}\n`);
+  t.mock.timers.setTime(T0 + 20 * MIN);
+
+  const [row] = (await open()).waiting;
+  assert.equal(row.id, id);
+  assert.deepEqual(row.waitingOnYou, [], 'no step of a held run waits on a person');
+  assert.equal(row.waitingSince, placed);
+});
+
 test('the finished runs page by when their work stopped, not by when they were created: a late cancellation is the last stop', async (t) => {
   seeded(t);
   const a = await started({ work: null });

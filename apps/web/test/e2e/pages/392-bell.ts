@@ -163,9 +163,9 @@ async function onPhone(page: Page, rows: readonly BellRow[]): Promise<void> {
 
 export default {
   /**
-   * The header's bell, on the default factory's floor: it counts the runs waiting on you across every factory, as the api's light answer counts
-   * them, the board's own rule over the whole list naming the same runs,
-   * and pressed opens them in the floating bar, a row each, oldest first, with its factory, the queue lane giving its room to the floor;
+   * The header's bell, on the default factory's floor: it counts the runs waiting on you across every factory, as the api's light answer
+   * counts them, the board's own rule over the whole list naming the same runs, and pressed opens them in the floating bar, a row each,
+   * oldest first, with its factory, the queue lane giving its room to the floor;
    * pressed again it closes. A row at a gate opens
    * its run's page at that step, and Back returns. The sidebar's Inbox badge counts the cards not yet started, every factory's under All
    * factories and the picked factory's under one. On a phone the bell keeps its count. The window's size is put back. It writes nothing.

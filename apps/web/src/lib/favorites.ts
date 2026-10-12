@@ -1,8 +1,7 @@
 /**
  * The favourites this browser keeps: the runs and workflows a person starred, read from local storage under `FAVORITES_KEY`, in the order
- * they were starred; a star pressed again takes one off, and the sidebar's rows say each by its title, a workflow gone once its list lacks it and a run once
- * its own read finds none. Pure,
- * for the sidebar and the stars, which draw them, and its node test.
+ * they were starred; a star pressed again takes one off, and the sidebar's rows say each by its title, a workflow gone once its list lacks
+ * it and a run once its own read finds none. Pure, for the sidebar and the stars, which draw them, and its node test.
  */
 import type { RunSummary, WorkflowListing } from './api';
 import { titleOf } from './factory.ts';

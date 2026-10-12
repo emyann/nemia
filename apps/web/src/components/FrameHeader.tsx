@@ -39,8 +39,9 @@ export function FrameHeader({ section }: { section?: string }) {
 const WAITING = { kind: 'waiting' } as const;
 
 /**
- * The bell: how many runs wait on you across every factory, the api's count (`openRunsQuery`), named in full and drawn as a count over the bell while there are
- * any; a press opens the runs waiting on you in the floating bar, kept in the address, and pressed again closes it.
+ * The bell: how many runs wait on you across every factory, the api's count (`openRunsQuery`), named in full and drawn as a count over
+ * the bell while there are any; a press opens the runs waiting on you in the floating bar, kept in the address, and pressed again closes
+ * it.
  */
 function BellButton() {
   const runs = useQuery(openRunsQuery());

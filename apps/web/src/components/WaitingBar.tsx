@@ -41,8 +41,8 @@ function WaitingRow({ row }: { row: BellRow }) {
 const countWords = (count: number): string => `${count} ${count === 1 ? 'run' : 'runs'}, across every factory`;
 
 /**
- * The runs waiting on you, read as the bell reads them (`openRunsQuery`): a row each, or a line saying nothing waits on you; a read that failed
- * says so, and one still on its way says that.
+ * The runs waiting on you, read as the bell reads them (`openRunsQuery`): a row each, or a line saying nothing waits on you; a read that
+ * failed says so, and one still on its way says that.
  */
 export function WaitingBar() {
   const runs = useQuery(openRunsQuery());

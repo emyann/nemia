@@ -195,8 +195,8 @@ export default {
   /**
    * Favourites: a run starred on its Runs row, its card on the floor, its page's header and its bar, and a workflow on its card, each
    * pressed again to take it off; Favorites lists them by title in the order starred, under any factory picked; another page sees a
-   * change; a workflow the api no longer lists is said gone (a run gone is `favorite-gone`'s); refused storage says nothing is starred; and a phone's sheet. The favourites
-   * and the window's size are taken back.
+   * change; a workflow the api no longer lists is said gone (a run gone is `favorite-gone`'s); refused storage says nothing is starred;
+   * and a phone's sheet. The favourites and the window's size are taken back.
    */
   name: 'favorites',
   route: '/runs',

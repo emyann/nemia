@@ -66,9 +66,9 @@ export function FactoryItemBody({ item }: { item: PickerFactory }) {
 
 /**
  * The picker of the factory the page at `path` with `search` shows: `picked`, the address's (`pickedOf`), else All factories. Its trigger
- * holds the factory's repositories whole and why its file does not read in its tooltip. It reads the factories, and, only while none of them
- * is named, whether the default factory holds a run (`openRunsQuery`), unpolled; nothing but All factories is offered while an answer it
- * needs is missing. A pick runs `onPick`, then goes
+ * holds the factory's repositories whole and why its file does not read in its tooltip. It reads the factories, and, only while none of
+ * them is named, whether the default factory holds a run (`openRunsQuery`), unpolled; nothing but All factories is offered while an
+ * answer it needs is missing. A pick runs `onPick`, then goes
  * where `pickTo` says, or nowhere.
  */
 export function FactoryPicker({

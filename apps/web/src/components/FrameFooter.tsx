@@ -70,7 +70,8 @@ function VersionPart() {
  * The frame's bottom bar, across the foot of every page, `h-8`, under the rail, the sidebar and the page, its height whatever it says.
  * Left, the daemon's dot — the api's own standing as the store's daemon (`GET /api/daemon`) — the pause (`PauseButton`), and
  * whether the board follows the workflow feed (`feed`, carried as `data-feed`); in the centre, what is at work across every factory
- * (`atWork`, off `GET /api/runs-open`); at the right, the subscription's quota in short (`GET /api/quota`) and the version (`GET /api/version`).
+ * (`atWork`, off `GET /api/runs-open`); at the right, the subscription's quota in short (`GET /api/quota`) and the version
+ * (`GET /api/version`).
  * All of it is read from the api over HTTP. A phone keeps the daemon's dot, the pause and the quota (`footerParts`). Each group but the
  * pause opens the gauges, whole, in the floating bar (`GaugesBar`); the pause opens its own popover.
  */

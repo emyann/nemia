@@ -7,9 +7,11 @@
  * The build workflow's review declares its own closeout, the reviewer's and the mutants it judged: `schemaDrift` holds the copy to the
  * agent's schema, field for field.
  *
- * The design system kit's skills sit in a folder of the board's, which no step can be given: build's design, implement and review are
- * told to load them (`KIT_SKILLS_TOLD`), and `kitDrift` holds the names told to the folders that are there and to what the trigger skill
- * `change-the-board` says of each. They are told of the look's own parts too, by the folder's name (`LOOK_PARTS_TOLD`).
+ * The design system kit's skills sit in a folder of the board's (`KIT_SKILLS`): build's design, implement and review are each given
+ * every one on their `skills:` line, named with the folder, and `kitDrift` holds the names given to the folders that are there and to
+ * what the trigger skill `change-the-board` says of each (`KIT_SKILLS_SAID`). Design and review, which are fenced, are told to load
+ * the trigger skill first and where `ds-spec`'s reader runs from (`KIT_READER_TOLD`). The three are told of the look's own parts too,
+ * by the folder's name (`LOOK_PARTS_TOLD`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -19,6 +21,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { loadWorkflows } from '../src/folder/folder.store.ts';
 import { outputFields } from '../src/step/step.ts';
 import { skillFolders } from '../src/skills/skills.store.ts';
+import { givenSkillOf } from '../src/keys/given-skill.ts';
 import { scratch } from './scratch.ts';
 import { REPO, SHIPPED_HOLDERS, placesOf } from './team.ts';
 
@@ -77,21 +80,36 @@ const HOLDS_THE_BASE = [
   'read the change alone with `git diff main-worktree/HEAD...HEAD`',
 ];
 
-/** Where the design system kit's install writes its skills, from the repository's root: a folder no step's `skills:` reaches. */
-const KIT_SKILLS = 'apps/web/.claude/skills';
+/** The board's folder, from the repository's root, as a `skills:` line names it before a kit skill's name. */
+const KIT_FOLDER = 'apps/web';
+
+/** Where the design system kit's install writes its skills, from the repository's root: the folder a `skills:` line reads them from. */
+const KIT_SKILLS = `${KIT_FOLDER}/.claude/skills`;
 
 /** The trigger skill of a change to the board, from the repository's root: it says once how a kit skill is loaded. */
 const TRIGGER = '.claude/skills/change-the-board/SKILL.md';
 
-/**
- * What design, implement and review are told of the kit's skills: to load each as the trigger skill says, then one sentence a skill, which
- * opens with its name and says when the work is its own.
- */
-const KIT_SKILLS_TOLD = [
-  "the design system kit's skills where the work is theirs, each loaded as `change-the-board` says",
+/** The steps of the build workflow that are given the kit's skills, each on its own `skills:` line. */
+const KIT_STEPS = ['design', 'implement', 'review'];
+
+/** What the trigger skill says of the kit's skills: one sentence a skill, which opens with its name and says when the work is its own. */
+const KIT_SKILLS_SAID = [
   "`ds-build` before you design, write or judge anything drawn with the kit's parts or its roles",
   '`ds-theme` before a change to `apps/web/DESIGN.md` or the theme',
   '`ds-spec` when a decision cites Material',
+];
+
+/** A skill of the kit named in backticks, as the trigger skill writes one: the kit names each of its skills `ds-` and a word or more. */
+const KIT_NAMED = /`(ds-[a-z0-9]+(?:-[a-z0-9]+)*)`/g;
+
+/**
+ * What design and review, the fenced steps, are told of the kit: to load the trigger skill first, and the command of `ds-spec`'s
+ * reader from the repository's root, the workspace's script and not the copy the step is given.
+ */
+const KIT_READER_TOLD = [
+  'When the change touches `apps/web`, load `change-the-board` first',
+  "`ds-spec`'s reader runs from the root as `node apps/web/.claude/skills/ds-spec/md3.mjs <command>`, typed whole and alone",
+  "this workspace's script, never the copy your skills hold, nor the path the skill's own text prints, which is no file here.",
 ];
 
 /**
@@ -115,7 +133,7 @@ const TOLD: Told[] = [
       NO_LIVE_BOARD,
       NO_FILENAME,
       STOP_BOARD,
-      ...KIT_SKILLS_TOLD,
+      ...KIT_READER_TOLD,
       ...LOOK_PARTS_TOLD,
     ],
     adds: ['shadcn', 'look'],
@@ -134,7 +152,6 @@ const TOLD: Told[] = [
       'When the change touches `tools/observe`',
       '`node tools/observe/render/render.ts --out <your files directory>` starts a throwaway stack from this workspace',
       'the check refuses a changed dashboard whose picture and',
-      ...KIT_SKILLS_TOLD,
       ...LOOK_PARTS_TOLD,
     ],
     adds: ['shadcn', 'look', 'see-a-dashboard'],
@@ -162,7 +179,7 @@ const TOLD: Told[] = [
       STOP_BOARD,
       "When the change touches `tools/observe`, read each dashboard's picture and text the implement step named in its `artifacts`",
       'You do not render one yourself: your fence refuses the command and Docker.',
-      ...KIT_SKILLS_TOLD,
+      ...KIT_READER_TOLD,
       ...LOOK_PARTS_TOLD,
     ],
     adds: ['shadcn', 'look', 'see-a-dashboard'],
@@ -234,7 +251,7 @@ test('each shipped step still says, adds, denies and declares what its agent and
 
 test('REFUSED: a step that adds a skill no more, or declares its closeout no more, is named', () => {
   const unskilled = shippedEdited('build', 'implement', (text) =>
-    text.replace('skills: effect, shadcn, change-the-board, look, see-a-dashboard\n', 'skills: effect, shadcn, change-the-board, look\n'),
+    text.replace('skills: effect, shadcn, change-the-board, look, see-a-dashboard, ', 'skills: effect, shadcn, change-the-board, look, '),
   );
   assert.deepEqual(untold('build', unskilled), ['build/implement: skill see-a-dashboard']);
   const undeclared = shippedEdited('build', 'implement', (text) => text.replace('output: implement.schema.json\n', ''));
@@ -305,19 +322,39 @@ const namedIn = (sentences: readonly string[]): { name: string; sentence: string
     return name ? [{ name, sentence }] : [];
   });
 
+/** The kit's skills the step `step` is given on its own `skills:` line, each by its bare name: those named with the kit's folder. */
+const kitGiven = (step: Step | undefined): string[] =>
+  (step?.agent?.addedSkills ?? []).flatMap((written) => {
+    const given = givenSkillOf(written);
+    return given?.folder === KIT_FOLDER ? [given.name] : [];
+  });
+
 /**
- * What the kit's skills told by `sentences`, the skill folders `folders` of the kit and the trigger skill's text `trigger` do not hold
- * together, a line each: a skill told that has no folder, a folder no step is told of, a skill told whose sentence the trigger skill does
- * not say, and a trigger skill that names no file to read a kit skill from.
+ * What the build workflow's steps `steps`, the skill folders `folders` of the kit and the trigger skill's text `trigger` do not hold
+ * together, a line each: for each step of `KIT_STEPS`, a kit skill it is given that has no folder and a folder it is not given; a folder
+ * whose sentence (`KIT_SKILLS_SAID`) the trigger skill does not say; a sentence of `KIT_SKILLS_SAID` whose skill has no folder, and a
+ * kit skill the trigger skill names (`KIT_NAMED`) that has none; and a trigger skill that names no file to read a kit skill from.
  */
-function kitDrift(sentences: readonly string[], folders: readonly string[], trigger: string): string[] {
-  const told = namedIn(sentences);
+function kitDrift(steps: readonly Step[], folders: readonly string[], trigger: string): string[] {
+  const said = namedIn(KIT_SKILLS_SAID);
+  const named = [...new Set([...trigger.matchAll(KIT_NAMED)].map((span) => span[1]))];
   return [
-    ...told.filter(({ name }) => !folders.includes(name)).map(({ name }) => `${name}: told to a step, and no folder in ${KIT_SKILLS}`),
-    ...folders.filter((folder) => !told.some(({ name }) => name === folder)).map((folder) => `${folder}: a folder no step is told of`),
-    ...told
-      .filter(({ sentence }) => !across(sentence).test(trigger))
-      .map(({ name }) => `${name}: change-the-board says no "${name}" sentence`),
+    ...KIT_STEPS.flatMap((name) => {
+      const given = kitGiven(steps.find((step) => step.name === name));
+      return [
+        ...given
+          .filter((skill) => !folders.includes(skill))
+          .map((skill) => `${name}: given ${KIT_FOLDER}:${skill}, and no folder in ${KIT_SKILLS}`),
+        ...folders.filter((folder) => !given.includes(folder)).map((folder) => `${name}: not given ${KIT_FOLDER}:${folder}`),
+      ];
+    }),
+    ...folders
+      .filter((folder) => !said.some(({ name, sentence }) => name === folder && across(sentence).test(trigger)))
+      .map((folder) => `${folder}: change-the-board says no "${folder}" sentence`),
+    ...said
+      .filter(({ name }) => !folders.includes(name))
+      .map(({ name }) => `${name}: KIT_SKILLS_SAID holds its sentence, and no folder in ${KIT_SKILLS}`),
+    ...named.filter((name) => !folders.includes(name)).map((name) => `${name}: change-the-board names it, and no folder in ${KIT_SKILLS}`),
     ...(trigger.includes(`\`${KIT_SKILLS}/<name>/SKILL.md\``) ? [] : [`change-the-board names no ${KIT_SKILLS}/<name>/SKILL.md to read`]),
   ];
 }
@@ -330,44 +367,81 @@ function kitFoldersEdited(edit: (dir: string) => void): string[] {
   return skillFolders(dir);
 }
 
-test("every kit skill build's steps are told to load has a folder, every kit skill folder is told, and change-the-board says each", () => {
+/** The shipped build workflow's steps, as a start in this checkout reads them. */
+const buildSteps = (): Step[] => loadWorkflows(path.join(HOLDER, 'build'), { repo: REPO });
+
+/** The trigger skill's text, as shipped. */
+const triggerText = (): string => fs.readFileSync(path.join(REPO, TRIGGER), 'utf8');
+
+test("build's design, implement and review are each given every kit skill there is a folder of, and change-the-board says each", () => {
   const folders = skillFolders(path.join(REPO, KIT_SKILLS));
   assert.deepEqual(folders, ['ds-build', 'ds-spec', 'ds-theme']);
-  assert.deepEqual(kitDrift(KIT_SKILLS_TOLD, folders, fs.readFileSync(path.join(REPO, TRIGGER), 'utf8')), []);
+  assert.deepEqual(kitDrift(buildSteps(), folders, triggerText()), []);
 });
 
-test('REFUSED: a kit skill told to a step that has no folder, and a kit skill folder no step is told of, are named', () => {
-  const trigger = fs.readFileSync(path.join(REPO, TRIGGER), 'utf8');
+test('REFUSED: a kit skill given to a step that has no folder, and a kit skill folder a step is not given, are named', () => {
+  const steps = buildSteps();
   const renamed = kitFoldersEdited((dir) => fs.renameSync(path.join(dir, 'ds-build'), path.join(dir, 'ds-builds')));
-  assert.deepEqual(kitDrift(KIT_SKILLS_TOLD, renamed, trigger), [
-    `ds-build: told to a step, and no folder in ${KIT_SKILLS}`,
-    'ds-builds: a folder no step is told of',
+  assert.deepEqual(kitDrift(steps, renamed, triggerText()), [
+    ...KIT_STEPS.flatMap((step) => [
+      `${step}: given apps/web:ds-build, and no folder in ${KIT_SKILLS}`,
+      `${step}: not given apps/web:ds-builds`,
+    ]),
+    'ds-builds: change-the-board says no "ds-builds" sentence',
+    `ds-build: KIT_SKILLS_SAID holds its sentence, and no folder in ${KIT_SKILLS}`,
+    `ds-build: change-the-board names it, and no folder in ${KIT_SKILLS}`,
   ]);
   const added = kitFoldersEdited((dir) => {
     fs.mkdirSync(path.join(dir, 'ds-new'));
     fs.writeFileSync(path.join(dir, 'ds-new', 'SKILL.md'), '---\nname: ds-new\ndescription: New.\n---\n');
     fs.mkdirSync(path.join(dir, 'ds-notes'));
   });
-  assert.deepEqual(kitDrift(KIT_SKILLS_TOLD, added, trigger), ['ds-new: a folder no step is told of']);
-  assert.deepEqual(kitDrift(KIT_SKILLS_TOLD.slice(0, 3), skillFolders(path.join(REPO, KIT_SKILLS)), trigger), [
-    'ds-spec: a folder no step is told of',
+  assert.deepEqual(kitDrift(steps, added, triggerText()), [
+    ...KIT_STEPS.map((step) => `${step}: not given apps/web:ds-new`),
+    'ds-new: change-the-board says no "ds-new" sentence',
   ]);
+  const folders = skillFolders(path.join(REPO, KIT_SKILLS));
+  const ungiven = shippedEdited('build', 'review', (text) => text.replace(', apps/web:ds-spec\n', '\n'));
+  assert.deepEqual(kitDrift(ungiven, folders, triggerText()), ['review: not given apps/web:ds-spec']);
+  const bare = shippedEdited('build', 'design', (text) => text.replace(', apps/web:ds-theme,', ','));
+  assert.deepEqual(kitDrift(bare, folders, triggerText()), ['design: not given apps/web:ds-theme']);
+});
+
+test('REFUSED: a kit skill gone from the kit and from the three lines, which the sentences here or change-the-board still say, is named', () => {
+  const root = scratch('wf-told-gone-');
+  fs.cpSync(HOLDER, root, { recursive: true });
+  for (const step of KIT_STEPS) {
+    const file = path.join(root, 'build', `${step}.md`);
+    const text = fs.readFileSync(file, 'utf8');
+    assert.ok(text.includes(', apps/web:ds-theme'), file);
+    fs.writeFileSync(file, text.replace(', apps/web:ds-theme', ''));
+  }
+  const steps = loadWorkflows(path.join(root, 'build'), { repo: REPO });
+  const gone = kitFoldersEdited((dir) => fs.rmSync(path.join(dir, 'ds-theme'), { recursive: true }));
+  assert.deepEqual(gone, ['ds-build', 'ds-spec']);
+  const sentence = `ds-theme: KIT_SKILLS_SAID holds its sentence, and no folder in ${KIT_SKILLS}`;
+  const trigger = `ds-theme: change-the-board names it, and no folder in ${KIT_SKILLS}`;
+  assert.deepEqual(kitDrift(steps, gone, triggerText()), [sentence, trigger]);
+  const silent = triggerText().replaceAll('`ds-theme`', 'the theme’s skill');
+  assert.deepEqual(kitDrift(steps, gone, silent), [sentence], 'a trigger that names it no more leaves the sentence held here');
+  assert.deepEqual(kitDrift(buildSteps(), skillFolders(path.join(REPO, KIT_SKILLS)), triggerText()), [], 'with its folder, neither');
 });
 
 test('REFUSED: a trigger skill that says a kit skill no more, or names no file to read one from, is named', () => {
-  const trigger = fs.readFileSync(path.join(REPO, TRIGGER), 'utf8');
+  const trigger = triggerText();
+  const steps = buildSteps();
   const folders = skillFolders(path.join(REPO, KIT_SKILLS));
   const plain = trigger.replace('`ds-theme` before', 'the theme skill before');
   assert.notEqual(plain, trigger);
-  assert.deepEqual(kitDrift(KIT_SKILLS_TOLD, folders, plain), ['ds-theme: change-the-board says no "ds-theme" sentence']);
+  assert.deepEqual(kitDrift(steps, folders, plain), ['ds-theme: change-the-board says no "ds-theme" sentence']);
   const elsewhere = trigger.replace(`${KIT_SKILLS}/<name>/SKILL.md`, '.claude/skills/<name>/SKILL.md');
   assert.notEqual(elsewhere, trigger);
-  assert.deepEqual(kitDrift(KIT_SKILLS_TOLD, folders, elsewhere), [`change-the-board names no ${KIT_SKILLS}/<name>/SKILL.md to read`]);
+  assert.deepEqual(kitDrift(steps, folders, elsewhere), [`change-the-board names no ${KIT_SKILLS}/<name>/SKILL.md to read`]);
 });
 
-test("REFUSED: design, implement or review told a sentence of the kit's skills no more is named", () => {
-  for (const step of ['design', 'implement', 'review'])
-    for (const sentence of KIT_SKILLS_TOLD)
+test("REFUSED: design or review told no more to load change-the-board first, or where ds-spec's reader runs from, is named", () => {
+  for (const step of ['design', 'review'])
+    for (const sentence of KIT_READER_TOLD)
       assert.deepEqual(
         untold(
           'build',

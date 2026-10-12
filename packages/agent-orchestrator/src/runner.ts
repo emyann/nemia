@@ -495,3 +495,4 @@ export { restingMemo, restingRead } from './rest/resting.verb.ts';
 export type { RestingMemo, RestingRead } from './rest/resting.verb.ts';
 export { judgedNow, runsSummarized } from './summary/summary.verb.ts';
 export type { RunSummary, SummaryHow } from './summary/summary.verb.ts';
+export type { FinishedPage, FinishedRun, ListedRun, OpenRuns, RunClock, RunOutcome, StepCost, WaitingRun } from './runlist/runlist.verb.ts';

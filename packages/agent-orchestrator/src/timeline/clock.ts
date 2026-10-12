@@ -58,7 +58,10 @@ const gateWaits = (run: Run, tl: Timeline, steps: readonly Workflow[]): Ran[] =>
       }),
     );
 
-/** The waits on a person's answer to a blocked sign-off: from the end of the turn that asked to the first spawn of the turn that answered. */
+/**
+ * The waits on a person's answer to a blocked sign-off: from the end of the turn that asked to the first spawn of the turn that
+ * answered.
+ */
 const answerWaits = (tl: Timeline): Ran[] =>
   Object.values(tl.steps)
     .flat()

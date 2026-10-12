@@ -294,7 +294,7 @@ test("a template's condition is amiss when Applied is not true, or ConflictsPend
   assert.equal(conditionAmiss({ type: 'ConflictsPending', status: 'True' }), true);
 });
 
-test('REFUSED: a factory\'s bar off its light answer counts every run by the counts, those waiting by the api, those in flight by the board', () => {
+test("REFUSED: a factory's bar off its light answer counts every run by the counts, those waiting by the api, those in flight by the board", () => {
   const holding = { at: 'x', runs: [], word: 'held until r-0 ships', advice: 'wait', onYou: false };
   const working = run('working', 'nemia', { status: 'running', moving: true });
   const held = run('held', 'nemia', { status: 'running', holding });

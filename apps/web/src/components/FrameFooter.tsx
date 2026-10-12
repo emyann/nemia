@@ -83,7 +83,9 @@ export function FrameFooter({ feed }: { feed: FeedStatus }) {
   const dot = daemonDot(daemon.data, daemon.error, now);
   const live = feedWords(feed);
   const short = quotaShort(quota.data, quota.error, now);
-  const work = runs.data ? atWorkWords(atWork(openRows(runs.data))) : { text: runs.error ? 'unread' : 'reading', title: runs.error?.message ?? '' };
+  const work = runs.data
+    ? atWorkWords(atWork(openRows(runs.data)))
+    : { text: runs.error ? 'unread' : 'reading', title: runs.error?.message ?? '' };
   const narrow = !parts.includes('feed');
 
   return (

@@ -46,9 +46,14 @@ test("REFUSED: a write that changes a run reads the frame's answer again at once
   await until(t, () => counts().every((count) => count === 2), 'the first read of each light answer', { bell: seen });
   assert.equal(asked.length, 2);
   await runsMoved(client);
-  await until(t, () => counts().every((count) => count === 1), () => `each light answer read again: ${JSON.stringify(counts())}`, {
-    bell: seen,
-  });
+  await until(
+    t,
+    () => counts().every((count) => count === 1),
+    () => `each light answer read again: ${JSON.stringify(counts())}`,
+    {
+      bell: seen,
+    },
+  );
   assert.deepEqual([...asked].sort(), [
     '/api/runs-open',
     '/api/runs-open',
@@ -69,7 +74,7 @@ test('no write that changes a run invalidates the whole list by hand: each calls
   assert.equal(others.length, 0, `${others.join(', ')} invalidate ['runs'] by hand: call runsMoved`);
 });
 
-test('REFUSED: a hand-written invalidation of the whole list is found, across a line break too; a run\'s own record is not', () => {
+test("REFUSED: a hand-written invalidation of the whole list is found, across a line break too; a run's own record is not", () => {
   assert.equal(byHand("void queryClient.invalidateQueries({ queryKey: ['runs'], exact: true });"), true);
   assert.equal(byHand("queryClient.invalidateQueries({\n  queryKey:\n    ['runs'],\n});"), true);
   assert.equal(byHand("void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });"), false);

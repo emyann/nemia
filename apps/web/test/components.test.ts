@@ -6068,7 +6068,11 @@ test('REFUSED: the bell counts what the api says waits, never a count of its own
   const movesAndWaits = { ...atGate, id: 'r-moves', status: 'running' as const, stoppedOn: null, moving: true };
   const waiting = [atGate, blocked, movesAndWaits];
   const three = await headerWith({ counts: { waiting: 3, inFlight: 0, finished: 1 }, waiting, inFlight: [] });
-  assert.match(bellOf(three), /aria-label="Waiting on you: 3"/, 'a gate, a blocked step and a run that moves and waits; not the run to decide');
+  assert.match(
+    bellOf(three),
+    /aria-label="Waiting on you: 3"/,
+    'a gate, a blocked step and a run that moves and waits; not the run to decide',
+  );
   assert.match(bellOf(three), /data-bell-count[^>]*>3<\/span>/);
   const five = await headerWith(openWith(waiting, 5));
   assert.match(bellOf(five), /aria-label="Waiting on you: 5"/, "the api's count, not the rows the board would count");

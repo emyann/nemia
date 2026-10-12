@@ -79,10 +79,7 @@ function PruneForm({ id, offer, onClose }: { id: string; offer: PruneOffer; onCl
     onSuccess: async (done) => {
       setAsking(false);
       if (done.left === 0) onClose();
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['runs', id], exact: true }),
-        runsMoved(queryClient),
-      ]);
+      await Promise.all([queryClient.invalidateQueries({ queryKey: ['runs', id], exact: true }), runsMoved(queryClient)]);
     },
   });
   return (

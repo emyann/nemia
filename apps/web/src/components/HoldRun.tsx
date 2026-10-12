@@ -71,10 +71,7 @@ function HoldForm({ id, runs, onClose }: { id: string; runs: RunSummary[]; onClo
     mutationFn: () => putHold(id, until, why),
     onSuccess: async () => {
       onClose();
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['runs', id], exact: true }),
-        runsMoved(queryClient),
-      ]);
+      await Promise.all([queryClient.invalidateQueries({ queryKey: ['runs', id], exact: true }), runsMoved(queryClient)]);
     },
   });
   return (

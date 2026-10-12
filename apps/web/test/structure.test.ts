@@ -244,7 +244,7 @@ test('nothing the frame reaches reads the whole list of the runs, but the picker
   assert.deepEqual(wholeListBreaks(texts), []);
   for (const file of ['src/components/FrameHeader.tsx', 'src/components/FrameFooter.tsx', 'src/components/FrameSidebar.tsx'])
     assert.ok(frame.includes(file), `the scan reaches ${file} from ${ROOT}`);
-  assert.ok(frame.includes('src/lib/bell.ts'), 'and what the frame\'s components read in turn');
+  assert.ok(frame.includes('src/lib/bell.ts'), "and what the frame's components read in turn");
   assert.deepEqual(opened, OPENED, 'every picker let through is still reached from the root: take one that is not off the list');
   for (const file of OPENED)
     assert.match(withoutComments(texts.get(file)!), /\brunsQuery\b/, `${file} reads the whole list no more: take it off the list`);

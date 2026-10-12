@@ -23,10 +23,7 @@ function useLift(id: string, onLifted: () => void = () => undefined) {
     mutationFn: () => liftHold(id),
     onSuccess: async () => {
       onLifted();
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['runs', id], exact: true }),
-        runsMoved(queryClient),
-      ]);
+      await Promise.all([queryClient.invalidateQueries({ queryKey: ['runs', id], exact: true }), runsMoved(queryClient)]);
     },
   });
 }

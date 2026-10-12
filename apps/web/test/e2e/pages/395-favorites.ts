@@ -133,22 +133,21 @@ async function inAnotherPage(page: Page): Promise<void> {
   }
 }
 
-/** A run and a workflow the api no longer lists are said gone, link nowhere, and their stars take them off. */
+/**
+ * A workflow the api no longer lists is said gone, links nowhere, and its star takes it off. A run the store no longer has is the page
+ * `favorite-gone`'s: its read answers a refusal, which this page's watch would count.
+ */
 async function gone(page: Page): Promise<void> {
-  const kept = [
-    { kind: 'run', run: 'no-such-run' },
-    { kind: 'workflow', from: 'yours', workflow: 'no-such-flow' },
-  ];
+  const kept = [{ kind: 'workflow', from: 'yours', workflow: 'no-such-flow' }];
   await page.evaluate(([key, value]) => localStorage.setItem(key, value), [FAVORITES_KEY, JSON.stringify(kept)] as const);
   await visit(page, '/runs');
   const rows = favoritesOf(page).locator('li[data-gone]');
-  await expectTexts(rows, ['no-such-rungone', 'no-such-flow (yours)gone'], 'each favourite gone is said so, by its id or name');
+  await expectTexts(rows, ['no-such-flow (yours)gone'], 'a favourite gone is said so, by its name');
   await expectCount(linksOf(page), 0, 'and links nowhere');
   await settled(page);
   await photograph(page, path.join(OUT, `favorites-gone-${await themeOf(page)}.png`));
-  await favoritesOf(page).getByRole('button', { name: 'Unstar no-such-run', exact: true }).click();
   await favoritesOf(page).getByRole('button', { name: 'Unstar no-such-flow (yours)', exact: true }).click();
-  await expectNone(page, 'both taken off');
+  await expectNone(page, 'taken off');
 }
 
 /** Where this browser refuses its storage, the board says nothing is starred, and a star pressed lasts as long as the page. */
@@ -196,7 +195,7 @@ export default {
   /**
    * Favourites: a run starred on its Runs row, its card on the floor, its page's header and its bar, and a workflow on its card, each
    * pressed again to take it off; Favorites lists them by title in the order starred, under any factory picked; another page sees a
-   * change; a favourite the api no longer lists is said gone; refused storage says nothing is starred; and a phone's sheet. The favourites
+   * change; a workflow the api no longer lists is said gone (a run gone is `favorite-gone`'s); refused storage says nothing is starred; and a phone's sheet. The favourites
    * and the window's size are taken back.
    */
   name: 'favorites',

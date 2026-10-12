@@ -95,10 +95,10 @@ function InboxPage() {
 }
 
 /**
+ * A card: its first line, linked to its page, and under it its name, factory, workflow, repository and filing time (`CardMeta`); Start,
  * which opens its start, in its factory or in one picked there, and Remove. Queue on a card that names a factory and a workflow, and
  * Unqueue on a queued one (`QueueButtons`), with why not on a card that names a workflow alone (`NoQueue`); on a queued card its place
  * and when it was queued; and, when the tick tried its start and did not make it, why — a card refused stays queued, as the package keeps
- * it. A card a run's record names — started, its removal failed — links to its run and offers Remove only. An entry that does not read as a
  * it. A card a run's record names — started, its removal failed — links to its run and offers Remove only. An entry that does not read as a
  * card shows why, with its file for a title, and offers Remove when it is a card's file, which the CLI's `inbox rm` can drop.
  *

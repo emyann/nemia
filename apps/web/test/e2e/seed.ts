@@ -1330,7 +1330,7 @@ export function seedInbox(root: string, repo: string, now = Date.now()): void {
 /**
  * The queue the Factory draws and the Inbox page places: three cards in the store's `inbox/` queued to start on their own, as
  * `wf inbox queue` writes one, each filed before CARDS so the Inbox page lists them after those. `first` and `refused` are cards of
- * FACTORIES.hiring, about the checkout: `first` names `dev` and was queued first; `refused` names a workflow its factory does not offer,
+ * FACTORIES.hiring, about the checkout: `first` names `dev` and was queued first; `refused` names a workflow nobody has,
  * and the tick's try of its start is written down as refused (`queue/<name>.json`, of the card as it stands), so it keeps its place and
  * says why. `third` names `dev`, no repository and no factory: a card queued before a queue asked for a factory, which the tick refused
  * for that, its try written down too; it is the default floor's one ghost. And the ceilings the daemon's last pass ran with
@@ -1377,11 +1377,11 @@ export const QUEUED = [QUEUE.first, QUEUE.refused, QUEUE.third] as const;
 export const QUEUED_IN = { hiring: [QUEUE.first, QUEUE.refused], default: [QUEUE.third] } as const;
 
 /**
- * Why the tick's start of QUEUE.refused was refused, in the package's words for a workflow its factory does not offer
- * (`unattachedRefusal`).
+ * Why the tick's start of QUEUE.refused was refused, in the package's words for a card whose workflow is no folder in the inbox, in its
+ * factory's tree or in its repository (`workflowFolder`'s sentence, after the card's file and line as `cardWorkflow` says them).
  */
-export const refusedWhy = (): string =>
-  `${QUEUE.refused.workflow}: the factory ${QUEUE.refused.factory} does not offer this workflow — it offers: ${WORKFLOWS.good.name}. Attach it: nemia factory attach ${QUEUE.refused.factory} ${QUEUE.refused.workflow}. Nothing was started.`;
+export const refusedWhy = (root: string, repo: string): string =>
+  `${QUEUE.refused.name}.md: \`workflow: ${QUEUE.refused.workflow}\` — no workflow folder at ${path.join(root, 'inbox', QUEUE.refused.workflow)}, nor a workflow named ${QUEUE.refused.workflow} in ${path.join(repo, 'workflows')}. The repository's workflows are: broken, dev — name one, or give the path to a workflow folder.`;
 
 /**
  * Why the tick's start of QUEUE.third was refused, in the package's words for a queued card that names no factory
@@ -1453,7 +1453,7 @@ export function seedQueue(root: string, repo: string, now = Date.now()): void {
     fs.utimesSync(file, filed, filed);
   }
   const tries = [
-    { card: refused, text: cards[1].text, why: refusedWhy() },
+    { card: refused, text: cards[1].text, why: refusedWhy(root, repo) },
     { card: third, text: cards[2].text, why: unfactoredWhy(root) },
   ];
   for (const { card, text, why } of tries) {

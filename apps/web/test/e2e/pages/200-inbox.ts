@@ -143,8 +143,8 @@ async function visit(page: Page): Promise<void> {
     }
     const refusedTry = cardIn(page, QUEUE.refused.name).locator('[data-tried="refused"]');
     await expectVisible(
-      refusedTry.getByText(refusedWhy(), { exact: false }),
-      `${QUEUE.refused.name}, whose factory does not offer its workflow, says why the tick refused its start, in the package's words`,
+      refusedTry.getByText(refusedWhy(store!, checkout), { exact: false }),
+      `${QUEUE.refused.name}, whose start the tick refused, says why in the package's words`,
     );
     await expectVisible(refusedTry.getByText('It stays queued', { exact: false }), 'and that it stays queued');
     await expectVisible(

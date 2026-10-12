@@ -129,16 +129,60 @@ async function noFactory(page: Page, theme: string): Promise<void> {
   }
 }
 
+/**
+ * The box while the factories are on their way, on a visit of its own whose read of them is held, at a factory's address: it says it is
+ * reading them, beside the one choice, and never that the store has none; let go, the list fills and is preset to the address's factory.
+ */
+async function reading(page: Page, theme: string): Promise<void> {
+  const factory = FACTORIES.hiring.name;
+  const other = await page.context().newPage();
+  let release = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  try {
+    await other.route(
+      (url) => url.pathname === '/api/factories',
+      async (route) => {
+        await held;
+        await route.continue();
+      },
+    );
+    await other.goto(new URL(`/inbox?factory=${factory}`, page.url()).href, { waitUntil: 'load' });
+    const box = other.locator('form[aria-label="File a card"]');
+    const list = box.getByRole('combobox', { name: 'Factory' });
+    await expectTexts(
+      box.locator('[data-reading-factories]'),
+      ['Reading the factories…'],
+      'while the factories are held, the box says it reads them',
+    );
+    await expectTexts(list.locator('option'), ['No factory: chosen at start'], 'beside a list that holds the one choice so far');
+    await expectCount(box.locator('[data-no-factory]'), 0, 'and never says the store has no factory: it does not know yet');
+    await settled(other);
+    await photograph(box, path.join(OUT, `inbox-file-places-reading-${theme}.png`));
+    release();
+    await expectCount(box.locator('[data-reading-factories]'), 0, 'let go, the line goes');
+    await idle(other);
+    if ((await list.inputValue()) !== factory)
+      throw new Refused(`and the list is preset to the factory the address names (${factory}) — it held ${await list.inputValue()}`);
+  } finally {
+    release();
+    await other.close();
+  }
+}
+
 export default {
   /**
    * The box that files a card, in the two states the seed does not hold: a factory on several repositories (`severalRepos`), and a
-   * store with no factory to offer (`noFactory`). Each rewrites the store's factories and puts them back, then the page is read again.
+   * store with no factory to offer (`noFactory`), each rewriting the store's factories and putting them back; and, between them, the
+   * box while the factories are still being read (`reading`). Then the page is read again.
    */
   name: 'inbox-file-places',
   route: '/inbox',
   expect: async (page) => {
     const theme = await themeOf(page);
     await severalRepos(page, theme);
+    await reading(page, theme);
     await noFactory(page, theme);
     await open(page, '/inbox');
   },

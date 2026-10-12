@@ -29,8 +29,8 @@ export default {
     }
     await expectTexts(
       lane.locator('[data-ghost-tried="refused"]'),
-      [`not started, refused: ${refusedWhy()}`],
-      `one try is marked, on ${QUEUE.refused.name}: its factory does not offer its workflow, in the package's words`,
+      [`not started, refused: ${refusedWhy(store!, path.join(store!, 'checkout'))}`],
+      `one try is marked, on ${QUEUE.refused.name}: nobody has its workflow, in the package's words`,
     );
     await expectCount(lane.locator(`a[data-ghost="${QUEUE.refused.name}"] [data-ghost-tried="refused"]`), 1, 'and it is on that card');
     const file = seedChained(store!, path.join(store!, 'checkout'));

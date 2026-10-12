@@ -283,7 +283,11 @@ test('`nemia start` on a folder with an ending says so: nothing of that step run
 
 test('a run stops at its ending step: nothing of it is filed, the checkout is untouched, and `nemia ls` says what is to be decided', async () => {
   const { repo, id, branch, e, filings, pass, base } = await atTheGate();
-  assert.deepEqual([pass.filed, pass.status], [[], 'failed'], 'the ending is not filed, and the run reads as one waiting on a person');
+  assert.deepEqual(
+    [pass.filed, pass.status],
+    [[], 'awaiting approval'],
+    'the ending is not filed, and the run reads as one waiting on a person',
+  );
   assert.deepEqual(filings, [`${id}-implement`]);
   assert.equal(readRun(id).steps.ship.taskId, null);
   assert.equal(world().head(repo), base, 'the base branch has not moved');

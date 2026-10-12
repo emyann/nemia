@@ -25,8 +25,6 @@ import { bare, judgedSteps, type Views } from './reads.verb.ts';
 
 /** Where a run stands, as `assess` decides it: `running` until every step is final one way or the other. */
 export type RunStatus = Assessment['status'];
-/** What stopped a `failed` run in which no step broke, as `assess` words it (`Assessment['stoppedOn']`). */
-export type RunStoppedOn = NonNullable<Assessment['stoppedOn']>;
 
 /**
  * What a person has to decide about a run's result — the fifth reason a run waits on one, beside a step blocked, unsigned, over budget or
@@ -231,9 +229,8 @@ type Judged = {
    * there is nothing.
    */
   toDecide: RunToDecide | null;
+  /** The run in one word, as `assess` judged it: `failed` where a step broke, `awaiting approval` or `blocked` where a person stops it. */
   status: RunStatus;
-  /** What stopped a `failed` run in which no step broke, off the same `assess` as `status`: what `nemia decide` says. Null otherwise. */
-  stoppedOn: RunStoppedOn | null;
   /**
    * The line `cancelPlan` draws for a finished run, which `status` does not: something in flight, or something a tick would still file — a
    * check, a try, a round due once a loop's looping step settled, or roots `assess` makes ready. Roots of a run waiting on runs are filed
@@ -390,7 +387,7 @@ export const judge = Effect.fn('judge')(function* (
   const steps = judgedSteps(run, folder);
   const shown = [...steps, ...names.filter((name) => !steps.some((s) => s.name === name)).map(bare)];
   const read = yield* runReading(reader, run, { views, steps, shown, standings, git, ...(parent ? { parent } : {}) });
-  const { status, stoppedOn, ready, check, retry, round } = read.assessed;
+  const { status, ready, check, retry, round } = read.assessed;
   const waiting = runWaitingOf(run, read.waiting);
   const holding = holdingOf(run, read.holding ?? []);
   const { hold: _, ...unheld } = run;
@@ -406,7 +403,6 @@ export const judge = Effect.fn('judge')(function* (
     onYou: onYouWords({ steps: read.steps, waitingOnYou }),
     toDecide: toDecideOf(run, read.toDecide, steps),
     status,
-    stoppedOn: stoppedOn ?? null,
     moving:
       inFlight(run, read.phaseOf).length > 0 ||
       (tickReads && ((due.ready.length > 0 && !waiting?.onYou) || due.check.length > 0 || due.retry.length > 0 || due.round.length > 0)),

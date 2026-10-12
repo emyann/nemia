@@ -42,12 +42,12 @@ export function workChecks(steps: readonly Workflow[]): string[] {
 }
 
 /**
- * The branches whose tips this pass records (`tipsSeen`): a finished run's result branches — succeeded or failed, so neither running nor
- * cancelled — when it cut worktrees and did not work on its base branch itself. What `nemia decide` offers to ship. None for any other run,
- * so git is not asked about it.
+ * The branches whose tips this pass records (`tipsSeen`): a stopped run's result branches — succeeded, failed or waiting on a person, so
+ * neither running nor cancelled — when it cut worktrees and did not work on its base branch itself. What `nemia decide` offers to ship.
+ * None for any other run, so git is not asked about it.
  */
 export function tipBranches(run: Run, steps: readonly Workflow[], status: Assessment['status']): string[] {
-  if (!run.isolate || (status !== 'succeeded' && status !== 'failed')) return [];
+  if (!run.isolate || status === 'running' || status === 'cancelled') return [];
   const branches = resultSteps(steps)
     .map((s) => run.steps[s.name]?.branch)
     .filter((b): b is string => Boolean(b));

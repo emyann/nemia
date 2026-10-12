@@ -126,15 +126,23 @@ export const watching = (
 /** What one pass of the tick hands back: each run it advanced, the queue's card, the feed's failure, its cost, and what it refused. */
 type Pass = Effect.Success<ReturnType<typeof tickRun>>;
 
-/** A run's line on `nemia tick`: its status and what the pass did to it, then its notes, a line each. */
-function tickRunLines(r: Pass['runs'][number]): void {
+/**
+ * A run's line on `nemia tick`: its status, as the pass judged it — `awaiting approval` or `blocked` for one a person alone stops, `failed`
+ * for one in which a step broke — and what the pass did to it.
+ */
+function tickRunLine(r: Pass['runs'][number]): string {
   const filed = r.filed.length ? `  filed: ${r.filed.join(', ')}` : '';
   const tried = r.tried.length ? `  tried again: ${r.tried.join(', ')}` : '';
   const looped = r.looped.length ? `  round again: ${r.looped.join(', ')}` : '';
   const checked = r.checked.length ? `  checking: ${r.checked.join(', ')}` : '';
   const blocked = r.blocked.length ? `  blocked: ${r.blocked.join(', ')}` : '';
   const waiting = r.waiting.length ? `  ${waitWord(r.waiting)}` : r.held ? `  ${slotWord(r.held)}` : '';
-  console.log(`${r.run.id}  ${r.status}${filed}${tried}${looped}${checked}${blocked}${waiting}`);
+  return `${r.run.id}  ${r.status}${filed}${tried}${looped}${checked}${blocked}${waiting}`;
+}
+
+/** What `nemia tick` prints of a run: its line (`tickRunLine`), then its notes, a line each. */
+function tickRunLines(r: Pass['runs'][number]): void {
+  console.log(tickRunLine(r));
   for (const note of r.notes) console.log(`   ${note}`);
 }
 

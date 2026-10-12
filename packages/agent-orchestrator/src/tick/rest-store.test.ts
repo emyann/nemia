@@ -376,7 +376,7 @@ test('an ask takes a run out, and the try it asks for is filed: a retry, and an 
   const [run] = await started(1);
   touched.add(run.id);
   const before = (await finish([run.id])).rested;
-  assert.equal((await answered(run.id)).status, 'failed', 'its step signed blocked');
+  assert.equal((await answered(run.id)).status, 'blocked', 'its step signed blocked');
   await runWith(h.e, retryRun(run.id, 'work', { mode: 'fresh' }));
   assert.equal(await rested(), before - 1, 'the ask read');
   assert.equal((await finish()).rested, before, 'the try filed, signed, settled, and the run at rest again');
@@ -610,7 +610,7 @@ test('a run called off before anything of it was filed rests like a finished one
   );
 });
 
-test('a finished run whose worktrees are gone owes no hand-off, and rests — succeeded, failed at a step, and called off', async () => {
+test('a finished run whose worktrees are gone owes no hand-off, and rests — succeeded, blocked at a step, and called off', async () => {
   const [ok, broke, off] = await started(3, TWO, ISOLATED_REPOS[0], true);
   for (const run of [ok, broke, off]) touched.add(run.id);
   await finish([broke.id]);
@@ -626,7 +626,7 @@ test('a finished run whose worktrees are gone owes no hand-off, and rests — su
   );
   assert.deepEqual(await Promise.all([ok, broke, off].map(async (r) => (await answered(r.id)).status)), [
     'succeeded',
-    'failed',
+    'blocked',
     'cancelled',
   ]);
   const after = await measured();

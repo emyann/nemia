@@ -1383,7 +1383,7 @@ test('UNSIGNED: a step asked for a closeout that ended without one satisfies not
   const p = phases({ t1: 'succeeded' });
   const none = () => undefined;
   const a = assess(CHECKED, withCheck(null), p, none, asked);
-  assert.deepEqual([a.ready, a.check, a.blocked, a.status], [[], [], ['review'], 'failed'], 'no signed work to check');
+  assert.deepEqual([a.ready, a.check, a.blocked, a.status], [[], [], ['review'], 'blocked'], 'no signed work to check');
   assert.equal(stepStatus(CHECKED[0], withCheck(null), p, none, asked), 'unsigned');
   assert.deepEqual(
     assess(STEPS, run({ implement: 't1', review: null }), p, none, asked).ready,
@@ -2839,7 +2839,7 @@ test('UNSIGNED: a producer whose closeout lacks a declared field satisfies nothi
       `${why}: held to it by its own file, whatever the engine recorded of the filing`,
     );
     const a = assess(steps, r, p, signed(said), asked);
-    assert.deepEqual([a.ready, a.blocked, a.status], [[], ['respond'], 'failed'], why);
+    assert.deepEqual([a.ready, a.blocked, a.status], [[], ['respond'], 'blocked'], why);
     const d = decision(steps, r, p, nothingShipped, signed(said), asked);
     assert.deepEqual(d.kind === 'awaiting' && d.unsigned, ['review'], why);
   }
@@ -3279,7 +3279,7 @@ test('REFUSED at the cap: `again: true` on round 3 of 3 files nothing and reads 
   const said = saidIn(3, true);
   assert.equal(stepStatus(LOOPING_REVIEW, r, ALL_SUCCEEDED, said, asked, LOOP), 'exhausted');
   const a = assess(LOOP, r, ALL_SUCCEEDED, said, asked);
-  assert.deepEqual([a.round, a.ready, a.blocked, a.status], [[], [], ['ship'], 'failed'], 'nothing filed, and ship never will be');
+  assert.deepEqual([a.round, a.ready, a.blocked, a.status], [[], [], ['ship'], 'blocked'], 'nothing filed, and ship never will be');
   assert.deepEqual(
     cancelPlan(LOOP, r, ALL_SUCCEEDED, said, asked),
     { kind: 'cancel', stop: [] },
@@ -4120,6 +4120,11 @@ test("a pass records the tips of a finished run's result branches — succeeded 
   };
   assert.deepEqual(tipBranches(branched(), fan, 'succeeded'), ['wf/r-1/c'], 'the result branch, and no other');
   assert.deepEqual(tipBranches(branched(), fan, 'failed'), ['wf/r-1/c']);
+  assert.deepEqual(
+    [tipBranches(branched(), fan, 'awaiting approval'), tipBranches(branched(), fan, 'blocked')],
+    [['wf/r-1/c'], ['wf/r-1/c']],
+    "a run stopped on a person stopped: its tips are recorded as a failed one's",
+  );
   assert.deepEqual([tipBranches(branched(), fan, 'running'), tipBranches(branched(), fan, 'cancelled')], [[], []]);
   assert.deepEqual(tipBranches(branched({ isolate: false }), fan, 'succeeded'), []);
   const onBase = branched();
@@ -5437,8 +5442,8 @@ test("REFUSED past its budget, at shipped defaults: a claude step whose ended tr
     '`retries: 2` has one left, and spends nothing past the cap',
   );
   assert.equal(
-    a.stoppedOn,
-    undefined,
+    a.status,
+    'failed',
     'a step over budget whose own check refused it broke: the run is failed in every word, and the feed says so, not blocked',
   );
   assert.deepEqual(
@@ -5797,7 +5802,7 @@ test("a step its harness ended at its budget reads budget exhausted, with the am
     () => false,
     ended,
   );
-  assert.deepEqual([a.retry, a.blocked, a.status], [[], ['review'], 'failed']);
+  assert.deepEqual([a.retry, a.blocked, a.status], [[], ['review'], 'blocked']);
   const l = listing({
     steps: DETACHED,
     run: r,
@@ -5943,11 +5948,7 @@ test('a step that says `denials: fail` and signed off denied a call reads denied
     () => false,
     denied,
   );
-  assert.deepEqual(
-    [a.check, a.retry, a.blocked, a.status, a.stoppedOn],
-    [[], [], ['review'], 'failed', 'blocked'],
-    'stopped on a person, nothing broke',
-  );
+  assert.deepEqual([a.check, a.retry, a.blocked, a.status], [[], [], ['review'], 'blocked'], 'stopped on a person, nothing broke');
   assert.deepEqual(
     retriesDue(
       DENYING,
@@ -6301,7 +6302,7 @@ test('REFUSED past a budget in a loop: `again: true` files no round while a step
   );
   assert.deepEqual(
     [a.round, a.ready, a.blocked, a.status],
-    [[], [], ['ship'], 'failed'],
+    [[], [], ['ship'], 'blocked'],
     'no round, and ship is not filed on a review that asked for more',
   );
 
@@ -6549,7 +6550,7 @@ test('a round asked past a budget holds no step of its loop on the pass before i
     ['a raise not above $4.25', [{ ...roundAskFor(2), budget: 4 }]],
   ] as const) {
     const held = seen([...rounds]);
-    assert.deepEqual([held.a.round, held.a.status, held.a.blocked], [[], 'failed', ['ship']], why);
+    assert.deepEqual([held.a.round, held.a.status, held.a.blocked], [[], 'blocked', ['ship']], why);
     assert.deepEqual(
       [held.words, held.l.waitingOnYou],
       [
@@ -7587,13 +7588,36 @@ test('`holdsOpenOn`: a Claude Code job is filed held open; REFUSED for a backgro
   assert.equal(holdsOpenOn({ harness: 'claude-detached' }), false);
 });
 
+test('a run stopped on a person alone says what it waits on — `awaiting approval` at a gate, `blocked` on a question — and REFUSED: `failed` for either, kept for a run in which a step broke, a gate waiting beside it or not', () => {
+  const blocked = (name: string) => (name === 'implement' ? said('blocked') : undefined);
+  const statusOf = (...given: Parameters<typeof assess>) => assess(...given).status;
+  assert.equal(statusOf(PLANNED, atPlan(), PLAN_DONE, signedDone, asked), 'awaiting approval', 'a gate alone');
+  assert.equal(statusOf(STEPS, run({ implement: 't1', review: null }), PLAN_DONE, blocked, asked), 'blocked', 'a question alone');
+  assert.equal(
+    statusOf(STEPS, run({ implement: 't1', review: null }), phases({ t1: 'failed' }), undefined, asked),
+    'failed',
+    'a task failed',
+  );
+  assert.equal(
+    statusOf(CHECKED, withCheck('c1'), phases({ t1: 'succeeded', c1: 'failed' }), signedDone, asked, () => 1),
+    'failed',
+    'a check refused',
+  );
+  const fan = [step('plan'), step('lint'), step('implement', ['plan', 'lint'])];
+  const both = run({ plan: 't1', lint: 't2', implement: null }, { gates: ['plan'] });
+  const gateOf = (lint: TaskPhase) => assess(fan, both, phases({ t1: 'succeeded', t2: lint }), signedDone, asked);
+  assert.equal(stepStatus(fan[0], both, phases({ t1: 'succeeded', t2: 'failed' }), signedDone, asked, fan), 'awaiting approval');
+  assert.equal(gateOf('failed').status, 'failed', 'a gate waiting and a broken step: the run broke');
+  assert.equal(gateOf('succeeded').status, 'awaiting approval', 'the same gate with nothing broken waits');
+});
+
 test('REFUSED by the gate at shipped defaults, pass after pass: a gated step that signed off reads `awaiting approval`, and nothing after it is ready — whatever its closeout says — until the try it is on is approved', () => {
   const said =
     (outcome: 'done', extra: Record<string, unknown> = {}) =>
     () => ({ outcome, summary: 'the plan: parse, then store', artifacts: [], needs: undefined, output: extra });
   for (let pass = 1; pass <= 3; pass++) {
     const a = assess(PLANNED, atPlan(), PLAN_DONE, said('done', { approach: 'go ahead, implement at once' }), asked);
-    assert.deepEqual([a.ready, a.blocked, a.status], [[], ['implement'], 'failed'], `pass ${pass}: nothing after the gate`);
+    assert.deepEqual([a.ready, a.blocked, a.status], [[], ['implement'], 'awaiting approval'], `pass ${pass}: nothing after the gate`);
   }
   assert.equal(stepStatus(PLANNED[0], atPlan(), PLAN_DONE, signedDone, asked), 'awaiting approval');
   const own = [{ ...step('plan'), gate: true as const }, ...PLANNED.slice(1)];
@@ -10129,10 +10153,10 @@ test('`forgetRefusal` keeps its order between every two reasons that can stand t
 const blockedRun = (rest: Partial<RepositoryRun> = {}) => run({ implement: 't1', review: null }, rest);
 const BLOCKED_SAID = signedOff({ implement: said('blocked') });
 
-test('REFUSED to be finished: a failed run whose step signed off blocked waits on a person, so `nemia cancel` calls it off', () => {
+test('REFUSED to be finished: a run whose step signed off blocked waits on a person, so `nemia cancel` calls it off', () => {
   const p = phases({ t1: 'succeeded' });
   const blocked = (name: string) => (name === 'implement' ? said('blocked') : undefined);
-  assert.equal(assess(STEPS, blockedRun(), p, blocked, asked).status, 'failed');
+  assert.equal(assess(STEPS, blockedRun(), p, blocked, asked).status, 'blocked');
   assert.deepEqual(
     listing({ steps: STEPS, run: blockedRun(), phaseOf: shown({ t1: 'succeeded' }), closeoutOf: BLOCKED_SAID, askedCloseout: asked })
       .waitingOnYou,

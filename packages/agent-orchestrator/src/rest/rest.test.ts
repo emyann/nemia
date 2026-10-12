@@ -25,7 +25,14 @@ const RESTING: RestFacts = {
 
 test('a finished run, frozen, settled, with nothing due, done, said or read of another run, is at rest — failed and cancelled too', () => {
   assert.equal(atRest(RESTING), true);
-  assert.equal(atRest({ ...RESTING, status: 'failed' }), true, 'failed, a gate waiting on a person included');
+  assert.equal(atRest({ ...RESTING, status: 'failed' }), true);
+  assert.equal(atRest({ ...RESTING, status: 'awaiting approval' }), true, 'a gate waiting on a person is a run that stopped');
+  assert.equal(atRest({ ...RESTING, status: 'blocked' }), true, 'and so is a step waiting on an answer');
+  assert.deepEqual(
+    (['awaiting approval', 'blocked', 'running'] as const).map((status) => restBlockers({ ...RESTING, status })),
+    [[], [], ['status']],
+    'only a run still running is kept out by its status',
+  );
   assert.equal(atRest({ ...RESTING, status: 'cancelled' }), true);
   assert.equal(
     atRest({ ...RESTING, status: 'running', run: { workflow: [], pruned: { at: '2026-09-25T10:00:00.000Z', worktrees: [] } } }),

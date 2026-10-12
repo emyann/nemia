@@ -88,6 +88,47 @@ test("the tests' team exports into a folder that passes its check, each part sai
   );
 });
 
+/** A repository holding the tests' team, its step `implement` given the skill `x`, a link of `.claude/skills/` to the folder `to`. */
+function repoGivenLinked(to: (repo: string) => string): string {
+  const repo = repoWithTeam();
+  fs.mkdirSync(path.join(repo, 'skills', 'x'), { recursive: true });
+  fs.writeFileSync(path.join(repo, 'skills', 'x', 'SKILL.md'), '---\ndescription: Linked.\n---\nDo it.\n');
+  fs.writeFileSync(path.join(repo, 'skills', 'x', 'notes.md'), 'Notes.\n');
+  fs.mkdirSync(path.join(repo, '.claude', 'skills'), { recursive: true });
+  fs.symlinkSync(to(repo), path.join(repo, '.claude', 'skills', 'x'));
+  const implement = path.join(repo, 'workflows', 'dev', 'implement.md');
+  fs.writeFileSync(implement, fs.readFileSync(implement, 'utf8').replace('agent: implementer\n', 'agent: implementer\nskills: x\n'));
+  return repo;
+}
+
+test('an export carries the real files of a skill linked inside the repository, and writes no link', () => {
+  const repo = repoGivenLinked(() => '../../skills/x');
+  const dir = target();
+  const { from } = exportTemplate({ dir, from: repo });
+  assert.equal(new Map(from.map(({ part, from: at }) => [part, at])).get('skills/x/'), path.join(repo, '.claude', 'skills', 'x'));
+  assert.equal(fs.lstatSync(path.join(dir, 'skills', 'x')).isDirectory(), true);
+  assert.equal(fs.lstatSync(path.join(dir, 'skills', 'x', 'SKILL.md')).isFile(), true);
+  assert.equal(fs.readFileSync(path.join(dir, 'skills', 'x', 'SKILL.md'), 'utf8'), '---\ndescription: Linked.\n---\nDo it.\n');
+  assert.equal(fs.readFileSync(path.join(dir, 'skills', 'x', 'notes.md'), 'utf8'), 'Notes.\n');
+  const links = (fs.readdirSync(dir, { recursive: true }) as string[]).filter((entry) =>
+    fs.lstatSync(path.join(dir, entry)).isSymbolicLink(),
+  );
+  assert.deepEqual(links, []);
+  assert.deepEqual(checkTemplateAt(dir), []);
+});
+
+test('REFUSED: an export of a workflow given a skill whose link leaves the repository, by name, nothing written', () => {
+  const outside = scratch('wf-template-outside-');
+  fs.writeFileSync(path.join(outside, 'SKILL.md'), '---\ndescription: Outside.\n---\nSecret.\n');
+  const repo = repoGivenLinked(() => outside);
+  const dir = target();
+  assert.throws(
+    () => exportTemplate({ dir, from: repo }),
+    refusedWith('Invalid', /x is a link, and what it points at is outside the folder of skills: make it a folder of its own\./),
+  );
+  assert.equal(fs.existsSync(dir), false);
+});
+
 test('what export writes reads back as it was written, a long line whole, and a step with no fence of its own writes no overrides fence', () => {
   const repo = repoWithTeam();
   const long = `npm test && ${Array.from({ length: 12 }, (_, i) => `node "scripts/check-${i}.ts" --mode: 'strict' # ${i}`).join(' && ')}`;

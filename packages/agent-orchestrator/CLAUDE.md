@@ -67,6 +67,9 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
   folder is read with its hires and rules too, built by `factoryFills` alone (`rules/rules.store.ts`; a run's by `workflowsOf`), and a version is
   checked with the places it was listed with (`skillsAt`). Who names an agent is read in every place that falls back to it (`repoUsers`),
   and a guard added at load goes on every verb that sets the same thing (`autoDropped`).
+- **A skill folder's files are read through `skillFiles`** (`skills/read.store.ts`), never a `readdirSync`, `cpSync` or `lstat` of one's
+  own: it follows a link of a checkout's `.claude/skills/` that stays inside the checkout and refuses every other, and `copySkill` alone
+  refuses them all (`src/skills/read.store.test.ts`, `test/skill-links.test.ts`).
 - **A key one function refuses is refused by every function that writes it**: grep for the key before trusting "one writer" in a comment.
 - **A team is whole with its `agents/` and `skills/`**: a test that copies a workflow folder copies both, as `teamCopy` copies the
   tests' team (`test/fixtures/team/`); a sentence a step is told is read with `toldIn`.

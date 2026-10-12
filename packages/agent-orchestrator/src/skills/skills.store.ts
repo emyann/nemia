@@ -13,7 +13,7 @@ import { AGENTS_FOLDER, SKILLS_FOLDER, WorkflowError } from '../step/step.ts';
 import { linkRefusal, takenAt } from '../folder/folder.ts';
 import { skillNameRefusal, skillTurnCost, type SkillCost, type SkillsFound } from '../agents/agents.ts';
 import { skillEntryOf, renderSkill, withPreload, type AgentSkill, type SkillDraft } from './skills.ts';
-import { skillVersion } from './read.store.ts';
+import { skillLinkRefusal, skillVersion } from './read.store.ts';
 import { HOME } from '../record/record.store.ts';
 import { isWorkflowsHolder } from '../folder/write.store.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
@@ -29,19 +29,16 @@ export type SkillRead = {
 };
 
 /**
- * The skill `name` whose folder is `dir`, read now. A folder or SKILL.md that is a link is refused unread: what it points at is outside the
- * folder of skills, and a copy refuses one too. A SKILL.md that cannot be read says why; one the card reader refuses (`skillEntryOf`) has
- * its refusal as `error`, and its cost all the same.
+ * The skill `name` whose folder is `dir`, read now. A link in it that is not followed is refused unread (`skillLinkRefusal`): any link
+ * of the store's library or a team's own folder, and one of a checkout's own skills whose target leaves the checkout, where a
+ * link that stays inside is read through. A SKILL.md that cannot be read says why; one the card reader refuses (`skillEntryOf`) has its
+ * refusal as `error`, and its cost all the same.
  */
 export function skillRead(name: string, dir: string): SkillRead {
   const file = path.join(dir, 'SKILL.md');
   const none: SkillRead = { entry: null, error: null, preload: false, cost: null };
-  const linked = [dir, file].find((at) => fs.lstatSync(at, { throwIfNoEntry: false })?.isSymbolicLink());
-  if (linked)
-    return {
-      ...none,
-      error: `${path.relative(path.dirname(dir), linked)} is a link, and what it points at is outside the folder of skills: make it a folder of its own.`,
-    };
+  const linked = skillLinkRefusal(dir);
+  if (linked) return { ...none, error: linked.message };
   let text: string;
   try {
     text = fs.readFileSync(file, 'utf8');
@@ -96,8 +93,12 @@ export function skillDirIn(roots: readonly string[], name: string): string | nul
   return dir ?? null;
 }
 
-/** The text of the SKILL.md in the skill folder `dir`, or empty where it cannot be read: `skillRead` says why. */
+/**
+ * The text of the SKILL.md in the skill folder `dir`, or empty where it cannot be read or a link in the skill is refused, unread
+ * (`skillLinkRefusal`): `skillRead` says why.
+ */
 export function skillText(dir: string): string {
+  if (skillLinkRefusal(dir)) return '';
   try {
     return fs.readFileSync(path.join(dir, 'SKILL.md'), 'utf8');
   } catch {

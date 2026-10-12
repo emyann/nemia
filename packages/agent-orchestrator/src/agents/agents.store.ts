@@ -35,7 +35,7 @@ import { frontmatterKey } from '../former/former.ts';
 import { linkRefusal, takenAt } from '../folder/folder.ts';
 import { agentUsers } from '../folder/folder.store.ts';
 import { agentVersion } from './read.store.ts';
-import { preloads, readSkillRules, skillsFor, skillVersion } from '../skills/read.store.ts';
+import { copySkillFiles, preloads, readSkillRules, skillsFor, skillVersion } from '../skills/read.store.ts';
 import { appliesOf, type SkillRule } from '../skills/skills.ts';
 import { isWorkflowsHolder } from '../folder/write.store.ts';
 import { HOME, isDirectory, runsDir } from '../record/record.store.ts';
@@ -58,8 +58,8 @@ export const renderedIn = (dir: string, step: Workflow): boolean =>
 /**
  * Render every step of `steps` whose agent is rendered (`rendersAgent`) into its folder (`agentFilesDir`): its prompt, its skills copied
  * whole from where the load found them (`skills`), and its style. Written once, at `nemia start`, so an edit of an agent or a skill after
- * it reaches no run already started, as an edit of its workflow does not. A skill is copied through its links: the folder is the step's
- * own.
+ * it reaches no run already started, as an edit of its workflow does not. A skill is copied as its files, never a link, and one holding
+ * a link that is not followed is refused (`copySkillFiles`): the folder is the step's own.
  */
 export function writeAgentFiles(run: Pick<Run, 'id'>, steps: readonly Workflow[], skills: SkillsFound): void {
   for (const step of steps.filter(rendersAgent)) {
@@ -73,7 +73,7 @@ export function writeAgentFiles(run: Pick<Run, 'id'>, steps: readonly Workflow[]
         throw new Error(
           `${step.name}: the skill ${name} of ${agent.name} is not where the load found it${from ? ` — ${from.message}` : ''}.`,
         );
-      fs.cpSync(from, path.join(plugin, 'skills', name), { recursive: true, dereference: true });
+      copySkillFiles(from, path.join(plugin, 'skills', name));
       return preloads(from)
         ? { name, whole: splitFrontmatter(`${name}/SKILL.md`, fs.readFileSync(path.join(from, 'SKILL.md'), 'utf8')).body }
         : { name };

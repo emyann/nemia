@@ -128,6 +128,17 @@ test('a copy is refused for a skill holding a link, and for a skill that is one:
   refuses(() => copySkill(from, LIBRARY, 'linked'), 'Invalid', /linked is a link/);
 });
 
+test("a copy is refused for a skill of a checkout's .claude/skills/ linked inside the checkout, which a start is given: a copy follows no link", () => {
+  fs.rmSync(LIBRARY, { recursive: true, force: true });
+  const repo = scratch('wf-skill-checkout-');
+  fs.mkdirSync(path.join(repo, 'skills', 'x'), { recursive: true });
+  fs.writeFileSync(path.join(repo, 'skills', 'x', 'SKILL.md'), '---\ndescription: Linked inside.\n---\nBody.\n');
+  fs.mkdirSync(path.join(repo, '.claude', 'skills'), { recursive: true });
+  fs.symlinkSync('../../skills/x', path.join(repo, '.claude', 'skills', 'x'));
+  assert.equal(skillsFor(path.join(repo, 'workflows', 'dev'), { repo }).at.get('x'), path.join(repo, '.claude', 'skills', 'x'));
+  refuses(() => copySkill(path.join(repo, '.claude', 'skills'), LIBRARY, 'x'), 'Invalid', /x is a link/);
+});
+
 test('a copy is refused into a folder that is not a skills/ the board lists, unless anywhere', () => {
   const elsewhere = path.join(scratch('wf-skill-elsewhere-'), 'skills');
   const name = fs.readdirSync(SHIPPED).sort()[0];

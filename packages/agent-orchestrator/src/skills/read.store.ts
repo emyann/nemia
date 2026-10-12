@@ -1,7 +1,10 @@
 /**
  * The skills read from disk: where a workflow's agents and skills are looked for beside its own folder (`lookupRoots`), each skill an
- * agent may give (`skillsFor`), its rules, its version, its card's entries and whether it is told whole. A store file at the bottom of the
- * tree beneath the controllers: it imports no other (`test/boundary.test.ts`), so the agents read (`agents/read.store.ts`), the
+ * agent may give (`skillsFor`), its rules, its version, its card's entries and whether it is told whole. And the one rule for a link in a
+ * skill's folder, which every reader asks (`skillFiles`): a skill of a checkout's own skills (`REPOSITORY_HOLDER`) is read through a
+ * link that stays inside the checkout's folder, by real path, and any other link, there or in any other folder of skills, is refused by
+ * name (`skillLinkRefusal`), never opened; a skill is copied as its files, never a link (`copySkillFiles`). A store file at the bottom
+ * of the tree beneath the controllers: it imports no other (`test/boundary.test.ts`), so the agents read (`agents/read.store.ts`), the
  * workflow folder read (`folder/folder.store.ts`) and the place (`place/place.store.ts`) all read through it.
  */
 import { createHash } from 'node:crypto';
@@ -21,6 +24,9 @@ import { skillEntryOf, type AgentSkill, type SkillRule } from './skills.ts';
  */
 export type Places = { repo?: string; home?: string };
 
+/** The folder of a repository that holds its own `agents/` and `skills/`, which a session there reads too. */
+const REPOSITORY_HOLDER = '.claude';
+
 /**
  * The folders a workflow's agents and skills are looked for in, each holding an `agents/` and a `skills/`, in the order a name is found:
  * the workflow's own root (the folder beside it, `agentsDir`'s parent), then the repository's `.claude/`, then the store's `workflows/`.
@@ -28,7 +34,7 @@ export type Places = { repo?: string; home?: string };
  */
 export function lookupRoots(workflowDir: string, places: Places = {}): string[] {
   const roots = [path.dirname(agentsDir(workflowDir))];
-  if (places.repo) roots.push(path.join(path.resolve(places.repo), '.claude'));
+  if (places.repo) roots.push(path.join(path.resolve(places.repo), REPOSITORY_HOLDER));
   if (places.home) roots.push(path.join(path.resolve(places.home), 'workflows'));
   return [...new Set(roots)];
 }
@@ -61,11 +67,33 @@ const holdsSkill = (dir: string): boolean => fs.statSync(path.join(dir, 'SKILL.m
 /** The names of the place skills the package ships: each folder of `PLACE_SKILLS` that holds a skill. */
 const placeSkills = (): string[] => entriesOf(PLACE_SKILLS).filter((name) => holdsSkill(path.join(PLACE_SKILLS, name)));
 
+/** Whether the folders `a` and `b` are one folder by real path; false where either cannot be reached. */
+function oneFolder(a: string, b: string): boolean {
+  try {
+    return fs.realpathSync(a) === fs.realpathSync(b);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The refusal of the skill `name` found in the root `first` and again in `root`, where the two are one repository's two places for skills
+ * (`sameRepository`) and two folders; nothing for two roots of different places, where the first wins, and for one folder under both.
+ */
+function inBoth(name: string, first: string, root: string): WorkflowError | undefined {
+  const [before, at] = [first, root].map((r) => path.join(r, SKILLS_FOLDER, name));
+  if (!sameRepository(first, root) || oneFolder(before, at)) return undefined;
+  return new WorkflowError(
+    `${name} is a skill in both ${before} and ${at}, one repository's two places for skills, and nothing says which a session is given. Keep one of them.`,
+  );
+}
+
 /**
  * Every skill a workflow's agents may give (`lookupRoots`): each name, the folder it is — `<root>/skills/<name>`, holding a `SKILL.md` — or
- * the refusal of a name one repository has in both `workflows/skills/` and `.claude/skills/`. The first root that has a name wins, and a
- * place skill the package ships (`PLACE_SKILLS`) is found last, where no root has its name. The roots and the package's place folder are
- * named for the refusal of a name none has (`skillAt`).
+ * its refusal: a link in it that is not followed (`skillLinkRefusal`), rules that do not read, or a name one repository has in both
+ * `workflows/skills/` and `.claude/skills/` as two folders. One folder under both, the one a link to the other, is one skill, given from
+ * the first. The first root that has a name wins, and a place skill the package ships (`PLACE_SKILLS`) is found last, where no root has
+ * its name. The roots and the package's place folder are named for the refusal of a name none has (`skillAt`).
  */
 export function skillsFor(workflowDir: string, places: Places = {}): SkillsFound {
   const roots = lookupRoots(workflowDir, places);
@@ -78,21 +106,152 @@ export function skillsFor(workflowDir: string, places: Places = {}): SkillsFound
       if (!holdsSkill(at)) continue;
       const first = found.get(name);
       if (!first) {
-        found.set(name, { at: root, dir: rulesRefusal(at) ?? at });
+        found.set(name, { at: root, dir: skillLinkRefusal(at) ?? rulesRefusal(at) ?? at });
         continue;
       }
-      if (sameRepository(first.at, root)) {
-        found.set(name, {
-          at: first.at,
-          dir: new WorkflowError(
-            `${name} is a skill in both ${path.join(first.at, SKILLS_FOLDER, name)} and ${at}, one repository's two places for skills, and nothing says which a session is given. Keep one of them.`,
-          ),
-        });
-      }
+      const twice = inBoth(name, first.at, root);
+      if (twice) found.set(name, { at: first.at, dir: twice });
     }
   }
-  for (const name of placeSkills().sort()) if (!found.has(name)) found.set(name, { at: PLACE_SKILLS, dir: path.join(PLACE_SKILLS, name) });
+  for (const name of placeSkills().sort()) {
+    const at = path.join(PLACE_SKILLS, name);
+    if (!found.has(name)) found.set(name, { at: PLACE_SKILLS, dir: skillLinkRefusal(at) ?? at });
+  }
   return { at: new Map([...found].map(([name, { dir }]) => [name, dir])), looked };
+}
+
+/** A file of a skill's folder, by its path in the skill: the real file it is read from, or why the link there is refused. */
+export type SkillFile = { path: string; real: string } | { path: string; refused: string };
+
+/** Why a link that leaves is refused, after its name. */
+const LEAVES = 'is a link, and what it points at is outside the folder of skills: make it a folder of its own.';
+
+/** The skill a walk reads: its folder's name, and the checkout its links may stay inside, none where every link is refused. */
+type Walked = { name: string; checkout: string | undefined };
+
+/**
+ * The checkout whose own skills (`REPOSITORY_HOLDER`) the skill folder `dir` is in, by real path: the folder a link there may stay
+ * inside. None for a folder of skills anywhere else, the store's library and a team's own among them, nor for a checkout that cannot be
+ * reached.
+ */
+function checkoutOf(dir: string): string | undefined {
+  const skills = path.dirname(path.resolve(dir));
+  const holder = path.dirname(skills);
+  if (path.basename(skills) !== SKILLS_FOLDER || path.basename(holder) !== REPOSITORY_HOLDER) return undefined;
+  try {
+    return fs.realpathSync(path.dirname(holder));
+  } catch {
+    return undefined;
+  }
+}
+
+/** Whether the real path `real` is the folder `checkout` or beneath it: a sibling whose name starts with the checkout's is not. */
+function insideOf(checkout: string, real: string): boolean {
+  const rel = path.relative(checkout, real);
+  return rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel);
+}
+
+/**
+ * What the link `at`, named `named`, is read as: the real file or folder it points at, or why it is refused — any link of a skill no
+ * checkout holds, one whose target is outside the checkout or cannot be reached, and one that points back at a folder of `held`, the
+ * folders the walk is in. A refused link's target is never opened.
+ */
+function followed(
+  walk: Walked,
+  at: string,
+  named: string,
+  held: readonly string[],
+): { real: string; folder: boolean } | { refused: string } {
+  if (walk.checkout === undefined) return { refused: `${named} ${LEAVES}` };
+  let real: string;
+  try {
+    real = fs.realpathSync(at);
+  } catch {
+    return {
+      refused: `${named} is a link, and what it points at cannot be reached: point it at a file or a folder inside the repository, or remove it.`,
+    };
+  }
+  if (!insideOf(walk.checkout, real)) return { refused: `${named} ${LEAVES}` };
+  const folder = fs.statSync(real).isDirectory();
+  if (folder && held.includes(real))
+    return { refused: `${named} is a link that points back at a folder it is in, and the skill's files would never end: remove it.` };
+  return { real, folder };
+}
+
+/** The files of the real folder `dir`, each by its path in the skill from `under`, a followed linked folder walked as the folder it is. */
+function filesUnder(walk: Walked, dir: string, under: string, held: readonly string[]): SkillFile[] {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry): SkillFile[] => {
+    const file = path.join(under, entry.name);
+    const at = path.join(dir, entry.name);
+    if (entry.isDirectory()) return filesUnder(walk, at, file, [...held, at]);
+    if (!entry.isSymbolicLink()) return [{ path: file, real: at }];
+    const to = followed(walk, at, path.join(walk.name, file), held);
+    if ('refused' in to) return [{ path: file, refused: to.refused }];
+    return to.folder ? filesUnder(walk, to.real, file, [...held, to.real]) : [{ path: file, real: to.real }];
+  });
+}
+
+/**
+ * The skill folder `dir` itself as a walk starts in it: the real folder, or why it is refused — as a link beneath it is (`followed`),
+ * and, for a folder that is no link, where the folder of skills it is in is reached through a link that leaves the checkout.
+ */
+function folderOf(walk: Walked, dir: string): { real: string } | { refused: string } {
+  if (fs.lstatSync(dir).isSymbolicLink()) return followed(walk, dir, walk.name, []);
+  if (walk.checkout === undefined) return { real: dir };
+  const real = fs.realpathSync(dir);
+  if (insideOf(walk.checkout, real)) return { real };
+  const skills = path.dirname(path.resolve(dir));
+  return {
+    refused: `${walk.name} is in a folder of skills reached through a link, ${skills} or the folder it is in, and what it points at is outside the repository: make it a folder of the repository's own.`,
+  };
+}
+
+/**
+ * Every file of the skill folder `dir`, sorted by its path in the skill, each with the real file it is read from or the refusal of the
+ * link there: the one rule every reader of a skill asks. A skill of a checkout's own skills — a folder `skills/<name>` of its
+ * `REPOSITORY_HOLDER` — has its links followed while their real path stays inside the checkout's folder, the skill's own folder, its
+ * SKILL.md and every file beneath, a followed folder's included; an ignored folder of the checkout is inside. Any other
+ * skill folder has every link refused. A refused link is named from the folder of skills (`x`, `x/SKILL.md`), with what to do, and what
+ * it points at is never opened; the folder itself refused is the one entry, under the path ''. Throws where a folder cannot be read.
+ */
+export function skillFiles(dir: string): SkillFile[] {
+  const walk: Walked = { name: path.basename(dir), checkout: checkoutOf(dir) };
+  const folder = folderOf(walk, dir);
+  if ('refused' in folder) return [{ path: '', refused: folder.refused }];
+  return filesUnder(walk, folder.real, '', [folder.real]).sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+}
+
+/**
+ * The refusal of the skill folder `dir` for a link in it that is not followed (`skillFiles`), the first by path, or nothing for a skill
+ * whose every file reads — and for a folder that cannot be read, which its reader says in its own words.
+ */
+export function skillLinkRefusal(dir: string): WorkflowError | undefined {
+  let files: SkillFile[];
+  try {
+    files = skillFiles(dir);
+  } catch {
+    return undefined;
+  }
+  const first = files.find((file) => 'refused' in file);
+  return first && 'refused' in first ? new WorkflowError(first.refused) : undefined;
+}
+
+/**
+ * The skill folder `dir` copied to the folder `to` as its files (`skillFiles`), each a regular file with its mode, a followed link as
+ * what it points at: no link is written. Refused with the skill's link refusal before a byte is written.
+ */
+export function copySkillFiles(dir: string, to: string): void {
+  const files = skillFiles(dir).map((file) => {
+    if ('refused' in file) throw new WorkflowError(file.refused);
+    return file;
+  });
+  fs.mkdirSync(to, { recursive: true });
+  for (const file of files) {
+    const at = path.join(to, file.path);
+    fs.mkdirSync(path.dirname(at), { recursive: true });
+    fs.copyFileSync(file.real, at);
+    fs.chmodSync(at, fs.statSync(file.real).mode & 0o7777);
+  }
 }
 
 /** The file beside a skill's SKILL.md that names its traceable rules (`readSkillRules`). */
@@ -183,6 +342,11 @@ export function skillVersion(dir: string): string | null {
  */
 export function readForVersion(file: string): string | { unreadable: string } | { link: string } {
   if (fs.lstatSync(file, { throwIfNoEntry: false })?.isSymbolicLink()) return { link: fs.readlinkSync(file) };
+  return textForVersion(file);
+}
+
+/** A file read as a version counts what it holds: its text, or why it cannot be read. */
+function textForVersion(file: string): string | { unreadable: string } {
   try {
     return fs.readFileSync(file, 'utf8');
   } catch (err) {
@@ -190,19 +354,19 @@ export function readForVersion(file: string): string | { unreadable: string } | 
   }
 }
 
-/** Every file under a skill's folder, by its path in the folder, sorted, each as a version counts it. */
+/**
+ * Every file of a skill's folder (`skillFiles`), by its path in the skill, sorted, each as a version counts it: a followed link as the
+ * content it points at, so the version moves when that does and equals that of the skill's copy (`copySkillFiles`); a refused link as
+ * where it points (`readForVersion`), never opened.
+ */
 export function folderForVersion(dir: string): Array<[string, unknown]> {
-  let entries: string[];
+  let files: SkillFile[];
   try {
-    entries = (fs.readdirSync(dir, { recursive: true }) as string[]).sort();
+    files = skillFiles(dir);
   } catch (err) {
     return [['', { unreadable: (err as Error).message }]];
   }
-  return entries.flatMap((entry) => {
-    const at = path.join(dir, entry);
-    const stat = fs.lstatSync(at, { throwIfNoEntry: false });
-    return stat?.isDirectory() ? [] : [[entry, readForVersion(at)] as [string, unknown]];
-  });
+  return files.map((file) => [file.path, 'refused' in file ? readForVersion(path.join(dir, file.path)) : textForVersion(file.real)]);
 }
 
 /**

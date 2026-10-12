@@ -6,6 +6,7 @@
 import { Badge } from '@/components/ui/badge';
 import type { PagePlace, WorkflowPageAddress, WorkflowStepPage } from '../lib/api';
 import { stepAnchor } from '../lib/asks';
+import { SOURCE_BADGES } from '../lib/skills';
 import { titleOf } from '../lib/factory';
 import { placeOfAddress } from '../lib/factories';
 import { clockWord } from '../lib/quota';
@@ -75,8 +76,9 @@ export function StepAgent({ page }: { page: WorkflowStepPage }) {
 /**
  * Where each layer of the step lives, for `Told`: the agent's file, on its page; your custom instructions, on the agent's page too; the
  * factory's rules, on the Settings of the factory the page is read in, null where it is read in none; the step's own file, edited in its
- * workflow's builder for one of yours and named by its path for the repository's; and each skill's page, where the api found it. `place`
- * is the factory and repository the page is read in, kept on the way to the builder.
+ * workflow's builder for one of yours and named by its path for the repository's; and each skill's page, where the api found it, or
+ * for one with no page that the repository has, a skill named with its folder, its name as written and that it is the repository's.
+ * `place` is the factory and repository the page is read in, kept on the way to the builder.
  */
 export function homesOf(page: WorkflowStepPage, place: PagePlace): LayerHomes {
   const agent = page.layers.agent;
@@ -130,8 +132,14 @@ export function homesOf(page: WorkflowStepPage, place: PagePlace): LayerHomes {
         </>
       ),
     skill: (name) => {
-      const from = page.skillsFrom.find((skill) => skill.name === name)?.from ?? null;
-      return from ? <SkillLink from={from} name={name} /> : name;
+      const found = page.skillsFrom.find((skill) => skill.name === name);
+      if (found?.from) return <SkillLink from={found.from} name={name} />;
+      if (!found?.foundIn) return name;
+      return (
+        <span data-skill-found-in={found.foundIn} title={found.foundIn}>
+          {name} <span className="text-muted-foreground">· {SOURCE_BADGES.repo}</span>
+        </span>
+      );
     },
   };
 }

@@ -339,7 +339,7 @@ test('a skill named with its folder is listed on its agent as written, found, wi
       const res = await app.request(`/api/skills/repo/${name}`);
       const body = (await res.json()) as { error: string };
       assert.equal(res.status, 400, body.error);
-      assert.equal(body.error, skillNameRefusal(decodeURIComponent(name)), 'no page: the name is refused as no skill\'s');
+      assert.equal(body.error, skillNameRefusal(decodeURIComponent(name)), "no page: the name is refused as no skill's");
     }
   } finally {
     fs.rmSync(path.join(root, 'workflows', 'agents', 'typer.md'));
@@ -353,7 +353,11 @@ test('REFUSED: where a skill was found is said for none the board pages, nor the
   assert.equal(foundInOf(path.join(THEIRS, 'review'), repo, root), null, "the repository's has a page");
   assert.equal(foundInOf(path.join(repo, 'workflows', 'skills', 'beside'), repo, root), null, 'and the one beside its agents');
   assert.equal(foundInOf(repo, repo, root), null, 'the repository itself');
-  assert.equal(foundInOf(`${repo}-twin/apps/site/.claude/skills/lay-out`, repo, root), null, "a sibling whose name starts with the repository's");
+  assert.equal(
+    foundInOf(`${repo}-twin/apps/site/.claude/skills/lay-out`, repo, root),
+    null,
+    "a sibling whose name starts with the repository's",
+  );
   assert.equal(foundInOf(path.join(path.dirname(repo), 'lay-out'), repo, root), null, 'a folder outside it');
 });
 

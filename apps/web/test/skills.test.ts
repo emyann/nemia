@@ -46,8 +46,30 @@ test("a turn's cost is said in words: named, its listing and the body only when 
   assert.equal(costWords({ preload: true, listed: 12, body: 1500, perTurn: 1512 }), 'loaded every turn — about 1,512 tokens (cached)');
 });
 
+test('a skill named with its folder, which no place lists, keeps its read row whole: where it was found, and never said missing', () => {
+  const read: GivenSkill[] = [
+    {
+      name: 'apps/site:lay-out',
+      from: null,
+      foundIn: 'apps/site/.claude/skills/lay-out',
+      entry: null,
+      error: null,
+      preload: false,
+      cost: null,
+    },
+  ];
+  const rows = givenRows(['write-a-note', 'apps/site:lay-out'], read, places([row()]));
+  assert.deepEqual(
+    rows.map((r) => [r.name, r.from, r.foundIn, r.error]),
+    [
+      ['write-a-note', 'yours', null, null],
+      ['apps/site:lay-out', null, 'apps/site/.claude/skills/lay-out', null],
+    ],
+  );
+});
+
 test('a skill the form gives is shown where an agent of yours finds it now, else as the agent was read, else said missing once the list is read', () => {
-  const read: GivenSkill[] = [{ name: 'old', from: 'repo', entry: null, error: 'as read', preload: false, cost: null }];
+  const read: GivenSkill[] = [{ name: 'old', from: 'repo', foundIn: null, entry: null, error: 'as read', preload: false, cost: null }];
   const shipped = row({ name: 'ship-it', from: 'shipped' });
   const rows = givenRows(['write-a-note', 'old', 'ship-it'], read, places([row()], [], [shipped]));
   assert.deepEqual(
@@ -63,7 +85,7 @@ test('a skill the form gives is shown where an agent of yours finds it now, else
   assert.match(rows[2].error!, /^Neither your library nor this repository has `ship-it`/);
   const copied = givenRows(
     ['gone'],
-    [{ name: 'gone', from: null, entry: null, error: 'No skills folder has `gone`', preload: false, cost: null }],
+    [{ name: 'gone', from: null, foundIn: null, entry: null, error: 'No skills folder has `gone`', preload: false, cost: null }],
     places([row({ name: 'gone' })]),
   );
   assert.deepEqual(

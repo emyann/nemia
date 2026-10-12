@@ -216,6 +216,9 @@ test('no key that describes the agent itself is a role key the form sends among 
 test('the skills line is edited as a list and sent as the line the package reads: in its order, each once, trimmed', () => {
   assert.deepEqual(skillList(' review-a-change,, write-a-note ,'), ['review-a-change', 'write-a-note']);
   assert.equal(skillLine(['a', 'b']), 'a, b');
+  assert.deepEqual(skillList('review, apps/site:lay-out'), ['review', 'apps/site:lay-out'], 'a name with its folder is kept whole');
+  assert.equal(withSkill('apps/site:lay-out', 'review'), 'apps/site:lay-out, review');
+  assert.equal(withoutSkill('review, apps/site:lay-out', 'review'), 'apps/site:lay-out');
   assert.equal(withSkill('', 'write-a-note'), 'write-a-note');
   assert.equal(withSkill('review-a-change', 'write-a-note'), 'review-a-change, write-a-note', 'added last');
   assert.equal(withSkill('write-a-note ', 'write-a-note'), 'write-a-note ', 'a name given already leaves the line as it was: no edit');

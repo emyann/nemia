@@ -537,7 +537,10 @@ test("a folder whose agent's skill is in the repository's `.claude/skills/` is l
 
 test("a step's `skills:` naming a skill with its folder is saved as sent and listed as written; REFUSED: a folder that holds no such skill, naming the step, and nothing is written", async () => {
   write(path.join(repo, '.claude', 'skills', 'review', 'SKILL.md'), '---\ndescription: Reviews a change.\n---\nReview it.\n');
-  write(path.join(repo, 'apps', 'site', '.claude', 'skills', 'lay-out', 'SKILL.md'), '---\ndescription: Lays a page out.\n---\nLay it out.\n');
+  write(
+    path.join(repo, 'apps', 'site', '.claude', 'skills', 'lay-out', 'SKILL.md'),
+    '---\ndescription: Lays a page out.\n---\nLay it out.\n',
+  );
   const dir = path.join(STORE, 'typeset');
   write(path.join(STORE, 'agents', 'typesetter.md'), '---\ntools: Read, Skill\n---\nYou set type.\n');
   write(path.join(dir, 'compose.md'), '---\nplace: git\nagent: typesetter\n---\nCompose.\n');

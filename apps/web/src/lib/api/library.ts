@@ -52,10 +52,15 @@ export const SkillCostSchema = Schema.Struct({
   perTurn: Schema.Number,
 }) satisfies Schema.Schema<SkillCost>;
 
-/** Mirrors `GivenSkill`: a skill an agent gives, where a start finds it and what it costs — or why none is found (`from: null`). */
+/**
+ * Mirrors `GivenSkill`: a skill an agent gives, named as its line writes it, where a start finds it and what it costs — or why none is
+ * found. `from` is the place whose page it has; where it is null, `foundIn` is where this repository has it, as a skill named with its
+ * folder, and null too for one found nowhere.
+ */
 export type GivenSkill = {
   name: string;
   from: SkillSource | null;
+  foundIn: string | null;
   entry: AgentSkill | null;
   error: string | null;
   preload: boolean;
@@ -66,6 +71,7 @@ export type GivenSkill = {
 export const GivenSkillSchema = Schema.Struct({
   name: Schema.String,
   from: Schema.NullOr(SkillSourceSchema),
+  foundIn: Schema.NullOr(Schema.String),
   entry: Schema.NullOr(AgentSkillSchema),
   error: Schema.NullOr(Schema.String),
   preload: Schema.Boolean,

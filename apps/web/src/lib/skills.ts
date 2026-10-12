@@ -25,18 +25,18 @@ export function costWords(cost: SkillCost): string {
 
 /**
  * The skills the form gives, one row each in its order: where an agent of yours finds each now (`places`, the picker's list, read again
- * after a copy), else as the agent was read (`given`). A name found in neither is said to be missing once the list is read; before, it is
- * only named.
+ * after a copy), else as the agent was read (`given`): a skill named with its folder, which the list never has, is its read row whole,
+ * with where it was found. A name found in neither is said to be missing once the list is read; before, it is only named.
  */
 export function givenRows(names: readonly string[], given: readonly GivenSkill[], places: readonly SkillPlace[] | undefined): GivenSkill[] {
   const found = (places ?? []).filter((place) => place.from !== 'shipped').flatMap((place) => place.skills);
   return names.map((name) => {
     const row = found.find((skill) => skill.name === name);
-    if (row) return { name, from: row.from, entry: row.entry, error: row.error, preload: row.preload, cost: row.cost };
+    if (row) return { name, from: row.from, foundIn: null, entry: row.entry, error: row.error, preload: row.preload, cost: row.cost };
     const read = given.find((skill) => skill.name === name);
     if (read) return read;
     const error = places ? `Neither your library nor this repository has \`${name}\`: add it from the list, or take it off.` : null;
-    return { name, from: null, entry: null, error, preload: false, cost: null };
+    return { name, from: null, foundIn: null, entry: null, error, preload: false, cost: null };
   });
 }
 

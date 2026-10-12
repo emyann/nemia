@@ -169,6 +169,13 @@ test("REFUSED, the agents' list: an agent without the factories it fills a step 
   answering(t, agent());
   assert.deepEqual(await readAgent('yours', 'agora'), agent());
   assert.equal(Object.hasOwn(await readAgent('yours', 'agora'), 'factories'), false);
+  const folder = { ...agent().given[0], name: 'apps/site:lay-out', from: null, foundIn: 'apps/site/.claude/skills/lay-out' };
+  answering(t, agent({ given: [folder] }));
+  assert.equal(
+    (await readAgent('yours', 'agora')).given[0].foundIn,
+    'apps/site/.claude/skills/lay-out',
+    'where a skill named with its folder was found is kept',
+  );
 });
 
 test('REFUSED, the agents: one from no place the board knows, and a skill it gives whose cost has no turn', async (t) => {
@@ -223,8 +230,9 @@ test("a step's page is read in the place named, keyed by it, with what a run of 
       ],
     },
     skillsFrom: [
-      { name: 'alpha', from: 'yours' },
-      { name: 'gamma', from: null },
+      { name: 'alpha', from: 'yours', foundIn: null },
+      { name: 'apps/site:set-type', from: null, foundIn: 'apps/site/.claude/skills/set-type' },
+      { name: 'gamma', from: null, foundIn: null },
     ],
     recentRuns: [{ id: 'r-1', brief: 'Do it', createdAt: '2026-10-01T00:00:00Z', factory: 'f', filed: false }],
   });
@@ -236,7 +244,9 @@ test("a step's page is read in the place named, keyed by it, with what a run of 
     globalThis.fetch = before;
   });
   const placed = stepQuery('yours', 'w', 'review', { factory: 'f' });
-  assert.deepEqual(await (placed.queryFn as unknown as () => Promise<WorkflowStepPage>)(), page);
+  const read = await (placed.queryFn as unknown as () => Promise<WorkflowStepPage>)();
+  assert.deepEqual(read, page);
+  assert.equal(read.skillsFrom[1].foundIn, 'apps/site/.claude/skills/set-type', 'where a skill named with its folder was found is kept');
   assert.equal(asked.at(-1), '/api/workflows/yours/w/review?factory=f');
   assert.notDeepEqual(placed.queryKey, stepQuery('yours', 'w', 'review').queryKey, 'two places, two answers kept apart');
   assert.notDeepEqual(placed.queryKey, stepQuery('yours', 'w', 'review', { factory: 'g' }).queryKey);
@@ -273,7 +283,7 @@ test("REFUSED, a step's page: one without its recent runs, the factories that hi
   await assert.rejects(readStep(), unread('/api/workflows/repo/build/ship', 'hiring', 'is missing'));
   answering(t, stepPage({ hiring: { refused: null, agents: [{ name: 'ada' }] as never } }));
   await assert.rejects(readStep(), unread('/api/workflows/repo/build/ship', 'hiring.agents[0].description', 'is missing'));
-  answering(t, stepPage({ skillsFrom: [{ name: 'alpha', from: 'elsewhere' as never }] }));
+  answering(t, stepPage({ skillsFrom: [{ name: 'alpha', from: 'elsewhere' as never, foundIn: null }] }));
   await assert.rejects(readStep(), unread('/api/workflows/repo/build/ship', 'skillsFrom[0].from', '"elsewhere", where'));
 });
 

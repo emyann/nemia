@@ -678,6 +678,31 @@ export function seedFactories(root: string, repo: string): void {
   write(path.join(dir, `${broken}.json`), JSON.stringify({ workflows: [WORKFLOWS.good.name] }, null, 2));
 }
 
+/** The agent `hiringStarts` writes into the checkout for FACTORIES.hiring to hire into `dev/review`, whose file names no agent. */
+export const REVIEWER = 'reviewer-e2e';
+
+/**
+ * Makes FACTORIES.hiring able to start `dev` in the store at `root`, which the seed leaves it unable to: its hire into `dev/implement`,
+ * a step whose file names its agent, leaves `dev` unread in the factory, and `dev/review` names no agent. Writes REVIEWER into the
+ * checkout's `workflows/agents/` — the checkout's one agent gives skills, which `review`'s `tools:` could not load — and the factory's
+ * file with REVIEWER hired into `review` in place of its hires. Returns the function that takes both back: the agent removed, and the
+ * factory's file as it was found.
+ */
+export function hiringStarts(root: string): () => void {
+  const file = path.join(root, 'factories', `${FACTORIES.hiring.name}.json`);
+  const found = fs.readFileSync(file, 'utf8');
+  const agent = path.join(root, 'checkout', 'workflows', 'agents', `${REVIEWER}.md`);
+  fs.writeFileSync(agent, '---\ndescription: Use this when a change needs reviewing.\n---\nYou review the change.\n');
+  fs.writeFileSync(
+    file,
+    JSON.stringify({ ...(JSON.parse(found) as object), hires: { [`${WORKFLOWS.good.name}/review`]: REVIEWER } }, null, 2),
+  );
+  return () => {
+    fs.rmSync(agent, { force: true });
+    fs.writeFileSync(file, found);
+  };
+}
+
 /** The diamond's runs, oldest first. */
 export const DIAMOND_RUNS = [DIAMOND.top, DIAMOND.shipped, DIAMOND.running, DIAMOND.bottom, DIAMOND.cancelled, DIAMOND.orphan] as const;
 
@@ -1250,8 +1275,8 @@ export const refusedWhy = (root: string, repo: string): string =>
   `no workflow folder at ${path.join(root, 'inbox', QUEUE.refused.workflow)}, nor a workflow named ${QUEUE.refused.workflow} in ${path.join(repo, 'workflows')}. The repository's workflows are: broken, dev — name one, or give the path to a workflow folder.`;
 
 /** A queued card's text, as `wf inbox queue` writes it: its keys in their order, `queued:` last. */
-export const queuedCardText = (card: { workflow: string; body: string }, queued: string, repo?: string): string =>
-  `---\nworkflow: ${card.workflow}\n${repo ? `repo: ${repo}\n` : ''}queued: ${queued}\n---\n${card.body}\n`;
+export const queuedCardText = (card: { workflow: string; body: string }, queued: string, repo?: string, factory?: string): string =>
+  `---\nworkflow: ${card.workflow}\n${repo ? `repo: ${repo}\n` : ''}${factory ? `factory: ${factory}\n` : ''}queued: ${queued}\n---\n${card.body}\n`;
 
 /**
  * What the daemon's last pass cost, as the tick writes it to `tick-stats.json` (`recordPassCost`): 212 ms over twelve run records, most of

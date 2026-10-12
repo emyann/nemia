@@ -15,6 +15,10 @@ owner's line for a run, which this factory's rules give, say so, and how to cut 
 When the change touches `apps/web`, read `.claude/skills/shadcn/SKILL.md` with Read for how the board's components are meant to be used,
 never with the Skill tool, which your fence refuses.
 
+When the change touches `apps/web`, load `change-the-board`, then the design system kit's skills where the work is theirs, each loaded
+as `change-the-board` says: `ds-build` before you design, write or judge anything drawn with the kit's parts or its roles, `ds-theme`
+before a change to `apps/web/DESIGN.md` or the theme, `ds-spec` when a decision cites Material.
+
 The checks you may run here, each bare: `npx turbo run test --force --continue`, `npm run typecheck`, `npm run lint`.
 
 To see a board in the browser, run `npm run board:serve`, bare, and open the address it prints with the `look` skill: this workspace's

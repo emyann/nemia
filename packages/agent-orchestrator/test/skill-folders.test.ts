@@ -3,15 +3,17 @@
  * names it, the run reads it from that folder of the repository and freezes its files under its bare name, the name the prompt gives
  * and a session lists, while the record, the versions and the settings say it as the line writes it. Refused by name, with no run left:
  * a folder that holds no such skill, a read with no repository, and two skills of one bare name in one step — which two steps of one
- * run are each given. The reader's rule is held beside its code (`src/skills/read.store.test.ts`). `WF_ROOT` is set before the modules
- * are imported, since they read it as they load.
+ * run are each given. The reader's rule is held beside its code (`src/skills/read.store.test.ts`). The shipped build folder gives
+ * the design system kit's three skills to its design, implement and review this way: loaded and started at shipped defaults on a copy
+ * of the checkout's skills (`checkoutCopy`), and refused by name once a kit skill's folder is renamed. `WF_ROOT` is set before the
+ * modules are imported, since they read it as they load.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
-import { teamCopy } from './team.ts';
+import { REPO, teamCopy } from './team.ts';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runGiven } from './placed.ts';
 
@@ -193,4 +195,68 @@ test('a folder’s version moves with a skill named with its folder, of one segm
     fs.appendFileSync(path.join(edited, 'SKILL.md'), 'Edited.\n');
     assert.notEqual(workflowVersion(workflowDir, { repo }), before, `skills: ${line}, after an edit of ${edited}`);
   }
+});
+
+/** The shipped build workflow's folder, and the steps of it that are given the kit's skills, each with its agent. */
+const BUILD = path.join(REPO, 'workflows', 'build');
+const KIT_STEPS = [
+  ['design', 'seldon'],
+  ['implement', 'ada'],
+  ['review', 'agora'],
+] as const;
+
+/** The kit's skills as the three steps' lines write them, in the lines' order. */
+const KIT_GIVEN = ['apps/web:ds-build', 'apps/web:ds-theme', 'apps/web:ds-spec'];
+
+/** A repository the stand-in knows, holding a copy of the checkout's own skills and of the board's nested ones, each link followed. */
+function checkoutCopy(): string {
+  const repo = fs.mkdtempSync(path.join(ROOT, 'checkout-'));
+  for (const folder of ['.', 'apps/web'])
+    fs.cpSync(path.join(REPO, folder, '.claude', 'skills'), path.join(repo, folder, '.claude', 'skills'), {
+      recursive: true,
+      dereference: true,
+    });
+  stand().world.repository(repo, {});
+  return repo;
+}
+
+test('the shipped build folder gives the kit’s three skills to design, implement and review, and a start freezes each with its files', async () => {
+  const loaded = loadWorkflows(BUILD, { repo: REPO });
+  for (const [name] of KIT_STEPS)
+    assert.deepEqual(
+      (loaded.find((step) => step.name === name)?.agent?.skills ?? []).filter((skill) => skill.includes(':')),
+      KIT_GIVEN,
+      name,
+    );
+  const repo = checkoutCopy();
+  const run = await runPlaced(startRun({ brief: 'change the board', repo, workflowDir: BUILD }));
+  for (const [name, agent] of KIT_STEPS) {
+    const step = (readRun(run.id).workflow ?? []).find((s) => s.name === name)!;
+    assert.deepEqual(
+      (step.agent?.skills ?? []).filter((skill) => skill.includes(':')),
+      KIT_GIVEN,
+      `${name}, on the record`,
+    );
+    for (const given of KIT_GIVEN) {
+      const bare = given.slice('apps/web:'.length);
+      assert.deepEqual(filesOf(path.join(frozen(run, name, agent), bare)), filesOf(nested(REPO, 'apps/web', bare)), `${name}: ${bare}`);
+    }
+    assert.deepEqual(Object.keys(filesOf(path.join(frozen(run, name, agent), 'ds-spec'))), ['SKILL.md', 'md3.mjs']);
+    assert.deepEqual(Object.keys(filesOf(path.join(frozen(run, name, agent), 'ds-theme'))), ['SKILL.md', 'design-md.md']);
+    const prompt = fs.readFileSync(path.join(agentFilesDir(run, name), 'prompt.md'), 'utf8');
+    for (const bare of ['ds-build', 'ds-theme', 'ds-spec']) assert.ok(prompt.includes(`\`nemia-${agent}:${bare}\``), prompt);
+    assert.ok(!prompt.includes('apps/web:ds-'), prompt);
+  }
+});
+
+test('REFUSED at a start and at the check of the shipped build folder: a kit skill’s folder renamed, by the name its line gives, and no run is left', async () => {
+  const repo = checkoutCopy();
+  fs.renameSync(nested(repo, 'apps/web', 'ds-build'), nested(repo, 'apps/web', 'ds-built'));
+  const before = runsNow();
+  const said = refusal(() => loadWorkflows(BUILD, { repo }));
+  assert.ok(said.includes('adds the skill `apps/web:ds-build`, which cannot be used'), said);
+  assert.ok(said.includes("`apps/web:ds-build` is the skill `ds-build` of the repository's folder `apps/web`"), said);
+  assert.ok(said.includes(`${nested(repo, 'apps/web', 'ds-build')} holds no SKILL.md`), said);
+  assert.equal(await rejection(() => runPlaced(startRun({ brief: 'change the board', repo, workflowDir: BUILD }))), said);
+  assert.deepEqual(runsNow(), before);
 });

@@ -176,7 +176,9 @@ What the `create-an-agent` skill, being generic, does not say here:
 - A checking step, its agent given `Bash`, denies `Bash(npm run build)` and `Bash(npm run e2e)`, which `.claude/settings.json` allows
   other roles, on its own `disallowedTools:`, beside each deny of its agent's; the checks it runs are allowed by exact name in
   `.claude/settings.json` (`npm run lint`, `npx turbo run typecheck --force`) and named in its note, where `CHECKERS` reads them in
-  `packages/agent-orchestrator/test/agent-fences.test.ts`, which holds every shipped step's fence.
+  `packages/agent-orchestrator/test/agent-fences.test.ts`, which holds every shipped step's fence. The reader of the kit's `ds-spec` is
+  allowed by its script's path, `node apps/web/.claude/skills/ds-spec/md3.mjs`, and named in design's and review's notes, where the same
+  `CHECKERS` reads it (`reader`): the workspace's script, never the copy a run froze for the step.
 - A checking step given the browser (design, review) serves the change with `npm run board:serve` and ends it with `npm run board:stop`,
   each allowed by exact name and named in its note (`BOARD_CHECKS`); its agent allows the browser's tools by name, never the server
   whole, and the step denies the live board's ports by address on its own `disallowedTools:` (`LIVE_BOARD`, same test). Agent and
@@ -210,8 +212,9 @@ What the `create-an-agent` skill, being generic, does not say here:
   board's pin).
 - `apps/web/src/components/ui/ds` — the design system kit (french-tech-homies/design-system, the `@ds` registry), vendored as shipped
   and credited in `THIRD_PARTY_NOTICES.md`, with its skills `ds-theme`, `ds-build` and `ds-spec` in `apps/web/.claude/skills/`: a nested
-  folder no step can be given, so the build's steps are told to load them by their notes and by `change-the-board`, and a kit update
-  that adds or renames one names it in both (`packages/agent-orchestrator/test/build-told.test.ts`); the
+  folder, given to the build's design, implement and review steps by their `skills:` lines as `apps/web:<name>`, and said to a session
+  outside a run by `change-the-board`; a kit update that adds or renames one names it on the three lines and in the skill
+  (`packages/agent-orchestrator/test/build-told.test.ts`); the
   board's look is `apps/web/DESIGN.md`, its generated theme `apps/web/theme/` (`apps/web/CLAUDE.md`, *The design system kit*).
 - `apps/web/src/components/look` — the look's own parts (the cut frame, tag and button, the plate, the sticker and stat tile, the rail,
   the scan lines, the pager, the text link, the copy id) behind one door, each with its stories beside it; Nemia's Storybook

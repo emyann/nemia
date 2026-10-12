@@ -1,7 +1,8 @@
 /**
  * A factory's rules on disk (`rules.store.ts`): written trimmed and read back, cleared, a link neither read nor written through, the
  * refusals of a write — blank words, a frontmatter block, a tree not rendered yet — each writing nothing, and the folder gone with its
- * factory. `WF_ROOT` is set before the import, since the store reads it as it loads.
+ * factory; and what a read of a factory's workflow folder is handed (`factoryFills`). `WF_ROOT` is set before the import, since the
+ * store reads it as it loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,7 +15,7 @@ import { eachTest, runOver } from '../../test/placed.ts';
 
 const ROOT = scratch('wf-rules-store-');
 process.env.WF_ROOT = ROOT;
-const { clearRules, readRules, rulesAt, rulesFolder, writeRules } = await import('./rules.store.ts');
+const { clearRules, factoryFills, readRules, rulesAt, rulesFolder, writeRules } = await import('./rules.store.ts');
 const { addFactory } = await import('../factory/factory.store.ts');
 const { FACTORIES } = await import('../factory/factory.verb.ts');
 const { runWith: runEngine } = await import('../runner.ts');
@@ -104,4 +105,33 @@ test('`nemia factory rm` leaves no rules behind: the folder the store keeps for 
   await runWith(engineOf(engine().layer), rm.handler({ factory: 'gone' }));
   assert.equal(fs.existsSync(file), false);
   assert.equal(fs.existsSync(path.dirname(file)), false);
+});
+
+test("a factory's fills for a workflow: its hires into that workflow alone, and its rules where they are told", () => {
+  const factory = { name: 'filled', hires: { 'build/design': 'seldon', 'build/review': 'agora', 'other/step': 'zed' } };
+  const agents = { design: 'seldon', review: 'agora' };
+  assert.deepEqual(factoryFills(factory, 'build'), { fills: { factory: 'filled', workflow: 'build', agents }, error: null });
+  assert.deepEqual(factoryFills(factory, 'none').fills.agents, {});
+  writeRules(factory, 'Never push on a Friday.');
+  assert.deepEqual(factoryFills(factory, 'build'), {
+    fills: { factory: 'filled', workflow: 'build', agents, rules: 'Never push on a Friday.' },
+    error: null,
+  });
+});
+
+test('REFUSED: rules that cannot be told are left out of the fills, and why is said: a frontmatter block, and a link', () => {
+  const factory = { name: 'untold', hires: { 'build/design': 'seldon' } };
+  const file = rulesAt(factory);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, '---\nharness: claude\n---\nNever push.\n');
+  const block = factoryFills(factory, 'build');
+  assert.deepEqual(block.fills, { factory: 'untold', workflow: 'build', agents: { design: 'seldon' } });
+  assert.match(block.error ?? '', /opens with a frontmatter block/);
+  const outside = path.join(ROOT, 'untold-elsewhere.md');
+  fs.writeFileSync(outside, 'Words from elsewhere.\n');
+  fs.rmSync(file);
+  fs.symlinkSync(outside, file);
+  const link = factoryFills(factory, 'build');
+  assert.equal('rules' in link.fills, false);
+  assert.match(link.error ?? '', /is a link/);
 });

@@ -8,7 +8,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Cause, Effect, Exit } from 'effect';
 import { asked, over, type Engine, type TaskView, unreadableJournal } from '../runtime-client.ts';
+import { DEFAULT_FACTORY } from '../factory/factory.ts';
+import { readFactory } from '../factory/factory.store.ts';
+import type { Fills } from '../folder/folder.ts';
 import { loadWorkflows } from '../folder/folder.store.ts';
+import { isRefusal, Missing } from '../refusal/refusal.ts';
+import { factoryFills } from '../rules/rules.store.ts';
 import { runStore } from '../record/files.store.ts';
 import { type Run, runTasks, unjudgedWords, unloadedWords } from '../record/record.ts';
 import { unloadedOf } from '../record/steps.store.ts';
@@ -111,21 +116,49 @@ export const seenBy = (e: Engine, views: Views): Engine => ({
 });
 
 /**
- * The run's workflow folder, read now: its steps, or none and a warning in the folder's words — gone, or no longer read as a workflow.
+ * What a read of `run`'s workflow folder is handed of the factory it started in, read now: its hires and rules (`factoryFills`), none for
+ * a run in no factory or the default one; or, for a factory that is not there (`gone`) or whose file does not read, its name alone. Throws
+ * what is no refusal.
+ */
+function factoryRead(run: Run): { fills?: Fills; unread?: { name: string; gone: boolean } } {
+  if (run.factory === undefined || run.factory === DEFAULT_FACTORY) return {};
+  try {
+    return { fills: factoryFills(readFactory(run.factory), path.basename(path.resolve(run.workflowDir))).fills };
+  } catch (err) {
+    if (!isRefusal(err)) throw err;
+    return { unread: { name: run.factory, gone: err instanceof Missing } };
+  }
+}
+
+/** `why` ended with a full stop, where it ends with no stop of its own. */
+const stopped = (why: string): string => (/[.!?]$/.test(why) ? why : `${why}.`);
+
+/**
+ * The run's workflow folder, read now as its start read it: its steps, or none and a warning — the folder gone, or no longer read as a
+ * workflow, in the folder's words ended with one full stop.
+ *
+ * Its agents and skills are looked for where the start looked, the run's repository's own folder of them, then yours; and a run started
+ * in a factory is read with that factory's hires and rules as they are now (`factoryRead`), so a step the factory hires an agent into
+ * reads as it did. None of a start's own refusals is asked: a workflow detached since still reads. A factory that is gone or does not
+ * read hands no hires: the folder is read without them, and where it then does not read, the warning names the factory and never quotes a
+ * loader that was given no hires.
  *
  * The run record is the truth about what ran; the folder is only where the prose came from, and it can be edited or deleted after
  * `nemia start`. So a folder that does not read is a warning, not a failure of the request. On a run that froze its workflow, the warning
  * says nothing the page draws comes from the folder. On a run that froze none, it is the folder's words alone: such a run is not judged
- * (`judgedUnlessUnreadable` answers `unloadedWords`), and its page says that instead. Its agents and skills are looked for where the start
- * looked: the run's repository's own folder of them, then yours.
+ * (`judgedUnlessUnreadable` answers `unloadedWords`), and its page says that instead.
  */
 export function workflowsOf(run: Run, home: string): { steps: Workflow[]; warning: null } | { steps: null; warning: string } {
+  const { fills, unread } = factoryRead(run);
   try {
-    return { steps: loadWorkflows(run.workflowDir, { repo: run.repo, home }), warning: null };
+    return { steps: loadWorkflows(run.workflowDir, { repo: run.repo, home }, fills), warning: null };
   } catch (err) {
-    const why = fs.existsSync(run.workflowDir)
-      ? `The workflow folder ${run.workflowDir} no longer reads as a workflow: ${(err as Error).message}.`
-      : `The workflow folder ${run.workflowDir} is gone.`;
+    const folder = `The workflow folder ${run.workflowDir}`;
+    const why = !fs.existsSync(run.workflowDir)
+      ? `${folder} is gone.`
+      : unread
+        ? `${folder} is not read as this run's start read it: the factory ${unread.name} it started in ${unread.gone ? 'is gone' : 'no longer reads'}.`
+        : `${folder} no longer reads as a workflow: ${stopped((err as Error).message)}`;
     return {
       steps: null,
       warning: run.workflow

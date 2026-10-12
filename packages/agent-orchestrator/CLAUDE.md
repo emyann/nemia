@@ -63,7 +63,8 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
 - **A key added to `AGENT_KEYS` that is no role key is excluded in three places** (`ROLE_KEYS` in the api's `builder.ts` and in
   `src/roster/roster.ts`, the web's `lib/agents.ts`); a key naming a file beside the agent is digested by `agentVersion` and by
   `workflowVersion` (`src/folder/version.store.ts`).
-- **A folder is read with its places** (`lookupRoots`): a reader outside `wf start` passes `Places` (`placesOf(repo)`), and a version is
+- **A folder is read with its places** (`lookupRoots`): a reader outside `wf start` passes `Places` (`placesOf(repo)`), a factory's
+  folder is read with its hires and rules too, built by `factoryFills` alone (`rules/rules.store.ts`; a run's by `workflowsOf`), and a version is
   checked with the places it was listed with (`skillsAt`). Who names an agent is read in every place that falls back to it (`repoUsers`),
   and a guard added at load goes on every verb that sets the same thing (`autoDropped`).
 - **A key one function refuses is refused by every function that writes it**: grep for the key before trusting "one writer" in a comment.

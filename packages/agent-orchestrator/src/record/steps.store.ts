@@ -4,6 +4,7 @@
  * controllers, as `record.store.ts` is, which re-exports `stepsOf`.
  */
 import { orderSteps, type Workflow } from '../workflow.ts';
+import { wfRoot } from '../config/config.store.ts';
 import { loadWorkflows } from '../folder/folder.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import type { Run } from './record.ts';
@@ -37,10 +38,14 @@ export const unloadedFolder = (err: unknown): string | undefined => (err instanc
  */
 export const stepsOf = (run: Run): Workflow[] => orderSteps(run.workflow ?? folderOf(run));
 
-/** The steps of `run`'s workflow folder, read now (`loadWorkflows`); refuses a folder that does not load (`UnloadedFolder`). */
+/**
+ * The steps of `run`'s workflow folder, read now (`loadWorkflows`) with the run's places, its repository's and the store's (`wfRoot`), as
+ * its page reads it; with no hires, since a record that froze no workflow names no factory. Refuses a folder that does not load
+ * (`UnloadedFolder`).
+ */
 const folderOf = (run: Run): Workflow[] => {
   try {
-    return loadWorkflows(run.workflowDir);
+    return loadWorkflows(run.workflowDir, { repo: run.repo, home: wfRoot() });
   } catch (err) {
     throw new UnloadedFolder(run, err instanceof Error ? err.message : String(err));
   }

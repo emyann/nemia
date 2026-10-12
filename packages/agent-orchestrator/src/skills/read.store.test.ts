@@ -253,3 +253,82 @@ test("REFUSED still: a name both of a repository's places have as two folders, t
   assert.ok(said.startsWith(`x is a skill in both ${path.join(repo, 'workflows', 'skills', 'x')} and ${given(repo)}`), said);
   assert.ok(said.endsWith('Keep one of them.'), said);
 });
+
+/** A checkout (`checkout`) holding the nested skills `app:y` and `other:z` too. */
+function nestedCheckout(): string {
+  const repo = checkout();
+  written(repo, {
+    'app/.claude/skills/y/SKILL.md': SKILL,
+    'app/shared/notes.md': 'Of the folder.\n',
+    'shared/notes.md': 'Of the repository.\n',
+    'other/.claude/skills/z/SKILL.md': SKILL,
+  });
+  return repo;
+}
+
+test('a skill named with its folder is found in that folder alone, when asked: no walk lists it, and a bare name is never it', () => {
+  const repo = nestedCheckout();
+  const skills = skillsFor(path.join(repo, 'workflows', 'dev'), { repo });
+  assert.equal(skills.at.get('app:y'), path.join(repo, 'app', '.claude', 'skills', 'y'));
+  assert.equal(skills.at.get('other:z'), path.join(repo, 'other', '.claude', 'skills', 'z'));
+  assert.deepEqual(
+    [...skills.all.keys()].filter((name) => ['y', 'z', 'app:y', 'other:z'].includes(name)),
+    [],
+  );
+  assert.equal(skills.at.get('y'), undefined);
+  assert.equal(skills.at.get('x'), undefined, 'the checkout’s skills/x is no root’s');
+  assert.equal(skills.at.get('../app:y'), undefined, 'neither form: no folder is looked in');
+});
+
+test('REFUSED: a folder that holds no such skill, naming the skill and where it was looked for', () => {
+  const repo = nestedCheckout();
+  const at = path.join(repo, 'app', '.claude', 'skills', 'nope');
+  assert.equal(
+    refusalOf(found(repo, 'app:nope')),
+    `\`app:nope\` is the skill \`nope\` of the repository's folder \`app\`, and ${at} holds no SKILL.md. A skill is a folder holding a SKILL.md: write ${path.join(at, 'SKILL.md')}, or take \`app:nope\` off the \`skills:\` line.`,
+  );
+  assert.ok(refusalOf(found(repo, 'gone:y')).includes(path.join(repo, 'gone', '.claude', 'skills', 'y')));
+});
+
+test('REFUSED: a skill named with its folder read with no repository, the store alone or nothing', () => {
+  const repo = nestedCheckout();
+  const said =
+    "`app:y` is the skill `y` of the repository's folder `app`, and this is read with no repository: a skill named with its folder is " +
+    'read from the repository a run is started on. Start the run on that repository, or take `app:y` off the `skills:` line.';
+  assert.equal(refusalOf(skillsFor(path.join(repo, 'workflows', 'dev')).at.get('app:y')), said);
+  assert.equal(refusalOf(skillsFor(path.join(repo, 'workflows', 'dev'), { home: repo }).at.get('app:y')), said);
+});
+
+test('REFUSED: a named folder that is a link out of the repository, by name, and the skill it holds outside is never given', () => {
+  const repo = checkout();
+  const outside = written(scratch('wf-skill-folders-outside-'), { '.claude/skills/y/SKILL.md': '---\nname: y\n---\nSENTINEL\n' });
+  linked(outside, path.join(repo, 'app'));
+  const at = found(repo, 'app:y');
+  assert.equal(
+    refusalOf(at),
+    `\`app:y\` is the skill \`y\` of the repository's folder \`app\`, and ${path.join(repo, 'app')} is reached through a link whose target is outside the repository ${repo}: make it a folder of the repository's own, or take \`app:y\` off the \`skills:\` line.`,
+  );
+  assert.ok(!refusalOf(at).includes('SENTINEL'));
+  written(repo, { 'real/.claude/skills/y/SKILL.md': SKILL });
+  linked(path.join(repo, 'real'), path.join(repo, 'inside'));
+  assert.equal(found(repo, 'inside:y'), path.join(repo, 'inside', '.claude', 'skills', 'y'), 'a folder linked inside the repository');
+});
+
+test('a nested skill’s link is followed inside the folder its line names; REFUSED into a sibling folder, naming the folder that bounds it', () => {
+  const repo = nestedCheckout();
+  const y = path.join(repo, 'app', '.claude', 'skills', 'y');
+  linked('../../../shared/notes.md', path.join(y, 'notes.md'));
+  assert.equal(found(repo, 'app:y'), y);
+  assert.deepEqual(
+    skillFiles(y).map((file) => ('real' in file ? [file.path, fs.readFileSync(file.real, 'utf8')] : file)),
+    [
+      ['SKILL.md', SKILL],
+      ['notes.md', 'Of the folder.\n'],
+    ],
+  );
+  linked('../../../../shared/notes.md', path.join(y, 'far.md'));
+  assert.equal(
+    refusalOf(skillsFor(path.join(repo, 'workflows', 'dev'), { repo }).at.get('app:y')),
+    `y/far.md${LEAVES} The links of \`app:y\` stay inside ${path.join(repo, 'app')}, the folder its line names.`,
+  );
+});

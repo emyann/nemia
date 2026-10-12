@@ -13,11 +13,12 @@ import { lookupRoots, skillsFor, skillVersion, type Places } from '../skills/rea
 
 /**
  * The value a file's frontmatter gives `key`, as the parser reads it (`frontmatterKey`), so `  agent: coder` and `agent : coder` name the
- * agent they load with. None for a file with no such line, or whose frontmatter never closes. A name with a slash names no file of agents/.
+ * agent they load with. None for a file with no such line, or whose frontmatter never closes; nor for an `agent` with a slash, which
+ * names no file of agents/. A `skills` line is given whole: a skill named with its folder holds one (`apps/web:ds-build`).
  */
 function frontmatterNamed(text: string, key: 'agent' | 'skills'): string[] {
   const value = frontmatterKey(text, key);
-  return value && !/[\\/]/.test(value) ? [value] : [];
+  return value && (key === 'skills' || !/[\\/]/.test(value)) ? [value] : [];
 }
 
 /** The skills a step file's own `skills:` line adds to its agent's, by name. None for a file with no such line. */

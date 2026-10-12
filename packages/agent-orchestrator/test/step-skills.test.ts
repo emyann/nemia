@@ -178,6 +178,38 @@ test("REFUSED: a step's `skills:` that names no skill, one twice, or a name no s
   );
 });
 
+test("REFUSED: a name on `skills:` that is neither a skill's name nor folder:name, in words that say the two forms", () => {
+  const said = refusal(() => stepOf(AGENTS, 'agent: ada\nskills: app:Y'));
+  assert.ok(said.startsWith("build: `skills: app:Y` has `app:Y`, which is not a skill's name."), said);
+  assert.ok(said.includes("a skill's name — its folder in skills/, lowercase words joined by dashes"), said);
+  assert.ok(said.includes('or `folder:name`') && said.includes('`apps/web:ds-build`'), said);
+  for (const odd of ['../x:y', 'a:b:y', '.claude:y'])
+    assert.ok(refusal(() => stepOf(AGENTS, `agent: ada\nskills: ${odd}`)).includes(`has \`${odd}\`, which is not a skill's name.`), odd);
+  assert.deepEqual(stepOf(AGENTS, 'agent: ada\nskills: x, apps/web:y').agent?.skills, ['alpha', 'beta', 'x', 'apps/web:y']);
+});
+
+test('REFUSED: two skills of one bare name in one step, on one line or across the agent’s and the step’s, naming both', () => {
+  assert.equal(
+    refusal(() => stepOf(AGENTS, 'agent: ada\nskills: x, app:x')),
+    'build: `skills: x, app:x` gives `x` and `app:x`, two skills named `x`. A session loads a skill by its bare name, so one step holds one skill of a name. Keep one.',
+  );
+  assert.equal(
+    refusal(() => stepOf(AGENTS, 'agent: ada\nskills: app:alpha')),
+    "build: its session would be given `alpha`, on agents/ada.md's `skills:`, and `app:alpha`, on this step's `skills:`: two skills named `alpha`. A session loads a skill by its bare name, so one step holds one skill of a name. Keep one of them here, and give the other to another step.",
+  );
+  const nested = agentsOf({ ada: '---\nskills: a:x\n---\nWork.\n' });
+  const both = refusal(() => stepOf(nested, 'agent: ada\nskills: b:x'));
+  assert.ok(both.includes("`a:x`, on agents/ada.md's `skills:`, and `b:x`, on this step's `skills:`"), both);
+  assert.deepEqual(stepOf(nested, 'agent: ada\nskills: a:x, b:y').agent?.skills, ['a:x', 'b:y'], 'the agent’s own again, and another name');
+});
+
+test('REFUSED: a skill named with its folder added past an agent’s deny of its bare name, as a session calls it', () => {
+  const fenced = agentsOf({ one: '---\ndisallowedTools: Skill(y)\n---\nWork.\n', other: '---\ndisallowedTools: Skill(z)\n---\nWork.\n' });
+  const said = refusal(() => stepOf(fenced, 'agent: one\nskills: app:y'));
+  assert.ok(said.startsWith("build: `skills: app:y` adds `app:y` to one's skills, and agents/one.md denies it `Skill(y)`"), said);
+  assert.deepEqual(stepOf(fenced, 'agent: other\nskills: app:y').agent?.skills, ['app:y']);
+});
+
 /** The tests' team, copied, with `dev/implement.md` written as `text`: the copy's root. */
 function teamWith(text: string): string {
   const root = teamCopy('wf-step-skills-team-');

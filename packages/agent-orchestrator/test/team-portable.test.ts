@@ -142,9 +142,10 @@ test('REFUSED: an agent whose `skills:` names a skill that is not a role’s own
   const files = new Map([
     ['workflows/agents/x.md', '---\nrole: X\nskills: implement-a-change, git, look\n---\nYou are X.\n'],
     ['workflows/agents/y.md', '---\nrole: Y\nskills: grilling\n---\nYou are Y. Mind your skills: look, board.\n'],
+    ['workflows/agents/z.md', '---\nrole: Z\nskills: implement-a-change, apps/web:ds-build\n---\nYou are Z.\n'],
     ['.claude/skills/x/SKILL.md', '---\nname: x\nskills: look\n---\n# X\n'],
   ]);
-  assert.deepEqual(foreignSkills(files), ['workflows/agents/x.md: look']);
+  assert.deepEqual(foreignSkills(files), ['workflows/agents/x.md: look', 'workflows/agents/z.md: apps/web:ds-build']);
 });
 
 test("each agent of the team names only its role's skills", () => {

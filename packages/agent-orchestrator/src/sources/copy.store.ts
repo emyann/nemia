@@ -9,6 +9,7 @@ import path from 'node:path';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import { frontmatterKey } from '../former/former.ts';
 import { linkRefusal } from '../folder/folder.ts';
+import { givenSkillOf } from '../keys/index.ts';
 import { yourSkillsDir, yoursOf } from '../yours/yours.ts';
 import { agentDraftOf, agentNameRefusal, renderAgent, type AgentDraft } from '../agents/agents.ts';
 import { copyRecordFile, readCopyRecord, sourceSkills, sourceVersion, type CopyRecord } from '../agents/read.store.ts';
@@ -65,7 +66,10 @@ export function readSource(file: string, as: string | undefined): Source {
   };
 }
 
-/** The skills the agent of `source` gives, by name and the folder each is found in; a place skill Nemia ships is left out. */
+/**
+ * The skills the agent of `source` gives, by name and the folder each is found in; a place skill Nemia ships is left out, and so is one
+ * named with its folder (`givenSkillOf`), a repository's own, which the agent names and the library never holds.
+ */
 export function skillsOf(source: Source, home: string): SourceSkill[] {
   const names = (source.draft.skills ?? '')
     .split(',')
@@ -73,6 +77,7 @@ export function skillsOf(source: Source, home: string): SourceSkill[] {
     .filter(Boolean);
   const found = sourceSkills(source.file, home);
   return names.flatMap((name) => {
+    if (givenSkillOf(name)?.folder !== undefined) return [];
     const dir = found.at.get(name);
     if (dir === undefined)
       throw new Missing({

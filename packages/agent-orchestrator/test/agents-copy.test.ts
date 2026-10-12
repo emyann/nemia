@@ -380,6 +380,20 @@ test("an agent given the place skill Nemia ships copies without it: a start find
   assert.match(fs.readFileSync(path.join(libraryOf(home).agents, 'hand.md'), 'utf8'), /^skills: git$/m);
 });
 
+test('an agent given a skill named with its folder copies without it: the library holds none, and the agent keeps the name', async () => {
+  const home = scratch('wf-agents-copy-home-');
+  const repo = scratch('wf-agents-copy-nested-');
+  fs.mkdirSync(path.join(repo, 'workflows', 'agents'), { recursive: true });
+  fs.mkdirSync(path.join(repo, 'app', '.claude', 'skills', 'y'), { recursive: true });
+  fs.writeFileSync(path.join(repo, 'app', '.claude', 'skills', 'y', 'SKILL.md'), '---\ndescription: Nested.\n---\nDo it.\n');
+  const file = path.join(repo, 'workflows', 'agents', 'hand.md');
+  fs.writeFileSync(file, '---\ndescription: Lends a hand.\nskills: app:y\n---\nHelp.\n');
+  const copied = await copy({ file }, home);
+  assert.deepEqual(copied.copied, ['agents/hand.md']);
+  assert.equal(fs.existsSync(libraryOf(home).skills) && fs.readdirSync(libraryOf(home).skills).length > 0, false, 'no skill is filed');
+  assert.match(fs.readFileSync(path.join(libraryOf(home).agents, 'hand.md'), 'utf8'), /^skills: app:y$/m);
+});
+
 test('the copy is classed a prompt write, served on its generated route', () => {
   const entry = TABLE.find((c) => c.name === 'agents copy');
   assert.equal(entry && 'nemia' in entry ? entry.nemia : undefined, 'prompts');

@@ -165,7 +165,7 @@ export async function listSkills(
     { from: 'yours', dir: librarySkills(home), skills: [] },
     { from: 'repo', dir: path.join(path.resolve(repo), '.claude', SKILLS_FOLDER), skills: [] },
   ];
-  const sorted = [...found.at].filter(([, at]) => typeof at !== 'string' || !isShippedPlace(at)).sort(([a], [b]) => a.localeCompare(b));
+  const sorted = [...found.all].filter(([, at]) => typeof at !== 'string' || !isShippedPlace(at)).sort(([a], [b]) => a.localeCompare(b));
   const dirOf = ([name, at]: (typeof sorted)[number]) =>
     at instanceof WorkflowError ? (skillDirIn([places[0].dir, places[1].dir], name) ?? path.join(places[0].dir, name)) : at;
   const shippedNames = skillFolders(shipped);

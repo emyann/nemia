@@ -239,10 +239,11 @@ function renderedForWrite(name: string, rules?: string) {
 renderedForWrite(RULED, JSON.stringify({ rules: RULES }));
 renderedForWrite('look');
 renderedForWrite('unread', '{ "rules": [{ "id": "x" }] }');
+renderedForWrite('y', JSON.stringify({ rules: [{ id: 'no-wget', says: 'Never download', breaks: ['Bash(wget:*)'] }] }));
 writeRun(
   'denied',
   [
-    { name: 'write', after: [], body: 'Write it.', agent: { ...agent('ada'), skills: [RULED, 'look', 'unread'] } },
+    { name: 'write', after: [], body: 'Write it.', agent: { ...agent('ada'), skills: [RULED, 'look', 'unread', 'app:y'] } },
     { name: 'codex', after: [], body: 'Do it.', harness: 'codex' },
     { name: 'bg', after: [], body: 'Do it.', background: true },
     { name: 'quiet', after: [], body: 'Do it.' },
@@ -298,10 +299,11 @@ writeRun(
 
 const TOUCHED_DAY = '2026-09-16';
 endedSession('touched-design', TOUCHED_DAY, 1, [{ skills: [], files: ['apps/web/src/a.tsx'] }]);
-endedSession('touched-design-2', TOUCHED_DAY, 2, [{ skills: ['change-the-board', 'shadcn'], files: ['apps/web/src/b.tsx'] }]);
+endedSession('touched-design-2', TOUCHED_DAY, 2, [{ skills: ['change-the-board', 'shadcn', 'y'], files: ['apps/web/src/b.tsx'] }]);
 for (const [name, applies] of [
   ['change-the-board', 'applies: ["apps/web/**"]\n'],
   ['shadcn', ''],
+  ['y', 'applies: ["apps/web/**"]\n'],
 ]) {
   const dir = path.join(ROOT, 'runs', 'touched', 'agents', 'design', 'nemia-seldon', 'skills', name);
   fs.mkdirSync(dir, { recursive: true });
@@ -309,7 +311,7 @@ for (const [name, applies] of [
 }
 writeRun(
   'touched',
-  [{ name: 'design', after: [], body: 'Design it.', agent: { ...agent('seldon'), skills: ['change-the-board', 'shadcn'] } }],
+  [{ name: 'design', after: [], body: 'Design it.', agent: { ...agent('seldon'), skills: ['change-the-board', 'shadcn', 'app:y'] } }],
   { design: { taskId: 'touched-design-2', tries: [{ taskId: 'touched-design', then: 'retries' }] } },
   { factory: 'touched', createdAt: `${TOUCHED_DAY}T00:00:00.000Z` },
 );
@@ -474,9 +476,10 @@ test("nemia stats counts each rule a step's frozen skills declare, kept or broke
     [
       { skill: RULED, rule: 'no-rm', says: 'Never remove', kept: 1, broken: 1 },
       { skill: RULED, rule: 'no-write', says: 'Write nothing at the root', kept: 1, broken: 1 },
+      { skill: 'app:y', rule: 'no-wget', says: 'Never download', kept: 2, broken: 0 },
       { skill: RULED, rule: 'no-curl', says: 'Never fetch', kept: 2, broken: 0 },
     ],
-    "write's two sessions, its recheck not counted again; look declares none, and unread's rules.json does not read",
+    "write's two sessions, its recheck not counted again; look declares none, and unread's rules.json does not read; a skill named with its folder, frozen as `y`, has its rules said as its line writes it",
   );
   assert.deepEqual(s.all.steps.find((row) => row.step === 'quiet')?.rules, [], 'a step given no skill');
   const words = await printedBy(t, ['stats', ...range]);
@@ -522,10 +525,11 @@ test("nemia stats counts the tries that touched a frozen skill's paths and how m
   assert.deepEqual(
     s.all.steps.find((r) => r.step === 'design')?.skills,
     [
+      { skill: 'app:y', count: 1, tries: 1, touched: 2, loadedWhenTouched: 1 },
       { skill: 'change-the-board', count: 1, tries: 1, touched: 2, loadedWhenTouched: 1 },
       { skill: 'shadcn', count: 1, tries: 1, touched: null, loadedWhenTouched: null },
     ],
-    'both tries touched apps/web and one loaded change-the-board; shadcn declares no path',
+    'both tries touched apps/web and one loaded change-the-board; shadcn declares no path; a skill named with its folder, frozen and loaded as `y`, is counted as its line writes it',
   );
   const words = await printedBy(t, ['stats', ...range]);
   assert.match(words, /^design\s+seldon\s+change-the-board\s+1\s+1\s+1 of 2$/m);

@@ -350,6 +350,30 @@ test("a bare workflow name started in a templated factory is its tree's, and the
   assert.equal(run.factory, 'started');
 });
 
+test('REFUSED: a start of a template whose step names a skill named with its folder, on a repository that lacks it, by name', async () => {
+  const from = repoWithTeam();
+  fs.mkdirSync(path.join(from, 'app', '.claude', 'skills', 'y'), { recursive: true });
+  fs.writeFileSync(path.join(from, 'app', '.claude', 'skills', 'y', 'SKILL.md'), '---\ndescription: Nested.\n---\nDo it.\n');
+  const implement = path.join(from, 'workflows', 'dev', 'implement.md');
+  fs.writeFileSync(implement, fs.readFileSync(implement, 'utf8').replace('agent: implementer\n', 'agent: implementer\nskills: app:y\n'));
+  const dir = path.join(scratch('wf-applied-template-'), 'team');
+  exportTemplate({ dir, from });
+  const lacking = repoWithTeam();
+  await apply('nested', dir, lacking);
+  reconcileFactory(templated('nested'));
+  const step = fs.readFileSync(path.join(treeDir('nested'), 'workflows', 'dev', 'implement.md'), 'utf8');
+  assert.match(step, /^skills: app:y$/m, 'the applied step names the skill as the template does');
+  assert.equal(fs.existsSync(path.join(treeDir('nested'), 'workflows', 'skills', 'y')), false, 'and the tree carries none');
+  const at = path.join(lacking, 'app', '.claude', 'skills', 'y');
+  await assert.rejects(
+    async () => await main(['start', 'Use the nested skill', '--factory', 'nested', '--workflows', 'dev'], noEngine()),
+    (err: Error) =>
+      err.message.includes(
+        `implement: \`skills: app:y\` adds the skill \`app:y\`, which cannot be used — \`app:y\` is the skill \`y\` of the repository's folder \`app\`, and ${at} holds no SKILL.md.`,
+      ),
+  );
+});
+
 test("a templated factory's due schedule starts its tree's workflow, as a person's start does, never the repository's", async (t) => {
   t.mock.method(console, 'log', () => {});
   const { dir, repo } = template();

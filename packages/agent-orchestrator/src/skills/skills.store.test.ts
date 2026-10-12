@@ -143,13 +143,11 @@ test("a SKILL.md's text, or empty where it cannot be read", () => {
 
 test("REFUSED: a given skill no folder has, naming where a start looked; one two folders of a place have, in the package's words", () => {
   const root = scratch('wf-skills-');
-  const found = {
-    at: new Map<string, string | InstanceType<typeof WorkflowError>>([
-      ['tidy', skillAt(root, 'tidy', SKILL)],
-      ['twice', new WorkflowError("twice is in both of the repository's folders of skills: say which.")],
-    ]),
-    looked: [root, '/elsewhere/skills'],
-  };
+  const all = new Map<string, string | InstanceType<typeof WorkflowError>>([
+    ['tidy', skillAt(root, 'tidy', SKILL)],
+    ['twice', new WorkflowError("twice is in both of the repository's folders of skills: say which.")],
+  ]);
+  const found = { at: all, all, looked: [root, '/elsewhere/skills'] };
   const [gone, twice, tidy] = givenSkills(['gone', 'twice', 'tidy'], found);
   assert.deepEqual(gone, {
     name: 'gone',

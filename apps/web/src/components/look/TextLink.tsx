@@ -1,6 +1,6 @@
 import { Link as AriaLink, type LinkProps } from 'react-aria-components';
 import { cn, focusRing } from '@/components/ui/ds/utils';
-import { routeLink } from './routeLink';
+import { routeLink } from '../routeLink';
 
 /**
  * How the board's text link is drawn: the surface's ink and no line at rest, underlined a little under the line under the pointer and

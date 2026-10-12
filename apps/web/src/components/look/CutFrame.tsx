@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { paint } from '@/lib/meaning';
 import { cn } from '@/components/ui/ds/utils';
+import { cutPoints, cutShape, type CutSize } from './cut';
 
 /** The hue of a cut frame's edge: what waits on a person, a session at work, or none, a quiet outline. */
 export type FrameHue = 'yours' | 'alive' | 'none';
@@ -18,63 +19,6 @@ const GLOW: Record<FrameHue, string | undefined> = {
   alive: undefined,
   none: undefined,
 };
-
-/** How long a cut is along each side, in pixels: a card's, a table's, a button's. */
-export type CutSize = 28 | 24 | 12;
-
-/** How much longer a cut is, for each pixel its shape is grown by on every side, so the grown cut runs beside the first: 2 − √2. */
-const GROWN = 2 - Math.SQRT2;
-
-/**
- * The outline of a box whose top-right and bottom-left corners are cut, as a `polygon`'s points: the box's own, or with `inset` the
- * outline that many pixels inside it, its cuts beside the first's.
- *
- * @param cut how long a cut is along each side of the box, in pixels
- * @param inset how far inside the box the outline runs, in pixels
- */
-export function cutPoints(cut: number, inset = 0): string {
-  const far = (length: number) => (length === 0 ? '100%' : `calc(100% - ${Number(length.toFixed(2))}px)`);
-  const near = (length: number) => `${Number(length.toFixed(2))}px`;
-  const [a, b] = [inset, inset + cut - inset * GROWN];
-  return [
-    `${near(a)} ${near(a)}`,
-    `${far(b)} ${near(a)}`,
-    `${far(a)} ${near(b)}`,
-    `${far(a)} ${far(a)}`,
-    `${near(b)} ${far(a)}`,
-    `${near(a)} ${far(b)}`,
-  ].join(', ');
-}
-
-/** The clip that leaves a box its cut shape: its top-right and bottom-left corners cut by `cut` pixels. */
-export const cutShape = (cut: number): string => `polygon(${cutPoints(cut)})`;
-
-/**
- * The clip that leaves a box a band along its edge, `width` pixels wide, in the cut shape: the ring of a shape `cut` pixels cut that
- * stands inside the box, `width` and a gap from its edge on every side.
- *
- * @param cut how long the cut of the shape inside is, in pixels
- * @param gap the room between the shape and its ring, in pixels
- * @param width how wide the ring is, in pixels
- */
-export function cutRing(cut: number, gap: number, width: number): string {
-  const outer = cutPoints(cut + (gap + width) * GROWN);
-  const inner = cutPoints(cut + (gap + width) * GROWN, width);
-  const [from, hole] = [outer.split(', ')[0], inner.split(', ')[0]];
-  return `polygon(evenodd, ${outer}, ${from}, ${inner}, ${hole}, ${from})`;
-}
-
-/** The clip that cuts a tag's top-right corner, seven pixels along each side. */
-const TAG_CUT = 'polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 0 100%)';
-
-/** A tag with its top-right corner cut, as the look cuts the tag that says a state: what it holds takes no focus, so no ring is cut. */
-export function CutTag({ children }: { children: ReactNode }) {
-  return (
-    <span data-cut-tag className="inline-flex" style={{ clipPath: TAG_CUT }}>
-      {children}
-    </span>
-  );
-}
 
 /**
  * The look's cut-corner frame: a shape of its own under what it holds, its top-right and bottom-left corners cut, an edge in `hue`

@@ -9,13 +9,14 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { createMemoryHistory, createRootRoute, createRouter, RouterContextProvider } from '@tanstack/react-router';
 import './tsx.ts';
 
-const { CutFrame, CutTag } = await import('../src/components/CutFrame.tsx');
-const { Pager } = await import('../src/components/Pager.tsx');
-const { PageName, Plate } = await import('../src/components/Plate.tsx');
-const { RunSteps } = await import('../src/components/RunSteps.tsx');
-const { ScanLines } = await import('../src/components/ScanLines.tsx');
-const { Sticker } = await import('../src/components/Sticker.tsx');
-const { TextLink } = await import('../src/components/TextLink.tsx');
+const { CutFrame } = await import('../src/components/look/CutFrame.tsx');
+const { CutTag } = await import('../src/components/look/CutTag.tsx');
+const { Pager } = await import('../src/components/look/Pager.tsx');
+const { PageName, Plate } = await import('../src/components/look/Plate.tsx');
+const { RunSteps } = await import('../src/components/look/RunSteps.tsx');
+const { ScanLines } = await import('../src/components/look/ScanLines.tsx');
+const { Sticker } = await import('../src/components/look/Sticker.tsx');
+const { TextLink } = await import('../src/components/look/TextLink.tsx');
 
 /** The markup of `element` under a router whose address is `at`. */
 async function drawn(element: ReactElement, at = '/'): Promise<string> {

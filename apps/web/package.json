@@ -10,7 +10,8 @@
     "test": "node --import=../../tools/test-costs/probe.ts --test --test-concurrency=2 --test-timeout=120000 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=../../tools/test-costs/reporter.ts --test-reporter-destination=stderr test/*.test.ts",
     "e2e": "node --test --test-timeout=120000 test/e2e/*.test.ts && node test/e2e/run.ts",
     "board:serve": "node test/e2e/serve.ts serve",
-    "board:stop": "node test/e2e/serve.ts stop"
+    "board:stop": "node test/e2e/serve.ts stop",
+    "storybook": "storybook dev -p 6007 --no-open"
   },
   "dependencies": {
     "@blobatar/react": "2.7.0",
@@ -47,6 +48,7 @@
     "@google/design.md": "^0.4.0",
     "@material/material-color-utilities": "^0.4.0",
     "@rolldown/plugin-babel": "^0.2.4",
+    "@storybook/react-vite": "10.6.1",
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/router-plugin": "^1.168.37",
     "@types/react": "^19.3.0",
@@ -55,6 +57,7 @@
     "babel-plugin-react-compiler": "^1.0.0",
     "playwright": "1.62.1",
     "shadcn": "4.21.0",
+    "storybook": "10.6.1",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",

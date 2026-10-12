@@ -5,10 +5,7 @@ import { titleOf } from '@/lib/factory';
 import { ink } from '@/lib/meaning';
 import { endedWords, sinceShort, whenWords } from '@/lib/runWords';
 import { cn } from '@/components/ui/ds/utils';
-import { CopyId } from './CopyId';
-import { CutFrame, FRAMED_BOX, FRAMED_ROW, FRAMED_TABLE } from './CutFrame';
-import { Pager } from './Pager';
-import { TextLink } from './TextLink';
+import { CopyId, CutFrame, FRAMED_BOX, FRAMED_ROW, FRAMED_TABLE, Pager, TextLink } from './look';
 
 /** A column's heading, in the look's small caps. */
 const HEAD = 'text-label-small uppercase';

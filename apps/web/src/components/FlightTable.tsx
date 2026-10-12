@@ -4,11 +4,8 @@ import { factoryOf } from '@/lib/factories';
 import { titleOf } from '@/lib/factory';
 import { ink } from '@/lib/meaning';
 import { nowOf, sinceShort } from '@/lib/runWords';
-import { CopyId } from './CopyId';
 import { cn } from '@/components/ui/ds/utils';
-import { CutFrame, CutTag, FRAMED_BOX, FRAMED_END, FRAMED_ROW, FRAMED_TABLE } from './CutFrame';
-import { RunSteps } from './RunSteps';
-import { TextLink } from './TextLink';
+import { CopyId, CutFrame, CutTag, FRAMED_BOX, FRAMED_END, FRAMED_ROW, FRAMED_TABLE, RunSteps, TextLink } from './look';
 
 /** A column's heading, in the look's small caps. */
 const HEAD = 'text-label-small uppercase';

@@ -72,7 +72,7 @@ export function StepNode({
 
       <div className="px-3 pt-2 pb-2">
         <div className="flex items-center justify-between gap-2">
-          <span className={`font-mono text-[10px] uppercase tracking-wider ${gate ? 'text-yours' : 'text-muted-foreground'}`}>
+          <span className={`text-label-small uppercase ${gate ? 'text-yours' : 'text-muted-foreground'}`}>
             {gate ? 'human gate' : stepLabel(index)}
           </span>
           {running && (
@@ -83,15 +83,15 @@ export function StepNode({
             />
           )}
         </div>
-        <p className="mt-0.5 truncate text-sm font-semibold" title={step.name}>
+        <p className="mt-0.5 truncate text-body-medium font-semibold" title={step.name}>
           {step.name}
         </p>
-        <p className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">{spec ? runsOn(spec) : 'no spec'}</p>
+        <p className="mt-0.5 truncate font-mono text-body-small text-muted-foreground">{spec ? runsOn(spec) : 'no spec'}</p>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t border-outline-variant px-3 py-1.5">
         <StatusChip status={step.status} runCancelled={runCancelled} runHeld={runHeld} note={step.note} />
-        <span className="font-mono text-[11px] text-muted-foreground">
+        <span className="font-mono text-body-small text-muted-foreground">
           {attemptLine(step.attempts, live, now) ?? (step.taskId === null ? 'not filed yet' : 'no attempt yet')}
         </span>
       </div>
@@ -104,7 +104,7 @@ export function StepNode({
               ? `What its tries have cost of its ${step.budget.said} budget${over ? (held ? ': the cap or more, so the run spends nothing more on it until a person raises it' : ': the cap or more — its harness ends a job at its cap, a little past it where a call was under way, and this step finished; nothing waits on a raise') : ''}`
               : 'What its tries have cost'
           }
-          className={`truncate border-t border-outline-variant px-3 py-1 font-mono text-[11px] ${over ? 'font-semibold text-money' : 'text-muted-foreground'}`}
+          className={`truncate border-t border-outline-variant px-3 py-1 font-mono text-body-small ${over ? 'font-semibold text-money' : 'text-muted-foreground'}`}
         >
           <span className="font-sans font-normal">cost </span>
           {cost}
@@ -114,7 +114,7 @@ export function StepNode({
       {gate && (
         <p
           title={need ? nodeNeed(need, step) : undefined}
-          className="truncate border-t border-border bg-yours-container px-3 py-1 text-xs text-on-yours-container"
+          className="truncate border-t border-border bg-yours-container px-3 py-1 text-body-small text-on-yours-container"
         >
           <span className="font-semibold">waiting on you</span>
           {need && (
@@ -129,7 +129,7 @@ export function StepNode({
         <p
           data-need={need.kind}
           title={needText(need)}
-          className="truncate border-t border-border bg-yours-container px-3 py-1 text-xs text-on-yours-container"
+          className="truncate border-t border-border bg-yours-container px-3 py-1 text-body-small text-on-yours-container"
         >
           {needNodeText(need)}
         </p>
@@ -138,7 +138,7 @@ export function StepNode({
         <p
           data-denied
           title={step.denied.words}
-          className="truncate border-t border-outline-variant px-3 py-1 font-mono text-[11px] text-failure"
+          className="truncate border-t border-outline-variant px-3 py-1 font-mono text-body-small text-failure"
         >
           {deniedNodeText(step.denied.calls)}
         </p>
@@ -240,15 +240,15 @@ export function SpecNode({
       <Handle type="target" position={targetPosition} isConnectable={false} className="opacity-0" />
 
       <div className="px-3 pt-2 pb-2">
-        <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{stepLabel(index)}</span>
-        <p className="mt-0.5 truncate text-sm font-semibold" title={name}>
+        <span className="text-label-small uppercase text-muted-foreground">{stepLabel(index)}</span>
+        <p className="mt-0.5 truncate text-body-medium font-semibold" title={name}>
           {name}
         </p>
-        <p className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">{runsOn(spec)}</p>
+        <p className="mt-0.5 truncate font-mono text-body-small text-muted-foreground">{runsOn(spec)}</p>
       </div>
 
       {lines.length > 0 && (
-        <dl className="space-y-0.5 border-t border-outline-variant px-3 py-1.5 text-[11px]">
+        <dl className="space-y-0.5 border-t border-outline-variant px-3 py-1.5 text-body-small">
           {lines.map(([label, value, title = value]) => (
             <div key={label} className="flex min-w-0 gap-1.5">
               <dt className="shrink-0 text-muted-foreground">{label}</dt>
@@ -315,19 +315,19 @@ function BuildingNode({
 
       <div className="px-3 pt-2 pb-2">
         <div className="flex items-center justify-between gap-2">
-          <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{stepLabel(index)}</span>
+          <span className="text-label-small uppercase text-muted-foreground">{stepLabel(index)}</span>
           {build.unsaved && (
-            <span className="rounded-full bg-yours-container px-1.5 text-[10px] font-medium text-on-yours-container">unsaved</span>
+            <span className="rounded-full bg-yours-container px-1.5 text-label-small text-on-yours-container">unsaved</span>
           )}
         </div>
-        <p className="mt-0.5 truncate text-sm font-semibold" title={name}>
+        <p className="mt-0.5 truncate text-body-medium font-semibold" title={name}>
           {name}
         </p>
-        <p className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">{runsOn(spec)}</p>
+        <p className="mt-0.5 truncate font-mono text-body-small text-muted-foreground">{runsOn(spec)}</p>
       </div>
 
       {lines.length > 0 && (
-        <dl className="space-y-0.5 border-t border-outline-variant px-3 py-1.5 text-[11px]">
+        <dl className="space-y-0.5 border-t border-outline-variant px-3 py-1.5 text-body-small">
           {lines.map(([label, value, title = value]) => (
             <div key={label} className="flex min-w-0 gap-1.5">
               <dt className="shrink-0 text-muted-foreground">{label}</dt>

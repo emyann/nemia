@@ -33,11 +33,11 @@ export function StateBar({ machine, state }: { machine: string; state: string })
         {graph.data ? (
           <StateBody graph={graph.data} state={state} />
         ) : graph.error ? (
-          <p className="text-sm text-failure">
+          <p className="text-body-medium text-failure">
             Could not read the machine {machine}: {graph.error.message}
           </p>
         ) : (
-          <p className="text-xs text-muted-foreground">Reading the machine…</p>
+          <p className="text-body-small text-muted-foreground">Reading the machine…</p>
         )}
       </div>
     </FloatingBar>
@@ -53,20 +53,20 @@ export function StateBody({ graph, state }: { graph: MachineGraph; state: string
   const facts = stateFacts(graph, state);
   if (!facts)
     return (
-      <p className="text-sm text-yours">
+      <p className="text-body-medium text-yours">
         {graph.title} has no state named {state}.
       </p>
     );
   return (
     <>
       <section aria-label="Kind" className="space-y-1">
-        <h3 className="text-xs font-medium text-muted-foreground">Kind</h3>
+        <h3 className="text-label-medium text-muted-foreground">Kind</h3>
         <p data-state-kind={kindOf(facts)}>
           <span className="font-mono">{kindOf(facts)}</span>: {kindMeaning(facts)}
         </p>
       </section>
       <section aria-label="Stays on" className="space-y-1">
-        <h3 className="text-xs font-medium text-muted-foreground">Stays on</h3>
+        <h3 className="text-label-medium text-muted-foreground">Stays on</h3>
         {facts.stays.length ? (
           <div className="overflow-x-auto rounded border">
             <ByActionList list={facts.stays} />
@@ -76,12 +76,12 @@ export function StateBody({ graph, state }: { graph: MachineGraph; state: string
         )}
       </section>
       <section aria-label="Routes out" className="space-y-1">
-        <h3 className="text-xs font-medium text-muted-foreground">Routes out</h3>
+        <h3 className="text-label-medium text-muted-foreground">Routes out</h3>
         {facts.routes.length ? (
           <ul className="space-y-2">
             {facts.routes.map((route) => (
               <li key={route.to} data-route-out={route.to} className="overflow-x-auto rounded border">
-                <p className="px-2.5 pt-1.5 font-mono text-sm font-semibold">→ {route.to}</p>
+                <p className="px-2.5 pt-1.5 font-mono text-body-medium font-semibold">→ {route.to}</p>
                 <ByActionList list={route.edges}>
                   {route.verbs.map((verb) => (
                     <div key={verb} data-route-verb={verb} className="text-muted-foreground italic">

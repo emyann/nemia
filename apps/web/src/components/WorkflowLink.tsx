@@ -2,7 +2,7 @@ import { Link } from '@tanstack/react-router';
 import { workflowNameOf, type WorkflowPageAddress } from '../lib/api';
 import { placeOfAddress } from '../lib/factories';
 
-const LABEL = 'text-xs text-muted-foreground hover:text-foreground';
+const LABEL = 'text-body-small text-muted-foreground hover:text-foreground';
 
 /**
  * The workflow a run was started from, by its folder's name, the folder in full on hover: linked to its page in the run's place where the

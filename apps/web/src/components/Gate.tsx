@@ -91,14 +91,14 @@ export function Gate({
     <section
       aria-label={`The gate of ${step}`}
       data-gate="awaiting"
-      className={cn('space-y-4 text-sm', framed && 'rounded border border-yours bg-card p-3')}
+      className={cn('space-y-4 text-body-medium', framed && 'rounded border border-yours bg-card p-3')}
     >
       {framed && <GateSentence step={step} back={back} acts={acts} />}
 
       <div className={cn('space-y-4', closeout && 'lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0')}>
         {closeout && (
           <section aria-label={`What ${step} handed on`} className="min-w-0 space-y-2 rounded border border-outline-variant bg-card p-3">
-            <h3 className="text-xs font-medium text-muted-foreground">
+            <h3 className="text-label-medium text-muted-foreground">
               What <span className="font-semibold text-foreground">{step}</span> handed on, which you approve
             </h3>
             <HandedOn closeout={closeout} answeredBeside={questions.length > 0} />
@@ -217,12 +217,12 @@ function ApproveForm({
             Not yet
           </button>
         )}
-        <p className="text-xs">
+        <p className="text-body-small">
           as <code>{approveLine}</code> approves it: the next tick files {acts ? 'it' : 'what waits on it'}
         </p>
       </div>
       {confirming && (
-        <p data-confirm className="text-xs font-medium text-yours">
+        <p data-confirm className="text-body-small font-medium text-yours">
           {`This runs ${step} in the repository's own checkout, and it cannot be taken back: press Run ${step} now to approve it.`}
         </p>
       )}
@@ -334,7 +334,7 @@ function Choice<T extends string>({
   label: (option: T) => ReactNode;
 }) {
   return (
-    <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+    <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-body-small">
       <legend className="sr-only">{legend}</legend>
       {options.map((o) => (
         <label key={o} className="flex cursor-pointer items-center gap-1.5">
@@ -406,9 +406,13 @@ export const sendBackBody = ({
 /** A gate once a person's word is taken (`takenOf`): the step it was about, and what the next tick does with it. */
 function GateTaken({ step, taken }: { step: string; taken: { named: string; said: string } }) {
   return (
-    <section aria-label={`The gate of ${step}`} data-gate="taken" className="rounded border border-outline-variant px-3 py-2 text-sm">
+    <section
+      aria-label={`The gate of ${step}`}
+      data-gate="taken"
+      className="rounded border border-outline-variant px-3 py-2 text-body-medium"
+    >
       <strong>{taken.named}</strong>{' '}
-      <span data-note className="font-mono text-xs text-muted-foreground">
+      <span data-note className="font-mono text-body-small text-muted-foreground">
         {taken.said}
       </span>
     </section>
@@ -460,21 +464,24 @@ export function ActsOn({ run, step }: { run: RunDetail; step: RunDetail['steps']
   const work = run.steps.filter((one) => waitsOn.has(one.name));
 
   return (
-    <section aria-label={`What ${step.name} would act on`} className="min-w-0 space-y-3 rounded border border-outline-variant p-3 text-sm">
+    <section
+      aria-label={`What ${step.name} would act on`}
+      className="min-w-0 space-y-3 rounded border border-outline-variant p-3 text-body-medium"
+    >
       <div className="space-y-1">
-        <h3 className="text-xs font-medium text-muted-foreground">The result it would act on</h3>
+        <h3 className="text-label-medium text-muted-foreground">The result it would act on</h3>
         {standings.map((s) => (
           <p key={s.branch} data-standing={s.where} className="break-words">
-            <span className="font-mono text-xs">{s.said}</span>
+            <span className="font-mono text-body-small">{s.said}</span>
             {s.stat && (
-              <span data-stat className="block font-mono text-xs text-muted-foreground">
+              <span data-stat className="block font-mono text-body-small text-muted-foreground">
                 {s.stat}
               </span>
             )}
           </p>
         ))}
         {!standings.length && (
-          <p className="text-xs text-muted-foreground">
+          <p className="text-body-small text-muted-foreground">
             {error
               ? `The branch could not be read: ${error.message}`
               : isDecidable(data)
@@ -486,16 +493,16 @@ export function ActsOn({ run, step }: { run: RunDetail; step: RunDetail['steps']
 
       {work.map((one) => (
         <div key={one.name} className="min-w-0 space-y-2 border-t border-outline-variant pt-3">
-          <h3 className="text-xs font-medium text-muted-foreground">
+          <h3 className="text-label-medium text-muted-foreground">
             What <span className="font-semibold text-foreground">{one.name}</span> handed on
           </h3>
           {one.closeout ? (
             <Markdown>{one.closeout.summary}</Markdown>
           ) : (
-            <p className="text-xs text-muted-foreground">It signed off with nothing to read.</p>
+            <p className="text-body-small text-muted-foreground">It signed off with nothing to read.</p>
           )}
           {one.closeout && (
-            <div aria-label={`Artifacts of ${one.name}`} className="text-xs text-muted-foreground">
+            <div aria-label={`Artifacts of ${one.name}`} className="text-body-small text-muted-foreground">
               Artifacts:
               <Artifacts artifacts={one.closeout.artifacts} />
             </div>
@@ -533,7 +540,7 @@ export function Approved({ step, approval, ends = false }: { step: string; appro
     <section
       aria-label={`The approval of ${step}`}
       data-approval={approval.try}
-      className="space-y-1 rounded border border-sage bg-surface-variant px-3 py-2 text-sm text-on-surface-variant"
+      className="space-y-1 rounded border border-sage bg-surface-variant px-3 py-2 text-body-medium text-on-surface-variant"
     >
       <p>
         <span className="font-medium text-foreground">Approved</span>{' '}

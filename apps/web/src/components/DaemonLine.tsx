@@ -13,7 +13,7 @@ export function DaemonLine({ daemon, error }: { daemon: Daemon | undefined; erro
   const now = new Date(useNow(30_000));
   if (error) {
     return (
-      <p data-daemon="error" className="max-w-3xl basis-full text-xs text-failure" title={error.message}>
+      <p data-daemon="error" className="max-w-3xl basis-full text-body-small text-failure" title={error.message}>
         Whether a daemon ticks this store could not be read: {error.message}
       </p>
     );
@@ -22,7 +22,7 @@ export function DaemonLine({ daemon, error }: { daemon: Daemon | undefined; erro
   const words = daemonWords(daemon, now);
   if (!words) return null;
   return (
-    <p data-daemon={daemon.kind} title={daemon.line} className="max-w-3xl basis-full text-sm text-yours">
+    <p data-daemon={daemon.kind} title={daemon.line} className="max-w-3xl basis-full text-body-medium text-yours">
       <TriangleAlert aria-hidden className="mr-1 inline size-3.5 -translate-y-px" />
       {words.before}
       <code className="font-medium">{words.command}</code>

@@ -8,7 +8,7 @@ function ConditionLine({ condition }: { condition: FactoryCondition }) {
   const amiss = conditionAmiss(condition);
   return (
     <li
-      className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs"
+      className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-body-small"
       data-condition={condition.type}
       data-condition-status={condition.status}
       data-amiss={amiss ? '' : undefined}
@@ -52,7 +52,7 @@ export function TemplateCard({ template }: { template: FactoryTemplate }) {
         {params.length > 0 || template.conditions.length > 0 ? (
           <CardContent className="flex flex-col gap-2">
             {params.length > 0 && (
-              <dl className="flex flex-wrap gap-x-4 gap-y-1 text-xs" data-template-params>
+              <dl className="flex flex-wrap gap-x-4 gap-y-1 text-body-small" data-template-params>
                 {params.map(([key, value]) => (
                   <div key={key} className="flex gap-1" data-param={key}>
                     <dt className="text-muted-foreground">{key}</dt>

@@ -8,7 +8,7 @@ export function TryTag({ agent }: { agent: string }) {
     <span
       data-try-tag={agent}
       title={`A try of the agent ${agent}, started from its page: fenced to its own folder, with a dollar to spend`}
-      className="shrink-0 rounded-full border border-dashed border-outline px-1.5 py-0.5 text-[10px] leading-none font-medium text-on-surface-variant"
+      className="shrink-0 rounded-full border border-dashed border-outline px-1.5 py-0.5 text-label-small leading-none text-on-surface-variant"
     >
       try
     </span>
@@ -26,7 +26,7 @@ export function StartedFrom({
 }) {
   if (!run.try) return <WorkflowLink dir={run.workflowDir} page={run.workflowPage} />;
   return (
-    <span className="flex items-center gap-1.5 text-xs text-muted-foreground" title={run.workflowDir}>
+    <span className="flex items-center gap-1.5 text-body-small text-muted-foreground" title={run.workflowDir}>
       <TryTag agent={run.try.agent} />
       of <AgentLink from="yours" name={run.try.agent} className="text-foreground" />
     </span>

@@ -42,7 +42,14 @@ export function StateEdge({
         style={read ? READ_LINE : { stroke, ...edgeLine(state, loop) }}
       />
       {state === 'running' && <Travelling path={path} colour={stroke} />}
-      <EdgeText x={labelX} y={labelY} label={label} labelStyle={{ fontSize: 10 }} labelBgPadding={[4, 2]} labelBgBorderRadius={3} />
+      <EdgeText
+        x={labelX}
+        y={labelY}
+        label={label}
+        labelStyle={{ fontSize: 'var(--md-sys-typescale-label-small-size)' }}
+        labelBgPadding={[4, 2]}
+        labelBgBorderRadius={3}
+      />
     </>
   );
 }

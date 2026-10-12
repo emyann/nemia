@@ -39,8 +39,8 @@ export function FactoryRules({ name }: { name: string }) {
   return (
     <section aria-label="Rules" data-factory-rules className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <h2 className="text-base font-semibold">Rules</h2>
-        <p data-rules-told className="text-sm text-muted-foreground">
+        <h2 className="text-title-medium">Rules</h2>
+        <p data-rules-told className="text-body-medium text-muted-foreground">
           Told to every agent hired into this factory, after its custom instructions and before the step's own policy. Runs already started
           keep what they were told.
         </p>
@@ -56,12 +56,12 @@ export function FactoryRules({ name }: { name: string }) {
           <RulesForm key={`${data.words ?? ''}\n${data.error ?? ''}`} data={data} pending={change.isPending} onChange={ask} />
         </>
       ) : (
-        <p className="text-sm text-muted-foreground">
+        <p className="text-body-medium text-muted-foreground">
           {error instanceof Error ? `Could not read the rules: ${error.message}` : 'Reading the rules…'}
         </p>
       )}
       {change.isSuccess && said && (
-        <p data-rules-done className="text-sm text-muted-foreground">
+        <p data-rules-done className="text-body-medium text-muted-foreground">
           {said.done}
         </p>
       )}
@@ -102,7 +102,7 @@ function RulesForm({ data, pending, onChange }: { data: Rules; pending: boolean;
           />
           <FieldDescription>
             Words only: they set no key and widen no fence. Kept in{' '}
-            <span data-rules-file className="font-mono text-xs break-all">
+            <span data-rules-file className="font-mono text-body-small break-all">
               {data.file}
             </span>
           </FieldDescription>
@@ -113,7 +113,7 @@ function RulesForm({ data, pending, onChange }: { data: Rules; pending: boolean;
           </Button>
           {kept &&
             (asking ? (
-              <span data-rules-clear-asks className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <span data-rules-clear-asks className="flex flex-wrap items-center gap-2 text-body-small text-muted-foreground">
                 Remove the rules of this factory?
                 <Button
                   variant="destructive"

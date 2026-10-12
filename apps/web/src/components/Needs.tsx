@@ -36,7 +36,7 @@ export function ToDecideBanner({ run, onStep }: { run: RunDetail; onStep?: (step
   const decide = toDecideOf(run);
   if (!decide) return null;
   return (
-    <section aria-label="To decide" data-to-decide={decide.kind} className={`rounded px-3 py-2 text-sm ${container.yours}`}>
+    <section aria-label="To decide" data-to-decide={decide.kind} className={`rounded px-3 py-2 text-body-medium ${container.yours}`}>
       <strong>To decide:</strong>{' '}
       {decide.kind === 'approve' ? (
         <StepLink step={decide.step} onStep={onStep}>
@@ -92,7 +92,7 @@ export function NeedsBanner({ run, onStep }: { run: RunDetail; onStep?: (step: s
   if (!asks.length && !needs.length) return null;
   const offers = offersOf(run);
   return (
-    <section aria-label="Waiting on you" className={`space-y-1.5 rounded px-3 py-2 text-sm ${container.yours}`}>
+    <section aria-label="Waiting on you" className={`space-y-1.5 rounded px-3 py-2 text-body-medium ${container.yours}`}>
       {asks.length > 0 && (
         <p>
           Waiting on you:{' '}
@@ -122,13 +122,13 @@ export function NeedsBanner({ run, onStep }: { run: RunDetail; onStep?: (step: s
               <li key={need.step} data-need={need.kind} data-step={need.step} className="space-y-1.5">
                 <NeedWords need={need} />
                 {need.kind === 'harness' && need.waitingFor && offer?.kind !== 'asked' && (
-                  <p data-advice className="break-words text-xs">
+                  <p data-advice className="break-words text-body-small">
                     {need.waitingFor.advice}
                   </p>
                 )}
                 {offer?.kind === 'continue' && <Continue runId={run.id} step={need.step} line={retryLineOf(run, need.step)} />}
                 {offer?.kind === 'asked' && (
-                  <p data-note className="font-mono text-xs">
+                  <p data-note className="font-mono text-body-small">
                     {offer.note ?? `try ${offer.try} asked`}
                   </p>
                 )}

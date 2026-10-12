@@ -36,7 +36,7 @@ function Arrows({ flow, rounds = false }: { flow: Flow; rounds?: boolean }) {
                 y={arrow.round.y}
                 textAnchor="middle"
                 dominantBaseline="central"
-                fontSize={10}
+                className="text-label-small"
                 strokeWidth={4}
                 strokeLinejoin="round"
                 style={{ fill: stroke, stroke: 'var(--card)', paintOrder: 'stroke' }}
@@ -84,7 +84,7 @@ export function StepRail({ run, flow }: { run: RunSummary; flow: Flow }) {
               }
               style={at(pill)}
               className={[
-                'absolute flex items-center justify-center rounded-full px-1.5 font-mono text-[10px] leading-none',
+                'absolute flex items-center justify-center rounded-full px-1 font-mono text-body-small leading-none',
                 pill.state ? stateClass[pill.state] : 'border border-dashed border-outline bg-background text-muted-foreground',
                 pill.live ? 'ring-2 ring-alive/60 ring-offset-1 ring-offset-background' : '',
               ].join(' ')}
@@ -95,7 +95,7 @@ export function StepRail({ run, flow }: { run: RunSummary; flow: Flow }) {
         </ul>
       </div>
       {flow.error && (
-        <p title={flow.error} className="mt-1 line-clamp-2 text-[11px] text-failure">
+        <p title={flow.error} className="mt-1 line-clamp-2 text-body-small text-failure">
           {flow.error}
         </p>
       )}
@@ -135,7 +135,7 @@ export function StepTiles({
   const now = useNow(live ? 1_000 : 30_000);
   return (
     <section aria-label="The run's steps" className="border-l px-3">
-      <p className="mb-1 h-4 text-[11px] leading-4 text-muted-foreground">Click a step for its inspector</p>
+      <p className="mb-1 h-4 text-body-small leading-4 text-muted-foreground">Click a step for its inspector</p>
       <div className="relative" style={{ width: flow.width, height: flow.height }}>
         <Arrows flow={flow} rounds />
         {flow.pills.map((pill) => {
@@ -169,13 +169,13 @@ export function StepTiles({
                   : 'data-[focus-visible]:outline-2 data-[focus-visible]:outline-offset-2 data-[focus-visible]:outline-ring',
               ].join(' ')}
             >
-              <span className="truncate text-xs font-semibold" title={name}>
+              <span className="truncate text-body-small font-semibold" title={name}>
                 {name}
               </span>
               <span className="flex min-w-0">
                 <StatusChip status={step.status} runCancelled={cancelled} runHeld={held} note={step.note} />
               </span>
-              <span className="flex min-w-0 gap-1 font-mono text-[10px] text-muted-foreground">
+              <span className="flex min-w-0 gap-1 font-mono text-body-small text-muted-foreground">
                 <span className="truncate">{attempt ?? '…'}</span>
                 {cost && read && (
                   <span
@@ -187,7 +187,7 @@ export function StepTiles({
                 )}
               </span>
               {need && (
-                <span data-need={need.kind} title={needText(need)} className="truncate text-[11px] text-yours">
+                <span data-need={need.kind} title={needText(need)} className="truncate text-body-small text-yours">
                   {tileNeed(need, gate)}
                 </span>
               )}
@@ -195,7 +195,7 @@ export function StepTiles({
           );
         })}
       </div>
-      {flow.error && <p className="mt-1 text-[11px] text-failure">{flow.error}</p>}
+      {flow.error && <p className="mt-1 text-body-small text-failure">{flow.error}</p>}
     </section>
   );
 }

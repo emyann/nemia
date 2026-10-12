@@ -26,7 +26,7 @@ export function AgentCard({ agent }: { agent: AgentListing & { factories?: reado
       </div>
       <div className="flex flex-1 flex-col gap-3 px-4 pt-3 pb-4">
         <header className="flex flex-col items-center gap-1 text-center">
-          <h3 className="text-lg leading-tight font-semibold">
+          <h3 className="text-title-medium leading-tight">
             <RouteLink
               to="/agents/$from/$agent"
               params={{ from: agent.from, agent: agent.name }}
@@ -35,7 +35,7 @@ export function AgentCard({ agent }: { agent: AgentListing & { factories?: reado
               {personOf(agent.name)}
             </RouteLink>
           </h3>
-          <p data-agent-role className="text-xs text-muted-foreground">
+          <p data-agent-role className="text-body-small text-muted-foreground">
             {agent.role ?? 'No role yet'} · <span className="font-mono">{agent.name}</span>
           </p>
           <div className="flex flex-wrap items-center justify-center gap-1">
@@ -43,16 +43,20 @@ export function AgentCard({ agent }: { agent: AgentListing & { factories?: reado
             <FactoryTags names={agent.factories ?? []} linked className="relative z-10" />
           </div>
         </header>
-        {agent.description && <p className="text-center text-sm text-foreground">{agent.description}</p>}
+        {agent.description && <p className="text-center text-body-medium text-foreground">{agent.description}</p>}
         {agent.error === null &&
           (agent.cardError !== null ? (
-            <p data-card-error className="font-mono text-xs break-words text-failure">
+            <p data-card-error className="font-mono text-body-small break-words text-failure">
               {agent.cardError}
             </p>
           ) : (
             <Skills skills={agent.card} compact className="space-y-2" />
           ))}
-        {agent.error !== null ? <p className="font-mono text-xs break-words text-failure">{agent.error}</p> : <Stats keys={agent.keys} />}
+        {agent.error !== null ? (
+          <p className="font-mono text-body-small break-words text-failure">{agent.error}</p>
+        ) : (
+          <Stats keys={agent.keys} />
+        )}
         <UsedBy listing={agent} className="relative z-10 mt-auto border-t border-outline-variant pt-3" />
       </div>
     </section>
@@ -64,7 +68,7 @@ function Stats({ keys }: { keys: AgentListing['keys'] }) {
   const set = STATS.filter((key) => keys[key] !== undefined);
   if (!set.length) return null;
   return (
-    <dl data-agent-stats className="flex flex-wrap gap-1.5 text-[11px] leading-none">
+    <dl data-agent-stats className="flex flex-wrap gap-1.5 text-body-small leading-none">
       {set.map((key) => (
         <div key={key} className="flex items-center gap-1 rounded-md bg-muted px-1.5 py-1">
           <dt className="text-muted-foreground">{key}</dt>

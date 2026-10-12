@@ -20,12 +20,12 @@ export const Route = createFileRoute('/agents_/skills/$from/$skill')({
   errorComponent: ({ error }) => (
     <div className="space-y-3">
       <BackToAgents />
-      <p className="text-sm text-failure">Could not load this skill: {error instanceof Error ? error.message : String(error)}</p>
+      <p className="text-body-medium text-failure">Could not load this skill: {error instanceof Error ? error.message : String(error)}</p>
     </div>
   ),
 });
 
-const code = (text: string) => <code className="font-mono text-xs break-all">{text}</code>;
+const code = (text: string) => <code className="font-mono text-body-small break-all">{text}</code>;
 
 /**
  * One skill: the agents that give it, each linked; what it costs a turn and the switch that loads it every turn; and its form — to edit,
@@ -75,12 +75,12 @@ function SkillPage() {
 
       <header className="space-y-2">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <h1 className="font-mono text-base font-semibold">{skill.name}</h1>
-          <span className="text-xs text-muted-foreground">a skill</span>
+          <h1 className="font-mono text-body-large font-semibold">{skill.name}</h1>
+          <span className="text-body-small text-muted-foreground">a skill</span>
           <SkillSourceBadge from={skill.from} />
         </div>
         {skill.entry && (
-          <p className="text-sm text-foreground">
+          <p className="text-body-medium text-foreground">
             {skill.entry.name !== skill.name && <span className="font-medium">{skill.entry.name}. </span>}
             {skill.entry.description}
           </p>
@@ -91,12 +91,12 @@ function SkillPage() {
 
       {skill.error !== null && (
         <div data-skill-error className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
-          <p className="text-sm font-medium text-on-failure-container">Does not read as a skill, so no agent can be given it:</p>
-          <p className="font-mono text-xs whitespace-pre-wrap break-words text-on-failure-container">{skill.error}</p>
+          <p className="text-body-medium font-medium text-on-failure-container">Does not read as a skill, so no agent can be given it:</p>
+          <p className="font-mono text-body-small whitespace-pre-wrap break-words text-on-failure-container">{skill.error}</p>
         </div>
       )}
 
-      <p className="border-b border-outline-variant pb-2 font-mono text-[11px] break-all text-muted-foreground">{skill.dir}/SKILL.md</p>
+      <p className="border-b border-outline-variant pb-2 font-mono text-body-small break-all text-muted-foreground">{skill.dir}/SKILL.md</p>
       <SkillForm
         key={shown.version}
         detail={shown}
@@ -118,7 +118,7 @@ function SkillPage() {
                 />
               ) : (
                 readPast && (
-                  <p data-skill-read-again className="text-xs text-muted-foreground">
+                  <p data-skill-read-again className="text-body-small text-muted-foreground">
                     It has been read again since: the page shows it as it now reads.
                   </p>
                 )
@@ -153,7 +153,7 @@ function SkillPage() {
 function Moved({ file, onReadAgain }: { file: string; onReadAgain: () => void }) {
   return (
     <div data-skill-moved className="flex flex-wrap items-center gap-3 rounded border border-failure bg-failure-container px-3 py-2">
-      <p className="min-w-0 flex-1 text-sm text-on-failure-container">
+      <p className="min-w-0 flex-1 text-body-medium text-on-failure-container">
         {file} has changed since this form was drawn, so a save of it would write over that change and is refused. What you typed stays here
         until you read it again, which draws the form from the file as it now reads and drops it: copy out what you want to keep first.
       </p>
@@ -167,13 +167,13 @@ function Moved({ file, onReadAgain }: { file: string; onReadAgain: () => void })
 /** The agents that give this very skill, each linked, or that none does. */
 function GivenBy({ detail }: { detail: SkillDetail }) {
   return (
-    <p data-skill-users className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs text-muted-foreground">
+    <p data-skill-users className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-body-small text-muted-foreground">
       {detail.users.length ? (
         <>
           <span>Given by</span>
           {detail.users.map((user, i) => (
             <span key={`${user.from}:${user.name}`}>
-              <AgentLink from={user.from} name={user.name} className="text-xs text-foreground" />
+              <AgentLink from={user.from} name={user.name} className="text-body-small text-foreground" />
               {user.from === 'repo' && <span className="text-muted-foreground"> (this repository)</span>}
               {i < detail.users.length - 1 && ','}
             </span>
@@ -190,7 +190,7 @@ function GivenBy({ detail }: { detail: SkillDetail }) {
 function Elsewhere({ detail }: { detail: SkillDetail }) {
   const { from } = detail.skill;
   return (
-    <p data-copy-hint className="text-xs text-muted-foreground">
+    <p data-copy-hint className="text-body-small text-muted-foreground">
       {from === 'yours' && detail.copyHint && (
         <>
           For this repository's agents to be given it, copy it into the repository by hand — the board writes no checkout — and commit it:{' '}
@@ -230,26 +230,26 @@ function Preload({
   const mine = skill.from === 'yours';
   return (
     <fieldset data-preload className="space-y-2 rounded border border-outline-variant px-3 py-3">
-      <legend className="px-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">Every turn, or when needed</legend>
-      <div className="flex items-center gap-2 text-sm">
+      <legend className="px-1 text-label-medium text-muted-foreground uppercase">Every turn, or when needed</legend>
+      <div className="flex items-center gap-2 text-body-medium">
         <Switch id={id} isSelected={skill.preload} onChange={onSwitch} isDisabled={!mine || changed || pending} />
         <label htmlFor={id} className={mine && !changed && !pending ? 'cursor-pointer' : 'text-muted-foreground'}>
-          Load it every turn <code className="font-mono text-xs text-muted-foreground">(preload: true)</code>
+          Load it every turn <code className="font-mono text-body-small text-muted-foreground">(preload: true)</code>
         </label>
       </div>
       {skill.cost && (
         <>
-          <p data-skill-cost className="text-xs text-foreground">
+          <p data-skill-cost className="text-body-small text-foreground">
             Now: {costWords(skill.cost)}.
           </p>
-          <p className="text-xs text-muted-foreground">{preloadWords(skill.cost)}</p>
+          <p className="text-body-small text-muted-foreground">{preloadWords(skill.cost)}</p>
         </>
       )}
-      <p data-skill-reach className="text-xs text-muted-foreground">
+      <p data-skill-reach className="text-body-small text-muted-foreground">
         {reachWords(detail.users)}
       </p>
       {mine && changed && (
-        <p className="text-xs text-yours">Save or discard the changes below first: the switch writes the file as it is on disk.</p>
+        <p className="text-body-small text-yours">Save or discard the changes below first: the switch writes the file as it is on disk.</p>
       )}
     </fieldset>
   );

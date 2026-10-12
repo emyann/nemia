@@ -41,7 +41,7 @@ const verdictClass = (verdict: string | null) =>
 export function Rounds({ tries, selected, onSelect }: { tries: readonly StepTry[]; selected: number; onSelect: (n: number) => void }) {
   return (
     <section aria-label="Rounds" className="space-y-1">
-      <h3 className="text-xs font-medium text-muted-foreground">Rounds</h3>
+      <h3 className="text-label-medium text-muted-foreground">Rounds</h3>
       <ol className="space-y-1">
         {tries.map((t) => {
           const label = tryLabel(t, tries);
@@ -52,7 +52,7 @@ export function Rounds({ tries, selected, onSelect }: { tries: readonly StepTry[
               data-try={t.try}
               aria-current={chosen || undefined}
               className={cn(
-                'space-y-0.5 rounded px-2 py-1 text-xs',
+                'space-y-0.5 rounded px-2 py-1 text-body-small',
                 chosen && 'bg-surface-container ring-1 ring-outline-variant ring-inset',
               )}
             >
@@ -70,7 +70,7 @@ export function Rounds({ tries, selected, onSelect }: { tries: readonly StepTry[
                   closeout
                 </button>
               </div>
-              <p className="break-all font-mono text-[11px] text-muted-foreground">{t.taskId ?? 'not filed'}</p>
+              <p className="break-all font-mono text-body-small text-muted-foreground">{t.taskId ?? 'not filed'}</p>
               <p className="flex flex-wrap gap-x-3">
                 <span data-attempts>{attemptsWord(t.attempts)}</span>
                 {t.check && (
@@ -102,7 +102,7 @@ export function TryCloseouts({ tries, selected, none }: { tries: readonly StepTr
   return (
     <>
       {tries.length > 1 && (
-        <p data-shown-try={selected.try} className="text-xs font-medium text-muted-foreground">
+        <p data-shown-try={selected.try} className="text-body-small font-medium text-muted-foreground">
           {tryLabel(selected, tries)}
           {selected.current && ' · current'}
         </p>
@@ -112,8 +112,8 @@ export function TryCloseouts({ tries, selected, none }: { tries: readonly StepTr
       {others.length > 0 && (
         <section aria-label="Other tries" className="space-y-1">
           {others.map((t) => (
-            <details key={t.try} data-try={t.try} className="rounded border border-outline-variant text-sm">
-              <summary className="cursor-pointer px-2 py-1 text-xs text-muted-foreground hover:text-foreground">
+            <details key={t.try} data-try={t.try} className="rounded border border-outline-variant text-body-medium">
+              <summary className="cursor-pointer px-2 py-1 text-body-small text-muted-foreground hover:text-foreground">
                 {tryLabel(t, tries)}
                 {t.current && ' · current'} — {outcomeWord(outcomeOf(t, EARLIER_NONE))}
               </summary>
@@ -135,7 +135,7 @@ const EARLIER_NONE = "No closeout on the engine's record of this try.";
 function AsItCame({ raw }: { raw: unknown }) {
   return (
     <section aria-label="As it came" className="space-y-1">
-      <h4 className="text-xs text-muted-foreground">the statement as it came</h4>
+      <h4 className="text-body-small text-muted-foreground">the statement as it came</h4>
       <Json data-raw value={raw} />
     </section>
   );
@@ -177,7 +177,7 @@ export function CloseoutView({ closeout, outcome }: { closeout: StepCloseout; ou
   const [raw, setRaw] = useState(false);
   const switchId = useId();
   const toggle = (
-    <div className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+    <div className="flex shrink-0 items-center gap-1.5 text-body-small text-muted-foreground">
       <Switch id={switchId} size="sm" isSelected={raw} onChange={setRaw} />
       <label htmlFor={switchId} className="cursor-pointer">
         Raw
@@ -195,7 +195,7 @@ export function CloseoutView({ closeout, outcome }: { closeout: StepCloseout; ou
         <>
           <DeclaredFields closeout={closeout} />
           <div>
-            <p className="text-xs text-muted-foreground">artifacts</p>
+            <p className="text-body-small text-muted-foreground">artifacts</p>
             <Artifacts artifacts={closeout.artifacts} />
           </div>
         </>
@@ -240,7 +240,7 @@ function DeclaredFields({ closeout, fold = false, answered = false }: { closeout
       {Object.entries(closeout.output).map(([name, value], i) => field(name, value, i === 0))}
       {closeout.replies && field('replies', closeout.replies)}
       {closeout.missing.length > 0 && (
-        <p data-missing className="text-xs text-yours">
+        <p data-missing className="text-body-small text-yours">
           declared and not given: {closeout.missing.join(', ')}
         </p>
       )}
@@ -258,7 +258,7 @@ function Fold({ name, count, children }: { name: string; count: number; children
       onToggle={(event) => setOpen(event.currentTarget.open)}
       className="rounded border border-outline-variant"
     >
-      <summary className="cursor-pointer px-2 py-1 text-xs text-muted-foreground hover:text-foreground">
+      <summary className="cursor-pointer px-2 py-1 text-body-small text-muted-foreground hover:text-foreground">
         <span className="font-mono">{name}</span> · {count}
       </summary>
       {open && <div className="border-t border-outline-variant p-2">{children}</div>}
@@ -279,7 +279,7 @@ export function HandedOn({ closeout, answeredBeside = false }: { closeout: StepC
       <Markdown>{closeout.summary}</Markdown>
       <DeclaredFields closeout={closeout} fold answered={answeredBeside} />
       {closeout.artifacts.length > 0 && (
-        <div aria-label="Artifacts" className="text-xs text-muted-foreground">
+        <div aria-label="Artifacts" className="text-body-small text-muted-foreground">
           Artifacts:
           <Artifacts artifacts={closeout.artifacts} />
         </div>

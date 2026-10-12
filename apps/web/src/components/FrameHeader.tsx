@@ -26,7 +26,7 @@ export function FrameHeader({ section }: { section?: string }) {
         Nemia
       </LogoLink>
       <span aria-hidden className="h-5 w-px shrink-0 bg-border" />
-      {section && <span className="text-sm font-medium">{section}</span>}
+      {section && <span className="text-body-medium font-medium">{section}</span>}
       <span className="flex-1" />
       <span aria-hidden data-slot="search" className="hidden h-8 w-64 md:block" />
       <BellButton />
@@ -63,7 +63,7 @@ function BellButton() {
         <span
           aria-hidden
           data-bell-count
-          className="absolute top-0.5 right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-yours px-1 text-[10px] leading-none font-semibold text-on-yours tabular-nums"
+          className="absolute top-0.5 right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-yours px-1 text-label-small leading-none text-on-yours tabular-nums"
         >
           {shown}
         </span>

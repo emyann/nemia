@@ -9,7 +9,7 @@ import { RouteLink } from './AgentParts';
 import { CopyButton } from './CopyButton';
 
 /** A section's quiet heading: small, medium weight, in the muted ink. */
-export const HEADING = 'text-xs font-medium text-muted-foreground';
+export const HEADING = 'text-body-small font-medium text-muted-foreground';
 
 /** A link's look in a fact's words. */
 export const LINK =
@@ -34,7 +34,7 @@ export function FactList({
   className?: string;
 }) {
   return (
-    <dl aria-label={label} className={cn('grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-xs', className)}>
+    <dl aria-label={label} className={cn('grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-body-small', className)}>
       {facts.map((fact, i) => (
         <div key={`${fact.label}-${i}`} className="contents">
           <dt className="text-muted-foreground">{fact.label}</dt>
@@ -64,7 +64,7 @@ function FactWords({ runId, fact }: { runId: string; fact: GateFact }) {
 export function TrialMerges({ runId, collisions }: { runId: string; collisions: Collisions }) {
   return (
     <section aria-label="Trial merges" className="space-y-1">
-      <h3 className="text-xs font-medium text-muted-foreground">
+      <h3 className="text-label-medium text-muted-foreground">
         Trial merges, as git says them now: onto {collisions.onto}, and onto each run in flight on it
       </h3>
       <FactList runId={runId} facts={collisionFacts(collisions)} label="What the trial merges say" />
@@ -75,7 +75,7 @@ export function TrialMerges({ runId, collisions }: { runId: string; collisions: 
 /** Label and value, one per row. A value that is not set reads as a dash. */
 export function Facts({ rows }: { rows: Array<[label: string, value: ReactNode]> }) {
   return (
-    <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
+    <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-body-medium">
       {rows.map(([label, value]) => (
         <div key={label} data-fact={label} className="contents">
           <dt className="text-muted-foreground">{label}</dt>
@@ -250,13 +250,13 @@ const filedFence = (filed: string | null, workflow: string | null): string | nul
 function Marked({ value, mark, word = false, title }: { value: string; mark: string; word?: boolean; title?: string }) {
   return (
     <span data-mark={mark} title={title}>
-      <span className={word ? undefined : 'font-mono text-xs'}>{value}</span>
+      <span className={word ? undefined : 'font-mono text-body-small'}>{value}</span>
       <span className="text-muted-foreground"> · {mark}</span>
     </span>
   );
 }
 
-export const code = (value: string | null) => (value === null ? null : <span className="font-mono text-xs">{value}</span>);
+export const code = (value: string | null) => (value === null ? null : <span className="font-mono text-body-small">{value}</span>);
 
 /**
  * A path on the machine, as a `Facts` value: the path, and a button that copies it. A folder run's work is somewhere under the store
@@ -266,7 +266,7 @@ export const code = (value: string | null) => (value === null ? null : <span cla
 export const pathRow = (at: string | null) =>
   at === null ? null : (
     <span data-path className="flex items-start gap-1">
-      <span className="min-w-0 break-all font-mono text-xs">{at}</span>
+      <span className="min-w-0 break-all font-mono text-body-small">{at}</span>
       <CopyButton text={at} what="the path" />
     </span>
   );
@@ -286,7 +286,11 @@ export function spentRows(step: Priced): Array<[string, ReactNode]> {
   return [
     [
       'spent',
-      <span key="spent" data-spent={over ? 'over' : 'within'} className={`font-mono text-xs ${over ? 'font-semibold text-money' : ''}`}>
+      <span
+        key="spent"
+        data-spent={over ? 'over' : 'within'}
+        className={`font-mono text-body-small ${over ? 'font-semibold text-money' : ''}`}
+      >
         {text}
       </span>,
     ],
@@ -310,7 +314,7 @@ export const unreadRows = (words: string | null): Array<[string, ReactNode]> =>
     ? [
         [
           'unread',
-          <span key="unread" data-unread className={cn('text-xs', WARN)}>
+          <span key="unread" data-unread className={cn('text-body-small', WARN)}>
             {words}
           </span>,
         ],
@@ -332,7 +336,7 @@ export function Read({ said, peak, rebuilt }: { said: string; peak: PeakMark; re
   return (
     <span data-read className="block">
       {counts.length > 0 && (
-        <span className="font-mono text-xs">
+        <span className="font-mono text-body-small">
           {counts.map((part, i) => (
             <span key={part}>
               {i > 0 && ' · '}
@@ -349,7 +353,7 @@ export function Read({ said, peak, rebuilt }: { said: string; peak: PeakMark; re
       )}
       {rebuilt > 0 &&
         rest.map((part) => (
-          <span key={part} data-rebuilt={rebuilt} className={`block text-xs ${WARN}`} title={REBUILT_TITLE}>
+          <span key={part} data-rebuilt={rebuilt} className={`block text-body-small ${WARN}`} title={REBUILT_TITLE}>
             {part}
           </span>
         ))}
@@ -371,7 +375,7 @@ const REBUILT_TITLE =
 export function Check({ check: { command, refused } }: { check: StepCheck }) {
   return (
     <section aria-label="Check" className="space-y-2">
-      <h3 className="text-xs font-medium text-muted-foreground">Check</h3>
+      <h3 className="text-label-medium text-muted-foreground">Check</h3>
       <Facts
         rows={[
           ['command', code(command)],
@@ -379,7 +383,7 @@ export function Check({ check: { command, refused } }: { check: StepCheck }) {
             ? [
                 [
                   'refused',
-                  <span key="refused" className="font-mono text-xs font-semibold text-failure">
+                  <span key="refused" className="font-mono text-body-small font-semibold text-failure">
                     {refused.exit}
                   </span>,
                 ] as [string, ReactNode],
@@ -387,7 +391,7 @@ export function Check({ check: { command, refused } }: { check: StepCheck }) {
             : []),
         ]}
       />
-      {refused?.unreadable && <p className="text-xs text-failure">{refused.unreadable}</p>}
+      {refused?.unreadable && <p className="text-body-small text-failure">{refused.unreadable}</p>}
       {refused?.stdout && <Stream name="output" log={refused.stdout} />}
       {refused && refused.stderr.lines.length > 0 && <Stream name="stderr" log={refused.stderr} />}
     </section>
@@ -396,11 +400,13 @@ export function Check({ check: { command, refused } }: { check: StepCheck }) {
 
 /** One of a refused check's streams, as the api cut it: its last lines, and whether there were more. */
 function Stream({ name, log }: { name: string; log: StepLog }) {
-  if (!log.lines.length) return <p className="text-xs text-muted-foreground">No {name}.</p>;
+  if (!log.lines.length) return <p className="text-body-small text-muted-foreground">No {name}.</p>;
   return (
     <div className="space-y-1">
-      <p className="text-xs text-muted-foreground">{log.truncated ? `The last ${log.lines.length} lines of its ${name}` : `Its ${name}`}</p>
-      <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded bg-muted p-2 font-mono text-[11px] leading-snug">
+      <p className="text-body-small text-muted-foreground">
+        {log.truncated ? `The last ${log.lines.length} lines of its ${name}` : `Its ${name}`}
+      </p>
+      <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded bg-muted p-2 font-mono text-body-small leading-snug">
         {log.lines.join('\n')}
       </pre>
     </div>

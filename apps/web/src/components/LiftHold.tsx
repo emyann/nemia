@@ -36,7 +36,7 @@ export function LiftHold({ id }: { id: string }) {
   const [asking, setAsking] = useState(false);
   const lift = useLift(id);
   return (
-    <span data-lift className="flex flex-wrap items-center gap-2 pt-1 text-xs">
+    <span data-lift className="flex flex-wrap items-center gap-2 pt-1 text-body-small">
       {asking ? (
         <>
           {`Lift the hold on ${id}? ${LIFTS}`}
@@ -101,12 +101,12 @@ function LiftForm({ id, onClose }: { id: string; onClose: () => void }) {
   return (
     <div className="space-y-2">
       <Heading slot="title" className="font-semibold">{`Lift the hold on ${id}?`}</Heading>
-      <p className="text-xs text-muted-foreground">{LIFTS}</p>
+      <p className="text-body-small text-muted-foreground">{LIFTS}</p>
       <div className="flex items-center gap-2">
-        <button type="button" onClick={() => lift.mutate()} disabled={lift.isPending} className={cn(BUTTON, 'px-2.5 py-1 text-xs')}>
+        <button type="button" onClick={() => lift.mutate()} disabled={lift.isPending} className={cn(BUTTON, 'px-2.5 py-1 text-body-small')}>
           {lift.isPending ? 'Lifting…' : 'Lift'}
         </button>
-        <button type="button" onClick={onClose} disabled={lift.isPending} className={cn(BUTTON, SECONDARY, 'px-2.5 py-1 text-xs')}>
+        <button type="button" onClick={onClose} disabled={lift.isPending} className={cn(BUTTON, SECONDARY, 'px-2.5 py-1 text-body-small')}>
           Keep it
         </button>
       </div>

@@ -56,7 +56,7 @@ function GateBrief({ run, step }: { run: RunDetail; step: Step }) {
       data-asked="approve"
       className="space-y-3 rounded border border-yours bg-card p-3"
     >
-      <h3 className="text-xs font-semibold tracking-wide text-yours uppercase">Waiting on you</h3>
+      <h3 className="text-label-medium text-yours uppercase">Waiting on you</h3>
       <p data-brief="waits" className="break-words">
         {brief.waits}
       </p>
@@ -103,14 +103,14 @@ function Waits({
 }) {
   return (
     <section aria-label="What the run asks of you" data-asked={kind} className="space-y-2 rounded border border-yours bg-card p-3">
-      <h3 className="text-xs font-semibold tracking-wide text-yours uppercase">Waiting on you</h3>
+      <h3 className="text-label-medium text-yours uppercase">Waiting on you</h3>
       {children ?? <p className="break-words whitespace-pre-wrap">{said}</p>}
       <RouteLink
         to="/runs/$runId"
         params={{ runId: run.id }}
         hash={anchor ? stepAnchor(anchor) : 'decide'}
         data-answer-link
-        className={cn('text-xs', LINK)}
+        className={cn('text-body-small', LINK)}
       >
         Answer it on the run's page
       </RouteLink>

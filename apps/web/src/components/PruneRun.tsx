@@ -56,7 +56,7 @@ function PruneRead({ run, onClose }: { run: RunDetail; onClose: () => void }) {
   }
   if (decidable && (!data || isPlaceholderData)) {
     return (
-      <p data-prune-reading className="text-xs text-muted-foreground">
+      <p data-prune-reading className="text-body-small text-muted-foreground">
         Reading whether it was merged…
       </p>
     );
@@ -96,7 +96,7 @@ function PruneForm({ id, offer, onClose }: { id: string; offer: PruneOffer; onCl
         isDisabled={asking || prune.isPending}
         className="space-y-2"
       >
-        <Text slot="description" className="block text-xs text-muted-foreground">
+        <Text slot="description" className="block text-body-small text-muted-foreground">
           What to give back. Its record and its branches are kept: no branch is ever deleted.
         </Text>
         {offer.choices.map((c) => (
@@ -109,18 +109,18 @@ function PruneForm({ id, offer, onClose }: { id: string; offer: PruneOffer; onCl
           >
             <span aria-hidden className={DOT} />
             <span className="space-y-0.5">
-              <span className="block text-xs font-medium">{c.label}</span>
-              <span className={cn('block text-[11px] leading-snug', c.how.unmerged ? 'text-yours' : 'text-muted-foreground')}>
+              <span className="block text-body-small font-medium">{c.label}</span>
+              <span className={cn('block text-body-small leading-snug', c.how.unmerged ? 'text-yours' : 'text-muted-foreground')}>
                 {c.says}
               </span>
-              {c.unavailable && <span className="block text-[11px] leading-snug text-yours">{c.unavailable}</span>}
+              {c.unavailable && <span className="block text-body-small leading-snug text-yours">{c.unavailable}</span>}
             </span>
           </Radio>
         ))}
       </RadioGroup>
       {asking ? (
         <div className="space-y-2">
-          <p data-prune-question className={cn('text-xs', choice.how.unmerged && 'text-yours')}>
+          <p data-prune-question className={cn('text-body-small', choice.how.unmerged && 'text-yours')}>
             {pruneQuestion(id, choice, offer)}
           </p>
           <div className="flex items-center gap-2">
@@ -156,7 +156,7 @@ function PruneForm({ id, offer, onClose }: { id: string; offer: PruneOffer; onCl
         </div>
       )}
       {prune.data && prune.data.left > 0 && (
-        <pre data-prune-said className="overflow-x-auto font-mono text-[11px] whitespace-pre-wrap text-muted-foreground">
+        <pre data-prune-said className="overflow-x-auto font-mono text-body-small whitespace-pre-wrap text-muted-foreground">
           {prune.data.lines.join('\n')}
         </pre>
       )}

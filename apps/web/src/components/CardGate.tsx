@@ -13,8 +13,9 @@ import { SECONDARY, useApprove } from './Gate';
  */
 export type Taken = { said: string; stamp: string; next?: string };
 
-export const SMALL = 'h-6 rounded px-2 text-[11px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring/50';
-export const POPOVER = 'z-50 w-72 rounded-lg border border-outline-variant bg-card p-3 text-sm text-foreground shadow-lg outline-none';
+export const SMALL = 'h-6 rounded px-2 text-body-small font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring/50';
+export const POPOVER =
+  'z-50 w-72 rounded-lg border border-outline-variant bg-card p-3 text-body-medium text-foreground shadow-lg outline-none';
 
 /**
  * A gate on the Factory's card: what approving does and where a send-back goes, in one row whatever the names (`gateCardLine`), since a
@@ -58,7 +59,7 @@ export function CardGate({
         data-to-decide={gate.ends ? 'approve' : undefined}
         data-gate-line={gate.step}
         title={`${line}\n${title}`}
-        className="truncate text-[11px] text-yours"
+        className="truncate text-body-small text-yours"
       >
         {line}
       </p>
@@ -111,7 +112,7 @@ export function CardGate({
           params={{ runId }}
           {...('step' in read ? { search: { bar: barValue({ kind: 'step', run: runId, step: read.step }) } } : { hash: read.hash })}
           data-read={gate.step}
-          className="ml-auto min-w-0 truncate rounded-sm text-[11px] font-medium text-foreground underline decoration-outline underline-offset-2 outline-none hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+          className="ml-auto min-w-0 truncate rounded-sm text-body-small font-medium text-foreground underline decoration-outline underline-offset-2 outline-none hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
         >
           {read.words}
         </RouteLink>
@@ -182,7 +183,7 @@ function ApproveForm({
       }}
     >
       <Heading slot="title" className="font-semibold">{`Approve ${gate.step}?`}</Heading>
-      <p className="text-xs text-muted-foreground">
+      <p className="text-body-small text-muted-foreground">
         {gate.ends
           ? `This runs ${gate.step} in the repository's own checkout${gate.onto ? ` on ${gate.onto}` : ''}, and it cannot be taken back.`
           : `What waits on ${gate.step} is filed next, handed what it handed on.`}
@@ -197,10 +198,10 @@ function ApproveForm({
         className={TEXTAREA}
       />
       <div className="flex items-center gap-2">
-        <button type="submit" disabled={pending} className={cn(BUTTON, 'px-2.5 py-1 text-xs')}>
+        <button type="submit" disabled={pending} className={cn(BUTTON, 'px-2.5 py-1 text-body-small')}>
           {pending ? 'Approving…' : gate.ends ? `Run ${gate.step} now` : 'Approve'}
         </button>
-        <button type="button" onClick={onCancel} className={cn(BUTTON, SECONDARY, 'px-2.5 py-1 text-xs')}>
+        <button type="button" onClick={onCancel} className={cn(BUTTON, SECONDARY, 'px-2.5 py-1 text-body-small')}>
           Not yet
         </button>
       </div>
@@ -239,7 +240,7 @@ function SendBackForm({
       }}
     >
       <Heading slot="title" className="font-semibold">{`Send ${name} back`}</Heading>
-      <p className="text-xs text-muted-foreground">
+      <p className="text-body-small text-muted-foreground">
         {`Its next try is told your words, and ${gate.step} waits at its gate again once it signs off.`}
       </p>
       <label htmlFor={field} className="sr-only">{`What to change, sent back to ${name}`}</label>
@@ -252,7 +253,7 @@ function SendBackForm({
         className={TEXTAREA}
       />
       {gate.ends && gate.back.length > 1 && (
-        <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+        <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-body-small">
           <legend className="sr-only">Which step to send back</legend>
           {gate.back.map((step) => (
             <label key={step} className="flex cursor-pointer items-center gap-1.5">
@@ -263,10 +264,10 @@ function SendBackForm({
         </fieldset>
       )}
       <div className="flex items-center gap-2">
-        <button type="submit" disabled={pending || !message.trim()} className={cn(BUTTON, 'px-2.5 py-1 text-xs')}>
+        <button type="submit" disabled={pending || !message.trim()} className={cn(BUTTON, 'px-2.5 py-1 text-body-small')}>
           {pending ? 'Sending back…' : 'Send back'}
         </button>
-        <button type="button" onClick={onCancel} className={cn(BUTTON, SECONDARY, 'px-2.5 py-1 text-xs')}>
+        <button type="button" onClick={onCancel} className={cn(BUTTON, SECONDARY, 'px-2.5 py-1 text-body-small')}>
           Not yet
         </button>
       </div>

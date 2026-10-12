@@ -37,7 +37,7 @@ export function Conversation({ turns, live, partial = null, density = 'page', cl
             className={cn(
               density === 'page'
                 ? 'mx-auto w-full max-w-3xl gap-5 px-4 py-6'
-                : 'gap-3 py-1 pr-1 text-xs [&_[data-slot=bubble-content]]:text-xs',
+                : 'gap-3 py-1 pr-1 text-body-small [&_[data-slot=bubble-content]]:text-body-small',
             )}
           >
             {turns.map((turn, i) => (
@@ -54,7 +54,7 @@ export function Conversation({ turns, live, partial = null, density = 'page', cl
             )}
             {live && (
               <MessageScrollerItem key="following">
-                <Shimmer as="p" className="text-xs text-muted-foreground">
+                <Shimmer as="p" className="text-body-small text-muted-foreground">
                   Following the session as it goes
                 </Shimmer>
               </MessageScrollerItem>

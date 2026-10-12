@@ -48,8 +48,8 @@ export function NemiaSettings() {
   return (
     <section aria-label="Nemia" data-nemia-section className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
-        <h2 className="text-base font-semibold">Nemia</h2>
-        <p className="text-sm text-muted-foreground">
+        <h2 className="text-title-medium">Nemia</h2>
+        <p className="text-body-medium text-muted-foreground">
           The store's own agent, across every factory: on Semi-auto she keeps a session of her own, and what waits on you — a gate, a step's
           question, a loop out of rounds — is asked of you first, as is a write that cannot be undone or changes your settings or a factory.
           The rest is hers. On Auto, an answer the rules you confirmed allow is hers too.
@@ -61,8 +61,8 @@ export function NemiaSettings() {
           <FactoriesPart factories={data.factories} pending={write.isPending} onAsk={ask} />
           {write.error && (
             <div data-nemia-refused className="flex flex-col gap-1 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2">
-              <p className="text-sm font-medium text-destructive">Not set:</p>
-              <p className="font-mono text-xs break-words whitespace-pre-wrap text-destructive">{write.error.message}</p>
+              <p className="text-body-medium font-medium text-destructive">Not set:</p>
+              <p className="font-mono text-body-small break-words whitespace-pre-wrap text-destructive">{write.error.message}</p>
             </div>
           )}
           <AutoRules agent="nemia" />
@@ -71,7 +71,7 @@ export function NemiaSettings() {
           <SpendPart nemia={data} />
         </>
       ) : (
-        <p className="text-sm text-muted-foreground">
+        <p className="text-body-medium text-muted-foreground">
           {error instanceof Error ? `Could not read where she is: ${error.message}` : 'Reading where she is…'}
         </p>
       )}
@@ -84,7 +84,7 @@ export function NemiaSettings() {
 function Part({ heading, children, ...data }: { heading: string; children: ReactNode } & Record<`data-${string}`, string | boolean>) {
   return (
     <div {...data} className="flex flex-col gap-2 border-t pt-4">
-      <h3 className="text-sm font-medium">{heading}</h3>
+      <h3 className="text-title-small">{heading}</h3>
       {children}
     </div>
   );
@@ -143,9 +143,9 @@ function LevelPart({ nemia, pending, onAsk }: { nemia: NemiaLevel; pending: bool
     <Part heading="Level" data-nemia-level={nemia.level}>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <LevelSelect label="Her level" level={nemia.level} pending={pending} onPick={onAsk} marks={{ 'data-nemia-pick': true }} />
-        {pending && <span className="text-xs text-muted-foreground">Writing…</span>}
+        {pending && <span className="text-body-small text-muted-foreground">Writing…</span>}
       </div>
-      <p className="text-xs text-muted-foreground">
+      <p className="text-body-small text-muted-foreground">
         {LEVEL_LINES[nemia.level]}
         {nemia.since !== null && <span data-nemia-since> Set at {clockWord(new Date(nemia.since), new Date(now))}.</span>}
       </p>
@@ -178,7 +178,7 @@ function FactoriesPart({
   const now = useNow(60_000);
   return (
     <Part heading="Factories" data-nemia-factories>
-      <p className="text-xs text-muted-foreground">
+      <p className="text-body-small text-muted-foreground">
         She works on a factory at Semi-auto, and at Auto gives unasked what your rules allow; one at Manual is left alone, its runs and its
         news not hers. Raise one for a stretch: it goes back to its default by itself once the stretch ends.
       </p>
@@ -202,7 +202,7 @@ function FactoryRow({ row, now, pending, onAsk }: { row: FactoryLevel; now: Date
   return (
     <div data-factory-level={row.factory} data-level={row.level} className="flex flex-col gap-2 rounded-lg border px-3 py-2">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="font-mono text-sm">{row.factory}</span>
+        <span className="font-mono text-body-medium">{row.factory}</span>
         <Badge variant={row.level === 'manual' ? 'secondary' : 'default'}>{levelWord(row.level)}</Badge>
         {row.raise !== null && (
           <Badge variant="outline" data-factory-raised>
@@ -210,12 +210,12 @@ function FactoryRow({ row, now, pending, onAsk }: { row: FactoryLevel; now: Date
           </Badge>
         )}
       </div>
-      <p data-factory-words className="text-xs text-muted-foreground">
+      <p data-factory-words className="text-body-small text-muted-foreground">
         {factoryWords(row, byDefault, now)}
       </p>
       {!byDefault && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <span className="flex items-center gap-2 text-sm">
+          <span className="flex items-center gap-2 text-body-medium">
             By default
             <LevelSelect
               label={`${row.factory}'s level by default`}
@@ -296,9 +296,9 @@ function SessionPart({ nemia, pending, onAsk }: { nemia: NemiaLevel; pending: bo
   const { kind, words } = sessionOf(nemia);
   return (
     <Part heading="Her session" data-nemia-session data-state={kind}>
-      <p className="text-sm">{words}</p>
+      <p className="text-body-medium">{words}</p>
       {nemia.phase !== null && (
-        <p className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        <p className="flex flex-wrap gap-x-4 gap-y-1 text-body-small text-muted-foreground">
           <span>
             Task{' '}
             <code data-nemia-task className="font-mono">
@@ -335,18 +335,18 @@ function ReachPart({ reach, bridge }: { reach: readonly string[]; bridge: Bridge
   return (
     <Part heading="Reach her" data-nemia-reach>
       <div className="flex max-w-full items-center gap-1 self-start rounded-md border bg-muted/40 px-2 py-1">
-        <code data-nemia-attach className="font-mono text-xs break-all">
+        <code data-nemia-attach className="font-mono text-body-small break-all">
           {command}
         </code>
         <CopyButton text={command} />
       </div>
       {rest.map((line) => (
-        <p key={line} className="text-xs text-muted-foreground">
+        <p key={line} className="text-body-small text-muted-foreground">
           {line}
         </p>
       ))}
       {bridge && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-body-small text-muted-foreground">
           <BridgeWords bridge={bridge} data-nemia-bridge />
         </p>
       )}
@@ -360,16 +360,16 @@ function SpendPart({ nemia }: { nemia: NemiaLevel }) {
   return (
     <Part heading="What she spent and was allowed">
       {nemia.spend !== null && (
-        <p data-nemia-spend className="text-sm">
+        <p data-nemia-spend className="text-body-medium">
           {spendWords(nemia.spend)}
         </p>
       )}
       {nemia.allows.length > 0 && (
         <div data-nemia-allows className="flex flex-col gap-1">
-          <p className="text-xs text-muted-foreground">Allowed at a prompt, beyond what ships (her folder's local settings):</p>
+          <p className="text-body-small text-muted-foreground">Allowed at a prompt, beyond what ships (her folder's local settings):</p>
           <span className="flex flex-wrap gap-1">
             {nemia.allows.map((rule) => (
-              <code key={rule} className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px]">
+              <code key={rule} className="rounded bg-muted px-1.5 py-0.5 font-mono text-body-small">
                 {rule}
               </code>
             ))}
@@ -395,16 +395,16 @@ function MemoryPart() {
             ))}
           </ul>
         ) : (
-          <p data-nemia-no-facts className="text-sm text-muted-foreground">
+          <p data-nemia-no-facts className="text-body-medium text-muted-foreground">
             She keeps no facts yet.
           </p>
         )
       ) : (
-        <p className="text-sm text-muted-foreground">
+        <p className="text-body-medium text-muted-foreground">
           {error instanceof Error ? `Could not read her memory: ${error.message}` : 'Reading her memory…'}
         </p>
       )}
-      <p data-nemia-prune className="text-xs text-muted-foreground">
+      <p data-nemia-prune className="text-body-small text-muted-foreground">
         {PRUNE_WORDS}
       </p>
     </Part>
@@ -417,7 +417,7 @@ function Fact({ name }: { name: string }) {
     <Collapsible data-nemia-fact={name}>
       {({ isExpanded }) => (
         <>
-          <CollapsibleTrigger className="rounded-sm font-mono text-xs outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50">
+          <CollapsibleTrigger className="rounded-sm font-mono text-body-small outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50">
             {isExpanded ? '▾' : '▸'} {name}
           </CollapsibleTrigger>
           <CollapsibleContent>{isExpanded && <FactText name={name} />}</CollapsibleContent>
@@ -432,12 +432,15 @@ function FactText({ name }: { name: string }) {
   const { data, error } = useQuery(nemiaFactQuery(name));
   if (data?.fact)
     return (
-      <pre data-nemia-fact-text className="mt-1 rounded-md border bg-muted/40 px-3 py-2 font-mono text-xs break-words whitespace-pre-wrap">
+      <pre
+        data-nemia-fact-text
+        className="mt-1 rounded-md border bg-muted/40 px-3 py-2 font-mono text-body-small break-words whitespace-pre-wrap"
+      >
         {data.fact.text}
       </pre>
     );
   return (
-    <p className="mt-1 text-xs text-muted-foreground">
+    <p className="mt-1 text-body-small text-muted-foreground">
       {error instanceof Error ? `Could not read this fact: ${error.message}` : 'Reading the fact…'}
     </p>
   );

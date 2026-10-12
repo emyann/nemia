@@ -11,8 +11,8 @@ const PLUGINS = [remarkGfm];
 const HEADING = {
   h1: 'text-[1.15em]',
   h2: 'text-[1.08em]',
-  h3: 'text-[1em]',
-  h4: 'text-[1em]',
+  h3: '',
+  h4: '',
   h5: 'text-[0.95em] text-muted-foreground',
   h6: 'text-[0.95em] text-muted-foreground',
 } as const;
@@ -71,7 +71,7 @@ const COMPONENTS: Components = {
   },
   pre: ({ node }) => {
     const { code, className } = fencedCode(node);
-    return <CodeBlock code={code} language={languageOf(className)} className="my-3 text-[13px] [&_pre]:whitespace-pre" />;
+    return <CodeBlock code={code} language={languageOf(className)} className="my-3 text-body-small [&_pre]:whitespace-pre" />;
   },
   code: ({ node: _node, className, ...props }) => (
     <code className={cn('box-decoration-clone rounded bg-muted px-1 py-px font-mono text-[0.9em]', className)} {...props} />

@@ -17,14 +17,14 @@ export const Route = createFileRoute('/agents')({
     ]),
   component: AgentsPage,
   errorComponent: ({ error }) => (
-    <p className="text-sm text-failure">
+    <p className="text-body-medium text-failure">
       Could not load the agents: {error instanceof Error ? error.message : String(error)}. Is the api running (<code>npm run dev</code>)?
     </p>
   ),
 });
 
 const RouterLinkButton = routeLink(LinkButton);
-const code = (text: string) => <code className="font-mono text-xs">{text}</code>;
+const code = (text: string) => <code className="font-mono text-body-small">{text}</code>;
 
 /**
  * The agents beside the workflows: yours, which the board writes, then this repository's, which it only reads. An agent is one kind of
@@ -41,7 +41,7 @@ function AgentsPage() {
   return (
     <article className="space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <p className="min-w-0 flex-1 text-sm text-muted-foreground">
+        <p className="min-w-0 flex-1 text-body-medium text-muted-foreground">
           An agent is a file in the {code('agents/')} folder beside the workflows: what a node that names it ({code('agent: <name>')}) is
           told first, and how its sessions run. Yours are under {code(`${store.agents}/`)} and are edited here; this repository's are under{' '}
           {code('workflows/agents/')}, read-only. An edit changes what a run started later freezes, never a run already started.
@@ -69,7 +69,7 @@ function AgentsPage() {
 function Place({ title, agents, empty }: { title: string; agents: LibraryAgent[]; empty: React.ReactNode }) {
   return (
     <section aria-label={title} className="space-y-3">
-      <h2 className="text-sm font-semibold">{title}</h2>
+      <h2 className="text-title-small">{title}</h2>
       {agents.length ? (
         <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {agents.map((agent) => (
@@ -79,7 +79,7 @@ function Place({ title, agents, empty }: { title: string; agents: LibraryAgent[]
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-muted-foreground">{empty}</p>
+        <p className="text-body-medium text-muted-foreground">{empty}</p>
       )}
     </section>
   );
@@ -94,19 +94,19 @@ function SkillPlaces({ places, library }: { places: readonly SkillPlace[]; libra
   return (
     <section aria-label="Skills" className="space-y-4">
       <div className="space-y-1">
-        <h2 className="text-sm font-semibold">Skills</h2>
-        <p className="text-sm text-muted-foreground">
+        <h2 className="text-title-small">Skills</h2>
+        <p className="text-body-medium text-muted-foreground">
           A skill is a folder with a {code('SKILL.md')}: instructions an agent gives its sessions, by name. Yours are under{' '}
           {code(`${library}/`)} and are written here.
         </p>
       </div>
       {places.map((place) => (
         <section key={place.from} aria-label={`Skills: ${PLACE_LABELS[place.from]}`} data-skill-place={place.from} className="space-y-2">
-          <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{PLACE_LABELS[place.from]}</h3>
+          <h3 className="text-label-medium text-muted-foreground uppercase">{PLACE_LABELS[place.from]}</h3>
           {place.skills.length ? (
             <ul className="grid gap-x-6 gap-y-1.5 lg:grid-cols-2">
               {place.skills.map((skill) => (
-                <li key={skill.name} data-skill-row={skill.name} className="min-w-0 text-xs leading-snug">
+                <li key={skill.name} data-skill-row={skill.name} className="min-w-0 text-body-small leading-snug">
                   <SkillLink from={skill.from} name={skill.name} className="font-medium text-foreground" />{' '}
                   {skill.error !== null ? (
                     <span className="text-failure">does not read</span>
@@ -117,7 +117,9 @@ function SkillPlaces({ places, library }: { places: readonly SkillPlace[]; libra
               ))}
             </ul>
           ) : (
-            <p className="text-xs text-muted-foreground">{place.from === 'yours' ? <>None yet. New skill writes one.</> : 'None.'}</p>
+            <p className="text-body-small text-muted-foreground">
+              {place.from === 'yours' ? <>None yet. New skill writes one.</> : 'None.'}
+            </p>
           )}
         </section>
       ))}

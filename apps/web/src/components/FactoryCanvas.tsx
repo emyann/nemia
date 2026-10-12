@@ -193,7 +193,7 @@ function FloorCounts({ runs, flying }: { runs: readonly RunSummary[]; flying: nu
   const waiting = runs.filter(waitsOnYou).length;
   const toDecide = runs.filter((run) => toDecideOf(run) !== null).length;
   return (
-    <p className="text-sm text-muted-foreground">
+    <p className="text-body-medium text-muted-foreground">
       <span className="font-medium text-foreground">{flying}</span> in flight
       {finished > 0 && ` · ${finished} finished`}
       {toDecide > 0 && <span className="text-yours"> · {toDecide} to decide</span>}
@@ -487,7 +487,7 @@ function Floor({ runs, factory }: { runs: readonly RunSummary[]; factory: Factor
                 defaultMarkerColor={null}
                 minZoom={0.2}
               >
-                <Panel position="top-left" className="hidden text-[11px] text-muted-foreground @4xl:block">
+                <Panel position="top-left" className="hidden text-body-small text-muted-foreground @4xl:block">
                   Click a run to inspect it · double-click to open its page · drag a card, and it moves alone · kept in this browser
                 </Panel>
                 <Panel position="top-right" className="flex flex-wrap justify-end gap-2">
@@ -552,7 +552,7 @@ function CapLine({ queued, queueError }: { queued: number; queueError: Error | n
   const now = new Date(useNow(60_000));
   if (error || queueError) {
     return (
-      <p data-cap-error className="max-w-md truncate text-xs text-failure" title={(error ?? queueError)!.message}>
+      <p data-cap-error className="max-w-md truncate text-body-small text-failure" title={(error ?? queueError)!.message}>
         {error ? 'The cap on runs in flight' : 'The queue'} could not be read: {(error ?? queueError)!.message}
       </p>
     );
@@ -566,7 +566,7 @@ function CapLine({ queued, queueError }: { queued: number; queueError: Error | n
       ? `Runs in flight against the cap, ${by}. A run takes a slot while a task of it is filed and not settled, or, once started, while it has something due; a run waiting on runs, which the floor counts in flight, takes none until it starts. ${data.held.length ? `Held for a slot: ${data.held.map((h) => h.run).join(', ')}.` : ''}`
       : `No cap on runs in flight, ${by}: every run is filed as soon as it is ready.`;
   return (
-    <p data-cap={data.cap} title={title.trim()} className="border-l pl-4 text-sm text-muted-foreground">
+    <p data-cap={data.cap} title={title.trim()} className="border-l pl-4 text-body-medium text-muted-foreground">
       {capLine(data, queued)}
       {data.pass && (
         <span data-pass={Math.round(data.pass.ms)} title={passTitle(data.pass, now)}>
@@ -588,7 +588,7 @@ const RouterLinkButton = routeLink(LinkButton);
 function FloorOptions(props: { factory: FactoryPlace; showFinished: boolean; onShowFinished: (on: boolean) => void }) {
   const finishedSwitch = useId();
   return (
-    <div className="flex items-center gap-4 text-sm">
+    <div className="flex items-center gap-4 text-body-medium">
       <div className="flex items-center gap-2">
         <Switch id={finishedSwitch} isSelected={props.showFinished} onChange={props.onShowFinished} />
         <label htmlFor={finishedSwitch} className="cursor-pointer">

@@ -153,11 +153,11 @@
   --md-sys-typescale-title-large-line-height: 28px;
   --md-sys-typescale-title-medium-size: 16px;
   --md-sys-typescale-title-medium-line-height: 24px;
-  --md-sys-typescale-title-medium-tracking: 0.15px;
+  --md-sys-typescale-title-medium-tracking: 0px;
   --md-sys-typescale-title-medium-weight: 500;
   --md-sys-typescale-title-small-size: 14px;
   --md-sys-typescale-title-small-line-height: 20px;
-  --md-sys-typescale-title-small-tracking: 0.1px;
+  --md-sys-typescale-title-small-tracking: 0px;
   --md-sys-typescale-title-small-weight: 500;
 
   --md-sys-typescale-label-large-size: 14px;
@@ -175,13 +175,13 @@
 
   --md-sys-typescale-body-large-size: 16px;
   --md-sys-typescale-body-large-line-height: 24px;
-  --md-sys-typescale-body-large-tracking: 0.5px;
+  --md-sys-typescale-body-large-tracking: 0px;
   --md-sys-typescale-body-medium-size: 14px;
   --md-sys-typescale-body-medium-line-height: 20px;
-  --md-sys-typescale-body-medium-tracking: 0.25px;
+  --md-sys-typescale-body-medium-tracking: 0px;
   --md-sys-typescale-body-small-size: 12px;
   --md-sys-typescale-body-small-line-height: 16px;
-  --md-sys-typescale-body-small-tracking: 0.4px;
+  --md-sys-typescale-body-small-tracking: 0px;
 
   /* ---- MD3 shape scale ----
      Values set from the `rounded` tokens of the project's DESIGN.md by

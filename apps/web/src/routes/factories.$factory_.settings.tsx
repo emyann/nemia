@@ -24,7 +24,9 @@ export const Route = createFileRoute('/factories/$factory_/settings')({
   },
   component: SettingsPage,
   errorComponent: ({ error }) => (
-    <p className="p-4 text-sm text-failure">Could not load the factories: {error instanceof Error ? error.message : String(error)}</p>
+    <p className="p-4 text-body-medium text-failure">
+      Could not load the factories: {error instanceof Error ? error.message : String(error)}
+    </p>
   ),
 });
 
@@ -50,16 +52,16 @@ function SettingsPage() {
           </RouterLinkButton>
         </div>
         <div className="flex flex-col gap-1">
-          <h1 className="text-lg font-semibold">{name}</h1>
-          <p className="text-sm text-muted-foreground">This factory's settings.</p>
+          <h1 className="text-title-large">{name}</h1>
+          <p className="text-body-medium text-muted-foreground">This factory's settings.</p>
         </div>
       </header>
       {factory === undefined ? (
-        <p data-no-factory={name} className="text-sm text-muted-foreground">
+        <p data-no-factory={name} className="text-body-medium text-muted-foreground">
           No factory is named {name}: the factories are listed on the Factories page.
         </p>
       ) : factory.default ? (
-        <p data-default-factory className="text-sm text-muted-foreground">
+        <p data-default-factory className="text-body-medium text-muted-foreground">
           The default factory has no file, so it keeps no settings: they are kept by the factories a person makes.
         </p>
       ) : (

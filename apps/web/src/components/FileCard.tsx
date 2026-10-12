@@ -11,7 +11,7 @@ import { cardFiling, factoriesOffered, factoryPreset, workflowKey } from '../lib
 import { PRIMARY } from './InboxParts';
 import { FIELD, WorkflowOptions, WorkflowsUnread } from './WorkflowOptions';
 
-const code = (text: string) => <code className="font-mono text-xs">{text}</code>;
+const code = (text: string) => <code className="font-mono text-body-small">{text}</code>;
 
 /** What the box's lists hold: the factory's name, `''` for none; the repository picked among several; and the workflow's key. */
 type Picks = { factory: string; repo: string; workflow: string };
@@ -80,14 +80,14 @@ export function FileCard({ shown }: { shown: string | undefined }) {
           unread={<WorkflowsUnread workflows={listed} />}
         >
           {workflows.error ? (
-            <p className="text-xs text-failure">Could not list the workflows: {workflows.error.message}</p>
+            <p className="text-body-small text-failure">Could not list the workflows: {workflows.error.message}</p>
           ) : (
             place !== null && workflows.data && <WorkflowOptions workflows={workflows.data} />
           )}
         </InFactory>
       )}
       {picked?.folderTeam && (
-        <p data-in-folders className="text-xs text-muted-foreground">
+        <p data-in-folders className="text-body-small text-muted-foreground">
           {picked.name} works in folders the run makes for it, and looks at no repository: the card names none.
         </p>
       )}
@@ -95,7 +95,7 @@ export function FileCard({ shown }: { shown: string | undefined }) {
         <button type="submit" disabled={!idea.trim() || file.isPending} className={PRIMARY}>
           {file.isPending ? 'Filing…' : 'File'}
         </button>
-        <span className="text-xs text-muted-foreground">Parked, not started: nothing runs until you start it.</span>
+        <span className="text-body-small text-muted-foreground">Parked, not started: nothing runs until you start it.</span>
       </div>
       {filed && !keptBy(shown)(filed) && <Hidden name={filed.name} shown={shown!} />}
       {file.isError && <NotFiled message={file.error.message} />}
@@ -108,7 +108,7 @@ function IdeaField({ idea, onIdea }: { idea: string; onIdea: (idea: string) => v
   const field = useId();
   return (
     <div className="space-y-1.5">
-      <label htmlFor={field} className="block text-sm font-medium">
+      <label htmlFor={field} className="block text-body-medium font-medium">
         An idea
       </label>
       <textarea
@@ -127,8 +127,8 @@ function IdeaField({ idea, onIdea }: { idea: string; onIdea: (idea: string) => v
 function NotFiled({ message }: { message: string }) {
   return (
     <div data-refused className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
-      <p className="text-sm font-medium text-on-failure-container">Not filed. The api refused it:</p>
-      <p className="font-mono text-xs whitespace-pre-wrap break-words text-on-failure-container">{message}</p>
+      <p className="text-body-medium font-medium text-on-failure-container">Not filed. The api refused it:</p>
+      <p className="font-mono text-body-small whitespace-pre-wrap break-words text-on-failure-container">{message}</p>
     </div>
   );
 }
@@ -164,7 +164,7 @@ function FactoryField({
   const field = useId();
   return (
     <div className="space-y-1.5">
-      <label htmlFor={field} className="block text-sm font-medium">
+      <label htmlFor={field} className="block text-body-medium font-medium">
         Factory
       </label>
       <select id={field} value={picked} onChange={(event) => onPick(event.target.value)} className={`${FIELD} sm:max-w-xs`}>
@@ -175,19 +175,19 @@ function FactoryField({
           </option>
         ))}
       </select>
-      {error && <p className="text-xs text-failure">Could not list the factories: {error.message}</p>}
+      {error && <p className="text-body-small text-failure">Could not list the factories: {error.message}</p>}
       {picked === '' && (
-        <p data-parked className="text-xs text-muted-foreground">
+        <p data-parked className="text-body-small text-muted-foreground">
           Parked with no factory: it gets its factory, workflow and repository when you start it.
         </p>
       )}
       {!error && !read && (
-        <p data-reading-factories className="text-xs text-muted-foreground">
+        <p data-reading-factories className="text-body-small text-muted-foreground">
           Reading the factories…
         </p>
       )}
       {!error && read && offered.length === 0 && store && (
-        <p data-no-factory className="text-xs text-muted-foreground">
+        <p data-no-factory className="text-body-small text-muted-foreground">
           The store has no factory yet: file one with {code(store.fileFactory)}.
         </p>
       )}
@@ -221,7 +221,7 @@ function InFactory({
   return (
     <div className="grid gap-3 sm:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]">
       <div className="space-y-1.5">
-        <label htmlFor={ids.workflow} className="block text-sm font-medium">
+        <label htmlFor={ids.workflow} className="block text-body-medium font-medium">
           Workflow
         </label>
         <select
@@ -236,7 +236,7 @@ function InFactory({
         </select>
         {unread}
         {!known && several && (
-          <p data-needs-repo className="text-xs text-muted-foreground">
+          <p data-needs-repo className="text-body-small text-muted-foreground">
             Pick a repository to choose among the workflows {code(factory.name)} offers on it.
           </p>
         )}
@@ -244,7 +244,7 @@ function InFactory({
       <div className="space-y-1.5">
         {several ? (
           <>
-            <label htmlFor={ids.repo} className="block text-sm font-medium">
+            <label htmlFor={ids.repo} className="block text-body-medium font-medium">
               Repository
             </label>
             <select
@@ -254,7 +254,7 @@ function InFactory({
                 onRepo(event.target.value);
                 onWorkflow('');
               }}
-              className={`${FIELD} font-mono text-xs`}
+              className={`${FIELD} font-mono text-body-small`}
             >
               <option value="">None: chosen at start</option>
               {factory.repos.map((repo) => (
@@ -266,8 +266,8 @@ function InFactory({
           </>
         ) : (
           <>
-            <p className="text-sm font-medium">Repository</p>
-            <p data-factory-repo className="py-1.5 font-mono text-xs break-all text-muted-foreground">
+            <p className="text-body-medium font-medium">Repository</p>
+            <p data-factory-repo className="py-1.5 font-mono text-body-small break-all text-muted-foreground">
               {factory.repos[0] ?? `${factory.name} names no repository.`}
             </p>
           </>
@@ -280,7 +280,7 @@ function InFactory({
 /** The note for a card just filed that the page's filter, on the factory `shown`, does not list: its name, and the way to see it. */
 function Hidden({ name, shown }: { name: string; shown: string }) {
   return (
-    <p data-filed-hidden className="text-xs text-muted-foreground">
+    <p data-filed-hidden className="text-body-small text-muted-foreground">
       Filed as <span className="font-mono">{name}</span>, which the cards below, of the factory <span className="font-mono">{shown}</span>,
       do not list.{' '}
       <Link to="/inbox" search={{}} replace className="underline underline-offset-2">

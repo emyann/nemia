@@ -70,6 +70,7 @@ async function tookOnTheCard(page: Page): Promise<void> {
     `and its time at work, its sessions and checks side by side counted once (${COSTLY.took}): it waits on you`,
   );
   await expectUncut(costly.locator('time, [data-cost], [data-tokens]'), 'the clock, the cost and the tokens are read whole');
+  await expectUncut(costly.locator('ul[aria-label="Steps"] [data-step] span'), "each step's name on the rail is read whole");
   await photographCard(page, costly, path.join(OUT, `factory-card-took-${await themeOf(page)}.png`));
 }
 

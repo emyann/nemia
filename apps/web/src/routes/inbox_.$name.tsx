@@ -11,7 +11,7 @@ export const Route = createFileRoute('/inbox_/$name')({
   errorComponent: ({ error }) => (
     <div className="space-y-3">
       <BackToInbox />
-      <p className="text-sm text-failure">Could not load this card: {error instanceof Error ? error.message : String(error)}</p>
+      <p className="text-body-medium text-failure">Could not load this card: {error instanceof Error ? error.message : String(error)}</p>
     </div>
   ),
 });
@@ -29,8 +29,8 @@ function CardPage() {
       <BackToInbox />
 
       <header className="space-y-1">
-        <h1 className="font-mono text-sm text-muted-foreground">{card.name}</h1>
-        <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+        <h1 className="font-mono text-body-medium text-muted-foreground">{card.name}</h1>
+        <p className="flex flex-wrap gap-x-3 gap-y-1 text-body-small text-muted-foreground">
           <span>{card.error === null ? 'inbox card' : 'in the inbox, not a card'}</span>
           {card.workflow && (
             <span data-workflow={card.workflow} title={card.workflow}>
@@ -46,7 +46,7 @@ function CardPage() {
       </header>
 
       {card.startedAs.length > 0 && (
-        <p data-started-as className="text-sm text-yours">
+        <p data-started-as className="text-body-medium text-yours">
           Started as{' '}
           {card.startedAs.map((id, i) => (
             <span key={id}>
@@ -62,8 +62,8 @@ function CardPage() {
 
       {card.error !== null && (
         <div className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
-          <p className="text-sm font-medium text-on-failure-container">Does not read as a card, so it cannot start:</p>
-          <p className="font-mono text-xs whitespace-pre-wrap break-words text-on-failure-container">{card.error}</p>
+          <p className="text-body-medium font-medium text-on-failure-container">Does not read as a card, so it cannot start:</p>
+          <p className="font-mono text-body-small whitespace-pre-wrap break-words text-on-failure-container">{card.error}</p>
         </div>
       )}
 
@@ -82,7 +82,7 @@ function CardPage() {
 
 function BackToInbox() {
   return (
-    <Link to="/inbox" className="text-sm text-muted-foreground hover:text-foreground">
+    <Link to="/inbox" className="text-body-medium text-muted-foreground hover:text-foreground">
       ← Inbox
     </Link>
   );

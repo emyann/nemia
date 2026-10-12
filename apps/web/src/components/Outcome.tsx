@@ -32,14 +32,16 @@ export function OutcomeHead({ outcome, aside }: { outcome: Outcome; aside?: Reac
     <div className="space-y-1">
       <div className="flex items-center justify-between gap-2">
         <p data-outcome={word} data-by={outcome.by} className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <Badge className={cn('text-sm', BADGE[outcome.by === 'agent' && outcome.outcome === 'blocked' ? 'blocked' : outcome.by])}>
+          <Badge
+            className={cn('text-body-medium', BADGE[outcome.by === 'agent' && outcome.outcome === 'blocked' ? 'blocked' : outcome.by])}
+          >
             {word}
           </Badge>{' '}
-          <span className="text-xs text-muted-foreground">{BY[outcome.by]}</span>
+          <span className="text-body-small text-muted-foreground">{BY[outcome.by]}</span>
         </p>
         {aside}
       </div>
-      {outcome.by === 'agent' && outcome.cut && <p className="text-xs text-failure">… {outcome.cut}.</p>}
+      {outcome.by === 'agent' && outcome.cut && <p className="text-body-small text-failure">… {outcome.cut}.</p>}
       {outcome.by !== 'agent' && (
         <p data-reason className="text-muted-foreground">
           {outcome.words}
@@ -71,7 +73,7 @@ export function FieldView({
   const kind = outputKind(schema, value, images);
   return (
     <section data-field={name} data-kind={kind} aria-label={name} className="min-w-0 space-y-1">
-      {named && <h4 className="font-mono text-xs text-muted-foreground">{name}</h4>}
+      {named && <h4 className="font-mono text-body-small text-muted-foreground">{name}</h4>}
       <KindView kind={kind} schema={schema} value={value} artifacts={artifacts} />
     </section>
   );
@@ -112,7 +114,7 @@ function KindView({
 
 const artifactAt = (artifacts: readonly StepArtifact[], path: string): StepArtifact => artifacts.find((a) => a.path === path) ?? { path };
 
-const None = () => <p className="text-xs text-muted-foreground">none</p>;
+const None = () => <p className="text-body-small text-muted-foreground">none</p>;
 
 type Place = (record: Record<string, unknown>) => { place: string; rest: string[] };
 
@@ -140,7 +142,7 @@ const text = (value: unknown) => (typeof value === 'string' ? value : JSON.strin
 function Records({ kind, records, place }: { kind: 'findings' | 'table'; records: Array<Record<string, unknown>>; place: Place }) {
   if (!records.length) return <None />;
   return (
-    <table data-kind={kind} className="w-full text-sm">
+    <table data-kind={kind} className="w-full text-body-medium">
       <tbody>
         {records.map((record, i) => {
           const { place: where, rest } = place(record);
@@ -150,7 +152,7 @@ function Records({ kind, records, place }: { kind: 'findings' | 'table'; records
                 scope="row"
                 data-place
                 title={where}
-                className="block break-all text-left font-mono text-xs font-medium text-foreground underline decoration-outline decoration-dotted underline-offset-2"
+                className="block break-all text-left font-mono text-body-small font-medium text-foreground underline decoration-outline decoration-dotted underline-offset-2"
               >
                 {where}
               </th>
@@ -159,13 +161,13 @@ function Records({ kind, records, place }: { kind: 'findings' | 'table'; records
                   <div key={key} data-cell={key}>
                     {rest.length > 1 && (
                       <>
-                        <span className="font-mono text-[11px] text-muted-foreground">{key}</span>{' '}
+                        <span className="font-mono text-body-small text-muted-foreground">{key}</span>{' '}
                       </>
                     )}
                     {typeof record[key] === 'string' ? (
                       <Markdown>{record[key]}</Markdown>
                     ) : (
-                      <code className="font-mono text-xs">{text(record[key])}</code>
+                      <code className="font-mono text-body-small">{text(record[key])}</code>
                     )}
                   </div>
                 ))}
@@ -189,7 +191,7 @@ const ANSWER: Record<string, string> = {
  */
 function Replies({ replies }: { replies: Array<Record<string, unknown>> }) {
   return (
-    <ul className="space-y-2 text-xs">
+    <ul className="space-y-2 text-body-small">
       {replies.map((reply, i) => {
         const answer = text(reply.answer ?? '');
         const why = reply.why === undefined ? '' : text(reply.why);
@@ -224,7 +226,7 @@ function YesNo({ yes, description }: { yes: boolean; description: string | null 
       {description && (
         <>
           {' '}
-          <span className="text-xs text-muted-foreground">— {description}</span>
+          <span className="text-body-small text-muted-foreground">— {description}</span>
         </>
       )}
     </p>
@@ -260,7 +262,7 @@ export function Json({ value, ...data }: { value: unknown; 'data-raw'?: boolean 
   return (
     <pre
       {...data}
-      className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded bg-muted p-2 font-mono text-[11px] leading-snug"
+      className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded bg-muted p-2 font-mono text-body-small leading-snug"
     >
       {typeof value === 'string' ? value : JSON.stringify(value, null, 2)}
     </pre>

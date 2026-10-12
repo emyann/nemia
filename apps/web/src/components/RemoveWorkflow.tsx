@@ -32,7 +32,7 @@ export function RemoveWorkflow({ workflow, onRemoved }: { workflow: WorkflowList
     );
   const held = error ? 'every file in it' : `its ${steps.length} ${steps.length === 1 ? 'step' : 'steps'} and every file in it`;
   return (
-    <div data-remove-asks className="flex basis-full flex-wrap items-center gap-2 text-xs text-muted-foreground">
+    <div data-remove-asks className="flex basis-full flex-wrap items-center gap-2 text-body-small text-muted-foreground">
       <p className="min-w-0 basis-full">
         Remove <code className="font-mono break-all">{dir}</code>, {held}? A run started on it goes on from the steps it froze at its start;
         a card that names it and is not queued is refused when it starts; its star goes with it.

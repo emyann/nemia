@@ -192,7 +192,7 @@ function drawnOf(workflow: WorkflowListing): Drawn | Error {
 export function WorkflowCanvas({ workflow, place = {} }: { workflow: WorkflowListing; place?: PagePlace }) {
   const drawn = useMemo(() => drawnOf(workflow), [workflow]);
   if (drawn instanceof Error) {
-    return <p className="rounded border border-failure px-3 py-2 text-sm text-failure">{drawn.message}</p>;
+    return <p className="rounded border border-failure px-3 py-2 text-body-medium text-failure">{drawn.message}</p>;
   }
   return (
     <ReactFlowProvider>

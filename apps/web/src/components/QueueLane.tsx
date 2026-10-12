@@ -21,7 +21,7 @@ export function QueueLane({ cards }: { cards: readonly InboxEntry[] }) {
       aria-label="Queued cards"
       className="flex shrink-0 gap-2 overflow-x-auto border-b bg-muted/30 p-3 md:w-64 md:flex-col md:overflow-x-hidden md:overflow-y-auto md:border-r md:border-b-0"
     >
-      <p className="hidden text-[11px] text-muted-foreground md:block">
+      <p className="hidden text-body-small text-muted-foreground md:block">
         <span className="font-medium text-foreground">Queued</span> · started in this order as run slots free
       </p>
       <ol className="flex gap-2 md:flex-col">
@@ -51,7 +51,7 @@ function Ghost({ card, now }: { card: InboxEntry; now: number }) {
       aria-label={`Queued ${ordinal(place)}: ${title}`}
       className="block rounded-lg border border-dashed border-outline bg-background/60 px-3 py-2 text-muted-foreground transition-colors hover:border-on-surface-variant hover:bg-background hover:text-foreground"
     >
-      <span className="flex items-center justify-between gap-2 text-[11px]">
+      <span className="flex items-center justify-between gap-2 text-body-small">
         <span data-ghost-place className="rounded-full border border-dashed border-current px-1.5 font-medium">
           {ordinal(place)}
         </span>
@@ -59,10 +59,10 @@ function Ghost({ card, now }: { card: InboxEntry; now: number }) {
           queued {waited(now - Date.parse(queued!.at))}
         </time>
       </span>
-      <span data-ghost-title title={title} className="mt-1 line-clamp-2 text-sm font-medium break-words text-foreground/80">
+      <span data-ghost-title title={title} className="mt-1 line-clamp-2 text-body-medium font-medium break-words text-foreground/80">
         {title}
       </span>
-      <span className="mt-0.5 flex items-center justify-between gap-2 text-[11px]">
+      <span className="mt-0.5 flex items-center justify-between gap-2 text-body-small">
         {card.workflow && (
           <span data-ghost-workflow className="truncate font-mono" title={card.workflow}>
             {workflowNameOf(card.workflow)}
@@ -80,14 +80,14 @@ function Ghost({ card, now }: { card: InboxEntry; now: number }) {
         <span
           data-ghost-tried={tried.refused ? 'refused' : 'failed'}
           title={tried.why}
-          className={`mt-1 line-clamp-2 text-[11px] break-words ${tried.refused ? 'text-yours' : 'text-muted-foreground'}`}
+          className={`mt-1 line-clamp-2 text-body-small break-words ${tried.refused ? 'text-yours' : 'text-muted-foreground'}`}
         >
           {tried.refused ? 'not started, refused: ' : 'failed, tried again: '}
           {tried.why}
         </span>
       )}
       {!tried && card.error && (
-        <span data-ghost-error title={card.error} className="mt-1 line-clamp-2 text-[11px] break-words text-failure">
+        <span data-ghost-error title={card.error} className="mt-1 line-clamp-2 text-body-small break-words text-failure">
           {card.error}
         </span>
       )}

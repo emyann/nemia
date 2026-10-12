@@ -25,14 +25,14 @@ export const Route = createFileRoute('/workflows')({
   loader: ({ context, deps }) => Promise.all([loadWorkflowsIn(context.queryClient, deps), context.queryClient.ensureQueryData(storeQuery)]),
   component: WorkflowsPage,
   errorComponent: ({ error }) => (
-    <p className="text-sm text-failure">
+    <p className="text-body-medium text-failure">
       Could not load the workflows: {error instanceof Error ? error.message : String(error)}. Is the api running (<code>npm run dev</code>)?{' '}
       {everyFactory}.
     </p>
   ),
 });
 
-const folder = <code className="font-mono text-xs">workflows/</code>;
+const folder = <code className="font-mono text-body-small">workflows/</code>;
 
 /**
  * The workflows of the address's place (`listPlace`), a card each, linked to its page — and yours made on the board, the one just made
@@ -50,7 +50,7 @@ function WorkflowsPage() {
   return (
     <article className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <p className="min-w-0 flex-1 text-sm text-muted-foreground">
+        <p className="min-w-0 flex-1 text-body-medium text-muted-foreground">
           A workflow is a folder of steps:{' '}
           {where.kind === 'every' ? (
             <>
@@ -105,9 +105,9 @@ function Every({ address }: { address: PagePlace }) {
         />
       ))}
       {all.length === 0 && (
-        <p className="text-sm text-muted-foreground">
+        <p className="text-body-medium text-muted-foreground">
           No workflows. Add a folder of steps under {folder} in the repository —{' '}
-          <code className="font-mono text-xs">workflows/dev/implement.md</code>, say — or under <YoursFolder />.
+          <code className="font-mono text-body-small">workflows/dev/implement.md</code>, say — or under <YoursFolder />.
         </p>
       )}
     </>
@@ -123,7 +123,7 @@ function InFactory({ place, address }: { place: Place; address: PagePlace }) {
   return (
     <>
       {listed.length === 0 && (
-        <p data-filtered-out className="text-sm text-muted-foreground">
+        <p data-filtered-out className="text-body-medium text-muted-foreground">
           No workflow is in the factory <span className="font-mono">{place.factory}</span>. {everyFactory}.
         </p>
       )}
@@ -165,7 +165,7 @@ function WorkflowCard({
       className="space-y-2 rounded-lg border border-outline-variant bg-card p-4 shadow-sm"
     >
       <header className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <h2 className="font-mono text-base font-semibold">
+        <h2 className="font-mono text-body-large font-semibold">
           <RouteLink
             to="/workflows/$from/$workflow"
             params={{ from, workflow: name }}
@@ -179,20 +179,20 @@ function WorkflowCard({
         <FromBadge from={from} factory={factory} />
         <FactoryTags names={tags} linked />
         {!error && (
-          <span className="text-xs text-muted-foreground">
+          <span className="text-body-small text-muted-foreground">
             {steps.length} {steps.length === 1 ? 'step' : 'steps'}
           </span>
         )}
       </header>
       {description ? (
-        <Markdown className="text-sm">{description}</Markdown>
+        <Markdown className="text-body-medium">{description}</Markdown>
       ) : (
-        <p className="text-sm text-muted-foreground">
-          No description: the first paragraph of a <code className="font-mono text-xs">README.md</code> in the folder is one.
+        <p className="text-body-medium text-muted-foreground">
+          No description: the first paragraph of a <code className="font-mono text-body-small">README.md</code> in the folder is one.
         </p>
       )}
       {error && (
-        <p data-refusal className="text-xs text-failure">
+        <p data-refusal className="text-body-small text-failure">
           Does not read as a workflow, so it cannot start: its page says why.
         </p>
       )}

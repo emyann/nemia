@@ -5,7 +5,7 @@ import { Skills } from './Told';
 import type { ListedStep, PagePlace, WorkflowListing } from '../lib/api';
 
 const LINK =
-  'rounded-sm font-mono text-sm font-semibold underline decoration-outline underline-offset-2 outline-none hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring/50';
+  'rounded-sm font-mono text-body-medium font-semibold underline decoration-outline underline-offset-2 outline-none hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring/50';
 
 /**
  * A workflow's steps, a row each in the order a run runs them: its name, linked to its page; its own words — a step with an agent its
@@ -38,7 +38,7 @@ function StepRow({ step, workflow, place, hiring }: { step: ListedStep; workflow
         >
           {step.name}
         </RouteLink>
-        <span className="text-xs text-muted-foreground">
+        <span className="text-body-small text-muted-foreground">
           {agent ? (
             <>
               Its agent: <AgentLink from={workflow.from} name={agent} className="text-foreground" />
@@ -49,11 +49,11 @@ function StepRow({ step, workflow, place, hiring }: { step: ListedStep; workflow
         </span>
       </div>
       {words.trim() ? (
-        <Markdown level={4} className="text-sm">
+        <Markdown level={4} className="text-body-medium">
           {words}
         </Markdown>
       ) : (
-        <p className="text-xs text-muted-foreground italic">
+        <p className="text-body-small text-muted-foreground italic">
           No words of its own{agent ? `: ${agent}'s instructions are all it is told` : ''}
         </p>
       )}

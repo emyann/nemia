@@ -112,7 +112,7 @@ function useRefit(frame: RefObject<HTMLDivElement | null>, { open, resets }: { o
 }
 
 const button =
-  'rounded border border-outline bg-card px-2 py-1 text-xs text-foreground shadow-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-card';
+  'rounded border border-outline bg-card px-2 py-1 text-body-small text-foreground shadow-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-card';
 
 /**
  * The run as the graph it froze: a node per step, an edge per `after`, and the edge back that `loop:` makes — as the api's
@@ -134,7 +134,7 @@ export function RunCanvas(props: Props) {
   }, [names, edges]);
 
   if (computed instanceof Error) {
-    return <p className="rounded border border-failure px-3 py-2 text-sm text-failure">{computed.message}</p>;
+    return <p className="rounded border border-failure px-3 py-2 text-body-medium text-failure">{computed.message}</p>;
   }
   return (
     <ReactFlowProvider>
@@ -296,7 +296,7 @@ function Canvas({ run, computed }: Props & { computed: ReadonlyMap<string, Point
         fitViewOptions={FIT}
         minZoom={LEAST_ZOOM}
       >
-        <Panel position="top-left" className="text-[11px] text-muted-foreground">
+        <Panel position="top-left" className="text-body-small text-muted-foreground">
           Drag to arrange · kept in this browser
         </Panel>
         <Buttons frame={frame} running={running} onReset={resetLayout} />

@@ -59,7 +59,7 @@ function Hiring({ page, where }: { page: WorkflowStepPage; where: 'page' | 'row'
   return (
     <div data-step-hire={page.step} className="space-y-1.5">
       {factory && hired ? (
-        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-body-small">
           <span className="text-muted-foreground">
             {factory} hires <AgentLink from={page.from} name={hired} className="text-foreground" /> into this step.
           </span>
@@ -68,7 +68,7 @@ function Hiring({ page, where }: { page: WorkflowStepPage; where: 'page' | 'row'
           </Button>
         </p>
       ) : hiring.refused !== null ? (
-        <p data-hire-refused className="text-xs text-muted-foreground">
+        <p data-hire-refused className="text-body-small text-muted-foreground">
           {hiring.refused}
         </p>
       ) : (
@@ -76,7 +76,7 @@ function Hiring({ page, where }: { page: WorkflowStepPage; where: 'page' | 'row'
       )}
       {hiring.refused === null && !hired && <NewAgent page={page} where={where} />}
       {write.error && (
-        <p role="alert" data-hire-write-refused className="text-xs text-failure">
+        <p role="alert" data-hire-write-refused className="text-body-small text-failure">
           {write.variables?.kind === 'fire' ? 'Not fired' : 'Not hired'}: {write.error.message}
         </p>
       )}
@@ -96,7 +96,7 @@ function Picker({ page, pending, onHire }: { page: WorkflowStepPage; pending: bo
   const { agents } = page.hiring;
   if (agents.length === 0)
     return (
-      <p data-hire-none className="text-xs text-muted-foreground">
+      <p data-hire-none className="text-body-small text-muted-foreground">
         {page.from === 'yours' ? 'None of your agents reads' : `None of ${whose(page)} agents reads`}, so there is no agent to hire into
         this step in {page.factory}.
       </p>
@@ -110,16 +110,16 @@ function Picker({ page, pending, onHire }: { page: WorkflowStepPage; pending: bo
         isDisabled={pending}
         className="w-64 max-w-full space-y-1"
       >
-        <Label className="text-xs text-muted-foreground">Hire into this step in {page.factory}</Label>
-        <SelectTrigger data-hire-picker className="w-full font-mono text-xs">
+        <Label className="text-body-small text-muted-foreground">Hire into this step in {page.factory}</Label>
+        <SelectTrigger data-hire-picker className="w-full font-mono text-body-small">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
           {agents.map((agent) => (
             <SelectItem key={agent.name} id={agent.name} textValue={agent.name} data-hire-agent={agent.name}>
               <span className="flex min-w-0 flex-col">
-                <span className="font-mono text-xs">{agent.name}</span>
-                {agent.description && <span className="truncate text-[11px] text-muted-foreground">{agent.description}</span>}
+                <span className="font-mono text-body-small">{agent.name}</span>
+                {agent.description && <span className="truncate text-body-small text-muted-foreground">{agent.description}</span>}
               </span>
             </SelectItem>
           ))}
@@ -143,14 +143,14 @@ function NewAgent({ page, where }: { page: WorkflowStepPage; where: 'page' | 'ro
         to="/agents/new"
         search={{ factory: page.factory ?? undefined, workflow: page.workflow, step: page.step }}
         data-new-agent
-        className={`text-xs text-muted-foreground ${LINK}`}
+        className={`text-body-small text-muted-foreground ${LINK}`}
       >
         New agent, hired into this step
       </RouteLink>
     );
   if (where === 'row') return null;
   return (
-    <p data-new-agent-repo className="text-xs text-muted-foreground">
+    <p data-new-agent-repo className="text-body-small text-muted-foreground">
       A new agent for {whose(page)} workflow is added through a card on the{' '}
       <RouteLink to="/inbox" className={LINK}>
         Inbox

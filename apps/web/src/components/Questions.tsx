@@ -49,7 +49,7 @@ function OptionText({ q, label, meaning }: { q: Question; label: string; meaning
     <span className="min-w-0">
       <strong className="font-medium">{label}</strong> <span className="text-muted-foreground">— {meaning}</span>
       {q.recommended === label && (
-        <span data-recommended className="ml-1.5 rounded bg-surface-variant px-1 py-px text-[11px] font-medium text-on-surface-variant">
+        <span data-recommended className="ml-1.5 rounded bg-surface-variant px-1 py-px text-body-small font-medium text-on-surface-variant">
           recommended
         </span>
       )}
@@ -61,8 +61,8 @@ function OptionText({ q, label, meaning }: { q: Question; label: string; meaning
 export function Questions({ field, questions }: { field: string; questions: readonly Question[] }) {
   return (
     <section data-questions={field} aria-label={field} className="min-w-0 space-y-2">
-      <h4 className="font-mono text-xs text-muted-foreground">{field}</h4>
-      <ol className="space-y-3 text-sm">
+      <h4 className="font-mono text-body-small text-muted-foreground">{field}</h4>
+      <ol className="space-y-3 text-body-medium">
         {questions.map((q, i) => (
           <li key={q.title} data-question={q.title} className="space-y-1">
             <p className="font-medium">
@@ -182,9 +182,9 @@ export function RecommendButton({
 /** A step whose try a person just asked for, as its row says it until the run is read again: the CLI `ls`'s note. */
 function AskedRow({ step, said }: { step: string; said: string }) {
   return (
-    <li data-offer="asked" data-step={step} className="rounded border border-outline-variant px-3 py-2 text-sm">
+    <li data-offer="asked" data-step={step} className="rounded border border-outline-variant px-3 py-2 text-body-medium">
       <strong>{step}</strong>{' '}
-      <span data-note className="font-mono text-xs text-muted-foreground">
+      <span data-note className="font-mono text-body-small text-muted-foreground">
         {said}
       </span>
     </li>
@@ -194,7 +194,7 @@ function AskedRow({ step, said }: { step: string; said: string }) {
 /** How the answers reach the step: its session continued, or a new one — a recheck files no session to read them. */
 function ModeChoice({ name, step, mode, onMode }: { name: string; step: string; mode: RetryMode; onMode: (m: RetryMode) => void }) {
   return (
-    <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+    <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-body-small">
       <legend className="sr-only">How to try {step} again</legend>
       {(['nudge', 'fresh'] as const).map((m) => (
         <label key={m} className="flex cursor-pointer items-center gap-1.5">
@@ -221,7 +221,12 @@ export function QuestionsForm({ runId, offer }: { runId: string; offer: Extract<
   if (ask.isSuccess) return <AskedRow step={offer.step} said={askedSaid(ask.data)} />;
   const left = unanswered(offer.questions, draft);
   return (
-    <li data-offer="answer" data-questions data-step={offer.step} className="space-y-2 rounded border border-yours bg-card p-3 text-sm">
+    <li
+      data-offer="answer"
+      data-questions
+      data-step={offer.step}
+      className="space-y-2 rounded border border-yours bg-card p-3 text-body-medium"
+    >
       <p data-said>
         <strong>{offer.step}</strong> asks {offer.questions.length === 1 ? 'a question' : `${offer.questions.length} questions`}
         {offer.needs && <span className="text-muted-foreground">: {offer.needs}</span>}

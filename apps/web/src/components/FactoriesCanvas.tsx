@@ -190,14 +190,14 @@ function TurnOn({ line }: { line: string | null }) {
     const { kind, words } = sessionOf(nemia);
     return (
       <CardContent data-nemia-on data-state={kind} className="flex flex-col gap-2 border-t pt-4">
-        <p className="text-sm">Nemia is on. {words}</p>
+        <p className="text-body-medium">Nemia is on. {words}</p>
         <TrustLine trust={nemia.trust} />
       </CardContent>
     );
   }
   return (
     <CardContent data-nemia-off className="flex flex-col gap-2 border-t pt-4">
-      <p className="text-sm text-muted-foreground">
+      <p className="text-body-medium text-muted-foreground">
         Or let Nemia, the store&apos;s own agent, keep a session that asks you what waits on you.
       </p>
       <div className="flex flex-wrap items-center gap-2">
@@ -205,13 +205,13 @@ function TurnOn({ line }: { line: string | null }) {
           Turn Nemia on
         </Button>
         {line !== null && (
-          <span className="text-xs text-muted-foreground">
+          <span className="text-body-small text-muted-foreground">
             or <code className="font-mono">{line}</code>
           </span>
         )}
       </div>
       {turnOn.error && (
-        <p data-nemia-refused className="font-mono text-xs break-words whitespace-pre-wrap text-destructive">
+        <p data-nemia-refused className="font-mono text-body-small break-words whitespace-pre-wrap text-destructive">
           {turnOn.error.message}
         </p>
       )}

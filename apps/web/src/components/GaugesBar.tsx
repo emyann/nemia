@@ -16,7 +16,7 @@ import { QuotaLine } from './QuotaLine';
 function Gauge({ name, children }: { name: string; children: ReactNode }) {
   return (
     <section className="space-y-1">
-      <h3 className="text-xs font-medium text-muted-foreground">{name}</h3>
+      <h3 className="text-label-medium text-muted-foreground">{name}</h3>
       {children}
     </section>
   );
@@ -39,18 +39,18 @@ export function GaugesBar({ feed }: { feed: FeedStatus }) {
         <Gauge name="Daemon">
           <DaemonLine daemon={daemon.data} error={daemon.error} />
           {ticks && (
-            <p data-daemon-ticks className="text-sm">
+            <p data-daemon-ticks className="text-body-medium">
               {daemon.data?.line}
             </p>
           )}
         </Gauge>
         <Gauge name="Feed">
-          <p data-feed-sentence={feed} className="text-sm">
+          <p data-feed-sentence={feed} className="text-body-medium">
             {feedWords(feed).title}
           </p>
         </Gauge>
         <Gauge name="At work">
-          <p data-at-work-sentence className="text-sm">
+          <p data-at-work-sentence className="text-body-medium">
             {runs.data
               ? atWorkWords(atWork(runs.data)).title
               : runs.error
@@ -62,7 +62,7 @@ export function GaugesBar({ feed }: { feed: FeedStatus }) {
           <QuotaLine quota={quota.data} error={quota.error} />
         </Gauge>
         <Gauge name="Version">
-          <p data-version-sentence className="text-sm">
+          <p data-version-sentence className="text-body-medium">
             {version.data
               ? `${versionWords(version.data).title}, as the api serving this board answers it.`
               : version.error

@@ -73,7 +73,7 @@ export function Told({
   if (!told && !layers) return null;
   if (layers && homes) return <WillBeTold layers={layers} homes={homes} />;
   return (
-    <details className="text-sm" data-told>
+    <details className="text-body-medium" data-told>
       <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
         {filed ? 'What it was told' : 'What it would be told now'}
       </summary>
@@ -90,10 +90,10 @@ function Layers({ layers, parts }: { layers: StepLayers; parts: TaskPart[] | nul
   return (
     <div className="mt-2 flex flex-col gap-3">
       {layers.agent === null ? (
-        <p className="text-xs text-muted-foreground">No agent: its own words are all it was told, before the task.</p>
+        <p className="text-body-small text-muted-foreground">No agent: its own words are all it was told, before the task.</p>
       ) : (
         <>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-body-small text-muted-foreground">
             {layers.factory === null ? "The agent's instructions and yours" : "The agent's instructions, yours and the factory's rules"}{' '}
             were frozen at the start of the run and given{' '}
             {layers.via === 'prompt' ? "in the session's system prompt" : 'at the head of its brief'}.
@@ -131,22 +131,22 @@ function Layers({ layers, parts }: { layers: StepLayers; parts: TaskPart[] | nul
  */
 function WillBeTold({ layers, homes }: { layers: StepLayers; homes: LayerHomes }) {
   return (
-    <details open className="text-sm" data-told data-will-be-told>
+    <details open className="text-body-medium" data-told data-will-be-told>
       <summary className="cursor-pointer text-muted-foreground hover:text-foreground">What it will be told</summary>
       <div className="mt-2 flex flex-col gap-3">
-        <p data-read-now className="text-xs text-muted-foreground">
+        <p data-read-now className="text-body-small text-muted-foreground">
           Read now from the files, and frozen when a run starts: a run is told what they say then
           {layers.agent === null
             ? '.'
             : `, ${layers.factory === null ? "the agent's words and yours" : "the agent's words, yours and the factory's rules"} ${layers.via === 'prompt' ? 'in its system prompt' : 'at the head of its brief'}.`}
         </p>
         {layers.agent === null ? (
-          <p className="text-xs text-muted-foreground">No agent: its own words are all it will be told, before the task.</p>
+          <p className="text-body-small text-muted-foreground">No agent: its own words are all it will be told, before the task.</p>
         ) : (
           <>
             <Layer name="instructions" title={`Instructions — ${layers.agent}'s`} home={homes.instructions}>
               <details data-instructions-fold>
-                <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">Read them</summary>
+                <summary className="cursor-pointer text-body-small text-muted-foreground hover:text-foreground">Read them</summary>
                 <Words text={layers.instructions} none="Its file gives no instructions" />
               </details>
               <Skills word="Its skills:" skills={layers.agentSkills} link={homes.skill} />
@@ -166,7 +166,7 @@ function WillBeTold({ layers, homes }: { layers: StepLayers; homes: LayerHomes }
           <Skills word="Adds the skills:" skills={layers.addedSkills} link={homes.skill} />
           <Fence agent={layers.agent} fence={layers.fence} />
         </Layer>
-        <p data-layer="task" className="text-xs text-muted-foreground">
+        <p data-layer="task" className="text-body-small text-muted-foreground">
           Then the task: the brief a run is started with.
         </p>
       </div>
@@ -180,7 +180,7 @@ function WillBeTold({ layers, homes }: { layers: StepLayers; homes: LayerHomes }
  */
 export function StepBody({ body, layers }: { body: string | null; layers: StepLayers | null }) {
   if (layers !== null || !body) return null;
-  return <Markdown className="text-sm">{body}</Markdown>;
+  return <Markdown className="text-body-medium">{body}</Markdown>;
 }
 
 /**
@@ -199,7 +199,7 @@ export function StepPolicy({ layers }: { layers: StepLayers | null }) {
         <Skills word="Adds the skills:" skills={layers.addedSkills} />
         <Fence agent={agent} fence={layers.fence} />
       </Layer>
-      <p className="text-xs text-muted-foreground">
+      <p className="text-body-small text-muted-foreground">
         Told after {toldBefore(agent, layers)}; where they conflict, this wins. Every layer is under “What it was told”.
       </p>
     </div>
@@ -222,7 +222,7 @@ export function TaskParts({ parts }: { parts: TaskPart[] }) {
         if (!part.how) return <Words key={i} text={`## From run ${part.run}\n\n${part.body}`} />;
         return (
           <section key={i} data-from-run={part.run} data-how={part.how} className="flex flex-col gap-1 rounded border p-2">
-            <h5 title={part.run} className="min-w-0 text-xs font-medium text-muted-foreground">
+            <h5 title={part.run} className="min-w-0 text-label-medium text-muted-foreground">
               <RouteLink to="/runs/$runId" params={{ runId: part.run }} className="block truncate hover:underline">
                 {HANDED[part.how]} · {part.asked || part.run} ↗
               </RouteLink>
@@ -240,11 +240,11 @@ export function Layer({ name, title, home, children }: { name: string; title: st
   return (
     <section data-layer={name} className="flex flex-col gap-1">
       {home === undefined ? (
-        <h4 className="text-xs font-medium text-muted-foreground">{title}</h4>
+        <h4 className="text-label-medium text-muted-foreground">{title}</h4>
       ) : (
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-          <h4 className="text-xs font-medium text-muted-foreground">{title}</h4>
-          <span data-home={name} className="min-w-0 text-xs break-all text-muted-foreground">
+          <h4 className="text-label-medium text-muted-foreground">{title}</h4>
+          <span data-home={name} className="min-w-0 text-body-small break-all text-muted-foreground">
             {home}
           </span>
         </div>
@@ -259,7 +259,7 @@ export function Layer({ name, title, home, children }: { name: string; title: st
  * layer's title; or `none` where the run froze none.
  */
 export function Words({ text, none = 'None frozen on this run' }: { text: string | null; none?: string }) {
-  if (text === null) return <p className="text-xs text-muted-foreground italic">{none}</p>;
+  if (text === null) return <p className="text-body-small text-muted-foreground italic">{none}</p>;
   return (
     <Markdown level={5} className="rounded bg-muted/60 p-3">
       {text}
@@ -271,7 +271,7 @@ export function Words({ text, none = 'None frozen on this run' }: { text: string
 export function Skills({ word, skills, link }: { word: string; skills: string[]; link?: (name: string) => ReactNode }) {
   if (!skills.length) return null;
   return (
-    <p className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+    <p className="flex flex-wrap items-center gap-1 text-body-small text-muted-foreground">
       {word}{' '}
       {skills.map((skill) => (
         <Badge key={skill} variant="outline" data-skill={skill}>
@@ -286,7 +286,7 @@ export function Skills({ word, skills, link }: { word: string; skills: string[];
 function Fence({ agent, fence }: { agent: string | null; fence: StepLayers['fence'] }) {
   if (!fence.length) return null;
   return (
-    <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+    <div className="flex flex-col gap-1 text-body-small text-muted-foreground">
       <p>Tightens {agent}'s fence:</p>
       <ul className="flex flex-col gap-1">
         {fence.map(({ key, value }) => (

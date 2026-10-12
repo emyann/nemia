@@ -26,7 +26,7 @@ type Asking = 'pause' | 'now' | null;
 function WhyField({ why, setWhy }: { why: string; setWhy: (why: string) => void }) {
   return (
     <TextField value={why} onChange={setWhy} maxLength={200} className="flex flex-col gap-1">
-      <Label className="text-xs">Why (optional)</Label>
+      <Label className="text-body-small">Why (optional)</Label>
       <Input data-pause-why placeholder="merging by hand on main" />
     </TextField>
   );
@@ -60,7 +60,7 @@ function WhyForm({ onPut, onClose, isPending }: { onPut: (why: string) => void; 
         onPut(why.trim());
       }}
     >
-      <p className="text-xs text-muted-foreground">Nothing new starts in any factory until they resume; what runs finishes.</p>
+      <p className="text-body-small text-muted-foreground">Nothing new starts in any factory until they resume; what runs finishes.</p>
       <WhyField why={why} setWhy={setWhy} />
       <FormActions label="Pause" onClose={onClose} isPending={isPending} />
     </Form>
@@ -71,7 +71,7 @@ function WhyForm({ onPut, onClose, isPending }: { onPut: (why: string) => void; 
 function Lines({ lines, data, className }: { lines: readonly string[]; data: string; className?: string }) {
   if (lines.length === 0) return null;
   return (
-    <ul {...{ [data]: '' }} className={cn('flex flex-col gap-0.5 font-mono text-xs', className)}>
+    <ul {...{ [data]: '' }} className={cn('flex flex-col gap-0.5 font-mono text-body-small', className)}>
       {lines.map((line) => (
         <li key={line}>{line}</li>
       ))}
@@ -106,18 +106,18 @@ function NowForm({
       }}
     >
       {!read.data ? (
-        <p data-pause-now-reading className="text-xs text-muted-foreground">
+        <p data-pause-now-reading className="text-body-small text-muted-foreground">
           {read.error ? `What runs could not be read: ${read.error.message}` : 'Reading what runs.'}
         </p>
       ) : (
         <>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-body-small text-muted-foreground">
             {read.data.interrupts.length === 0
               ? 'Nothing outside a landing is at work: pausing now stops nothing.'
               : `A landing finishes; this stops ${read.data.interrupts.length} at work, each tried again on Resume:`}
           </p>
           <Lines lines={read.data.interrupts.map(interruptSentence)} data="data-pause-interrupt" />
-          <p data-pause-cost className="text-xs">
+          <p data-pause-cost className="text-body-small">
             {read.data.cost}
           </p>
         </>
@@ -146,7 +146,7 @@ function PauseFacts({
 }) {
   return (
     <>
-      <p data-pause-line className="text-xs text-muted-foreground">
+      <p data-pause-line className="text-body-small text-muted-foreground">
         {words.line}
       </p>
       <Lines lines={words.finishing} data="data-pause-finishing" />
@@ -251,7 +251,7 @@ export function PauseButton() {
           )}
           {asking === null && <PauseFacts words={words} onAsk={setAsking} onResume={() => act.mutate(null)} isPending={act.isPending} />}
           {refused && (
-            <p role="alert" data-pause-refused className="font-mono text-xs break-words whitespace-pre-wrap text-destructive">
+            <p role="alert" data-pause-refused className="font-mono text-body-small break-words whitespace-pre-wrap text-destructive">
               {refused.message}
             </p>
           )}

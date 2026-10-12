@@ -14,9 +14,9 @@ export const Route = createFileRoute('/machines')({
   },
   component: MachinesPage,
   staticData: { fullBleed: true },
-  pendingComponent: () => <p className="px-6 py-6 text-sm text-muted-foreground">Reading the state machines off their code…</p>,
+  pendingComponent: () => <p className="px-6 py-6 text-body-medium text-muted-foreground">Reading the state machines off their code…</p>,
   errorComponent: ({ error }) => (
-    <p className="px-6 py-6 text-sm text-failure">
+    <p className="px-6 py-6 text-body-medium text-failure">
       Could not load the state machines: {error instanceof Error ? error.message : String(error)}. Is the api running (
       <code>npm run dev</code>)?
     </p>
@@ -28,11 +28,12 @@ function MachinesPage() {
   const { data } = useSuspenseQuery(machinesQuery);
   return (
     <article className="space-y-8 px-6 py-6">
-      <div className="max-w-4xl space-y-2 text-sm text-muted-foreground">
+      <div className="max-w-4xl space-y-2 text-body-medium text-muted-foreground">
         <p>
           Each state machine as its code has it, drawn from the code and never by hand. A box is a state; an arrow joins two states, and
-          lists the events that take it, each with its guard in brackets, and under them <span className="font-mono text-xs">→</span> the
-          action they take. What a box lists under its name are the events it stays in its state on.
+          lists the events that take it, each with its guard in brackets, and under them{' '}
+          <span className="font-mono text-body-small">→</span> the action they take. What a box lists under its name are the events it stays
+          in its state on.
         </p>
         <p>A click on a state shows it in the bar: its kind, what keeps it there, and each route out of it.</p>
       </div>
@@ -56,13 +57,13 @@ function Machine({ listing }: { listing: MachineListing }) {
   const over = useBarOver(whole);
   return (
     <section aria-label={listing.title} className="space-y-3">
-      <h2 className="text-sm font-medium">
+      <h2 className="text-title-small">
         {listing.title}{' '}
         <span className="font-normal text-muted-foreground">
-          — drawn from <code className="font-mono text-xs">{listing.source}</code>
+          — drawn from <code className="font-mono text-body-small">{listing.source}</code>
         </span>
       </h2>
-      <p className="text-xs text-muted-foreground">
+      <p className="text-body-small text-muted-foreground">
         {data.states.length} states, {data.edges.length} edges; it starts in <span className="font-mono">{data.initial}</span> and ends in{' '}
         {data.final.map((state, i) => (
           <span key={state}>

@@ -9,7 +9,7 @@ import { CopyButton } from './CopyButton';
 import { StatusChip } from './StatusChip';
 import { runsMoved } from '@/lib/runWrites';
 
-const code = (text: string) => <code className="font-mono text-xs break-all">{text}</code>;
+const code = (text: string) => <code className="font-mono text-body-small break-all">{text}</code>;
 
 /**
  * An agent of yours tried on a short brief: the fence said in one line, the brief and the button, and the latest try of it — its state,
@@ -46,8 +46,8 @@ function TryForm({ agent }: { agent: AgentListing }) {
   return (
     <section aria-label="Try it" data-try-agent className="space-y-3 border-t border-outline-variant pt-4">
       <div className="space-y-1">
-        <h2 className="text-sm font-semibold">Try it</h2>
-        <p data-try-fence className="text-xs text-muted-foreground">
+        <h2 className="text-title-small">Try it</h2>
+        <p data-try-fence className="text-body-small text-muted-foreground">
           {TRY_FENCE}: {TRY_TERMS}.
         </p>
       </div>
@@ -59,7 +59,7 @@ function TryForm({ agent }: { agent: AgentListing }) {
           if (!held) start.mutate(brief);
         }}
       >
-        <label htmlFor={field} className="block text-xs font-medium text-foreground">
+        <label htmlFor={field} className="block text-body-small font-medium text-foreground">
           Brief
         </label>
         <textarea
@@ -68,18 +68,18 @@ function TryForm({ agent }: { agent: AgentListing }) {
           onChange={(event) => setBrief(event.target.value)}
           rows={3}
           placeholder="A short brief to try it on: what it is told, in a folder of its own."
-          className="block w-full resize-y rounded border border-outline bg-background px-2 py-1.5 text-sm placeholder:text-muted-foreground focus:border-on-surface-variant focus:outline-none"
+          className="block w-full resize-y rounded border border-outline bg-background px-2 py-1.5 text-body-medium placeholder:text-muted-foreground focus:border-on-surface-variant focus:outline-none"
         />
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="submit"
             disabled={held !== null || start.isPending}
-            className="rounded bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-primary"
+            className="rounded bg-primary px-3 py-1.5 text-body-medium font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-primary"
           >
             {start.isPending ? 'Starting…' : 'Try it'}
           </button>
           {held && (
-            <span data-try-held className="text-xs text-muted-foreground">
+            <span data-try-held className="text-body-small text-muted-foreground">
               {held}
             </span>
           )}
@@ -98,20 +98,25 @@ function TryForm({ agent }: { agent: AgentListing }) {
 export function TryRun({ id }: { id: string }) {
   const { data: run, error } = useQuery(runQuery(id));
   const link = (
-    <RouteLink to="/runs/$runId" params={{ runId: id }} data-try-run={id} className="font-mono text-xs underline underline-offset-2">
+    <RouteLink
+      to="/runs/$runId"
+      params={{ runId: id }}
+      data-try-run={id}
+      className="font-mono text-body-small underline underline-offset-2"
+    >
       {id}
     </RouteLink>
   );
   if (runGone(error)) {
     return (
-      <p data-try-gone className="text-xs text-muted-foreground">
+      <p data-try-gone className="text-body-small text-muted-foreground">
         The try {code(id)} was removed.
       </p>
     );
   }
   if (!run)
     return (
-      <p className="text-xs text-muted-foreground">
+      <p className="text-body-small text-muted-foreground">
         {error instanceof Error ? `Could not read the try ${id}: ${error.message}` : 'Reading the try…'}
       </p>
     );
@@ -119,7 +124,7 @@ export function TryRun({ id }: { id: string }) {
   const spent = step ? costText(step) : null;
   return (
     <div data-try={id} className="space-y-2 rounded border border-outline-variant px-3 py-2">
-      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-body-small text-muted-foreground">
         <span>The latest try, {link}:</span>
         {step && <StatusChip status={step.status} runCancelled={run.cancelledAt !== null} runHeld={run.holding != null} />}
         <span data-try-status>{run.status}</span>
@@ -130,7 +135,7 @@ export function TryRun({ id }: { id: string }) {
         )}
       </p>
       {step && step.taskId !== null ? (
-        <div data-try-files className="text-xs text-muted-foreground">
+        <div data-try-files className="text-body-small text-muted-foreground">
           {step.filesError === null ? (
             <>
               Files it wrote:
@@ -141,7 +146,7 @@ export function TryRun({ id }: { id: string }) {
           )}
         </div>
       ) : (
-        <p className="text-xs text-muted-foreground">Not filed yet: nothing is filed until the daemon&apos;s next pass.</p>
+        <p className="text-body-small text-muted-foreground">Not filed yet: nothing is filed until the daemon&apos;s next pass.</p>
       )}
     </div>
   );
@@ -159,10 +164,10 @@ function Untried({ untried, yours = false }: { untried: NonNullable<AgentListing
       data-try-untried
       className="space-y-1 border-t border-outline-variant pt-4"
     >
-      <h2 className="text-sm font-semibold">Try it</h2>
-      <p className="text-xs text-muted-foreground">{untried.why}</p>
+      <h2 className="text-title-small">Try it</h2>
+      <p className="text-body-small text-muted-foreground">{untried.why}</p>
       {untried.copy && (
-        <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <p className="flex flex-wrap items-center gap-2 text-body-small text-muted-foreground">
           {code(untried.copy)}
           <CopyButton text={untried.copy} />
         </p>

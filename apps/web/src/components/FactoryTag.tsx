@@ -4,7 +4,7 @@ import { DEFAULT_NAME } from '@/lib/factories';
 import { cn } from '@/lib/utils';
 import { RouteLink } from './AgentParts';
 
-const TAG = 'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] leading-none font-medium whitespace-nowrap';
+const TAG = 'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-body-small leading-none font-medium whitespace-nowrap';
 const NAMED = 'border-sage bg-surface-variant text-on-surface-variant';
 const MUTED = 'border-outline-variant text-muted-foreground';
 

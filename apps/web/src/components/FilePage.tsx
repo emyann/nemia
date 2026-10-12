@@ -11,12 +11,12 @@ export function KeyTable({ rows, note }: { rows: readonly KeyRow[]; note?: React
   return (
     <section aria-label="Keys" className="space-y-2">
       <div className="space-y-0.5">
-        <h2 className="text-sm font-semibold">Keys</h2>
-        {note && <p className="text-xs text-muted-foreground">{note}</p>}
+        <h2 className="text-title-small">Keys</h2>
+        {note && <p className="text-body-small text-muted-foreground">{note}</p>}
       </div>
       <div className="overflow-x-auto rounded border border-outline-variant">
-        <table className="w-full min-w-[36rem] border-collapse text-left text-sm">
-          <thead className="bg-surface-container text-xs text-muted-foreground">
+        <table className="w-full min-w-[36rem] border-collapse text-left text-body-medium">
+          <thead className="bg-surface-container text-body-small text-muted-foreground">
             <tr>
               <th scope="col" className="px-3 py-1.5 font-medium">
                 key
@@ -32,13 +32,19 @@ export function KeyTable({ rows, note }: { rows: readonly KeyRow[]; note?: React
           <tbody>
             {rows.map(({ key, value, meaning }) => (
               <tr key={key} data-key={key} data-set={value !== null} className="border-t border-outline-variant align-top">
-                <th scope="row" className={cn('w-36 px-3 py-1.5 font-mono text-xs font-medium', value === null && 'text-muted-foreground')}>
+                <th
+                  scope="row"
+                  className={cn('w-36 px-3 py-1.5 font-mono text-body-small font-medium', value === null && 'text-muted-foreground')}
+                >
                   {key}
                 </th>
-                <td data-value className="w-56 px-3 py-1.5 font-mono text-xs break-all">
+                <td data-value className="w-56 px-3 py-1.5 font-mono text-body-small break-all">
                   {value ?? <span className="font-sans text-muted-foreground">not set</span>}
                 </td>
-                <td data-meaning className={cn('px-3 py-1.5 text-xs', value === null ? 'text-muted-foreground' : 'text-foreground')}>
+                <td
+                  data-meaning
+                  className={cn('px-3 py-1.5 text-body-small', value === null ? 'text-muted-foreground' : 'text-foreground')}
+                >
                   <Markdown>{meaning}</Markdown>
                 </td>
               </tr>
@@ -59,14 +65,14 @@ export function AsWritten({ file, source, children }: { file: string; source: st
   return (
     <section aria-label="The file" className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-outline-variant pb-2">
-        <p className="min-w-0 font-mono text-[11px] break-all text-muted-foreground">{file}</p>
+        <p className="min-w-0 font-mono text-body-small break-all text-muted-foreground">{file}</p>
         <button
           type="button"
           aria-pressed={shown}
           onClick={() => setShown(!shown)}
           title={shown ? 'Show it rendered, with its keys' : 'Show the file as written, frontmatter included'}
           className={cn(
-            'shrink-0 rounded border px-2 py-0.5 text-xs font-medium',
+            'shrink-0 rounded border px-2 py-0.5 text-body-small font-medium',
             shown ? 'border-rest bg-rest text-on-rest' : 'border-outline hover:bg-accent',
           )}
         >
@@ -76,7 +82,7 @@ export function AsWritten({ file, source, children }: { file: string; source: st
       {shown ? (
         <pre
           data-source
-          className="overflow-x-auto rounded border border-outline-variant bg-surface-container p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap break-words"
+          className="overflow-x-auto rounded border border-outline-variant bg-surface-container p-3 font-mono text-body-small leading-relaxed whitespace-pre-wrap break-words"
         >
           {source}
         </pre>

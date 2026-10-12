@@ -18,14 +18,14 @@ export function Timeline({ run }: { run: RunDetail }) {
 
   return (
     <section aria-label="Timeline" className="space-y-2">
-      <h2 className="text-sm font-medium">Timeline</h2>
-      <p className="text-xs text-muted-foreground">
+      <h2 className="text-title-small">Timeline</h2>
+      <p className="text-body-small text-muted-foreground">
         Queued is filed → spawned: the wait for a slot. Ran is spawned → ended. A total sums its tasks, so steps side by side add up to more
         than its wall, first filed → last ended. A round's counts only the steps its loop files again. Cost is what the harness priced each
         session at, once it ended; a check costs nothing.
       </p>
       <div className="overflow-x-auto rounded border border-outline-variant">
-        <table className="w-full text-left text-xs tabular-nums">
+        <table className="w-full text-left text-body-small tabular-nums">
           <thead className="bg-surface-container text-muted-foreground">
             <tr>
               {['step', 'try', 'filed', 'spawned', 'ended', 'queued', 'ran', 'cost', 'used'].map((heading) => (

@@ -65,14 +65,14 @@ export function FactoryItemBody({ item }: { item: PickerFactory }) {
     <span className="flex min-w-0 flex-col" data-factory={item.name}>
       <span className="truncate font-medium">{item.name}</span>
       {item.factory ? (
-        <span className="truncate text-xs text-muted-foreground" title={item.factory.repos.join('\n')}>
+        <span className="truncate text-body-small text-muted-foreground" title={item.factory.repos.join('\n')}>
           {reposOf(item.factory)}
         </span>
       ) : (
-        <span className="truncate text-xs text-muted-foreground">no such factory</span>
+        <span className="truncate text-body-small text-muted-foreground">no such factory</span>
       )}
       {item.factory?.error && (
-        <span data-error className="truncate text-xs text-destructive" title={item.factory.error}>
+        <span data-error className="truncate text-body-small text-destructive" title={item.factory.error}>
           Its file does not read: {item.factory.error}
         </span>
       )}

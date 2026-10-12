@@ -6,7 +6,7 @@ import { firstStep, listedWith } from '../lib/builder';
 import { rereadWorkflows } from '../lib/placed';
 
 const INPUT =
-  'block w-full rounded border border-outline bg-background px-2 py-1.5 text-sm placeholder:text-muted-foreground focus:border-on-surface-variant focus:outline-none';
+  'block w-full rounded border border-outline bg-background px-2 py-1.5 text-body-medium placeholder:text-muted-foreground focus:border-on-surface-variant focus:outline-none';
 
 /** Where a workflow's steps may work, each with the words a person chooses it by: none is chosen for them. */
 const PLACES: ReadonlyArray<{ place: NonNullable<WorkflowStepSpec['place']>; label: string; hint: string }> = [
@@ -26,12 +26,12 @@ function PlaceChoice({
 }) {
   return (
     <fieldset className="space-y-1">
-      <legend className="block text-xs font-medium">Where its steps work</legend>
+      <legend className="block text-body-small font-medium">Where its steps work</legend>
       <div className="grid gap-2 sm:grid-cols-2">
         {PLACES.map((p) => (
           <label
             key={p.place}
-            className="grid cursor-pointer grid-cols-[auto_1fr] items-start gap-x-2 gap-y-0.5 rounded border border-outline px-2 py-1.5 text-sm has-checked:border-on-surface-variant has-checked:bg-accent"
+            className="grid cursor-pointer grid-cols-[auto_1fr] items-start gap-x-2 gap-y-0.5 rounded border border-outline px-2 py-1.5 text-body-medium has-checked:border-on-surface-variant has-checked:bg-accent"
           >
             <input
               type="radio"
@@ -42,7 +42,7 @@ function PlaceChoice({
               className="mt-1"
             />
             <span className="font-medium">{p.label}</span>
-            <span className="col-start-2 text-xs text-muted-foreground">{p.hint}</span>
+            <span className="col-start-2 text-body-small text-muted-foreground">{p.hint}</span>
           </label>
         ))}
       </div>
@@ -54,8 +54,8 @@ function PlaceChoice({
 function Refused({ message }: { message: string }) {
   return (
     <div data-refused className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
-      <p className="text-sm font-medium text-on-failure-container">Not made. The api refused it:</p>
-      <p className="font-mono text-xs whitespace-pre-wrap break-words text-on-failure-container">{message}</p>
+      <p className="text-body-medium font-medium text-on-failure-container">Not made. The api refused it:</p>
+      <p className="font-mono text-body-small whitespace-pre-wrap break-words text-on-failure-container">{message}</p>
     </div>
   );
 }
@@ -93,7 +93,7 @@ export function NewWorkflow({ folder, onCreated }: { folder: string; onCreated: 
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="rounded border border-outline px-3 py-1.5 text-sm font-medium hover:bg-accent"
+        className="rounded border border-outline px-3 py-1.5 text-body-medium font-medium hover:bg-accent"
       >
         New workflow
       </button>
@@ -109,14 +109,14 @@ export function NewWorkflow({ folder, onCreated }: { folder: string; onCreated: 
       }}
     >
       <div className="space-y-0.5">
-        <h2 className="text-sm font-semibold">New workflow</h2>
-        <p className="text-xs text-muted-foreground">
+        <h2 className="text-title-small">New workflow</h2>
+        <p className="text-body-small text-muted-foreground">
           A folder of yours, under <code className="font-mono">{folder}/</code>, with its first step. Its page opens in its builder.
         </p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1">
-          <label htmlFor={ids.name} className="block text-xs font-medium">
+          <label htmlFor={ids.name} className="block text-body-small font-medium">
             Workflow name
           </label>
           <input
@@ -128,7 +128,7 @@ export function NewWorkflow({ folder, onCreated }: { folder: string; onCreated: 
           />
         </div>
         <div className="space-y-1">
-          <label htmlFor={ids.step} className="block text-xs font-medium">
+          <label htmlFor={ids.step} className="block text-body-small font-medium">
             First step
           </label>
           <input
@@ -141,7 +141,7 @@ export function NewWorkflow({ folder, onCreated }: { folder: string; onCreated: 
         </div>
       </div>
       <div className="space-y-1">
-        <label htmlFor={ids.body} className="block text-xs font-medium">
+        <label htmlFor={ids.body} className="block text-body-small font-medium">
           What it is told
         </label>
         <textarea id={ids.body} value={body} rows={3} onChange={(event) => setBody(event.target.value)} className={`${INPUT} resize-y`} />
@@ -151,7 +151,7 @@ export function NewWorkflow({ folder, onCreated }: { folder: string; onCreated: 
         <button
           type="submit"
           disabled={!name.trim() || !first || create.isPending}
-          className="rounded bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-primary"
+          className="rounded bg-primary px-3 py-1.5 text-body-medium font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-primary"
         >
           {create.isPending ? 'Making…' : 'Make it'}
         </button>
@@ -161,7 +161,7 @@ export function NewWorkflow({ folder, onCreated }: { folder: string; onCreated: 
             setOpen(false);
             create.reset();
           }}
-          className="rounded border border-outline px-3 py-1.5 text-sm font-medium hover:bg-accent"
+          className="rounded border border-outline px-3 py-1.5 text-body-medium font-medium hover:bg-accent"
         >
           Cancel
         </button>

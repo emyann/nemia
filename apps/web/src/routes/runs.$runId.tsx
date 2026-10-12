@@ -47,7 +47,7 @@ export const Route = createFileRoute('/runs/$runId')({
   errorComponent: ({ error }) => (
     <div className="space-y-3">
       <BackToRuns />
-      <p className="text-sm text-failure">Could not load this run: {error instanceof Error ? error.message : String(error)}</p>
+      <p className="text-body-medium text-failure">Could not load this run: {error instanceof Error ? error.message : String(error)}</p>
     </div>
   ),
 });
@@ -117,14 +117,14 @@ function Run({ run }: { run: RunDetail }) {
 
       <HeldUntil run={run} />
 
-      {run.warning && <p className="rounded border border-outline px-3 py-2 text-sm text-muted-foreground">{run.warning}</p>}
+      {run.warning && <p className="rounded border border-outline px-3 py-2 text-body-medium text-muted-foreground">{run.warning}</p>}
 
       <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <RunHeading run={run} />
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
           <RunTook run={run} />
           {run.cost && (
-            <p data-run-cost title={spentTitle(run.cost, "the run's tries")} className="text-sm">
+            <p data-run-cost title={spentTitle(run.cost, "the run's tries")} className="text-body-medium">
               <span className="text-muted-foreground">cost </span>
               <span className="font-mono">{run.cost.said}</span>
             </p>
@@ -132,14 +132,14 @@ function Run({ run }: { run: RunDetail }) {
           {run.read && (
             <p
               data-run-read
-              className="text-sm"
+              className="text-body-medium"
               title="What every try of every step read: from the cache, written to it, and the largest context one response carried."
             >
               <Read said={run.read.said} peak={run.read.peak} rebuilt={run.read.rebuilt} />
             </p>
           )}
           {run.tokens && (
-            <p data-run-tokens className="text-sm">
+            <p data-run-tokens className="text-body-medium">
               <span className="font-mono">{run.tokens.said}</span> <span className="text-muted-foreground">({run.tokens.split})</span>
             </p>
           )}
@@ -159,7 +159,7 @@ function Run({ run }: { run: RunDetail }) {
       <section className="space-y-4">
         <Markdown>{run.brief}</Markdown>
         {run.fromNote && (
-          <p data-from={run.from?.inbox} className="text-sm text-muted-foreground">
+          <p data-from={run.from?.inbox} className="text-body-medium text-muted-foreground">
             {run.fromNote}
           </p>
         )}
@@ -236,11 +236,11 @@ function Pruned({ pruned: { at, worktrees, artifacts } }: { pruned: NonNullable<
  */
 const deniedRow = (calls: readonly string[], cause: UntrustedPlace | undefined): ReactNode => (
   <span className="flex min-w-0 flex-col gap-1">
-    <span data-denied className={`font-mono text-xs ${ink.yours}`}>
+    <span data-denied className={`font-mono text-body-small ${ink.yours}`}>
       {calls.join(', ')}
     </span>
     {cause && (
-      <span data-denied-cause={cause.factory} className="text-xs text-muted-foreground">
+      <span data-denied-cause={cause.factory} className="text-body-small text-muted-foreground">
         Likely cause: <span className="font-mono break-all">{cause.place.place}</span> is not trusted for {cause.place.harness}, which
         withholds {cause.place.withheld}.{' '}
         {cause.place.never ?? (
@@ -297,11 +297,11 @@ function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; 
   const ends = endsTheRun(step);
   const acts = atGate && ends && step.taskId === null;
   const handedOn = closeout && (
-    <div className="min-w-0 space-y-2 rounded border border-outline-variant p-3 text-sm">
+    <div className="min-w-0 space-y-2 rounded border border-outline-variant p-3 text-body-medium">
       <Markdown>{closeout.summary}</Markdown>
       {closeout.needs && <ClosedNeeds needs={closeout.needs} />}
       {closeout.artifacts.length > 0 && (
-        <div aria-label="Artifacts" className="text-xs text-muted-foreground">
+        <div aria-label="Artifacts" className="text-body-small text-muted-foreground">
           Artifacts:
           <Artifacts artifacts={closeout.artifacts} />
         </div>
@@ -343,7 +343,7 @@ function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; 
       />
 
       {run.place === 'folder' && step.taskId !== null && (
-        <div aria-label="Files" data-files className="text-xs text-muted-foreground">
+        <div aria-label="Files" data-files className="text-body-small text-muted-foreground">
           {step.filesError === null ? (
             <>
               Files in its folder:
@@ -401,7 +401,7 @@ function RunTook({ run }: { run: RunDetail }) {
   if (run.startedAt === null) return null;
   const clock = runClock(run, now, finished);
   return (
-    <p data-run-took className="text-sm">
+    <p data-run-took className="text-body-medium">
       <time dateTime={clock.at} title={clock.title} className="font-mono">
         {clock.words}
       </time>
@@ -436,11 +436,11 @@ function WaitingOnRuns({ run }: { run: RunDetail }) {
     <section
       aria-label="Waiting on runs"
       data-on-you={waiting.onYou}
-      className={`space-y-1 rounded px-3 py-2 text-sm ${waiting.onYou ? container.yours : 'bg-muted text-foreground'}`}
+      className={`space-y-1 rounded px-3 py-2 text-body-medium ${waiting.onYou ? container.yours : 'bg-muted text-foreground'}`}
     >
       <p className="font-mono">{waiting.word}</p>
       <p data-advice>{waiting.advice}</p>
-      <ul className="flex flex-wrap gap-x-3 text-xs">
+      <ul className="flex flex-wrap gap-x-3 text-body-small">
         {waiting.runs.map((w) => (
           <li key={w.run}>
             {w.missing ? (
@@ -470,12 +470,12 @@ function HeldUntil({ run }: { run: RunDetail }) {
     <section
       aria-label="Held"
       data-on-you={holding.onYou}
-      className={`space-y-1 rounded px-3 py-2 text-sm ${holding.onYou ? container.yours : container.grey}`}
+      className={`space-y-1 rounded px-3 py-2 text-body-medium ${holding.onYou ? container.yours : container.grey}`}
     >
       <p className="font-mono">{holding.word}</p>
       <p data-advice>{holding.advice}</p>
       {holding.runs.length > 0 && (
-        <ul className="flex flex-wrap gap-x-3 text-xs">
+        <ul className="flex flex-wrap gap-x-3 text-body-small">
           {holding.runs.map((h) => (
             <li key={h.run}>
               {h.missing ? (
@@ -498,7 +498,7 @@ function HeldUntil({ run }: { run: RunDetail }) {
 function RunHeading({ run }: { run: RunDetail }) {
   return (
     <div className="flex items-center gap-1">
-      <h1 className="font-mono text-sm text-muted-foreground">{run.id}</h1>
+      <h1 className="font-mono text-body-medium text-muted-foreground">{run.id}</h1>
       <FavoriteStar favorite={{ kind: 'run', run: run.id }} name={titleOf(run)} />
     </div>
   );
@@ -506,7 +506,7 @@ function RunHeading({ run }: { run: RunDetail }) {
 
 function BackToRuns() {
   return (
-    <Link to="/runs" className="text-sm text-muted-foreground hover:text-foreground">
+    <Link to="/runs" className="text-body-medium text-muted-foreground hover:text-foreground">
       ← Runs
     </Link>
   );

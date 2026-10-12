@@ -33,8 +33,8 @@ function Tiles({ run, asOf }: { run: WaitingRun; asOf: Date }) {
 
 /**
  * A run that waits on a person, as a card: what is asked and its factory as tags, how long it has waited on a person this time where the
- * answer dates that wait, its title as a link, its id with a copy control four pixels under it, one plain sentence, its own steps as a rail,
- * three tiles, and one button at the card's right, beside the tiles where the card holds both and under them where it does not, which
+ * answer dates that wait, its title as a link, its id with a copy control four pixels under it, one plain sentence, its own steps as a
+ * rail, three tiles, and one button at the card's right, beside the tiles where the card holds both and under them where it does not, which
  * says what there is to read (`openWord`) and opens the run's page. The title stands over the copy control's target, so a press on
  * the title opens the run. It decides nothing and shows no command: the run's page does.
  */

@@ -266,3 +266,52 @@ test('what a forgotten task leaves: its transcript stays on the disk, and no tas
     [['g2', blocksOf(stays)]],
   );
 });
+
+test('REFUSED: a journal that does not read is named with its bytes and why, and stops no other task', async () => {
+  const root = scratch('ae-kept-root-');
+  await journalled(root, 'u2', { nativeId: 'sess-u2' });
+  const transcript = plant(transcriptAt('-r', 'sess-u2'));
+  const bad = path.join(root, 'tasks', 'u1.jsonl');
+  plant(path.join(bad, 'inside'), 4096);
+  const { tasks } = await Effect.runPromise(engineOn(root).kept());
+  assert.deepEqual(
+    tasks.map((t) => (t.unread ? { ...t, unread: t.unread.length } : t)),
+    [
+      { taskId: 'u1', journal: blocksOf(bad) + blocksOf(path.join(bad, 'inside')), bodies: 0, files: 0, unread: 1 },
+      { taskId: 'u2', journal: blocksOf(path.join(root, 'tasks', 'u2.jsonl')), bodies: 0, files: 0, records: blocksOf(transcript) },
+    ],
+  );
+  assert.match(tasks[0].unread![0], /EISDIR/);
+});
+
+test('REFUSED: a task that ran on a harness this engine does not have is said unread, and no harness is asked for it', async () => {
+  const root = scratch('ae-kept-root-');
+  await journalled(root, 'h1', { harness: 'gone', nativeId: 'sess-h1' });
+  plant(transcriptAt('-r', 'sess-h1'));
+  plant(path.join(root, 'runs', HARNESS, 'ae_h1_1.stdout'));
+  assert.deepEqual(await keptOf(engineOn(root), 'h1'), {
+    taskId: 'h1',
+    journal: blocksOf(path.join(root, 'tasks', 'h1.jsonl')),
+    bodies: 0,
+    files: 0,
+    unread: ["task h1 ran on the `gone` harness, which this engine does not have: its sessions' files are not counted"],
+  });
+});
+
+test('REFUSED: a path that cannot be measured is said on unread, and the paths beside it are still counted', async () => {
+  const root = scratch('ae-kept-root-');
+  const real = plant(path.join(scratch('ae-kept-far-'), 'a-real-file'));
+  const record = plant(path.join(scratch('ae-kept-far-'), 'a-real-record'), 12000);
+  const unreadable = `/no${String.fromCharCode(0)}where`;
+  const naming: RunnerOps = {
+    ...nothing,
+    kept: () => Effect.succeed({ 'ae/p1/1': { files: [unreadable, real], records: [unreadable, record] } }),
+  };
+  await journalled(root, 'p1', { harness: 'naming' });
+  const kept = await keptOf(engineOn(root, { naming }), 'p1');
+  assert.deepEqual([kept?.files, kept?.records, kept?.unread?.length], [blocksOf(real), blocksOf(record), 2]);
+  assert.ok(
+    kept?.unread?.every((words) => words.startsWith(`${unreadable}: `)),
+    'each names the path and why',
+  );
+});

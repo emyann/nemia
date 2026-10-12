@@ -8,7 +8,7 @@
  * hiring no one; `hired` does the same, and hires `ada` into `alpha/implement`; `pair` works on both. `stranger` is a directory no factory
  * names, with a workflow and an MCP server of its own, which the api must never read nor start.
  */
-import { root } from '../../test/harness.ts';
+import { config, root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -411,6 +411,7 @@ test('GET /api/factories serves the default factory first, then each factory by 
       rm: `nemia factory rm ${name}`,
       add: `nemia factory add ${name} --repo <path>`,
       schedule: `nemia factory schedule ${name} <workflow> --cron <expr> --brief <text>`,
+      trust: `nemia factory trust ${name}`,
     });
     assert.deepEqual(body[0], {
       name: 'default',
@@ -421,9 +422,31 @@ test('GET /api/factories serves the default factory first, then each factory by 
       error: null,
       schedules: [],
       template: null,
+      untrusted: [],
       commands: commandsOf('default'),
     });
-    assert.deepEqual(body[2], {
+    assert.deepEqual(body[2].untrusted, [
+      {
+        place: repoR,
+        harness: 'Claude Code',
+        withheld: `the allow rules of ${repoR}/.claude/settings.json, for a session started there or in a worktree of it, and the start of a background session there`,
+        never: null,
+      },
+    ]);
+    assert.deepEqual(
+      body[3].untrusted.map((u) => u.place),
+      [repoR, repoS],
+    );
+    assert.deepEqual(body[1].untrusted, [], 'a file that does not read names no place');
+    fs.writeFileSync(path.join(config, '.claude.json'), JSON.stringify({ projects: { [repoR]: { hasTrustDialogAccepted: true } } }));
+    const trusting = (await get<FactoryAnswer[]>('/api/factories')).body;
+    assert.deepEqual(trusting[2].untrusted, [], 'trusted, nothing is said');
+    assert.deepEqual(
+      trusting[3].untrusted.map((u) => u.place),
+      [repoS],
+    );
+    fs.rmSync(path.join(config, '.claude.json'));
+    assert.deepEqual({ ...body[2], untrusted: [] }, {
       name: 'hired',
       default: false,
       repos: [repoR],
@@ -432,6 +455,7 @@ test('GET /api/factories serves the default factory first, then each factory by 
       error: null,
       schedules: [],
       template: null,
+      untrusted: [],
       commands: commandsOf('hired'),
     });
     assert.deepEqual(body[1].commands, commandsOf('broken'), 'a file that does not read is filed again by the same lines');

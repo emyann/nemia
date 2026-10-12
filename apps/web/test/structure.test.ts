@@ -325,6 +325,26 @@ test('REFUSED: a read of the whole list on the Runs page, or in a part it draws'
   assert.deepEqual(runsPageBreaks(through), [`${card} ${why}`]);
 });
 
+/** Why the waiting card's source is refused, if it is: its figure must be the present wait, never the run's waits summed. */
+const waitedBreaks = (text: string): string[] => {
+  const code = withoutComments(text);
+  return [
+    ...(/data-waited[\s\S]*?\{\s*waited\s*\}/.test(code) && /\bwaited\s*=\s*presentWait\(/.test(code)
+      ? []
+      : ['the [data-waited] figure is not presentWait: it says how long the run has waited this time']),
+    ...(/\bpersonMs\b/.test(code) ? ['it names personMs: the sum of every wait is the Clock tile’s row, never the card’s figure'] : []),
+  ];
+};
+
+test('REFUSED: a waiting card whose figure reads the sum of the run’s waits on a person', () => {
+  const card = sourceTexts().get('src/components/WaitingCard.tsx')!;
+  assert.deepEqual(waitedBreaks(card), []);
+  const summed = card.replace(/\{\s*waited\s*\}/, '{sinceShort(run.clock.personMs)}');
+  assert.notEqual(summed, card, 'the figure is planted over');
+  assert.equal(waitedBreaks(summed).length, 2);
+  assert.equal(waitedBreaks(card.replace(/presentWait\(run, asOf\)/, 'null')).length, 1);
+});
+
 test(`only ${STREAMS.join(' and ')} open an EventSource`, () => {
   assert.deepEqual(eventSourceBreaks(sourceTexts()), []);
 });

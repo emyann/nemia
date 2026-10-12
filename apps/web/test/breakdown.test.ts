@@ -17,7 +17,7 @@ import {
   tokensSaid,
   type Breakdown,
 } from '../src/lib/breakdown.ts';
-import { sinceWords } from '../src/lib/runWords.ts';
+import { presentWait, sinceWords } from '../src/lib/runWords.ts';
 import { summary, waitingRun } from './run-fixtures.ts';
 
 const [S, M] = [1_000, 60_000];
@@ -68,10 +68,12 @@ const answered = (): WaitingRun =>
     },
   );
 
-/** The run as the board reads it: the api's answer decoded through the light answer's schema. */
-async function decoded(): Promise<WaitingRun> {
+const AS_OF = '2026-10-12T12:00:00.000Z';
+
+/** `run` as the board reads it: the api's answer decoded through the light answer's schema; the run at its last gate where none is given. */
+async function decoded(run: WaitingRun = answered()): Promise<WaitingRun> {
   const before = globalThis.fetch;
-  const open = { asOf: '2026-10-12T12:00:00.000Z', counts: { waiting: 1, inFlight: 0, finished: 0 }, waiting: [answered()], inFlight: [] };
+  const open = { asOf: AS_OF, counts: { waiting: 1, inFlight: 0, finished: 0 }, waiting: [run], inFlight: [] };
   globalThis.fetch = async () => new Response(JSON.stringify(open), { status: 200, headers: { 'content-type': 'application/json' } });
   const client = new QueryClient();
   try {
@@ -100,6 +102,18 @@ test('REFUSED: a breakdown that does not add up to its tile: the clock, the cost
   assert.equal(sum(tokens), run.tokens!.total, "the tokens' rows add up to the total");
   assert.deepEqual(whats(tokens), ['Written to the cache', 'Uncached, in', 'Out', 'Read back from the cache', TOKENS_REST]);
   assert.equal(tokens.rows.at(-1)!.amount, 14, 'the last line is what no kind counts');
+});
+
+test('a run at its second gate: the card says the present wait, and the clock’s row every wait on a person summed', async () => {
+  const model = answered();
+  const waitingSince = new Date(Date.parse(AS_OF) - 3 * M - 20 * S).toISOString();
+  const clock = { ...model.clock!, wallMs: 50 * M, personMs: 25 * M + 10 * S };
+  const run = await decoded({ ...model, wallMs: 50 * M, clock, waitingSince });
+  assert.equal(run.waitingSince, waitingSince, 'the schema keeps the instant');
+  assert.equal(presentWait(run, new Date(AS_OF)), '3m');
+  const row = clockBreakdown(run.clock!, '11:10').rows.find((r) => r.what === 'Waiting on you')!;
+  assert.equal(row.amount, 25 * M + 10 * S);
+  assert.equal(row.said, '25m');
 });
 
 test('the last line is absent when the rest is nothing', async () => {

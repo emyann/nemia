@@ -102,6 +102,9 @@ const CONCLUDED = COMMANDS.find((c) => c.name === 'concluded')!;
  *   moves and also waits is among the waiting, once. Each row is the list's own (`RunListing`) with its `wallMs`, created until now, and
  *   `finishedAt: null`. A waiting row carries `stepCosts`, the cost of each of its steps, and `clock`, its wall time in five parts that add
  *   up to it: sessions, checks, a wait on a person, a wait for a slot, and the rest; both null where a task of the run does not read.
+ *   It carries `waitingSince` too, the instant its present wait on a person began: the end of the waiting step's last try (the gate
+ *   reached, the question asked) or the placing of a hold only a person lifts, the earliest where several are open; null where a task
+ *   does not read or the record does not date the wait, as for a run that waits on one which never ships. A row in flight has no such key.
  *   `?ofFactory=` keeps the runs of one factory, `default` those whose record names none, compared as strings: a name no run carries
  *   answers empty lists and zero counts. Read off the same memo as `GET /api/runs`, with the journals of the waiting runs read for their
  *   breakdowns: it does not grow with the finished runs.

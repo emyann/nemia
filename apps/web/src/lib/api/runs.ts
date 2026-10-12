@@ -185,10 +185,11 @@ export type RunClock = { wallMs: number; sessionsMs: number; checksMs: number; p
 export type StepCost = { step: string; cost: Spent | null };
 
 /**
- * Mirrors `WaitingRun` in agent-orchestrator: a run that waits on a person, with where its wall time went (`clock`) and the cost of each
- * of its steps (`stepCosts`), each null where the api could not read it.
+ * Mirrors `WaitingRun` in agent-orchestrator: a run that waits on a person, with where its wall time went (`clock`), the cost of each
+ * of its steps (`stepCosts`) and the instant its present wait on a person began (`waitingSince`), each null where the api could not read
+ * it, the last also where the api dates no such wait.
  */
-export type WaitingRun = ListedRun & { clock: RunClock | null; stepCosts: StepCost[] | null };
+export type WaitingRun = ListedRun & { clock: RunClock | null; stepCosts: StepCost[] | null; waitingSince: string | null };
 
 /**
  * Mirrors `OpenListing` in apps/api/src/runs/runs.ts: the instant it was read at (`asOf`), the runs that wait on a person (`waiting`)
@@ -218,11 +219,12 @@ const ListedFields = { ...RunSummarySchema.fields, wallMs: Schema.Number, finish
 /** Decodes a `ListedRun`. */
 const ListedRunSchema = Schema.Struct(ListedFields) satisfies Schema.Schema<ListedRun>;
 
-/** Decodes a `WaitingRun`: the listed row, its clock and its steps' costs. */
+/** Decodes a `WaitingRun`: the listed row, its clock, its steps' costs and when its present wait began. */
 const WaitingRunSchema = Schema.Struct({
   ...ListedFields,
   clock: Schema.NullOr(RunClockSchema),
   stepCosts: Schema.NullOr(Schema.mutable(Schema.Array(Schema.Struct({ step: Schema.String, cost: Schema.NullOr(SpentSchema) })))),
+  waitingSince: Schema.NullOr(Schema.String),
 }) satisfies Schema.Schema<WaitingRun>;
 
 /** Decodes an `OpenRuns`: a waiting row with its breakdowns, a row in flight with its wall time. */

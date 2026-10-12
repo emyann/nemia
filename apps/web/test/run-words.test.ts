@@ -9,6 +9,7 @@ import { stateMeaning, type StepState } from '../src/lib/status.ts';
 import {
   endedWords,
   nowOf,
+  presentWait,
   railSaid,
   sentenceOf,
   sinceCreated,
@@ -194,6 +195,15 @@ test('a time is a fact to the minute, wall time', () => {
   assert.equal(sinceWords(2 * D), '2d');
   assert.equal(sinceWords(-5), 'under a minute');
   assert.deepEqual([0, 59 * S, M, 3 * H + 12 * M].map(sinceShort), ['under 1m', 'under 1m', '1m', '3h 12m'], 'short, where room is');
+});
+
+test('the present wait is said since the instant it began, to the minute, never negative, and not at all where none is dated', () => {
+  const asOf = new Date('2026-10-12T12:00:00.000Z');
+  const since = (ms: number) => ({ waitingSince: new Date(asOf.getTime() - ms).toISOString() });
+  assert.equal(presentWait(since(2 * M + 30 * S), asOf), '2m');
+  assert.equal(presentWait(since(30 * S), asOf), 'under 1m');
+  assert.equal(presentWait(since(-5 * M), asOf), 'under 1m', 'an instant after the answer was read');
+  assert.equal(presentWait({ waitingSince: null }, asOf), null);
 });
 
 test('the rail says each step and its word, in the run’s order', () => {

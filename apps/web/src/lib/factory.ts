@@ -5,6 +5,7 @@
 import type { AtWork, RunSummary, RunToDecide } from './api';
 import { duration, type EdgeState } from './canvas.ts';
 import type { Flow } from './flow.ts';
+import { instantWhole } from './instant.ts';
 import { layers, type Point } from './layout.ts';
 
 /**
@@ -115,25 +116,25 @@ const atWorkMs = (atWork: AtWork, now: number): number =>
 const isOver = (run: Clocked & { atWork: AtWork }, finished: boolean): boolean =>
   run.atWork.since === null && (run.cancelledAt !== null || (finished && !waitsOnYou({ ...run, waitingOnYou: run.waitingOnYou ?? [] })));
 
+/** An ISO instant whole, as a clock's title says it in the browser's time zone (`instantWhole`). */
+const whole = (iso: string): string => instantWhole(new Date(iso));
+
 /** The sentence a clock's title ends on for a run that waited a second or more before its first filing (`waitedMs`); else nothing. */
 const waitedSentence = (run: Pick<RunSummary, 'createdAt' | 'startedAt'>): string => {
   const waited = waitedMs(run) ?? 0;
-  return waited >= 1000
-    ? ` Created ${new Date(run.createdAt).toLocaleString()}, and waited ${duration(waited)} before its first step was filed.`
-    : '';
+  return waited >= 1000 ? ` Created ${whole(run.createdAt)}, and waited ${duration(waited)} before its first step was filed.` : '';
 };
 
 /** The clock's title past the start: the time at work, the start, the end or that it still goes, the wall time, and the wait before. */
 function workedTitle(run: Clocked & { startedAt: string; atWork: AtWork }, now: number, over: boolean): string {
-  const local = (iso: string) => new Date(iso).toLocaleString();
   const started = Date.parse(run.startedAt);
   const { endedAt } = run.atWork;
   const end = !over
     ? `still going: ${duration(now - started)} from start to now`
     : endedAt === null
       ? 'and no session or check of it ran'
-      : `ended ${local(endedAt)}: ${duration(Date.parse(endedAt) - started)} from start to end`;
-  return `At work ${duration(atWorkMs(run.atWork, now))}. Started ${local(run.startedAt)}, ${end}.${waitedSentence(run)}`;
+      : `ended ${whole(endedAt)}: ${duration(Date.parse(endedAt) - started)} from start to end`;
+  return `At work ${duration(atWorkMs(run.atWork, now))}. Started ${whole(run.startedAt)}, ${end}.${waitedSentence(run)}`;
 }
 
 /**
@@ -150,9 +151,8 @@ function workedTitle(run: Clocked & { startedAt: string; atWork: AtWork }, now: 
  * A run the api could not judge has no time at work, and says when it started.
  */
 export function runClock(run: Clocked, now: number, finished: boolean): { words: string; at: string; title: string } {
-  const local = (iso: string) => new Date(iso).toLocaleString();
   if (run.startedAt === null) {
-    const created = `Created ${local(run.createdAt)}.`;
+    const created = `Created ${whole(run.createdAt)}.`;
     const since = duration(now - Date.parse(run.createdAt));
     return run.cancelledAt !== null
       ? { words: `created ${since} ago`, at: run.createdAt, title: `${created} Called off before anything of it was filed.` }
@@ -173,7 +173,7 @@ export function runClock(run: Clocked, now: number, finished: boolean): { words:
     };
   }
   const since = duration(now - Date.parse(startedAt));
-  const title = `Started ${local(startedAt)}.${waitedSentence(run)}`;
+  const title = `Started ${whole(startedAt)}.${waitedSentence(run)}`;
   return { words: finished ? `started ${since} ago` : `${since} since it started`, at: startedAt, title };
 }
 

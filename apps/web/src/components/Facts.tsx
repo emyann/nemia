@@ -7,6 +7,7 @@ import { collisionFacts, type GateFact } from '../lib/gate';
 import { cn } from '../lib/utils';
 import { RouteLink } from './AgentParts';
 import { CopyButton } from './CopyButton';
+import { Instant } from './Instant';
 
 /** A section's quiet heading: small, medium weight, in the muted ink. */
 export const HEADING = 'text-body-small font-medium text-muted-foreground';
@@ -413,4 +414,5 @@ function Stream({ name, log }: { name: string; log: StepLog }) {
   );
 }
 
-export const when = (iso: string) => <time dateTime={iso}>{new Date(iso).toLocaleString()}</time>;
+/** An ISO instant as a `Facts` value: the page's words, whole on hover (`Instant`). */
+export const when = (iso: string) => <Instant at={iso} />;

@@ -15,6 +15,7 @@ import {
   unfactoredWhy,
   WORKFLOWS,
 } from '../seed.ts';
+import { instantWhole, instantWords } from '../../../src/lib/instant.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
@@ -279,13 +280,20 @@ async function visit(page: Page): Promise<void> {
       const item = cardIn(page, planned.name);
       await expectVisible(item.locator(`[data-factory-tag="${FACTORY}"]`), `${planned.name}, given the factory ${FACTORY}, names it`);
       await expectCount(item.locator('[data-no-queue]'), 0, 'and no longer says it has no Queue');
-      const filedTime = item.locator('time[title="When its file was last written"]');
+      const filedTime = item.locator('time[title^="When its file was last written: "]');
       const shownAs = async () => ({
         order: await order(page),
         filedAt: await filedTime.getAttribute('datetime'),
         shown: await filedTime.textContent(),
       });
       const before = await shownAs();
+      const timeZone = await page.evaluate(() => new Intl.DateTimeFormat().resolvedOptions().timeZone);
+      const words = instantWords(new Date(before.filedAt ?? ''), new Date(), timeZone);
+      if (before.shown !== words)
+        throw new Refused(`${planned.name} says when it was filed as the board writes an instant, ${words} — it says ${before.shown}`);
+      const whole = `When its file was last written: ${instantWhole(new Date(before.filedAt ?? ''), timeZone)}`;
+      const title = await filedTime.getAttribute('title');
+      if (title !== whole) throw new Refused(`and on hover the whole instant, ${whole} — its title is ${title}`);
       if (before.order.indexOf(planned.name) === 0)
         throw new Refused(`${planned.name} is not the newest card, so a move would show — it is listed first`);
       const unmoved = async (when: string) => {

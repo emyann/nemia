@@ -1,8 +1,9 @@
 /**
  * A time of day in words has one writer, `timeOfDay` (src/lib/timeOfDay.ts), on a 12-hour clock, and the board's source holds no
- * second one: no option that writes an hour (`hourCycle`, `hour12`, `hour:`, `timeStyle:`) outside the writer's file, and no instant
- * written whole as the browser does (`toLocaleTimeString(`, a bare `toLocaleString()`) but the ones `LEFT` lists, by file and count,
- * a list that only shrinks. The vendored kit (`src/components/ui/ds`) is another repository's and stays out.
+ * second one: no option that writes an hour (`hourCycle`, `hour12`, `hour:`, `timeStyle:`) outside the writer's file, and nothing
+ * written as the browser's locale does (`toLocaleString(`, `toLocaleTimeString(`, `toLocaleDateString(`, whatever their arguments):
+ * a whole instant is `instantWords`'s (src/lib/instant.ts). The calls that write a number in a locale are `NUMBERS`, by file and
+ * count, each with its reason. The vendored kit (`src/components/ui/ds`) is another repository's and stays out.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -29,10 +30,14 @@ export const OPTIONS: Record<string, RegExp> = {
   style: /(?<![\w.'"`])timeStyle\s*:/g,
 };
 
-/** The calls that write a whole instant as the browser does, its hour included. */
+/** The file a whole instant is written in, from the board's root: where a refusal sends a date written in a locale. */
+export const INSTANT = 'src/lib/instant.ts';
+
+/** The calls that write in a locale, whatever their arguments: a date's writes its hour or its date as the browser does. */
 export const LOCALE: Record<string, RegExp> = {
+  whole: /\.toLocaleString\s*\(/g,
   time: /\.toLocaleTimeString\s*\(/g,
-  bare: /\.toLocaleString\s*\(\s*\)/g,
+  date: /\.toLocaleDateString\s*\(/g,
 };
 
 /** What a pattern found in a text: the words written and where, as `line:column`. */
@@ -52,56 +57,41 @@ export function foundAt(text: string, families: Record<string, RegExp>): Found[]
     });
 }
 
-/**
- * An instant left written as the browser does: its file from the board's root, how many of them it holds, and why it is no time of
- * day in words.
- */
-export interface Left {
+/** A file's calls that write a number in a locale: the file from the board's root, how many it holds, and why none is an instant. */
+export interface Numbers {
   file: string;
   count: number;
   why: string;
 }
 
-const WHOLE = "a whole instant, its date and its seconds, in the browser's own form: the form of an instant is a card of its own";
-
-/** The instants left, each in its file alone. A new one is refused, and one moved onto the writer lowers its count here. */
-export const LEFT: Left[] = [
-  { file: 'src/components/Facts.tsx', count: 1, why: WHOLE },
-  { file: 'src/components/InboxParts.tsx', count: 2, why: WHOLE },
-  { file: 'src/components/QueueLane.tsx', count: 1, why: WHOLE },
-  {
-    file: 'src/components/Timeline.tsx',
-    count: 2,
-    why: "a log line's instant to the second, and its date in the title: data read as a log's",
-  },
-  { file: 'src/lib/factory.ts', count: 3, why: WHOLE },
-  { file: 'src/routes/inbox.tsx', count: 1, why: WHOLE },
-  { file: 'src/routes/inbox_.$name.tsx', count: 1, why: WHOLE },
+/** The numbers written in a locale, each in its file alone. A call no entry counts is refused, and one that goes lowers its count. */
+export const NUMBERS: Numbers[] = [
+  { file: 'src/lib/skills.ts', count: 4, why: "a skill's token counts, each a number grouped by thousands in English: no date, no hour" },
 ];
 
 /**
  * What is wrong in `files` (each a source text by its path from the board's root): an hour option outside `WRITER`, as
- * `file:line:column (words)`; a file with more whole instants than `left` gives it; and an entry of `left` whose file holds fewer.
+ * `file:line:column (words)`; a file with more calls that write in a locale than `numbers` gives it; and an entry of `numbers`
+ * whose file holds fewer.
  */
-export function refusals(files: Record<string, string>, left: Left[] = LEFT): string[] {
+export function refusals(files: Record<string, string>, numbers: Numbers[] = NUMBERS): string[] {
   const options = Object.entries(files)
     .filter(([file]) => file !== WRITER)
     .flatMap(([file, text]) =>
       foundAt(text, OPTIONS).map(({ words, at }) => `${file}:${at} (${words}) writes an hour: take the time from timeOfDay (${WRITER})`),
     );
-  const names = [...new Set([...Object.keys(files), ...left.map((l) => l.file)])].sort();
-  const instants = names.flatMap((file) => {
+  const names = [...new Set([...Object.keys(files), ...numbers.map((n) => n.file)])].sort();
+  const locale = names.flatMap((file) => {
     const found = foundAt(files[file] ?? '', LOCALE);
-    const allowed = left.find((l) => l.file === file)?.count ?? 0;
+    const allowed = numbers.find((n) => n.file === file)?.count ?? 0;
     if (found.length > allowed)
       return [
-        `${file} writes ${found.length} instants as the browser does (${found.map((f) => f.at).join(', ')}), ${allowed} are left to it: take the time from timeOfDay (${WRITER})`,
+        `${file} writes ${found.length} times in a locale (${found.map((f) => f.at).join(', ')}), NUMBERS gives it ${allowed}: write an instant with instantWords (${INSTANT}), or name a number's call in NUMBERS`,
       ];
-    if (found.length < allowed)
-      return [`${file} writes ${found.length} instants as the browser does, LEFT says ${allowed}: lower the list`];
+    if (found.length < allowed) return [`${file} writes ${found.length} times in a locale, NUMBERS says ${allowed}: lower the list`];
     return [];
   });
-  return [...options, ...instants];
+  return [...options, ...locale];
 }
 
 /** Every `.ts` and `.tsx` of `root`'s `src` outside the kit, as its text by its path from `root`. */
@@ -137,7 +127,11 @@ test('every word that says a time takes it from the one writer, and decides its 
   assert.equal(whenColumn(at, now, 'UTC'), '12 Oct  1:11 PM', 'a column pads the hour to two characters');
   assert.equal(whenWords(new Date('2025-12-31T13:11:00Z'), now, 'UTC'), '31 Dec 2025', 'the runs page drops the time in another year');
   assert.equal(fireWord(new Date('2026-10-20T12:00:00Z'), now, 'UTC'), '20 Oct 12:00 PM', "a far fire, in the runs page's order");
-  assert.equal(fireWord(new Date('2027-01-01T09:00:00Z'), now, 'UTC'), '1 Jan 2027 9:00 AM', 'a fire in another year keeps its time');
+  assert.equal(
+    fireWord(new Date('2027-01-01T09:00:00Z'), now, 'UTC'),
+    '1 Jan 2027, 9:00 AM',
+    'a fire in another year keeps its time, after a comma',
+  );
 });
 
 test('REFUSED: a second writer of an hour, by each way one is written, and never the writer itself', () => {
@@ -149,38 +143,58 @@ test('REFUSED: a second writer of an hour, by each way one is written, and never
   assert.equal(second('const o = {\n  hour12:\n    true };').length, 1, 'an option broken across lines');
   assert.match(second('const o = {\n  hour\n    : "numeric" };')[0] ?? '', /^src\/lib\/x\.ts:2:3 \(hour:\)/, 'named where it starts');
   assert.equal(second("new Intl.DateTimeFormat('en', { timeStyle: 'short' })").length, 1, 'a time style');
-  assert.equal(second("at.toLocaleTimeString([], { minute: '2-digit' })").length, 1, 'a time in the locale');
-  assert.equal(second('at.toLocaleTimeString\n  ()').length, 1, 'broken before its parenthesis');
-  assert.equal(second('new Date(iso).toLocaleString()').length, 1, 'a whole instant in the locale');
-  assert.equal(second("count.toLocaleString('en')").length, 0, 'a number in a locale is no instant');
   assert.equal(second("of('hour'); const perHour = 3; rate.hour; type T = { hours: number }").length, 0, 'a word that only holds the name');
   assert.equal(refusals({ [WRITER]: 'new Intl.DateTimeFormat("en-US", { hour: "numeric", hour12: true })' }, []).length, 0, 'the writer');
 });
 
-test('REFUSED: one more instant written as the browser does than the list leaves a file, and a list left loose', () => {
-  const left: Left[] = [{ file: 'src/a.tsx', count: 1, why: 'a fixture' }];
-  const one = 'new Date(iso).toLocaleString()';
-  assert.equal(refusals({ 'src/a.tsx': one }, left).length, 0, 'the one left to it');
-  assert.deepEqual(refusals({ 'src/a.tsx': `${one}\n${one}` }, left), [
-    `src/a.tsx writes 2 instants as the browser does (1:14, 2:14), 1 are left to it: take the time from timeOfDay (${WRITER})`,
+test('REFUSED: anything written as the locale does, a date with a locale and no options too, and a number until the list names it', () => {
+  const written = (text: string) => refusals({ 'src/lib/x.ts': text }, []);
+  assert.deepEqual(written('new Date(iso).toLocaleString()'), [
+    `src/lib/x.ts writes 1 times in a locale (1:14), NUMBERS gives it 0: write an instant with instantWords (${INSTANT}), or name a number's call in NUMBERS`,
   ]);
-  assert.deepEqual(refusals({ 'src/a.tsx': '' }, left), ['src/a.tsx writes 0 instants as the browser does, LEFT says 1: lower the list']);
-  assert.equal(refusals({}, left).length, 1, 'a file that is gone holds none');
-  assert.equal(refusals({ 'src/a.tsx': one, 'src/b.tsx': one }, left).length, 1, 'the list is by file: another file has none left to it');
+  assert.equal(written("new Date(iso).toLocaleString('en-GB')").length, 1, 'a date with a locale and no options writes an hour');
+  assert.equal(written('new Date(iso).toLocaleString(undefined)').length, 1, 'with no locale of its own');
+  assert.equal(written('at.toLocaleDateString()').length, 1, 'a date alone');
+  assert.equal(written("at.toLocaleTimeString([], { minute: '2-digit' })").length, 1, 'a time in the locale');
+  assert.equal(written('at.toLocaleTimeString\n  ()').length, 1, 'broken before its parenthesis');
+  assert.equal(written('at.toLocaleString\n  (\n  "en-GB")').length, 1, 'broken around its argument');
+  assert.equal(written("count.toLocaleString('en')").length, 1, 'a number, which the guard cannot tell from a date');
+  const named: Numbers[] = [{ file: 'src/lib/x.ts', count: 1, why: 'a fixture' }];
+  assert.equal(refusals({ 'src/lib/x.ts': "count.toLocaleString('en')" }, named).length, 0, 'and none once the list names its file');
+  assert.equal(written('const toLocaleStringOf = 1; at.toISOString()').length, 0, 'a word that only holds the name');
 });
 
-test("the board's source has one writer of an hour, and no instant in the browser's form but the ones left", () => {
+test('REFUSED: one more call in a locale than the list gives a file, and a list left loose', () => {
+  const numbers: Numbers[] = [{ file: 'src/a.tsx', count: 1, why: 'a fixture' }];
+  const one = "count.toLocaleString('en')";
+  assert.equal(refusals({ 'src/a.tsx': one }, numbers).length, 0, 'the one it is given');
+  assert.deepEqual(refusals({ 'src/a.tsx': `${one}\nnew Date(iso).toLocaleString()` }, numbers), [
+    `src/a.tsx writes 2 times in a locale (1:6, 2:14), NUMBERS gives it 1: write an instant with instantWords (${INSTANT}), or name a number's call in NUMBERS`,
+  ]);
+  assert.deepEqual(refusals({ 'src/a.tsx': '' }, numbers), ['src/a.tsx writes 0 times in a locale, NUMBERS says 1: lower the list']);
+  assert.equal(refusals({}, numbers).length, 1, 'a file that is gone holds none');
+  assert.equal(refusals({ 'src/a.tsx': one, 'src/b.tsx': one }, numbers).length, 1, 'the list is by file: another file is given none');
+});
+
+test("the board's source has one writer of an hour, and writes nothing in a locale but the numbers the list names", () => {
   const files = sources(WEB);
   assert.ok(Object.keys(files).length > 100, `the source is read: ${Object.keys(files).length} files`);
   assert.ok(
     foundAt(files[WRITER] ?? '', OPTIONS).some((found) => found.words === 'hour12'),
     `${WRITER} is read, and holds the option`,
   );
+  assert.ok(files[INSTANT]?.includes('export function instantWords('), `${INSTANT} is read, and holds the writer of an instant`);
   assert.equal(
-    LEFT.every((l) => l.why.trim()),
+    NUMBERS.every((n) => n.why.trim()),
     true,
-    'every instant left says why',
+    'every number written in a locale says why',
   );
   const wrong = refusals(files);
   assert.equal(wrong.length, 0, wrong.join('\n'));
+  const back = refusals({
+    ...files,
+    'src/components/Facts.tsx': `${files['src/components/Facts.tsx']}\nnew Date(iso).toLocaleString();\n`,
+  });
+  assert.equal(back.length, 1, back.join('\n'));
+  assert.match(back[0] ?? '', /^src\/components\/Facts\.tsx writes 1 times in a locale/, 'a toLocaleString() written back is refused');
 });

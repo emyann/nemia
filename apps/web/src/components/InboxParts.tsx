@@ -3,7 +3,10 @@ import type { ReactNode } from 'react';
 import { Link } from '@tanstack/react-router';
 import { workflowNameOf, type InboxEntry } from '../lib/api';
 import { hasPage, queueable, queueNeedsFactory, triedLine, unassigned, type CardRefusal } from '../lib/inbox';
+import { instantWords } from '../lib/instant';
+import { useNow } from '../lib/useNow';
 import { FactoryTag } from './FactoryTag';
+import { Instant } from './Instant';
 
 /** A button that does what its form or card is for. */
 export const PRIMARY =
@@ -38,11 +41,7 @@ export function CardMeta({ entry }: { entry: InboxEntry }) {
           {entry.repo}
         </span>
       )}
-      {entry.filedAt && (
-        <time dateTime={entry.filedAt} title="When its file was last written">
-          {new Date(entry.filedAt).toLocaleString()}
-        </time>
-      )}
+      {entry.filedAt && <Instant at={entry.filedAt} about="When its file was last written" />}
     </p>
   );
 }
@@ -143,12 +142,13 @@ export function GoneItem({ entry, refusal, onDismiss }: { entry: InboxEntry; ref
  */
 export function Tried({ entry }: { entry: InboxEntry & { tried: NonNullable<InboxEntry['tried']> } }) {
   const { refused } = entry.tried;
+  const now = useNow(60_000);
   return (
     <p
       data-tried={refused ? 'refused' : 'failed'}
       className={`rounded border px-3 py-2 text-body-small break-words ${refused ? 'border-failure bg-failure-container text-on-failure-container' : 'border-outline-variant text-muted-foreground'}`}
     >
-      {triedLine(entry, new Date(entry.tried.at).toLocaleString())}
+      {triedLine(entry, instantWords(new Date(entry.tried.at), new Date(now)))}
     </p>
   );
 }

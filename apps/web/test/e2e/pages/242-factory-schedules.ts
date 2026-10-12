@@ -1,11 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Page } from 'playwright';
+import type { Locator, Page } from 'playwright';
 import { photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { FACTORIES, FOLDER, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { fireWord } from '../../../src/lib/schedules.ts';
+import { OUT, photographing, store } from '../world.ts';
 
 /** The factory the page schedules a workflow in, and the workflow attached to it that it schedules. */
 const FACTORY = FACTORIES.hiring.name;
@@ -45,8 +46,40 @@ async function scheduleLine(page: Page, factory: string): Promise<string> {
   return line;
 }
 
+/** How many times its size the line of the next run is pictured at, so the gap between a far fire's year and its hour is judged by eye. */
+const ENLARGED = 4;
+
 /**
- * The card of the scheduled factory: its workflow, cron and time zone, brief, the next fire as the api answers it, and the last run, a
+ * Pictures the line of the next run by itself, named factory-schedules-next and its theme: its label and `next`'s words, drawn
+ * `ENLARGED` times their size by a transform on their list, which lays no text out again, and taken back after the shot. Only when
+ * the page is pictured: nothing is touched otherwise.
+ */
+async function photographNext(page: Page, next: Locator): Promise<void> {
+  if (!photographing) return;
+  const list = next.locator('xpath=..');
+  await list.scrollIntoViewIfNeeded();
+  const style = await list.getAttribute('style');
+  await list.evaluate((el, by) => {
+    (el as HTMLElement).style.transformOrigin = 'top left';
+    (el as HTMLElement).style.transform = `scale(${by})`;
+  }, ENLARGED);
+  try {
+    const clip = await next.evaluate((el) => {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const [label, words] = [el.previousElementSibling!.getBoundingClientRect(), range.getBoundingClientRect()];
+      const [left, top] = [Math.floor(label.left) - 16, Math.floor(Math.min(label.top, words.top)) - 16];
+      const right = Math.min(window.innerWidth, Math.ceil(words.right) + 16);
+      return { x: left, y: top, width: right - left, height: Math.ceil(Math.max(label.bottom, words.bottom)) + 16 - top };
+    });
+    await photograph(page, path.join(OUT, `factory-schedules-next-${await themeOf(page)}.png`), { clip });
+  } finally {
+    await list.evaluate((el, was) => (was === null ? el.removeAttribute('style') : el.setAttribute('style', was)), style);
+  }
+}
+
+/**
+ * The card of the scheduled factory: its workflow, cron and time zone, brief, the next fire as the api answers it and as `fireWord` writes it, and the last run, a
  * link to the run's page; no refusal, since the kept try started its run.
  */
 async function expectScheduled(page: Page): Promise<void> {
@@ -60,6 +93,10 @@ async function expectScheduled(page: Page): Promise<void> {
   const next = nextFire(Date.now());
   const shown = await row.locator('[data-schedule-next]').getAttribute('title');
   if (shown !== next) throw new Refused(`the next run is the cron's next fire, ${next} — the row says ${JSON.stringify(shown)}`);
+  const timeZone = await page.evaluate(() => new Intl.DateTimeFormat().resolvedOptions().timeZone);
+  const words = fireWord(new Date(next), new Date(), timeZone);
+  const said = await row.locator('[data-schedule-next]').textContent();
+  if (said !== words) throw new Refused(`the next run reads as the board writes a far fire, ${words} — it reads ${JSON.stringify(said)}`);
   const last = row.locator('[data-schedule-last]').getByRole('link', { name: FOLDER.id });
   await expectVisible(last, 'the last run is a link named by the run');
   const href = await last.getAttribute('href');
@@ -68,6 +105,7 @@ async function expectScheduled(page: Page): Promise<void> {
   await expectVisible(row.locator('code', { hasText: `factory unschedule ${FACTORY} ${WORKFLOW}` }), 'the line that takes it back');
   await settled(page);
   await photograph(page, path.join(OUT, `factory-schedules-scheduled-${await themeOf(page)}.png`), { fullPage: true });
+  await photographNext(page, row.locator('[data-schedule-next]'));
   await last.click();
   await page.waitForURL((url) => url.pathname === `/runs/${FOLDER.id}`);
   await idle(page);

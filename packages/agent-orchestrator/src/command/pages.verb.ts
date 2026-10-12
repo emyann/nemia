@@ -103,7 +103,8 @@ const howOf = (env?: NodeJS.ProcessEnv, home?: string, kept?: Kept): SummaryHow 
 
 /**
  * The runs that wait on a person and the runs in flight, with the counts of each and of the finished runs (`runsOpen`), read now: of
- * the factory `factory`, or of every factory where none is given. The waiting runs carry the cost of each step and their clock's parts.
+ * the factory `factory`, or of every factory where none is given. The waiting runs carry the cost of each step, their clock's parts and
+ * when their present wait began.
  */
 export const RUNS_OPEN: Command<OpenRuns> = {
   name: 'runs open',

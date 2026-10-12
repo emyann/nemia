@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { RepositoryRun } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
-import { clockOf, type RunClock } from './clock.ts';
+import { clockOf, waitingSinceOf, type RunClock } from './clock.ts';
 import type { AttemptClock, TaskClock } from './timeline.ts';
 
 const MIN = 60_000;
@@ -174,4 +174,29 @@ test('a clock read before the run was created is empty, never negative', () => {
     slotMs: 0,
     restMs: 0,
   });
+});
+
+test("a run at its second gate has waited since the second gate was reached, while its clock sums both waits", () => {
+  const { run: r, views } = approved(ran(at(11, 42), at(11, 50)));
+  assert.equal(waitingSinceOf(r, views, FILED, STEPS, ['build'], null), at(11, 50));
+  assert.equal(clockOf(r, views, FILED, STEPS, ['build'], UNTIL).personMs, 35 * MIN, '25 at the first gate, 10 open at the second');
+});
+
+test('a step held at its gate before it is filed has waited since the end of the steps it comes after', () => {
+  assert.equal(waitingSinceOf(run(), VIEWS, FILED, STEPS, ['build'], null), at(10, 45));
+});
+
+test('with several waits open, the present wait began at the earliest, in whichever order they are named', () => {
+  assert.equal(waitingSinceOf(run(), VIEWS, FILED, STEPS, ['plan', 'side'], null), at(10, 45));
+  assert.equal(waitingSinceOf(run(), VIEWS, FILED, STEPS, ['side', 'plan'], null), at(10, 45));
+});
+
+test('a hold only a person lifts dates the wait from its placing, and an earlier step that waits dates it before', () => {
+  assert.equal(waitingSinceOf(run(), VIEWS, FILED, STEPS, [], at(11, 30)), at(11, 30));
+  assert.equal(waitingSinceOf(run(), VIEWS, FILED, STEPS, ['side'], at(11, 30)), at(11, 10));
+});
+
+test('a wait the record does not date began at no instant: nothing waits, or the waiting step has no try that ended', () => {
+  assert.equal(waitingSinceOf(run(), VIEWS, FILED, STEPS, [], null), null);
+  assert.equal(waitingSinceOf(run(), new Map(), FILED, STEPS, ['side'], null), null);
 });

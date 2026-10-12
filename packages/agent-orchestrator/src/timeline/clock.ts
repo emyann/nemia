@@ -136,3 +136,26 @@ export function clockOf(
   const wallMs = wall.to - wall.from;
   return { wallMs, sessionsMs, checksMs, personMs, slotMs, restMs: wallMs - reach[3] };
 }
+
+/**
+ * When a run's present wait on a person began, as an ISO instant: the earliest start among the waits open on one — each step of
+ * `waiting`, dated as the open part of `personMs` dates it (`openWaits`), and `held`. Null where none is dated: nothing waits, or the
+ * record dates none of what does.
+ *
+ * @param views The engine's view of every task of the run, as `clockOf` takes them.
+ * @param filed Each task's filing time, as `clockOf` takes them.
+ * @param steps The workflow the run is judged by.
+ * @param waiting The steps that wait on a person now (`waitingOnYou`).
+ * @param held When a hold that only a person lifts was placed, null for a run with none.
+ */
+export function waitingSinceOf(
+  run: Run,
+  views: ReadonlyMap<string, TaskClock>,
+  filed: ReadonlyMap<string, string>,
+  steps: readonly Workflow[],
+  waiting: readonly string[],
+  held: string | null,
+): string | null {
+  const starts = [...openWaits(timeline(run, views, filed, steps), steps, waiting), ...spanOf(held, null)].map((wait) => wait.from);
+  return starts.length ? new Date(Math.min(...starts)).toISOString() : null;
+}

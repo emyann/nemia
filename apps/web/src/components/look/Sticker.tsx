@@ -6,8 +6,9 @@ import { cn } from '@/components/ui/ds/utils';
 const WIDE: CSSProperties = { fontStretch: '125%' };
 
 /**
- * The look's sticker tile, by its shape alone: a rounded tile filled in `hue` under a label's grain, a small `label` over its value. Its rounding is the
- * sticker's own, 14 pixels, which the look draws beside the kit's corners: no step of the shape scale, and nothing else takes it.
+ * The look's sticker tile, by its shape alone: a rounded tile filled in `hue` under a label's grain, a small `label` over its
+ * value. Its rounding is the sticker's own, 14 pixels, which the look draws beside the kit's corners: no step of the shape scale, and
+ * nothing else takes it.
  */
 export function Sticker({ hue, label, children }: { hue: Hue; label: string; children: ReactNode }) {
   return (

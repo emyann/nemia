@@ -27,8 +27,8 @@ const WIDE: CSSProperties = { fontStretch: '125%' };
 export type PlateHue = 'yours' | 'alive' | 'grey';
 
 /**
- * The look's plate, a section's heading: its `count` large, its `title` as an `h2`, its `hue`'s barcode, on its ground under a label's grain. `quiet` is
- * the plate of a section that holds nothing: in grey whatever its hue, and with no barcode.
+ * The look's plate, a section's heading: its `count` large, its `title` as an `h2`, its `hue`'s barcode, on its ground under a
+ * label's grain. `quiet` is the plate of a section that holds nothing: in grey whatever its hue, and with no barcode.
  */
 export function Plate({ count, title, hue = 'yours', quiet = false }: { count: number; title: string; hue?: PlateHue; quiet?: boolean }) {
   return (

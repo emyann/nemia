@@ -110,31 +110,31 @@ typography:
     fontSize: 16px
     fontWeight: 500
     lineHeight: 24px
-    letterSpacing: 0.15px
+    letterSpacing: 0px
   title-small:
     fontFamily: Michroma
     fontSize: 14px
     fontWeight: 500
     lineHeight: 20px
-    letterSpacing: 0.1px
+    letterSpacing: 0px
   body-large:
     fontFamily: Chakra Petch
     fontSize: 16px
     fontWeight: 400
     lineHeight: 24px
-    letterSpacing: 0.5px
+    letterSpacing: 0px
   body-medium:
     fontFamily: Chakra Petch
     fontSize: 14px
     fontWeight: 400
     lineHeight: 20px
-    letterSpacing: 0.25px
+    letterSpacing: 0px
   body-small:
     fontFamily: Chakra Petch
     fontSize: 12px
     fontWeight: 400
     lineHeight: 16px
-    letterSpacing: 0.4px
+    letterSpacing: 0px
   label-large:
     fontFamily: Chakra Petch
     fontSize: 14px
@@ -218,8 +218,13 @@ caps, as printed on a label: heavier than Material's (weight 600), tracked
 wide, and set in capitals where they are written. Each role is tracked for
 what it mostly draws: the large and the medium, a button's word and a
 tag's, by six hundredths of an em; the small, a rail's name, a table's
-heading and a tile's label, by a tenth. Every other size, weight and
-tracking of the kit's roles is Material's.
+heading and a tile's label, by a tenth. Five roles are not tracked at all:
+the three body roles, and the medium and small titles, which the board
+draws in the plain face and in mixed case. Chakra Petch joins `fl`, `fi`
+and `tt`, and any tracking parts them ("Workf lows"), so running text is
+set as the face was drawn. Mono text takes a body role and so is untracked
+too. Every other size, weight and tracking of the kit's roles is
+Material's.
 
 ## Shape
 

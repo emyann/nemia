@@ -88,3 +88,23 @@ test('each label role is tracked for what it mostly draws: a button and a tag by
   );
   assert.equal(JSON.stringify(tracked), JSON.stringify({ large: '0.06em', medium: '0.06em', small: '0.1em' }));
 });
+
+test('REFUSED: a tracking on running text: the body roles and the two titles drawn in the plain face are untracked, so its joined letters hold', () => {
+  const theme = fs.readFileSync(path.join(web, 'theme', 'theme.v4.css'), 'utf8');
+  const tracked = Object.fromEntries(
+    ['body-large', 'body-medium', 'body-small', 'title-medium', 'title-small'].map((role) => [
+      role,
+      theme.match(new RegExp(`--md-sys-typescale-${role}-tracking:\\s*([^;]+);`))?.[1],
+    ]),
+  );
+  assert.equal(
+    JSON.stringify(tracked),
+    JSON.stringify({
+      'body-large': '0px',
+      'body-medium': '0px',
+      'body-small': '0px',
+      'title-medium': '0px',
+      'title-small': '0px',
+    }),
+  );
+});

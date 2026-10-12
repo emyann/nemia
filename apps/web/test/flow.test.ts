@@ -239,8 +239,8 @@ test('opened, every step is a tile, nothing folded or counted', () => {
   assert.equal(flow.height, 5 * TILE.height + 4 * TILE.lane);
 });
 
-/** What a pill keeps of its width from its name: its padding (`px-0.5`, two pixels a side) and its border, a pixel a side. */
-const PILL_EDGES = 6;
+/** What a pill keeps of its width from its name: its padding (`px-1`, four pixels a side) and its border, a pixel a side. */
+const PILL_EDGES = 10;
 
 test("REFUSED: a four-column rail whose pills cannot hold a nine-letter name: the pill's room is its width less its padding and border", () => {
   const chain = ['design', 'implement', 'review', 'land'];
@@ -256,7 +256,7 @@ test("REFUSED: a four-column rail whose pills cannot hold a nine-letter name: th
   const rail = fs.readFileSync(path.join(import.meta.dirname, '..', 'src', 'components', 'StepRail.tsx'), 'utf8');
   assert.match(
     rail,
-    /rounded-full\s+px-0\.5\s+font-mono\s+text-body-small/,
-    'the pill pads its name by two pixels a side, in mono at the small body role',
+    /rounded-full\s+px-1\s+font-mono\s+text-body-small/,
+    'the pill pads its name by four pixels a side, in mono at the small body role',
   );
 });

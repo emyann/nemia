@@ -30,7 +30,7 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
 - Mono text is `font-mono`, which reads the theme's `--font-mono`, the face `typography.mono` names in `DESIGN.md`; `code`, `kbd`,
   `samp` and `pre` follow it. No `--font-mono` in `@theme inline`: it would win over the theme's (the `typefaces` page refuses it).
   The face has one weight: a weight class on mono text is drawn by the browser, so mono text takes a body role whole (`font-mono
-  text-body-small`), its tracking included, never a label or title role, which carry one (`monoWeighted`, `test/type.test.ts`).
+  text-body-small`), untracked as the body roles are (`DESIGN.md`), never a label or title role, which carry one (`monoWeighted`, `test/type.test.ts`).
 - The kit's corners (`rounded-shape-*`) follow `DESIGN.md`; shadcn's (`--radius`) are the board's own. shadcn's `secondary` reads a
   neutral surface, not the theme's `secondary`: that green is `alive`, a session at work. The chart colours are not the theme's.
 - A colour says one thing: `yours` (waits on a person), `alive`, `money` (an amount), `rest` (grey, and sage for done) and `failure`.

@@ -92,6 +92,7 @@ const each =
 
 /** What each verb reads of its request, in the order it names what it cannot read. */
 const READS: { readonly [V in PlaceVerb]: readonly ((request: Request) => void)[] } = {
+  root: [each(text, 'dir')],
   open: [each(text, 'root'), each(flag, 'isolate')],
   make: [each(text, 'repo', 'at', 'name', 'from'), each(texts, 'also')],
   handoff: [each(text, 'workspace', 'step', 'why')],

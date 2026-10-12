@@ -86,6 +86,8 @@ and no process between, and you need not ask any of them. What each takes and an
 - `export` — a tag's tree written into an empty folder, from git's object store, never a working tree, for `nemia upgrade`:
   `{ "repo", "tag", "into" }` answers `{ "commit" }`. The tree gets an empty repository of its own, nothing committed, so its checks can
   list its files.
+- `root` — the repository a folder is in, asked when a folder joins a factory: `{ "dir" }` answers `{ "root" }`, the main checkout's
+  root from that root, a folder inside it or a linked worktree alike, and `null` for a folder in no repository.
 - `seal` — that empty repository taken away once the checks passed: `{ "tree" }` answers `{ "removed" }`.
 
 A verb that will not act answers `{ "refused": "<why>" }`; one git did not answer within its deadline, or that failed before it

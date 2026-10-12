@@ -12,7 +12,7 @@
  */
 import { Effect, type Layer } from 'effect';
 import { worldOf } from './handle.ts';
-import { inventory, open, report, standing, status, trial, type Reply } from './reads.ts';
+import { inventory, open, report, root, standing, status, trial, type Reply } from './reads.ts';
 import { exported, handoff, land, make, remove, seal } from './writes.ts';
 import type { Held, World } from './world.ts';
 import { PlaceService, threwWords, unreadNow, type Place } from '../../src/place/place.store.ts';
@@ -20,6 +20,7 @@ import type { PlaceDeclared, PlaceOutcome, PlaceRequests, PlaceVerb } from '../.
 
 /** Each verb's body, over what the place holds. */
 const VERBS: { readonly [V in PlaceVerb]: (held: Held, request: PlaceRequests[V]) => Reply<V> } = {
+  root,
   open,
   make,
   handoff,

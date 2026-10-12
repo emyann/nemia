@@ -102,8 +102,17 @@ test('a pass with a reading of the disk is sampled into its four series, and its
       { part: 'worktrees' as const, factory: 'nemia', bytes: 40, unread: 2 },
       { part: 'worktrees' as const, factory: 'pipao', unread: 1 },
       { part: 'engine' as const, bytes: 90, unread: 0 },
+      { part: 'engine' as const, factory: 'nemia', bytes: 25, unread: 0 },
+      { part: 'sessions' as const, factory: 'nemia', bytes: 60, unread: 0 },
     ],
   };
+  const bytesOf = (entries: (typeof disk)['entries']) =>
+    samplesOf(pass('2026-10-05T14:02:00Z', 10, { disk: { ...disk, entries } })).filter((x) => x.s === 'disk.bytes');
+  assert.deepEqual(
+    bytesOf(disk.entries.slice(0, 3)).filter((x) => x.l.part === 'sessions'),
+    [],
+    'REFUSED: a reading with no entry of a part samples no bytes for it, never a zero',
+  );
   const bare = samplesOf(pass('2026-10-05T14:02:00Z'));
   const read = samplesOf(pass('2026-10-05T14:02:00Z', 10, { disk }));
   assert.deepEqual(
@@ -121,9 +130,12 @@ test('a pass with a reading of the disk is sampled into its four series, and its
     [
       { s: 'disk.bytes', l: { part: 'worktrees', factory: 'nemia' }, v: 40 },
       { s: 'disk.bytes', l: { part: 'engine' }, v: 90 },
+      { s: 'disk.bytes', l: { part: 'engine', factory: 'nemia' }, v: 25 },
+      { s: 'disk.bytes', l: { part: 'sessions', factory: 'nemia' }, v: 60 },
       { s: 'disk.unread', l: { part: 'worktrees' }, v: 3 },
       { s: 'disk.unread', l: { part: 'runs' }, v: 0 },
       { s: 'disk.unread', l: { part: 'engine' }, v: 0 },
+      { s: 'disk.unread', l: { part: 'sessions' }, v: 0 },
       { s: 'disk.unread', l: { part: 'checks' }, v: 0 },
       { s: 'disk.unread', l: { part: 'series' }, v: 0 },
       { s: 'disk.unread', l: { part: 'other' }, v: 0 },

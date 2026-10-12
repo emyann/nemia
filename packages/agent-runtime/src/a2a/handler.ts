@@ -54,6 +54,7 @@ import {
   type ExpectedSession,
   type HarnessQuota,
   type SessionForgotten,
+  type SessionKept,
   type RunnerOps,
   type Transcript,
   type TranscriptCursor,
@@ -127,6 +128,7 @@ export const cardOf = (harness: string, ops: RunnerOps): AgentCard => ({
             ...(ops.observeFor ? ['observeSessions' as const] : []),
             ...(ops.quota ? ['harnessQuota' as const] : []),
             ...(ops.forget ? ['forgetSession' as const] : []),
+            ...(ops.kept ? ['sessionKept' as const] : []),
           ],
           say: ops.say !== undefined,
         } satisfies RuntimeExtensionParams,
@@ -154,6 +156,9 @@ export type TranscriptRequest =
 
 /** A session to forget, by its name and the id its attempt ended with; `dry` lists what would go and removes nothing. */
 export type ForgetRequest = { session: { name: string; nativeId?: string }; dry: boolean };
+
+/** The sessions whose kept paths are asked, each by its name and the id its attempt ended with. */
+export type KeptRequest = { sessions: readonly { name: string; nativeId?: string }[] };
 
 /** A stream of a session asked for by the session's name: `stdout` or `stderr`, whole or its last `lastBytes` bytes. */
 export type OutputRequest = { name: string; stream: 'stdout' | 'stderr'; lastBytes?: number };
@@ -195,6 +200,11 @@ export interface SessionMethods {
    * it leaves that is not its own to remove (`RunnerOps.forget`). Asked only of a session the harness no longer lists.
    */
   forgetSession(params: ForgetRequest, context: ServerCallContext): Promise<SessionForgotten>;
+  /**
+   * Where the harness keeps what it has of each session asked, by the session's name, and its own record of it (`RunnerOps.kept`):
+   * asked of every session at once, removing nothing. A session it keeps nothing of has no key.
+   */
+  sessionKept(params: KeptRequest, context: ServerCallContext): Promise<Record<string, SessionKept>>;
 }
 
 /** Every listed session, as one listing saw them: the pages of that listing are served from here. */
@@ -523,6 +533,18 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
       );
     }
     return this.run(this.ops.forget(params.session, { dry: params.dry }));
+  }
+
+  async sessionKept(params: KeptRequest, _context: ServerCallContext): Promise<Record<string, SessionKept>> {
+    if (!this.ops.kept) {
+      throw new UnsupportedOperationError(`the \`${this.harness}\` harness says nothing of where it keeps a session's files.`);
+    }
+    if (!Array.isArray(params.sessions) || !params.sessions.every((s) => typeof s?.name === 'string' && nameParts(s.name))) {
+      throw new RequestMalformedError(
+        'the request names no sessions: send `{ sessions: [{ name }] }`, each name `ae/<task>/<n>`, n from 1.',
+      );
+    }
+    return this.run(this.ops.kept(params.sessions));
   }
 
   async createTaskPushNotificationConfig(

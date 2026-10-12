@@ -1,15 +1,16 @@
 /**
  * What the store takes on the disk, the pure half: its parts (`DISK_PARTS`), which part a name of the store's root is (`partOf`), which
- * run a name under a part kept by run is (`runOf`), a walk's answers summed into a reading by part and factory (`readingOf`), the runs
- * that take the most (`largestOf`), and the label sets said before that a reading no longer has (`vanished`). The listing is
- * `disk.store.ts`'s and the sweep `disk.verb.ts`'s.
+ * run a name under a part kept by run is (`runOf`), a walk's answers summed into a reading by part and factory (`readingOf`), what the
+ * runtime keeps by task laid over it (`withKept`), the runs that take the most (`largestOf`), and the label sets said before that a
+ * reading no longer has (`vanished`). The listing is `disk.store.ts`'s and the sweep `disk.verb.ts`'s.
  */
 
 /**
- * The parts of the store a reading is said by: the runs' worktrees, their records and files, the folder handed to the runtime, the
- * checks' output, the series, and `other` for every other name of the store's root and the root itself.
+ * The parts a reading is said by: the runs' worktrees, their records and files, the folder handed to the runtime, `sessions`, the
+ * records the runtime's tasks left outside the store, which the runtime alone finds and measures, the checks' output, the series, and
+ * `other` for every other name of the store's root and the root itself.
  */
-export const DISK_PARTS = ['worktrees', 'runs', 'engine', 'checks', 'series', 'other'] as const;
+export const DISK_PARTS = ['worktrees', 'runs', 'engine', 'sessions', 'checks', 'series', 'other'] as const;
 export type DiskPart = (typeof DISK_PARTS)[number];
 
 /** The parts whose names each belong to a run, and through it to a factory. */
@@ -97,6 +98,65 @@ export function readingOf(
   }
   const said = [...entries.values()].map(({ read, bytes, ...entry }): DiskEntry => (read ? { ...entry, bytes } : entry));
   return { at, ...space, entries: DISK_PARTS.flatMap((part) => said.filter((entry) => entry.part === part)) };
+}
+
+/**
+ * What the runtime keeps of one task, as the sweep reads its answer: the bytes under the folder handed to the runtime (`engine`),
+ * the bytes of the records its sessions left outside the store, absent where none is kept, and how many things did not read.
+ */
+export type TaskKept = { readonly taskId: string; readonly engine: number; readonly sessions?: number; readonly unread: number };
+
+/** `entry` with `bytes` more and `unread` more names that did not read. */
+const plus = (entry: DiskEntry, bytes: number, unread: number): DiskEntry => ({
+  ...entry,
+  bytes: (entry.bytes ?? 0) + bytes,
+  unread: entry.unread + unread,
+});
+
+/**
+ * `entries`, a walk's, with what the runtime keeps by task (`kept`) laid over them, each task its run's factory's (`factoryOf`, by a
+ * task's id) or no factory's:
+ *
+ * - `engine` by factory, the sum of its tasks' `engine` bytes, and `engine` alone, the walked whole less what the factories were given,
+ *   never below zero since the two were read at two moments; a task of no factory stays in `engine` alone;
+ * - `sessions` by factory, the sum of its tasks' `sessions` bytes, and `sessions` alone for the tasks of no factory; a task with no
+ *   `sessions` adds to none, so with no record kept there is no `sessions` entry at all, never one at zero;
+ * - a task's `unread` on the `engine` entry it is counted in.
+ *
+ * With `kept` undefined, an ask that failed, `engine` stays whole and `sessions` is one entry with no bytes and one name unread.
+ * In `DISK_PARTS`' order, and within a part the entry of no factory first.
+ */
+export function withKept(
+  entries: readonly DiskEntry[],
+  kept: readonly TaskKept[] | undefined,
+  factoryOf: (taskId: string) => string | undefined,
+): DiskEntry[] {
+  const made = new Map<string, DiskEntry>(entries.map((entry) => [entryKey(entry), entry]));
+  const add = (part: DiskPart, factory: string | undefined, bytes: number, unread: number) => {
+    const at = { part, ...(factory === undefined ? {} : { factory }) };
+    made.set(entryKey(at), plus(made.get(entryKey(at)) ?? { ...at, unread: 0 }, bytes, unread));
+  };
+  if (kept === undefined) made.set(entryKey({ part: 'sessions' }), { part: 'sessions', unread: 1 });
+  let given = 0;
+  for (const task of kept ?? []) {
+    const factory = factoryOf(task.taskId);
+    const alone = made.get(entryKey({ part: 'engine' }));
+    if (factory === undefined) {
+      if (alone || task.unread)
+        made.set(entryKey({ part: 'engine' }), { part: 'engine', ...alone, unread: (alone?.unread ?? 0) + task.unread });
+    } else {
+      add('engine', factory, task.engine, task.unread);
+      given += task.engine;
+    }
+    if (task.sessions !== undefined) add('sessions', factory, task.sessions, 0);
+  }
+  const whole = made.get(entryKey({ part: 'engine' }));
+  if (whole?.bytes !== undefined) made.set(entryKey({ part: 'engine' }), { ...whole, bytes: Math.max(0, whole.bytes - given) });
+  const said = [...made.values()];
+  return DISK_PARTS.flatMap((part) => [
+    ...said.filter((entry) => entry.part === part && entry.factory === undefined),
+    ...said.filter((entry) => entry.part === part && entry.factory !== undefined),
+  ]);
 }
 
 /**

@@ -7,7 +7,7 @@ export type { CodexArgs, HarnessArgs } from './args.ts';
 export type { Mount } from './mounts.ts';
 export type { Admission, AdmissionAnswer, AdmissionCall } from './admission.ts';
 export { admissionHook, admitCall } from './claude/admission.ts';
-export { forgetFiles } from './forget.ts';
+export { forgetFiles, keptOf } from './forget.ts';
 export { sdkRunner } from './sdk.ts';
 export { Runner, RunnerError, composite, testOps } from './seam.ts';
 export type {
@@ -19,6 +19,7 @@ export type {
   QuotaLimit,
   RunnerOps,
   SessionForgotten,
+  SessionKept,
   SpawnRequest,
   Transcript,
   TranscriptCursor,

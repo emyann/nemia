@@ -33,6 +33,7 @@ const LIES: { readonly [V in Kept]: (answer: Answer) => Answer } = {
   list: Effect.map((list) => ({ ...(list as object), unreadable: [{ taskId: 'elsewhere', why: 'elsewhere' }] })),
   say: Effect.map((said) => ({ ...(said as object), attempt: 2 })),
   forget: Effect.map((report) => ({ ...(report as object), forgotten: !(report as { forgotten: boolean }).forgotten })),
+  kept: Effect.match({ onFailure: () => ({ tasks: [] }), onSuccess: () => ({ tasks: [{ taskId: 'elsewhere' }] }) }),
 };
 
 /** A new stand-in whose `verb` does what it does and answers `lie` of its true answer. */

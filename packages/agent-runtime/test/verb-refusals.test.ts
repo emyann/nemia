@@ -114,6 +114,7 @@ const VERBS = [
   'follow',
   'forget',
   'io',
+  'kept',
   'list',
   'logs',
   'output',
@@ -399,6 +400,12 @@ test('each refusal is a tagged error, and refusalWords words it behind the verb,
       'ForgetRefused',
       () => effect((e) => e.forget(['one'])),
       /^this store keeps no way to forget a task: nothing was forgotten\.$/,
+    ],
+    [
+      'kept',
+      'KeptRefused',
+      () => effect((e) => untyped(e.kept)({ yes: true })),
+      /^takes nothing, and measures every task the store lists; it was handed \{"yes":true\}: nothing was measured\.$/,
     ],
   ];
   for (const [verb, tag, refused, words] of cases) {

@@ -29,6 +29,7 @@ const PINNED: Record<string, string[]> = {
     'InputRefused',
     'Journal',
     'JournalError',
+    'KeptRefused',
     'ListRefused',
     'OutputRefused',
     'QuotaRefused',

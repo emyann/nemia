@@ -51,6 +51,7 @@ const { DENIED_SPAN, DENIED_SPAN_KEYS, PASS_METRICS, STEP_METRICS, TIMELINE_SPAN
   await import('../src/meter/meter.verb.ts');
 const { TIMELINE_OF, TIMELINE_PARTS } = await import('../src/timeline/index.ts');
 const { DISK_EVERY, DISK_METRICS, DISK_SPAN, DISK_SPAN_KEYS } = await import('../src/disk/disk.verb.ts');
+const { DISK_PARTS } = await import('../src/disk/disk.ts');
 const { STEP_ATTRIBUTE_KEYS } = await import('../src/meter/step.ts');
 const { DEFAULT_SERVICE_NAME } = await import('../src/telemetry/telemetry.ts');
 const { PHASES } = await import('../src/meter/meter.ts');
@@ -961,6 +962,23 @@ test("System's Disk row draws the store's disk by the code's names, and its larg
   assert.ok(grafanaMs(largest.timeFrom) >= 2 * sweep, `${largest.timeFrom} holds two sweeps of ${sweep} ms`);
   assert.ok(grafanaMs(largest.timeFrom) <= 6 * sweep, `${largest.timeFrom} is now, not a day: a run freed leaves the panel`);
   assert.ok(/WSL/.test((windowed(system, "Free on the store's disk") as { description?: string }).description ?? ''), 'the limit is said');
+  const said = (windowed(system, 'On disk, by part') as { description?: string }).description ?? '';
+  assert.deepEqual(unsaidParts(said, DISK_PARTS), [], 'the by-part panel says each part by the word its series carries');
+  const seeded = SEED.flatMap((s) => s.metrics.filter((m) => m.name === 'disk.bytes').flatMap((m) => m.series.map(([labels]) => labels)));
+  for (const part of ['engine', 'sessions'])
+    assert.ok(
+      seeded.some((labels) => labels.part === part && labels.factory !== undefined) && seeded.some((l) => l.part === part && !l.factory),
+      `the render draws ${part} by factory and alone`,
+    );
+});
+
+/** The parts of `parts` that `description` does not say in brackets, as a panel names the word a series carries. */
+const unsaidParts = (description: string, parts: readonly string[]): string[] => parts.filter((part) => !description.includes(`(${part})`));
+
+test('REFUSED: a by-part description that leaves a part of the disk unsaid names it', () => {
+  const said = (windowed(dashboardTitled('System'), 'On disk, by part') as { description?: string }).description ?? '';
+  assert.deepEqual(unsaidParts(said.replace('(sessions)', ''), DISK_PARTS), ['sessions']);
+  assert.deepEqual(unsaidParts(said, [...DISK_PARTS, 'elsewhere']), ['elsewhere']);
 });
 
 test('REFUSED: a Disk panel asking a misspelt gauge, one kept by run, a largest-runs panel of one sweep, and a seed of one large run', () => {

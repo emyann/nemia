@@ -16,6 +16,7 @@ const REFUSALS = new Set([
   'EngineRefused',
   'BodyRefused',
   'ForgetRefused',
+  'KeptRefused',
 ]);
 
 /**

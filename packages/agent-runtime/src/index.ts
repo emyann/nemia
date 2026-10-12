@@ -44,9 +44,10 @@ export {
   SayUnsent,
   QuotaRefused,
   ForgetRefused,
+  KeptRefused,
   refusalWords,
 } from './service/index.ts';
-export type { EngineShape, ForgetReport } from './service/index.ts';
+export type { EngineShape, ForgetReport, KeptReport } from './service/index.ts';
 export type { EngineOptions, HarnessConfig, Pooled, TaskSpec, TickReport, EngineIo, ObserveCount } from './service/options.ts';
 /**
  * Why a task's configuration on one of the harnesses an engine runs by default is one `file()` refuses, in the runtime's words, or

@@ -204,7 +204,10 @@ What the `create-an-agent` skill, being generic, does not say here:
   `effect` (how we write Effect 4), `create-an-agent` (how an agent is made here) and `change-the-board` (shadcn's trigger, for a
   change under apps/web). Vendored unchanged, pinned in `skills-lock.json`
   and credited in `THIRD_PARTY_NOTICES.md`: `shadcn` (it is loaded, and its CLI runs, from `apps/web`, where `components.json` is:
-  loaded from the root it refuses with `monorepo_root`), and `grilling` and `grill-me` (Iris's interview).
+  loaded from the root it refuses with `monorepo_root`), `grilling` and `grill-me` (Iris's interview), and `react-aria` (Adobe's
+  documentation of React Aria, for the board's own parts: taken from the root by `npx skills add https://react-aria.adobe.com -a
+  claude-code --copy -y`, refreshed by `npx skills update`, and it describes the library's latest release, which may be ahead of the
+  board's pin).
 - `apps/web/src/components/ui/ds` — the design system kit (french-tech-homies/design-system, the `@ds` registry), vendored as shipped
   and credited in `THIRD_PARTY_NOTICES.md`, with its skills `ds-theme`, `ds-build` and `ds-spec` in `apps/web/.claude/skills/`; the
   board's look is `apps/web/DESIGN.md`, its generated theme `apps/web/theme/` (`apps/web/CLAUDE.md`, *The design system kit*).

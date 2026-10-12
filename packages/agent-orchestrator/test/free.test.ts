@@ -489,8 +489,10 @@ test(
   async (t) => {
     const { id } = await started(WORK);
     const from = new Date().toISOString();
+    const turn = Effect.promise(() => new Promise<void>((next) => setImmediate(next)));
+    const turns = Effect.forEach(Array.from({ length: 200 }), () => turn, { discard: true });
     const daemon = Effect.runFork(
-      Effect.scoped(up(e, { every: 20, repo: ROOT, holder: 'wf up' })).pipe(
+      Effect.scoped(up(e, { every: 20, repo: ROOT, holder: 'wf up', onTaken: () => turns })).pipe(
         Effect.provide(stand().layer),
         Effect.provide(Logger.layer([])),
       ),
@@ -501,7 +503,11 @@ test(
       everyMs: 20,
     });
     const first = kept()[0];
-    assert.equal(first.disk, undefined, 'REFUSED: a sweep before the first pass answered, which knows no run and so no factory');
+    assert.equal(
+      first.disk,
+      undefined,
+      'REFUSED: a sweep before the first pass answered, which the fibers forked had two hundred turns to start, and which knows no run and so no factory',
+    );
     assert.ok(first.at < read.at);
     const ours = read.disk!.entries.find((entry) => entry.part === 'runs' && entry.factory === DEFAULT_FACTORY);
     assert.ok(ours?.bytes, `the runs the pass answered, ${id} among them, are their factory's: ${JSON.stringify(read.disk!.entries)}`);

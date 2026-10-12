@@ -17,16 +17,18 @@ applies: ["apps/web/**"]
 4. **Its CLI runs from `apps/web`**, or from the root with `-c apps/web`. Its rules know radix and base, not React Aria: on the board
    the reference is what `npx shadcn@latest add <component> --view <file>` prints, never what you remember.
 5. **Read `apps/web/CLAUDE.md`** before you change a page: it holds the board's traps, and how its e2e runs.
-6. **Then load the design system kit's skills, where the work is theirs.** They are in `apps/web/.claude/skills`, not at the root, and
-   the first list of skills you were shown holds none of them: the list gains a nested folder's skills once you have read a file under
-   it. So read `apps/web/CLAUDE.md` with Read first (item 5), then load each with the Skill tool by its bare name, from the root, with
-   no `cd`, in a fenced step too: `ds-build` before you design, write or judge anything drawn with the kit's parts or its roles,
-   `ds-theme` before a change to `apps/web/DESIGN.md` or the theme, `ds-spec` when a decision cites Material. Where the Skill tool
-   does not know the name, read `apps/web/.claude/skills/<name>/SKILL.md` with Read: the text is the same.
+6. **Then load the design system kit's skills, where the work is theirs**: `ds-build` before you design, write or judge anything drawn
+   with the kit's parts or its roles, `ds-theme` before a change to `apps/web/DESIGN.md` or the theme, `ds-spec` when a decision cites
+   Material. A step of a run that gives them has them in its first list of skills, under its agent's name: load each with the Skill
+   tool by the name its prompt gives. A session outside a run finds them in `apps/web/.claude/skills`, not at the root, and its first
+   list of skills holds none of them: the list gains a nested folder's skills once the session has read a file under it. So it reads
+   `apps/web/CLAUDE.md` with Read first (item 5), then loads each with the Skill tool by its bare name, from the root, with no `cd`.
+   Where the Skill tool does not know the name, read `apps/web/.claude/skills/<name>/SKILL.md` with Read: the text is the same.
 7. **The project they speak of is `apps/web`**, not the repository's root: their `DESIGN.md`, `theme/` and `components.json` are the
    ones there, and their `<kit>` is `apps/web/src/components/ui/ds`. From the root, `ds-spec`'s command is
-   `node apps/web/.claude/skills/ds-spec/md3.mjs <command>`, typed whole and alone, which a fenced step may run too. A fenced step
-   runs none of the commands `ds-theme` and `ds-build` name: it reads what they say and the files they point at.
+   `node apps/web/.claude/skills/ds-spec/md3.mjs <command>`, typed whole and alone, which a fenced step may run too. It is the
+   workspace's script in a run too: the copy of `ds-spec` a step is given is read, never run. A fenced step runs none of the commands
+   `ds-theme` and `ds-build` name: it reads what they say and the files they point at.
 8. **For a part the kit ships, the reference is `ds-build` and the part's own file** under `apps/web/src/components/ui/ds/components`,
    its doc comment first. `shadcn` stays the reference for the board's shadcn components (`apps/web/src/components/ui/*.tsx`) and for
    the CLI that installs either family.

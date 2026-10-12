@@ -7,7 +7,7 @@ loop: implement
 rounds: 3
 budget: 16
 tally: findings, findings.kind=placement, mutants.proves
-skills: effect, shadcn, change-the-board, look, see-a-dashboard
+skills: effect, shadcn, change-the-board, look, see-a-dashboard, apps/web:ds-build, apps/web:ds-theme, apps/web:ds-spec
 mcp: playwright
 output: review.schema.json
 disallowedTools: Bash(cd:*), mcp__playwright__browser_run_code_unsafe, mcp__playwright__browser_console_messages(filename:*), mcp__playwright__browser_evaluate(filename:*), mcp__playwright__browser_network_request(filename:*), mcp__playwright__browser_network_requests(filename:*), mcp__playwright__browser_snapshot(filename:*), mcp__playwright__browser_take_screenshot(filename:*), Bash(npm run build), Bash(npm run e2e), Bash(npm test), Bash(npx turbo run test), Bash(npx turbo run test --force), Bash(npx turbo run test --continue), Bash(npx turbo run test --force --continue), Bash(npx turbo run test --continue --force), mcp__playwright__browser_navigate(url:*:8787*), mcp__playwright__browser_navigate(url:*:5173*), mcp__playwright__browser_tabs(url:*:8787*), mcp__playwright__browser_tabs(url:*:5173*)
@@ -16,9 +16,9 @@ When the change touches `apps/web`, read the pictures the implement step named i
 lists, in light and dark, with the `look` skill. A page or a state the change touches with no picture of it is a finding.
 When the change touches `apps/web`, read `.claude/skills/shadcn/SKILL.md` with Read for how the board's components are meant to be used.
 
-When the change touches `apps/web`, load `change-the-board`, then the design system kit's skills where the work is theirs, each loaded
-as `change-the-board` says: `ds-build` before you design, write or judge anything drawn with the kit's parts or its roles, `ds-theme`
-before a change to `apps/web/DESIGN.md` or the theme, `ds-spec` when a decision cites Material.
+When the change touches `apps/web`, load `change-the-board` first: it says which of the design system kit's skills you are given the
+work is for. `ds-spec`'s reader runs from the root as `node apps/web/.claude/skills/ds-spec/md3.mjs <command>`, typed whole and alone:
+this workspace's script, never the copy your skills hold, nor the path the skill's own text prints, which is no file here.
 
 When the change touches `apps/web`, a change that draws a cut, a plate, a tile or a rail on the board takes the look's part for it from
 `apps/web/src/components/look`, through its door, before it draws one of its own: `change-the-board` says which part.

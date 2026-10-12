@@ -16,6 +16,10 @@ When the change touches `apps/web`, read the pictures the implement step named i
 lists, in light and dark, with the `look` skill. A page or a state the change touches with no picture of it is a finding.
 When the change touches `apps/web`, read `.claude/skills/shadcn/SKILL.md` with Read for how the board's components are meant to be used.
 
+When the change touches `apps/web`, load `change-the-board`, then the design system kit's skills where the work is theirs, each loaded
+as `change-the-board` says: `ds-build` before you design, write or judge anything drawn with the kit's parts or its roles, `ds-theme`
+before a change to `apps/web/DESIGN.md` or the theme, `ds-spec` when a decision cites Material.
+
 When the change touches `tools/observe`, read each dashboard's picture and text the implement step named in its `artifacts`,
 `dashboard-<name>.png` and `dashboard-<name>.txt`, with the `see-a-dashboard` skill: the text first. A dashboard the change touches
 with no picture and text of it is a finding. You do not render one yourself: your fence refuses the command and Docker.

@@ -22,6 +22,10 @@ but to measure it: this step's check runs every page, in workers, outside your s
 When the change touches `apps/web`, load `shadcn` for the board's components, and load `change-the-board` before `shadcn`: it says
 where your shell must be for that load.
 
+When the change touches `apps/web`, load `change-the-board`, then the design system kit's skills where the work is theirs, each loaded
+as `change-the-board` says: `ds-build` before you design, write or judge anything drawn with the kit's parts or its roles, `ds-theme`
+before a change to `apps/web/DESIGN.md` or the theme, `ds-spec` when a decision cites Material.
+
 When the change touches `tools/observe` — a dashboard, the collector's or Tempo's file, the compose file, the render — see it rendered
 before you sign off: `node tools/observe/render/render.ts --out <your files directory>` starts a throwaway stack from this workspace
 with fake data, never the live one, and writes `dashboard-<name>.png` and `dashboard-<name>.txt` for each dashboard. Read them as the

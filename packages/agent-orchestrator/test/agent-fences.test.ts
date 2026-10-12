@@ -539,6 +539,41 @@ test('every check the steps of Seldon, Agora and Argus name is one their fence a
   }
 });
 
+/** The numbered item of the trigger skill of a change to the board that names the command of the kit's `ds-spec` skill. */
+const KIT_COMMAND = { file: '.claude/skills/change-the-board/SKILL.md', from: '**The project they speak of is `apps/web`**' };
+
+/** The settings' allow of that command, whatever follows the script's name. */
+const KIT_ALLOW = 'Bash(node apps/web/.claude/skills/ds-spec/md3.mjs:*)';
+
+test("the command change-the-board names for the kit's ds-spec is a script of the checkout that Seldon's and Agora's fences allow", () => {
+  const commands = checksOf(KIT_COMMAND.file, KIT_COMMAND.from, /`(node\s[^`]*)`/g);
+  assert.deepEqual(commands, ['node apps/web/.claude/skills/ds-spec/md3.mjs <command>']);
+  assert.ok(fs.statSync(path.join(REPO, commands[0].split(' ')[1])).isFile(), 'its script is a file of the checkout');
+  for (const agent of ['seldon', 'agora']) {
+    const step = shippedStepOf(agent);
+    assert.equal(step.permissionMode, 'dontAsk', `${agent} runs dontAsk`);
+    assert.deepEqual(unallowed(step, commands), [], `${agent}'s fence refuses the command change-the-board names`);
+  }
+});
+
+test("REFUSED: the kit's ds-spec command without the settings' allow of it is named for Seldon and Agora, and a skill that names it no more throws", () => {
+  const commands = checksOf(KIT_COMMAND.file, KIT_COMMAND.from, /`(node\s[^`]*)`/g);
+  assert.ok(SETTINGS_ALLOWS.includes(KIT_ALLOW), `${KIT_ALLOW} is in the settings`);
+  const without = SETTINGS_ALLOWS.filter((rule) => rule !== KIT_ALLOW);
+  for (const agent of ['seldon', 'agora']) {
+    assert.deepEqual(unallowed(shippedStepOf(agent), commands, without), commands, agent);
+    assert.deepEqual(
+      unallowed(shippedStepOf(agent), commands, [...without, KIT_ALLOW.replace(':*', '')]),
+      commands,
+      `${agent}, the bare name`,
+    );
+  }
+  assert.throws(
+    () => checksOf(KIT_COMMAND.file, 'The project they speak of is the root', /`(node\s[^`]*)`/g),
+    (err: Error) => err.message.includes(`${KIT_COMMAND.file}: no "The project they speak of is the root"`),
+  );
+});
+
 test("REFUSED: a step's check that neither its fence nor the settings allow is named", () => {
   const [design, review, janitor] = CHECKERS.map(({ agent, step, from }) => ({ step: shippedStepOf(agent), checks: checksOf(step, from) }));
   const without = (rule: string): string[] => SETTINGS_ALLOWS.filter((r) => r !== rule);

@@ -7131,6 +7131,7 @@ test("FactoryTrust says each place that is not trusted, what is withheld and the
   const two = renderToStaticMarkup(createElement(FactoryTrust, { factory: filed('nemia', { untrusted: [place, home] }) }));
   assert.match(two, /2 places are not trusted/);
   assert.match(two, /Trust them:/);
+});
 
 const InboxParts = await import('../src/components/InboxParts.tsx');
 const { FileCard } = await import('../src/components/FileCard.tsx');

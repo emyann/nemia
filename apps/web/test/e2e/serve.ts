@@ -10,9 +10,10 @@
  * - `serve` prints where a board already served here listens and starts nothing, when that board was built from the tree as it is now
  *   (`treeOf`, `standsFor`); a board built from another tree is ended first. Else it builds the web app into the folder (`vite build
  *   --outDir`), puts back the route tree the build regenerates (`keeping`), refuses when the workspace's `git status` changed over the
- *   build (`changedOver`), starts a holder of its own (`hold`) and prints the two lines the holder wrote (`linesOf`): the board's
- *   address and the api's.
- * - `hold`, the holder, started by `serve` alone and detached from it: seeds the store, serves it (served.ts), writes where it listens,
+ *   build (`changedOver`), builds the page of the look's stories beside it (`buildParts`), starts a holder of its own (`hold`) and
+ *   prints the three lines the holder wrote (`linesOf`): the board's address, the api's, and the stories'.
+ * - `hold`, the holder, started by `serve` alone and detached from it: seeds the store, serves it (served.ts), answers the stories'
+ *   page itself from the folder it was built into (`serveStories`), writes where each listens,
  *   its pid and the tree it was built from into the folder (`served.json`), and ends by itself after `HOLD_MS` (`BOARD_HOLD_MS` in a
  *   test), sooner when `stop` asks, a server dies or a signal comes. On its way out it stops both servers by the handles it kept and
  *   removes the folder. A port the steps given a browser are refused by address (`usable`) is given back and the servers started
@@ -25,8 +26,10 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
+import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
+import { buildParts, fileAt, typeOf } from './parts/gallery.ts';
 import { fromNodeModules, plain, REPO, WEB } from './world.ts';
 
 /** How long a served board is held before it ends by itself. */
@@ -44,8 +47,11 @@ const PACE_MS = 200;
 /** How many times the holder starts its servers before it gives up on a port it may use. */
 const TRIES = 3;
 
-/** What the holder writes once it serves: its own pid, where the board and its api listen, and the tree the board was built from. */
-export type ServedBoard = { pid: number; board: string; api: string; tree: string };
+/**
+ * What the holder writes once it serves: its own pid, where the board, its api and the page of the look's stories listen, and the
+ * tree they were built from.
+ */
+export type ServedBoard = { pid: number; board: string; api: string; stories: string; tree: string };
 
 /**
  * The tree of the repository `repo` as it is now, as one word: a digest of its commit, of every change to a tracked file since, and of
@@ -109,7 +115,8 @@ export function alive(pid: number): boolean {
 }
 
 /**
- * The board served from `folder`, or undefined: for a folder with no `served.json`, one that does not read, and one whose holder is gone.
+ * The board served from `folder`, or undefined: for a folder with no `served.json`, one that does not read, one that says no address
+ * of the stories, as a holder older than them wrote it, and one whose holder is gone.
  */
 export function servedIn(folder: string): ServedBoard | undefined {
   let read: unknown;
@@ -118,9 +125,9 @@ export function servedIn(folder: string): ServedBoard | undefined {
   } catch {
     return undefined;
   }
-  const { pid, board, api, tree } = (read ?? {}) as Partial<ServedBoard>;
-  if (typeof pid !== 'number' || typeof board !== 'string' || typeof api !== 'string' || typeof tree !== 'string') return undefined;
-  return alive(pid) ? { pid, board, api, tree } : undefined;
+  const { pid, board, api, stories, tree } = (read ?? {}) as Partial<ServedBoard>;
+  if (typeof pid !== 'number' || ![board, api, stories, tree].every((said) => typeof said === 'string')) return undefined;
+  return alive(pid) ? ({ pid, board, api, stories, tree } as ServedBoard) : undefined;
 }
 
 /**
@@ -129,8 +136,12 @@ export function servedIn(folder: string): ServedBoard | undefined {
  */
 export const usable = (port: string): boolean => /^\d+$/.test(port) && !/^(?:8787|5173)/.test(port);
 
-/** The two lines `serve` prints: where the board listens, and where its api does. */
-export const linesOf = (served: Pick<ServedBoard, 'board' | 'api'>): string[] => [`board on ${served.board}`, `api on ${served.api}`];
+/** The three lines `serve` prints: where the board listens, where its api does, and where the page of the look's stories does. */
+export const linesOf = (served: Pick<ServedBoard, 'board' | 'api' | 'stories'>): string[] => [
+  `board on ${served.board}`,
+  `api on ${served.api}`,
+  `stories on ${served.stories}`,
+];
 
 /** A refusal: said on stderr, exit 1. */
 class Refusal extends Error {}
@@ -190,6 +201,56 @@ function build(dist: string): void {
 }
 
 /**
+ * Builds the page of the look's stories into `out`, outside the workspace, and leaves the workspace as it was, as `build` does: the
+ * route tree put back, and a `git status` that changed refused.
+ */
+async function buildStories(out: string): Promise<void> {
+  const before = status();
+  const routes = path.join(WEB, 'src', 'routeTree.gen.ts');
+  const kept = fs.readFileSync(routes);
+  try {
+    await buildParts(out);
+  } catch (err) {
+    throw new Refusal(
+      plain(`the look's stories did not build, so no board is served:\n${err instanceof Error ? err.message : String(err)}`),
+      {
+        cause: err,
+      },
+    );
+  } finally {
+    if (!fs.readFileSync(routes).equals(kept)) fs.writeFileSync(routes, kept);
+  }
+  const changed = changedOver(before, status());
+  if (changed.length)
+    throw new Refusal(`the stories' build changed the workspace, which a served board never does: ${changed.join(', ')}. Put it back.`);
+}
+
+/**
+ * Answers the page of the look's stories built in `dir`, on a port of this machine a step may open (`usable`): a file the folder has
+ * as it is, and every other address with the stories' page. A port a step is refused is given back and another taken, `TRIES` times
+ * at most.
+ *
+ * @returns where it listens, and what ends it
+ */
+export async function serveStories(dir: string): Promise<{ at: string; close: () => void }> {
+  for (let tried = 1; ; tried++) {
+    const server = http.createServer((request, response) => {
+      const file = fileAt(dir, `http://stories${request.url ?? '/'}`);
+      response.writeHead(200, { 'content-type': typeOf(file) }).end(fs.readFileSync(file));
+    });
+    await new Promise<void>((resolve, reject) => server.once('error', reject).listen(0, '127.0.0.1', resolve));
+    const { port } = server.address() as { port: number };
+    const close = (): void => {
+      server.close();
+      server.closeAllConnections();
+    };
+    if (usable(String(port))) return { at: `http://127.0.0.1:${port}`, close };
+    close();
+    if (tried === TRIES) throw new Error(`no port a step may open for the stories in ${TRIES} starts: the last was ${port}`);
+  }
+}
+
+/**
  * `serve`: says where the board already served here listens when it was built from the tree as it is now; else ends the one built from
  * another tree, builds the board, starts its holder and says where that one listens.
  */
@@ -204,6 +265,7 @@ async function serve(dir: string): Promise<void> {
   fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(dir, { recursive: true });
   build(path.join(dir, 'dist'));
+  await buildStories(path.join(dir, 'stories'));
   const log = path.join(dir, 'hold.log');
   const out = fs.openSync(log, 'a');
   const holder = spawn(process.execPath, [import.meta.filename, 'hold'], {
@@ -248,7 +310,8 @@ async function hold(dir: string): Promise<void> {
     at = await startServers(seat, dist);
   }
   const tree = process.env.BOARD_SERVE_TREE ?? '';
-  const served: ServedBoard = { pid: process.pid, board: at.base, api: `http://127.0.0.1:${at.apiPort}`, tree };
+  const stories = await serveStories(path.join(dir, 'stories'));
+  const served: ServedBoard = { pid: process.pid, board: at.base, api: `http://127.0.0.1:${at.apiPort}`, stories: stories.at, tree };
   fs.writeFileSync(path.join(dir, 'served.json.new'), `${JSON.stringify(served)}\n`);
   fs.renameSync(path.join(dir, 'served.json.new'), path.join(dir, 'served.json'));
   const holdMs = Number(process.env.BOARD_HOLD_MS) || HOLD_MS;
@@ -262,6 +325,7 @@ async function hold(dir: string): Promise<void> {
     const look = setInterval(() => (fs.existsSync(path.join(dir, 'stop')) || gone() ? end() : undefined), PACE_MS);
     const bound = setTimeout(end, holdMs);
   });
+  stories.close();
   await stopServers();
 }
 

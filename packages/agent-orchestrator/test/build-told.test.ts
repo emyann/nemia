@@ -9,7 +9,7 @@
  *
  * The design system kit's skills sit in a folder of the board's, which no step can be given: build's design, implement and review are
  * told to load them (`KIT_SKILLS_TOLD`), and `kitDrift` holds the names told to the folders that are there and to what the trigger skill
- * `change-the-board` says of each.
+ * `change-the-board` says of each. They are told of the look's own parts too, by the folder's name (`LOOK_PARTS_TOLD`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -94,6 +94,15 @@ const KIT_SKILLS_TOLD = [
   '`ds-spec` when a decision cites Material',
 ];
 
+/**
+ * What design, implement and review are told of the look's own parts: where they are, to take one before drawing one, and that the
+ * trigger skill says which.
+ */
+const LOOK_PARTS_TOLD = [
+  "a change that draws a cut, a plate, a tile or a rail on the board takes the look's part for it from `apps/web/src/components/look`",
+  'through its door, before it draws one of its own: `change-the-board` says which part.',
+];
+
 const TOLD: Told[] = [
   {
     workflow: 'build',
@@ -107,6 +116,7 @@ const TOLD: Told[] = [
       NO_FILENAME,
       STOP_BOARD,
       ...KIT_SKILLS_TOLD,
+      ...LOOK_PARTS_TOLD,
     ],
     adds: ['shadcn', 'look'],
     denies: ['Bash(cd:*)', ...NO_BUILD, ...BROWSER_FENCE],
@@ -125,6 +135,7 @@ const TOLD: Told[] = [
       '`node tools/observe/render/render.ts --out <your files directory>` starts a throwaway stack from this workspace',
       'the check refuses a changed dashboard whose picture and',
       ...KIT_SKILLS_TOLD,
+      ...LOOK_PARTS_TOLD,
     ],
     adds: ['shadcn', 'look', 'see-a-dashboard'],
     denies: [],
@@ -152,6 +163,7 @@ const TOLD: Told[] = [
       "When the change touches `tools/observe`, read each dashboard's picture and text the implement step named in its `artifacts`",
       'You do not render one yourself: your fence refuses the command and Docker.',
       ...KIT_SKILLS_TOLD,
+      ...LOOK_PARTS_TOLD,
     ],
     adds: ['shadcn', 'look', 'see-a-dashboard'],
     denies: ['Bash(cd:*)', ...NO_BUILD, ...WHOLE_SUITE, ...BROWSER_FENCE],
@@ -363,6 +375,19 @@ test("REFUSED: design, implement or review told a sentence of the kit's skills n
         ),
         [`build/${step}: says "${sentence}"`],
       );
+});
+
+test("REFUSED: design, implement or review told of the look's parts no more is named", () => {
+  for (const step of ['design', 'implement', 'review'])
+    for (const sentence of LOOK_PARTS_TOLD)
+      assert.deepEqual(
+        untold(
+          'build',
+          shippedEdited('build', step, (text) => text.replace(across(sentence), '')),
+        ),
+        [`build/${step}: says "${sentence}"`],
+      );
+  assert.match(fs.readFileSync(path.join(REPO, TRIGGER), 'utf8'), /`apps\/web\/src\/components\/look`,\s+taken\s+through\s+its\s+door/);
 });
 
 type Schema = { properties: Record<string, unknown>; required: string[] };

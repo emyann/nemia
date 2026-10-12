@@ -24,6 +24,7 @@ const FILES = [
   'components/look/Pager.tsx',
   'components/look/TextLink.tsx',
   'components/look/CutFrame.tsx',
+  'components/look/CutTag.tsx',
   'components/look/ScanLines.tsx',
 ];
 
@@ -48,6 +49,13 @@ test('REFUSED: a Tailwind size or a bracketed size in a file that draws the Runs
   assert.deepEqual(handSizes('className="text-body-small text-label-large text-on-surface text-[30px] rounded-[14px]"'), []);
 });
 
+/** The files a folder's door exports from, when `at` is a folder with a door (`index.ts`): each sibling it names, as a component's file. */
+function throughDoor(at: string): string[] {
+  const door = path.join(SRC, at, 'index.ts');
+  if (!fs.existsSync(door)) return [];
+  return [...fs.readFileSync(door, 'utf8').matchAll(/from\s*'\.\/([^']+)'/g)].map(([, name]) => `${at}/${name}.tsx`);
+}
+
 test('every file that draws the Runs page is on the list: each part the route and its parts import from the board', () => {
   const reached = new Set<string>(['routes/runs.index.tsx']);
   const next = [...reached];
@@ -56,10 +64,12 @@ test('every file that draws the Runs page is on the list: each part the route an
     const text = fs.readFileSync(path.join(SRC, file), 'utf8');
     for (const [, mod] of text.matchAll(/from\s*'((?:\.\.?\/|@\/components\/)[^']+)'/g)) {
       const at = mod.startsWith('@/') ? mod.slice(2) : path.posix.normalize(path.posix.join(path.posix.dirname(file), mod));
-      const found = `${at}.tsx`;
-      if (!at.startsWith('components/') || at.startsWith('components/ui/') || !fs.existsSync(path.join(SRC, found))) continue;
-      if (!reached.has(found)) next.push(found);
-      reached.add(found);
+      if (!at.startsWith('components/') || at.startsWith('components/ui/')) continue;
+      for (const found of [`${at}.tsx`, ...throughDoor(at)]) {
+        if (!fs.existsSync(path.join(SRC, found))) continue;
+        if (!reached.has(found)) next.push(found);
+        reached.add(found);
+      }
     }
   }
   reached.delete('components/routeLink.tsx');

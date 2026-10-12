@@ -1,7 +1,7 @@
 /**
- * The look's scroll bars and a table in a cut frame, read in browsers that draw scroll bars, which the e2e's own hides: the gallery
- * (`parts/main.tsx`) opened in a browser whose bars take room (`classic`) and in one whose bars float (`overlay`). The last row of a
- * framed table draws no line and nothing of the table is painted in a cut corner; a table whose rows fit shows no upright bar and a
+ * The look's scroll bars and a table in a cut frame, read in browsers that draw scroll bars, which the e2e's own hides: the page of
+ * the look's stories (`parts/main.tsx`) opened in a browser whose bars take room (`classic`) and in one whose bars float
+ * (`overlay`). The last row of a framed table draws no line and nothing of the table is painted in a cut corner; a table whose rows fit shows no upright bar and a
  * narrow one still scrolls sideways, its thumb off the cut; a bar is an 8-pixel lane the ground shows through, its thumb in the
  * look's inks while it scrolls, under the pointer and while held, in both kinds of browser and both schemes; and what scrolls is
  * marked while it scrolls. Each is refused for a fault put back. `npm run e2e` runs this first; it needs Chromium.
@@ -13,7 +13,7 @@ import type { Browser, Page } from 'playwright';
 import { scratch } from '../scratch.ts';
 import { WAITED } from '../waits.ts';
 import { expectNone } from './checks.ts';
-import { buildParts, openParts } from './parts/gallery.ts';
+import { buildParts, openParts, story } from './parts/gallery.ts';
 import { apart, coloursOf, edgesOf, type Rgb } from './parts/pixels.ts';
 import { launch, type Bars } from './visit.ts';
 
@@ -32,12 +32,14 @@ after(async () => {
 const THEMES = ['light', 'dark'] as const;
 const KINDS = ['classic', 'overlay'] as const;
 
-/** A framed table of the gallery, by its name, and the box that scrolls it. */
+/** A framed table of the cut frame's stories, by its name, and the box that scrolls it. */
 const framed = (name: string): string => `[data-framed="${name}"]`;
 const boxOf = (name: string): string => `${framed(name)} [data-table-box]`;
 
-/** The box the gallery draws shorter than what it holds. */
-const SCROLLER = '[data-part="scrollers"] [data-scroller]';
+/** The box the scroll bars' story draws shorter than what it holds, and the same box in the story nothing marks the scrolls of. */
+const SCROLLER = `${story('look-scrollbars--marked')} [data-scroller]`;
+const UNMARKED = 'look-scrollbars--unmarked';
+const UNMARKED_SCROLLER = `${story(UNMARKED)} [data-scroller]`;
 
 /** The colours of the named `points` in a picture of the window taken now, as `name`. */
 const read = <K extends string>(kind: Bars, page: Page, name: string, points: Record<K, readonly [number, number]>) =>
@@ -48,7 +50,7 @@ const linesOf = (page: Page, name: string): Promise<string[]> =>
   page.locator(`${framed(name)} tbody tr`).evaluateAll((rows) => rows.map((row) => getComputedStyle(row).borderBottomWidth));
 
 /** The framed tables with the line under their last row put back. */
-const LINED = '[data-part="framed-table"] tbody tr:last-child { border-bottom-width: 1px !important; }';
+const LINED = '[data-framed] tbody tr:last-child { border-bottom-width: 1px !important; }';
 
 test(
   'REFUSED: the last row of a framed table draws no line under it, with one row and with several; a line put back is seen',
@@ -100,7 +102,7 @@ async function cutSpills(kind: Bars, page: Page, name: string, shot: string): Pr
 }
 
 /** The framed tables with a ground of their own under the header's cells and the rows, as the kit draws a row by default. */
-const GROUNDED = '[data-part="framed-table"] :is(th, tbody tr) { background-color: var(--md-sys-color-surface) !important; }';
+const GROUNDED = '[data-framed] :is(th, tbody tr) { background-color: var(--md-sys-color-surface) !important; }';
 
 for (const theme of THEMES) {
   test(
@@ -160,7 +162,7 @@ const roomFaults = (page: Page): Promise<string[]> =>
   });
 
 /** The framed tables laid out as a table is by default: what it holds runs past its box. */
-const UNCLIPPED = '[data-part="framed-table"] table { overflow: visible !important; }';
+const UNCLIPPED = '[data-framed] table { overflow: visible !important; }';
 
 test(
   'REFUSED: a framed table whose rows fit shows no scroll bar, and a narrow one scrolls sideways alone; a table left unclipped is seen',
@@ -213,7 +215,7 @@ async function pageAtRest(page: Page): Promise<void> {
 }
 
 /**
- * What is wrong with the scroll bar of the gallery's box and of the page, none when each is the look's: an 8-pixel lane the ground
+ * What is wrong with the scroll bar of the story's box and of the page, none when each is the look's: an 8-pixel lane the ground
  * shows through at rest; the page's thumb in `outline` while the page is marked as scrolling, the box's unlit by it; and the box's
  * thumb in `outline` while marked, 4 pixels wide, in `on-surface-variant` under the pointer and `on-surface` while held, the lane's
  * whole width. Read with nothing moving, each mark placed by hand.
@@ -322,7 +324,7 @@ test(
   WAITED,
   async () => {
     const page = await openParts(browsers.classic, built, 'dark');
-    const unmarked = await openParts(browsers.classic, built, 'dark', '?bars=unmarked');
+    const unmarked = await openParts(browsers.classic, built, 'dark', `?story=${UNMARKED}`);
     try {
       await page.locator(SCROLLER).scrollIntoViewIfNeeded();
       await marked(page, 'html', 'rest', 'the page, brought to the box, comes to rest');
@@ -334,10 +336,10 @@ test(
       await wheelOver(page, 'html');
       await marked(page, 'html', 'shown', 'the page that scrolls is marked shown, on its root');
       await marked(page, 'html', 'rest', 'and at rest once it scrolls no more');
-      await unmarked.locator(SCROLLER).scrollIntoViewIfNeeded();
-      await wheelOver(unmarked, SCROLLER);
+      await unmarked.locator(UNMARKED_SCROLLER).scrollIntoViewIfNeeded();
+      await wheelOver(unmarked, UNMARKED_SCROLLER);
       assert.equal(
-        await unmarked.locator(SCROLLER).getAttribute('data-scroll-bar'),
+        await unmarked.locator(UNMARKED_SCROLLER).getAttribute('data-scroll-bar'),
         null,
         'nothing listening, a box that scrolled has no mark',
       );

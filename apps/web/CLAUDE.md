@@ -44,19 +44,21 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
   cell's own room (`expectRoom` in `test/e2e/pages/052-runs-pages.ts`).
 - Text dimmed by an `opacity` falls under 4.5:1: sink a card into the floor (`bg-background`) or use the muted ink instead.
 - The kit has no adapter for TanStack Router: an `href` on one of its buttons, chips or menu items loads the page whole.
-- A cut corner is a shape of its own under unclipped content (`CutFrame.tsx`, `CutButton.tsx`): a layer clipped to the cut, never an
-  overlay in the ground's colour, and never a clip on what holds content or takes the focus. A glow is that layer's `drop-shadow`, and
+- A cut corner is a shape of its own under unclipped content (`look/cut.ts`, `look/CutFrame.tsx`, `look/CutButton.tsx`): a layer
+  clipped to the cut, never an overlay in the ground's colour, and never a clip on what holds content or takes the focus. A glow is
+  that layer's `drop-shadow`, and
   a ring that follows the cut is a band clipped beside it (`cutRing`). A ground on a child (the kit's `Card`, a table `Row`) paints
   the cut over, so it is given none (`bg-transparent`). `test/e2e/parts.test.ts` reads each in a picture, pixel by pixel.
 - A control's touch target under a table's last row makes an `overflow-x-auto` box scroll upright: a table in a cut frame wears
-  `FRAMED_BOX`, `FRAMED_TABLE` and `FRAMED_ROW` (`CutFrame.tsx`), which also drop the last row's line; `test/e2e/bars.test.ts`.
+  `FRAMED_BOX`, `FRAMED_TABLE` and `FRAMED_ROW` (`look/CutFrame.tsx`), which also drop the last row's line; `test/e2e/bars.test.ts`.
 - A scroll bar is drawn by `src/styles.css` from `data-scroll-bar`, which `markScrolls` (`lib/useScrollMark.ts`) writes on what scrolls. The
   window's bar takes its parts from `body` and no selector on the root's attribute reaches it: the thumb reads an inherited property
   (`--bar-ink`). A bar already laid out keeps its track under a style added later.
 - The look's small caps are its three label roles: `DESIGN.md` gives them their weight and tracking, and a text writes the role and
   `uppercase` (`text-label-small uppercase`); a kit part's own label (`Tag`, a `Column`) follows the role. No class of the board's.
 - The kit's type primitives write Material's weight over the role's (`Label` draws 500 where `DESIGN.md` says 600, a `Tag`'s word
-  included): a label of the look writes the role class, and a text given a `background-image` is unmeasured (`PageName` in `Plate.tsx`).
+  included): a label of the look writes the role class, and a text given a `background-image` is unmeasured (`PageName` in
+  `look/Plate.tsx`).
 - A box the browser lays between two pixels is drawn from the next whole one, and `boundingBox` carries float noise: a test that reads
   a pixel beside an edge rounds past it (`edgesOf` in `test/e2e/parts.test.ts`).
 - The kit's `xsmall` icon button answers 8 pixels beyond its box, and of two targets that overlap the later in the document wins: in a
@@ -81,9 +83,16 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
   `node node_modules/@playwright/mcp/cli.js install-browser chromium` for the steps' `browser_*` tools.
 - The e2e's Chromium hides every scroll bar, so no bar takes room or is in a picture: a bar is asserted and pictured in a browser from
   `launch('classic')` (bars that take room) or `launch('overlay')` (bars that float), `test/e2e/visit.ts`.
-- A part no page mounts yet is drawn in the gallery, `test/e2e/parts/main.tsx`, built into a scratch folder by `buildParts` and never
-  by `npm run build`: `test/e2e/parts.test.ts` presses it, `node test/e2e/parts-photos.ts` pictures it, light then dark, and
-  `test/structure.test.ts` refuses a file of `src` that imports one of `test/`. Its layout is inline styles, never a class of its own.
+- The look's own parts are `src/components/look`, taken through its door (`index.ts`) by every file outside it; each has its stories
+  beside it (`<Part>.stories.tsx`), one a state, and `test/look.test.ts` refuses a part with none, an import past the door, and a
+  part `change-the-board` does not name. A story lays out with inline styles, never a class of its own, and a node test imports a
+  part by its own file: the door loads the kit's folder, which Node refuses.
+- The stories are the one place the parts are shown, in two hosts under one decorator (`.storybook/preview.tsx`: the look's ground,
+  a router of the story's own in memory, `data-at` where it stands). `npm run storybook`, from `apps/web`, is a person's, on port
+  6007, in no check; dark follows the system alone, so its toolbar switches nothing. The checks read the stories' page,
+  `test/e2e/parts/main.tsx` (`?part=<name>`, `?story=<id>`), built into a scratch folder by `buildParts` and never by `npm run
+  build`: `test/e2e/parts.test.ts` presses it and refuses a story that throws, and `node test/e2e/parts-photos.ts` pictures it,
+  light then dark. `npm run board:serve` prints its address on a third line, `stories on <url>`.
 - `npm test` runs `test/*.test.ts`, never `test/e2e/*.test.ts` (those launch Chromium; only `npm run e2e` runs them). A web test that needs
   no browser sits in `test/`.
 - `components/ui` and `components/ai-elements` are registry code adapted to React Aria by hand: adding one again overwrites its edits
@@ -94,7 +103,8 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
 - `browser_take_screenshot` resolves a relative `filename` against the workspace: give it an absolute path under `/tmp/playwright-mcp`,
   and in a checking step (design, review), whose fence refuses every `filename`, none: the call answers with the picture.
 - `npm run board:serve` (`e2e/serve.ts`) builds outside the workspace and serves one board a workspace, on a seeded store of its own
-  (`e2e/served.ts`, the worker's serving code too); `npm run board:stop` ends its holder, which else ends by itself.
+  (`e2e/served.ts`, the worker's serving code too), and the look's stories beside it; `npm run board:stop` ends its holder, which
+  else ends by itself.
 
 ## Writing an e2e page
 

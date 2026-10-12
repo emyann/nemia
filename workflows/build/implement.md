@@ -26,6 +26,9 @@ When the change touches `apps/web`, load `change-the-board`, then the design sys
 as `change-the-board` says: `ds-build` before you design, write or judge anything drawn with the kit's parts or its roles, `ds-theme`
 before a change to `apps/web/DESIGN.md` or the theme, `ds-spec` when a decision cites Material.
 
+When the change touches `apps/web`, a change that draws a cut, a plate, a tile or a rail on the board takes the look's part for it from
+`apps/web/src/components/look`, through its door, before it draws one of its own: `change-the-board` says which part.
+
 When the change touches `tools/observe` — a dashboard, the collector's or Tempo's file, the compose file, the render — see it rendered
 before you sign off: `node tools/observe/render/render.ts --out <your files directory>` starts a throwaway stack from this workspace
 with fake data, never the live one, and writes `dashboard-<name>.png` and `dashboard-<name>.txt` for each dashboard. Read them as the

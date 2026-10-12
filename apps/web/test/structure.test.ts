@@ -87,7 +87,7 @@ function importsIn(text: string): string[] {
 const leavesWeb = (file: string, mod: string): boolean =>
   mod.startsWith('.') && path.posix.normalize(path.posix.join(path.posix.dirname(file), mod)).startsWith('../');
 
-/** Whether a relative module named in `file` of `src` is under the board's `test/`: a fixture, a helper, the gallery of the parts. */
+/** Whether a relative module named in `file` of `src` is under the board's `test/`: a fixture, a helper, the page of the look's stories. */
 const reachesTests = (file: string, mod: string): boolean =>
   mod.startsWith('.') && path.posix.normalize(path.posix.join(path.posix.dirname(file), mod)).startsWith('test/');
 
@@ -205,7 +205,7 @@ test('REFUSED: a workspace package, a node built-in, and a path out of apps/web'
     assert.deepEqual(planted(mod), [], `${mod} is let through`);
 });
 
-test('REFUSED: a file of the source that imports a test file, the gallery of the parts among them', () => {
+test("REFUSED: a file of the source that imports a test file, the page of the look's stories among them", () => {
   const planted = (mod: string): string[] => importBreaks(new Map([...sourceTexts(), ['src/x.ts', `import { y } from '${mod}';\n`]]));
   assert.deepEqual(planted('../test/fixtures.ts'), [
     'src/x.ts imports ../test/fixtures.ts, a file of the tests: move what the board needs under src, the built board holds no test',

@@ -1,18 +1,11 @@
 /**
  * What every story of the look is drawn in, in Storybook and on the page the checks read alike: the board's styles, the look's
  * ground, and a router of its own over a history kept in memory, so a link of a story leads somewhere and moves no address but its
- * own. Where that router stands is written on the story's wrapper (`data-at`). A story's parameters say `at`, the address it opens
- * on, and `scrollMark: false`, for a story nothing marks the scrolls of.
+ * own. Where that router stands is written on the story's wrapper (`data-at`), and how many times it moved (`data-moves`). A story's
+ * parameters say `at`, the address it opens on, and `scrollMark: false`, for a story nothing marks the scrolls of.
  */
-import { createContext, useContext, useState, type ComponentType, type CSSProperties } from 'react';
-import {
-  createMemoryHistory,
-  createRootRoute,
-  createRouter,
-  RouterProvider,
-  useRouter,
-  useRouterState,
-} from '@tanstack/react-router';
+import { createContext, useContext, useEffect, useState, type ComponentType, type CSSProperties } from 'react';
+import { createMemoryHistory, createRootRoute, createRouter, RouterProvider, useRouter, useRouterState } from '@tanstack/react-router';
 import type { Preview } from '@storybook/react-vite';
 import { RouterProvider as AriaRouterProvider } from 'react-aria-components';
 import '../src/styles.css';
@@ -36,13 +29,15 @@ function ScrollMark() {
 function Stage() {
   const router = useRouter();
   const at = useRouterState({ select: (state) => state.location.href });
+  const [moves, setMoves] = useState(0);
+  useEffect(() => router.history.subscribe(() => setMoves((n) => n + 1)), [router]);
   const drawn = useContext(Drawing);
   if (!drawn) return null;
   return (
     <AriaRouterProvider navigate={(href) => void router.navigate({ href })}>
       {drawn.marked && <ScrollMark />}
       <ScanLines>
-        <div data-story-ground data-at={at} style={GROUND}>
+        <div data-story-ground data-at={at} data-moves={moves} style={GROUND}>
           <drawn.Story />
         </div>
       </ScanLines>

@@ -213,6 +213,9 @@ What the `create-an-agent` skill, being generic, does not say here:
   folder no step can be given, so the build's steps are told to load them by their notes and by `change-the-board`, and a kit update
   that adds or renames one names it in both (`packages/agent-orchestrator/test/build-told.test.ts`); the
   board's look is `apps/web/DESIGN.md`, its generated theme `apps/web/theme/` (`apps/web/CLAUDE.md`, *The design system kit*).
+- `apps/web/src/components/look` — the look's own parts (the cut frame, tag and button, the plate, the sticker and stat tile, the rail,
+  the scan lines, the pager, the text link, the copy id) behind one door, each with its stories beside it; Nemia's Storybook
+  (`npm run storybook`, from `apps/web`) shows them to a person, and `change-the-board` says which to take (`apps/web/CLAUDE.md`).
 - `workflows/` — this repository's own team, `agents/`: Iris (product engineer), Seldon (software architect), Ada (software engineer),
   Agora (code reviewer), Otto (release engineer), Argus (janitor); and three workflows: `intake` (an idea to an intent), `build` (an
   intent to main, started `--after` the intake run) and `janitor` (on demand: the stats to inbox cards, none started). What Nemia ships:

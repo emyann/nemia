@@ -1,4 +1,7 @@
-/** The look's cut, as any part takes it: the outline of a box with its top-right and bottom-left corners cut, its clip, and the clip of a ring beside it. */
+/**
+ * The look's cut, as any part takes it: the outline of a box with its top-right and bottom-left corners cut, its clip, and the clip
+ * of a ring beside it.
+ */
 
 /** How long a cut is along each side, in pixels: a card's, a table's, a button's. */
 export type CutSize = 28 | 24 | 12;

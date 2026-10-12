@@ -20,6 +20,9 @@ When the change touches `apps/web`, load `change-the-board`, then the design sys
 as `change-the-board` says: `ds-build` before you design, write or judge anything drawn with the kit's parts or its roles, `ds-theme`
 before a change to `apps/web/DESIGN.md` or the theme, `ds-spec` when a decision cites Material.
 
+When the change touches `apps/web`, a change that draws a cut, a plate, a tile or a rail on the board takes the look's part for it from
+`apps/web/src/components/look`, through its door, before it draws one of its own: `change-the-board` says which part.
+
 When the change touches `tools/observe`, read each dashboard's picture and text the implement step named in its `artifacts`,
 `dashboard-<name>.png` and `dashboard-<name>.txt`, with the `see-a-dashboard` skill: the text first. A dashboard the change touches
 with no picture and text of it is a finding. You do not render one yourself: your fence refuses the command and Docker.

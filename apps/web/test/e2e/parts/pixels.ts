@@ -1,5 +1,5 @@
 /**
- * How the gallery's tests read what a browser painted: the colour of a pixel in a picture, how far two colours are apart, and where
+ * How the stories' tests read what a browser painted: the colour of a pixel in a picture, how far two colours are apart, and where
  * the whole pixels beside a part's edges are.
  */
 import assert from 'node:assert/strict';

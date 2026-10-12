@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { filled, type Hue } from '@/lib/meaning';
-import { cn } from '@/lib/utils';
+import { cn } from '@/components/ui/ds/utils';
 
 /** The label face drawn wide, as the look's values are. */
 const WIDE: CSSProperties = { fontStretch: '125%' };

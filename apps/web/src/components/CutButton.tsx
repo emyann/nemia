@@ -1,6 +1,6 @@
 import { Link as AriaLink, type LinkProps } from 'react-aria-components';
 import { filled, paint } from '@/lib/meaning';
-import { cn } from '@/lib/utils';
+import { cn } from '@/components/ui/ds/utils';
 import { CutCorner, type Ground } from './CutFrame';
 import { routeLink } from './routeLink';
 

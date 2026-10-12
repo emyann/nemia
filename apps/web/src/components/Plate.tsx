@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 import { filled } from '@/lib/meaning';
-import { cn } from '@/lib/utils';
+import { cn } from '@/components/ui/ds/utils';
 
 /** The plate's barcode: bars of the plate's own ink, read by nobody. */
 const BARCODE: CSSProperties = {

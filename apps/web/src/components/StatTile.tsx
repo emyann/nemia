@@ -1,7 +1,7 @@
 import { Focusable, Tooltip, TooltipTrigger } from '@/components/ui/ds';
 import type { Breakdown } from '@/lib/breakdown';
 import type { Hue } from '@/lib/meaning';
-import { cn } from '@/lib/utils';
+import { cn } from '@/components/ui/ds/utils';
 import { Sticker } from './Sticker';
 
 /** A breakdown's rows as a list of terms, then its closing note under a rule. */

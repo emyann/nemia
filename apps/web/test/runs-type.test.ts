@@ -65,3 +65,18 @@ test('every file that draws the Runs page is on the list: each part the route an
   reached.delete('components/routeLink.tsx');
   assert.deepEqual([...reached].sort(), [...FILES].sort());
 });
+
+/** The import of a `cn` that does not know the theme's roles: the board's own, which reads `text-body-small` as a colour. */
+const roleBlind = (text: string): boolean => /import\s*\{[^}]*\bcn\b[^}]*\}\s*from\s*'@\/lib\/utils'/.test(text);
+
+test("REFUSED: the board's own cn in a file that draws the Runs page: it drops a role beside a colour, the kit's keeps both", async () => {
+  for (const file of FILES)
+    assert.equal(roleBlind(fs.readFileSync(path.join(SRC, file), 'utf8')), false, `${file} merges classes with the kit's cn`);
+  assert.equal(roleBlind("import { cn } from '@/lib/utils';"), true);
+  assert.equal(roleBlind("import { cn } from '@/components/ui/ds/utils';"), false);
+  const { cn: ours } = await import('../src/lib/utils.ts');
+  const { cn: kits } = await import('../src/components/ui/ds/utils.ts');
+  assert.equal(ours('text-body-small', 'text-on-surface-variant'), 'text-on-surface-variant', "the board's own loses the role");
+  assert.equal(kits('text-body-small', 'text-on-surface-variant'), 'text-body-small text-on-surface-variant');
+  assert.equal(kits('text-on-surface', 'block text-title-small'), 'text-on-surface block text-title-small');
+});

@@ -4,7 +4,7 @@ import { factoryOf } from '@/lib/factories';
 import { titleOf } from '@/lib/factory';
 import { ink } from '@/lib/meaning';
 import { endedWords, sinceShort, whenWords } from '@/lib/runWords';
-import { cn } from '@/lib/utils';
+import { cn } from '@/components/ui/ds/utils';
 import { CopyId } from './CopyId';
 import { CutFrame } from './CutFrame';
 import { Pager } from './Pager';
@@ -67,25 +67,25 @@ export function FinishedTable({ page }: { page: FinishedPage }) {
               <Column id="run" isRowHeader>
                 Run
               </Column>
-              <Column id="factory" className="w-28">
+              <Column id="factory" className="w-24">
                 Factory
               </Column>
-              <Column id="created" className="w-32">
+              <Column id="created" className="w-28">
                 Created
               </Column>
-              <Column id="finished" className="w-32">
+              <Column id="finished" className="w-28">
                 Finished
               </Column>
-              <Column id="clock" align="end" className="w-24">
+              <Column id="clock" align="end" className="w-20">
                 Clock
               </Column>
-              <Column id="cost" align="end" className="w-24">
+              <Column id="cost" align="end" className="w-20">
                 Cost
               </Column>
-              <Column id="outcome" className="w-28">
+              <Column id="outcome" className="w-24">
                 Outcome
               </Column>
-              <Column id="id" align="end" className="w-28">
+              <Column id="id" align="end" className="w-24">
                 Id
               </Column>
             </TableHeader>

@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { edged, paint } from '@/lib/meaning';
-import { cn } from '@/lib/utils';
+import { cn } from '@/components/ui/ds/utils';
 
 /** The ground a cut frame sits on, which its cut corners are painted in, and the ground it holds: each a role of the theme. */
 const GROUNDS = {

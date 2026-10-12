@@ -2,7 +2,7 @@ import type { RunSummary } from '@/lib/api';
 import { filled, ink } from '@/lib/meaning';
 import { railSaid, railStates } from '@/lib/runWords';
 import { stateClass, stateDrawn, type StepState } from '@/lib/status';
-import { cn } from '@/lib/utils';
+import { cn } from '@/components/ui/ds/utils';
 
 /** The ink of a step's name under its bar: its hue where it waits on a person or failed, muted for every other. */
 function nameInk(state: StepState): string {

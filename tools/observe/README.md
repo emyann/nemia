@@ -102,12 +102,19 @@ They sit in the folder `Nemia`, linked to each other at the top of each page. Th
 Grafana cannot be saved, so edit the JSON here, and Grafana reads it again within ten seconds.
 
 - **System** — every metric the daemon and the api export, from Prometheus: a pass's time, its phases and its journal reads; the runs in
-  the store, the sessions queued and admitted, the oldest one's wait and the machine's load; the api's reads by route; each step's cost,
+  the store, the sessions queued and admitted, the oldest one's wait and the machine's load; what the store takes on the disk (the row
+  **Disk**, below); the api's reads by route; each step's cost,
   tokens, time, tries, checks and rounds over the range, by factory, workflow, step and agent; the feed's readers, the subscriptions and
   Nemia's keeper. Its **Denied calls** is no metric: it counts the `step.denied` spans from Tempo, by step, agent and tool, as **Steps**
   does. Below them, **Profiles**: the CPU and the heap in use from Pyroscope, by stack, over the dashboard's
   range and its `Service`, for a daemon started with the preload. A flame graph sums every pass in its range: read it beside **Passes**
   over the same range, which the links at the top keep.
+  Its row **Disk** draws what the daemon's sweep of the store reads every ten minutes: **On disk, by part** and **On disk, by
+  factory** (`disk.bytes`, stacked), **Free on the store's disk** (`disk.free`, `disk.size`), **Names that did not read**
+  (`disk.unread`: what is in no byte of its part), and **Largest runs now**, no metric: the `disk.run` spans of the last 30 minutes
+  from Tempo, a bar a run, whatever the dashboard's range. The free space is the file system's that holds the store: under WSL the
+  Linux virtual disk, far larger than what it may take. The real limit there is the Windows drive that holds its file, which nothing
+  here reads, and space freed inside returns to it only when that file is compacted.
 - **Passes** — a pass's time from the `pass` spans (TraceQL metrics), its phases from `pass.phase.duration` (the phases are not spans),
   and the slowest of the latest 500 `pass` and `advancePass` spans, each linked to its trace. Its tables are span tables
   (`tableType: "spans"`): a row's Duration is the span's own. A trace lasts as long as the session a pass filed, which joins it
@@ -386,7 +393,8 @@ Read off a daemon exporting to this stack (2026-10-06), and a step's session (20
   takes `_ratio`, from the unit `1` the exporter gives it (`machine_load_ratio`); a counter that only grows (`incremental: true`) takes
   `_total` (`step_cost_total`); any other counter is a gauge with no suffix (`subscription_wakes`, `nemia_acts`). Every series carries
   `job` and `service_name`, both the service's name. The step metrics carry `factory`, `workflow`, `step`, `agent` and `outcome`, the
-  phases `phase`, and the api's reads `route`. A run's id is never a label.
+  phases `phase`, the api's reads `route`, and the disk's `part` and, for a part kept by run, `factory`: `disk_bytes_ratio`,
+  `disk_free_ratio` and `disk_size_ratio` are bytes, whatever the suffix says. A run's id is never a label.
 - **Tempo**: the resource attribute `service.name`; the span attributes `run`, `step`, `task`, `kind` and `attempt`, as `span.run` and so
   on. An `append` made outside a filing (a session's end) carries its task and kind but no run. Two spans are named `tick`: the
   orchestrator's tick and the runtime engine's tick inside it, so a query on `name="tick"` mixes them. Read a pass from `pass`. A step's

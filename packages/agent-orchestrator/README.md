@@ -3214,7 +3214,8 @@ written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on 
   handed over again, and a run called off with nothing filed has no timeline and is left unmarked.
 - **Their names in Prometheus**, through an OTLP collector, measured on the side Grafana: `pass_duration_bucket` (`_count`, `_sum`),
   `pass_phase_duration_bucket`, `pass_journal_reads_bucket`; the gauges with `_ratio`, the unit `1` the exporter gives one with none
-  (`store_runs_ratio`, `sessions_queued_ratio`, `sessions_admitted_ratio`, `admission_wait_ratio`, `machine_load_ratio`); the counters
+  (`store_runs_ratio`, `sessions_queued_ratio`, `sessions_admitted_ratio`, `admission_wait_ratio`, `machine_load_ratio`, and the
+  disk's, in bytes whatever the suffix: `disk_bytes_ratio`, `disk_free_ratio`, `disk_size_ratio`, and `disk_unread_ratio`); the counters
   with `_total` (`step_cost_total`, `step_tokens_input_total`, `step_tokens_output_total`, `step_tries_total`, `step_checks_total`,
   `step_rounds_total`); and `step_duration_bucket`.
 - **The system's series are kept as rollups**, so what the recent passes say outlives the ring (`src/series/`). Each pass also keeps among
@@ -3226,8 +3227,20 @@ written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on 
   buckets with an exact p50 and p95 (`SERIES`, `rollMinutes`). Once an hour is done it merges its minutes into
   `$WF_ROOT/metrics/hour/<YYYY-MM-DD>.jsonl`, the percentiles read off the summed buckets (`rollHours`). What is due is read off the
   files' last lines on every pass, so a restart rolls nothing twice. A line's labels are only `factory`, `workflow`, `step`, `agent`,
-  `phase`, `harness` and `window`, and a line with another is refused, never written: a run's own detail stays in its record. A pass
+  `phase`, `harness`, `window` and `part`, and a line with another is refused, never written: a run's own detail stays in its record. A pass
   that cannot keep its series says so on stderr and goes on.
+- **What the store takes on the disk is measured on a sweep of the daemon's, never in a pass** (`disk`, `diskOnce` in
+  `src/disk/disk.verb.ts`): once the first pass has answered and every 10 minutes after (`DISK_EVERY`), it lists the store's root and
+  walks every name under it, a burst of `WALK_BURST` names at a time, with `lstat` and `readdir` and no process (`walk` in
+  `src/prune/freed.store.ts`). Each name is in one part: `worktrees`, `runs`, `engine` (the folder handed to the runtime, whole),
+  `checks`, `series` (`metrics/`) or `other`; a name under `runs/` or `worktrees/` is its run's, and through it its factory's, the
+  default factory's for a run of none, and its part's alone for a folder of no run the last pass answered. A file hardlinked from
+  outside the store, as a worktree's packages are, counts nothing; a name that does not read is counted unread and is in no byte,
+  never a zero. The reading is handed to each pass, which keeps it among the recent and so in the series: `disk.bytes` (by `part`, and
+  `factory`), `disk.unread` (by `part`), `disk.free` and `disk.size`, the room on the file system that holds the store — under WSL
+  the Linux virtual disk, not the Windows drive that is the real limit. The same four are exported as gauges (`DISK_METRICS`), a
+  label set that is gone said at zero once, and each of the ten largest runs is a span, `disk.run`, with its `run` and its bytes as
+  `value`, since no metric carries a run. A sweep that fails warns once and leaves the passes no reading until one succeeds.
 - **Minute lines are kept 30 days and hour lines until deleted**: `WF_METRICS_MINUTE_DAYS` (a whole number from 2) and
   `WF_METRICS_HOUR_DAYS` (a whole number from 1; unset, every hour is kept) delete the days past them on each pass, and any other value
   is refused by name (`metricsMinuteDays`, `metricsHourDays` in `src/config/config.store.ts`). `nemia series [--range 24h|7d|30d|all]

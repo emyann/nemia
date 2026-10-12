@@ -11,25 +11,18 @@ const BARCODE: CSSProperties = {
 /** The label face drawn wide, as the look's counts and headings are. */
 const WIDE: CSSProperties = { fontStretch: '125%' };
 
+/** The ground a plate is drawn on: what waits on a person, a session at work, or `grey`, what is at rest. */
+export type PlateHue = 'yours' | 'alive' | 'grey';
+
 /**
- * The look's plate, a section's heading: its `count` large, its `title` as an `h2`, and a barcode, on the ground of what waits on a
- * person, or with `hue` on that of a session at work. `quiet` draws it at rest, in grey and with no barcode: the plate of a section
- * that holds nothing.
+ * The look's plate, a section's heading: its `count` large, its `title` as an `h2`, and a barcode, on the ground of `hue`. `quiet` is
+ * the plate of a section that holds nothing: in grey whatever its hue, and with no barcode.
  */
-export function Plate({
-  count,
-  title,
-  hue = 'yours',
-  quiet = false,
-}: {
-  count: number;
-  title: string;
-  hue?: 'yours' | 'alive';
-  quiet?: boolean;
-}) {
+export function Plate({ count, title, hue = 'yours', quiet = false }: { count: number; title: string; hue?: PlateHue; quiet?: boolean }) {
   return (
     <div
       data-plate={quiet ? 'quiet' : 'loud'}
+      data-plate-hue={quiet ? 'grey' : hue}
       className={cn('inline-flex items-center gap-3 rounded-[14px] px-3.5 py-2', quiet ? filled.grey : filled[hue])}
     >
       <span data-plate-count className="font-label text-[30px] leading-8 font-extrabold tracking-[-0.02em]" style={WIDE}>

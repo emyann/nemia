@@ -10,6 +10,9 @@ import { CutFrame } from './CutFrame';
 import { Pager } from './Pager';
 import { TextLink } from './TextLink';
 
+/** A column's heading, in the look's small caps. */
+const HEAD = 'text-label-small uppercase';
+
 /** A fact in the mono face, on one line. */
 const FACT = 'font-mono text-body-small whitespace-nowrap';
 
@@ -23,7 +26,7 @@ function FinishedRow({ run, asOf }: { run: FinishedPage['runs'][number]; asOf: D
           {titleOf(run)}
         </TextLink>
       </Cell>
-      <Cell truncate data-factory={factoryOf(run)} className="text-label-small text-on-surface-variant uppercase">
+      <Cell truncate data-factory={factoryOf(run)} className="text-label-small uppercase text-on-surface-variant">
         {factoryOf(run)}
       </Cell>
       <Cell data-created className={cn(FACT, 'text-on-surface-variant')}>
@@ -64,28 +67,28 @@ export function FinishedTable({ page }: { page: FinishedPage }) {
         <div data-table-box className="overflow-x-auto">
           <Table aria-label="Finished runs" density="dense" className="min-w-[920px] table-fixed">
             <TableHeader>
-              <Column id="run" isRowHeader>
+              <Column id="run" isRowHeader className={HEAD}>
                 Run
               </Column>
-              <Column id="factory" className="w-24">
+              <Column id="factory" className={cn(HEAD, 'w-24')}>
                 Factory
               </Column>
-              <Column id="created" className="w-32">
+              <Column id="created" className={cn(HEAD, 'w-32')}>
                 Created
               </Column>
-              <Column id="finished" className="w-32">
+              <Column id="finished" className={cn(HEAD, 'w-32')}>
                 Finished
               </Column>
-              <Column id="clock" align="end" className="w-20">
+              <Column id="clock" align="end" className={cn(HEAD, 'w-20')}>
                 Clock
               </Column>
-              <Column id="cost" align="end" className="w-20">
+              <Column id="cost" align="end" className={cn(HEAD, 'w-20')}>
                 Cost
               </Column>
-              <Column id="outcome" className="w-24">
+              <Column id="outcome" className={cn(HEAD, 'w-24')}>
                 Outcome
               </Column>
-              <Column id="id" align="end" className="w-24">
+              <Column id="id" align="end" className={cn(HEAD, 'w-24')}>
                 Id
               </Column>
             </TableHeader>

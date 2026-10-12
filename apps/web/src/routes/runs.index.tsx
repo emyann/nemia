@@ -111,7 +111,7 @@ function Runs() {
       <Section name="in-flight" plate={<Plate count={counts.inFlight} title="In flight" hue="alive" quiet={counts.inFlight === 0} />}>
         {open.inFlight.length === 0 ? <Nothing>Nothing is in flight.</Nothing> : <FlightTable runs={open.inFlight} asOf={asOf} />}
       </Section>
-      <Section name="finished" plate={<Plate count={counts.finished} title="Finished" quiet />}>
+      <Section name="finished" plate={<Plate count={counts.finished} title="Finished" hue="grey" quiet={counts.finished === 0} />}>
         {finished.total === 0 ? <Nothing>No run has finished yet.</Nothing> : <FinishedTable page={finished} />}
       </Section>
     </Page>

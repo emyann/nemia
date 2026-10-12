@@ -134,6 +134,8 @@ async function datesFit(page: Page): Promise<void> {
     if (!/^\d{1,2} \w+ \d{4}$/.test((await old.locator('td[data-created]').innerText()).trim()))
       throw new Refused('and the day it was created, with its year');
     await expectRoom(page, "each date of the finished table has its column's room");
+    await settled(page);
+    await photographBothWidths(page, OUT, 'runs-pages', 'another-year');
     const year = new Date().getFullYear();
     const times = whensOf(page);
     const said = await times.allInnerTexts();

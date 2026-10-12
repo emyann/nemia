@@ -86,6 +86,7 @@ function Parts({ page, row }: { page: number; row: WaitingRow }) {
         <Part name="plate">
           <div style={ROW}>
             <Plate count={2} title="Waiting on you" />
+            <Plate count={6} title="Finished" hue="grey" />
             <Plate count={0} title="Waiting on you" quiet />
           </div>
         </Part>
@@ -115,6 +116,20 @@ function Parts({ page, row }: { page: number; row: WaitingRow }) {
                 <RunSteps steps={REFUSED} cancelled={false} held={false} />
               </div>
             </CutFrame>
+          </div>
+        </Part>
+        <Part name="cut">
+          <div style={ROW}>
+            <div data-ground="plain" style={{ padding: 40, background: 'var(--background)' }}>
+              <CutFrame hue="yours">
+                <div style={{ width: 220, height: 96 }} />
+              </CutFrame>
+            </div>
+            <div data-ground="other" style={{ padding: 40, background: 'var(--md-sys-color-inverse-surface)' }}>
+              <CutFrame size={24}>
+                <div style={{ width: 220, height: 96 }} />
+              </CutFrame>
+            </div>
           </div>
         </Part>
         <Part name="ring">

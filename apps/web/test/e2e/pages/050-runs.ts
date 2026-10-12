@@ -79,8 +79,14 @@ async function threeParts(page: Page, open: OpenRuns, finished: FinishedPage): P
     ['waiting', open.counts.waiting],
     ['in-flight', open.counts.inFlight],
     ['finished', open.counts.finished],
-  ] as const)
+  ] as const) {
     await expectTexts(section(page, name).locator('[data-plate-count]'), [String(count)], `the plate of ${name} says the api's count`);
+    await expectCount(
+      section(page, name).locator('[data-plate="loud"] [data-plate-barcode]'),
+      1,
+      `the plate of ${name} counts runs, so it carries its barcode`,
+    );
+  }
   if (open.counts.waiting < 2 || open.counts.inFlight < 2 || open.counts.finished < 2)
     throw new Refused(`the seed holds runs of each part — ${JSON.stringify(open.counts)}`);
   await expectCount(section(page, 'waiting').locator('article[data-run]'), open.counts.waiting, 'every run the bell counts gets a card');
@@ -145,7 +151,6 @@ async function byKeyboard(page: Page, run: WaitingRun): Promise<void> {
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
   const asked: string[] = [];
   const hear = (request: { url(): string }) => void (request.url().includes(`/api/runs/${run.id}`) && asked.push(request.url()));
-  page.on('request', hear);
   await card.getByRole('heading', { level: 3 }).locator('a').focus();
   await page.keyboard.press('Tab');
   await expectVisible(card.locator('[data-copy-id] button:focus'), 'Tab from the title reaches the copy control');
@@ -160,6 +165,7 @@ async function byKeyboard(page: Page, run: WaitingRun): Promise<void> {
     cost: new RegExp(`^${literal(COSTLY.cost)} so far, by step$`),
     tokens: new RegExp(`^${COSTLY.tokens.said.replace(' tokens', '')} counted, `),
   };
+  page.on('request', hear);
   for (const tile of ['clock', 'cost', 'tokens'] as const) {
     await page.keyboard.press('Tab');
     await expectVisible(card.locator(`[data-stat-tile="${tile}"]:focus`), `Tab reaches the ${tile} tile`);
@@ -179,9 +185,9 @@ async function byKeyboard(page: Page, run: WaitingRun): Promise<void> {
     await page.keyboard.press('Escape');
     await expectCount(tooltip(page), 0, 'Escape closes it');
   }
+  page.off('request', hear);
   await page.keyboard.press('Tab');
   await expectVisible(card.locator('a[data-cut-button]:focus'), 'then Tab reaches the button that opens the run');
-  page.off('request', hear);
   if (asked.length)
     throw new Refused(`a tooltip opens with no request: the light answer carries its rows — the page asked ${asked.join(', ')}`);
 }
@@ -277,6 +283,17 @@ async function rowsSay(page: Page, open: OpenRuns, finished: FinishedPage): Prom
     ['Run', 'Factory', 'Created', 'Finished', 'Clock', 'Cost', 'Outcome', 'Id'],
     'the finished table has its columns',
   );
+  await expectVisible(page.locator('section[data-section="finished"] [data-plate-hue="grey"]'), 'the Finished plate is at rest, in grey');
+  const heads = await page.locator('[data-runs-page] th').evaluateAll((all) =>
+    all.map((th) => {
+      const style = getComputedStyle(th);
+      return `${style.textTransform} ${style.fontSize} ${style.fontWeight}`;
+    }),
+  );
+  if (heads.length !== 13 || heads.some((head) => head !== 'uppercase 11px 600'))
+    throw new Refused(
+      `every heading of the two tables is in the look's small caps, the small label role in capitals — ${heads.join(', ')}`,
+    );
   await expectTexts(
     section(page, 'finished').locator('tr[data-run] [data-ended]'),
     finished.runs.map((run) => endedWords(run.outcome).word),

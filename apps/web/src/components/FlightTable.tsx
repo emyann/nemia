@@ -5,9 +5,13 @@ import { titleOf } from '@/lib/factory';
 import { ink } from '@/lib/meaning';
 import { nowOf, sinceShort } from '@/lib/runWords';
 import { CopyId } from './CopyId';
+import { cn } from '@/components/ui/ds/utils';
 import { CutFrame } from './CutFrame';
 import { RunSteps } from './RunSteps';
 import { TextLink } from './TextLink';
+
+/** A column's heading, in the look's small caps. */
+const HEAD = 'text-label-small uppercase';
 
 /** How long a run has been at work without a stop, at `asOf`; none for a run nothing of which runs. */
 const workingMs = (run: ListedRun, asOf: Date): number | null => (run.atWork?.since ? asOf.getTime() - Date.parse(run.atWork.since) : null);
@@ -46,19 +50,19 @@ export function FlightTable({ runs, asOf }: { runs: readonly ListedRun[]; asOf: 
       <div data-table-box className="overflow-x-auto">
         <Table aria-label="Runs in flight" density="dense" className="min-w-[920px] table-fixed">
           <TableHeader>
-            <Column id="run" isRowHeader>
+            <Column id="run" isRowHeader className={HEAD}>
               Run
             </Column>
-            <Column id="steps" className="w-40">
+            <Column id="steps" className={cn(HEAD, 'w-40')}>
               Steps
             </Column>
-            <Column id="now" className="w-64">
+            <Column id="now" className={cn(HEAD, 'w-64')}>
               Now
             </Column>
-            <Column id="clock" align="end" className="w-20">
+            <Column id="clock" align="end" className={cn(HEAD, 'w-20')}>
               Clock
             </Column>
-            <Column id="cost" align="end" className="w-24">
+            <Column id="cost" align="end" className={cn(HEAD, 'w-24')}>
               Cost
             </Column>
           </TableHeader>
@@ -72,7 +76,7 @@ export function FlightTable({ runs, asOf }: { runs: readonly ListedRun[]; asOf: 
                     </TextLink>
                     <span className="flex items-center gap-2">
                       <CopyId id={run.id} />
-                      <span data-factory={factoryOf(run)} className="text-label-small text-on-surface-variant uppercase">
+                      <span data-factory={factoryOf(run)} className="text-label-small uppercase text-on-surface-variant">
                         {factoryOf(run)}
                       </span>
                     </span>

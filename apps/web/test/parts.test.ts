@@ -4,8 +4,6 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
 import { createElement, type ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createMemoryHistory, createRootRoute, createRouter, RouterContextProvider } from '@tanstack/react-router';
@@ -18,8 +16,6 @@ const { RunSteps } = await import('../src/components/RunSteps.tsx');
 const { ScanLines } = await import('../src/components/ScanLines.tsx');
 const { Sticker } = await import('../src/components/Sticker.tsx');
 const { TextLink } = await import('../src/components/TextLink.tsx');
-
-const COMPONENTS = path.resolve(import.meta.dirname, '../src/components');
 
 /** The markup of `element` under a router whose address is `at`. */
 async function drawn(element: ReactElement, at = '/'): Promise<string> {
@@ -103,13 +99,16 @@ test('the text link is a link to its route, underlined, with a ring for the keyb
   assert.match(html, />Read the review</);
 });
 
-test('the plate: its count, its heading and a barcode nobody reads; quiet, in grey with none', async () => {
+test('the plate: its count, its heading and a barcode nobody reads, in grey too; quiet, in grey with none', async () => {
   const loud = await drawn(createElement(Plate, { count: 2, title: 'Waiting on you' }));
   assert.match(tagWith(loud, 'data-plate='), /data-plate="loud"[^>]*bg-yours text-on-yours/);
   assert.match(loud, /data-plate-count[^>]*>2</);
   assert.match(loud, /<h2[^>]*>Waiting on you<\/h2>/);
   assert.match(tagWith(loud, 'data-plate-barcode'), /aria-hidden="true"/);
   assert.match(tagWith(loud, 'data-plate-barcode'), /currentColor/);
+  const rest = await drawn(createElement(Plate, { count: 6, title: 'Finished', hue: 'grey' }));
+  assert.match(tagWith(rest, 'data-plate='), /data-plate="loud"[^>]*data-plate-hue="grey"[^>]*bg-rest text-on-rest/);
+  assert.match(tagWith(rest, 'data-plate-barcode'), /currentColor/, 'a plate that counts runs keeps its barcode, at rest too');
   const quiet = await drawn(createElement(Plate, { count: 0, title: 'Waiting on you', quiet: true }));
   assert.match(tagWith(quiet, 'data-plate='), /data-plate="quiet"[^>]*bg-rest text-on-rest/);
   assert.doesNotMatch(quiet, /data-plate-barcode/);
@@ -136,42 +135,48 @@ test('the scan lines: a glow and lines in the hue of a session at work, thinned,
   assert.doesNotMatch(plain, /repeating-linear-gradient/);
 });
 
-test('the cut frame: two overlays nobody reads or presses, each before what the frame holds, in the hue of its edge', async () => {
+test('the cut frame: a shape nobody reads or presses, before what the frame holds: an edge in its hue around the card ground', async () => {
   const child = createElement('button', { type: 'button' }, 'Approve');
   // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
   const html = await drawn(createElement(CutFrame, { hue: 'yours', children: child }));
-  assert.match(tagWith(html, 'data-cut-frame'), /data-cut-frame="yours"[^>]*border-yours/);
-  const corners = [...html.matchAll(/<span[^>]*data-cut-corner="([^"]+)"[^>]*>/g)];
-  assert.deepEqual(
-    corners.map((m) => m[1]),
-    ['top-right', 'bottom-left'],
+  assert.match(tagWith(html, 'data-cut-frame'), /data-cut-frame="yours"/);
+  const shape = tagWith(html, 'data-cut-shape');
+  assert.match(shape, /aria-hidden="true"/);
+  assert.match(shape, /pointer-events-none/);
+  assert.match(shape, /filter:drop-shadow\(0 0 10px color-mix\(in srgb, var\(--meaning-yours\) 26%, transparent\)\)/, 'its glow');
+  assert.match(
+    tagWith(html, 'data-cut-edge'),
+    /background-color:var\(--meaning-yours\);clip-path:polygon\(0px 0px, calc\(100% - 28px\) 0px, 100% 28px, 100% 100%, 28px 100%, 0px calc\(100% - 28px\)\)/,
   );
-  for (const [tag] of corners) {
-    assert.match(tag, /aria-hidden="true"/);
-    assert.match(tag, /pointer-events-none/);
-    assert.match(tag, /var\(--background\)[^"]*var\(--meaning-yours\)[^"]*transparent/, 'the ground outside, the edge, then nothing');
-    assert.match(tag, /width:28px;height:28px/);
-  }
-  assert.ok(
-    html.lastIndexOf('data-cut-corner') < html.indexOf('<button'),
-    'both overlays come before the content, which stands above them',
+  assert.match(
+    tagWith(html, 'data-cut-ground'),
+    /bg-card[^>]*clip-path:polygon\(1px 1px, calc\(100% - 28\.41px\) 1px, calc\(100% - 1px\) 28\.41px,/,
+    "the ground a pixel inside the edge, its cut beside the edge's",
   );
+  assert.ok(html.indexOf('data-cut-ground') < html.indexOf('<button'), 'the shape comes before the content, which stands above it');
   assert.match(html, /<div class="relative"><button/);
   // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
-  const quiet = await drawn(createElement(CutFrame, { on: 'card', size: 12, children: child }));
-  assert.match(tagWith(quiet, 'data-cut-frame'), /border-outline-variant/);
-  assert.match(tagWith(quiet, 'data-cut-corner="top-right"'), /width:12px;height:12px[^"]*var\(--card\)/);
+  const quiet = await drawn(createElement(CutFrame, { size: 24, children: child }));
+  assert.match(tagWith(quiet, 'data-cut-edge'), /var\(--md-sys-color-outline-variant\);clip-path:polygon\(0px 0px, calc\(100% - 24px\)/);
+  assert.doesNotMatch(tagWith(quiet, 'data-cut-shape'), /filter/, 'a frame with no hue casts no glow');
+  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
+  const alive = await drawn(createElement(CutFrame, { hue: 'alive', children: child }));
+  assert.doesNotMatch(tagWith(alive, 'data-cut-shape'), /filter/, 'nor one of a session at work');
 });
 
-/** Each way `source` would cut what a frame holds off: a clip path, or an overflow that hides or clips. */
-const clips = (source: string): string[] => [...source.matchAll(/clip-?path|overflow-(?:hidden|clip)|overflow\s*:/gi)].map((m) => m[0]);
+/** Each way `markup` would cut what an element holds off: a clip path, or an overflow that hides or clips. */
+const clips = (markup: string): string[] => [...markup.matchAll(/clip-?path|overflow-(?:hidden|clip)|overflow\s*:/gi)].map((m) => m[0]);
 
-test('REFUSED: the cut frame clips nothing, so a focus ring inside it is drawn whole', () => {
+test('REFUSED: the cut frame clips what it holds: only its shape, which holds nothing, is cut, so a focus ring inside is whole', async () => {
+  assert.deepEqual(clips('style="clip-path:polygon(0 0)"'), ['clip-path']);
   assert.deepEqual(clips('style={{ clipPath: "polygon(0 0)" }}'), ['clipPath']);
-  assert.deepEqual(clips('clip-path: polygon(0 0, calc(100% - 28px) 0)'), ['clip-path']);
-  assert.deepEqual(clips('className="relative overflow-hidden"'), ['overflow-hidden']);
-  assert.deepEqual(clips('className="overflow-clip" style={{ overflow: "hidden" }}'), ['overflow-clip', 'overflow:']);
-  const source = fs.readFileSync(path.join(COMPONENTS, 'CutFrame.tsx'), 'utf8');
-  assert.match(source, /export function CutFrame\(/, 'the frame is read');
-  assert.deepEqual(clips(source), []);
+  assert.deepEqual(clips('class="relative overflow-hidden"'), ['overflow-hidden']);
+  assert.deepEqual(clips('class="overflow-clip" style="overflow:hidden"'), ['overflow-clip', 'overflow:']);
+  const child = createElement('button', { type: 'button' }, 'Approve');
+  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
+  const html = await drawn(createElement(CutFrame, { hue: 'yours', className: 'h-full', children: child }));
+  const shape = /<span[^>]*data-cut-shape[^>]*>(?:<span[^>]*><\/span>)+<\/span>/.exec(html);
+  assert.ok(shape, 'the shape is a span that holds its two layers and nothing else');
+  assert.equal(clips(shape[0]).length, 2, 'each layer of the shape is cut');
+  assert.deepEqual(clips(html.replace(shape[0], '')), [], 'and nothing else of the frame is: not the frame, not what holds its content');
 });

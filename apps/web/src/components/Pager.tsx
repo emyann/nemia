@@ -6,7 +6,7 @@ const PageLink = routeLink(AriaLink);
 
 /** An outlined button of the pager: quiet, and dimmed by its ink where it leads nowhere. */
 const BUTTON =
-  'inline-flex h-8 items-center border border-outline px-3 text-label-large text-on-surface uppercase outline-none hover:bg-accent data-focus-visible:ring-2 data-focus-visible:ring-ring data-disabled:border-outline-variant data-disabled:text-muted-foreground data-disabled:hover:bg-transparent';
+  'inline-flex h-8 items-center border border-outline px-3 text-label-large uppercase text-on-surface outline-none hover:bg-accent data-focus-visible:ring-2 data-focus-visible:ring-ring data-disabled:border-outline-variant data-disabled:text-muted-foreground data-disabled:hover:bg-transparent';
 
 /**
  * The search of the same address at `page`, as a link takes it. Typed for any route: which route the pager stands on, and so whether

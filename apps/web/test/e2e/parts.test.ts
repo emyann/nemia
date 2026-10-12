@@ -1,8 +1,9 @@
 /**
  * The board's parts no page mounts yet, pressed in a browser: the gallery (`parts/main.tsx`) built as the board is and opened in dark.
  * The pager's and the text link's keyboard paths navigate once, a pager's end that leads nowhere takes no focus, and a focus ring
- * inside the cut-corner frame is drawn whole over its cut corner — refused for the same frame cut by a clip. `npm run e2e` runs this
- * first; it needs Chromium.
+ * inside the cut-corner frame is drawn whole over its cut corner — refused for the same frame cut by a clip; the cut button's shape
+ * and its ring, and a frame's cut corner and its glow, are each read in a picture, pixel by pixel. `npm run e2e` runs this first; it
+ * needs Chromium.
  */
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -188,52 +189,248 @@ async function ringGaps(page: Page, name: string): Promise<string[]> {
   );
 }
 
+/** The cut button the gallery draws on a card's ground. */
+const BUTTON = '[data-part="ring"] [data-cut-button]';
+
+/** How far two colours are apart: their widest channel's difference. */
+const apart = (a: Rgb, b: Rgb): number => Math.max(...a.map((channel, i) => Math.abs(channel - b[i])));
+
 /**
- * Where the ring of the focused cut button is missing, a side each, none when it is drawn on all four: read in a picture of the window,
- * in the middle of the ring's own band, three pixels outside each side of the button, the top's and the right's beside the top-right
- * cut corner, the bottom's and the left's beside the bottom-left one.
+ * The edges of what `selector` finds, brought to the window's middle, in the window's pixels: `out`, the first whole pixels outside
+ * its box on each side, and `box`, its box as measured, which a text's width leaves between two pixels.
  */
-async function buttonRingGaps(page: Page, name: string): Promise<string[]> {
-  const ring = await ringOf(page);
-  assert.ok(ring, 'the focused button has a ring, by its computed shadow');
-  const box = await page.locator('[data-part="ring"] [data-cut-button]').boundingBox();
-  assert.ok(box, 'the button is drawn');
-  const [left, top, right, bottom] = [box.x, box.y, box.x + box.width, box.y + box.height].map(Math.round);
-  const sides: Record<string, readonly [number, number]> = {
-    top: [right - 4, top - 3],
-    right: [right + 2, top + 4],
-    bottom: [left + 4, bottom + 2],
-    left: [left - 3, bottom - 4],
+async function edgesOf(page: Page, selector: string) {
+  await page.locator(selector).evaluate((found) => found.scrollIntoView({ block: 'center' }));
+  const box = await page.locator(selector).boundingBox();
+  assert.ok(box, `${selector} is drawn`);
+  const [left, top, right, bottom] = [box.x, box.y, box.x + box.width, box.y + box.height];
+  return {
+    box: { left, top, right, bottom },
+    out: {
+      left: Math.floor(left + 0.01) - 1,
+      top: Math.floor(top + 0.01) - 1,
+      right: Math.ceil(right - 0.01),
+      bottom: Math.ceil(bottom - 0.01),
+    },
   };
-  const file = path.join(built, `${name}.png`);
-  await photograph(page, file, { always: true });
-  const found = await coloursAt(file, Object.values(sides));
-  const near = (a: Rgb, b: Rgb) => a.every((channel, i) => Math.abs(channel - b[i]) <= 3);
-  return Object.keys(sides).flatMap((side, i) =>
-    near(found[i], ring) ? [] : [`${side}: ${found[i].join(' ')}, the ring is ${ring.join(' ')}`],
-  );
 }
 
-/** The cut button as a clip would cut it: its two corners, and with them whatever is drawn outside its box. */
-const CLIPPED_BUTTON = `[data-part="ring"] [data-cut-button] {
-  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
-}`;
+/** The colours of the named `points` in a picture of the window taken now, as `name`. */
+async function coloursOf<K extends string>(
+  page: Page,
+  name: string,
+  points: Record<K, readonly [number, number]>,
+): Promise<Record<K, Rgb>> {
+  const file = path.join(built, `${name}.png`);
+  await photograph(page, file, { always: true });
+  const found = await coloursAt(file, Object.values<readonly [number, number]>(points));
+  return Object.fromEntries(Object.keys(points).map((key, i) => [key, found[i]])) as Record<K, Rgb>;
+}
+
+/**
+ * Where the cut button paints what it must not, none when its shape is exact: a pixel outside its box beside each cut, which must
+ * be the ground it sits on, and inside each cut corner, which must be too; and its fill, which must not be.
+ */
+async function buttonSpills(page: Page, name: string): Promise<string[]> {
+  const { box, out } = await edgesOf(page, BUTTON);
+  assert.ok(
+    [box.left, box.top].every((edge) => Math.abs(edge - Math.round(edge)) < 0.02),
+    `the gallery lays the button on whole pixels, where a pixel beside it is its neighbour: ${box.left}, ${box.top}`,
+  );
+  const points = {
+    ground: [out.left - 7, out.top - 7],
+    fill: [out.left + 5, out.top + 5],
+    'above the top-right cut': [out.right - 7, out.top],
+    'right of the top-right cut': [out.right, out.top + 7],
+    'below the bottom-left cut': [out.left + 7, out.bottom],
+    'left of the bottom-left cut': [out.left, out.bottom - 7],
+    'in the top-right cut': [out.right - 3, out.top + 2],
+    'in the bottom-left cut': [out.left + 3, out.bottom - 2],
+  } as const;
+  const { ground, fill, ...found } = await coloursOf(page, name, points);
+  assert.ok(apart(fill, ground) > 40, `the button's fill is read apart from its ground: ${fill.join(' ')} on ${ground.join(' ')}`);
+  return Object.entries(found).flatMap(([where, colour]) => (apart(colour, ground) <= 3 ? [] : [where]));
+}
+
+/** The cut button as its corners were laid a pixel out: its shape grown past its box, and square. */
+const SPILLED = `${BUTTON} [data-cut-shape] { clip-path: none !important; box-shadow: 0 0 0 1px var(--meaning-yours); }`;
 
 test(
-  'REFUSED: the cut button keeps its focus ring whole beside both cut corners, and a button cut by a clip loses it',
+  'REFUSED: the cut button paints its cut shape exactly inside its box, and a shape that reaches a pixel past it is seen',
   WAITED,
   async () => {
     const page = await openParts(browser, built, 'dark');
     try {
+      assert.equal(await page.locator(`${BUTTON} [data-cut-corner]`).count(), 0, 'no corner is laid over it');
+      assert.deepEqual(await buttonSpills(page, 'button-exact'), [], 'nothing of it is painted outside its box, nor in a cut corner');
+      await page.addStyleTag({ content: SPILLED });
+      assert.deepEqual(
+        await buttonSpills(page, 'button-spilled'),
+        [
+          'above the top-right cut',
+          'right of the top-right cut',
+          'below the bottom-left cut',
+          'left of the bottom-left cut',
+          'in the top-right cut',
+          'in the bottom-left cut',
+        ],
+        'grown a pixel and square, it spills on every side: the check sees it',
+      );
+    } finally {
+      await page.context().close();
+    }
+  },
+);
+
+/**
+ * What is wrong with the focused cut button's ring, nothing when it follows the button's shape whole: `missing`, where along the
+ * shape's outline the ring's band, three pixels out, is not drawn (three places a straight side, three a cut); and `square`, the
+ * box's corners a rectangular ring would turn and the shape's does not, where the ring is drawn.
+ */
+async function buttonRing(page: Page, name: string): Promise<{ missing: string[]; square: string[] }> {
+  const { box, out } = await edgesOf(page, BUTTON);
+  const [midX, midY] = [Math.round((box.left + box.right) / 2), Math.round((box.top + box.bottom) / 2)];
+  const [ringTop, ringLeft, ringRight, ringBottom] = [out.top - 2, out.left - 2, out.right + 2, out.bottom + 2];
+  const off = 3 / Math.SQRT2;
+  const along = [0.25, 0.5, 0.75].map((t) => 12 * t);
+  const outline: Record<string, readonly [number, number]> = {
+    'top, at its left': [out.left + 3, ringTop],
+    'top, in its middle': [midX, ringTop],
+    'top, before the cut': [out.right - 17, ringTop],
+    'right, after the cut': [ringRight, out.top + 17],
+    'right, in its middle': [ringRight, Math.max(midY, out.top + 17)],
+    'right, at its foot': [ringRight, out.bottom - 3],
+    'bottom, at its right': [out.right - 3, ringBottom],
+    'bottom, in its middle': [midX, ringBottom],
+    'bottom, before the cut': [out.left + 17, ringBottom],
+    'left, after the cut': [ringLeft, out.bottom - 17],
+    'left, in its middle': [ringLeft, Math.min(midY, out.bottom - 17)],
+    'left, at its head': [ringLeft, out.top + 3],
+    ...Object.fromEntries(
+      along.flatMap((d, i) => [
+        [`the top-right cut, ${i + 1} of 3`, [Math.floor(box.right - 12 + d + off), Math.floor(box.top + d - off)]],
+        [`the bottom-left cut, ${i + 1} of 3`, [Math.floor(box.left + d - off), Math.floor(box.bottom - 12 + d + off)]],
+      ]),
+    ),
+  };
+  const corners: Record<string, readonly [number, number]> = {
+    'the top-right corner': [ringRight, ringTop],
+    'the bottom-left corner': [ringLeft, ringBottom],
+  };
+  const points: Record<string, readonly [number, number]> = { ground: [out.left - 9, out.top - 9], ...outline, ...corners };
+  const found = await coloursOf(page, name, points);
+  const { ground } = found;
+  const ring = found['top, in its middle'];
+  const ringed = (where: string) => apart(ring, ground) > 40 && apart(found[where], ring) < apart(found[where], ground);
+  return { missing: Object.keys(outline).filter((where) => !ringed(where)), square: Object.keys(corners).filter(ringed) };
+}
+
+/** The cut button's ring as a rectangle around its box: the ring every other button has. */
+const SQUARE_RING = `${BUTTON} [data-cut-ring] { clip-path: none !important; }`;
+
+/** The cut button as a clip on the link itself would cut it: its two corners, and with them whatever is drawn outside its box. */
+const CLIPPED_BUTTON = `${BUTTON} {
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+}`;
+
+test(
+  "REFUSED: the cut button's focus ring follows its shape whole, both cuts too; a rectangular ring and a ring cut off are each seen",
+  WAITED,
+  async () => {
+    const page = await openParts(browser, built, 'dark');
+    try {
+      assert.equal(await page.locator(`${BUTTON} [data-cut-ring]`).isVisible(), false, 'no ring before the keyboard reaches it');
       await tabTo(page, 'cutButton');
-      const button = page.locator('[data-part="ring"] [data-cut-button]');
-      assert.equal(await button.locator('[data-cut-corner]').count(), 2, 'its two corners are cut by overlays');
-      const cut = await button.evaluate((link) => [getComputedStyle(link).clipPath, getComputedStyle(link).overflow]);
-      assert.deepEqual(cut, ['none', 'visible'], 'and nothing of it clips');
-      assert.deepEqual(await buttonRingGaps(page, 'button-ring-whole'), [], 'the ring is whole on its four sides');
+      const cut = await page.locator(BUTTON).evaluate((link) => [getComputedStyle(link).clipPath, getComputedStyle(link).overflow]);
+      assert.deepEqual(cut, ['none', 'visible'], 'nothing clips the link itself');
+      assert.deepEqual(await buttonRing(page, 'button-ring-shaped'), { missing: [], square: [] }, 'the ring runs along the whole shape');
+      const square = await page.addStyleTag({ content: SQUARE_RING });
+      const squared = await buttonRing(page, 'button-ring-square');
+      assert.deepEqual(squared.square, ['the top-right corner', 'the bottom-left corner'], 'a rectangular ring turns the corners: seen');
+      await square.evaluate((style) => (style as HTMLStyleElement).remove());
       await page.addStyleTag({ content: CLIPPED_BUTTON });
-      const gaps = (await buttonRingGaps(page, 'button-ring-clipped')).map((gap) => gap.split(':')[0]);
-      assert.deepEqual(gaps, ['top', 'right', 'bottom', 'left'], 'cut by a clip, the ring is lost: the check sees it');
+      const clipped = await buttonRing(page, 'button-ring-clipped');
+      assert.equal(
+        clipped.missing.length,
+        18,
+        `cut by a clip, the ring is lost along the whole shape: seen (${clipped.missing.join('; ')})`,
+      );
+    } finally {
+      await page.context().close();
+    }
+  },
+);
+
+/** A cut frame of the gallery's `cut` part, by the ground it stands on. */
+const frameOn = (ground: 'plain' | 'other'): string => `[data-part="cut"] [data-ground="${ground}"] [data-cut-frame]`;
+
+/** Where the cut frame on the other ground paints over that ground inside a cut corner, none when the ground shows through both. */
+async function cornerPatches(page: Page, name: string): Promise<string[]> {
+  const { out } = await edgesOf(page, frameOn('other'));
+  const found = await coloursOf(page, name, {
+    ground: [out.left - 30, out.top - 30],
+    edge: [Math.round((out.left + out.right) / 2), out.top + 1],
+    'edge, a row lower': [Math.round((out.left + out.right) / 2), out.top + 2],
+    'the top-right cut': [out.right - 4, out.top + 3],
+    'the bottom-left cut': [out.left + 4, out.bottom - 3],
+  });
+  const edge = Math.max(apart(found.edge, found.ground), apart(found['edge, a row lower'], found.ground));
+  assert.ok(edge > 8, `the frame's edge is read apart from the ground, on the row a box between two pixels is drawn from: ${edge}`);
+  return (['the top-right cut', 'the bottom-left cut'] as const).filter((where) => apart(found[where], found.ground) > 3);
+}
+
+/** The frame with its shape left square: its edge and its ground painted into both cut corners. */
+const PATCHED = `${frameOn('other')} [data-cut-shape] > * { clip-path: none !important; }`;
+
+/**
+ * How much the glow of the frame that waits on a person tints the ground, as the widest channel's difference from the ground thirty pixels
+ * from it: three pixels above its top edge, three pixels outside the middle of its top-right cut, and past the box's own top-right
+ * corner, where a glow that follows the cut has faded and a square one has not.
+ */
+async function glowOf(page: Page, name: string): Promise<{ edge: number; cut: number; corner: number }> {
+  const { box, out } = await edgesOf(page, frameOn('plain'));
+  const off = 3 / Math.SQRT2;
+  const found = await coloursOf(page, name, {
+    ground: [out.left - 30, out.top - 30],
+    edge: [Math.round((box.left + box.right) / 2), out.top - 2],
+    cut: [Math.floor(box.right - 14 + off), Math.floor(box.top + 14 - off)],
+    corner: [out.right + 2, out.top - 2],
+  });
+  return { edge: apart(found.edge, found.ground), cut: apart(found.cut, found.ground), corner: apart(found.corner, found.ground) };
+}
+
+/** Whether a glow, as `glowOf` measured it, is there along the edge and the cut, and follows the cut. */
+const glowFollows = (glow: { edge: number; cut: number; corner: number }): boolean =>
+  glow.edge >= 6 && glow.cut >= 6 && glow.corner * 3 <= glow.cut;
+
+/** The frame with no glow, and with a glow its box casts, square behind the cut. */
+const NO_GLOW = `${frameOn('plain')} [data-cut-shape] { filter: none !important; }`;
+const SQUARE_GLOW = `${frameOn('plain')} { box-shadow: 0 0 10px var(--meaning-yours); }`;
+
+test(
+  'REFUSED: a cut corner shows the ground under it, and a waiting frame glows along its cut; a patch, no glow and a square glow are each seen',
+  WAITED,
+  async () => {
+    const page = await openParts(browser, built, 'dark');
+    try {
+      assert.deepEqual(await cornerPatches(page, 'corner-clear'), [], 'the ground shows through both cut corners');
+      const glow = await glowOf(page, 'glow-shaped');
+      assert.ok(glowFollows(glow), `the frame glows along its edge and its cut, and not past the corner it cut: ${JSON.stringify(glow)}`);
+      await page.addStyleTag({ content: PATCHED });
+      assert.deepEqual(
+        await cornerPatches(page, 'corner-patched'),
+        ['the top-right cut', 'the bottom-left cut'],
+        'a shape left square paints the corners over: seen',
+      );
+      await page.addStyleTag({ content: NO_GLOW });
+      const none = await glowOf(page, 'glow-none');
+      assert.ok(!glowFollows(none) && none.cut < 6, `with no glow, none is read: ${JSON.stringify(none)}`);
+      await page.addStyleTag({ content: SQUARE_GLOW });
+      const square = await glowOf(page, 'glow-square');
+      assert.ok(
+        !glowFollows(square) && square.corner >= 6,
+        `a glow the box casts is square behind the cut: seen ${JSON.stringify(square)}`,
+      );
     } finally {
       await page.context().close();
     }
@@ -252,11 +449,13 @@ test(
     const page = await openParts(browser, built, 'dark');
     try {
       await tabTo(page, 'ringProbe');
-      const corner = page.locator('[data-part="ring"] [data-cut-frame] > [data-cut-corner="top-right"]');
-      const [link, cut] = [await page.locator('[data-ring-probe]').boundingBox(), await corner.boundingBox()];
-      assert.ok(link && cut);
-      assert.ok(link.x + link.width > cut.x && link.y < cut.y + cut.height, 'the link stands in the cut corner');
-      assert.deepEqual(await ringGaps(page, 'ring-whole'), [], 'the ring is whole, the corner cut by overlays');
+      const [link, frame] = [
+        await page.locator('[data-ring-probe]').boundingBox(),
+        await page.locator('[data-part="ring"] [data-cut-frame]').boundingBox(),
+      ];
+      assert.ok(link && frame);
+      assert.ok(link.x + link.width > frame.x + frame.width - 28 && link.y < frame.y + 28, 'the link stands in the cut corner');
+      assert.deepEqual(await ringGaps(page, 'ring-whole'), [], 'the ring is whole, the corner cut by a shape under the link');
       await page.addStyleTag({ content: CLIPPED });
       const gaps = (await ringGaps(page, 'ring-clipped')).map((gap) => gap.split(':')[0]);
       assert.deepEqual(gaps, ['top', 'right'], 'cut by a clip, the ring is lost in the corner: the check sees it');

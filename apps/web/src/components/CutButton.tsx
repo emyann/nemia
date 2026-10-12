@@ -1,32 +1,40 @@
 import { Link as AriaLink, type LinkProps } from 'react-aria-components';
-import { filled, paint } from '@/lib/meaning';
+import { filled } from '@/lib/meaning';
 import { cn } from '@/components/ui/ds/utils';
-import { CutCorner, type Ground } from './CutFrame';
+import { cutRing, cutShape } from './CutFrame';
 import { routeLink } from './routeLink';
 
+/** How long the button's cut is along each side, in pixels. */
+const CUT = 12;
+
+/** The room between the button and its focus ring, and the ring's width, in pixels: the kit's ring's own. */
+const [GAP, RING] = [2, 3];
+
 /**
- * React Aria's link drawn as the look's filled button, in the hue of what waits on a person: its top-right and bottom-left corners cut
- * by overlays painted in `on`, the ground it sits on, never by a clip, so its focus ring, drawn around its whole box, stays whole.
+ * React Aria's link drawn as the look's filled button, in the hue of what waits on a person: its words on a shape of its own, the
+ * top-right and bottom-left corners cut, exactly the button's box, with a state layer in its ink. Focused from the keyboard, its ring
+ * is a band in that shape around it, as wide and as far as the kit's ring, the cuts followed; the link itself is clipped by nothing.
  */
-function Cut({
-  on = 'card',
-  className,
-  children,
-  ...props
-}: Omit<LinkProps, 'className' | 'children'> & { on?: Ground; className?: string; children: string }) {
+function Cut({ className, children, ...props }: Omit<LinkProps, 'className' | 'children'> & { className?: string; children: string }) {
   return (
-    <AriaLink
-      {...props}
-      data-cut-button
-      className={cn(
-        'relative inline-flex h-10 items-center px-6 text-label-large whitespace-nowrap uppercase outline-none hover:brightness-110 data-focus-visible:ring-2 data-focus-visible:ring-ring data-focus-visible:ring-offset-2 data-focus-visible:ring-offset-card',
-        filled.yours,
-        className,
-      )}
-    >
-      <CutCorner corner="top-right" size={12} on={on} line={paint.yours} />
-      <CutCorner corner="bottom-left" size={12} on={on} line={paint.yours} />
-      <span className="relative">{children}</span>
+    <AriaLink {...props} data-cut-button className={cn('group/cut relative inline-flex outline-none', className)}>
+      <span
+        aria-hidden="true"
+        data-cut-ring
+        className="pointer-events-none absolute -inset-[5px] hidden bg-ring group-data-focus-visible/cut:block"
+        style={{ clipPath: cutRing(CUT, GAP, RING) }}
+      />
+      <span
+        data-cut-shape
+        className={cn('relative inline-flex h-10 items-center px-6 text-label-large whitespace-nowrap uppercase', filled.yours)}
+        style={{ clipPath: cutShape(CUT) }}
+      >
+        <span
+          aria-hidden="true"
+          className="absolute inset-0 bg-current opacity-0 group-hover/cut:state-opacity-hover group-data-pressed/cut:state-opacity-pressed"
+        />
+        <span className="relative">{children}</span>
+      </span>
     </AriaLink>
   );
 }

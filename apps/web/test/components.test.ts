@@ -6,6 +6,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { waitingRun } from './run-fixtures.ts';
 import './tsx.ts';
 
 const { createElement } = await import('react');
@@ -6016,8 +6017,9 @@ test("REFUSED: the Inbox's badge counts the picked factory's cards not yet start
 
 /** The light answer holding `waiting`, which it counts unless `counted` says another number, and nothing in flight or finished. */
 const openWith = (waiting: RunSummary[], counted = waiting.length): OpenRuns => ({
+  asOf: '2026-10-12T12:00:00.000Z',
   counts: { waiting: counted, inFlight: 0, finished: 0 },
-  waiting,
+  waiting: waiting.map((row) => waitingRun(row)),
   inFlight: [],
 });
 
@@ -6060,7 +6062,7 @@ test('REFUSED: the bell counts what the api says waits, never a count of its own
   const blocked = { ...atGate, id: 'r-blocked', stoppedOn: 'blocked' as const, onYou: [] };
   const movesAndWaits = { ...atGate, id: 'r-moves', status: 'running' as const, stoppedOn: null, moving: true };
   const waiting = [atGate, blocked, movesAndWaits];
-  const three = await headerWith({ counts: { waiting: 3, inFlight: 0, finished: 1 }, waiting, inFlight: [] });
+  const three = await headerWith({ ...openWith(waiting), counts: { waiting: 3, inFlight: 0, finished: 1 } });
   assert.match(
     bellOf(three),
     /aria-label="Waiting on you: 3"/,

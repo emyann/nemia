@@ -38,8 +38,26 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
 - `test/palette.test.ts` refuses a palette colour (`bg-amber-100`, `text-white`, `--color-neutral-400`) in `src` outside the kit: a ground
   or an outline reads a role (`bg-card`, `border-outline`), one class for both schemes, no `dark:` twin. A use that means none of the
   five is rest; a caution is failure for a write refused, yours drawn light for what a person weighs, rest for a note.
+- A text that stands on `ScanLines` is `unmeasured` by the contrast measure, its ground being an image, and an unmeasured text is
+  never refused: a page of the look measures through `contrastHolds` (`test/e2e/runs-contrast.ts`), which flattens the ground first.
+- A table cell's `scrollWidth` does not grow with a `nowrap` text that runs out of it: measure the text's right edge against the
+  cell's own room (`expectRoom` in `test/e2e/pages/052-runs-pages.ts`).
 - Text dimmed by an `opacity` falls under 4.5:1: sink a card into the floor (`bg-background`) or use the muted ink instead.
 - The kit has no adapter for TanStack Router: an `href` on one of its buttons, chips or menu items loads the page whole.
+- A cut corner is a shape of its own under unclipped content (`CutFrame.tsx`, `CutButton.tsx`): a layer clipped to the cut, never an
+  overlay in the ground's colour, and never a clip on what holds content or takes the focus. A glow is that layer's `drop-shadow`, and
+  a ring that follows the cut is a band clipped beside it (`cutRing`). A ground on a child (the kit's `Card`, a table `Row`) paints
+  the cut over, so it is given none (`bg-transparent`). `test/e2e/parts.test.ts` reads each in a picture, pixel by pixel.
+- The look's small caps are its three label roles: `DESIGN.md` gives them their weight and tracking, and a text writes the role and
+  `uppercase` (`text-label-small uppercase`); a kit part's own label (`Tag`, a `Column`) follows the role. No class of the board's.
+- The kit's type primitives write Material's weight over the role's (`Label` draws 500 where `DESIGN.md` says 600, a `Tag`'s word
+  included): a label of the look writes the role class, and a text given a `background-image` is unmeasured (`PageName` in `Plate.tsx`).
+- A box the browser lays between two pixels is drawn from the next whole one, and `boundingBox` carries float noise: a test that reads
+  a pixel beside an edge rounds past it (`edgesOf` in `test/e2e/parts.test.ts`).
+- The kit's `xsmall` icon button answers 8 pixels beyond its box, and of two targets that overlap the later in the document wins: in a
+  40-pixel row a copy control answers from 24 above its centre to 16 below (`finger` in `test/e2e/pages/050-runs.ts`).
+- A kit `Cell truncate` shows its children again in a tooltip: a cut cell that holds a link cuts the link itself (`block truncate`, a
+  `title`), never the cell.
 
 ## Build and e2e
 

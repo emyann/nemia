@@ -1,8 +1,9 @@
 import type { RunSummary } from '@/lib/api';
-import { filled, ink } from '@/lib/meaning';
+import type { CSSProperties } from 'react';
+import { filled, ink, paint } from '@/lib/meaning';
 import { railSaid, railStates } from '@/lib/runWords';
 import { stateClass, stateDrawn, type StepState } from '@/lib/status';
-import { cn } from '@/lib/utils';
+import { cn } from '@/components/ui/ds/utils';
 
 /** The ink of a step's name under its bar: its hue where it waits on a person or failed, muted for every other. */
 function nameInk(state: StepState): string {
@@ -10,14 +11,30 @@ function nameInk(state: StepState): string {
   return hue === 'yours' || hue === 'failure' ? ink[hue] : 'text-on-surface-variant';
 }
 
-/**
- * A step's bar: its state's drawing on every page (`stateClass`), but the step at work in its hue's own fill, the one lit bar of the
- * rail: a bar carries no text, and a container's tone alone is the dimmest fill on a dark ground.
- */
-const barClass = (state: StepState): string => (state === 'working' ? filled.alive : stateClass[state]);
+/** Whether a state waits on a person's word: the rail draws its bar hollow and lit, whatever form every other page gives it. */
+const isLitGate = (state: StepState): boolean => stateDrawn[state].hue === 'yours';
 
 /**
- * A run's own steps as a rail: one bar a step, in the run's order, each drawn by its state (`barClass`), and under
+ * A step's bar: its state's drawing on every page (`stateClass`), but three. A step done is filled whether a check says so or its own
+ * word does, the step at work is filled in its hue, and the step that waits on a person's word is hollow, edged in its hue;
+ * `barGlow` lights the last two.
+ */
+function barClass(state: StepState): string {
+  if (state === 'working') return filled.alive;
+  if (isLitGate(state)) return 'bg-transparent';
+  return stateClass[state === 'unverified' ? 'verified' : state];
+}
+
+/** What lights a bar: the gate's edge and its glow, the glow of the step at work, and nothing for any other. */
+function barGlow(state: StepState): CSSProperties | undefined {
+  if (isLitGate(state))
+    return { boxShadow: `inset 0 0 0 1.5px ${paint.yours}, 0 0 10px color-mix(in srgb, ${paint.yours} 45%, transparent)` };
+  if (state === 'working') return { boxShadow: `0 0 12px color-mix(in srgb, ${paint.alive} 70%, transparent)` };
+  return undefined;
+}
+
+/**
+ * A run's own steps as a rail: one bar a step, in the run's order, each drawn by its state (`barClass`, `barGlow`), and under
  * the bars, with `names`, each step's name. Read aloud as one picture, each step and its word (`railSaid`). `cancelled` and `held` are
  * the run's, as `stepState` takes them.
  */
@@ -38,11 +55,17 @@ export function RunSteps({
       role="img"
       aria-label={railSaid(steps, cancelled, held)}
       data-run-steps
-      className="grid gap-1.5 text-[11px] leading-4 font-semibold tracking-widest uppercase"
+      className="grid gap-1.5 text-label-small uppercase"
       style={{ gridTemplateColumns: `repeat(${Math.max(1, drawn.length)}, minmax(0, 1fr))` }}
     >
       {drawn.map((step) => (
-        <span key={step.name} data-step={step.name} data-state={step.state} className={cn('block h-2', barClass(step.state))} />
+        <span
+          key={step.name}
+          data-step={step.name}
+          data-state={step.state}
+          className={cn('block h-2', barClass(step.state))}
+          style={barGlow(step.state)}
+        />
       ))}
       {names &&
         drawn.map((step) => (

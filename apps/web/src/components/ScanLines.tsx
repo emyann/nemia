@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { paint } from '@/lib/meaning';
-import { cn } from '@/lib/utils';
+import { cn } from '@/components/ui/ds/utils';
 
 /** The hue of a session at work, thinned to `percent` of itself over nothing. */
 const thin = (percent: number): string => `color-mix(in srgb, ${paint.alive} ${percent}%, transparent)`;

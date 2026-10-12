@@ -130,15 +130,30 @@ const unread = (at: string, found: string) => (err: unknown) => {
 /** The light answer read for `factory`, or for every factory, with no context of a query's. */
 const readOpen = (factory?: string) => (openRunsQuery(factory).queryFn as unknown as () => Promise<OpenRuns>)();
 
-test('the light answer decodes what the api gives, asks for one factory by its name encoded, and keeps no key it does not read', async (t) => {
+test("the light answer decodes what the api gives, a waiting run with its clock and its steps' costs, asks for one factory by its name encoded, and keeps no key it does not read", async (t) => {
   const asked: string[] = [];
   const before = globalThis.fetch;
-  const answer = { counts: { waiting: 1, inFlight: 1, finished: 7 }, waiting: [row()], inFlight: [row({ id: 'r-2' })] };
-  const more = { wallMs: 5, finishedAt: null, clock: null, stepCosts: null };
+  const clock = { wallMs: 5, sessionsMs: 1, checksMs: 1, personMs: 1, slotMs: 1, restMs: 1 };
+  const stepCosts = [
+    { step: 'plan', cost: { usd: 1.5, measured: 1, unmeasured: 0, said: '$1.50' } },
+    { step: 'land', cost: null },
+  ];
+  const listed = { wallMs: 5, finishedAt: null };
+  const answer = {
+    asOf: '2026-10-12T12:00:00.000Z',
+    counts: { waiting: 1, inFlight: 1, finished: 7 },
+    waiting: [{ ...row(), ...listed, clock, stepCosts }],
+    inFlight: [{ ...row({ id: 'r-2' }), ...listed }],
+  };
   globalThis.fetch = async (input) => {
     asked.push(String(input));
     return new Response(
-      JSON.stringify({ ...answer, asOf: 'now', waiting: [{ ...row(), ...more }], inFlight: [{ ...row({ id: 'r-2' }), ...more }] }),
+      JSON.stringify({
+        ...answer,
+        unknown: 1,
+        waiting: answer.waiting.map((run) => ({ ...run, page: 1 })),
+        inFlight: answer.inFlight.map((run) => ({ ...run, clock, stepCosts, page: 1 })),
+      }),
       { status: 200, headers: { 'content-type': 'application/json' } },
     );
   };
@@ -154,7 +169,9 @@ test('the light answer decodes what the api gives, asks for one factory by its n
 
 test('REFUSED: a light answer whose row lacks a key the board reads, or that lacks a count, is an unreadable answer', async (t) => {
   const { waitingOnYou: _dropped, ...short } = row();
-  answering(t, { counts: { waiting: 1, inFlight: 0, finished: 0 }, waiting: [short], inFlight: [] });
+  const more = { wallMs: 5, finishedAt: null, clock: null, stepCosts: null };
+  const asOf = '2026-10-12T12:00:00.000Z';
+  answering(t, { asOf, counts: { waiting: 1, inFlight: 0, finished: 0 }, waiting: [{ ...short, ...more }], inFlight: [] });
   const refused = (found: string) => (err: unknown) => {
     assert.ok(err instanceof UnreadAnswer, String(err));
     assert.ok(err.message.startsWith('GET /api/runs-open answered what this board does not read'), err.message);
@@ -162,8 +179,11 @@ test('REFUSED: a light answer whose row lacks a key the board reads, or that lac
     return true;
   };
   await assert.rejects(readOpen(), refused('waiting[0].waitingOnYou'));
-  answering(t, { counts: { waiting: 1, inFlight: 0 }, waiting: [row()], inFlight: [] });
+  answering(t, { asOf, counts: { waiting: 1, inFlight: 0 }, waiting: [{ ...row(), ...more }], inFlight: [] });
   await assert.rejects(readOpen(), refused('counts.finished'));
+  const { clock: _clock, ...unbroken } = { ...row(), ...more };
+  answering(t, { asOf, counts: { waiting: 1, inFlight: 0, finished: 0 }, waiting: [unbroken], inFlight: [] });
+  await assert.rejects(readOpen(), refused('waiting[0].clock'));
 });
 
 test('the Runs list decodes an answer the api gives, each union in its every shape', async (t) => {

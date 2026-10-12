@@ -130,7 +130,11 @@ async function heldWithWords(page: Page): Promise<void> {
 
     await page.goto(new URL('/runs', page.url()).href, { waitUntil: 'load' });
     await idle(page);
-    await expectVisible(page.locator('[data-holding="on-runs"]', { hasText: whole }), `${id}'s row on Runs says ${word}`);
+    await expectVisible(
+      page.locator(`[data-runs-page] [data-run="${id}"] [data-run-steps][aria-label*=" held"]`),
+      `on Runs, which says less, ${id} is drawn with its steps held on its rail`,
+    );
+    await expectCount(page.locator('[data-runs-page] [data-holding]'), 0, 'and the hold in its own words is on its page');
     await settled(page);
     await photograph(page, path.join(OUT, `hold-said-runs-${theme}.png`), { fullPage: true });
 

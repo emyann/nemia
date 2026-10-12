@@ -403,3 +403,21 @@ export async function openDebug(page: Page, taskId: string): Promise<{ panel: Lo
   await expectVisible(panel.locator(`[data-path="${taskId}"]`), `opened, the Debug panel draws the path of ${taskId}`);
   return { panel, lifecycle: panel.locator('[data-machine="lifecycle"]') };
 }
+
+/** What the api answers at `pathname`, read apart from the page: the page's own requests do not count it. */
+export async function answered<T>(page: Page, pathname: string): Promise<T> {
+  return (await (await page.request.get(new URL(pathname, page.url()).href)).json()) as T;
+}
+
+/**
+ * Photographs the whole page as `<name>-<what>-<theme>.png` in the window it is in, then 390 wide as `<name>-<what>-phone-<theme>.png`,
+ * and puts the window back. Takes none unless the page is pictured (`photograph`); the window is narrowed and put back all the same.
+ */
+export async function photographBothWidths(page: Page, out: string, name: string, what: string): Promise<void> {
+  const size = page.viewportSize() ?? { width: 1280, height: 800 };
+  const theme = await themeOf(page);
+  await photograph(page, path.join(out, `${name}-${what}-${theme}.png`), { fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await photograph(page, path.join(out, `${name}-${what}-phone-${theme}.png`), { fullPage: true });
+  await page.setViewportSize(size);
+}

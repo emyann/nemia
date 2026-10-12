@@ -1,12 +1,15 @@
 import { Link as AriaLink } from 'react-aria-components';
 import { newerOf, olderOf, pageSaid, pageSearch, rowsSaid, type PageAt } from '@/lib/finished';
+import { cn, focusRing } from '@/components/ui/ds/utils';
 import { routeLink } from './routeLink';
 
 const PageLink = routeLink(AriaLink);
 
-/** An outlined button of the pager, in the label face: quiet, and dimmed by its ink where it leads nowhere. */
-const BUTTON =
-  'inline-flex h-8 items-center border border-outline px-3 font-label text-xs font-bold tracking-[0.06em] text-on-surface uppercase outline-none hover:bg-accent data-focus-visible:ring-2 data-focus-visible:ring-ring data-disabled:border-outline-variant data-disabled:text-muted-foreground data-disabled:hover:bg-transparent';
+/** An outlined button of the pager, in the label face: quiet, dimmed by its ink where it leads nowhere, and ringed as the kit rings. */
+const BUTTON = cn(
+  'inline-flex h-8 items-center border border-outline px-3 font-plain text-label-large uppercase text-on-surface hover:bg-accent data-disabled:border-outline-variant data-disabled:text-muted-foreground data-disabled:hover:bg-transparent',
+  focusRing(),
+);
 
 /**
  * The search of the same address at `page`, as a link takes it. Typed for any route: which route the pager stands on, and so whether
@@ -42,13 +45,16 @@ function PageButton({ page, which, children }: { page: number | null; which: 'ne
 export function Pager({ page, pages, total, size }: PageAt) {
   const at = { page, pages, total, size };
   return (
-    <div data-pager className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-xs text-on-surface-variant">
+    <div
+      data-pager
+      className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 font-mono text-body-small text-on-surface-variant"
+    >
       <span data-pager-rows>{rowsSaid(at)}</span>
       <div role="group" aria-label="Pages of finished runs" className="flex items-center gap-3">
         <PageButton page={newerOf(page, pages)} which="newer">
           Newer
         </PageButton>
-        <span data-pager-at className="tracking-[0.06em] uppercase">
+        <span data-pager-at className="uppercase">
           {pageSaid(at)}
         </span>
         <PageButton page={olderOf(page, pages)} which="older">

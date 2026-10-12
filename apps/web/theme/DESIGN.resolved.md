@@ -138,21 +138,21 @@ typography:
   label-large:
     fontFamily: Chakra Petch
     fontSize: 14px
-    fontWeight: 500
+    fontWeight: 600
     lineHeight: 20px
-    letterSpacing: 0.1px
+    letterSpacing: 0.06em
   label-medium:
     fontFamily: Chakra Petch
     fontSize: 12px
-    fontWeight: 500
+    fontWeight: 600
     lineHeight: 16px
-    letterSpacing: 0.5px
+    letterSpacing: 0.06em
   label-small:
     fontFamily: Chakra Petch
     fontSize: 11px
-    fontWeight: 500
+    fontWeight: 600
     lineHeight: 16px
-    letterSpacing: 0.5px
+    letterSpacing: 0.1em
   mono:
     fontFamily: Share Tech Mono
 rounded:
@@ -213,8 +213,13 @@ The kit carries three faces and this look wants four. The third is the mono
 face: identifiers, commands and readouts in Share Tech Mono, wherever the
 board writes mono text. The board sets the fourth beside the kit: a printed
 label's numerals in Archivo at its widest and heavy (width 125, weight 800),
-black ink on the label's stock. Sizes, weights and tracking of the kit's
-roles are Material's.
+black ink on the label's stock. The three label roles are the look's small
+caps, as printed on a label: heavier than Material's (weight 600), tracked
+wide, and set in capitals where they are written. Each role is tracked for
+what it mostly draws: the large and the medium, a button's word and a
+tag's, by six hundredths of an em; the small, a rail's name, a table's
+heading and a tile's label, by a tenth. Every other size, weight and
+tracking of the kit's roles is Material's.
 
 ## Shape
 

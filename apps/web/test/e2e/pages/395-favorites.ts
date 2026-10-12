@@ -20,8 +20,8 @@ const favoritesOf = (page: Page): Locator => sidebarOf(page).locator('[data-favo
 const linksOf = (page: Page): Locator => favoritesOf(page).getByRole('link');
 /** The star in `scope` that stars the thing named `name`. */
 const starIn = (scope: Locator, name: string): Locator => scope.getByRole('button', { name: `Star ${name}`, exact: true });
-/** The run's row on the Runs page. */
-const rowOf = (page: Page): Locator => page.locator('main li[data-in-flight]', { has: page.locator(`a[href="/runs/${RUN.id}"]`) });
+/** The header of the run's own page. */
+const headerOf = (page: Page): Locator => page.locator('article header');
 /** The workflow's card on the Workflows page. */
 const flowCard = (page: Page): Locator => page.locator(`section[aria-label="Workflow ${FLOW}"]`);
 
@@ -51,14 +51,21 @@ async function expectStar(star: Locator, pressed: boolean, assertion: string): P
 const expectNone = (page: Page, assertion: string) =>
   expectVisible(favoritesOf(page).getByText('Nothing starred yet.'), `${assertion}: Favorites says nothing is starred yet`);
 
-/** The run starred on its Runs row is under Favorites by its title, a link to its page, and its star reads pressed. */
-async function fromItsRow(page: Page): Promise<void> {
+/**
+ * The Runs page has no star; the run starred on its own page's header is under Favorites by its title, a link to its page, its star
+ * reads pressed, and Runs lists it under Favorites too.
+ */
+async function fromItsPage(page: Page): Promise<void> {
   await visit(page, '/runs');
   await expectNone(page, 'with none kept');
-  await starIn(rowOf(page), RUN.title).click();
-  await expectTexts(linksOf(page), [RUN.title], 'starred on its row, the run is under Favorites by its title');
+  await expectCount(page.locator('[data-runs-page]').getByRole('button', { name: /^Star / }), 0, 'the Runs page has no star');
+  await visit(page, `/runs/${RUN.id}`);
+  await starIn(headerOf(page), RUN.title).click();
+  await expectTexts(linksOf(page), [RUN.title], "starred on its page's header, the run is under Favorites by its title");
   if ((await linksOf(page).getAttribute('href')) !== `/runs/${RUN.id}`) throw new Refused('its favourite links to its page');
-  await expectStar(starIn(rowOf(page), RUN.title), true, 'its row');
+  await expectStar(starIn(headerOf(page), RUN.title), true, "its page's header");
+  await visit(page, '/runs');
+  await expectTexts(linksOf(page), [RUN.title], 'and on Runs it is under Favorites still');
   await settled(page);
   await photograph(page, path.join(OUT, `favorites-starred-${await themeOf(page)}.png`));
 }
@@ -162,9 +169,9 @@ async function refused(page: Page): Promise<void> {
       Storage.prototype.getItem = refuse;
       Storage.prototype.setItem = refuse;
     });
-    await visit(blocked, new URL('/runs', page.url()).href);
+    await visit(blocked, new URL(`/runs/${RUN.id}`, page.url()).href);
     await expectNone(blocked, 'with storage refused');
-    await starIn(rowOf(blocked), RUN.title).click();
+    await starIn(headerOf(blocked), RUN.title).click();
     await expectTexts(linksOf(blocked), [RUN.title], 'a star pressed there is listed for the page');
     if (problems().length) throw new Refused(`refused storage breaks nothing: ${problems().join('; ')}`);
   } finally {
@@ -193,7 +200,8 @@ async function onPhone(page: Page): Promise<void> {
 
 export default {
   /**
-   * Favourites: a run starred on its Runs row, its card on the floor, its page's header and its bar, and a workflow on its card, each
+   * Favourites: a run starred on its page's header, which Runs, with no star of its own, lists; then its card on the floor, its page's
+   * header and its bar, and a workflow on its card, each
    * pressed again to take it off; Favorites lists them by title in the order starred, under any factory picked; another page sees a
    * change; a workflow the api no longer lists is said gone (a run gone is `favorite-gone`'s); refused storage says nothing is starred;
    * and a phone's sheet. The favourites and the window's size are taken back.
@@ -203,7 +211,7 @@ export default {
   expect: async (page) => {
     const size = page.viewportSize();
     try {
-      await fromItsRow(page);
+      await fromItsPage(page);
       await onItsCardAndPage(page);
       await fromTheFloorThenAWorkflow(page);
       await fromItsBar(page);

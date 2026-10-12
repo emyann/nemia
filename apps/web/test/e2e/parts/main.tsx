@@ -8,9 +8,11 @@ import { createRoot } from 'react-dom/client';
 import { createRootRoute, createRouter, RouterProvider, useRouter, useSearch } from '@tanstack/react-router';
 import { RouterProvider as AriaRouterProvider } from 'react-aria-components';
 import '../../../src/styles.css';
+import { CutButton } from '../../../src/components/CutButton.tsx';
+import { CopyId } from '../../../src/components/CopyId.tsx';
 import { CutFrame } from '../../../src/components/CutFrame.tsx';
 import { Pager } from '../../../src/components/Pager.tsx';
-import { Plate } from '../../../src/components/Plate.tsx';
+import { PageName, Plate } from '../../../src/components/Plate.tsx';
 import { RunSteps } from '../../../src/components/RunSteps.tsx';
 import { ScanLines } from '../../../src/components/ScanLines.tsx';
 import { Sticker } from '../../../src/components/Sticker.tsx';
@@ -31,11 +33,17 @@ const HEADING: CSSProperties = { margin: '0 0 10px', fontSize: 11, letterSpacing
 const CARD: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 16, padding: '22px 26px 24px' };
 const FLUSH: CSSProperties = { display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-start', minHeight: 64 };
 
-/** A run at its gate, a run at work, and one refused by its check: each a rail. */
+/** A run at its gate, one whose steps are done on a check or their own word, a run at work, and one refused by its check: each a rail. */
 const GATE = [
   { name: 'design', status: 'verified ✓' },
   { name: 'implement', status: 'verified ✓' },
   { name: 'review', status: 'verified ✓' },
+  { name: 'land', status: 'awaiting approval' },
+];
+const DONE = [
+  { name: 'design', status: 'unverified' },
+  { name: 'implement', status: 'verified ✓' },
+  { name: 'review', status: 'unverified' },
   { name: 'land', status: 'awaiting approval' },
 ];
 const AT_WORK = [
@@ -85,6 +93,7 @@ function Parts({ page, row }: { page: number; row: WaitingRow }) {
         <Part name="plate">
           <div style={ROW}>
             <Plate count={2} title="Waiting on you" />
+            <Plate count={6} title="Finished" hue="grey" />
             <Plate count={0} title="Waiting on you" quiet />
           </div>
         </Part>
@@ -116,6 +125,20 @@ function Parts({ page, row }: { page: number; row: WaitingRow }) {
             </CutFrame>
           </div>
         </Part>
+        <Part name="cut">
+          <div style={ROW}>
+            <div data-ground="plain" style={{ padding: 40, background: 'var(--background)' }}>
+              <CutFrame hue="yours">
+                <div style={{ width: 220, height: 96 }} />
+              </CutFrame>
+            </div>
+            <div data-ground="other" style={{ padding: 40, background: 'var(--md-sys-color-inverse-surface)' }}>
+              <CutFrame size={24}>
+                <div style={{ width: 220, height: 96 }} />
+              </CutFrame>
+            </div>
+          </div>
+        </Part>
         <Part name="ring">
           <div style={{ width: 360 }}>
             <CutFrame hue="yours">
@@ -125,6 +148,11 @@ function Parts({ page, row }: { page: number; row: WaitingRow }) {
                 </TextLink>
               </div>
             </CutFrame>
+          </div>
+          <div style={{ display: 'inline-block', padding: 16, marginTop: 16, background: 'var(--card)' }}>
+            <CutButton to="." search={{ read: 'button' }}>
+              Open the run
+            </CutButton>
           </div>
         </Part>
         <Part name="sticker">
@@ -141,12 +169,28 @@ function Parts({ page, row }: { page: number; row: WaitingRow }) {
           </div>
         </Part>
         <Part name="text-link">
-          <TextLink to="." search={{ read: 'link' }} data-plain-link>
-            Read the review
-          </TextLink>
+          <div style={{ display: 'inline-block', padding: 16, background: 'var(--card)' }}>
+            <TextLink to="." search={{ read: 'link' }} data-plain-link>
+              Read the review
+            </TextLink>
+          </div>
         </Part>
         <Part name="pager">
           <Pager page={page} pages={3} total={25} size={9} />
+        </Part>
+        <Part name="page-name">
+          <PageName>Runs</PageName>
+        </Part>
+        <Part name="rail">
+          <div style={{ width: 420, padding: 16, background: 'var(--card)' }}>
+            <RunSteps steps={DONE} cancelled={false} held={false} names />
+          </div>
+        </Part>
+        <Part name="copy-id">
+          <div style={{ display: 'inline-flex', gap: 24, padding: 16, background: 'var(--card)' }}>
+            <CopyId id="the-tool-errors-panels-2e13" short />
+            <CopyId id="lay-the-diamond-top-e2e4" />
+          </div>
         </Part>
       </main>
     </>

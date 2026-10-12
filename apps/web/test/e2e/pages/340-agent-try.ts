@@ -170,9 +170,10 @@ export default {
         'the Factory, where a try in flight is on the floor, tags its card try',
       );
       await goto(page, '/runs');
-      const row = page.locator('li', { has: page.locator(`a[href="/runs/${id}"]`) });
-      await expectVisible(row.locator(`[data-try-tag="${seeded.name}"]`), 'Runs tags its row try');
-      await expectVisible(row.locator(`a[data-agent-link="${seeded.name}"]`), 'and links the agent it tried');
+      await expectVisible(
+        page.locator(`[data-runs-page] [data-run="${id}"] a[href="/runs/${id}"]`).first(),
+        'Runs draws the try as any run, a link to its page, where its tag is',
+      );
 
       ranTo(id);
       fed(id, 'try', 'done');

@@ -657,6 +657,69 @@ export function seedFolder(root: string, now = Date.now()): void {
 }
 
 /**
+ * Write one finished folder run into the store at `root`, as `seedFolder` writes FOLDER, by its least: a record of one step in
+ * `factory`, the step's journal, signed off `finishedAgo` minutes before `now` a minute after it was filed, and those events on the
+ * engine's feed, which the api reads a filing off. Answers what takes it back: the record, the journal and the run's folder removed,
+ * and the feed as it was.
+ */
+export function seedFinished(
+  root: string,
+  run: { id: string; title: string; factory: string; finishedAgo: number },
+  now = Date.now(),
+): () => void {
+  const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
+  const { id } = run;
+  const work = path.join(root, 'runs', id, 'work');
+  const record = path.join(root, 'runs', `${id}.json`);
+  const journal = path.join(root, 'engine', 'tasks', `${id}-write.jsonl`);
+  const feed = path.join(root, 'engine', 'feed.jsonl');
+  const fedBefore = fs.readFileSync(feed, 'utf8');
+  const body = 'Write a short note on what was asked.';
+  write(
+    record,
+    JSON.stringify(
+      {
+        id,
+        place: { kind: 'folder' },
+        workspace: work,
+        brief: `${run.title}\n\nA run written by a page of npm run e2e, which takes it back.`,
+        workflowDir: path.join(root, FOLDER.workflow),
+        workflow: [{ name: 'write', after: [], body, harness: 'claude', workspace: 'folder', permissionMode: 'dontAsk' }],
+        factory: run.factory,
+        createdAt: ago(run.finishedAgo + 2),
+        steps: { write: { taskId: `${id}-write`, workspace: path.join(work, 'write') } },
+      },
+      null,
+      2,
+    ),
+  );
+  const closeout = { outcome: 'done', summary: 'Wrote the note.', needs: null, artifacts: [] };
+  const events = [
+    {
+      kind: 'filed',
+      at: ago(run.finishedAgo + 1),
+      brief: body,
+      cwd: path.join(work, 'write'),
+      maxAttempts: 1,
+      harness: 'claude',
+      permissionMode: 'dontAsk',
+    },
+    { kind: 'starting', at: ago(run.finishedAgo + 1), attempt: 1 },
+    { kind: 'spawned', at: ago(run.finishedAgo + 1), attempt: 1 },
+    { kind: 'ended', at: ago(run.finishedAgo), attempt: 1, sessionId: `ae/${id}-write/1`, observed: 'done', reason: 'harness', closeout },
+    { kind: 'settled', at: ago(run.finishedAgo), outcome: 'succeeded' },
+  ];
+  write(journal, lines(events));
+  fs.appendFileSync(feed, lines(events.map((event) => ({ taskId: `${id}-write`, event }))));
+  return () => {
+    fs.rmSync(record, { force: true });
+    fs.rmSync(journal, { force: true });
+    fs.rmSync(path.join(root, 'runs', id), { recursive: true, force: true });
+    fs.writeFileSync(feed, fedBefore);
+  };
+}
+
+/**
  * The factories in the store, each a file in `factories/` as `wf factory add` writes it. `hiring` holds FOLDER's run, is offered WORKFLOWS'
  * `dev` and hires its agent into `implement`; `bare` names only a folder, and so do `others`, which are there so the menu has more
  * factories than it shows; `broken`'s file names no repository, so it does not read as a factory. Listed by name, as the api lists them.

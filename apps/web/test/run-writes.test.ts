@@ -38,7 +38,7 @@ test('a write that changes a run reads each page of the finished runs again', WA
   globalThis.fetch = async (input) => {
     asked.push(String(input));
     rang.ring();
-    return new Response(JSON.stringify({ total: asked.length, page: 2, size: 9, pages: 1, runs: [] }), {
+    return new Response(JSON.stringify({ asOf: '2026-10-12T12:00:00.000Z', total: asked.length, page: 2, size: 9, pages: 1, runs: [] }), {
       status: 200,
       headers: { 'content-type': 'application/json' },
     });
@@ -73,10 +73,13 @@ test("REFUSED: a write that changes a run reads the frame's answer again at once
     asked.push(String(input));
     const waiting = asked.filter((url) => url === String(input)).length === 1 ? 2 : 1;
     rang.ring();
-    return new Response(JSON.stringify({ counts: { waiting, inFlight: 0, finished: 0 }, waiting: [], inFlight: [] }), {
-      status: 200,
-      headers: { 'content-type': 'application/json' },
-    });
+    return new Response(
+      JSON.stringify({ asOf: '2026-10-12T12:00:00.000Z', counts: { waiting, inFlight: 0, finished: 0 }, waiting: [], inFlight: [] }),
+      {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      },
+    );
   };
   const client = new QueryClient();
   const every = new QueryObserver(client, openRunsQuery());

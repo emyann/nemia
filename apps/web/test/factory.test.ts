@@ -10,7 +10,6 @@ import {
   GRID_COLUMNS,
   floorRuns,
   inFlight,
-  inFlightFirst,
   keepLayout,
   NARROW_CELL_WIDTH,
   onYouOf,
@@ -18,7 +17,6 @@ import {
   openSpan,
   placeRuns,
   repoName,
-  rowClockEveryMs,
   runEdges,
   contextEdges,
   runClock,
@@ -940,60 +938,6 @@ test("the ending step's own gate is not asked for twice: the to-decide line says
   assert.deepEqual(onYouOf(ahead), ['implement'], 'a branch nobody merged asks for no step, so nothing is filtered');
 });
 
-test('the Runs page lists the runs in flight first, then the rest, each newest first', () => {
-  const runs = [
-    run([], { id: 'old-done', status: 'succeeded', createdAt: at(0) }),
-    run([], { id: 'old-going', moving: true, createdAt: at(1) }),
-    run([], { id: 'new-done', status: 'succeeded', createdAt: at(5) }),
-    run([], { id: 'failed-moving', status: 'failed', moving: true, createdAt: at(3) }),
-    run([], { id: 'gated', after: ['p'], waiting: waitingOn(true), createdAt: at(6) }),
-    run([], { id: 'cancelled', status: 'cancelled', cancelledAt, createdAt: at(4) }),
-    run([], { id: 'lost', createdAt: at(2) }),
-  ];
-  assert.deepEqual(
-    inFlightFirst(runs).map((r) => r.id),
-    ['failed-moving', 'lost', 'old-going', 'gated', 'new-done', 'cancelled', 'old-done'],
-    'failed-moving, a fan-out `assess` calls failed while a sibling still works, and lost, running with nothing held, are in flight, so ' +
-      'on top; gated, waiting on a run that never ships, moves nothing, so is among the rest by its date',
-  );
-  const done = runs.filter((r) => !inFlight(r));
-  assert.deepEqual(
-    inFlightFirst(done).map((r) => r.id),
-    ['gated', 'new-done', 'cancelled', 'old-done'],
-    'newest first when nothing is in flight',
-  );
-  assert.deepEqual(
-    inFlightFirst(runs.filter(inFlight)).map((r) => r.id),
-    ['failed-moving', 'lost', 'old-going'],
-    'newest first when all is in flight',
-  );
-  const twins = [run([], { id: 'b', createdAt: at(0) }), run([], { id: 'a', createdAt: at(0) })];
-  assert.deepEqual(
-    inFlightFirst(twins).map((r) => r.id),
-    ['a', 'b'],
-    'the same instant: by id, so a refetch moves no row',
-  );
-  assert.deepEqual(
-    twins.map((r) => r.id),
-    ['b', 'a'],
-    'and the list given is left as it was',
-  );
-});
-
-test('a run that stops moving drops below the runs still going, whenever it started', () => {
-  const going = run([], { id: 'going', moving: true, createdAt: at(0) });
-  const started = run([], { id: 'started', moving: true, createdAt: at(9) });
-  assert.deepEqual(
-    inFlightFirst([going, started]).map((r) => r.id),
-    ['started', 'going'],
-  );
-  const finished = { ...started, status: 'succeeded' as const, moving: false };
-  assert.deepEqual(
-    inFlightFirst([going, finished]).map((r) => r.id),
-    ['going', 'started'],
-  );
-});
-
 test('an edge from each run a card still waits on to its card, both on the floor, to come — reduced: A→B, B→C and A→C draws only A→B and B→C', () => {
   const edges = runEdges([
     run(['verified ✓'], { id: 'a' }),
@@ -1309,27 +1253,6 @@ test("a card's clock counts from when the run started — its first filing — n
     [atOnce.words, atOnce.title],
     ['6h 14m since it started', `Started ${new Date(createdAt).toLocaleString()}.`],
     'started at once, or with its filings off the feed where the api gives createdAt: no wait to speak of',
-  );
-});
-
-test("REFUSED: a row of the runs list reads its clock each second only while its run's clock counts, and each minute otherwise", () => {
-  const startedAt = '2026-09-20T12:00:00.000Z';
-  const working = run(['running'], { startedAt, atWork: { ms: 60_000, since: '2026-09-20T12:01:00.000Z', endedAt: null } });
-  assert.equal(rowClockEveryMs(working), 1_000, 'a task of it runs: its seconds move');
-  const onYou = run(['over budget $4.25 of $3'], {
-    status: 'failed',
-    startedAt,
-    waitingOnYou: ['step-0'],
-    atWork: { ms: 31_000, since: null, endedAt: '2026-09-20T12:01:00.000Z' },
-  });
-  assert.equal(rowClockEveryMs(onYou), 60_000, 'finished and waiting on you, nothing of it runs: its clock stands');
-  const unjudged = run(['running'], { startedAt });
-  assert.equal(rowClockEveryMs(unjudged), 1_000, "without the api's time at work, it counts while in flight");
-  assert.equal(rowClockEveryMs({ ...unjudged, status: 'failed' }), 60_000, 'and not once finished');
-  assert.equal(
-    rowClockEveryMs(run(['waiting'], { status: 'failed' })),
-    1_000,
-    'nothing filed and nobody called it off: it waits, counting',
   );
 });
 

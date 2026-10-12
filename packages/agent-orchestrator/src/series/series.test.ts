@@ -93,6 +93,48 @@ test('a pass is sampled into each series it carries, a figure an older tick did 
   assert.equal(newer.filter((x) => x.s === 'pass.phase.ms').length, PHASES.length);
 });
 
+test('a pass with a reading of the disk is sampled into its four series, and its other samples are those of the same pass with none', () => {
+  const disk = {
+    at: '2026-10-05T14:00:00Z',
+    free: 700,
+    size: 1000,
+    entries: [
+      { part: 'worktrees' as const, factory: 'nemia', bytes: 40, unread: 2 },
+      { part: 'worktrees' as const, factory: 'pipao', unread: 1 },
+      { part: 'engine' as const, bytes: 90, unread: 0 },
+    ],
+  };
+  const bare = samplesOf(pass('2026-10-05T14:02:00Z'));
+  const read = samplesOf(pass('2026-10-05T14:02:00Z', 10, { disk }));
+  assert.deepEqual(
+    bare.filter((x) => x.s.startsWith('disk.')),
+    [],
+    'a pass with no reading carries none of them, never a zero',
+  );
+  assert.deepEqual(
+    read.filter((x) => !x.s.startsWith('disk.')),
+    bare,
+    'the pass is sampled as it was: its time and its phases are no part of the measure',
+  );
+  assert.deepEqual(
+    read.filter((x) => x.s.startsWith('disk.')),
+    [
+      { s: 'disk.bytes', l: { part: 'worktrees', factory: 'nemia' }, v: 40 },
+      { s: 'disk.bytes', l: { part: 'engine' }, v: 90 },
+      { s: 'disk.unread', l: { part: 'worktrees' }, v: 3 },
+      { s: 'disk.unread', l: { part: 'runs' }, v: 0 },
+      { s: 'disk.unread', l: { part: 'engine' }, v: 0 },
+      { s: 'disk.unread', l: { part: 'checks' }, v: 0 },
+      { s: 'disk.unread', l: { part: 'series' }, v: 0 },
+      { s: 'disk.unread', l: { part: 'other' }, v: 0 },
+      { s: 'disk.free', l: {}, v: 700 },
+      { s: 'disk.size', l: {}, v: 1000 },
+    ],
+    'REFUSED: bytes for the entry that did not read',
+  );
+  assert.deepEqual(strangeLabels({ part: 'engine', factory: 'f' }), []);
+});
+
 test('a label key outside the closed set is named, a run id among them', () => {
   assert.deepEqual(strangeLabels({ factory: 'f', run: 'r-1', step: 's' }), ['run']);
   assert.deepEqual(strangeLabels({ factory: 'f', workflow: 'w', step: 's', agent: 'a', phase: 'place' }), []);

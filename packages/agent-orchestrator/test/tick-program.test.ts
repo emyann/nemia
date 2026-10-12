@@ -221,6 +221,37 @@ test('a pass whose series cannot be written keeps its own cost and says so: the 
   assert.deepEqual([last.at, last.quota], [pass.cost.at, { h: { w: 12 } }]);
 });
 
+test('a pass handed a reading of the disk keeps it as it is and measures nothing: no phase of its own, no store of the disk imported', async () => {
+  const reading = {
+    at: '2026-10-12T06:00:00.000Z',
+    free: 700,
+    size: 1000,
+    entries: [
+      { part: 'runs' as const, factory: 'nemia', bytes: 40, unread: 0 },
+      { part: 'engine' as const, unread: 2 },
+    ],
+  };
+  const pass = await runWith(e, tickRun({ repo: ROOT, disk: () => reading }));
+  const kept = recentPasses().at(-1)!;
+  assert.deepEqual([kept.at, kept.disk], [pass.cost!.at, reading], 'read back off the store, typed');
+  assert.deepEqual(Object.keys(kept.phases), [...PHASES], 'the pass has the phases it had');
+  assert.deepEqual(
+    PHASES.filter((phase) => /disk/.test(phase)),
+    [],
+  );
+  await runWith(e, tickRun({ repo: ROOT, disk: () => undefined }));
+  assert.equal('disk' in recentPasses().at(-1)!, false, 'a pass handed no reading keeps none');
+  const source = fs.readFileSync(path.join(import.meta.dirname, '..', 'src', 'tick', 'tick.verb.ts'), 'utf8');
+  const imports = source.slice(0, source.indexOf('export type TickOptions'));
+  assert.ok(imports.length > 0 && imports.includes("from '../meter/meter.verb.ts'"), 'the slice holds the imports');
+  assert.deepEqual(
+    [...imports.matchAll(/from\s*'(\.\.\/(?:disk|prune)\/[^']+)'/g)].map(([, from]) => from),
+    ['../disk/disk.ts'],
+    'REFUSED: the pass importing the walk or the sweep',
+  );
+  assert.match(imports, /import\s+type\s*\{\s*DiskReading\s*\}\s*from\s*'\.\.\/disk\/disk\.ts'/);
+});
+
 test('a check filed by a pass is kept with its labels among the recent passes, and in the series as check.load', async () => {
   const { keepSeries, seriesRead } = await import('../src/series/series.store.ts');
   const { readRun } = await import('../src/record/record.store.ts');

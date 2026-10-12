@@ -8,7 +8,8 @@
  * their attributes and the logs' annotations come from a pass of the tick traced over the runtime's engine as the client builds it
  * (`engineOf`), the orchestrator's own `Effect.fn` names, the waits' spans (`WAIT_SPANS`) with their own keys (`WAIT_SPAN_KEYS`) and a
  * denied call's (`DENIED_SPAN`, `DENIED_SPAN_KEYS`), each with its step's attributes, and a finished run's timeline's (`TIMELINE_SPAN`,
- * `TIMELINE_SPAN_KEYS`), whose `of` and `part` a query may ask only for a value the code gives (`TIMELINE_OF`, `TIMELINE_PARTS`); the
+ * `TIMELINE_SPAN_KEYS`), whose `of` and `part` a query may ask only for a value the code gives (`TIMELINE_OF`, `TIMELINE_PARTS`), and
+ * a large run's of a sweep of the store's disk (`DISK_SPAN`, `DISK_SPAN_KEYS`); the
  * labels from `STEP_ATTRIBUTE_KEYS` and the attributes each `Metric.withAttributes` gives. What a step's Claude Code session sends, its
  * spans and its log events, and what Tempo's span metrics write, are no code of ours: they are listed as measured, dated, and the span
  * metrics' dimensions and the collector's `command_head` and `test_scope` are read from `tempo.yaml` and `otelcol.yaml`.
@@ -26,12 +27,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
 import { Engine as RuntimeEngine, type Event, type Sighting } from 'agent-runtime';
-import { Effect, Logger, Option, References, Tracer } from 'effect';
+import { Duration, Effect, Logger, Option, References, Tracer } from 'effect';
 import { scratch } from './scratch.ts';
 import { asyncOps, asyncStore, type AsyncJournal, type AsyncRunner } from './promised.ts';
 import { testPlace } from '../place/memory/index.ts';
 import { runGiven } from './placed.ts';
-import { SEED, UNSEEDED, type ServiceSeed, type SpanSeed } from '../../../tools/observe/render/seed.ts';
+import { RUN, SEED, UNSEEDED, type ServiceSeed, type SpanSeed } from '../../../tools/observe/render/seed.ts';
 
 const ROOT = scratch('wf-observe-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -49,6 +50,7 @@ const { EngineService, engineOf } = await import('../src/runtime-client.ts');
 const { DENIED_SPAN, DENIED_SPAN_KEYS, PASS_METRICS, STEP_METRICS, TIMELINE_SPAN, TIMELINE_SPAN_KEYS, WAIT_SPAN_KEYS, WAIT_SPANS } =
   await import('../src/meter/meter.verb.ts');
 const { TIMELINE_OF, TIMELINE_PARTS } = await import('../src/timeline/index.ts');
+const { DISK_EVERY, DISK_METRICS, DISK_SPAN, DISK_SPAN_KEYS } = await import('../src/disk/disk.verb.ts');
 const { STEP_ATTRIBUTE_KEYS } = await import('../src/meter/step.ts');
 const { DEFAULT_SERVICE_NAME } = await import('../src/telemetry/telemetry.ts');
 const { PHASES } = await import('../src/meter/meter.ts');
@@ -353,6 +355,7 @@ const KNOWN: Known = {
     ...Object.values(WAIT_SPANS),
     DENIED_SPAN,
     TIMELINE_SPAN,
+    DISK_SPAN,
     ...[...SOURCE_TEXT.matchAll(/Effect\.fn\(\s*'([^']+)'/g)].map(([, name]) => name),
     ...CLAUDE_SPANS,
   ]),
@@ -361,6 +364,7 @@ const KNOWN: Known = {
     ...WAIT_SPAN_KEYS,
     ...DENIED_SPAN_KEYS,
     ...TIMELINE_SPAN_KEYS,
+    ...DISK_SPAN_KEYS,
     ...STEP_ATTRIBUTE_KEYS,
     ...CLAUDE_SPAN_ATTRIBUTES,
     ...COLLECTOR_ATTRIBUTES,
@@ -918,6 +922,72 @@ test('System charts every metric the code exports', () => {
   system.panels = keep(system.panels);
   assert.deepEqual(unchartedMetrics(system), ['step.rounds']);
   assert.equal(METRICS.has(DENIED_SPAN), false, 'a denied call is a span, and no metric to chart');
+});
+
+/** A duration Grafana writes as a count and a unit (`30m`, `1h`), in milliseconds; NaN for any other text. */
+const grafanaMs = (text: string | undefined): number => {
+  const [, count, unit] = /^(\d+)([smhd])$/.exec(text ?? '') ?? [];
+  return Number(count) * ({ s: 1_000, m: 60_000, h: 3_600_000, d: 86_400_000 }[unit] ?? Number.NaN);
+};
+
+/** The panels of the row `title` of `dashboard`: those after it, up to the next row. */
+const rowPanels = (dashboard: Dashboard, title: string): Panel[] => {
+  const from = dashboard.panels.findIndex((p) => p.type === 'row' && p.title === title);
+  const rest = from < 0 ? [] : dashboard.panels.slice(from + 1);
+  const to = rest.findIndex((p) => p.type === 'row');
+  return to < 0 ? rest : rest.slice(0, to);
+};
+
+/** The panel of `dashboard` titled `title`, with the window it reads where it sets one of its own. */
+const windowed = (dashboard: Dashboard, title: string): (Panel & { timeFrom?: string }) | undefined =>
+  allPanels(dashboard.panels).find((p) => p.title === title);
+
+test("System's Disk row draws the store's disk by the code's names, and its largest runs over a window that holds two sweeps", () => {
+  const system = dashboardTitled('System');
+  const disk = rowPanels(system, 'Disk');
+  assert.deepEqual(
+    disk.map((p) => p.title),
+    ['On disk, by part', 'On disk, by factory', "Free on the store's disk", 'Names that did not read', 'Largest runs now'],
+  );
+  const asked = new Set(disk.flatMap((p) => (p.targets ?? []).flatMap((t) => promNames(t.expr ?? '').metrics)));
+  const exported = Object.keys(DISK_METRICS).flatMap((key) => METRICS.get(`disk.${key}`) ?? [`disk.${key} is no metric of the code`]);
+  assert.deepEqual([...asked].sort(), exported.sort(), 'each gauge of the disk is drawn in the row, and nothing else');
+  const largest = windowed(system, 'Largest runs now')!;
+  assert.deepEqual(traceNames(largest.targets?.[0].query ?? '').spans, [DISK_SPAN]);
+  assert.deepEqual(keptBy(largest.targets?.[0].query ?? '', 'span.'), [['run']], 'a bar a run');
+  assert.equal(largest.options?.namePlacement, 'top', "a run's id is long: above its bar, where it is not cut");
+  const sweep = Duration.toMillis(Duration.fromInputUnsafe(DISK_EVERY));
+  assert.equal(sweep, 600_000);
+  assert.ok(grafanaMs(largest.timeFrom) >= 2 * sweep, `${largest.timeFrom} holds two sweeps of ${sweep} ms`);
+  assert.ok(grafanaMs(largest.timeFrom) <= 6 * sweep, `${largest.timeFrom} is now, not a day: a run freed leaves the panel`);
+  assert.ok(/WSL/.test((windowed(system, "Free on the store's disk") as { description?: string }).description ?? ''), 'the limit is said');
+});
+
+test('REFUSED: a Disk panel asking a misspelt gauge, one kept by run, a largest-runs panel of one sweep, and a seed of one large run', () => {
+  const system = () => dashboardTitled('System');
+  const misspelt = withQuery(system(), 'prometheus', 'disk_bytes_ratio', 'disk_byte_ratio');
+  assert.deepEqual(unknownNames(misspelt, KNOWN), ['disk_byte_ratio']);
+  const byRun = withQuery(system(), 'prometheus', 'sum by (part) (disk_bytes_ratio', 'sum by (run) (disk_bytes_ratio');
+  assert.deepEqual(unknownNames(byRun, KNOWN), ['run'], 'no metric carries a run');
+  const renamed = withQuery(system(), 'tempo', `name="${DISK_SPAN}"`, 'name="disk.runs"');
+  assert.deepEqual(unknownNames(renamed, KNOWN), ['disk.runs']);
+  assert.ok(grafanaMs('10m') < 2 * Duration.toMillis(Duration.fromInputUnsafe(DISK_EVERY)), 'one sweep is no window');
+  assert.ok(Number.isNaN(grafanaMs(undefined)) && Number.isNaN(grafanaMs('now-30m')), 'a panel with no window of its own is refused');
+  const oneRun = SEED.map((said) => ({
+    ...said,
+    spans: said.spans.filter((span) => span.name !== DISK_SPAN || span.attributes.run === RUN),
+  }));
+  assert.deepEqual(unmet(system(), 'system', oneRun), ['Largest runs now: one series by run']);
+  const onePart = SEED.map((said) => ({
+    ...said,
+    metrics: said.metrics.map((m) =>
+      m.name === 'disk.bytes' ? { ...m, series: m.series.filter(([l]) => l.factory === 'nemia' && l.part === 'runs') } : m,
+    ),
+  }));
+  assert.deepEqual(unmet(system(), 'system', onePart), [
+    'On disk, by part: one series by part',
+    'On disk, by factory: one series by factory',
+  ]);
 });
 
 /** The values a TraceQL query asks of the span attribute `key`, each alternative of a regex its own. */

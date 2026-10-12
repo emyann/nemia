@@ -56,7 +56,6 @@ const row = (extra: object = {}): RunSummary => ({
     onYou: true,
   },
   status: 'running',
-  stoppedOn: null,
   moving: true,
   cost: { usd: 4.2, measured: 1, unmeasured: 0, said: '$4.20' },
   atWork: { ms: 1_920_000, since: null, endedAt: '2026-09-30T05:40:00.000Z' },
@@ -229,23 +228,15 @@ test('REFUSED: a row whose status is no word the board knows', async (t) => {
   );
 });
 
-test('a row says what stopped a failed run in which no step broke, in its every word; REFUSED: a row without it, and a word the board does not know', async (t) => {
-  answering(t, [
-    row({ status: 'failed', stoppedOn: 'awaiting approval' }),
-    row({ status: 'failed', stoppedOn: 'blocked' }),
-    row({ status: 'failed', stoppedOn: null }),
-  ]);
+test('a row says a run stopped on a person in its own word, under status; REFUSED: a status the board does not know', async (t) => {
+  answering(t, [row({ status: 'awaiting approval' }), row({ status: 'blocked' }), row({ status: 'failed' })]);
   assert.deepEqual(
-    (await readRuns()).map((run) => run.stoppedOn),
-    ['awaiting approval', 'blocked', null],
+    (await readRuns()).map((run) => run.status),
+    ['awaiting approval', 'blocked', 'failed'],
   );
 
-  const { stoppedOn: _, ...without } = row();
-  answering(t, [without]);
-  await assert.rejects(readRuns(), unread('[0].stoppedOn', 'is missing'));
-
-  answering(t, [row({ stoppedOn: 'nope' })]);
-  await assert.rejects(readRuns(), unread('[0].stoppedOn', '"nope"'));
+  answering(t, [row({ status: 'nope' })]);
+  await assert.rejects(readRuns(), unread('[0].status', '"nope"'));
 });
 
 test('REFUSED: a row whose steps are not an array', async (t) => {

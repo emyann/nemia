@@ -40,7 +40,6 @@ const run = (statuses: readonly string[], extra: Partial<RunSummary> = {}): RunS
   cancelledAt: null,
   pruned: null,
   status: 'running',
-  stoppedOn: null,
   moving: true,
   cost: null,
   atWork: null,

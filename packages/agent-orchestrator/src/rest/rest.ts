@@ -48,14 +48,11 @@ export type RestFacts = {
   held: boolean;
 };
 
-/** The statuses a run rests in: it stopped, and only a person's word, or a change in its tasks, moves it. */
-const FINAL: ReadonlySet<Assessment['status']> = new Set(['succeeded', 'failed', 'cancelled']);
-
 /**
- * Whether a run is at rest after the pass that read `f`: its status is final — succeeded, failed (a gate waiting on a person included) or
- * cancelled — or it is pruned; its workflow is frozen on its record (a record without one reads its folder, which is not an input the
- * memo watches); every task it has is settled; nothing is due and nothing was done; it has no notes; and nothing it was judged by is
- * another run's — no hold, no claim on the checkout read, no run waited on, no slot. Pure.
+ * Whether a run is at rest after the pass that read `f`: it is not `running` — it succeeded, failed, was cancelled, or stopped on a
+ * person, at a gate or on a question — or it is pruned; its workflow is frozen on its record (a record without one reads its folder,
+ * which is not an input the memo watches); every task it has is settled; nothing is due and nothing was done; it has no notes; and
+ * nothing it was judged by is another run's — no hold, no claim on the checkout read, no run waited on, no slot. Pure.
  */
 export const atRest = (f: RestFacts): boolean => restBlockers(f).length === 0;
 
@@ -66,7 +63,7 @@ export const atRest = (f: RestFacts): boolean => restBlockers(f).length === 0;
  */
 export function restBlockers(f: RestFacts): string[] {
   const out: string[] = [];
-  if (!FINAL.has(f.status) && !f.run.pruned) out.push('status');
+  if (f.status === 'running' && !f.run.pruned) out.push('status');
   if (!f.run.workflow) out.push('workflow');
   if (f.run.hold) out.push('hold');
   if (!f.settled) out.push('settled');

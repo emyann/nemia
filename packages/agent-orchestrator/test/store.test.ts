@@ -936,7 +936,7 @@ test('UNSIGNED at shipped defaults: a producer whose closeout lacks a declared f
         ['outcome', 'summary', 'artifacts', 'needs', 'findings'],
         'the run asked for it',
       );
-      assert.deepEqual([pass.filed, pass.blocked, pass.status], [[], ['respond'], 'failed'], why);
+      assert.deepEqual([pass.filed, pass.blocked, pass.status], [[], ['respond'], 'blocked'], why);
       assert.ok(!filings.includes(`${run.id}-respond`), why);
       assert.match((await runWith(e, list(e, readRun(run.id)))).steps.find((s) => s.name === 'review')!.status, /^unsigned/, why);
       const { decision: d } = await runWith(e, decideRun(run.id));
@@ -1752,7 +1752,7 @@ test('REFUSED at the cap, at shipped defaults: `again: true` on round 3 files no
   const filed = [...b.filings];
   for (let i = 0; i < 3; i++) {
     const pass = await runWith(b.e, advanceRun(readRun(run.id)));
-    assert.deepEqual([pass.looped, pass.filed, pass.tried, pass.checked, pass.status], [[], [], [], [], 'failed'], `pass ${i + 1}`);
+    assert.deepEqual([pass.looped, pass.filed, pass.tried, pass.checked, pass.status], [[], [], [], [], 'blocked'], `pass ${i + 1}`);
   }
   assert.deepEqual(b.filings, filed, 'nothing filed at the cap');
   const l = await runWith(b.e, list(b.e, readRun(run.id)));
@@ -1911,7 +1911,7 @@ test('an acceptance file the run cannot read is not honoured, and not touched: t
   for (const [written, why] of bad) {
     fs.writeFileSync(file, written);
     const pass = await runWith(b.e, advanceRun(readRun(run.id)));
-    assert.deepEqual([pass.filed, pass.status], [[], 'failed'], written);
+    assert.deepEqual([pass.filed, pass.status], [[], 'blocked'], written);
     assert.ok(
       pass.notes.some((n) => why.test(n)),
       `${written}: ${pass.notes.join(' | ')}`,
@@ -4771,7 +4771,7 @@ test("a claude-detached step's `budget:` goes to the engine as `budgetUsd`; a se
     const pass = await runWith(e, advanceRun(readRun(run.id)));
     assert.deepEqual(
       [pass.tried, pass.filed, pass.checked, pass.blocked, pass.status],
-      [[], [], [], ['review'], 'failed'],
+      [[], [], [], ['review'], 'blocked'],
       `pass ${i + 1}`,
     );
   }
@@ -4850,7 +4850,7 @@ test("REFUSED past a budget in a loop at shipped defaults: review's `again: true
   const filed = [...b.filings];
   for (let i = 0; i < 2; i++) {
     const pass = await runWith(b.e, advanceRun(readRun(run.id)));
-    assert.deepEqual([pass.looped, pass.filed, pass.tried, pass.status], [[], [], [], 'failed'], `pass ${i + 1}`);
+    assert.deepEqual([pass.looped, pass.filed, pass.tried, pass.status], [[], [], [], 'blocked'], `pass ${i + 1}`);
   }
   assert.deepEqual(b.filings, filed, 'no round');
   const l = await runWith(b.e, list(b.e, readRun(run.id)));

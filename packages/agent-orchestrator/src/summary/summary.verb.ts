@@ -35,7 +35,6 @@ import {
   needsOf,
   type RunHolding,
   type RunStatus,
-  type RunStoppedOn,
   type RunToDecide,
   type RunWaiting,
   type Spent,
@@ -90,12 +89,11 @@ export type RunSummary = {
    * filed and nothing is asked of anyone: no step waits on you, and no verb is offered, as `nemia ls` says it.
    */
   holding: RunHolding | null;
-  status: RunStatus;
   /**
-   * What stopped a `failed` run in which no step broke, as `nemia decide` and the feed say it: `awaiting approval` for a run at its gate,
-   * `blocked` for one whose step signed off blocked. Null for every other run, one whose step broke among them.
+   * The run in one word, as the feed and `nemia tick` say it: `running`, `succeeded`, `cancelled`; `failed` for a run in which a step
+   * broke; `awaiting approval` for one stopped at its gates alone; `blocked` for one a person's word stops otherwise.
    */
-  stoppedOn: RunStoppedOn | null;
+  status: RunStatus;
   /**
    * Whether anything of the run still moves: a task the engine holds for it — a step's or a check's, filed
    * and not settled — or a step, a check, a try or a round a tick would still file. `status` does not say: `assess` reads a
@@ -186,7 +184,6 @@ const summarize = Effect.fnUntraced(function* (run: Run, views: Views, reader: E
     heldUntil: judged.holding ? run.hold!.until : [],
     holding: judged.holding,
     status: judged.status,
-    stoppedOn: judged.stoppedOn,
     moving: judged.moving,
     cost: judged.cost,
     atWork: atWork(run, views),
@@ -237,7 +234,6 @@ function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, 
     heldUntil: run.hold && !run.cancelledAt ? run.hold.until : [],
     holding: null,
     status: 'running',
-    stoppedOn: null,
     moving: true,
     cost: null,
     atWork: null,
@@ -297,14 +293,14 @@ export const judgedNow = Effect.fn('judgedNow')(function* (e: Engine, home: stri
 
 /**
  * Whether a run's summary may be kept (`restingRead`): a run at rest, which nothing but a person, git or the engine's journals can move.
- * Its status final or the run pruned, nothing of it moving, waited on or held, every task it has filed settled, the workflow it is judged
- * by frozen on its record — a folder on disk is watched by nothing — and git's every answer given. The tick's own test (`atRest` in the
- * package's rest.ts) reads what a pass would file; this reads what the list says, which is what it keeps.
+ * Its status not `running` or the run pruned, nothing of it moving, waited on or held, every task it has filed settled, the workflow it is
+ * judged by frozen on its record — a folder on disk is watched by nothing — and git's every answer given. The tick's own test (`atRest`
+ * in the package's rest.ts) reads what a pass would file; this reads what the list says, which is what it keeps.
  */
 const atRest = Effect.fnUntraced(function* (run: Run, judged: Judged, reader: Engine) {
   const { summary, asked } = judged;
   if (!run.workflow || run.hold || asked.failed || summary.moving || summary.waiting || summary.holding) return false;
-  if (!run.pruned && !['succeeded', 'failed', 'cancelled'].includes(summary.status)) return false;
+  if (!run.pruned && summary.status === 'running') return false;
   return [...(yield* viewsOf(run, reader)).values()].every((view) => view.state.settled);
 });
 

@@ -14,7 +14,6 @@ import {
   latestTryOf,
   settleSave,
   tryHeld,
-  tryStatusWord,
   KEY_LABELS,
   pickHarnessPrompt,
   ROLE_KEYS,
@@ -371,16 +370,4 @@ test('REFUSED: Try it is held on an empty brief and while a try moves, as the ap
   );
   assert.equal(tryHeld('Write a note', { id: 'r-1', moving: false }), null);
   assert.equal(tryHeld('Write a note', undefined), null);
-});
-
-test("a try's state says what stopped it where the list judged its run as its detail does, and the bare status otherwise", () => {
-  assert.equal(tryStatusWord('failed', { status: 'failed', stoppedOn: 'awaiting approval' }), 'awaiting approval', 'at its gate');
-  assert.equal(tryStatusWord('failed', { status: 'failed', stoppedOn: 'blocked' }), 'blocked', 'signed off blocked');
-  assert.equal(tryStatusWord('failed', { status: 'failed', stoppedOn: null }), 'failed', 'a step broke: nothing more to say');
-  assert.equal(tryStatusWord('failed', undefined), 'failed', 'the list does not have it yet');
-  assert.equal(
-    tryStatusWord('running', { status: 'failed', stoppedOn: 'blocked' }),
-    'running',
-    "a row read before the detail's: what it says of a failed run is not this one's",
-  );
 });

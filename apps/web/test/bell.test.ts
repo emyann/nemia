@@ -26,7 +26,6 @@ const run = (id: string, extra: Partial<RunSummary> = {}, steps: readonly string
   cancelledAt: null,
   pruned: null,
   status: 'running',
-  stoppedOn: null,
   moving: true,
   cost: null,
   atWork: null,
@@ -61,8 +60,7 @@ const run = (id: string, extra: Partial<RunSummary> = {}, steps: readonly string
 /** A run whose second step waits at its gate. */
 const atGate = (id: string, extra: Partial<RunSummary> = {}): RunSummary => {
   const base = run(id, {
-    status: 'failed',
-    stoppedOn: 'awaiting approval',
+    status: 'awaiting approval',
     moving: false,
     waitingOnYou: ['build'],
     onYou: ['approve build'],

@@ -23,7 +23,7 @@ const listed = (status: string, { onYou = false, waits }: { onYou?: boolean; wai
 /** The feed's lines for a pass that judged the run `status`, and its step as `listed` says it: the run's, then the step's. */
 const linesOf = (
   l: Listing,
-  status: { status: 'running' | 'succeeded' | 'failed' | 'cancelled'; stoppedOn?: 'awaiting approval' | 'blocked' },
+  status: { status: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting approval' | 'blocked' },
   closeout?: Closeout,
 ): RunLine[] => {
   const words = feedWords(l, {}, status, () => closeout);
@@ -34,10 +34,10 @@ const BLOCKED: Closeout = { outcome: 'blocked', summary: 's', artifacts: [], nee
 
 test('the default wake words wake on each line the feed writes for a wait on a person, pinned against feedWords', () => {
   const waits: Array<[string, FeedLine[]]> = [
-    ['a step at its gate', linesOf(listed('awaiting approval', { onYou: true }), { status: 'failed', stoppedOn: 'awaiting approval' })],
+    ['a step at its gate', linesOf(listed('awaiting approval', { onYou: true }), { status: 'awaiting approval' })],
     ['a loop out of rounds', linesOf(listed('rounds exhausted', { onYou: true }), { status: 'running' })],
     ['a session on its prompt', linesOf(listed('needs-human', { waits: 'permission: Bash' }), { status: 'running' })],
-    ['a blocked sign-off', linesOf(listed('succeeded · BLOCKED', { onYou: true }), { status: 'failed', stoppedOn: 'blocked' }, BLOCKED)],
+    ['a blocked sign-off', linesOf(listed('succeeded · BLOCKED', { onYou: true }), { status: 'blocked' }, BLOCKED)],
     ['a check refused', linesOf(listed('failed ✗ check (exit 1)', { onYou: true }), { status: 'failed' })],
   ];
   for (const [what, lines] of waits)
@@ -48,7 +48,7 @@ test('the default wake words wake on each line the feed writes for a wait on a p
 });
 
 test("a run blocked, its note waiting on you: review, wakes on the run's own line, and a loop out of rounds on the step's", () => {
-  const [run] = linesOf(listed('rounds exhausted', { onYou: true }), { status: 'failed', stoppedOn: 'blocked' });
+  const [run] = linesOf(listed('rounds exhausted', { onYou: true }), { status: 'blocked' });
   assert.deepEqual(run, { at: AT, run: 'r-1', word: 'blocked', note: 'waiting on you: review' });
   assert.equal(sortLine(run, DEFAULT_WAKE), 'wake');
   assert.equal(

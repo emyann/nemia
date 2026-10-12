@@ -2,226 +2,238 @@
 # Generated from the project's DESIGN.md by the MD3 kit (tokens/generate-theme.mjs).
 # Never edit this file: edit the project's DESIGN.md and regenerate.
 version: alpha
-name: Nemia
-description: Nemia's board in a cyberpunk look — near-black violet surfaces, neon magenta for what acts, cyan for what informs, acid yellow for what warns, hairlines and glows instead of shadows, sharp corners.
+name: Nemia, Cyberpunk Blend
+description: Nemia's board between two cyberpunks — a green-black night with acid yellow for what a person does and neon green for what runs, and on it the printed labels of a retro spec sheet in amber, terracotta and grey with black ink.
 scheme: dark
 colors:
-  seed: "#7b2cff"
-  primary-key: "#ff2bd6"
-  secondary-key: "#00e5ff"
-  tertiary-key: "#fcee0a"
-  neutral-key: "#2b2545"
-  neutral-variant-key: "#3a2f66"
-  error-key: "#ff3355"
-  primary: "#ff2bd6"
-  on-primary: "#1a0016"
-  primary-container: "#86006f"
-  on-primary-container: "#ffd8ee"
-  secondary: "#00e5ff"
-  on-secondary: "#001f24"
-  secondary-container: "#004f58"
-  on-secondary-container: "#9cf0ff"
-  tertiary: "#fcee0a"
-  on-tertiary: "#1f1d00"
-  tertiary-container: "#4d4800"
-  on-tertiary-container: "#f4e700"
-  error: "#ffb3b5"
-  on-error: "#680018"
-  error-container: "#920025"
-  on-error-container: "#ffdada"
-  background: "#07060d"
-  on-background: "#e9e6ff"
-  surface: "#0b0a14"
-  on-surface: "#e9e6ff"
-  surface-variant: "#493e76"
-  on-surface-variant: "#cbbeff"
-  surface-dim: "#140e2d"
-  surface-bright: "#3b3556"
-  surface-container-lowest: "#0f0928"
-  surface-container-low: "#1d1736"
-  surface-container: "#211b3a"
-  surface-container-high: "#2b2545"
-  surface-container-highest: "#363051"
-  surface-tint: "#ffade2"
-  outline: "#9588c6"
-  outline-variant: "#493e76"
+  seed: "#1f7a36"
+  primary-key: "#f5e61a"
+  secondary-key: "#2bff4f"
+  tertiary-key: "#e0a15e"
+  neutral-key: "#25332a"
+  neutral-variant-key: "#2e4335"
+  error-key: "#e0584b"
+  primary: "#f5e61a"
+  on-primary: "#141300"
+  primary-container: "#4d4800"
+  on-primary-container: "#f5e61b"
+  secondary: "#39ff5a"
+  on-secondary: "#00210a"
+  secondary-container: "#005310"
+  on-secondary-container: "#71ff73"
+  tertiary: "#e0a15e"
+  on-tertiary: "#1c1105"
+  tertiary-container: "#683c00"
+  on-tertiary-container: "#ffdcbd"
+  error: "#e8695b"
+  on-error: "#210503"
+  error-container: "#8b1a15"
+  on-error-container: "#ffdad5"
+  background: "#050b07"
+  on-background: "#e6efe2"
+  surface: "#08110b"
+  on-surface: "#e6efe2"
+  surface-variant: "#364c3d"
+  on-surface-variant: "#b4ccba"
+  surface-dim: "#09160e"
+  surface-bright: "#2e3c33"
+  surface-container-lowest: "#041109"
+  surface-container-low: "#111e16"
+  surface-container: "#15231a"
+  surface-container-high: "#1f2d24"
+  surface-container-highest: "#2a382f"
+  surface-tint: "#d7ca00"
+  outline: "#7f9685"
+  outline-variant: "#364c3d"
   shadow: "#000000"
   scrim: "#000000"
-  inverse-surface: "#e6deff"
-  inverse-on-surface: "#322c4c"
-  inverse-primary: "#af0092"
-  primary-fixed: "#ffd8ee"
-  on-primary-fixed: "#3b002f"
-  primary-fixed-dim: "#ffade2"
-  on-primary-fixed-variant: "#86006f"
-  secondary-fixed: "#9cf0ff"
-  on-secondary-fixed: "#001f24"
-  secondary-fixed-dim: "#00daf3"
-  on-secondary-fixed-variant: "#004f58"
-  tertiary-fixed: "#f4e700"
-  on-tertiary-fixed: "#1f1c00"
-  tertiary-fixed-dim: "#d6ca00"
-  on-tertiary-fixed-variant: "#4d4800"
+  inverse-surface: "#a9aca6"
+  inverse-on-surface: "#0c0f0c"
+  inverse-primary: "#3a3600"
+  primary-fixed: "#f5e61b"
+  on-primary-fixed: "#1f1c00"
+  primary-fixed-dim: "#d7ca00"
+  on-primary-fixed-variant: "#4d4800"
+  secondary-fixed: "#71ff73"
+  on-secondary-fixed: "#002203"
+  secondary-fixed-dim: "#00e63f"
+  on-secondary-fixed-variant: "#005310"
+  tertiary-fixed: "#ffdcbd"
+  on-tertiary-fixed: "#2c1600"
+  tertiary-fixed-dim: "#fcb974"
+  on-tertiary-fixed-variant: "#683c00"
 typography:
   display-large:
-    fontFamily: Orbitron Variable
+    fontFamily: Michroma
     fontSize: 57px
     fontWeight: 400
     lineHeight: 64px
     letterSpacing: -0.25px
   display-medium:
-    fontFamily: Orbitron Variable
+    fontFamily: Michroma
     fontSize: 45px
     fontWeight: 400
     lineHeight: 52px
     letterSpacing: 0px
   display-small:
-    fontFamily: Orbitron Variable
+    fontFamily: Michroma
     fontSize: 36px
     fontWeight: 400
     lineHeight: 44px
     letterSpacing: 0px
   headline-large:
-    fontFamily: Orbitron Variable
+    fontFamily: Michroma
     fontSize: 32px
     fontWeight: 400
     lineHeight: 40px
     letterSpacing: 0px
   headline-medium:
-    fontFamily: Orbitron Variable
+    fontFamily: Michroma
     fontSize: 28px
     fontWeight: 400
     lineHeight: 36px
     letterSpacing: 0px
   headline-small:
-    fontFamily: Orbitron Variable
+    fontFamily: Michroma
     fontSize: 24px
     fontWeight: 400
     lineHeight: 32px
     letterSpacing: 0px
   title-large:
-    fontFamily: Orbitron Variable
+    fontFamily: Michroma
     fontSize: 22px
     fontWeight: 400
     lineHeight: 28px
     letterSpacing: 0px
   title-medium:
-    fontFamily: Orbitron Variable
+    fontFamily: Michroma
     fontSize: 16px
     fontWeight: 500
     lineHeight: 24px
     letterSpacing: 0.15px
   title-small:
-    fontFamily: Orbitron Variable
+    fontFamily: Michroma
     fontSize: 14px
     fontWeight: 500
     lineHeight: 20px
     letterSpacing: 0.1px
   body-large:
-    fontFamily: Geist Variable
+    fontFamily: Chakra Petch
     fontSize: 16px
     fontWeight: 400
     lineHeight: 24px
     letterSpacing: 0.5px
   body-medium:
-    fontFamily: Geist Variable
+    fontFamily: Chakra Petch
     fontSize: 14px
     fontWeight: 400
     lineHeight: 20px
     letterSpacing: 0.25px
   body-small:
-    fontFamily: Geist Variable
+    fontFamily: Chakra Petch
     fontSize: 12px
     fontWeight: 400
     lineHeight: 16px
     letterSpacing: 0.4px
   label-large:
-    fontFamily: Geist Variable
+    fontFamily: Chakra Petch
     fontSize: 14px
     fontWeight: 500
     lineHeight: 20px
     letterSpacing: 0.1px
   label-medium:
-    fontFamily: Geist Variable
+    fontFamily: Chakra Petch
     fontSize: 12px
     fontWeight: 500
     lineHeight: 16px
     letterSpacing: 0.5px
   label-small:
-    fontFamily: Geist Variable
+    fontFamily: Chakra Petch
     fontSize: 11px
     fontWeight: 500
     lineHeight: 16px
     letterSpacing: 0.5px
 rounded:
   extra-small: 0
-  small: 2px
-  medium: 2px
-  large: 4px
-  extra-large: 4px
-  full: 2px
+  small: 0
+  medium: 0
+  large: 0
+  extra-large: 0
+  full: 0
 ---
 
 ## Overview
 
-Nemia is a board for running teams of agents: runs, steps, gates, costs. The
-look is cyberpunk, a control room at night. The page is nearly black with a
-violet cast, and colour is kept for meaning: magenta is what a person can act
-on, cyan is what the machine reports, yellow is what needs a look.
+Two cyberpunks, blended. From the night-city one: a ground that is nearly
+black with a green cast, frames with a cut corner and a hairline, acid yellow
+on whatever a person can press, neon green on whatever is alive. From the
+retro one: the printed label. An instrument is a flat matte tile, amber,
+terracotta or grey, with black ink, a wide machine lettering and a boxed
+readout, as stuck on the equipment by whoever built it.
 
-The board is dark by nature. The dark scheme is the one written here; the
-light scheme is derived from the same keys for a person whose system asks for
-it, and is checked by eye, not designed.
+The rule that holds the blend together: hardware is cut, labels are stuck on.
+A frame, a button and a tag have hard corners or a cut one. A tile that
+carries a number is a sticker, and only a sticker is rounded.
+
+The dark scheme is the one written here. The light scheme is derived from the
+same keys and is checked by eye, not designed.
 
 ## Colors
 
-- **Seed (`seed`):** an electric violet. The neutrals lean towards it.
-- **Primary (`primary-key`, `primary`):** neon magenta, `#ff2bd6`, written as
-  a role so a filled button is exactly that colour, with near-black text on it.
-- **Secondary (`secondary-key`, `secondary`):** cyan, `#00e5ff`, for what
-  informs: the focus ring, a selected tab, a running step.
-- **Tertiary (`tertiary-key`, `tertiary`):** acid yellow, `#fcee0a`, for what
-  needs a look.
-- **Neutrals (`neutral-key`, `neutral-variant-key`):** a dark violet, so every
-  surface and outline carries the cast, in both schemes.
+A colour says one thing, on every page.
+
+- **Seed (`seed`):** a deep green. The neutrals lean towards it, so every
+  surface and outline carries the cast.
+- **Primary (`primary-key`, `primary`):** acid yellow, `#f5e61a`, with black
+  on it. It is yours: a gate that waits on a person, and the one filled
+  button.
+- **Secondary (`secondary-key`, `secondary`):** neon green, `#39ff5a`, for
+  what is alive: a session at work, a selected filter.
+- **Tertiary (`tertiary-key`, `tertiary`):** the amber of a printed label,
+  `#e0a15e`, with black ink on it. It is money: what a run cost.
+- **Inverse (`inverse-surface`, `inverse-on-surface`):** the label's grey,
+  with black ink, for what is at rest: a count, a clock, a finished run.
+- **Outline (`outline`):** a sage grey. Filled, it is a step that is done, a
+  check that runs, a wait on another run.
+- **Error (`error-key`, `error`):** the label's terracotta, kept for what
+  failed. A board where nothing failed does not show it.
 - **Surfaces (`background`, `surface`):** written, because the derived dark
-  surface is a grey and the board wants a near-black.
-- **Error (`error-key`):** a hot red, kept apart from the magenta by its hue.
+  surface is a grey and the board wants a green-black.
 
 ## Typography
 
-Two faces. Orbitron for the brand face (display, headline, title): wide,
-geometric, a machine's lettering. Geist for the plain face (body, label), the
-face the board already reads in. Sizes, weights and tracking are Material's.
+Michroma for the brand face (display, headline, title): wide, thin, square
+lettering, the face of a head-up display, set in capitals on the hardware.
+Chakra Petch for the plain face (body, label): squared, with cut terminals,
+readable small and at home in capitals.
+
+The kit carries two faces and this look wants four. The board sets the other
+two beside the kit: a printed label's numerals in Archivo at its widest and
+heavy (width 125, weight 800), black ink on the label's stock; and
+identifiers, commands and readouts in Share Tech Mono. Sizes, weights and
+tracking of the kit's roles are Material's.
 
 ## Shape
 
-Sharp. Nothing is a pill: `full` is 2px, so a button, a chip and a switch are
-cut like the panels around them.
+Every corner of the kit is square: all six radii are 0. A cut corner and a
+rounded sticker are not radii; the board draws them around the kit's
+components.
 
 ## Elevation and motion
 
-No shadow: a surface is lifted by a hairline in the primary colour, then by a
-glow that grows with the level. Motion is short and decisive.
+No shadow. A raised surface is a hairline in yellow, then in green as it
+rises. Motion is short and decisive.
 
 ## Reference CSS
 
 ```css
 :root {
   --md3-dark-mode: system;
-  --md-sys-elevation-1: 0 0 0 1px --alpha(var(--md-sys-color-primary) / 30%);
-  --md-sys-elevation-2:
-    0 0 0 1px --alpha(var(--md-sys-color-primary) / 45%),
-    0 0 12px 0 --alpha(var(--md-sys-color-primary) / 22%);
-  --md-sys-elevation-3:
-    0 0 0 1px --alpha(var(--md-sys-color-secondary) / 55%),
-    0 0 18px 0 --alpha(var(--md-sys-color-secondary) / 28%);
-  --md-sys-elevation-4:
-    0 0 0 1px --alpha(var(--md-sys-color-secondary) / 65%),
-    0 0 26px 2px --alpha(var(--md-sys-color-secondary) / 32%);
-  --md-sys-elevation-5:
-    0 0 0 1px --alpha(var(--md-sys-color-tertiary) / 70%),
-    0 0 34px 4px --alpha(var(--md-sys-color-tertiary) / 30%);
+  --md-sys-elevation-1: 0 0 0 1px --alpha(var(--md-sys-color-outline-variant) / 100%);
+  --md-sys-elevation-2: 0 0 0 1px --alpha(var(--md-sys-color-primary) / 45%);
+  --md-sys-elevation-3: 0 0 0 1px --alpha(var(--md-sys-color-primary) / 70%);
+  --md-sys-elevation-4: 0 0 0 1px --alpha(var(--md-sys-color-secondary) / 60%);
+  --md-sys-elevation-5: 0 0 0 1px --alpha(var(--md-sys-color-secondary) / 85%);
   --md-sys-state-hover-state-layer-opacity: 10%;
   --md-sys-state-focus-state-layer-opacity: 14%;
   --md-sys-state-pressed-state-layer-opacity: 18%;
@@ -229,17 +241,17 @@ glow that grows with the level. Motion is short and decisive.
   --md-sys-motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
   --md-sys-motion-easing-standard-accelerate: cubic-bezier(0.3, 0, 1, 1);
   --md-sys-motion-easing-standard-decelerate: cubic-bezier(0, 0, 0, 1);
-  --md-sys-motion-easing-emphasized: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --md-sys-motion-easing-emphasized: cubic-bezier(0.2, 0, 0, 1);
   --md-sys-motion-easing-emphasized-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15);
   --md-sys-motion-easing-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
-  --md3-duration-short-1: 40ms;
-  --md3-duration-short-2: 70ms;
-  --md3-duration-short-3: 100ms;
-  --md3-duration-short-4: 130ms;
-  --md3-duration-medium-1: 160ms;
-  --md3-duration-medium-2: 200ms;
-  --md3-duration-medium-3: 240ms;
-  --md3-duration-medium-4: 280ms;
+  --md3-duration-short-1: 50ms;
+  --md3-duration-short-2: 100ms;
+  --md3-duration-short-3: 150ms;
+  --md3-duration-short-4: 110ms;
+  --md3-duration-medium-1: 250ms;
+  --md3-duration-medium-2: 180ms;
+  --md3-duration-medium-3: 350ms;
+  --md3-duration-medium-4: 400ms;
   --md3-duration-long-1: 450ms;
   --md3-duration-long-2: 500ms;
   --md3-duration-long-3: 550ms;
@@ -257,52 +269,52 @@ the system asks for it (`prefers-color-scheme: dark`); no class switches it.
 
 | Role | Light | Dark |
 | :--- | :--- | :--- |
-| `primary` | `#af0092` `hsl(310 100% 34%)` | `#ff2bd6` `hsl(312 100% 58%)` |
-| `on-primary` | `#ffffff` `hsl(0 0% 100%)` | `#1a0016` `hsl(309 100% 5%)` |
-| `primary-container` | `#ffd8ee` `hsl(326 100% 92%)` | `#86006f` `hsl(310 100% 26%)` |
-| `on-primary-container` | `#86006f` `hsl(310 100% 26%)` | `#ffd8ee` `hsl(326 100% 92%)` |
-| `secondary` | `#006875` `hsl(187 100% 23%)` | `#00e5ff` `hsl(186 100% 50%)` |
-| `on-secondary` | `#ffffff` `hsl(0 0% 100%)` | `#001f24` `hsl(188 100% 7%)` |
-| `secondary-container` | `#9cf0ff` `hsl(189 100% 81%)` | `#004f58` `hsl(186 100% 17%)` |
-| `on-secondary-container` | `#004f58` `hsl(186 100% 17%)` | `#9cf0ff` `hsl(189 100% 81%)` |
-| `tertiary` | `#666000` `hsl(56 100% 20%)` | `#fcee0a` `hsl(57 98% 51%)` |
-| `on-tertiary` | `#ffffff` `hsl(0 0% 100%)` | `#1f1d00` `hsl(56 100% 6%)` |
-| `tertiary-container` | `#f4e700` `hsl(57 100% 48%)` | `#4d4800` `hsl(56 100% 15%)` |
-| `on-tertiary-container` | `#4d4800` `hsl(56 100% 15%)` | `#f4e700` `hsl(57 100% 48%)` |
-| `error` | `#be0034` `hsl(344 100% 37%)` | `#ffb3b5` `hsl(358 100% 85%)` |
-| `on-error` | `#ffffff` `hsl(0 0% 100%)` | `#680018` `hsl(346 100% 20%)` |
-| `error-container` | `#ffdada` `hsl(0 100% 93%)` | `#920025` `hsl(345 100% 29%)` |
-| `on-error-container` | `#920025` `hsl(345 100% 29%)` | `#ffdada` `hsl(0 100% 93%)` |
-| `background` | `#fdf8ff` `hsl(283 100% 99%)` | `#07060d` `hsl(249 37% 4%)` |
-| `on-background` | `#1d1736` `hsl(252 40% 15%)` | `#e9e6ff` `hsl(247 100% 95%)` |
-| `surface` | `#fdf8ff` `hsl(283 100% 99%)` | `#0b0a14` `hsl(246 33% 6%)` |
-| `on-surface` | `#1d1736` `hsl(252 40% 15%)` | `#e9e6ff` `hsl(247 100% 95%)` |
-| `surface-variant` | `#e7deff` `hsl(256 100% 94%)` | `#493e76` `hsl(252 31% 35%)` |
-| `on-surface-variant` | `#493e76` `hsl(252 31% 35%)` | `#cbbeff` `hsl(252 100% 87%)` |
-| `surface-dim` | `#ded4fe` `hsl(254 95% 91%)` | `#140e2d` `hsl(252 53% 12%)` |
-| `surface-bright` | `#fdf8ff` `hsl(283 100% 99%)` | `#3b3556` `hsl(251 24% 27%)` |
-| `surface-container-lowest` | `#ffffff` `hsl(0 0% 100%)` | `#0f0928` `hsl(252 63% 10%)` |
-| `surface-container-low` | `#f7f1ff` `hsl(266 100% 97%)` | `#1d1736` `hsl(252 40% 15%)` |
-| `surface-container` | `#f2ebff` `hsl(261 100% 96%)` | `#211b3a` `hsl(252 36% 17%)` |
-| `surface-container-high` | `#ece4ff` `hsl(258 100% 95%)` | `#2b2545` `hsl(251 30% 21%)` |
-| `surface-container-highest` | `#e6deff` `hsl(255 100% 94%)` | `#363051` `hsl(251 26% 25%)` |
-| `surface-tint` | `#af0092` `hsl(310 100% 34%)` | `#ffade2` `hsl(321 100% 84%)` |
-| `outline` | `#7b6faa` `hsl(252 26% 55%)` | `#9588c6` `hsl(253 35% 65%)` |
-| `outline-variant` | `#cbbeff` `hsl(252 100% 87%)` | `#493e76` `hsl(252 31% 35%)` |
+| `primary` | `#676000` `hsl(56 100% 20%)` | `#f5e61a` `hsl(56 92% 53%)` |
+| `on-primary` | `#ffffff` `hsl(0 0% 100%)` | `#141300` `hsl(57 100% 4%)` |
+| `primary-container` | `#f5e61b` `hsl(56 92% 53%)` | `#4d4800` `hsl(56 100% 15%)` |
+| `on-primary-container` | `#4d4800` `hsl(56 100% 15%)` | `#f5e61b` `hsl(56 92% 53%)` |
+| `secondary` | `#006e19` `hsl(134 100% 22%)` | `#39ff5a` `hsl(130 100% 61%)` |
+| `on-secondary` | `#ffffff` `hsl(0 0% 100%)` | `#00210a` `hsl(138 100% 6%)` |
+| `secondary-container` | `#71ff73` `hsl(121 100% 72%)` | `#005310` `hsl(132 100% 16%)` |
+| `on-secondary-container` | `#005310` `hsl(132 100% 16%)` | `#71ff73` `hsl(121 100% 72%)` |
+| `tertiary` | `#855317` `hsl(33 71% 31%)` | `#e0a15e` `hsl(31 68% 62%)` |
+| `on-tertiary` | `#ffffff` `hsl(0 0% 100%)` | `#1c1105` `hsl(31 70% 6%)` |
+| `tertiary-container` | `#ffdcbd` `hsl(28 100% 87%)` | `#683c00` `hsl(35 100% 20%)` |
+| `on-tertiary-container` | `#683c00` `hsl(35 100% 20%)` | `#ffdcbd` `hsl(28 100% 87%)` |
+| `error` | `#ac3229` `hsl(4 62% 42%)` | `#e8695b` `hsl(6 75% 63%)` |
+| `on-error` | `#ffffff` `hsl(0 0% 100%)` | `#210503` `hsl(4 83% 7%)` |
+| `error-container` | `#ffdad5` `hsl(7 100% 92%)` | `#8b1a15` `hsl(3 74% 31%)` |
+| `on-error-container` | `#8b1a15` `hsl(3 74% 31%)` | `#ffdad5` `hsl(7 100% 92%)` |
+| `background` | `#edfef0` `hsl(131 89% 96%)` | `#050b07` `hsl(140 38% 3%)` |
+| `on-background` | `#111e16` `hsl(143 28% 9%)` | `#e6efe2` `hsl(102 29% 91%)` |
+| `surface` | `#edfef0` `hsl(131 89% 96%)` | `#08110b` `hsl(140 36% 5%)` |
+| `on-surface` | `#111e16` `hsl(143 28% 9%)` | `#e6efe2` `hsl(102 29% 91%)` |
+| `surface-variant` | `#d0e9d5` `hsl(132 36% 86%)` | `#364c3d` `hsl(139 17% 25%)` |
+| `on-surface-variant` | `#364c3d` `hsl(139 17% 25%)` | `#b4ccba` `hsl(135 19% 75%)` |
+| `surface-dim` | `#ceded1` `hsl(131 20% 84%)` | `#09160e` `hsl(143 42% 6%)` |
+| `surface-bright` | `#edfef0` `hsl(131 89% 96%)` | `#2e3c33` `hsl(141 13% 21%)` |
+| `surface-container-lowest` | `#ffffff` `hsl(0 0% 100%)` | `#041109` `hsl(143 62% 4%)` |
+| `surface-container-low` | `#e7f8ea` `hsl(131 55% 94%)` | `#111e16` `hsl(143 28% 9%)` |
+| `surface-container` | `#e2f2e4` `hsl(128 38% 92%)` | `#15231a` `hsl(141 25% 11%)` |
+| `surface-container-high` | `#dcecdf` `hsl(131 30% 89%)` | `#1f2d24` `hsl(141 18% 15%)` |
+| `surface-container-highest` | `#d6e7d9` `hsl(131 26% 87%)` | `#2a382f` `hsl(141 14% 19%)` |
+| `surface-tint` | `#676000` `hsl(56 100% 20%)` | `#d7ca00` `hsl(56 100% 42%)` |
+| `outline` | `#667c6c` `hsl(136 10% 44%)` | `#7f9685` `hsl(136 10% 54%)` |
+| `outline-variant` | `#b4ccba` `hsl(135 19% 75%)` | `#364c3d` `hsl(139 17% 25%)` |
 | `shadow` | `#000000` `hsl(0 0% 0%)` | `#000000` `hsl(0 0% 0%)` |
 | `scrim` | `#000000` `hsl(0 0% 0%)` | `#000000` `hsl(0 0% 0%)` |
-| `inverse-surface` | `#322c4c` `hsl(251 27% 24%)` | `#e6deff` `hsl(255 100% 94%)` |
-| `inverse-on-surface` | `#f4eeff` `hsl(261 100% 97%)` | `#322c4c` `hsl(251 27% 24%)` |
-| `inverse-primary` | `#ffade2` `hsl(321 100% 84%)` | `#af0092` `hsl(310 100% 34%)` |
-| `primary-fixed` | `#ffd8ee` `hsl(326 100% 92%)` | `#ffd8ee` `hsl(326 100% 92%)` |
-| `on-primary-fixed` | `#3b002f` `hsl(312 100% 12%)` | `#3b002f` `hsl(312 100% 12%)` |
-| `primary-fixed-dim` | `#ffade2` `hsl(321 100% 84%)` | `#ffade2` `hsl(321 100% 84%)` |
-| `on-primary-fixed-variant` | `#86006f` `hsl(310 100% 26%)` | `#86006f` `hsl(310 100% 26%)` |
-| `secondary-fixed` | `#9cf0ff` `hsl(189 100% 81%)` | `#9cf0ff` `hsl(189 100% 81%)` |
-| `on-secondary-fixed` | `#001f24` `hsl(188 100% 7%)` | `#001f24` `hsl(188 100% 7%)` |
-| `secondary-fixed-dim` | `#00daf3` `hsl(186 100% 48%)` | `#00daf3` `hsl(186 100% 48%)` |
-| `on-secondary-fixed-variant` | `#004f58` `hsl(186 100% 17%)` | `#004f58` `hsl(186 100% 17%)` |
-| `tertiary-fixed` | `#f4e700` `hsl(57 100% 48%)` | `#f4e700` `hsl(57 100% 48%)` |
-| `on-tertiary-fixed` | `#1f1c00` `hsl(54 100% 6%)` | `#1f1c00` `hsl(54 100% 6%)` |
-| `tertiary-fixed-dim` | `#d6ca00` `hsl(57 100% 42%)` | `#d6ca00` `hsl(57 100% 42%)` |
-| `on-tertiary-fixed-variant` | `#4d4800` `hsl(56 100% 15%)` | `#4d4800` `hsl(56 100% 15%)` |
+| `inverse-surface` | `#26342b` `hsl(141 16% 18%)` | `#a9aca6` `hsl(90 3% 66%)` |
+| `inverse-on-surface` | `#e4f5e7` `hsl(131 46% 93%)` | `#0c0f0c` `hsl(120 11% 5%)` |
+| `inverse-primary` | `#d7ca00` `hsl(56 100% 42%)` | `#3a3600` `hsl(56 100% 11%)` |
+| `primary-fixed` | `#f5e61b` `hsl(56 92% 53%)` | `#f5e61b` `hsl(56 92% 53%)` |
+| `on-primary-fixed` | `#1f1c00` `hsl(54 100% 6%)` | `#1f1c00` `hsl(54 100% 6%)` |
+| `primary-fixed-dim` | `#d7ca00` `hsl(56 100% 42%)` | `#d7ca00` `hsl(56 100% 42%)` |
+| `on-primary-fixed-variant` | `#4d4800` `hsl(56 100% 15%)` | `#4d4800` `hsl(56 100% 15%)` |
+| `secondary-fixed` | `#71ff73` `hsl(121 100% 72%)` | `#71ff73` `hsl(121 100% 72%)` |
+| `on-secondary-fixed` | `#002203` `hsl(125 100% 7%)` | `#002203` `hsl(125 100% 7%)` |
+| `secondary-fixed-dim` | `#00e63f` `hsl(136 100% 45%)` | `#00e63f` `hsl(136 100% 45%)` |
+| `on-secondary-fixed-variant` | `#005310` `hsl(132 100% 16%)` | `#005310` `hsl(132 100% 16%)` |
+| `tertiary-fixed` | `#ffdcbd` `hsl(28 100% 87%)` | `#ffdcbd` `hsl(28 100% 87%)` |
+| `on-tertiary-fixed` | `#2c1600` `hsl(30 100% 9%)` | `#2c1600` `hsl(30 100% 9%)` |
+| `tertiary-fixed-dim` | `#fcb974` `hsl(30 96% 72%)` | `#fcb974` `hsl(30 96% 72%)` |
+| `on-tertiary-fixed-variant` | `#683c00` `hsl(35 100% 20%)` | `#683c00` `hsl(35 100% 20%)` |

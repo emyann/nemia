@@ -3,7 +3,7 @@ import type { WaitingRun } from '@/lib/api';
 import { clockBreakdown, costBreakdown, tokensBreakdown, tokensSaid } from '@/lib/breakdown';
 import { factoryOf } from '@/lib/factories';
 import { titleOf } from '@/lib/factory';
-import { presentWait, sinceShort, waitSentence, waitTag, whenWords } from '@/lib/runWords';
+import { openWord, presentWait, sinceShort, waitSentence, waitTag, whenWords } from '@/lib/runWords';
 import { CopyId, CutButton, CutFrame, CutTag, RunSteps, StatTile, TextLink } from './look';
 
 /**
@@ -33,8 +33,10 @@ function Tiles({ run, asOf }: { run: WaitingRun; asOf: Date }) {
 
 /**
  * A run that waits on a person, as a card: what is asked and its factory as tags, how long it has waited on a person this time where the
- * answer dates that wait, its title as a link, its id with a copy control, one plain sentence, its own steps as a rail, three tiles, and
- * one button that opens the run's page. It decides nothing and shows no command: the run's page does.
+ * answer dates that wait, its title as a link, its id with a copy control four pixels under it, one plain sentence, its own steps as a rail,
+ * three tiles, and one button at the card's right, beside the tiles where the card holds both and under them where it does not, which
+ * says what there is to read (`openWord`) and opens the run's page. The title stands over the copy control's target, so a press on
+ * the title opens the run. It decides nothing and shows no command: the run's page does.
  */
 export function WaitingCard({ run, asOf }: { run: WaitingRun; asOf: Date }) {
   const title = titleOf(run);
@@ -65,8 +67,8 @@ export function WaitingCard({ run, asOf }: { run: WaitingRun; asOf: Date }) {
             </span>
           )}
         </div>
-        <div className="flex flex-col items-start gap-2">
-          <h3 className="m-0 text-title-medium">
+        <div className="flex flex-col items-start gap-1">
+          <h3 className="relative z-10 m-0 text-title-medium">
             <TextLink to="/runs/$runId" params={{ runId: run.id }}>
               {title}
             </TextLink>
@@ -77,10 +79,10 @@ export function WaitingCard({ run, asOf }: { run: WaitingRun; asOf: Date }) {
           {run.unreadable ?? waitSentence(run)}
         </p>
         <RunSteps steps={run.steps} cancelled={run.cancelledAt !== null} held={run.holding != null} names />
-        <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
+        <div data-foot className="mt-2 flex flex-wrap items-end justify-between gap-4">
           <Tiles run={run} asOf={asOf} />
-          <CutButton to="/runs/$runId" params={{ runId: run.id }}>
-            Open the run
+          <CutButton to="/runs/$runId" params={{ runId: run.id }} className="ml-auto">
+            {openWord(run)}
           </CutButton>
         </div>
       </Card>

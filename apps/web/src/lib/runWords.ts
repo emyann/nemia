@@ -41,13 +41,13 @@ export const waitKindOf: Record<StepState, WaitKind | null> = {
   unknown: null,
 };
 
-/**
- * What the words read of a row of the light answer: of each step its name, its word and the task of its work, none for a step not
- * filed yet, and of the run who it waits on.
- */
+/** What the words read of a row of the light answer: of each step its name and its word, and of the run who it waits on. */
 export type WaitingRow = Pick<RunSummary, 'cancelledAt' | 'holding' | 'waiting' | 'waitingOnYou'> & {
-  steps: ReadonlyArray<Pick<RunSummary['steps'][number], 'name' | 'status' | 'taskId'>>;
+  steps: ReadonlyArray<Pick<RunSummary['steps'][number], 'name' | 'status'>>;
 };
+
+/** A row whose button is worded: a `WaitingRow` that says of each step the task of its work too, none for a step not filed yet. */
+export type OpenedRow = WaitingRow & { steps: ReadonlyArray<Pick<RunSummary['steps'][number], 'name' | 'status' | 'taskId'>> };
 
 /** A wait: its kind, the step that waits, none for a wait of the run's own, and how many of the run's steps are done. */
 export type Wait = { kind: WaitKind; step: string | null; done: number };
@@ -151,15 +151,16 @@ export const OPENS = 'Open the run';
  * The step whose work a person reads at the gate of `gated` on `row`: the gated step itself where it has run (its task is filed), else
  * the last step done before it, as at a gate held before its step is filed. None where neither is.
  */
-function readAt(row: WaitingRow, gated: string | null): string | null {
+function readAt(row: OpenedRow, gated: string | null): string | null {
   const at = row.steps.findIndex((step) => step.name === gated);
   if (at < 0) return null;
   if (row.steps[at].taskId !== null) return row.steps[at].name;
-  return row.steps.slice(0, at).findLast((step) => PAST.includes(stateOn(row, step.status)))?.name ?? null;
+  const done = row.steps.slice(0, at).filter((step) => PAST.includes(stateOn(row, step.status)));
+  return done.pop()?.name ?? null;
 }
 
 /** What a waiting card's button says of each kind of wait: what there is to read where it is one thing, else `OPENS`. */
-const OPEN_WORDS: Record<WaitKind, (wait: Wait, row: WaitingRow) => string> = {
+const OPEN_WORDS: Record<WaitKind, (wait: Wait, row: OpenedRow) => string> = {
   approve: (wait, row) => {
     const step = readAt(row, wait.step);
     return step ? `Read the ${step}` : OPENS;
@@ -180,7 +181,7 @@ const OPEN_WORDS: Record<WaitKind, (wait: Wait, row: WaitingRow) => string> = {
  * `Read the check`, and `Open the run` for every other kind and for a wait the board has no kind for. The button opens the run's page
  * whatever it says.
  */
-export function openWord(row: WaitingRow): string {
+export function openWord(row: OpenedRow): string {
   const wait = waitOf(row);
   return wait ? OPEN_WORDS[wait.kind](wait, row) : OPENS;
 }

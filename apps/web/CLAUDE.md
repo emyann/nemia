@@ -48,6 +48,11 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
   overlay in the ground's colour, and never a clip on what holds content or takes the focus. A glow is that layer's `drop-shadow`, and
   a ring that follows the cut is a band clipped beside it (`cutRing`). A ground on a child (the kit's `Card`, a table `Row`) paints
   the cut over, so it is given none (`bg-transparent`). `test/e2e/parts.test.ts` reads each in a picture, pixel by pixel.
+- A control's touch target under a table's last row makes an `overflow-x-auto` box scroll upright: a table in a cut frame wears
+  `FRAMED_BOX`, `FRAMED_TABLE` and `FRAMED_ROW` (`CutFrame.tsx`), which also drop the last row's line; `test/e2e/bars.test.ts`.
+- A scroll bar is drawn by `src/styles.css` from `data-bar`, which `markScrolls` (`lib/useScrollMark.ts`) writes on what scrolls. The
+  window's bar takes its parts from `body` and no selector on the root's attribute reaches it: the thumb reads an inherited property
+  (`--bar-ink`). A bar already laid out keeps its track under a style added later.
 - The look's small caps are its three label roles: `DESIGN.md` gives them their weight and tracking, and a text writes the role and
   `uppercase` (`text-label-small uppercase`); a kit part's own label (`Tag`, a `Column`) follows the role. No class of the board's.
 - The kit's type primitives write Material's weight over the role's (`Label` draws 500 where `DESIGN.md` says 600, a `Tag`'s word
@@ -72,6 +77,8 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
 - Once per machine, install each Playwright's browser through the checkout's own `node_modules`, never from an `npx` download (an install
   deletes the builds of every Playwright it does not see): `npx playwright install chromium` for the e2e, and
   `node node_modules/@playwright/mcp/cli.js install-browser chromium` for the steps' `browser_*` tools.
+- The e2e's Chromium hides every scroll bar, so no bar takes room or is in a picture: a bar is asserted and pictured in a browser from
+  `launch('classic')` (bars that take room) or `launch('overlay')` (bars that float), `test/e2e/visit.ts`.
 - A part no page mounts yet is drawn in the gallery, `test/e2e/parts/main.tsx`, built into a scratch folder by `buildParts` and never
   by `npm run build`: `test/e2e/parts.test.ts` presses it, `node test/e2e/parts-photos.ts` pictures it, light then dark, and
   `test/structure.test.ts` refuses a file of `src` that imports one of `test/`. Its layout is inline styles, never a class of its own.

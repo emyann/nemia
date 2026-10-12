@@ -135,7 +135,8 @@ export const themeOf = (page: Page): Promise<string> =>
  * it: an agent's face, which moves at all times, is drawn at rest with its eyes open, the same in every run. `fullPage` as Playwright's,
  * but a page taller than its window is taken in a window as tall as the page (`grownToPage`), so its sticky header and footer and its fixed
  * sidebar are drawn once, where a person sees them, never where the window was; the window and the scroll are put back after the shot,
- * whether it was taken or refused. A page that fits its window, and a locator, are taken as Playwright takes them.
+ * whether it was taken or refused. A page that fits its window, and a locator, are taken as Playwright takes them; `clip` takes that
+ * part of a page's window alone.
  * Takes none, and writes nothing, unless the page being visited is pictured (`photographing`) or the picture is taken `always`: a
  * failure's. While the run measures (`measuring`), writes the text pairs of what it pictured beside the picture, as
  * `<file>.contrast.json`; never for a failure's.
@@ -143,7 +144,10 @@ export const themeOf = (page: Page): Promise<string> =>
 export async function photograph(
   target: Page | Locator,
   file: string,
-  { always = false, ...options }: { fullPage?: boolean; always?: boolean } = {},
+  {
+    always = false,
+    ...options
+  }: { fullPage?: boolean; always?: boolean; clip?: { x: number; y: number; width: number; height: number } } = {},
 ): Promise<void> {
   if (!photographing && !always) return;
   const putBack = options.fullPage && 'viewportSize' in target ? await grownToPage(target, file) : undefined;

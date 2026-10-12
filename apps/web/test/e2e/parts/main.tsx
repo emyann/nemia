@@ -142,7 +142,11 @@ function Bars() {
       <Part name="framed-table">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'flex-start' }}>
           <Framed name="one" rows={['the-tool-errors-panels-2e13']} width={640} />
-          <Framed name="several" rows={['the-tool-errors-panels-2e13', 'lay-the-diamond-top-e2e4', 'a-table-in-a-cut-frame-liog']} width={640} />
+          <Framed
+            name="several"
+            rows={['the-tool-errors-panels-2e13', 'lay-the-diamond-top-e2e4', 'a-table-in-a-cut-frame-liog']}
+            width={640}
+          />
           <Framed name="narrow" rows={['the-tool-errors-panels-2e13', 'lay-the-diamond-top-e2e4']} width={390} />
         </div>
       </Part>

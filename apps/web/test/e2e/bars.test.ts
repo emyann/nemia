@@ -50,17 +50,21 @@ const linesOf = (page: Page, name: string): Promise<string[]> =>
 /** The framed tables with the line under their last row put back. */
 const LINED = '[data-part="framed-table"] tbody tr:last-child { border-bottom-width: 1px !important; }';
 
-test('REFUSED: the last row of a framed table draws no line under it, with one row and with several; a line put back is seen', WAITED, async () => {
-  const page = await openParts(browsers.classic, built, 'dark');
-  try {
-    assert.deepEqual(await linesOf(page, 'one'), ['0px'], 'one row: no line under it');
-    assert.deepEqual(await linesOf(page, 'several'), ['1px', '1px', '0px'], 'several: a line under each row but the last');
-    await page.addStyleTag({ content: LINED });
-    assert.deepEqual(await linesOf(page, 'one'), ['1px'], 'the line put back is read');
-  } finally {
-    await page.context().close();
-  }
-});
+test(
+  'REFUSED: the last row of a framed table draws no line under it, with one row and with several; a line put back is seen',
+  WAITED,
+  async () => {
+    const page = await openParts(browsers.classic, built, 'dark');
+    try {
+      assert.deepEqual(await linesOf(page, 'one'), ['0px'], 'one row: no line under it');
+      assert.deepEqual(await linesOf(page, 'several'), ['1px', '1px', '0px'], 'several: a line under each row but the last');
+      await page.addStyleTag({ content: LINED });
+      assert.deepEqual(await linesOf(page, 'one'), ['1px'], 'the line put back is read');
+    } finally {
+      await page.context().close();
+    }
+  },
+);
 
 /**
  * Where the framed table `name` paints over the ground in a cut corner of its frame, none when the ground shows through both, with
@@ -69,7 +73,12 @@ test('REFUSED: the last row of a framed table draws no line under it, with one r
  */
 async function cutSpills(kind: Bars, page: Page, name: string, shot: string): Promise<string[]> {
   const { out } = await edgesOf(page, `${framed(name)} [data-cut-frame]`);
-  await page.locator(`${framed(name)} tbody tr`).last().locator('td').first().hover();
+  await page
+    .locator(`${framed(name)} tbody tr`)
+    .last()
+    .locator('td')
+    .first()
+    .hover();
   const rows = [1, 2, 3, 4, 5, 6];
   const points: Record<string, readonly [number, number]> = {
     ground: [out.left - 20, out.top - 20],
@@ -91,17 +100,29 @@ async function cutSpills(kind: Bars, page: Page, name: string, shot: string): Pr
 }
 
 for (const theme of THEMES) {
-  test(`REFUSED: nothing of a framed table is painted in its frame's cut corners, ${theme}; the last row's line put back is seen`, WAITED, async () => {
-    const page = await openParts(browsers.classic, built, theme);
-    try {
-      for (const name of ['one', 'several'])
-        assert.deepEqual(await cutSpills('classic', page, name, `cut-${name}-${theme}`), [], `${name}: the ground shows through both cuts`);
-      await page.addStyleTag({ content: LINED });
-      assert.deepEqual(await cutSpills('classic', page, 'one', `cut-lined-${theme}`), ['the bottom-left cut'], 'the line put back crosses the cut');
-    } finally {
-      await page.context().close();
-    }
-  });
+  test(
+    `REFUSED: nothing of a framed table is painted in its frame's cut corners, ${theme}; the last row's line put back is seen`,
+    WAITED,
+    async () => {
+      const page = await openParts(browsers.classic, built, theme);
+      try {
+        for (const name of ['one', 'several'])
+          assert.deepEqual(
+            await cutSpills('classic', page, name, `cut-${name}-${theme}`),
+            [],
+            `${name}: the ground shows through both cuts`,
+          );
+        await page.addStyleTag({ content: LINED });
+        assert.deepEqual(
+          await cutSpills('classic', page, 'one', `cut-lined-${theme}`),
+          ['the bottom-left cut'],
+          'the line put back crosses the cut',
+        );
+      } finally {
+        await page.context().close();
+      }
+    },
+  );
 }
 
 /** What is wrong with the room the framed tables' boxes take, none when no bar is drawn that nothing scrolls. */
@@ -120,7 +141,8 @@ const roomFaults = (page: Page): Promise<string[]> =>
     }
     const narrow = box('narrow');
     if (narrow.scrollWidth <= narrow.clientWidth) faults.push('narrow: nothing to scroll sideways');
-    if (narrow.offsetHeight - narrow.clientHeight !== 8) faults.push(`narrow: its sideways lane is ${narrow.offsetHeight - narrow.clientHeight}`);
+    if (narrow.offsetHeight - narrow.clientHeight !== 8)
+      faults.push(`narrow: its sideways lane is ${narrow.offsetHeight - narrow.clientHeight}`);
     narrow.scrollLeft = 60;
     if (narrow.scrollLeft !== 60) faults.push(`narrow: scrolled sideways to ${narrow.scrollLeft}, not 60`);
     narrow.scrollLeft = 0;
@@ -130,17 +152,24 @@ const roomFaults = (page: Page): Promise<string[]> =>
 /** The framed tables laid out as a table is by default: what it holds runs past its box. */
 const UNCLIPPED = '[data-part="framed-table"] table { overflow: visible !important; }';
 
-test('REFUSED: a framed table whose rows fit shows no scroll bar, and a narrow one scrolls sideways alone; a table left unclipped is seen', WAITED, async () => {
-  const page = await openParts(browsers.classic, built, 'dark');
-  try {
-    assert.deepEqual(await roomFaults(page), [], 'no box is taller inside than it is, and no bar takes room where nothing scrolls');
-    await page.addStyleTag({ content: UNCLIPPED });
-    const faults = await roomFaults(page);
-    assert.ok(faults.some((fault) => fault.startsWith('one:') && fault.includes('tall inside')), `unclipped, the content is taller: ${faults.join('; ')}`);
-  } finally {
-    await page.context().close();
-  }
-});
+test(
+  'REFUSED: a framed table whose rows fit shows no scroll bar, and a narrow one scrolls sideways alone; a table left unclipped is seen',
+  WAITED,
+  async () => {
+    const page = await openParts(browsers.classic, built, 'dark');
+    try {
+      assert.deepEqual(await roomFaults(page), [], 'no box is taller inside than it is, and no bar takes room where nothing scrolls');
+      await page.addStyleTag({ content: UNCLIPPED });
+      const faults = await roomFaults(page);
+      assert.ok(
+        faults.some((fault) => fault.startsWith('one:') && fault.includes('tall inside')),
+        `unclipped, the content is taller: ${faults.join('; ')}`,
+      );
+    } finally {
+      await page.context().close();
+    }
+  },
+);
 
 /** A role of the theme as the page computes it, or what it computed when that is no plain colour. */
 const inkOf = (page: Page, role: string): Promise<Rgb> =>
@@ -160,9 +189,22 @@ const mark = (page: Page, selector: string, word: 'shown' | 'rest' | null): Prom
   page.locator(selector).evaluate((found, word) => (word ? found.setAttribute('data-bar', word) : found.removeAttribute('data-bar')), word);
 
 /**
+ * Waits until the page, brought to a part by a scroll of the test's own, is marked as scrolling no more: two frames, in which a scroll
+ * just made is heard, then for as long as the root's mark reads shown.
+ */
+async function pageAtRest(page: Page): Promise<void> {
+  await page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))));
+  await expectNone(
+    async () => ((await page.locator('html').getAttribute('data-bar')) === 'shown' ? 'its root is still marked shown' : null),
+    'the page comes to rest',
+  );
+}
+
+/**
  * What is wrong with the scroll bar of the gallery's box and of the page, none when each is the look's: an 8-pixel lane the ground
- * shows through at rest, and a thumb in `outline` while marked as scrolling, 4 pixels wide, in `on-surface-variant` under the
- * pointer and `on-surface` while held, the lane's whole width. Read with nothing moving, the mark placed by hand.
+ * shows through at rest; the page's thumb in `outline` while the page is marked as scrolling, the box's unlit by it; and the box's
+ * thumb in `outline` while marked, 4 pixels wide, in `on-surface-variant` under the pointer and `on-surface` while held, the lane's
+ * whole width. Read with nothing moving, each mark placed by hand.
  */
 async function barFaults(kind: Bars, page: Page, shot: string): Promise<string[]> {
   const faults: string[] = [];
@@ -170,24 +212,37 @@ async function barFaults(kind: Bars, page: Page, shot: string): Promise<string[]
     if (apart(found, wanted) > 3) faults.push(`${what}: ${found.join(' ')}, not ${wanted.join(' ')}`);
   };
   const { out } = await edgesOf(page, SCROLLER);
+  await pageAtRest(page);
   const lanes = await page.evaluate((selector) => {
     const box = document.querySelector<HTMLElement>(selector)!;
-    return { box: box.offsetWidth - box.clientWidth, page: innerWidth - document.documentElement.clientWidth };
+    const root = document.documentElement;
+    return {
+      box: box.offsetWidth - box.clientWidth,
+      page: innerWidth - root.clientWidth,
+      thumb: Math.round(((scrollY + innerHeight / 2) / root.scrollHeight) * innerHeight),
+    };
   }, SCROLLER);
   if (lanes.box !== 8) faults.push(`lane: the box's is ${lanes.box} wide`);
   if (lanes.page !== 8) faults.push(`lane: the page's is ${lanes.page} wide`);
-  const [outline, variant, surface, floor] = await Promise.all(['outline', 'on-surface-variant', 'on-surface', 'background'].map((role) => inkOf(page, role)));
+  const [outline, variant, surface, floor] = await Promise.all(
+    ['outline', 'on-surface-variant', 'on-surface', 'background'].map((role) => inkOf(page, role)),
+  );
   const points = {
     ground: [out.right - 40, out.top + 20],
     thumb: [out.right - 4, out.top + 20],
     side: [out.right - 8, out.top + 20],
     lane: [out.right - 4, out.bottom - 20],
-    page: [1280 - 4, 400],
+    page: [1280 - 4, lanes.thumb],
   } as const;
   const rest = await read(kind, page, `${shot}-rest`, points);
   says('rest: the thumb', rest.thumb, rest.ground);
   says('rest: the lane', rest.lane, rest.ground);
-  says("rest: the page's lane", rest.page, floor);
+  says("rest: the page's thumb", rest.page, floor);
+  await mark(page, 'html', 'shown');
+  const paged = await read(kind, page, `${shot}-page`, points);
+  says("shown: the page's thumb", paged.page, outline);
+  says('shown: the thumb of a box in a page that scrolls', paged.thumb, rest.ground);
+  await mark(page, 'html', null);
   await mark(page, SCROLLER, 'shown');
   const shown = await read(kind, page, `${shot}-shown`, points);
   says('shown: the thumb', shown.thumb, outline);
@@ -246,29 +301,33 @@ async function wheelOver(page: Page, selector: string): Promise<void> {
   );
 }
 
-test('REFUSED: what scrolls is marked shown while it scrolls and at rest after, a box and the page; with nothing listening no mark is written', WAITED, async () => {
-  const page = await openParts(browsers.classic, built, 'dark');
-  const unmarked = await openParts(browsers.classic, built, 'dark', '?bars=unmarked');
-  try {
-    await page.locator(SCROLLER).scrollIntoViewIfNeeded();
-    await marked(page, 'html', 'rest', 'the page, brought to the box, comes to rest');
-    await wheelOver(page, SCROLLER);
-    await marked(page, SCROLLER, 'shown', 'a box that scrolls is marked shown');
-    await marked(page, SCROLLER, 'rest', 'and at rest once it scrolls no more');
-    await page.evaluate(() => scrollTo(0, 0));
-    await marked(page, 'html', 'rest', 'the page, brought to its top, comes to rest');
-    await wheelOver(page, 'html');
-    await marked(page, 'html', 'shown', 'the page that scrolls is marked shown, on its root');
-    await marked(page, 'html', 'rest', 'and at rest once it scrolls no more');
-    await unmarked.locator(SCROLLER).scrollIntoViewIfNeeded();
-    await wheelOver(unmarked, SCROLLER);
-    assert.equal(await unmarked.locator(SCROLLER).getAttribute('data-bar'), null, 'nothing listening, a box that scrolled has no mark');
-    assert.equal(await unmarked.locator('html').getAttribute('data-bar'), null, 'nor has the page');
-  } finally {
-    await page.context().close();
-    await unmarked.context().close();
-  }
-});
+test(
+  'REFUSED: what scrolls is marked shown while it scrolls and at rest after, a box and the page; with nothing listening no mark is written',
+  WAITED,
+  async () => {
+    const page = await openParts(browsers.classic, built, 'dark');
+    const unmarked = await openParts(browsers.classic, built, 'dark', '?bars=unmarked');
+    try {
+      await page.locator(SCROLLER).scrollIntoViewIfNeeded();
+      await marked(page, 'html', 'rest', 'the page, brought to the box, comes to rest');
+      await wheelOver(page, SCROLLER);
+      await marked(page, SCROLLER, 'shown', 'a box that scrolls is marked shown');
+      await marked(page, SCROLLER, 'rest', 'and at rest once it scrolls no more');
+      await page.evaluate(() => scrollTo(0, 0));
+      await marked(page, 'html', 'rest', 'the page, brought to its top, comes to rest');
+      await wheelOver(page, 'html');
+      await marked(page, 'html', 'shown', 'the page that scrolls is marked shown, on its root');
+      await marked(page, 'html', 'rest', 'and at rest once it scrolls no more');
+      await unmarked.locator(SCROLLER).scrollIntoViewIfNeeded();
+      await wheelOver(unmarked, SCROLLER);
+      assert.equal(await unmarked.locator(SCROLLER).getAttribute('data-bar'), null, 'nothing listening, a box that scrolled has no mark');
+      assert.equal(await unmarked.locator('html').getAttribute('data-bar'), null, 'nor has the page');
+    } finally {
+      await page.context().close();
+      await unmarked.context().close();
+    }
+  },
+);
 
 /** Where the sideways thumb of the narrow framed table, at its left end and marked as scrolling, is painted in the bottom-left cut. */
 async function thumbInCut(page: Page, shot: string): Promise<string[]> {
@@ -295,14 +354,18 @@ const laidOutAgain = (page: Page, selector: string): Promise<void> =>
 /** The sideways scroll bars with their track from the box's very left. */
 const UNSET_TRACK = '::-webkit-scrollbar-track { margin: 0 !important; }';
 
-test("REFUSED: the sideways thumb of a framed table starts past its frame's bottom-left cut; a track from the box's left is seen", WAITED, async () => {
-  const page = await openParts(browsers.classic, built, 'dark', '', { still: true });
-  try {
-    assert.deepEqual(await thumbInCut(page, 'thumb-clear'), [], 'the ground shows through the cut, the thumb beside it');
-    await page.addStyleTag({ content: UNSET_TRACK });
-    await laidOutAgain(page, boxOf('narrow'));
-    assert.deepEqual(await thumbInCut(page, 'thumb-in-cut'), ['the bottom-left cut'], 'from the left, the thumb is painted in the cut');
-  } finally {
-    await page.context().close();
-  }
-});
+test(
+  "REFUSED: the sideways thumb of a framed table starts past its frame's bottom-left cut; a track from the box's left is seen",
+  WAITED,
+  async () => {
+    const page = await openParts(browsers.classic, built, 'dark', '', { still: true });
+    try {
+      assert.deepEqual(await thumbInCut(page, 'thumb-clear'), [], 'the ground shows through the cut, the thumb beside it');
+      await page.addStyleTag({ content: UNSET_TRACK });
+      await laidOutAgain(page, boxOf('narrow'));
+      assert.deepEqual(await thumbInCut(page, 'thumb-in-cut'), ['the bottom-left cut'], 'from the left, the thumb is painted in the cut');
+    } finally {
+      await page.context().close();
+    }
+  },
+);

@@ -232,6 +232,26 @@ components.
 No shadow. A raised surface is a hairline in yellow, then in green as it
 rises. Motion is short and decisive.
 
+## Scroll bars
+
+A scroll bar is the look's wherever something scrolls: the page, the
+sidebar, a panel, a table, a block of code. It is an 8-pixel square lane
+with no arrows, and the ground shows through it. At rest no thumb is seen.
+While the thing scrolls its thumb is drawn 4 pixels wide in `outline`, and
+fades once it stops. Under the pointer the thumb takes the lane's whole
+width in `on-surface-variant`, and `on-surface` while it is held. The inks
+are neutral roles: a scroll bar says none of the five meanings.
+
+The lane keeps its room wherever something overflows, so nothing moves when
+a thumb comes or goes; beside the page it shows the plain ground, not the
+scan lines. A table in a cut frame scrolls sideways alone, its thumb
+starting past the frame's cut.
+
+The rule is the board's (`src/styles.css`), not the theme's: the kit's
+generator gives a scroll bar no token. What stays the system's: the list a
+native select opens, drawn in the page's scheme, and the bar of a browser
+that knows neither the parts nor `scrollbar-color`.
+
 ## Reference CSS
 
 ```css

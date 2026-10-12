@@ -71,7 +71,7 @@ const FILED = new Map([
 const approved = (build: TaskClock) => ({
   run: run({
     approvals: [{ step: 'plan', try: 1, at: at(11, 30) }],
-    hold: { until: ['r-9'], at: at(11, 30) } as RepositoryRun['hold'],
+    hold: { until: ['r-9'], at: at(11, 30) },
     steps: { plan: { taskId: 'p', check: { taskId: 'pc' } }, side: { taskId: 's' }, build: { taskId: 'b' } },
   }),
   views: new Map([...VIEWS, ['b', build]]),

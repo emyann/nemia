@@ -107,6 +107,7 @@ test('each command is served on the api where it was before the table, the lift 
           { method: 'DELETE', path: '/api/factories/:factory/instruction/words', status: 200, sets: { clear: true } },
         ],
       ],
+      ['factory trust', 'cli'],
       ['factory rm', 'cli'],
       ['template check', 'cli'],
       ['template export', 'cli'],

@@ -216,7 +216,9 @@ const factories = (): Factory[] => [
       rm: 'nemia factory rm default',
       add: 'nemia factory add default --repo <path>',
       schedule: 'nemia factory schedule default <workflow> --cron <expr> --brief <text>',
+      trust: 'nemia factory trust default',
     },
+    untrusted: [],
     template: null,
   },
   {
@@ -255,7 +257,12 @@ const factories = (): Factory[] => [
       rm: 'nemia factory rm nemia',
       add: 'nemia factory add nemia --repo <path>',
       schedule: 'nemia factory schedule nemia <workflow> --cron <expr> --brief <text>',
+      trust: 'nemia factory trust nemia',
     },
+    untrusted: [
+      { place: '/work/repo', harness: 'A harness', withheld: 'the allow rules of its own settings', never: null },
+      { place: '/home/me', harness: 'A harness', withheld: 'the allow rules of its own settings', never: 'no trust is kept for a home' },
+    ],
     template: null,
   },
   {
@@ -271,7 +278,9 @@ const factories = (): Factory[] => [
       rm: 'nemia factory rm broken',
       add: 'nemia factory add broken --repo <path>',
       schedule: 'nemia factory schedule broken <workflow> --cron <expr> --brief <text>',
+      trust: 'nemia factory trust broken',
     },
+    untrusted: [],
     template: null,
   },
 ];
@@ -313,6 +322,17 @@ test("REFUSED, a factory's template: one without it, and a condition whose state
   maybe.template!.conditions[0] = { ...maybe.template!.conditions[0], status: 'Unknown' as never };
   answering(t, [maybe]);
   await assert.rejects(readFactories(), unread('/api/factories', '[0].template.conditions[0].status', '"Unknown", where'));
+});
+
+test("REFUSED, a factory's trust: one without its untrusted places, a place without what is withheld, and no line that trusts", async (t) => {
+  answering(t, [without(factories()[1], 'untrusted')]);
+  await assert.rejects(readFactories(), unread('/api/factories', '[0].untrusted', 'is missing'));
+
+  answering(t, [{ ...factories()[1], untrusted: [without(factories()[1].untrusted[0], 'withheld')] }]);
+  await assert.rejects(readFactories(), unread('/api/factories', '[0].untrusted[0].withheld', 'is missing'));
+
+  answering(t, [{ ...factories()[1], commands: without(factories()[1].commands, 'trust') }]);
+  await assert.rejects(readFactories(), unread('/api/factories', '[0].commands.trust', 'is missing'));
 });
 
 test('REFUSED, the factories: one without its error, the default offering its workflows as a word, and a schedule without its refusal', async (t) => {

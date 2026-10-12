@@ -2356,8 +2356,9 @@ and every write she proposes is asked of the person at a prompt, over Remote Con
   read from her folder's local settings. `auto` is refused as to come (slice 6), as is a word that is no level (`Invalid`). `semi-auto`
   is accepted while her folder is not trusted by the harness: her session waits in `untrusted`, and `nemia level` and `GET /api/level`
   answer the command that trusts it once, by hand (`trust`), which the board shows beside the switch and in its empty state; the keeper
-  reads the trust each beat and files her once it is given. The store never writes the harness's config (`trustedFolder`, the
-  runtime's, read-only): Claude Code offers no program a door to trust a folder.
+  reads the trust each beat and files her once it is given. Her own folder's trust is still given by hand: no pass writes the
+  harness's config, and the keeper only reads it (`trustedFolder`, the runtime's). A factory's places are another matter: each is
+  given its trust when a person adds it (`nemia factory add`, `apply`, `trust`), through the runtime's `trustFolder`.
 - **The keeper** (`keep`, `src/nemia/keep.verb.ts`), forked by `up` beside the deliverer, beats every 5 s and acts on what her
   machine owes (`nemiaDue`, `src/nemia/nemia.ts`): at `semi-auto`, her task filed once under `nemia-<since>`, then her subscription put;
   at `manual`, her task stopped and her subscription dropped. A task stopped or ended from outside is never filed again — the keeper

@@ -259,9 +259,10 @@ Each asks the person at a prompt every time it runs: say what it does before you
 ```text
   nemia inbox rm <name>
                                drop a card without starting it
-  nemia factory add <name> --repo <path> [--repo <path> ...]
-                               file a factory: a lowercase slug naming one or more directories
-  nemia factory apply <name> --template <folder|archive> --repo <path> [--repo <path> ...] [--set <key>=<value> ...]
+  nemia factory add <name> --repo <path> [--repo <path> ...] [--no-trust]
+                               file a factory: a lowercase slug naming one or more directories,
+                               each trusted for its steps unless --no-trust
+  nemia factory apply <name> --template <folder|archive> --repo <path> [--repo <path> ...] [--set <key>=<value> ...] [--no-trust]
                                make a factory from a template that passes its check, its parameters
                                given with --set; the daemon renders its tree
   nemia factory upgrade <name> --to <x.y.z> [--template <folder|archive>] [--downgrade]
@@ -287,6 +288,9 @@ Each asks the person at a prompt every time it runs: say what it does before you
   nemia factory instruct <name> --file <path>|- | --clear
                                write the instruction the store keeps for a factory (- for stdin), what
                                Nemia is to know of it and no step is told, or remove it with --clear
+  nemia factory trust <name>
+                               trust a factory's places for the harnesses its steps run on, so each
+                               place's own settings apply to them
   nemia factory rm <name>
                                remove a factory's file, and the instruction and the rules the store
                                keeps for it

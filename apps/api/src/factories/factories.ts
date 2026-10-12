@@ -1,6 +1,7 @@
 /**
  * The factories, for the board: the default factory and every factory in the store, each with the repositories it works on, the workflows
- * it offers, the agents it hires and its schedules. Read from the store on each request, by `nemia factory`'s entry (`FACTORY`), never
+ * it offers, the agents it hires, its schedules and its places a harness does not trust. Read from the store on each request, by `nemia
+ * factory`'s entry (`FACTORY`), never
  * written: `nemia factory` is the one writer of a factory's file.
  */
 import { Hono } from 'hono';
@@ -13,16 +14,17 @@ import {
   type FactoryListing,
   type Hires,
   type ScheduleListed,
+  type Untrusted,
 } from 'agent-orchestrator';
 import { repoOf } from '../capabilities/capabilities.ts';
 import { type ApiEnv, served } from '../layer.ts';
 import { runPlaced } from '../store.ts';
 
 /**
- * The lines a person types for a factory, built off the table: a workflow attached to it, its file removed and filed again, and a workflow
- * scheduled.
+ * The lines a person types for a factory, built off the table: a workflow attached to it, its file removed and filed again, a workflow
+ * scheduled, and its places trusted again.
  */
-export type FactoryCommands = { attach: string; rm: string; add: string; schedule: string };
+export type FactoryCommands = { attach: string; rm: string; add: string; schedule: string; trust: string };
 
 const entry = (name: string) => COMMANDS.find((c) => c.name === name)!;
 const ATTACH = entry('factory attach');
@@ -30,16 +32,18 @@ const RM = entry('factory rm');
 const ADD = entry('factory add');
 const SCHEDULE = entry('factory schedule');
 const UNSCHEDULE = entry('factory unschedule');
+const TRUST = entry('factory trust');
 
 /**
- * A factory's lines: `nemia factory attach <name> <workflow>`, `nemia factory rm <name>`, `nemia factory add <name> --repo <path>` and
- * `nemia factory schedule <name> <workflow> --cron <expr> --brief <text>`.
+ * A factory's lines: `nemia factory attach <name> <workflow>`, `nemia factory rm <name>`, `nemia factory add <name> --repo <path>`,
+ * `nemia factory schedule <name> <workflow> --cron <expr> --brief <text>` and `nemia factory trust <name>`.
  */
 const commandsOf = (name: string): FactoryCommands => ({
   attach: commandLine(ATTACH, { factory: name }),
   rm: commandLine(RM, { factory: name }),
   add: commandLine(ADD, { name }, { repos: '<path>' }),
   schedule: commandLine(SCHEDULE, { factory: name }, { cron: '<expr>', brief: '<text>' }),
+  trust: commandLine(TRUST, { factory: name }),
 });
 
 /**
@@ -68,10 +72,21 @@ const schedulesOf = (listed: readonly ScheduleListed[], name: string): ScheduleA
     .map(({ factory, ...s }) => ({ ...s, commands: { unschedule: commandLine(UNSCHEDULE, { factory, workflow: s.workflow }) } }));
 
 /**
+ * A place of a factory that a harness does not trust now, each word the package's: the place, the harness by the name a person reads,
+ * what is withheld from the place's own settings meanwhile, and why no trust can be kept for it (`never`, else null).
+ */
+export type UntrustedAnswer = { place: string; harness: string; withheld: string; never: string | null };
+
+/** The places of the factory `name` among those `untrusted`, as the board reads them. */
+const untrustedOf = (untrusted: readonly Untrusted[], name: string): UntrustedAnswer[] =>
+  untrusted.filter((u) => u.factory === name).map(({ place, harness, withheld, never }) => ({ place, harness, withheld, never }));
+
+/**
  * A factory as the board reads it: its name, whether it is the default factory, its repositories, the workflows it offers — null for the
  * default factory, which offers every workflow found — its hires, `<workflow>/<step>` to an agent's name, and its schedules, none for
  * the default factory. A factory whose file does not read has none of them, and `error` says why, in the package's words; null for every
- * other. `template`: the template it was made from (`FactoryTemplateAnswer`), null for one filed by hand. `commands`: its lines
+ * other. `template`: the template it was made from (`FactoryTemplateAnswer`), null for one filed by hand. `untrusted`: its places a
+ * harness does not trust now (`UntrustedAnswer`), none for the default factory and for one that does not read. `commands`: its lines
  * (`commandsOf`).
  */
 export type FactoryAnswer = {
@@ -83,6 +98,7 @@ export type FactoryAnswer = {
   error: string | null;
   schedules: ScheduleAnswer[];
   template: FactoryTemplateAnswer | null;
+  untrusted: UntrustedAnswer[];
   commands: FactoryCommands;
 };
 
@@ -98,8 +114,11 @@ const templateOf = (listing: Exclude<FactoryListing, { error: string }>): Factor
         conditions: (listing.status?.conditions ?? []).map((c) => ({ ...c })),
       };
 
-/** One factory of the store as the board reads it, its schedules among those `listed`, or one whose file does not read, with why. */
-const answerOf = (listing: FactoryListing, listed: readonly ScheduleListed[]): FactoryAnswer =>
+/**
+ * One factory of the store as the board reads it, its schedules among those `listed` and its places among those `untrusted`, or one
+ * whose file does not read, with why.
+ */
+const answerOf = (listing: FactoryListing, listed: readonly ScheduleListed[], untrusted: readonly Untrusted[]): FactoryAnswer =>
   'error' in listing
     ? {
         name: listing.name,
@@ -110,6 +129,7 @@ const answerOf = (listing: FactoryListing, listed: readonly ScheduleListed[]): F
         error: `${listing.file} ${listing.error}`,
         schedules: [],
         template: null,
+        untrusted: [],
         commands: commandsOf(listing.name),
       }
     : {
@@ -121,6 +141,7 @@ const answerOf = (listing: FactoryListing, listed: readonly ScheduleListed[]): F
         error: null,
         schedules: schedulesOf(listed, listing.name),
         template: templateOf(listing),
+        untrusted: untrustedOf(untrusted, listing.name),
         commands: commandsOf(listing.name),
       };
 
@@ -131,7 +152,8 @@ const answerOf = (listing: FactoryListing, listed: readonly ScheduleListed[]): F
  *   then each factory in the store, by name (`FactoryAnswer`), a file that does not read listed with why, so it hides no other. A request
  *   is answered in one of them, on one of their repositories, by naming it: `?factory=<name>` and `?repo=<path>` on any route
  *   (factories/place.ts). Each factory's schedules are the package's listing of them (`schedulesListed`), read off the runs the store
- *   has, in the entry's one answer. Served by hand, through the entry's handler (`FACTORY`), since the default factory is the api's to add.
+ *   has, and its places not trusted are read now off the place and the harness's own file, in the entry's one answer. Served by hand,
+ *   through the entry's handler (`FACTORY`), since the default factory is the api's to add.
  */
 export const factories = new Hono<ApiEnv>().get('/api/factories', (c) =>
   served(c, async ({ e, placeService, env, running }) => {
@@ -146,9 +168,10 @@ export const factories = new Hono<ApiEnv>().get('/api/factories', (c) =>
         error: null,
         schedules: [],
         template: null,
+        untrusted: [],
         commands: commandsOf(DEFAULT_FACTORY),
       },
-      ...listed.factories.map((listing) => answerOf(listing, listed.schedules)),
+      ...listed.factories.map((listing) => answerOf(listing, listed.schedules, listed.untrusted)),
     ] satisfies FactoryAnswer[]);
   }),
 );

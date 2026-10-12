@@ -1,14 +1,16 @@
 /**
  * The frame's floating bar for a factory: what its block on the Factories canvas says, in a bar beside it — its name, its repositories,
- * what its runs are doing and what it offers, or why its file does not read — read from the factories and the runs, which a read again
+ * what its runs are doing and what it offers, a place of it that is not trusted, or why its file does not read — read from the factories
+ * and the runs, which a read again
  * keeps current. Its floor, which Open visits, has its runs.
  */
 import { useQuery } from '@tanstack/react-query';
 import { TriangleAlert } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { factoriesQuery, openRunsQuery } from '@/lib/api';
+import { factoriesQuery, openRunsQuery, type Factory } from '@/lib/api';
 import { offerOf, openBlockOf, runsOf, type FactoryBlock } from '@/lib/factories';
 import { FloatingBar } from './FloatingBar';
+import { FactoryTrust } from './FactoryTrust';
 
 /**
  * The bar for the factory `factory`, titled by its name, `default` badged for the default factory, with its repositories under the title.
@@ -33,7 +35,7 @@ export function FactoryBar({ factory: name }: { factory: string }) {
     >
       <div data-factory-bar={name} className="space-y-5">
         {block ? (
-          <FactoryBody block={block} />
+          <FactoryBody block={block} factory={factory} />
         ) : (
           <Unread name={name} error={factories.error ?? runs.error} read={factories.data !== undefined && runs.data !== undefined} />
         )}
@@ -53,10 +55,10 @@ function Unread({ name, error, read }: { name: string; error: Error | null; read
 }
 
 /**
- * What the bar holds for `block`: why its file does not read, whole; else what its runs are doing and what it offers, as its block says
- * them.
+ * What the bar holds for `block`: why its file does not read, whole; else the places of `factory` that are not trusted (`FactoryTrust`),
+ * then what its runs are doing and what it offers, as its block says them.
  */
-function FactoryBody({ block }: { block: FactoryBlock }) {
+function FactoryBody({ block, factory }: { block: FactoryBlock; factory: Factory | undefined }) {
   if (block.error)
     return (
       <p className="flex gap-2 text-destructive" data-error>
@@ -66,6 +68,7 @@ function FactoryBody({ block }: { block: FactoryBlock }) {
     );
   return (
     <>
+      {factory && <FactoryTrust factory={factory} />}
       <section aria-label="Runs" className="space-y-1">
         <h3 className="text-xs font-medium text-muted-foreground">Runs</h3>
         <p className="font-medium" data-runs>

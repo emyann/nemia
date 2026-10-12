@@ -123,5 +123,8 @@ export { fenceReach, unruledIn, type FenceReach } from './harness/reach.ts';
 export { CODEX_EFFORTS, CODEX_SANDBOXES } from './harness/codex/vocabulary.ts';
 export { HARNESS_CHOICES, HARNESS_KNOBS } from './harness/choices.ts';
 export { CONFIG_FOLDERS, configFolderIn } from './harness/config-folders.ts';
-/** Whether a harness trusts a folder to run a background session in, read off its own file; `undefined` for one that keeps none. */
-export { trustedFolder } from './harness/trust.ts';
+/**
+ * A harness's trust of a folder, off its own file: whether it is given (`trustedFolder`), what it is in a person's words
+ * (`folderTrust`), and the act of giving it (`trustFolder`); each `undefined` for a harness that keeps none.
+ */
+export { folderTrust, trustFolder, trustedFolder, type FolderTrust, type FolderTrusted } from './harness/trust.ts';

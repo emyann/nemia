@@ -10,6 +10,7 @@ import { stepNameRefusal } from '../folder/folder.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import type { Mount } from '../record/record.ts';
 import { fireWord, type ScheduleListed } from '../schedule/schedule.ts';
+import { untrustedLines, type Untrusted } from '../trust/trust.ts';
 
 /** The one default factory's name: listed by `nemia factory ls`, refused to `nemia factory add` and `nemia factory rm`. */
 export const DEFAULT_FACTORY = 'default';
@@ -488,12 +489,13 @@ const scheduleLines = (factory: Factory, listed: readonly ScheduleListed[], widt
 
 /**
  * What `nemia factory ls` prints: the default factory first, then each factory by name with its repositories, or why it does not read;
- * each schedule with its next fire and last run as `listed` reads them at `now`.
+ * each schedule with its next fire and last run as `listed` reads them at `now`, and each place in `untrusted` under its factory.
  */
 export function factoryLines(
   listing: readonly FactoryListing[],
   listed: readonly ScheduleListed[] = [],
   now: number = Date.now(),
+  untrusted: readonly Untrusted[] = [],
 ): string[] {
   const sorted = [...listing].sort((a, b) => a.name.localeCompare(b.name));
   const width = Math.max(DEFAULT_FACTORY.length, ...sorted.map((l) => l.name.length));
@@ -504,6 +506,7 @@ export function factoryLines(
       ...('error' in l
         ? []
         : [
+            ...untrustedLines(l.name, untrusted, width),
             ...templateLines(l.template, l.status, width),
             ...workflowLine(l.workflows, width),
             ...hireLines(l.hires, width),

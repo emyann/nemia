@@ -203,6 +203,58 @@ export const openRunsQuery = (factory?: string) =>
     refetchInterval: () => pace(5_000),
   });
 
+/** How a finished run ended, in the api's words: `undecided` for one whose result nobody has decided. */
+export type RunOutcome = 'succeeded' | 'failed' | 'cancelled' | 'undecided';
+
+/**
+ * Mirrors a row of `FinishedListing` in apps/api/src/runs/runs.ts: the list's own row, when its work stopped (`finishedAt`), its wall
+ * time from its creation until then (`wallMs`), and how it ended (`outcome`).
+ */
+export type FinishedRun = RunSummary & { wallMs: number; finishedAt: string; outcome: RunOutcome };
+
+/**
+ * Mirrors `FinishedListing`: one page of the finished runs, newest finished first. `total` rows in all, `page` from 1 of `pages`, at
+ * least one, of `size` rows each. A page past the last is answered with no row, and says the `pages` there are.
+ */
+export type FinishedPage = { total: number; page: number; size: number; pages: number; runs: FinishedRun[] };
+
+/** Decodes a `FinishedPage`: each row the list's (`RunSummarySchema`) with its three facts; when the answer was read is dropped. */
+const FinishedPageSchema = Schema.Struct({
+  total: Schema.Number,
+  page: Schema.Number,
+  size: Schema.Number,
+  pages: Schema.Number,
+  runs: Schema.mutable(
+    Schema.Array(
+      Schema.Struct({
+        ...RunSummarySchema.fields,
+        wallMs: Schema.Number,
+        finishedAt: Schema.String,
+        outcome: Schema.Literals(['succeeded', 'failed', 'cancelled', 'undecided']),
+      }),
+    ),
+  ),
+}) satisfies Schema.Schema<FinishedPage>;
+
+/** How many finished runs a page of the board holds. */
+export const FINISHED_SIZE = 9;
+
+/**
+ * One page of the finished runs (`GET /api/runs-finished`), `FINISHED_SIZE` rows, of every factory, or of `factory` alone
+ * (`?ofFactory=`). Keyed `['runs-finished', factory, page]`, the factory null for every factory's; read again on each event of the
+ * workflow feed (`useFeed`), and paced as `runsQuery` is.
+ */
+export const finishedRunsQuery = (factory: string | undefined, page: number) =>
+  queryOptions({
+    queryKey: ['runs-finished', factory ?? null, page],
+    queryFn: () =>
+      get(
+        `/api/runs-finished?page=${page}&size=${FINISHED_SIZE}${factory === undefined ? '' : `&ofFactory=${encodeURIComponent(factory)}`}`,
+        FinishedPageSchema,
+      ),
+    refetchInterval: () => pace(5_000),
+  });
+
 /**
  * What a run started now with this one as context would be handed of it, as the CLI's `concluded` prints it: the run, whether it has
  * shipped, and its section, in the words the run's steps would read.

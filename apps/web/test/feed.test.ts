@@ -102,9 +102,17 @@ function followed() {
 const line = (run: string, step?: string) => ({ at: '2026-09-22T21:00:00.000Z', run, ...(step ? { step } : {}), word: 'running' });
 
 test('each event names the queries it can change, and no other: a step its run and the list, a run the cap and the inbox too, a removal its record and the cap', () => {
-  assert.deepEqual(keysOf('step', 'r-1'), [['runs'], ['runs-open'], ['runs', 'r-1'], ['daemon']]);
-  assert.deepEqual(keysOf('run', 'r-1'), [['runs'], ['runs-open'], ['runs', 'r-1'], ['ceilings'], ['inbox'], ['daemon']]);
-  assert.deepEqual(keysOf('removed', 'r-1'), [['runs'], ['runs-open'], ['runs', 'r-1'], ['ceilings'], ['daemon']]);
+  assert.deepEqual(keysOf('step', 'r-1'), [['runs'], ['runs-open'], ['runs-finished'], ['runs', 'r-1'], ['daemon']]);
+  assert.deepEqual(keysOf('run', 'r-1'), [
+    ['runs'],
+    ['runs-open'],
+    ['runs-finished'],
+    ['runs', 'r-1'],
+    ['ceilings'],
+    ['inbox'],
+    ['daemon'],
+  ]);
+  assert.deepEqual(keysOf('removed', 'r-1'), [['runs'], ['runs-open'], ['runs-finished'], ['runs', 'r-1'], ['ceilings'], ['daemon']]);
   for (const event of ['step', 'run', 'removed'] as const) {
     assert.ok(
       keysOf(event, 'r-1').every((key) => key.length <= 2),
@@ -172,6 +180,29 @@ test('the light answer is polled, for every factory and for one, and no key unde
   assert.equal(polled(['runs-open', 'harbour', 'x']), false);
 });
 
+test('every page of the finished runs is polled and read again on an event, under the one key that stands for them', async () => {
+  assert.equal(polled(['runs-finished']), true);
+  assert.equal(polled(['runs-finished', null, 2]), true);
+  assert.equal(polled(['runs-finished', 'harbour', 1]), true);
+  assert.deepEqual(filterOf(['runs-finished']), { queryKey: ['runs-finished'], exact: false });
+  const client = new QueryClient();
+  const pages: QueryKey[] = [
+    ['runs-finished', null, 1],
+    ['runs-finished', 'harbour', 3],
+  ];
+  for (const key of pages) client.setQueryData(key, {});
+  for (const event of ['step', 'run', 'removed'] as const) {
+    for (const key of pages) client.setQueryData(key, {});
+    await Promise.all(keysOf(event, 'a').map((key) => client.invalidateQueries(filterOf(key))));
+    assert.deepEqual(
+      pages.filter((key) => client.getQueryState(key)?.isInvalidated),
+      pages,
+      `a ${event} event reads each page again`,
+    );
+  }
+  client.clear();
+});
+
 test("REFUSED: an event reads a factory's light answer again with every factory's, and still no decision", async () => {
   const seeded: QueryKey[] = [['runs'], ['runs', 'a'], ['runs', 'a', 'decision', 's'], ['runs-open'], ['runs-open', 'harbour']];
   const marked = async (filter: (key: QueryKey) => { queryKey: QueryKey; exact: boolean }) => {
@@ -205,9 +236,13 @@ test('the events that arrive together are read again once a frame, each key once
   assert.equal(f.invalidated.length, 1, 'one invalidation for the frame');
   assert.deepEqual(
     new Set(f.invalidated[0].map((k) => JSON.stringify(k))),
-    new Set([['runs'], ['runs-open'], ['runs', 'r-1'], ['ceilings'], ['inbox'], ['daemon'], ['runs', 'r-2']].map((k) => JSON.stringify(k))),
+    new Set(
+      [['runs'], ['runs-open'], ['runs-finished'], ['runs', 'r-1'], ['ceilings'], ['inbox'], ['daemon'], ['runs', 'r-2']].map((k) =>
+        JSON.stringify(k),
+      ),
+    ),
   );
-  assert.equal(f.invalidated[0].length, 7, 'each key once');
+  assert.equal(f.invalidated[0].length, 8, 'each key once');
   f.frame();
   assert.equal(f.invalidated.length, 1, 'an empty frame invalidates nothing');
   f.stop();

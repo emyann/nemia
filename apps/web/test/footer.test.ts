@@ -7,7 +7,6 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { QuotaWindow, RunSummary } from '../src/lib/api.ts';
-import { inFlight, openRows } from '../src/lib/factory.ts';
 import { atWork, atWorkWords, daemonDot, feedWords, footerParts, quotaShort, staleFrameHeights, versionWords } from '../src/lib/footer.ts';
 import { daemon, quota } from './factory-fixtures.ts';
 
@@ -72,28 +71,32 @@ const run = (statuses: readonly string[], extra: Partial<RunSummary> = {}): RunS
   ...extra,
 });
 
-test('at work: a working step and a checking step are a session each, in a run in flight', () => {
-  assert.deepEqual(atWork([run(['running (working)', 'checking', 'verified ✓'])]), { runs: 1, sessions: 2 });
+/** A light answer holding `waiting` and `inFlight`, its counts their lengths. */
+const light = (waiting: RunSummary[], inFlight: RunSummary[]) => ({
+  counts: { waiting: waiting.length, inFlight: inFlight.length, finished: 0 },
+  waiting,
+  inFlight,
+});
+
+test('at work: the runs the api counts in flight, and each step working or checking', () => {
+  assert.deepEqual(atWork(light([], [run(['running (working)', 'checking', 'verified ✓'])])), { runs: 1, sessions: 2 });
 });
 
 test('at work: REFUSED, a step that asks a person (needs-human) is the bell’s, not a session at work', () => {
-  assert.deepEqual(atWork([run(['needs-human'])]), { runs: 1, sessions: 0 });
+  assert.deepEqual(atWork(light([run(['needs-human'], { waitingOnYou: ['step-0'] })], [])), { runs: 0, sessions: 0 });
 });
 
 test('at work: REFUSED, a cancelled run’s step still saying it works is no session', () => {
-  assert.deepEqual(atWork([run(['running (working)'], { cancelledAt: '2026-09-30T05:00:00.000Z', status: 'cancelled', moving: false })]), {
-    runs: 0,
-    sessions: 0,
-  });
+  const off = run(['running (working)'], { cancelledAt: '2026-09-30T05:00:00.000Z', status: 'cancelled', moving: false });
+  assert.deepEqual(atWork(light([], [off])).sessions, 0);
 });
 
-test('at work: REFUSED, a run that waits on you is not in flight', () => {
-  const waiting = { runs: [], word: 'waiting on r-0 (cancelled)', advice: 'wf cancel r-1', onYou: true };
-  const waits = run(['waiting on r-0 (cancelled)'], { moving: false, waiting });
-  assert.deepEqual(atWork([waits]), { runs: 0, sessions: 0 });
+test('at work: REFUSED, the runs in flight are the api’s count, never the rows counted by the board', () => {
+  const moving = run(['checking']);
+  assert.equal(atWork({ ...light([], [moving]), counts: { waiting: 0, inFlight: 7, finished: 0 } }).runs, 7);
 });
 
-test('at work: a session of a run held until a person lifts it still works, and counts, though the run is not in flight', () => {
+test('at work: a session of a run that waits on a person still works, and counts, though the run is not in flight', () => {
   const holding = {
     at: '2026-09-30T05:00:00.000Z',
     runs: [],
@@ -101,12 +104,12 @@ test('at work: a session of a run held until a person lifts it still works, and 
     advice: 'wf hold r-1 --off',
     onYou: true,
   };
-  assert.deepEqual(atWork([run(['running (working)', 'waiting'], { moving: false, holding })]), { runs: 0, sessions: 1 });
+  assert.deepEqual(atWork(light([run(['running (working)', 'waiting'], { moving: false, holding })], [])), { runs: 0, sessions: 1 });
 });
 
 test('at work: runs in every factory count', () => {
   const runs = [run(['running (working)']), run(['checking'], { id: 'r-2', factory: 'other' })];
-  assert.deepEqual(atWork(runs), { runs: 2, sessions: 2 });
+  assert.deepEqual(atWork(light([], runs)), { runs: 2, sessions: 2 });
 });
 
 test('at work, in words: one and many, short enough for the bar, and the whole sentence in the title', () => {
@@ -249,22 +252,4 @@ test("the version says the code serving the board: an install's tag, or checkout
     title: "Nemia's orchestrator, version 1.0.0, run from the checkout at /home/me/nemia",
   });
   assert.deepEqual(versionWords({ version: '1.0.0' }), { text: 'v1.0.0', title: "Nemia's orchestrator, version 1.0.0" });
-});
-
-test('REFUSED: at work off the light answer says what it said off the whole list, a run that waits and still works among them', () => {
-  const worksAndWaits = run(['running (working)', 'needs-human'], { id: 'r-both', waitingOnYou: ['ask'] });
-  const atGate = run(['verified ✓', 'awaiting approval'], { id: 'r-gate', status: 'failed', moving: false, waitingOnYou: ['plan'] });
-  const moving = run(['checking'], { id: 'r-moving' });
-  const finished = run(['verified ✓'], { id: 'r-done', status: 'succeeded', moving: false });
-  const cancelled = run(['cancelled'], { id: 'r-off', status: 'cancelled', moving: false, cancelledAt: '2026-09-30T05:00:00.000Z' });
-  const open = { waiting: [worksAndWaits, atGate], inFlight: [moving] };
-  const all = [finished, worksAndWaits, cancelled, moving, atGate];
-  assert.deepEqual(atWork(openRows(open)), atWork(all));
-  assert.deepEqual(atWork(openRows(open)), { runs: 2, sessions: 2 });
-  assert.deepEqual(
-    openRows(open).map((one) => one.id),
-    ['r-both', 'r-gate', 'r-moving'],
-  );
-  assert.notDeepEqual(atWork(open.inFlight), atWork(all), 'the runs in flight alone lose the session of the run that also waits');
-  assert.equal(inFlight(worksAndWaits), true);
 });

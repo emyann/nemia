@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { daemonQuery, openRunsQuery, quotaQuery, versionQuery } from '@/lib/api';
 import type { Bar } from '@/lib/bar';
-import { openRows } from '@/lib/factory';
 import type { FeedStatus } from '@/lib/feed';
 import { atWork, atWorkWords, type DaemonTone, daemonDot, feedWords, footerParts, quotaShort, versionWords } from '@/lib/footer';
 import { useBar } from '@/lib/useBar';
@@ -84,9 +83,7 @@ export function FrameFooter({ feed }: { feed: FeedStatus }) {
   const dot = daemonDot(daemon.data, daemon.error, now);
   const live = feedWords(feed);
   const short = quotaShort(quota.data, quota.error, now);
-  const work = runs.data
-    ? atWorkWords(atWork(openRows(runs.data)))
-    : { text: runs.error ? 'unread' : 'reading', title: runs.error?.message ?? '' };
+  const work = runs.data ? atWorkWords(atWork(runs.data)) : { text: runs.error ? 'unread' : 'reading', title: runs.error?.message ?? '' };
   const narrow = !parts.includes('feed');
 
   return (

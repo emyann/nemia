@@ -1,48 +1,12 @@
 /**
  * The board's components, rendered to markup as a server renders them: what a person is shown, without a browser.
  *
- * Node runs a test's TypeScript as it is, and not a component's JSX. The hooks below hand it the app's `.tsx` compiled
- * by `typescript`, the compiler the app is typechecked with, and resolve an import as vite does — no extension, and
- * `@/` for `src/`. Registered before the components are imported, so every import below is dynamic. `npm run e2e`
- * looks at the same components on the pages.
+ * Node runs a test's TypeScript as it is, and not a component's JSX: `./tsx.ts` registers the hooks that load one. Registered before
+ * the components are imported, so every import of one below is dynamic. `npm run e2e` looks at the same components on the pages.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import { registerHooks } from 'node:module';
-import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
-import ts from 'typescript';
-
-const SRC = path.resolve(import.meta.dirname, '..', 'src');
-
-registerHooks({
-  resolve(specifier, context, nextResolve) {
-    const named = specifier.startsWith('@/') ? pathToFileURL(path.join(SRC, specifier.slice(2))).href : specifier;
-    if ((named.startsWith('.') || named.startsWith('file:')) && !path.extname(named)) {
-      for (const extension of ['.ts', '.tsx']) {
-        try {
-          return nextResolve(named + extension, context);
-        } catch {}
-      }
-    }
-    return nextResolve(named, context);
-  },
-  load(url, context, nextLoad) {
-    if (!url.endsWith('.tsx')) return nextLoad(url, context);
-    const fileName = fileURLToPath(url);
-    const { outputText } = ts.transpileModule(fs.readFileSync(fileName, 'utf8'), {
-      fileName,
-      compilerOptions: {
-        jsx: ts.JsxEmit.ReactJSX,
-        module: ts.ModuleKind.ESNext,
-        target: ts.ScriptTarget.ES2022,
-        verbatimModuleSyntax: true,
-      },
-    });
-    return { format: 'module', source: outputText, shortCircuit: true };
-  },
-});
+import './tsx.ts';
 
 const { createElement } = await import('react');
 const { renderToStaticMarkup } = await import('react-dom/server');
@@ -5940,6 +5904,26 @@ test("the picker offers the factories Home lists, then the address's own when th
     'with no factory named, the default one is offered while it holds a run',
   );
   assert.equal(pickerFactories(alone, false, undefined).length, 0, 'and not while it holds none');
+});
+
+test("REFUSED: the picker offers only All factories until the default's light answer arrives, though the address picks the default", async () => {
+  const { pickerOffer } = await import('../src/components/FactoryPicker.tsx');
+  const alone = [filed('default', { default: true, workflows: null })];
+  const counts = (finished: number) => ({ counts: { waiting: 0, inFlight: 0, finished } });
+  assert.deepEqual(pickerOffer(alone, undefined, 'default'), [], 'the light answer unread: nothing is offered');
+  assert.deepEqual(pickerOffer(undefined, counts(1), 'default'), [], 'the factories unread: nothing is offered');
+  assert.deepEqual(
+    pickerOffer(alone, counts(1), 'default').map((item) => item.name),
+    ['default'],
+    'read, and holding a run: the default is offered',
+  );
+  assert.equal(pickerOffer(alone, counts(1), 'default')[0].factory, alone[0], 'as the factory the api lists, not a bare name');
+  const named = [...alone, filed('nemia')];
+  assert.deepEqual(
+    pickerOffer(named, undefined, undefined).map((item) => item.name),
+    ['nemia'],
+    'once a factory is named, no light answer is waited for',
+  );
 });
 
 test("a factory in the picker reads its repositories by their folders' names, whole in the tooltip, and why its file does not read", async () => {

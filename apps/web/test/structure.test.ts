@@ -87,7 +87,14 @@ function importsIn(text: string): string[] {
 const leavesWeb = (file: string, mod: string): boolean =>
   mod.startsWith('.') && path.posix.normalize(path.posix.join(path.posix.dirname(file), mod)).startsWith('../');
 
-/** Each import of the board's source that reaches past the api: a workspace package, a node built-in, a path out of `apps/web`. */
+/** Whether a relative module named in `file` of `src` is under the board's `test/`: a fixture, a helper, the gallery of the parts. */
+const reachesTests = (file: string, mod: string): boolean =>
+  mod.startsWith('.') && path.posix.normalize(path.posix.join(path.posix.dirname(file), mod)).startsWith('test/');
+
+/**
+ * Each import of the board's source that reaches past the api — a workspace package, a node built-in, a path out of `apps/web` — or
+ * into the board's own tests, which the built board never holds.
+ */
 function importBreaks(texts: ReadonlyMap<string, string>): string[] {
   const out: string[] = [];
   for (const [file, text] of texts)
@@ -97,6 +104,8 @@ function importBreaks(texts: ReadonlyMap<string, string>): string[] {
       else if (mod.startsWith('node:') || builtinModules.includes(mod))
         out.push(`${file} imports ${mod}, a node built-in: the board runs in a browser, and asks the api for what node knows`);
       else if (leavesWeb(file, mod)) out.push(`${file} imports ${mod}, a path out of apps/web: the board reaches the api over HTTP alone`);
+      else if (reachesTests(file, mod))
+        out.push(`${file} imports ${mod}, a file of the tests: move what the board needs under src, the built board holds no test`);
     }
   return out;
 }
@@ -192,8 +201,31 @@ test('REFUSED: a workspace package, a node built-in, and a path out of apps/web'
   assert.deepEqual(planted('../../api/src/app.ts'), [
     'src/x.ts imports ../../api/src/app.ts, a path out of apps/web: the board reaches the api over HTTP alone',
   ]);
-  for (const mod of ['react', 'agent-orchestrator-ui', './lib/api.ts', '@/lib/api.ts', '../test/fixtures.ts'])
+  for (const mod of ['react', 'agent-orchestrator-ui', './lib/api.ts', '@/lib/api.ts', './test/fixtures.ts'])
     assert.deepEqual(planted(mod), [], `${mod} is let through`);
+});
+
+test('REFUSED: a file of the source that imports a test file, the gallery of the parts among them', () => {
+  const planted = (mod: string): string[] => importBreaks(new Map([...sourceTexts(), ['src/x.ts', `import { y } from '${mod}';\n`]]));
+  assert.deepEqual(planted('../test/fixtures.ts'), [
+    'src/x.ts imports ../test/fixtures.ts, a file of the tests: move what the board needs under src, the built board holds no test',
+  ]);
+  assert.deepEqual(planted('../test/e2e/parts/main.tsx'), [
+    'src/x.ts imports ../test/e2e/parts/main.tsx, a file of the tests: move what the board needs under src, the built board holds no test',
+  ]);
+});
+
+test('REFUSED: the board is built from its one page, never from an entry of its own beside it', () => {
+  const entries = (config: string): string[] => [...config.matchAll(/\b(?:input|entry)\s*:/g)].map((m) => m[0]);
+  assert.deepEqual(entries("build: { rollupOptions: { input: { parts: 'test/e2e/parts/index.html' } } }"), ['input:']);
+  const config = fs.readFileSync(path.join(WEB, 'vite.config.ts'), 'utf8');
+  assert.match(config, /export default defineConfig\(/, 'the config is read');
+  assert.deepEqual(entries(config), []);
+  assert.match(
+    fs.readFileSync(path.join(WEB, 'index.html'), 'utf8'),
+    /src="\/src\/main\.tsx"/,
+    'its page loads the board, and nothing else',
+  );
 });
 
 /** The file of `texts` a module named in `file` is, for one under `src` named by `@/` or a relative path; none for a package. */

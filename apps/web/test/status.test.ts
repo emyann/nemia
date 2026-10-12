@@ -360,6 +360,7 @@ const STATE_DRAWERS = [
   'MachineEdge.tsx',
   'FactoryCanvas.tsx',
   'QueueLane.tsx',
+  'RunSteps.tsx',
 ];
 
 test('no hand-picked hue says a state: the chips, the minimap and the canvases draw the meanings alone', () => {

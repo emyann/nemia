@@ -51,7 +51,7 @@ export const Route = createFileRoute('/workflows_/$from/$workflow')({
   errorComponent: ({ error }) => (
     <div className="space-y-3">
       <BackToWorkflows />
-      <p className="text-sm text-red-600">Could not load this workflow: {error instanceof Error ? error.message : String(error)}</p>
+      <p className="text-sm text-failure">Could not load this workflow: {error instanceof Error ? error.message : String(error)}</p>
     </div>
   ),
 });
@@ -273,11 +273,7 @@ function WorkflowHeader({
         )}
         {(onBuild || removable) && <span aria-hidden className="ml-auto" />}
         {onBuild && (
-          <button
-            type="button"
-            onClick={onBuild}
-            className="rounded border border-neutral-300 px-2 py-0.5 text-xs font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-900"
-          >
+          <button type="button" onClick={onBuild} className="rounded border border-outline px-2 py-0.5 text-xs font-medium hover:bg-accent">
             Build
           </button>
         )}
@@ -317,10 +313,7 @@ function NotOffered({ name, place, address, attach }: { name: string; place: Pla
 /** The README whole, as the markdown it is written in, or that there is none. */
 function Readme({ text }: { text: string | null }) {
   return (
-    <section
-      aria-label="README"
-      className="space-y-2 rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950"
-    >
+    <section aria-label="README" className="space-y-2 rounded-lg border border-outline-variant bg-card p-4">
       <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">README</h2>
       {text?.trim() ? (
         <Markdown className="text-sm">{text}</Markdown>
@@ -337,9 +330,9 @@ function Readme({ text }: { text: string | null }) {
 /** Why the folder does not read as a workflow, in the loader's words: it cannot start. */
 function Refused({ error }: { error: string }) {
   return (
-    <div className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40">
-      <p className="text-sm font-medium text-red-800 dark:text-red-300">Does not read as a workflow, so it cannot start:</p>
-      <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{error}</p>
+    <div className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
+      <p className="text-sm font-medium text-on-failure-container">Does not read as a workflow, so it cannot start:</p>
+      <p className="font-mono text-xs whitespace-pre-wrap break-words text-on-failure-container">{error}</p>
     </div>
   );
 }

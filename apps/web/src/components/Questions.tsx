@@ -49,10 +49,7 @@ function OptionText({ q, label, meaning }: { q: Question; label: string; meaning
     <span className="min-w-0">
       <strong className="font-medium">{label}</strong> <span className="text-muted-foreground">— {meaning}</span>
       {q.recommended === label && (
-        <span
-          data-recommended
-          className="ml-1.5 rounded bg-emerald-100 px-1 py-px text-[11px] font-medium text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-        >
+        <span data-recommended className="ml-1.5 rounded bg-surface-variant px-1 py-px text-[11px] font-medium text-on-surface-variant">
           recommended
         </span>
       )}
@@ -92,7 +89,7 @@ export function QuestionField({ q, n, draft, onDraft }: { q: Question; n: number
   const id = useId();
   const { chose, own } = said(draft, q);
   return (
-    <fieldset data-question={q.title} className="space-y-1.5 rounded border border-neutral-200 p-2 dark:border-neutral-800">
+    <fieldset data-question={q.title} className="space-y-1.5 rounded border border-outline-variant p-2">
       <legend className="px-1 font-medium">
         {n}. {q.title}
         {q.multiple && <span className="font-normal text-muted-foreground"> (choose any)</span>}
@@ -175,10 +172,7 @@ export function RecommendButton({
       type="button"
       data-recommend-all
       onClick={() => onDraft(recommendedDraft(questions, draft))}
-      className={cn(
-        BUTTON,
-        'bg-white text-foreground ring-1 dark:text-foreground ring-neutral-300 hover:bg-neutral-100 dark:bg-neutral-900 dark:ring-neutral-700 dark:hover:bg-neutral-800',
-      )}
+      className={cn(BUTTON, 'bg-card text-foreground ring-1 ring-outline hover:bg-accent')}
     >
       Choose the recommended answers
     </button>
@@ -188,7 +182,7 @@ export function RecommendButton({
 /** A step whose try a person just asked for, as its row says it until the run is read again: the CLI `ls`'s note. */
 function AskedRow({ step, said }: { step: string; said: string }) {
   return (
-    <li data-offer="asked" data-step={step} className="rounded border border-neutral-200 px-3 py-2 text-sm dark:border-neutral-800">
+    <li data-offer="asked" data-step={step} className="rounded border border-outline-variant px-3 py-2 text-sm">
       <strong>{step}</strong>{' '}
       <span data-note className="font-mono text-xs text-muted-foreground">
         {said}
@@ -227,12 +221,7 @@ export function QuestionsForm({ runId, offer }: { runId: string; offer: Extract<
   if (ask.isSuccess) return <AskedRow step={offer.step} said={askedSaid(ask.data)} />;
   const left = unanswered(offer.questions, draft);
   return (
-    <li
-      data-offer="answer"
-      data-questions
-      data-step={offer.step}
-      className="space-y-2 rounded border border-amber-300 bg-amber-50/60 p-3 text-sm dark:border-amber-900 dark:bg-amber-950/30"
-    >
+    <li data-offer="answer" data-questions data-step={offer.step} className="space-y-2 rounded border border-yours bg-card p-3 text-sm">
       <p data-said>
         <strong>{offer.step}</strong> asks {offer.questions.length === 1 ? 'a question' : `${offer.questions.length} questions`}
         {offer.needs && <span className="text-muted-foreground">: {offer.needs}</span>}

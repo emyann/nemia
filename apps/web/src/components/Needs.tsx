@@ -4,6 +4,7 @@ import { needsOf, needText, offersOf, stepAnchor } from '../lib/asks';
 import { onYouOf, toDecideOf } from '../lib/factory';
 import { Continue } from './Decide';
 import { Markdown } from './Markdown';
+import { container } from '../lib/meaning';
 
 /** The line that continues `step` from a terminal, as the api answers it on the step (`commands.retry`); none for a step the run lacks. */
 const retryLineOf = (run: RunDetail, step: string): string => run.steps.find((s) => s.name === step)?.commands.retry ?? '';
@@ -35,11 +36,7 @@ export function ToDecideBanner({ run, onStep }: { run: RunDetail; onStep?: (step
   const decide = toDecideOf(run);
   if (!decide) return null;
   return (
-    <section
-      aria-label="To decide"
-      data-to-decide={decide.kind}
-      className="rounded bg-emerald-100 px-3 py-2 text-sm text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200"
-    >
+    <section aria-label="To decide" data-to-decide={decide.kind} className={`rounded px-3 py-2 text-sm ${container.yours}`}>
       <strong>To decide:</strong>{' '}
       {decide.kind === 'approve' ? (
         <StepLink step={decide.step} onStep={onStep}>
@@ -95,10 +92,7 @@ export function NeedsBanner({ run, onStep }: { run: RunDetail; onStep?: (step: s
   if (!asks.length && !needs.length) return null;
   const offers = offersOf(run);
   return (
-    <section
-      aria-label="Waiting on you"
-      className="space-y-1.5 rounded bg-amber-100 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200"
-    >
+    <section aria-label="Waiting on you" className={`space-y-1.5 rounded px-3 py-2 text-sm ${container.yours}`}>
       {asks.length > 0 && (
         <p>
           Waiting on you:{' '}

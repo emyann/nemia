@@ -36,19 +36,16 @@ export function ContextPicker({
         judged.
       </p>
       {runs.error ? (
-        <p className="text-xs text-red-700 dark:text-red-400">Could not list the runs to read: {runs.error.message}</p>
+        <p className="text-xs text-failure">Could not list the runs to read: {runs.error.message}</p>
       ) : !listed ? (
         <p className="text-xs text-muted-foreground">Reading the runs…</p>
       ) : !listed.length ? (
         <p className="text-xs text-muted-foreground">No run to read.</p>
       ) : (
-        <ul
-          aria-label="Runs to read"
-          className="max-h-44 divide-y divide-neutral-200 overflow-y-auto rounded border border-neutral-300 dark:divide-neutral-800 dark:border-neutral-700"
-        >
+        <ul aria-label="Runs to read" className="max-h-44 divide-y divide-outline-variant overflow-y-auto rounded border border-outline">
           {listed.map((run) => (
             <li key={run.id} data-run={run.id}>
-              <label className="flex cursor-pointer items-baseline gap-2 px-2 py-1 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-900">
+              <label className="flex cursor-pointer items-baseline gap-2 px-2 py-1 text-sm hover:bg-accent">
                 <input
                   type="checkbox"
                   value={run.id}
@@ -83,19 +80,19 @@ export function ContextPicker({
 export function ConcludedPreview({ run }: { run: string }) {
   const concluded = useQuery(concludedQuery(run));
   return (
-    <section data-concluded={run} className="space-y-1 rounded border border-neutral-200 p-2 dark:border-neutral-800">
+    <section data-concluded={run} className="space-y-1 rounded border border-outline-variant p-2">
       <h4 className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
         <span>
           What <span className="font-mono">{run}</span> hands
         </span>
         {concluded.data && !concluded.data.shipped && (
-          <Badge variant="outline" data-not-shipped className="border-amber-400 text-amber-800 dark:border-amber-700 dark:text-amber-300">
+          <Badge variant="outline" data-not-shipped className="border-dashed border-outline text-on-surface-variant">
             not shipped, not judged
           </Badge>
         )}
       </h4>
       {concluded.error ? (
-        <p className="text-xs text-red-700 dark:text-red-400">Could not read what it concluded: {concluded.error.message}</p>
+        <p className="text-xs text-failure">Could not read what it concluded: {concluded.error.message}</p>
       ) : !concluded.data ? (
         <p className="text-xs text-muted-foreground">Reading what it concluded…</p>
       ) : (

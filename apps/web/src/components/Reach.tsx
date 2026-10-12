@@ -1,15 +1,16 @@
 import type { ReactNode } from 'react';
 import type { ReadOnlyCommands, StepReach } from '../lib/api';
+import { container, dashed } from '../lib/meaning';
 
 export const CHIP = 'inline-flex items-center rounded px-1.5 py-0.5 font-mono text-[11px] leading-none whitespace-nowrap';
-export const PLAIN = 'bg-neutral-100 text-foreground dark:bg-neutral-800';
-export const STRUCK = 'bg-red-50 text-red-800 line-through decoration-red-500 dark:bg-red-950/60 dark:text-red-300';
+export const PLAIN = 'bg-muted text-foreground';
+export const STRUCK = `${container.grey} line-through decoration-outline`;
 /** A command that runs without asking. */
-const RUNS = 'bg-emerald-50 text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-300';
+const RUNS = container.sage;
 /** One said to, and not measured. */
-const DOCUMENTED = 'border border-dashed border-emerald-400 text-emerald-800 dark:border-emerald-700 dark:text-emerald-300';
+const DOCUMENTED = dashed.sage;
 /** One an ask rule makes ask, on a step that prompts. In dontAsk, or on a job, which deny what asks, it is struck. */
-export const ASKS = 'bg-amber-50 text-amber-900 dark:bg-amber-950/60 dark:text-amber-300';
+export const ASKS = container.yours;
 
 /** One part of what a step gets, under its label. */
 export function Reach({ label, children }: { label: string; children: ReactNode }) {

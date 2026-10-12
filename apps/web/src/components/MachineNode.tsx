@@ -41,7 +41,7 @@ export const kindOf = ({ initial, final }: Pick<StateBox, 'initial' | 'final'>):
  */
 function markOf({ lit, inspected, pressable }: MachineFlowNode['data']): string {
   if (lit) return 'bg-alive-container ring-4 ring-alive';
-  const fill = 'bg-white dark:bg-neutral-900';
+  const fill = 'bg-card';
   if (inspected) return `${fill} cursor-pointer ring-4 ring-ring`;
   return pressable ? `${fill} cursor-pointer in-focus-visible:ring-2 in-focus-visible:ring-ring` : fill;
 }
@@ -53,11 +53,7 @@ function markOf({ lit, inspected, pressable }: MachineFlowNode['data']): string 
  * one a press shows in the bar is ringed on keyboard focus too. Handles are hidden: nobody draws an edge here.
  */
 export function MachineNode({ data }: NodeProps<MachineFlowNode>) {
-  const edge = data.initial
-    ? 'border-2 border-sage'
-    : data.final
-      ? 'border-4 border-double border-neutral-500 dark:border-neutral-400'
-      : 'border border-neutral-300 dark:border-neutral-700';
+  const edge = data.initial ? 'border-2 border-sage' : data.final ? 'border-4 border-double border-outline' : 'border border-outline';
   return (
     <div
       data-state={data.id}
@@ -75,7 +71,7 @@ export function MachineNode({ data }: NodeProps<MachineFlowNode>) {
         </p>
       </div>
       {data.stays.length > 0 && (
-        <div className="mt-1.5 border-t border-neutral-200 dark:border-neutral-800">
+        <div className="mt-1.5 border-t border-outline-variant">
           <ByActionList list={data.stays} />
         </div>
       )}

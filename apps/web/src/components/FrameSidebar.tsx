@@ -156,7 +156,7 @@ export function FavoriteLinks({ rows, onPick }: { rows: readonly FavoriteRow[]; 
         >
           {row.gone ? <GoneRow row={row} /> : <FavoriteLink row={row} onPick={onPick} />}
           <SidebarMenuAction showOnHover={!row.gone} aria-label={`Unstar ${rowName(row)}`} onPress={() => toggleFavorite(row.favorite)}>
-            <Star className="fill-amber-400 text-amber-500 dark:fill-amber-300 dark:text-amber-300" />
+            <Star className="fill-foreground text-foreground" />
           </SidebarMenuAction>
         </SidebarMenuItem>
       ))}

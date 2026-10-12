@@ -26,7 +26,7 @@ export const Route = createFileRoute('/runs/$runId_/steps/$step')({
       <Link to="/runs" className="text-sm text-muted-foreground hover:text-foreground">
         ← Runs
       </Link>
-      <p className="text-sm text-red-600">Could not load this run: {error instanceof Error ? error.message : String(error)}</p>
+      <p className="text-sm text-failure">Could not load this run: {error instanceof Error ? error.message : String(error)}</p>
     </div>
   ),
 });
@@ -75,7 +75,7 @@ function SessionRead({ runId, name }: { runId: string; name: string }) {
     return (
       <div className="space-y-3 p-4">
         <BackToRun run={run} />
-        <p className="text-sm text-red-600">
+        <p className="text-sm text-failure">
           Run {run.id} has no step '{name}'. Its page lists the steps it has.
         </p>
       </div>
@@ -113,13 +113,13 @@ function Session({ run, step }: { run: RunDetail; step: Step }) {
               data-streamed={following.streamed || undefined}
               className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
             >
-              <span aria-hidden className="size-1.5 animate-pulse rounded-full bg-green-500" />
+              <span aria-hidden className="size-1.5 animate-pulse rounded-full bg-alive" />
               following live
             </span>
           )}
         </div>
         <StepNote note={step.note} />
-        {following.error && <p className="text-sm text-red-600">{following.error}</p>}
+        {following.error && <p className="text-sm text-failure">{following.error}</p>}
       </header>
       <DebugPanel run={run} step={step} />
       <div className="flex min-h-0 flex-1 flex-col">

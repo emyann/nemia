@@ -12,10 +12,7 @@ export function WorkflowLink({ dir, page }: { dir: string; page: WorkflowPageAdd
   const name = workflowNameOf(dir);
   const label = (
     <>
-      workflow{' '}
-      <span className="font-mono text-foreground underline decoration-neutral-300 underline-offset-2 dark:decoration-neutral-600">
-        {name}
-      </span>
+      workflow <span className="font-mono text-foreground underline decoration-outline underline-offset-2">{name}</span>
     </>
   );
   if (!page) {

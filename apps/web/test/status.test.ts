@@ -15,7 +15,7 @@ import {
   type Drawn,
   type StepState,
 } from '../src/lib/status.ts';
-import { meaningOf } from '../src/lib/meaning.ts';
+import { container, meaningOf } from '../src/lib/meaning.ts';
 import { isLive, movingInto } from '../src/lib/canvas.ts';
 
 test("each word wf ls prints reads as the state a person acts on: waiting, rounds exhausted, the run's verdicts, and the engine's own word for the step's task with how it signed off beside it", () => {
@@ -376,4 +376,29 @@ test('no hand-picked hue says a state: the chips, the minimap and the canvases d
     const found = lines.flatMap((line, at) => (HUE.test(line) ? [`${file}:${at + 1}`] : []));
     assert.equal(found.length, 0, found.join(', '));
   }
+});
+
+/** The text of `source` from the declaration `from` up to the declaration `to`, both of which must be there. */
+function sliceOf(source: string, from: string, to: string): string {
+  const [start, end] = [source.indexOf(from), source.indexOf(to)];
+  assert.ok(start >= 0 && end > start, `${from} then ${to}`);
+  return source.slice(start, end);
+}
+
+/** Whether a banner's source draws what waits on a person from the yours container: `onYou`, then the form, across line breaks. */
+const onYouReadsYours = (banner: string): boolean => /\.onYou\s*\?\s*container\.yours\s*:/.test(banner);
+
+test("REFUSED: the run page's banners of a wait on a person — waiting on runs, held — drawn from another meaning than yours", () => {
+  const page = fs.readFileSync(path.join(web, 'src', 'routes', 'runs.$runId.tsx'), 'utf8');
+  for (const [from, to] of [
+    ['function WaitingOnRuns(', 'function HeldUntil('],
+    ['function HeldUntil(', 'function RunHeading('],
+  ]) {
+    const banner = sliceOf(page, from, to);
+    assert.equal(onYouReadsYours(banner), true, `${from} draws a wait on a person from container.yours`);
+    assert.doesNotMatch(banner, /container\.(?:money|failure|alive)/, `${from} draws no other meaning`);
+  }
+  assert.equal(onYouReadsYours('waiting.onYou\n  ? container.yours\n  : filled.grey'), true, 'across a line break');
+  assert.equal(onYouReadsYours('waiting.onYou ? container.money : filled.grey'), false, "an amount's amber is refused");
+  assert.equal(container.yours, 'bg-yours-container text-on-yours-container');
 });

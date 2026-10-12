@@ -48,11 +48,7 @@ export function RemoveRun({ id }: { id: string }) {
         </Button>
       )}
       {remove.isError && (
-        <span
-          role="alert"
-          data-remove-refused
-          className="basis-full font-mono whitespace-pre-wrap break-words text-red-700 dark:text-red-400"
-        >
+        <span role="alert" data-remove-refused className="basis-full font-mono whitespace-pre-wrap break-words text-failure">
           {remove.error.message}
         </span>
       )}

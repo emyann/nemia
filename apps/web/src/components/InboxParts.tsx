@@ -8,10 +8,10 @@ import { FactoryTag } from './FactoryTag';
 
 /** A button that does what its form or card is for. */
 export const PRIMARY =
-  'rounded bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-neutral-900 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300 dark:disabled:hover:bg-neutral-100';
+  'rounded bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-primary';
 /** A button beside it. */
 export const SECONDARY =
-  'rounded border border-neutral-300 px-3 py-1.5 text-sm font-medium hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-neutral-700 dark:hover:bg-neutral-900';
+  'rounded border border-outline px-3 py-1.5 text-sm font-medium hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40';
 
 /**
  * A card's line under its title: its name, the factory it is in, linked to its floor — `default`, muted and not linked, for one naming none
@@ -48,7 +48,7 @@ export function PageLink({ entry, entries, children }: { entry: InboxEntry; entr
     <Link
       to="/inbox/$name"
       params={{ name: entry.name }}
-      className="underline decoration-neutral-300 underline-offset-4 hover:decoration-current dark:decoration-neutral-600"
+      className="underline decoration-outline underline-offset-4 hover:decoration-current"
     >
       {children}
     </Link>
@@ -64,7 +64,7 @@ export function GoneItem({ entry, refusal, onDismiss }: { entry: InboxEntry; ref
     <li
       aria-label={`Card ${entry.name}, no longer in the inbox`}
       data-gone={entry.name}
-      className="space-y-3 rounded-lg border border-dashed border-neutral-300 p-4 dark:border-neutral-700"
+      className="space-y-3 rounded-lg border border-dashed border-outline p-4"
     >
       <div className="flex flex-wrap items-start gap-3 sm:flex-nowrap">
         <div className="min-w-0 flex-1 space-y-1">
@@ -94,7 +94,7 @@ export function Tried({ entry }: { entry: InboxEntry & { tried: NonNullable<Inbo
   return (
     <p
       data-tried={refused ? 'refused' : 'failed'}
-      className={`rounded border px-3 py-2 text-xs break-words ${refused ? 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200' : 'border-neutral-200 text-muted-foreground dark:border-neutral-800'}`}
+      className={`rounded border px-3 py-2 text-xs break-words ${refused ? 'border-failure bg-failure-container text-on-failure-container' : 'border-outline-variant text-muted-foreground'}`}
     >
       {triedLine(entry, new Date(entry.tried.at).toLocaleString())}
     </p>
@@ -112,12 +112,9 @@ const NOT_DONE: Record<CardRefusal['action'], string> = {
 /** What a start, a drop, a queue or its taking back, or a `from:` set, was refused with, in the api's words. */
 export function Refused({ refusal }: { refusal: CardRefusal }) {
   return (
-    <div
-      data-refused={refusal.action}
-      className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40"
-    >
-      <p className="text-sm font-medium text-red-800 dark:text-red-300">{NOT_DONE[refusal.action]}. The api refused it:</p>
-      <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{refusal.message}</p>
+    <div data-refused={refusal.action} className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
+      <p className="text-sm font-medium text-on-failure-container">{NOT_DONE[refusal.action]}. The api refused it:</p>
+      <p className="font-mono text-xs whitespace-pre-wrap break-words text-on-failure-container">{refusal.message}</p>
     </div>
   );
 }

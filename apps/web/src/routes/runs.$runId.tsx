@@ -27,6 +27,7 @@ import { decidableRun } from '../lib/decide';
 import { duration } from '../lib/canvas';
 import { clockCounts, inFlight, runClock, titleOf, waitedMs } from '../lib/factory';
 import { useNow } from '../lib/useNow';
+import { container, ink } from '../lib/meaning';
 
 /**
  * `step`, the old address of one step of the run, opens that step in the frame's bar: the page is loaded again in place of that address,
@@ -45,7 +46,7 @@ export const Route = createFileRoute('/runs/$runId')({
   errorComponent: ({ error }) => (
     <div className="space-y-3">
       <BackToRuns />
-      <p className="text-sm text-red-600">Could not load this run: {error instanceof Error ? error.message : String(error)}</p>
+      <p className="text-sm text-failure">Could not load this run: {error instanceof Error ? error.message : String(error)}</p>
     </div>
   ),
 });
@@ -115,9 +116,7 @@ function Run({ run }: { run: RunDetail }) {
 
       <HeldUntil run={run} />
 
-      {run.warning && (
-        <p className="rounded border border-neutral-300 px-3 py-2 text-sm text-muted-foreground dark:border-neutral-700">{run.warning}</p>
-      )}
+      {run.warning && <p className="rounded border border-outline px-3 py-2 text-sm text-muted-foreground">{run.warning}</p>}
 
       <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <RunHeading run={run} />
@@ -231,7 +230,7 @@ function Pruned({ pruned: { at, worktrees, artifacts } }: { pruned: NonNullable<
 
 /** What the harness denied a step's try, every call as a permission rule names it: `Skill(look), Bash(pytest)`. */
 const deniedRow = (calls: readonly string[]): ReactNode => (
-  <span data-denied className="font-mono text-xs text-red-700 dark:text-red-400">
+  <span data-denied className={`font-mono text-xs ${ink.yours}`}>
     {calls.join(', ')}
   </span>
 );
@@ -269,7 +268,7 @@ function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; 
   const ends = endsTheRun(step);
   const acts = atGate && ends && step.taskId === null;
   const handedOn = closeout && (
-    <div className="min-w-0 space-y-2 rounded border border-neutral-200 p-3 text-sm dark:border-neutral-800">
+    <div className="min-w-0 space-y-2 rounded border border-outline-variant p-3 text-sm">
       <Markdown>{closeout.summary}</Markdown>
       {closeout.needs && <ClosedNeeds needs={closeout.needs} />}
       {closeout.artifacts.length > 0 && (
@@ -282,7 +281,7 @@ function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; 
   );
 
   return (
-    <section id={stepAnchor(step.name)} className="scroll-mt-4 space-y-4 border-t border-neutral-200 pt-6 dark:border-neutral-800">
+    <section id={stepAnchor(step.name)} className="scroll-mt-4 space-y-4 border-t border-outline-variant pt-6">
       <div className="space-y-1">
         <div className="flex flex-wrap items-center gap-3">
           <h2 className="font-semibold">{step.name}</h2>
@@ -398,8 +397,8 @@ function startedRow(run: RunDetail): ReactNode {
 
 /**
  * What a run started `--after` runs still waits on, as the CLI's `decide` says it for such a run and offers nothing else: the CLI `ls`'s
- * word, what it leaves a person to do, and each run it names, linked to its page where the store has it. Amber when one never ships without
- * a person.
+ * word, what it leaves a person to do, and each run it names, linked to its page where the store has it. In the yours container when one
+ * never ships without a person, at rest otherwise.
  */
 function WaitingOnRuns({ run }: { run: RunDetail }) {
   const { waiting } = run;
@@ -408,11 +407,7 @@ function WaitingOnRuns({ run }: { run: RunDetail }) {
     <section
       aria-label="Waiting on runs"
       data-on-you={waiting.onYou}
-      className={`space-y-1 rounded px-3 py-2 text-sm ${
-        waiting.onYou
-          ? 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200'
-          : 'bg-neutral-100 text-foreground dark:bg-neutral-900'
-      }`}
+      className={`space-y-1 rounded px-3 py-2 text-sm ${waiting.onYou ? container.yours : 'bg-muted text-foreground'}`}
     >
       <p className="font-mono">{waiting.word}</p>
       <p data-advice>{waiting.advice}</p>
@@ -435,8 +430,9 @@ function WaitingOnRuns({ run }: { run: RunDetail }) {
 
 /**
  * A person's hold on the run (the CLI's `hold`), as the CLI's `decide` says it: until which runs ship, what that means and how to lift it,
- * and each run it is held until, linked where it is there. In violet as the held chips are, and in amber once only a person lifts it. While
- * it stands no step offers an answer — the package refuses each — so this is the one thing on the page asked of anyone.
+ * and each run it is held until, linked where it is there. At rest, in the grey container, and in the yours container
+ * once only a person lifts it. While it stands no step offers an answer — the package refuses each — so this is the one thing on the page
+ * asked of anyone.
  */
 function HeldUntil({ run }: { run: RunDetail }) {
   const { holding } = run;
@@ -445,11 +441,7 @@ function HeldUntil({ run }: { run: RunDetail }) {
     <section
       aria-label="Held"
       data-on-you={holding.onYou}
-      className={`space-y-1 rounded px-3 py-2 text-sm ${
-        holding.onYou
-          ? 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200'
-          : 'bg-violet-100 text-violet-900 dark:bg-violet-950 dark:text-violet-200'
-      }`}
+      className={`space-y-1 rounded px-3 py-2 text-sm ${holding.onYou ? container.yours : container.grey}`}
     >
       <p className="font-mono">{holding.word}</p>
       <p data-advice>{holding.advice}</p>

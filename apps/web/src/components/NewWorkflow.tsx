@@ -6,7 +6,7 @@ import { firstStep, listedWith } from '../lib/builder';
 import { rereadWorkflows } from '../lib/placed';
 
 const INPUT =
-  'block w-full rounded border border-neutral-300 bg-white px-2 py-1.5 text-sm placeholder:text-muted-foreground focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:focus:border-neutral-400';
+  'block w-full rounded border border-outline bg-background px-2 py-1.5 text-sm placeholder:text-muted-foreground focus:border-on-surface-variant focus:outline-none';
 
 /** Where a workflow's steps may work, each with the words a person chooses it by: none is chosen for them. */
 const PLACES: ReadonlyArray<{ place: NonNullable<WorkflowStepSpec['place']>; label: string; hint: string }> = [
@@ -31,7 +31,7 @@ function PlaceChoice({
         {PLACES.map((p) => (
           <label
             key={p.place}
-            className="grid cursor-pointer grid-cols-[auto_1fr] items-start gap-x-2 gap-y-0.5 rounded border border-neutral-300 px-2 py-1.5 text-sm has-checked:border-neutral-500 has-checked:bg-neutral-50 dark:border-neutral-700 dark:has-checked:border-neutral-400 dark:has-checked:bg-neutral-900"
+            className="grid cursor-pointer grid-cols-[auto_1fr] items-start gap-x-2 gap-y-0.5 rounded border border-outline px-2 py-1.5 text-sm has-checked:border-on-surface-variant has-checked:bg-accent"
           >
             <input
               type="radio"
@@ -53,9 +53,9 @@ function PlaceChoice({
 /** Why the api made nothing: `message`, its words. */
 function Refused({ message }: { message: string }) {
   return (
-    <div data-refused className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40">
-      <p className="text-sm font-medium text-red-800 dark:text-red-300">Not made. The api refused it:</p>
-      <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{message}</p>
+    <div data-refused className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
+      <p className="text-sm font-medium text-on-failure-container">Not made. The api refused it:</p>
+      <p className="font-mono text-xs whitespace-pre-wrap break-words text-on-failure-container">{message}</p>
     </div>
   );
 }
@@ -93,7 +93,7 @@ export function NewWorkflow({ folder, onCreated }: { folder: string; onCreated: 
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="rounded border border-neutral-300 px-3 py-1.5 text-sm font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-900"
+        className="rounded border border-outline px-3 py-1.5 text-sm font-medium hover:bg-accent"
       >
         New workflow
       </button>
@@ -102,7 +102,7 @@ export function NewWorkflow({ folder, onCreated }: { folder: string; onCreated: 
   return (
     <form
       aria-label="New workflow"
-      className="space-y-3 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950"
+      className="space-y-3 rounded-lg border border-outline-variant bg-card p-4 shadow-sm"
       onSubmit={(event) => {
         event.preventDefault();
         if (first) create.mutate(first);
@@ -151,7 +151,7 @@ export function NewWorkflow({ folder, onCreated }: { folder: string; onCreated: 
         <button
           type="submit"
           disabled={!name.trim() || !first || create.isPending}
-          className="rounded bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-neutral-900 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300 dark:disabled:hover:bg-neutral-100"
+          className="rounded bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-primary"
         >
           {create.isPending ? 'Making…' : 'Make it'}
         </button>
@@ -161,7 +161,7 @@ export function NewWorkflow({ folder, onCreated }: { folder: string; onCreated: 
             setOpen(false);
             create.reset();
           }}
-          className="rounded border border-neutral-300 px-3 py-1.5 text-sm font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-900"
+          className="rounded border border-outline px-3 py-1.5 text-sm font-medium hover:bg-accent"
         >
           Cancel
         </button>

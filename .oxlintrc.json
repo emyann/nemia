@@ -369,8 +369,8 @@
     {
       "files": ["apps/web/src/components/Decide.tsx"],
       "rules": {
-        "max-lines": ["error", { "max": 556, "skipBlankLines": true, "skipComments": true }],
-        "max-lines-per-function": ["error", { "max": 92, "skipBlankLines": true, "skipComments": true }],
+        "max-lines": ["error", { "max": 524, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 88, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 26 }],
         "sonarjs/cognitive-complexity": ["error", 26]
       }
@@ -390,7 +390,7 @@
     {
       "files": ["apps/web/src/components/PruneRun.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 99, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 94, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
@@ -443,7 +443,7 @@
     {
       "files": ["apps/web/src/components/StepNode.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 105, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 101, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 27 }],
         "sonarjs/cognitive-complexity": ["error", 19]
       }
@@ -516,13 +516,13 @@
     {
       "files": ["apps/web/src/routes/agents_.skills.$from.$skill.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 108, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 103, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
       "files": ["apps/web/src/routes/capabilities.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 172, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 170, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 21 }],
         "sonarjs/cognitive-complexity": ["error", 16]
       }

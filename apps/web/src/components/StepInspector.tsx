@@ -53,7 +53,7 @@ export function StepTabs({ run, step, className }: { run: RunDetail; step: Step;
 
   return (
     <div className={cn('flex flex-col', className)}>
-      <div role="tablist" className="flex gap-1 border-b border-neutral-200 px-2 dark:border-neutral-800">
+      <div role="tablist" className="flex gap-1 border-b border-outline-variant px-2">
         {TABS.map((t) => (
           <button
             key={t}
@@ -62,9 +62,7 @@ export function StepTabs({ run, step, className }: { run: RunDetail; step: Step;
             aria-selected={tab === t}
             onClick={() => setTab(t)}
             className={`-mb-px border-b-2 px-2 py-1.5 text-xs ${
-              tab === t
-                ? 'border-neutral-900 font-medium dark:border-neutral-100'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
+              tab === t ? 'border-foreground font-medium' : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
             {t}
@@ -87,7 +85,7 @@ export function StepTabs({ run, step, className }: { run: RunDetail; step: Step;
         {tab === 'Output' && (
           <>
             {gateOfStep(run, step) && (
-              <p data-answer-at="Details" className="text-xs text-amber-800 dark:text-amber-300">
+              <p data-answer-at="Details" className="text-xs text-yours">
                 {step.name} waits at its gate on you: read what it handed on, then{' '}
                 <button type="button" onClick={() => setTab('Details')} className="font-medium underline underline-offset-2">
                   approve it or send it back
@@ -240,7 +238,7 @@ function Activity({ run, step }: { run: RunDetail; step: Step }) {
           Open the session
         </Link>
       </div>
-      {following.error && <p className="text-xs text-red-600">{following.error}</p>}
+      {following.error && <p className="text-xs text-failure">{following.error}</p>}
       {!following.loading &&
         (tail.length ? (
           <Suspense fallback={<p className="text-muted-foreground">Reading its conversation…</p>}>

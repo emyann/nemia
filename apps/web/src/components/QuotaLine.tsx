@@ -15,7 +15,7 @@ export function QuotaLine({ quota, error }: { quota: Quota | undefined; error: E
   const now = new Date(useNow(30_000));
   if (error) {
     return (
-      <p data-quota="error" className="max-w-md basis-full truncate text-xs text-red-600 dark:text-red-400" title={error.message}>
+      <p data-quota="error" className="max-w-md basis-full truncate text-xs text-failure" title={error.message}>
         The quota could not be read: {error.message}
       </p>
     );

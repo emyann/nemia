@@ -29,9 +29,9 @@ export function attemptsWord({ count, latest }: StepAttempts): string {
 
 const verdictClass = (verdict: string | null) =>
   verdict === 'passed'
-    ? 'text-emerald-700 dark:text-emerald-400'
+    ? 'text-foreground'
     : verdict === 'unfinished' || verdict?.startsWith('exit ')
-      ? 'font-semibold text-red-700 dark:text-red-400'
+      ? 'font-semibold text-failure'
       : 'text-muted-foreground';
 
 /**
@@ -51,7 +51,10 @@ export function Rounds({ tries, selected, onSelect }: { tries: readonly StepTry[
               key={t.try}
               data-try={t.try}
               aria-current={chosen || undefined}
-              className={cn('space-y-0.5 rounded px-2 py-1 text-xs', chosen && 'bg-neutral-100 dark:bg-neutral-800')}
+              className={cn(
+                'space-y-0.5 rounded px-2 py-1 text-xs',
+                chosen && 'bg-surface-container ring-1 ring-outline-variant ring-inset',
+              )}
             >
               <div className="flex items-baseline justify-between gap-2">
                 <span className="font-medium" title={t.note ?? undefined}>
@@ -109,12 +112,12 @@ export function TryCloseouts({ tries, selected, none }: { tries: readonly StepTr
       {others.length > 0 && (
         <section aria-label="Other tries" className="space-y-1">
           {others.map((t) => (
-            <details key={t.try} data-try={t.try} className="rounded border border-neutral-200 text-sm dark:border-neutral-800">
+            <details key={t.try} data-try={t.try} className="rounded border border-outline-variant text-sm">
               <summary className="cursor-pointer px-2 py-1 text-xs text-muted-foreground hover:text-foreground">
                 {tryLabel(t, tries)}
                 {t.current && ' · current'} — {outcomeWord(outcomeOf(t, EARLIER_NONE))}
               </summary>
-              <div className="space-y-3 border-t border-neutral-200 p-2 dark:border-neutral-800">
+              <div className="space-y-3 border-t border-outline-variant p-2">
                 {t.answer && <YourAnswer answer={t.answer} />}
                 <TryOutcome t={t} none={EARLIER_NONE} />
               </div>
@@ -253,12 +256,12 @@ function Fold({ name, count, children }: { name: string; count: number; children
       data-fold={name}
       open={open}
       onToggle={(event) => setOpen(event.currentTarget.open)}
-      className="rounded border border-neutral-200 dark:border-neutral-800"
+      className="rounded border border-outline-variant"
     >
       <summary className="cursor-pointer px-2 py-1 text-xs text-muted-foreground hover:text-foreground">
         <span className="font-mono">{name}</span> · {count}
       </summary>
-      {open && <div className="border-t border-neutral-200 p-2 dark:border-neutral-800">{children}</div>}
+      {open && <div className="border-t border-outline-variant p-2">{children}</div>}
     </details>
   );
 }

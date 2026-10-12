@@ -14,9 +14,9 @@ export function KeyTable({ rows, note }: { rows: readonly KeyRow[]; note?: React
         <h2 className="text-sm font-semibold">Keys</h2>
         {note && <p className="text-xs text-muted-foreground">{note}</p>}
       </div>
-      <div className="overflow-x-auto rounded border border-neutral-200 dark:border-neutral-800">
+      <div className="overflow-x-auto rounded border border-outline-variant">
         <table className="w-full min-w-[36rem] border-collapse text-left text-sm">
-          <thead className="bg-neutral-50 text-xs text-muted-foreground dark:bg-neutral-900">
+          <thead className="bg-surface-container text-xs text-muted-foreground">
             <tr>
               <th scope="col" className="px-3 py-1.5 font-medium">
                 key
@@ -31,12 +31,7 @@ export function KeyTable({ rows, note }: { rows: readonly KeyRow[]; note?: React
           </thead>
           <tbody>
             {rows.map(({ key, value, meaning }) => (
-              <tr
-                key={key}
-                data-key={key}
-                data-set={value !== null}
-                className="border-t border-neutral-200 align-top dark:border-neutral-800"
-              >
+              <tr key={key} data-key={key} data-set={value !== null} className="border-t border-outline-variant align-top">
                 <th scope="row" className={cn('w-36 px-3 py-1.5 font-mono text-xs font-medium', value === null && 'text-muted-foreground')}>
                   {key}
                 </th>
@@ -63,7 +58,7 @@ export function AsWritten({ file, source, children }: { file: string; source: st
   const [shown, setShown] = useState(false);
   return (
     <section aria-label="The file" className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-neutral-200 pb-2 dark:border-neutral-800">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-outline-variant pb-2">
         <p className="min-w-0 font-mono text-[11px] break-all text-muted-foreground">{file}</p>
         <button
           type="button"
@@ -72,9 +67,7 @@ export function AsWritten({ file, source, children }: { file: string; source: st
           title={shown ? 'Show it rendered, with its keys' : 'Show the file as written, frontmatter included'}
           className={cn(
             'shrink-0 rounded border px-2 py-0.5 text-xs font-medium',
-            shown
-              ? 'border-neutral-900 bg-neutral-900 text-white dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-900'
-              : 'border-neutral-300 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-900',
+            shown ? 'border-rest bg-rest text-on-rest' : 'border-outline hover:bg-accent',
           )}
         >
           Source
@@ -83,7 +76,7 @@ export function AsWritten({ file, source, children }: { file: string; source: st
       {shown ? (
         <pre
           data-source
-          className="overflow-x-auto rounded border border-neutral-200 bg-neutral-50 p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap break-words dark:border-neutral-800 dark:bg-neutral-900"
+          className="overflow-x-auto rounded border border-outline-variant bg-surface-container p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap break-words"
         >
           {source}
         </pre>

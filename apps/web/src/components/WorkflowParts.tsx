@@ -7,15 +7,14 @@ import { useSuspenseQuery } from '@tanstack/react-query';
 import { storeQuery, type WorkflowListing } from '../lib/api';
 import { fromWord, type ListPlace } from '../lib/factories';
 import { repoName } from '../lib/factory';
+import { container } from '../lib/meaning';
 
 /** Where a workflow is read from, read in `factory` (`fromWord`): yours, this repository's, or the factory's. */
 export function FromBadge({ from, factory }: { from: WorkflowListing['from']; factory?: string }) {
   return (
     <span
       className={`rounded-full px-2 py-0.5 text-[11px] leading-none font-medium ${
-        from === 'yours'
-          ? 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300'
-          : 'bg-neutral-100 text-muted-foreground dark:bg-neutral-800'
+        from === 'yours' ? container.grey : 'bg-muted text-muted-foreground'
       }`}
     >
       {fromWord(from, factory)}

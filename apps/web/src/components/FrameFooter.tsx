@@ -17,9 +17,9 @@ const GAUGES: Bar = { kind: 'gauges' };
 
 /** The colour of the daemon's dot, by its tone. */
 const DOT: Record<DaemonTone, string> = {
-  ok: 'bg-emerald-500',
-  warn: 'bg-amber-500',
-  down: 'bg-red-500',
+  ok: 'bg-alive',
+  warn: 'bg-yours',
+  down: 'bg-failure',
   reading: 'bg-muted-foreground/40',
 };
 

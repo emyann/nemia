@@ -20,7 +20,7 @@ import { AgentLayers, PolicyLayer } from './StepLayers';
 export type DraftUpdate = (change: (steps: DraftStep[]) => DraftStep[]) => void;
 
 const INPUT =
-  'block w-full rounded border border-neutral-300 bg-white px-2 py-1 text-sm placeholder:text-muted-foreground focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:focus:border-neutral-400';
+  'block w-full rounded border border-outline bg-background px-2 py-1 text-sm placeholder:text-muted-foreground focus:border-on-surface-variant focus:outline-none';
 const MONO_INPUT = `${INPUT} font-mono text-xs`;
 
 /** The option of a `schema` field that opens the box a schema is pasted into: no schema's file, which ends in .json. */
@@ -126,19 +126,16 @@ function StepHead({
             update((all) => removeStep(all, name));
             onRemoved();
           }}
-          className="shrink-0 rounded border border-neutral-300 px-2 py-0.5 text-xs text-muted-foreground hover:border-red-400 hover:text-red-700 dark:border-neutral-700 dark:hover:border-red-500 dark:hover:text-red-400"
+          className="shrink-0 rounded border border-outline px-2 py-0.5 text-xs text-muted-foreground hover:border-on-surface-variant hover:text-foreground"
         >
           Remove step
         </button>
       </div>
 
       {refused && (
-        <div
-          data-refused-here
-          className="space-y-1 rounded border border-red-300 bg-red-50 px-2 py-1.5 dark:border-red-900 dark:bg-red-950/40"
-        >
-          <p className="text-xs font-medium text-red-800 dark:text-red-300">The last save was refused for {name}:</p>
-          <p className="font-mono text-[11px] whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{refused}</p>
+        <div data-refused-here className="space-y-1 rounded border border-failure bg-failure-container px-2 py-1.5">
+          <p className="text-xs font-medium text-on-failure-container">The last save was refused for {name}:</p>
+          <p className="font-mono text-[11px] whitespace-pre-wrap break-words text-on-failure-container">{refused}</p>
         </div>
       )}
     </>
@@ -480,7 +477,7 @@ function SchemaInput({
         <option value={PASTE}>Paste a schema…</option>
       </select>
       {pasted && (
-        <div className="space-y-1 rounded border border-dashed border-neutral-300 p-2 dark:border-neutral-700">
+        <div className="space-y-1 rounded border border-dashed border-outline p-2">
           <label htmlFor={file} className="block text-[11px] text-muted-foreground">
             Written on save as
           </label>

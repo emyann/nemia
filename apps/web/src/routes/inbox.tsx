@@ -25,7 +25,7 @@ export const Route = createFileRoute('/inbox')({
   loader: ({ context }) => context.queryClient.ensureQueryData(inboxQuery),
   component: InboxPage,
   errorComponent: ({ error }) => (
-    <p className="text-sm text-red-600">
+    <p className="text-sm text-failure">
       Could not load the inbox: {error instanceof Error ? error.message : String(error)}. Is the api running (<code>npm run dev</code>)?
     </p>
   ),
@@ -139,7 +139,7 @@ function FileCard() {
   return (
     <form
       aria-label="File a card"
-      className="space-y-3 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950"
+      className="space-y-3 rounded-lg border border-outline-variant bg-card p-4 shadow-sm"
       onSubmit={(event) => {
         event.preventDefault();
         file.mutate();
@@ -167,9 +167,7 @@ function FileCard() {
             <option value="">None: chosen at start</option>
             {workflows.data && <WorkflowOptions workflows={workflows.data} />}
           </select>
-          {workflows.error && (
-            <p className="text-xs text-red-700 dark:text-red-400">Could not list the workflows: {workflows.error.message}</p>
-          )}
+          {workflows.error && <p className="text-xs text-failure">Could not list the workflows: {workflows.error.message}</p>}
         </div>
         <div className="space-y-1.5">
           <label htmlFor={ids.repo} className="block text-sm font-medium">
@@ -198,9 +196,9 @@ function FileCard() {
         <span className="text-xs text-muted-foreground">Parked, not started: nothing runs until you start it.</span>
       </div>
       {file.isError && (
-        <div data-refused className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40">
-          <p className="text-sm font-medium text-red-800 dark:text-red-300">Not filed. The api refused it:</p>
-          <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{file.error.message}</p>
+        <div data-refused className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
+          <p className="text-sm font-medium text-on-failure-container">Not filed. The api refused it:</p>
+          <p className="font-mono text-xs whitespace-pre-wrap break-words text-on-failure-container">{file.error.message}</p>
         </div>
       )}
     </form>
@@ -260,7 +258,7 @@ function CardItem({
     <li
       aria-label={`Card ${entry.name}`}
       data-card={entry.name}
-      className="space-y-3 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950"
+      className="space-y-3 rounded-lg border border-outline-variant bg-card p-4 shadow-sm"
     >
       <div className="flex flex-wrap items-start gap-3 sm:flex-nowrap">
         <div className="min-w-0 flex-1 space-y-1">
@@ -283,7 +281,7 @@ function CardItem({
             <p className="flex flex-wrap items-baseline gap-x-2 text-xs text-muted-foreground">
               <span
                 data-queued={entry.queued.place ?? ''}
-                className="rounded-full border border-sky-300 bg-sky-50 px-2 py-0.5 font-medium text-sky-900 dark:border-sky-800 dark:bg-sky-950/60 dark:text-sky-200"
+                className="rounded-full border border-outline-variant bg-surface-container-highest px-2 py-0.5 font-medium text-on-surface-variant"
               >
                 {queuedWord(entry.queued)}
               </span>
@@ -340,9 +338,9 @@ function CardItem({
       {started && <StartedAs startedAs={startedAs} kept={kept} />}
       {entry.queued && entry.tried && <Tried entry={{ ...entry, tried: entry.tried }} />}
       {entry.error !== null && (
-        <div className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40">
-          <p className="text-sm font-medium text-red-800 dark:text-red-300">Does not read as a card, so it cannot start:</p>
-          <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{entry.error}</p>
+        <div className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
+          <p className="text-sm font-medium text-on-failure-container">Does not read as a card, so it cannot start:</p>
+          <p className="font-mono text-xs whitespace-pre-wrap break-words text-on-failure-container">{entry.error}</p>
         </div>
       )}
       {starting && startable && (
@@ -430,13 +428,13 @@ function StartHere({
   const field = useId();
 
   return (
-    <div data-start-card className="space-y-3 border-t border-neutral-200 pt-4 dark:border-neutral-800">
+    <div data-start-card className="space-y-3 border-t border-outline-variant pt-4">
       <div className="space-y-1.5">
         <label htmlFor={field} className="block text-sm font-medium">
           Workflow
         </label>
         {workflows.error || repository.error ? (
-          <p className="text-xs text-red-700 dark:text-red-400">
+          <p className="text-xs text-failure">
             Could not list the workflows to start it on: {(workflows.error ?? repository.error)!.message}
           </p>
         ) : !workflows.data || here === undefined ? (

@@ -84,7 +84,7 @@ export function StartRun({
   return (
     <form
       aria-label={card ? `Start ${card.name}` : `Start a run of ${workflow.name}`}
-      className={card ? 'space-y-2' : 'space-y-2 border-t border-neutral-200 pt-4 dark:border-neutral-800'}
+      className={card ? 'space-y-2' : 'space-y-2 border-t border-outline-variant pt-4'}
       onSubmit={(event) => {
         event.preventDefault();
         start.mutate({ brief, after: afterFor(workflow, after), context });
@@ -99,7 +99,7 @@ export function StartRun({
         onChange={(event) => setBrief(event.target.value)}
         rows={card ? 5 : 3}
         placeholder="What to do: the brief each step is told, under “What was asked for”."
-        className="block w-full resize-y rounded border border-neutral-300 bg-white px-2 py-1.5 text-sm placeholder:text-muted-foreground focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:focus:border-neutral-400"
+        className="block w-full resize-y rounded border border-outline bg-background px-2 py-1.5 text-sm placeholder:text-muted-foreground focus:border-on-surface-variant focus:outline-none"
       />
       {!inFolders && <AfterPicker selected={after} onChange={setAfter} repo={repo} />}
       <ContextPicker selected={context} onChange={setContext} />
@@ -107,7 +107,7 @@ export function StartRun({
         <button
           type="submit"
           disabled={!brief.trim() || start.isPending}
-          className="rounded bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-neutral-900 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300 dark:disabled:hover:bg-neutral-100"
+          className="rounded bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-primary"
         >
           {start.isPending ? 'Starting…' : 'Start'}
         </button>
@@ -121,9 +121,9 @@ export function StartRun({
 
       {start.isSuccess && <StartedLine id={start.data.id} after={start.variables.after} />}
       {start.isError && !onRefused && (
-        <div data-refused className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40">
-          <p className="text-sm font-medium text-red-800 dark:text-red-300">Not started. The api refused it:</p>
-          <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{start.error.message}</p>
+        <div data-refused className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
+          <p className="text-sm font-medium text-on-failure-container">Not started. The api refused it:</p>
+          <p className="font-mono text-xs whitespace-pre-wrap break-words text-on-failure-container">{start.error.message}</p>
         </div>
       )}
     </form>
@@ -208,19 +208,16 @@ export function AfterPicker({
         Waits until it ships: nothing of it is filed until each has shipped, and it is handed what each concluded.
       </p>
       {error ? (
-        <p className="text-xs text-red-700 dark:text-red-400">Could not list the runs to wait on: {error.message}</p>
+        <p className="text-xs text-failure">Could not list the runs to wait on: {error.message}</p>
       ) : !onRepo ? (
         <p className="text-xs text-muted-foreground">Reading the runs…</p>
       ) : !onRepo.length ? (
         <p className="text-xs text-muted-foreground">No run on this repository to wait on.</p>
       ) : (
-        <ul
-          aria-label="Runs to wait on"
-          className="max-h-44 divide-y divide-neutral-200 overflow-y-auto rounded border border-neutral-300 dark:divide-neutral-800 dark:border-neutral-700"
-        >
+        <ul aria-label="Runs to wait on" className="max-h-44 divide-y divide-outline-variant overflow-y-auto rounded border border-outline">
           {onRepo.map((run) => (
             <li key={run.id} data-run={run.id}>
-              <label className="flex cursor-pointer items-baseline gap-2 px-2 py-1 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-900">
+              <label className="flex cursor-pointer items-baseline gap-2 px-2 py-1 text-sm hover:bg-accent">
                 <input
                   type="checkbox"
                   value={run.id}

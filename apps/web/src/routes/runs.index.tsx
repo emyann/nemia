@@ -15,7 +15,7 @@ export const Route = createFileRoute('/runs/')({
   loader: ({ context }) => context.queryClient.ensureQueryData(runsQuery),
   component: Runs,
   errorComponent: ({ error }) => (
-    <p className="text-sm text-red-600">
+    <p className="text-sm text-failure">
       Could not load runs: {error instanceof Error ? error.message : String(error)}. Is the api running (<code>npm run dev</code>)?
     </p>
   ),
@@ -92,7 +92,7 @@ function RunGroup({ group, title, about, runs }: { group: string; title: string;
           {waiting > 0 && <span className="text-yours"> · {waiting} waiting on you</span>}
         </span>
       </h2>
-      <ul className="divide-y divide-neutral-200 dark:divide-neutral-800">
+      <ul className="divide-y divide-outline-variant">
         {runs.map((run) => (
           <RunRow key={run.id} run={run} />
         ))}
@@ -120,10 +120,7 @@ function RunRow({ run }: { run: RunSummary }) {
   const decide = toDecideOf(run);
 
   return (
-    <li
-      data-in-flight={inFlight(run)}
-      className="-mx-2 flex items-start gap-4 rounded px-2 py-3 hover:bg-neutral-100 dark:hover:bg-neutral-900"
-    >
+    <li data-in-flight={inFlight(run)} className="-mx-2 flex items-start gap-4 rounded px-2 py-3 hover:bg-accent">
       <Link to="/runs/$runId" params={{ runId: run.id }} className="block min-w-0 flex-1">
         <p className="truncate font-medium">{title}</p>
         <p className="mt-1 flex flex-wrap gap-x-3 text-xs text-muted-foreground">
@@ -152,12 +149,12 @@ function RunRow({ run }: { run: RunSummary }) {
           )}
         </p>
         {decide && (
-          <p data-to-decide={decide.kind} className="mt-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+          <p data-to-decide={decide.kind} className="mt-1 text-xs font-medium text-yours">
             to decide: {decide.said}
           </p>
         )}
         {run.unreadable && (
-          <p data-unreadable className="mt-1 text-xs font-medium break-words text-red-700 dark:text-red-400">
+          <p data-unreadable className="mt-1 text-xs font-medium break-words text-failure">
             {run.unreadable}
           </p>
         )}

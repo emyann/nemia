@@ -31,7 +31,7 @@ const heading = (written: (typeof TAGS)[number], Tag: (typeof TAGS)[number]) =>
 const headingsAt = (level: Level): Components =>
   Object.fromEntries(TAGS.map((written, i) => [written, heading(written, TAGS[Math.min(level - 1 + i, TAGS.length - 1)])]));
 
-const LINK = 'font-medium text-foreground underline underline-offset-2 break-words hover:text-neutral-600 dark:hover:text-neutral-300';
+const LINK = 'font-medium text-foreground underline underline-offset-2 break-words hover:text-muted-foreground';
 
 /**
  * How each element of a text is drawn: the board's type in both themes, and three rules.
@@ -74,10 +74,7 @@ const COMPONENTS: Components = {
     return <CodeBlock code={code} language={languageOf(className)} className="my-3 text-[13px] [&_pre]:whitespace-pre" />;
   },
   code: ({ node: _node, className, ...props }) => (
-    <code
-      className={cn('box-decoration-clone rounded bg-neutral-100 px-1 py-px font-mono text-[0.9em] dark:bg-neutral-800', className)}
-      {...props}
-    />
+    <code className={cn('box-decoration-clone rounded bg-muted px-1 py-px font-mono text-[0.9em]', className)} {...props} />
   ),
   p: ({ node: _node, className, ...props }) => <p className={cn('my-2 leading-relaxed', className)} {...props} />,
   ul: ({ node: _node, className, ...props }) => <ul className={cn('my-2 list-disc space-y-1 pl-5', className)} {...props} />,
@@ -86,7 +83,7 @@ const COMPONENTS: Components = {
   li: ({ node: _node, className, ...props }) => (
     <li
       className={cn(
-        'pl-0.5 leading-relaxed marker:text-neutral-400 [&>ol]:my-1 [&>p]:my-1 [&>ul]:my-1',
+        'pl-0.5 leading-relaxed marker:text-muted-foreground [&>ol]:my-1 [&>p]:my-1 [&>ul]:my-1',
         className?.includes('task-list-item') && '-ml-5 list-none',
         className,
       )}
@@ -95,24 +92,19 @@ const COMPONENTS: Components = {
   ),
   input: ({ node: _node, className, ...props }) => <input {...props} disabled className={cn('mr-1.5 align-[-1px]', className)} />,
   blockquote: ({ node: _node, className, ...props }) => (
-    <blockquote
-      className={cn('my-2 border-l-2 border-neutral-300 pl-3 text-muted-foreground dark:border-neutral-700', className)}
-      {...props}
-    />
+    <blockquote className={cn('my-2 border-l-2 border-outline pl-3 text-muted-foreground', className)} {...props} />
   ),
-  hr: ({ node: _node, className, ...props }) => (
-    <hr className={cn('my-4 border-neutral-200 dark:border-neutral-800', className)} {...props} />
-  ),
+  hr: ({ node: _node, className, ...props }) => <hr className={cn('my-4 border-outline-variant', className)} {...props} />,
   table: ({ node: _node, className, ...props }) => (
     <div className="my-3 max-w-full overflow-x-auto">
       <table className={cn('w-max border-collapse text-left text-[0.95em]', className)} {...props} />
     </div>
   ),
   th: ({ node: _node, className, ...props }) => (
-    <th className={cn('border-b border-neutral-300 px-2 py-1 font-semibold dark:border-neutral-700', className)} {...props} />
+    <th className={cn('border-b border-outline px-2 py-1 font-semibold', className)} {...props} />
   ),
   td: ({ node: _node, className, ...props }) => (
-    <td className={cn('border-b border-neutral-200 px-2 py-1 align-top dark:border-neutral-800', className)} {...props} />
+    <td className={cn('border-b border-outline-variant px-2 py-1 align-top', className)} {...props} />
   ),
 };
 

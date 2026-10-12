@@ -192,9 +192,7 @@ function drawnOf(workflow: WorkflowListing): Drawn | Error {
 export function WorkflowCanvas({ workflow, place = {} }: { workflow: WorkflowListing; place?: PagePlace }) {
   const drawn = useMemo(() => drawnOf(workflow), [workflow]);
   if (drawn instanceof Error) {
-    return (
-      <p className="rounded border border-red-300 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:text-red-400">{drawn.message}</p>
-    );
+    return <p className="rounded border border-failure px-3 py-2 text-sm text-failure">{drawn.message}</p>;
   }
   return (
     <ReactFlowProvider>
@@ -228,7 +226,7 @@ function Graph({ workflow, drawn, place }: { workflow: WorkflowListing; drawn: D
     <div
       ref={whole}
       aria-label={`The steps of ${name} as a graph`}
-      className="overflow-hidden rounded border border-neutral-200 dark:border-neutral-800"
+      className="overflow-hidden rounded border border-outline-variant"
       style={{ height: Math.min(Math.max(drawn.height + 40, 180), 420) }}
     >
       <div ref={frame} className="h-full min-w-0" style={{ marginRight: over }}>

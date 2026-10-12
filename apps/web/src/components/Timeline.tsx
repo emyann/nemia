@@ -24,9 +24,9 @@ export function Timeline({ run }: { run: RunDetail }) {
         than its wall, first filed → last ended. A round's counts only the steps its loop files again. Cost is what the harness priced each
         session at, once it ended; a check costs nothing.
       </p>
-      <div className="overflow-x-auto rounded border border-neutral-200 dark:border-neutral-800">
+      <div className="overflow-x-auto rounded border border-outline-variant">
         <table className="w-full text-left text-xs tabular-nums">
-          <thead className="bg-neutral-50 text-muted-foreground dark:bg-neutral-900">
+          <thead className="bg-surface-container text-muted-foreground">
             <tr>
               {['step', 'try', 'filed', 'spawned', 'ended', 'queued', 'ran', 'cost', 'used'].map((heading) => (
                 <th key={heading} scope="col" className="px-2 py-1.5 font-medium whitespace-nowrap">
@@ -35,7 +35,7 @@ export function Timeline({ run }: { run: RunDetail }) {
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-neutral-100 dark:divide-neutral-900">
+          <tbody className="divide-y divide-outline-variant">
             {steps.flatMap((step) =>
               step.timeline.flatMap((t) => [
                 <TryRow key={`${step.name}/${t.try}`} step={step.name} t={t} />,
@@ -55,7 +55,7 @@ export function Timeline({ run }: { run: RunDetail }) {
               ]),
             )}
           </tbody>
-          <tfoot className="border-t border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900">
+          <tfoot className="border-t border-outline-variant bg-surface-container">
             {totals.map((total) => (
               <TotalRow key={`${total.loop}:${total.round}`} total={total} named={went.length > 1} />
             ))}
@@ -123,7 +123,7 @@ function SpanRow({
           <td data-cell="queued" className={`${CELL} font-mono`}>
             {span.queued}
           </td>
-          <td data-cell="ran" className={`${CELL} font-mono ${span.at === 'running' ? 'text-sky-700 dark:text-sky-400' : ''}`}>
+          <td data-cell="ran" className={`${CELL} font-mono ${span.at === 'running' ? 'text-alive' : ''}`}>
             {span.ran}
           </td>
           <td data-cell="cost" className={`${CELL} font-mono ${cost === 'not measured' ? 'text-muted-foreground' : ''}`}>

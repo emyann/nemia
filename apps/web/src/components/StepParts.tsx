@@ -18,7 +18,7 @@ import { Markdown } from './Markdown';
 import { Told, type LayerHomes } from './Told';
 
 const LINK =
-  'rounded-sm underline decoration-neutral-300 underline-offset-2 outline-none hover:decoration-neutral-600 focus-visible:ring-2 focus-visible:ring-ring/50 dark:decoration-neutral-600 dark:hover:decoration-neutral-300';
+  'rounded-sm underline decoration-outline underline-offset-2 outline-none hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring/50';
 
 /**
  * The step's agent: the one the factory picked hires into it, marked as hired (`data-hired`); else the one its file names, or that it names

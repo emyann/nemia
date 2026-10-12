@@ -33,7 +33,7 @@ export function StateBar({ machine, state }: { machine: string; state: string })
         {graph.data ? (
           <StateBody graph={graph.data} state={state} />
         ) : graph.error ? (
-          <p className="text-sm text-red-700 dark:text-red-400">
+          <p className="text-sm text-failure">
             Could not read the machine {machine}: {graph.error.message}
           </p>
         ) : (
@@ -84,7 +84,7 @@ export function StateBody({ graph, state }: { graph: MachineGraph; state: string
                 <p className="px-2.5 pt-1.5 font-mono text-sm font-semibold">→ {route.to}</p>
                 <ByActionList list={route.edges}>
                   {route.verbs.map((verb) => (
-                    <div key={verb} data-route-verb={verb} className="text-violet-700 italic dark:text-violet-300">
+                    <div key={verb} data-route-verb={verb} className="text-muted-foreground italic">
                       {verb}
                     </div>
                   ))}

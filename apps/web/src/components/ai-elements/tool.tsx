@@ -39,7 +39,7 @@ const labels: Record<ToolState, string> = {
 
 const icons: Record<ToolState, ReactNode> = {
   running: <ClockIcon className="size-4 animate-pulse" />,
-  completed: <CheckCircleIcon className="size-4 text-green-600 dark:text-green-500" />,
+  completed: <CheckCircleIcon className="size-4 text-muted-foreground" />,
   error: <XCircleIcon className="size-4 text-destructive" />,
   'no-result': <CircleIcon className="size-4 text-muted-foreground" />,
 };

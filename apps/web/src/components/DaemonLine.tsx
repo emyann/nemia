@@ -13,7 +13,7 @@ export function DaemonLine({ daemon, error }: { daemon: Daemon | undefined; erro
   const now = new Date(useNow(30_000));
   if (error) {
     return (
-      <p data-daemon="error" className="max-w-3xl basis-full text-xs text-red-600 dark:text-red-400" title={error.message}>
+      <p data-daemon="error" className="max-w-3xl basis-full text-xs text-failure" title={error.message}>
         Whether a daemon ticks this store could not be read: {error.message}
       </p>
     );

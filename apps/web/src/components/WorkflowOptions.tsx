@@ -15,4 +15,4 @@ export function WorkflowOptions({ workflows }: { workflows: readonly WorkflowLis
 
 /** A select's field, as the inbox draws its inputs. */
 export const FIELD =
-  'block w-full rounded border border-neutral-300 bg-white px-2 py-1.5 text-sm placeholder:text-muted-foreground focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:focus:border-neutral-400';
+  'block w-full rounded border border-outline bg-background px-2 py-1.5 text-sm placeholder:text-muted-foreground focus:border-on-surface-variant focus:outline-none';

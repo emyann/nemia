@@ -110,12 +110,7 @@ function PruneForm({ id, offer, onClose }: { id: string; offer: PruneOffer; onCl
             <span aria-hidden className={DOT} />
             <span className="space-y-0.5">
               <span className="block text-xs font-medium">{c.label}</span>
-              <span
-                className={cn(
-                  'block text-[11px] leading-snug',
-                  c.how.unmerged ? 'text-red-700 dark:text-red-400' : 'text-muted-foreground',
-                )}
-              >
+              <span className={cn('block text-[11px] leading-snug', c.how.unmerged ? 'text-yours' : 'text-muted-foreground')}>
                 {c.says}
               </span>
               {c.unavailable && <span className="block text-[11px] leading-snug text-yours">{c.unavailable}</span>}
@@ -125,7 +120,7 @@ function PruneForm({ id, offer, onClose }: { id: string; offer: PruneOffer; onCl
       </RadioGroup>
       {asking ? (
         <div className="space-y-2">
-          <p data-prune-question className={cn('text-xs', choice.how.unmerged && 'text-red-700 dark:text-red-400')}>
+          <p data-prune-question className={cn('text-xs', choice.how.unmerged && 'text-yours')}>
             {pruneQuestion(id, choice, offer)}
           </p>
           <div className="flex items-center gap-2">

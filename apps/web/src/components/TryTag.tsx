@@ -8,7 +8,7 @@ export function TryTag({ agent }: { agent: string }) {
     <span
       data-try-tag={agent}
       title={`A try of the agent ${agent}, started from its page: fenced to its own folder, with a dollar to spend`}
-      className="shrink-0 rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] leading-none font-medium text-sky-800 dark:bg-sky-950 dark:text-sky-300"
+      className="shrink-0 rounded-full border border-dashed border-outline px-1.5 py-0.5 text-[10px] leading-none font-medium text-on-surface-variant"
     >
       try
     </span>

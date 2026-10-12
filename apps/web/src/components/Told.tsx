@@ -193,7 +193,7 @@ export function StepPolicy({ layers }: { layers: StepLayers | null }) {
   const agent = layers?.agent ?? null;
   if (layers === null || agent === null) return null;
   return (
-    <div data-gate-policy className="flex flex-col gap-2 rounded border border-neutral-200 p-3 dark:border-neutral-800">
+    <div data-gate-policy className="flex flex-col gap-2 rounded border border-outline-variant p-3">
       <Layer name="policy" title="The step's policy">
         <Words text={layers.policy || null} none={`No words of its own: ${agent}'s instructions are all it was told`} />
         <Skills word="Adds the skills:" skills={layers.addedSkills} />

@@ -62,8 +62,8 @@ import { followVerbOf, type FollowRefused } from './follow.ts';
 import { DEFAULT_HARNESSES } from './harnesses.ts';
 import { a2aOps, type SeamOps } from '../a2a/index.ts';
 import { bodyVerbsOf } from './bodies.ts';
-import { forgetVerbOf, journalBytesOf, type ForgetFailure, type ForgetReport } from './forget.ts';
-import { keptVerbOf, type KeptRefused, type KeptReport } from './kept.ts';
+import type { ForgetFailure, ForgetReport } from './forget.ts';
+import { keepingVerbsOf, type KeptRefused, type KeptReport } from './kept.ts';
 import { watchOf } from './watch.ts';
 import { sayVerbOf, type SayRefused, type SayUnsent } from './say.ts';
 import {
@@ -714,8 +714,7 @@ const make = (options: EngineOptions) =>
       close: (taskId) => go(close(taskId)),
       feed: feedVerb,
       ...bodyVerbsOf(go),
-      forget: forgetVerbOf(go, runners, harnessOf, journalBytesOf(journalOps)),
-      kept: keptVerbOf(journalOps, runners, (harness = fallback) => (Object.hasOwn(runners, harness) ? harness : undefined)),
+      ...keepingVerbsOf(go, journalOps, runners, harnessOf, fallback),
       watch: watchOf(feedVerb, journalOps.subscribe),
       ...ioVerbsOf(observedNow),
       start: startOf(tickVerb),

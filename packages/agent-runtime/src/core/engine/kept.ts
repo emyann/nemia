@@ -31,20 +31,35 @@ export const diskBytesOf = (file: string, seen?: Set<string>): number | undefine
   return bytes;
 };
 
-/** The harness and the attempts the stored entries `entries` name: an attempt by its `starting`, its id by its `ended` or the task's `settled`. */
+/**
+ * The harness and the attempts the stored entries `entries` name: an attempt by its `starting`, its id by its `ended` or the task's
+ * `settled`.
+ */
 const sessionsIn = (entries: readonly unknown[]): Pick<JournalKept, 'harness' | 'attempts'> => {
   const attempts: KeptAttempt[] = [];
   let harness: string | undefined;
   for (const entry of entries) {
     if (typeof entry !== 'object' || entry === null) continue;
-    const e = entry as { kind?: unknown; attempt?: unknown; nativeId?: unknown; harness?: unknown };
-    const id = typeof e.nativeId === 'string' && e.nativeId !== '' ? e.nativeId : undefined;
+    const e = entry as Stored;
     if (e.kind === 'filed' && typeof e.harness === 'string') harness = e.harness;
     if (e.kind === 'starting' && typeof e.attempt === 'number' && !attempts.some((a) => a.n === e.attempt)) attempts.push({ n: e.attempt });
-    const named = e.kind === 'ended' ? attempts.find((a) => a.n === e.attempt) : e.kind === 'settled' ? attempts.at(-1) : undefined;
-    if (named && id && (e.kind === 'ended' || named.nativeId === undefined)) named.nativeId = id;
+    idInto(attempts, e);
   }
   return { ...(harness === undefined ? {} : { harness }), attempts };
+};
+
+/** A stored entry, as far as the measure reads it. */
+type Stored = { kind?: unknown; attempt?: unknown; nativeId?: unknown; harness?: unknown };
+
+/** The session id `e` says, put on the attempt it ends, or, for a `settled`, on the last attempt where no end gave one. */
+const idInto = (attempts: KeptAttempt[], e: Stored): void => {
+  if (typeof e.nativeId !== 'string' || e.nativeId === '') return;
+  if (e.kind === 'ended') {
+    const ended = attempts.find((a) => a.n === e.attempt);
+    if (ended) ended.nativeId = e.nativeId;
+  }
+  const last = attempts.at(-1);
+  if (e.kind === 'settled' && last && last.nativeId === undefined) last.nativeId = e.nativeId;
 };
 
 /**
@@ -67,7 +82,7 @@ export const journalsKept = Effect.fn('journalsKept')(function* (ops: StoreOps) 
   for (const taskId of yield* ops.list) {
     const file = ops.located?.journal(taskId);
     const journal = (file ? diskBytesOf(file) : undefined) ?? 0;
-    const read = yield* Effect.result(ops.read(taskId) as Effect.Effect<readonly unknown[], { message: string }>);
+    const read = yield* Effect.result(ops.read(taskId));
     if (read._tag === 'Failure') kept.push({ taskId, journal, bodies: 0, attempts: [], unread: read.failure.message });
     else {
       const bodies = read.success.flatMap(refsOf).reduce((sum, ref) => sum + bodyBytes(ref), 0);

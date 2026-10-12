@@ -40,7 +40,12 @@ const transcriptAt = (project: string, id: string): string => path.join(config, 
 const journalled = async (
   root: string,
   taskId: string,
-  { harness = HARNESS, nativeId, brief = `do ${taskId}`, settled = true }: { harness?: string; nativeId?: string; brief?: string; settled?: boolean } = {},
+  {
+    harness = HARNESS,
+    nativeId,
+    brief = `do ${taskId}`,
+    settled = true,
+  }: { harness?: string; nativeId?: string; brief?: string; settled?: boolean } = {},
 ) => {
   const events: Event[] = [
     { kind: 'filed', at, brief, cwd: '/r', harness },
@@ -48,7 +53,15 @@ const journalled = async (
     { kind: 'spawned', at, attempt: 1 },
     ...(settled
       ? ([
-          { kind: 'ended', at, attempt: 1, sessionId: `job-${taskId}`, observed: 'done', reason: 'harness', ...(nativeId ? { nativeId } : {}) },
+          {
+            kind: 'ended',
+            at,
+            attempt: 1,
+            sessionId: `job-${taskId}`,
+            observed: 'done',
+            reason: 'harness',
+            ...(nativeId ? { nativeId } : {}),
+          },
           { kind: 'settled', at, outcome: 'succeeded' },
         ] satisfies Event[])
       : []),
@@ -82,7 +95,7 @@ test("a task's records are the transcript its journal names by id, and the folde
     files: blocksOf(runFile),
     records: blocksOf(transcript) + folder,
   });
-  assert.ok(kept.records! > 0 && kept.journal > 0 && kept.files > 0, 'each part was measured');
+  assert.ok(kept.records > 0 && kept.journal > 0 && kept.files > 0, 'each part was measured');
 });
 
 test("REFUSED, a person's own: a transcript in the same project folder under an id no journal names changes no number", async () => {
@@ -146,7 +159,7 @@ test('a harness with no kept answers no records and no files, and its task is st
   plant(transcriptAt('-r', 'sess-n1'));
   const kept = await keptOf(engineOn(root, { bare: nothing }), 'n1');
   assert.deepEqual(kept, { taskId: 'n1', journal: blocksOf(path.join(root, 'tasks', 'n1.jsonl')), bodies: 0, files: 0 });
-  assert.equal(Object.hasOwn(kept!, 'records'), false, 'no record is no key, never zero');
+  assert.equal(Object.hasOwn(kept, 'records'), false, 'no record is no key, never zero');
 });
 
 test("a harness's kept reaches the answer through the Engine service, and one whose kept fails is said on its own tasks alone", async () => {
@@ -167,14 +180,15 @@ test("a harness's kept reaches the answer through the Engine service, and one wh
   await journalled(root, 'f1', { harness: 'failing' });
   const { tasks } = await Effect.runPromise(engineOn(root, { keeping, failing }).kept());
   const journal = (id: string) => blocksOf(path.join(root, 'tasks', `${id}.jsonl`));
-  assert.deepEqual(asked, [
-    [{ name: 'ae/s1/1', nativeId: 'n-1' }, { name: 'ae/s2/1' }],
-  ]);
+  assert.deepEqual(asked, [[{ name: 'ae/s1/1', nativeId: 'n-1' }, { name: 'ae/s2/1' }]]);
   assert.deepEqual(tasks.slice(1), [
     { taskId: 's1', journal: journal('s1'), bodies: 0, files: blocksOf(file), records: blocksOf(record) },
     { taskId: 's2', journal: journal('s2'), bodies: 0, files: 0 },
   ]);
-  assert.deepEqual({ ...tasks[0], unread: tasks[0].unread?.length }, { taskId: 'f1', journal: journal('f1'), bodies: 0, files: 0, unread: 1 });
+  assert.deepEqual(
+    { ...tasks[0], unread: tasks[0].unread?.length },
+    { taskId: 'f1', journal: journal('f1'), bodies: 0, files: 0, unread: 1 },
+  );
   assert.match(tasks[0].unread![0], /^the `failing` harness did not say what it keeps: .*fake: no disk today/);
 });
 

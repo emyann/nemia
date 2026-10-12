@@ -142,7 +142,8 @@ export function withKept(
     const factory = factoryOf(task.taskId);
     const alone = made.get(entryKey({ part: 'engine' }));
     if (factory === undefined) {
-      if (alone || task.unread) made.set(entryKey({ part: 'engine' }), { part: 'engine', ...alone, unread: (alone?.unread ?? 0) + task.unread });
+      if (alone || task.unread)
+        made.set(entryKey({ part: 'engine' }), { part: 'engine', ...alone, unread: (alone?.unread ?? 0) + task.unread });
     } else {
       add('engine', factory, task.engine, task.unread);
       given += task.engine;

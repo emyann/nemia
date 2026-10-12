@@ -540,7 +540,9 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
       throw new UnsupportedOperationError(`the \`${this.harness}\` harness says nothing of where it keeps a session's files.`);
     }
     if (!Array.isArray(params.sessions) || !params.sessions.every((s) => typeof s?.name === 'string' && nameParts(s.name))) {
-      throw new RequestMalformedError('the request names no sessions: send `{ sessions: [{ name }] }`, each name `ae/<task>/<n>`, n from 1.');
+      throw new RequestMalformedError(
+        'the request names no sessions: send `{ sessions: [{ name }] }`, each name `ae/<task>/<n>`, n from 1.',
+      );
     }
     return this.run(this.ops.kept(params.sessions));
   }

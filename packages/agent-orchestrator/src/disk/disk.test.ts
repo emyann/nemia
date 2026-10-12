@@ -196,7 +196,10 @@ test('REFUSED, nothing is drawn: with no task that keeps a record there is no se
   );
   assert.deepEqual(withKept(walkedWith(1000), [], factoryOfTask), walkedWith(1000), 'and a runtime with no task changes nothing');
   const drawn = withKept(walkedWith(1000), [{ taskId: 't-n1', engine: 0, sessions: 0, unread: 0 }], factoryOfTask);
-  assert.deepEqual(drawn.find((entry) => entry.part === 'sessions'), { part: 'sessions', factory: 'nemia', bytes: 0, unread: 0 });
+  assert.deepEqual(
+    drawn.find((entry) => entry.part === 'sessions'),
+    { part: 'sessions', factory: 'nemia', bytes: 0, unread: 0 },
+  );
 });
 
 test('bytes given to factories above the walked whole leave the engine alone at zero, never below', () => {

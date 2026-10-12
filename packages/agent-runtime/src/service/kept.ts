@@ -3,10 +3,12 @@
  * ran, in bytes, by task. It removes nothing.
  */
 import { Effect, Schema } from 'effect';
-import { nameFor } from '../core/index.ts';
-import { diskBytesOf, journalsKept, type JournalError, type JournalKept, type StoreOps } from '../core/engine/index.ts';
-import type { SessionKept } from '../harness/index.ts';
+import { nameFor, type State } from '../core/index.ts';
+import { diskBytesOf, journalsKept, type Journal, type JournalError, type JournalKept, type StoreOps } from '../core/engine/index.ts';
+import type { Runner, SessionKept } from '../harness/index.ts';
 import type { SeamOps } from '../a2a/index.ts';
+import type { EngineShape } from './engine.ts';
+import { forgetVerbOf, journalBytesOf } from './forget.ts';
 
 /** Why `kept` measured nothing: an argument, where it takes none. */
 export class KeptRefused extends Schema.TaggedError<KeptRefused>()('KeptRefused', { message: Schema.String }) {}
@@ -52,23 +54,53 @@ const bytesOf = (paths: readonly string[], seen: Set<string>, unread: string[]):
 };
 
 /**
+ * What is kept of `task`, measured: its journal's and bodies' bytes as the store gave them, and the paths its harness answered for
+ * its sessions (`asked`), each counted once across the ask (`seen`). `asked` is the harness's answer, why it gave none, or, as a
+ * string, the name of a harness this engine does not have; what could not be measured is said on `unread`.
+ */
+const taskKept = (task: JournalKept, asked: Asked | string | undefined, seen: Set<string>): KeptReport['tasks'][number] => {
+  const unread = task.unread === undefined ? [] : [task.unread];
+  const ran = task.attempts.length > 0;
+  if (typeof asked === 'string' && ran)
+    unread.push(`task ${task.taskId} ran on the ${asked} harness, which this engine does not have: its sessions' files are not counted`);
+  if (typeof asked === 'object' && 'why' in asked && ran) unread.push(asked.why);
+  const answered = typeof asked === 'object' && 'kept' in asked ? asked.kept : {};
+  const sessions = task.attempts.flatMap((a) => {
+    const name = nameFor(task.taskId, a.n);
+    return Object.hasOwn(answered, name) ? [answered[name]] : [];
+  });
+  const files = bytesOf(
+    sessions.flatMap((s) => s.files),
+    seen,
+    unread,
+  );
+  const records = sessions.flatMap((s) => s.records);
+  return {
+    taskId: task.taskId,
+    journal: task.journal,
+    bodies: task.bodies,
+    files,
+    ...(records.length ? { records: bytesOf(records, seen, unread) } : {}),
+    ...(unread.length ? { unread } : {}),
+  };
+};
+
+/**
  * `kept` over the engine's store `store`, its runners by harness, and `harnessNamed`, the harness that answers for a task filed
  * on one, `undefined` for a harness this engine does not have. Refuses any argument. Reads each journal as the store holds it,
  * so no body is read; asks each harness once, with every session of its tasks (`RunnerOps.kept`); a harness without the verb is
  * not asked, and one whose ask fails, or that this engine does not have, is said on each of its tasks' `unread`. Yields between
  * tasks.
  */
-export const keptVerbOf = (
-  store: StoreOps,
-  runners: Record<string, SeamOps>,
-  harnessNamed: (harness?: string) => string | undefined,
-) => {
+export const keptVerbOf = (store: StoreOps, runners: Record<string, SeamOps>, harnessNamed: (harness?: string) => string | undefined) => {
   const ask = (harness: string, sessions: readonly { name: string; nativeId?: string }[]) => {
     const kept = runners[harness].kept;
     if (!kept || !sessions.length) return Effect.succeed<Asked>({ kept: {} });
     return kept(sessions).pipe(
       Effect.map((answer): Asked => ({ kept: answer })),
-      Effect.catchCause((cause) => Effect.succeed<Asked>({ why: `the \`${harness}\` harness did not say what it keeps: ${String(cause)}` })),
+      Effect.catchCause((cause) =>
+        Effect.succeed<Asked>({ why: `the \`${harness}\` harness did not say what it keeps: ${String(cause)}` }),
+      ),
     );
   };
 
@@ -86,28 +118,26 @@ export const keptVerbOf = (
     const seen = new Set<string>();
     const tasks: KeptReport['tasks'] = [];
     for (const task of journals) {
-      const unread = task.unread === undefined ? [] : [task.unread];
       const harness = harnessNamed(task.harness);
-      const asked = harness === undefined ? undefined : answers.get(harness);
-      if (harness === undefined && task.attempts.length)
-        unread.push(`task ${task.taskId} ran on the \`${task.harness}\` harness, which this engine does not have: its sessions' files are not counted`);
-      if (asked && 'why' in asked && task.attempts.length) unread.push(asked.why);
-      const sessions = task.attempts.flatMap((a) => {
-        const kept = asked && 'kept' in asked ? asked.kept[nameFor(task.taskId, a.n)] : undefined;
-        return kept ? [kept] : [];
-      });
-      const files = bytesOf(sessions.flatMap((s) => s.files), seen, unread);
-      const records = sessions.flatMap((s) => s.records);
-      tasks.push({
-        taskId: task.taskId,
-        journal: task.journal,
-        bodies: task.bodies,
-        files,
-        ...(records.length ? { records: bytesOf(records, seen, unread) } : {}),
-        ...(unread.length ? { unread } : {}),
-      });
+      tasks.push(taskKept(task, harness === undefined ? `\`${task.harness}\`` : answers.get(harness), seen));
       yield* Effect.yieldNow;
     }
     return { tasks };
   });
 };
+
+/**
+ * The engine's two verbs over what a task keeps, `forget` (`forgetVerbOf`) and `kept` (`keptVerbOf`), over `go`, the engine's store
+ * and runners, its store as a plain value, `runners` by harness, `harnessOf`, the harness that answers for a task, and `fallback`,
+ * the one that takes a task that names none: `kept` asks only a harness this engine has.
+ */
+export const keepingVerbsOf = (
+  go: <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.Effect<A, E>,
+  store: StoreOps,
+  runners: Record<string, SeamOps>,
+  harnessOf: (state: State) => string,
+  fallback: string,
+): Pick<EngineShape, 'forget' | 'kept'> => ({
+  forget: forgetVerbOf(go, runners, harnessOf, journalBytesOf(store)),
+  kept: keptVerbOf(store, runners, (harness = fallback) => (Object.hasOwn(runners, harness) ? harness : undefined)),
+});

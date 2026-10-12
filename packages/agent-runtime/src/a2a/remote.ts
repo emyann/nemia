@@ -50,7 +50,7 @@ import fs from 'node:fs';
 import type { SessionState, Sighting } from '../core/index.ts';
 import { RunnerError, type SpawnRequest, type TranscriptCursor } from '../harness/index.ts';
 import { instantNow } from '../core/engine/now.ts';
-import { forgetEntryOf, keptEntryOf, readEntry, registryOf, type Entry } from './entry.ts';
+import { entryVerbsOf, readEntry, registryOf, type Entry } from './entry.ts';
 import { logsOfTask, remoteFollowUpOf, remoteMessageOf, sightingOfTask } from './map.ts';
 import { turnOver } from './remote-events.ts';
 import type { SeamOps } from './client.ts';
@@ -451,8 +451,7 @@ export const remoteOps = (
     follow: remoteFollowOf(followed),
     transcript,
     transcriptOf,
-    forget: forgetEntryOf(harness, dir),
-    kept: keptEntryOf(harness, dir),
+    ...entryVerbsOf(harness, dir),
     refuses: remoteRefuses(harness),
   };
 };

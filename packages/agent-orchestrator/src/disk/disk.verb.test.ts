@@ -30,7 +30,7 @@ const { samplesOf } = await import('../series/series.ts');
 const { PHASES } = await import('../meter/meter.ts');
 const { storeRoots } = await import('./disk.store.ts');
 const { disk, DISK_METRICS, DISK_SPAN, DISK_SPAN_KEYS, diskOnce, freshDiskMemory } = await import('./disk.verb.ts');
-const { engineOf, EngineService } = await import('../runtime-client.ts');
+const { engineOf, over: overEngine } = await import('../runtime-client.ts');
 const engine = eachTest(testEngine);
 
 /** A file of `kb` kilobytes under the store. */
@@ -113,11 +113,7 @@ const over = async <A>(registry: Registry, program: Effect.Effect<A, unknown, En
     },
   });
   const value = await Effect.runPromise(
-    program.pipe(
-      Effect.provideService(EngineService, engineOf(engine().layer)),
-      Effect.provideService(Metric.MetricRegistry, registry),
-      Effect.withTracer(tracer),
-    ),
+    program.pipe(overEngine(engineOf(engine().layer)), Effect.provideService(Metric.MetricRegistry, registry), Effect.withTracer(tracer)),
   );
   return { value, spans };
 };
@@ -338,16 +334,10 @@ test('an engine whose kept fails leaves the engine whole under no factory and th
   planted();
   const registry = registryOf();
   const before = (await over(registry, diskOnce(TASKED, freshDiskMemory()))).value.reading.entries;
-  const failing = {
-    ...engineOf(engine().layer),
-    kept: () => Effect.fail({ _tag: 'JournalError', taskId: '*', message: 'the store does not list' }),
-  };
-  const { reading } = await Effect.runPromise(
-    diskOnce(TASKED, freshDiskMemory()).pipe(
-      Effect.provideService(EngineService, failing as never),
-      Effect.provideService(Metric.MetricRegistry, registry),
-    ),
-  );
+  await filed(['t-a1']);
+  engine().keeps('t-a1', { journal: 1000, records: 2000 });
+  engine().failKept(1);
+  const { reading } = (await over(registry, diskOnce(TASKED, freshDiskMemory()))).value;
   assert.deepEqual(reading.entries, [
     ...before.filter((entry) => DISK_PARTS_BEFORE.includes(entry.part)),
     { part: 'sessions', unread: 1 },
@@ -421,7 +411,7 @@ test(
         () => ANSWERS,
         (reading) => void kept.push(reading && `${reading.entries.length} entries`),
       ).pipe(
-        Effect.provideService(EngineService, engineOf(engine().layer)),
+        overEngine(engineOf(engine().layer)),
         Effect.provideService(Metric.MetricRegistry, new Map()),
         Effect.provide(Logger.layer([keeper])),
         Effect.provide(clock.layer),

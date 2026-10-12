@@ -93,6 +93,12 @@ export const keptEntryOf =
   (sessions) =>
     keptOf(harness, sessions, ({ name }) => ({ files: entryFilesOf(dir, name), records: [] }));
 
+/** The remote harness `harness`'s verbs over its registry in `dir` alone: `forget` (`forgetEntryOf`) and `kept` (`keptEntryOf`). */
+export const entryVerbsOf = (harness: string, dir: string): Required<Pick<RunnerOps, 'forget' | 'kept'>> => ({
+  forget: forgetEntryOf(harness, dir),
+  kept: keptEntryOf(harness, dir),
+});
+
 /** The names of the entries in `under`; none for a folder not made yet. */
 const entryNames = (under: string): string[] => {
   try {

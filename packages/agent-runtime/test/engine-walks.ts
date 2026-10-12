@@ -461,7 +461,8 @@ const KEPT: readonly Walk[] = [
       await asked(engine.file(task('a')));
       await asked(engine.file(task('b')));
       await settle('a', 'failed', { exitCode: 1 });
-      const refused = await asked((engine.kept as (...args: unknown[]) => ReturnType<EngineShape['kept']>)(['a']));
+      const handed: ReturnType<EngineShape['kept']> = Reflect.apply(engine.kept, engine, [['a']]);
+      const refused = await asked(handed);
       await asked(engine.forget(['a'], { yes: true }));
       return [refused, named(await asked(engine.kept()))];
     },

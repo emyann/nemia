@@ -98,7 +98,10 @@ const named = (run: DiskRun, at: string): Effect.Effect<void> =>
     run.factory === undefined ? {} : { factory: run.factory },
   );
 
-/** What the runtime answered of each task, as the pure half takes it: its journal, bodies and files as `engine`, its records as `sessions`. */
+/**
+ * What the runtime answered of each task, as the pure half takes it: its journal, bodies and files as `engine`, its records as
+ * `sessions`.
+ */
 const keptOf = (report: KeptReport): TaskKept[] =>
   report.tasks.map((task) => ({
     taskId: task.taskId,

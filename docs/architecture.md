@@ -217,7 +217,8 @@ only while the branch's commit is still the one judged, and a restart asks every
 while its files in the store stamp the same and nothing of its tasks is on the feed (`StatsMemo` in
 `src/stats/stats.verb.ts`), and the board's list of runs one more: each finished run's summary, while its record, its files in the
 store, its tasks on the feed and its branches' tips stand (`RestingMemo` in `src/rest/resting.verb.ts`, read by the list's `runs` entry
-through `runsSummarized` in `src/summary/summary.verb.ts`), every memo brought up to the feed by `src/rest/rest.verb.ts`. The api holds
+through `runsSummarized` in `src/summary/summary.verb.ts`), every memo brought up to the feed by `src/rest/rest.verb.ts`. The `runs open`
+and `runs finished` entries (`src/runlist/runlist.verb.ts`) answer through the same memo and keep nothing of their own. The api holds
 both for an app; `wf stats` and `wf ls` keep none, and the api's tests read every answer from them afresh as well (`WF_VERIFY_REST`).
 
 ## The rules

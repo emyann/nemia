@@ -32,6 +32,7 @@ import {
   standingSnapshot,
   verifiesRest,
 } from 'agent-orchestrator';
+import { runTasks } from 'agent-orchestrator/run';
 import { runWith } from '../../test/placed.ts';
 
 /** The engine the app's requests read through: its reads are what a poll costs. */
@@ -609,5 +610,47 @@ test("a held run's decision reads what holds it and none of its own tasks: a ses
     );
   } finally {
     for (const file of ['r-held.json', 'r-held.hold']) fs.rmSync(path.join(root, 'runs', file));
+  }
+});
+
+test('a finished page read warm asks the engine for no journal the whole list does not, none of a run at rest; the light answer adds the journals of the runs that wait on a person, alone', async () => {
+  aFinishedRun('r-paged');
+  branchOff('wf/r-asks/implement');
+  blocked('r-asks-implement');
+  writeRun('r-asks', 'Answer it');
+  const asks = path.join(root, 'runs', 'r-asks.json');
+  write(asks, JSON.stringify({ ...(JSON.parse(fs.readFileSync(asks, 'utf8')) as object), after: ['r-paged'] }));
+  await aPass();
+  try {
+    await list();
+    const whole = await journalsAsked(() => unverified(list));
+    assert.ok(resting.runs.has('r-paged') && resting.runs.has('r-asks'), 'both at rest, and kept');
+    const read = <T>(address: string) =>
+      journalsAsked(() =>
+        unverified(async () => {
+          const res = await app.request(address);
+          assert.equal(res.status, 200, await res.clone().text());
+          return (await res.json()) as T;
+        }),
+      );
+    const page = await read<{ runs: { id: string }[] }>('/api/runs-finished?size=100');
+    assert.ok(
+      page.value.runs.some((run) => run.id === 'r-paged'),
+      'the finished run is on the page',
+    );
+    assert.equal(page.asked, whole.asked, 'what the whole list asks warm, and no journal of a run at rest');
+    const open = await read<{ waiting: { id: string; clock: unknown }[] }>('/api/runs-open');
+    const waiting = open.value.waiting.map((run) => run.id);
+    assert.ok(waiting.includes('r-asks'), 'the run that waits on a person is among the waiting');
+    assert.ok(
+      open.value.waiting.every((run) => run.clock !== null),
+      'each with its clock read',
+    );
+    const theirs = new Set(waiting.flatMap((id) => runTasks(runStore.runs.read(id))));
+    assert.ok(theirs.has('r-asks-implement') && !theirs.has('r-paged-implement'));
+    assert.deepEqual(runStore.runs.read('r-asks').after, ['r-paged'], 'it was started after the finished run, whose journal is not read');
+    assert.equal(open.asked, whole.asked + theirs.size, "the whole list's, and the journals of the runs that wait on a person alone");
+  } finally {
+    for (const file of ['r-paged.json', 'r-asks.json']) fs.rmSync(path.join(root, 'runs', file));
   }
 });

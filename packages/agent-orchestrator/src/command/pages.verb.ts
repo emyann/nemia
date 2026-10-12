@@ -1,5 +1,6 @@
 /**
  * The board's reads of its runs, each an entry of the command table served on the api alone: every run's summary for its list (`RUNS`),
+ * the runs that wait or move with the counts (`RUNS_OPEN`), a page of the finished runs (`RUNS_FINISHED`),
  * the run for its page (`RUN`), and of one of
  * its steps a file of its files directory (`STEP_ARTIFACT`) or of its own folder (`STEP_FILE`), the path of one of its tasks through the
  * runtime's lifecycle (`STEP_PATH`), and a read of that task's conversation (`STEP_TRANSCRIPT`). A run is found among those the store
@@ -16,7 +17,8 @@ import { isRepositoryRun, type Run } from '../record/record.ts';
 import { verifiesRest } from '../config/config.store.ts';
 import { restingMemo } from '../rest/resting.verb.ts';
 import { HOME } from '../record/record.store.ts';
-import { type RunSummary, runsSummarized } from '../summary/summary.verb.ts';
+import { type FinishedPage, type OpenRuns, runsFinished, runsOpen } from '../runlist/runlist.verb.ts';
+import { type RunSummary, runsSummarized, type SummaryHow } from '../summary/summary.verb.ts';
 
 /** The text under `key`, or undefined where none was given. */
 const textOf = (args: Args, key: string): string | undefined => {
@@ -83,6 +85,70 @@ export const RUNS: Command<RunSummary[]> = {
       memo: kept?.runs ?? restingMemo(),
       filings: kept?.filings ?? { filed: new Map(), cursor: 0 },
       verify: env ? verifiesRest(env) : false,
+    });
+  }),
+  print: () => [],
+};
+
+/**
+ * How a read of the list reads, as `RUNS` does: the memo of runs at rest and the feed's filing times its caller keeps, verified as its
+ * environment says; a caller that keeps neither judges every run.
+ */
+const howOf = (env?: NodeJS.ProcessEnv, home?: string, kept?: Kept): SummaryHow => ({
+  home: home ?? HOME,
+  memo: kept?.runs ?? restingMemo(),
+  filings: kept?.filings ?? { filed: new Map(), cursor: 0 },
+  verify: env ? verifiesRest(env) : false,
+});
+
+/**
+ * The runs that wait on a person and the runs in flight, with the counts of each and of the finished runs (`runsOpen`), read now: of
+ * the factory `factory`, or of every factory where none is given. The waiting runs carry the cost of each step and their clock's parts.
+ */
+export const RUNS_OPEN: Command<OpenRuns> = {
+  name: 'runs open',
+  usage: '',
+  help: ['the runs that wait on a person and the runs in flight, with the counts of each and of the finished'],
+  spec: { positionals: [], flags: [keyed('factory')], unknown: (arg) => `the board's read of the open runs takes no ${arg}.` },
+  writes: false,
+  nemia: 'read',
+  route: { method: 'GET', path: '/api/runs-open', status: 200 },
+  only: {
+    side: 'api',
+    why: "the board's bell and its runs page poll what waits and what moves, apart from the finished runs; the command line lists every run",
+  },
+  handler: Effect.fnUntraced(function* (args: Args, env?: NodeJS.ProcessEnv, home?: string, kept?: Kept) {
+    return yield* runsOpen(yield* EngineService, howOf(env, home, kept), { factory: textOf(args, 'factory'), now: Date.now() });
+  }),
+  print: () => [],
+};
+
+/**
+ * One page of the finished runs, newest first by when their work stopped (`runsFinished`), read now: of the factory `factory`, or of
+ * every factory; page `page`, from 1, of `size` rows, 9 where none is said. Refused (`Invalid`): a page or a size asked wrongly.
+ */
+export const RUNS_FINISHED: Command<FinishedPage> = {
+  name: 'runs finished',
+  usage: '',
+  help: ['one page of the finished runs, newest first by when their work stopped'],
+  spec: {
+    positionals: [],
+    flags: ['factory', 'page', 'size'].map(keyed),
+    unknown: (arg) => `the board's read of the finished runs takes no ${arg}.`,
+  },
+  writes: false,
+  nemia: 'read',
+  route: { method: 'GET', path: '/api/runs-finished', status: 200 },
+  only: {
+    side: 'api',
+    why: "the board's runs page reads the finished runs a page at a time; the command line lists every run",
+  },
+  handler: Effect.fnUntraced(function* (args: Args, env?: NodeJS.ProcessEnv, home?: string, kept?: Kept) {
+    return yield* runsFinished(yield* EngineService, howOf(env, home, kept), {
+      factory: textOf(args, 'factory'),
+      page: textOf(args, 'page'),
+      size: textOf(args, 'size'),
+      now: Date.now(),
     });
   }),
   print: () => [],
@@ -176,4 +242,13 @@ export const STEP_TRANSCRIPT: Command<{ events: ConversationEvent[]; cursor: str
 };
 
 /** The board's reads of one run and its steps, in the order the table lists them. */
-export const PAGES: readonly Command[] = [RUNS, RUN, STEP_ARTIFACT, STEP_FILE, STEP_PATH, STEP_TRANSCRIPT] as readonly Command[];
+export const PAGES: readonly Command[] = [
+  RUNS,
+  RUNS_OPEN,
+  RUNS_FINISHED,
+  RUN,
+  STEP_ARTIFACT,
+  STEP_FILE,
+  STEP_PATH,
+  STEP_TRANSCRIPT,
+] as readonly Command[];

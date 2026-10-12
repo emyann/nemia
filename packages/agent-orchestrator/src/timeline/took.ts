@@ -19,14 +19,14 @@ import { signedAndHeld, taskUsage, type AttemptClock, type TaskClock, type Timel
 export type AtWork = { ms: number; since: string | null; endedAt: string | null };
 
 /** An interval a task ran in, in epoch milliseconds: `to` null while it still runs. */
-type Ran = { from: number; to: number | null };
+export type Ran = { from: number; to: number | null };
 
 /**
  * The intervals one task ran in, turn by turn as `timeline`'s `ranOf` counts them: a turn's first spawn to its last end, an attempt that
  * never started (`unstartable`) left out. The last turn of a task neither settled nor held open and signed (`signedAndHeld`) still runs
  * when it has no end; a turn that has none otherwise is left out, as one the record does not say the end of.
  */
-function ranIn(view: TaskClock): Ran[] {
+export function ranIn(view: TaskClock): Ran[] {
   const turns = new Map<number, AttemptClock[]>();
   for (const a of view.state.attempts) {
     if (a.reason !== 'unstartable') turns.set(a.turn ?? 0, [...(turns.get(a.turn ?? 0) ?? []), a]);
@@ -42,7 +42,7 @@ function ranIn(view: TaskClock): Ran[] {
 }
 
 /** The length of the union of intervals that all ended. */
-function unionMs(spans: ReadonlyArray<{ from: number; to: number }>): number {
+export function unionMs(spans: ReadonlyArray<{ from: number; to: number }>): number {
   let ms = 0;
   let reach = -Infinity;
   for (const s of [...spans].sort((a, b) => a.from - b.from)) {

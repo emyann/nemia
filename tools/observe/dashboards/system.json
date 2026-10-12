@@ -589,7 +589,7 @@
       "id": 36,
       "type": "timeseries",
       "title": "On disk, by part",
-      "description": "disk.bytes: what each part of the store holds, as the daemon's last sweep read it, stacked: the runs' worktrees, their records and files, the folder handed to the runtime (engine), the checks' output, the series, and everything else under the store's root. A file hardlinked from outside the store, as a worktree's packages are, is the other name's and counts nothing.",
+      "description": "disk.bytes: what each part of the store holds, as the daemon's last sweep read it, stacked: the runs' worktrees (worktrees), their records and files (runs), the folder handed to the runtime (engine), the records the runtime's sessions left where their harness keeps them (sessions), the checks' output (checks), the series (series), and everything else under the store's root (other). The sessions' records are outside the store, perhaps on another file system than the free room beside this panel describes, and only those a task still names are counted: a run removed leaves its records on the disk and out of this part. A file hardlinked from outside the store, as a worktree's packages are, is the other name's and counts nothing.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -642,7 +642,7 @@
       "id": 37,
       "type": "timeseries",
       "title": "On disk, by factory",
-      "description": "disk.bytes of the parts kept by run, the worktrees and the runs' records and files, by the factory of each run the last pass answered, stacked. A folder of no run known is in no factory, and only in its part.",
+      "description": "disk.bytes of the parts kept by run or by task, by the factory of each run the last pass answered, stacked: the worktrees, the runs' records and files, and, as the runtime says them by task, the engine's journals, bodies and session files and the sessions' records. A folder or a task of no run known is in no factory, and only in its part.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"

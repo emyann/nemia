@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { Locator, Page, Response } from 'playwright';
 import { photograph, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
-import { FACTORIES, hiringStarts, WORKFLOWS } from '../seed.ts';
+import { CARDS, FACTORIES, hiringStarts, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
@@ -115,6 +115,42 @@ async function expectStartedIn(started: Response, { factory, repo, card }: { fac
     throw new Refused(`the record names the factory picked, its repository and the card — it holds ${JSON.stringify(got)}`);
 }
 
+/**
+ * The seed's factory as it is found, its one workflow unread in it: the box, with the factory picked, offers no workflow and says which
+ * was left out and why; and so does the start of a seeded card of no factory, with the factory picked there. Nothing is written.
+ */
+async function unreadSaid(page: Page, theme: string): Promise<void> {
+  const factory = FACTORIES.hiring.name;
+  const workflow = WORKFLOWS.good.name;
+  const box = page.locator('form[aria-label="File a card"]');
+  await box.getByRole('combobox', { name: 'Factory' }).selectOption(factory);
+  await expectTexts(
+    box.getByRole('combobox', { name: 'Workflow' }).locator('option'),
+    ['None: chosen at start'],
+    `${factory}, as seeded, offers no workflow in the box: ${workflow} does not read in it`,
+  );
+  const unread = box.locator(`[data-workflows-unread] [data-unread="${workflow}"]`);
+  await expectVisible(unread, `and the box says ${workflow} is left out of the list`);
+  const why = ((await unread.textContent()) ?? '').trim();
+  if (!why.startsWith(`${workflow}: implement: \`agent: implementer\` fills this step in every factory`))
+    throw new Refused(`with why it does not read, in the api's words — it said ${JSON.stringify(why)}`);
+  await settled(page);
+  await photograph(box, path.join(OUT, `inbox-file-unread-${theme}.png`));
+  await box.getByRole('combobox', { name: 'Factory' }).selectOption('');
+
+  const card = cardIn(page, CARDS.rich.name);
+  await card.getByRole('button', { name: 'Start' }).click();
+  await card.getByRole('combobox', { name: 'Factory' }).selectOption(factory);
+  await expectVisible(
+    card.locator(`[data-workflows-unread] [data-unread="${workflow}"]`),
+    `the start of a card of no factory, in ${factory}, says ${workflow} is left out too`,
+  );
+  await expectCount(card.locator(`form[aria-label="Start ${CARDS.rich.name}"]`), 0, 'and draws no start form: nothing to run it on');
+  await settled(page);
+  await photograph(card, path.join(OUT, `inbox-start-unread-${theme}.png`));
+  await card.getByRole('button', { name: 'Close' }).click();
+}
+
 export default {
   /**
    * The box that files a card. Its Factory list holds "No factory" and each factory whose file reads, never `default` nor `broken`,
@@ -123,7 +159,8 @@ export default {
    * text, and a filing sends the factory and the workflow picked and no repository: the card's file names the factory, and its line
    * wears the factory's tag, linked. A card filed with no factory there is hidden by the page's filter, and the box says so. The card
    * of no factory is then started through its Start's Factory list (`startUnassigned`). The factory is made able to start its
-   * workflow for the page (`hiringStarts`), since the seed leaves that workflow unread in it; that, every card and the run are taken back.
+   * workflow for the page (`hiringStarts`), since the seed leaves that workflow unread in it — which the box and a card's start say first
+   * (`unreadSaid`); that, every card and the run are taken back.
    */
   name: 'inbox-file',
   route: '/inbox',
@@ -134,6 +171,7 @@ export default {
     const box = page.locator('form[aria-label="File a card"]');
     const list = box.getByRole('combobox', { name: 'Factory' });
     const written: string[] = [];
+    await unreadSaid(page, theme);
     const unhire = hiringStarts(store!);
     try {
       await expectTexts(

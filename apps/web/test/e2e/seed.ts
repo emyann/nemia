@@ -773,6 +773,34 @@ export function hiringStarts(root: string): () => void {
   };
 }
 
+/**
+ * Gives FACTORIES.hiring a second repository in the store at `root`, FACTORIES.bare's folder, after its own: a factory on several, which
+ * the seed has none of. Returns the second repository and the function that writes the factory's file back as it was found.
+ */
+export function onSeveralRepos(root: string): { second: string; back: () => void } {
+  const file = path.join(root, 'factories', `${FACTORIES.hiring.name}.json`);
+  const found = fs.readFileSync(file, 'utf8');
+  const read = JSON.parse(found) as { repos: string[] };
+  const second = path.join(root, FACTORIES.bare);
+  fs.writeFileSync(file, JSON.stringify({ ...read, repos: [...read.repos, second] }, null, 2));
+  return { second, back: () => fs.writeFileSync(file, found) };
+}
+
+/**
+ * Leaves the store at `root` with no factory on file: its `factories/` moved aside, and an empty one in its place. Returns the function
+ * that puts the folder back.
+ */
+export function noFactories(root: string): () => void {
+  const dir = path.join(root, 'factories');
+  const aside = path.join(root, 'factories.aside');
+  fs.renameSync(dir, aside);
+  fs.mkdirSync(dir);
+  return () => {
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.renameSync(aside, dir);
+  };
+}
+
 /** The diamond's runs, oldest first. */
 export const DIAMOND_RUNS = [DIAMOND.top, DIAMOND.shipped, DIAMOND.running, DIAMOND.bottom, DIAMOND.cancelled, DIAMOND.orphan] as const;
 

@@ -3,7 +3,18 @@ import path from 'node:path';
 import type { Locator, Page, Response } from 'playwright';
 import { photograph, PLACES_SAID, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
-import { CARDS, DIAMOND_RUNS, FACTORIES, hiringStarts, QUEUE, QUEUED, queuedCardText, refusedWhy, unfactoredWhy, WORKFLOWS } from '../seed.ts';
+import {
+  CARDS,
+  DIAMOND_RUNS,
+  FACTORIES,
+  hiringStarts,
+  QUEUE,
+  QUEUED,
+  queuedCardText,
+  refusedWhy,
+  unfactoredWhy,
+  WORKFLOWS,
+} from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 

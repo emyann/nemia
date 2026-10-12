@@ -42,7 +42,8 @@ import {
   PASS,
   QUEUE,
   QUEUED,
-  refusedWhy,
+  QUEUED_IN,
+  unfactoredWhy,
   SESSION,
   SHIPPED,
   UNMERGED,
@@ -105,6 +106,9 @@ async function expectDiamond(page: Page, when: string): Promise<void> {
  */
 const IN_FLIGHT_BY_CAP = 3;
 
+/** The default floor's lane: the queued cards of no factory, in the queue's order. */
+const LANE = QUEUED_IN.default;
+
 export default {
   /**
    * The Factory: the queue's ghosts at the floor's left edge and the run slots over it; the runs in flight, to decide and waiting on you
@@ -121,34 +125,29 @@ export default {
 
     const lane = page.locator('aside[aria-label="Queued cards"]');
     const ghosts = lane.locator('a[data-ghost]');
-    await expectCount(ghosts, QUEUED.length, `a ghost per queued card (${QUEUED.map((c) => c.name).join(', ')})`);
+    await expectCount(ghosts, LANE.length, `a ghost per queued card of no factory (${LANE.map((c) => c.name).join(', ')})`);
     const drawn = await ghosts.evaluateAll((links) => links.map((link) => link.getAttribute('data-ghost')));
-    if (JSON.stringify(drawn) !== JSON.stringify(QUEUED.map((c) => c.name))) {
+    if (JSON.stringify(drawn) !== JSON.stringify(LANE.map((c) => c.name))) {
       throw new Refused(
-        `the ghosts are in the queue's order — ${QUEUED.map((c) => c.name).join(', ')} — and they were drawn ${drawn.join(', ')}`,
+        `the ghosts are this floor's cards in the queue's order — ${LANE.map((c) => c.name).join(', ')} — and they were drawn ${drawn.join(', ')}`,
       );
     }
-    const checkout = path.join(store!, 'checkout');
-    for (const [i, card] of QUEUED.entries()) {
+    for (const card of LANE) {
+      const i = QUEUED.findIndex((queued) => queued.name === card.name);
       const ghost = lane.locator(`a[data-ghost="${card.name}"]`);
       await expectTexts(ghost.locator('[data-ghost-place]'), [PLACES_SAID[i]], `${card.name}'s ghost says its place (${PLACES_SAID[i]})`);
       await expectTexts(ghost.locator('[data-ghost-title]'), [card.title], `and its first line (${card.title})`);
       await expectTexts(ghost.locator('[data-ghost-workflow]'), [card.workflow], `and its workflow (${card.workflow})`);
-      const repo = card === QUEUE.third ? "the daemon's repository" : path.basename(checkout);
+      const repo = "the daemon's repository";
       await expectTexts(ghost.locator('[data-ghost-repo]'), [repo], `and its repository (${repo})`);
       const href = await ghost.getAttribute('href');
       if (href !== `/inbox/${card.name}`)
         throw new Refused(`${card.name}'s ghost opens the card's page (/inbox/${card.name}) — it links to ${href}`);
-      await expectCount(
-        ghost.locator('[data-ghost-tried]'),
-        card === QUEUE.refused ? 1 : 0,
-        card === QUEUE.refused ? 'the refused card is marked' : 'no try is marked on a card the tick has not tried',
-      );
     }
     await expectTexts(
-      lane.locator(`a[data-ghost="${QUEUE.refused.name}"] [data-ghost-tried="refused"]`),
-      [`not started, refused: ${refusedWhy(store!, checkout)}`],
-      "the refused card's ghost says why, in the package's words",
+      lane.locator(`a[data-ghost="${QUEUE.third.name}"] [data-ghost-tried="refused"]`),
+      [`not started, refused: ${unfactoredWhy(store!)}`],
+      "the card of no factory, queued before a queue asked for one, says the tick refused its start for that, in the package's words",
     );
     await expectCount(
       page.locator(QUEUED.map((c) => `.react-flow__node[data-id="${c.name}"]`).join(', ')),
@@ -158,7 +157,7 @@ export default {
     await expectLeftOf(ghosts, floor, "the ghosts wait at the floor's left edge");
     await expectTexts(
       page.locator('[data-cap]'),
-      [`${IN_FLIGHT_BY_CAP} of ${QUEUE.cap} run slots taken on this machine · ${QUEUED.length} queued · ${PASS.line}`],
+      [`${IN_FLIGHT_BY_CAP} of ${QUEUE.cap} run slots taken on this machine · ${LANE.length} queued · ${PASS.line}`],
       `the header says the run slots taken of the cap the daemon last ran with (WF_MAX_RUNS=${QUEUE.cap}), and how many are queued — in slots, not beside the floor's 4 in flight as a second count of runs in flight — and what the daemon's last pass took`,
     );
     const pass = page.locator('[data-cap] [data-pass]');
@@ -601,7 +600,7 @@ export default {
     );
     await expectTexts(
       page.locator('[data-cap]'),
-      [`${IN_FLIGHT_BY_CAP} of ${QUEUE.cap} run slots taken on this machine · ${QUEUED.length} queued · ${PASS.line}`],
+      [`${IN_FLIGHT_BY_CAP} of ${QUEUE.cap} run slots taken on this machine · ${LANE.length} queued · ${PASS.line}`],
       'and the header still counts the queue',
     );
     await expectVisible(inspector.getByText(FAKE.title), 'the bar names the run the step is in');
@@ -623,7 +622,7 @@ export default {
     await expectInside(card, floor, `the open card is on the floor beside ${FAKE.refused}'s bar`);
     await refused.getByRole('button', { name: 'Close', exact: true }).click();
     await expectCount(refused, 0, "the step's bar closes");
-    await expectCount(ghosts, QUEUED.length, "and the queue's lane is back beside the floor");
+    await expectCount(ghosts, LANE.length, "and the queue's lane is back beside the floor");
 
     await beside.getByRole('button', { name: 'Show steps' }).click();
     const besideOpen = beside.locator(`section[aria-label="The run's steps"]`);

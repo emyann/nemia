@@ -1301,10 +1301,12 @@ export function seedInbox(root: string, repo: string, now = Date.now()): void {
 
 /**
  * The queue the Factory draws and the Inbox page places: three cards in the store's `inbox/` queued to start on their own, as
- * `wf inbox queue` writes one, each filed before CARDS so the Inbox page lists them after those. `first` names `dev` and the checkout, and
- * was queued first; `refused` names a workflow nobody has, and the tick's try of its start is written down as refused (`queue/<name>.json`,
- * of the card as it stands), so it keeps its place and says why; `third` names `dev` and no repository. And the ceilings the daemon's last
- * pass ran with (`tick.json`): a cap of `cap` runs in flight.
+ * `wf inbox queue` writes one, each filed before CARDS so the Inbox page lists them after those. `first` and `refused` are cards of
+ * FACTORIES.hiring, about the checkout: `first` names `dev` and was queued first; `refused` names a workflow its factory does not offer,
+ * and the tick's try of its start is written down as refused (`queue/<name>.json`, of the card as it stands), so it keeps its place and
+ * says why. `third` names `dev`, no repository and no factory: a card queued before a queue asked for a factory, which the tick refused
+ * for that, its try written down too; it is the default floor's one ghost. And the ceilings the daemon's last pass ran with
+ * (`tick.json`): a cap of `cap` runs in flight.
  */
 export const QUEUE = {
   first: {
@@ -1312,6 +1314,7 @@ export const QUEUE = {
     title: 'Draw the queue on the Factory',
     body: 'Draw the queue on the Factory\n\nGhost cards at the left edge, in queue order.',
     workflow: 'dev',
+    factory: FACTORIES.hiring.name,
     filedMinutesAgo: 120,
     queuedMinutesAgo: 50,
   },
@@ -1320,6 +1323,7 @@ export const QUEUE = {
     title: 'Run a workflow nobody has',
     body: 'Run a workflow nobody has\n\nIts start is refused, and it keeps its place.',
     workflow: 'gone',
+    factory: FACTORIES.hiring.name,
     filedMinutesAgo: 110,
     queuedMinutesAgo: 40,
     triedMinutesAgo: 39,
@@ -1331,6 +1335,7 @@ export const QUEUE = {
     workflow: 'dev',
     filedMinutesAgo: 100,
     queuedMinutesAgo: 20,
+    triedMinutesAgo: 19,
   },
   /** WF_MAX_RUNS as the daemon's last pass wrote it. */
   cap: 4,
@@ -1340,9 +1345,21 @@ export const QUEUE = {
 /** The three queued cards, in the queue's order. */
 export const QUEUED = [QUEUE.first, QUEUE.refused, QUEUE.third] as const;
 
-/** Why the tick's start of QUEUE.refused was refused, in the package's words for a card whose workflow is not there. */
-export const refusedWhy = (root: string, repo: string): string =>
-  `no workflow folder at ${path.join(root, 'inbox', QUEUE.refused.workflow)}, nor a workflow named ${QUEUE.refused.workflow} in ${path.join(repo, 'workflows')}. The repository's workflows are: broken, dev — name one, or give the path to a workflow folder.`;
+/** The queued cards a factory's floor draws as ghosts: FACTORIES.hiring's, and the default floor's, which holds the card of no factory. */
+export const QUEUED_IN = { hiring: [QUEUE.first, QUEUE.refused], default: [QUEUE.third] } as const;
+
+/** Why the tick's start of QUEUE.refused was refused, in the package's words for a workflow its factory does not offer (`unattachedRefusal`). */
+export const refusedWhy = (): string =>
+  `${QUEUE.refused.workflow}: the factory ${QUEUE.refused.factory} does not offer this workflow — it offers: ${WORKFLOWS.good.name}. Attach it: nemia factory attach ${QUEUE.refused.factory} ${QUEUE.refused.workflow}. Nothing was started.`;
+
+/**
+ * Why the tick's start of QUEUE.third was refused, in the package's words for a queued card that names no factory
+ * (`unfactoredCardRefusal`, with no start's flag): its file in the store at `root`, and the factories that read, by name.
+ */
+export const unfactoredWhy = (root: string): string => {
+  const names = [FACTORIES.hiring.name, FACTORIES.bare, ...FACTORIES.others].sort().join(', ');
+  return `${path.join(root, 'inbox', `${QUEUE.third.name}.md`)}: this card names no factory, and a card is started only in the factory named for it, never one taken from its folder or its repo:, which can be two factories'. Write \`factory: <name>\` in its frontmatter — one of ${names}; a new card names it as it is filed: nemia inbox add "<idea>" --factory <name>. Nothing was started.`;
+};
 
 /**
  * A queued card's text, as `wf inbox queue` writes it: its workflow and its repository, then `queued:`, then its factory when it names
@@ -1387,15 +1404,15 @@ export const PASS = {
 } as const;
 
 /**
- * Write QUEUE into the store at `root`, `first` and `refused` about the checkout at `repo`: the cards, the refused try, `tick.json`, and
- * what the pass that wrote it cost (`tick-stats.json`, PASS).
+ * Write QUEUE into the store at `root`, `first` and `refused` about the checkout at `repo`: the cards, the two refused tries, `tick.json`,
+ * and what the pass that wrote it cost (`tick-stats.json`, PASS).
  */
 export function seedQueue(root: string, repo: string, now = Date.now()): void {
   const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
   const { first, refused, third } = QUEUE;
   const cards = [
-    { card: first, text: queuedCardText(first, ago(first.queuedMinutesAgo), repo) },
-    { card: refused, text: queuedCardText(refused, ago(refused.queuedMinutesAgo), repo) },
+    { card: first, text: queuedCardText(first, ago(first.queuedMinutesAgo), repo, first.factory) },
+    { card: refused, text: queuedCardText(refused, ago(refused.queuedMinutesAgo), repo, refused.factory) },
     { card: third, text: queuedCardText(third, ago(third.queuedMinutesAgo)) },
   ];
   for (const { card, text } of cards) {
@@ -1404,8 +1421,14 @@ export function seedQueue(root: string, repo: string, now = Date.now()): void {
     const filed = new Date(now - card.filedMinutesAgo * 60_000);
     fs.utimesSync(file, filed, filed);
   }
-  const tried = { at: ago(refused.triedMinutesAgo), text: cards[1].text, repo, why: refusedWhy(root, repo), refused: true };
-  write(path.join(root, 'queue', `${refused.name}.json`), JSON.stringify(tried, null, 2));
+  const tries = [
+    { card: refused, text: cards[1].text, why: refusedWhy() },
+    { card: third, text: cards[2].text, why: unfactoredWhy(root) },
+  ];
+  for (const { card, text, why } of tries) {
+    const tried = { at: ago(card.triedMinutesAgo), text, repo, why, refused: true };
+    write(path.join(root, 'queue', `${card.name}.json`), JSON.stringify(tried, null, 2));
+  }
   write(path.join(root, 'tick.json'), JSON.stringify({ sessions: QUEUE.sessions, runs: QUEUE.cap }, null, 2));
   write(path.join(root, 'tick-stats.json'), JSON.stringify(PASS.cost(ago(1)), null, 2));
 }

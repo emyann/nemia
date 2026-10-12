@@ -16,7 +16,8 @@
  *     otherwise.
  *  5. Reads what each worker wrote, refusing two that served one store, api or app (`apart`); and says last the ten slowest pages, what
  *     each worker took, and how many pages passed, in which themes, in how many seconds. A whole run — every page, in the dark theme —
- *     that took longer than the bound fails, naming its slowest pages (`overBound`, timing.ts).
+ *     says what its pages cost summed, and fails when that passes their bound, naming its slowest pages (`overBound`, timing.ts); its
+ *     own time refuses nothing, and is said when it passed a step's tool (`pastTool`).
  *
  * Exits non-zero when a worker fails, saying each failure, and last the first by the pages' order, naming the page, the theme and the
  * assertion, with a screenshot of what the page looked like. On a signal, every worker is stopped and every store removed. The assertions
@@ -28,7 +29,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { loadPages, planOf } from './pages.ts';
-import { overBound, rankLines, type PageTiming } from './timing.ts';
+import { overBound, pagesLine, pastTool, rankLines, type PageTiming } from './timing.ts';
 import { exitOn } from './visit.ts';
 import { apart, failedInOrder, queueOf, workersFor, type PageQueue, type Seat } from './workers.ts';
 import type { WorkerResult } from './worker.ts';
@@ -167,9 +168,12 @@ async function main(): Promise<void> {
   if (shots.length) console.log(`\ne2e: the pages pictured:\n${shots.map((shot) => `  ${shot}`).join('\n')}`);
   console.log(`\ne2e: the slowest pages:\n  ${rankLines(timings, RANKED).join('\n  ')}`);
   console.log(`\ne2e: ${results.map(workerLine).join('\n     ')}`);
+  if (plan.whole) console.log(`     ${pagesLine(timings)}`);
   const totalMs = performance.now() - started;
-  const late = overBound(totalMs, timings, plan.whole);
+  const late = overBound(timings, plan.whole);
   if (late) throw new Error(late);
+  const slow = pastTool(totalMs, results.length, plan.whole);
+  if (slow) console.log(`\ne2e: ${slow}`);
   console.log(
     `\ne2e: ${plan.visit.length} of ${pages.length} pages passed in the ${plan.themes.join(' and ')} theme${plan.themes.length > 1 ? 's' : ''}` +
       ` in ${Math.round(totalMs / 1000)} s, over ${results.length} worker${results.length > 1 ? 's' : ''}`,

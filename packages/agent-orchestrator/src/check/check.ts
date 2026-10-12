@@ -32,8 +32,8 @@ import type { Workflow } from '../step/step.ts';
  *
  * A guard against a hang, not a budget, so it is set well above the slowest round check: the whole suite forced, the typecheck and the
  * lint, each mutant the closeout names, which its runner fails past five minutes, and the build and the e2e where the change touches the
- * board, the api or the root's package files, which its runner fails past eight minutes. The number is twice the slowest round check,
- * rounded up to five minutes, never less than 2400.
+ * board, the api or the root's package files, which takes as long as the workers the machine gives it: its runner refuses on what its
+ * pages cost, never on its own time. The number is twice the slowest round check, rounded up to five minutes, never less than 2400.
  *
  * Measured from the round checks' journals, spawned to ended: 346 passed round checks that ran the mutants over a week, median 22 s, p90
  * 160 s, slowest 865 s, the forced suite, four mutants and the e2e; most replayed the suite from turbo's cache, which the forced suite no

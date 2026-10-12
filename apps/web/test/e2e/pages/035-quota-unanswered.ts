@@ -53,7 +53,7 @@ export default {
         'with its percentage and reset',
       );
       await expectVisible(
-        line.locator('[data-quota-last-age]').filter({ hasText: /^as of \d{2}:\d{2}, just now$/ }),
+        line.locator('[data-quota-last-age]').filter({ hasText: /^as of \d{1,2}:\d{2} [AP]M, just now$/ }),
         'dated in the gauges themselves: as of when, and how long ago',
       );
       const opacity = Number(await line.locator('[data-quota-last]').evaluate((el) => getComputedStyle(el).opacity));

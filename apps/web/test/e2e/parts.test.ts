@@ -664,3 +664,67 @@ test(
     }
   },
 );
+
+const CARD_NARROW = 'board-waitingcard--narrow';
+const CARD_WIDE = 'board-waitingcard--wide';
+
+/** Where the button of the card the page draws stands against its tiles, and how far its right edge is from the foot's. */
+const footOf = (page: Page): Promise<{ under: boolean; beside: boolean; fromRight: number }> =>
+  page.locator('[data-foot]').evaluate((foot) => {
+    const [tiles, button] = ['[data-tiles]', '[data-cut-button]'].map((part) => foot.querySelector(part)!.getBoundingClientRect());
+    return {
+      under: button.top >= tiles.bottom,
+      beside: button.top < tiles.bottom && button.bottom > tiles.top,
+      fromRight: Math.round(foot.getBoundingClientRect().right - button.right),
+    };
+  });
+
+test(
+  "a waiting card's button stands at the card's right: under its tiles where the card is narrow, beside them where it is wide",
+  WAITED,
+  async () => {
+    const narrow = await openParts(browser, built, 'dark', alone(CARD_NARROW));
+    const wide = await openParts(browser, built, 'dark', alone(CARD_WIDE));
+    try {
+      assert.deepEqual(await footOf(narrow), { under: true, beside: false, fromRight: 0 }, 'narrow, the button wraps under the tiles');
+      assert.deepEqual(await footOf(wide), { under: false, beside: true, fromRight: 0 }, 'wide, it stands beside them');
+    } finally {
+      await narrow.context().close();
+      await wide.context().close();
+    }
+  },
+);
+
+test("a press on a waiting card's title, on its lowest pixels over the copy control, opens the run", WAITED, async () => {
+  const page = await openParts(browser, built, 'dark', alone(CARD_WIDE));
+  try {
+    const hit = await page.locator('article[data-run]').evaluate((article) => {
+      const link = article.querySelector('h3 a')!;
+      const button = article.querySelector('[data-copy-id] button')!.getBoundingClientRect();
+      const [x, cy] = [button.left + button.width / 2, button.top + button.height / 2];
+      const rows = [...link.getClientRects()];
+      const row = rows.at(-1)!;
+      const at = document.elementFromPoint(x, row.bottom - 1);
+      return {
+        run: article.getAttribute('data-run'),
+        x,
+        y: row.bottom - 1,
+        rows: rows.length,
+        over: x > row.left && x < row.right,
+        above: Math.round(cy - row.bottom),
+        title: at?.closest('a') === link,
+        tag: at?.tagName ?? 'nothing',
+      };
+    });
+    assert.ok(
+      hit.rows === 1 && hit.over && hit.above < 24,
+      `the title runs over the copy control, within its reach: ${JSON.stringify(hit)}`,
+    );
+    assert.ok(hit.title, `the point a pixel inside the title, over the copy control, answers the title's link: it answers ${hit.tag}`);
+    await page.mouse.click(hit.x, hit.y);
+    await page.locator(`${story(CARD_WIDE)} [data-story-ground][data-at="/runs/${hit.run}"]`).waitFor();
+    assert.equal(await page.locator('[data-copied]').count(), 0, 'and nothing was copied');
+  } finally {
+    await page.context().close();
+  }
+});

@@ -8,6 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Markdown } from '@/components/Markdown';
 import { Marker, MarkerContent, MarkerIcon } from '@/components/ui/marker';
 import { Message, MessageContent } from '@/components/ui/message';
+import { timeOfDay } from '@/lib/timeOfDay';
 import {
   closeoutOf,
   CLOSEOUT_TOOL,
@@ -87,7 +88,7 @@ function Told({ turn }: { turn: ToldTurn }) {
           <span>You said, while it ran</span>
           <span aria-hidden>·</span>
           <time dateTime={turn.at} title={turn.at}>
-            {new Date(turn.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            {timeOfDay(new Date(turn.at))}
           </time>
           {turn.arrived && (
             <>

@@ -7,6 +7,7 @@ import { titleOf } from '../../../src/lib/factory.ts';
 import { endedWords, openWord, presentWait, waitSentence, waitTag, whenColumn } from '../../../src/lib/runWords.ts';
 import { answered, fed, photograph, photographBothWidths, SECTIONS, sectionsOf, sidebar, themeOf } from '../board.ts';
 import { expectBeneath, expectCount, expectNone, expectTexts, expectVisible, idle, literal, Refused, WAIT_MS } from '../checks.ts';
+import { timesRefused } from '../runs-times.ts';
 import { contrastHolds } from '../runs-contrast.ts';
 import { COSTLY, ENDING, GATED, REGATED, regatedFiles, writeRegated } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -517,11 +518,17 @@ async function rowsSay(page: Page, open: OpenRuns, finished: FinishedPage): Prom
       .evaluateAll((rows) => rows.map((row) => [...row.querySelectorAll('time')].map((time) => time.textContent).join('|')));
     return said.join() === whens.join() ? null : `expected ${whens.join(', ')}, found ${said.join(', ')}`;
   }, 'a finished row says when it was created and when it finished, its date on every row, as `whenColumn` writes it');
-  const kept = await section(page, 'finished')
+  const drawn = await section(page, 'finished')
     .locator('tr[data-run] time')
-    .evaluateAll((all) => all.map((time) => `${getComputedStyle(time).whiteSpace} ${Math.round(time.getBoundingClientRect().width)}`));
-  if (new Set(kept).size !== 1 || !kept[0].startsWith('pre '))
-    throw new Refused(`each time of the finished table keeps its padding, so every one is as wide as the next — ${kept.join(', ')}`);
+    .evaluateAll((all) =>
+      all.map((time) => ({
+        words: time.textContent ?? '',
+        whiteSpace: getComputedStyle(time).whiteSpace,
+        width: Math.round(time.getBoundingClientRect().width),
+      })),
+    );
+  const refused = timesRefused(drawn);
+  if (refused !== null) throw new Refused(refused);
   await expectTexts(page.locator('[data-pager-rows]'), [rowsSaid(finished)], 'the pager says the rows of the first page');
 }
 

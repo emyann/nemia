@@ -94,6 +94,78 @@
   html {
     @apply font-sans;
   }
+
+  /*
+   * The look's scroll bar, wherever something scrolls: an 8-pixel square lane with no arrows, the ground showing through, and a thumb
+   * that is not seen at rest. What scrolls is marked while it scrolls (`data-scroll-bar`, written by `markScrolls`): its thumb is then
+   * drawn 4 pixels wide in `outline`, and leaves by a fade once it is at rest; under the pointer the thumb takes the lane's whole width in
+   * `on-surface-variant`, and `on-surface` while it is held. A conversation that follows its stream (`data-autoscrolling`) shows none.
+   * The ink is an inherited property, which a thumb reads off what it scrolls: the window's own bar is drawn from the body, which
+   * takes the root's. What a marked thing holds takes the ink back, so that a page that scrolls lights no bar inside it.
+   */
+  @supports selector(::-webkit-scrollbar) {
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track,
+    ::-webkit-scrollbar-corner {
+      background-color: transparent;
+    }
+    ::-webkit-scrollbar-button {
+      display: none;
+    }
+    ::-webkit-scrollbar-thumb {
+      border: 2px solid transparent;
+      background-color: var(--bar-ink);
+      background-clip: content-box;
+    }
+    :where([data-autoscrolling])::-webkit-scrollbar-thumb {
+      background-color: transparent;
+    }
+    :where([data-scroll-bar]:not(:root)) > *,
+    :where(:root[data-scroll-bar]) > body > * {
+      --bar-ink: transparent;
+    }
+    [data-scroll-bar] {
+      --bar-ink: transparent;
+      transition: --bar-ink var(--md3-duration-medium-4) linear;
+    }
+    [data-scroll-bar='shown'] {
+      --bar-ink: var(--md-sys-color-outline);
+      transition-duration: 0s;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      border-width: 0;
+      background-color: var(--md-sys-color-on-surface-variant);
+    }
+    ::-webkit-scrollbar-thumb:active {
+      border-width: 0;
+      background-color: var(--md-sys-color-on-surface);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      [data-scroll-bar] {
+        transition: none;
+      }
+    }
+  }
+  /* A browser that knows no scroll bar part draws its own thin bar in the same ink while what it scrolls is marked, and none at rest. */
+  @supports not selector(::-webkit-scrollbar) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: transparent transparent;
+    }
+    [data-scroll-bar='shown'] {
+      scrollbar-color: var(--md-sys-color-outline) transparent;
+    }
+  }
+}
+
+/* The ink of a scroll bar's thumb, a colour a transition can carry from what scrolls to its thumb. */
+@property --bar-ink {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: transparent;
 }
 
 @theme inline {
@@ -163,9 +235,11 @@
 /*
  * The look's five meanings, each read from a role of the theme once: a colour says one thing on every page. Yours is what waits on a
  * person, alive a session at work, money an amount, failure what failed and nothing else; rest is the label's grey, and sage, filled, a
- * step that is done. The three faces the theme names by a hook are given their loaded families here.
+ * step that is done. The three faces the theme names by a hook are given their loaded families here. The page says it is drawn in both
+ * schemes, so that what the browser draws itself (a list of choices, a scroll bar it styles alone) follows the system as the theme does.
  */
 :root {
+  color-scheme: light dark;
   --font-michroma: 'Michroma', ui-sans-serif, system-ui, sans-serif;
   --font-chakra-petch: 'Chakra Petch', ui-sans-serif, system-ui, sans-serif;
   --font-share-tech-mono: 'Share Tech Mono', ui-monospace, monospace;

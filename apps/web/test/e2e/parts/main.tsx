@@ -10,14 +10,16 @@ import { RouterProvider as AriaRouterProvider } from 'react-aria-components';
 import '../../../src/styles.css';
 import { CutButton } from '../../../src/components/CutButton.tsx';
 import { CopyId } from '../../../src/components/CopyId.tsx';
-import { CutFrame } from '../../../src/components/CutFrame.tsx';
+import { CutFrame, FRAMED_BOX, FRAMED_END, FRAMED_ROW, FRAMED_TABLE } from '../../../src/components/CutFrame.tsx';
 import { Pager } from '../../../src/components/Pager.tsx';
 import { PageName, Plate } from '../../../src/components/Plate.tsx';
 import { RunSteps } from '../../../src/components/RunSteps.tsx';
 import { ScanLines } from '../../../src/components/ScanLines.tsx';
 import { Sticker } from '../../../src/components/Sticker.tsx';
 import { TextLink } from '../../../src/components/TextLink.tsx';
+import { Cell, Column, Row, Table, TableBody, TableHeader } from '../../../src/components/ui/ds/index.ts';
 import { finishedSearch, pageAt } from '../../../src/lib/finished.ts';
+import { useScrollMark } from '../../../src/lib/useScrollMark.ts';
 import { endedWords, sinceCreated, waitSentence, type WaitingRow } from '../../../src/lib/runWords.ts';
 
 const COLUMN: CSSProperties = {
@@ -74,14 +76,86 @@ function Part({ name, children }: { name: string; children: ReactNode }) {
  */
 function Gallery() {
   const router = useRouter();
-  const page = pageAt(finishedSearch(useSearch({ strict: false })));
+  const search = useSearch({ strict: false });
+  const page = pageAt(finishedSearch(search));
   const row = { steps: GATE, cancelledAt: null, holding: null, waiting: null, waitingOnYou: ['land'] };
   return (
     <AriaRouterProvider navigate={(href) => void router.navigate({ href })}>
+      {(search as { bars?: string }).bars !== 'unmarked' && <ScrollMark />}
       <ScanLines>
         <Parts page={page} row={row} />
+        <Bars />
       </ScanLines>
     </AriaRouterProvider>
+  );
+}
+
+/** What marks the gallery's scrollers while they scroll, as the board's frame does: left out at `?bars=unmarked`, where nothing marks. */
+function ScrollMark() {
+  useScrollMark();
+  return null;
+}
+
+const GROUND: CSSProperties = { padding: 40, background: 'var(--md-sys-color-inverse-surface)' };
+
+/** A table in the look's cut frame, as the runs page draws one: `rows` of an id and its copy control under a header, `name`d. */
+function Framed({ name, rows, width }: { name: string; rows: readonly string[]; width?: number }) {
+  return (
+    <div data-ground="other" data-framed={name} style={GROUND}>
+      <div style={{ width }}>
+        <CutFrame size={24}>
+          <div data-table-box className={`${FRAMED_BOX} ${FRAMED_END}`}>
+            <Table aria-label={`A framed table: ${name}`} density="dense" className={FRAMED_TABLE} style={{ minWidth: 520 }}>
+              <TableHeader>
+                <Column id="run" isRowHeader>
+                  Run
+                </Column>
+                <Column id="id" align="end">
+                  Id
+                </Column>
+              </TableHeader>
+              <TableBody>
+                {rows.map((id) => (
+                  <Row key={id} id={id} className={FRAMED_ROW}>
+                    <Cell>{id}</Cell>
+                    <Cell>
+                      <CopyId id={id} short />
+                    </Cell>
+                  </Row>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CutFrame>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * What the look's scroll bars are read on: a table in a cut frame with one row, with several, and narrower than its columns; and a
+ * box shorter than what it holds.
+ */
+function Bars() {
+  return (
+    <div style={{ ...COLUMN, minHeight: 0 }}>
+      <Part name="framed-table">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'flex-start' }}>
+          <Framed name="one" rows={['the-tool-errors-panels-2e13']} width={640} />
+          <Framed
+            name="several"
+            rows={['the-tool-errors-panels-2e13', 'lay-the-diamond-top-e2e4', 'a-table-in-a-cut-frame-liog']}
+            width={640}
+          />
+          <Framed name="narrow" rows={['the-tool-errors-panels-2e13', 'lay-the-diamond-top-e2e4']} width={390} />
+        </div>
+      </Part>
+      <Part name="scrollers">
+        <div data-scroller style={{ width: 260, height: 160, overflow: 'auto', background: 'var(--card)' }}>
+          <div style={{ height: 640, padding: 16 }}>A box shorter than what it holds.</div>
+        </div>
+      </Part>
+    </div>
   );
 }
 

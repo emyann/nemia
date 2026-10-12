@@ -6,7 +6,7 @@ import { ink } from '@/lib/meaning';
 import { nowOf, sinceShort } from '@/lib/runWords';
 import { CopyId } from './CopyId';
 import { cn } from '@/components/ui/ds/utils';
-import { CutFrame, CutTag } from './CutFrame';
+import { CutFrame, CutTag, FRAMED_BOX, FRAMED_END, FRAMED_ROW, FRAMED_TABLE } from './CutFrame';
 import { RunSteps } from './RunSteps';
 import { TextLink } from './TextLink';
 
@@ -49,8 +49,8 @@ function Now({ run, asOf }: { run: ListedRun; asOf: Date }) {
 export function FlightTable({ runs, asOf }: { runs: readonly ListedRun[]; asOf: Date }) {
   return (
     <CutFrame hue="alive" size={24}>
-      <div data-table-box className="overflow-x-auto">
-        <Table aria-label="Runs in flight" density="dense" className="min-w-[920px] table-fixed">
+      <div data-table-box className={cn(FRAMED_BOX, FRAMED_END)}>
+        <Table aria-label="Runs in flight" density="dense" className={cn('min-w-[920px] table-fixed', FRAMED_TABLE)}>
           <TableHeader>
             <Column id="run" isRowHeader className={HEAD}>
               Run
@@ -70,7 +70,7 @@ export function FlightTable({ runs, asOf }: { runs: readonly ListedRun[]; asOf: 
           </TableHeader>
           <TableBody>
             {runs.map((run) => (
-              <Row key={run.id} id={run.id} data-run={run.id} data-unreadable={run.unreadable ? '' : undefined} className="bg-transparent">
+              <Row key={run.id} id={run.id} data-run={run.id} data-unreadable={run.unreadable ? '' : undefined} className={FRAMED_ROW}>
                 <Cell className="py-1">
                   <span className="flex flex-col gap-2">
                     <TextLink to="/runs/$runId" params={{ runId: run.id }} title={titleOf(run)} className="block truncate text-title-small">

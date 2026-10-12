@@ -7,7 +7,6 @@
  */
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import path from 'node:path';
 import { chromium, type Browser, type Page } from 'playwright';
 import { scratch } from '../scratch.ts';
@@ -15,6 +14,7 @@ import { WAITED } from '../waits.ts';
 import { photograph } from './board.ts';
 import { expectNone } from './checks.ts';
 import { buildParts, openParts } from './parts/gallery.ts';
+import { apart, coloursAt, coloursOf as coloursIn, edgesOf, type Rgb } from './parts/pixels.ts';
 
 const built = scratch('nemia-parts-');
 let browser: Browser;
@@ -125,33 +125,6 @@ test('the text link by the keyboard: Enter navigates once', WAITED, async () => 
   }
 });
 
-/** A colour as a picture holds it. */
-type Rgb = [number, number, number];
-
-/** The colour of each of `points` in the picture `file`, read on a canvas in a blank page. */
-async function coloursAt(file: string, points: ReadonlyArray<readonly [number, number]>): Promise<Rgb[]> {
-  const page = await browser.newPage();
-  try {
-    const url = `data:image/png;base64,${fs.readFileSync(file).toString('base64')}`;
-    return await page.evaluate(
-      async ({ url, points }) => {
-        const img = new Image();
-        img.src = url;
-        await img.decode();
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d')!;
-        ctx.drawImage(img, 0, 0);
-        return points.map(([x, y]) => Array.from(ctx.getImageData(x, y, 1, 1).data.slice(0, 3)) as [number, number, number]);
-      },
-      { url, points },
-    );
-  } finally {
-    await page.close();
-  }
-}
-
 /**
  * The colour of the ring drawn around what has the focus, off its computed shadow: the last one that is not transparent, the ring
  * itself where a ground-coloured offset is drawn before it.
@@ -183,7 +156,7 @@ async function ringGaps(page: Page, name: string): Promise<string[]> {
   };
   const file = path.join(built, `${name}.png`);
   await photograph(page, file, { always: true });
-  const found = await coloursAt(file, Object.values(sides));
+  const found = await coloursAt(browser, file, Object.values(sides));
   const near = (a: Rgb, b: Rgb) => a.every((channel, i) => Math.abs(channel - b[i]) <= 3);
   return Object.keys(sides).flatMap((side, i) =>
     near(found[i], ring) ? [] : [`${side}: ${found[i].join(' ')}, the ring is ${ring.join(' ')}`],
@@ -193,40 +166,9 @@ async function ringGaps(page: Page, name: string): Promise<string[]> {
 /** The cut button the gallery draws on a card's ground. */
 const BUTTON = '[data-part="ring"] [data-cut-button]';
 
-/** How far two colours are apart: their widest channel's difference. */
-const apart = (a: Rgb, b: Rgb): number => Math.max(...a.map((channel, i) => Math.abs(channel - b[i])));
-
-/**
- * The edges of what `selector` finds, brought to the window's middle, in the window's pixels: `out`, the first whole pixels outside
- * its box on each side, and `box`, its box as measured, which a text's width leaves between two pixels.
- */
-async function edgesOf(page: Page, selector: string) {
-  await page.locator(selector).evaluate((found) => found.scrollIntoView({ block: 'center' }));
-  const box = await page.locator(selector).boundingBox();
-  assert.ok(box, `${selector} is drawn`);
-  const [left, top, right, bottom] = [box.x, box.y, box.x + box.width, box.y + box.height];
-  return {
-    box: { left, top, right, bottom },
-    out: {
-      left: Math.floor(left + 0.01) - 1,
-      top: Math.floor(top + 0.01) - 1,
-      right: Math.ceil(right - 0.01),
-      bottom: Math.ceil(bottom - 0.01),
-    },
-  };
-}
-
 /** The colours of the named `points` in a picture of the window taken now, as `name`. */
-async function coloursOf<K extends string>(
-  page: Page,
-  name: string,
-  points: Record<K, readonly [number, number]>,
-): Promise<Record<K, Rgb>> {
-  const file = path.join(built, `${name}.png`);
-  await photograph(page, file, { always: true });
-  const found = await coloursAt(file, Object.values<readonly [number, number]>(points));
-  return Object.fromEntries(Object.keys(points).map((key, i) => [key, found[i]])) as Record<K, Rgb>;
-}
+const coloursOf = <K extends string>(page: Page, name: string, points: Record<K, readonly [number, number]>): Promise<Record<K, Rgb>> =>
+  coloursIn(browser, page, path.join(built, `${name}.png`), points);
 
 /**
  * Where the cut button paints what it must not, none when its shape is exact: a pixel outside its box beside each cut, which must

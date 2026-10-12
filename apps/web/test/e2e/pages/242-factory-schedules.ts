@@ -47,12 +47,12 @@ async function scheduleLine(page: Page, factory: string): Promise<string> {
 }
 
 /** How many times its size the line of the next run is pictured at, so the gap between a far fire's year and its hour is judged by eye. */
-const ENLARGED = 4;
+const ENLARGED = 3;
 
 /**
  * Pictures the line of the next run by itself, named factory-schedules-next and its theme: its label and `next`'s words, drawn
- * `ENLARGED` times their size by a transform on their list, which lays no text out again, and taken back after the shot. Only when
- * the page is pictured: nothing is touched otherwise.
+ * `ENLARGED` times their size by a transform on their list, which lays no text out again, with the room it takes under it, and
+ * taken back after the shot. Only when the page is pictured: nothing is touched otherwise.
  */
 async function photographNext(page: Page, next: Locator): Promise<void> {
   if (!photographing) return;
@@ -62,6 +62,7 @@ async function photographNext(page: Page, next: Locator): Promise<void> {
   await list.evaluate((el, by) => {
     (el as HTMLElement).style.transformOrigin = 'top left';
     (el as HTMLElement).style.transform = `scale(${by})`;
+    (el as HTMLElement).style.marginBottom = `${(el as HTMLElement).offsetHeight * (by - 1)}px`;
   }, ENLARGED);
   try {
     const clip = await next.evaluate((el) => {

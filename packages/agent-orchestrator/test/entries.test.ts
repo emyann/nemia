@@ -247,6 +247,7 @@ const PINNED: Record<string, string[]> = {
     'noCardLine',
     'noFactoryLine',
     'onYouWords',
+    'oneFolder',
     'oneLine',
     'outputLines',
     'outsideRefusal',

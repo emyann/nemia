@@ -4,7 +4,7 @@
  * own. Where that router stands is written on the story's wrapper (`data-at`), and how many times it moved (`data-moves`). A story's
  * parameters say `at`, the address it opens on, and `scrollMark: false`, for a story nothing marks the scrolls of.
  */
-import { createContext, useContext, useEffect, useState, type ComponentType, type CSSProperties } from 'react';
+import { Component, createContext, useContext, useEffect, useState, type ComponentType, type CSSProperties, type ReactNode } from 'react';
 import { createMemoryHistory, createRootRoute, createRouter, RouterProvider, useRouter, useRouterState } from '@tanstack/react-router';
 import type { Preview } from '@storybook/react-vite';
 import { RouterProvider as AriaRouterProvider } from 'react-aria-components';
@@ -18,6 +18,22 @@ type Drawn = { Story: ComponentType; marked: boolean };
 const Drawing = createContext<Drawn | null>(null);
 
 const GROUND: CSSProperties = { padding: 24 };
+
+/**
+ * What holds a story: one that throws is said in its place (`data-broken`), by what it threw, before the router under it takes the
+ * error for its own.
+ */
+class Held extends Component<{ children: ReactNode }, { broken: string | null }> {
+  override state = { broken: null as string | null };
+
+  static getDerivedStateFromError(err: unknown): { broken: string } {
+    return { broken: err instanceof Error ? err.message : String(err) };
+  }
+
+  override render(): ReactNode {
+    return this.state.broken === null ? this.props.children : <p data-broken>{this.state.broken}</p>;
+  }
+}
 
 /** What marks a story's scrollers while they scroll, as the board's frame does. */
 function ScrollMark() {
@@ -38,24 +54,18 @@ function Stage() {
       {drawn.marked && <ScrollMark />}
       <ScanLines>
         <div data-story-ground data-at={at} data-moves={moves} style={GROUND}>
-          <drawn.Story />
+          <Held>
+            <drawn.Story />
+          </Held>
         </div>
       </ScanLines>
     </AriaRouterProvider>
   );
 }
 
-/** What the router draws for a story that threw: nothing of its own, the error thrown on to whatever holds the story. */
-function Rethrown({ error }: { error: unknown }): never {
-  throw error;
-}
-
-/** A router of the story's own, standing on `at` in a history kept in memory; a story that throws is its host's to say. */
+/** A router of the story's own, standing on `at` in a history kept in memory. */
 const routerAt = (at: string) =>
-  createRouter({
-    routeTree: createRootRoute({ component: Stage, errorComponent: Rethrown }),
-    history: createMemoryHistory({ initialEntries: [at] }),
-  });
+  createRouter({ routeTree: createRootRoute({ component: Stage }), history: createMemoryHistory({ initialEntries: [at] }) });
 
 /** One story under a router of its own, made once for as long as the story is drawn. */
 function Routed({ Story, at, marked }: Drawn & { at: string }) {

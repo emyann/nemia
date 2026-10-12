@@ -1,10 +1,10 @@
 /**
  * The page the checks read the look's stories on: every story beside a part of `src/components/look`, drawn as Storybook draws it
- * (`composeStories`, under the annotations of `.storybook/preview.tsx`), each in a section of its own named by Storybook's id for
- * it. The bare address draws an index and every story; `?part=<name>` every story of one part; `?story=<id>` one story. A story
- * that throws is said in its place by the preview (`data-broken`). It holds no part's props: a state is shown by writing its story. Built by
- * `buildParts` (`gallery.ts`) into a scratch folder, never by the board's own build, and no file of `src` imports it. Its layout
- * is inline styles: a class written here alone would enter the board's stylesheet.
+ * (`composeStories`, under the annotations of `.storybook/preview.tsx`), each in a section of its own named by Storybook's id for it.
+ * The bare address draws an index and every story; `?part=<name>` every story of one part; `?story=<id>` one story. A story that
+ * throws is said in its place by the preview (`data-broken`). It holds no part's props: a state is shown by writing its story. Built
+ * by `buildParts` (`gallery.ts`) into a scratch folder, never by the board's own build, and no file of `src` imports it. Its layout is
+ * inline styles: a class written here alone would enter the board's stylesheet.
  */
 import { StrictMode, type ComponentType, type CSSProperties } from 'react';
 import { createRoot } from 'react-dom/client';

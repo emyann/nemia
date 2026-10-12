@@ -49,7 +49,8 @@ export function readRules(file: string): RulesRead {
 /**
  * What a read of the folder of `workflow` in `factory` is handed (`Fills`), read now: the agents the factory hires into its steps
  * (`fillsOf`), and its rules where their file reads and is not blank. `error` is why the rules file cannot be told (`readRules`), null
- * where it can or there is none: a start refuses on it, and a read that only loads leaves the rules out. Nothing is thrown.
+ * where it can or there is none: a start refuses on it, and a read that only loads leaves the rules out. Refused: a name that is no slug
+ * (`rulesFolder`, `Invalid`).
  */
 export function factoryFills(factory: Pick<Factory, 'name' | 'hires' | 'tree'>, workflow: string): { fills: Fills; error: string | null } {
   const { words, error } = readRules(rulesAt(factory));

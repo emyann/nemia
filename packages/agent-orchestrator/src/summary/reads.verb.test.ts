@@ -165,3 +165,11 @@ test('a run in no factory, or in the default one, is read with its places and no
     assert.equal(read.steps?.[0].agent?.name, 'seldon');
   }
 });
+
+test("REFUSED: a run whose record says the default factory, its folder broken, is warned in the loader's words: no factory is said gone", () => {
+  const { repo, folder } = repository();
+  const why = loaderWords(folder, repo);
+  const warning = workflowsOf(runOf(repo, folder, DEFAULT_FACTORY, false), ROOT).warning;
+  assert.equal(warning, `The workflow folder ${folder} no longer reads as a workflow: ${why}`);
+  assert.doesNotMatch(warning ?? '', /the factory default/);
+});

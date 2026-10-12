@@ -276,3 +276,17 @@ test("an unfrozen run whose step names an agent only its repository's `.claude/a
   assert.ok(!pass.unreadable?.some((w) => w.startsWith(LEFT_OUT(run.id))), JSON.stringify(pass.unreadable));
   assert.deepEqual(pass.runs.find((a) => a.run.id === run.id)?.filed, ['work']);
 });
+
+test("an unfrozen run whose step names an agent only the store's `workflows/agents/` holds is read with the store's place, and filed", async () => {
+  const named = fs.mkdtempSync(path.join(ROOT, 'yours-'));
+  fs.writeFileSync(path.join(named, 'work.md'), '---\nplace: git\nagent: store-only\n---\nwork it\n');
+  fs.mkdirSync(path.join(ROOT, 'workflows', 'agents'), { recursive: true });
+  fs.writeFileSync(path.join(ROOT, 'workflows', 'agents', 'store-only.md'), '---\nharness: codex\n---\nYou work.\n');
+  assert.throws(() => loadWorkflows(named, { repo: REPO }), 'the folder and its repository do not hold the agent: the store alone does');
+  const run = await started('the agent is yours');
+  unfrozen(run.id, named);
+
+  const pass = await runWith(e, tickRun({ repo: ROOT }));
+  assert.ok(!pass.unreadable?.some((w) => w.startsWith(LEFT_OUT(run.id))), JSON.stringify(pass.unreadable));
+  assert.deepEqual(pass.runs.find((a) => a.run.id === run.id)?.filed, ['work']);
+});

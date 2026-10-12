@@ -1131,12 +1131,12 @@ test('feedWords says the run with its prune, what waits on a person as a note, a
   assert.deepEqual(feedWords(other, run, { status: 'running' }), a, 'the count in flight moving is not a change');
   assert.deepEqual(feedWords(held, { pruned: { at: '', worktrees: [] } }, { status: 'succeeded' }).run, { word: 'succeeded (pruned)' });
   assert.deepEqual(
-    feedWords(held, run, { status: 'failed', stoppedOn: 'awaiting approval' }).run,
+    feedWords(held, run, { status: 'awaiting approval' }).run,
     { word: 'awaiting approval' },
     "a run stopped on a person's word, and not on anything that broke, says what it stopped on",
   );
   assert.deepEqual(
-    feedWords(held, { pruned: { at: '', worktrees: [] } }, { status: 'failed', stoppedOn: 'blocked' }).run,
+    feedWords(held, { pruned: { at: '', worktrees: [] } }, { status: 'blocked' }).run,
     { word: 'blocked (pruned)' },
     'pruned too',
   );

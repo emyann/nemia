@@ -4897,8 +4897,8 @@ in `dontAsk` denied the command it was told to run signed off all the same. A st
   `allowedTools:` is frozen on its record at `wf start`, so a try of the same run is denied the same call again: a retry the tick files by
   itself would spend every try on it and learn nothing. So a signed try that was denied anything reads `denied` (`ownStatus` in
   `status/status.ts`, read off `TaskSpend.denied`, which `spendReader` fills from the runtime's attempts): nothing after it is filed, its check
-  is not run, it is never in `retriesDue`, and the run waits on a person (`DENIED, waiting on you` in `wf decide`; `stoppedOn:
-  'blocked'`).
+  is not run, it is never in `retriesDue`, and the run waits on a person (`DENIED, waiting on you` in `wf decide`; the run's status is
+  `blocked`, as it is `awaiting approval` at a gate alone, and `failed` only where a step broke).
 - **The offer names both ways out** (`deniedOffer`): the rule to add to the folder's `allowedTools:` for a new run, worded as Claude Code
   matches it (`allowRuleOf` in `keys/tools.ts`: `Bash(npm:*)`; a denied Write, MultiEdit or NotebookEdit as `Edit(<path>)`; a path in
   the step's own directory from it, `Edit(notes.md)`, since the next run's worktree is named by its own id; any other absolute path

@@ -362,7 +362,6 @@ export const summary = (steps: ReadonlyArray<readonly [string, string]>, extra: 
   cancelledAt: null,
   pruned: null,
   status: 'running',
-  stoppedOn: null,
   moving: true,
   cost: null,
   atWork: null,

@@ -310,7 +310,7 @@ test('a cancelled run whose tasks have settled is freed; one cancelled with a ta
   assert.equal(readRun(settled.id).pruned?.worktrees.length, 1);
 });
 
-test('REFUSED at shipped defaults: a run at its gate, a run that failed and a run in flight are each left whole by three sweeps, and nothing is asked of their place', async () => {
+test('REFUSED at shipped defaults: a run at its gate, a run that signed off blocked and a run in flight are each left whole by three sweeps, and nothing is asked of their place', async () => {
   const gated = await started(ENDING);
   await worked(gated.id);
   const failed = await started(WORK);
@@ -323,8 +323,8 @@ test('REFUSED at shipped defaults: a run at its gate, a run that failed and a ru
     const pass = await tick();
     assert.deepEqual(
       ids.map((id) => answerOf(pass, id)?.status),
-      ['failed', 'failed', 'running'],
-      'a gate waiting on a person reads failed, as a blocked step does',
+      ['awaiting approval', 'blocked', 'running'],
+      'a gate waiting on a person reads so, and a blocked step blocked: neither failed',
     );
     assert.equal(answerOf(pass, gated.id)?.feed.atRest, true, 'and the gated run is at rest: its status alone keeps it');
     const done = await sweep(pass, ids, memory);

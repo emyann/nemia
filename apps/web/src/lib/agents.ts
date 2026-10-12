@@ -1,4 +1,4 @@
-import type { AgentDraft, AgentListing, AgentRoleKey, KeyForm, RunStatus, RunSummary } from './api';
+import type { AgentDraft, AgentListing, AgentRoleKey, KeyForm } from './api';
 import { remoteRefuses } from './builder.ts';
 
 /**
@@ -287,12 +287,4 @@ export function tryHeld(brief: string, latest: { moving: boolean; id: string } |
   if (latest?.moving) return `A try is still running (${latest.id}): one at a time.`;
   if (!brief.trim()) return 'Write a brief to try it on.';
   return null;
-}
-
-/**
- * A try's state in words: what stopped it (`stoppedOn`, `awaiting approval` or `blocked`) off its row on the list, where the list judged
- * its run as `status`, the run's detail, does; else `status`. Takes the row undefined before the list has the try.
- */
-export function tryStatusWord(status: RunStatus, listed: Pick<RunSummary, 'status' | 'stoppedOn'> | undefined): string {
-  return (listed?.status === status ? listed.stoppedOn : null) ?? status;
 }

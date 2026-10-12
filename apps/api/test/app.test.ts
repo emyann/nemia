@@ -248,8 +248,6 @@ test('runs are read from the workflow store and summarized, with what each step 
       heldUntil: [],
       holding: null,
       status: 'cancelled',
-      /** Called off: not a failed run, so nothing stopped it but a person. */
-      stoppedOn: null,
       moving: false,
       /** Nothing of it was measured: no cost, which is not $0. */
       cost: null,
@@ -407,8 +405,8 @@ test("a run in full: the brief, each step's spec and prose, what it was told, an
       waiting: null,
       heldUntil: [],
       holding: null,
-      /** implement signed off blocked, so review can never be filed: the run is over, and failed. */
-      status: 'failed',
+      /** implement signed off blocked, so review is not filed: the run waits on an answer, and nothing in it failed. */
+      status: 'blocked',
       moving: false,
       cost: null,
       /** implement spawned and ended at the same instant, and nothing else ran: at work for no time, and over. */
@@ -1327,26 +1325,34 @@ test("the api's words, and who it says is waited on, are `list`'s — a refused 
   }
 });
 
-test("a run's status is where `assess` puts it — running, succeeded, failed or cancelled — on both endpoints, and the list says what stopped a failed run in which no step broke", async () => {
-  const cases: Array<[id: string, status: string, stoppedOn: RunSummary['stoppedOn'], why: string]> = [
-    ['r-5', 'running', null, 'a step filed and queued for a slot, its follower still to be filed'],
-    ['r-7', 'running', null, 'a step on its second attempt'],
-    ['r-21', 'succeeded', null, 'verified, then done on its own word'],
+test("a run's status is where `assess` puts it on both endpoints, in one word under one key: a run at its gate alone is awaiting approval and one waiting on an answer blocked, REFUSED failed, which is a run in which a step broke", async () => {
+  settledTask('t-gate', done);
+  writeRun({
+    ...r2,
+    id: 'r-gate',
+    gates: ['implement'],
+    steps: { implement: { taskId: 't-gate', branch: 'wf/r-gate/implement' }, review: { taskId: null } },
+  });
+  const cases: Array<[id: string, status: RunSummary['status'], why: string]> = [
+    ['r-5', 'running', 'a step filed and queued for a slot, its follower still to be filed'],
+    ['r-7', 'running', 'a step on its second attempt'],
+    ['r-21', 'succeeded', 'verified, then done on its own word'],
     [
       'r-6',
       'running',
-      null,
       'no frozen workflow, so judged by its folder as the tick judges it: its step signed off blocked, and the folder gained a step the tick would file',
     ],
-    ['r-20', 'failed', null, 'a check refused, so what waits on that step waits for ever: a step broke'],
-    ['r-8', 'failed', 'blocked', 'a step signed off blocked, so its follower will never be filed'],
-    ['r-2', 'cancelled', null, 'called off, whatever its steps say'],
+    ['r-20', 'failed', 'a check refused, so what waits on that step waits for ever: a step broke'],
+    ['r-8', 'blocked', 'a step signed off blocked: it waits on an answer, and nothing broke'],
+    ['r-gate', 'awaiting approval', 'a step signed off at its gate: it waits for a yes, and nothing broke'],
+    ['r-2', 'cancelled', 'called off, whatever its steps say'],
   ];
-  for (const [id, status, stoppedOn, why] of cases) {
-    const summary = await listed(id);
-    assert.equal(summary.status, status, `${id} listed: ${why}`);
-    assert.equal(summary.stoppedOn, stoppedOn, `${id} stopped on: ${why}`);
-    assert.equal((await detailOf(id)).status, status, `${id} in full: ${why}`);
+  for (const [id, status, why] of cases) {
+    const row = (await listed(id)) as unknown as Record<string, unknown>;
+    const full = (await detailOf(id)) as unknown as Record<string, unknown>;
+    assert.equal(row.status, status, `${id} listed: ${why}`);
+    assert.equal(full.status, status, `${id} in full: ${why}`);
+    assert.deepEqual(['stoppedOn' in row, 'stoppedOn' in full], [false, false], `${id}: the word has one key`);
   }
   assert.equal(
     (await listed('r-3')).status,
@@ -1416,7 +1422,7 @@ test('a run moves while the engine holds a task of it, or a tick would still fil
     ['r-23', 'cancelled', true, 'called off, its session not stopped yet'],
     ['r-5', 'running', true, 'a step queued for a slot'],
     ['r-6', 'running', true, 'a step the folder gained, which the tick would file'],
-    ['r-8', 'failed', false, 'a step signed off blocked, and its follower will never be filed'],
+    ['r-8', 'blocked', false, 'a step signed off blocked, and its follower is not filed'],
     ['r-21', 'succeeded', false, 'verified, then done on its own word'],
     ['r-2', 'cancelled', false, 'called off, nothing left running'],
     [
@@ -1599,7 +1605,7 @@ test('a loop out of rounds reads `rounds exhausted`, waits on you, and does not 
   await expectJudged([
     [
       'r-30',
-      'failed',
+      'blocked',
       false,
       ['review'],
       [

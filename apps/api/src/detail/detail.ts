@@ -267,6 +267,7 @@ export type RunDetail = {
   heldUntil: string[];
   /** As on `RunSummary` (`RunHolding`). */
   holding: RunHolding | null;
+  /** As on `RunSummary`: the list's word, `awaiting approval` or `blocked` for a run a person alone stops, never `failed`. */
   status: RunStatus;
   /** As on `RunSummary`. */
   moving: boolean;

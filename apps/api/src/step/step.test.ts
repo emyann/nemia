@@ -5,9 +5,12 @@
 import '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { hireRefusalOf, type FactoryListing } from 'agent-orchestrator';
-import type { Run } from 'agent-orchestrator/run';
-import { hiredInOf, hiringOf, RECENT_RUNS, recentRunsOf, unreadAgentsRefusal, workflowPageOf } from './step.ts';
+import fs from 'node:fs';
+import path from 'node:path';
+import { hireRefusalOf, skillsFor, type FactoryListing } from 'agent-orchestrator';
+import type { Run, ToldLayers } from 'agent-orchestrator/run';
+import { scratch } from '../../test/scratch.ts';
+import { hiredInOf, hiringOf, RECENT_RUNS, recentRunsOf, skillsFromOf, unreadAgentsRefusal, workflowPageOf } from './step.ts';
 
 const home = '/store';
 const served = '/own';
@@ -189,4 +192,23 @@ test("REFUSED: agents that cannot be read offer none to hire, and say why in the
     unreadAgentsRefusal('x'),
     /^The agents beside this workflow could not be read, so none is offered to hire into this step: x\./,
   );
+});
+
+test("each skill of a step's layers, the agent's then its own: one named with its folder as written, with where the repository has it", () => {
+  const [repo, store] = [scratch('nemia-api-step-repo-'), scratch('nemia-api-step-store-')];
+  const skill = (dir: string, name: string): void => {
+    fs.mkdirSync(path.join(dir, name), { recursive: true });
+    fs.writeFileSync(path.join(dir, name, 'SKILL.md'), `---\ndescription: Does ${name}.\n---\nDo it.\n`);
+  };
+  skill(path.join(repo, '.claude', 'skills'), 'review');
+  skill(path.join(repo, 'apps', 'site', '.claude', 'skills'), 'lay-out');
+  skill(path.join(repo, 'apps', 'site', '.claude', 'skills'), 'set-type');
+  const layers = { agentSkills: ['apps/site:lay-out', 'review'], addedSkills: ['apps/site:set-type', 'gone', 'review'] } as ToldLayers;
+  const found = skillsFor(path.join(store, 'workflows', 'typeset'), { repo, home: store });
+  assert.deepEqual(skillsFromOf(layers, found, repo, store), [
+    { name: 'apps/site:lay-out', from: null, foundIn: 'apps/site/.claude/skills/lay-out' },
+    { name: 'review', from: 'repo', foundIn: null },
+    { name: 'apps/site:set-type', from: null, foundIn: 'apps/site/.claude/skills/set-type' },
+    { name: 'gone', from: null, foundIn: null },
+  ]);
 });

@@ -373,7 +373,7 @@ test("GET /api/workflows/:from/:name/:step is a step's page: which workflow and 
   assert.equal(attached.layers.instructions, 'Write it down.', "what a run would be told first: the agent's instructions, read now");
   assert.deepEqual(
     attached.skillsFrom,
-    [{ name: 'take-notes', from: 'yours' }],
+    [{ name: 'take-notes', from: 'yours', foundIn: null }],
     "each skill of its layers, with where it is found: in your library, so its page is yours'",
   );
   write(path.join(mine, 'notes.md'), '---\nplace: git\n---\nTake notes.\n');

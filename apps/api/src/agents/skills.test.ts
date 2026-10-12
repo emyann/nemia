@@ -15,10 +15,10 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { engine, shippedGitPlace, skillCopyCommand } from 'agent-orchestrator';
-import { skillTurnCost } from 'agent-orchestrator/workflow';
+import { skillNameRefusal, skillTurnCost } from 'agent-orchestrator/workflow';
 import { scratch } from '../../test/scratch.ts';
 import { app } from '../app.ts';
-import { listSkills, SHIPPED_SKILLS, skillDetail } from './skills.ts';
+import { foundInOf, listSkills, SHIPPED_SKILLS, skillDetail } from './skills.ts';
 import { TEAM } from '../../test/team.ts';
 const repo = scratch('nemia-api-skills-repo-');
 process.env.HKB_REPO = repo;
@@ -188,6 +188,12 @@ test('a repository skill linked inside the repository lists under repo, read, wi
     assert.match(apart.error ?? '', /^apart is a link, and what it points at is outside the folder of skills/);
     const refused = await skillDetail(engine(), shippedGitPlace, 'repo', 'apart', repo, root);
     assert.equal(refused?.skill.entry, null);
+    const res = await app.request('/api/skills/repo/apart');
+    assert.equal(res.status, 200, 'its page answers, and says the refusal');
+    assert.equal(
+      ((await res.json()) as import('./skills.ts').SkillDetail).skill.error,
+      'apart is a link, and what it points at is outside the folder of skills: make it a folder of its own.',
+    );
     assert.doesNotMatch(JSON.stringify(refused), /Secret/, 'and its page reads none of it either');
   } finally {
     fs.rmSync(path.join(THEIRS, 'inside'));
@@ -304,6 +310,72 @@ const NOTES = {
   examples: ['tidy my notes'],
   body: '# Tidy\n\nOne fact a line.',
 };
+
+test('a skill named with its folder is listed on its agent as written, found, with where the repository has it — and has no page and no pick', async () => {
+  const SITE = path.join(repo, 'apps', 'site', '.claude', 'skills');
+  skill(SITE, 'lay-out', '---\ndescription: Lays a page out.\n---\nLay it out.\n');
+  fs.writeFileSync(
+    path.join(root, 'workflows', 'agents', 'typer.md'),
+    '---\ndescription: Sets type.\nskills: review, apps/site:lay-out, apps/site:no-such\n---\nSet.\n',
+  );
+  try {
+    const typer = (await (await app.request('/api/agents/yours/typer')).json()) as import('./agents.ts').AgentListing;
+    assert.deepEqual(
+      typer.given.map((g) => [g.name, g.from, g.foundIn, g.entry?.description ?? null]),
+      [
+        ['review', 'repo', null, 'Reviews a change.'],
+        ['apps/site:lay-out', null, 'apps/site/.claude/skills/lay-out', 'Lays a page out.'],
+        ['apps/site:no-such', null, null, null],
+      ],
+    );
+    assert.equal(typer.given[1].error, null);
+    assert.ok(typer.given[2].error?.includes('holds no SKILL.md'), `one its folder has not keeps the refusal: ${typer.given[2].error}`);
+    assert.deepEqual(
+      (await listed()).flatMap((place) => place.skills.filter((row) => row.name.includes(':')).map((row) => row.name)),
+      [],
+      'the picker lists none of them',
+    );
+    for (const name of ['apps%2Fsite:lay-out', 'site:lay-out']) {
+      const res = await app.request(`/api/skills/repo/${name}`);
+      const body = (await res.json()) as { error: string };
+      assert.equal(res.status, 400, body.error);
+      assert.equal(body.error, skillNameRefusal(decodeURIComponent(name)), 'no page: the name is refused as no skill\'s');
+    }
+  } finally {
+    fs.rmSync(path.join(root, 'workflows', 'agents', 'typer.md'));
+    fs.rmSync(path.join(repo, 'apps'), { recursive: true });
+  }
+});
+
+test('REFUSED: where a skill was found is said for none the board pages, nor the repository itself, nor a folder outside it', () => {
+  assert.equal(foundInOf(path.join(repo, 'apps', 'site', '.claude', 'skills', 'lay-out'), repo, root), 'apps/site/.claude/skills/lay-out');
+  assert.equal(foundInOf(path.join(LIBRARY, 'mine'), repo, root), null, 'yours has a page');
+  assert.equal(foundInOf(path.join(THEIRS, 'review'), repo, root), null, "the repository's has a page");
+  assert.equal(foundInOf(path.join(repo, 'workflows', 'skills', 'beside'), repo, root), null, 'and the one beside its agents');
+  assert.equal(foundInOf(repo, repo, root), null, 'the repository itself');
+  assert.equal(foundInOf(`${repo}-twin/apps/site/.claude/skills/lay-out`, repo, root), null, "a sibling whose name starts with the repository's");
+  assert.equal(foundInOf(path.join(path.dirname(repo), 'lay-out'), repo, root), null, 'a folder outside it');
+});
+
+test("a skill's page names every agent that gives it where the repository's two places for skills are one folder", async () => {
+  const team = path.join(repo, 'workflows', 'skills');
+  skill(team, 'joined', '---\ndescription: One folder under both.\n---\nJoined.\n');
+  fs.symlinkSync('../../workflows/skills/joined', path.join(THEIRS, 'joined'));
+  fs.mkdirSync(path.join(repo, 'workflows', 'agents'), { recursive: true });
+  fs.writeFileSync(path.join(repo, 'workflows', 'agents', 'joiner.md'), '---\ndescription: Joins.\nskills: joined\n---\nJoin.\n');
+  fs.writeFileSync(path.join(root, 'workflows', 'agents', 'mine-too.md'), '---\ndescription: Joins too.\nskills: joined\n---\nJoin.\n');
+  try {
+    assert.deepEqual((await detail('repo', 'joined')).users, [
+      { from: 'repo', name: 'joiner' },
+      { from: 'yours', name: 'mine-too' },
+    ]);
+  } finally {
+    fs.rmSync(path.join(root, 'workflows', 'agents', 'mine-too.md'));
+    fs.rmSync(path.join(repo, 'workflows', 'agents'), { recursive: true });
+    fs.rmSync(path.join(THEIRS, 'joined'));
+    fs.rmSync(path.join(team, 'joined'), { recursive: true });
+  }
+});
 
 test("a skill's page says what it says, what it costs a turn, the agents of either place that give this very folder, and how to move it", async () => {
   fs.mkdirSync(path.join(repo, 'workflows', 'agents'), { recursive: true });

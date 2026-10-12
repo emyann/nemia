@@ -25,6 +25,7 @@ import {
   isShippedPlace,
   listAgents,
   loadAgents,
+  oneFolder,
   skillDirIn,
   skillFolders,
   skillsFor,
@@ -113,6 +114,17 @@ export function sourceOf(dir: string, repo: string, home: string): SkillSource |
 }
 
 /**
+ * Where a skill with no page of the board's was found, as its folder's path from the repository's root, `/` between its parts: a skill
+ * named with its folder (`apps/site/.claude/skills/lay-out`), or any other found beneath `repo` in a place the board lists nothing for.
+ * Null for a skill of a place the board pages (`sourceOf`), for the repository's own folder, and for a folder outside it.
+ */
+export function foundInOf(dir: string, repo: string, home: string): string | null {
+  if (sourceOf(dir, repo, home) !== null) return null;
+  const parts = path.relative(path.resolve(repo), path.resolve(dir)).split(path.sep);
+  return parts[0] === '' || parts[0] === '..' || path.isAbsolute(parts.join(path.sep)) ? null : parts.join('/');
+}
+
+/**
  * The board's skill library in the package's table, each entry served on the api alone: the skill folders listed, each read
  * (`skills list`), one skill read for its page (`skills read`), and one of yours written or copied (`skills write`).
  */
@@ -198,10 +210,15 @@ export async function listSkills(
   return places;
 }
 
-/** A skill an agent gives, as its page lists it: where it is found, and what it costs a turn — or why none is found. */
+/**
+ * A skill an agent gives, as its page lists it, named as its line writes it: where it is found, and what it costs a turn — or why none
+ * is found. `from` is the place whose page it has; where it is null, `foundIn` is where the repository has it (`foundInOf`), or null too
+ * for a skill found nowhere or outside the repository.
+ */
 export type GivenSkill = {
   name: string;
   from: SkillSource | null;
+  foundIn: string | null;
   entry: AgentSkill | null;
   error: string | null;
   preload: boolean;
@@ -210,12 +227,14 @@ export type GivenSkill = {
 
 /**
  * The skills an agent gives, one row each in its order, each found where a start finds it (`found`, the agent's `skillsFor`). A skill no
- * place has is a row with the refusal the card says; one found in a place the board does not list reads `from: null`.
+ * place has is a row with the refusal the card says; one found in the repository where the board pages nothing, as a skill named with
+ * its folder is, reads `from: null` and its folder in `foundIn`.
  */
 export function givenSkills(skills: readonly string[], found: ReturnType<typeof skillsFor>, repo: string, home: string): GivenSkill[] {
   return givenRead(skills, found).map(({ name, dir, entry, error, preload, cost }) => ({
     name,
     from: dir === null ? null : sourceOf(dir, repo, home),
+    foundIn: dir === null ? null : foundInOf(dir, repo, home),
     entry,
     error,
     preload,
@@ -343,7 +362,8 @@ export type SkillSaved = SkillDetail & { written: string[] };
 
 /**
  * Where the skill `name` of `from` is: your library's folder of it, the repository's — its `.claude/skills/` first, then
- * `workflows/skills/`, as a start of the repository's finds it — or what Nemia ships. Null when that place has none.
+ * `workflows/skills/`: the order its page takes, while a start of an agent of the repository's finds `workflows/skills/` first — or
+ * what Nemia ships. Null when that place has none.
  */
 export function skillDirOf(from: SkillSource, name: string, repo: string, home: string, shipped: string = SHIPPED_SKILLS): string | null {
   const places =
@@ -355,7 +375,10 @@ export function skillDirOf(from: SkillSource, name: string, repo: string, home: 
   return skillDirIn(places, name);
 }
 
-/** The agents of both places that give the skill whose folder is `dir`, each as its own start finds the skill it names. */
+/**
+ * The agents of both places that give the skill whose folder is `dir`, each as its own start finds the skill it names: at that path, or
+ * at another that is the same folder (`oneFolder`), as where one of the repository's two places for skills is a link to the other.
+ */
 export function skillUsers(dir: string, name: string, repo: string): SkillUser[] {
   const found = new Map<string, ReturnType<typeof agentSkillsFound>>();
   const at = path.resolve(dir);
@@ -363,7 +386,7 @@ export function skillUsers(dir: string, name: string, repo: string): SkillUser[]
     if (read instanceof Error || !read.skills?.includes(name)) return [];
     if (!found.has(agents)) found.set(agents, agentSkillsFound(agents, repo));
     const given = found.get(agents)!.at.get(name);
-    return typeof given === 'string' && path.resolve(given) === at ? [{ from, name: agent }] : [];
+    return typeof given === 'string' && (path.resolve(given) === at || oneFolder(given, at)) ? [{ from, name: agent }] : [];
   });
 }
 

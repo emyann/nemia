@@ -63,3 +63,17 @@ test("the DESIGN.md and its resolved copy pass the kit's lint with no error and 
   fs.writeFileSync(broken, '---\nname: Broken\ncolors:\n  primary: "nope"\n---\n');
   assert.ok(findings(broken) > 0, 'the lint finds a colour that is no colour');
 });
+
+test('the look names a mono face, and the theme reads it — a DESIGN.md that names none gives the system stack', () => {
+  const hooked = /--md-sys-typescale-mono-font:\s*var\(--font-[a-z0-9-]+\)/;
+  assert.match(fs.readFileSync(path.join(web, 'theme', 'theme.v4.css'), 'utf8'), hooked);
+
+  const look = fs.readFileSync(path.join(web, 'DESIGN.md'), 'utf8');
+  const named = /\n {2}mono:\s*\n {4}fontFamily:[^\n]*/;
+  assert.match(look, named, 'the fixture cuts the mono face the look names');
+  const other = path.join(scratch('web-theme-'), 'DESIGN.md');
+  fs.writeFileSync(other, look.replace(named, ''));
+  const { out } = generated(other);
+  assert.doesNotMatch(fs.readFileSync(path.join(out, 'theme.v4.css'), 'utf8'), hooked);
+  assert.ok(stale(out).includes('theme.v4.css'), 'a look with no mono face generates another theme.v4.css');
+});

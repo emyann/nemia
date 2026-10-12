@@ -7,13 +7,15 @@
 @import 'shadcn/tailwind.css';
 /*
  * The look's faces, each under the family its package registers, bundled by the build and served from the board's own origin: the brand
- * face (Michroma), the plain face (Chakra Petch) and the label face (Archivo Variable, its width axis from 62% to 125%).
+ * face (Michroma), the plain face (Chakra Petch), the mono face (Share Tech Mono, one weight) and the label face (Archivo Variable, its
+ * width axis from 62% to 125%).
  */
 @import '@fontsource/michroma/400.css';
 @import '@fontsource/chakra-petch/400.css';
 @import '@fontsource/chakra-petch/500.css';
 @import '@fontsource/chakra-petch/600.css';
 @import '@fontsource/chakra-petch/700.css';
+@import '@fontsource/share-tech-mono/400.css';
 @import '@fontsource-variable/archivo/wdth.css';
 /* Blobatar's motion, then its gaze, which reads the properties motion registers: what a following agent face moves with. */
 @import 'blobatar/motion.css';
@@ -161,11 +163,12 @@
 /*
  * The look's five meanings, each read from a role of the theme once: a colour says one thing on every page. Yours is what waits on a
  * person, alive a session at work, money an amount, failure what failed and nothing else; rest is the label's grey, and sage, filled, a
- * step that is done. The two faces the theme names by a hook are given their loaded families here.
+ * step that is done. The three faces the theme names by a hook are given their loaded families here.
  */
 :root {
   --font-michroma: 'Michroma', ui-sans-serif, system-ui, sans-serif;
   --font-chakra-petch: 'Chakra Petch', ui-sans-serif, system-ui, sans-serif;
+  --font-share-tech-mono: 'Share Tech Mono', ui-monospace, monospace;
   --meaning-yours: var(--md-sys-color-primary);
   --meaning-on-yours: var(--md-sys-color-on-primary);
   --meaning-yours-container: var(--md-sys-color-primary-container);

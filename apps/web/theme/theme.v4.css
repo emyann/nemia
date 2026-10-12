@@ -129,7 +129,7 @@
      amount) and no kit component uses it. Set from `typography.mono` in the
      project's DESIGN.md by `npm run theme:generate`: the face's hook when one
      is named, the system's monospace when none is. */
-  --md-sys-typescale-mono-font: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --md-sys-typescale-mono-font: var(--font-share-tech-mono);
 
   /* ---- MD3 type scale ----
      Values set from the `typography` tokens of the project's DESIGN.md by

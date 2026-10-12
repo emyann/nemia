@@ -30,3 +30,13 @@ applies: ["apps/web/**"]
 8. **For a part the kit ships, the reference is `ds-build` and the part's own file** under `apps/web/src/components/ui/ds/components`,
    its doc comment first. `shadcn` stays the reference for the board's shadcn components (`apps/web/src/components/ui/*.tsx`) and for
    the CLI that installs either family.
+9. **For a cut, a plate, a tile or a rail, take the look's own part** before you draw one: they are in
+   `apps/web/src/components/look`, taken through its door (`@/components/look`), never from a part's own file. `CutFrame` for a card
+   or a table in a cut frame (with `FRAMED_BOX`, `FRAMED_END`, `FRAMED_TABLE` and `FRAMED_ROW` around a table), `CutTag` for a tag
+   with a cut corner, `CutButton` for the filled cut button that is a link to a route and `CutPress` for the one that is pressed,
+   and `cutShape`, `cutRing` and `cutPoints` for a new part that takes the cut; `Plate` for a section's heading and `PageName` for
+   a page's name; `Sticker` for a tile that carries a number and `StatTile` for one over its breakdown; `RunSteps` for a run's rail;
+   `ScanLines` for the ground of a page; `Pager`, `TextLink` and `CopyId`. Each is shown in its stories beside it
+   (`<Part>.stories.tsx`): `npm run storybook`, from `apps/web`, serves them to a person on port 6007, and `npm run board:serve`
+   prints a third line, `stories on <address>`, where a step given a browser opens them. A new part of the look gets its stories in
+   the same change, and its name here.

@@ -1,7 +1,7 @@
 import { Link as AriaLink } from 'react-aria-components';
 import { newerOf, olderOf, pageSaid, pageSearch, rowsSaid, type PageAt } from '@/lib/finished';
 import { cn, focusRing } from '@/components/ui/ds/utils';
-import { routeLink } from './routeLink';
+import { routeLink } from '../routeLink';
 
 const PageLink = routeLink(AriaLink);
 

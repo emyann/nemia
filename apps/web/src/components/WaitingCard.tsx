@@ -4,12 +4,7 @@ import { clockBreakdown, costBreakdown, tokensBreakdown, tokensSaid } from '@/li
 import { factoryOf } from '@/lib/factories';
 import { titleOf } from '@/lib/factory';
 import { sinceShort, waitSentence, waitTag, whenWords } from '@/lib/runWords';
-import { CopyId } from './CopyId';
-import { CutButton } from './CutButton';
-import { CutFrame, CutTag } from './CutFrame';
-import { RunSteps } from './RunSteps';
-import { StatTile } from './StatTile';
-import { TextLink } from './TextLink';
+import { CopyId, CutButton, CutFrame, CutTag, RunSteps, StatTile, TextLink } from './look';
 
 /**
  * A waiting run's three tiles: its wall time, what it cost and its tokens, each over its breakdown where the answer gives one. Every

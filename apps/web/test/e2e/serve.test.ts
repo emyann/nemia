@@ -1,6 +1,7 @@
 /**
  * `npm run board:serve` and `npm run board:stop` (serve.ts), run whole in a folder of the test's: the board built and served against a
- * store of its own holding the e2e's seed, on ports a step may open, with nothing written into the workspace; a second serve that starts
+ * store of its own holding the e2e's seed, with the page of the look's stories beside it, on ports a step may open, with nothing written
+ * into the workspace; a second serve that starts
  * nothing; a stop that leaves no process and no folder; and a holder that ends by itself. Builds the web app once, so only `npm run e2e`
  * runs it.
  */
@@ -19,6 +20,7 @@ const SERVE = path.join(import.meta.dirname, 'serve.ts');
 /** The folder the board is served from, and a copy of what it built, for a holder started by hand. */
 const dir = path.join(scratch('nemia-board-served-'), 'board');
 const built = path.join(scratch('nemia-board-built-'), 'dist');
+const builtStories = path.join(scratch('nemia-board-built-'), 'stories');
 
 type Ended = { code: number | null; stdout: string; stderr: string };
 
@@ -47,15 +49,24 @@ let statusBefore: string;
 before(async () => {
   statusBefore = status();
   first = await board('serve');
-  if (first.code === 0) fs.cpSync(path.join(dir, 'dist'), built, { recursive: true });
+  if (first.code === 0) {
+    fs.cpSync(path.join(dir, 'dist'), built, { recursive: true });
+    fs.cpSync(path.join(dir, 'stories'), builtStories, { recursive: true });
+  }
 }, WAITED);
+
+/** The three lines a serve prints, each with the address and the port it names. */
+const SAID = /^board on (http:\/\/127\.0\.0\.1:(\d+))\napi on (http:\/\/127\.0\.0\.1:(\d+))\nstories on (http:\/\/127\.0\.0\.1:(\d+))\n$/;
 
 test('serve builds outside the workspace and prints a board and an api that serve the seed from a store of their own', async () => {
   assert.equal(first.code, 0, first.stderr);
-  const said = /^board on (http:\/\/127\.0\.0\.1:(\d+))\napi on (http:\/\/127\.0\.0\.1:(\d+))\n$/.exec(first.stdout);
+  const said = SAID.exec(first.stdout);
   assert.ok(said, first.stdout);
-  const [, boardAt, boardPort, apiAt, apiPort] = said;
-  assert.ok(usable(boardPort) && usable(apiPort), `${boardPort} and ${apiPort} are ports a step may open`);
+  const [, boardAt, boardPort, apiAt, apiPort, , storiesPort] = said;
+  assert.ok(
+    [boardPort, apiPort, storiesPort].every(usable) && new Set([boardPort, apiPort, storiesPort]).size === 3,
+    `${boardPort}, ${apiPort} and ${storiesPort} are three ports a step may open`,
+  );
   assert.equal(status(), statusBefore, 'the build left the workspace as it was');
   const runs = (await (await fetch(`${apiAt}/api/runs`)).json()) as { id: string; work?: string }[];
   const seeded = runs.find((run) => run.id === 'a-note-on-the-tides-e2e15');
@@ -66,7 +77,22 @@ test('serve builds outside the workspace and prints a board and an api that serv
   assert.equal(through.length, runs.length, "the board's /api is its own api");
 });
 
-test('a second serve prints the same two lines and starts nothing', async () => {
+test("serve prints a third line, where the page of the look's stories answers: its page at any address, and a file it built", async () => {
+  const said = SAID.exec(first.stdout);
+  assert.ok(said, first.stdout);
+  const storiesAt = said[5];
+  const page = await (await fetch(`${storiesAt}/`)).text();
+  assert.match(page, /<title>Nemia — the look's stories<\/title>/);
+  assert.equal(await (await fetch(`${storiesAt}/?story=look-cutbutton--press`)).text(), page, 'a story is the same page, at its address');
+  const script = /src="(\/assets\/[^"]+\.js)"/.exec(page)?.[1];
+  assert.ok(script, `the page names its script: ${page}`);
+  const answered = await fetch(`${storiesAt}${script}`);
+  assert.equal(answered.headers.get('content-type'), 'text/javascript');
+  assert.match(await answered.text(), /look-cutbutton--press|CutButton/);
+  assert.equal(status(), statusBefore, "the stories' build left the workspace as it was");
+});
+
+test('a second serve prints the same three lines and starts nothing', async () => {
   const running = runningIn([dir]).map((proc) => proc.pid);
   assert.ok(running.length >= 3, `the holder, the api and the preview run in the folder: ${running.join(', ')}`);
   const again = await board('serve');
@@ -89,7 +115,7 @@ test('REFUSED: a serve over a board built from another tree ends that board, bui
   const now = servedIn(dir);
   assert.ok(now && now.pid !== old.pid, 'another holder serves');
   assert.notEqual(now.tree, 'another-tree');
-  assert.equal(again.stdout, `board on ${now.board}\napi on ${now.api}\n`);
+  assert.equal(again.stdout, `board on ${now.board}\napi on ${now.api}\nstories on ${now.stories}\n`);
   assert.match(await (await fetch(`${now.board}/`)).text(), /<title>Nemia<\/title>/);
   const same = await board('serve');
   assert.equal(same.stdout, again.stdout, 'and the tree unchanged, it is said again');
@@ -120,6 +146,7 @@ test(
 test('a holder whose time is up ends by itself, stops both servers and removes its folder', WAITED, async (t) => {
   const own = path.join(scratch('nemia-board-held-'), 'board');
   fs.cpSync(built, path.join(own, 'dist'), { recursive: true });
+  fs.cpSync(builtStories, path.join(own, 'stories'), { recursive: true });
   const held = await board('hold', own, { BOARD_HOLD_MS: '1' });
   assert.equal(held.code, 0, held.stderr + held.stdout);
   await until(

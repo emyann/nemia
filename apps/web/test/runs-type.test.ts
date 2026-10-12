@@ -13,18 +13,19 @@ const SRC = path.join(import.meta.dirname, '..', 'src');
 const FILES = [
   'routes/runs.index.tsx',
   'components/WaitingCard.tsx',
-  'components/StatTile.tsx',
-  'components/CopyId.tsx',
-  'components/CutButton.tsx',
+  'components/look/StatTile.tsx',
+  'components/look/CopyId.tsx',
+  'components/look/CutButton.tsx',
   'components/FlightTable.tsx',
   'components/FinishedTable.tsx',
-  'components/Plate.tsx',
-  'components/Sticker.tsx',
-  'components/RunSteps.tsx',
-  'components/Pager.tsx',
-  'components/TextLink.tsx',
-  'components/CutFrame.tsx',
-  'components/ScanLines.tsx',
+  'components/look/Plate.tsx',
+  'components/look/Sticker.tsx',
+  'components/look/RunSteps.tsx',
+  'components/look/Pager.tsx',
+  'components/look/TextLink.tsx',
+  'components/look/CutFrame.tsx',
+  'components/look/CutTag.tsx',
+  'components/look/ScanLines.tsx',
 ];
 
 /** The sizes no role gives: the count on a plate and the value on a tile, both in the label face. */
@@ -48,6 +49,13 @@ test('REFUSED: a Tailwind size or a bracketed size in a file that draws the Runs
   assert.deepEqual(handSizes('className="text-body-small text-label-large text-on-surface text-[30px] rounded-[14px]"'), []);
 });
 
+/** The files a folder's door exports from, when `at` is a folder with a door (`index.ts`): each sibling it names, as a component's file. */
+function throughDoor(at: string): string[] {
+  const door = path.join(SRC, at, 'index.ts');
+  if (!fs.existsSync(door)) return [];
+  return [...fs.readFileSync(door, 'utf8').matchAll(/from\s*'\.\/([^']+)'/g)].map(([, name]) => `${at}/${name}.tsx`);
+}
+
 test('every file that draws the Runs page is on the list: each part the route and its parts import from the board', () => {
   const reached = new Set<string>(['routes/runs.index.tsx']);
   const next = [...reached];
@@ -56,10 +64,12 @@ test('every file that draws the Runs page is on the list: each part the route an
     const text = fs.readFileSync(path.join(SRC, file), 'utf8');
     for (const [, mod] of text.matchAll(/from\s*'((?:\.\.?\/|@\/components\/)[^']+)'/g)) {
       const at = mod.startsWith('@/') ? mod.slice(2) : path.posix.normalize(path.posix.join(path.posix.dirname(file), mod));
-      const found = `${at}.tsx`;
-      if (!at.startsWith('components/') || at.startsWith('components/ui/') || !fs.existsSync(path.join(SRC, found))) continue;
-      if (!reached.has(found)) next.push(found);
-      reached.add(found);
+      if (!at.startsWith('components/') || at.startsWith('components/ui/')) continue;
+      for (const found of [`${at}.tsx`, ...throughDoor(at)]) {
+        if (!fs.existsSync(path.join(SRC, found))) continue;
+        if (!reached.has(found)) next.push(found);
+        reached.add(found);
+      }
     }
   }
   reached.delete('components/routeLink.tsx');
@@ -85,7 +95,7 @@ test("REFUSED: the board's own cn in a file that draws the Runs page: it drops a
 const handRings = (text: string): string[] => text.match(/(?<![\w-])(?:data-)?focus(?:-visible|-within)?:(?:ring|outline)-[\w-]+/g) ?? [];
 
 /** The parts of the Runs page that take the focus as a box, each ringed by the kit. */
-const RINGED = ['components/StatTile.tsx', 'components/Pager.tsx', 'components/TextLink.tsx'];
+const RINGED = ['components/look/StatTile.tsx', 'components/look/Pager.tsx', 'components/look/TextLink.tsx'];
 
 test("REFUSED: a focus ring written by hand in a file that draws the Runs page: a box that takes the focus takes the kit's ring", () => {
   for (const file of FILES)

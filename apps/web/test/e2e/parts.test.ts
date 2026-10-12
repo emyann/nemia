@@ -1,9 +1,9 @@
 /**
- * The board's parts no page mounts yet, pressed in a browser: the gallery (`parts/main.tsx`) built as the board is and opened in dark.
- * The pager's and the text link's keyboard paths navigate once, a pager's end that leads nowhere takes no focus, and a focus ring
- * inside the cut-corner frame is drawn whole over its cut corner — refused for the same frame cut by a clip; the cut button's shape
- * and its ring, and a frame's cut corner and its glow, are each read in a picture, pixel by pixel. `npm run e2e` runs this first; it
- * needs Chromium.
+ * The look's parts, pressed in a browser: the page of their stories (`parts/main.tsx`) built as the board is and opened in dark. Every
+ * story draws. The pager's and the text link's keyboard paths navigate once, a pager's end that leads nowhere takes no focus, and a
+ * focus ring inside the cut-corner frame is drawn whole over its cut corner — refused for the same frame cut by a clip; the cut
+ * button's shape and its ring, as a link and as a press, and a frame's cut corner and its glow, are each read in a picture, pixel by
+ * pixel; a press is pressed by the keyboard, and a disabled one by nothing. `npm run e2e` runs this first; it needs Chromium.
  */
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,9 +12,10 @@ import { chromium, type Browser, type Page } from 'playwright';
 import { scratch } from '../scratch.ts';
 import { WAITED } from '../waits.ts';
 import { photograph } from './board.ts';
-import { expectNone } from './checks.ts';
-import { buildParts, openParts } from './parts/gallery.ts';
+import { buildParts, openParts, story } from './parts/gallery.ts';
+import { entersOnce, focused, tabStops, tabTo } from './parts/keys.ts';
 import { apart, coloursAt, coloursOf as coloursIn, edgesOf, type Rgb } from './parts/pixels.ts';
+import { undrawn, type StoryDrawn } from './parts/drawn.ts';
 
 const built = scratch('nemia-parts-');
 let browser: Browser;
@@ -26,71 +27,66 @@ after(async () => {
   await browser?.close();
 });
 
-/** What has the focus, as its marks say it: its `data-` attributes' names, and its text. */
-const focused = (page: Page): Promise<{ marks: string[]; text: string }> =>
-  page.evaluate(() => {
-    const at = document.activeElement as HTMLElement | null;
-    return { marks: at ? Object.keys(at.dataset) : [], text: at?.textContent ?? '' };
-  });
+/** A story's page, by the story's id. */
+const alone = (id: string): string => `?story=${id}`;
 
-/** Every stop of the Tab key, in order, from the top of the page until it comes back to the first: each by its marks and text. */
-async function tabStops(page: Page): Promise<Array<{ marks: string[]; text: string }>> {
-  const stops: Array<{ marks: string[]; text: string }> = [];
-  for (let i = 0; i < 40; i += 1) {
-    await page.keyboard.press('Tab');
-    const stop = await focused(page);
-    if (stops.length > 0 && stop.text === stops[0].text && stop.marks.join() === stops[0].marks.join()) return stops;
-    if (stop.marks.length > 0) stops.push(stop);
-  }
-  throw new Error(`Tab did not come back to its first stop in 40 presses: ${JSON.stringify(stops)}`);
-}
+const PAGER_FIRST = 'look-pager--on-the-first-page';
+const PAGER_LAST = 'look-pager--on-the-last-page';
+const TITLE_STORY = 'look-textlink--title';
+const CORNER = 'look-cutframe--link-in-the-cut-corner';
 
-/** Presses Tab until what has the focus carries `mark`, a `data-` attribute by its camel-cased name. */
-async function tabTo(page: Page, mark: string): Promise<void> {
-  for (let i = 0; i < 40; i += 1) {
-    await page.keyboard.press('Tab');
-    if ((await focused(page)).marks.includes(mark)) return;
-  }
-  throw new Error(`Tab never reached ${mark}`);
-}
-
-/** Counts every navigation of `page`'s own document from now on, one inside the document too: an entry pushed or replaced. */
-function navigationsOf(page: Page): () => number {
-  let count = 0;
-  page.on('framenavigated', (frame) => {
-    if (frame === page.mainFrame()) count += 1;
-  });
-  return () => count;
-}
-
-/** Waits for two frames of the page: what a press started has been drawn. */
-const drawn = (page: Page): Promise<void> =>
-  page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))));
-
-/** Enter on what has the focus leads to `search`, by one navigation and one entry of the history. */
-async function entersOnce(page: Page, navigations: () => number, search: string, what: string): Promise<void> {
-  const before = { navigations: navigations(), history: await page.evaluate(() => history.length) };
-  await page.keyboard.press('Enter');
-  await expectNone(
-    async () => (new URL(page.url()).search === search ? null : `the address is ${page.url()}`),
-    `${what} leads to ${search}`,
-  );
-  await drawn(page);
-  assert.equal(navigations() - before.navigations, 1, `${what}: Enter navigates once, never twice`);
-  assert.equal((await page.evaluate(() => history.length)) - before.history, 1, `${what}: one entry more in the history`);
-}
+test(
+  'REFUSED: a story that throws or draws nothing; every story of the look draws, and one is drawn alone at its address',
+  WAITED,
+  async () => {
+    const fixture: StoryDrawn[] = [
+      { id: 'look-a--fine', broken: null, height: 40 },
+      { id: 'look-a--throws', broken: 'no such part', height: 20 },
+      { id: 'look-a--empty', broken: null, height: 0 },
+    ];
+    assert.deepEqual(undrawn(fixture), ['look-a--throws threw: no such part', 'look-a--empty draws nothing']);
+    const page = await openParts(browser, built, 'dark');
+    const one = await openParts(browser, built, 'dark', alone(TITLE_STORY));
+    try {
+      const listed = await page
+        .locator('[data-story-link]')
+        .evaluateAll((links) => links.map((link) => link.getAttribute('data-story-link')));
+      const drawn: StoryDrawn[] = await page.locator('[data-story]').evaluateAll((sections) =>
+        sections.map((section) => ({
+          id: section.getAttribute('data-story') ?? '',
+          broken: section.querySelector('[data-broken]')?.textContent ?? null,
+          height: section.querySelector('[data-story-ground] > *')?.getBoundingClientRect().height ?? 0,
+        })),
+      );
+      assert.ok(drawn.length >= 30, `the page draws the look's stories: ${drawn.length}`);
+      assert.deepEqual(
+        drawn.map((one) => one.id),
+        listed,
+        'every story the index lists is drawn',
+      );
+      assert.deepEqual(undrawn(drawn), [], 'no story throws, and none draws nothing');
+      assert.deepEqual(
+        await one.locator('[data-story]').evaluateAll((sections) => sections.map((section) => section.getAttribute('data-story'))),
+        [TITLE_STORY],
+        'at its address a story is drawn alone',
+      );
+    } finally {
+      await page.context().close();
+      await one.context().close();
+    }
+  },
+);
 
 test('the pager by the keyboard: Enter on Older leads to the next page once, then Newer back to the bare address', WAITED, async () => {
-  const page = await openParts(browser, built, 'dark');
+  const page = await openParts(browser, built, 'dark', alone(PAGER_FIRST));
   try {
-    const navigations = navigationsOf(page);
     await tabTo(page, 'pagerOlder');
-    await entersOnce(page, navigations, '?page=2', 'Older');
+    await entersOnce(page, story(PAGER_FIRST), '?page=2', 'Older');
     assert.equal(await page.locator('[data-pager-at]').textContent(), 'Page 2 / 3');
     assert.equal(await page.locator('[data-pager-rows]').textContent(), 'Runs 10–18 of 25');
     await page.keyboard.press('Shift+Tab');
     assert.ok((await focused(page)).marks.includes('pagerNewer'), 'on page 2 Newer takes the focus');
-    await entersOnce(page, navigations, '', 'Newer');
+    await entersOnce(page, story(PAGER_FIRST), '', 'Newer');
     assert.equal(await page.locator('[data-pager-at]').textContent(), 'Page 1 / 3');
   } finally {
     await page.context().close();
@@ -98,8 +94,8 @@ test('the pager by the keyboard: Enter on Older leads to the next page once, the
 });
 
 test('REFUSED: an end of the pager that leads nowhere takes no focus, and is no link', WAITED, async () => {
-  const first = await openParts(browser, built, 'dark');
-  const last = await openParts(browser, built, 'dark', '?page=3');
+  const first = await openParts(browser, built, 'dark', alone(PAGER_FIRST));
+  const last = await openParts(browser, built, 'dark', alone(PAGER_LAST));
   try {
     const stops = (await tabStops(first)).flatMap((stop) => stop.marks);
     assert.ok(stops.includes('pagerOlder'), `Tab reaches Older: ${stops.join(' ')}`);
@@ -115,11 +111,10 @@ test('REFUSED: an end of the pager that leads nowhere takes no focus, and is no 
 });
 
 test('the text link by the keyboard: Enter navigates once', WAITED, async () => {
-  const page = await openParts(browser, built, 'dark');
+  const page = await openParts(browser, built, 'dark', alone(TITLE_STORY));
   try {
-    const navigations = navigationsOf(page);
     await tabTo(page, 'plainLink');
-    await entersOnce(page, navigations, '?read=link', 'the text link');
+    await entersOnce(page, story(TITLE_STORY), '?read=link', 'the text link');
   } finally {
     await page.context().close();
   }
@@ -163,8 +158,13 @@ async function ringGaps(page: Page, name: string): Promise<string[]> {
   );
 }
 
-/** The cut button the gallery draws on a card's ground. */
-const BUTTON = '[data-part="ring"] [data-cut-button]';
+/** The cut button its stories draw on a card's ground: as a link, as a press, and as a press that is disabled. */
+const BUTTON = `${story('look-cutbutton--link')} [data-cut-button]`;
+const PRESS = `${story('look-cutbutton--press')} [data-cut-button]`;
+const DISABLED = `${story('look-cutbutton--disabled-press')} [data-cut-button]`;
+
+/** The page of the cut button's three stories. */
+const BUTTONS = '?part=CutButton';
 
 /** The colours of the named `points` in a picture of the window taken now, as `name`. */
 const coloursOf = <K extends string>(page: Page, name: string, points: Record<K, readonly [number, number]>): Promise<Record<K, Rgb>> =>
@@ -178,7 +178,7 @@ async function buttonSpills(page: Page, name: string): Promise<string[]> {
   const { box, out } = await edgesOf(page, BUTTON);
   assert.ok(
     [box.left, box.top].every((edge) => Math.abs(edge - Math.round(edge)) < 0.02),
-    `the gallery lays the button on whole pixels, where a pixel beside it is its neighbour: ${box.left}, ${box.top}`,
+    `the story lays the button on whole pixels, where a pixel beside it is its neighbour: ${box.left}, ${box.top}`,
   );
   const points = {
     ground: [out.left - 7, out.top - 7],
@@ -205,7 +205,7 @@ test(
   'REFUSED: the cut button paints its cut shape exactly inside its box, and a shape that reaches a pixel past it is seen',
   WAITED,
   async () => {
-    const page = await openParts(browser, built, 'dark');
+    const page = await openParts(browser, built, 'dark', BUTTONS);
     try {
       assert.equal(await page.locator(`${BUTTON} [data-cut-corner]`).count(), 0, 'no corner is laid over it');
       assert.deepEqual(await buttonSpills(page, 'button-exact'), [], 'nothing of it is painted outside its box, nor in a cut corner');
@@ -233,8 +233,8 @@ test(
  * shape's outline the ring's band, three pixels out, is not drawn (three places a straight side, three a cut); and `square`, the
  * box's corners a rectangular ring would turn and the shape's does not, where the ring is drawn.
  */
-async function buttonRing(page: Page, name: string): Promise<{ missing: string[]; square: string[] }> {
-  const { box, out } = await edgesOf(page, BUTTON);
+async function buttonRing(page: Page, name: string, button = BUTTON): Promise<{ missing: string[]; square: string[] }> {
+  const { box, out } = await edgesOf(page, button);
   const [midX, midY] = [Math.round((box.left + box.right) / 2), Math.round((box.top + box.bottom) / 2)];
   const [ringTop, ringLeft, ringRight, ringBottom] = [out.top - 2, out.left - 2, out.right + 2, out.bottom + 2];
   const off = 3 / Math.SQRT2;
@@ -272,7 +272,7 @@ async function buttonRing(page: Page, name: string): Promise<{ missing: string[]
 }
 
 /** The cut button's ring as a rectangle around its box: the ring every other button has. */
-const SQUARE_RING = `${BUTTON} [data-cut-ring] { clip-path: none !important; }`;
+const SQUARE_RING = '[data-cut-button] [data-cut-ring] { clip-path: none !important; }';
 
 /** The cut button as a clip on the link itself would cut it: its two corners, and with them whatever is drawn outside its box. */
 const CLIPPED_BUTTON = `${BUTTON} {
@@ -283,7 +283,7 @@ test(
   "REFUSED: the cut button's focus ring follows its shape whole, both cuts too; a rectangular ring and a ring cut off are each seen",
   WAITED,
   async () => {
-    const page = await openParts(browser, built, 'dark');
+    const page = await openParts(browser, built, 'dark', alone('look-cutbutton--link'));
     try {
       assert.equal(await page.locator(`${BUTTON} [data-cut-ring]`).isVisible(), false, 'no ring before the keyboard reaches it');
       await tabTo(page, 'cutButton');
@@ -307,8 +307,9 @@ test(
   },
 );
 
-/** A cut frame of the gallery's `cut` part, by the ground it stands on. */
-const frameOn = (ground: 'plain' | 'other'): string => `[data-part="cut"] [data-ground="${ground}"] [data-cut-frame]`;
+/** The cut frame its stories draw on the page's own ground, and on another. */
+const ON = { plain: 'look-cutframe--on-the-page', other: 'look-cutframe--on-another-ground' } as const;
+const frameOn = (ground: 'plain' | 'other'): string => `${story(ON[ground])} [data-ground="${ground}"] [data-cut-frame]`;
 
 /** Where the cut frame on the other ground paints over that ground inside a cut corner, none when the ground shows through both. */
 async function cornerPatches(page: Page, name: string): Promise<string[]> {
@@ -357,7 +358,7 @@ test(
   'REFUSED: a cut corner shows the ground under it, and a waiting frame glows along its cut; a patch, no glow and a square glow are each seen',
   WAITED,
   async () => {
-    const page = await openParts(browser, built, 'dark');
+    const page = await openParts(browser, built, 'dark', '?part=CutFrame');
     try {
       assert.deepEqual(await cornerPatches(page, 'corner-clear'), [], 'the ground shows through both cut corners');
       const glow = await glowOf(page, 'glow-shaped');
@@ -384,7 +385,7 @@ test(
 );
 
 /** The frame as the look's source cut it: by a clip, which cuts off whatever it holds too. */
-const CLIPPED = `[data-part="ring"] [data-cut-frame] {
+const CLIPPED = `${story(CORNER)} [data-cut-frame] {
   clip-path: polygon(0 0, calc(100% - 28px) 0, 100% 28px, 100% 100%, 28px 100%, 0 calc(100% - 28px));
 }`;
 
@@ -392,12 +393,12 @@ test(
   'REFUSED: a focus ring inside the cut-corner frame is drawn whole over its cut corner, and a frame cut by a clip loses it',
   WAITED,
   async () => {
-    const page = await openParts(browser, built, 'dark');
+    const page = await openParts(browser, built, 'dark', alone(CORNER));
     try {
       await tabTo(page, 'ringProbe');
       const [link, frame] = [
         await page.locator('[data-ring-probe]').boundingBox(),
-        await page.locator('[data-part="ring"] [data-cut-frame]').boundingBox(),
+        await page.locator(`${story(CORNER)} [data-cut-frame]`).boundingBox(),
       ];
       assert.ok(link && frame);
       assert.ok(link.x + link.width > frame.x + frame.width - 28 && link.y < frame.y + 28, 'the link stands in the cut corner');
@@ -445,7 +446,7 @@ test(
   'REFUSED: a text link is underlined under the pointer and with the keyboard on it, never at rest; each fault is seen',
   WAITED,
   async () => {
-    const page = await openParts(browser, built, 'dark');
+    const page = await openParts(browser, built, 'dark', alone(TITLE_STORY));
     try {
       assert.deepEqual(await lineFaults(page), [], 'no line at rest, a line under the pointer and on focus, and the ring');
       const always = await page.addStyleTag({ content: ALWAYS_LINED });
@@ -464,9 +465,9 @@ test(
 );
 
 test('a short id stands in a hairline box with six pixels of room, and a whole id in none', WAITED, async () => {
-  const page = await openParts(browser, built, 'dark');
+  const page = await openParts(browser, built, 'dark', '?part=CopyId');
   try {
-    const boxes = await page.locator('[data-part="copy-id"] [data-run-id]').evaluateAll((all) =>
+    const boxes = await page.locator('[data-part="CopyId"] [data-run-id]').evaluateAll((all) =>
       all.map((id) => {
         const style = getComputedStyle(id);
         return `${id.textContent}: ${style.borderTopWidth}, ${style.paddingLeft} ${style.paddingRight}, ${id.getBoundingClientRect().height}px tall`;
@@ -477,3 +478,118 @@ test('a short id stands in a hairline box with six pixels of room, and a whole i
     await page.context().close();
   }
 });
+
+test(
+  "REFUSED: a cut button that is pressed is pressed by the keyboard, once a key, and its ring is the link's band; a rectangular ring is seen",
+  WAITED,
+  async () => {
+    const page = await openParts(browser, built, 'dark', alone('look-cutbutton--press'));
+    const link = await openParts(browser, built, 'dark', alone('look-cutbutton--link'));
+    try {
+      const presses = () => page.locator(`${story('look-cutbutton--press')} [data-presses]`).getAttribute('data-presses');
+      await tabTo(page, 'cutButton');
+      assert.equal(await page.locator(PRESS).evaluate((button) => button.tagName), 'BUTTON', 'the press is a button, no link');
+      assert.equal(await presses(), '0');
+      await page.keyboard.press('Enter');
+      assert.equal(await presses(), '1', 'Enter presses it once');
+      await page.keyboard.press('Space');
+      assert.equal(await presses(), '2', 'Space presses it once');
+      const pressed = await buttonRing(page, 'press-ring-shaped', PRESS);
+      assert.deepEqual(pressed, { missing: [], square: [] }, "the press's ring runs along its whole shape");
+      await tabTo(link, 'cutButton');
+      assert.deepEqual(pressed, await buttonRing(link, 'link-ring-shaped'), "and it is the link's band, offset for offset from its box");
+      const [onPress, onLink] = [
+        await page.locator(`${PRESS} [data-cut-ring]`).evaluate((ring) => [getComputedStyle(ring).clipPath, getComputedStyle(ring).inset]),
+        await link.locator(`${BUTTON} [data-cut-ring]`).evaluate((ring) => [getComputedStyle(ring).clipPath, getComputedStyle(ring).inset]),
+      ];
+      assert.deepEqual(onPress, onLink, 'one ring element, the same clip and the same offsets');
+      await page.addStyleTag({ content: SQUARE_RING });
+      const squared = await buttonRing(page, 'press-ring-square', PRESS);
+      assert.deepEqual(squared.square, ['the top-right corner', 'the bottom-left corner'], 'a rectangular ring on the press: seen');
+    } finally {
+      await page.context().close();
+      await link.context().close();
+    }
+  },
+);
+
+test(
+  'REFUSED: a disabled press takes no focus and no press, draws no ring, and is not the yellow of the press beside it',
+  WAITED,
+  async () => {
+    const page = await openParts(browser, built, 'dark', BUTTONS);
+    try {
+      const stops = await tabStops(page);
+      assert.deepEqual(
+        stops.filter((stop) => stop.marks.includes('cutButton')).map((stop) => stop.text),
+        ['Open the run', 'Approve'],
+        'Tab reaches the link and the press, and passes the disabled press',
+      );
+      const count = () => page.locator(`${story('look-cutbutton--disabled-press')} [data-presses]`).getAttribute('data-presses');
+      await page.locator(DISABLED).click({ force: true });
+      assert.equal(await count(), '0', 'a click presses nothing');
+      assert.equal(await page.locator(DISABLED).isDisabled(), true);
+      assert.equal(await page.locator(`${DISABLED} [data-cut-ring]`).count(), 0, 'it draws no ring');
+      await page.mouse.move(0, 0);
+      const fills: Rgb[] = [];
+      for (const [button, name] of [
+        [DISABLED, 'press-disabled'],
+        [PRESS, 'press-enabled'],
+      ] as const) {
+        const { out } = await edgesOf(page, button);
+        const { fill, ground } = await coloursOf(page, name, { fill: [out.left + 5, out.top + 5], ground: [out.left - 7, out.top - 7] });
+        assert.ok(apart(fill, ground) > 8, `${name}: its ground is read apart from the card's: ${fill.join(' ')} on ${ground.join(' ')}`);
+        fills.push(fill);
+      }
+      assert.ok(
+        apart(fills[0], fills[1]) > 40,
+        `the disabled ground is not the yellow: ${fills[0].join(' ')} beside ${fills[1].join(' ')}`,
+      );
+    } finally {
+      await page.context().close();
+    }
+  },
+);
+
+/** The short id its story draws, and the box it stands in. */
+const SHORT = story('look-copyid--short');
+
+/** The colour of the edge of the short id's box, as the page computes it. */
+const edgeOf = (page: Page): Promise<string> =>
+  page.locator(`${SHORT} [data-run-id]`).evaluate((id) => getComputedStyle(id).borderTopColor);
+
+/** The hue of a session at work, as the page computes it. */
+const aliveOf = (page: Page): Promise<string> =>
+  page.evaluate(() => {
+    const probe = document.createElement('i');
+    probe.style.color = 'var(--meaning-alive)';
+    document.body.append(probe);
+    const said = getComputedStyle(probe).color;
+    probe.remove();
+    return said;
+  });
+
+/** The short id's box as it is at rest, whatever was just copied. */
+const KEPT_HAIRLINE = '[data-copied] [data-run-id] { border-color: var(--md-sys-color-outline-variant) !important; }';
+
+test(
+  'REFUSED: the box of an id just copied takes the hue of a session at work, and its hairline back at rest; a box left as it was is seen',
+  WAITED,
+  async () => {
+    const page = await openParts(browser, built, 'dark', alone('look-copyid--short'), { still: true });
+    try {
+      await page.evaluate(() =>
+        Object.defineProperty(navigator, 'clipboard', { value: { writeText: async () => {} }, configurable: true }),
+      );
+      const [rest, alive] = [await edgeOf(page), await aliveOf(page)];
+      assert.notEqual(rest, alive, `at rest the box is no hue of a session at work: ${rest}`);
+      await page.locator(`${SHORT} button`).click();
+      await page.locator(`${SHORT} [data-copied]`).waitFor();
+      assert.equal(await edgeOf(page), alive, 'just copied, its edge is the hue of a session at work');
+      await page.addStyleTag({ content: KEPT_HAIRLINE });
+      assert.equal(await edgeOf(page), rest, 'a box left with its hairline: seen');
+    } finally {
+      await page.context().close();
+    }
+  },
+);

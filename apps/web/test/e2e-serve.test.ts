@@ -1,6 +1,6 @@
 /**
  * The served board's command (`test/e2e/serve.ts`), as far as it needs no build: the folder it serves a workspace from, a holder that is
- * gone read as no board, the ports a step given the browser could not open, and the two lines it prints. The serving itself is held by
+ * gone read as no board, the ports a step given the browser could not open, and the three lines it prints. The serving itself is held by
  * `test/e2e/serve.test.ts`, under `npm run e2e`.
  */
 import { test } from 'node:test';
@@ -32,23 +32,26 @@ test('REFUSED: a folder whose holder is gone, or whose file does not read, serve
   const gone = ended.pid;
   assert.equal(alive(gone), false);
   const write = (said: unknown) => fs.writeFileSync(path.join(dir, 'served.json'), JSON.stringify(said));
-  const at = { board: 'http://127.0.0.1:41234', api: 'http://127.0.0.1:41235', tree: 'a1' };
+  const at = { board: 'http://127.0.0.1:41234', api: 'http://127.0.0.1:41235', stories: 'http://127.0.0.1:41236', tree: 'a1' };
   write({ pid: gone, ...at });
   assert.equal(servedIn(dir), undefined, 'a holder that is gone');
   write({ pid: process.pid, board: at.board });
   assert.equal(servedIn(dir), undefined, 'no api said');
-  write({ pid: process.pid, board: at.board, api: at.api });
+  write({ pid: process.pid, board: at.board, api: at.api, stories: at.stories });
   assert.equal(servedIn(dir), undefined, 'no tree said: a board built from nobody knows what');
+  write({ pid: process.pid, board: at.board, api: at.api, tree: at.tree });
+  assert.equal(servedIn(dir), undefined, "no stories said: a holder from before the look's stories, to be replaced");
   fs.writeFileSync(path.join(dir, 'served.json'), '{');
   assert.equal(servedIn(dir), undefined, 'a file half written');
   write({ pid: process.pid, ...at });
   assert.deepEqual(servedIn(dir), { pid: process.pid, ...at });
 });
 
-test('serve prints the board first and its api second, each on a line a step reads an address from', () => {
-  assert.deepEqual(linesOf({ board: 'http://127.0.0.1:41234', api: 'http://127.0.0.1:41235' }), [
+test('serve prints the board first, its api second and the stories third, each on a line a step reads an address from', () => {
+  assert.deepEqual(linesOf({ board: 'http://127.0.0.1:41234', api: 'http://127.0.0.1:41235', stories: 'http://127.0.0.1:41236' }), [
     'board on http://127.0.0.1:41234',
     'api on http://127.0.0.1:41235',
+    'stories on http://127.0.0.1:41236',
   ]);
 });
 
@@ -82,7 +85,13 @@ test('REFUSED: a board built from another tree is not the one to open: a commit,
   fs.mkdirSync(path.join(repo, 'ignored'));
   fs.writeFileSync(path.join(repo, 'ignored', 'x'), 'x');
   assert.equal(treeOf(repo), seen.at(-1), 'a file git ignores is no part of the tree');
-  const served = { pid: process.pid, board: 'http://127.0.0.1:41234', api: 'http://127.0.0.1:41235', tree: seen[0] };
+  const served = {
+    pid: process.pid,
+    board: 'http://127.0.0.1:41234',
+    api: 'http://127.0.0.1:41235',
+    stories: 'http://127.0.0.1:41236',
+    tree: seen[0],
+  };
   assert.equal(standsFor(served, seen[0]), true);
   assert.equal(standsFor(served, seen.at(-1)!), false, 'a board of the first tree is not one of the last');
   assert.equal(standsFor(undefined, seen[0]), false, 'no board served stands for no tree');

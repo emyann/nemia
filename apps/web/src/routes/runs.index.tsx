@@ -3,12 +3,11 @@ import { createFileRoute } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
 import { FinishedTable } from '../components/FinishedTable';
 import { FlightTable } from '../components/FlightTable';
-import { PageName, Plate } from '../components/Plate';
-import { ScanLines } from '../components/ScanLines';
 import { WaitingCard } from '../components/WaitingCard';
 import { finishedRunsQuery, openRunsQuery } from '../lib/api';
 import { finishedSearch, pageAt } from '../lib/finished';
 import { ink } from '../lib/meaning';
+import { PageName, Plate, ScanLines } from '../components/look';
 
 export const Route = createFileRoute('/runs/')({
   validateSearch: finishedSearch,

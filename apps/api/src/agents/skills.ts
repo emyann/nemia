@@ -148,7 +148,8 @@ function yourAgentsSkills(home: string): Array<[string, string[]]> {
  * in yours alone — then what Nemia ships, each marked where an agent of yours already finds a skill of its name. A place skill the
  * package ships (`isShippedPlace`), which an agent finds where no place has its name, is in neither of the first two. A name both of one
  * repository's places for skills have, which happens only when the store is in that repository and nothing says which is given, is listed
- * in yours with the package's refusal as its `error`.
+ * in yours with the package's refusal as its `error`. Any other skill the package refuses — a link in it that is not followed, rules that
+ * do not read — is listed in the place its folder is in (`skillDirIn`, `sourceOf`), unread where a link is refused, with that refusal.
  */
 export async function listSkills(
   e: Engine['Service'],
@@ -165,15 +166,17 @@ export async function listSkills(
     { from: 'repo', dir: path.join(path.resolve(repo), '.claude', SKILLS_FOLDER), skills: [] },
   ];
   const sorted = [...found.at].filter(([, at]) => typeof at !== 'string' || !isShippedPlace(at)).sort(([a], [b]) => a.localeCompare(b));
-  const dirOf = ([name, at]: (typeof sorted)[number]) => (at instanceof WorkflowError ? path.join(places[0].dir, name) : at);
+  const dirOf = ([name, at]: (typeof sorted)[number]) =>
+    at instanceof WorkflowError ? (skillDirIn([places[0].dir, places[1].dir], name) ?? path.join(places[0].dir, name)) : at;
   const shippedNames = skillFolders(shipped);
   const reads = await readsOf(e, placeService, [...sorted.map(dirOf), ...shippedNames.map((name) => path.join(shipped, name))]);
   const where = new Map<string, 'yours' | 'repo'>();
   for (const [name, at] of sorted) {
     const dir = dirOf([name, at]);
     if (at instanceof WorkflowError) {
-      places[0].skills.push({ ...skillRow(name, dir, 'yours', reads[dir], usedBy(name)), entry: null, error: at.message });
-      where.set(name, 'yours');
+      const from = sourceOf(dir, repo, home) === 'repo' ? 'repo' : 'yours';
+      places[from === 'yours' ? 0 : 1].skills.push({ ...skillRow(name, dir, from, reads[dir], usedBy(name)), entry: null, error: at.message });
+      where.set(name, from);
       continue;
     }
     const from = sourceOf(at, repo, home) === 'yours' ? 'yours' : 'repo';

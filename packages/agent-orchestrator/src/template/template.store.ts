@@ -17,7 +17,7 @@ import { placesOf } from '../folder/lookup.store.ts';
 import { readKeys } from '../former/former.ts';
 import { SKILL_NAME } from '../keys/index.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
-import { entriesOf, isShippedPlace, lookupRoots, PLACE_SKILLS, skillsFor } from '../skills/read.store.ts';
+import { copySkillFiles, entriesOf, isShippedPlace, lookupRoots, PLACE_SKILLS, skillsFor } from '../skills/read.store.ts';
 import { splitFrontmatter } from '../step/step.ts';
 import { ARCHIVE_LIMIT, contentDigest, packArchive, pathRefusals, unpackArchive, type TreeFile } from '../archive/archive.ts';
 import { checkTemplate, documentFile, draftOf, type Draft, type ReadFolder, type Source, type StepSource } from './index.ts';
@@ -284,12 +284,19 @@ function copyTree(from: string, to: string): void {
   fs.chmodSync(to, stat.mode & 0o7777);
 }
 
-/** The draft's files, written under `dir`: a document as YAML on lines of any length, a text as it is, a copy with its modes. */
+/**
+ * The draft's files, written under `dir`: a document as YAML on lines of any length, a text as it is, a copy with its modes, and a skill
+ * as its real files (`copySkillFiles`).
+ */
 function writeDraft(dir: string, draft: Draft): void {
   for (const file of draft.files) {
     const at = path.join(dir, file.path);
     if ('copy' in file) {
       copyTree(file.copy, at);
+      continue;
+    }
+    if ('skill' in file) {
+      copySkillFiles(file.skill, at);
       continue;
     }
     fs.mkdirSync(path.dirname(at), { recursive: true });

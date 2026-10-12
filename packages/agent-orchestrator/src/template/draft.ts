@@ -51,8 +51,11 @@ export type Source = {
   skill: (name: string) => SkillFound;
 };
 
-/** A file of the draft: a document, a text, or a file or folder copied from `copy` with its modes. */
-export type DraftFile = { path: string } & ({ document: unknown } | { text: string } | { copy: string });
+/**
+ * A file of the draft: a document, a text, a file or folder copied from `copy` with its modes, or the skill folder `skill` carried as its
+ * real files, a link it follows as what it points at.
+ */
+export type DraftFile = { path: string } & ({ document: unknown } | { text: string } | { copy: string } | { skill: string });
 
 /** The draft: its files, where each part came from, and what refuses it, each by name; nothing is written while one stands. */
 export type Draft = { files: DraftFile[]; from: Array<{ part: string; from: string }>; refusals: string[] };
@@ -262,7 +265,7 @@ function gatherSkills(source: Source, into: Gathered): void {
     else if (found === undefined || 'refused' in found)
       into.refusals.push(found?.refused ?? `${by} names the skill ${name}, and none is found: carry it, or remove the name.`);
     else {
-      into.files.push({ path: `skills/${name}`, copy: found.dir });
+      into.files.push({ path: `skills/${name}`, skill: found.dir });
       into.from.push({ part: `skills/${name}/`, from: found.dir });
     }
   }

@@ -62,7 +62,8 @@ import { followVerbOf, type FollowRefused } from './follow.ts';
 import { DEFAULT_HARNESSES } from './harnesses.ts';
 import { a2aOps, type SeamOps } from '../a2a/index.ts';
 import { bodyVerbsOf } from './bodies.ts';
-import { forgetVerbOf, journalBytesOf, type ForgetFailure, type ForgetReport } from './forget.ts';
+import type { ForgetFailure, ForgetReport } from './forget.ts';
+import { keepingVerbsOf, type KeptRefused, type KeptReport } from './kept.ts';
 import { watchOf } from './watch.ts';
 import { sayVerbOf, type SayRefused, type SayUnsent } from './say.ts';
 import {
@@ -117,7 +118,7 @@ export const listRefusalOf = (args: readonly unknown[]): string | undefined => {
  * The engine's verbs, each an Effect with what refuses it on its error channel, a tagged error whose message says what to do
  * instead: `FileRefused`, `TickRefused`, `AdmitRefused`, `ListRefused`, `TranscriptRefused`, `OutputRefused`, `FollowRefused`,
  * `SayRefused`, `QuotaRefused`, `StopRefused` for `stop`, `InputRefused` for `answer` and `close`, `BodyRefused` for `sweep` and
- * `removeBody`, and `ForgetRefused` for `forget`.
+ * `removeBody`, `ForgetRefused` for `forget`, and `KeptRefused` for `kept`.
  * `SayUnsent` is `say`'s failure that is not a refusal; a `JournalError` or a `RunnerError` is the store's or the harness's.
  * `refusalWords(verb)` words a refusal as `ae` says it.
  * `watch`, `io` and `start` succeed at once: `watch` and `start` with a handle that stops them.
@@ -348,6 +349,15 @@ export type EngineShape = {
    * filed on a harness this engine does not have; and one whose harness still lists a session of it, or could not be read.
    */
   readonly forget: (taskIds: readonly string[], options?: { yes?: boolean }) => Effect.Effect<ForgetReport, ForgetFailure>;
+  /**
+   * What is kept on the disk for the sessions this engine ran, in bytes, by task (`KeptReport`): each listed task's journal, the
+   * bodies it is first to name, the files its harness keeps of its sessions, and the harness's own record of each session its
+   * journal names by id. Takes nothing, removes nothing and reads no body; a task at work is answered, its `files` as a settled
+   * one's, and no record of an attempt still at work, whose id its journal names only once it has ended or the task settled. A
+   * record whose task was forgotten is named by no journal, and is counted for none. What could not be measured of a task is said
+   * on its `unread`, and stops no other. Refused — `KeptRefused`, nothing measured — for any argument.
+   */
+  readonly kept: () => Effect.Effect<KeptReport, KeptRefused | JournalError>;
   /**
    * Everything that has happened since `after`, and where to resume. An entry no runtime wrote is skipped, the cursor past it, and
    * said on `refused` (`FeedRefusal`), so it is met by one read and stops no reader. Lines of tasks forgotten since are counted on
@@ -705,7 +715,7 @@ const make = (options: EngineOptions) =>
       close: (taskId) => go(close(taskId)),
       feed: feedVerb,
       ...bodyVerbsOf(go),
-      forget: forgetVerbOf(go, runners, harnessOf, journalBytesOf(journalOps)),
+      ...keepingVerbsOf(go, journalOps, runners, harnessOf, fallback),
       watch: watchOf(feedVerb, journalOps.subscribe),
       ...ioVerbsOf(observedNow),
       start: startOf(tickVerb),

@@ -37,6 +37,36 @@ export const transcriptFile = (sessionId: string): string | undefined => {
 };
 
 /**
+ * Claude Code's record of each session of `sessionIds`, by id: its transcript, and the folder beside it named by the same id
+ * where it keeps one. Found in one pass over the project folders, each listed once, whatever the count of ids; an id no folder
+ * holds has no key, and a record under an id not asked is never named.
+ */
+export const transcriptRecords = (sessionIds: readonly string[]): Map<string, string[]> => {
+  const asked = new Set(sessionIds);
+  const found = new Map<string, string[]>();
+  if (!asked.size) return found;
+  let dirs: string[];
+  try {
+    dirs = fs.readdirSync(PROJECTS);
+  } catch {
+    return found;
+  }
+  for (const d of dirs) {
+    let names: string[];
+    try {
+      names = fs.readdirSync(path.join(PROJECTS, d));
+    } catch {
+      continue;
+    }
+    for (const name of names) {
+      const id = name.endsWith('.jsonl') ? name.slice(0, -6) : name;
+      if (asked.has(id)) found.set(id, [...(found.get(id) ?? []), path.join(PROJECTS, d, name)]);
+    }
+  }
+  return found;
+};
+
+/**
  * When a Claude Code session's transcript was last written: its file's mtime in whole milliseconds, as the Agent SDK's
  * `getSessionInfo` gives it, read by a stat that reads none of its bytes; `undefined` while no project folder holds it, or when
  * the stat fails.
@@ -172,6 +202,9 @@ const endsWithResultOf = (lines: readonly string[], id: string, file?: string): 
 
 /** A Claude Code session's transcript file, for the other runner that reads one: `claude -p`'s. */
 export const claudeTranscriptFile = (sessionId: string): string | undefined => transcriptFile(sessionId);
+
+/** A detached spec's `transcript.records` for Claude Code: `transcriptRecords`. */
+export const claudeTranscriptRecords = (sessionIds: readonly string[]): Map<string, string[]> => transcriptRecords(sessionIds);
 
 /** A tool result's content as text: a string as it is, a list of blocks as their text, naming any that is not text. */
 const resultText = (content: BlockOf<'tool_result'>['content']): string =>

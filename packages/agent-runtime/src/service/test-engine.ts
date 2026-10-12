@@ -4,17 +4,19 @@
  * printed (`printed`), which `output` then answers stream by stream, and reads back what the engine was asked:
  * each task (`tasks`), every filing by id (`filings`) and by what it was filed with (`specs`), each stop taken (`stopped`), each word
  * said (`said`) and each `forget` call by call (`forgets`); `refuseSay(n)` refuses the next `n` says as the runtime refuses a session
- * not running.
+ * not running; `keeps(id, sizes)` plants what `kept` answers of a task, and `failKept(n)` fails the next `n` as a store that does not
+ * list fails one.
  *
- * It keeps `file`, `view`, `list`, `stop`, `logs`, `feed`, `output`, `say` and `forget`, each answering what the real engine answers over a
- * harness that costs nothing: `test/engine-walks.ts` holds the walks both run, and `APART` there what this one cannot say. Every other
- * verb dies naming itself. Reached from another package through `agent-runtime/testing` alone, and by no file of a `src`.
+ * It keeps `file`, `view`, `list`, `stop`, `logs`, `feed`, `output`, `say`, `forget` and `kept`, each answering what the real engine
+ * answers over a harness that costs nothing: `test/engine-walks.ts` holds the walks both run, and `APART` there what this one cannot
+ * say. Every other verb dies naming itself. Reached from another package through `agent-runtime/testing` alone, and by no file of a `src`.
  */
 import { Effect, Layer } from 'effect';
 import type { Attempt, Said, State } from '../core/index.ts';
-import { StopRefused, type TaskView } from '../core/engine/index.ts';
+import { JournalError, StopRefused, type TaskView } from '../core/engine/index.ts';
 import { Engine, ListRefused, listRefusalOf, type EngineShape } from './engine.ts';
 import { ForgetRefused } from './forget.ts';
+import { KeptRefused, type KeptReport } from './kept.ts';
 import type { TaskSpec } from './options.ts';
 import { notACount, notAStream, OutputRefused } from './output.ts';
 import { SayRefused } from './say.ts';
@@ -147,6 +149,10 @@ export type TestEngine = {
    * printed, which the task keeps until a settle gives another. Throws for a task never filed.
    */
   readonly settle: (id: string, phase: string, end?: TestEnd) => TestTask;
+  /** Plants what `kept` answers of the task `id`, in bytes, in place of what was planted before; a task not held is never named. */
+  readonly keeps: (id: string, sizes: TestKeeps) => void;
+  /** Fails the next `times` asks of `kept` with a `JournalError`, as the engine fails one over a store that does not list. */
+  readonly failKept: (times: number) => void;
 };
 
 /**
@@ -166,8 +172,63 @@ const outputOf =
     return Effect.succeed(text === undefined || lastBytes === undefined ? text : Buffer.from(text).subarray(-lastBytes).toString());
   };
 
+/** What a test plants of a task for `kept` to answer, in bytes: a part left out is 0, and `records` left out is no record kept. */
+export type TestKeeps = { readonly journal?: number; readonly bodies?: number; readonly files?: number; readonly records?: number };
+
+/**
+ * `kept` over the tasks a stand-in holds and the sizes planted: refuses an argument as the engine does, fails while `failures` has
+ * any left, as the engine fails over a store that does not list, then names each task held once, in the order filed, with what was
+ * planted of it, 0 where nothing was, and no `records` where none was.
+ */
+const keptVerbOf = (tasks: Map<string, TestTask>, sizes: Map<string, TestKeeps>, failures: { left: number }): EngineShape['kept'] =>
+  function () {
+    if (arguments.length > 0) {
+      return Effect.fail(
+        new KeptRefused({
+          message: `takes nothing, and measures every task the store lists; it was handed ${[...arguments].map((a) => JSON.stringify(a)).join(', ')}: nothing was measured.`,
+        }),
+      );
+    }
+    if (failures.left > 0) {
+      failures.left -= 1;
+      return Effect.fail(new JournalError({ taskId: '*', message: 'the test engine was told to fail this kept: its store does not list' }));
+    }
+    const of = (taskId: string): KeptReport['tasks'][number] => {
+      const { journal = 0, bodies = 0, files = 0, records } = sizes.get(taskId) ?? {};
+      return { taskId, journal, bodies, files, ...(records === undefined ? {} : { records }) };
+    };
+    return Effect.sync(() => ({ tasks: [...tasks.keys()].map(of) }));
+  };
+
+/**
+ * `forget` over the tasks a stand-in holds: each call kept in `forgets`, a task not held or not settled (`settledIn`) refused as
+ * the engine refuses it, and, with `yes`, the tasks dropped; its report names each task with no size.
+ */
+const forgetVerbOf =
+  (tasks: Map<string, TestTask>, forgets: TestEngine['forgets'], settledIn: (id: string) => unknown): EngineShape['forget'] =>
+  (taskIds, options) =>
+    Effect.gen(function* () {
+      const yes = options?.yes === true;
+      forgets.push({ taskIds: [...taskIds], yes });
+      for (const id of taskIds)
+        if (!settledIn(id))
+          return yield* Effect.fail(
+            new ForgetRefused({
+              taskId: id,
+              message: tasks.has(id) ? `${id} has not settled: stop it first` : `no task ${id} in this store`,
+            }),
+          );
+      if (yes) for (const id of taskIds) tasks.delete(id);
+      return { forgotten: yes, tasks: taskIds.map((taskId) => ({ taskId, journalBytes: 0, feedLines: 0, sessions: [] })) };
+    });
+
 /** The kept verbs over what a stand-in holds. */
-const keptOf = (held: Omit<TestEngine, 'layer' | 'refuseSay' | 'settle'>, sayRefusals: { left: number }) => {
+const keptOf = (
+  held: Omit<TestEngine, 'layer' | 'refuseSay' | 'settle' | 'keeps' | 'failKept'>,
+  sayRefusals: { left: number },
+  sizes: Map<string, TestKeeps>,
+  keptFailures: { left: number },
+) => {
   const { tasks, filings, specs, stopped, forgets, said } = held;
   const settledIn = (id: string) => {
     const t = tasks.get(id);
@@ -227,21 +288,8 @@ const keptOf = (held: Omit<TestEngine, 'layer' | 'refuseSay' | 'settle'>, sayRef
         said.push({ taskId, text });
         return heard;
       }),
-    forget: (taskIds, options) =>
-      Effect.gen(function* () {
-        const yes = options?.yes === true;
-        forgets.push({ taskIds: [...taskIds], yes });
-        for (const id of taskIds)
-          if (!settledIn(id))
-            return yield* Effect.fail(
-              new ForgetRefused({
-                taskId: id,
-                message: tasks.has(id) ? `${id} has not settled: stop it first` : `no task ${id} in this store`,
-              }),
-            );
-        if (yes) for (const id of taskIds) tasks.delete(id);
-        return { forgotten: yes, tasks: taskIds.map((taskId) => ({ taskId, journalBytes: 0, feedLines: 0, sessions: [] })) };
-      }),
+    forget: forgetVerbOf(tasks, forgets, settledIn),
+    kept: keptVerbOf(tasks, sizes, keptFailures),
   } satisfies Partial<EngineShape>;
 };
 
@@ -260,9 +308,11 @@ export const testEngine = (): TestEngine => {
     said: [] as { taskId: string; text: string }[],
   };
   const sayRefusals = { left: 0 };
+  const sizes = new Map<string, TestKeeps>();
+  const keptFailures = { left: 0 };
   const layer = Layer.succeed(Engine)(
     Engine.of({
-      ...keptOf(held, sayRefusals),
+      ...keptOf(held, sayRefusals, sizes, keptFailures),
       tick: unkept('tick'),
       admit: unkept('admit'),
       transcript: unkept('transcript'),
@@ -292,5 +342,11 @@ export const testEngine = (): TestEngine => {
   const refuseSay = (times: number) => {
     sayRefusals.left = times;
   };
-  return { layer, ...held, refuseSay, settle };
+  const keeps = (id: string, planted: TestKeeps) => {
+    sizes.set(id, planted);
+  };
+  const failKept = (times: number) => {
+    keptFailures.left = times;
+  };
+  return { layer, ...held, refuseSay, settle, keeps, failKept };
 };

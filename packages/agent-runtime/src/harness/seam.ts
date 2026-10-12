@@ -264,10 +264,23 @@ export type RunnerOps = {
     session: { name: string; nativeId?: string },
     options: { dry: boolean },
   ) => Effect.Effect<SessionForgotten, RunnerError>;
+  /**
+   * Where this harness keeps what it has of each of `sessions`, by the session's name: optional, for a harness that keeps files
+   * of its own per session. Given every session asked of this harness at once, each by the name the engine gave it and the id
+   * the harness knew it by, when it had one, so a harness lists a folder once an ask and never once a session. It removes
+   * nothing and reads no file's content. A session it keeps nothing of has no key, and a path is one that was there when asked.
+   */
+  readonly kept?: (sessions: readonly { name: string; nativeId?: string }[]) => Effect.Effect<Record<string, SessionKept>, RunnerError>;
 };
 
 /** What a harness removed of a session (`RunnerOps.forget`), or would remove, by path, and what it leaves, by name. */
 export type SessionForgotten = { files: string[]; left: string[] };
+
+/**
+ * Where a harness keeps what it has of a session (`RunnerOps.kept`), by path: `files`, what its `forget` would remove, and
+ * `records`, its own record of the session, which `forget` leaves, a file or a folder found by the session's id.
+ */
+export type SessionKept = { files: string[]; records: string[] };
 
 export class Runner extends Context.Service<Runner, RunnerOps>()('engine/Runner') {
   /**

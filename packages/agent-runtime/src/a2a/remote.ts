@@ -50,7 +50,7 @@ import fs from 'node:fs';
 import type { SessionState, Sighting } from '../core/index.ts';
 import { RunnerError, type SpawnRequest, type TranscriptCursor } from '../harness/index.ts';
 import { instantNow } from '../core/engine/now.ts';
-import { forgetEntryOf, readEntry, registryOf, type Entry } from './entry.ts';
+import { entryVerbsOf, readEntry, registryOf, type Entry } from './entry.ts';
 import { logsOfTask, remoteFollowUpOf, remoteMessageOf, sightingOfTask } from './map.ts';
 import { turnOver } from './remote-events.ts';
 import type { SeamOps } from './client.ts';
@@ -134,6 +134,7 @@ export type RemoteOptions = {
  * - `say` sends words to a Task that waits on its caller, as A2A's follow-up on it; the engine's `say` refuses them to a Task
  *   at work.
  * - `forget` removes the session's entry, open or let go of, and names the Task the remote party keeps, which is not ours.
+ * - `kept` names each session's entry, open or let go of, and no record: the Task is the remote party's.
  * - `follow`, `transcript` and `transcriptOf` are `remoteFollowOf`'s, `remoteTranscriptOf`'s and `remoteTranscriptByName`'s.
  */
 export const remoteOps = (
@@ -450,7 +451,7 @@ export const remoteOps = (
     follow: remoteFollowOf(followed),
     transcript,
     transcriptOf,
-    forget: forgetEntryOf(harness, dir),
+    ...entryVerbsOf(harness, dir),
     refuses: remoteRefuses(harness),
   };
 };

@@ -122,6 +122,11 @@ const harness = (
               asked.push(['forget', [session, options]]);
               return Effect.succeed({ files: [`/runs/${session.name}.json`], left: options.dry ? ['kept elsewhere'] : [] });
             }),
+          kept: (sessions: readonly { name: string; nativeId?: string }[]) =>
+            Effect.suspend(() => {
+              asked.push(['kept', [sessions]]);
+              return Effect.succeed(Object.fromEntries(sessions.map((s) => [s.name, { files: [`/runs/${s.name}.json`], records: [] }])));
+            }),
           transcript: (sessionId: string, after?: string) =>
             Effect.suspend(() => {
               asked.push(['transcript', [sessionId, after]]);
@@ -529,6 +534,20 @@ const REFUSALS: Array<[string, (h: H) => Promise<unknown>, (e: Error) => boolean
     (h) => h.handler.forgetSession({ session: { name: 'ae/t-1/1' }, dry: true }, ctx),
     refusedWith(UnsupportedOperationError, 'the `fake` harness keeps nothing of a session to forget.'),
     { bare: true },
+  ],
+  [
+    'a kept on a harness that says nothing of where it keeps a session',
+    (h) => h.handler.sessionKept({ sessions: [{ name: 'ae/t-1/1' }] }, ctx),
+    refusedWith(UnsupportedOperationError, "the `fake` harness says nothing of where it keeps a session's files."),
+    { bare: true },
+  ],
+  [
+    'a kept of a name that is not a session name',
+    (h) => h.handler.sessionKept({ sessions: [{ name: 'ae/t-1/1' }, { name: 'elsewhere' }] }, ctx),
+    refusedWith(
+      RequestMalformedError,
+      'the request names no sessions: send `{ sessions: [{ name }] }`, each name `ae/<task>/<n>`, n from 1.',
+    ),
   ],
   [
     'a forget of a name that is not a session name',
@@ -1027,6 +1046,7 @@ test("the harness's card: its name, no streaming, no notifications, text in and 
             'observeSessions',
             'harnessQuota',
             'forgetSession',
+            'sessionKept',
           ],
           say: true,
         },
@@ -1042,6 +1062,16 @@ test('REFUSED on the card: a verb the driver lacks is not offered, and logs, whi
     card.capabilities!.extensions.map((e) => e.params),
     [{ methods: ['sessionLogs'], say: false }],
   );
+});
+
+test("sessionKept hands the driver's kept every session at once, and answers where each is kept", async () => {
+  const h = harness();
+  const sessions = [{ name: 'ae/t-1/1', nativeId: 'n-1' }, { name: 'ae/t-2/1' }];
+  assert.deepEqual(await h.handler.sessionKept({ sessions }, ctx), {
+    'ae/t-1/1': { files: ['/runs/ae/t-1/1.json'], records: [] },
+    'ae/t-2/1': { files: ['/runs/ae/t-2/1.json'], records: [] },
+  });
+  assert.deepEqual(h.acted(), [['kept', [sessions]]]);
 });
 
 test("forgetSession hands the driver's forget the session and whether to remove, and answers what it removed", async () => {

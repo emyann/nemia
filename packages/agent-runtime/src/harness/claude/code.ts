@@ -26,7 +26,7 @@ import { claudeQuota } from './quota.ts';
 import type { Observation, RunnerOps, SpawnRequest } from '../seam.ts';
 import { causeWords } from '../error.ts';
 import { detachedFind, detachedOps, type HarnessIO, type HarnessSpec, type StartEvent } from '../detached/detached.ts';
-import { claudeTranscriptEvents, claudeTranscriptFile } from './transcript.ts';
+import { claudeTranscriptEvents, claudeTranscriptFile, claudeTranscriptRecords } from './transcript.ts';
 import {
   CLAUDE_CONTEXT_TOKENS,
   CLAUDE_DEFAULT_MODE,
@@ -148,7 +148,7 @@ export const claudeDetached: HarnessSpec = {
   }),
   readOutput: claudeResultOutput,
   start: CLAUDE_RESULT_START,
-  transcript: { file: claudeTranscriptFile, events: claudeTranscriptEvents },
+  transcript: { file: claudeTranscriptFile, events: claudeTranscriptEvents, records: claudeTranscriptRecords },
   noChannel:
     "`claude -p` listens for messages, but this harness learns its session's id only from what it prints as it exits, so nothing can be addressed to one while it runs. File the task on `claude`, whose jobs take words on their stdin, to be able to tell it something, or continue its session with a new task that carries the words (`resumeFrom`).",
   prepare: claudePrepare,
@@ -203,7 +203,7 @@ export const claudeJob: HarnessSpec = {
   },
   readOutput: claudeStreamOutput,
   start: CLAUDE_INIT_START,
-  transcript: { file: claudeTranscriptFile, events: claudeTranscriptEvents },
+  transcript: { file: claudeTranscriptFile, events: claudeTranscriptEvents, records: claudeTranscriptRecords },
   streams: true,
   partials: claudePartials,
   prepare: claudePrepare,
@@ -250,6 +250,7 @@ export const isClaudeJob = (sessionId: string) => nameParts(sessionId) !== undef
  * - `quota` asks the `claude` on PATH for the plan's usage (`claudeQuota`), whichever mode the sessions run in.
  * - `forget` removes what either mode keeps under the session's name, since a name the engine gave does not say which mode
  *   ran it, and names the transcript once.
+ * - `kept` names what either mode keeps under each session's name, joined the same way, a path named once.
  */
 export const claudeCodeOps = (options: ClaudeOptions = {}): RunnerOps => {
   const root = options.root ?? path.join(os.homedir(), '.agent-engine');
@@ -332,6 +333,21 @@ export const claudeCodeOps = (options: ClaudeOptions = {}): RunnerOps => {
           files: [...jobs.files, ...sessions.files],
           left: [...new Set([...jobs.left, ...sessions.left])],
         })),
+      ),
+
+    kept: (sessions) =>
+      Effect.all([job.kept!(sessions), bg.kept!(sessions)]).pipe(
+        Effect.map(([jobs, held]) =>
+          Object.fromEntries(
+            [...new Set([...Object.keys(jobs), ...Object.keys(held)])].map((name) => [
+              name,
+              {
+                files: [...new Set([...(jobs[name]?.files ?? []), ...(held[name]?.files ?? [])])],
+                records: [...new Set([...(jobs[name]?.records ?? []), ...(held[name]?.records ?? [])])],
+              },
+            ]),
+          ),
+        ),
       ),
   };
 };

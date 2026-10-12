@@ -1,6 +1,7 @@
 /**
  * The disk's pure half (`disk.ts`): which part a name of the store's root is, which run a name beside a record belongs to, a walk's
- * answers summed by part and factory with what did not read never said as zero, the runs that hold the most, and the label sets gone.
+ * answers summed by part and factory with what did not read never said as zero, what the runtime keeps by task laid over them, the
+ * runs that hold the most, and the label sets gone.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,7 +16,10 @@ import {
   runOf,
   unreadByPart,
   vanished,
+  withKept,
+  type DiskEntry,
   type DiskRoot,
+  type TaskKept,
 } from './disk.ts';
 
 const SPACE = { free: 70, size: 100 };
@@ -41,7 +45,8 @@ test('a name of the store root is its part, the series for metrics, and other fo
     'other',
     'other',
   ]);
-  assert.deepEqual([...DISK_PARTS].sort(), ['checks', 'engine', 'other', 'runs', 'series', 'worktrees']);
+  assert.deepEqual([...DISK_PARTS].sort(), ['checks', 'engine', 'other', 'runs', 'series', 'sessions', 'worktrees']);
+  assert.equal(partOf('sessions'), 'other', 'the sessions are no folder of the store: a name so called is any other name');
 });
 
 test('a name beside a record is its run by the id before a dot, the longest known, and never a run whose id it only starts with', () => {
@@ -107,7 +112,7 @@ test('REFUSED: an entry none of whose roots read has no bytes, never zero, and i
   );
   assert.deepEqual(
     unreadByPart(entries).map(({ part, unread }) => `${part} ${unread}`),
-    ['worktrees 0', 'runs 4', 'engine 1', 'checks 0', 'series 0', 'other 0'],
+    ['worktrees 0', 'runs 4', 'engine 1', 'sessions 0', 'checks 0', 'series 0', 'other 0'],
     'every part is said, zero where all read',
   );
 });
@@ -140,4 +145,81 @@ test('a label set said before and in no entry now is gone; one whose entry did n
   ]);
   assert.deepEqual(gone.map(entryOf), [{ part: 'runs', factory: 'nemia' }]);
   assert.deepEqual(entryOf(entryKey({ part: 'engine' })), { part: 'engine' });
+});
+
+/** A walk's entries around an engine folder of `engine` bytes. */
+const walkedWith = (engine: number): DiskEntry[] => [
+  { part: 'runs', factory: 'nemia', bytes: 7, unread: 0 },
+  { part: 'engine', bytes: engine, unread: 0 },
+  { part: 'other', bytes: 3, unread: 0 },
+];
+
+/** The factory of each task of the fixtures: `t-n*` nemia's, `t-p*` pipao's, any other no run's. */
+const factoryOfTask = (taskId: string): string | undefined =>
+  taskId.startsWith('t-n') ? 'nemia' : taskId.startsWith('t-p') ? 'pipao' : undefined;
+
+test('what the runtime keeps by task is the engine by factory, the engine alone the whole less those, and the sessions by factory and alone', () => {
+  const kept: TaskKept[] = [
+    { taskId: 't-n1', engine: 100, sessions: 40, unread: 0 },
+    { taskId: 't-p1', engine: 30, unread: 2 },
+    { taskId: 't-n2', engine: 50, sessions: 5, unread: 0 },
+    { taskId: 'gone', engine: 20, sessions: 9, unread: 1 },
+  ];
+  const entries = withKept(walkedWith(1000), kept, factoryOfTask);
+  assert.deepEqual(entries, [
+    { part: 'runs', factory: 'nemia', bytes: 7, unread: 0 },
+    { part: 'engine', bytes: 1000 - 100 - 30 - 50, unread: 1 },
+    { part: 'engine', factory: 'nemia', bytes: 150, unread: 0 },
+    { part: 'engine', factory: 'pipao', bytes: 30, unread: 2 },
+    { part: 'sessions', bytes: 9, unread: 0 },
+    { part: 'sessions', factory: 'nemia', bytes: 45, unread: 0 },
+    { part: 'other', bytes: 3, unread: 0 },
+  ]);
+  const engine = entries.filter((entry) => entry.part === 'engine').reduce((sum, entry) => sum + (entry.bytes ?? 0), 0);
+  assert.equal(engine, 1000, 'the entries of the engine add up to the walked whole: a task of no run stays in the part alone');
+});
+
+test('REFUSED, nothing is drawn: with no task that keeps a record there is no sessions entry at all, not one at zero', () => {
+  const kept: TaskKept[] = [
+    { taskId: 't-n1', engine: 100, unread: 0 },
+    { taskId: 'gone', engine: 20, unread: 0 },
+  ];
+  const entries = withKept(walkedWith(1000), kept, factoryOfTask);
+  assert.deepEqual(
+    entries.map((entry) => [entry.part, entry.factory ?? null, entry.bytes]),
+    [
+      ['runs', 'nemia', 7],
+      ['engine', null, 900],
+      ['engine', 'nemia', 100],
+      ['other', null, 3],
+    ],
+  );
+  assert.deepEqual(withKept(walkedWith(1000), [], factoryOfTask), walkedWith(1000), 'and a runtime with no task changes nothing');
+  const drawn = withKept(walkedWith(1000), [{ taskId: 't-n1', engine: 0, sessions: 0, unread: 0 }], factoryOfTask);
+  assert.deepEqual(
+    drawn.find((entry) => entry.part === 'sessions'),
+    { part: 'sessions', factory: 'nemia', bytes: 0, unread: 0 },
+  );
+});
+
+test('bytes given to factories above the walked whole leave the engine alone at zero, never below', () => {
+  const entries = withKept(walkedWith(100), [{ taskId: 't-n1', engine: 160, unread: 0 }], factoryOfTask);
+  assert.deepEqual(
+    entries.filter((entry) => entry.part === 'engine'),
+    [
+      { part: 'engine', bytes: 0, unread: 0 },
+      { part: 'engine', factory: 'nemia', bytes: 160, unread: 0 },
+    ],
+  );
+});
+
+test('an ask that failed leaves the engine whole, and the sessions one entry with no bytes and a name unread; an engine that did not read stays so', () => {
+  assert.deepEqual(withKept(walkedWith(1000), undefined, factoryOfTask), [
+    { part: 'runs', factory: 'nemia', bytes: 7, unread: 0 },
+    { part: 'engine', bytes: 1000, unread: 0 },
+    { part: 'sessions', unread: 1 },
+    { part: 'other', bytes: 3, unread: 0 },
+  ]);
+  const unread: DiskEntry[] = [{ part: 'engine', unread: 1 }];
+  assert.deepEqual(withKept(unread, [{ taskId: 'gone', engine: 5, unread: 0 }], factoryOfTask), unread, 'no bytes, never zero');
 });

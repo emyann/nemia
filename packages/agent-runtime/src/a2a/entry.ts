@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import fs from 'node:fs';
 import { formerStateOf, isSessionState, type Sighting } from '../core/index.ts';
-import { forgetFiles, type RunnerOps } from '../harness/index.ts';
+import { forgetFiles, keptOf, type RunnerOps } from '../harness/index.ts';
 import type { Monotonic } from '../core/clock.ts';
 
 /** One session's entry in the registry. */
@@ -66,6 +66,9 @@ export const readEntry = (file: string): Entry | undefined => {
   }
 };
 
+/** Where the registry in `dir` keeps the entry of the session `name`: open, and let go of. */
+const entryFilesOf = (dir: string, name: string): string[] => [entryFileOf(dir, name), entryFileOf(path.join(dir, 'done'), name)];
+
 /**
  * The remote harness `harness`'s `forget`, its registry in `dir`: the session's entry, open or let go of, removed or with `dry`
  * listed, and the Task the agent made of it named as left, since the remote party keeps it.
@@ -73,13 +76,28 @@ export const readEntry = (file: string): Entry | undefined => {
 export const forgetEntryOf =
   (harness: string, dir: string): NonNullable<RunnerOps['forget']> =>
   (session, options) => {
-    const files = [entryFileOf(dir, session.name), entryFileOf(path.join(dir, 'done'), session.name)];
+    const files = entryFilesOf(dir, session.name);
     const left = () => {
       const e = readEntry(files[0]) ?? readEntry(files[1]);
       return e?.taskId ? [`the Task ${e.taskId}, the \`${harness}\` agent's to keep`] : [];
     };
     return forgetFiles(harness, files, left, options.dry);
   };
+
+/**
+ * The remote harness `harness`'s `kept`, its registry in `dir`: each session's entry, open or let go of. It names no record: the
+ * Task the agent made of a session is the remote party's, and on no disk of ours.
+ */
+export const keptEntryOf =
+  (harness: string, dir: string): NonNullable<RunnerOps['kept']> =>
+  (sessions) =>
+    keptOf(harness, sessions, ({ name }) => ({ files: entryFilesOf(dir, name), records: [] }));
+
+/** The remote harness `harness`'s verbs over its registry in `dir` alone: `forget` (`forgetEntryOf`) and `kept` (`keptEntryOf`). */
+export const entryVerbsOf = (harness: string, dir: string): Required<Pick<RunnerOps, 'forget' | 'kept'>> => ({
+  forget: forgetEntryOf(harness, dir),
+  kept: keptEntryOf(harness, dir),
+});
 
 /** The names of the entries in `under`; none for a folder not made yet. */
 const entryNames = (under: string): string[] => {

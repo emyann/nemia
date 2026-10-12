@@ -439,6 +439,37 @@ const FORGET: readonly Walk[] = [
   },
 ];
 
+/** The tasks a `kept` names, sorted, or the refusal it gave: the sizes are each side's own (`APART`). */
+const named = (report: Awaited<ReturnType<typeof asked<{ tasks: { taskId: string }[] }, unknown>>>): unknown =>
+  report && 'tasks' in report ? report.tasks.map((t) => t.taskId).sort() : report;
+
+const KEPT: readonly Walk[] = [
+  {
+    name: 'kept names a task filed, one at work and one settled each once, and no task never filed',
+    walk: async ({ engine, settle }) => {
+      const none = named(await asked(engine.kept()));
+      for (const id of ['a', 'b', 'c']) await asked(engine.file(task(id)));
+      await settle('b', 'running (working)');
+      await settle('c', 'failed', { exitCode: 1 });
+      return [none, named(await asked(engine.kept()))];
+    },
+    says: [[], ['a', 'b', 'c']],
+  },
+  {
+    name: 'kept handed an argument is refused, and a task forgotten is named no more',
+    walk: async ({ engine, settle }) => {
+      await asked(engine.file(task('a')));
+      await asked(engine.file(task('b')));
+      await settle('a', 'failed', { exitCode: 1 });
+      const handed: ReturnType<EngineShape['kept']> = Reflect.apply(engine.kept, engine, [['a']]);
+      const refused = await asked(handed);
+      await asked(engine.forget(['a'], { yes: true }));
+      return [refused, named(await asked(engine.kept()))];
+    },
+    says: [{ refused: 'KeptRefused' }, ['b']],
+  },
+];
+
 /** The contract: every kept verb's walks. */
 export const WALKS = {
   file: FILE,
@@ -450,6 +481,7 @@ export const WALKS = {
   list: LIST,
   say: SAY,
   forget: FORGET,
+  kept: KEPT,
 } as const;
 
 /** A verb the stand-in keeps. */
@@ -572,6 +604,15 @@ export const APART: readonly Apart[] = [
       return asked(engine.forget(['a']));
     },
     standIn: { forgotten: false, tasks: [{ taskId: 'a', journalBytes: 0, feedLines: 0, sessions: [] }] },
+  },
+  {
+    name: 'what is kept of a task',
+    why: "the sizes kept are the store's and the harness's, and the stand-in answers what a test planted",
+    walk: async ({ engine }) => {
+      await asked(engine.file(task('a')));
+      return asked(engine.kept());
+    },
+    standIn: { tasks: [{ taskId: 'a', journal: 0, bodies: 0, files: 0 }] },
   },
 ];
 

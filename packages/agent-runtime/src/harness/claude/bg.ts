@@ -25,6 +25,7 @@ import {
   readSessionTranscript,
   renderTranscript,
   transcriptFile,
+  transcriptRecords,
   TranscriptUnread,
   transcriptUsage,
   transcriptWrittenAt,
@@ -39,7 +40,7 @@ import { countSpawn } from '../../core/engine/tally.ts';
 import type { Monotonic } from '../../core/clock.ts';
 import { monoNow } from '../../core/engine/now.ts';
 import { RunnerError, refusedOsError } from '../error.ts';
-import { forgetFiles } from '../forget.ts';
+import { forgetFiles, keptOf } from '../forget.ts';
 import { bgFollowOf, sharedListing } from './bg-follow.ts';
 import { claudeStateOf, registryOf, type RegistryRow } from './registry.ts';
 import { type ParentCall, parentFileOf, parentOf, recordParent, whoseCall } from './parent.ts';
@@ -360,6 +361,7 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
     say: sayThrough(sessionsDir, registry.pids),
     quota: claudeQuota(),
     forget: forgetUnder(root),
+    kept: keptUnder(root),
   };
 };
 
@@ -372,13 +374,31 @@ const forgetUnder =
   (session, { dry }) =>
     forgetFiles(
       'claude --bg',
-      [mcpFileOf(root, session.name), quietFileOf(root, session.name), parentFileOf(root, session.name)],
+      writtenUnder(root, session.name),
       () => {
         const file = session.nativeId ? transcriptFile(session.nativeId) : undefined;
         return file ? [file] : [];
       },
       dry,
     );
+
+/** The files this runner wrote of the session `name` under `root`: its MCP config, its transcript's sighting, its parent's last call. */
+const writtenUnder = (root: string, name: string): string[] => [mcpFileOf(root, name), quietFileOf(root, name), parentFileOf(root, name)];
+
+/**
+ * A background session's `kept`: the files `forgetUnder` would remove of each session, and Claude Code's record of it, its
+ * transcript and the folder beside it, found for them all in one pass (`transcriptRecords`).
+ */
+const keptUnder =
+  (root: string): NonNullable<RunnerOps['kept']> =>
+  (sessions) =>
+    Effect.suspend(() => {
+      const records = transcriptRecords(sessions.flatMap((s) => (s.nativeId ? [s.nativeId] : [])));
+      return keptOf('claude --bg', sessions, (s) => ({
+        files: writtenUnder(root, s.name),
+        records: (s.nativeId ? records.get(s.nativeId) : undefined) ?? [],
+      }));
+    });
 
 /**
  * `claude --bg` under `r.name`, in the task's `cwd`, with its MCP configs written under `root`, and its parent's last call recorded

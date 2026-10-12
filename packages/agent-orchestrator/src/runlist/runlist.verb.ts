@@ -15,7 +15,7 @@ import { stepSpend, taskSpend } from '../status/status.ts';
 import { type Spent, spentOf } from '../summary/judged.verb.ts';
 import { filedTimes, judgedSteps, unreadableOf, type Unreadable, type Views, viewsFor, workflowsOf } from '../summary/reads.verb.ts';
 import { type RunSummary, runsSummarized, type SummaryHow } from '../summary/summary.verb.ts';
-import { clockOf, type RunClock } from '../timeline/index.ts';
+import { clockOf, waitingSinceOf, type RunClock } from '../timeline/index.ts';
 import {
   byFinished,
   finishedAtOf,
@@ -40,10 +40,13 @@ export type ListedRun = Listed<RunSummary>;
 export type StepCost = { step: string; cost: Spent | null };
 
 /**
- * A run that waits on a person: its `clock`, where its wall time went until now (`RunClock`), and `stepCosts`, the cost of each of its
- * steps in the summary's order. Both null for a run a task of which does not read, or whose record is gone since the list was read.
+ * A run that waits on a person: its `clock`, where its wall time went until now (`RunClock`), `stepCosts`, the cost of each of its
+ * steps in the summary's order, and `waitingSince`, when its present wait on a person began (`waitingSinceOf`): the end of the waiting
+ * step's last try or the placing of a hold only a person lifts, the earliest where several are open. All three null for a run a task of
+ * which does not read, or whose record is gone since the list was read; `waitingSince` null too for a wait the record does not date, as
+ * one on a run that never ships.
  */
-export type WaitingRun = ListedRun & { clock: RunClock | null; stepCosts: StepCost[] | null };
+export type WaitingRun = ListedRun & { clock: RunClock | null; stepCosts: StepCost[] | null; waitingSince: string | null };
 
 /** A finished run on its page: when its work stopped, and how it ended (`RunOutcome`). */
 export type FinishedRun = Finished<RunSummary>;
@@ -91,8 +94,9 @@ function brokenDown(
   run: Run | undefined,
   read: { views: Views; unreadable: Unreadable; filed: ReadonlyMap<string, string> },
   how: { home: string; now: number },
-): Pick<WaitingRun, 'clock' | 'stepCosts'> {
-  if (!run || unreadableOf(run, read.unreadable)) return { clock: null, stepCosts: null };
+): Pick<WaitingRun, 'clock' | 'stepCosts' | 'waitingSince'> {
+  if (!run || unreadableOf(run, read.unreadable)) return { clock: null, stepCosts: null, waitingSince: null };
+  const held = summary.holding?.onYou ? summary.holding.at : null;
   const steps = judgedSteps(run, workflowsOf(run, how.home).steps);
   return {
     clock: clockOf(run, read.views, read.filed, steps, summary.waitingOnYou, how.now),
@@ -100,6 +104,7 @@ function brokenDown(
       step: name,
       cost: spentOf(stepSpend(run, name, (id) => taskSpend(read.views.get(id)))),
     })),
+    waitingSince: waitingSinceOf(run, read.views, read.filed, steps, summary.waitingOnYou, held),
   };
 }
 

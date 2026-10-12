@@ -91,7 +91,15 @@ const everyPage = async (query = ''): Promise<FinishedListing[]> => {
 
 /** A row of either read as the whole list answers the run: without what the two reads add. */
 const listingOf = (row: object): object => {
-  const { wallMs: _w, finishedAt: _f, outcome: _o, clock: _c, stepCosts: _s, ...listing } = row as Record<string, unknown>;
+  const {
+    wallMs: _w,
+    finishedAt: _f,
+    outcome: _o,
+    clock: _c,
+    stepCosts: _s,
+    waitingSince: _p,
+    ...listing
+  } = row as Record<string, unknown>;
   return listing;
 };
 
@@ -143,6 +151,9 @@ test('a waiting row carries its steps’ costs and a clock whose parts add up to
   assert.deepEqual([checksMs, slotMs, restMs], [0, 0, 0]);
   assert.equal(personMs, wallMs - 5 * 60_000, 'from its blocked sign-off until now');
   assert.equal('clock' in open.inFlight[0], false);
+  assert.equal(row.waitingSince, at(25), 'its present wait began as its blocked sign-off ended');
+  assert.equal(wallMs - personMs, Date.parse(row.waitingSince) - Date.parse(row.createdAt), 'its one wait is its whole wait on a person');
+  assert.equal('waitingSince' in open.inFlight[0], false);
 });
 
 test('?ofFactory= keeps the runs of one factory, default those that name none, and a name no run carries answers empty', async () => {

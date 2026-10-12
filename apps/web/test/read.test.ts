@@ -141,7 +141,7 @@ test("the light answer decodes what the api gives, a waiting run with its clock 
   const answer = {
     asOf: '2026-10-12T12:00:00.000Z',
     counts: { waiting: 1, inFlight: 1, finished: 7 },
-    waiting: [{ ...row(), ...listed, clock, stepCosts }],
+    waiting: [{ ...row(), ...listed, clock, stepCosts, waitingSince: '2026-10-12T11:57:00.000Z' }],
     inFlight: [{ ...row({ id: 'r-2' }), ...listed }],
   };
   globalThis.fetch = async (input) => {
@@ -168,7 +168,7 @@ test("the light answer decodes what the api gives, a waiting run with its clock 
 
 test('REFUSED: a light answer whose row lacks a key the board reads, or that lacks a count, is an unreadable answer', async (t) => {
   const { waitingOnYou: _dropped, ...short } = row();
-  const more = { wallMs: 5, finishedAt: null, clock: null, stepCosts: null };
+  const more = { wallMs: 5, finishedAt: null, clock: null, stepCosts: null, waitingSince: null };
   const asOf = '2026-10-12T12:00:00.000Z';
   answering(t, { asOf, counts: { waiting: 1, inFlight: 0, finished: 0 }, waiting: [{ ...short, ...more }], inFlight: [] });
   const refused = (found: string) => (err: unknown) => {
@@ -183,6 +183,11 @@ test('REFUSED: a light answer whose row lacks a key the board reads, or that lac
   const { clock: _clock, ...unbroken } = { ...row(), ...more };
   answering(t, { asOf, counts: { waiting: 1, inFlight: 0, finished: 0 }, waiting: [unbroken], inFlight: [] });
   await assert.rejects(readOpen(), refused('waiting[0].clock'));
+  const { waitingSince: _since, ...undated } = { ...row(), ...more };
+  answering(t, { asOf, counts: { waiting: 1, inFlight: 0, finished: 0 }, waiting: [undated], inFlight: [] });
+  await assert.rejects(readOpen(), refused('waiting[0].waitingSince'));
+  answering(t, { asOf, counts: { waiting: 1, inFlight: 0, finished: 0 }, waiting: [{ ...row(), ...more }], inFlight: [] });
+  assert.equal((await readOpen()).waiting[0].waitingSince, null, 'a wait the api does not date decodes as none');
 });
 
 test('the Runs list decodes an answer the api gives, each union in its every shape', async (t) => {

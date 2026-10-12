@@ -435,6 +435,23 @@ export const GATED = {
 } as const;
 
 /**
+ * A run at its second gate: `plan → build → ship`, the first two gated. plan signed off half an hour ago and waited some twenty minutes
+ * for its approval, the file `nemia approve` writes beside the record; build then ran, signed off a few minutes ago, and awaits its own;
+ * ship is not filed, so the run's result is nobody's to decide yet. So the run's present wait on a person is minutes long while all its
+ * waits on one, summed, are over twenty: the `runs` page tells the two apart. No seeded run: the Factory lays its cards out by age, so
+ * the `runs` page writes it for itself (`writeRegated`) and takes it back.
+ */
+export const REGATED = {
+  id: 'wait-at-the-second-gate-e2e12',
+  title: 'Wait at the second gate',
+  steps: ['plan', 'build', 'ship'],
+  /** Minutes ago, each mid-minute: plan signed off, a person approved it, and build signed off. */
+  planEnded: 30.5,
+  approved: 8.5,
+  buildEnded: 3.5,
+} as const;
+
+/**
  * A seventh run, whose workflow's ending is a step of its own: `implement → review → ship`, with `ship` in the repository's own checkout
  * (`workspace: main`) and gated. implement and review signed off; ship has never run, so it reads `awaiting approval` — its approval is
  * what files it — and nothing of the run moves. So it is finished, and it stays on the Factory's floor all the same: nobody has decided it.
@@ -1882,6 +1899,77 @@ export function seedFeed(root: string): void {
     );
   entries.sort((a, b) => a.event.at.localeCompare(b.event.at));
   write(path.join(root, 'engine', 'feed.jsonl'), lines(entries));
+}
+
+/** Each path `writeRegated` makes in `root`, a folder or a file, for the page that takes them back, whether or not all were made. */
+export const regatedFiles = (root: string): string[] => [
+  path.join(root, 'workflow-regated'),
+  path.join(root, 'runs', `${REGATED.id}.json`),
+  path.join(root, 'runs', `${REGATED.id}.asks`),
+  path.join(root, 'engine', 'tasks', `${REGATED.id}-plan.jsonl`),
+  path.join(root, 'engine', 'tasks', `${REGATED.id}-build.jsonl`),
+];
+
+/**
+ * REGATED into `root`, its times minutes before `now`: its workflow folder, its record, plan's approval beside it, and the journals of
+ * its two tasks (`regatedFiles`).
+ */
+export function writeRegated(root: string, now: number): void {
+  const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
+  const { id, title, planEnded, approved, buildEnded } = REGATED;
+  const dir = path.join(root, 'workflow-regated');
+  write(path.join(dir, 'plan.md'), '---\nplace: git\nharness: claude\n---\nPlan it.\n');
+  write(path.join(dir, 'build.md'), '---\nplace: git\nharness: claude\nafter: plan\n---\nBuild the plan.\n');
+  write(path.join(dir, 'ship.md'), '---\nplace: git\nharness: claude\nafter: build\n---\nShip what was built.\n');
+  const lane = (step: string) => path.join(root, 'worktrees', id, step);
+  const record = (step: string) => ({ taskId: `${id}-${step}`, workspace: lane(step), branch: `wf/${id}/${step}` });
+  write(
+    path.join(root, 'runs', `${id}.json`),
+    JSON.stringify(
+      {
+        id,
+        repo: '/code/hkb-v2',
+        workspace: '/code/hkb-v2',
+        baseRef: '19c9365',
+        branch: 'main',
+        isolate: true,
+        brief: `${title}\n\nA run seeded by npm run e2e, started --gate plan --gate build: plan was approved, and build awaits its own approval.`,
+        workflowDir: dir,
+        workflow: [
+          { name: 'plan', after: [], body: 'Plan it.', harness: 'claude' },
+          { name: 'build', after: ['plan'], body: 'Build the plan.', harness: 'claude' },
+          { name: 'ship', after: ['build'], body: 'Ship what was built.', harness: 'claude' },
+        ],
+        gates: ['plan', 'build'],
+        createdAt: ago(planEnded + 1),
+        steps: { plan: record('plan'), build: record('build'), ship: { taskId: null } },
+      },
+      null,
+      2,
+    ),
+  );
+  write(path.join(root, 'runs', `${id}.asks`, 'approve-plan-1'), `${JSON.stringify({ step: 'plan', try: 1, at: ago(approved) })}\n`);
+  const journal = (step: string, filed: number, ended: number, summary: string) =>
+    write(
+      path.join(root, 'engine', 'tasks', `${id}-${step}.jsonl`),
+      lines([
+        { kind: 'filed', at: ago(filed), brief: summary, cwd: lane(step), maxAttempts: 1, harness: 'claude' },
+        { kind: 'starting', at: ago(filed), attempt: 1 },
+        { kind: 'spawned', at: ago(filed), attempt: 1 },
+        {
+          kind: 'ended',
+          at: ago(ended),
+          attempt: 1,
+          sessionId: `ae/${id}-${step}/1`,
+          observed: 'done',
+          reason: 'harness',
+          closeout: { outcome: 'done', summary, needs: null, artifacts: [] },
+        },
+        { kind: 'settled', at: ago(ended), outcome: 'succeeded' },
+      ]),
+    );
+  journal('plan', planEnded + 1, planEnded, 'The plan, in two steps.');
+  journal('build', approved, buildEnded, 'Built as planned.');
 }
 
 /**

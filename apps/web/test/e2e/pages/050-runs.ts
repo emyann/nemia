@@ -1,15 +1,16 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { FINISHED_SIZE, type FinishedPage, type OpenRuns, type WaitingRun } from '../../../src/lib/api/runs.ts';
 import { rowsSaid } from '../../../src/lib/finished.ts';
 import { titleOf } from '../../../src/lib/factory.ts';
-import { endedWords, waitSentence, waitTag } from '../../../src/lib/runWords.ts';
-import { answered, photograph, photographBothWidths, SECTIONS, sectionsOf, sidebar, themeOf } from '../board.ts';
+import { endedWords, presentWait, waitSentence, waitTag } from '../../../src/lib/runWords.ts';
+import { answered, fed, photograph, photographBothWidths, SECTIONS, sectionsOf, sidebar, themeOf } from '../board.ts';
 import { expectBeneath, expectCount, expectNone, expectTexts, expectVisible, idle, literal, Refused, WAIT_MS } from '../checks.ts';
 import { contrastHolds } from '../runs-contrast.ts';
-import { COSTLY } from '../seed.ts';
+import { COSTLY, REGATED, regatedFiles, writeRegated } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT } from '../world.ts';
+import { OUT, store } from '../world.ts';
 
 /**
  * A place in the menu pressed with Enter, as from the keyboard: the page is not loaded again, and the history has one entry more, as after
@@ -114,6 +115,67 @@ async function threeParts(page: Page, open: OpenRuns, finished: FinishedPage): P
   if (told) throw new Refused(`the page's own words say nothing of git and repeat no command — it says "${told[0]}"`);
   if (/\d+s\b/.test(await section(page, 'in-flight').innerText()))
     throw new Refused('no time on the page counts seconds: each is a fact to the minute');
+}
+
+/**
+ * What a card may say `run` has waited this time: its present wait at each half minute from a little before the answer `asOf` was read at
+ * until now, since the page's own read is another than the one the check made, and the wait grows meanwhile. None for a wait not dated.
+ */
+const waitsSaid = (run: WaitingRun, asOf: string): Set<string> => {
+  const said = new Set<string>();
+  const [from, now] = [Date.parse(asOf) - 90_000, Date.now()];
+  for (let at = from; at - 30_000 <= now; at += 30_000) {
+    const wait = presentWait(run, new Date(at));
+    if (wait !== null) said.add(`waiting ${wait}`);
+  }
+  return said;
+};
+
+/** The card of `run` says how long it has waited on a person this time, since the api's `waitingSince`, and nothing where it is null. */
+async function waitSaid(page: Page, run: WaitingRun, asOf: string): Promise<void> {
+  const figure = cardOf(page, run.id).locator('[data-waited]');
+  if (run.waitingSince === null)
+    return await expectCount(figure, 0, `the card of ${run.id}, whose wait the api does not date, says no wait`);
+  await expectNone(async () => {
+    const [said, may] = [(await figure.allInnerTexts()).map((text) => text.trim().toLowerCase()), waitsSaid(run, asOf)];
+    return said.length === 1 && may.has(said[0]) ? null : `it says "${said.join(' | ')}", and its present wait is ${[...may].join(' or ')}`;
+  }, `the card of ${run.id} says how long it has waited this time, since ${run.waitingSince}`);
+}
+
+/** The whole minutes a figure says, of `2h 5m` or `25m`; none for `under 1m` and `none`. */
+const minutesIn = (said: string): number => {
+  const [, h, m] = /(?:(\d+)h)?\s*(?:(\d+)m)?$/.exec(said.replace(/^under 1m$/, '')) ?? [];
+  return Number(h ?? 0) * 60 + Number(m ?? 0);
+};
+
+/**
+ * REGATED, at its second gate: its card says the present wait, minutes long, while the row of its Clock tile's tooltip keeps every wait
+ * on a person summed, over twenty minutes. A card that read the sum would say the row's figure. The open tooltip is photographed.
+ */
+async function secondGate(page: Page, open: OpenRuns): Promise<void> {
+  const run = open.waiting.find((waiting) => waiting.id === REGATED.id);
+  if (!run?.clock || run.waitingSince === null) throw new Refused(`${REGATED.id} waits on you, and the api dates its present wait`);
+  const [present, summed] = [Date.parse(open.asOf) - Date.parse(run.waitingSince), run.clock.personMs];
+  if (present >= 10 * 60_000 || summed < 20 * 60_000)
+    throw new Refused(`the api dates ${REGATED.id}'s wait from its second gate: ${present} ms of ${summed} ms waited in all`);
+  const card = cardOf(page, run.id);
+  await card.scrollIntoViewIfNeeded();
+  const waited = minutesIn(
+    (await card.locator('[data-waited]').innerText())
+      .trim()
+      .toLowerCase()
+      .replace(/^waiting /, ''),
+  );
+  if (waited < 1 || waited >= 10)
+    throw new Refused(`the card of ${REGATED.id} says its wait at the second gate, a few minutes — it says ${waited} minutes`);
+  await card.locator('[data-stat-tile="clock"]').focus();
+  await expectVisible(tooltip(page), "its Clock tile's tooltip opens on focus");
+  const row = (await tooltip(page).locator('[data-breakdown-row="Waiting on you"] dd').innerText()).trim();
+  await photograph(page, path.join(OUT, `runs-tooltip-second-gate-${await themeOf(page)}.png`));
+  await page.keyboard.press('Escape');
+  await expectCount(tooltip(page), 0, 'Escape closes it');
+  if (minutesIn(row) < 20)
+    throw new Refused(`the tooltip's row keeps the run's whole time waiting on a person, both gates summed — it says "${row}"`);
 }
 
 /** A waiting run's card says its tag, its factory, its title as a link, its id, one sentence, its steps by name, and opens its page. */
@@ -445,44 +507,75 @@ async function narrow(page: Page): Promise<void> {
   }
 }
 
+/** REGATED written into the worker's store and said on the feed, and the page loaded again on it. */
+async function regated(page: Page): Promise<void> {
+  writeRegated(store!, Date.now());
+  fed(REGATED.id, 'build', 'awaiting approval');
+  await page.reload({ waitUntil: 'load' });
+  await idle(page);
+  await expectCount(cardOf(page, REGATED.id), 1, `${REGATED.id}, written at its second gate, has its card`);
+}
+
+/** REGATED taken out of the worker's store, whatever of it was written, and the feed told. */
+function regatedBack(): void {
+  for (const file of regatedFiles(store!)) fs.rmSync(file, { recursive: true, force: true });
+  fed(REGATED.id, 'gone');
+}
+
+/** What the page asserts while REGATED is in the store, from its two reads to the menu's places and back. */
+async function withRegated(page: Page): Promise<void> {
+  await regated(page);
+  const open = await answered<OpenRuns>(page, '/api/runs-open');
+  const finished = await answered<FinishedPage>(page, `/api/runs-finished?page=1&size=${FINISHED_SIZE}`);
+  await twoReads(page);
+  await threeParts(page, open, finished);
+  for (const run of open.waiting) {
+    await cardSays(page, run);
+    await waitSaid(page, run, open.asOf);
+  }
+  const costly = open.waiting.find((run) => run.id === COSTLY.id);
+  if (!costly?.clock || !costly.stepCosts) throw new Refused(`${COSTLY.id} waits on you, and the api breaks its clock and its cost down`);
+  await photographBothWidths(page, OUT, 'runs', 'page');
+  await byKeyboard(page, costly);
+  await secondGate(page, open);
+  await tableByKeyboard(page, finished);
+  await finger(page, open, finished);
+  await rowsSay(page, open, finished);
+  await lookDetails(page);
+  await narrow(page);
+  await contrastHolds(page, ['[data-sentence]']);
+
+  await enterOnPlace(page, 'Inbox', '/inbox');
+  await expectVisible(
+    page.locator('[data-sidebar="sidebar"] a[data-active="true"]', { hasText: 'Inbox' }),
+    'reached with Enter, the Inbox is lit in the menu',
+  );
+  await enterOnPlace(page, 'Runs', '/runs');
+  await expectCount(
+    section(page, 'waiting').locator('article[data-run]'),
+    open.counts.waiting,
+    'back on Runs with Enter, its cards are drawn',
+  );
+}
+
 export default {
   /**
-   * The runs page, "Your move first": on two reads and never the whole list, a card for every run that waits on a person and no row
-   * of it, the runs in flight and one page of the finished as quiet tables, each under a plate that says the api's count. A card says
-   * its plain words and opens its run; its tiles open their breakdowns, and its id is copied, from the keyboard; a finger finds the
-   * copy control; 390 wide breaks nothing; and no text pair is under 4.5:1 in either scheme. The menu's places are reached with Enter
-   * in the page, to the Inbox and back.
+   * The runs page, "Your move first": on two reads and never the whole list, a card for every run that waits on a person and no row of
+   * it, the runs in flight and one page of the finished as quiet tables, each under a plate that says the api's count. A card says its
+   * plain words, how long it has waited this time, and opens its run; its tiles open their breakdowns, and its id is copied, from the
+   * keyboard; a finger finds the copy control; 390 wide breaks nothing; and no text pair is under 4.5:1 in either scheme. The menu's
+   * places are reached with Enter in the page, to the Inbox and back. It writes REGATED, the run at its second gate, for itself, and
+   * takes it back at its end, on a refusal too.
    */
   name: 'runs',
   route: '/runs',
   expect: async (page) => {
     await sidebar(page);
-    const open = await answered<OpenRuns>(page, '/api/runs-open');
-    const finished = await answered<FinishedPage>(page, `/api/runs-finished?page=1&size=${FINISHED_SIZE}`);
-    await twoReads(page);
-    await threeParts(page, open, finished);
-    for (const run of open.waiting) await cardSays(page, run);
-    const costly = open.waiting.find((run) => run.id === COSTLY.id);
-    if (!costly?.clock || !costly.stepCosts) throw new Refused(`${COSTLY.id} waits on you, and the api breaks its clock and its cost down`);
-    await photographBothWidths(page, OUT, 'runs', 'page');
-    await byKeyboard(page, costly);
-    await tableByKeyboard(page, finished);
-    await finger(page, open, finished);
-    await rowsSay(page, open, finished);
-    await lookDetails(page);
-    await narrow(page);
-    await contrastHolds(page, ['[data-sentence]']);
-
-    await enterOnPlace(page, 'Inbox', '/inbox');
-    await expectVisible(
-      page.locator('[data-sidebar="sidebar"] a[data-active="true"]', { hasText: 'Inbox' }),
-      'reached with Enter, the Inbox is lit in the menu',
-    );
-    await enterOnPlace(page, 'Runs', '/runs');
-    await expectCount(
-      section(page, 'waiting').locator('article[data-run]'),
-      open.counts.waiting,
-      'back on Runs with Enter, its cards are drawn',
-    );
+    try {
+      await withRegated(page);
+    } finally {
+      regatedBack();
+    }
+    await expectCount(cardOf(page, REGATED.id), 0, `${REGATED.id} taken back, its card goes`);
   },
 } satisfies PageSpec;

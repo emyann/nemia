@@ -184,6 +184,13 @@ export function sinceWords(ms: number): string {
 /** `ms` of wall time to the minute where room is short, on a tile or in a column: `under 1m` for less than one, else as `sinceWords`. */
 export const sinceShort = (ms: number): string => (ms < 60_000 ? 'under 1m' : sinceWords(ms));
 
+/**
+ * How long a waiting run has waited on a person this time, at `asOf`, as `sinceShort` says it: since `waitingSince`, never the sum of
+ * its waits. Null for a run the answer dates no present wait of.
+ */
+export const presentWait = (run: { waitingSince: string | null }, asOf: Date): string | null =>
+  run.waitingSince === null ? null : sinceShort(asOf.getTime() - Date.parse(run.waitingSince));
+
 /** A run's wall time as a fact: `27m since it was created`. */
 export const sinceCreated = (ms: number): string => `${sinceWords(ms)} since it was created`;
 

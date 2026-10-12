@@ -23,7 +23,7 @@ process.env.WF_DEFAULT_FACTORY_STARTS = '1';
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
 const { RUNS, RUNS_FINISHED, RUNS_OPEN } = await import('../command/pages.verb.ts');
-const { advanceRun, startRun, runWith: runEngine } = await import('../runner.ts');
+const { advanceRun, approveRun, startRun, runWith: runEngine } = await import('../runner.ts');
 const { Invalid } = await import('../refusal/refusal.ts');
 const { readRun } = await import('../record/record.store.ts');
 const { engineOf } = await import('../runtime-client.ts');
@@ -117,7 +117,15 @@ const everyPage = async (size: number, factory?: string): Promise<FinishedPage[]
 
 /** A row of either read as the whole list answers the run: without what the two reads add. */
 const summaryOf = (row: object): object => {
-  const { wallMs: _w, finishedAt: _f, outcome: _o, clock: _c, stepCosts: _s, ...summary } = row as Record<string, unknown>;
+  const {
+    wallMs: _w,
+    finishedAt: _f,
+    outcome: _o,
+    clock: _c,
+    stepCosts: _s,
+    waitingSince: _p,
+    ...summary
+  } = row as Record<string, unknown>;
   return summary;
 };
 
@@ -223,7 +231,65 @@ test('a waiting run carries the cost of each of its steps and a clock whose part
   );
   assert.equal('clock' in light.inFlight[0], false);
   assert.equal('stepCosts' in light.inFlight[0], false);
+  assert.equal('waitingSince' in light.inFlight[0], false);
+  assert.equal(row.waitingSince, new Date(T0 + 10 * MIN).toISOString(), 'the gate was reached as plan ended');
   assert.equal(light.inFlight[0].wallMs, 50 * MIN, 'created at 10:10, read at 11:00');
+});
+
+test('a run at its second gate has waited since that gate was reached, while its clock sums both waits on a person', async (t) => {
+  seeded(t);
+  const stamp = (min: number) => new Date(T0 + min * MIN).toISOString();
+  const id = await started({ plan: null, build: 'plan' }, ['plan', 'build']);
+  t.mock.timers.setTime(T0 + 10 * MIN);
+  engine().settle(`${id}-plan`, 'succeeded', { closeout: SIGNED, startedAt: stamp(0), spawnedAt: stamp(0) });
+  await advanced(id);
+  t.mock.timers.setTime(T0 + 30 * MIN);
+  await runWith(e(), approveRun(id, 'plan'));
+  await advanced(id);
+  t.mock.timers.setTime(T0 + 35 * MIN);
+  engine().settle(`${id}-build`, 'succeeded', { closeout: SIGNED, startedAt: stamp(30), spawnedAt: stamp(30) });
+  await advanced(id);
+  t.mock.timers.setTime(T0 + 60 * MIN);
+
+  const light = await open();
+  const [row] = light.waiting;
+  assert.deepEqual(row.waitingOnYou, ['build'], 'the fixture waits at its second gate');
+  assert.equal(row.waitingSince, stamp(35));
+  assert.equal(row.clock?.personMs, 45 * MIN, '20 minutes at the first gate and 25 at the second');
+  assert.equal(Date.parse(light.asOf) - Date.parse(row.waitingSince), 25 * MIN);
+});
+
+test('a run held until a person lifts the hold has waited since the hold was placed', async (t) => {
+  seeded(t);
+  const id = await started({ work: null });
+  const placed = new Date(T0 + 5 * MIN).toISOString();
+  fs.writeFileSync(path.join(RUNS_DIR, `${id}.hold`), `${JSON.stringify({ at: placed, until: [] })}\n`);
+  t.mock.timers.setTime(T0 + 20 * MIN);
+
+  const [row] = (await open()).waiting;
+  assert.equal(row.id, id);
+  assert.deepEqual(row.waitingOnYou, [], 'no step of a held run waits on a person');
+  assert.equal(row.waitingSince, placed);
+});
+
+test('a run that waits on a run which never ships, held until one that will, waits on a person since no instant: its hold is nobody’s to lift', async (t) => {
+  seeded(t);
+  const parent = await started({ work: null }, [], true);
+  const ships = await anInFlight();
+  const { repo } = readRun(parent) as { repo: string };
+  const child = await runPlaced(startRun({ brief: 'after it', repo, workflowDir: folder({ work: null }), after: [parent] }));
+  cancelled(parent, T0 + MIN);
+  fs.writeFileSync(
+    path.join(RUNS_DIR, `${child.id}.hold`),
+    `${JSON.stringify({ at: new Date(T0 + 5 * MIN).toISOString(), until: [ships] })}\n`,
+  );
+  t.mock.timers.setTime(T0 + 20 * MIN);
+
+  const row = (await open()).waiting.find((run) => run.id === child.id);
+  assert.ok(row, 'it waits on a person: the run it waits on was called off');
+  assert.equal(row.waiting?.onYou, true);
+  assert.equal(row.holding?.onYou, false, 'and its hold lifts by itself, once the run it names ships');
+  assert.equal(row.waitingSince, null);
 });
 
 test('the finished runs page by when their work stopped, not by when they were created: a late cancellation is the last stop', async (t) => {

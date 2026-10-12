@@ -19,7 +19,7 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
 - `npx shadcn add @ds/ds --overwrite -y`, from `apps/web`, takes an update: read `git diff`. The CLI also writes into `src/styles.css`
   each time, and that is taken back out: a second `tw-animate-css` import, names that point at themselves in `@theme inline`
   (`--ring: var(--ring)`), a `.dark` block, `--radius`, and the bridge's `--secondary` and `--secondary-foreground`, which it sets to
-  the theme's green. The message it prints, to import the kit's default theme, is not for us. Then `node
+  the theme's `secondary`. The message it prints, to import the kit's default theme, is not for us. Then `node
   src/components/ui/ds/changed.mjs`, from `apps/web`, says whether a kit file differs from the release's record (`RELEASE.json`): exit
   0 none does, 1 some do, 2 it cannot tell; run it before an update too, since the update overwrites every file that differs.
 - `theme/` is generated, never edited: change `DESIGN.md`, then `npx tsx src/components/ui/ds/tokens/generate-theme.mjs DESIGN.md --out
@@ -32,7 +32,7 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
   The face has one weight: a weight class on mono text is drawn by the browser, so mono text takes a body role whole (`font-mono
   text-body-small`), untracked as the body roles are (`DESIGN.md`), never a label or title role, which carry one (`monoWeighted`, `test/type.test.ts`).
 - The kit's corners (`rounded-shape-*`) follow `DESIGN.md`; shadcn's (`--radius`) are the board's own. shadcn's `secondary` reads a
-  neutral surface, not the theme's `secondary`: that green is `alive`, a session at work. The chart colours are not the theme's.
+  neutral surface, not the theme's `secondary`: that role is `alive`, a session at work. The chart colours are not the theme's.
 - A colour says one thing: `yours` (waits on a person), `alive`, `money` (an amount), `rest` (grey, and sage for done) and `failure`.
   `src/styles.css` reads each from a theme role once (`--meaning-*`, `bg-yours`); `lib/meaning.ts` holds the drawn forms, each class a
   whole literal; `test/status.test.ts` holds the table and refuses a hand-picked hue in the files that draw a state.
@@ -47,6 +47,10 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
   ink and drops it beside one (`roleBlind`, same test). A `leading-*` written before a role in one merge is dropped: write it after.
 - A text that stands on `ScanLines` is `unmeasured` by the contrast measure, its ground being an image, and an unmeasured text is
   never refused: a page of the look measures through `contrastHolds` (`test/e2e/runs-contrast.ts`), which flattens the ground first.
+  A grain is the one image it reads: a tile of one colour, measured plain and at its far 2% (`GRAIN_TAIL`, a row said `grained`), and
+  a cut frame's ground is read from its `data-cut-ground` layer, no ancestor of its content (`readerIn`, `test/e2e/contrast.ts`).
+- The grain is `look/grain.css`, each tile written once, percent-encoded whole (the build's minifier refuses a raw `<svg` in a custom
+  property), and worn by a part that writes `data-grain` (`surface`, `label`); on a cut frame it is the ground layer's, clipped with it.
 - A table cell's `scrollWidth` does not grow with a `nowrap` text that runs out of it: measure the text's right edge against the
   cell's own room (`expectRoom` in `test/e2e/pages/052-runs-pages.ts`).
 - Text dimmed by an `opacity` falls under 4.5:1: sink a card into the floor (`bg-background`) or use the muted ink instead.

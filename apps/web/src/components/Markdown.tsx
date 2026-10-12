@@ -31,7 +31,7 @@ const heading = (written: (typeof TAGS)[number], Tag: (typeof TAGS)[number]) =>
 const headingsAt = (level: Level): Components =>
   Object.fromEntries(TAGS.map((written, i) => [written, heading(written, TAGS[Math.min(level - 1 + i, TAGS.length - 1)])]));
 
-const LINK = 'font-medium text-foreground underline underline-offset-2 break-words hover:text-foreground';
+const LINK = 'font-medium text-foreground underline underline-offset-2 break-words hover:text-muted-foreground';
 
 /**
  * How each element of a text is drawn: the board's type in both themes, and three rules.

@@ -59,9 +59,12 @@ const UTILITIES = [
   '-color',
 ];
 
-/** A palette family with its shade, as a class or a variable spells it, or a colour utility that ends in white or black. */
+/**
+ * A palette family with its shade, as a class or a variable spells it, or a colour utility that ends in white or black, a side or an
+ * offset between them included (`border-b-white`, `ring-offset-black`).
+ */
 const PALETTE = new RegExp(
-  `(?<![\\w])(?:${FAMILIES.join('|')})-(?:50|[1-9]00|950)(?![\\w-])|(?<![\\w])(?:${UTILITIES.join('|')})-(?:white|black)(?![\\w-])`,
+  `(?<![\\w])(?:${FAMILIES.join('|')})-(?:50|[1-9]00|950)(?![\\w-])|(?<![\\w])(?:${UTILITIES.join('|')})(?:-[a-z]+)*-(?:white|black)(?![\\w-])`,
 );
 
 /** Where `text` first names a palette colour, as `line:column` and the words found, or null. */
@@ -93,6 +96,10 @@ test('REFUSED: a palette colour is found, where it is, under any variant; a role
     ['text-white', 'text-white'],
     ['!border-white', 'border-white'],
     ['bg-black/10', 'bg-black'],
+    ['border-b-white', 'border-b-white'],
+    ['ring-offset-black/20', 'ring-offset-black'],
+    ['inset-shadow-black', 'shadow-black'],
+    ['hover:drop-shadow-white', 'shadow-white'],
     ['fill-amber-400', 'amber-400'],
     ['var(--color-neutral-400)', 'neutral-400'],
     ['var(--color-white)', '-color-white'],
@@ -111,6 +118,7 @@ test('REFUSED: a palette colour is found, where it is, under any variant; a role
     'bg-background',
     'the amber banner, on white, is yours; a red that is no failure',
     'gap-100 scale-950 text-whiteboard',
+    'border-b-whiteish text-on-black-ish to-blacksmith',
   ])
     assert.equal(paletteAt(allowed), null, allowed);
 });

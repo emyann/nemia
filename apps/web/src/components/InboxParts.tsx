@@ -8,7 +8,7 @@ import { FactoryTag } from './FactoryTag';
 
 /** A button that does what its form or card is for. */
 export const PRIMARY =
-  'rounded bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40';
+  'rounded bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-primary';
 /** A button beside it. */
 export const SECONDARY =
   'rounded border border-outline px-3 py-1.5 text-sm font-medium hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40';

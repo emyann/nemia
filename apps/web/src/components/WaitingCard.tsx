@@ -32,9 +32,9 @@ function Tiles({ run, asOf }: { run: WaitingRun; asOf: Date }) {
 }
 
 /**
- * A run that waits on a person, as a card: what is asked and its factory as tags, how long it has waited on a person this time where the answer dates that wait, its title
- * as a link, its id with a copy control, one plain sentence, its own steps as a rail, three tiles, and one button that opens the run's
- * page. It decides nothing and shows no command: the run's page does.
+ * A run that waits on a person, as a card: what is asked and its factory as tags, how long it has waited on a person this time where the
+ * answer dates that wait, its title as a link, its id with a copy control, one plain sentence, its own steps as a rail, three tiles, and
+ * one button that opens the run's page. It decides nothing and shows no command: the run's page does.
  */
 export function WaitingCard({ run, asOf }: { run: WaitingRun; asOf: Date }) {
   const title = titleOf(run);

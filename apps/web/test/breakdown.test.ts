@@ -70,7 +70,7 @@ const answered = (): WaitingRun =>
 
 const AS_OF = '2026-10-12T12:00:00.000Z';
 
-/** `run` as the board reads it: the api's answer decoded through the light answer's schema; the run at its last gate where none is given. */
+/** `run` as the board reads it, decoded through the light answer's schema; the run at its last gate where none is given. */
 async function decoded(run: WaitingRun = answered()): Promise<WaitingRun> {
   const before = globalThis.fetch;
   const open = { asOf: AS_OF, counts: { waiting: 1, inFlight: 0, finished: 0 }, waiting: [run], inFlight: [] };

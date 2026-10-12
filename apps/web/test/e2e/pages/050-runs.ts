@@ -123,7 +123,8 @@ async function threeParts(page: Page, open: OpenRuns, finished: FinishedPage): P
  */
 const waitsSaid = (run: WaitingRun, asOf: string): Set<string> => {
   const said = new Set<string>();
-  for (let at = Date.parse(asOf) - 90_000; at <= Date.now() + 30_000; at += 30_000) {
+  const [from, now] = [Date.parse(asOf) - 90_000, Date.now()];
+  for (let at = from; at - 30_000 <= now; at += 30_000) {
     const wait = presentWait(run, new Date(at));
     if (wait !== null) said.add(`waiting ${wait}`);
   }
@@ -525,11 +526,12 @@ async function regated(page: Page): Promise<() => Promise<void>> {
 
 export default {
   /**
-   * The runs page, "Your move first": on two reads and never the whole list, a card for every run that waits on a person and no row
-   * of it, the runs in flight and one page of the finished as quiet tables, each under a plate that says the api's count. A card says
-   * its plain words, how long it has waited this time, and opens its run; its tiles open their breakdowns, and its id is copied, from the keyboard; a finger finds the
-   * copy control; 390 wide breaks nothing; and no text pair is under 4.5:1 in either scheme. The menu's places are reached with Enter
-   * in the page, to the Inbox and back. It writes REGATED, the run at its second gate, for itself, and takes it back at its end.
+   * The runs page, "Your move first": on two reads and never the whole list, a card for every run that waits on a person and no row of
+   * it, the runs in flight and one page of the finished as quiet tables, each under a plate that says the api's count. A card says its
+   * plain words, how long it has waited this time, and opens its run; its tiles open their breakdowns, and its id is copied, from the
+   * keyboard; a finger finds the copy control; 390 wide breaks nothing; and no text pair is under 4.5:1 in either scheme. The menu's
+   * places are reached with Enter in the page, to the Inbox and back. It writes REGATED, the run at its second gate, for itself, and
+   * takes it back at its end.
    */
   name: 'runs',
   route: '/runs',

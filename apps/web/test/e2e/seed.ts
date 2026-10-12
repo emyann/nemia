@@ -435,10 +435,11 @@ export const GATED = {
 } as const;
 
 /**
- * A run at its second gate: `plan → build → ship`, the first two gated. plan signed off half an hour ago and waited some twenty minutes for its approval,
- * the file `nemia approve` writes beside the record; build then ran, signed off a few minutes ago, and awaits its own; ship is not filed, so the run's result is nobody's to decide yet. So the run's present
- * wait on a person is minutes long while all its waits on one, summed, are over twenty: the `runs` page tells the two apart. No
- * seeded run: the Factory lays its cards out by age, so the `runs` page writes it for itself (`writeRegated`) and takes it back.
+ * A run at its second gate: `plan → build → ship`, the first two gated. plan signed off half an hour ago and waited some twenty minutes
+ * for its approval, the file `nemia approve` writes beside the record; build then ran, signed off a few minutes ago, and awaits its own;
+ * ship is not filed, so the run's result is nobody's to decide yet. So the run's present wait on a person is minutes long while all its
+ * waits on one, summed, are over twenty: the `runs` page tells the two apart. No seeded run: the Factory lays its cards out by age, so
+ * the `runs` page writes it for itself (`writeRegated`) and takes it back.
  */
 export const REGATED = {
   id: 'wait-at-the-second-gate-e2e12',
@@ -1970,8 +1971,8 @@ export function writeRegated(root: string, now: number): string[] {
 }
 
 /**
- * Write the fake run into `root`, which becomes the api's WF_ROOT, with NEIGHBOUR, LOOPING, HELD, GATED, COSTLY, and last the
- * three runs whose result is a decision (`seedDecisions`), newest, whose cards take the cells after every other run's. Times are minutes before
+ * Write the fake run into `root`, which becomes the api's WF_ROOT, with NEIGHBOUR, LOOPING, HELD, GATED, COSTLY, and last the three runs
+ * whose result is a decision (`seedDecisions`), newest, whose cards take the cells after every other run's. Times are minutes before
  * `now`. A task's end records the session's own id (`nativeId`) for a harness that has one, which the engine reads a transcript by.
  *
  * FAKE's repository is named as the other runs' is, so the Factory's card reads the same. tokens runs beside implement, so it has a

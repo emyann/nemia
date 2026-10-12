@@ -5,7 +5,8 @@
  */
 import type { ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { daemonQuery, quotaQuery, runsQuery, versionQuery } from '@/lib/api';
+import { daemonQuery, openRunsQuery, quotaQuery, versionQuery } from '@/lib/api';
+import { openRows } from '@/lib/factory';
 import type { FeedStatus } from '@/lib/feed';
 import { atWork, atWorkWords, feedWords, versionWords } from '@/lib/footer';
 import { DaemonLine } from './DaemonLine';
@@ -29,7 +30,7 @@ function Gauge({ name, children }: { name: string; children: ReactNode }) {
 export function GaugesBar({ feed }: { feed: FeedStatus }) {
   const daemon = useQuery(daemonQuery);
   const quota = useQuery(quotaQuery);
-  const runs = useQuery(runsQuery);
+  const runs = useQuery(openRunsQuery());
   const version = useQuery(versionQuery);
   const ticks = daemon.data?.ticking === true;
 
@@ -52,7 +53,7 @@ export function GaugesBar({ feed }: { feed: FeedStatus }) {
         <Gauge name="At work">
           <p data-at-work-sentence className="text-sm">
             {runs.data
-              ? atWorkWords(atWork(runs.data)).title
+              ? atWorkWords(atWork(openRows(runs.data))).title
               : runs.error
                 ? `The runs could not be read: ${runs.error.message}`
                 : 'Reading the runs…'}

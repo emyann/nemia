@@ -5,6 +5,7 @@ import { repositoryQuery, runsQuery, startRun, type Place, type RunSummary, type
 import { standingOf, titleOf } from '../lib/factory';
 import { afterFor, ignoredRepoNote } from '../lib/inbox';
 import { ContextPicker } from './ContextPicker';
+import { runsMoved } from '@/lib/runWrites';
 
 /**
  * A brief, the runs the new run waits on, the runs it reads as context (`ContextPicker`), and the button that starts a run of the
@@ -70,7 +71,7 @@ export function StartRun({
         setAfter([]);
         setContext([]);
       }
-      void queryClient.invalidateQueries({ queryKey: ['runs'], exact: true });
+      void runsMoved(queryClient);
       onStarted?.(started);
     },
     onError: (error) => onRefused?.(error.message),

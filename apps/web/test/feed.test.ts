@@ -4,9 +4,9 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { QueryKey } from '@tanstack/react-query';
+import { QueryClient, type QueryKey } from '@tanstack/react-query';
 import { END_GRACE_MS, type Frames, type StreamLike } from '../src/lib/following.ts';
-import { FALLBACK_MS, type FeedStatus, followFeed, keysOf, pace, polled, REOPEN_MS } from '../src/lib/feed.ts';
+import { FALLBACK_MS, type FeedStatus, filterOf, followFeed, keysOf, pace, polled, REOPEN_MS } from '../src/lib/feed.ts';
 
 /** An EventSource as far as `followFeed` uses it: its state, its events, and `close`. */
 class Stream implements StreamLike {
@@ -102,9 +102,9 @@ function followed() {
 const line = (run: string, step?: string) => ({ at: '2026-09-22T21:00:00.000Z', run, ...(step ? { step } : {}), word: 'running' });
 
 test('each event names the queries it can change, and no other: a step its run and the list, a run the cap and the inbox too, a removal its record and the cap', () => {
-  assert.deepEqual(keysOf('step', 'r-1'), [['runs'], ['runs', 'r-1'], ['daemon']]);
-  assert.deepEqual(keysOf('run', 'r-1'), [['runs'], ['runs', 'r-1'], ['ceilings'], ['inbox'], ['daemon']]);
-  assert.deepEqual(keysOf('removed', 'r-1'), [['runs'], ['runs', 'r-1'], ['ceilings'], ['daemon']]);
+  assert.deepEqual(keysOf('step', 'r-1'), [['runs'], ['runs-open'], ['runs', 'r-1'], ['daemon']]);
+  assert.deepEqual(keysOf('run', 'r-1'), [['runs'], ['runs-open'], ['runs', 'r-1'], ['ceilings'], ['inbox'], ['daemon']]);
+  assert.deepEqual(keysOf('removed', 'r-1'), [['runs'], ['runs-open'], ['runs', 'r-1'], ['ceilings'], ['daemon']]);
   for (const event of ['step', 'run', 'removed'] as const) {
     assert.ok(
       keysOf(event, 'r-1').every((key) => key.length <= 2),
@@ -166,6 +166,33 @@ test('the polled queries are the runs, a run, the cap, and whether a daemon tick
   }
 });
 
+test('the light answer is polled, for every factory and for one, and no key under a factory is', () => {
+  assert.equal(polled(['runs-open']), true);
+  assert.equal(polled(['runs-open', 'harbour']), true);
+  assert.equal(polled(['runs-open', 'harbour', 'x']), false);
+});
+
+test("REFUSED: an event reads a factory's light answer again with every factory's, and still no decision", async () => {
+  const seeded: QueryKey[] = [['runs'], ['runs', 'a'], ['runs', 'a', 'decision', 's'], ['runs-open'], ['runs-open', 'harbour']];
+  const marked = async (filter: (key: QueryKey) => { queryKey: QueryKey; exact: boolean }) => {
+    const client = new QueryClient();
+    for (const key of seeded) client.setQueryData(key, {});
+    await Promise.all(keysOf('step', 'a').map((key) => client.invalidateQueries(filter(key))));
+    const keys = seeded.filter((key) => client.getQueryState(key)?.isInvalidated);
+    client.clear();
+    return keys;
+  };
+  assert.deepEqual(await marked(filterOf), [['runs'], ['runs', 'a'], ['runs-open'], ['runs-open', 'harbour']]);
+  assert.deepEqual(
+    await marked((queryKey) => ({ queryKey, exact: true })),
+    [['runs'], ['runs', 'a'], ['runs-open']],
+    "invalidated exactly, a factory's answer is left as it was",
+  );
+  assert.deepEqual(filterOf(['runs']), { queryKey: ['runs'], exact: true });
+  assert.deepEqual(filterOf(['runs', 'a']), { queryKey: ['runs', 'a'], exact: true });
+  assert.deepEqual(filterOf(['runs-open']), { queryKey: ['runs-open'], exact: false });
+});
+
 test('the events that arrive together are read again once a frame, each key once, and each run named has its record read', () => {
   const f = followed();
   f.stream().opens();
@@ -178,9 +205,9 @@ test('the events that arrive together are read again once a frame, each key once
   assert.equal(f.invalidated.length, 1, 'one invalidation for the frame');
   assert.deepEqual(
     new Set(f.invalidated[0].map((k) => JSON.stringify(k))),
-    new Set([['runs'], ['runs', 'r-1'], ['ceilings'], ['inbox'], ['daemon'], ['runs', 'r-2']].map((k) => JSON.stringify(k))),
+    new Set([['runs'], ['runs-open'], ['runs', 'r-1'], ['ceilings'], ['inbox'], ['daemon'], ['runs', 'r-2']].map((k) => JSON.stringify(k))),
   );
-  assert.equal(f.invalidated[0].length, 6, 'each key once');
+  assert.equal(f.invalidated[0].length, 7, 'each key once');
   f.frame();
   assert.equal(f.invalidated.length, 1, 'an empty frame invalidates nothing');
   f.stop();

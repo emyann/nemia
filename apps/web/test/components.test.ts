@@ -67,6 +67,7 @@ type StepReach = import('../src/lib/api.ts').StepReach;
 type ReadOnlyCommands = import('../src/lib/api.ts').ReadOnlyCommands;
 type GraphEdge = import('../src/lib/api.ts').GraphEdge;
 type RunSummary = import('../src/lib/api.ts').RunSummary;
+type OpenRuns = import('../src/lib/api.ts').OpenRuns;
 type StepUsed = import('../src/lib/api.ts').StepUsed;
 type Decidable = import('../src/lib/api.ts').Decidable;
 type StepLayers = import('../src/lib/api.ts').StepLayers;
@@ -5770,7 +5771,7 @@ async function sidebarAt(
     createElement(SidebarProvider, { children: createElement(FrameSidebar, { path, search }) }),
     [
       [['factories'], factories],
-      [['runs'], []],
+      [['runs-open'], { counts: { waiting: 0, inFlight: 0, finished: 0 }, waiting: [], inFlight: [] }],
       [['inbox'], inbox],
     ],
   );
@@ -5912,12 +5913,24 @@ test('REFUSED: the sidebar is drawn folded only where the cookie keeps sidebar_s
 test("the picker offers the factories Home lists, then the address's own when they leave it out, never twice", async () => {
   const { pickerFactories } = await import('../src/components/FactoryPicker.tsx');
   const factories = [filed('default', { default: true, workflows: null }), filed('nemia'), filed('quay')];
-  const names = (picked: string | undefined) => pickerFactories(factories, [], picked).map((item) => item.name);
+  const names = (picked: string | undefined) => pickerFactories(factories, false, picked).map((item) => item.name);
   assert.deepEqual(names(undefined), ['nemia', 'quay']);
   assert.deepEqual(names('quay'), ['nemia', 'quay']);
   assert.deepEqual(names('default'), ['nemia', 'quay', 'default']);
   assert.deepEqual(names('gone'), ['nemia', 'quay', 'gone']);
-  assert.equal(pickerFactories(factories, [], 'gone').at(-1)?.factory, undefined);
+  assert.equal(pickerFactories(factories, false, 'gone').at(-1)?.factory, undefined);
+  assert.deepEqual(
+    pickerFactories(factories, true, undefined).map((item) => item.name),
+    ['nemia', 'quay'],
+    'a default factory that holds a run is not offered once a factory is named',
+  );
+  const alone = [filed('default', { default: true, workflows: null })];
+  assert.deepEqual(
+    pickerFactories(alone, true, undefined).map((item) => item.name),
+    ['default'],
+    'with no factory named, the default one is offered while it holds a run',
+  );
+  assert.equal(pickerFactories(alone, false, undefined).length, 0, 'and not while it holds none');
 });
 
 test("a factory in the picker reads its repositories by their folders' names, whole in the tooltip, and why its file does not read", async () => {
@@ -6008,40 +6021,63 @@ test("REFUSED: the Inbox's badge counts the picked factory's cards not yet start
   assert.equal([...nemia.matchAll(/data-inbox-badge/g)].length, 1, 'on the Inbox alone');
 });
 
-/** The header with the section Floor, the factories read and the runs `runs`, or the runs not read yet for none. */
-async function headerWith(runs?: RunSummary[]): Promise<string> {
+/** The light answer holding `waiting`, which it counts unless `counted` says another number, and nothing in flight or finished. */
+const openWith = (waiting: RunSummary[], counted = waiting.length): OpenRuns => ({
+  counts: { waiting: counted, inFlight: 0, finished: 0 },
+  waiting,
+  inFlight: [],
+});
+
+/** The header with the section Floor, the factories read and the light answer `open`, or not read yet for none; the whole list never. */
+async function headerWith(open?: OpenRuns): Promise<string> {
   const { FrameHeader } = await import('../src/components/FrameHeader.tsx');
   const { SidebarProvider } = await import('../src/components/ui/sidebar.tsx');
   return pagedWith(
     // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
     createElement(SidebarProvider, { children: createElement(FrameHeader, { section: 'Floor' }) }),
-    runs
+    open
       ? [
           [['factories'], [filed('nemia')]],
-          [['runs'], runs],
+          [['runs-open'], open],
         ]
       : [[['factories'], [filed('nemia')]]],
   );
 }
 
+/** The bell's button in `html`, whole. */
+const bellOf = (html: string) => /<button[^>]*data-bell[^>]*>[\s\S]*?<\/button>/.exec(html)?.[0] ?? '';
+
 test("REFUSED: the header's bell counts the runs waiting on you, named in full; with none it says so and draws no count", async () => {
-  const bell = (html: string) => /<button[^>]*data-bell[^>]*>[\s\S]*?<\/button>/.exec(html)?.[0] ?? '';
   const waits = summaryRun();
-  const two = await headerWith([waits, { ...waits, id: 'r-2', factory: 'nemia' }, { ...waits, id: 'r-3', cancelledAt: at }]);
-  assert.match(bell(two), /aria-label="Waiting on you: 2"/);
-  assert.match(bell(two), /aria-expanded="false"/);
-  assert.doesNotMatch(bell(two), / disabled=""|data-disabled/, 'the bell is pressed, not drawn disabled');
-  assert.match(bell(two), /data-bell-count[^>]*>2<\/span>/);
-  const none = await headerWith([{ ...waits, waitingOnYou: [], onYou: [] }]);
-  assert.match(bell(none), /aria-label="Nothing waits on you"/);
-  assert.doesNotMatch(bell(none), /data-bell-count/);
-  const unread = bell(await headerWith());
+  const two = await headerWith(openWith([waits, { ...waits, id: 'r-2', factory: 'nemia' }]));
+  assert.match(bellOf(two), /aria-label="Waiting on you: 2"/);
+  assert.match(bellOf(two), /aria-expanded="false"/);
+  assert.doesNotMatch(bellOf(two), / disabled=""|data-disabled/, 'the bell is pressed, not drawn disabled');
+  assert.match(bellOf(two), /data-bell-count[^>]*>2<\/span>/);
+  const none = await headerWith(openWith([]));
+  assert.match(bellOf(none), /aria-label="Nothing waits on you"/);
+  assert.doesNotMatch(bellOf(none), /data-bell-count/);
+  const unread = bellOf(await headerWith());
   assert.match(unread, /aria-label="Waiting on you"/, 'before the runs are read, the bell says no number');
   assert.doesNotMatch(unread, /data-bell-count/);
 });
 
+test('REFUSED: the bell counts what the api says waits, never a count of its own over the rows', async () => {
+  const atGate = summaryRun();
+  const blocked = { ...atGate, id: 'r-blocked', stoppedOn: 'blocked' as const, onYou: [] };
+  const movesAndWaits = { ...atGate, id: 'r-moves', status: 'running' as const, stoppedOn: null, moving: true };
+  const waiting = [atGate, blocked, movesAndWaits];
+  const three = await headerWith({ counts: { waiting: 3, inFlight: 0, finished: 1 }, waiting, inFlight: [] });
+  assert.match(bellOf(three), /aria-label="Waiting on you: 3"/, 'a gate, a blocked step and a run that moves and waits; not the run to decide');
+  assert.match(bellOf(three), /data-bell-count[^>]*>3<\/span>/);
+  const five = await headerWith(openWith(waiting, 5));
+  assert.match(bellOf(five), /aria-label="Waiting on you: 5"/, "the api's count, not the rows the board would count");
+  const called = await headerWith(openWith([{ ...atGate, cancelledAt: at }]));
+  assert.match(bellOf(called), /aria-label="Waiting on you: 1"/, "a row the board's own rule would drop is counted all the same");
+});
+
 test("the header reads the section's name alone: a floor reads Floor, with no factory's crumb and no start of a run", async () => {
-  const html = await headerWith([]);
+  const html = await headerWith(openWith([]));
   assert.match(html, /<span class="text-sm font-medium">Floor<\/span>/);
   assert.doesNotMatch(html, /Start a run|aria-label="Factory"|<h1/);
 });

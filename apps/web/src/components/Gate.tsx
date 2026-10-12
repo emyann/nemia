@@ -19,6 +19,7 @@ import { BUTTON, MODES, Refusal, TEXTAREA, useAsk } from './Ask';
 import { Markdown } from './Markdown';
 import { answersFrom, QuestionFields, RecommendButton, unanswered, type Draft } from './Questions';
 import { when } from './Facts';
+import { runsMoved } from '@/lib/runWrites';
 
 /**
  * A step waiting at its gate, beside the closeout it handed on: the two things the CLI's `ls` says a person can do. Approve, with a box for
@@ -585,7 +586,7 @@ export function useApprove(runId: string, step: string, onApproved: () => void) 
     onSuccess: () => {
       onApproved();
       void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });
-      void queryClient.invalidateQueries({ queryKey: ['runs'], exact: true });
+      void runsMoved(queryClient);
     },
   });
 }

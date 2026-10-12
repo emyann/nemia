@@ -9,7 +9,11 @@ import assert from 'node:assert/strict';
 import type { Factory, InboxEntry, RunSummary } from '../src/lib/api.ts';
 import {
   conditionAmiss,
+  blockOf,
+  factoriesShown,
   factoryBlocks,
+  openBlockOf,
+  runsOf,
   factoryOf,
   factorySearch,
   floorPlace,
@@ -288,4 +292,31 @@ test("a template's condition is amiss when Applied is not true, or ConflictsPend
   assert.equal(conditionAmiss({ type: 'Applied', status: 'False' }), true);
   assert.equal(conditionAmiss({ type: 'ConflictsPending', status: 'False' }), false);
   assert.equal(conditionAmiss({ type: 'ConflictsPending', status: 'True' }), true);
+});
+
+test('REFUSED: a factory\'s bar off its light answer counts every run by the counts, those waiting by the api, those in flight by the board', () => {
+  const holding = { at: 'x', runs: [], word: 'held until r-0 ships', advice: 'wait', onYou: false };
+  const working = run('working', 'nemia', { status: 'running', moving: true });
+  const held = run('held', 'nemia', { status: 'running', holding });
+  const gate = run('gate', 'nemia', { status: 'running', waitingOnYou: ['plan'] });
+  const stopped = run('stopped', 'nemia', { status: 'failed', waitingOnYou: ['plan'] });
+  const done = run('done', 'nemia');
+  const open = { counts: { waiting: 2, inFlight: 2, finished: 1 }, waiting: [gate, stopped], inFlight: [working, held] };
+  const block = openBlockOf(factory('nemia'), open);
+  assert.deepEqual(block, blockOf(factory('nemia'), [working, held, gate, stopped, done]), 'what the whole list says of the same runs');
+  assert.equal(runsOf(block), '3 in flight · 2 waiting on you · 5 runs');
+  assert.equal(openBlockOf(factory('nemia'), { ...open, counts: { waiting: 4, inFlight: 2, finished: 30 } }).runs, 36);
+  assert.equal(openBlockOf(factory('nemia'), { ...open, counts: { waiting: 4, inFlight: 2, finished: 30 } }).waitsOnYou, 4);
+  assert.equal(
+    runsOf(openBlockOf(factory('nemia'), { counts: { waiting: 0, inFlight: 0, finished: 0 }, waiting: [], inFlight: [] })),
+    'No runs yet',
+  );
+});
+
+test('REFUSED: the default factory is shown only while no factory is named and it holds a run', () => {
+  const nemia = factory('nemia');
+  assert.deepEqual(names(factoriesShown([fallback], true)), ['default']);
+  assert.deepEqual(names(factoriesShown([fallback], false)), []);
+  assert.deepEqual(names(factoriesShown([fallback, nemia], true)), ['nemia']);
+  assert.deepEqual(names(factoriesShown([nemia, fallback], false)), ['nemia']);
 });

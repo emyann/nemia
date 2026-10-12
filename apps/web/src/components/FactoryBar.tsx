@@ -6,8 +6,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { TriangleAlert } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { factoriesQuery, runsQuery } from '@/lib/api';
-import { blockOf, offerOf, runsOf, type FactoryBlock } from '@/lib/factories';
+import { factoriesQuery, openRunsQuery } from '@/lib/api';
+import { offerOf, openBlockOf, runsOf, type FactoryBlock } from '@/lib/factories';
 import { FloatingBar } from './FloatingBar';
 
 /**
@@ -17,9 +17,9 @@ import { FloatingBar } from './FloatingBar';
  */
 export function FactoryBar({ factory: name }: { factory: string }) {
   const factories = useQuery(factoriesQuery);
-  const runs = useQuery(runsQuery);
+  const runs = useQuery(openRunsQuery(name));
   const factory = factories.data?.find((f) => f.name === name);
-  const block = factory && runs.data ? blockOf(factory, runs.data) : undefined;
+  const block = factory && runs.data ? openBlockOf(factory, runs.data) : undefined;
   const repos = block?.repos.join(', ');
   return (
     <FloatingBar

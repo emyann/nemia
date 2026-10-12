@@ -7,6 +7,7 @@ import { AgentRefused, RouteLink } from './AgentParts';
 import { Artifacts } from './Artifacts';
 import { CopyButton } from './CopyButton';
 import { StatusChip } from './StatusChip';
+import { runsMoved } from '@/lib/runWrites';
 
 const code = (text: string) => <code className="font-mono text-xs break-all">{text}</code>;
 
@@ -37,7 +38,7 @@ function TryForm({ agent }: { agent: AgentListing }) {
     onSuccess: (tried) => {
       setBrief('');
       setStarted(tried.id);
-      void queryClient.invalidateQueries({ queryKey: ['runs'], exact: true });
+      void runsMoved(queryClient);
     },
   });
   const held = tryHeld(brief, latest);

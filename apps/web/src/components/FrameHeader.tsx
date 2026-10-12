@@ -3,8 +3,8 @@ import { Bell, Workflow } from 'lucide-react';
 import { routeLink } from '@/components/routeLink';
 import { Button, LinkButton } from '@/components/ui/button';
 import { SidebarTrigger } from '@/components/ui/sidebar';
-import { runsQuery } from '@/lib/api';
-import { bellCount, bellLabel, bellRuns } from '@/lib/bell';
+import { openRunsQuery } from '@/lib/api';
+import { bellCount, bellLabel } from '@/lib/bell';
 import { useBar } from '@/lib/useBar';
 
 /** The logo: a ghost button that is React Aria's link, given the router's `to`. */
@@ -39,13 +39,13 @@ export function FrameHeader({ section }: { section?: string }) {
 const WAITING = { kind: 'waiting' } as const;
 
 /**
- * The bell: how many runs wait on you across every factory (`bellRuns`), named in full and drawn as a count over the bell while there are
+ * The bell: how many runs wait on you across every factory, the api's count (`openRunsQuery`), named in full and drawn as a count over the bell while there are
  * any; a press opens the runs waiting on you in the floating bar, kept in the address, and pressed again closes it.
  */
 function BellButton() {
-  const runs = useQuery(runsQuery);
+  const runs = useQuery(openRunsQuery());
   const { open, toggle } = useBar();
-  const count = runs.data ? bellRuns(runs.data).length : undefined;
+  const count = runs.data?.counts.waiting;
   const shown = bellCount(count ?? 0);
   return (
     <Button

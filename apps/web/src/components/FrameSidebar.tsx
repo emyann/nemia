@@ -3,7 +3,7 @@
  * with how many of its cards are not yet started, and the favourites this browser keeps: every factory's, in the order starred, each by
  * its title, one gone said so, each with a star that takes it off.
  */
-import { useQuery } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
 import { List, Star, Waypoints } from 'lucide-react';
 import {
   Sidebar,
@@ -18,8 +18,9 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { inboxQuery, runsQuery, workflowsQuery } from '@/lib/api';
-import { favoriteRows, type Favorite, type FavoriteRow } from '@/lib/favorites';
+import { inboxQuery, openRunsQuery, runGone, runQuery, workflowsQuery } from '@/lib/api';
+import { openRows } from '@/lib/factory';
+import { favoriteRows, type Favorite, type FavoriteRow, type OwnRead } from '@/lib/favorites';
 import { inboxBadgeTitle, notStarted } from '@/lib/inbox';
 import { toggleFavorite, useFavorites } from '@/lib/useFavorites';
 import { FactoryPicker } from './FactoryPicker';
@@ -105,13 +106,28 @@ function InboxBadge({ count, title }: { count: number; title: string }) {
 }
 
 /**
- * The sidebar's row of each favourite (`favoriteRows`): a run by its title once the runs are read, gone once the api's list lacks it. Each
- * list is read only while something of its kind is starred.
+ * The sidebar's row of each favourite (`favoriteRows`): a run by its title, off the light answer while it waits or moves, else off its own
+ * record, read once the light answer is read or has failed and never polled; gone once that read finds no such run. Each read is made
+ * only while something of its kind is starred.
  */
 function useFavoriteRows(favorites: readonly Favorite[]): FavoriteRow[] {
-  const runs = useQuery({ ...runsQuery, enabled: favorites.some((favorite) => favorite.kind === 'run') });
+  const starred = favorites.flatMap((favorite) => (favorite.kind === 'run' ? [favorite.run] : []));
+  const open = useQuery({ ...openRunsQuery(), enabled: starred.length > 0 });
   const workflows = useQuery({ ...workflowsQuery, enabled: favorites.some((favorite) => favorite.kind === 'workflow') });
-  return favoriteRows(favorites, runs.data, workflows.data);
+  const rows = open.data && openRows(open.data);
+  const settled = open.data !== undefined || open.isError;
+  const apart = settled ? starred.filter((id) => !rows?.some((row) => row.id === id)) : [];
+  const own = useQueries({
+    queries: apart.map((id) => ({ ...runQuery(id), refetchInterval: false as const })),
+    combine: (results) =>
+      new Map(
+        results.flatMap((result, i): Array<[string, OwnRead]> => {
+          if (result.data) return [[apart[i], result.data]];
+          return runGone(result.error) ? [[apart[i], 'gone']] : [];
+        }),
+      ),
+  });
+  return favoriteRows(favorites, rows, own, workflows.data);
 }
 
 /** The key a favourite's row is drawn under: its kind and every key it is known by. */

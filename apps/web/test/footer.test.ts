@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { QuotaWindow, RunSummary } from '../src/lib/api.ts';
+import { inFlight, openRows } from '../src/lib/factory.ts';
 import { atWork, atWorkWords, daemonDot, feedWords, footerParts, quotaShort, staleFrameHeights, versionWords } from '../src/lib/footer.ts';
 import { daemon, quota } from './factory-fixtures.ts';
 
@@ -248,4 +249,22 @@ test("the version says the code serving the board: an install's tag, or checkout
     title: "Nemia's orchestrator, version 1.0.0, run from the checkout at /home/me/nemia",
   });
   assert.deepEqual(versionWords({ version: '1.0.0' }), { text: 'v1.0.0', title: "Nemia's orchestrator, version 1.0.0" });
+});
+
+test('REFUSED: at work off the light answer says what it said off the whole list, a run that waits and still works among them', () => {
+  const worksAndWaits = run(['running (working)', 'needs-human'], { id: 'r-both', waitingOnYou: ['ask'] });
+  const atGate = run(['verified ✓', 'awaiting approval'], { id: 'r-gate', status: 'failed', moving: false, waitingOnYou: ['plan'] });
+  const moving = run(['checking'], { id: 'r-moving' });
+  const finished = run(['verified ✓'], { id: 'r-done', status: 'succeeded', moving: false });
+  const cancelled = run(['cancelled'], { id: 'r-off', status: 'cancelled', moving: false, cancelledAt: '2026-09-30T05:00:00.000Z' });
+  const open = { waiting: [worksAndWaits, atGate], inFlight: [moving] };
+  const all = [finished, worksAndWaits, cancelled, moving, atGate];
+  assert.deepEqual(atWork(openRows(open)), atWork(all));
+  assert.deepEqual(atWork(openRows(open)), { runs: 2, sessions: 2 });
+  assert.deepEqual(
+    openRows(open).map((one) => one.id),
+    ['r-both', 'r-gate', 'r-moving'],
+  );
+  assert.notDeepEqual(atWork(open.inFlight), atWork(all), 'the runs in flight alone lose the session of the run that also waits');
+  assert.equal(inFlight(worksAndWaits), true);
 });

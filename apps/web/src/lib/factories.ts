@@ -4,8 +4,18 @@
  * with, what the factory picked keeps, the factories a workflow listed with no factory is in, and where the address's place reads a list of
  * workflows. A run or a card belongs to the factory it names, and one naming none to the default factory. Pure.
  */
-import type { Factory, FactoryCondition, InboxEntry, PagePlace, Place, RunSummary, WorkflowListing, WorkflowPageAddress } from './api.ts';
-import { inFlight, repoName, waitsOnYou } from './factory.ts';
+import type {
+  Factory,
+  FactoryCondition,
+  InboxEntry,
+  OpenRuns,
+  PagePlace,
+  Place,
+  RunSummary,
+  WorkflowListing,
+  WorkflowPageAddress,
+} from './api.ts';
+import { inFlight, openRows, repoName, waitsOnYou } from './factory.ts';
 
 /** What the blocks read of a run: the factory it names, and what `inFlight` and `waitsOnYou` read. */
 export type FactoryRun = Pick<RunSummary, 'factory' | 'status' | 'moving' | 'waitingOnYou' | 'cancelledAt' | 'waiting' | 'holding'>;
@@ -64,6 +74,24 @@ export const blockOf = (factory: Factory, runs: readonly FactoryRun[]): FactoryB
   };
 };
 
+/** What a factory's block reads of its light answer: the three counts, and of each row what `inFlight` reads. */
+export type OpenBlock = Pick<OpenRuns, 'counts'> & {
+  waiting: ReadonlyArray<Pick<FactoryRun, 'status' | 'moving' | 'waiting' | 'holding'>>;
+  inFlight: ReadonlyArray<Pick<FactoryRun, 'status' | 'moving' | 'waiting' | 'holding'>>;
+};
+
+/**
+ * `factory` as its bar shows it, from `open`, the light answer asked for that factory alone: the runs it holds are the three counts
+ * together, those that wait on you the api's count, and those in flight the board's word (`inFlight`) over the rows, a run at its gate
+ * that still moves among them.
+ */
+export const openBlockOf = (factory: Factory, open: OpenBlock): FactoryBlock => ({
+  ...blockOf(factory, []),
+  runs: open.counts.waiting + open.counts.inFlight + open.counts.finished,
+  inFlight: openRows(open).filter(inFlight).length,
+  waitsOnYou: open.counts.waiting,
+});
+
 /** `n` of `one`, in words: `1 run`, `3 runs`. */
 const count = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
 
@@ -82,15 +110,21 @@ export const runsOf = (block: FactoryBlock): string =>
         .join(' · ');
 
 /**
- * The blocks of the machine, one a factory, in the order the api lists them, one whose file does not read among them. The default factory
- * is a block only while no factory is filed and a run names none: an empty default says nothing a person must act on, and once a factory
+ * The factories the machine shows, in the order the api lists them, one whose file does not read among them. The default factory is one
+ * only while no factory is filed and it holds a run (`held`): an empty default says nothing a person must act on, and once a factory
  * exists every run is started in one, so the default's runs are read on the Runs page alone.
  */
-export const factoryBlocks = (factories: readonly Factory[], runs: readonly FactoryRun[]): FactoryBlock[] => {
+export const factoriesShown = <T extends FactoryPlace>(factories: readonly T[], held: boolean): T[] => {
   const named = factories.filter((f) => !f.default);
-  const held = runs.some((run) => run.factory === null);
-  return (named.length || !held ? named : factories).map((f) => blockOf(f, runs));
+  return named.length || !held ? named : [...factories];
 };
+
+/** The blocks of the machine, one for each factory shown (`factoriesShown`), the default one while a run of `runs` names no factory. */
+export const factoryBlocks = (factories: readonly Factory[], runs: readonly FactoryRun[]): FactoryBlock[] =>
+  factoriesShown(
+    factories,
+    runs.some((run) => run.factory === null),
+  ).map((f) => blockOf(f, runs));
 
 /**
  * The repository a card starts on in `factory`: the card's `repo:`, else the factory's one repository when it has only one, else null — a

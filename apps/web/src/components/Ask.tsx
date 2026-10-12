@@ -5,6 +5,7 @@
  */
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { acceptLoop, askRound, askTry, type QuestionAnswer, type RetryMode } from '../lib/api';
+import { runsMoved } from '@/lib/runWrites';
 
 /** Each of the CLI `retry`'s ways, as an answer offers it. */
 export const MODES: Record<RetryMode, string> = {
@@ -45,7 +46,7 @@ export function useAsk(runId: string, step: string, onAsked: () => void) {
     onSuccess: () => {
       onAsked();
       void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });
-      void queryClient.invalidateQueries({ queryKey: ['runs'], exact: true });
+      void runsMoved(queryClient);
     },
   });
 }
@@ -61,7 +62,7 @@ export function useAccept(runId: string, step: string) {
     mutationFn: (how: { message: string }) => acceptLoop(runId, step, how),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });
-      void queryClient.invalidateQueries({ queryKey: ['runs'], exact: true });
+      void runsMoved(queryClient);
     },
   });
 }

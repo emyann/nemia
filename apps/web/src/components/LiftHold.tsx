@@ -7,6 +7,7 @@ import { cn } from '../lib/utils';
 import { POPOVER, SMALL } from './CardGate';
 import { BUTTON, Refusal } from './Ask';
 import { SECONDARY } from './Gate';
+import { runsMoved } from '@/lib/runWrites';
 
 /** What a lift does, said before the second press: the package's `unhold`, as the CLI's `hold <run> --off` runs it. */
 const LIFTS = 'It goes on at the next tick, and what its steps asked while it was held is asked again.';
@@ -24,7 +25,7 @@ function useLift(id: string, onLifted: () => void = () => undefined) {
       onLifted();
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['runs', id], exact: true }),
-        queryClient.invalidateQueries({ queryKey: ['runs'], exact: true }),
+        runsMoved(queryClient),
       ]);
     },
   });

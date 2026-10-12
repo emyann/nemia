@@ -5,6 +5,9 @@
  * `EventSource`, the api's two streams (`eventSourceBreaks`), and only `components/Markdown.tsx` imports a markdown renderer
  * (`rendererBreaks`). Its reads go through `lib/api/read.ts` (`unschemedReads`, `read.test.ts`).
  *
+ * The frame, what the root route mounts on every page, never asks for the whole list of the runs: no file the root reaches names
+ * `runsQuery` (`wholeListBreaks`), but the pickers a person opens (`OPENED`), a list that only shrinks.
+ *
  * The board names no store path and builds no command of its own: a command or a store folder it shows is text the api answered, and no
  * file of `src` spells one, JSDoc included (`STORE_PATHS`, `COMMAND_TEXT`, both empty). `ratchetBreaks` refuses a file the baseline does
  * not hold, a count above the measure or below it, an entry for a file that is gone or clean, and an entry that names no card.
@@ -31,6 +34,18 @@ const STORE_PATH = /\.agent-workflows|\.agent-engine|\bWF_ROOT\b|\bAE_ROOT\b/g;
 
 /** A command of the orchestrator's CLI, under its name today or the one it takes: `wf retry`, `nemia start`. */
 const COMMAND = /\b(?:wf|nemia) [a-z]+/g;
+
+/** The route that mounts the frame on every page: what it reaches is drawn whatever the page. */
+const ROOT = 'src/routes/__root.tsx';
+
+/**
+ * The pickers a person opens that the frame reaches, each of which reads the whole list of the runs while it is open, and only then: the
+ * start form, with its runs to wait on, and behind it the runs to read as context. The guard does not look past them.
+ */
+const OPENED = ['src/components/StartRun.tsx'];
+
+/** The board's mirror of the api, which defines the read of the whole list: the guard reads who names it, not the mirror. */
+const MIRROR = /^src\/lib\/api(?:\.ts$|\/)/;
 
 type Baseline = Record<string, { count: number; card: string }>;
 
@@ -179,6 +194,79 @@ test('REFUSED: a workspace package, a node built-in, and a path out of apps/web'
   ]);
   for (const mod of ['react', 'agent-orchestrator-ui', './lib/api.ts', '@/lib/api.ts', '../test/fixtures.ts'])
     assert.deepEqual(planted(mod), [], `${mod} is let through`);
+});
+
+/** The file of `texts` a module named in `file` is, for one under `src` named by `@/` or a relative path; none for a package. */
+function fileOf(texts: ReadonlyMap<string, string>, file: string, mod: string): string | undefined {
+  const at = mod.startsWith('@/')
+    ? `src/${mod.slice(2)}`
+    : mod.startsWith('.')
+      ? path.posix.normalize(path.posix.join(path.posix.dirname(file), mod))
+      : undefined;
+  if (at === undefined) return undefined;
+  return [at, `${at}.ts`, `${at}.tsx`, `${at}/index.ts`, `${at}/index.tsx`].find((candidate) => texts.has(candidate));
+}
+
+/**
+ * The files the root route reaches through its imports, itself among them, in order: the frame. Not entered: the mirror of the api, and
+ * the pickers of `OPENED`, each named when reached.
+ */
+function frameReach(texts: ReadonlyMap<string, string>): { frame: string[]; opened: string[] } {
+  const seen = new Set<string>();
+  const opened = new Set<string>();
+  const next = texts.has(ROOT) ? [ROOT] : [];
+  while (next.length) {
+    const file = next.pop()!;
+    if (seen.has(file)) continue;
+    seen.add(file);
+    for (const mod of importsIn(texts.get(file)!)) {
+      const found = fileOf(texts, file, mod);
+      if (found === undefined || MIRROR.test(found)) continue;
+      if (OPENED.includes(found)) opened.add(found);
+      else next.push(found);
+    }
+  }
+  return { frame: [...seen].sort(), opened: [...opened].sort() };
+}
+
+/** Each file of the frame that names the read of the whole list of the runs, outside a comment. */
+const wholeListBreaks = (texts: ReadonlyMap<string, string>): string[] =>
+  frameReach(texts)
+    .frame.filter((file) => /\brunsQuery\b/.test(withoutComments(texts.get(file)!)))
+    .map(
+      (file) =>
+        `${file} names runsQuery: the frame is drawn on every page and reads the light answer (openRunsQuery), never the whole list`,
+    );
+
+test('nothing the frame reaches reads the whole list of the runs, but the pickers a person opens', () => {
+  const texts = sourceTexts();
+  const { frame, opened } = frameReach(texts);
+  assert.deepEqual(wholeListBreaks(texts), []);
+  for (const file of ['src/components/FrameHeader.tsx', 'src/components/FrameFooter.tsx', 'src/components/FrameSidebar.tsx'])
+    assert.ok(frame.includes(file), `the scan reaches ${file} from ${ROOT}`);
+  assert.ok(frame.includes('src/lib/bell.ts'), 'and what the frame\'s components read in turn');
+  assert.deepEqual(opened, OPENED, 'every picker let through is still reached from the root: take one that is not off the list');
+  for (const file of OPENED)
+    assert.match(withoutComments(texts.get(file)!), /\brunsQuery\b/, `${file} reads the whole list no more: take it off the list`);
+});
+
+test('REFUSED: a read of the whole list in a file of the frame, or in one a file of the frame imports; a JSDoc and a page are let through', () => {
+  const texts = sourceTexts();
+  const footer = 'src/components/FrameFooter.tsx';
+  const header = 'src/components/FrameHeader.tsx';
+  const why = 'names runsQuery: the frame is drawn on every page and reads the light answer (openRunsQuery), never the whole list';
+  const direct = new Map([...texts, [footer, `${texts.get(footer)!}\nimport { runsQuery } from '@/lib/api';\nvoid runsQuery;\n`]]);
+  assert.deepEqual(wholeListBreaks(direct), [`${footer} ${why}`]);
+  const through = new Map([
+    ...texts,
+    [header, `import { x } from './x';\n${texts.get(header)!}\nvoid x;\n`],
+    ['src/components/x.tsx', "import { runsQuery } from '../lib/api';\nexport const x = runsQuery;\n"],
+  ]);
+  assert.deepEqual(wholeListBreaks(through), [`src/components/x.tsx ${why}`]);
+  const said = new Map([...texts, [footer, `${texts.get(footer)!}\n/** Not \`runsQuery\`: the light answer. */\nexport const y = 1;\n`]]);
+  assert.deepEqual(wholeListBreaks(said), []);
+  assert.match(texts.get('src/routes/runs.index.tsx')!, /\brunsQuery\b/, 'a page the root does not reach keeps the whole list');
+  assert.ok(!frameReach(texts).frame.includes('src/routes/runs.index.tsx'));
 });
 
 test(`only ${STREAMS.join(' and ')} open an EventSource`, () => {

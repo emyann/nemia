@@ -19,12 +19,12 @@ const win = (over: Partial<QuotaWindow> = {}): QuotaWindow => ({
 });
 
 test("a reset is said in the person's own time zone: the time on the same day, the weekday before it on another", () => {
-  assert.equal(clockWord(new Date('2026-09-19T12:30:00Z'), NOW, 'UTC'), '12:30');
-  assert.equal(clockWord(new Date('2026-09-19T12:30:00Z'), NOW, 'Asia/Tokyo'), '21:30');
-  assert.equal(clockWord(new Date('2026-09-22T02:00:00Z'), NOW, 'UTC'), 'Tue 02:00', 'Tuesday in UTC');
-  assert.equal(clockWord(new Date('2026-09-22T02:00:00Z'), NOW, 'America/New_York'), 'Mon 22:00', 'still Monday in New York');
-  assert.equal(clockWord(new Date('2026-09-19T20:00:00Z'), NOW, 'UTC'), '20:00', 'the same instant is today in one zone');
-  assert.equal(clockWord(new Date('2026-09-19T20:00:00Z'), NOW, 'Asia/Tokyo'), 'Sun 05:00', 'and tomorrow in another');
+  assert.equal(clockWord(new Date('2026-09-19T12:30:00Z'), NOW, 'UTC'), '12:30 PM');
+  assert.equal(clockWord(new Date('2026-09-19T12:30:00Z'), NOW, 'Asia/Tokyo'), '9:30 PM');
+  assert.equal(clockWord(new Date('2026-09-22T02:00:00Z'), NOW, 'UTC'), 'Tue 2:00 AM', 'Tuesday in UTC');
+  assert.equal(clockWord(new Date('2026-09-22T02:00:00Z'), NOW, 'America/New_York'), 'Mon 10:00 PM', 'still Monday in New York');
+  assert.equal(clockWord(new Date('2026-09-19T20:00:00Z'), NOW, 'UTC'), '8:00 PM', 'the same instant is today in one zone');
+  assert.equal(clockWord(new Date('2026-09-19T20:00:00Z'), NOW, 'Asia/Tokyo'), 'Sun 5:00 AM', 'and tomorrow in another');
 });
 
 test('the age of a reading', () => {
@@ -41,12 +41,12 @@ test('a window: its percentage rounded, when it resets, marked past the mark —
     key: 'five_hour',
     label: '5-hour',
     used: '38%',
-    resets: 'resets 12:30',
+    resets: 'resets 12:30 PM',
     marked: false,
   });
   assert.equal(windowWords(win({ usedPercentage: 86, marked: true }), NOW, 'UTC').marked, true);
   const reset = windowWords(win({ usedPercentage: 91, marked: true, reset: true, resetsAt: '2026-09-19T09:00:00Z' }), NOW, 'UTC');
-  assert.equal(reset.resets, 'reset 09:00, not read since');
+  assert.equal(reset.resets, 'reset 9:00 AM, not read since');
   assert.equal(reset.marked, false, 'a window begun again is not the number it was');
   assert.equal(windowWords(win({ resetsAt: null }), NOW, 'UTC').resets, null);
 });
@@ -67,7 +67,7 @@ test('the hover says where the reading came from, when it is asked again, and by
   };
   assert.equal(
     quotaTitle(fresh, NOW, 'UTC'),
-    'Asked of Claude Code (get_usage, max plan) at 09:58; asked again at most every 3 min while a board is open. A window 80% used or more is marked.',
+    'Asked of Claude Code (get_usage, max plan) at 9:58 AM; asked again at most every 3 min while a board is open. A window 80% used or more is marked.',
   );
   const failed: Quota = {
     ...fresh,
@@ -104,18 +104,18 @@ test('the last good reading beside a state with none: its windows, and as of whe
     said: 'nothing this time',
   };
   const last = lastWords(unanswered, NOW, 'UTC');
-  assert.equal(last?.asOf, 'as of 09:35, 25 min ago');
+  assert.equal(last?.asOf, 'as of 9:35 AM, 25 min ago');
   assert.deepEqual(
     last?.windows.map((w) => [w.label, w.used, w.resets, w.marked]),
     [
-      ['5-hour', '38%', 'resets 12:30', false],
-      ['week', '86%', 'resets Tue 11:00', true],
+      ['5-hour', '38%', 'resets 12:30 PM', false],
+      ['week', '86%', 'resets Tue 11:00 AM', true],
     ],
   );
   assert.equal(lastWords({ ...unanswered, last: null }, NOW, 'UTC'), null, "none past the api's bound");
   assert.equal(lastWords({ ...unanswered, state: 'fresh', windows }, NOW, 'UTC'), null);
   assert.equal(
     quotaTitle(unanswered, NOW, 'UTC'),
-    'Asked of Claude Code (get_usage); asked again at 10:19 at the soonest, and less often each time the usage service gives nothing. A window 80% used or more is marked. The dimmed numbers are the last reading, not now.',
+    'Asked of Claude Code (get_usage); asked again at 10:19 AM at the soonest, and less often each time the usage service gives nothing. A window 80% used or more is marked. The dimmed numbers are the last reading, not now.',
   );
 });

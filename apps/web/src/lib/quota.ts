@@ -3,10 +3,11 @@
  * handed in, the browser's own on the page.
  */
 import type { Quota, QuotaWindow } from './api';
+import { timeOfDay } from './timeOfDay.ts';
 
-/** A time as a person reads it where they are: `16:40` on the day of `now`, `Tue 09:00` on another. */
+/** A time as a person reads it where they are, as `timeOfDay` writes it: `4:40 PM` on the day of `now`, `Tue 9:00 AM` on another. */
 export function clockWord(at: Date, now: Date, timeZone?: string): string {
-  const time = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone }).format(at);
+  const time = timeOfDay(at, timeZone);
   const day = (d: Date) => new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone }).format(d);
   if (day(at) === day(now)) return time;
   return `${new Intl.DateTimeFormat(undefined, { weekday: 'short', timeZone }).format(at)} ${time}`;
@@ -41,7 +42,7 @@ function keepWord(ms: number): string {
   return ms % 60_000 === 0 ? `${ms / 60_000} min` : `${Math.round(ms / 1000)} s`;
 }
 
-/** The last good reading beside a state with no windows of its own: its windows, and `as of 11:20, 25 min ago`. Null when there is none. */
+/** The last good reading beside a state with no windows of its own: its windows, and `as of 11:20 AM, 25 min ago`. Null when there is none. */
 export function lastWords(q: Quota, now: Date, timeZone?: string): { windows: WindowWords[]; asOf: string } | null {
   if (q.state === 'fresh' || !q.last?.windows.length) return null;
   const at = new Date(q.last.askedAt);

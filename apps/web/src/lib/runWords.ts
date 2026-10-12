@@ -6,6 +6,7 @@
 import type { RunOutcome, RunSummary } from './api/runs.ts';
 import type { Hue } from './meaning.ts';
 import { stepState, type StepState } from './status.ts';
+import { timeOfDay } from './timeOfDay.ts';
 
 /** Every kind of wait on a person the page has a sentence for. */
 export const WAIT_KINDS = ['approve', 'blocked', 'check', 'unfinished', 'unsigned', 'denied', 'rounds', 'budget', 'hold', 'after'] as const;
@@ -281,19 +282,11 @@ export const railSaid = (
     .map((step) => `${step.name} ${railWord[step.state]}`)
     .join(', ');
 
-/** The parts of an instant as a person reads it in `timeZone`, theirs by default: its date, and its time on a 12-hour clock. */
-function partsOf(at: Date, timeZone?: string) {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-    timeZone,
-  }).formatToParts(at);
+/** The parts of a date as a person reads it in `timeZone`, theirs by default: its year, its month in three letters and its day. */
+export function dateParts(at: Date, timeZone?: string): { year: string; month: string; day: string } {
+  const parts = new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone }).formatToParts(at);
   const of = (type: Intl.DateTimeFormatPartTypes): string => parts.find((part) => part.type === type)?.value ?? '';
-  return { year: of('year'), month: of('month'), day: of('day'), hour: of('hour'), minute: of('minute'), period: of('dayPeriod') };
+  return { year: of('year'), month: of('month'), day: of('day') };
 }
 
 /**
@@ -302,8 +295,8 @@ function partsOf(at: Date, timeZone?: string) {
  * year (`31 Dec 2025`). Its spaces are plain ones.
  */
 export function whenWords(at: Date, now: Date, timeZone?: string): string {
-  const [then, today] = [partsOf(at, timeZone), partsOf(now, timeZone)];
-  const time = `${then.hour}:${then.minute} ${then.period}`;
+  const [then, today] = [dateParts(at, timeZone), dateParts(now, timeZone)];
+  const time = timeOfDay(at, timeZone);
   if (then.year !== today.year) return `${then.day} ${then.month} ${then.year}`;
   return then.day === today.day && then.month === today.month ? time : `${then.day} ${then.month} ${time}`;
 }
@@ -315,8 +308,8 @@ export function whenWords(at: Date, now: Date, timeZone?: string): string {
  * its white space kept.
  */
 export function whenColumn(at: Date, now: Date, timeZone?: string): string {
-  const then = partsOf(at, timeZone);
+  const then = dateParts(at, timeZone);
   const date = `${then.day.padStart(2)} ${then.month}`;
-  if (then.year !== partsOf(now, timeZone).year) return `${date} ${then.year}`;
-  return `${date} ${then.hour.padStart(2)}:${then.minute} ${then.period}`;
+  if (then.year !== dateParts(now, timeZone).year) return `${date} ${then.year}`;
+  return `${date} ${timeOfDay(at, timeZone).padStart(8)}`;
 }

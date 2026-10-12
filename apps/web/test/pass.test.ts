@@ -46,7 +46,7 @@ test("the line says what a pass takes, in the package's rounding", () => {
 test("the title is the breakdown: the pass, every phase in the package's order, each harness, and what measuring took", () => {
   const now = new Date('2026-09-25T10:05:00.000Z');
   const lines = passTitle(PASS, now, 'UTC').split('\n');
-  assert.equal(lines[0], "The daemon's last pass, at 10:00: 212 ms, 12 run records read, 812.0 kB read, 1 process started.");
+  assert.equal(lines[0], "The daemon's last pass, at 10:00 AM: 212 ms, 12 run records read, 812.0 kB read, 1 process started.");
   assert.deepEqual(
     lines.slice(1, 9).map((l) => l.split(':')[0]),
     [...PASS_PHASES],
@@ -63,7 +63,7 @@ test("the title is the breakdown: the pass, every phase in the package's order, 
   assert.ok(passTitle({ ...PASS, harnesses: {} }, now, 'UTC').includes('\nNo harness was observed.\n'));
   assert.match(
     passTitle(PASS, new Date('2026-09-26T10:05:00.000Z'), 'UTC'),
-    /^The daemon's last pass, at Fri 10:00: /,
+    /^The daemon's last pass, at Fri 10:00 AM: /,
     'a pass of another day says its day',
   );
 });

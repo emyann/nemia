@@ -99,6 +99,9 @@ const KIT_SKILLS_SAID = [
   '`ds-spec` when a decision cites Material',
 ];
 
+/** A skill of the kit named in backticks, as the trigger skill writes one: the kit names each of its skills `ds-` and a word or more. */
+const KIT_NAMED = /`(ds-[a-z0-9]+(?:-[a-z0-9]+)*)`/g;
+
 /**
  * What design and review, the fenced steps, are told of the kit: to load the trigger skill first, and the command of `ds-spec`'s
  * reader from the repository's root, the workspace's script and not the copy the step is given.
@@ -329,10 +332,12 @@ const kitGiven = (step: Step | undefined): string[] =>
 /**
  * What the build workflow's steps `steps`, the skill folders `folders` of the kit and the trigger skill's text `trigger` do not hold
  * together, a line each: for each step of `KIT_STEPS`, a kit skill it is given that has no folder and a folder it is not given; a folder
- * whose sentence (`KIT_SKILLS_SAID`) the trigger skill does not say; and a trigger skill that names no file to read a kit skill from.
+ * whose sentence (`KIT_SKILLS_SAID`) the trigger skill does not say; a sentence of `KIT_SKILLS_SAID` whose skill has no folder, and a
+ * kit skill the trigger skill names (`KIT_NAMED`) that has none; and a trigger skill that names no file to read a kit skill from.
  */
 function kitDrift(steps: readonly Step[], folders: readonly string[], trigger: string): string[] {
   const said = namedIn(KIT_SKILLS_SAID);
+  const named = [...new Set([...trigger.matchAll(KIT_NAMED)].map((span) => span[1]))];
   return [
     ...KIT_STEPS.flatMap((name) => {
       const given = kitGiven(steps.find((step) => step.name === name));
@@ -346,6 +351,10 @@ function kitDrift(steps: readonly Step[], folders: readonly string[], trigger: s
     ...folders
       .filter((folder) => !said.some(({ name, sentence }) => name === folder && across(sentence).test(trigger)))
       .map((folder) => `${folder}: change-the-board says no "${folder}" sentence`),
+    ...said
+      .filter(({ name }) => !folders.includes(name))
+      .map(({ name }) => `${name}: KIT_SKILLS_SAID holds its sentence, and no folder in ${KIT_SKILLS}`),
+    ...named.filter((name) => !folders.includes(name)).map((name) => `${name}: change-the-board names it, and no folder in ${KIT_SKILLS}`),
     ...(trigger.includes(`\`${KIT_SKILLS}/<name>/SKILL.md\``) ? [] : [`change-the-board names no ${KIT_SKILLS}/<name>/SKILL.md to read`]),
   ];
 }
@@ -379,6 +388,8 @@ test('REFUSED: a kit skill given to a step that has no folder, and a kit skill f
       `${step}: not given apps/web:ds-builds`,
     ]),
     'ds-builds: change-the-board says no "ds-builds" sentence',
+    `ds-build: KIT_SKILLS_SAID holds its sentence, and no folder in ${KIT_SKILLS}`,
+    `ds-build: change-the-board names it, and no folder in ${KIT_SKILLS}`,
   ]);
   const added = kitFoldersEdited((dir) => {
     fs.mkdirSync(path.join(dir, 'ds-new'));
@@ -394,7 +405,26 @@ test('REFUSED: a kit skill given to a step that has no folder, and a kit skill f
   assert.deepEqual(kitDrift(ungiven, folders, triggerText()), ['review: not given apps/web:ds-spec']);
   const bare = shippedEdited('build', 'design', (text) => text.replace(', apps/web:ds-theme,', ','));
   assert.deepEqual(kitDrift(bare, folders, triggerText()), ['design: not given apps/web:ds-theme']);
-  assert.deepEqual(kitDrift([], [], triggerText()), [], 'no folder asks nothing of a step');
+});
+
+test('REFUSED: a kit skill gone from the kit and from the three lines, which the sentences here or change-the-board still say, is named', () => {
+  const root = scratch('wf-told-gone-');
+  fs.cpSync(HOLDER, root, { recursive: true });
+  for (const step of KIT_STEPS) {
+    const file = path.join(root, 'build', `${step}.md`);
+    const text = fs.readFileSync(file, 'utf8');
+    assert.ok(text.includes(', apps/web:ds-theme'), file);
+    fs.writeFileSync(file, text.replace(', apps/web:ds-theme', ''));
+  }
+  const steps = loadWorkflows(path.join(root, 'build'), { repo: REPO });
+  const gone = kitFoldersEdited((dir) => fs.rmSync(path.join(dir, 'ds-theme'), { recursive: true }));
+  assert.deepEqual(gone, ['ds-build', 'ds-spec']);
+  const sentence = `ds-theme: KIT_SKILLS_SAID holds its sentence, and no folder in ${KIT_SKILLS}`;
+  const trigger = `ds-theme: change-the-board names it, and no folder in ${KIT_SKILLS}`;
+  assert.deepEqual(kitDrift(steps, gone, triggerText()), [sentence, trigger]);
+  const silent = triggerText().replaceAll('`ds-theme`', 'the theme’s skill');
+  assert.deepEqual(kitDrift(steps, gone, silent), [sentence], 'a trigger that names it no more leaves the sentence held here');
+  assert.deepEqual(kitDrift(buildSteps(), skillFolders(path.join(REPO, KIT_SKILLS)), triggerText()), [], 'with its folder, neither');
 });
 
 test('REFUSED: a trigger skill that says a kit skill no more, or names no file to read one from, is named', () => {

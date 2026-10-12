@@ -38,9 +38,23 @@ export async function buildParts(outDir: string): Promise<void> {
 /**
  * A 1280 × 800 page in `theme`, open on the gallery built in `dir` at `search`: a file the folder has is answered as it is, and every
  * other address with the gallery's page, as a server of a one-page app does. Waits for the first part to be drawn.
+ *
+ * @param look `scale`, how many pixels of a picture draw one of the page, for a picture enlarged with the pointer's state kept; and
+ *   `still`, whether the page is told nothing may move, so that a colour is read with no transition to wait out
  */
-export async function openParts(browser: Browser, dir: string, theme: 'light' | 'dark', search = ''): Promise<Page> {
-  const context = await browser.newContext({ colorScheme: theme, viewport: { width: 1280, height: 800 } });
+export async function openParts(
+  browser: Browser,
+  dir: string,
+  theme: 'light' | 'dark',
+  search = '',
+  look: { scale?: number; still?: boolean } = {},
+): Promise<Page> {
+  const context = await browser.newContext({
+    colorScheme: theme,
+    viewport: { width: 1280, height: 800 },
+    deviceScaleFactor: look.scale ?? 1,
+    reducedMotion: look.still ? 'reduce' : 'no-preference',
+  });
   const page = await context.newPage();
   await page.route(`${PARTS_URL}**`, (route) => {
     const asked = path.join(dir, decodeURIComponent(new URL(route.request().url()).pathname));

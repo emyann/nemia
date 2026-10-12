@@ -13,6 +13,7 @@ import { OpenBar } from '@/components/OpenBar';
 import { Sidebar, SidebarInset, SidebarProvider, SidebarRail, sidebarOpenOf, useSidebar } from '@/components/ui/sidebar';
 import { barSearch } from '@/lib/bar';
 import { useFeed } from '@/lib/useFeed';
+import { useScrollMark } from '@/lib/useScrollMark';
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   validateSearch: barSearch,
@@ -37,6 +38,7 @@ function Root() {
   const search: Record<string, unknown> = useRouterState({ select: (state) => state.location.search });
   const router = useRouter();
   const feed = useFeed();
+  useScrollMark();
 
   return (
     <AriaRouterProvider navigate={(href) => void router.navigate({ href })}>

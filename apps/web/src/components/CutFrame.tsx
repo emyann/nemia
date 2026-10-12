@@ -103,3 +103,22 @@ export function CutFrame({
     </div>
   );
 }
+
+/**
+ * What the box around a table in a cut frame wears: it scrolls sideways when the table is wider than the frame and never upright,
+ * the frame growing with its rows; and its sideways scroll bar starts past the frame's bottom-left cut, where its thumb would be
+ * painted in the cut corner.
+ */
+export const FRAMED_BOX = 'overflow-x-auto overflow-y-hidden [&::-webkit-scrollbar-track:horizontal]:ml-6';
+
+/**
+ * What a table in a cut frame wears: nothing it holds is laid out past its own box, where a control's touch target under the last
+ * row would make the box around it scroll upright. The table's box is the frame's inside, so nothing drawn in it is cut.
+ */
+export const FRAMED_TABLE = 'overflow-clip';
+
+/**
+ * What a row of a table in a cut frame wears: no ground of its own, which would paint a cut corner over, and no line under the last
+ * row, where the frame's own edge closes the table.
+ */
+export const FRAMED_ROW = 'bg-transparent last:border-b-0';

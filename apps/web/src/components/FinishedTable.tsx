@@ -6,7 +6,7 @@ import { ink } from '@/lib/meaning';
 import { endedWords, sinceShort, whenWords } from '@/lib/runWords';
 import { cn } from '@/components/ui/ds/utils';
 import { CopyId } from './CopyId';
-import { CutFrame } from './CutFrame';
+import { CutFrame, FRAMED_BOX, FRAMED_ROW, FRAMED_TABLE } from './CutFrame';
 import { Pager } from './Pager';
 import { TextLink } from './TextLink';
 
@@ -20,7 +20,7 @@ const FACT = 'font-mono text-body-small whitespace-nowrap';
 function FinishedRow({ run, asOf }: { run: FinishedPage['runs'][number]; asOf: Date }) {
   const ended = endedWords(run.outcome);
   return (
-    <Row id={run.id} data-run={run.id} data-outcome={run.outcome} className="bg-transparent">
+    <Row id={run.id} data-run={run.id} data-outcome={run.outcome} className={FRAMED_ROW}>
       <Cell>
         <TextLink to="/runs/$runId" params={{ runId: run.id }} title={titleOf(run)} className="block truncate text-body-medium">
           {titleOf(run)}
@@ -56,7 +56,8 @@ function FinishedRow({ run, asOf }: { run: FinishedPage['runs'][number]; asOf: D
 /**
  * One page of the finished runs, newest finished first, as the kit's dense table in the look's cut frame, quiet: each run's title as a
  * link, its factory, when it was created and when it finished, its wall time and its cost, how it ended, and its id's end with a copy
- * control; then the pager. A page that holds no row draws no table, and the pager says why. Narrower than its columns, the table
+ * control, the last row with no line under it; then the pager, under a line of its own. A page that holds no row draws no table and no
+ * line, and the pager says why. Narrower than its columns, the table
  * scrolls sideways inside its frame.
  */
 export function FinishedTable({ page }: { page: FinishedPage }) {
@@ -64,8 +65,8 @@ export function FinishedTable({ page }: { page: FinishedPage }) {
   return (
     <CutFrame size={24}>
       {page.runs.length > 0 && (
-        <div data-table-box className="overflow-x-auto">
-          <Table aria-label="Finished runs" density="dense" className="min-w-[920px] table-fixed">
+        <div data-table-box className={FRAMED_BOX}>
+          <Table aria-label="Finished runs" density="dense" className={cn('min-w-[920px] table-fixed', FRAMED_TABLE)}>
             <TableHeader>
               <Column id="run" isRowHeader className={HEAD}>
                 Run
@@ -100,7 +101,7 @@ export function FinishedTable({ page }: { page: FinishedPage }) {
           </Table>
         </div>
       )}
-      <div className="px-4 py-3">
+      <div data-pager-box className={cn('px-4 py-3', page.runs.length > 0 && 'border-t border-outline-variant')}>
         <Pager page={page.page} pages={page.pages} total={page.total} size={page.size} />
       </div>
     </CutFrame>

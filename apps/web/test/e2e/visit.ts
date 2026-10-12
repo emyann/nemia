@@ -156,9 +156,25 @@ export async function visitAll(
   return { shots, timings };
 }
 
-export async function launch(): Promise<Browser> {
+/** The kind of scroll bar a browser of the e2e draws: one that takes room beside what scrolls, or one that floats over it. */
+export type Bars = 'classic' | 'overlay';
+
+/** What Chromium is started with to draw each kind of bar: neither hides its bars, and the overlay kind asks for the floating ones. */
+const DRAWN: Record<Bars, { ignoreDefaultArgs: string[]; args?: string[] }> = {
+  classic: { ignoreDefaultArgs: ['--hide-scrollbars'] },
+  overlay: { ignoreDefaultArgs: ['--hide-scrollbars'], args: ['--enable-features=OverlayScrollbar'] },
+};
+
+/**
+ * Starts the e2e's Chromium. With no `bars` it hides every scroll bar, as a headless browser does: no bar takes room and none is in a
+ * picture. `classic` draws the bars a desktop browser draws by default, which take room beside what scrolls (15 pixels where a page
+ * styles none); `overlay` draws the floating ones, which take none unless the page gives them a width.
+ *
+ * @throws when Chromium does not start, saying how it is installed
+ */
+export async function launch(bars?: Bars): Promise<Browser> {
   try {
-    return await chromium.launch();
+    return await chromium.launch(bars ? DRAWN[bars] : {});
   } catch (err) {
     throw new Error(
       `Chromium did not start: ${(err as Error).message.split('\n')[0]}\n  If it is not installed, run \`npx playwright install chromium\` once on this machine; every worktree shares ~/.cache/ms-playwright.`,

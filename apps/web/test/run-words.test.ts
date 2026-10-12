@@ -200,9 +200,9 @@ test('a time is a fact to the minute, wall time', () => {
 test('the present wait is said since the instant it began, to the minute, never negative, and not at all where none is dated', () => {
   const asOf = new Date('2026-10-12T12:00:00.000Z');
   const since = (ms: number) => ({ waitingSince: new Date(asOf.getTime() - ms).toISOString() });
-  assert.equal(presentWait(since(2 * M + 30 * S), asOf), '2m');
-  assert.equal(presentWait(since(30 * S), asOf), 'under 1m');
-  assert.equal(presentWait(since(-5 * M), asOf), 'under 1m', 'an instant after the answer was read');
+  assert.equal(presentWait(since(150_000), asOf), '2m');
+  assert.equal(presentWait(since(30_000), asOf), 'under 1m');
+  assert.equal(presentWait(since(-300_000), asOf), 'under 1m', 'an instant after the answer was read');
   assert.equal(presentWait({ waitingSince: null }, asOf), null);
 });
 

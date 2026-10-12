@@ -435,6 +435,22 @@ export const GATED = {
 } as const;
 
 /**
+ * A run at its second gate: `plan → build`, both gated. plan signed off half an hour ago and waited some twenty minutes for its approval,
+ * the file `nemia approve` writes beside the record; build then ran, signed off a few minutes ago, and awaits its own. So the run's present
+ * wait on a person is minutes long while all its waits on one, summed, are over twenty: the `runs` page tells the two apart. The oldest
+ * of the seeded runs, and no page writes to it.
+ */
+export const REGATED = {
+  id: 'wait-at-the-second-gate-e2e12',
+  title: 'Wait at the second gate',
+  steps: ['plan', 'build'],
+  /** Minutes ago, each mid-minute: plan signed off, a person approved it, and build signed off. */
+  planEnded: 30.5,
+  approved: 8.5,
+  buildEnded: 3.5,
+} as const;
+
+/**
  * A seventh run, whose workflow's ending is a step of its own: `implement → review → ship`, with `ship` in the repository's own checkout
  * (`workspace: main`) and gated. implement and review signed off; ship has never run, so it reads `awaiting approval` — its approval is
  * what files it — and nothing of the run moves. So it is finished, and it stays on the Factory's floor all the same: nobody has decided it.
@@ -1884,9 +1900,65 @@ export function seedFeed(root: string): void {
   write(path.join(root, 'engine', 'feed.jsonl'), lines(entries));
 }
 
+/** REGATED into `root`: its workflow folder, its record, plan's approval beside it, and the journals of its two tasks. */
+function seedRegated(root: string, ago: (minutes: number) => string): void {
+  const { id, title, planEnded, approved, buildEnded } = REGATED;
+  const dir = path.join(root, 'workflow-regated');
+  write(path.join(dir, 'plan.md'), '---\nplace: git\nharness: claude\n---\nPlan it.\n');
+  write(path.join(dir, 'build.md'), '---\nplace: git\nharness: claude\nafter: plan\n---\nBuild the plan.\n');
+  const lane = (step: string) => path.join(root, 'worktrees', id, step);
+  const record = (step: string) => ({ taskId: `${id}-${step}`, workspace: lane(step), branch: `wf/${id}/${step}` });
+  write(
+    path.join(root, 'runs', `${id}.json`),
+    JSON.stringify(
+      {
+        id,
+        repo: '/code/hkb-v2',
+        workspace: '/code/hkb-v2',
+        baseRef: '19c9365',
+        branch: 'main',
+        isolate: true,
+        brief: `${title}\n\nA run seeded by npm run e2e, started --gate plan --gate build: plan was approved, and build awaits its own approval.`,
+        workflowDir: dir,
+        workflow: [
+          { name: 'plan', after: [], body: 'Plan it.', harness: 'claude' },
+          { name: 'build', after: ['plan'], body: 'Build the plan.', harness: 'claude' },
+        ],
+        gates: ['plan', 'build'],
+        createdAt: ago(planEnded + 1),
+        steps: { plan: record('plan'), build: record('build') },
+      },
+      null,
+      2,
+    ),
+  );
+  write(path.join(root, 'runs', `${id}.asks`, 'approve-plan-1'), `${JSON.stringify({ step: 'plan', try: 1, at: ago(approved) })}\n`);
+  const journal = (step: string, filed: number, ended: number, summary: string) =>
+    write(
+      path.join(root, 'engine', 'tasks', `${id}-${step}.jsonl`),
+      lines([
+        { kind: 'filed', at: ago(filed), brief: summary, cwd: lane(step), maxAttempts: 1, harness: 'claude' },
+        { kind: 'starting', at: ago(filed), attempt: 1 },
+        { kind: 'spawned', at: ago(filed), attempt: 1 },
+        {
+          kind: 'ended',
+          at: ago(ended),
+          attempt: 1,
+          sessionId: `ae/${id}-${step}/1`,
+          observed: 'done',
+          reason: 'harness',
+          closeout: { outcome: 'done', summary, needs: null, artifacts: [] },
+        },
+        { kind: 'settled', at: ago(ended), outcome: 'succeeded' },
+      ]),
+    );
+  journal('plan', planEnded + 1, planEnded, 'The plan, in two steps.');
+  journal('build', approved, buildEnded, 'Built as planned.');
+}
+
 /**
- * Write the fake run into `root`, which becomes the api's WF_ROOT, with NEIGHBOUR, LOOPING, HELD, GATED, COSTLY, and last the three runs
- * whose result is a decision (`seedDecisions`), newest, whose cards take the cells after every other run's. Times are minutes before
+ * Write the fake run into `root`, which becomes the api's WF_ROOT, with NEIGHBOUR, LOOPING, HELD, GATED, REGATED, COSTLY, and last the
+ * three runs whose result is a decision (`seedDecisions`), newest, whose cards take the cells after every other run's. Times are minutes before
  * `now`. A task's end records the session's own id (`nativeId`) for a harness that has one, which the engine reads a transcript by.
  *
  * FAKE's repository is named as the other runs' is, so the Factory's card reads the same. tokens runs beside implement, so it has a
@@ -2364,6 +2436,8 @@ export function seed(root: string, now = Date.now()): void {
       { kind: 'settled', at: ago(1.1), outcome: 'succeeded' },
     ]),
   );
+
+  seedRegated(root, ago);
 
   const costDir = path.join(root, 'workflow-cost');
   write(path.join(costDir, 'implement.md'), '---\nplace: git\nharness: claude\nbudget: 2\n---\nImplement it.\n');

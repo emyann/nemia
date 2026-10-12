@@ -176,7 +176,7 @@ test('a clock read before the run was created is empty, never negative', () => {
   });
 });
 
-test("a run at its second gate has waited since the second gate was reached, while its clock sums both waits", () => {
+test('a run at its second gate has waited since the second gate was reached, while its clock sums both waits', () => {
   const { run: r, views } = approved(ran(at(11, 42), at(11, 50)));
   assert.equal(waitingSinceOf(r, views, FILED, STEPS, ['build'], null), at(11, 50));
   assert.equal(clockOf(r, views, FILED, STEPS, ['build'], UNTIL).personMs, 35 * MIN, '25 at the first gate, 10 open at the second');

@@ -117,7 +117,15 @@ const everyPage = async (size: number, factory?: string): Promise<FinishedPage[]
 
 /** A row of either read as the whole list answers the run: without what the two reads add. */
 const summaryOf = (row: object): object => {
-  const { wallMs: _w, finishedAt: _f, outcome: _o, clock: _c, stepCosts: _s, waitingSince: _p, ...summary } = row as Record<string, unknown>;
+  const {
+    wallMs: _w,
+    finishedAt: _f,
+    outcome: _o,
+    clock: _c,
+    stepCosts: _s,
+    waitingSince: _p,
+    ...summary
+  } = row as Record<string, unknown>;
   return summary;
 };
 
@@ -248,7 +256,7 @@ test('a run at its second gate has waited since that gate was reached, while its
   assert.deepEqual(row.waitingOnYou, ['build'], 'the fixture waits at its second gate');
   assert.equal(row.waitingSince, stamp(35));
   assert.equal(row.clock?.personMs, 45 * MIN, '20 minutes at the first gate and 25 at the second');
-  assert.equal(Date.parse(light.asOf) - Date.parse(row.waitingSince!), 25 * MIN);
+  assert.equal(Date.parse(light.asOf) - Date.parse(row.waitingSince), 25 * MIN);
 });
 
 test('the finished runs page by when their work stopped, not by when they were created: a late cancellation is the last stop', async (t) => {

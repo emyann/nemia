@@ -132,7 +132,7 @@ export const DRESSED: { file: string; classes: string; why: string }[] = [
   },
 ];
 
-/** Every class string under `root`'s `src` outside the kit that `dressed` finds and `kept` does not list for its file, as `file (classes)`. */
+/** Every class string of `root`'s `src` outside the kit that `dressed` finds and `kept` lists not for its file, as `file (classes)`. */
 export function dressedIn(root: string, kept = DRESSED): string[] {
   return sources(root).flatMap((file) =>
     dressed(fs.readFileSync(path.join(root, file), 'utf8'))

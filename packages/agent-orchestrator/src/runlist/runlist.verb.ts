@@ -68,6 +68,12 @@ type Asked = { factory?: string; now: number };
 /** What is read of no run: no view, and no task left out. */
 const NONE_READ: { views: Views; unreadable: Unreadable } = { views: new Map(), unreadable: new Map() };
 
+/**
+ * The store a waiting run's parents are looked for in: none. A breakdown reads the run's own tasks, so no run it waits on, or is held
+ * until, is read for it.
+ */
+const NO_PARENT = (): readonly Run[] => [];
+
 /** A summary with its wall time until `now`, and no time it finished at. */
 const listedAt =
   (now: number) =>
@@ -99,7 +105,8 @@ function brokenDown(
 
 /**
  * The runs that wait on a person and the runs in flight, of `asked.factory` or of every factory, with the three counts (`OpenRuns`).
- * The waiting runs alone are read for their breakdowns: their records, the views of their tasks and the feed's filing times.
+ * The waiting runs alone are read for their breakdowns: their records, the views of their own tasks and the feed's filing times; a run
+ * one of them waits on is not read.
  */
 export const runsOpen = Effect.fn('runsOpen')(function* (e: Engine, how: SummaryHow, asked: Asked) {
   const all = (yield* runsSummarized(e, how)).filter(inFactory(asked.factory));
@@ -107,7 +114,7 @@ export const runsOpen = Effect.fn('runsOpen')(function* (e: Engine, how: Summary
   const waiting = of('waiting');
   const inFlight = of('inFlight');
   const records = yield* tried(() => recordsOf(waiting.map((run) => run.id)));
-  const { views, unreadable } = records.length ? yield* viewsFor(e, records) : NONE_READ;
+  const { views, unreadable } = records.length ? yield* viewsFor(e, records, NO_PARENT) : NONE_READ;
   const filed = records.length ? yield* filedTimes(e, how.filings) : new Map<string, string>();
   const byId = new Map(records.map((run) => [run.id, run]));
   const open: OpenRuns = {

@@ -618,6 +618,8 @@ test('a finished page read warm asks the engine for no journal the whole list do
   branchOff('wf/r-asks/implement');
   blocked('r-asks-implement');
   writeRun('r-asks', 'Answer it');
+  const asks = path.join(root, 'runs', 'r-asks.json');
+  write(asks, JSON.stringify({ ...(JSON.parse(fs.readFileSync(asks, 'utf8')) as object), after: ['r-paged'] }));
   await aPass();
   try {
     await list();
@@ -646,6 +648,7 @@ test('a finished page read warm asks the engine for no journal the whole list do
     );
     const theirs = new Set(waiting.flatMap((id) => runTasks(runStore.runs.read(id))));
     assert.ok(theirs.has('r-asks-implement') && !theirs.has('r-paged-implement'));
+    assert.deepEqual(runStore.runs.read('r-asks').after, ['r-paged'], 'it was started after the finished run, whose journal is not read');
     assert.equal(open.asked, whole.asked + theirs.size, "the whole list's, and the journals of the runs that wait on a person alone");
   } finally {
     for (const file of ['r-paged.json', 'r-asks.json']) fs.rmSync(path.join(root, 'runs', file));

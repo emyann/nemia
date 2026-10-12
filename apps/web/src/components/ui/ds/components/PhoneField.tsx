@@ -48,7 +48,8 @@ import { MenuItem } from "./MenuItem";
  * `./field-styles.ts`) and menus —
  * https://m3.material.io/components/menus/{specs,guidelines} for the country
  * list (48dp rows, a checkmark as the second selection cue, the calling code
- * in the trailing "shortcut" slot). Deviations: MD3 has no phone field; the
+ * in the trailing "shortcut" slot). Material 3 does not describe this component.
+ * Deviations: MD3 has no phone field; the
  * country picker is a 40dp icon-button-shaped trigger in the leading-icon
  * position (a leading icon that opens a menu is not in the spec), labelled
  * "Phone number country" per the accessibility page's rule for interactive

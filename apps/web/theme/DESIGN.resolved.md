@@ -153,6 +153,8 @@ typography:
     fontWeight: 500
     lineHeight: 16px
     letterSpacing: 0.5px
+  mono:
+    fontFamily: Share Tech Mono
 rounded:
   extra-small: 0
   small: 0
@@ -207,11 +209,12 @@ lettering, the face of a head-up display, set in capitals on the hardware.
 Chakra Petch for the plain face (body, label): squared, with cut terminals,
 readable small and at home in capitals.
 
-The kit carries two faces and this look wants four. The board sets the other
-two beside the kit: a printed label's numerals in Archivo at its widest and
-heavy (width 125, weight 800), black ink on the label's stock; and
-identifiers, commands and readouts in Share Tech Mono. Sizes, weights and
-tracking of the kit's roles are Material's.
+The kit carries three faces and this look wants four. The third is the mono
+face: identifiers, commands and readouts in Share Tech Mono, wherever the
+board writes mono text. The board sets the fourth beside the kit: a printed
+label's numerals in Archivo at its widest and heavy (width 125, weight 800),
+black ink on the label's stock. Sizes, weights and tracking of the kit's
+roles are Material's.
 
 ## Shape
 

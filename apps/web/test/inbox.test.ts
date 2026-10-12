@@ -9,8 +9,11 @@ import { dropCard, fileCard, queueCard, startRun, type Factory, type InboxEntry,
 import {
   afterFor,
   capLine,
+  cardFiling,
   cardLines,
   cardPlace,
+  factoriesOffered,
+  factoryPreset,
   hasPage,
   ignoredRepoNote,
   inboxBadgeTitle,
@@ -22,7 +25,9 @@ import {
   queueable,
   queuedWord,
   queueOf,
+  startPlace,
   triedLine,
+  unassigned,
   workflowKey,
   type CardRefusal,
 } from '../src/lib/inbox.ts';
@@ -311,7 +316,7 @@ test("a card is filed as JSON, the one body the api takes, and resolves with its
     body: 'Cache the views',
   });
   const sent = sending(t, () => answer);
-  const card = { body: 'Cache the views', workflow: 'dev', from: 'repo' as const, repo: '/code/app' };
+  const card = { body: 'Cache the views', workflow: 'dev', from: 'repo' as const, repo: '/code/app', factory: 'pair' };
   assert.deepEqual(await fileCard(card), { name: 'cache-the-views-k2q9' });
   const [{ url, init }] = sent as [(typeof sent)[number]];
   assert.deepEqual([url, init?.method, new Headers(init?.headers).get('content-type')], ['/api/inbox', 'POST', 'application/json']);
@@ -615,4 +620,90 @@ test("REFUSED: the Inbox badge counts the picked factory's cards not yet started
 test("the Inbox badge's title says what it counts whole: in the factory picked, or in every factory", () => {
   assert.equal(inboxBadgeTitle(3, undefined), '3 cards not yet started, in every factory');
   assert.equal(inboxBadgeTitle(1, 'nemia'), '1 card not yet started, in nemia');
+});
+
+test('a card names no factory when it has no factory: line or writes default; one naming a factory is assigned', () => {
+  assert.equal(unassigned({ factory: null }), true);
+  assert.equal(unassigned({ factory: 'default' }), true);
+  assert.equal(unassigned({ factory: 'solo' }), false);
+});
+
+test("the factories offered are the named ones whose file reads, in the api's order: never the default factory, never one that does not read", () => {
+  const listed = [
+    factoryOn('default', ['/code/app']),
+    factoryOn('pair', ['/r/a', '/r/b']),
+    factoryOn('bad', [], 'not JSON'),
+    factoryOn('solo', ['/r/a']),
+  ];
+  assert.deepEqual(
+    factoriesOffered(listed).map((f) => f.name),
+    ['pair', 'solo'],
+  );
+  assert.equal(factoriesOffered([factoryOn('default', ['/code/app'])]).length, 0);
+});
+
+test("the box is preset to the address's factory when it is offered, else to no factory", () => {
+  const offered = factoriesOffered(FACTORIES);
+  assert.equal(factoryPreset('solo', offered), 'solo');
+  for (const shown of ['gone', 'default', undefined]) assert.equal(factoryPreset(shown, offered), '', String(shown));
+});
+
+const SOLO = { name: 'solo', repos: ['/r/a'] };
+const PAIR = { name: 'pair', repos: ['/r/a', '/r/b'] };
+const GIT = { name: 'good', from: 'repo' as const, folderTeam: false };
+const FOLDERS = { name: 'notes', from: 'yours' as const, folderTeam: true };
+
+test('REFUSED: the box sends no repository a person did not choose — none with no factory, none for a factory on one repository, whatever a list held before', () => {
+  assert.deepEqual(
+    cardFiling({ idea: 'An idea', factory: null, repo: '/r/b', workflow: GIT }),
+    { body: 'An idea' },
+    'no factory: the idea alone, also when a workflow and a repository were picked under a factory chosen before',
+  );
+  const solo = cardFiling({ idea: 'An idea', factory: SOLO, repo: '', workflow: GIT });
+  assert.deepEqual(solo, { body: 'An idea', factory: 'solo', workflow: 'good', from: 'repo' });
+  assert.equal('repo' in solo, false, "a factory's only repository is the factory's to give");
+  assert.equal(
+    'repo' in cardFiling({ idea: 'An idea', factory: SOLO, repo: '/r/a', workflow: null }),
+    false,
+    'nor is it sent when a list held it under a factory chosen before: one repository offers no list',
+  );
+  assert.equal(
+    'repo' in cardFiling({ idea: 'An idea', factory: PAIR, repo: '/r/elsewhere', workflow: null }),
+    false,
+    "a repository picked under another factory is none of this one's",
+  );
+});
+
+test('in a factory on several repositories the box sends the one a person picked, and none with a workflow that works in folders', () => {
+  assert.deepEqual(cardFiling({ idea: 'An idea', factory: PAIR, repo: '', workflow: null }), { body: 'An idea', factory: 'pair' });
+  assert.deepEqual(cardFiling({ idea: 'An idea', factory: PAIR, repo: '/r/b', workflow: GIT }), {
+    body: 'An idea',
+    factory: 'pair',
+    workflow: 'good',
+    from: 'repo',
+    repo: '/r/b',
+  });
+  assert.deepEqual(cardFiling({ idea: 'An idea', factory: PAIR, repo: '/r/b', workflow: FOLDERS }), {
+    body: 'An idea',
+    factory: 'pair',
+    workflow: 'notes',
+    from: 'yours',
+  });
+});
+
+test("a card of no factory starts nowhere until a factory is picked, then in that factory's place: its one repository, or the card's repo: among several", () => {
+  assert.equal(startPlace(entry('a', null), '', FACTORIES, FILE_FACTORY), null);
+  assert.deepEqual(startPlace(entry('a', null), 'solo', FACTORIES, FILE_FACTORY), { factory: 'solo', repos: ['/r/a'], repo: '/r/a' });
+  assert.deepEqual(startPlace(entry('a', null, { factory: 'default', repo: '/r/b/' }), 'pair', FACTORIES, FILE_FACTORY), {
+    factory: 'pair',
+    repos: ['/r/a', '/r/b'],
+    repo: '/r/b/',
+  });
+  assert.deepEqual(startPlace(entry('a', null), 'pair', FACTORIES, FILE_FACTORY), { factory: 'pair', repos: ['/r/a', '/r/b'], repo: null });
+});
+
+test('REFUSED: a card about a repository the picked factory does not work on has no place there — it says why, naming both', () => {
+  assert.deepEqual(startPlace(entry('a', null, { repo: '/code/app' }), 'pair', FACTORIES, FILE_FACTORY), {
+    why: "The card is about /code/app, and the factory pair works on /r/a, /r/b: pick a factory that works on it, or change the card's repo: line.",
+  });
 });

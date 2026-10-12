@@ -18,6 +18,9 @@ import { cn } from "../utils";
  * Animates through React Aria's `data-entering` / `data-exiting` attributes
  * (Tailwind's bare `data-*` variants) and `tw-animate-css` (`animate-in` /
  * `fade-in-0`). No Tailwind plugin is required.
+ *
+ * Spec (the scrim and where a dialog sits):
+ * https://m3.material.io/components/dialogs/{specs,guidelines}
  */
 export type ModalProps = AriaModalOverlayProps & {
   className?: string;

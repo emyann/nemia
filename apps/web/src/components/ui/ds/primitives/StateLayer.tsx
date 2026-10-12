@@ -13,9 +13,11 @@ const stateLayerColors = {
   primary: "bg-primary",
   secondary: "bg-secondary",
   "on-primary": "bg-on-primary",
+  "on-secondary": "bg-on-secondary",
   "on-secondary-container": "bg-on-secondary-container",
   "on-surface": "bg-on-surface",
   "on-surface-variant": "bg-on-surface-variant",
+  "inverse-on-surface": "bg-inverse-on-surface",
 } as const;
 
 export type StateLayerColor = keyof typeof stateLayerColors;
@@ -45,10 +47,13 @@ type StateLayerProps = Omit<VariantProps<typeof styles>, "state"> & {
   isFocusVisible?: boolean;
   isPressed?: boolean;
   isDragged?: boolean;
+  /** Classes for the layer, such as the rounding of a host that does not clip it. */
+  className?: string;
 };
 
 export default function StateLayer(props: StateLayerProps) {
-  const { color, isHovered, isFocusVisible, isPressed, isDragged } = props;
+  const { color, isHovered, isFocusVisible, isPressed, isDragged, className } =
+    props;
 
   const state = isDragged
     ? "drag"
@@ -63,7 +68,7 @@ export default function StateLayer(props: StateLayerProps) {
   return (
     <div
       data-slot="state-layer"
-      className={cn(stateLayerColors[color], styles({ state }))}
+      className={cn(stateLayerColors[color], styles({ state }), className)}
     />
   );
 }

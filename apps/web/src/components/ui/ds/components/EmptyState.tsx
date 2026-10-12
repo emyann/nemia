@@ -41,6 +41,13 @@ interface EmptyStateProps extends VariantProps<typeof emptyState> {
   className?: string;
 }
 
+/**
+ * What a list, a table or a page shows when it has nothing to show: optional
+ * media, a title, a description and up to two actions, centred.
+ *
+ * Material 3 does not describe this component. The title and the description
+ * take MD3's type scale; the actions are whatever the caller passes.
+ */
 export default function EmptyState(props: EmptyStateProps) {
   const {
     title,

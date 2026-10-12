@@ -69,6 +69,12 @@ export type DialogContentProps =
   | StructuredDialogContentProps
   | ChildrenDialogContentProps;
 
+/**
+ * What an MD3 dialog holds: an optional icon, the headline, supporting text
+ * and the actions, or children of your own under the headline.
+ *
+ * Spec: https://m3.material.io/components/dialogs/{overview,specs,guidelines,accessibility}
+ */
 export function DialogContent(props: DialogContentProps) {
   const { className } = props;
 

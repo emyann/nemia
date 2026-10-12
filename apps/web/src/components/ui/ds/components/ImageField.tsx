@@ -22,7 +22,8 @@ import IconButton from "./IconButton";
  * `renderImage` draws the preview (a plain `<img>` by default; pass
  * `nextImageRenderer` from `../adapters/next` for `next/image`).
  *
- * Spec: MD3 has no file or image control. The pattern composes spec'd parts:
+ * Material 3 does not describe this component. MD3 has no file or image
+ * control. The pattern composes spec'd parts:
  * a tonal button for the medium-emphasis "choose" action and a text button
  * for "replace" (https://m3.material.io/components/buttons/guidelines), an
  * icon button for "remove"

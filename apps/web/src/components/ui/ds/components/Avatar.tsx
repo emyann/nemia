@@ -26,7 +26,7 @@ export type AvatarProps = {
  *   <Avatar src={user.image} alt={user.name} fallback="YR" />
  *   <Avatar size={24} fallback={initials(author)} alt={author} />
  *
- * Not a Material 3 component of its own: MD3 draws avatars inside list
+ * Material 3 does not describe this component. MD3 draws avatars inside list
  * items, chips and the top app bar at 40dp (lists) and 24dp (chips) on
  * `primary-container` with `on-primary-container` initials — those are the
  * colours used here. The fallback is `aria-hidden` when `alt` names the

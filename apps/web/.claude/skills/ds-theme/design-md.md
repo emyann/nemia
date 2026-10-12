@@ -42,6 +42,8 @@ typography:
     fontWeight: 500
     lineHeight: 24px
     letterSpacing: 0.15px
+  mono: # optional: the face `font-mono` gives
+    fontFamily: JetBrains Mono
 rounded:
   small: 8px
 ---
@@ -73,6 +75,8 @@ What the kit reads there, and nothing else:
   `lineHeight` a length or a number (`24px`, `1.5`), `letterSpacing` a length
   of either sign or `0` (`0.5px`, `-0.02em`), `fontWeight` a number from 1 to
   1000, `normal` or `bold`. No `var()`, `calc()` or `clamp()` there.
+  - `mono`, beside the 15, is not a Material role: it names the **mono
+    face**, with a `fontFamily` and nothing else (see **The mono face**).
 - **`rounded`**: `extra-small`, `small`, `medium`, `large`, `extra-large`,
   `full`, each a length or `0` (`8px`, `0.5rem`).
 
@@ -210,8 +214,8 @@ section at the end of `DESIGN.resolved.md`, which is absent when there are
 none. The command exits 1, and writes nothing, only for a file it cannot read:
 no front matter, no `scheme`, no `seed`, a colour under a name it knows that
 is not a hex, a type size, line height, tracking, weight or corner that is not
-one value of its kind, a family that cannot be a name, or a reference value in
-a form it refuses. The message names the token and says what the kit reads
+one value of its kind, a family that cannot be a name (the mono face's
+included), or a reference value in a form it refuses. The message names the token and says what the kit reads
 there.
 
 ## Fonts go through a hook
@@ -231,6 +235,38 @@ and a list are refused. Material has two
 faces: the family of `display-large` sets the brand face (display, headline,
 title), the family of `body-large` the plain face (body, label). A different
 family on another token of the same face is not applied, and listed.
+
+## The mono face
+
+A project that wants a monospace face for some of its text (an identifier, a
+time, an amount) names it as a typography token of its own:
+
+```yaml
+typography:
+  mono:
+    fontFamily: JetBrains Mono
+```
+
+- It becomes a hook in `theme.css`, as any family does
+  (`--font-jetbrains-mono: "JetBrains Mono", ui-monospace, SFMono-Regular,
+  Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace`), the
+  token `--md-sys-typescale-mono-font: var(--font-jetbrains-mono)` in
+  `theme.v4.css`, and through it Tailwind's own utility, **`font-mono`**.
+  Fallbacks written after a comma replace the monospace stack. The project
+  loads the face, as for the other two.
+- **The project writes `font-mono` where it wants the face.** No kit component
+  uses it, and naming one changes no kit component.
+- **With none named**, the token is the system's monospace stack, the one
+  Tailwind gives `font-mono` by default: nothing on any screen moves.
+- **`code`, `kbd`, `samp` and `pre` follow a named face** without a class:
+  Tailwind's base styles draw those four elements with the same variable.
+- It is a family only. The text keeps the size, weight and tracking of the
+  type role it is written in; any other property on `mono` (`fontSize`) is not
+  applied, and listed.
+- A family called just `Mono` is refused: its hook would be `--font-mono`,
+  the variable the utility reads. Write the family's full name.
+- A mono face that is also the brand or the plain face shares that face's
+  hook, with the stack written there.
 
 ## Limits
 

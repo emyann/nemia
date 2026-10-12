@@ -22,7 +22,8 @@ export default {
    * floor, and not with `broken`, whose file does not read, and the factory picked in the address keeps it alone, or none and says so; on
    * Agents, the agent that factory hires is tagged with it. On Runs, FOLDER's row is tagged with its factory and every other row
    * `default`; the factory picked in the address keeps its runs alone, says when it keeps none, and shows every factory's again. On the
-   * Inbox, a card filed in the factory is tagged with it, linked, and `default` picked leaves it out. The card is taken back.
+   * Inbox, a card filed in the factory is tagged with it, linked, every other card says it has no factory yet and wears no tag, and
+   * `default` picked leaves the tagged one out. The card is taken back.
    */
   name: 'factory-tags',
   route: '/runs',
@@ -109,7 +110,8 @@ export default {
         card.locator(`a[data-factory-tag="${factory}"][href="/factories/${factory}"]`),
         'the card is tagged with its factory, linked',
       );
-      await expectCount(cards.locator('[data-factory-tag="default"]'), filed - 1, 'and every other card with the default factory');
+      await expectCount(cards.locator('[data-factory-tag="default"]'), 0, 'no card wears the default factory for a tag');
+      await expectCount(cards.locator('[data-unassigned]'), filed - 1, 'and every other card says it has no factory yet');
       await shoot('inbox');
       await open(page, '/inbox?factory=default');
       await expectCount(cards, filed - 1, 'with default picked, the Inbox keeps every card that names no factory');

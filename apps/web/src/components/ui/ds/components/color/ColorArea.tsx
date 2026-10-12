@@ -6,6 +6,12 @@ import {
   type ColorAreaProps,
 } from "react-aria-components";
 
+/**
+ * The two-dimensional surface a colour is picked on, on React Aria `ColorArea`.
+ * A part of `ColorPicker`.
+ *
+ * Material 3 does not describe this component.
+ */
 export default function ColorArea(props: ColorAreaProps) {
   return (
     <AriaColorArea

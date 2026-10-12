@@ -157,8 +157,10 @@
    `--font-michroma` and `--font-chakra-petch` is the hook a host app fills with its own loaded face (Next:
    `localFont({ variable: "--font-…" })` on <body> wins over this root default
    by inheritance); without one, the named family resolves to a locally
-   installed or web-loaded face, then the stack behind it. */
+   installed or web-loaded face, then the stack behind it.
+   The mono face, which `font-mono` gives, is Share Tech Mono, on `--font-share-tech-mono`. */
 :root {
   --font-michroma: "Michroma", ui-sans-serif, system-ui, sans-serif;
   --font-chakra-petch: "Chakra Petch", ui-sans-serif, system-ui, sans-serif;
+  --font-share-tech-mono: "Share Tech Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }

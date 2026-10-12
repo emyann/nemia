@@ -22,14 +22,18 @@ import { Schema } from 'effect';
 import { Hono } from 'hono';
 import {
   COMMANDS,
+  DEFAULT_FACTORY,
   INBOX,
   INBOX_ADD,
   INBOX_KEY_MEANINGS,
   INBOX_KEYS,
   inboxNameRefusal,
+  Invalid,
   parseInboxCard,
+  readFactory,
   readInbox,
   runStore,
+  type Factory,
   type InboxListing,
 } from 'agent-orchestrator';
 import { readBody, type BodyIssue } from '../body.ts';
@@ -55,8 +59,15 @@ export type InboxEntry = InboxListing & { body: string | null; filedAt: string |
  */
 export type InboxCardPage = InboxEntry & { source: string; keys: KeyRow[] | null };
 
-/** What `POST /api/inbox` answers: the card written, as `nemia inbox add` prints it. */
-export type InboxFiled = { name: string; file: string; workflow: string | null; repo: string | null; body: string };
+/** What `POST /api/inbox` answers: the card written, as `nemia inbox add` prints it, `factory` null for a card that names none. */
+export type InboxFiled = {
+  name: string;
+  file: string;
+  workflow: string | null;
+  repo: string | null;
+  factory: string | null;
+  body: string;
+};
 
 /**
  * What `POST` and `DELETE /api/inbox/:name/queue` answer: what `nemia inbox queue` did (the package's `InboxQueued`) — `queued`, `taken
@@ -102,17 +113,18 @@ export function listInbox(cards: readonly InboxListing[] = readInbox()): InboxEn
 }
 
 const FILE_SHAPE =
-  '`{ "body": "<the idea>" }`, with `"workflow": "<name>"` for what runs it — `"from": "repo"` or `"yours"` when both have a workflow of that name — and `"repo": "<absolute path>"` for the repository it is about';
+  '`{ "body": "<the idea>" }`, with `"workflow": "<name>"` for what runs it — `"from": "repo"` or `"yours"` when both have a workflow of that name — `"repo": "<absolute path>"` for the repository it is about, and `"factory": "<name>"` for the factory it is filed in';
 
 /**
- * `POST /api/inbox`'s body, its keys in the order they are refused: a workflow is a folder's name, never a path, and `from` says where it
- * is read from only beside one (`filingOf`).
+ * `POST /api/inbox`'s body, its keys in the order they are refused: a workflow is a folder's name, never a path, `from` says where it
+ * is read from only beside one (`filingOf`), and a factory is a named one, never the default, which is left out.
  */
 const FILE_BODY = Schema.Struct({
   body: Schema.String,
   workflow: Schema.optionalKey(Schema.String.check(Schema.makeFilter((name: string) => name !== '' && !/[\\/]/.test(name)))),
   from: Schema.optionalKey(Schema.Literals(['repo', 'yours'])),
   repo: Schema.optionalKey(Schema.String),
+  factory: Schema.optionalKey(Schema.String.check(Schema.makeFilter((name: string) => name !== DEFAULT_FACTORY))),
 });
 
 /** Why `POST /api/inbox`'s body is not a filing (400), by the first key its schema refused. */
@@ -125,6 +137,10 @@ function fileWords({ path: [key], input }: BodyIssue): string {
     return `\`from\` is where the card's workflow is read from: "repo" or "yours", or left out when only one has a workflow of that name.`;
   if (key === 'repo')
     return `\`repo\` is the repository the idea is about, as \`nemia inbox add --repo <path>\` takes it: an absolute path, or left out. This request's was ${JSON.stringify(input)}.`;
+  if (key === 'factory' && input === DEFAULT_FACTORY)
+    return `\`factory\` names the factory the card is filed in, and \`${DEFAULT_FACTORY}\` is none to file into: it holds what names no factory. Leave \`factory\` out for a card that gets its factory when it is started.`;
+  if (key === 'factory')
+    return `\`factory\` names the factory the card is filed in, as \`nemia inbox add --factory <name>\` takes it: a factory's name, as GET /api/factories lists them, or left out for a card that gets its factory when it is started. This request's was ${JSON.stringify(input)}.`;
   return `POST /api/inbox takes a JSON object: ${FILE_SHAPE}.`;
 }
 
@@ -139,6 +155,64 @@ const FILE: Guarded = {
   shape: FILE_SHAPE,
 };
 
+/** What `POST /api/inbox` hands the package: the idea, and the keys the card writes. */
+type Filing = { text: string; workflow?: string; repo?: string; factory?: string };
+
+/** Why `factory` does not take a card about `repo`, not one of its repositories: an `Invalid`, naming them. */
+const outsideFactory = (factory: Factory, repo: string): Invalid =>
+  new Invalid({
+    message: `${repo}: the factory ${factory.name} works on ${factory.repos.map((r) => path.resolve(r)).join(', ')}, and this repository is not one of them. Send one of them as \`repo\`, or leave it out. Nothing was filed.`,
+  });
+
+/**
+ * The folder of the workflow `name` in `factory`, looked for on each of `repos` in turn as a start there would (`folderOf`, the factory's
+ * tree first): the one folder found, whichever of them has it; else what the first refused it with (404, 409); and for two folders on two
+ * repositories a 409 that asks for `repo`.
+ */
+function folderAmong(
+  name: string,
+  from: 'repo' | 'yours' | undefined,
+  repos: readonly string[],
+  home: string,
+  factory: Factory,
+): { dir: string } | Refusal {
+  const looked = repos.map((repo) => folderOf(name, from, repo, home, factory.tree));
+  const dirs = [...new Set(looked.flatMap((found) => ('dir' in found ? [found.dir] : [])))];
+  if (dirs.length === 1) return { dir: dirs[0] };
+  if (dirs.length > 1) {
+    return {
+      status: 409,
+      error: `The factory ${factory.name} works on ${repos.join(', ')}, and more than one has a workflow named '${name}' (${dirs.join(' and ')}). Say which with \`"repo": "<one of them>"\`.`,
+    };
+  }
+  return (
+    looked.find((found): found is Refusal => 'status' in found) ?? {
+      status: 404,
+      error: `No workflow '${name}': the factory ${factory.name} names no repository to look for one on. Leave \`workflow\` out, or file the card in a factory that works on one.`,
+    }
+  );
+}
+
+/**
+ * What a filing in `factory` files, or why not. The repository the card is about is the one sent, which must be one of the factory's
+ * (`outsideFactory`, thrown), else the factory's only one, else none; `repo:` is written only when one was sent, never a repository nobody
+ * chose. Its workflow is looked for where a start in the factory would look (`folderOf` on that repository, `folderAmong` when it has
+ * several and none was sent), and written by name only where a start finds that same folder by its name: under the factory's tree, or
+ * under the repository the card is about. Else by its folder, absolute.
+ */
+function filingIn(factory: Factory, body: typeof FILE_BODY.Type, home: string): Filing | Refusal {
+  const repos = factory.repos.map((r) => path.resolve(r));
+  const sent = body.repo === undefined ? undefined : path.resolve(body.repo);
+  if (sent !== undefined && !repos.includes(sent)) throw outsideFactory(factory, body.repo!);
+  const filing: Filing = { text: body.body, factory: factory.name, ...(sent !== undefined ? { repo: sent } : {}) };
+  if (body.workflow === undefined) return filing;
+  const about = sent ?? (repos.length === 1 ? repos[0] : undefined);
+  const folder = folderAmong(body.workflow, body.from, about === undefined ? repos : [about], home, factory);
+  if ('status' in folder) return folder;
+  const byName = [factory.tree, about].some((at) => at !== undefined && path.dirname(folder.dir) === path.join(at, 'workflows'));
+  return { ...filing, workflow: byName ? body.workflow : folder.dir };
+}
+
 /**
  * What `POST /api/inbox` files, or why not, before the package is asked: the body's shape (400), and the workflow, found among the folders
  * a start finds one in (`folderOf`: 404, 409) — so a card names a workflow a start from the board can run, never a path that was sent.
@@ -151,8 +225,10 @@ const FILE: Guarded = {
  * An absolute `repo` is written as `nemia inbox add --repo` writes it (`path.resolve`): no trailing slash, no `.` or `..`, so the run a
  * start records names the repository as every other run on it does, and the board finds them together. A relative one is sent on as it is,
  * for the package to refuse: the api has no directory it was typed from.
+ *
+ * A filing that names a `factory` is the factory's to place (`filingIn`), and the api's repository is not looked at.
  */
-function filingOf(body: typeof FILE_BODY.Type, repo: string, home: string): { text: string; workflow?: string; repo?: string } | Refusal {
+function filingOf(body: typeof FILE_BODY.Type, repo: string, home: string): Filing | Refusal {
   const { body: text, workflow, from, repo: about } = body;
   if (from !== undefined && workflow === undefined) {
     return {
@@ -160,7 +236,8 @@ function filingOf(body: typeof FILE_BODY.Type, repo: string, home: string): { te
       error: "`from` says where the card's workflow is read from, and this request names no `workflow`. Name one, or leave both out.",
     };
   }
-  const filing: { text: string; workflow?: string; repo?: string } = {
+  if (body.factory !== undefined) return filingIn(readFactory(body.factory, 'Nothing was filed.'), body, home);
+  const filing: Filing = {
     text,
     ...(about !== undefined ? { repo: path.isAbsolute(about) ? path.resolve(about) : about } : {}),
   };
@@ -183,7 +260,11 @@ function filingOf(body: typeof FILE_BODY.Type, repo: string, home: string): { te
  *   (`inbox card`). 404 for a card not there, or dropped since the listing read it, the package's `Missing` naming the cards that are.
  *   Its keys are as the listing reads them: `queued` is when it was queued (the listing carries its place too), null when unset.
  * - `POST /api/inbox` — `nemia inbox add "<idea>" --workflow <name> --repo <path>`, through its entry's handler: a card filed, under the
- *   slug of its first line (201, `InboxFiled`). The body and its workflow are refused as `filingOf` says; the package's refusal, word for
+ *   slug of its first line (201, `InboxFiled`). The body and its workflow are refused as `filingOf` says. With `factory`, the card is
+ *   filed in that factory, as `--factory <name>` files it: `default` is refused as the body's shape is (400); a name the store has no
+ *   factory of is the package's `Missing` (404), and one that is no slug or whose file does not read its `Invalid` (422), each from
+ *   `readFactory`; a `repo` that is none of the factory's is a 422 naming them, and a workflow two of its repositories have, with no
+ *   `repo`, a 409 (`filingIn`). No `repo:` is written that the request did not send. The package's refusal, word for
  *   word, is an `Invalid`, which `app.onError` answers 422: an idea with nothing in it, a key it would write on two lines, a repo that is
  *   not an absolute path to a directory, an `after:` in the idea's own frontmatter. Anything else is the store's, 500: the inbox could not
  *   be written.
@@ -228,11 +309,16 @@ export const inbox = new Hono<ApiEnv>()
       const { card, file } = await runPlaced(
         placeService,
         e,
-        INBOX_ADD.handler({ idea: asked.text, workflow: asked.workflow, repo: asked.repo }),
+        INBOX_ADD.handler({ idea: asked.text, workflow: asked.workflow, repo: asked.repo, factory: asked.factory }),
       );
-      return c.json(
-        { name: card.name, file, workflow: card.workflow ?? null, repo: card.repo ?? null, body: card.body } satisfies InboxFiled,
-        201,
-      );
+      const filed: InboxFiled = {
+        name: card.name,
+        file,
+        workflow: card.workflow ?? null,
+        repo: card.repo ?? null,
+        factory: card.factory ?? null,
+        body: card.body,
+      };
+      return c.json(filed, 201);
     }),
   );

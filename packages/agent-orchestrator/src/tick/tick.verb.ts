@@ -18,7 +18,7 @@ import {
   type RefusedMove,
   type TaskView,
 } from '../runtime-client.ts';
-import type { QueueStarted } from '../inbox/inbox.ts';
+import type { QueueStarted } from '../inbox/index.ts';
 import { tipsSeen } from '../branches/index.ts';
 import { admissionOrder, slotFree, type RunSlot } from '../cap/cap.ts';
 import { passRead, type PassRead } from '../cap/cap.verb.ts';

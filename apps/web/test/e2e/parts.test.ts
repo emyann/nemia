@@ -166,7 +166,8 @@ const ringOf = (page: Page): Promise<Rgb | null> =>
 
 /**
  * Where the ring of the focused link in the frame's cut corner is missing, a side each, none when it is drawn on all four: read in a
- * picture of the window, a pixel outside each side of the link, the top's and the right's inside the cut corner.
+ * picture of the window, in the band the kit's ring draws four pixels outside each side of the link, the top's and the right's inside the
+ * cut corner.
  */
 async function ringGaps(page: Page, name: string): Promise<string[]> {
   const ring = await ringOf(page);
@@ -175,10 +176,10 @@ async function ringGaps(page: Page, name: string): Promise<string[]> {
   assert.ok(box, 'the link is drawn');
   const [left, top, right, bottom] = [box.x, box.y, box.x + box.width, box.y + box.height].map(Math.round);
   const sides: Record<string, readonly [number, number]> = {
-    top: [right - 4, top - 1],
-    right: [right, Math.round((top + bottom) / 2)],
-    bottom: [Math.round((left + right) / 2), bottom],
-    left: [left - 1, Math.round((top + bottom) / 2)],
+    top: [right - 4, top - 4],
+    right: [right + 3, Math.round((top + bottom) / 2)],
+    bottom: [Math.round((left + right) / 2), bottom + 3],
+    left: [left - 4, Math.round((top + bottom) / 2)],
   };
   const file = path.join(built, `${name}.png`);
   await photograph(page, file, { always: true });
@@ -252,8 +253,11 @@ async function buttonSpills(page: Page, name: string): Promise<string[]> {
   return Object.entries(found).flatMap(([where, colour]) => (apart(colour, ground) <= 3 ? [] : [where]));
 }
 
-/** The cut button as its corners were laid a pixel out: its shape grown past its box, and square. */
-const SPILLED = `${BUTTON} [data-cut-shape] { clip-path: none !important; box-shadow: 0 0 0 1px var(--meaning-yours); }`;
+/**
+ * The cut button as its corners were laid out past it: its shape square and grown two pixels past its box, whose width a text leaves
+ * between two pixels, so that a whole pixel is painted on every side.
+ */
+const SPILLED = `${BUTTON} [data-cut-shape] { clip-path: none !important; box-shadow: 0 0 0 2px var(--meaning-yours); }`;
 
 test(
   'REFUSED: the cut button paints its cut shape exactly inside its box, and a shape that reaches a pixel past it is seen',
@@ -274,7 +278,7 @@ test(
           'in the top-right cut',
           'in the bottom-left cut',
         ],
-        'grown a pixel and square, it spills on every side: the check sees it',
+        'grown past its box and square, it spills on every side: the check sees it',
       );
     } finally {
       await page.context().close();

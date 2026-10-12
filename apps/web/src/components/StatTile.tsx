@@ -1,7 +1,7 @@
 import { Focusable, Tooltip, TooltipTrigger } from '@/components/ui/ds';
 import type { Breakdown } from '@/lib/breakdown';
 import type { Hue } from '@/lib/meaning';
-import { cn } from '@/components/ui/ds/utils';
+import { cn, focusRing } from '@/components/ui/ds/utils';
 import { Sticker } from './Sticker';
 
 /** A breakdown's rows as a list of terms, then its closing note under a rule. */
@@ -47,7 +47,7 @@ export function StatTile({ hue, label, value, breakdown }: { hue: Hue; label: st
           tabIndex={0}
           aria-label={`${label} ${value}`}
           data-stat-tile={name}
-          className="inline-flex rounded-[14px] outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+          className={cn('inline-flex rounded-[14px]', focusRing())}
         >
           {tile}
         </span>

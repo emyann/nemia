@@ -1,12 +1,15 @@
 import { Link as AriaLink } from 'react-aria-components';
 import { newerOf, olderOf, pageSaid, pageSearch, rowsSaid, type PageAt } from '@/lib/finished';
+import { cn, focusRing } from '@/components/ui/ds/utils';
 import { routeLink } from './routeLink';
 
 const PageLink = routeLink(AriaLink);
 
-/** An outlined button of the pager: quiet, and dimmed by its ink where it leads nowhere. */
-const BUTTON =
-  'inline-flex h-8 items-center border border-outline px-3 text-label-large uppercase text-on-surface outline-none hover:bg-accent data-focus-visible:ring-2 data-focus-visible:ring-ring data-disabled:border-outline-variant data-disabled:text-muted-foreground data-disabled:hover:bg-transparent';
+/** An outlined button of the pager, in the label face: quiet, dimmed by its ink where it leads nowhere, and ringed as the kit rings. */
+const BUTTON = cn(
+  'inline-flex h-8 items-center border border-outline px-3 font-plain text-label-large uppercase text-on-surface hover:bg-accent data-disabled:border-outline-variant data-disabled:text-muted-foreground data-disabled:hover:bg-transparent',
+  focusRing(),
+);
 
 /**
  * The search of the same address at `page`, as a link takes it. Typed for any route: which route the pager stands on, and so whether

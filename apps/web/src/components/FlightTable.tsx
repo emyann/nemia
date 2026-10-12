@@ -6,7 +6,7 @@ import { ink } from '@/lib/meaning';
 import { nowOf, sinceShort } from '@/lib/runWords';
 import { CopyId } from './CopyId';
 import { cn } from '@/components/ui/ds/utils';
-import { CutFrame } from './CutFrame';
+import { CutFrame, CutTag } from './CutFrame';
 import { RunSteps } from './RunSteps';
 import { TextLink } from './TextLink';
 
@@ -29,9 +29,11 @@ function Now({ run, asOf }: { run: ListedRun; asOf: Date }) {
   if (!now) return null;
   return (
     <span className="flex items-center gap-3">
-      <Tag data-now-word variant="tonal" color="secondary" className="uppercase">
-        {now.word}
-      </Tag>
+      <CutTag>
+        <Tag data-now-word variant="tonal" color="secondary" className="uppercase">
+          {now.word}
+        </Tag>
+      </CutTag>
       <span data-now-note className="text-body-small whitespace-nowrap text-on-surface-variant">
         {now.note}
       </span>

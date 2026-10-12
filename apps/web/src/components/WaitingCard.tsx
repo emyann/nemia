@@ -6,7 +6,7 @@ import { titleOf } from '@/lib/factory';
 import { sinceShort, waitSentence, waitTag, whenWords } from '@/lib/runWords';
 import { CopyId } from './CopyId';
 import { CutButton } from './CutButton';
-import { CutFrame } from './CutFrame';
+import { CutFrame, CutTag } from './CutFrame';
 import { RunSteps } from './RunSteps';
 import { StatTile } from './StatTile';
 import { TextLink } from './TextLink';
@@ -55,9 +55,11 @@ export function WaitingCard({ run, asOf }: { run: WaitingRun; asOf: Date }) {
         classNames={{ content: 'gap-3 p-6' }}
       >
         <div className="flex flex-wrap items-center gap-2">
-          <Tag data-wait-tag variant="filled" color="primary" className="uppercase">
-            {waitTag(run)}
-          </Tag>
+          <CutTag>
+            <Tag data-wait-tag variant="filled" color="primary" className="uppercase">
+              {waitTag(run)}
+            </Tag>
+          </CutTag>
           <Tag data-factory={factoryOf(run)} variant="outlined" className="uppercase">
             {factoryOf(run)}
           </Tag>

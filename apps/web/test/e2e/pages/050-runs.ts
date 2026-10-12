@@ -311,6 +311,73 @@ async function rowsSay(page: Page, open: OpenRuns, finished: FinishedPage): Prom
   await expectTexts(page.locator('[data-pager-rows]'), [rowsSaid(finished)], 'the pager says the rows of the first page');
 }
 
+/** What the browser draws of each element `marks` finds under the runs page: the facts of its type, and how it is cut and lit. */
+const drawnOf = (page: Page, marks: string) =>
+  page
+    .locator('[data-runs-page]')
+    .locator(marks)
+    .evaluateAll((all) =>
+      all.map((element) => {
+        const style = getComputedStyle(element);
+        return {
+          face: style.fontFamily,
+          tracking: style.letterSpacing,
+          cut: element.closest('[data-cut-tag]') ? getComputedStyle(element.closest('[data-cut-tag]')!).clipPath : 'none',
+          bars: style.backgroundImage,
+          glow: style.boxShadow,
+        };
+      }),
+    );
+
+/** Refuses with `said` unless `marks` finds at least one element and each is drawn with `fact` at `want`. */
+async function expectDrawn(page: Page, marks: string, fact: 'tracking' | 'cut', want: string, said: string): Promise<void> {
+  const found = (await drawnOf(page, marks)).map((drawn) => drawn[fact]);
+  if (!found.length || found.some((value) => value !== want)) throw new Refused(`${said} — ${marks}: ${found.join(', ') || 'none drawn'}`);
+}
+
+const TAG_CUT = 'polygon(0px 0px, calc(100% - 7px) 0px, 100% 7px, 100% 100%, 0px 100%)';
+
+/**
+ * The details of the look, as the browser draws them: each label role's tracking where it is written, the two tags that say a state
+ * cut and the factory's whole, a barcode of its own on each plate, the pager's buttons in the face of a heading, and the rail's lit bars.
+ */
+async function lookDetails(page: Page): Promise<void> {
+  await expectDrawn(page, 'th', 'tracking', '1.1px', 'a heading is the small label, tracked by a tenth of its 11 pixels');
+  await expectDrawn(page, '[data-step-name]', 'tracking', '1.1px', "a rail's name is tracked by a tenth of its 11 pixels");
+  await expectDrawn(
+    page,
+    '[data-wait-tag] span, [data-now-word] span, article [data-factory] span',
+    'tracking',
+    '0.72px',
+    'a tag is tracked by six hundredths of its 12 pixels',
+  );
+  await expectDrawn(page, '[data-cut-button] [data-cut-shape]', 'tracking', '0.84px', 'the cut button, by six hundredths of its 14');
+  await expectDrawn(page, '[data-pager-newer], [data-pager-older]', 'tracking', '0.84px', "the pager's buttons, as the cut button");
+  await expectDrawn(page, '[data-wait-tag], [data-now-word]', 'cut', TAG_CUT, 'a tag that says a state has its top-right corner cut');
+  await expectDrawn(page, 'article [data-factory]', 'cut', 'none', "a factory's tag is whole");
+  const bars = (await drawnOf(page, '[data-plate-barcode]')).map((drawn) => drawn.bars);
+  if (bars.length !== 3 || new Set(bars).size !== 3 || bars.some((image) => !image.startsWith('repeating-linear-gradient')))
+    throw new Refused(`each of the three plates carries a barcode of its own — ${bars.join(' | ')}`);
+  const [head] = await drawnOf(page, 'th');
+  const buttons = await drawnOf(page, '[data-pager-newer], [data-pager-older]');
+  const [count] = await drawnOf(page, '[data-pager-rows]');
+  if (buttons.length !== 2 || buttons.some((button) => button.face !== head.face || button.face === count.face))
+    throw new Refused(
+      `the pager's buttons are in the face of a heading, not the mono of its counts — ${buttons.map((b) => b.face).join(' | ')}; a heading ${head.face}; a count ${count.face}`,
+    );
+  for (const [state, what] of [
+    ['working', 'the step at work glows'],
+    ['awaiting-approval', 'the step that waits on a person is edged in its hue and glows'],
+  ] as const) {
+    const glows = (await drawnOf(page, `[data-step][data-state="${state}"]`)).map((drawn) => drawn.glow);
+    if (!glows.length || glows.some((glow) => glow === 'none' || (state !== 'working' && !glow.includes('inset'))))
+      throw new Refused(`${what} — ${glows.join(' | ') || `no step ${state} in a rail`}`);
+  }
+  const rest = (await drawnOf(page, '[data-step]:not([data-state="working"])')).map((drawn) => drawn.glow);
+  if (!rest.includes('none') || rest.some((glow) => glow !== 'none' && !glow.includes('inset')))
+    throw new Refused(`a step that neither works nor waits on a person carries no glow — ${rest.join(' | ')}`);
+}
+
 /** At 390 wide nothing breaks: the document does not scroll sideways, the cards stack, and each table scrolls inside its frame. */
 async function narrow(page: Page): Promise<void> {
   const size = page.viewportSize() ?? { width: 1280, height: 800 };
@@ -359,6 +426,7 @@ export default {
     await tableByKeyboard(page, finished);
     await finger(page, open, finished);
     await rowsSay(page, open, finished);
+    await lookDetails(page);
     await narrow(page);
     await contrastHolds(page, ['[data-sentence]']);
 

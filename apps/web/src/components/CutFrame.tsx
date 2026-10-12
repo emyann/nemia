@@ -64,6 +64,18 @@ export function cutRing(cut: number, gap: number, width: number): string {
   return `polygon(evenodd, ${outer}, ${from}, ${inner}, ${hole}, ${from})`;
 }
 
+/** The clip that cuts a tag's top-right corner, seven pixels along each side. */
+const TAG_CUT = 'polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 0 100%)';
+
+/** A tag with its top-right corner cut, as the look cuts the tag that says a state: what it holds takes no focus, so no ring is cut. */
+export function CutTag({ children }: { children: ReactNode }) {
+  return (
+    <span data-cut-tag className="inline-flex" style={{ clipPath: TAG_CUT }}>
+      {children}
+    </span>
+  );
+}
+
 /**
  * The look's cut-corner frame: a shape of its own under what it holds, its top-right and bottom-left corners cut, an edge in `hue`
  * around the card's ground, and for what waits on a person a glow the shape casts. Outside the cut nothing is painted: the page's

@@ -9,7 +9,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { createMemoryHistory, createRootRoute, createRouter, RouterContextProvider } from '@tanstack/react-router';
 import './tsx.ts';
 
-const { CutFrame } = await import('../src/components/CutFrame.tsx');
+const { CutFrame, CutTag } = await import('../src/components/CutFrame.tsx');
 const { Pager } = await import('../src/components/Pager.tsx');
 const { Plate } = await import('../src/components/Plate.tsx');
 const { RunSteps } = await import('../src/components/RunSteps.tsx');
@@ -55,7 +55,17 @@ test('the steps rail: one bar a step by its state, its names in the hue of what 
   assert.match(tagWith(html, 'data-step-name="land"'), /text-yours/);
   assert.match(tagWith(html, 'data-step-name="review"'), /text-failure/);
   assert.match(tagWith(html, 'data-step-name="design"'), /text-on-surface-variant/);
-  assert.match(tagWith(html, 'data-step="land"'), /bg-yours/);
+  const [gate, atWork] = [tagWith(html, 'data-step="land"'), tagWith(html, 'data-step="implement"')];
+  assert.match(gate, /bg-transparent/, 'the step that waits on a person is hollow');
+  assert.doesNotMatch(gate, /bg-yours/);
+  assert.match(
+    gate,
+    /box-shadow:inset 0 0 0 1\.5px var\(--meaning-yours\), 0 0 10px color-mix\(in srgb, var\(--meaning-yours\) 45%, transparent\)/,
+    'edged in its hue, and glowing',
+  );
+  assert.match(atWork, /box-shadow:0 0 12px color-mix\(in srgb, var\(--meaning-alive\) 70%, transparent\)/, 'the step at work glows');
+  for (const dark of ['design', 'review'])
+    assert.doesNotMatch(tagWith(html, `data-step="${dark}"`), /box-shadow/, `${dark} neither waits nor works: no glow`);
   assert.match(tagWith(html, 'data-step="implement"'), /bg-alive /, 'the step at work is the lit bar, in its hue itself');
   assert.doesNotMatch(tagWith(html, 'data-step="implement"'), /bg-alive-container/);
   assert.match(tagWith(html, 'data-step="review"'), /bg-failure-container/, 'every other bar is drawn as its state is on every page');
@@ -95,7 +105,12 @@ test('the text link is a link to its route, underlined, with a ring for the keyb
   assert.match(link, /^<a /);
   assert.match(link, /href="\/\?factory=nemia"/);
   assert.match(link, / underline /, 'underlined, not only offset');
-  assert.match(link, /data-focus-visible:ring-2/);
+  assert.match(
+    link,
+    /outline-none focus-visible:ring-3 focus-visible:ring-ring focus-visible:ring-offset-2/,
+    "the kit's ring, not its own",
+  );
+  assert.doesNotMatch(link, /ring-2\b/);
   assert.match(html, />Read the review</);
 });
 
@@ -112,6 +127,55 @@ test('the plate: its count, its heading and a barcode nobody reads, in grey too;
   const quiet = await drawn(createElement(Plate, { count: 0, title: 'Waiting on you', quiet: true }));
   assert.match(tagWith(quiet, 'data-plate='), /data-plate="quiet"[^>]*bg-rest text-on-rest/);
   assert.doesNotMatch(quiet, /data-plate-barcode/);
+});
+
+/** The canvas's barcode of each plate: an inked bar and a gap in turn, in pixels. */
+const BARS = {
+  yours: 'currentColor 0 2px, transparent 2px 3px, currentColor 3px 4px, transparent 4px 7px, currentColor 7px 10px, transparent 10px 12px',
+  alive: 'currentColor 0 1px, transparent 1px 3px, currentColor 3px 6px, transparent 6px 7px, currentColor 7px 8px, transparent 8px 11px',
+  grey: 'currentColor 0 3px, transparent 3px 4px, currentColor 4px 5px, transparent 5px 8px, currentColor 8px 10px, transparent 10px 13px',
+} as const;
+
+/** The hues whose plate, as `barcodeOf` draws it, carries another barcode than the canvas gives it. */
+const wrongBarcodes = (barcodeOf: (hue: keyof typeof BARS) => string): string[] =>
+  (Object.keys(BARS) as (keyof typeof BARS)[]).filter(
+    (hue) => !barcodeOf(hue).includes(`background-image:repeating-linear-gradient(90deg, ${BARS[hue]})`),
+  );
+
+test('each plate carries its own barcode, bar for bar, and two swapped are seen', async () => {
+  const tags = Object.fromEntries(
+    await Promise.all(
+      (Object.keys(BARS) as (keyof typeof BARS)[]).map(
+        async (hue) => [hue, tagWith(await drawn(createElement(Plate, { count: 2, title: 'Runs', hue })), 'data-plate-barcode')] as const,
+      ),
+    ),
+  );
+  assert.equal(wrongBarcodes((hue) => tags[hue]).length, 0, `each plate carries its own barcode — ${JSON.stringify(tags)}`);
+  assert.equal(new Set(Object.values(tags)).size, 3, 'no two plates carry the same');
+  const swapped: Record<string, string> = { ...tags, alive: tags.grey, grey: tags.alive };
+  assert.equal(wrongBarcodes((hue) => swapped[hue]).join(','), 'alive,grey', 'two barcodes swapped: the check names both plates');
+});
+
+test('the cut tag cuts its top-right corner by seven pixels, around what it holds', async () => {
+  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
+  const html = await drawn(createElement(CutTag, { children: 'YOUR WORD' }));
+  assert.match(
+    tagWith(html, 'data-cut-tag'),
+    /clip-path:polygon\(0 0, calc\(100% - 7px\) 0, 100% 7px, 100% 100%, 0 100%\)/,
+    'the corner is cut as the canvas cuts it',
+  );
+  assert.match(html, />YOUR WORD<\/span>$/);
+});
+
+test('the pager writes its buttons in the label face, never the mono of its counts, and rings them as the kit does', async () => {
+  const html = await drawn(createElement(Pager, { page: 2, pages: 3, total: 25, size: 9 }));
+  for (const mark of ['data-pager-newer', 'data-pager-older']) {
+    const button = tagWith(html, mark);
+    assert.match(button, /\bfont-plain\b/, `${mark} is in the label face`);
+    assert.match(button, /text-label-large uppercase/);
+    assert.match(button, /focus-visible:ring-3 focus-visible:ring-ring focus-visible:ring-offset-2/);
+    assert.doesNotMatch(button, /font-mono|ring-2\b/);
+  }
 });
 
 test('the sticker: a label over its value, filled in its hue', async () => {

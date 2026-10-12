@@ -2,10 +2,22 @@ import type { CSSProperties } from 'react';
 import { filled } from '@/lib/meaning';
 import { cn } from '@/components/ui/ds/utils';
 
-/** The plate's barcode: bars of the plate's own ink, read by nobody. */
-const BARCODE: CSSProperties = {
-  backgroundImage:
-    'repeating-linear-gradient(90deg, currentColor 0 2px, transparent 2px 3px, currentColor 3px 4px, transparent 4px 7px, currentColor 7px 10px, transparent 10px 12px)',
+/** Bars of the plate's own ink, `widths` in pixels, an inked bar and a gap in turn, repeated along the barcode. */
+function bars(widths: readonly number[]): CSSProperties {
+  let at = 0;
+  const stops = widths.map((width, i) => {
+    const from = at;
+    at += width;
+    return `${i % 2 === 0 ? 'currentColor' : 'transparent'} ${from === 0 ? '0' : `${from}px`} ${at}px`;
+  });
+  return { backgroundImage: `repeating-linear-gradient(90deg, ${stops.join(', ')})` };
+}
+
+/** Each plate's own barcode, read by nobody: no two hues carry the same. */
+const BARCODE: Record<PlateHue, CSSProperties> = {
+  yours: bars([2, 1, 1, 3, 3, 2]),
+  alive: bars([1, 2, 3, 1, 1, 3]),
+  grey: bars([3, 1, 1, 3, 2, 3]),
 };
 
 /** The label face drawn wide, as the look's counts and headings are. */
@@ -15,7 +27,7 @@ const WIDE: CSSProperties = { fontStretch: '125%' };
 export type PlateHue = 'yours' | 'alive' | 'grey';
 
 /**
- * The look's plate, a section's heading: its `count` large, its `title` as an `h2`, and a barcode, on the ground of `hue`. `quiet` is
+ * The look's plate, a section's heading: its `count` large, its `title` as an `h2`, its `hue`'s barcode, on its ground. `quiet` is
  * the plate of a section that holds nothing: in grey whatever its hue, and with no barcode.
  */
 export function Plate({ count, title, hue = 'yours', quiet = false }: { count: number; title: string; hue?: PlateHue; quiet?: boolean }) {
@@ -31,7 +43,7 @@ export function Plate({ count, title, hue = 'yours', quiet = false }: { count: n
       <h2 className="m-0 font-label text-label-large font-extrabold uppercase" style={WIDE}>
         {title}
       </h2>
-      {!quiet && <span aria-hidden="true" data-plate-barcode className="ml-1.5 h-[26px] w-[54px] flex-none" style={BARCODE} />}
+      {!quiet && <span aria-hidden="true" data-plate-barcode className="ml-1.5 h-[26px] w-[54px] flex-none" style={BARCODE[hue]} />}
     </div>
   );
 }

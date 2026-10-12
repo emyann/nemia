@@ -46,6 +46,9 @@ export type WaitingRow = Pick<RunSummary, 'cancelledAt' | 'holding' | 'waiting' 
   steps: ReadonlyArray<Pick<RunSummary['steps'][number], 'name' | 'status'>>;
 };
 
+/** A row whose button is worded: a `WaitingRow` that says of each step the task of its work too, none for a step not filed yet. */
+export type OpenedRow = WaitingRow & { steps: ReadonlyArray<Pick<RunSummary['steps'][number], 'name' | 'status' | 'taskId'>> };
+
 /** A wait: its kind, the step that waits, none for a wait of the run's own, and how many of the run's steps are done. */
 export type Wait = { kind: WaitKind; step: string | null; done: number };
 
@@ -138,11 +141,53 @@ export function waitTag(row: WaitingRow): string {
   return wait ? TAGS[wait.kind](wait) : WAITS_TAG;
 }
 
-/** What a row in flight says it does now: the word of the step it is on, and a note of which step, its place, and how long. */
-export type Now = { word: string; note: string };
-
 /** The states of a step a run is past. */
 const PAST: readonly StepState[] = ['verified', 'unverified'];
+
+/** What a waiting card's button says where the card names nothing to read: it opens the run's page. */
+export const OPENS = 'Open the run';
+
+/**
+ * The step whose work a person reads at the gate of `gated` on `row`: the gated step itself where it has run (its task is filed), else
+ * the last step done before it, as at a gate held before its step is filed. None where neither is.
+ */
+function readAt(row: OpenedRow, gated: string | null): string | null {
+  const at = row.steps.findIndex((step) => step.name === gated);
+  if (at < 0) return null;
+  if (row.steps[at].taskId !== null) return row.steps[at].name;
+  const done = row.steps.slice(0, at).filter((step) => PAST.includes(stateOn(row, step.status)));
+  return done.pop()?.name ?? null;
+}
+
+/** What a waiting card's button says of each kind of wait: what there is to read where it is one thing, else `OPENS`. */
+const OPEN_WORDS: Record<WaitKind, (wait: Wait, row: OpenedRow) => string> = {
+  approve: (wait, row) => {
+    const step = readAt(row, wait.step);
+    return step ? `Read the ${step}` : OPENS;
+  },
+  blocked: () => 'Read the question',
+  check: () => 'Read the check',
+  unfinished: () => 'Read the check',
+  unsigned: () => OPENS,
+  denied: () => OPENS,
+  rounds: () => OPENS,
+  budget: () => OPENS,
+  hold: () => OPENS,
+  after: () => OPENS,
+};
+
+/**
+ * The words of a waiting card's button, by the kind of its wait (`waitOf`): `Read the design` at a gate, `Read the question`,
+ * `Read the check`, and `Open the run` for every other kind and for a wait the board has no kind for. The button opens the run's page
+ * whatever it says.
+ */
+export function openWord(row: OpenedRow): string {
+  const wait = waitOf(row);
+  return wait ? OPEN_WORDS[wait.kind](wait, row) : OPENS;
+}
+
+/** What a row in flight says it does now: the word of the step it is on, and a note of which step, its place, and how long. */
+export type Now = { word: string; note: string };
 
 /**
  * What a run in flight does now: its first step not done, by the rail's word for its state, its name and its place among the run's
@@ -199,7 +244,7 @@ export const railWord: Record<StepState, string> = {
   working: 'at work',
   'needs-human': 'asks you',
   checking: 'being checked',
-  verified: 'done',
+  verified: 'verified',
   unverified: 'done',
   blocked: 'waits for you',
   'awaiting-approval': 'waits for you',
@@ -225,7 +270,8 @@ export const railStates = (
   held: boolean,
 ): Array<{ name: string; state: StepState }> => steps.map((step) => ({ name: step.name, state: stepState(step.status, cancelled, held) }));
 
-/** What the rail says aloud: each step and its word, in the run's order: `design done, land waits for you`. */
+/** What the rail says aloud: each step and its word, in the run's order: `design verified, land waits for you`, a step a
+ * check verified told from one done on its own word. */
 export const railSaid = (
   steps: ReadonlyArray<Pick<RunSummary['steps'][number], 'name' | 'status'>>,
   cancelled: boolean,
@@ -235,17 +281,42 @@ export const railSaid = (
     .map((step) => `${step.name} ${railWord[step.state]}`)
     .join(', ');
 
+/** The parts of an instant as a person reads it in `timeZone`, theirs by default: its date, and its time on a 12-hour clock. */
+function partsOf(at: Date, timeZone?: string) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZone,
+  }).formatToParts(at);
+  const of = (type: Intl.DateTimeFormatPartTypes): string => parts.find((part) => part.type === type)?.value ?? '';
+  return { year: of('year'), month: of('month'), day: of('day'), hour: of('hour'), minute: of('minute'), period: of('dayPeriod') };
+}
+
 /**
- * When something of a run happened, as a person reads it where they are, to the minute: the time alone on the day of `now`
- * (`13:11`), the day and the month before it on another (`11 Oct 13:11`), and in another year the day alone, with its year
- * (`31 Dec 2025`).
+ * When something of a run happened, as a person reads it where they are, to the minute, on a 12-hour clock: the time alone on the day
+ * of `now` (`1:11 PM`), the day and the month before it on another (`11 Oct 1:11 PM`), and in another year the day alone, with its
+ * year (`31 Dec 2025`). Its spaces are plain ones.
  */
 export function whenWords(at: Date, now: Date, timeZone?: string): string {
-  const time = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone }).format(at);
-  const part = (date: Date, options: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat('en-GB', { ...options, timeZone }).format(date);
-  const day = (date: Date) => part(date, { year: 'numeric', month: '2-digit', day: '2-digit' });
-  if (day(at) === day(now)) return time;
-  const year = part(at, { year: 'numeric' });
-  const date = part(at, { day: 'numeric', month: 'short' });
-  return year === part(now, { year: 'numeric' }) ? `${date} ${time}` : `${date} ${year}`;
+  const [then, today] = [partsOf(at, timeZone), partsOf(now, timeZone)];
+  const time = `${then.hour}:${then.minute} ${then.period}`;
+  if (then.year !== today.year) return `${then.day} ${then.month} ${then.year}`;
+  return then.day === today.day && then.month === today.month ? time : `${then.day} ${then.month} ${time}`;
+}
+
+/**
+ * When something of a run happened, as a column of a table writes it: its date on every row, the day of `now` included, and its time
+ * on a 12-hour clock, the day and the hour each two characters wide so that a mono column lines up (`11 Oct  1:11 PM`,
+ * ` 3 Aug 11:05 AM`); in another year than `now`'s the day and its year (`31 Dec 2025`). Its spaces are plain ones: draw it with
+ * its white space kept.
+ */
+export function whenColumn(at: Date, now: Date, timeZone?: string): string {
+  const then = partsOf(at, timeZone);
+  const date = `${then.day.padStart(2)} ${then.month}`;
+  if (then.year !== partsOf(now, timeZone).year) return `${date} ${then.year}`;
+  return `${date} ${then.hour.padStart(2)}:${then.minute} ${then.period}`;
 }

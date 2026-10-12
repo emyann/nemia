@@ -43,7 +43,7 @@ const STEPS = [
 test('the steps rail: one bar a step by its state, its names in the hue of what waits or failed, and read aloud as one picture', async () => {
   const html = await drawn(createElement(RunSteps, { steps: STEPS, cancelled: false, held: false, names: true }));
   assert.match(tagWith(html, 'data-run-steps'), /role="img"/);
-  assert.match(html, /aria-label="design done, implement at work, review failed its check, land waits for you"/);
+  assert.match(html, /aria-label="design verified, implement at work, review failed its check, land waits for you"/);
   assert.deepEqual(
     [...html.matchAll(/data-step="([^"]+)" data-state="([^"]+)"/g)].map((m) => [m[1], m[2]]),
     [
@@ -286,7 +286,7 @@ test('a step done is filled in the rail whether a check says so or its own word 
   assert.equal(classOf('design'), classOf('implement'), 'done on its own word is drawn as done on a check');
   assert.match(classOf('design') ?? '', /bg-sage /, 'filled');
   assert.notEqual(classOf('review'), classOf('design'), 'a step to come is not drawn as one done');
-  assert.match(html, /aria-label="design done, implement done, review to come"/, 'read aloud, both are done');
+  assert.match(html, /aria-label="design done, implement verified, review to come"/, 'read aloud, a check is told from a word');
 });
 
 test("a page's name stands over a rule whose first 140 pixels are lit in the hue of a session at work", async () => {

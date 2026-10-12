@@ -70,6 +70,11 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
   a pixel beside an edge rounds past it (`edgesOf` in `test/e2e/parts.test.ts`).
 - The kit's `xsmall` icon button answers 8 pixels beyond its box, and of two targets that overlap the later in the document wins: in a
   40-pixel row a copy control answers from 24 above its centre to 16 below (`finger` in `test/e2e/pages/050-runs.ts`).
+- The copy control's glyph is the look's own, 12 pixels whatever size the kit hands it, and its button is pulled in around it
+  (`look/CopyId.tsx`): its target reaches what stands 4 pixels over it, so a card's title is raised (`relative z-10`) to keep its box
+  (`titleKeepsItsBox`, same page), and a row in flight keeps 16 pixels between its title and its id.
+- A time on the runs page is `whenWords`, or `whenColumn` in a table (`lib/runWords.ts`), built from `formatToParts` and joined with
+  plain spaces; `expectTexts` trims, so a padded time is compared trimmed or by its `textContent`.
 - A kit `Cell truncate` shows its children again in a tooltip: a cut cell that holds a link cuts the link itself (`block truncate`, a
   `title`), never the cell.
 

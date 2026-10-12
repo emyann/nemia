@@ -511,20 +511,44 @@ test(
   },
 );
 
-test('a short id stands in a hairline box with six pixels of room, and a whole id in none', WAITED, async () => {
-  const page = await openParts(browser, built, 'dark', '?part=CopyId');
-  try {
-    const boxes = await page.locator('[data-part="CopyId"] [data-run-id]').evaluateAll((all) =>
-      all.map((id) => {
-        const style = getComputedStyle(id);
-        return `${id.textContent}: ${style.borderTopWidth}, ${style.paddingLeft} ${style.paddingRight}, ${id.getBoundingClientRect().height}px tall`;
-      }),
-    );
-    assert.deepEqual(boxes, ['2e13: 1px, 6px 6px, 20px tall', 'lay-the-diamond-top-e2e4: 0px, 0px 0px, 16px tall']);
-  } finally {
-    await page.context().close();
-  }
-});
+test(
+  'a short id stands in a hairline box with six pixels of room, and a whole id in none; the glyph is twelve pixels, seven from it',
+  WAITED,
+  async () => {
+    const page = await openParts(browser, built, 'dark', '?part=CopyId');
+    try {
+      const boxes = await page.locator('[data-part="CopyId"] [data-run-id]').evaluateAll((all) =>
+        all.map((id) => {
+          const style = getComputedStyle(id);
+          return `${id.textContent}: ${style.borderTopWidth}, ${style.paddingLeft} ${style.paddingRight}, ${id.getBoundingClientRect().height}px tall`;
+        }),
+      );
+      assert.deepEqual(boxes, [
+        '2e13: 1px, 6px 6px, 20px tall',
+        'lay-the-diamond-top-e2e4: 0px, 0px 0px, 16px tall',
+        'lay-the-diamond-top-e2e4: 0px, 0px 0px, 16px tall',
+      ]);
+      const drawn = await page.locator('[data-part="CopyId"] [data-copy-id]').evaluateAll((all) =>
+        all.map((copy) => {
+          const [glyph, id] = ['[data-copy-glyph]', '[data-run-id]'].map((part) => copy.querySelector(part)!.getBoundingClientRect());
+          return `glyph ${glyph.width} by ${glyph.height}, ${Math.round(glyph.left - id.right)} from the id, on a line ${copy.getBoundingClientRect().height} tall`;
+        }),
+      );
+      assert.deepEqual(
+        drawn,
+        [20, 16, 16].map((line) => `glyph 12 by 12, 7 from the id, on a line ${line} tall`),
+        'the glyph is 12 pixels across, 7 from the id, and the line is no taller than the id',
+      );
+      const under = await page.locator('[data-under-title]').evaluate((holder) => {
+        const [title, copy] = [...holder.children].map((child) => child.getBoundingClientRect());
+        return copy.top - title.bottom;
+      });
+      assert.equal(under, 4, 'under a title, the id stands four pixels from it');
+    } finally {
+      await page.context().close();
+    }
+  },
+);
 
 test(
   "REFUSED: a cut button that is pressed is pressed by the keyboard, once a key, and its ring is the link's band; a rectangular ring is seen",

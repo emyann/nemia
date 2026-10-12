@@ -4,13 +4,13 @@ import type { Locator, Page } from 'playwright';
 import { FINISHED_SIZE, type FinishedPage, type OpenRuns, type WaitingRun } from '../../../src/lib/api/runs.ts';
 import { rowsSaid } from '../../../src/lib/finished.ts';
 import { titleOf } from '../../../src/lib/factory.ts';
-import { endedWords, presentWait, waitSentence, waitTag } from '../../../src/lib/runWords.ts';
+import { endedWords, openWord, presentWait, waitSentence, waitTag, whenColumn } from '../../../src/lib/runWords.ts';
 import { answered, fed, photograph, photographBothWidths, SECTIONS, sectionsOf, sidebar, themeOf } from '../board.ts';
 import { expectBeneath, expectCount, expectNone, expectTexts, expectVisible, idle, literal, Refused, WAIT_MS } from '../checks.ts';
 import { contrastHolds } from '../runs-contrast.ts';
-import { COSTLY, REGATED, regatedFiles, writeRegated } from '../seed.ts';
+import { COSTLY, ENDING, GATED, REGATED, regatedFiles, writeRegated } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { OUT, photographing, store } from '../world.ts';
 
 /**
  * A place in the menu pressed with Enter, as from the keyboard: the page is not loaded again, and the history has one entry more, as after
@@ -178,7 +178,10 @@ async function secondGate(page: Page, open: OpenRuns): Promise<void> {
     throw new Refused(`the tooltip's row keeps the run's whole time waiting on a person, both gates summed — it says "${row}"`);
 }
 
-/** A waiting run's card says its tag, its factory, its title as a link, its id, one sentence, its steps by name, and opens its page. */
+/**
+ * A waiting run's card says its tag, its factory, its title as a link, its id, one sentence, its steps by name, and on its one button
+ * what there is to read, by the kind of its wait (`openWord`); the button opens its page.
+ */
 async function cardSays(page: Page, run: WaitingRun): Promise<void> {
   const card = cardOf(page, run.id);
   const open = `[href="/runs/${run.id}"]`;
@@ -192,8 +195,142 @@ async function cardSays(page: Page, run: WaitingRun): Promise<void> {
     'a rail of its own steps, each by its name',
   );
   await expectTexts(card.locator('[data-sticker] > span:first-child'), ['Clock', 'Cost', 'Tokens'], 'three tiles');
-  await expectTexts(card.locator(`a[data-cut-button]${open}`), ['Open the run'], "one filled button, which opens the run's page");
+  await expectTexts(
+    card.locator(`a[data-cut-button]${open}`),
+    [openWord(run)],
+    "one filled button, which says what there is to read and opens the run's page",
+  );
   await expectCount(card.locator('button'), 1, 'and one control, the copy of its id: nothing is decided from the list');
+}
+
+/** The seed's two gates name what a person reads there: the plan that waits, and the review done before a landing not yet filed. */
+async function gatesSay(page: Page): Promise<void> {
+  for (const [id, words, why] of [
+    [GATED.id, 'Read the plan', 'a gate on a step that has run names that step'],
+    [ENDING.id, 'Read the review', 'a gate held before its step is filed names the step done before it'],
+  ] as const)
+    await expectTexts(cardOf(page, id).locator('a[data-cut-button]'), [words], why);
+}
+
+/** Where a card's button stands against its tiles: under them or beside them, and how far its right edge is from the foot's. */
+const footOf = (card: Locator): Promise<{ under: boolean; beside: boolean; fromRight: number }> =>
+  card.locator('[data-foot]').evaluate((foot) => {
+    const [tiles, button] = ['[data-tiles]', '[data-cut-button]'].map((part) => foot.querySelector(part)!.getBoundingClientRect());
+    return {
+      under: button.top >= tiles.bottom,
+      beside: button.top < tiles.bottom && button.bottom > tiles.top,
+      fromRight: Math.round(foot.getBoundingClientRect().right - button.right),
+    };
+  });
+
+/** The window a card holds its tiles and its button side by side in. */
+const WIDE = 1680;
+
+/**
+ * The button of `run`'s card stands at the card's right: under the tiles in the window the visit is in, where the card does not hold
+ * both, and beside them in a window `WIDE` across, where it does; and so does every other card's, wherever its button falls. The foot
+ * is photographed at each width, and the window put back.
+ */
+async function footAtRight(page: Page, open: OpenRuns, run: WaitingRun): Promise<void> {
+  const size = page.viewportSize() ?? { width: 1280, height: 800 };
+  try {
+    for (const [width, place] of [
+      [size.width, 'under'],
+      [WIDE, 'beside'],
+    ] as const) {
+      await page.setViewportSize({ width, height: size.height });
+      await expectNone(async () => {
+        const at = await footOf(cardOf(page, run.id));
+        return at[place] && at.fromRight === 0 ? null : JSON.stringify(at);
+      }, `${width} wide, the button of ${run.id}'s card is ${place} its tiles, at the card's right`);
+      for (const other of open.waiting) {
+        const at = await footOf(cardOf(page, other.id));
+        if (at.fromRight !== 0 || at.under === at.beside)
+          throw new Refused(`${width} wide, the button of ${other.id}'s card is at the card's right — ${JSON.stringify(at)}`);
+      }
+      const foot = cardOf(page, run.id).locator('[data-foot]');
+      await foot.scrollIntoViewIfNeeded();
+      await photograph(foot, path.join(OUT, `runs-foot-${place}-${await themeOf(page)}.png`));
+    }
+  } finally {
+    await page.setViewportSize(size);
+  }
+}
+
+/** A copy control's glyph, its id and the line that holds both, as the browser lays them out, in whole pixels. */
+const copyOf = (holder: Locator): Promise<{ glyph: string; gap: number; line: number }> =>
+  holder.evaluate((copy) => {
+    const box = (part: string) => copy.querySelector(part)!.getBoundingClientRect();
+    const [glyph, id] = [box('[data-copy-glyph]'), box('[data-run-id]')];
+    return {
+      glyph: `${glyph.width} by ${glyph.height}`,
+      gap: Math.round(glyph.left - id.right),
+      line: Math.round(copy.getBoundingClientRect().height),
+    };
+  });
+
+/**
+ * The copy control as the canvas draws it, on a card and in each table: its glyph 12 pixels across, 7 from the id; and on a card the
+ * line of the whole id 16 pixels tall, 4 under the title.
+ */
+async function copyDrawn(page: Page, open: OpenRuns, finished: FinishedPage): Promise<void> {
+  const card = cardOf(page, open.waiting[0].id);
+  const holders: Array<[Locator, string]> = [
+    [card.locator('[data-copy-id]'), 'a card'],
+    [section(page, 'in-flight').locator('tr[data-run] [data-copy-id]').first(), 'a row in flight'],
+    [section(page, 'finished').locator(`tr[data-run="${finished.runs[0].id}"] [data-copy-id]`), 'a finished row'],
+  ];
+  for (const [holder, where] of holders) {
+    const drawn = await copyOf(holder);
+    if (drawn.glyph !== '12 by 12' || drawn.gap !== 7)
+      throw new Refused(`the copy control of ${where} draws its glyph 12 pixels across, 7 from the id — ${JSON.stringify(drawn)}`);
+  }
+  const under = await card.locator('[data-copy-id]').evaluate((copy) => {
+    const title = copy.closest('article')!.querySelector('h3')!.getBoundingClientRect();
+    return Math.round(copy.getBoundingClientRect().top - title.bottom);
+  });
+  const { line } = await copyOf(holders[0][0]);
+  if (line !== 16 || under !== 4)
+    throw new Refused(`on a card the whole id's line is 16 pixels tall, 4 under the title — ${line} tall, ${under} under`);
+}
+
+/** A title long enough to run over the copy control under it, and short enough to stay on one line of a card. */
+const OVER = 'A title that runs over the copy control';
+
+/**
+ * A press on a card's title opens the run, on its lowest row too, which the copy control's target reaches: with a title that runs
+ * over the control written into the first card and taken out again, the point a pixel inside the title's lower edge, above the
+ * control's centre, is within the target's reach and answers the title's link.
+ */
+async function titleKeepsItsBox(page: Page, open: OpenRuns): Promise<void> {
+  const card = cardOf(page, open.waiting[0].id);
+  await card.scrollIntoViewIfNeeded();
+  const hit = await card.evaluate((article, over) => {
+    const link = article.querySelector('h3 a')!;
+    const text = [...link.childNodes].find((node) => node.nodeType === Node.TEXT_NODE)!;
+    const was = text.nodeValue;
+    text.nodeValue = over;
+    try {
+      const button = article.querySelector('[data-copy-id] button')!.getBoundingClientRect();
+      const [x, cy] = [button.left + button.width / 2, button.top + button.height / 2];
+      const rows = [...link.getClientRects()];
+      const row = rows.at(-1)!;
+      const at = document.elementFromPoint(x, row.bottom - 1);
+      return {
+        rows: rows.length,
+        over: x > row.left && x < row.right,
+        above: Math.round(cy - row.bottom),
+        title: at?.closest('a') === link,
+        tag: at?.tagName ?? 'nothing',
+      };
+    } finally {
+      text.nodeValue = was;
+    }
+  }, OVER);
+  if (hit.rows !== 1 || !hit.over || hit.above >= 24)
+    throw new Refused(`the title written runs over the copy control, within its target's reach — ${JSON.stringify(hit)}`);
+  if (!hit.title)
+    throw new Refused(`a press on the lowest row of a card's title, over the copy control, opens the run — it lands on ${hit.tag}`);
 }
 
 /** The element the keyboard is on. */
@@ -309,22 +446,22 @@ const missed = (control: Locator, across: number, up: number, down: number): Pro
   );
 
 /**
- * What the page guarantees a finger on a copy control: 48 pixels across and 48 down on a card; 48 across and 40 down in a table, from
- * 24 above its centre to 16 below, where the target of the next row's control begins. Probed a pixel inside each edge; and the probe
- * refuses a control whose target something clips.
+ * What the page guarantees a finger on a copy control: 48 pixels across everywhere; on a card from the title's lower edge, 12 above
+ * its centre, to 24 below it; in a table 40 down, from 24 above its centre to 16 below, where the target of the next row's control
+ * begins. Probed a pixel inside each edge; and the probe refuses a control whose target something clips.
  */
 async function finger(page: Page, open: OpenRuns, finished: FinishedPage): Promise<void> {
-  const controls: Array<[Locator, number, string]> = [
-    [cardOf(page, open.waiting[0].id).locator('[data-copy-id] button'), 23, 'a card'],
-    [section(page, 'in-flight').locator('tr[data-run] [data-copy-id] button').first(), 15, 'a row in flight'],
-    [section(page, 'finished').locator(`tr[data-run="${finished.runs[1].id}"] [data-copy-id] button`), 15, 'a finished row'],
+  const controls: Array<[Locator, number, number, string]> = [
+    [cardOf(page, open.waiting[0].id).locator('[data-copy-id] button'), 11, 23, 'a card'],
+    [section(page, 'in-flight').locator('tr[data-run] [data-copy-id] button').first(), 23, 15, 'a row in flight'],
+    [section(page, 'finished').locator(`tr[data-run="${finished.runs[1].id}"] [data-copy-id] button`), 23, 15, 'a finished row'],
   ];
-  for (const [control, down, where] of controls) {
+  for (const [control, up, down, where] of controls) {
     await control.scrollIntoViewIfNeeded();
-    const off = await missed(control, 23, 23, down);
+    const off = await missed(control, 23, up, down);
     if (off.length)
       throw new Refused(
-        `the copy control of ${where} answers a finger 48 across and ${down === 23 ? 48 : 40} down — not at ${off.join(' and ')} of its centre`,
+        `the copy control of ${where} answers a finger 48 across, from ${up + 1} above its centre to ${down + 1} below — not at ${off.join(' and ')} of its centre`,
       );
   }
   const clip = await page.addStyleTag({ content: '[data-copy-id] { overflow: hidden }' });
@@ -372,10 +509,19 @@ async function rowsSay(page: Page, open: OpenRuns, finished: FinishedPage): Prom
     finished.runs.map((run) => run.id.slice(-4)),
     "and its id's end",
   );
-  const first = section(page, 'finished').locator('tr[data-run]').first();
-  for (const fact of ['data-created', 'data-finished'])
-    if (!/\d{2}:\d{2}$/.test((await first.locator(`[${fact}]`).innerText()).trim()))
-      throw new Refused(`a finished row says when it was created and when it finished, to the minute (${fact})`);
+  const asOf = new Date(finished.asOf);
+  const whens = finished.runs.map((run) => [run.createdAt, run.finishedAt].map((at) => whenColumn(new Date(at), asOf)).join('|'));
+  await expectNone(async () => {
+    const said = await section(page, 'finished')
+      .locator('tr[data-run]')
+      .evaluateAll((rows) => rows.map((row) => [...row.querySelectorAll('time')].map((time) => time.textContent).join('|')));
+    return said.join() === whens.join() ? null : `expected ${whens.join(', ')}, found ${said.join(', ')}`;
+  }, 'a finished row says when it was created and when it finished, its date on every row, as `whenColumn` writes it');
+  const kept = await section(page, 'finished')
+    .locator('tr[data-run] time')
+    .evaluateAll((all) => all.map((time) => `${getComputedStyle(time).whiteSpace} ${Math.round(time.getBoundingClientRect().width)}`));
+  if (new Set(kept).size !== 1 || !kept[0].startsWith('pre '))
+    throw new Refused(`each time of the finished table keeps its padding, so every one is as wide as the next — ${kept.join(', ')}`);
   await expectTexts(page.locator('[data-pager-rows]'), [rowsSaid(finished)], 'the pager says the rows of the first page');
 }
 
@@ -483,6 +629,43 @@ async function lookDetails(page: Page): Promise<void> {
     throw new Refused(`a step that neither works nor waits on a person carries no glow — ${rest.join(' | ')}`);
 }
 
+/** The parts of the page this change draws, each as a picture of its own, three times the size: `runs-<what>-<theme>.png`. */
+const CLOSE_UPS = {
+  foot: (page: Page) => section(page, 'waiting').locator('article[data-run] [data-foot]').first(),
+  'copy-card': (page: Page) => section(page, 'waiting').locator('article[data-run] h3').first().locator('xpath=..'),
+  'copy-flight': (page: Page) => section(page, 'in-flight').locator('tr[data-run] td').first(),
+  'finished-row': (page: Page) => section(page, 'finished').locator('tr[data-run]').first(),
+} as const;
+
+/**
+ * The page's small parts photographed three times their size, in a window of the visit's own size and scheme opened for it and
+ * closed after: a card's foot, the copy control on a card, in a row in flight and in a finished row, and a card's title with the
+ * keyboard on it, its ring around it. Opens nothing unless the page is pictured.
+ */
+async function closeUps(page: Page): Promise<void> {
+  if (!photographing) return;
+  const theme = (await themeOf(page)) as 'light' | 'dark';
+  const context = await page.context().browser()!.newContext({ colorScheme: theme, viewport: page.viewportSize(), deviceScaleFactor: 3 });
+  try {
+    const near = await context.newPage();
+    await near.goto(page.url(), { waitUntil: 'load' });
+    await idle(near);
+    await expectVisible(near.locator('[data-runs-page="loaded"]'), 'the page is drawn in the window that pictures it enlarged');
+    for (const [what, part] of Object.entries(CLOSE_UPS)) {
+      await part(near).scrollIntoViewIfNeeded();
+      await photograph(part(near), path.join(OUT, `runs-${what}-${theme}.png`));
+    }
+    const title = section(near, 'waiting').locator('article[data-run] h3 a').first();
+    await section(near, 'waiting').locator('article[data-run]').first().scrollIntoViewIfNeeded();
+    await near.keyboard.press('Tab');
+    await title.focus();
+    await expectVisible(section(near, 'waiting').locator('h3 a[data-focus-visible]'), 'the keyboard is on the title, and its ring shows');
+    await photograph(CLOSE_UPS['copy-card'](near), path.join(OUT, `runs-title-ring-${theme}.png`));
+  } finally {
+    await context.close();
+  }
+}
+
 /** At 390 wide nothing breaks: the document does not scroll sideways, the cards stack, and each table scrolls inside its frame. */
 async function narrow(page: Page): Promise<void> {
   const size = page.viewportSize() ?? { width: 1280, height: 800 };
@@ -533,9 +716,14 @@ async function withRegated(page: Page): Promise<void> {
     await cardSays(page, run);
     await waitSaid(page, run, open.asOf);
   }
+  await gatesSay(page);
   const costly = open.waiting.find((run) => run.id === COSTLY.id);
   if (!costly?.clock || !costly.stepCosts) throw new Refused(`${COSTLY.id} waits on you, and the api breaks its clock and its cost down`);
   await photographBothWidths(page, OUT, 'runs', 'page');
+  await closeUps(page);
+  await footAtRight(page, open, costly);
+  await copyDrawn(page, open, finished);
+  await titleKeepsItsBox(page, open);
   await byKeyboard(page, costly);
   await secondGate(page, open);
   await tableByKeyboard(page, finished);
@@ -562,8 +750,9 @@ export default {
   /**
    * The runs page, "Your move first": on two reads and never the whole list, a card for every run that waits on a person and no row of
    * it, the runs in flight and one page of the finished as quiet tables, each under a plate that says the api's count. A card says its
-   * plain words, how long it has waited this time, and opens its run; its tiles open their breakdowns, and its id is copied, from the
-   * keyboard; a finger finds the copy control; 390 wide breaks nothing; and no text pair is under 4.5:1 in either scheme. The menu's
+   * plain words, how long it has waited this time, and opens its run; its button stands at the card's right, under its tiles or beside
+   * them; its tiles open their breakdowns, and its id is copied, from the keyboard; a finger finds the copy control, and the title
+   * above it keeps its box; 390 wide breaks nothing; and no text pair is under 4.5:1 in either scheme. The menu's
    * places are reached with Enter in the page, to the Inbox and back. It writes REGATED, the run at its second gate, for itself, and
    * takes it back at its end, on a refusal too.
    */

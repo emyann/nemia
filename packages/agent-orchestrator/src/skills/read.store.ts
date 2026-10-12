@@ -191,12 +191,19 @@ function filesUnder(walk: Walked, dir: string, under: string, held: readonly str
   });
 }
 
-/** The skill folder `dir` itself as a walk starts in it: the real folder, or why it is refused, as a link beneath it is (`followed`). */
+/**
+ * The skill folder `dir` itself as a walk starts in it: the real folder, or why it is refused — as a link beneath it is (`followed`),
+ * and, for a folder that is no link, where the folder of skills it is in is reached through a link that leaves the checkout.
+ */
 function folderOf(walk: Walked, dir: string): { real: string } | { refused: string } {
   if (fs.lstatSync(dir).isSymbolicLink()) return followed(walk, dir, walk.name, []);
   if (walk.checkout === undefined) return { real: dir };
   const real = fs.realpathSync(dir);
-  return insideOf(walk.checkout, real) ? { real } : { refused: `${walk.name} ${LEAVES}` };
+  if (insideOf(walk.checkout, real)) return { real };
+  const skills = path.dirname(path.resolve(dir));
+  return {
+    refused: `${walk.name} is in a folder of skills reached through a link, ${skills} or the folder it is in, and what it points at is outside the repository: make it a folder of the repository's own.`,
+  };
 }
 
 /**

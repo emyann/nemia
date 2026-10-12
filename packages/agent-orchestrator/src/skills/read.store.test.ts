@@ -195,6 +195,36 @@ test('a skill is copied as regular files, each with its content and mode, and it
   assert.equal(skillVersion(to), skillVersion(given(repo)));
 });
 
+for (const [what, linkedAt] of [
+  ["the repository's holder of its own skills", (repo: string) => path.join(repo, '.claude')],
+  ["the repository's folder of skills", (repo: string) => path.join(repo, '.claude', 'skills')],
+] as const) {
+  test(`REFUSED: a skill that is a folder of its own where ${what} is a link out of the checkout, and nothing of it is copied`, () => {
+    const repo = checkout();
+    const outside = written(scratch('wf-skill-links-outside-'), { 'skills/x/SKILL.md': SKILL });
+    fs.rmSync(path.join(repo, '.claude'), { recursive: true });
+    if (linkedAt(repo).endsWith('skills')) fs.mkdirSync(path.join(repo, '.claude'));
+    fs.symlinkSync(linkedAt(repo).endsWith('skills') ? path.join(outside, 'skills') : outside, linkedAt(repo));
+    assert.equal(fs.lstatSync(given(repo)).isDirectory(), true, 'the skill folder itself is no link');
+    const said = `x is in a folder of skills reached through a link, ${path.join(repo, '.claude', 'skills')} or the folder it is in, and what it points at is outside the repository: make it a folder of the repository's own.`;
+    assert.equal(refusalOf(found(repo)), said);
+    const to = path.join(scratch('wf-skill-links-copy-'), 'x');
+    assert.throws(
+      () => copySkillFiles(given(repo), to),
+      (err: unknown) => err instanceof WorkflowError && err.message === said,
+    );
+    assert.equal(fs.existsSync(to), false);
+  });
+}
+
+test("given: a skill that is a folder of its own where the repository's folder of skills is a link inside the checkout", () => {
+  const repo = checkout();
+  written(repo, { 'kept/skills/own/SKILL.md': SKILL });
+  fs.rmSync(path.join(repo, '.claude', 'skills'), { recursive: true });
+  fs.symlinkSync('../kept/skills', path.join(repo, '.claude', 'skills'));
+  assert.equal(found(repo, 'own'), given(repo, 'own'));
+});
+
 test('REFUSED: a copy of a skill linked outside the checkout, and nothing is written', () => {
   const repo = checkout();
   const outside = written(scratch('wf-skill-links-outside-'), { 'secret.md': 'Not the skill.\n' });

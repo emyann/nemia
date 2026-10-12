@@ -176,11 +176,21 @@ test('REFUSED at a start: two skills of one bare name in one step, the agent’s
   assert.deepEqual(runsNow(), before);
 });
 
-test('a folder’s version moves with a skill named with its folder', () => {
+test('a folder’s version moves with a skill named with its folder, of one segment or two, and with a bare one on the same line', () => {
   const repo = repository();
-  const workflowDir = byStep();
-  const before = workflowVersion(workflowDir, { repo });
-  assert.equal(workflowVersion(workflowDir, { repo }), before);
-  fs.appendFileSync(path.join(nested(repo, 'app', 'y'), 'SKILL.md'), 'Edited.\n');
-  assert.notEqual(workflowVersion(workflowDir, { repo }), before);
+  for (const at of [nested(repo, 'apps/web', 'z'), path.join(repo, '.claude', 'skills', 'x')]) {
+    fs.mkdirSync(at, { recursive: true });
+    fs.writeFileSync(path.join(at, 'SKILL.md'), skill(path.basename(at)));
+  }
+  for (const [line, edited] of [
+    ['app:y', nested(repo, 'app', 'y')],
+    ['x, apps/web:z', nested(repo, 'apps/web', 'z')],
+    ['x, apps/web:z', path.join(repo, '.claude', 'skills', 'x')],
+  ] as const) {
+    const workflowDir = byStep(line);
+    const before = workflowVersion(workflowDir, { repo });
+    assert.equal(workflowVersion(workflowDir, { repo }), before);
+    fs.appendFileSync(path.join(edited, 'SKILL.md'), 'Edited.\n');
+    assert.notEqual(workflowVersion(workflowDir, { repo }), before, `skills: ${line}, after an edit of ${edited}`);
+  }
 });

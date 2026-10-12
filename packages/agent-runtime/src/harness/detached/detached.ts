@@ -482,8 +482,9 @@ const outputOps = (spec: HarnessSpec, dir: string): Pick<RunnerOps, 'output'> =>
 
 /**
  * What a detached runner keeps of a session, off one listing of its run folder: `files`, the session's run file and every file
- * beside it, each named by the run's name and an end after a dot, a name with no dot being no session's; and `records`, by session name, the harness's own record of
- * each of the sessions given, when the spec keeps one, found in one pass where the spec has one (`transcript.records`).
+ * beside it, each named by the run's name and an end after a dot, a name with no dot being no session's; and `records`, by
+ * session name, the harness's own record of each of the sessions given, when the spec keeps one, found in one pass where the
+ * spec has one (`transcript.records`).
  */
 const sessionFilesOf = (spec: HarnessSpec, root: string) => {
   const dir = path.join(root, 'runs', spec.name);

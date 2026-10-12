@@ -31,7 +31,7 @@ export type StepFlowNode = Node<StepNodeData, 'step'>;
  * - It is drawn as a human gate when it is one (`isGate`), a step that signed off blocked or a loop out of rounds, and the run's
  *   `waitingOnYou` names it: a step a person has sent round or asked to retry keeps its word until the tick files what they asked for,
  *   and is no gate from the moment they ask, as the page's banner says.
- * - What its tries have cost, of its cap where it has one, red once they have cost it or more. It is held on its budget only when its
+ * - What its tries have cost, of its cap where it has one, in money's amber once they have cost it or more. It is held on its budget only when its
  *   word says so: past the cap alone, a finished step holds nothing, since its harness ends a job at its cap, a little past it where a
  *   call was under way.
  * - A gate's line, and what it waits for when the step said (`nodeNeed`), on one line whole on hover, so the node is no taller than
@@ -65,9 +65,9 @@ export function StepNode({
       className={[
         'w-56 overflow-hidden rounded-md bg-white text-neutral-900 shadow-sm dark:bg-neutral-900 dark:text-neutral-100',
         gate
-          ? 'border-2 border-amber-500 dark:border-amber-400'
+          ? 'border-2 border-yours'
           : running
-            ? 'border border-sky-500 ring-4 ring-sky-500/25 dark:border-sky-400 dark:ring-sky-400/20'
+            ? 'border border-alive ring-4 ring-alive/25'
             : 'border border-neutral-300 dark:border-neutral-700',
         selected ? 'outline-2 outline-offset-2 outline-neutral-900 dark:outline-neutral-100' : '',
       ].join(' ')}
@@ -76,16 +76,14 @@ export function StepNode({
 
       <div className="px-3 pt-2 pb-2">
         <div className="flex items-center justify-between gap-2">
-          <span
-            className={`font-mono text-[10px] uppercase tracking-wider ${gate ? 'text-amber-700 dark:text-amber-400' : 'text-neutral-500'}`}
-          >
+          <span className={`font-mono text-[10px] uppercase tracking-wider ${gate ? 'text-yours' : 'text-muted-foreground'}`}>
             {gate ? 'human gate' : stepLabel(index)}
           </span>
           {running && (
             <span
               role="img"
               aria-label="running now"
-              className="size-3 animate-spin rounded-full border-2 border-sky-500 border-t-transparent dark:border-sky-400 dark:border-t-transparent"
+              className="size-3 animate-spin rounded-full border-2 border-alive border-t-transparent"
             />
           )}
         </div>
@@ -110,7 +108,7 @@ export function StepNode({
               ? `What its tries have cost of its ${step.budget.said} budget${over ? (held ? ': the cap or more, so the run spends nothing more on it until a person raises it' : ': the cap or more — its harness ends a job at its cap, a little past it where a call was under way, and this step finished; nothing waits on a raise') : ''}`
               : 'What its tries have cost'
           }
-          className={`truncate border-t border-neutral-200 px-3 py-1 font-mono text-[11px] dark:border-neutral-800 ${over ? 'font-semibold text-red-700 dark:text-red-400' : 'text-neutral-500 dark:text-neutral-400'}`}
+          className={`truncate border-t border-neutral-200 px-3 py-1 font-mono text-[11px] dark:border-neutral-800 ${over ? 'font-semibold text-money' : 'text-muted-foreground'}`}
         >
           <span className="font-sans font-normal">cost </span>
           {cost}
@@ -120,7 +118,7 @@ export function StepNode({
       {gate && (
         <p
           title={need ? nodeNeed(need, step) : undefined}
-          className="truncate border-t border-amber-200 bg-amber-50 px-3 py-1 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300"
+          className="truncate border-t border-border bg-yours-container px-3 py-1 text-xs text-on-yours-container"
         >
           <span className="font-semibold">waiting on you</span>
           {need && (
@@ -135,7 +133,7 @@ export function StepNode({
         <p
           data-need={need.kind}
           title={needText(need)}
-          className="truncate border-t border-orange-200 bg-orange-50 px-3 py-1 text-xs text-orange-800 dark:border-orange-900 dark:bg-orange-950 dark:text-orange-300"
+          className="truncate border-t border-border bg-yours-container px-3 py-1 text-xs text-on-yours-container"
         >
           {needNodeText(need)}
         </p>
@@ -144,7 +142,7 @@ export function StepNode({
         <p
           data-denied
           title={step.denied.words}
-          className="truncate border-t border-neutral-200 px-3 py-1 font-mono text-[11px] text-red-700 dark:border-neutral-800 dark:text-red-400"
+          className="truncate border-t border-neutral-200 px-3 py-1 font-mono text-[11px] text-failure dark:border-neutral-800"
         >
           {deniedNodeText(step.denied.calls)}
         </p>
@@ -278,9 +276,9 @@ const HANDLE = '!size-3 !border-2 !border-white dark:!border-neutral-900';
 
 /**
  * The spec node while the builder has it: the same head and lines, with handles a person draws edges with. Drag from the right-hand dot to
- * a step's left-hand dot and that step waits on this one (`after:`); drag from the violet dot underneath to another step and this one runs
+ * a step's left-hand dot and that step waits on this one (`after:`); drag from the grey dot underneath to another step and this one runs
  * that step again (`loop:`). The dot a loop comes into sits beside it, and takes no drag of its own. A step not saved says so under its
- * name, and a step the last save was refused for is drawn in red.
+ * name, and a step the last save was refused for is drawn as a failure.
  */
 function BuildingNode({
   name,
@@ -307,7 +305,7 @@ function BuildingNode({
       data-refused-step={build.refused || undefined}
       className={[
         'w-56 cursor-pointer rounded-md bg-white text-neutral-900 shadow-sm dark:bg-neutral-900 dark:text-neutral-100',
-        build.refused ? 'border-2 border-red-500 dark:border-red-400' : 'border border-neutral-300 dark:border-neutral-700',
+        build.refused ? 'border-2 border-failure' : 'border border-neutral-300 dark:border-neutral-700',
         build.selected ? 'outline-2 outline-offset-2 outline-neutral-900 dark:outline-neutral-100' : '',
       ].join(' ')}
     >
@@ -323,9 +321,7 @@ function BuildingNode({
         <div className="flex items-center justify-between gap-2">
           <span className="font-mono text-[10px] uppercase tracking-wider text-neutral-500">{stepLabel(index)}</span>
           {build.unsaved && (
-            <span className="rounded-full bg-amber-100 px-1.5 text-[10px] font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-300">
-              unsaved
-            </span>
+            <span className="rounded-full bg-yours-container px-1.5 text-[10px] font-medium text-on-yours-container">unsaved</span>
           )}
         </div>
         <p className="mt-0.5 truncate text-sm font-semibold" title={name}>
@@ -359,7 +355,7 @@ function BuildingNode({
         position={Position.Bottom}
         title={`Drag to a step ${name} waits on, to run it again when ${name} says so: loop`}
         style={{ left: '70%' }}
-        className={`${HANDLE} !bg-violet-500`}
+        className={`${HANDLE} !bg-rest`}
       />
       <Handle
         id={LOOP_TARGET}
@@ -368,7 +364,7 @@ function BuildingNode({
         isConnectableStart={false}
         title={`Where a loop back to ${name} comes in`}
         style={{ left: '30%' }}
-        className={`${HANDLE} !bg-violet-300 dark:!bg-violet-800`}
+        className={`${HANDLE} !bg-sage`}
       />
     </div>
   );

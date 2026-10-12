@@ -5,8 +5,16 @@
 @import '@xyflow/react/dist/style.css' layer(base);
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
-@import '@fontsource-variable/geist';
-@import '@fontsource-variable/orbitron';
+/*
+ * The look's faces, each under the family its package registers, bundled by the build and served from the board's own origin: the brand
+ * face (Michroma), the plain face (Chakra Petch) and the label face (Archivo Variable, its width axis from 62% to 125%).
+ */
+@import '@fontsource/michroma/400.css';
+@import '@fontsource/chakra-petch/400.css';
+@import '@fontsource/chakra-petch/500.css';
+@import '@fontsource/chakra-petch/600.css';
+@import '@fontsource/chakra-petch/700.css';
+@import '@fontsource-variable/archivo/wdth.css';
 /* Blobatar's motion, then its gaze, which reads the properties motion registers: what a following agent face moves with. */
 @import 'blobatar/motion.css';
 @import 'blobatar/gaze.css';
@@ -31,79 +39,48 @@
   }
 
   /*
-   * React Flow in the board's palette. Its own `-default` colours stay underneath for anything not
-   * named here. Dark follows `prefers-color-scheme`, as Tailwind's `dark:` does and as React Flow's
-   * `colorMode="system"` does.
+   * React Flow in the board's palette, read from the theme's roles, so one block serves light and dark. Its own `-default` colours stay
+   * underneath for anything not named here.
    */
   .react-flow {
-    --xy-background-color: var(--color-neutral-50);
-    --xy-background-pattern-dots-color: var(--color-neutral-300);
-    --xy-edge-stroke: var(--color-neutral-400);
+    --xy-background-color: var(--md-sys-color-background);
+    --xy-background-pattern-dots-color: var(--md-sys-color-outline-variant);
+    --xy-edge-stroke: var(--md-sys-color-outline);
     --xy-edge-stroke-width: 1.5;
-    --xy-edge-stroke-selected: var(--color-neutral-700);
-    --xy-connectionline-stroke: var(--color-neutral-400);
-    --xy-handle-background-color: var(--color-neutral-400);
-    --xy-handle-border-color: var(--color-white);
-    --xy-node-color: var(--color-neutral-900);
-    --xy-node-border: 1px solid var(--color-neutral-300);
-    --xy-node-background-color: var(--color-white);
-    --xy-node-boxshadow-hover: 0 1px 3px 0 rgb(0 0 0 / 0.1);
-    --xy-node-boxshadow-selected: 0 0 0 2px var(--color-neutral-900);
-    --xy-selection-background-color: rgb(115 115 115 / 0.08);
-    --xy-selection-border: 1px dotted var(--color-neutral-400);
-    --xy-minimap-background-color: var(--color-white);
-    --xy-minimap-mask-background-color: rgb(229 229 229 / 0.6);
-    --xy-minimap-mask-stroke-color: var(--color-neutral-300);
-    --xy-minimap-node-background-color: var(--color-neutral-300);
+    --xy-edge-stroke-selected: var(--md-sys-color-on-surface);
+    --xy-connectionline-stroke: var(--md-sys-color-outline);
+    --xy-handle-background-color: var(--md-sys-color-outline);
+    --xy-handle-border-color: var(--md-sys-color-background);
+    --xy-node-color: var(--md-sys-color-on-surface);
+    --xy-node-border: 1px solid var(--md-sys-color-outline-variant);
+    --xy-node-background-color: var(--md-sys-color-surface-container-low);
+    --xy-node-boxshadow-hover: 0 0 0 1px var(--md-sys-color-outline);
+    --xy-node-boxshadow-selected: 0 0 0 2px var(--md-sys-color-on-surface);
+    --xy-selection-background-color: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+    --xy-selection-border: 1px dotted var(--md-sys-color-outline);
+    --xy-minimap-background-color: var(--md-sys-color-surface-container-low);
+    --xy-minimap-mask-background-color: color-mix(in srgb, var(--md-sys-color-surface-dim) 60%, transparent);
+    --xy-minimap-mask-stroke-color: var(--md-sys-color-outline-variant);
+    --xy-minimap-node-background-color: var(--md-sys-color-outline-variant);
     --xy-minimap-node-stroke-color: transparent;
-    --xy-controls-button-background-color: var(--color-white);
-    --xy-controls-button-background-color-hover: var(--color-neutral-100);
-    --xy-controls-button-color: var(--color-neutral-700);
-    --xy-controls-button-color-hover: var(--color-neutral-900);
-    --xy-controls-button-border-color: var(--color-neutral-200);
-    --xy-controls-box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --xy-controls-button-background-color: var(--md-sys-color-surface-container-low);
+    --xy-controls-button-background-color-hover: var(--md-sys-color-surface-container-high);
+    --xy-controls-button-color: var(--md-sys-color-on-surface-variant);
+    --xy-controls-button-color-hover: var(--md-sys-color-on-surface);
+    --xy-controls-button-border-color: var(--md-sys-color-outline-variant);
+    --xy-controls-box-shadow: 0 0 0 1px var(--md-sys-color-outline-variant);
     --xy-attribution-background-color: transparent;
-    --xy-edge-label-background-color: var(--color-white);
-    --xy-edge-label-color: var(--color-neutral-700);
-    /* An edge by what it says (`edgeStroke`): its line, its arrow and its travelling dot. The running colour is the running step's. */
-    --edge-to-come: var(--color-neutral-400);
-    --edge-done: var(--color-neutral-500);
-    --edge-taken: var(--color-amber-500);
-    --edge-running: var(--color-sky-500);
-    --edge-loop: var(--color-violet-500);
-  }
-
-  @media (prefers-color-scheme: dark) {
-    .react-flow {
-      --xy-background-color: var(--color-neutral-950);
-      --xy-background-pattern-dots-color: var(--color-neutral-800);
-      --xy-edge-stroke: var(--color-neutral-600);
-      --xy-edge-stroke-selected: var(--color-neutral-300);
-      --xy-connectionline-stroke: var(--color-neutral-600);
-      --xy-handle-background-color: var(--color-neutral-600);
-      --xy-handle-border-color: var(--color-neutral-950);
-      --xy-node-color: var(--color-neutral-100);
-      --xy-node-border: 1px solid var(--color-neutral-700);
-      --xy-node-background-color: var(--color-neutral-900);
-      --xy-node-boxshadow-selected: 0 0 0 2px var(--color-neutral-100);
-      --xy-selection-border: 1px dotted var(--color-neutral-600);
-      --xy-minimap-background-color: var(--color-neutral-900);
-      --xy-minimap-mask-background-color: rgb(10 10 10 / 0.6);
-      --xy-minimap-mask-stroke-color: var(--color-neutral-700);
-      --xy-minimap-node-background-color: var(--color-neutral-700);
-      --xy-controls-button-background-color: var(--color-neutral-900);
-      --xy-controls-button-background-color-hover: var(--color-neutral-800);
-      --xy-controls-button-color: var(--color-neutral-300);
-      --xy-controls-button-color-hover: var(--color-neutral-100);
-      --xy-controls-button-border-color: var(--color-neutral-800);
-      --xy-edge-label-background-color: var(--color-neutral-900);
-      --xy-edge-label-color: var(--color-neutral-300);
-      --edge-to-come: var(--color-neutral-600);
-      --edge-done: var(--color-neutral-400);
-      --edge-taken: var(--color-amber-400);
-      --edge-running: var(--color-sky-400);
-      --edge-loop: var(--color-violet-400);
-    }
+    --xy-edge-label-background-color: var(--md-sys-color-surface-container-low);
+    --xy-edge-label-color: var(--md-sys-color-on-surface-variant);
+    /*
+     * An edge by what it says (`edgeStroke`): its line, its arrow and its travelling dot, in the look's meanings. Running and taken are
+     * alive, done is the sage of a finished step, and a loop is told by its arc, not a hue of its own.
+     */
+    --edge-to-come: var(--md-sys-color-outline-variant);
+    --edge-done: var(--meaning-sage);
+    --edge-taken: var(--meaning-alive);
+    --edge-running: var(--meaning-alive);
+    --edge-loop: var(--md-sys-color-on-surface-variant);
   }
   * {
     @apply border-border outline-ring/50;
@@ -115,7 +92,28 @@
 
 @theme inline {
   --font-heading: var(--font-sans);
-  --font-sans: 'Geist Variable', sans-serif;
+  --font-sans: var(--md-sys-typescale-plain-font);
+  --font-label: 'Archivo Variable', 'Arial Black', sans-serif;
+  --color-yours: var(--meaning-yours);
+  --color-on-yours: var(--meaning-on-yours);
+  --color-yours-container: var(--meaning-yours-container);
+  --color-on-yours-container: var(--meaning-on-yours-container);
+  --color-alive: var(--meaning-alive);
+  --color-on-alive: var(--meaning-on-alive);
+  --color-alive-container: var(--meaning-alive-container);
+  --color-on-alive-container: var(--meaning-on-alive-container);
+  --color-money: var(--meaning-money);
+  --color-on-money: var(--meaning-on-money);
+  --color-money-container: var(--meaning-money-container);
+  --color-on-money-container: var(--meaning-on-money-container);
+  --color-failure: var(--meaning-failure);
+  --color-on-failure: var(--meaning-on-failure);
+  --color-failure-container: var(--meaning-failure-container);
+  --color-on-failure-container: var(--meaning-on-failure-container);
+  --color-rest: var(--meaning-rest);
+  --color-on-rest: var(--meaning-on-rest);
+  --color-sage: var(--meaning-sage);
+  --color-on-sage: var(--meaning-on-sage);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -156,7 +154,34 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/*
+ * The look's five meanings, each read from a role of the theme once: a colour says one thing on every page. Yours is what waits on a
+ * person, alive a session at work, money an amount, failure what failed and nothing else; rest is the label's grey, and sage, filled, a
+ * step that is done. The two faces the theme names by a hook are given their loaded families here.
+ */
 :root {
+  --font-michroma: 'Michroma', ui-sans-serif, system-ui, sans-serif;
+  --font-chakra-petch: 'Chakra Petch', ui-sans-serif, system-ui, sans-serif;
+  --meaning-yours: var(--md-sys-color-primary);
+  --meaning-on-yours: var(--md-sys-color-on-primary);
+  --meaning-yours-container: var(--md-sys-color-primary-container);
+  --meaning-on-yours-container: var(--md-sys-color-on-primary-container);
+  --meaning-alive: var(--md-sys-color-secondary);
+  --meaning-on-alive: var(--md-sys-color-on-secondary);
+  --meaning-alive-container: var(--md-sys-color-secondary-container);
+  --meaning-on-alive-container: var(--md-sys-color-on-secondary-container);
+  --meaning-money: var(--md-sys-color-tertiary);
+  --meaning-on-money: var(--md-sys-color-on-tertiary);
+  --meaning-money-container: var(--md-sys-color-tertiary-container);
+  --meaning-on-money-container: var(--md-sys-color-on-tertiary-container);
+  --meaning-failure: var(--md-sys-color-error);
+  --meaning-on-failure: var(--md-sys-color-on-error);
+  --meaning-failure-container: var(--md-sys-color-error-container);
+  --meaning-on-failure-container: var(--md-sys-color-on-error-container);
+  --meaning-rest: var(--md-sys-color-inverse-surface);
+  --meaning-on-rest: var(--md-sys-color-inverse-on-surface);
+  --meaning-sage: var(--md-sys-color-outline);
+  --meaning-on-sage: var(--md-sys-color-surface-container-lowest);
   --background: var(--md-sys-color-background);
   --foreground: var(--md-sys-color-on-background);
   --card: var(--md-sys-color-surface-container-low);
@@ -165,8 +190,8 @@
   --popover-foreground: var(--md-sys-color-on-surface);
   --primary: var(--md-sys-color-primary);
   --primary-foreground: var(--md-sys-color-on-primary);
-  --secondary: var(--md-sys-color-secondary);
-  --secondary-foreground: var(--md-sys-color-on-secondary);
+  --secondary: var(--md-sys-color-surface-container-highest);
+  --secondary-foreground: var(--md-sys-color-on-surface);
   --muted: var(--md-sys-color-surface-container-highest);
   --muted-foreground: var(--md-sys-color-on-surface-variant);
   --accent: var(--md-sys-color-surface-container-high);

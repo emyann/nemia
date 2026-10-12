@@ -56,7 +56,7 @@ export type RunFlowNode = Node<RunNodeData, 'run'>;
  *   that waits for a person rather than for a machine.
  * - Beside its id, where its steps work: its repository, or folders the run made (`workspace: folder`); a try of an agent, a folder   run
  *   of the store's own, is tagged with its agent instead, since its folder is on no page.
- * - On whom a run started `--after` waits, and a person's hold on it (the CLI's `hold`), each in the CLI `ls`'s word, amber when only a
+ * - On whom a run started `--after` waits, and a person's hold on it (the CLI's `hold`), each in the CLI `ls`'s word, yours when only a
  *   person moves   it, with what to do on hover (`WaitingLine`). A hold is said instead of a gate: while it stands, nothing of the run is
  *   asked of anyone.
  * - A run that waits on runs that may still ship, and on nothing else (`waitsOnRuns`), is a ghost until it starts: dimmed and dashed, as
@@ -124,7 +124,7 @@ export function RunNode({
             <p
               data-holding={run.holding.onYou ? 'on-you' : 'on-runs'}
               title={`${run.holding.word}\n${run.holding.advice}`}
-              className={`mt-1 line-clamp-2 font-mono text-[11px] break-words ${run.holding.onYou ? 'text-amber-800 dark:text-amber-300' : 'text-violet-800 dark:text-violet-300'}`}
+              className={`mt-1 line-clamp-2 font-mono text-[11px] break-words ${run.holding.onYou ? 'text-yours' : 'text-muted-foreground'}`}
             >
               {run.holding.word}
             </p>
@@ -143,7 +143,7 @@ export function RunNode({
                   hash={stepAnchor(need.step)}
                   data-need={need.kind}
                   data-step={need.step}
-                  className={`nodrag hover:underline ${need.kind === 'harness' ? 'text-orange-800 dark:text-orange-300' : 'text-amber-800 dark:text-amber-300'}`}
+                  className={`nodrag hover:underline ${'text-yours'}`}
                 >
                   {needLine(need)}
                 </RouteLink>
@@ -153,7 +153,7 @@ export function RunNode({
         )}
 
         {said ? (
-          <p data-taken className="px-3 text-[11px] break-words text-emerald-800 dark:text-emerald-300">
+          <p data-taken className="px-3 text-[11px] break-words text-muted-foreground">
             {said}
           </p>
         ) : gate ? (
@@ -173,7 +173,7 @@ export function RunNode({
               params={{ runId: run.id }}
               hash="decide"
               data-to-decide="result"
-              className="nodrag text-emerald-800 hover:underline dark:text-emerald-300"
+              className="nodrag text-yours hover:underline"
             >
               {decideLine(decide.branches)}
             </RouteLink>
@@ -182,7 +182,7 @@ export function RunNode({
 
         {open && run.waitingOnYou.length > 0 && <TouchedLine run={run} />}
 
-        {open && trouble && <p className="px-3 text-[11px] text-red-600 dark:text-red-400">{trouble}</p>}
+        {open && trouble && <p className="px-3 text-[11px] text-failure">{trouble}</p>}
 
         <div className="flex min-h-6 flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t px-3 pt-2">
           <Took run={run} clock={clock} />
@@ -248,13 +248,13 @@ function lookOf(run: RunSummary, finished: boolean, inspected: boolean): Look {
   const ghost = waitsOnRuns(run);
   const marks = { ...(ghost && { 'data-ghost-run': true as const }), ...(inspected && { 'data-inspected': true as const }) };
   if (inspected) return { ghost, className: 'ring-2 ring-ring', marks };
-  if (toDecideOf(run)) return { ghost: false, className: 'ring-1 ring-emerald-500/60', marks: {} };
+  if (toDecideOf(run)) return { ghost: false, className: 'ring-1 ring-yours/60', marks: {} };
   if (ghost) return { ghost, className: GHOST, marks };
   return { ghost, className: finished ? 'opacity-50 hover:opacity-80' : '', marks };
 }
 
 /**
- * What a run started `--after` runs waits on, in the CLI `ls`'s word (`waiting.word`), with what the CLI's `decide` says on hover. Amber
+ * What a run started `--after` runs waits on, in the CLI `ls`'s word (`waiting.word`), with what the CLI's `decide` says on hover. Yours
  * when only a person moves it; on a ghost's card (`ghost`), each run it waits on a link to that run's page.
  */
 function WaitingLine({ waiting, ghost }: { waiting: RunWaiting; ghost: boolean }) {
@@ -262,7 +262,7 @@ function WaitingLine({ waiting, ghost }: { waiting: RunWaiting; ghost: boolean }
     <p
       data-waiting={waiting.onYou ? 'on-you' : 'on-runs'}
       title={waiting.advice}
-      className={`mt-1 line-clamp-2 font-mono text-[11px] break-words ${waiting.onYou ? 'text-amber-800 dark:text-amber-300' : 'text-muted-foreground'}`}
+      className={`mt-1 line-clamp-2 font-mono text-[11px] break-words ${waiting.onYou ? 'text-yours' : 'text-muted-foreground'}`}
     >
       {ghost ? (
         <>
@@ -293,7 +293,7 @@ function TouchedLine({ run }: { run: RunSummary }) {
   const { data, error } = useQuery(decisionQuery(run.id, decisionStamp(run)));
   if (error) {
     return (
-      <p className="truncate px-3 text-[11px] text-red-600 dark:text-red-400" title={error.message}>
+      <p className="truncate px-3 text-[11px] text-failure" title={error.message}>
         touched: not read — {error.message}
       </p>
     );
@@ -343,27 +343,22 @@ function Chips({ run, decide, cancelled, reads }: { run: RunSummary; decide: boo
           ⧉ reads {run.context.length} {run.context.length === 1 ? 'run' : 'runs'}
         </Badge>
       )}
-      {decide && <Badge className="bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-300">to decide</Badge>}
-      {waitsOnYou(run) && <Badge className="bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300">waiting on you</Badge>}
+      {decide && <Badge className="bg-yours text-on-yours">to decide</Badge>}
+      {waitsOnYou(run) && <Badge className="bg-yours-container text-on-yours-container">waiting on you</Badge>}
       {run.holding && !cancelled && (
-        <Badge title={run.holding.advice} className="bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300">
+        <Badge title={run.holding.advice} className="bg-rest text-on-rest">
           held
         </Badge>
       )}
       {run.holding && !cancelled && <CardLift id={run.id} />}
       {cancelled && <Badge variant="outline">cancelled</Badge>}
       {run.pruned && (
-        <Badge variant="outline" data-pruned title={run.pruned.said} className="text-neutral-500">
+        <Badge variant="outline" data-pruned title={run.pruned.said} className="text-on-surface-variant">
           pruned
         </Badge>
       )}
       {run.unreadable && (
-        <Badge
-          variant="outline"
-          data-unreadable
-          title={run.unreadable}
-          className="border-red-400 text-red-700 dark:border-red-700 dark:text-red-400"
-        >
+        <Badge variant="outline" data-unreadable title={run.unreadable} className="border-failure text-failure">
           unreadable
         </Badge>
       )}

@@ -70,7 +70,7 @@ export default {
       node(LOOPING.exhausted).locator(`[data-state="exhausted"][title^="rounds exhausted: "][title$="${LOOPING.notes.review}"]`, {
         hasText: 'rounds exhausted',
       }),
-      `${LOOPING.exhausted}, out of rounds, is an amber chip on the graph, its note after what that means on hover, with no room under a chip`,
+      `${LOOPING.exhausted}, out of rounds, is a chip that waits on a person on the graph, its note after what that means on hover, with no room under a chip`,
     );
     await expectVisible(
       node(LOOPING.exhausted).getByText('human gate'),

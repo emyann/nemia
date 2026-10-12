@@ -399,7 +399,7 @@ export default {
     );
     await expectVisible(
       cardOf(page, orphan.id).locator('[data-waiting="on-you"]', { hasText: DIAMOND.words.orphan }),
-      `${orphan.id}'s card says ${DIAMOND.words.orphan}, amber`,
+      `${orphan.id}'s card says ${DIAMOND.words.orphan}, as a wait on a person`,
     );
     await expectVisible(cardOf(page, orphan.id).getByText('waiting on you', { exact: true }), `${orphan.id} waits on you`);
     await expectCount(
@@ -413,7 +413,7 @@ export default {
       page.locator(
         `.react-flow__node[data-id="${LOOPING.id}"] [data-step="${LOOPING.exhausted}"][data-state="exhausted"][title*="rounds exhausted"][title$="${LOOPING.notes.review}"]`,
       ),
-      `the loop's rail shows ${LOOPING.exhausted} out of rounds as an amber pill, its note after what that means on hover (${LOOPING.id})`,
+      `the loop's rail shows ${LOOPING.exhausted} out of rounds as a pill that waits on a person, its note after what that means on hover (${LOOPING.id})`,
     );
     await expectVisible(card, `the fake run's card, once finished runs are shown (${FAKE.id})`);
     await expectVisible(
@@ -434,7 +434,7 @@ export default {
     await expectVisible(gated.getByRole('button', { name: 'Approve', exact: true }), 'and answers it on the card');
     await expectVisible(
       gated.locator(`[data-step="${GATED.gated}"][data-state="awaiting-approval"][data-live]`),
-      'and its rail shows the step as awaiting approval, an amber pill ringed as the step the run is at',
+      'and its rail shows the step as awaiting approval, a pill that waits on a person, ringed as the step the run is at',
     );
     await expectVisible(gated.getByText('waiting on you', { exact: true }), 'and waits on you');
     await expectVisible(card.getByText(FAKE.title), `the card says what was asked (${FAKE.title})`);

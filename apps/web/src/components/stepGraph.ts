@@ -2,7 +2,7 @@ import { MarkerType } from '@xyflow/react';
 import type { RunDetail } from '../lib/api';
 import { edgesOf, edgeStroke, LOOP_SOURCE, LOOP_TARGET, type EdgeState } from '../lib/canvas';
 import { contextEdges, runEdges } from '../lib/factory';
-import { stepState, type StepState } from '../lib/status';
+import { statePaint, stepState, type StepState } from '../lib/status';
 import type { StateFlowEdge } from './StateEdge';
 import type { StepNodeData } from './StepNode';
 
@@ -18,29 +18,8 @@ export const stepData = (run: RunDetail, index: number): StepNodeData => ({
   waitingOnYou: run.waitingOnYou.includes(run.steps[index].name),
 });
 
-/** The minimap in the chips' colours, so a glance at it says what the nodes say. */
-export const stepMinimapFill: Record<StepState, string> = {
-  working: 'var(--color-sky-500)',
-  'needs-human': 'var(--color-orange-500)',
-  checking: 'var(--color-blue-500)',
-  verified: 'var(--color-emerald-500)',
-  unverified: 'var(--color-neutral-500)',
-  blocked: 'var(--color-amber-500)',
-  'awaiting-approval': 'var(--color-amber-500)',
-  exhausted: 'var(--color-amber-500)',
-  'over-budget': 'var(--color-amber-500)',
-  'budget-exhausted': 'var(--color-amber-500)',
-  unsigned: 'var(--color-amber-400)',
-  denied: 'var(--color-amber-400)',
-  failed: 'var(--color-red-500)',
-  'failed-check': 'var(--color-red-500)',
-  waiting: 'var(--color-neutral-400)',
-  'waiting-for-slot': 'var(--color-neutral-400)',
-  held: 'var(--color-violet-400)',
-  cancelled: 'var(--color-neutral-400)',
-  unreadable: 'var(--color-red-400)',
-  unknown: 'var(--color-neutral-400)',
-};
+/** The minimap in the chips' colours, so a glance at it says what the nodes say: each state's fill is its meaning's (`statePaint`). */
+export const stepMinimapFill: Record<StepState, string> = statePaint;
 
 /**
  * An edge as React Flow takes it: drawn by `StateEdge` from what it says, with an arrow at its target in its colour, sized in

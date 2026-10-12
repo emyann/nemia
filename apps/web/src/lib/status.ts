@@ -10,6 +10,8 @@
  * stay the CLI `ls`'s (`awaiting approval`, `succeeded · BLOCKED`); only the colour and the meaning say the run is held. A step at work,
  * asking through its harness (`needs-human`), checking, or settled keeps its state: what is in flight runs on, and a verdict is a verdict.
  */
+import { container, dashed, filled, hairline, meaningOf, paint, ringed, type Hue } from './meaning.ts';
+
 export type StepState =
   | 'working'
   | 'needs-human'
@@ -141,33 +143,87 @@ export const stateMeaning: Record<StepState, string> = {
   unknown: 'unknown: the engine has no record of its task',
 };
 
+/** How a state is drawn: the hue that says its meaning, the form the hue takes, and what marks it beside its colour. */
+export interface Drawn {
+  readonly hue: Hue;
+  readonly form: 'filled' | 'container' | 'ringed' | 'dashed' | 'hairline';
+  readonly mark?: string;
+}
+
+const GATE: Drawn = { hue: 'yours', form: 'filled', mark: 'font-semibold' };
+
 /**
- * The chip's classes for each state. Amber and bold for a state that waits on a person's word (`isGate`); amber and ringed for work to try
- * again, not a question (`unsigned`, `denied`); red for a failure. `unverified` is neutral and ringed, not green, since nothing checked it,
- * and `StatusChip` marks it too, so it does not pass for a step still to do. `held` is violet, not grey as `waiting` is: nobody is asked,
- * and a person's word stops it, not the order of the steps.
+ * Each state's meaning, of the look's five, and its form. `yours`, filled and bold, for a state that waits on a person's word (`isGate`),
+ * the only filled accent; `yours` for a session asking, and ringed for work to try again, not a question (`unsigned`, `denied`). `alive`
+ * for a session at work. `failure` for a failure and nothing else. The rest is at rest or done: sage for a check that runs, a step that is
+ * done (ringed when only its own word says so, and `StatusChip` marks it too) and a step to come, a hairline; grey for a step a person
+ * holds, one called off, and one the engine does not know. No state is `money`: amber is an amount, drawn beside the chip.
  */
-export const stateClass: Record<StepState, string> = {
-  working: 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300',
-  'needs-human': 'bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300',
-  checking: 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300',
-  verified: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
-  unverified:
-    'bg-neutral-100 text-neutral-700 ring-1 ring-neutral-300 ring-inset dark:bg-neutral-800 dark:text-neutral-200 dark:ring-neutral-600',
-  blocked: 'bg-amber-100 font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-300',
-  'awaiting-approval': 'bg-amber-100 font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-300',
-  exhausted: 'bg-amber-100 font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-300',
-  'over-budget': 'bg-amber-100 font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-300',
-  'budget-exhausted': 'bg-amber-100 font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-300',
-  unsigned: 'bg-amber-50 text-amber-800 ring-1 ring-amber-400 ring-inset dark:bg-amber-950/50 dark:text-amber-300 dark:ring-amber-700',
-  denied: 'bg-amber-50 text-amber-800 ring-1 ring-amber-400 ring-inset dark:bg-amber-950/50 dark:text-amber-300 dark:ring-amber-700',
-  failed: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300',
-  'failed-check':
-    'bg-red-100 font-semibold text-red-800 ring-1 ring-red-300 ring-inset dark:bg-red-950 dark:text-red-300 dark:ring-red-800',
-  waiting: 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300',
-  'waiting-for-slot': 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300',
-  held: 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300',
-  cancelled: 'bg-neutral-100 text-neutral-500 line-through dark:bg-neutral-900 dark:text-neutral-500',
-  unreadable: 'border border-dashed border-red-400 text-red-800 dark:border-red-700 dark:text-red-300',
-  unknown: 'border border-dashed border-neutral-300 text-neutral-500 dark:border-neutral-700',
+export const stateDrawn: Record<StepState, Drawn> = {
+  working: { hue: 'alive', form: 'container' },
+  'needs-human': { hue: 'yours', form: 'container' },
+  checking: { hue: 'sage', form: 'container', mark: 'ring-1 ring-sage ring-inset' },
+  verified: { hue: 'sage', form: 'filled' },
+  unverified: { hue: 'sage', form: 'ringed' },
+  blocked: GATE,
+  'awaiting-approval': GATE,
+  exhausted: GATE,
+  'over-budget': GATE,
+  'budget-exhausted': GATE,
+  unsigned: { hue: 'yours', form: 'ringed' },
+  denied: { hue: 'yours', form: 'ringed' },
+  failed: { hue: 'failure', form: 'container' },
+  'failed-check': { hue: 'failure', form: 'container', mark: 'font-semibold ring-1 ring-failure ring-inset' },
+  waiting: { hue: 'sage', form: 'hairline' },
+  'waiting-for-slot': { hue: 'sage', form: 'hairline' },
+  held: { hue: 'grey', form: 'filled' },
+  cancelled: { hue: 'grey', form: 'container', mark: 'line-through' },
+  unreadable: { hue: 'failure', form: 'dashed' },
+  unknown: { hue: 'grey', form: 'dashed' },
 };
+
+const FORMS = { filled, container, ringed, dashed } as const;
+
+/** The classes of one drawing: its form in its hue, then its mark. */
+export const classOf = ({ hue, form, mark }: Drawn): string =>
+  [form === 'hairline' ? hairline : FORMS[form][hue], mark].filter(Boolean).join(' ');
+
+/**
+ * The states of `table` that break the look's rule, each with why; none for a table that keeps it. A state that waits on a person
+ * (`isGate`, a session asking, work to try again) is `yours`; a failure is `failure`, and no other state is; no state is `money`.
+ */
+export function brokenMeanings(table: Record<StepState, Drawn>): string[] {
+  const states = Object.keys(table) as StepState[];
+  return states.flatMap((state) => {
+    const meaning = meaningOf(table[state].hue);
+    if (meaning === 'money') return [`${state} is money: amber is an amount, never a state`];
+    if (WAITS_ON_A_PERSON.has(state)) return meaning === 'yours' ? [] : [`${state} waits on a person and is ${meaning}, not yours`];
+    if (FAILURES.has(state)) return meaning === 'failure' ? [] : [`${state} is a failure and is ${meaning}`];
+    if (meaning === 'yours') return [`${state} waits on nobody and is yours`];
+    return meaning === 'failure' ? [`${state} is no failure and is drawn as one`] : [];
+  });
+}
+
+const WAITS_ON_A_PERSON: ReadonlySet<StepState> = new Set([
+  'needs-human',
+  'blocked',
+  'awaiting-approval',
+  'exhausted',
+  'over-budget',
+  'budget-exhausted',
+  'unsigned',
+  'denied',
+]);
+
+const FAILURES: ReadonlySet<StepState> = new Set(['failed', 'failed-check', 'unreadable']);
+
+const each = (table: Record<StepState, Drawn>, of: (drawn: Drawn) => string): Record<StepState, string> => {
+  const entries = (Object.keys(table) as StepState[]).map((state) => [state, of(table[state])] as const);
+  return Object.fromEntries(entries) as Record<StepState, string>;
+};
+
+/** The chip's classes for each state, from `stateDrawn`. */
+export const stateClass: Record<StepState, string> = each(stateDrawn, classOf);
+
+/** Each state's colour outside Tailwind, its meaning's: what the minimap fills a step with. */
+export const statePaint: Record<StepState, string> = each(stateDrawn, (drawn) => paint[drawn.hue]);

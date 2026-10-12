@@ -36,11 +36,11 @@ export const kindOf = ({ initial, final }: Pick<StateBox, 'initial' | 'final'>):
   initial ? 'initial state' : final ? 'final state' : 'state';
 
 /**
- * The fill and ring of a box: amber while lit; ringed while the bar shows it, as thick as a lit one, since the drawing shrinks beside the
+ * The fill and ring of a box: alive while lit; ringed while the bar shows it, as thick as a lit one, since the drawing shrinks beside the
  * bar; ringed on keyboard focus while it can be pressed.
  */
 function markOf({ lit, inspected, pressable }: MachineFlowNode['data']): string {
-  if (lit) return 'bg-amber-50 ring-4 ring-amber-400 dark:bg-amber-950 dark:ring-amber-400';
+  if (lit) return 'bg-alive-container ring-4 ring-alive';
   const fill = 'bg-white dark:bg-neutral-900';
   if (inspected) return `${fill} cursor-pointer ring-4 ring-ring`;
   return pressable ? `${fill} cursor-pointer in-focus-visible:ring-2 in-focus-visible:ring-ring` : fill;
@@ -48,13 +48,13 @@ function markOf({ lit, inspected, pressable }: MachineFlowNode['data']): string 
 
 /**
  * A state of a machine, in the box its layout gave it: its kind and its name, and under them the edges that come back to it. The first
- * state has a sky border and says it is the initial one; a final one has a double border and says so. A lit one — where a task's path
- * stands — is ringed and filled in amber, and says so as `data-lit`. One the frame's bar shows is ringed, and says so as `data-inspected`;
+ * state has a sage border and says it is the initial one; a final one has a double border and says so. A lit one — where a task's path
+ * stands — is ringed and filled as alive, and says so as `data-lit`. One the frame's bar shows is ringed, and says so as `data-inspected`;
  * one a press shows in the bar is ringed on keyboard focus too. Handles are hidden: nobody draws an edge here.
  */
 export function MachineNode({ data }: NodeProps<MachineFlowNode>) {
   const edge = data.initial
-    ? 'border-2 border-sky-500 dark:border-sky-400'
+    ? 'border-2 border-sage'
     : data.final
       ? 'border-4 border-double border-neutral-500 dark:border-neutral-400'
       : 'border border-neutral-300 dark:border-neutral-700';
@@ -65,15 +65,11 @@ export function MachineNode({ data }: NodeProps<MachineFlowNode>) {
       data-final={data.final || undefined}
       data-lit={data.lit || undefined}
       data-inspected={data.inspected || undefined}
-      className={`size-full overflow-hidden rounded-md text-neutral-900 shadow-sm dark:text-neutral-100 ${edge} ${markOf(data)}`}
+      className={`size-full overflow-hidden rounded-md text-foreground shadow-sm ${edge} ${markOf(data)}`}
     >
       <Handle type="target" position={Position.Top} isConnectable={false} className="opacity-0" />
       <div className="px-2.5 pt-1.5">
-        <p
-          className={`font-mono text-[10px] uppercase tracking-wider ${data.initial ? 'text-sky-700 dark:text-sky-400' : 'text-neutral-500 dark:text-neutral-400'}`}
-        >
-          {kindOf(data)}
-        </p>
+        <p className={`font-mono text-[10px] uppercase tracking-wider text-muted-foreground`}>{kindOf(data)}</p>
         <p data-state-name className="text-sm font-semibold">
           {data.id}
         </p>

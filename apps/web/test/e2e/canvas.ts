@@ -206,7 +206,7 @@ export const holdEdgeOf = (page: Page, from: string, to: string): Locator =>
 
 /**
  * An edge drawn on a builder, as a person drags it: from `from`'s right-hand dot to `to`'s left-hand dot, which makes `to` wait on `from` —
- * or, with `loop`, from the violet dot under `from` to the one under `to`, which makes `from` loop back to `to`. With the mouse, not
+ * or, with `loop`, from the grey dot under `from` to the one under `to`, which makes `from` loop back to `to`. With the mouse, not
  * `dragTo`: a handle a drag cannot start from takes no pointer events until a drag is under way, so `dragTo`'s check that the target is
  * what the pointer would hit finds the node over it, and waits for ever.
  */

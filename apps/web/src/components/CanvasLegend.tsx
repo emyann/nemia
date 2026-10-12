@@ -26,7 +26,7 @@ export function CanvasLegend({ className = '', cards = false }: { className?: st
         sample={
           <>
             <Sample state="running" />
-            <span className="size-2.5 animate-spin rounded-full border-2 border-sky-500 border-t-transparent" />
+            <span className="size-2.5 animate-spin rounded-full border-2 border-alive border-t-transparent" />
           </>
         }
       >
@@ -44,8 +44,8 @@ export function CanvasLegend({ className = '', cards = false }: { className?: st
           reads what it concluded
         </Item>
       )}
-      <Item sample={<span className="size-2.5 rounded-sm border-2 border-amber-500" />}>human gate</Item>
-      {cards && <Item sample={<span className="size-2.5 rounded-sm ring-1 ring-emerald-500" />}>to decide</Item>}
+      <Item sample={<span className="size-2.5 rounded-sm border-2 border-yours" />}>human gate</Item>
+      {cards && <Item sample={<span className="size-2.5 rounded-sm ring-1 ring-yours" />}>to decide</Item>}
     </Panel>
   );
 }

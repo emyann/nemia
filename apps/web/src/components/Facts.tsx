@@ -283,11 +283,7 @@ export function spentRows(step: Priced): Array<[string, ReactNode]> {
   return [
     [
       'spent',
-      <span
-        key="spent"
-        data-spent={over ? 'over' : 'within'}
-        className={`font-mono text-xs ${over ? 'font-semibold text-red-700 dark:text-red-400' : ''}`}
-      >
+      <span key="spent" data-spent={over ? 'over' : 'within'} className={`font-mono text-xs ${over ? 'font-semibold text-money' : ''}`}>
         {text}
       </span>,
     ],

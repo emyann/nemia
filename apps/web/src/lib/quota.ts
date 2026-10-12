@@ -42,7 +42,10 @@ function keepWord(ms: number): string {
   return ms % 60_000 === 0 ? `${ms / 60_000} min` : `${Math.round(ms / 1000)} s`;
 }
 
-/** The last good reading beside a state with no windows of its own: its windows, and `as of 11:20 AM, 25 min ago`. Null when there is none. */
+/**
+ * The last good reading beside a state with no windows of its own: its windows, and `as of 11:20 AM, 25 min ago`. Null when there is
+ * none.
+ */
 export function lastWords(q: Quota, now: Date, timeZone?: string): { windows: WindowWords[]; asOf: string } | null {
   if (q.state === 'fresh' || !q.last?.windows.length) return null;
   const at = new Date(q.last.askedAt);

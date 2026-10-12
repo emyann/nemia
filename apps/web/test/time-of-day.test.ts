@@ -52,7 +52,10 @@ export function foundAt(text: string, families: Record<string, RegExp>): Found[]
     });
 }
 
-/** An instant left written as the browser does: its file from the board's root, how many of them it holds, and why it is no time of day in words. */
+/**
+ * An instant left written as the browser does: its file from the board's root, how many of them it holds, and why it is no time of
+ * day in words.
+ */
 export interface Left {
   file: string;
   count: number;

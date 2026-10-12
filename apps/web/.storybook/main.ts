@@ -1,7 +1,7 @@
 /**
  * Nemia's Storybook: the look's own parts (`src/components/look`) and the board's components that have stories (`src/components`), each
- * in the stories beside it, for a person to open with `npm run storybook`. It is built from the board's own Vite config but for the router's plugin, which would write the route tree
- * again; it takes no addon, sends no telemetry and asks for no update.
+ * in the stories beside it, for a person to open with `npm run storybook`. It is built from the board's own Vite config but for the
+ * router's plugin, which would write the route tree again; it takes no addon, sends no telemetry and asks for no update.
  */
 import type { StorybookConfig } from '@storybook/react-vite';
 import type { PluginOption } from 'vite';

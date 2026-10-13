@@ -138,3 +138,35 @@ test('REFUSED: an entry stylesheet that imports the grain under another at-rule,
   assert.equal(readsGrain("@import\n  './components/look/grain.css'\n;\n@layer base {\n}\n"), true, 'across line breaks');
   assert.equal(readsGrain(fs.readFileSync(path.join(SRC, 'styles.css'), 'utf8')), true, 'the board reads it');
 });
+
+/** A surface's specks by the red, green and blue its tile's colour matrix gives every pixel. */
+const SPECKS: Readonly<Record<string, string>> = { '0,0,0': 'ink', '1,1,1': 'white' };
+
+/** The specks of the surface tile `rules` writes, `ink` or `white`; `unread` where it writes none, or one of another colour. */
+const specksOf = (rules: string): string => {
+  const tile = /--grain-surface\s*:\s*url\(\s*['"]([^'"]+)['"]\s*\)/.exec(rules)?.[1] ?? '';
+  const values = /<feColorMatrix[^>]*\svalues="([^"]+)"/.exec(decodeURIComponent(tile))?.[1]?.trim().split(/\s+/) ?? [];
+  return SPECKS[[values[4], values[9], values[14]].join(',')] ?? 'unread';
+};
+
+/**
+ * The specks of a surface's grain in each scheme, as `css`, the look's grain, writes them: the light scheme's above the dark
+ * scheme's media rule, the dark one's inside it, which ends above the rule that draws the surface. `unread` for both where either
+ * mark is missing.
+ */
+export function surfaceSpecks(css: string): { light: string; dark: string } {
+  const dark = css.search(/@media\s*\(\s*prefers-color-scheme\s*:\s*dark\s*\)/);
+  const drawn = css.search(/\[data-grain\s*=\s*['"]surface['"]\s*\]/);
+  if (dark === -1 || drawn < dark) return { light: 'unread', dark: 'unread' };
+  return { light: specksOf(css.slice(0, dark)), dark: specksOf(css.slice(dark, drawn)) };
+}
+
+test("REFUSED: a surface's grain whose specks are ink in the dark scheme or white in the light one", () => {
+  const grain = fs.readFileSync(path.join(SRC, GRAIN), 'utf8');
+  const [light, dark] = [...grain.matchAll(/--grain-surface\s*:\s*(url\([^)]+\))/g)].map((found) => found[1] ?? '');
+  assert.ok(light && dark && light !== dark, 'the grain writes a surface tile for each scheme');
+  const swapped = grain.replace(light, '<light>').replace(dark, light).replace('<light>', dark);
+  assert.deepEqual(surfaceSpecks(swapped), { light: 'white', dark: 'ink' }, 'the two swapped are read as swapped');
+  assert.deepEqual(surfaceSpecks(grain.replace(/\[data-grain\s*=\s*'surface'\s*\]/, '[data-grain]')), { light: 'unread', dark: 'unread' });
+  assert.deepEqual(surfaceSpecks(grain), { light: 'ink', dark: 'white' }, 'ink specks in the light scheme, light ones in the dark');
+});

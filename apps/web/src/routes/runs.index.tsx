@@ -60,14 +60,11 @@ function Failed({ error }: { error: unknown }) {
   );
 }
 
-/** A section of the page: its plate, a rule beside it, then what it holds. */
+/** A section of the page: its plate, alone on its line, then what it holds. */
 function Section({ name, plate, children }: { name: string; plate: ReactNode; children: ReactNode }) {
   return (
     <section data-section={name} className="flex flex-col gap-4">
-      <div className="flex items-center gap-4">
-        {plate}
-        <span aria-hidden="true" className="h-px flex-1 bg-outline-variant" />
-      </div>
+      <div className="flex items-center">{plate}</div>
       {children}
     </section>
   );

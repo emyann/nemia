@@ -3,11 +3,18 @@
  * and decides its own day beside it; `test/time-of-day.test.ts` refuses a second writer. Pure, and it imports nothing.
  */
 
+/** What every writer of a time or a date says of a date that does not parse, where the time would stand: none of them throws. */
+export const UNREADABLE = 'an unreadable time';
+
+/** Whether one of `dates` does not parse: a writer handed one says `UNREADABLE`, of the instant or of the clock it is said against. */
+export const unreadable = (...dates: Date[]): boolean => dates.some((date) => Number.isNaN(date.getTime()));
+
 /**
  * A time of day as a person reads it in `timeZone`, theirs by default, to the minute: `1:11 PM`, `12:00 PM` at noon, `12:05 AM` after
- * midnight. The hour has no leading zero, and the space before the period is a plain one.
+ * midnight. The hour has no leading zero, and the space before the period is a plain one. A date that does not parse is `UNREADABLE`.
  */
 export function timeOfDay(at: Date, timeZone?: string): string {
+  if (unreadable(at)) return UNREADABLE;
   const parts = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone }).formatToParts(at);
   const of = (type: Intl.DateTimeFormatPartTypes): string => parts.find((part) => part.type === type)?.value ?? '';
   return `${of('hour')}:${of('minute')} ${of('dayPeriod')}`;
@@ -15,9 +22,11 @@ export function timeOfDay(at: Date, timeZone?: string): string {
 
 /**
  * A time of day to the second, as a log's line is stamped, in `timeZone`, theirs by default: `7:08:53 PM`. The hour has no leading
- * zero, the minute and the second two digits each, and the space before the period is a plain one.
+ * zero, the minute and the second two digits each, and the space before the period is a plain one. A date that does not parse is
+ * `UNREADABLE`.
  */
 export function timeToTheSecond(at: Date, timeZone?: string): string {
+  if (unreadable(at)) return UNREADABLE;
   const parts = new Intl.DateTimeFormat('en-US', {
     hour: 'numeric',
     minute: '2-digit',

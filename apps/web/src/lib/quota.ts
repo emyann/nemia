@@ -3,10 +3,14 @@
  * handed in, the browser's own on the page.
  */
 import type { Quota, QuotaWindow } from './api';
-import { timeOfDay } from './timeOfDay.ts';
+import { timeOfDay, unreadable, UNREADABLE } from './timeOfDay.ts';
 
-/** A time as a person reads it where they are, as `timeOfDay` writes it: `4:40 PM` on the day of `now`, `Tue 9:00 AM` on another. */
+/**
+ * A time as a person reads it where they are, as `timeOfDay` writes it: `4:40 PM` on the day of `now`, `Tue 9:00 AM` on another;
+ * `UNREADABLE` where `at` or `now` does not parse.
+ */
 export function clockWord(at: Date, now: Date, timeZone?: string): string {
+  if (unreadable(at, now)) return UNREADABLE;
   const time = timeOfDay(at, timeZone);
   const day = (d: Date) => new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone }).format(d);
   if (day(at) === day(now)) return time;

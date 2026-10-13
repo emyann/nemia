@@ -2941,6 +2941,14 @@ test('an instant on a page: its words against now, and on hover the whole instan
   assert.match(renderToStaticMarkup(createElement(Instant, { at: today })), />\d{1,2}:\d\d [AP]M<\/time>$/, 'the time alone today');
 });
 
+test('REFUSED: an instant that does not parse stands on its page in fixed words, hover included, and its page does not throw', async () => {
+  const { Instant } = await import('../src/components/Instant.tsx');
+  assert.equal(
+    renderToStaticMarkup(createElement(Instant, { at: 'not a date', about: 'Queued at' })),
+    '<time dateTime="not a date" title="Queued at: an unreadable time">an unreadable time</time>',
+  );
+});
+
 test("REFUSED: a queued card's last try says when as the board writes an instant, its date before its time on another day", async () => {
   const { Tried } = await import('../src/components/InboxParts.tsx');
   const tried = { at: new Date(Date.now() - 3 * 24 * 60 * 60_000).toISOString(), refused: true, why: 'no such workflow', repo: '/r' };

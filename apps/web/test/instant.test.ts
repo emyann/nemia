@@ -7,7 +7,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { instantWhole, instantWords } from '../src/lib/instant.ts';
 import { fireWord } from '../src/lib/schedules.ts';
-import { timeToTheSecond } from '../src/lib/timeOfDay.ts';
+import { clockWord } from '../src/lib/quota.ts';
+import { dateParts, whenColumn, whenWords } from '../src/lib/runWords.ts';
+import { timeOfDay, timeToTheSecond, UNREADABLE } from '../src/lib/timeOfDay.ts';
 
 const NOW = new Date('2026-10-12T23:08:53Z');
 const ZONE = 'America/Toronto';
@@ -45,4 +47,45 @@ test("a schedule's far fire is the whole instant's words, and a near one stays t
     'no mark without a year',
   );
   assert.equal(fireWord(new Date('2026-10-13T13:00:00Z'), NOW, ZONE), 'Tue 9:00 AM', 'within six days');
+});
+
+const BROKEN = new Date('not a date');
+
+test('REFUSED: a date that does not parse is said in fixed words by the writers of an hour, and none throws', () => {
+  assert.equal(UNREADABLE, 'an unreadable time');
+  assert.equal(timeOfDay(BROKEN, ZONE), UNREADABLE);
+  assert.equal(timeToTheSecond(BROKEN, ZONE), UNREADABLE);
+});
+
+test('REFUSED: the parts of a date that does not parse are empty, and nothing throws', () => {
+  assert.deepEqual(dateParts(BROKEN, ZONE), { year: '', month: '', day: '' });
+});
+
+test("REFUSED: the runs page's words say a date that does not parse, or a clock that does not, in the fixed words", () => {
+  assert.equal(whenWords(BROKEN, NOW, ZONE), UNREADABLE);
+  assert.equal(whenWords(NOW, BROKEN, ZONE), UNREADABLE, 'a clock that does not parse');
+});
+
+test("REFUSED: a column's words say a date that does not parse, or a clock that does not, in the fixed words, unpadded", () => {
+  assert.equal(whenColumn(BROKEN, NOW, ZONE), UNREADABLE);
+  assert.equal(whenColumn(NOW, BROKEN, ZONE), UNREADABLE, 'a clock that does not parse');
+});
+
+test("REFUSED: the page's words say an instant that does not parse, or a clock that does not, in the fixed words", () => {
+  assert.equal(instantWords(BROKEN, NOW, ZONE), UNREADABLE);
+  assert.equal(instantWords(NOW, BROKEN, ZONE), UNREADABLE, 'a clock that does not parse');
+});
+
+test('REFUSED: the whole instant, on hover, says an instant that does not parse in the fixed words', () => {
+  assert.equal(instantWhole(BROKEN, ZONE), UNREADABLE);
+});
+
+test("REFUSED: the clock's word says a time that does not parse, or a clock that does not, in the fixed words", () => {
+  assert.equal(clockWord(BROKEN, NOW, ZONE), UNREADABLE);
+  assert.equal(clockWord(NOW, BROKEN, ZONE), UNREADABLE, 'a clock that does not parse');
+});
+
+test("REFUSED: a schedule's fire that does not parse, or said against a clock that does not, is the fixed words", () => {
+  assert.equal(fireWord(BROKEN, NOW, ZONE), UNREADABLE);
+  assert.equal(fireWord(NOW, BROKEN, ZONE), UNREADABLE, 'a clock that does not parse');
 });

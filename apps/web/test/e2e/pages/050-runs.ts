@@ -68,7 +68,7 @@ const cardOf = (page: Page, id: string): Locator => section(page, 'waiting').loc
 
 /**
  * The three parts as the api counts them: a card for every run that waits and no row of it, a row for every run in flight, a page of
- * the finished, each under a plate that says the api's count; and nothing of the list the page was.
+ * the finished, each under a plate that says the api's count and stands alone on its line; and nothing of the list the page was.
  */
 async function threeParts(page: Page, open: OpenRuns, finished: FinishedPage): Promise<void> {
   await expectTexts(page.getByRole('heading', { level: 1 }), ['Runs'], "the page's header is its name");
@@ -88,6 +88,10 @@ async function threeParts(page: Page, open: OpenRuns, finished: FinishedPage): P
       1,
       `the plate of ${name} counts runs, so it carries its barcode`,
     );
+    const beside = await section(page, name)
+      .locator('[data-plate]')
+      .evaluate((plate) => [...plate.parentElement!.children].filter((other) => other !== plate).map((other) => other.outerHTML));
+    if (beside.length) throw new Refused(`the plate of ${name} stands alone on its line, no rule beside it — ${beside.join(' ')}`);
   }
   if (open.counts.waiting < 2 || open.counts.inFlight < 2 || open.counts.finished < 2)
     throw new Refused(`the seed holds runs of each part — ${JSON.stringify(open.counts)}`);

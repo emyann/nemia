@@ -530,7 +530,7 @@
     {
       "files": ["apps/web/src/routes/inbox.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 108, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 105, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {

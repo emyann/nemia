@@ -27,6 +27,8 @@ const { TemplateCard } = await import('../src/components/TemplateCard.tsx');
 const { stateMeaning } = await import('../src/lib/status.ts');
 const { StepBody, StepPolicy, Told } = await import('../src/components/Told.tsx');
 const { RunGone } = await import('../src/components/RunGone.tsx');
+const { instantWhole, instantWords } = await import('../src/lib/instant.ts');
+const { timeToTheSecond } = await import('../src/lib/timeOfDay.ts');
 type RunDetail = import('../src/lib/api.ts').RunDetail;
 type StepReach = import('../src/lib/api.ts').StepReach;
 type ReadOnlyCommands = import('../src/lib/api.ts').ReadOnlyCommands;
@@ -2925,12 +2927,36 @@ test('the gate: Approve with a box for the words, which may stay empty, and Send
   assert.doesNotMatch(html, /data-refused/);
 });
 
+test('an instant on a page: its words against now, and on hover the whole instant, after what it is of where the caller says', async () => {
+  const { Instant } = await import('../src/components/Instant.tsx');
+  const whole = instantWhole(new Date(at));
+  assert.match(whole, /^\d{1,2} Sep 2026, \d{1,2}:00:00 [AP]M$/);
+  const words = instantWords(new Date(at), new Date());
+  assert.equal(renderToStaticMarkup(createElement(Instant, { at })), `<time dateTime="${at}" title="${whole}">${words}</time>`);
+  assert.equal(
+    renderToStaticMarkup(createElement(Instant, { at, about: 'When its file was last written', className: 'font-mono' })),
+    `<time dateTime="${at}" title="When its file was last written: ${whole}" class="font-mono">${words}</time>`,
+  );
+  const today = new Date().toISOString();
+  assert.match(renderToStaticMarkup(createElement(Instant, { at: today })), />\d{1,2}:\d\d [AP]M<\/time>$/, 'the time alone today');
+});
+
+test("REFUSED: a queued card's last try says when as the board writes an instant, its date before its time on another day", async () => {
+  const { Tried } = await import('../src/components/InboxParts.tsx');
+  const tried = { at: new Date(Date.now() - 3 * 24 * 60 * 60_000).toISOString(), refused: true, why: 'no such workflow', repo: '/r' };
+  const entry = { repo: '/r', factory: null, error: null, tried };
+  const html = renderToStaticMarkup(createElement(Tried, { entry: entry as never }));
+  const words = instantWords(new Date(tried.at), new Date());
+  assert.ok(textsOf(html).join(' ').startsWith(`Not started at ${words}: no such workflow.`), html);
+  assert.match(words, /^\d{1,2} [A-Z][a-z]{2} (\d{4}, )?\d{1,2}:\d\d [AP]M$/, 'three days ago is another day: never its time alone');
+});
+
 test('the approval under a step: the try, when, and the words as they were written — or that there were none', () => {
   const words = 'Ship the second reading.\nKeep the flag <b>off</b> by default.';
   const html = renderToStaticMarkup(createElement(Gates.Approved, { step: 'plan', approval: { try: 2, at, message: words } }));
   assert.match(html, /^<section aria-label="The approval of plan" data-approval="2"/);
   assert.ok(textsOf(html).includes('Approved'), html);
-  assert.match(html, new RegExp(`try 2, <time dateTime="${at}">`));
+  assert.ok(html.includes(`try 2, <time dateTime="${at}" title="${instantWhole(new Date(at))}">`), html);
   assert.match(
     html,
     /<p data-words="true" class="whitespace-pre-wrap break-words">Ship the second reading\.\nKeep the flag &lt;b&gt;off&lt;\/b&gt; by default\.<\/p>/,
@@ -3481,6 +3507,12 @@ test("the run page's timeline: a row per try's session and per check, in the api
     html.includes(`<time dateTime="${T(0, 12)}"`) || html.includes(`datetime="${T(0, 12)}"`),
     'each instant as the engine wrote it, on its <time>',
   );
+  const filed = new Date(T(0, 12));
+  assert.ok(
+    html.includes(`<time dateTime="${T(0, 12)}" title="${instantWhole(filed)}" class="font-mono">${timeToTheSecond(filed)}</time>`),
+    "a log's timestamp: the time to the second on a 12-hour clock, the whole instant on hover",
+  );
+  assert.match(timeToTheSecond(filed), /^\d{1,2}:00:12 [AP]M$/);
   assert.match(unescaped(html), /try 2<\/td><td colSpan="7"[^>]*>its session is try 1's, checked again/i);
   assert.match(html, /the engine has no record of t-lost/);
   assert.ok(html.includes('>54 turns · tool calls not measured'), 'what the session used, beside it');

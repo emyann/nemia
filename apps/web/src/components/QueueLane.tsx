@@ -3,6 +3,7 @@ import { workflowNameOf, type InboxEntry } from '@/lib/api';
 import { duration } from '@/lib/canvas';
 import { repoName } from '@/lib/factory';
 import { ordinal } from '@/lib/inbox';
+import { instantWhole } from '@/lib/instant';
 import { useNow } from '@/lib/useNow';
 
 /**
@@ -55,7 +56,7 @@ function Ghost({ card, now }: { card: InboxEntry; now: number }) {
         <span data-ghost-place className="rounded-full border border-dashed border-current px-1.5 font-medium">
           {ordinal(place)}
         </span>
-        <time dateTime={queued!.at} title={`Queued at ${new Date(queued!.at).toLocaleString()}`} className="font-mono">
+        <time dateTime={queued!.at} title={`Queued at ${instantWhole(new Date(queued!.at))}`} className="font-mono">
           queued {waited(now - Date.parse(queued!.at))}
         </time>
       </span>

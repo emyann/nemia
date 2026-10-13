@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
 import type { RunDetail, StepTimelineTry, TaskSpan, TimelineTotal } from '../lib/api';
 import { spentTitle } from '../lib/cost';
+import { instantWhole } from '../lib/instant';
+import { timeToTheSecond } from '../lib/timeOfDay';
 
 /**
  * Where a run's time went, as the CLI's `decide` prints it: a row for each try's session and each try's check of every step, in the order
@@ -173,13 +175,16 @@ function TotalRow({ total, named }: { total: TimelineTotal; named: boolean }) {
   );
 }
 
-/** An instant the engine wrote down, in this browser's clock, whole on hover; `none` where there is none. */
+/**
+ * An instant the engine wrote down, as a log's timestamp: its time to the second on a 12-hour clock (`timeToTheSecond`), in this
+ * browser's time zone, whole on hover (`instantWhole`); `none` where there is none.
+ */
 function instant(at: string | null, none: string): ReactNode {
   if (at === null) return <span className="text-muted-foreground">{none}</span>;
   const date = new Date(at);
   return (
-    <time dateTime={at} title={date.toLocaleString()} className="font-mono">
-      {date.toLocaleTimeString()}
+    <time dateTime={at} title={instantWhole(date)} className="font-mono">
+      {timeToTheSecond(date)}
     </time>
   );
 }

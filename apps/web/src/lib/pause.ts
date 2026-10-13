@@ -24,7 +24,7 @@ export type PauseWords = {
   held: string[];
 };
 
-/** Since when, by whom and why: `since 16:40 by ann: merging by hand`, and what the file no longer says, said so. */
+/** Since when, by whom and why: `since 4:40 PM by ann: merging by hand`, and what the file no longer says, said so. */
 export function pauseSince(pause: Pause, now: Date): string {
   const at = Number.isNaN(Date.parse(pause.at)) ? 'a time its file no longer says' : clockWord(new Date(pause.at), now);
   return `since ${at} by ${pause.by || 'someone its file no longer names'}${pause.why ? `: ${pause.why}` : ''}`;

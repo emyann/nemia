@@ -6,7 +6,7 @@
 import type { RunOutcome, RunSummary } from './api/runs.ts';
 import type { Hue } from './meaning.ts';
 import { stepState, type StepState } from './status.ts';
-import { timeOfDay } from './timeOfDay.ts';
+import { timeOfDay, unreadable, UNREADABLE } from './timeOfDay.ts';
 
 /** Every kind of wait on a person the page has a sentence for. */
 export const WAIT_KINDS = ['approve', 'blocked', 'check', 'unfinished', 'unsigned', 'denied', 'rounds', 'budget', 'hold', 'after'] as const;
@@ -282,8 +282,12 @@ export const railSaid = (
     .map((step) => `${step.name} ${railWord[step.state]}`)
     .join(', ');
 
-/** The parts of a date as a person reads it in `timeZone`, theirs by default: its year, its month in three letters and its day. */
+/**
+ * The parts of a date as a person reads it in `timeZone`, theirs by default: its year, its month in three letters and its day; each
+ * empty for a date that does not parse, which the writers that compose them say as `UNREADABLE` before they ask.
+ */
 export function dateParts(at: Date, timeZone?: string): { year: string; month: string; day: string } {
+  if (unreadable(at)) return { year: '', month: '', day: '' };
   const parts = new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone }).formatToParts(at);
   const of = (type: Intl.DateTimeFormatPartTypes): string => parts.find((part) => part.type === type)?.value ?? '';
   return { year: of('year'), month: of('month'), day: of('day') };
@@ -292,9 +296,10 @@ export function dateParts(at: Date, timeZone?: string): { year: string; month: s
 /**
  * When something of a run happened, as a person reads it where they are, to the minute, on a 12-hour clock: the time alone on the day
  * of `now` (`1:11 PM`), the day and the month before it on another (`11 Oct 1:11 PM`), and in another year the day alone, with its
- * year (`31 Dec 2025`). Its spaces are plain ones.
+ * year (`31 Dec 2025`). Its spaces are plain ones. `UNREADABLE` where `at` or `now` does not parse.
  */
 export function whenWords(at: Date, now: Date, timeZone?: string): string {
+  if (unreadable(at, now)) return UNREADABLE;
   const [then, today] = [dateParts(at, timeZone), dateParts(now, timeZone)];
   const time = timeOfDay(at, timeZone);
   if (then.year !== today.year) return `${then.day} ${then.month} ${then.year}`;
@@ -305,9 +310,10 @@ export function whenWords(at: Date, now: Date, timeZone?: string): string {
  * When something of a run happened, as a column of a table writes it: its date on every row, the day of `now` included, and its time
  * on a 12-hour clock, the day and the hour each two characters wide so that a mono column lines up (`11 Oct  1:11 PM`,
  * ` 3 Aug 11:05 AM`); in another year than `now`'s the day and its year (`31 Dec 2025`). Its spaces are plain ones: draw it with
- * its white space kept.
+ * its white space kept. `UNREADABLE`, unpadded, where `at` or `now` does not parse.
  */
 export function whenColumn(at: Date, now: Date, timeZone?: string): string {
+  if (unreadable(at, now)) return UNREADABLE;
   const then = dateParts(at, timeZone);
   const date = `${then.day.padStart(2)} ${then.month}`;
   if (then.year !== dateParts(now, timeZone).year) return `${date} ${then.year}`;

@@ -87,6 +87,8 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
 - A time on the runs page is `whenWords`, or `whenColumn` in a table (`lib/runWords.ts`); its date is `dateParts`. A schedule's
   far fire is `instantWords` (`14 Oct 12:00 PM`, `1 Jan 2027, 4:00 AM`); `whenWords` keeps dropping the time in another year.
   `expectTexts` trims, so a padded time is compared trimmed or by its `textContent`.
+- A writer of a time or a date never throws: handed a date that does not parse, or a `now` that does not, it says `UNREADABLE`
+  (`lib/timeOfDay.ts`, `an unreadable time`). A new writer asks `unreadable` first; `test/instant.test.ts` holds each.
 - A foot's button needs `ml-auto` only once the foot wraps: two children under `justify-between` stand apart on one line without it,
   so its proof draws the card narrow (`WaitingCard.stories.tsx`, `test/e2e/parts.test.ts`).
 - A kit `Cell truncate` shows its children again in a tooltip: a cut cell that holds a link cuts the link itself (`block truncate`, a

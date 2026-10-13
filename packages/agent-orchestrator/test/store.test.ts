@@ -4397,13 +4397,14 @@ test("`nemia start --input` copies each file into the run's own inputs/, freezes
   assert.ok(printed.includes(`inputs: mock.png, brief notes.md — copied into ${dir}`), printed.join('\n'));
   assert.equal(uncommitted(repo), '', 'nothing written into the workspace');
 
-  const line = `Files given with it (\`nemia start --input\`), which you may read and must not write, in \`${dir}\`: \`mock.png\`, \`brief notes.md\`. The folder is mounted read-only; read them with Read, Grep and Glob.`;
+  const line = `The person gave these files with what was asked for (\`nemia start --input\`). They are part of what was asked, there for you to build your understanding of the task: \`mock.png\`, a picture; \`brief notes.md\`, a text file. You may read them and must not write them, in \`${dir}\`. The folder is mounted read-only; read them with Read, Grep and Glob.`;
   await runWith(b.e, advanceRun(readRun(id)));
   b.settle(`${id}-implement`, 'succeeded', SIGNED);
   await runWith(b.e, advanceRun(readRun(id)));
   for (const name of ['implement', 'review']) {
     const brief = b.tasks.get(`${id}-${name}`)!.spec.brief;
-    assert.ok(brief.includes(`## What was asked for\n\nadd a flag\n\n${line}\n`), `${name}:\n${brief}`);
+    const asked = brief.indexOf('## What was asked for\n\nadd a flag\n');
+    assert.ok(asked >= 0 && brief.indexOf(`\n\n## Files given with it\n\n${line}\n`) > asked, `${name}:\n${brief}`);
   }
   printed.length = 0;
   await main(['decide', id], b.e);

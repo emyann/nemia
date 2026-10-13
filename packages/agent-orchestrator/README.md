@@ -1636,10 +1636,13 @@ wf start ./ui.md --repo ~/code/myapp --input ./mock.png --input ./notes/api.md
 
 - **Each file is copied into `runs/<id>/inputs/`**: the run's own directory, beside its artifacts, never the workspace, so no
   file rides a branch. The names are frozen on the record as `inputs`, in the order given.
-- **Every step's brief names them, in one line under *What was asked for***:
+- **Every step's brief names them, under a heading of their own after *What was asked for***, as part of what was asked, each
+  with what it is, read off its name (a picture, a text file, a file); no step is obliged to open one:
 
   ```text
-  Files given with it (`wf start --input`), in `/home/you/.agent-workflows/runs/give-the-factory-a-leg-x1y2/inputs`: `mock.png`, `api.md`.
+  ## Files given with it
+
+  The person gave these files with what was asked for (`nemia start --input`). They are part of what was asked, there for you to build your understanding of the task: `mock.png`, a picture; `api.md`, a text file. They are in `/home/you/.agent-workflows/runs/give-the-factory-a-leg-x1y2/inputs`.
   ```
 
   A brief that continues a session is not told again, as it is not told the request again: a step that `resume:`s
@@ -1647,13 +1650,13 @@ wf start ./ui.md --repo ~/code/myapp --input ./mock.png --input ./notes/api.md
 
   The directory is outside the workspace, so the run files it read-only on each step of a repository run on a harness fenced
   by a permission mode, its first filing, a try and a round (`inputsMounts`, in `filedFolders`), and the line names it so:
-  ``Files given with it (`wf start --input`), which you may read and must not write, in `<dir>`: … The folder is mounted
-  read-only; read them with Read, Grep and Glob.`` Codex reads the disk in its sandbox and is filed none; a remote agent is
+  ``… You may read them and must not write them, in `<dir>`. The folder is mounted read-only; read them with Read, Grep and
+  Glob.`` Codex reads the disk in its sandbox and is filed none; a remote agent is
   filed no local field, and its brief says the files are not sent to it. A run given none mounts nothing. A store whose path no
   permission rule can name refuses `wf start --input` of such a step, in the store's words, before anything is written.
 
   On a folder run the directory is outside the step's fence, so the run copies the files into each folder it makes and
-  the line names the copy: ``Files given with it (`wf start --input`), copied into `given/inputs` in this folder: …``
+  the line names the copy: ``… They are copied into `given/inputs` in this folder.``
 - **`wf decide` names them under the run's line**: `inputs  mock.png, api.md  —  in <dir>`.
 - **Refused before anything is written**, by name and with the fix: a file that is not there, a directory, anything else
   that is not a regular file, two inputs of one name, one file given twice, and `--input` with no file.

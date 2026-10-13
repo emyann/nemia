@@ -546,9 +546,12 @@ test('a folder team with a fan-in, given files at its start: what each brief tel
     "c is filed a's and b's artifacts folders, so its brief is held to naming them",
   );
   assert.match(tasks.get(`${run.id}-c`)!.spec.brief, /- a: `given\/from\/a`\n- b: `given\/from\/b`/);
-  assert.match(tasks.get(`${run.id}-a`)!.spec.brief, /copied into `given\/inputs` in this folder: `mock\.png`, `brief notes\.md`\./);
+  assert.match(
+    tasks.get(`${run.id}-a`)!.spec.brief,
+    /`mock\.png`, a picture; `brief notes\.md`, a text file\. They are copied into `given\/inputs` in this folder\./,
+  );
   const d = tasks.get(`${run.id}-d`)!.spec.brief;
-  assert.match(d, /copied into `given\/inputs` in this folder: `mock\.png`, `brief notes\.md`\./);
+  assert.match(d, /`mock\.png`, a picture; `brief notes\.md`, a text file\. They are copied into `given\/inputs` in this folder\./);
   assert.doesNotMatch(d, /given\/from/, 'a step standing in the folder it was given is given nothing more');
 
   await runWith(e, forgetRun(run.id));

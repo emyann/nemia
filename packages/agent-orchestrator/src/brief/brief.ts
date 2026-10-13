@@ -26,7 +26,7 @@ import { artifactsContract } from '../artifacts/artifacts.ts';
 import { briefBody, rendersAgent, skillLayers } from '../agents/agents.ts';
 import { ownNote } from '../ending/ending.ts';
 import { FENCE_KEYS } from '../workflow/index.ts';
-import { inputsLine, mountsLine } from '../start/index.ts';
+import { INPUTS_HEADING, inputsLine, mountsLine } from '../start/index.ts';
 import { resultSteps, workChecks } from '../branches/index.ts';
 import { costsSection, type WorkflowCosts } from '../costs/index.ts';
 import { sayFilled, skillSaid, type PlaceSay } from '../place/place.ts';
@@ -99,7 +99,8 @@ const conflictLines = (merge: { readonly conflicts: readonly string[]; readonly 
  * run's steps are told of folders and never of git (`placeOf`). A try or a round that continues the last session is told only what
  * became of it and the contracts; a step that continues another (`resume`) is told what it reads and a tree the run installed, never the
  * spec again. How the run provisioned the tree is said only when it did more than link it (`depsLines`). What was asked for carries the
- * files given with it (`inputsLine`), one line and only when there are any, and the folders the run mounts (`mountsLine`), likewise.
+ * folders the run mounts (`mountsLine`), only when there are any; the files given with it stand after it under a heading of their own
+ * (`INPUTS_HEADING`, `inputsLine`), likewise, as part of what was asked and outside the request's own sections.
  *
  * A fan-in works on a branch with every step it waits on merged in, unless it works in the repository's checkout or in a folder, where
  * nothing is merged. A folder step is told which earlier steps worked in its own folder, read off the folders the record names, not the
@@ -118,7 +119,7 @@ const conflictLines = (merge: { readonly conflicts: readonly string[]; readonly 
  *   (`--from`): what each concluded (`handedSection`), the runs waited on first, gathered by file.verb.ts. Given to no other step: a run
  *   with neither, and every step after a root, is composed without it.
  * @param inputsDir The directory the run copied `nemia start --input` files into (`inputsDir` in record.store.ts): named, with
- *   `run.inputs`, under what was asked for, as mounted where `folders` holds it (`inputsLine`).
+ *   `run.inputs`, under their own heading after what was asked for, as mounted where `folders` holds it (`inputsLine`).
  * @param checked For a step filed after checked steps: what each of their checks said on the try or round it follows
  *   (`checkHandedSection`), read by file.verb.ts. Absent, and nothing is said of a check: the board's preview composes without it.
  * @param folders The folders the step is filed with beyond its factory's, each read-only (`filedFolders` in filed.ts): the artifacts
@@ -171,7 +172,7 @@ export function composeBrief(
     : steps.filter((s) => s.name !== step.name && run.steps[s.name]?.taskId).map((s) => s.name);
 
   const inputs = inputsLine(inputsDir, run.inputs, inFolder, folders);
-  const request = [run.brief, ...(inputs ? ['', inputs] : []), ...mountsLine(step, run, folders)];
+  const request = [run.brief, ...mountsLine(step, run, folders), ...(inputs ? ['', INPUTS_HEADING, '', inputs] : [])];
   const opening = briefBody(step) ? [briefBody(step), ''] : [];
   const parts = [...opening, '## What was asked for', '', ...request, ...handed.parents, ...handed.decided];
 

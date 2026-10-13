@@ -582,7 +582,7 @@ test('a run given an input files each local step its inputs folder read-only, on
   fs.writeFileSync(given, 'the draft\n');
   const run = await runPlaced(startRun({ brief: 'build it', repo: repos[0], workflowDir: loop, isolate: false, inputs: [given] }));
   const inputs = inputsDir(run);
-  const said = `Files given with it (\`nemia start --input\`), which you may read and must not write, in \`${inputs}\`: \`template-draft.md\`. The folder is mounted read-only; read them with Read, Grep and Glob.`;
+  const said = `## Files given with it\n\nThe person gave these files with what was asked for (\`nemia start --input\`). They are part of what was asked, there for you to build your understanding of the task: \`template-draft.md\`, a text file. You may read them and must not write them, in \`${inputs}\`. The folder is mounted read-only; read them with Read, Grep and Glob.`;
   const b = board();
   await runWith(b.e, advanceRun(readRun(run.id)));
   const first = b.filed.get(`${run.id}-implement`)!;

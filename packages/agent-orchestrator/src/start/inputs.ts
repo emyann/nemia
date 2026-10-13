@@ -45,9 +45,20 @@ export function inputRefusal(inputs: readonly InputFile[]): string | null {
   return null;
 }
 
+const PICTURES = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp', '.avif']);
+const TEXTS = new Set(['.md', '.txt', '.json', '.yaml', '.yml', '.csv', '.log', '.html', '.xml', '.toml']);
+
+/** What a given file is, read off its name alone: a picture, a text file, or a file. */
+const inputKind = (name: string): 'a picture' | 'a text file' | 'a file' => {
+  const ext = path.extname(name).toLowerCase();
+  if (PICTURES.has(ext)) return 'a picture';
+  return TEXTS.has(ext) ? 'a text file' : 'a file';
+};
+
 /**
- * The line a step's brief carries under what was asked for when `nemia start --input` gave the run files: where they are, and each by name.
- * Undefined for a run given none, or with no directory to name.
+ * What a step's brief says, under a heading of its own (`INPUTS_HEADING`), when `nemia start --input` gave the run files: what they are,
+ * part of what was asked; each by name with what it is (`inputKind`); then where they are and what the step may do with them. It obliges
+ * no step to open one. Undefined for a run given none, or with no directory to name.
  *
  * `inFolder` for a step of a folder run, which is fenced to its own folder (`validateFolderMode` in workflow/validate.ts): the run's own
  * `inputs/` sits beside that folder, outside the fence, and named it the session would be denied the read with no prompt and no way to say
@@ -64,12 +75,16 @@ export const inputsLine = (
   folders?: Pick<FiledFolders, 'inputs'>,
 ): string | undefined => {
   if (!dir || !names?.length) return undefined;
-  const files = names.map((n) => `\`${n}\``).join(', ');
+  const files = names.map((n) => `\`${n}\`, ${inputKind(n)}`).join('; ');
+  const said = `The person gave these files with what was asked for (\`nemia start --input\`). They are part of what was asked, there for you to build your understanding of the task: ${files}.`;
   const mounted = inFolder ? undefined : folders?.inputs[0];
   if (mounted)
-    return `Files given with it (\`nemia start --input\`), which you may read and must not write, in \`${mounted.path}\`: ${files}. The folder is mounted read-only; read them with Read, Grep and Glob.`;
-  return `Files given with it (\`nemia start --input\`), ${inFolder ? `copied into \`${GIVEN}/inputs\` in this folder` : `in \`${dir}\``}: ${files}.`;
+    return `${said} You may read them and must not write them, in \`${mounted.path}\`. The folder is mounted read-only; read them with Read, Grep and Glob.`;
+  return `${said} They are ${inFolder ? `copied into \`${GIVEN}/inputs\` in this folder` : `in \`${dir}\``}.`;
 };
+
+/** The heading a brief gives the files handed with what was asked for, over `inputsLine`: a section of its own, beside the request. */
+export const INPUTS_HEADING = '## Files given with it';
 
 /** Folders by their absolute paths, each in backticks. */
 const pathsOf = (mounts: readonly Mount[]): string => mounts.map((m) => `\`${m.path}\``).join(', ');

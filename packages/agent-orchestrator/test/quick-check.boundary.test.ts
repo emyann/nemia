@@ -72,13 +72,20 @@ function workOn(work: Record<string, string>, base: Record<string, string> = {})
   return made;
 }
 
-/** A folder holding an `npx`, an `npm` and a `claude` that exit 0, the first two writing their arguments as a line of `log`. */
-function stubs(): { bin: string; said: () => string[] } {
+/** What a stub exits with where it is not 0: `npx` whatever it is handed, `npm` handed the e2e, and `claude`. */
+type Failing = { npx?: number; e2e?: number; claude?: number };
+
+/**
+ * A folder holding an `npx`, an `npm` and a `claude` that exit 0 but as `failing` says, the first two writing their arguments as a
+ * line of `log` first.
+ */
+function stubs(failing: Failing = {}): { bin: string; said: () => string[] } {
   const bin = scratch('wf-quick-bin-');
   const log = path.join(bin, 'said.log');
-  for (const name of ['npx', 'npm'])
-    fs.writeFileSync(path.join(bin, name), `#!/bin/sh\nprintf '%s\\n' "${name} $*" >> '${log}'\nexit 0\n`, { mode: 0o755 });
-  fs.writeFileSync(path.join(bin, 'claude'), '#!/bin/sh\necho "[]"\n', { mode: 0o755 });
+  const exits = { npx: `exit ${failing.npx ?? 0}`, npm: `case "$*" in *e2e*) exit ${failing.e2e ?? 0};; esac; exit 0` };
+  for (const [name, exit] of Object.entries(exits))
+    fs.writeFileSync(path.join(bin, name), `#!/bin/sh\nprintf '%s\\n' "${name} $*" >> '${log}'\n${exit}\n`, { mode: 0o755 });
+  fs.writeFileSync(path.join(bin, 'claude'), `#!/bin/sh\necho "[]"\nexit ${failing.claude ?? 0}\n`, { mode: 0o755 });
   return { bin, said: () => (fs.existsSync(log) ? fs.readFileSync(log, 'utf8').split('\n').filter(Boolean) : []) };
 }
 
@@ -96,7 +103,12 @@ const envOf = (repo: string, base: string, bin: string, more: Record<string, str
 
 /** Run the script's `verb` in `repo` on `base`, bounded; its exit, its streams, and what the stubs were handed. */
 function change(repo: string, base: string, verb: string, ...args: string[]): Ran {
-  const { bin, said } = stubs();
+  return changeOver({}, repo, base, verb, ...args);
+}
+
+/** `change`, over stubs that exit as `failing` says. */
+function changeOver(failing: Failing, repo: string, base: string, verb: string, ...args: string[]): Ran {
+  const { bin, said } = stubs(failing);
   const ran = spawnSync(process.execPath, [SCRIPT, verb, ...args], {
     cwd: repo,
     env: envOf(repo, base, bin),
@@ -124,15 +136,24 @@ const SCRIPTS = {
   ),
 };
 
-/** Run the shipped check of quick's implement in `repo` as a check runs, its argv `checkArgv`'s, over the stubs. */
-function shipped(repo: string, base: string, closeout: Record<string, unknown> = { plan: 'p', pages: [] }): Ran {
+/**
+ * Run the shipped check of quick's implement in `repo` as a check runs, its argv `checkArgv`'s, over the stubs, which exit as
+ * `failing` says; `files` is the step's files directory, one of its own where none is given.
+ */
+function shipped(
+  repo: string,
+  base: string,
+  closeout: Record<string, unknown> = { plan: 'p', pages: [] },
+  failing: Failing = {},
+  files = scratch('wf-quick-files-'),
+): Ran {
   const check = loadWorkflows(QUICK, placesOf(QUICK)).find((step) => step.name === 'implement')?.check;
   assert.equal(typeof check, 'string', 'workflows/quick has an implement step with a check');
-  const { bin, said } = stubs();
+  const { bin, said } = stubs(failing);
   const [cmd, ...args] = checkArgv(check as string);
   const ran = spawnSync(cmd, args, {
     cwd: repo,
-    env: envOf(repo, base, bin, { WF_ARTIFACTS: scratch('wf-quick-files-'), WF_CLOSEOUT: closeoutFile(closeout) }),
+    env: envOf(repo, base, bin, { WF_ARTIFACTS: files, WF_CLOSEOUT: closeoutFile(closeout) }),
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
     timeout: 120_000,
@@ -161,6 +182,60 @@ test("REFUSED at shipped defaults: implement's check, as frozen, refuses a chang
   const old = shipped(bare.repo, bare.base);
   assert.notEqual(old.code, 0, old.out);
   assert.match(old.err, /has no workflows\/quick\/change\.ts/, 'a base without the script refuses, never skips');
+});
+
+const TYPES_AND_LINT = ['npm run typecheck', 'npm run lint'];
+const TURBO = 'npx turbo run test --force --continue';
+const E2E = 'npm run e2e -- --pages runs';
+
+test("REFUSED at shipped defaults: implement's check, as frozen, runs each of its clauses in order, and refuses on each one's refusal", () => {
+  const { repo, base } = workOn({ 'apps/api/src/a.ts': 'x\n', 'apps/web/src/routes/x.tsx': 'export const x = 1;\n' }, SCRIPTS);
+  const files = scratch('wf-quick-files-');
+  const picture = path.join(files, 'x-dark.png');
+  fs.writeFileSync(picture, 'png');
+  const signed = { plan: 'p', pages: ['runs'], artifacts: [picture] };
+  const run = (closeout: Record<string, unknown>, failing: Failing = {}): Ran => shipped(repo, base, closeout, failing, files);
+
+  const passed = run(signed);
+  assert.equal(passed.code, 0, passed.out + passed.err);
+  assert.deepEqual(passed.said, [...TYPES_AND_LINT, TURBO, E2E], 'the types, the lint, the tests of what it touched, then its pages');
+  for (const line of [
+    'wf size: 2 files, 2 lines',
+    'wf pictures: 1 picture named',
+    'wf scope: tests of every package',
+    'wf scope: pages runs',
+  ])
+    assert.ok(passed.out.includes(line), `the check prints ${line}:\n${passed.out}`);
+  assert.match(passed.out, /no live probe of run r-1/);
+  assert.match(passed.out, /wf mutants: /);
+
+  const unpictured = run({ ...signed, artifacts: [] });
+  assert.notEqual(unpictured.code, 0, unpictured.out);
+  assert.match(unpictured.err, /npm run e2e -- --photos --pages/);
+  assert.deepEqual(unpictured.said, [], 'the pictures are asked before the types');
+
+  const probing = run(signed, { claude: 1 });
+  assert.notEqual(probing.code, 0, probing.out);
+  assert.match(probing.err, /cannot tell which probes are live/);
+  assert.deepEqual(probing.said, []);
+
+  const unproven = run({ ...signed, noMutants: null });
+  assert.notEqual(unproven.code, 0, unproven.out);
+  assert.match(unproven.err, /names no mutant and says not why/);
+  assert.deepEqual(unproven.said, TYPES_AND_LINT, 'the mutants run after the lint, before the tests');
+
+  const failing = run(signed, { npx: 3 });
+  assert.notEqual(failing.code, 0, failing.out);
+  assert.deepEqual(failing.said, [...TYPES_AND_LINT, TURBO], 'a failing test of what the change touched refuses, and no page is visited');
+
+  const unnamed = run({ ...signed, pages: [] });
+  assert.notEqual(unnamed.code, 0, unnamed.out);
+  assert.match(unnamed.err, /Name the e2e pages the change touches/);
+  assert.deepEqual(unnamed.said, [...TYPES_AND_LINT, TURBO]);
+
+  const broken = run(signed, { e2e: 4 });
+  assert.notEqual(broken.code, 0, broken.out);
+  assert.deepEqual(broken.said, [...TYPES_AND_LINT, TURBO, E2E], 'a failing page refuses');
 });
 
 test('REFUSED: a change of one line past the bound, added or removed, and none at it', () => {
@@ -274,10 +349,16 @@ test('tests: turbo is handed a filter for each package that reads the change, wi
 
 test('REFUSED: a failing run of the tests is the exit of the check', () => {
   const { repo, base } = workOn({ 'apps/api/src/a.ts': 'x\n' });
-  const { bin } = stubs();
-  fs.writeFileSync(path.join(bin, 'npx'), '#!/bin/sh\nexit 3\n', { mode: 0o755 });
-  const ran = spawnSync(process.execPath, [SCRIPT, 'tests'], { cwd: repo, env: envOf(repo, base, bin), encoding: 'utf8', timeout: 60_000 });
-  assert.equal(ran.status, 3);
+  const failed = changeOver({ npx: 3 }, repo, base, 'tests');
+  assert.equal(failed.code, 3);
+  assert.equal(failed.said.length, 1, 'turbo ran, and failed');
+});
+
+test('REFUSED: a failing page is the exit of the check', () => {
+  const { repo, base } = workOn({ 'apps/web/src/routes/x.tsx': 'export const x = 1;\n' });
+  const failed = changeOver({ e2e: 4 }, repo, base, 'pages', closeoutFile({ pages: ['runs'] }));
+  assert.equal(failed.code, 4);
+  assert.deepEqual(failed.said, [E2E]);
 });
 
 type Turbo = { tasks: Record<string, { inputs?: string[] }> };

@@ -38,12 +38,15 @@ The check is the cheap set, each script read from the run's base (`git show "$WF
 4. `change.ts tests`: the tests of each package that reads a path the change touched, and of the packages that depend on it
    (`npx turbo run test --force --continue --filter=...<name>`). The table of who reads what mirrors `turbo.json`, which the test
    holds, with the workflows, the docs and the skills added for the orchestrator, whose tests read them. A root config file selects
-   every package; a path no package reads runs none.
+   every package; a path no package reads runs none. A change under `apps/*/src` selects every package too: `turbo.json` gives
+   those sources to the orchestrator's, the runtime's and the docs' tests, the app's own reads them, and the api depends on the
+   orchestrator. So for a change to the board or the api this clause is the whole suite, here and again in land's check: what such a
+   quick run saves beside `build` is the spec, the review and the whole e2e, not the suite.
 5. `change.ts pages`: the e2e on the pages the closeout names in `pages` (`npm run e2e -- --pages <name,…>`). A change under
    `apps/web/src` that names none is refused.
 
-Not the whole suite, and not the whole e2e: those run once, in land's check on the merged tree, which is `build`'s land check to the
-letter (`agent-fences.test.ts` holds the two steps equal but their `after:`). Main has one guard, whatever the workflow. What the
+Never the whole e2e, and the whole suite only where the table selects every package: land's check runs both on the merged tree,
+whatever was touched, and is `build`'s land check to the letter (`agent-fences.test.ts` holds the two steps equal but their `after:`). Main has one guard, whatever the workflow. What the
 scoped checks miss (a test that reads a path no table names, a page Ada did not name) is caught there, after the person approved: the
 landing aborts, and the run waits on a person again.
 

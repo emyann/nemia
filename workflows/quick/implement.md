@@ -26,8 +26,9 @@ grows past the bound, do not trim it to fit, split it or drop its tests: sign of
 
 **Name the pages** the change touches in your closeout's `pages`, each by the name `npm run e2e -- --pages <name,…>` takes, `[]` when
 it touches none: the check runs the e2e on those pages alone, and refuses a change under `apps/web/src` that names none. The check runs
-the types, the lint, your mutants and the tests of the packages that read what you changed; the whole suite and the whole e2e run once,
-in the landing's check on the merged tree, after a person approved. A failure there aborts the landing and comes back to you.
+the types, the lint, your mutants and the tests of the packages that read what you changed, which is every package for a change under
+`apps/*/src`; the whole e2e, and the whole suite whatever you touched, run in the landing's check on the merged tree, after a person
+approved. A failure there aborts the landing and comes back to you.
 
 When the change touches `apps/web`, picture the pages and the states it touches, in light and dark, and at a phone's width where the
 page sets one: `WF_ARTIFACTS=<your files directory> npm run e2e -- --photos --pages <name,…>` pictures the pages named, in both themes,

@@ -252,7 +252,11 @@ function filtersFor(...paths: string[]): string[] | undefined {
 }
 
 test('tests: turbo is handed a filter for each package that reads the change, with its dependents, and none for a root config file', () => {
-  assert.deepEqual(filtersFor('packages/agent-runtime/src/a.ts'), ['--filter=...agent-orchestrator', '--filter=...agent-runtime', '--filter=...docs']);
+  assert.deepEqual(filtersFor('packages/agent-runtime/src/a.ts'), [
+    '--filter=...agent-orchestrator',
+    '--filter=...agent-runtime',
+    '--filter=...docs',
+  ]);
   assert.deepEqual(filtersFor('workflows/quick/README.md'), ['--filter=...agent-orchestrator', '--filter=...docs']);
   assert.deepEqual(filtersFor('apps/api/README.md'), ['--filter=...api']);
   assert.deepEqual(filtersFor('apps/web/src/a.tsx', 'apps/api/src/a.ts'), [], 'both apps and the three that read their sources: all five');
@@ -320,7 +324,9 @@ test('REFUSED: a change under apps/web/src whose closeout names no page; the pag
   const none = change(elsewhere.repo, elsewhere.base, 'pages', closeoutFile({ pages: [] }));
   assert.equal(none.code, 0, none.err);
   assert.deepEqual(none.said, [], 'nothing is started');
-  assert.deepEqual(change(elsewhere.repo, elsewhere.base, 'pages', closeoutFile({ pages: ['runs'] })).said, ['npm run e2e -- --pages runs']);
+  assert.deepEqual(change(elsewhere.repo, elsewhere.base, 'pages', closeoutFile({ pages: ['runs'] })).said, [
+    'npm run e2e -- --pages runs',
+  ]);
 
   for (const pages of [['--photos'], 'runs', [7]]) {
     const flag = change(board.repo, board.base, 'pages', closeoutFile({ pages }));
@@ -330,4 +336,18 @@ test('REFUSED: a change under apps/web/src whose closeout names no page; the pag
   const unread = change(board.repo, board.base, 'pages');
   assert.equal(unread.code, 1);
   assert.match(unread.err, /no closeout reached the check/);
+});
+
+test("REFUSED: a note or a README that says another bound than the script's", () => {
+  const said = (file: string): string => fs.readFileSync(path.join(QUICK, file), 'utf8');
+  const note = new RegExp(`at\\s+most\\s+${FILES}\\s+files\\s+and\\s+${LINES}\\s+lines\\s+changed`);
+  assert.match(said('implement.md'), note);
+  assert.doesNotMatch(said('implement.md').replace(`${LINES} lines`, `${LINES + 1} lines`), note);
+  const readme = new RegExp(`at\\s+most\\s+\\*\\*${FILES}\\s+files\\*\\*\\s+and\\s+\\*\\*${LINES}\\s+lines\\*\\*\\s+changed`);
+  assert.match(said('README.md'), readme);
+  for (const made of /const GENERATED = \[([^\]]*)\];/
+    .exec(TEXT)![1]
+    .split(',')
+    .map((entry) => entry.trim().slice(1, -1)))
+    for (const file of ['implement.md', 'README.md']) assert.ok(said(file).includes(`\`${made}\``), `${file} names ${made}`);
 });

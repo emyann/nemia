@@ -1,8 +1,8 @@
 /**
  * A run of the shipped quick workflow (`workflows/quick`) on the stand-ins: `implement → land`, with no spec before and no review
  * between. Implement signs off its plan, its check answers, and the run waits at the landing's gate with land not filed; the gate shows
- * the plan and sends the work back to implement, the one step there is to send it to. A check that refuses leaves the run to a person: the step declares
- * no `retries:`, so a size refusal is never answered by a try that trims the work to fit, which a copy given one shows.
+ * the plan and sends the work back to implement, the one step there is to send it to. A check that refuses leaves the run to a person:
+ * the step declares no `retries:`, so a size refusal is never answered by a try that trims the work to fit, which a copy given one shows.
  *
  * The repository the run works on holds the checkout's skill folders, as a start in this checkout finds them.
  *
@@ -71,10 +71,13 @@ async function toTheCheck(dir: string) {
   const b = engine();
   const e = engineOf(b.layer);
   const run = await runPlaced(startRun({ brief: 'remove the dividers', repo: repository(), workflowDir: dir }));
-  assert.deepEqual(readRun(run.id).workflow.map((step) => [step.name, step.agent?.name, step.gate === true]), [
-    ['implement', 'ada', false],
-    ['land', 'otto', true],
-  ]);
+  assert.deepEqual(
+    (readRun(run.id).workflow ?? []).map((step) => [step.name, step.agent?.name, step.gate === true]),
+    [
+      ['implement', 'ada', false],
+      ['land', 'otto', true],
+    ],
+  );
   assert.deepEqual((await runWith(e, advanceRun(readRun(run.id)))).filed, ['implement']);
   const work = readRun(run.id).steps.implement.workspace!;
   fs.appendFileSync(path.join(work, 'a.ts'), 'export const b = 2;\n');
@@ -91,9 +94,10 @@ test('a quick run within the bound reaches the landing gate: land is not filed, 
   assert.deepEqual(waiting.filed, []);
   assert.deepEqual(b.filings, [`${id}-implement`, `${id}-implement-check`], 'land waits at its gate');
   const run = readRun(id);
-  const land = run.workflow.find((step) => step.name === 'land')!;
+  const land = (run.workflow ?? []).find((step) => step.name === 'land')!;
   assert.deepEqual(sendBackTo(land, run), ['implement']);
-  assert.deepEqual((await runWith(e, decideRun(id))).decision.awaitingApproval, ['land']);
+  const { decision } = await runWith(e, decideRun(id));
+  assert.deepEqual(decision.kind === 'awaiting' && decision.awaitingApproval, ['land']);
   const screen = await decideScreen(t, e, [id], { '<id>': id }, stand().place);
   for (const line of [
     '    plan: Remove the rule beside each plate in Section; the runs page proves it.',
@@ -112,7 +116,11 @@ test('REFUSED: a quick run whose check refuses files no land and no second try; 
   }
   assert.deepEqual(b.filings, [`${id}-implement`, `${id}-implement-check`]);
   const { decision } = await runWith(e, decideRun(id));
-  assert.deepEqual([decision.kind, decision.failedCheck, decision.awaitingApproval], ['awaiting', ['implement'], []], 'it waits on a person');
+  assert.deepEqual(
+    decision.kind === 'awaiting' && [decision.failedCheck, decision.awaitingApproval],
+    [['implement'], []],
+    'it waits on a person',
+  );
 
   const retried = quickFolder((dir) => {
     const file = path.join(dir, 'implement.md');

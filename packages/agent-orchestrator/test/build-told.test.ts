@@ -12,6 +12,9 @@
  * what the trigger skill `change-the-board` says of each (`KIT_SKILLS_SAID`). Design and review, which are fenced, are told to load
  * the trigger skill first and where `ds-spec`'s reader runs from (`KIT_READER_TOLD`). The three are told of the look's own parts too,
  * by the folder's name (`LOOK_PARTS_TOLD`).
+ *
+ * The quick workflow's implement is told what build's is (`IMPLEMENT_TOLD`), and what makes a build quick (`QUICK_TOLD`): its plan
+ * first, no decision of its own, the bound and the pages it names; it is given the kit's skills as build's steps are.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -121,6 +124,32 @@ const LOOK_PARTS_TOLD = [
   'through its door, before it draws one of its own: `change-the-board` says which part.',
 ];
 
+/** What an implement step is told, build's and quick's alike: the base, the board's components, its mutants, a dashboard rendered. */
+const IMPLEMENT_TOLD = [
+  ...MERGES_THE_BASE,
+  "load `shadcn` for the board's components",
+  '**Name your mutants** in the closeout: one per rule or guard the change adds',
+  'Try them first: `node workflows/build/mutants.ts <closeout.json>` after you commit.',
+  'saying why in `noMutants`',
+  'When the change touches `tools/observe`',
+  '`node tools/observe/render/render.ts --out <your files directory>` starts a throwaway stack from this workspace',
+  'the check refuses a changed dashboard whose picture and',
+  ...LOOK_PARTS_TOLD,
+];
+
+/** What quick's implement is told that build's is not: to plan first, to decide nothing, the bound, and to name its pages. */
+const QUICK_TOLD = [
+  'no spec was written for you and no review follows',
+  '**Write your plan first**, before you build: what changes, where, and what proves it',
+  "It goes in your closeout's `plan`",
+  '**Decide nothing the card does not give.**',
+  'sign off `blocked` and say in `needs` what is undecided; do not choose for them.',
+  'The check measures it first (`workflows/quick/change.ts`) and refuses a change past either number',
+  'do not trim it to fit, split it or drop its tests: sign off `blocked`',
+  "**Name the pages** the change touches in your closeout's `pages`",
+  "this step's check runs the pages you name in `pages`",
+];
+
 const TOLD: Told[] = [
   {
     workflow: 'build',
@@ -143,17 +172,7 @@ const TOLD: Told[] = [
   {
     workflow: 'build',
     step: 'implement',
-    says: [
-      ...MERGES_THE_BASE,
-      "load `shadcn` for the board's components",
-      '**Name your mutants** in the closeout: one per rule or guard the change adds',
-      'Try them first: `node workflows/build/mutants.ts <closeout.json>` after you commit.',
-      'saying why in `noMutants`',
-      'When the change touches `tools/observe`',
-      '`node tools/observe/render/render.ts --out <your files directory>` starts a throwaway stack from this workspace',
-      'the check refuses a changed dashboard whose picture and',
-      ...LOOK_PARTS_TOLD,
-    ],
+    says: IMPLEMENT_TOLD,
     adds: ['shadcn', 'look', 'see-a-dashboard'],
     denies: [],
     declares: ['mutants', 'noMutants'],
@@ -186,6 +205,14 @@ const TOLD: Told[] = [
     denies: ['Bash(cd:*)', ...NO_BUILD, ...WHOLE_SUITE, ...BROWSER_FENCE],
     declares: ['findings', 'mutants', 'again'],
   },
+  {
+    workflow: 'quick',
+    step: 'implement',
+    says: [...IMPLEMENT_TOLD, ...QUICK_TOLD],
+    adds: ['shadcn', 'look', 'see-a-dashboard'],
+    denies: [],
+    declares: ['plan', 'pages', 'mutants', 'noMutants'],
+  },
   { workflow: 'intake', step: 'intake', says: [], adds: [], denies: ['Bash(cd:*)', ...NO_BUILD], declares: [] },
   {
     workflow: 'janitor',
@@ -202,6 +229,8 @@ const TOLD: Told[] = [
     declares: [],
   },
 ];
+
+type Schema = { properties: Record<string, unknown>; required: string[] };
 
 /** A sentence as a pattern of a note, whatever line it breaks on. */
 const across = (sentence: string): RegExp =>
@@ -331,15 +360,16 @@ const kitGiven = (step: Step | undefined): string[] =>
 
 /**
  * What the build workflow's steps `steps`, the skill folders `folders` of the kit and the trigger skill's text `trigger` do not hold
- * together, a line each: for each step of `KIT_STEPS`, a kit skill it is given that has no folder and a folder it is not given; a folder
- * whose sentence (`KIT_SKILLS_SAID`) the trigger skill does not say; a sentence of `KIT_SKILLS_SAID` whose skill has no folder, and a
- * kit skill the trigger skill names (`KIT_NAMED`) that has none; and a trigger skill that names no file to read a kit skill from.
+ * together, a line each: for each step of `given`, `KIT_STEPS` where none is named, a kit skill it is given that has no folder and a
+ * folder it is not given; a folder whose sentence (`KIT_SKILLS_SAID`) the trigger skill does not say; a sentence of
+ * `KIT_SKILLS_SAID` whose skill has no folder, and a kit skill the trigger skill names (`KIT_NAMED`) that has none; and a trigger
+ * skill that names no file to read a kit skill from.
  */
-function kitDrift(steps: readonly Step[], folders: readonly string[], trigger: string): string[] {
+function kitDrift(steps: readonly Step[], folders: readonly string[], trigger: string, given: readonly string[] = KIT_STEPS): string[] {
   const said = namedIn(KIT_SKILLS_SAID);
   const named = [...new Set([...trigger.matchAll(KIT_NAMED)].map((span) => span[1]))];
   return [
-    ...KIT_STEPS.flatMap((name) => {
+    ...given.flatMap((name) => {
       const given = kitGiven(steps.find((step) => step.name === name));
       return [
         ...given
@@ -439,6 +469,36 @@ test('REFUSED: a trigger skill that says a kit skill no more, or names no file t
   assert.deepEqual(kitDrift(steps, folders, elsewhere), [`change-the-board names no ${KIT_SKILLS}/<name>/SKILL.md to read`]);
 });
 
+test("quick's implement is given every kit skill there is a folder of, and REFUSED: one it is given no more is named", () => {
+  const folders = skillFolders(path.join(REPO, KIT_SKILLS));
+  const quick = loadWorkflows(path.join(HOLDER, 'quick'), { repo: REPO });
+  assert.deepEqual(kitDrift(quick, folders, triggerText(), ['implement']), []);
+  const ungiven = shippedEdited('quick', 'implement', (text) => text.replace(', apps/web:ds-theme,', ','));
+  assert.deepEqual(kitDrift(ungiven, folders, triggerText(), ['implement']), ['implement: not given apps/web:ds-theme']);
+});
+
+test("REFUSED: quick's implement told no more what build's is told, or what makes a build quick, or that declares its plan no more, is named", () => {
+  for (const sentence of [...IMPLEMENT_TOLD, ...QUICK_TOLD])
+    assert.deepEqual(
+      untold(
+        'quick',
+        shippedEdited('quick', 'implement', (text) => text.replace(across(sentence), '')),
+      ),
+      [`quick/implement: says "${sentence}"`],
+    );
+  const schema = path.join('quick', 'implement.schema.json');
+  const root = scratch('wf-told-quick-');
+  fs.cpSync(HOLDER, root, { recursive: true });
+  const declared = JSON.parse(fs.readFileSync(path.join(root, schema), 'utf8')) as Schema;
+  const { plan: _plan, ...properties } = declared.properties;
+  fs.writeFileSync(
+    path.join(root, schema),
+    JSON.stringify({ ...declared, properties, required: declared.required.filter((name) => name !== 'plan') }),
+  );
+  assert.deepEqual(untold('quick', loadWorkflows(path.join(root, 'quick'), { repo: REPO })), ['quick/implement: declares plan']);
+  assert.deepEqual(new Set(declared.required), new Set(['plan', 'pages', 'mutants', 'noMutants']), 'each is required of the closeout');
+});
+
 test("REFUSED: design or review told no more to load change-the-board first, or where ds-spec's reader runs from, is named", () => {
   for (const step of ['design', 'review'])
     for (const sentence of KIT_READER_TOLD)
@@ -463,8 +523,6 @@ test("REFUSED: design, implement or review told of the look's parts no more is n
       );
   assert.match(fs.readFileSync(path.join(REPO, TRIGGER), 'utf8'), /`apps\/web\/src\/components\/look`,\s+taken\s+through\s+its\s+door/);
 });
-
-type Schema = { properties: Record<string, unknown>; required: string[] };
 
 /**
  * Why the schema a step declares, `ours`, is not the agent's `theirs` with the field `field` added and required: undefined when it is.

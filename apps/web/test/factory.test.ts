@@ -34,6 +34,7 @@ import {
 } from '../src/lib/factory.ts';
 import { runsIn } from '../src/lib/factories.ts';
 import { tilesOf } from '../src/lib/flow.ts';
+import { instantWhole } from '../src/lib/instant.ts';
 import type { Point } from '../src/lib/layout.ts';
 
 /**
@@ -1232,9 +1233,10 @@ test("a card's clock counts from when the run started — its first filing — n
   const going = { createdAt, startedAt, cancelledAt: null, waiting: null };
   const clock = runClock(going, now, false);
   assert.deepEqual([clock.words, clock.at], ['1h 45m since it started', startedAt]);
-  assert.ok(clock.title.startsWith(`Started ${new Date(startedAt).toLocaleString()}.`), clock.title);
+  assert.ok(clock.title.startsWith(`Started ${instantWhole(new Date(startedAt))}.`), clock.title);
+  assert.match(clock.title, /^Started \d{1,2} Sep 2026, \d{1,2}:29:00 [AP]M\. /, 'the whole instant, to the second, with its year');
   assert.ok(
-    clock.title.endsWith(`Created ${new Date(createdAt).toLocaleString()}, and waited 4h 29m before its first step was filed.`),
+    clock.title.endsWith(`Created ${instantWhole(new Date(createdAt))}, and waited 4h 29m before its first step was filed.`),
     clock.title,
   );
   assert.equal(waitedMs(going), (4 * 60 + 29) * 60_000);
@@ -1248,7 +1250,7 @@ test("a card's clock counts from when the run started — its first filing — n
   const atOnce = runClock({ ...going, startedAt: createdAt }, now, false);
   assert.deepEqual(
     [atOnce.words, atOnce.title],
-    ['6h 14m since it started', `Started ${new Date(createdAt).toLocaleString()}.`],
+    ['6h 14m since it started', `Started ${instantWhole(new Date(createdAt))}.`],
     'started at once, or with its filings off the feed where the api gives createdAt: no wait to speak of',
   );
 });
@@ -1256,7 +1258,7 @@ test("a card's clock counts from when the run started — its first filing — n
 test("a card's clock is the run's time at work: a run that is over took it, one still going is at work and counts up while a task of it runs, and the wall time is on hover", () => {
   const startedAt = '2026-09-20T12:00:00.000Z';
   const base = { createdAt: startedAt, startedAt, cancelledAt: null, waiting: null, waitingOnYou: [] };
-  const local = (iso: string) => new Date(iso).toLocaleString();
+  const local = (iso: string) => instantWhole(new Date(iso));
   const done = { ...base, atWork: { ms: (2 * 60 + 10) * 60_000, since: null, endedAt: '2026-09-20T15:00:00.000Z' } };
   const later = Date.parse('2026-09-20T16:30:00.000Z');
   assert.deepEqual(runClock(done, later, true), {
@@ -1291,7 +1293,7 @@ test('REFUSED: a run at a gate is not over — it is at work for what it ran, sa
   const now = Date.parse('2026-09-20T14:00:00.000Z');
   const clock = runClock(gated, now, true);
   assert.equal(clock.words, '20m 00s at work', 'off the moving floor, finished, and not over: a person is to answer');
-  assert.equal(clock.title, `At work 20m 00s. Started ${new Date(startedAt).toLocaleString()}, still going: 2h 00m from start to now.`);
+  assert.equal(clock.title, `At work 20m 00s. Started ${instantWhole(new Date(startedAt))}, still going: 2h 00m from start to now.`);
   assert.deepEqual([clockCounts(gated, true), clockCounts(gated, false)], [false, false], 'nothing of it runs, so nothing counts');
 });
 
@@ -1306,7 +1308,7 @@ test('REFUSED: a run nothing of which is filed has no time at work — it is wai
   };
   const onRuns = runClock({ createdAt, startedAt: null, cancelledAt: null, waiting }, now, false);
   assert.deepEqual([onRuns.words, onRuns.at], ['waiting for 4h 29m', createdAt]);
-  assert.equal(onRuns.title, `Created ${new Date(createdAt).toLocaleString()}. Nothing of it is filed yet: waiting on 7a87.`);
+  assert.equal(onRuns.title, `Created ${instantWhole(new Date(createdAt))}. Nothing of it is filed yet: waiting on 7a87.`);
   assert.doesNotMatch(onRuns.words, /since it started|started .* ago/);
   assert.equal(
     runClock({ createdAt, startedAt: null, cancelledAt: null, waiting: null }, now, false).words,
@@ -1324,7 +1326,7 @@ test('REFUSED: a run nothing of which is filed has no time at work — it is wai
   const called = { createdAt, startedAt: null, cancelledAt: '2026-09-20T09:00:00.000Z', waiting: null };
   assert.deepEqual(
     [runClock(called, now, true).words, runClock(called, now, true).title],
-    ['created 4h 29m ago', `Created ${new Date(createdAt).toLocaleString()}. Called off before anything of it was filed.`],
+    ['created 4h 29m ago', `Created ${instantWhole(new Date(createdAt))}. Called off before anything of it was filed.`],
     'called off before anything of it was filed: it never started, and waits for nothing',
   );
   assert.equal(clockCounts(called, true), false);

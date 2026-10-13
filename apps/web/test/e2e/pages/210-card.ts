@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { expectKeys, expectRendered, expectSource, filesIn, sidebar } from '../board.ts';
+import { expectInstant, expectKeys, expectRendered, expectSource, filesIn, sidebar } from '../board.ts';
 import { expectCount, expectVisible, Refused } from '../checks.ts';
 import { CARDS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -7,9 +7,10 @@ import { store } from '../world.ts';
 
 export default {
   /**
-   * A card's page: its body rendered — a heading, a list, a table, a code block, a line of raw HTML shown as text, a link that opens in a
-   * new tab and a `javascript:` one that is only its words — then its keys, each with what it means as the api says it, and Source: the
-   * file as written, frontmatter included. It writes nothing: the inbox is as it was.
+   * A card's page: when it was filed, as the board writes an instant; its body rendered — a heading, a list, a table, a code block, a
+   * line of raw HTML shown as text, a link that opens in a new tab and a `javascript:` one that is only its words — then its keys,
+   * each with what it means as the api says it, and Source: the file as written, frontmatter included. It writes nothing: the inbox
+   * is as it was.
    */
   name: 'card',
   route: `/inbox/${CARDS.rich.name}`,
@@ -24,6 +25,10 @@ export default {
     const before = filesIn(inbox);
     await expectVisible(page.locator('h1', { hasText: rich.name }), `the page names the card (${rich.name})`);
     await expectVisible(page.getByRole('link', { name: '← Inbox' }), 'and leads back to the Inbox');
+    const filed = page.locator('header time');
+    await expectCount(filed, 1, 'the header says when the card was filed, once');
+    await expectInstant(filed, 'When its file was last written: ', `when ${rich.name} was filed`);
+    await expectVisible(page.locator('header', { hasText: /filed \d/ }), 'after the word filed, a space between them');
 
     const file = page.locator('section[aria-label="The file"]');
     const body = file.locator('[data-markdown]').first();

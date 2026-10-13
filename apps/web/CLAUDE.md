@@ -79,10 +79,14 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
   (`titleKeepsItsBox`, same page), and a row in flight keeps 16 pixels between its title and its id.
 - A time of day in words has one writer, `timeOfDay` (`lib/timeOfDay.ts`): 12-hour (`1:11 PM`), built from `formatToParts` and joined
   with plain spaces. `clockWord`, `whenWords`, `whenColumn` and `fireWord` each decide their day and take the time from it, and
-  `test/time-of-day.test.ts` refuses a second writer of an hour in `src`; the whole instants still written as the browser does are its
-  `LEFT`, by file and count, which only shrinks.
-- A time on the runs page is `whenWords`, or `whenColumn` in a table (`lib/runWords.ts`); its date is `dateParts`, which a schedule's
-  far fire reads too (`14 Oct 12:00 PM`). `expectTexts` trims, so a padded time is compared trimmed or by its `textContent`.
+  `test/time-of-day.test.ts` refuses a second writer of an hour in `src`.
+- A whole instant has one writer, `lib/instant.ts`: text on a page is `instantWords` (`7:08 PM` today, `9 Oct 5:30 PM`, `31 Dec 2025,
+  4:10 PM`: a comma after a year alone), a `title` is `instantWhole` (`12 Oct 2026, 7:08:53 PM`), the Timeline's cell is
+  `timeToTheSecond`; a component draws one with `Instant` (`components/Instant.tsx`). The same guard refuses any `toLocaleString(`,
+  `toLocaleTimeString(` or `toLocaleDateString(` in `src`, a number's too until its file and count are named in `NUMBERS`.
+- A time on the runs page is `whenWords`, or `whenColumn` in a table (`lib/runWords.ts`); its date is `dateParts`. A schedule's
+  far fire is `instantWords` (`14 Oct 12:00 PM`, `1 Jan 2027, 4:00 AM`); `whenWords` keeps dropping the time in another year.
+  `expectTexts` trims, so a padded time is compared trimmed or by its `textContent`.
 - A foot's button needs `ml-auto` only once the foot wraps: two children under `justify-between` stand apart on one line without it,
   so its proof draws the card narrow (`WaitingCard.stories.tsx`, `test/e2e/parts.test.ts`).
 - A kit `Cell truncate` shows its children again in a tooltip: a cut cell that holds a link cuts the link itself (`block truncate`, a

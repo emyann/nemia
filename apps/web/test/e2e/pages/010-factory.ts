@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { nextVisit, photograph, PLACES_SAID, sidebar, stepBar, themeOf } from '../board.ts';
+import { expectInstant, nextVisit, photograph, PLACES_SAID, sidebar, stepBar, themeOf } from '../board.ts';
 import {
   cardOf,
   cardsOf,
@@ -138,6 +138,10 @@ export default {
       const ghost = lane.locator(`a[data-ghost="${card.name}"]`);
       await expectTexts(ghost.locator('[data-ghost-place]'), [PLACES_SAID[i]], `${card.name}'s ghost says its place (${PLACES_SAID[i]})`);
       await expectTexts(ghost.locator('[data-ghost-title]'), [card.title], `and its first line (${card.title})`);
+      const queued = ghost.locator('time');
+      const ago = (await queued.textContent()) ?? '';
+      if (!ago.startsWith('queued ')) throw new Refused(`${card.name}'s ghost says how long it has been queued — it says ${ago}`);
+      await expectInstant(queued, 'Queued at ', `when ${card.name}'s ghost was queued`, () => ago);
       await expectTexts(ghost.locator('[data-ghost-workflow]'), [card.workflow], `and its workflow (${card.workflow})`);
       const repo = "the daemon's repository";
       await expectTexts(ghost.locator('[data-ghost-repo]'), [repo], `and its repository (${repo})`);

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page, Response } from 'playwright';
-import { photograph, PLACES_SAID, sidebar, themeOf } from '../board.ts';
+import { expectInstant, photograph, PLACES_SAID, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import {
   CARDS,
@@ -137,7 +137,11 @@ async function visit(page: Page): Promise<void> {
         [`queued · ${PLACES_SAID[i]}`],
         `${card.name} says its place in the queue (queued · ${PLACES_SAID[i]})`,
       );
-      await expectVisible(item.locator('time[data-queued-at]'), 'and when it was queued');
+      await expectInstant(
+        item.locator('time[data-queued-at]'),
+        'When it was queued, which orders the queue: ',
+        `when ${card.name} was queued`,
+      );
       await expectVisible(item.getByRole('button', { name: 'Unqueue' }), 'and offers Unqueue');
       await expectCount(item.getByRole('button', { name: 'Queue', exact: true }), 0, 'and not Queue: it is queued');
     }
@@ -279,13 +283,14 @@ async function visit(page: Page): Promise<void> {
       const item = cardIn(page, planned.name);
       await expectVisible(item.locator(`[data-factory-tag="${FACTORY}"]`), `${planned.name}, given the factory ${FACTORY}, names it`);
       await expectCount(item.locator('[data-no-queue]'), 0, 'and no longer says it has no Queue');
-      const filedTime = item.locator('time[title="When its file was last written"]');
+      const filedTime = item.locator('time[title^="When its file was last written: "]');
       const shownAs = async () => ({
         order: await order(page),
         filedAt: await filedTime.getAttribute('datetime'),
         shown: await filedTime.textContent(),
       });
       const before = await shownAs();
+      await expectInstant(filedTime, 'When its file was last written: ', `when ${planned.name} was filed`);
       if (before.order.indexOf(planned.name) === 0)
         throw new Refused(`${planned.name} is not the newest card, so a move would show — it is listed first`);
       const unmoved = async (when: string) => {

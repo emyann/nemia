@@ -5,6 +5,7 @@ import { FactoryCardStart, UnassignedStart } from '../components/FactoryCardStar
 import { FileCard } from '../components/FileCard';
 import { CardMeta, GoneItem, NoQueue, PageLink, QueueButtons, PRIMARY, Refused, SECONDARY, Tried } from '../components/InboxParts';
 import { CardFrom } from '../components/CardFrom';
+import { Instant } from '../components/Instant';
 import { dropCard, inboxQuery, queueCard, type InboxEntry, type Started } from '../lib/api';
 import { factorySearch, keptBy, shownIn } from '../lib/factories';
 import { cardLines, newestCardsFirst, queuedWord, queueOf, unassigned, type CardRefusal } from '../lib/inbox';
@@ -177,10 +178,7 @@ function CardItem({
                 {queuedWord(entry.queued)}
               </span>
               <span>
-                since{' '}
-                <time data-queued-at dateTime={entry.queued.at} title="When it was queued: what orders the queue">
-                  {new Date(entry.queued.at).toLocaleString()}
-                </time>
+                since <Instant data-queued-at at={entry.queued.at} about="When it was queued, which orders the queue" />
               </span>
             </p>
           )}

@@ -1,6 +1,7 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { AsWritten, KeyTable } from '../components/FilePage';
+import { Instant } from '../components/Instant';
 import { Markdown } from '../components/Markdown';
 import { cardQuery, workflowNameOf } from '../lib/api';
 
@@ -38,9 +39,9 @@ function CardPage() {
             </span>
           )}
           {card.filedAt && (
-            <time dateTime={card.filedAt} title="When its file was last written">
-              filed {new Date(card.filedAt).toLocaleString()}
-            </time>
+            <span>
+              filed <Instant at={card.filedAt} about="When its file was last written" />
+            </span>
           )}
         </p>
       </header>

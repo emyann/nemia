@@ -25,37 +25,34 @@ step's note, which `packages/agent-orchestrator/test/quick-check.boundary.test.t
 
 ## Implement's check
 
-The check is the cheap set, each script read from the run's base (`git show "$WF_BASE_REF:…"`), never from the tree it judges:
+The check is the cheap set: it runs `change.ts size`, `pictures.ts`, `probe.ts` and `mutants.ts`, in that order, and nothing else.
+Each script is read from the run's base (`git show "$WF_BASE_REF:…"`), never from the tree it judges:
 
 1. `change.ts size`, first: the net change from the base the branch holds to `HEAD` (`git diff --numstat -M`, so a line added then
    removed counts for nothing and a rename is one file). Past either number it refuses and says what to do next: `nemia cancel <run>`,
    then start the card with `build`. The step has no `retries:`, so the refusal waits on a person and no try trims the work to fit.
    Its `wf size:` line is the bound's own count; the `touched` list at the gate is the place's report, and may count a rename as two.
-2. `build`'s `pictures.ts`, `probe.ts` and, after the types and the lint, `mutants.ts`, where they are in `workflows/build/`: a change
-   under `apps/web/src` owes a picture, no probe is left live, and a rule the change adds is proven by a mutant (a removal names none,
-   and says why in `noMutants`).
-3. `npm run typecheck` and `npm run lint`, whole.
-4. `change.ts tests`: the tests of each package that reads a path the change touched, and of the packages that depend on it
-   (`npx turbo run test --force --continue --filter=...<name>`). The table of who reads what mirrors `turbo.json`, which the test
-   holds, with the workflows, the docs and the skills added for the orchestrator, whose tests read them. A root config file selects
-   every package; a path no package reads runs none. A change under `apps/*/src` selects every package too: `turbo.json` gives
-   those sources to the orchestrator's, the runtime's and the docs' tests, the app's own reads them, and the api depends on the
-   orchestrator. So for a change to the board or the api this clause is the whole suite, here and again in land's check: what such a
-   quick run saves beside `build` is the spec, the review and the whole e2e, not the suite.
-5. `change.ts pages`: the e2e on the pages the closeout names in `pages` (`npm run e2e -- --pages <name,…>`). A change under
-   `apps/web/src` that names none is refused.
+2. `build`'s `pictures.ts`, `probe.ts` and `mutants.ts`, where they are in `workflows/build/`: a change under `apps/web/src` owes a
+   picture, no probe is left live, and a rule the change adds is proven by a mutant (a removal names none, and says why in
+   `noMutants`).
 
-Never the whole e2e, and the whole suite only where the table selects every package: land's check runs both on the merged tree,
-whatever was touched, and is `build`'s land check to the letter (`agent-fences.test.ts` holds the two steps equal but their `after:`). Main has one guard, whatever the workflow. What the
-scoped checks miss (a test that reads a path no table names, a page Ada did not name) is caught there, after the person approved: the
-landing aborts, and the run waits on a person again.
+No typecheck, no lint, no test of a package and no e2e page: nothing runs Ada's tests for her before the gate. Her session runs the
+tests of what she changed, the types, the lint and the e2e pages a change to the board touches, as `CLAUDE.md`, *Check your work*,
+says of a step's session. Land's check then runs the whole suite, the types, the lint and the whole e2e on the merged tree, whatever
+was touched, and is `build`'s land check to the letter (`agent-fences.test.ts` holds the two steps equal but their `after:`). Main
+has one guard, whatever the workflow.
+
+**A landing whose check refuses**: the merge is aborted and nothing landed. The work goes back to implement at once, with what the
+check said (`nemia decide <run>` prints it): `nemia retry <run> implement --message "<what failed>"`. Then it comes to the gate
+again, since an approval is for one try. Whoever operates the factory sends it back, by instruction (`NEMIA.md`): no step is filed
+by itself.
 
 ## The closeout, and the gate
 
 Implement's closeout is `build`'s with two fields more (`implement.schema.json`): `plan`, what changes, where and what proves it,
-written before the work; and `pages`, the e2e pages the change touches. At land's gate a person is shown the plan, the pages, the
-mutants, the pictures and how many files and lines the branch touched (`nemia decide <run>`, and the run's page); the check's
-`wf size:` and `wf scope:` lines are handed to the landing step. The board does not show the change itself at a gate: read it in a
+written before the work; and `pages`, the e2e pages she ran, which nothing reads but the person. At land's gate a person is shown the
+plan, the pages, the mutants, the pictures and how many files and lines the branch touched (`nemia decide <run>`, and the run's page); the check's
+`wf size:` line is handed to the landing step. The board does not show the change itself at a gate: read it in a
 terminal, `git diff main...wf/<run>/implement`, until it does.
 
 A person approves the landing, `nemia approve <run> land`, or sends the work back to implement, the one step there is to send it to:

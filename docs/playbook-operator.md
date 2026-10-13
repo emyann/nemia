@@ -197,7 +197,9 @@ rm "$S"/node_modules; git worktree remove "$S"
 - **After a rename of the CLI or a new bin**, `npm install` in the main checkout at a gap links it; check the tree stays clean.
 - **A failed landing check:** nothing landed and the merge was aborted. Read the check's `✖ failing tests:` block and name the cause. A
   check that did not finish (a deadline) is no refusal: file the landing again, after removing the cause (a deadline too short for the
-  load). A real refusal goes back through review.
+  load). A real refusal is sent back to the step that built the change, with the check's words (`nemia decide <run>` prints them),
+  without waiting to be asked: in `quick`, `nemia retry <run> implement --message "<what failed>"`; in `build`, through review, as
+  *Send a landing back* says. The next landing is approved by whoever approved the first: an approval is for one try.
 - **Never touch the main checkout** (npm, git, a file) while a landing is checking in it.
 
 ## Filing and chaining

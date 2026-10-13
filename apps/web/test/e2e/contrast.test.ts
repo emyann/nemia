@@ -112,6 +112,22 @@ test('a tile of more than one colour is no grain: its ground is answered unmeasu
   assert.equal(rowsOf(pairs, 'on a pattern').length, 1);
 });
 
+test('REFUSED: a far end carried through a translucent ground unpainted: it is the ground laid over the grain’s far end', async () => {
+  const { pairs } = await pairsOf(
+    `<style>.card{background-color:#000;background-image:${LIGHT_SPECKS};background-size:220px 220px}</style><div class="card">` +
+      '<p style="color:#fff">on the grain</p><div style="background:rgba(255,255,255,0.5)"><p style="color:#000">on a chip</p></div></div>',
+    'dark',
+  );
+  const [, grain, ...others] = rowsOf(pairs, 'on the grain');
+  const [plain, far, ...more] = rowsOf(pairs, 'on a chip');
+  assert.ok(grain?.grained && !others.length && plain && far && !more.length, 'each text on the grain has two rows');
+  assert.ok(grain.ground[0] > 8 && grain.ground[0] < 64, `light specks lift the black to ${hex(grain.ground)}`);
+  assert.deepEqual([plain.grained, hex(plain.ground)], [false, '#808080']);
+  assert.deepEqual([far.state, far.grained], ['measured', true]);
+  for (const [c, channel] of far.ground.entries())
+    assert.ok(Math.abs(channel - (255 + (grain.ground[c] ?? 0)) / 2) <= 1, `half white over ${hex(grain.ground)}, not ${hex(far.ground)}`);
+});
+
 const framed = (ground: string, text: string): string =>
   '<div style="background:#000;padding:8px"><div data-cut-frame="none" style="position:relative">' +
   `<span data-cut-shape style="position:absolute;inset:0"><span data-cut-ground style="position:absolute;inset:0;${ground}"></span>` +

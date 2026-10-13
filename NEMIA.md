@@ -14,6 +14,9 @@ team that works it is in `workflows/agents/`. What follows is for the operator o
 - A quick run has no review but the person's read when land waits at its gate: read its plan on the run's page and its whole change
   in a terminal (`git diff main...wf/<run>/implement`) before approving, until the board shows the change there.
 - A quick run whose check refuses its size is a `build` card: cancel it and start the card with `build`, as the refusal says.
+- A landing whose check refused is sent back to the step that built the change, with the check's words (`nemia decide <run>` prints
+  them), without waiting to be asked: in `quick`, `nemia retry <run> implement --message "<what failed>"`. The next landing is
+  approved by whoever approved the first: an approval is for one try.
 - One coherent slice a card: a card cut too small slows the factory more than it saves.
 - Cards that change the command table (`packages/agent-orchestrator/src/command/`, the api's routes) or the board's frame collide with
   each other: chain them, the second started `--after` the first, never side by side.

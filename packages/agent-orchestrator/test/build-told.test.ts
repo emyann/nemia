@@ -137,7 +137,7 @@ const IMPLEMENT_TOLD = [
   ...LOOK_PARTS_TOLD,
 ];
 
-/** What quick's implement is told that build's is not: to plan first, to decide nothing, the bound, and to name its pages. */
+/** What quick's implement is told that build's is not: to plan first, to decide nothing, the bound, to run its tests and name its pages. */
 const QUICK_TOLD = [
   'no spec was written for you and no review follows',
   '**Write your plan first**, before you build: what changes, where, and what proves it',
@@ -147,7 +147,8 @@ const QUICK_TOLD = [
   'The check measures it first (`workflows/quick/change.ts`) and refuses a change past either number',
   'do not trim it to fit, split it or drop its tests: sign off `blocked`',
   "**Name the pages** the change touches in your closeout's `pages`",
-  "this step's check runs the pages you name in `pages`",
+  '**Nothing runs your tests for you before the gate.**',
+  "Run them yourself before you sign off, as `CLAUDE.md`, *Check your work*, says of a step's session",
 ];
 
 const TOLD: Told[] = [

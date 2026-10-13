@@ -72,8 +72,8 @@ function workOn(work: Record<string, string>, base: Record<string, string> = {})
   return made;
 }
 
-/** What a stub exits with where it is not 0: `npx` whatever it is handed, `npm` handed the e2e, and `claude`. */
-type Failing = { npx?: number; e2e?: number; claude?: number };
+/** What a stub exits with where it is not 0: `npx` whatever it is handed, `npm` handed the e2e or anything else, and `claude`. */
+type Failing = { npx?: number; e2e?: number; npm?: number; claude?: number };
 
 /**
  * A folder holding an `npx`, an `npm` and a `claude` that exit 0 but as `failing` says, the first two writing their arguments as a
@@ -82,7 +82,7 @@ type Failing = { npx?: number; e2e?: number; claude?: number };
 function stubs(failing: Failing = {}): { bin: string; said: () => string[] } {
   const bin = scratch('wf-quick-bin-');
   const log = path.join(bin, 'said.log');
-  const exits = { npx: `exit ${failing.npx ?? 0}`, npm: `case "$*" in *e2e*) exit ${failing.e2e ?? 0};; esac; exit 0` };
+  const exits = { npx: `exit ${failing.npx ?? 0}`, npm: `case "$*" in *e2e*) exit ${failing.e2e ?? 0};; esac; exit ${failing.npm ?? 0}` };
   for (const [name, exit] of Object.entries(exits))
     fs.writeFileSync(path.join(bin, name), `#!/bin/sh\nprintf '%s\\n' "${name} $*" >> '${log}'\n${exit}\n`, { mode: 0o755 });
   fs.writeFileSync(path.join(bin, 'claude'), `#!/bin/sh\necho "[]"\nexit ${failing.claude ?? 0}\n`, { mode: 0o755 });
@@ -176,7 +176,7 @@ test("REFUSED at shipped defaults: implement's check, as frozen, refuses a chang
   const passed = shipped(within.repo, within.base);
   assert.equal(passed.code, 0, passed.out + passed.err);
   assert.ok(passed.out.includes(`wf size: ${FILES} files, ${FILES} lines of ${FILES} and ${LINES}\n`), passed.out);
-  assert.deepEqual(passed.said, ['npm run typecheck', 'npm run lint'], 'the types and the lint, and no test of a package none reads');
+  assert.deepEqual(passed.said, [], 'no types, no lint, no test of a package');
 
   const bare = workOn(files(1));
   const old = shipped(bare.repo, bare.base);
@@ -184,58 +184,63 @@ test("REFUSED at shipped defaults: implement's check, as frozen, refuses a chang
   assert.match(old.err, /has no workflows\/quick\/change\.ts/, 'a base without the script refuses, never skips');
 });
 
-const TYPES_AND_LINT = ['npm run typecheck', 'npm run lint'];
-const TURBO = 'npx turbo run test --force --continue';
 const E2E = 'npm run e2e -- --pages runs';
 
-test("REFUSED at shipped defaults: implement's check, as frozen, runs each of its clauses in order, and refuses on each one's refusal", () => {
+/** An `npx` and an `npm` that fail whatever they are handed: a check that passes over them ran no test, no types, no lint, no page. */
+const UNRUNNABLE: Failing = { npx: 3, e2e: 4, npm: 5 };
+
+test("REFUSED at shipped defaults: implement's check, as frozen, runs its four clauses in order, refuses on each one's refusal, and runs no npm or npx", () => {
   const { repo, base } = workOn({ 'apps/api/src/a.ts': 'x\n', 'apps/web/src/routes/x.tsx': 'export const x = 1;\n' }, SCRIPTS);
   const files = scratch('wf-quick-files-');
   const picture = path.join(files, 'x-dark.png');
   fs.writeFileSync(picture, 'png');
-  const signed = { plan: 'p', pages: ['runs'], artifacts: [picture] };
-  const run = (closeout: Record<string, unknown>, failing: Failing = {}): Ran => shipped(repo, base, closeout, failing, files);
+  const signed = { plan: 'p', pages: [], artifacts: [picture] };
+  const run = (closeout: Record<string, unknown>, failing: Failing = {}): Ran =>
+    shipped(repo, base, closeout, { ...UNRUNNABLE, ...failing }, files);
+  const PRINTS = [/wf size: 2 files, 2 lines/, /wf pictures: 1 picture named/, /no live probe of run r-1/, /wf mutants: /];
+  const printed = (ran: Ran): number[] => PRINTS.map((line) => ran.out.search(line));
 
   const passed = run(signed);
   assert.equal(passed.code, 0, passed.out + passed.err);
-  assert.deepEqual(passed.said, [...TYPES_AND_LINT, TURBO, E2E], 'the types, the lint, the tests of what it touched, then its pages');
-  for (const line of [
-    'wf size: 2 files, 2 lines',
-    'wf pictures: 1 picture named',
-    'wf scope: tests of every package',
-    'wf scope: pages runs',
-  ])
-    assert.ok(passed.out.includes(line), `the check prints ${line}:\n${passed.out}`);
-  assert.match(passed.out, /no live probe of run r-1/);
-  assert.match(passed.out, /wf mutants: /);
+  assert.deepEqual(passed.said, [], 'a change to both apps that names no page: no types, no lint, no test of a package, no page');
+  assert.deepEqual(
+    printed(passed),
+    [...printed(passed)].sort((a, b) => a - b),
+    passed.out,
+  );
+  assert.ok(
+    printed(passed).every((at) => at >= 0),
+    `each clause prints its line, in order:\n${passed.out}`,
+  );
+  assert.doesNotMatch(passed.out, /wf scope:/);
 
   const unpictured = run({ ...signed, artifacts: [] });
   assert.notEqual(unpictured.code, 0, unpictured.out);
   assert.match(unpictured.err, /npm run e2e -- --photos --pages/);
-  assert.deepEqual(unpictured.said, [], 'the pictures are asked before the types');
+  assert.deepEqual(
+    printed(unpictured).map((at) => at >= 0),
+    [true, false, false, false],
+    'the pictures are asked second',
+  );
 
   const probing = run(signed, { claude: 1 });
   assert.notEqual(probing.code, 0, probing.out);
   assert.match(probing.err, /cannot tell which probes are live/);
-  assert.deepEqual(probing.said, []);
+  assert.deepEqual(
+    printed(probing).map((at) => at >= 0),
+    [true, true, false, false],
+    'the probes are read third',
+  );
 
   const unproven = run({ ...signed, noMutants: null });
   assert.notEqual(unproven.code, 0, unproven.out);
   assert.match(unproven.err, /names no mutant and says not why/);
-  assert.deepEqual(unproven.said, TYPES_AND_LINT, 'the mutants run after the lint, before the tests');
-
-  const failing = run(signed, { npx: 3 });
-  assert.notEqual(failing.code, 0, failing.out);
-  assert.deepEqual(failing.said, [...TYPES_AND_LINT, TURBO], 'a failing test of what the change touched refuses, and no page is visited');
-
-  const unnamed = run({ ...signed, pages: [] });
-  assert.notEqual(unnamed.code, 0, unnamed.out);
-  assert.match(unnamed.err, /Name the e2e pages the change touches/);
-  assert.deepEqual(unnamed.said, [...TYPES_AND_LINT, TURBO]);
-
-  const broken = run(signed, { e2e: 4 });
-  assert.notEqual(broken.code, 0, broken.out);
-  assert.deepEqual(broken.said, [...TYPES_AND_LINT, TURBO, E2E], 'a failing page refuses');
+  assert.deepEqual(
+    printed(unproven).map((at) => at >= 0),
+    [true, true, true, false],
+    'the mutants run last',
+  );
+  for (const refused of [unpictured, probing, unproven]) assert.deepEqual(refused.said, []);
 });
 
 test('REFUSED: a change of one line past the bound, added or removed, and none at it', () => {
@@ -419,13 +424,27 @@ test('REFUSED: a change under apps/web/src whose closeout names no page; the pag
   assert.match(unread.err, /no closeout reached the check/);
 });
 
-test("REFUSED: a note or a README that says another bound than the script's", () => {
+test("REFUSED: a note or a README that says another bound than the script's, or other clauses than the check's", () => {
   const said = (file: string): string => fs.readFileSync(path.join(QUICK, file), 'utf8');
   const note = new RegExp(`at\\s+most\\s+${FILES}\\s+files\\s+and\\s+${LINES}\\s+lines\\s+changed`);
   assert.match(said('implement.md'), note);
   assert.doesNotMatch(said('implement.md').replace(`${LINES} lines`, `${LINES + 1} lines`), note);
   const readme = new RegExp(`at\\s+most\\s+\\*\\*${FILES}\\s+files\\*\\*\\s+and\\s+\\*\\*${LINES}\\s+lines\\*\\*\\s+changed`);
   assert.match(said('README.md'), readme);
+  const check = loadWorkflows(QUICK, placesOf(QUICK)).find((step) => step.name === 'implement')?.check ?? '';
+  const clauses = [...check.matchAll(/node\s+"\$\w+\/(\w+\.ts)"\s+(size|tests|pages)?/g)].map(([, script, verb]) =>
+    verb ? `${script} ${verb}` : script,
+  );
+  assert.deepEqual(clauses, ['change.ts size', 'pictures.ts', 'probe.ts', 'mutants.ts']);
+  assert.doesNotMatch(check, /\bnpm\b|\bnpx\b/);
+  const ticked = clauses.map((clause) => `\`${clause.replace('.', '\\.').replace(' ', '\\s+')}\``);
+  const runs = new RegExp(
+    `runs\\s+${ticked.slice(0, -1).join(',\\s+')}\\s+and\\s+${ticked.at(-1)},\\s+in\\s+that\\s+order,\\s+and\\s+nothing\\s+else`,
+  );
+  for (const file of ['implement.md', 'README.md']) {
+    assert.match(said(file), runs, `${file} says what the check runs`);
+    assert.doesNotMatch(said(file).replace('`probe.ts` and', '`probe.ts`, `change.ts tests` and'), runs);
+  }
   for (const made of /const GENERATED = \[([^\]]*)\];/
     .exec(TEXT)![1]
     .split(',')

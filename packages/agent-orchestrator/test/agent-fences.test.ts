@@ -873,12 +873,28 @@ function shippedWith(agent: string, workflow: string, key: 'allowedTools' | 'dis
 const COLLECTOR_FENCED = [
   { agent: 'ada', workflow: 'build', file: 'build/implement.md' },
   { agent: 'otto', workflow: 'build', file: 'build/land.md' },
+  { agent: 'ada', workflow: 'quick', file: 'quick/implement.md' },
+  { agent: 'otto', workflow: 'quick', file: 'quick/land.md' },
 ];
 
-/** The files a deny of `agent`'s is written in, from the shipped holder: its own, and its step's, which repeats each to add its own. */
-const denyFilesOf = (agent: string): string[] => [
+/** The rules on the `disallowedTools:` line of the shipped file `file`, none where it has no such line. */
+const denyLineOf = (file: string): string[] =>
+  /^disallowedTools: (.*)$/m.exec(fs.readFileSync(path.join(SHIPPED_HOLDERS[0], file), 'utf8'))?.[1].split(', ') ?? [];
+
+/** The step of the shipped `workflow` that `agent` runs, as `wf start` freezes it. */
+const shippedStepIn = (agent: string, workflow: string): Step => {
+  const found = shipped().find(({ dir, step }) => path.basename(dir) === workflow && step.agent?.name === agent);
+  assert.ok(found, `no step of the shipped ${workflow} runs ${agent}`);
+  return found.step;
+};
+
+/**
+ * The files a deny of `agent`'s is written in for its step of `workflow`, from the shipped holder: its own, and its step's, which
+ * repeats each to add its own.
+ */
+const denyFilesOf = (agent: string, workflow = 'build'): string[] => [
   `agents/${agent}.md`,
-  ...COLLECTOR_FENCED.filter((fenced) => fenced.agent === agent).map((fenced) => fenced.file),
+  ...COLLECTOR_FENCED.filter((fenced) => fenced.agent === agent && fenced.workflow === workflow).map((fenced) => fenced.file),
 ];
 
 /**
@@ -1136,38 +1152,93 @@ test('design and review name the two commands of a served board, the settings al
   );
 });
 
-/** The steps of the build workflow that design, write or judge a change, and the skills each gives its session to list. */
-const WORK_STEPS = ['design', 'implement', 'review'];
+/** The steps that design, write or judge a change, by workflow, and the skills each gives its session to list. */
+const WORK_STEPS: Record<string, string[]> = { build: ['design', 'implement', 'review'], quick: ['implement'] };
 const WORK_SKILLS = ['effect', 'shadcn', 'change-the-board'];
 
-/** Each skill of `WORK_SKILLS` a work step of `steps` does not give, as `<step>: <skill>`, read off the agent each step froze. */
-const workSkillsMissing = (steps: readonly Step[]): string[] =>
-  WORK_STEPS.flatMap((name) => {
+/**
+ * Each skill of `WORK_SKILLS` a work step of `steps`, the workflow `workflow`'s, does not give, as `<step>: <skill>`, read off the
+ * agent each step froze.
+ */
+const workSkillsMissing = (steps: readonly Step[], workflow = 'build'): string[] =>
+  WORK_STEPS[workflow].flatMap((name) => {
     const given = steps.find((step) => step.name === name)?.agent?.skills ?? [];
     return WORK_SKILLS.filter((skill) => !given.includes(skill)).map((skill) => `${name}: ${skill}`);
   });
 
-/** The build workflow's steps, read from a scratch copy of the shipped team whose step `step` has its `skills:` line replaced by `line`. */
-function buildWith(step: string, line: string): Step[] {
+/**
+ * The steps of `workflow`, the build workflow by default, read from a scratch copy of the shipped team whose step `step` has its
+ * `skills:` line replaced by `line`.
+ */
+function buildWith(step: string, line: string, workflow = 'build'): Step[] {
   const root = scratch('wf-fences-build-');
   fs.cpSync(SHIPPED_HOLDERS[0], root, { recursive: true });
-  const file = path.join(root, 'build', `${step}.md`);
+  const file = path.join(root, workflow, `${step}.md`);
   const text = fs.readFileSync(file, 'utf8');
   const changed = text.replace(/^skills: .*\n/m, line);
   assert.notEqual(changed, text, `${step} has a skills: line to replace`);
   fs.writeFileSync(file, changed);
-  return loadWorkflows(path.join(root, 'build'), { repo: REPO });
+  return loadWorkflows(path.join(root, workflow), { repo: REPO });
 }
 
-test("build's design, implement and review each give effect, shadcn and change-the-board, whatever their agents give", () => {
-  const build = FOLDERS.find((dir) => path.basename(dir) === 'build');
-  assert.ok(build, 'the build workflow is shipped');
-  assert.deepEqual(workSkillsMissing(loadWorkflows(build, placesOf(build))), []);
+test("build's design, implement and review, and quick's implement, each give effect, shadcn and change-the-board, whatever their agents give", () => {
+  for (const workflow of Object.keys(WORK_STEPS)) {
+    const dir = FOLDERS.find((folder) => path.basename(folder) === workflow);
+    assert.ok(dir, `the ${workflow} workflow is shipped`);
+    assert.deepEqual(workSkillsMissing(loadWorkflows(dir, placesOf(dir)), workflow), [], workflow);
+  }
 });
 
 test('REFUSED: a work step that gives one of the three skills no more is named, read from its file as a run reads it', () => {
   assert.deepEqual(workSkillsMissing(buildWith('review', 'skills: effect, shadcn\n')), ['review: change-the-board']);
   assert.deepEqual(workSkillsMissing(buildWith('design', '')), ['design: effect', 'design: shadcn', 'design: change-the-board']);
+  assert.deepEqual(workSkillsMissing(buildWith('implement', 'skills: shadcn, change-the-board\n', 'quick'), 'quick'), [
+    'implement: effect',
+  ]);
+});
+
+/**
+ * What makes a landing step what it is, its `after` apart: where it works, its agent, its gate, its check, its budget, its fence and
+ * its note.
+ */
+const landingOf = (step: Step | undefined): unknown[] => [
+  step?.workspace,
+  step?.agent?.name,
+  step?.gate,
+  step?.check,
+  step?.budget,
+  step?.disallowedTools,
+  step?.body,
+];
+
+/** The landing step of the workflow `workflow`, read from `root`, a holder laid out as the shipped one. */
+const landIn = (workflow: string, root = SHIPPED_HOLDERS[0]): Step | undefined =>
+  loadWorkflows(path.join(root, workflow), { repo: REPO }).find((step) => step.name === 'land');
+
+test("quick's land is build's land but its after: main has one guard, whatever the workflow", () => {
+  const [build, quick] = [landIn('build'), landIn('quick')];
+  assert.ok(build?.check && build.gate === true && build.workspace === 'main', 'build lands at a gate, in the checkout, on a check');
+  assert.deepEqual(landingOf(quick), landingOf(build));
+  assert.deepEqual([build.after, quick?.after], [['review'], ['implement']]);
+});
+
+test("REFUSED: a quick land whose check, workspace, gate, fence or budget is no more build's is unequal to it", () => {
+  const edits: [string, (text: string) => string][] = [
+    ['check', (text) => text.replace('npx turbo run test --force --continue && ', '')],
+    ['check', (text) => text.replace('else npm run e2e; fi', 'else true; fi')],
+    ['workspace and gate', (text) => text.replace('workspace: main\n', '').replace('gate: true\n', '')],
+    ['fence', (text) => text.replace(', Bash(*:4317*)', '')],
+    ['budget', (text) => text.replace('budget: 10', 'budget: 11')],
+  ];
+  for (const [what, edit] of edits) {
+    const root = scratch('wf-fences-land-');
+    fs.cpSync(SHIPPED_HOLDERS[0], root, { recursive: true });
+    const file = path.join(root, 'quick', 'land.md');
+    const text = fs.readFileSync(file, 'utf8');
+    assert.notEqual(edit(text), text, `quick's land has the ${what} the edit changes`);
+    fs.writeFileSync(file, edit(text));
+    assert.notDeepEqual(landingOf(landIn('quick', root)), landingOf(landIn('build', root)), what);
+  }
 });
 
 /**
@@ -1619,10 +1690,17 @@ const LIVE_COLLECTOR: Call[] = [
 
 test('every shipped step is refused the live collector by address: implement and land by their own deny, a dontAsk step by no allow', () => {
   for (const { step } of shipped()) assert.deepEqual(unfenced(step, SETTINGS, LIVE_COLLECTOR), [], step.name);
-  for (const { agent } of COLLECTOR_FENCED) {
-    const step = shippedStepOf(agent);
-    assert.notEqual(step.permissionMode, 'dontAsk', `${step.name} runs what no deny names`);
-    for (const port of ['4318', '4317']) assert.ok(step.disallowedTools?.includes(`Bash(*:${port}*)`), `${step.name} denies :${port}`);
+  for (const { agent, workflow, file } of COLLECTOR_FENCED) {
+    const step = shippedStepIn(agent, workflow);
+    assert.notEqual(step.permissionMode, 'dontAsk', `${file} runs what no deny names`);
+    for (const port of ['4318', '4317']) assert.ok(step.disallowedTools?.includes(`Bash(*:${port}*)`), `${file} denies :${port}`);
+    const agents = denyLineOf(`agents/${agent}.md`);
+    assert.ok(agents.length > 0, `${agent} denies of its own`);
+    assert.deepEqual(
+      agents.filter((rule) => !denyLineOf(file).includes(rule)),
+      [],
+      `${file} repeats each deny of ${agent}'s`,
+    );
   }
   assert.deepEqual(
     unfenced(shippedStepOf('ada'), SETTINGS, RENDERS),

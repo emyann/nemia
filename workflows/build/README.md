@@ -2,6 +2,7 @@
 
 Build an accepted intent into working, reviewed code on main. Seldon writes the spec, which a person approves; Ada builds it; Agora
 reviews it and sends it back while a finding is worth a round, three at most; Otto lands it, once a person approves the landing.
+A small change its card settles, within the bound of [`quick`](../quick/README.md), goes through `quick`, with no spec and no review.
 
 ```
 design → implement ⇄ review → land

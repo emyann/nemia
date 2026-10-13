@@ -103,12 +103,7 @@ const envOf = (repo: string, base: string, bin: string, more: Record<string, str
 
 /** Run the script's `verb` in `repo` on `base`, bounded; its exit, its streams, and what the stubs were handed. */
 function change(repo: string, base: string, verb: string, ...args: string[]): Ran {
-  return changeOver({}, repo, base, verb, ...args);
-}
-
-/** `change`, over stubs that exit as `failing` says. */
-function changeOver(failing: Failing, repo: string, base: string, verb: string, ...args: string[]): Ran {
-  const { bin, said } = stubs(failing);
+  const { bin, said } = stubs();
   const ran = spawnSync(process.execPath, [SCRIPT, verb, ...args], {
     cwd: repo,
     env: envOf(repo, base, bin),
@@ -183,8 +178,6 @@ test("REFUSED at shipped defaults: implement's check, as frozen, refuses a chang
   assert.notEqual(old.code, 0, old.out);
   assert.match(old.err, /has no workflows\/quick\/change\.ts/, 'a base without the script refuses, never skips');
 });
-
-const E2E = 'npm run e2e -- --pages runs';
 
 /** An `npx` and an `npm` that fail whatever they are handed: a check that passes over them ran no test, no types, no lint, no page. */
 const UNRUNNABLE: Failing = { npx: 3, e2e: 4, npm: 5 };
@@ -314,114 +307,13 @@ test('REFUSED: no base to measure from, and a verb the script has not', () => {
   const gone = change(repo, 'no-such-commit', 'size');
   assert.equal(gone.code, 1);
   assert.match(gone.err, /cannot tell where the work began/);
-  const unknown = change(repo, base, 'trim');
-  assert.equal(unknown.code, 1);
-  assert.match(unknown.err, /usage: node change\.ts <size\|tests\|pages>/);
-});
-
-/** What `tests` handed turbo for a change of `paths`: the filters, `[]` for the whole suite, undefined where it started nothing. */
-function filtersFor(...paths: string[]): string[] | undefined {
-  const { repo, base } = workOn(Object.fromEntries(paths.map((name) => [name, 'x\n'])));
-  const ran = change(repo, base, 'tests');
-  assert.equal(ran.code, 0, ran.err);
-  if (!ran.said.length) return undefined;
-  assert.equal(ran.said.length, 1, 'one run of turbo');
-  const head = 'npx turbo run test --force --continue';
-  assert.ok(ran.said[0].startsWith(head), ran.said[0]);
-  return ran.said[0].slice(head.length).split(' ').filter(Boolean);
-}
-
-test('tests: turbo is handed a filter for each package that reads the change, with its dependents, and none for a root config file', () => {
-  assert.deepEqual(filtersFor('packages/agent-runtime/src/a.ts'), [
-    '--filter=...agent-orchestrator',
-    '--filter=...agent-runtime',
-    '--filter=...docs',
-  ]);
-  assert.deepEqual(filtersFor('workflows/quick/README.md'), ['--filter=...agent-orchestrator', '--filter=...docs']);
-  assert.deepEqual(filtersFor('apps/api/README.md'), ['--filter=...api']);
-  assert.deepEqual(filtersFor('apps/web/src/a.tsx', 'apps/api/src/a.ts'), [], 'both apps and the three that read their sources: all five');
-  assert.deepEqual(filtersFor('turbo.json'), []);
-  assert.deepEqual(filtersFor('package-lock.json'), [], 'a generated file is still read by the tests');
-  assert.deepEqual(filtersFor('tools/test-costs/report.ts'), [], 'every package reads the tools');
-  assert.equal(filtersFor('.github/workflows/ci.yml'), undefined, 'no package reads it: nothing is run');
-  const { repo, base } = workOn({ '.github/a.yml': 'x\n' });
-  assert.match(change(repo, base, 'tests').out, /^wf scope: tests of no package/);
-  const moved = based({ 'packages/agent-runtime/a.md': lines(20) });
-  git(moved.repo, 'mv', 'packages/agent-runtime/a.md', 'a.txt');
-  commit(moved.repo, {}, 'move it out');
-  assert.equal(change(moved.repo, moved.base, 'tests').said.length, 1, 'a file moved out of a package is a change to that package');
-});
-
-test('REFUSED: a failing run of the tests is the exit of the check', () => {
-  const { repo, base } = workOn({ 'apps/api/src/a.ts': 'x\n' });
-  const failed = changeOver({ npx: 3 }, repo, base, 'tests');
-  assert.equal(failed.code, 3);
-  assert.equal(failed.said.length, 1, 'turbo ran, and failed');
-});
-
-test('REFUSED: a failing page is the exit of the check', () => {
-  const { repo, base } = workOn({ 'apps/web/src/routes/x.tsx': 'export const x = 1;\n' });
-  const failed = changeOver({ e2e: 4 }, repo, base, 'pages', closeoutFile({ pages: ['runs'] }));
-  assert.equal(failed.code, 4);
-  assert.deepEqual(failed.said, [E2E]);
-});
-
-type Turbo = { tasks: Record<string, { inputs?: string[] }> };
-
-/** A path the turbo input `glob` matches: `web` for a folder's `*`, a file for a name's, a deep file for `**`. */
-const sampleOf = (glob: string): string => glob.replace('/**', '/deep/file.txt').replace('*.', 'file.').replaceAll('*', 'web');
-
-test("REFUSED: an input of a package's test task in turbo.json that the script's table does not select the package for", () => {
-  const turbo = JSON.parse(fs.readFileSync(path.join(REPO, 'turbo.json'), 'utf8')) as Turbo;
-  const ROOT = '$TURBO_ROOT$/';
-  const inputs = Object.entries(turbo.tasks).flatMap(([task, { inputs: globs = [] }]) =>
-    task.endsWith('#test') ? globs.filter((glob) => glob.startsWith(ROOT)).map((glob) => ({ name: task.slice(0, -5), glob })) : [],
-  );
-  assert.ok(inputs.length >= 20 && new Set(inputs.map(({ name }) => name)).size === 5, 'turbo.json names the inputs of five test tasks');
-  const { repo, base } = based();
-  const unselected = inputs.filter(({ name, glob }, i) => {
-    git(repo, 'checkout', '-q', '-b', `input-${i}`, base);
-    commit(repo, { [sampleOf(glob.slice(ROOT.length))]: 'x\n' }, 'touch it');
-    const [said] = change(repo, base, 'tests').said;
-    return !said || (said.includes('--filter=') && !said.split(' ').includes(`--filter=...${name}`));
-  });
-  assert.deepEqual(unselected, []);
-  assert.equal(sampleOf('apps/*/*.ts'), 'apps/web/file.ts');
-  git(repo, 'checkout', '-q', '-b', 'unread', base);
-  commit(repo, { 'unread/deep/file.txt': 'x\n' }, 'touch it');
-  assert.deepEqual(change(repo, base, 'tests').said, [], 'a path no input names selects none: the filter above could fail');
-});
-
-test('REFUSED: a change under apps/web/src whose closeout names no page; the pages named are the ones the e2e is handed', () => {
-  const board = workOn({ 'apps/web/src/routes/x.tsx': 'export const x = 1;\n' });
-  const unnamed = change(board.repo, board.base, 'pages', closeoutFile({ pages: [] }));
-  assert.equal(unnamed.code, 1, unnamed.out);
-  assert.ok(unnamed.err.includes('apps/web/src/routes/x.tsx'), unnamed.err);
-  assert.ok(unnamed.err.includes('Name the e2e pages the change touches'), unnamed.err);
-  assert.deepEqual(unnamed.said, []);
-  assert.equal(change(board.repo, board.base, 'pages', closeoutFile({})).code, 1, 'a closeout with no pages names none');
-
-  const named = change(board.repo, board.base, 'pages', closeoutFile({ pages: ['runs', 'run-detail'] }));
-  assert.equal(named.code, 0, named.err);
-  assert.deepEqual(named.said, ['npm run e2e -- --pages runs,run-detail']);
-  assert.equal(named.out, 'wf scope: pages runs, run-detail\n');
-
-  const elsewhere = workOn({ 'apps/web/test/x.test.ts': 'x\n', 'docs/a.md': 'x\n' });
-  const none = change(elsewhere.repo, elsewhere.base, 'pages', closeoutFile({ pages: [] }));
-  assert.equal(none.code, 0, none.err);
-  assert.deepEqual(none.said, [], 'nothing is started');
-  assert.deepEqual(change(elsewhere.repo, elsewhere.base, 'pages', closeoutFile({ pages: ['runs'] })).said, [
-    'npm run e2e -- --pages runs',
-  ]);
-
-  for (const pages of [['--photos'], 'runs', [7]]) {
-    const flag = change(board.repo, board.base, 'pages', closeoutFile({ pages }));
-    assert.equal(flag.code, 1, JSON.stringify(pages));
-    assert.match(flag.err, /is not a list of page names/);
+  for (const verb of ['trim', 'tests', 'pages']) {
+    const unknown = change(repo, base, verb, closeoutFile({ pages: ['runs'] }));
+    assert.equal(unknown.code, 1, verb);
+    assert.equal(unknown.err, `wf change: usage: node change.ts size, not "${verb}"\n`);
+    assert.equal(unknown.out, '');
+    assert.deepEqual(unknown.said, [], 'nothing is started');
   }
-  const unread = change(board.repo, board.base, 'pages');
-  assert.equal(unread.code, 1);
-  assert.match(unread.err, /no closeout reached the check/);
 });
 
 test("REFUSED: a note or a README that says another bound than the script's, or other clauses than the check's", () => {

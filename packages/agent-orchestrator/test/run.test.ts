@@ -82,6 +82,7 @@ import {
   listing,
   feedWords,
   inputRefusal,
+  briefParts,
   inputsLine,
   inputsNote,
   namesInOrder,
@@ -4557,7 +4558,8 @@ test('REFUSED by name: an --input that is not there, a directory, not a regular 
 
 test('a run given inputs names them once, under what was asked for, on every brief that carries it — and a run given none composes exactly as before', () => {
   const DIR = '/wf/runs/r-1/inputs';
-  const line = 'Files given with it (`nemia start --input`), in `/wf/runs/r-1/inputs`: `mock.png`, `brief notes.md`.';
+  const line =
+    'The person gave these files with what was asked for (`nemia start --input`). They are part of what was asked, there for you to build your understanding of the task: `mock.png`, a picture; `brief notes.md`, a text file. They are in `/wf/runs/r-1/inputs`.';
   const inputs = ['mock.png', 'brief notes.md'];
   const brief = (s: Workflow, r: Run, steps: readonly Workflow[], retry?: RetryBriefing, dir: string | undefined = DIR) =>
     composeBrief(s, r, steps, undefined, undefined, undefined, retry, undefined, undefined, dir);
@@ -4574,8 +4576,22 @@ test('a run given inputs names them once, under what was asked for, on every bri
     plain,
     "no directory to name: nothing said (composed with none at all, as undefined would not skip brief's default directory)",
   );
-  assert.equal(brief(step('implement'), { ...r, inputs }, STEPS), plain.replace('\n\nadd a flag\n', `\n\nadd a flag\n\n${line}\n`));
+  assert.equal(
+    brief(step('implement'), { ...r, inputs }, STEPS),
+    plain.replace('\n\nadd a flag\n', `\n\nadd a flag\n\n## Files given with it\n\n${line}\n`),
+    'under a heading of their own, after what was asked for',
+  );
   assert.equal(inputsLine(DIR, inputs), line);
+  assert.match(line, /part of what was asked/);
+  assert.match(
+    inputsLine(DIR, ['shot.JPG', 'trace.bin', 'Makefile'])!,
+    /`shot\.JPG`, a picture; `trace\.bin`, a file; `Makefile`, a file\./,
+  );
+  const sectioned = { ...r, brief: 'add a flag\n\n## Proof\n\n- it is there', inputs };
+  const parts = briefParts(brief(step('implement'), sectioned, STEPS));
+  const proof = parts.find((p) => p.startsWith('## Proof'))!;
+  assert.doesNotMatch(proof, /mock\.png/, "outside the card's last section");
+  assert.equal(parts[parts.indexOf(proof) + 1].startsWith(`## Files given with it\n\n${line}`), true, parts.join('|'));
 
   const fanIn = step('integrate', ['a', 'b']);
   const carried = [
@@ -4595,7 +4611,10 @@ test('a run given inputs names them once, under what was asked for, on every bri
       2,
       `a step after another, a fan-in, and a new session tried again carry it, each exactly once:\n${b}`,
     );
-    assert.ok(b.indexOf('## What was asked for') < b.indexOf(line), 'under the request');
+    assert.ok(
+      b.indexOf('## What was asked for') < b.indexOf(`\n## Files given with it\n\n${line}`),
+      'after the request, under its heading',
+    );
   }
   const resumed: Workflow = { name: 'respond', after: ['implement'], resume: 'implement', body: 'answer it' };
   assert.doesNotMatch(
@@ -4621,13 +4640,13 @@ test("a step filed its run's inputs folder is told it there, to read and never w
   const inputs = ['mock.png', 'brief notes.md'];
   const mounted = { handed: [], store: [], inputs: [{ path: DIR, readOnly: true }] };
   const said =
-    'Files given with it (`nemia start --input`), which you may read and must not write, in `/wf/runs/r-1/inputs`: `mock.png`, `brief notes.md`. The folder is mounted read-only; read them with Read, Grep and Glob.';
+    'The person gave these files with what was asked for (`nemia start --input`). They are part of what was asked, there for you to build your understanding of the task: `mock.png`, a picture; `brief notes.md`, a text file. You may read them and must not write them, in `/wf/runs/r-1/inputs`. The folder is mounted read-only; read them with Read, Grep and Glob.';
   assert.equal(inputsLine(DIR, inputs, false, mounted), said);
   assert.equal(inputsLine(DIR, inputs, false, { inputs: [] }), inputsLine(DIR, inputs), 'a step filed none, as codex is: named on disk');
   assert.equal(inputsLine(DIR, [], false, mounted), undefined, 'a run given none');
   assert.equal(
     inputsLine(DIR, inputs, true, mounted),
-    'Files given with it (`nemia start --input`), copied into `given/inputs` in this folder: `mock.png`, `brief notes.md`.',
+    'The person gave these files with what was asked for (`nemia start --input`). They are part of what was asked, there for you to build your understanding of the task: `mock.png`, a picture; `brief notes.md`, a text file. They are copied into `given/inputs` in this folder.',
     "a folder run's step reads its copy",
   );
   const r = run({ implement: null, review: null }, { inputs });
@@ -9559,7 +9578,7 @@ test("a folder run is briefed on folders, never on git: a chain continues its pa
   );
   assert.match(
     withInputs,
-    /Files given with it \(`nemia start --input`\), copied into `given\/inputs` in this folder: `mock\.png`\./,
+    /\n## Files given with it\n\n[^\n]*: `mock\.png`, a picture\. They are copied into `given\/inputs` in this folder\./,
     'the inputs a person gave the run sit outside the fence too: the line names the copy in this folder',
   );
   assert.doesNotMatch(withInputs, /\/store\//, "the run's own inputs directory is outside the fence: it is not named");

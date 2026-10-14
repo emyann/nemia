@@ -31,9 +31,10 @@ const PULLED = '-my-2 -ml-0.75';
  * A run's id, in the mono face, with the control that copies it: the kit's smallest icon button, its glyph twelve pixels across and
  * seven from the id, which answers over 48 by 48 pixels where nothing around it clips or stands over it. Pressed, it says so for a
  * moment (`data-copied`), or that it could not. `short` shows the id's last four characters in a box, which takes the hue of a session
- * at work for that moment, and the whole id in its title; what is copied is always the whole id.
+ * at work for that moment, and the whole id in its title; what is copied is always the whole id. `room` is how many characters wide the
+ * id is drawn at least, so that ids of different lengths given the same room hold their controls, and what follows, at one edge.
  */
-export function CopyId({ id, short = false }: { id: string; short?: boolean }) {
+export function CopyId({ id, short = false, room }: { id: string; short?: boolean; room?: number }) {
   const [said, setSaid] = useState<keyof typeof SAID>('copy');
   useEffect(() => {
     if (said === 'copy') return;
@@ -53,6 +54,7 @@ export function CopyId({ id, short = false }: { id: string; short?: boolean }) {
       <span
         data-run-id
         title={short ? id : undefined}
+        style={room ? { minWidth: `${room}ch` } : undefined}
         className={cn(
           'font-mono text-body-small whitespace-nowrap text-on-surface-variant',
           short && BOXED,

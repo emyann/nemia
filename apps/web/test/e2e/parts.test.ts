@@ -527,6 +527,8 @@ test(
         }),
       );
       assert.deepEqual(boxes, [
+        'lay-the-diamond-top-e2e4: 0px, 0px 0px, 16px tall',
+        'the-board-s-frame-on-the-kit-04ys: 0px, 0px 0px, 16px tall',
         '2e13: 1px, 6px 6px, 20px tall',
         'lay-the-diamond-top-e2e4: 0px, 0px 0px, 16px tall',
         'lay-the-diamond-top-e2e4: 0px, 0px 0px, 16px tall',
@@ -539,7 +541,7 @@ test(
       );
       assert.deepEqual(
         drawn,
-        [20, 16, 16].map((line) => `glyph 12 by 12, 7 from the id, on a line ${line} tall`),
+        [16, 16, 20, 16, 16].map((line) => `glyph 12 by 12, 7 from the id, on a line ${line} tall`),
         'the glyph is 12 pixels across, 7 from the id, and the line is no taller than the id',
       );
       const under = await page.locator('[data-under-title]').evaluate((holder) => {
@@ -624,6 +626,19 @@ test(
     }
   },
 );
+
+test('ids of different lengths given one room hold their copy controls at one edge', WAITED, async () => {
+  const page = await openParts(browser, built, 'dark', alone('look-copyid--lined'));
+  try {
+    const lefts = await page
+      .locator('[data-lined] [data-copy-id]')
+      .evaluateAll((all) => all.map((copy) => Math.round(copy.querySelector('button')!.getBoundingClientRect().left)));
+    assert.equal(lefts.length, 2, 'the story draws two ids');
+    assert.equal(lefts[0], lefts[1], `the two controls stand at one left edge: ${lefts.join(' and ')}`);
+  } finally {
+    await page.context().close();
+  }
+});
 
 /** The short id its story draws, and the box it stands in. */
 const SHORT = story('look-copyid--short');

@@ -16,12 +16,14 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
 - `src/components/ui/ds` and `.claude/skills/ds-{theme,build,spec}` are another repository's files, as its registry ships them (`@ds`
   in `components.json`): never edited, linted or formatted here (`VENDORED` in `packages/agent-orchestrator/test/comments.test.ts`). A
   component the kit lacks is written beside it, under the board's own rules.
-- `npx shadcn add @ds/ds --overwrite -y`, from `apps/web`, takes an update: read `git diff`. The CLI also writes into `src/styles.css`
-  each time, and that is taken back out: a second `tw-animate-css` import, names that point at themselves in `@theme inline`
-  (`--ring: var(--ring)`), a `.dark` block, `--radius`, and the bridge's `--secondary` and `--secondary-foreground`, which it sets to
-  the theme's `secondary`. The message it prints, to import the kit's default theme, is not for us. Then `node
-  src/components/ui/ds/changed.mjs`, from `apps/web`, says whether a kit file differs from the release's record (`RELEASE.json`): exit
-  0 none does, 1 some do, 2 it cannot tell; run it before an update too, since the update overwrites every file that differs.
+- `node src/components/ui/ds/changed.mjs`, from `apps/web`, says whether a kit file differs from the release's record (`RELEASE.json`):
+  exit 0 none does, 1 some do, 2 it cannot tell; run it before an update, since the update overwrites every file that differs. It
+  prints the update's command, which covers every item the board holds (`npx shadcn add @ds/ds --overwrite -y` while it holds no
+  adapter or preset): run it from `apps/web`, read `git diff`, regenerate the theme, and run the check again until nothing is left.
+  Since 0.4.0 the CLI writes nothing into `src/styles.css`, and the board imports no `bridge-shadcn.css`: it names shadcn's roles
+  itself. The message it prints, to import the kit's default theme, is not for us.
+- Every `IconButton` outside the kit names its colour style (`variant="standard"` draws it bare): one that names none is filled
+  (`test/icon-button.test.ts`).
 - `theme/` is generated, never edited: change `DESIGN.md`, then `npx tsx src/components/ui/ds/tokens/generate-theme.mjs DESIGN.md --out
   theme` from `apps/web`, and read the warnings in `theme/DESIGN.resolved.md`; `test/theme.test.ts` refuses a theme that is not the
   generator's. A face the DESIGN.md names is loaded by `src/styles.css` from its npm package, under the exact family the package
@@ -64,12 +66,14 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
   `FRAMED_BOX`, `FRAMED_TABLE` and `FRAMED_ROW` (`look/CutFrame.tsx`), which also drop the last row's line; `test/e2e/bars.test.ts`.
 - A scroll bar is drawn by `src/styles.css` from `data-scroll-bar`, which `markScrolls` (`lib/useScrollMark.ts`) writes on what scrolls. The
   window's bar takes its parts from `body` and no selector on the root's attribute reaches it: the thumb reads an inherited property
-  (`--bar-ink`). A bar already laid out keeps its track under a style added later.
+  (`--bar-ink`). A bar already laid out keeps its track under a style added later. The theme sets `scrollbar-color` on the root, which
+  in Chromium hides every `::-webkit-scrollbar` rule: the board's `:root` reverts it to the base layer (`revert-layer`), whose rules
+  draw the bar (`test/e2e/bars.test.ts`).
 - The look's small caps are its three label roles: `DESIGN.md` gives them their weight and tracking, and a text writes the role and
   `uppercase` (`text-label-small uppercase`); a kit part's own label (`Tag`, a `Column`) follows the role. No class of the board's.
-- The kit's type primitives write Material's weight over the role's (`Label` draws 500 where `DESIGN.md` says 600, a `Tag`'s word
-  included): a label of the look writes the role class, and a text given a `background-image` is unmeasured (`PageName` in
-  `look/Plate.tsx`).
+- Each `text-<role>` carries its role's weight from the theme, and the kit's type primitives write none of their own (`Label` draws
+  `DESIGN.md`'s 600, a `Tag`'s word included): a weight the board wants on a role's text sits on the element that carries the role,
+  never on a parent, which the role overrides. A text given a `background-image` is unmeasured (`PageName` in `look/Plate.tsx`).
 - A box the browser lays between two pixels is drawn from the next whole one, and `boundingBox` carries float noise: a test that reads
   a pixel beside an edge rounds past it (`edgesOf` in `test/e2e/parts.test.ts`).
 - The kit's `xsmall` icon button answers 8 pixels beyond its box, and of two targets that overlap the later in the document wins: in a

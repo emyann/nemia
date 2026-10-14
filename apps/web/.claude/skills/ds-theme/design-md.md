@@ -83,8 +83,12 @@ What the kit reads there, and nothing else:
   1000, `normal` or `bold`. No `var()`, `calc()` or `clamp()` there.
   - `mono`, beside the 15, is not a Material role: it names the **mono
     face**, with a `fontFamily` and nothing else (see **The mono face**).
-- **`rounded`**: `extra-small`, `small`, `medium`, `large`, `extra-large`,
-  `full`, each a length or `0` (`8px`, `0.5rem`).
+- **`rounded`**: `extra-small`, `small`, `medium`, `large`,
+  `large-increased`, `extra-large`, `full`, each a length or `0` (`8px`,
+  `0.5rem`). `large-increased` (Material's 20px, drawn by connected button
+  groups and split buttons) has no short name. A file that writes `large` and
+  not `large-increased` gets its `large` value for it, so a square theme stays
+  square; a file that writes neither gets Material's 20px.
 
 A DESIGN.md that writes no `typography` at all gets Material's baseline, which
 is Roboto: write `fontFamily` on the roles to choose a family.

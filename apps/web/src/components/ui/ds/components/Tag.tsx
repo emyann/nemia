@@ -7,7 +7,7 @@ import { tv, type VariantProps } from "../utils";
  * A static label — an order number, a plan name, a status, a price — drawn
  * on a colour-role container. Presentational and server-safe: not a chip
  * (chips are actions and filters, this never reacts to the pointer) and not
- * an MD3 badge (that is the notification dot / count anchored on an icon).
+ * a badge (the notification dot or count anchored on an icon: `Badge`).
  *
  *   <Tag>#42</Tag>
  *   <Tag color="error">Canceled</Tag>

@@ -2,7 +2,8 @@ import { tv, type VariantProps } from "../utils";
 
 /**
  * The MD3 field container — the **style module** every field in the kit renders
- * from: `TextField`, `NumberField`, `PhoneField`, `Select` and `ComboBox`.
+ * from: `TextField`, `NumberField`, `PhoneField`, `Select`, `ComboBox`,
+ * `DatePicker` and `DateRangePicker`.
  * Fork this one file and every field in the app changes anatomy together; see
  * the README, "Retheming — the three layers", for what a style module is allowed to
  * do and what a kit update guarantees about it.
@@ -43,9 +44,9 @@ import { tv, type VariantProps } from "../utils";
  *
  * ## The `kind` variant
  *
- * One MD3 anatomy, three ways of learning its state — the only real difference
+ * One MD3 anatomy, four ways of learning its state — the only real difference
  * between a typed field and a trigger field, so it is a variant here instead of
- * three copies of the container:
+ * four copies of the container:
  *
  * - `text` — a real `<input>` / `<textarea>` **is** the field. Padding sits on
  *   the input so its whole box is a click target, the label floats with CSS
@@ -62,6 +63,16 @@ import { tv, type VariantProps } from "../utils";
  *   on `data-focus-visible` on the button rather than `:focus-within`, so
  *   picking an option with the mouse does not leave the field looking focused.
  *   `Select`.
+ * - `segmented` — the container is a React Aria `Group` holding one or two
+ *   `DateInput`s, rows of editable segments (month, day, year; hour, minute),
+ *   and a trailing icon button. It carries the padding and stays 56dp. The
+ *   label floats on `:focus-within`, `data-open`, or once any editable
+ *   segment holds a value (`:has()` over React Aria's `data-type` and
+ *   `data-placeholder`, so no component has to count segments: the selector
+ *   is written out in each class, where Tailwind's scan can read it); until then
+ *   the `input` slot is transparent, as a text field's placeholder is. Each
+ *   segment renders with the `segment` slot. `DatePicker`,
+ *   `DateRangePicker`.
  *
  * The outlined variant's label sits on the outline over a notch painted in
  * `--md3-field-notch` (defaults to `surface`); set that variable on any
@@ -113,6 +124,7 @@ export const fieldStyles = tv({
       "flex gap-4 px-4 pt-1 text-body-small font-body-small text-on-surface-variant group-data-invalid/tf:text-error group-data-disabled/tf:text-on-surface/38",
     supportingText: "flex-1",
     counter: "ml-auto shrink-0 tabular-nums",
+    segment: "",
   },
   variants: {
     variant: {
@@ -159,6 +171,26 @@ export const fieldStyles = tv({
         label: "top-7",
         leadingIcon: "ml-0",
         trailingIcon: "mr-0",
+      },
+      segmented: {
+        container: "h-14 w-full gap-1",
+        // The row of segments; transparent while the label rests on it.
+        input: [
+          "flex items-center whitespace-nowrap tabular-nums opacity-0 transition-opacity duration-short-4",
+          "group-focus-within/tfc:opacity-100 group-data-open/tf:opacity-100 group-has-[[data-type]:not([data-type=literal]):not([data-placeholder])]/tfc:opacity-100",
+        ],
+        // The segment with focus is marked in `primary-container`: Material
+        // draws no segment, and a caret alone does not show which part a
+        // typed digit lands in.
+        segment: [
+          "rounded-shape-extra-small px-px outline-none caret-transparent",
+          "data-placeholder:text-on-surface-variant data-[type=literal]:px-0",
+          "data-focused:bg-primary-container data-focused:text-on-primary-container",
+          "group-data-invalid/tf:data-focused:bg-error-container group-data-invalid/tf:data-focused:text-on-error-container",
+          "group-data-disabled/tf:text-on-surface/38",
+        ],
+        leadingIcon: "ml-0",
+        trailingIcon: "-mr-2",
       },
       trigger: {
         container: "h-14 w-full gap-3 text-left outline-none",
@@ -293,6 +325,45 @@ export const fieldStyles = tv({
           FOCUSED_INVALID.trigger,
           "group-data-open/tf:top-0 group-data-populated/tfc:top-0",
         ],
+      },
+    },
+    {
+      variant: "filled",
+      kind: "segmented",
+      class: {
+        container: "pl-4 pr-3 pt-6 pb-2",
+        label: [
+          "group-focus-within/tfc:text-body-small group-focus-within/tfc:font-body-small group-data-open/tf:text-body-small group-data-open/tf:font-body-small group-has-[[data-type]:not([data-type=literal]):not([data-placeholder])]/tfc:text-body-small group-has-[[data-type]:not([data-type=literal]):not([data-placeholder])]/tfc:font-body-small",
+          "group-focus-within/tfc:text-primary group-data-open/tf:text-primary",
+          FOCUSED_INVALID.composite,
+          "group-focus-within/tfc:top-2 group-focus-within/tfc:translate-y-0 group-data-open/tf:top-2 group-data-open/tf:translate-y-0 group-has-[[data-type]:not([data-type=literal]):not([data-placeholder])]/tfc:top-2 group-has-[[data-type]:not([data-type=literal]):not([data-placeholder])]/tfc:translate-y-0",
+        ],
+        indicator: [
+          "group-focus-within/tfc:h-0.5 group-focus-within/tfc:bg-primary group-hover/tfc:group-focus-within/tfc:bg-primary",
+          "group-data-invalid/tf:group-focus-within/tfc:bg-error group-data-invalid/tf:group-hover/tfc:group-focus-within/tfc:bg-error",
+        ],
+        trailingIcon: FOCUSED_INVALID.composite,
+        stateLayer:
+          "group-focus-within/tfc:opacity-0 group-hover/tfc:group-focus-within/tfc:opacity-0",
+      },
+    },
+    {
+      variant: "outlined",
+      kind: "segmented",
+      class: {
+        container: [
+          "pl-4 pr-3",
+          // The text field's 3dp focused outline.
+          "focus-within:border-primary focus-within:outline focus-within:outline-3 focus-within:-outline-offset-3 focus-within:outline-primary",
+          "group-data-invalid/tf:focus-within:outline-error",
+        ],
+        label: [
+          "group-focus-within/tfc:text-body-small group-focus-within/tfc:font-body-small group-data-open/tf:text-body-small group-data-open/tf:font-body-small group-has-[[data-type]:not([data-type=literal]):not([data-placeholder])]/tfc:text-body-small group-has-[[data-type]:not([data-type=literal]):not([data-placeholder])]/tfc:font-body-small",
+          "group-focus-within/tfc:text-primary group-data-open/tf:text-primary",
+          FOCUSED_INVALID.composite,
+          "group-focus-within/tfc:top-0 group-data-open/tf:top-0 group-has-[[data-type]:not([data-type=literal]):not([data-placeholder])]/tfc:top-0",
+        ],
+        trailingIcon: FOCUSED_INVALID.composite,
       },
     },
     // With a leading icon the label starts after the icon, and a composite

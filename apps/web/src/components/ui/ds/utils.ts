@@ -69,6 +69,8 @@ export const twMergeConfig = {
       rounded: [{ rounded: shapeScale() }],
       "rounded-l": [{ "rounded-l": shapeScale() }],
       "rounded-r": [{ "rounded-r": shapeScale() }],
+      "rounded-s": [{ "rounded-s": shapeScale() }],
+      "rounded-e": [{ "rounded-e": shapeScale() }],
       "rounded-t": [{ "rounded-t": shapeScale() }],
       "rounded-b": [{ "rounded-b": shapeScale() }],
       duration: [
@@ -117,6 +119,7 @@ function shapeScale() {
     "shape-small",
     "shape-medium",
     "shape-large",
+    "shape-large-increased",
     "shape-extra-large",
     "shape-full",
   ];

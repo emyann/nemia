@@ -10,7 +10,11 @@ import {
   ModalOverlay,
 } from "react-aria-components";
 
-import type { NavigationItem } from "./BottomNavigation";
+import { Badge, badgeAccessibleText, BADGE_MAX, hasBadge } from "./Badge";
+import {
+  destinationName,
+  type NavigationItem,
+} from "./BottomNavigation";
 import { Divider } from "./Divider";
 import StateLayer from "../primitives/StateLayer";
 import { Label, Title } from "../primitives/Typography";
@@ -53,8 +57,15 @@ import { cn, focusRing, tv } from "../utils";
  * `aria-current="page"` on the active one, not a tab set: Tab moves between
  * destinations and the arrow keys are not bound.
  *
- * Deviations: no badges (the kit has no Badge component, and the drawer's
- * badge tokens are the deprecated set), no bottom-anchored drawer
+ * **Badges.** A destination's `badge` is the drawer's own "badge label
+ * text" (its anatomy, element 5): the count as `label-large` text at the
+ * trailing end of the row, `on-surface-variant`, `on-secondary-container`
+ * on the active one, never the red `Badge` the bar and the rail draw. It is
+ * read after the name ("Inbox, 24"). A badge of `true`, which has no text,
+ * shows its `badgeLabel` as that text; without one it falls back to the small
+ * `Badge` dot, so that an unread mark is never drawn as nothing.
+ *
+ * Deviations: no bottom-anchored drawer
  * (`…bottom.container.shape` describes a compact-window variant the kit's
  * `SideSheet` already covers), and — as with the rail — no filled active icon
  * unless the item carries an `activeIcon`.
@@ -75,8 +86,10 @@ const styles = tv({
       "relative flex h-14 w-full items-center gap-3 overflow-hidden rounded-shape-full px-4",
     ],
     icon: "shrink-0 transition-colors duration-short-4",
-    label: "min-w-0 flex-1 truncate transition-colors duration-short-4",
-    trailing: "text-on-surface-variant shrink-0",
+    // Start-aligned, as the spec draws it: a `<button>` centres its text.
+    label: "min-w-0 flex-1 truncate text-start transition-colors duration-short-4",
+    // The badge label text (anatomy element 5).
+    trailing: "shrink-0 transition-colors duration-short-4",
   },
   variants: {
     variant: {
@@ -89,10 +102,12 @@ const styles = tv({
         icon: "text-on-secondary-container",
         // `…active.label-text.weight` is the prominent (bold) weight.
         label: "font-bold text-on-secondary-container",
+        trailing: "text-on-secondary-container",
       },
       false: {
         icon: "text-on-surface-variant",
         label: "text-on-surface-variant",
+        trailing: "text-on-surface-variant",
       },
     },
   },
@@ -273,6 +288,14 @@ function Destination({
 }) {
   const s = styles({ variant, isActive });
   const Icon = (isActive && item.activeIcon) || item.icon;
+  const name = destinationName(item);
+  // The text the row shows for its badge: the count, or `badgeLabel` for a
+  // `true` badge. A `true` badge without one is the small dot.
+  const badgeText = !hasBadge(item.badge)
+    ? undefined
+    : item.badge === true
+      ? item.badgeLabel
+      : badgeAccessibleText(item.badge, undefined, BADGE_MAX);
 
   const content = ({
     isHovered,
@@ -290,6 +313,21 @@ function Destination({
       <Label component="span" size="large" className={s.label()}>
         {item.label}
       </Label>
+      {badgeText !== undefined ? (
+        // Already in the name, after a comma: hidden here so it is not read
+        // twice.
+        <Label
+          component="span"
+          size="large"
+          aria-hidden="true"
+          data-slot="navigation-drawer-badge"
+          className={s.trailing()}
+        >
+          {badgeText}
+        </Label>
+      ) : hasBadge(item.badge) ? (
+        <Badge value={true} />
+      ) : null}
     </>
   );
 
@@ -297,7 +335,7 @@ function Destination({
     "data-slot": "navigation-drawer-item",
     "data-active": isActive || undefined,
     "aria-current": isActive ? ("page" as const) : undefined,
-    "aria-label": item.ariaLabel,
+    "aria-label": name,
     onPress: onSelect,
     // The whole row *is* the active indicator, so the container carries the
     // `secondary-container` fill rather than a nested pill.

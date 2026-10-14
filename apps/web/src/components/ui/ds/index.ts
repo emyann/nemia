@@ -10,6 +10,12 @@ export {
   XIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  CalendarIcon,
+  EditIcon,
+  ScheduleIcon,
+  KeyboardIcon,
   GlobeIcon,
   ImageIcon,
   MinusIcon,
@@ -17,6 +23,8 @@ export {
   PlusIcon,
   SpinnerIcon,
   UploadIcon,
+  SearchIcon,
+  ArrowBackIcon,
 } from "./icons";
 
 // Primitives
@@ -30,6 +38,24 @@ export {
 export { default as Button, type ButtonProps } from "./components/Button";
 export { default as IconButton } from "./components/IconButton";
 export {
+  ButtonGroup,
+  ButtonGroupContext,
+  type ButtonGroupProps,
+  type ButtonSize,
+} from "./components/ButtonGroup";
+export {
+  SegmentedButton,
+  Segment,
+  type SegmentedButtonProps,
+  type SegmentProps,
+} from "./components/SegmentedButton";
+export { SplitButton, type SplitButtonProps } from "./components/SplitButton";
+export {
+  FabMenu,
+  type FabMenuProps,
+  type FabMenuItem,
+} from "./components/FabMenu";
+export {
   default as Chip,
   ChipGroup,
   type ChipGroupProps,
@@ -41,8 +67,22 @@ export {
   type CardContentProps,
   type ImageRenderer,
 } from "./components/Card";
+export {
+  Carousel,
+  CarouselItem,
+  type CarouselProps,
+  type CarouselItemProps,
+  type CarouselLayout,
+} from "./components/Carousel";
 export { default as ListItem, type ListItemProps } from "./components/ListItem";
 export { Tag, type TagProps } from "./components/Tag";
+export {
+  Badge,
+  badgeAccessibleText,
+  BADGE_MAX,
+  type BadgeProps,
+  type BadgeValue,
+} from "./components/Badge";
 export {
   Table,
   TableHeader,
@@ -71,6 +111,11 @@ export {
   default as SideSheet,
   type SideSheetProps,
 } from "./components/SideSheet";
+export {
+  default as BottomSheet,
+  type BottomSheetProps,
+  type BottomSheetHeight,
+} from "./components/BottomSheet";
 export {
   Tooltip,
   TooltipTrigger,
@@ -112,6 +157,17 @@ export {
   type NavigationItem,
 } from "./components/BottomNavigation";
 export { TopAppBar, type TopAppBarProps } from "./components/TopAppBar";
+export { Toolbar, type ToolbarProps } from "./components/Toolbar";
+export {
+  SearchBar,
+  SearchView,
+  SearchViewItem,
+  SearchViewSection,
+  type SearchBarProps,
+  type SearchViewProps,
+  type SearchViewItemProps,
+  type SearchViewSectionProps,
+} from "./components/Search";
 export {
   NavigationRail,
   type NavigationRailProps,
@@ -140,6 +196,11 @@ export {
   ProgressIndicator,
   type ProgressIndicatorProps,
 } from "./components/ProgressIndicator";
+export {
+  LoadingIndicator,
+  type LoadingIndicatorProps,
+} from "./components/LoadingIndicator";
+export { Meter, type MeterProps } from "./components/Meter";
 
 // Color picker family
 export { default as ColorPicker } from "./components/color/ColorPicker";
@@ -172,6 +233,18 @@ export {
   type SelectProps,
   type SelectItemProps,
 } from "./components/Select";
+export {
+  DatePicker,
+  DateRangePicker,
+  type DatePickerProps,
+  type DateRangePickerProps,
+  type DatePickerLabels,
+} from "./components/DatePicker";
+export {
+  TimePicker,
+  type TimePickerProps,
+  type TimePickerLabels,
+} from "./components/TimePicker";
 export {
   ComboBox,
   ComboBoxItem,

@@ -759,7 +759,7 @@ test(
         }),
       );
       assert.deepEqual(
-        [...measured.map((one) => one.name)].sort(),
+        measured.map((one) => one.name).sort(),
         ['Factories', 'Runs'],
         "the plate's stories draw a short name and a long one",
       );
@@ -768,7 +768,7 @@ test(
         assert.deepEqual(one.rule, one.whole, `the hairline runs the h1's width: ${JSON.stringify(one)}`);
         assert.ok(one.onTheRule, `the lit part lies on the hairline, at the h1's foot: ${JSON.stringify(one)}`);
       }
-      const [short, long] = [...measured.map((one) => one.lit[1] - one.lit[0])].sort((a, b) => a - b);
+      const [short, long] = measured.map((one) => one.lit[1] - one.lit[0]).sort((a, b) => a - b);
       assert.ok(long > short && long > 140, `a long name's lit part reaches past a short one's: ${short} then ${long}`);
     } finally {
       await page.context().close();

@@ -25,7 +25,7 @@ const styles = tv({
   slots: {
     base: [
       // min-h-12 = the 48dp touch target (spec); the state layer stays 40dp.
-      "group/sw inline-flex min-h-12 items-center gap-3 text-body-medium text-on-surface",
+      "group/sw inline-flex min-h-12 items-center gap-3 text-body-medium font-body-medium text-on-surface",
       "data-disabled:text-on-surface/38 data-disabled:pointer-events-none",
     ],
     track: [

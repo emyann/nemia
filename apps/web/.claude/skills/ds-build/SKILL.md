@@ -1,6 +1,6 @@
 ---
 name: ds-build
-description: Build screens and components with the MD3 kit installed in this project. The rules for styling with it (role utilities and their pairing, the type primitives, state layers), where to read the project's real values, and what a project may change (tokens freely, and a kit file by an edit that is allowed, priced and rarely needed). Use before writing or reviewing any UI that uses the kit, and before editing a kit file.
+description: "Use when writing, changing or reviewing any UI in this project, which has a design system: the Material 3 (MD3) components copied into the ds folder under its ui folder (src/components/ui/ds). Load it before adding a screen, a table, a form or a button, before choosing a colour, type or shape class, and before editing a file in ds/. Gives the rules for the role utilities, the type primitives and state layers, where the project's real values are, and what a project may change."
 ---
 
 # ds-build: building with the kit
@@ -98,14 +98,19 @@ Write colours as the role's utility. Never a hex, never a palette class
 
 If the project also has stock shadcn components, their `bg-background`,
 `bg-card`, `bg-muted`, `border-border` read the same roles through the bridge
-the install wrote. `bg-primary` and `bg-secondary` are the Material roles.
+file, `<kit>/tokens/bridge-shadcn.css`, where the entry CSS imports it. `bg-primary` and `bg-secondary` are the Material roles.
 
 ## Type, shape, elevation, motion
 
 - **Type**: prefer the primitives, `<Title size="medium">`,
-  `<Body size="small">`. They carry the face and the weight. A raw
-  `text-title-medium` sets size, line height and tracking only; the faces are
-  `font-brand` (display, headline, title) and `font-plain` (body, label).
+  `<Body size="small">`. They carry the role's family and follow the theme's
+  roles, weight included: a role's weight or family set in `DESIGN.md` is
+  the one they draw. A raw `text-title-medium` sets size, line height,
+  tracking and weight, and no family: write `font-title-medium` beside it,
+  as the kit's own components do, and the text is in the role's family (the
+  one `DESIGN.md` writes on it, else its face). The faces themselves remain,
+  `font-brand` (display, headline, title) and `font-plain` (body, label). Write no weight class beside a role: it
+  would win over the theme's.
   `font-mono` is the project's mono face, the one its `DESIGN.md` names or
   else the system's: write it where the project wants one (an identifier, a
   time, an amount). No kit component uses it.
@@ -128,7 +133,8 @@ opacity follows the state.
 - Never Tailwind's numeric `opacity-8` for a state: it compiles to a literal
   and the theme cannot move it.
 - Focus is `focus-visible`, never plain focus. The ring is `focusRing` from
-  `<kit>/utils.ts`; extend it, do not invent another.
+  `<kit>/utils.ts`; extend it, do not invent another. It is an outline with
+  an unpainted 2px gap: never paint the gap, it shows the ground under it.
 - Disabled content is `on-surface` at 38 %, disabled containers at 12 %.
 - Variants are Tailwind's own (`hover:`, `focus-visible:`, `disabled:`) and
   the data attributes React Aria emits (`data-pressed:`, `data-selected:`,
@@ -204,8 +210,8 @@ npx shadcn add @ds/ds       # the whole kit, the first time
 npx shadcn add @ds/button    # one component and what it needs
 ```
 
-No `add` writes a colour into the project's CSS or touches `DESIGN.md` or
-`theme/`.
+`@ds/ds` writes nothing into the project's CSS, and no `add` writes a colour
+there or touches `DESIGN.md` or `theme/`.
 
 **Updating is not the same command.** Over an existing install, a plain `add`
 asks about the first kit file that differs, defaulting to No, even under
@@ -217,9 +223,12 @@ them:
 node <kit>/changed.mjs
 ```
 
-It lists them and writes nothing (exit 0: none; 1: the files listed; 2: it
-cannot tell, as for a kit installed before 0.3.0). Then update from a clean
-working tree with
+It lists them and writes nothing (exit 0: none; 1: the files listed, changed
+or missing; 2: it cannot tell, as for a kit installed before 0.3.0). Its
+last line is the update command for what the project holds: an adapter or a
+preset the project added by name is named in it, since `@ds/ds` alone leaves
+it at the old release. Then update from a clean working tree with that
+command, which for a project with no adapter and no preset is
 
 ```bash
 npx shadcn add @ds/ds --overwrite -y

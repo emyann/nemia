@@ -9,8 +9,12 @@ import { tv, type VariantProps } from "../utils";
  *
  *   <TopAppBar
  *     title="Tables & QR"
- *     leading={<IconButton icon={MenuIcon} aria-label="Open navigation" />}
- *     actions={<IconButton icon={SearchIcon} aria-label="Search tables" />}
+ *     leading={
+ *       <IconButton variant="standard" icon={MenuIcon} aria-label="Open navigation" />
+ *     }
+ *     actions={
+ *       <IconButton variant="standard" icon={SearchIcon} aria-label="Search tables" />
+ *     }
  *   />
  *
  * Spec: https://m3.material.io/components/app-bars/overview · .../specs ·

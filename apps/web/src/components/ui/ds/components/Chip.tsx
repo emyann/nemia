@@ -492,7 +492,7 @@ export function ChipGroup({
         <span
           id={labelId}
           className={cn(
-            "text-title-small",
+            "text-title-small font-title-small",
             isDisabled ? "text-on-surface/38" : "text-on-surface",
           )}
         >
@@ -513,7 +513,7 @@ export function ChipGroup({
           id={messageId}
           role={showError ? "alert" : undefined}
           className={cn(
-            "text-body-small",
+            "text-body-small font-body-small",
             showError
               ? "text-error"
               : isDisabled

@@ -85,7 +85,7 @@ const styles = tv({
     leadingIcon:
       "size-6 shrink-0 text-on-surface-variant group-disabled/disclosure-trigger:text-on-surface/38",
     label:
-      "min-w-0 flex-1 text-title-medium text-on-surface group-disabled/disclosure-trigger:text-on-surface/38",
+      "min-w-0 flex-1 text-title-medium font-title-medium text-on-surface group-disabled/disclosure-trigger:text-on-surface/38",
     indicator: [
       "size-6 shrink-0 text-on-surface-variant",
       "transition-transform duration-medium-1 ease-standard",
@@ -94,7 +94,7 @@ const styles = tv({
     ],
     panel:
       "h-(--disclosure-panel-height) overflow-hidden motion-safe:transition-[height] motion-safe:duration-medium-2 motion-safe:ease-standard",
-    panelContent: "px-4 pt-1 pb-4 text-body-medium text-on-surface-variant",
+    panelContent: "px-4 pt-1 pb-4 text-body-medium font-body-medium text-on-surface-variant",
   },
   variants: {
     variant: {

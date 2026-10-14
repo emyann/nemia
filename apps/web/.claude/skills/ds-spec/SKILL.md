@@ -1,6 +1,6 @@
 ---
 name: ds-spec
-description: Read the current Material Design 3 spec, guidelines (Do/Don't), accessibility rules and component tokens straight from m3.material.io — no browser, cached per site version. Use before building, reviewing or migrating any MD3 component, and whenever a design decision cites Material.
+description: "Use when a design decision in this project's design system needs what Material Design 3 says: before building, reviewing or migrating a component in the ds folder (src/components/ui/ds), and whenever a size, a state, a colour role or a Do and Don't is in question. Reads the current spec, guidelines, accessibility rules and component tokens from m3.material.io, with no browser, cached per site version."
 ---
 
 # ds-spec — the Material 3 spec on demand

@@ -34,7 +34,7 @@ export default function ColorPicker(props: ColorPickerProps) {
   return (
     <AriaColorPicker {...rest}>
       <DialogTrigger>
-        <Button className="flex appearance-none items-center gap-2 rounded-shape-extra-small border-none bg-transparent p-0 align-middle text-body-large text-on-surface outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+        <Button className="flex appearance-none items-center gap-2 rounded-shape-extra-small border-none bg-transparent p-0 align-middle text-body-large font-body-large text-on-surface outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
           <ColorSwatch />
           <span>{label}</span>
         </Button>

@@ -15,7 +15,24 @@ import { tv, type VariantProps } from "../utils";
  * `colorRole` states the role explicitly when inheritance is not what you want
  * — secondary text under a heading (`colorRole="on-surface-variant"`), an
  * accent label on a neutral surface (`colorRole="primary"`). A `className`
- * still wins over it, through the kit's tailwind-merge. It is `colorRole` and
+ * still wins over it, through the kit's tailwind-merge.
+ *
+ * **The weight is the role's, from the theme.** No weight class is written
+ * here: each `text-<role>` utility carries its role's weight with its size,
+ * line height and tracking (`--md-sys-typescale-<role>-weight` in
+ * `tokens/theme.v4.css`), so a project whose `DESIGN.md` gives a role a
+ * weight gets it from these primitives, and one that gives none gets
+ * Material's: 500 for the labels, `title-medium` and `title-small`, 400 for
+ * the rest, `title-large` among them. A `className` with a weight of its own
+ * (`font-bold`) still wins.
+ *
+ * **The family is the role's too.** Each primitive writes `font-<role>`
+ * beside `text-<role>`. It reads `--md-sys-typescale-<role>-font`, the family
+ * a project's `DESIGN.md` writes on that role, and where it writes none the
+ * role's face: `brand` for display, headline and title, `plain` for body and
+ * label. A `className` with a family of its own still wins.
+ *
+ * It is `colorRole` and
  * not `color` because `color` is a real (deprecated) HTML attribute, and these
  * primitives are prop-forwarding targets: a wrapper that pipes
  * `ComponentPropsWithoutRef<"h3">` through would stop typechecking.
@@ -23,19 +40,21 @@ import { tv, type VariantProps } from "../utils";
 const typography = tv({
   base: "",
   variants: {
-    // Each role carries its face as well as its weight. Material splits the
-    // scale across two typefaces — `brand` for display / headline / title,
-    // `plain` for body / label — so a theme can set a display face without
-    // turning the running text over to it. Both resolve to the same
-    // `--font-inter` hook by default (tokens/theme.v4.css), so a kit that is
-    // not themed still renders one family throughout. A `className` with a
-    // `font-*` family of its own still wins, through the kit's merge.
+    // The family is the role's, in the `font-<role>` utility below, as the
+    // size is in `text-<role>`: Material gives each role a font token of its
+    // own, which reads one of its two faces (`brand` for display / headline /
+    // title, `plain` for body / label) unless the theme's DESIGN.md writes a
+    // family on the role. Both faces resolve to the same `--font-inter` hook
+    // by default (tokens/theme.v4.css), so a kit that is not themed still
+    // renders one family throughout. A `className` with a `font-*` family of
+    // its own still wins, through the kit's merge. No weight is written: it
+    // is the role's, in the `text-<role>` utility.
     variant: {
-      display: "font-brand font-regular",
-      headline: "font-brand font-regular",
-      title: "font-brand font-medium",
-      body: "font-plain font-regular",
-      label: "font-plain font-medium",
+      display: "",
+      headline: "",
+      title: "",
+      body: "",
+      label: "",
     },
     size: {
       large: "",
@@ -71,84 +90,77 @@ const typography = tv({
     {
       variant: "display",
       size: "large",
-      class: "text-display-large",
+      class: "text-display-large font-display-large",
     },
     {
       variant: "display",
       size: "medium",
-      class: "text-display-medium",
+      class: "text-display-medium font-display-medium",
     },
     {
       variant: "display",
       size: "small",
-      class: "text-display-small",
+      class: "text-display-small font-display-small",
     },
     {
       variant: "headline",
       size: "large",
-      class: "text-headline-large",
+      class: "text-headline-large font-headline-large",
     },
     {
       variant: "headline",
       size: "medium",
-      class: "text-headline-medium",
+      class: "text-headline-medium font-headline-medium",
     },
     {
       variant: "headline",
       size: "small",
-      class: "text-headline-small",
+      class: "text-headline-small font-headline-small",
     },
     {
       variant: "title",
       size: "large",
-      class: "text-title-large",
+      class: "text-title-large font-title-large",
     },
     {
       variant: "title",
       size: "medium",
-      class: "text-title-medium",
+      class: "text-title-medium font-title-medium",
     },
     {
       variant: "title",
       size: "small",
-      class: "text-title-small",
+      class: "text-title-small font-title-small",
     },
     {
       variant: "body",
       size: "large",
-      class: "text-body-large",
+      class: "text-body-large font-body-large",
     },
     {
       variant: "body",
       size: "medium",
-      class: "text-body-medium",
+      class: "text-body-medium font-body-medium",
     },
     {
       variant: "body",
       size: "small",
-      class: "text-body-small",
+      class: "text-body-small font-body-small",
     },
     {
       variant: "label",
       size: "large",
-      class: "text-label-large",
+      class: "text-label-large font-label-large",
     },
     {
       variant: "label",
       size: "medium",
-      class: "text-label-medium",
+      class: "text-label-medium font-label-medium",
     },
     {
       variant: "label",
       size: "small",
-      class: "text-label-small",
-    },
-    // title-large is the one title role Material sets at regular weight; it
-    // overrides the variant's `font-medium` and keeps its `font-brand` face.
-    {
-      variant: "title",
-      size: "large",
-      class: "font-regular",
+      class: "text-label-small font-label-small",
     },
   ],
   defaultVariants: {

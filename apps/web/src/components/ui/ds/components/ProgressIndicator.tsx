@@ -69,8 +69,8 @@ const styles = tv({
   slots: {
     base: "flex w-full flex-col gap-2",
     header: "flex items-baseline justify-between gap-2",
-    label: "text-label-large text-on-surface",
-    value: "text-label-medium text-on-surface-variant tabular-nums",
+    label: "text-label-large font-label-large text-on-surface",
+    value: "text-label-medium font-label-medium text-on-surface-variant tabular-nums",
     track: "relative w-full overflow-hidden rounded-shape-full",
     activeIndicator:
       "absolute inset-y-0 left-0 rounded-shape-full bg-primary transition-[width] duration-medium-2 ease-standard",

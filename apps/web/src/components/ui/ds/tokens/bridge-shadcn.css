@@ -13,6 +13,12 @@
      @import "./components/ui/ds/tokens/bridge-shadcn.css";
      @import "./components/ui/ds/tokens/theme.v4.css";
 
+   The whole install (`add @ds/ds`) writes none of this into the entry CSS:
+   this import is how a project gets it. A `:root` or `.dark` declaration of
+   one of these names in the entry CSS itself comes after every import and
+   wins: a palette of the project's own, or the blocks an install of 0.3.0 or
+   earlier wrote there, which can be deleted once this file is imported.
+
    Mapping rationale (shadcn meaning → MD3 role):
    - accent      "interactive hover/focus surface" → surface-container-high.
                  Never an accent *hue*: mapping it to tertiary painted every

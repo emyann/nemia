@@ -110,7 +110,7 @@ const comboBoxStyles = tv({
     chips: "contents",
     chip: [
       focusRing(),
-      "flex h-8 items-center gap-2 rounded-shape-small border border-outline-variant bg-surface-container-low pl-3 pr-1 text-label-large text-on-surface-variant transition-colors duration-short-4",
+      "flex h-8 items-center gap-2 rounded-shape-small border border-outline-variant bg-surface-container-low pl-3 pr-1 text-label-large font-label-large text-on-surface-variant transition-colors duration-short-4",
       "hover:bg-surface-container-high data-selected:border-transparent data-selected:bg-secondary-container data-selected:text-on-secondary-container",
       "group-data-disabled/tf:border-on-surface/12 group-data-disabled/tf:text-on-surface/38",
     ],
@@ -126,7 +126,7 @@ const comboBoxStyles = tv({
     listBox: "max-h-[inherit] overflow-auto outline-none",
     // Same 48dp row as `MenuItem`, but inert: it is a message, not an option.
     emptyState:
-      "flex min-h-[48px] items-center px-3 py-2 text-body-medium text-on-surface-variant",
+      "flex min-h-[48px] items-center px-3 py-2 text-body-medium font-body-medium text-on-surface-variant",
   },
 });
 

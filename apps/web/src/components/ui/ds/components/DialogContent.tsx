@@ -9,12 +9,10 @@ export const styles = tv({
     base: "bg-surface-container-high rounded-shape-extra-large p-6 min-w-[280px] w-full shadow-elevation-3 outline-hidden relative overflow-hidden",
     header: "mb-4",
     icon: "text-secondary",
-    // No weight here: the headline this styles is `Headline`, which carries
-    // MD3's regular weight for the role. It used to read `font-medium` and
-    // still rendered at 400, because tailwind-merge classified the primitive's
-    // `font-regular` as a *family* and kept both classes — with `.font-regular`
-    // emitted later, so it won the cascade. That is fixed in `twMergeConfig`
-    // (utils.ts), which would have turned every dialog title 500.
+    // No weight here: the headline this styles is `Headline`, and its weight
+    // is its role's, from the theme (MD3's regular unless the project's
+    // DESIGN.md says otherwise). A weight class written here would win over
+    // the theme's.
     title: "text-on-surface",
     supportingText: "text-on-surface-variant",
     actions: "mt-6 flex justify-end space-x-2",

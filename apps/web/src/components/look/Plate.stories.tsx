@@ -21,4 +21,4 @@ export const Quiet: StoryObj = { render: () => <Plate count={0} title="Waiting o
 export const NameOfAPage: StoryObj = { render: () => <PageName>Runs</PageName> };
 
 /** A page's long name: its rule lit under the whole name, past where a short one's stops. */
-export const LongNameOfAPage: StoryObj = { render: () => <PageName>Factories and their workflows</PageName> };
+export const LongNameOfAPage: StoryObj = { render: () => <PageName>Factories</PageName> };

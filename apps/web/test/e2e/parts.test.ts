@@ -760,7 +760,7 @@ test(
       );
       assert.deepEqual(
         measured.map((one) => one.name).toSorted(),
-        ['Factories and their workflows', 'Runs'],
+        ['Factories', 'Runs'],
         "the plate's stories draw a short name and a long one",
       );
       for (const one of measured) {

@@ -287,7 +287,7 @@ test('a step done is filled in the rail whether a check says so or its own word 
 
 test("a page's name stands over a hairline, lit under the name alone, as wide as the name and never a fixed width", async () => {
   // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
-  const html = await drawn(createElement(PageName, { children: 'Factories and their workflows' }));
+  const html = await drawn(createElement(PageName, { children: 'Factories' }));
   const [name, rule, text, lit] = ['data-page-name', 'data-page-rule', 'data-page-name-text', 'data-page-rule-lit'].map((mark) =>
     tagWith(html, `${mark}[ >=]`),
   );
@@ -306,7 +306,7 @@ test("a page's name stands over a hairline, lit under the name alone, as wide as
   assert.doesNotMatch(lit, /\bw-|\d+px|width/, 'the lit part has no width of its own');
   assert.match(
     html,
-    /<span data-page-name-text[^>]*>Factories and their workflows<span aria-hidden="true" data-page-rule-lit/,
+    /<span data-page-name-text[^>]*>Factories<span aria-hidden="true" data-page-rule-lit/,
     'the lit part hangs from the name',
   );
 });

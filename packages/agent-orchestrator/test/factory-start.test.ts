@@ -412,6 +412,14 @@ test('nemia start <name> of an inbox card starts it as its path does: its body, 
   );
   assert.equal(text.brief, 'no-such-card', 'a name no card has stays a text brief');
   assert.equal('from' in text, false);
+
+  const shadowed = aCard('shadowed', 'From the card.\n');
+  fs.writeFileSync(path.join(elsewhere, 'shadowed'), 'From the file.\n');
+  const file = readRun(
+    startedId(await typedFrom(elsewhere, ['start', 'shadowed', '--factory', 'pipao', '--workflows', build, '--no-worktree'])),
+  );
+  assert.equal(file.brief, 'From the file.', 'a file of that name where it is typed is the brief');
+  assert.ok(fs.existsSync(shadowed), 'the card of that name stays in the inbox');
 });
 
 test('a card of a factory with two repositories runs where it is started when that is one of them, else is refused naming both, nothing written and the card kept', async () => {

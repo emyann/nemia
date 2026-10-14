@@ -223,6 +223,7 @@
   --md-sys-shape-corner-small: 8px;
   --md-sys-shape-corner-medium: 12px;
   --md-sys-shape-corner-large: 16px;
+  --md-sys-shape-corner-large-increased: 20px;
   --md-sys-shape-corner-extra-large: 28px;
   --md-sys-shape-corner-full: 9999px;
 
@@ -463,6 +464,7 @@
   --radius-shape-small: var(--md-sys-shape-corner-small);
   --radius-shape-medium: var(--md-sys-shape-corner-medium);
   --radius-shape-large: var(--md-sys-shape-corner-large);
+  --radius-shape-large-increased: var(--md-sys-shape-corner-large-increased);
   --radius-shape-extra-large: var(--md-sys-shape-corner-extra-large);
   --radius-shape-full: var(--md-sys-shape-corner-full);
 

@@ -46,11 +46,15 @@ react-hook-form adapter are not part of the whole-kit install: add
 `@ds/react-hook-form-adapter` when the project needs one. Without a router
 adapter, `href` on a `Button`, `Chip` or menu item does a full page load.
 
-The kit holds what Material 3's specification describes, and a closed group
+The kit holds what Material 3's specification describes, and a named group
 of components of its own: each of those says "Material 3 does not describe
-this component." in its doc comment. A component the kit does not have is the
-project's: it is written beside the kit, not inside it, on
-`react-aria-components`, following the rules below.
+this component." in its doc comment and cites, beside it, the Material page
+of each thing it borrows. A React Aria component that Material 3 does not
+describe joins that group when a project needs it, asked of the kit and
+built there from Material's foundations and the nearest Material component.
+Until then, and for anything neither Material nor React Aria describes, a
+component the kit does not have is the project's: it is written beside the
+kit, not inside it, on `react-aria-components`, following the rules below.
 
 What the project's own component follows:
 
@@ -115,7 +119,7 @@ file, `<kit>/tokens/bridge-shadcn.css`, where the entry CSS imports it. `bg-prim
   else the system's: write it where the project wants one (an identifier, a
   time, an amount). No kit component uses it.
 - **Shape**: `rounded-shape-extra-small`, `-small`, `-medium`, `-large`,
-  `-extra-large`, `-full`. Never `rounded-lg`: it does not follow the theme.
+  `-large-increased`, `-extra-large`, `-full`. Never `rounded-lg`: it does not follow the theme.
 - **Elevation**: `shadow-elevation-1` to `shadow-elevation-5`.
 - **Motion**: `duration-short-1` to `duration-long-4`, `ease-standard`,
   `ease-emphasized` and their `-accelerate` / `-decelerate` forms. Enter with
@@ -150,8 +154,8 @@ opacity follows the state.
 - Every kit root carries `data-slot="<component>"`. Target a part by its slot,
   never by a class name.
 - Anything backed by React Aria is a client component. `Card`, `ListItem`,
-  `MenuItem`, `Tag`, `Divider`, `TopAppBar`, `EmptyState`, `DialogContent` and
-  the type primitives render on the server.
+  `MenuItem`, `Tag`, `Badge`, `Divider`, `TopAppBar`, `EmptyState`,
+  `DialogContent` and the type primitives render on the server.
 - Icons are any component taking `{ size, className }`. The kit ships no icon
   library.
 
@@ -169,7 +173,8 @@ One rule: **an edit of a kit file is allowed, priced and rarely needed.**
 - **Rarely needed.** First try, in order: a token in `DESIGN.md` (the
   `ds-theme` skill), a `className` on the component, a class on one of its
   named parts through `classNames` (on a component whose doc comment lists
-  its parts: `Tooltip`, `Card`, `Table`'s `Column` and `Cell`, `IconButton`;
+  its parts: `Tooltip`, `Card`, `Carousel` and `CarouselItem`, `Table`'s
+  `Column` and `Cell`, `IconButton`;
   a part's name is a prop, and a release that renames one lists it as a
   break), a wrapper component in the project, a new component beside the
   kit. Edit a kit file last, and write

@@ -30,8 +30,10 @@
                   (`display-large` names the brand face, `body-large` the
                   plain one), and `mono`: the `fontFamily` of the face the project
                   reaches for with `font-mono`. No kit component uses it.
-     rounded      the 6 corners (`extra-small` … `full`, or the format's
-                  short `xs`, `sm`, `md`, `lg`, `xl`).
+     rounded      the 7 corners (`extra-small` … `full`, or the format's
+                  short `xs`, `sm`, `md`, `lg`, `xl`). `large-increased` has
+                  no short name; a file that writes `large` and not it gets
+                  its `large` value for it.
 
    What the body means to the kit: under `## Reference CSS`, the first `css`
    fence, and in it the first top-level `:root` rule.
@@ -244,6 +246,7 @@ export const CORNER_DEFAULTS = {
   small: "8px",
   medium: "12px",
   large: "16px",
+  "large-increased": "20px",
   "extra-large": "28px",
   full: "9999px",
 };
@@ -986,6 +989,7 @@ function deriveTypography(front, warnings) {
 function deriveRounded(front, warnings) {
   const written = section(front, "rounded");
   const rounded = { ...CORNER_DEFAULTS };
+  const writes = new Set();
   for (const [step, value, key] of byMaterialName(
     written,
     "rounded",
@@ -994,6 +998,7 @@ function deriveRounded(front, warnings) {
   )) {
     if (Object.hasOwn(rounded, step)) {
       rounded[step] = oneValue(`rounded.${key}`, value, CORNER_FORM);
+      writes.add(step);
     } else {
       warnings.push({
         kind: "ignored",
@@ -1001,6 +1006,12 @@ function deriveRounded(front, warnings) {
         message: `rounded.${step} is not a Material corner: ignored`,
       });
     }
+  }
+  // `large-increased` joined the corners after files were written without
+  // it: a file that sets its own `large` (a square theme, say) keeps that
+  // corner on what draws at `large-increased`, rather than Material's 20px.
+  if (writes.has("large") && !writes.has("large-increased")) {
+    rounded["large-increased"] = rounded.large;
   }
   return rounded;
 }

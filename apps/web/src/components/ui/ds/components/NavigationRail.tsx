@@ -7,7 +7,11 @@ import {
   Link as AriaLink,
 } from "react-aria-components";
 
-import type { NavigationItem } from "./BottomNavigation";
+import { Badge, hasBadge } from "./Badge";
+import {
+  destinationName,
+  type NavigationItem,
+} from "./BottomNavigation";
 import StateLayer from "../primitives/StateLayer";
 import { Label } from "../primitives/Typography";
 import { focusRing, tv } from "../utils";
@@ -50,8 +54,12 @@ import { focusRing, tv } from "../utils";
  * menu button, a FAB, or both (its "Configurations" figure). It keeps the 40dp
  * minimum gap the spec asks for (`…item.header-space-minimum`).
  *
- * Deviations, the same three `BottomNavigation` documents: no badges (the
- * token set deprecates them and the kit has no Badge), no filled active icon
+ * A destination's `badge` is the kit's `Badge`, read after its name. It sits
+ * on the icon; on an expanded rail, where the label follows the icon, a large
+ * badge goes to the trailing edge of the pill instead, as Material's badge
+ * guidelines ask, and the small dot stays on the icon.
+ *
+ * Deviations, the two `BottomNavigation` documents: no filled active icon
  * unless the item carries an `activeIcon` (the kit ships no icon library to
  * pull the filled member from), and the baseline rail rather than any
  * Expressive variant.
@@ -65,8 +73,11 @@ const styles = tv({
     list: "flex list-none flex-col",
     item: "",
     destination: [focusRing(), "flex w-full items-center"],
+    // Does not clip, so a badge on the icon may reach past the pill.
     indicator:
-      "relative flex shrink-0 items-center justify-center overflow-hidden rounded-shape-full transition-colors duration-short-4",
+      "relative flex shrink-0 items-center justify-center rounded-shape-full transition-colors duration-short-4",
+    // The icon's 24dp box, which a badge is anchored on.
+    iconBox: "relative flex shrink-0",
     icon: "transition-colors duration-short-4",
     label: "transition-colors duration-short-4",
   },
@@ -229,6 +240,11 @@ function Destination({
 }) {
   const s = styles({ isActive, isExpanded, isNarrow });
   const Icon = (isActive && item.activeIcon) || item.icon;
+  const name = destinationName(item);
+  // A count after the label on the expanded pill; the dot, and any badge on
+  // a collapsed rail, on the icon.
+  const isTrailingBadge =
+    isExpanded && hasBadge(item.badge) && item.badge !== true;
 
   const content = ({
     isHovered,
@@ -237,11 +253,19 @@ function Destination({
   }: DestinationRenderProps) => {
     const iconAndLabel = (
       <>
-        <Icon size={24} className={s.icon()} />
+        <span className={s.iconBox()}>
+          <Icon size={24} className={s.icon()} />
+          {item.badge !== undefined && !isTrailingBadge ? (
+            <Badge value={item.badge} anchored />
+          ) : null}
+        </span>
         {isExpanded ? (
           <Label component="span" size="large" className={s.label()}>
             {item.label}
           </Label>
+        ) : null}
+        {isTrailingBadge ? (
+          <Badge value={item.badge} className="ms-auto" />
         ) : null}
       </>
     );
@@ -256,6 +280,7 @@ function Destination({
             isHovered={isHovered}
             isPressed={isPressed}
             isFocusVisible={isFocusVisible}
+            className="rounded-[inherit]"
           />
           {iconAndLabel}
         </span>
@@ -273,7 +298,7 @@ function Destination({
     "data-slot": "navigation-rail-item",
     "data-active": isActive || undefined,
     "aria-current": isActive ? ("page" as const) : undefined,
-    "aria-label": item.ariaLabel,
+    "aria-label": name,
     onPress: onSelect,
     className: s.destination(),
   };

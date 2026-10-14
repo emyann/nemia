@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef } from "react";
+import { forwardRef, useContext } from "react";
 import { focusRing, tv } from "../utils";
 import type React from "react";
 import {
@@ -15,14 +15,22 @@ import {
 } from "react-aria-components";
 import StateLayer, { type StateLayerColor } from "../primitives/StateLayer";
 import { type IconComponent } from "../icons";
+import {
+  ButtonGroupContext,
+  type ButtonSize,
+  connectedItemStyles,
+  standardPressedIconButtonStyles,
+} from "./ButtonGroup";
+import { Badge, badgeAccessibleText, type BadgeValue } from "./Badge";
 
 const styles = tv({
   slots: {
     base: [
       focusRing(),
-      "relative inline-flex shrink-0 items-center justify-center rounded-shape-full text-sm font-medium transition-colors duration-short-4 p-0",
+      "relative inline-flex shrink-0 items-center justify-center rounded-shape-full transition-all duration-short-4 ease-standard p-0",
     ],
-    icon: "inline-flex",
+    // Positioned, so a badge is anchored on the icon's corner.
+    icon: "relative inline-flex",
   },
   variants: {
     variant: {
@@ -174,7 +182,7 @@ const styles = tv({
 });
 
 type IconButtonVariant = "standard" | "filled" | "tonal" | "outlined";
-type IconButtonSize = "xsmall" | "small" | "medium" | "large" | "xlarge";
+type IconButtonSize = ButtonSize;
 type IconButtonSelection = "none" | "unselected" | "selected";
 
 /** Material's icon size in each container (`md.comp.icon-button.<size>.icon.size`). */
@@ -191,7 +199,7 @@ type BaseIconButtonProps = {
   variant?: IconButtonVariant;
   /**
    * Material's five sizes: 32, 40, 56, 96 and 136 pixels square. Default
-   * `small`, Material's.
+   * `small`, Material's, or the size of the group the button is in.
    */
   size?: IconButtonSize;
   /**
@@ -201,6 +209,14 @@ type BaseIconButtonProps = {
   isContained?: boolean;
   icon: IconComponent;
   "aria-label": string;
+  /**
+   * A badge on the icon: a count, a short status, or `true` for the small
+   * dot. Its words are joined to `aria-label` ("Notifications, 3").
+   */
+  badge?: BadgeValue;
+  /** What the badge says to a screen reader, when the count alone is not
+      enough ("3 unread"). */
+  badgeLabel?: string;
   /** Classes for the named parts. */
   classNames?: {
     icon?: string;
@@ -257,6 +273,15 @@ type IconButtonProps = StandardIconButtonProps | ToggleIconButtonProps;
  * cuts the target at its edge: a `Table` does, so a button in its last row
  * answers down to the table's edge and no further.
  *
+ * In a `ButtonGroup` it takes the group's size where it sets none, and the
+ * group's corners (connected) or pressed width (standard).
+ *
+ * **Badge.** `badge` draws the kit's `Badge` on the icon's top trailing
+ * corner, and its words follow the label in the button's name ("Notifications,
+ * 3"; "Notifications, New notification" for `badge` true), as Material's
+ * badges page asks. Material suggests the small badge where room is tight, as
+ * in an app bar.
+ *
  * Parts, each with its `data-slot` and its key in `classNames`: `icon`
  * (`icon-button-icon`). The root is `data-slot="icon-button"` with
  * `data-variant` and `data-size`, and takes `className`.
@@ -271,7 +296,6 @@ type IconButtonProps = StandardIconButtonProps | ToggleIconButtonProps;
  * - **Filled icon when selected**: a selected toggle should show the filled
  *   version of its icon. The button draws the `icon` it is given; swap it
  *   from the toggle's state.
- * - **Button groups**: neighbours that answer to each other's press.
  *
  * Not Material's:
  * - **`isContained`**: `isContained={false}` on `filled` or `tonal` draws only
@@ -292,6 +316,29 @@ const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
 
 IconButton.displayName = "IconButton";
 
+/** The size an icon button draws at, and what its group adds. */
+function useGroupLayout(sizeProp: IconButtonSize | undefined) {
+  const group = useContext(ButtonGroupContext);
+  const size = sizeProp ?? group?.size ?? "small";
+  const groupStyles =
+    group?.variant === "connected"
+      ? connectedItemStyles[size]
+      : group?.variant === "standard"
+        ? standardPressedIconButtonStyles[size]
+        : "";
+  return { size, groupStyles };
+}
+
+/** The button's name with its badge's words after it. */
+function nameWithBadge(
+  ariaLabel: string,
+  badge: BadgeValue | undefined,
+  badgeLabel: string | undefined,
+) {
+  const text = badgeAccessibleText(badge, badgeLabel);
+  return text === undefined ? ariaLabel : `${ariaLabel}, ${text}`;
+}
+
 /** Material's filled and tonal buttons draw their container. */
 function resolveContained(
   isContained: boolean | undefined,
@@ -302,6 +349,7 @@ function resolveContained(
 
 type IconButtonContentProps = {
   icon: IconComponent;
+  badge?: BadgeValue;
   variant: IconButtonVariant;
   size: IconButtonSize;
   isContained: boolean;
@@ -311,6 +359,7 @@ type IconButtonContentProps = {
 
 function IconButtonContent({
   icon: Icon,
+  badge,
   variant,
   size,
   isContained,
@@ -335,6 +384,7 @@ function IconButtonContent({
       />
       <span data-slot="icon-button-icon" className={icon({ className })}>
         <Icon size={iconSizes[size]} />
+        {badge !== undefined ? <Badge value={badge} anchored /> : null}
       </span>
     </>
   );
@@ -349,9 +399,11 @@ const StandardIconButton = forwardRef<
     classNames,
     isContained: isContainedProp,
     variant = "filled",
-    size = "small",
+    size: sizeProp,
     icon,
-    "aria-label": ariaLabel,
+    badge,
+    badgeLabel,
+    "aria-label": label,
     href,
     target,
     rel,
@@ -360,17 +412,22 @@ const StandardIconButton = forwardRef<
     ...buttonProps
   } = props;
   const isContained = resolveContained(isContainedProp, variant);
+  const { size, groupStyles } = useGroupLayout(sizeProp);
+  const ariaLabel = nameWithBadge(label, badge, badgeLabel);
 
   const baseStyles = composeRenderProps(
     className,
     (className, { isDisabled }: IconButtonRenderProps) =>
-      styles({ variant, size, isContained, isDisabled }).base({ className }),
+      styles({ variant, size, isContained, isDisabled }).base({
+        className: [groupStyles, className],
+      }),
   );
 
   const content = (renderProps: IconButtonRenderProps) => (
     <IconButtonContent
       {...renderProps}
       icon={icon}
+      badge={badge}
       variant={variant}
       size={size}
       isContained={isContained}
@@ -430,15 +487,19 @@ const ToggleIconButton = forwardRef<HTMLButtonElement, ToggleIconButtonProps>(
     const {
       isContained: isContainedProp,
       variant = "filled",
-      size = "small",
+      size: sizeProp,
       className,
       classNames,
       icon,
+      badge,
+      badgeLabel,
       isSelected,
-      "aria-label": ariaLabel,
+      "aria-label": label,
       ...toggleButtonProps
     } = props;
     const isContained = resolveContained(isContainedProp, variant);
+    const { size, groupStyles } = useGroupLayout(sizeProp);
+    const ariaLabel = nameWithBadge(label, badge, badgeLabel);
 
     const baseStyles = composeRenderProps(
       className,
@@ -449,7 +510,7 @@ const ToggleIconButton = forwardRef<HTMLButtonElement, ToggleIconButtonProps>(
           isContained,
           isDisabled,
           selection: isSelected ? "selected" : "unselected",
-        }).base({ className }),
+        }).base({ className: [groupStyles, className] }),
     );
 
     return (
@@ -469,6 +530,7 @@ const ToggleIconButton = forwardRef<HTMLButtonElement, ToggleIconButtonProps>(
           <IconButtonContent
             {...renderProps}
             icon={icon}
+            badge={badge}
             variant={variant}
             size={size}
             isContained={isContained}

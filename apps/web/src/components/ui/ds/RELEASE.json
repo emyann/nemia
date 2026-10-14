@@ -1,5 +1,5 @@
 {
-  "version": "0.4.0",
+  "version": "0.5.0",
   "kit": {
     "DESIGN.md": {
       "exact": "b69a94a40d70a369e1ea253ebb6620c9ce7d1fd1e83581ec68fcccd23c588257",
@@ -29,17 +29,33 @@
       "exact": "f672b4d9473a458826ccf7c7d381e117d5d84ebd4416944339a38e42960cc3c9",
       "loose": "4c864c3bc5bbc2338d731d3157465452c4b93ff2f12ff2322d49b21b13105a54"
     },
+    "components/Badge.tsx": {
+      "exact": "9d827878b85d1ea429d4a95a682a0954afcb159dc4c3b85dd6aced6dfe6d00bf",
+      "loose": "502fec350e318c0116e4b5d8455167153a19592179bf1583dd2bc13c94eb2616"
+    },
     "components/BottomNavigation.tsx": {
-      "exact": "07b194ebaed19e70ea0c05c27e8769cd9ad5e7629a6d0d3f8a3acb7ff1685144",
-      "loose": "a7c49fbad818e5a01fee0a1d040ea20358460d16db6ea1f337d0ed764edea7e1"
+      "exact": "1bf0141f41ecb2ff51b9961cd4dd61cb65ecdd49fff5ce6b80958a828316c1c6",
+      "loose": "cdff6130e3a2a6f395c3eb67ec802ce515d992a1f398839230281825658b9530"
+    },
+    "components/BottomSheet.tsx": {
+      "exact": "58caabca1be0d7d8493b364fae667476c206839960c114503b4375c3a9e23e18",
+      "loose": "14fc1cde8b81745c93b15a9d6d293fcd2f1c5c8d448410e396c495ba23206d70"
     },
     "components/Button.tsx": {
-      "exact": "2a62ed8e6fd36f567555b0d11a078385022b4b35f218d058a7746316e1c82b02",
-      "loose": "d03d831512d711767e9804d09d2e694838b336f98e7946400be78a1ba30d39e9"
+      "exact": "98fbfef79bf8bea9bd4289e12cf0add3977f03d9f9d0319b39ecdee317ef54d5",
+      "loose": "2df4d03853a75962e406b5f90d7e42fb421af68015a752774048e4ccea9c9495"
+    },
+    "components/ButtonGroup.tsx": {
+      "exact": "553f15fce4aee51f2e135475136420335eb369ede75ce0109155b0ddabfcbf04",
+      "loose": "e9f593c7ef44a91d4bcf69a43596eb15d66fb72c2757c711c324ef850f02476b"
     },
     "components/Card.tsx": {
       "exact": "91f305b861239d5f14db72066b2f54e5bed06115ab512b730f0a8a976b0154c6",
       "loose": "4aaf9f4a199060a1c012bb28826a23522ec902d3c1ccbe066c61cf582bfdbfae"
+    },
+    "components/Carousel.tsx": {
+      "exact": "7578f52f8091a3b5fbbf59beaa353bedb24876d5c4a5adff07d29788a4642c23",
+      "loose": "e265ca2edcc0bc2d1963add138fb567a2dd8384c685774c6a4a2b805da6da2f5"
     },
     "components/Checkbox.tsx": {
       "exact": "19f5ae25c5000f5c6ced78744da05536b0b41bd87f8bd71cb1e2595254728c24",
@@ -52,6 +68,10 @@
     "components/ComboBox.tsx": {
       "exact": "21345adf95fa26c1986c44a5b8113764416d61dc20dc40a35c166ab5d59f739b",
       "loose": "8d22890c2d43d4a2da90e68973555867862199394d50e87a119b4a672b1703bf"
+    },
+    "components/DatePicker.tsx": {
+      "exact": "40d00b4c2a4e09e529611432075c960b8979262f701b1dd0f90956a6ac290b3c",
+      "loose": "3bab2800b673ec4c1f29c83cf98e17af96e73784b79fdec979b7eb13646ce416"
     },
     "components/Dialog.tsx": {
       "exact": "98005744882b856c2fbca34639f84d31d17ebec1ebfd33875cf4f262eac245e8",
@@ -73,13 +93,17 @@
       "exact": "4bdb5d899049d815309a7ec375947cb2c554a0a15730d850576e03fba06197fa",
       "loose": "045897835f23fa5494b23889cf9c2d28ea1fa17d637a6900ed0121ec65bacc25"
     },
+    "components/FabMenu.tsx": {
+      "exact": "3eca2e25b49ab37887f011172aae13038a585cc200681db4e001fc2bc0ae1b24",
+      "loose": "4fb2881fa30890bbfbb8fe8b87f7102e8c62e77615f9c455495ea997522007a9"
+    },
     "components/GridList.tsx": {
       "exact": "b8a26ad6c931e2153819aca554229d8f53b8a6e82b8c78b99299eaff24790ccd",
       "loose": "994f8e94e3b7b23a64cf5ba42507caac2f1e9fe8f7bc4993f561ac74a81b1d4e"
     },
     "components/IconButton.tsx": {
-      "exact": "a6322320b9c6221a95e5ee8f7b92146d7bad3692f623357feb8d59abc43e1634",
-      "loose": "8bc2a6ce47383084ecbd233c7b398adde7f6ff8540f7a47c930d5bfd6eb5bb4e"
+      "exact": "45079374c064c9abc7a698c978331480c739fd482ea47b06fa94a7e0e9c4893c",
+      "loose": "324c02a21280f7d18f6adf635923c1809328ce775fe1b91eff0e8cb9a83b2c1f"
     },
     "components/ImageField.tsx": {
       "exact": "6dc9628d6708510ef5741ed6fa703d77232432a8a16289cd84a0aba11a431b34",
@@ -89,13 +113,21 @@
       "exact": "82645fe292add1799a09e78b46c57493fe9dd2eb9986ab9ff30e13969dc80999",
       "loose": "8d16eb375c0889eeaee6175448396f23c3911eacc2b25448584c3d47911b5c46"
     },
+    "components/LoadingIndicator.tsx": {
+      "exact": "61cea7e289ce7c7edf37f8d6c49d0094aa9d793c5e2fe7bdeccb609b08a8bffc",
+      "loose": "75247e272f164fc1047b6c0e209d741a192592092c1a5c4a403c6b668ee77a1b"
+    },
     "components/Menu.tsx": {
-      "exact": "3b95968c473e078e2ce47bf6c55d9b21807d0b4d5503715f3b99a6be4c45560e",
-      "loose": "df3336d3ad1d2b2e6fba63c91c618bd0b206c44262f71599c5301cdbc9da1f41"
+      "exact": "cd12d68e062ea0675279da7e698cb3809ba9f634896a57302dad0cf11b584dd0",
+      "loose": "2835412bc7157c7fce7790c4c0f85f98836c6bdd6c236f3d713f1693dd1050b1"
     },
     "components/MenuItem.tsx": {
       "exact": "a4fcd95871b64cf9cdfedfb9b0c6424abd0d5dbf39d8b42f87dddb0c1b7ca6cd",
       "loose": "0d0053b93ee282d6296696014e85784cebc1395f0fe3cae7706df09be24631ac"
+    },
+    "components/Meter.tsx": {
+      "exact": "facb9d17c96dc4e3e88f973aa7f2cf5b50d376c3296ffc89ec80951d0691bd31",
+      "loose": "1fa95ea5c9b8c12654fdc88c058a8fc6e670e147e9581acf62a12103758fb999"
     },
     "components/Modal.tsx": {
       "exact": "55b28c6a72fffe367562a573b0c4b5041c3a56e4571646f9e3933bbe5d128f08",
@@ -106,12 +138,12 @@
       "loose": "bd5e68c1dedcbd119532e8fefa92b1d067bc4d8ff1ecf371c16ac9289ad1cc06"
     },
     "components/NavigationDrawer.tsx": {
-      "exact": "2b288f8a3b2da90ac33507a868096c25c74ddf0b8a4f729c6997381adcdf839e",
-      "loose": "1c52918a8bfc7c275ecbbd749598b7361bea49424798b587656875895060d7a5"
+      "exact": "dca9ffd7c06fb6549a51db02d782a3510d311eb5cc5bc5fa35ceea33789ddd16",
+      "loose": "c8ca802d5817deccab04f94755cfa445ebd46577ead396bcd918fefa47772c98"
     },
     "components/NavigationRail.tsx": {
-      "exact": "aedce18e62efc6205c11dda5855905d3f0e843d861da7b81b2902a589547f084",
-      "loose": "9cba80b3c5afd22e9a797ee77c74a0911c14f882451a6a23d9e891418e755899"
+      "exact": "7dfc6763495cc303b4e22cc3a04ed4f8b2012d1664a8502c71751872c5c8a3a2",
+      "loose": "015f12c7a4bf5d3524f1a6688eadf4f03f83aa963e1baaa7768a0cefd348689a"
     },
     "components/NumberField.tsx": {
       "exact": "78d4ed8fc30b1eb64262cf5684e38351d5cd4ceb1ffe683f67189886c1e93b19",
@@ -133,6 +165,14 @@
       "exact": "bb968a1e3eca362295bb1c75e3d9bf0367f8507949f5645eaf927c9a5481e534",
       "loose": "0ee42af4b8a4f2e01f05ef1cbb3b5e945a309fc8a7f90a4545273d3e2f579d03"
     },
+    "components/Search.tsx": {
+      "exact": "7223e3ab47edf600c95606d4cf3f7c3ea1f758aee4da60f769378a27e5ccf123",
+      "loose": "40aea7a8a2ca9cfa5afeec73e20fd63c58c9df70df816241e15f32179ddcc14e"
+    },
+    "components/SegmentedButton.tsx": {
+      "exact": "60bb0f1e8483f25c55a47e18406bf9b3b18c2385cdd0fe8ba0bf172eb542b592",
+      "loose": "575f0fc0a9fa33b065deaa6d2ace3b5731177ddef711db14c4036c9cb506348d"
+    },
     "components/Select.tsx": {
       "exact": "44115ff11c3a8e44f88e1bfb2657975570d694d575bdba085ed2a0ff7e3fa9d9",
       "loose": "bf4ed589779fe40c23918be66dde4f5dcc541c3e1bba28a635dfe20cbbf24415"
@@ -149,6 +189,10 @@
       "exact": "9dc137813948faf676c941e937ac25ca780b4fa325e318b4324be54dca46649b",
       "loose": "64799b7cc5cc4af8974cb8392d1720899a8d1e970115e97f5734ba988f665cf6"
     },
+    "components/SplitButton.tsx": {
+      "exact": "92d0cecd899df67ccdf3479cb7926b71cfdfd726cdb4b6dd0b47159c8b2124ed",
+      "loose": "ab7f99eaf5cdc9342a106e568bb5ce46cd8f6386acac8c33311071df97472563"
+    },
     "components/Switch.tsx": {
       "exact": "228f0b73088eaafb523d68c9be5afa086b1819ca117c3295c9ddf9400a63c46e",
       "loose": "83aafd789252da74bcc09d753ae596abd97d7211427993a2476afd0fdfd0b80c"
@@ -158,24 +202,32 @@
       "loose": "c6f6d6ccb12943815ed8b73b671136267d13f52908c09fe72f1b1ff9864fa0fb"
     },
     "components/Tabs.tsx": {
-      "exact": "32446b5210dcd9767d35dbb2cffda81f723a044c265d55c841c908abbdca12a7",
-      "loose": "d5a2989578d6faac4c80f1b45fb1401a0d23e395581a42b650cb481f2b5ff7fa"
+      "exact": "47bd316bb9bc2da51b1b649d438544af97ae1933cb70230ff401700dde84772e",
+      "loose": "60d4906e920cf548762a0c6a0cf60e9df85d9104b3f1bf6fc5d670fe2b701213"
     },
     "components/Tag.tsx": {
-      "exact": "6bdaaa49cecc55118ec275603cce693581ef0117ecc690835cb41b9f2d2607fb",
-      "loose": "56d3067209aa163e4f154a846f49206e845e26512d29bec1a15a8b84c3d73cc5"
+      "exact": "b66f47a4644bd964791d7353ca87edd3b0516759b2a55c43a52caf9264655173",
+      "loose": "0bf367f8e24c9f68ed70174c37b55cb6eb2dcbeb240d7ee86bf07da3943f39a6"
     },
     "components/TextField.tsx": {
       "exact": "b17222ef688a65605f90ddfb59ef6b37a215ef80d793cffc9582d96a0b63a224",
       "loose": "62eec8a6e70c97d695ce0a6cc3e53b51a86d4480730146cca6ae71fe3808d1e5"
+    },
+    "components/TimePicker.tsx": {
+      "exact": "fad21c76b45950471c492626b8aa11c56fb47e875329d4cdfa7018a6890f537b",
+      "loose": "0ef559a2649986b91320fd044fffacad00c0b6e25124e90c0d682f461bfe69cb"
+    },
+    "components/Toolbar.tsx": {
+      "exact": "2265ae8436ce64de6cf49e668134dd07f92aef00686aca82f74f18e168a9edb9",
+      "loose": "8cf07bec385f7331c4caba970544fa771a9cecc94a6ba387e4700b89ad08c717"
     },
     "components/Tooltip.tsx": {
       "exact": "798dd5a93037a87bc993cc448e01ccb3c22c59ce96fbda45e52212e7dac5f9f8",
       "loose": "3dc043a82ab0715febc001e9f598e2d372a49fb9b3ccf7a73ba4c1e818ab3c21"
     },
     "components/TopAppBar.tsx": {
-      "exact": "fadb105e1ff1c6427d31fcd0e4932add1e496379cc794d37c4fcbdc6c92dbf77",
-      "loose": "5a03b7d60fa963d962622dd0b0c372f006dc060734c8d9d5560cc13fbebd217b"
+      "exact": "e4ac6df1149e69e018e40852ed3dcbc210fc8b91f8d1065a813b95c8c22dc034",
+      "loose": "7861b01aff96a838ce94078efe0e5157d2bfaa9b1fe4c4cd5874488398144cc9"
     },
     "components/color/ColorArea.tsx": {
       "exact": "6302d35513b8163836e1b24088be8acb7aa2f81eaa64df61e118ae03f5dfe253",
@@ -197,20 +249,28 @@
       "exact": "22fc6d0563404252d772b4cf6b5047af3502d17b700c08f1efcf3d512d7c912d",
       "loose": "f7b4cda9634037cc53d91536e59888fc78850d27566212cdf25a176107f12440"
     },
+    "components/date-picker-styles.ts": {
+      "exact": "1087af81017a72b4a5a442c9330964a852762ca914e7f1715d4fe35334fff3ed",
+      "loose": "e19494870c03c35acc137005dcbd70de477fdb7fe686fecbfc4d2acbe20f7639"
+    },
     "components/field-styles.ts": {
-      "exact": "95badd11c6066e064e2149b9951b78a68378d6554e1d1680af576b66785e37c1",
-      "loose": "239a57fa4648928f9ba07df1732e71643cce82b69f5799eddfdc5439f3c4f49c"
+      "exact": "d1e7b15366f4f6da4b647ad9ba90b252c0a7d83b9d42450a0ea7715e2a84f2e2",
+      "loose": "25eb4e26e61fe2094c7674ea8dcaf3950c7da5faa4c0da8d22ee0475898f3f64"
+    },
+    "components/picker-dialog-styles.ts": {
+      "exact": "d4fc8f65f8add1def1f908569a67bebf028396665882feb7196bc53a4b0adf9d",
+      "loose": "e4a92f9d7d8b3a3a46da7e411e8b12382200061b3ada7e20b6f514f3da4998a9"
     },
     "icons.tsx": {
-      "exact": "b6be4e5905ad30e97d8e3dcd410f7a206c75815b5ba48f0fa2ed52f2490a25d6",
-      "loose": "33831e5247b975333ca204c36bbab7c7abceb4e60cfa267cbecb0708fbd32c7d"
+      "exact": "1a84852a4ee683080a2d99cfb88181c405cba0e9af36bc7abd21e070cdb58054",
+      "loose": "d45a560ebb867c95739b1fb3d8386ef92943204fc160e97176cc4e8b391cc2b9"
     },
     "index.ts": {
-      "exact": "4b9b7c2653e5a11d2aa2fe493344509f79053faca52cb22911f92f61c92b2d5f",
-      "loose": "0b3c54722afa85e478f6700a35fac74daa3a2646e5ea8359e770108e8d31908d",
+      "exact": "59ef0e2899766890fe9aac8cdd34b876b073dd51a2249dc3c6596841d4d5f5b7",
+      "loose": "c38caaf09c745480928eeaadf3a330e38dbe84185e1a37dac13bacdb016f5ec8",
       "landed": {
-        "exact": "bc95c312b646b3f713a394fa28a3ec029dc1a0c3733d3339686cb42dab07f17c",
-        "loose": "7d03a6019ac182a33771c6bbd091f51f9423b44b02099d1a5b134be3d6a613da"
+        "exact": "f2170fabff380f5020e335d68ebc869da817a856a5880799322098922118a9a4",
+        "loose": "0a14a7acf7f273531a23458afd10bd7682f38f9323c240533a3182259e484611"
       }
     },
     "primitives/StateLayer.tsx": {
@@ -230,42 +290,42 @@
       "loose": "99442b1130ee59169ad43b2fd7d7572fa99e09dd503d6f0b352640261edcb7c2"
     },
     "tokens/DESIGN.resolved.md": {
-      "exact": "2bb09dc229789c7732440cc3569a29adc382e42782b48b5b582790cc3edbb8d8",
-      "loose": "fc287f9d853cd48430e6c8e746472601bae89019956c9051d4f976fcaea5617c"
+      "exact": "27a1eb26a7233c6165a1950521f998c9cad0754422321b766be7ed9422e30d18",
+      "loose": "7bdb676a23ab804f522247db12bc8fe6162f4b8cc29584676a4d833d819c48cc"
     },
     "tokens/bridge-shadcn.css": {
       "exact": "24c32c157cbddbd244ddf60801faa5bacab08b6d1c1076e9a1f2c96d598256f7",
       "loose": "cb0b2f4f16e4cbf0c46c40256514b088602a8c000aeef16993d6a86aadaf545c"
     },
     "tokens/design-md.mjs": {
-      "exact": "eda22eb134c4e1c06376bdacafe1b4904dfcb3f34a138a512e6a662c20a539f7",
-      "loose": "55eec9d3f74cfda8ad5deb17adc83ce5c50a1dda20d2096d67f149555fe8109d"
+      "exact": "92981d937fce51e7fc1c31259b2543641ab8af5210c8b1a83684c3d814eb8ad0",
+      "loose": "531bb8dce56da14ef2a4e0e5ce41543c2addcf9895d6035a9aabe09a452feeee"
     },
     "tokens/generate-theme.mjs": {
       "exact": "0a7f19678cee574e34fbc5cde94afc8026bc5d57dba6e99b6d41a989663f6603",
       "loose": "0c8ad7a27bf5625c3253ab124aaefd318ecefd92c5e37824be948cab031698c2"
     },
     "tokens/preset-editorial.css": {
-      "exact": "36d6cbff1befb15e874652b781cfc4462f152114c2f1ad7110e362e95ff3ec06",
-      "loose": "67d3eddadc7bef487917db4cae6da6bb7584649000bc2a5ab5fb0f94dbc9b645"
+      "exact": "06241a346310046b62765379b8bd36ef5dd2e40ed430ad4e0d483697f739e2cc",
+      "loose": "fa963cc399fa0785b5c3bc6378fa16721becb632ae0dfc664b8ada61501a8e61"
     },
     "tokens/theme.css": {
       "exact": "4bf32f8c76be8e2049732c1d1113de17f9cce9c7ab3be70dff7e9b23a1b0c060",
       "loose": "2710939fc4f02e6fd8d60eb7def9c2ce1a6ca70ac0b157cb708df8a11876d832"
     },
     "tokens/theme.v4.css": {
-      "exact": "d9631091c5ea30f870ea140432c9f19de88d3ba50a3d53a2517ce2bdb5e604e8",
-      "loose": "39f7bc6d7a8a98488132ea9f4e35e5c1c7f494c02c6812fa15aa78ac962a8717"
+      "exact": "21b84942b01622f3d322b8e2e242379929c0582e149c7645bf798a02ad582a25",
+      "loose": "f905316d5d5d08b0933c283986b5e9ac0ef95909055999fb362d49d4c3df8318"
     },
     "utils.ts": {
-      "exact": "eda0568e5441b25b0246578deee7af08e500850e55ba04759f0cf1d4cef199f5",
-      "loose": "5e809ca610e6cb85bada53acc152e836e069bd36c02bd955127fa5f28685d294"
+      "exact": "7ec740659638b095702db9d08308a6b45ad329f4f90571fd7c88edc3ab9507b2",
+      "loose": "c14a7c3ecc7c3b624bf057efc0b495ac0c8675e0861f64b23ab15eecfe7ff80b"
     }
   },
   "project": {
     ".claude/skills/ds-build/SKILL.md": {
-      "exact": "a8c12aeffcfffb6492ffeac073d6fbacffd8602559d8ec4722c1bed2bf606576",
-      "loose": "8f2177af5664c19e06ff475f6075e32e2ba537c5b12d1e1c8ddbc780c0abf083"
+      "exact": "aad7972b2e9ffdd1257d6a9c3f4488d0bf43ba3350456013ae9482cb6ef7f2af",
+      "loose": "a96894ed967f7824e2891eb5435618bdbeac63ba774f760dae9aad6299e2de4e"
     },
     ".claude/skills/ds-spec/SKILL.md": {
       "exact": "96df5b9d9585d4dfb4f5ef97d0baa936a5d7176111ef5247d29a04670d8fd25e",
@@ -280,8 +340,8 @@
       "loose": "00b5d9cbe02837f1f337f929036d42b9fed0c698a53227c39e34af9ac9a91099"
     },
     ".claude/skills/ds-theme/design-md.md": {
-      "exact": "b5c70873b7547377201243f6501c586b53ea35f08717f260c6139413d4233520",
-      "loose": "e22aae9a00efb447f964d31dc9bf5f5e386424d6d6994a7f2fa7cbf80170efc8"
+      "exact": "3dfe96e43b49a8f255a98e716a583d60572c87b5614bc29a92b7c3e3678dfb6a",
+      "loose": "d69c23b700c83d0fb5229ecd988d245899df071b57490834971772e64217082d"
     }
   },
   "optional": {

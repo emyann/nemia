@@ -155,6 +155,7 @@ rounded:
   small: 8px
   medium: 12px
   large: 16px
+  large-increased: 20px
   extra-large: 28px
   full: 9999px
 ---

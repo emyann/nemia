@@ -13,6 +13,7 @@ import {
   type TabsProps as AriaTabsProps,
 } from "react-aria-components";
 
+import { Badge, badgeAccessibleText, type BadgeValue } from "./Badge";
 import { renderIcon, type IconProp } from "../icons";
 import { composeTailwindRenderProps } from "../render-props";
 import { cn, focusRing, tv } from "../utils";
@@ -56,10 +57,15 @@ import { Title } from "../primitives/Typography";
  * tall, so nothing here goes under the 48×48 touch target the spec's
  * "avoid applying density" note protects.
  *
+ * **Badges.** `badge` draws the kit's `Badge`: on the icon of a tab whose
+ * icon is stacked over its label, and after the label, at the tab's trailing
+ * edge, where the label follows the icon on one line or there is no icon (the
+ * badge guidelines: a large badge must not overlap what follows the icon).
+ * It is read after the tab's name ("Inbox, 3").
+ *
  * Deviations: **no swipe** between panels (a pointer gesture the kit does not
- * own, and the spec itself warns it collides with other swipeable content),
- * and **no badge slot** — MD3 draws a badge on a tab, but the kit has no badge
- * component; put one in the label until it does. Vertical orientation is React
+ * own, and the spec itself warns it collides with other swipeable content).
+ * Vertical orientation is React
  * Aria's, not Material's: the spec has horizontal tabs only, so a vertical set
  * gets the behaviour but keeps the horizontal anatomy.
  */
@@ -84,6 +90,8 @@ const styles = tv({
     // as wide as the content above it.
     content: "grid grid-rows-[1fr_auto] justify-items-center",
     labelRow: "row-start-1 flex items-center gap-2 self-center py-2",
+    // The icon's box, which a badge on a stacked icon is anchored on.
+    iconBox: "relative flex shrink-0",
     icon: "size-6 shrink-0",
     label: "whitespace-nowrap",
     indicator: "row-start-2 opacity-0 transition-opacity duration-short-4",
@@ -239,12 +247,22 @@ export type TabProps = AriaTabProps & {
   icon?: IconProp;
   /** `start` puts the icon inline with the label, 8dp before it, at 48dp. */
   iconPosition?: "top" | "start";
+  /**
+   * A badge: a count, a short status, or `true` for the small dot. On a
+   * stacked icon it sits on the icon; otherwise after the label.
+   */
+  badge?: BadgeValue;
+  /** What the badge says to a screen reader, when the count alone is not
+      enough ("3 unread"). */
+  badgeLabel?: string;
   children?: ReactNode;
 };
 
 export function Tab({
   icon,
   iconPosition = "top",
+  badge,
+  badgeLabel,
   className,
   children,
   ...props
@@ -252,6 +270,13 @@ export function Tab({
   const variant = useContext(VariantContext);
   const isScrollable = useContext(ScrollableContext);
   const hasStackedIcon = Boolean(icon) && iconPosition === "top";
+  const badgeText = badgeAccessibleText(badge, badgeLabel);
+  // The badge's words after the tab's name: on `aria-label` when the label is
+  // plain text, else in a visually hidden span after it.
+  const badgeName =
+    badgeText !== undefined && typeof children === "string"
+      ? `${children}, ${badgeText}`
+      : undefined;
 
   const slotsFor = (isSelected: boolean, isDisabled: boolean) =>
     styles({ variant, isSelected, isDisabled, hasStackedIcon });
@@ -259,6 +284,7 @@ export function Tab({
   return (
     <AriaTab
       data-slot="tab"
+      aria-label={badgeName}
       {...props}
       className={composeRenderProps(className, (caller, renderProps) =>
         cn(
@@ -284,10 +310,23 @@ export function Tab({
             <span data-slot="state-layer" className={s.stateLayer()} />
             <span className={s.content()}>
               <span className={s.labelRow()}>
-                {icon ? renderIcon(icon, 24, s.icon()) : null}
+                {icon ? (
+                  <span className={s.iconBox()}>
+                    {renderIcon(icon, 24, s.icon())}
+                    {hasStackedIcon && badge !== undefined ? (
+                      <Badge value={badge} anchored />
+                    ) : null}
+                  </span>
+                ) : null}
                 <Title size="small" component="span" className={s.label()}>
                   {children}
+                  {badgeText !== undefined && badgeName === undefined ? (
+                    <span className="sr-only">{`, ${badgeText}`}</span>
+                  ) : null}
                 </Title>
+                {!hasStackedIcon && badge !== undefined ? (
+                  <Badge value={badge} />
+                ) : null}
               </span>
               <span data-slot="tab-indicator" className={s.indicator()} />
             </span>

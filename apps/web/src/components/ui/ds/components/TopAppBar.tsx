@@ -47,7 +47,19 @@ import { tv, type VariantProps } from "../utils";
  *
  * Presentational and server-safe: no React Aria, no `"use client"`. The
  * `leading` and `actions` slots take the interactive parts — pass
- * `IconButton`s, which bring their own client boundary.
+ * `IconButton`s, which bring their own client boundary. A screen that wants
+ * its actions as Material's toolbar, with the arrow keys between them,
+ * passes a `Toolbar` into `actions`; the bar does not make one itself.
+ *
+ * **The search app bar.** `search` puts a search where the title was, 8dp
+ * from the leading and trailing elements (`md.comp.app-bar.search.*`): pass
+ * the kit's `SearchView` (or `SearchBar`). The bar draws it on
+ * `surface-container` with no shadow and its hint in `on-surface-variant`,
+ * the search app bar's own colours, by its `data-slot`; another element is
+ * passed through as it is. The title stays the page's heading, visually
+ * hidden, so the heading list still names the screen. `search` makes the
+ * bar one 64dp row whatever `variant` says: Material's search app bar is a
+ * type of its own, not a medium or a large one.
  *
  * Deviations:
  * - **No on-scroll behaviour.** MD3's app bar changes elevation and, for the
@@ -60,9 +72,6 @@ import { tv, type VariantProps } from "../utils";
  *   `large-flexible` (112/120dp, with a two-line title). The kit follows the
  *   baseline token set throughout — the same choice `BottomNavigation` makes —
  *   so those two are what ship here.
- * - **No search app bar.** `md.comp.app-bar.small.search.*` describes a bar
- *   whose title is a search field; the kit has no search bar yet, and it is
- *   out of scope for this track.
  */
 const styles = tv({
   slots: {
@@ -77,6 +86,13 @@ const styles = tv({
     actions: "flex shrink-0 items-center gap-1",
     // The title block of the two-row types, bottom-aligned with 16dp padding.
     stackedTitle: "flex flex-col justify-end px-4 pb-6",
+    // The search app bar's search (`md.comp.app-bar.search.{leading,trailing}
+    // -space`, `…container.color`, `…label.color`).
+    search: [
+      "flex min-w-0 flex-1 items-center px-2",
+      "[&_[data-slot=search-bar]]:bg-surface-container [&_[data-slot=search-bar]]:shadow-none",
+      "[&_[data-slot=search-view]]:bg-surface-container [&_[data-slot=search-view]]:shadow-none",
+    ],
     title: "truncate",
     subtitle: "text-on-surface-variant truncate",
   },
@@ -125,8 +141,12 @@ export type TopAppBarProps = VariantProps<typeof styles> &
     subtitle?: ReactNode;
     /** The navigation action — a menu or back `IconButton`. */
     leading?: ReactNode;
-    /** Trailing actions for this screen. Three at most, says the spec. */
+    /** Trailing actions for this screen. Three at most, says the spec. A
+        `Toolbar` here makes them one toolbar. */
     actions?: ReactNode;
+    /** The search app bar: a `SearchView` or `SearchBar` in the title's
+        place. The title stays, as a visually hidden heading. */
+    search?: ReactNode;
     /** Heading level for the title. Default 1. */
     headingLevel?: 1 | 2 | 3 | 4 | 5 | 6;
     className?: string;
@@ -138,12 +158,14 @@ export function TopAppBar({
   subtitle,
   leading,
   actions,
+  search,
   headingLevel = 1,
   className,
   ...rest
 }: TopAppBarProps) {
-  const s = styles({ variant });
-  const isStacked = variant === "medium" || variant === "large";
+  const hasSearch = search !== undefined && search !== null;
+  const s = styles({ variant: hasSearch ? "small" : variant });
+  const isStacked = !hasSearch && (variant === "medium" || variant === "large");
 
   const TitleText = TITLE_SIZE[variant].component;
   const SubtitleText = SUBTITLE_SIZE[variant].component;
@@ -183,7 +205,16 @@ export function TopAppBar({
         </div>
         {/* On a stacked bar this row holds only the actions; the title moves
             below it, which is the whole difference between the types. */}
-        {isStacked ? (
+        {hasSearch ? (
+          <>
+            <div data-slot="top-app-bar-title" className="sr-only">
+              {titleBlock}
+            </div>
+            <div data-slot="top-app-bar-search" className={s.search()}>
+              {search}
+            </div>
+          </>
+        ) : isStacked ? (
           <div className="flex-1" />
         ) : (
           <div data-slot="top-app-bar-title" className={s.inlineTitle()}>

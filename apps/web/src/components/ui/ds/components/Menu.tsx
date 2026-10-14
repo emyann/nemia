@@ -30,6 +30,9 @@ type MenuProps = {
   items: MenuItemType[];
   triggerButton: React.ReactNode;
   placement?: Placement;
+  /** The space between the trigger and the menu, in pixels. Left out, React
+   *  Aria's default. */
+  offset?: number;
   onOpenChange?: (isOpen: boolean) => void;
   /** Static content above the items — an account line, a title. Not focusable. */
   header?: React.ReactNode;
@@ -52,6 +55,7 @@ export function Menu(props: MenuProps) {
     items,
     triggerButton,
     placement = "bottom",
+    offset,
     onOpenChange,
     header,
     className,
@@ -59,7 +63,10 @@ export function Menu(props: MenuProps) {
   return (
     <MenuTrigger onOpenChange={onOpenChange}>
       {triggerButton}
-      <Popover placement={placement} className={menuStyles({ className })}>
+      <Popover
+        placement={placement}
+        {...(offset !== undefined ? { offset } : {})}
+        className={menuStyles({ className })}>
         {header && (
           <div data-slot="menu-header" className={headerStyles()}>
             {header}

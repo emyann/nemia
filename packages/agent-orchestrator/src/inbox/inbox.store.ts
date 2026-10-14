@@ -7,6 +7,7 @@
  * package exports of it. A card's start — `startFromInbox`, and `startQueued`, the tick's — starts a run, and
  * is `inbox.verb.ts`'s, through `startRun`.
  */
+import fs from 'node:fs';
 import {
   ideaCard,
   inboxListing,
@@ -189,7 +190,10 @@ export function dropFromInbox(name: string): InboxDropped {
 
 /**
  * The name of the inbox card `given` is a path to, as the store reads it (`runStore.inbox.nameAt`) — any path under the inbox, links
- * resolved — or null for a path outside it, and for text: what makes `nemia start <path>` go through `startFromInbox`. A card not there
- * is still a card's path, refused by name at start.
+ * resolved — or `given` itself where it is a card's name the inbox has and no file of that name stands where it is typed; else null, for
+ * a path outside it and for text: what makes `nemia start <path|name>` go through `startFromInbox`. A card not there at its path is still
+ * a card's path, refused by name at start; a name no card has is text.
  */
-export const inboxNameAt = (given: string): string | null => runStore.inbox.nameAt(given);
+export const inboxNameAt = (given: string): string | null =>
+  runStore.inbox.nameAt(given) ??
+  (inboxNameRefusal(given) === undefined && !fs.existsSync(given) && runStore.inbox.read(`${given}.md`) !== null ? given : null);

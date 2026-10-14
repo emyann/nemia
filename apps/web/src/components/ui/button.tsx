@@ -17,7 +17,7 @@ const buttonVariants = cva(
         outline:
           'border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50',
         secondary:
-          'bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground',
+          'bg-surface-container-highest text-on-surface hover:bg-[color-mix(in_oklch,var(--md-sys-color-surface-container-highest),var(--foreground)_5%)] aria-expanded:bg-surface-container-highest aria-expanded:text-on-surface',
         ghost: 'hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50',
         destructive:
           'bg-failure-container text-on-failure-container hover:bg-failure-container/90 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40',

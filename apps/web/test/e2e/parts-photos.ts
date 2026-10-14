@@ -3,7 +3,7 @@
  * stories (`parts/main.tsx`), opens it in light, then in dark, and writes into the e2e's folder of pictures (`OUT`, the run's files
  * where `WF_ARTIFACTS` names them) a sheet of each part's stories (`parts-<Part>-<theme>.png`); then, enlarged for a person's eye,
  * the cut button at rest and with the keyboard's focus, as a link and as a press, and disabled, six times, the corner of a frame
- * that waits on a person, four times, the rail of a run whose steps are done, a page's name over its rule, a text link at rest,
+ * that waits on a person, four times, the rail of a run whose steps are done, a page's name over its rule, short and long, a text link at rest,
  * under the pointer and with the keyboard on it, and a short id at rest and just copied, on a clipboard that takes anything. Then,
  * in a browser that draws scroll bars, which the first hides, four times as large: in one whose bars take room, the bottom-left
  * corner and the right edge of a table in a cut frame (`parts-bars-corner-classic-<theme>.png`,
@@ -163,6 +163,7 @@ async function closeUps(browser: Browser, dir: string, theme: 'light' | 'dark'):
   await enlarged(page, DISABLED_GROUND, 6, `parts-cut-press-disabled-${theme}.png`);
   await enlarged(page, `${story('look-runsteps--done')} [data-rail]`, 4, `parts-rail-done-${theme}.png`);
   await enlarged(page, `${story('look-plate--name-of-a-page')} [data-story-ground]`, 2, `parts-page-name-${theme}.png`);
+  await enlarged(page, `${story('look-plate--long-name-of-a-page')} [data-story-ground]`, 2, `parts-page-name-long-${theme}.png`);
   await enlarged(page, TITLE_GROUND, 6, `parts-title-rest-${theme}.png`);
   await enlarged(page, TITLE_GROUND, 6, `parts-title-pointer-${theme}.png`, `${TITLE_GROUND} [data-plain-link]`);
   await tabInto(page, TITLE_GROUND);

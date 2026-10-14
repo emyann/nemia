@@ -160,6 +160,7 @@ rounded:
   small: 0
   medium: 0
   large: 0
+  large-increased: 0
   extra-large: 0
   full: 0
 ---

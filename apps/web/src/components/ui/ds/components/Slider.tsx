@@ -22,8 +22,8 @@ interface SliderProps<T extends number | number[]> extends AriaSliderProps<T> {
 const styles = tv({
   slots: {
     root: "grid gap-2 grid-cols-[1fr_auto] [grid-template-areas:'label_output'_'track_track'] max-w-[300px]",
-    label: "text-label-large text-on-surface [grid-area:label]",
-    output: "text-label-large text-on-surface-variant [grid-area:output]",
+    label: "text-label-large font-label-large text-on-surface [grid-area:label]",
+    output: "text-label-large font-label-large text-on-surface-variant [grid-area:output]",
     track: [
       "relative [grid-area:track] col-span-2",
       "h-8 w-full touch-none",
@@ -38,8 +38,10 @@ const styles = tv({
       "absolute top-1/2 -translate-y-1/2",
       "h-4 w-4 rounded-shape-full",
       "bg-primary border-2 border-surface",
-      "focus-visible:outline-hidden focus-visible:ring-2",
-      "focus-visible:ring-ring focus-visible:ring-offset-2",
+      // A ring of its own, thinner than `focusRing`'s for a 16px thumb; the
+      // gap is not painted, like the kit's. Focus is on the hidden input
+      // inside the thumb, so the style keys on React Aria's attribute.
+      "outline-none outline-2 outline-offset-2 outline-ring data-focus-visible:outline-solid",
       "group-data-[disabled]:bg-surface-variant",
       "group-data-[dragging]:bg-primary/90",
       "transition-colors",

@@ -239,9 +239,12 @@
  * person, alive a session at work, money an amount, failure what failed and nothing else; rest is the label's grey, and sage, filled, a
  * step that is done. The three faces the theme names by a hook are given their loaded families here. The page says it is drawn in both
  * schemes, so that what the browser draws itself (a list of choices, a scroll bar it styles alone) follows the system as the theme does.
+ * The theme's own scroll bar colour gives way to the look's bar, drawn in the base layer: in Chromium a `scrollbar-color` set on the
+ * root would hide every `::-webkit-scrollbar` rule, and elsewhere it would show the window's thumb at rest.
  */
 :root {
   color-scheme: light dark;
+  scrollbar-color: revert-layer;
   --font-michroma: 'Michroma', ui-sans-serif, system-ui, sans-serif;
   --font-chakra-petch: 'Chakra Petch', ui-sans-serif, system-ui, sans-serif;
   --font-share-tech-mono: 'Share Tech Mono', ui-monospace, monospace;

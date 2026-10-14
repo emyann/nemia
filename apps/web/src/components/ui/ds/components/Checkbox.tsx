@@ -29,7 +29,7 @@ const styles = tv({
   slots: {
     base: [
       // min-h-12 = the 48dp touch target (spec); the state layer stays 40dp.
-      "group/cb inline-flex min-h-12 items-center gap-2 text-body-medium text-on-surface",
+      "group/cb inline-flex min-h-12 items-center gap-2 text-body-medium font-body-medium text-on-surface",
       "data-disabled:text-on-surface/38 data-disabled:pointer-events-none",
     ],
     // The 40px touch target that also hosts the state layer.
@@ -132,7 +132,7 @@ export function CheckboxGroup({
       )}
     >
       {label && (
-        <Label className="text-title-small text-on-surface group-data-disabled/cbg:text-on-surface/38">
+        <Label className="text-title-small font-title-small text-on-surface group-data-disabled/cbg:text-on-surface/38">
           {label}
         </Label>
       )}
@@ -140,12 +140,12 @@ export function CheckboxGroup({
       {supportingText && (
         <Text
           slot="description"
-          className="text-body-small text-on-surface-variant group-data-invalid/cbg:hidden"
+          className="text-body-small font-body-small text-on-surface-variant group-data-invalid/cbg:hidden"
         >
           {supportingText}
         </Text>
       )}
-      <FieldError className="text-body-small text-error">
+      <FieldError className="text-body-small font-body-small text-error">
         {errorMessage}
       </FieldError>
     </AriaCheckboxGroup>

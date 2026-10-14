@@ -74,10 +74,10 @@ const styles = tv({
       "animate-in fade-in-0 slide-in-from-bottom-2 duration-medium-2 ease-emphasized-decelerate",
     ],
     content: "flex min-w-0 grow items-center py-3.5",
-    text: "line-clamp-2 text-body-medium text-inverse-on-surface",
+    text: "line-clamp-2 text-body-medium font-body-medium text-inverse-on-surface",
     action: [
       focusRing(),
-      "group/snackbar-action relative inline-flex h-10 shrink-0 items-center justify-center overflow-hidden rounded-shape-full px-3 text-label-large text-inverse-primary",
+      "group/snackbar-action relative inline-flex h-10 shrink-0 items-center justify-center overflow-hidden rounded-shape-full px-3 text-label-large font-label-large text-inverse-primary",
     ],
     actionStateLayer: [
       "absolute inset-0 bg-inverse-primary opacity-0 transition-opacity pointer-events-none",

@@ -119,11 +119,34 @@
      hook still gets one family everywhere and nothing renders differently.
      Override one of them — in a preset, a `.dark` scope, anywhere — to get the
      split: a serif for the headings, the loaded sans for the running text.
-     `primitives/Typography.tsx` applies the right one per variant.
      Set from the project's DESIGN.md by `npm run theme:generate` (the family
-     of the display/headline/title tokens, and of the body/label tokens). */
+     of `display-large`, and of `body-large`). */
   --md-sys-typescale-brand-font: var(--font-inter);
   --md-sys-typescale-plain-font: var(--font-inter);
+  /* A family per role, as Material's own tokens have it
+     (`md.sys.typescale.<role>.font`). `initial` is no value: the role then
+     reads its face, through the fallback of its `--font-<role>` mapping
+     below, at the element that draws the text. So a face overridden in a
+     preset or on a subtree still moves every role with no family of its own.
+     Set from the project's DESIGN.md by `npm run theme:generate`: the hook of
+     the family written on the role, where it is not its face's.
+     `primitives/Typography.tsx` and the components write `font-<role>`
+     beside `text-<role>`. */
+  --md-sys-typescale-display-large-font: initial;
+  --md-sys-typescale-display-medium-font: initial;
+  --md-sys-typescale-display-small-font: initial;
+  --md-sys-typescale-headline-large-font: initial;
+  --md-sys-typescale-headline-medium-font: initial;
+  --md-sys-typescale-headline-small-font: initial;
+  --md-sys-typescale-title-large-font: initial;
+  --md-sys-typescale-title-medium-font: initial;
+  --md-sys-typescale-title-small-font: initial;
+  --md-sys-typescale-body-large-font: initial;
+  --md-sys-typescale-body-medium-font: initial;
+  --md-sys-typescale-body-small-font: initial;
+  --md-sys-typescale-label-large-font: initial;
+  --md-sys-typescale-label-medium-font: initial;
+  --md-sys-typescale-label-small-font: initial;
   /* The mono face: the kit's own token, not one of Material's. It is the
      face a project reaches for with `font-mono` (an identifier, a time, an
      amount) and no kit component uses it. Set from `typography.mono` in the
@@ -137,20 +160,27 @@
   --md-sys-typescale-display-large-size: 57px;
   --md-sys-typescale-display-large-line-height: 64px;
   --md-sys-typescale-display-large-tracking: -0.25px;
+  --md-sys-typescale-display-large-weight: 400;
   --md-sys-typescale-display-medium-size: 45px;
   --md-sys-typescale-display-medium-line-height: 52px;
+  --md-sys-typescale-display-medium-weight: 400;
   --md-sys-typescale-display-small-size: 36px;
   --md-sys-typescale-display-small-line-height: 44px;
+  --md-sys-typescale-display-small-weight: 400;
 
   --md-sys-typescale-headline-large-size: 32px;
   --md-sys-typescale-headline-large-line-height: 40px;
+  --md-sys-typescale-headline-large-weight: 400;
   --md-sys-typescale-headline-medium-size: 28px;
   --md-sys-typescale-headline-medium-line-height: 36px;
+  --md-sys-typescale-headline-medium-weight: 400;
   --md-sys-typescale-headline-small-size: 24px;
   --md-sys-typescale-headline-small-line-height: 32px;
+  --md-sys-typescale-headline-small-weight: 400;
 
   --md-sys-typescale-title-large-size: 22px;
   --md-sys-typescale-title-large-line-height: 28px;
+  --md-sys-typescale-title-large-weight: 400;
   --md-sys-typescale-title-medium-size: 16px;
   --md-sys-typescale-title-medium-line-height: 24px;
   --md-sys-typescale-title-medium-tracking: 0.15px;
@@ -176,12 +206,15 @@
   --md-sys-typescale-body-large-size: 16px;
   --md-sys-typescale-body-large-line-height: 24px;
   --md-sys-typescale-body-large-tracking: 0.5px;
+  --md-sys-typescale-body-large-weight: 400;
   --md-sys-typescale-body-medium-size: 14px;
   --md-sys-typescale-body-medium-line-height: 20px;
   --md-sys-typescale-body-medium-tracking: 0.25px;
+  --md-sys-typescale-body-medium-weight: 400;
   --md-sys-typescale-body-small-size: 12px;
   --md-sys-typescale-body-small-line-height: 16px;
   --md-sys-typescale-body-small-tracking: 0.4px;
+  --md-sys-typescale-body-small-weight: 400;
 
   /* ---- MD3 shape scale ----
      Values set from the `rounded` tokens of the project's DESIGN.md by
@@ -251,6 +284,70 @@
      collide in a merge and a caller's own `font-*` family still wins. */
   --font-brand: var(--md-sys-typescale-brand-font);
   --font-plain: var(--md-sys-typescale-plain-font);
+  /* `font-<role>`: the role's own family, else its face's. Written beside
+     `text-<role>`, which carries the size, the line height, the tracking and
+     the weight and no family: `text-label-large font-mono` stays possible.
+     Registered in `twMergeConfig` with the two above. */
+  --font-display-large: var(
+    --md-sys-typescale-display-large-font,
+    var(--md-sys-typescale-brand-font)
+  );
+  --font-display-medium: var(
+    --md-sys-typescale-display-medium-font,
+    var(--md-sys-typescale-brand-font)
+  );
+  --font-display-small: var(
+    --md-sys-typescale-display-small-font,
+    var(--md-sys-typescale-brand-font)
+  );
+  --font-headline-large: var(
+    --md-sys-typescale-headline-large-font,
+    var(--md-sys-typescale-brand-font)
+  );
+  --font-headline-medium: var(
+    --md-sys-typescale-headline-medium-font,
+    var(--md-sys-typescale-brand-font)
+  );
+  --font-headline-small: var(
+    --md-sys-typescale-headline-small-font,
+    var(--md-sys-typescale-brand-font)
+  );
+  --font-title-large: var(
+    --md-sys-typescale-title-large-font,
+    var(--md-sys-typescale-brand-font)
+  );
+  --font-title-medium: var(
+    --md-sys-typescale-title-medium-font,
+    var(--md-sys-typescale-brand-font)
+  );
+  --font-title-small: var(
+    --md-sys-typescale-title-small-font,
+    var(--md-sys-typescale-brand-font)
+  );
+  --font-body-large: var(
+    --md-sys-typescale-body-large-font,
+    var(--md-sys-typescale-plain-font)
+  );
+  --font-body-medium: var(
+    --md-sys-typescale-body-medium-font,
+    var(--md-sys-typescale-plain-font)
+  );
+  --font-body-small: var(
+    --md-sys-typescale-body-small-font,
+    var(--md-sys-typescale-plain-font)
+  );
+  --font-label-large: var(
+    --md-sys-typescale-label-large-font,
+    var(--md-sys-typescale-plain-font)
+  );
+  --font-label-medium: var(
+    --md-sys-typescale-label-medium-font,
+    var(--md-sys-typescale-plain-font)
+  );
+  --font-label-small: var(
+    --md-sys-typescale-label-small-font,
+    var(--md-sys-typescale-plain-font)
+  );
   /* `font-mono` is Tailwind's own utility, fed by the kit's token. Tailwind's
      preflight draws `code`, `kbd`, `samp` and `pre` with the same variable. */
   --font-mono: var(--md-sys-typescale-mono-font);
@@ -262,32 +359,39 @@
   --text-display-large--letter-spacing: var(
     --md-sys-typescale-display-large-tracking
   );
+  --text-display-large--font-weight: var(--md-sys-typescale-display-large-weight);
   --text-display-medium: var(--md-sys-typescale-display-medium-size);
   --text-display-medium--line-height: var(
     --md-sys-typescale-display-medium-line-height
   );
+  --text-display-medium--font-weight: var(--md-sys-typescale-display-medium-weight);
   --text-display-small: var(--md-sys-typescale-display-small-size);
   --text-display-small--line-height: var(
     --md-sys-typescale-display-small-line-height
   );
+  --text-display-small--font-weight: var(--md-sys-typescale-display-small-weight);
 
   --text-headline-large: var(--md-sys-typescale-headline-large-size);
   --text-headline-large--line-height: var(
     --md-sys-typescale-headline-large-line-height
   );
+  --text-headline-large--font-weight: var(--md-sys-typescale-headline-large-weight);
   --text-headline-medium: var(--md-sys-typescale-headline-medium-size);
   --text-headline-medium--line-height: var(
     --md-sys-typescale-headline-medium-line-height
   );
+  --text-headline-medium--font-weight: var(--md-sys-typescale-headline-medium-weight);
   --text-headline-small: var(--md-sys-typescale-headline-small-size);
   --text-headline-small--line-height: var(
     --md-sys-typescale-headline-small-line-height
   );
+  --text-headline-small--font-weight: var(--md-sys-typescale-headline-small-weight);
 
   --text-title-large: var(--md-sys-typescale-title-large-size);
   --text-title-large--line-height: var(
     --md-sys-typescale-title-large-line-height
   );
+  --text-title-large--font-weight: var(--md-sys-typescale-title-large-weight);
   --text-title-medium: var(--md-sys-typescale-title-medium-size);
   --text-title-medium--line-height: var(
     --md-sys-typescale-title-medium-line-height
@@ -335,6 +439,7 @@
     --md-sys-typescale-body-large-line-height
   );
   --text-body-large--letter-spacing: var(--md-sys-typescale-body-large-tracking);
+  --text-body-large--font-weight: var(--md-sys-typescale-body-large-weight);
   --text-body-medium: var(--md-sys-typescale-body-medium-size);
   --text-body-medium--line-height: var(
     --md-sys-typescale-body-medium-line-height
@@ -342,11 +447,13 @@
   --text-body-medium--letter-spacing: var(
     --md-sys-typescale-body-medium-tracking
   );
+  --text-body-medium--font-weight: var(--md-sys-typescale-body-medium-weight);
   --text-body-small: var(--md-sys-typescale-body-small-size);
   --text-body-small--line-height: var(
     --md-sys-typescale-body-small-line-height
   );
   --text-body-small--letter-spacing: var(--md-sys-typescale-body-small-tracking);
+  --text-body-small--font-weight: var(--md-sys-typescale-body-small-weight);
 
   --font-weight-regular: 400;
   --font-weight-medium: 500;

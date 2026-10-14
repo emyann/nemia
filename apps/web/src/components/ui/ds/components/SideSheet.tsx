@@ -27,7 +27,7 @@ const styles = tv({
         // The modal sheet *is* the dialog, and React Aria focuses a dialog on
         // open through its `tabIndex={-1}` — `outline-hidden` keeps the browser
         // from drawing a focus outline around the whole sheet. (This is also
-        // why the slots no longer extend `focusRing`: its `focus-visible:ring`
+        // why the slots no longer extend `focusRing`: its focus-visible outline
         // would land on the sheet container, not on anything inside it.)
         base: "h-[var(--visual-viewport-height)] w-[calc(100%-56px)] sm:w-[560px] outline-hidden",
       },
@@ -136,7 +136,12 @@ export default function SideSheet(props: SideSheetProps) {
               {title}
             </div>
           )}
-          <IconButton aria-label="Close" icon={XIcon} onPress={onClose} />
+          <IconButton
+            variant="standard"
+            aria-label="Close"
+            icon={XIcon}
+            onPress={onClose}
+          />
         </div>
       )}
       <Body className={s.content()} component="div">

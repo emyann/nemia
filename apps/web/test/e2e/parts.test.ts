@@ -121,15 +121,18 @@ test('the text link by the keyboard: Enter navigates once', WAITED, async () => 
 });
 
 /**
- * The colour of the ring drawn around what has the focus, off its computed shadow: the last one that is not transparent, the ring
- * itself where a ground-coloured offset is drawn before it.
+ * The colour of the ring drawn around what has the focus, off its computed outline, the kit's ring: null when no outline is drawn,
+ * none wide or one that is transparent.
  */
 const ringOf = (page: Page): Promise<Rgb | null> =>
   page.evaluate(() => {
-    const shadow = getComputedStyle(document.activeElement!).boxShadow;
-    const colours = [...shadow.matchAll(/rgba?\(([^)]+)\)/g)].map((m) => m[1].split(/[\s,/]+/).map(Number));
-    const solid = colours.filter((c) => c.length === 3 || c[3] > 0).at(-1);
-    return solid ? (solid.slice(0, 3) as [number, number, number]) : null;
+    const style = getComputedStyle(document.activeElement!);
+    if (style.outlineStyle === 'none' || !(parseFloat(style.outlineWidth) > 0)) return null;
+    const colour = /rgba?\(([^)]+)\)/
+      .exec(style.outlineColor)?.[1]
+      .split(/[\s,/]+/)
+      .map(Number);
+    return colour && (colour.length === 3 || colour[3] > 0) ? (colour.slice(0, 3) as [number, number, number]) : null;
   });
 
 /**
@@ -139,7 +142,7 @@ const ringOf = (page: Page): Promise<Rgb | null> =>
  */
 async function ringGaps(page: Page, name: string): Promise<string[]> {
   const ring = await ringOf(page);
-  assert.ok(ring, 'the focused link has a ring, by its computed shadow');
+  assert.ok(ring, 'the focused link has a ring, by its computed outline');
   const box = await page.locator('[data-ring-probe]').boundingBox();
   assert.ok(box, 'the link is drawn');
   const [left, top, right, bottom] = [box.x, box.y, box.x + box.width, box.y + box.height].map(Math.round);

@@ -39,7 +39,7 @@ const styles = tv({
   slots: {
     base: "group/if flex flex-col gap-2",
     label:
-      "text-title-small text-on-surface group-data-disabled/if:text-on-surface/38",
+      "text-title-small font-title-small text-on-surface group-data-disabled/if:text-on-surface/38",
     dropZone: [
       focusRing(),
       "flex flex-col items-center justify-center gap-3 rounded-shape-medium border-2 border-dashed border-outline-variant bg-surface-container-low p-6 text-center transition-colors duration-short-4",
@@ -48,7 +48,7 @@ const styles = tv({
       "group-data-disabled/if:pointer-events-none group-data-disabled/if:opacity-38",
     ],
     dropIcon: "text-on-surface-variant",
-    dropText: "text-body-medium text-on-surface-variant",
+    dropText: "text-body-medium font-body-medium text-on-surface-variant",
     preview: [
       "relative overflow-hidden rounded-shape-medium border border-outline-variant bg-surface-container-low",
       "group-data-invalid/if:border-error",
@@ -57,9 +57,9 @@ const styles = tv({
     image: "absolute inset-0 h-full w-full object-contain",
     remove: "absolute right-2 top-2",
     actions: "flex items-center gap-2",
-    fileName: "min-w-0 flex-1 truncate text-body-small text-on-surface-variant",
+    fileName: "min-w-0 flex-1 truncate text-body-small font-body-small text-on-surface-variant",
     supporting:
-      "px-4 text-body-small text-on-surface-variant group-data-invalid/if:text-error group-data-disabled/if:text-on-surface/38",
+      "px-4 text-body-small font-body-small text-on-surface-variant group-data-invalid/if:text-error group-data-disabled/if:text-on-surface/38",
   },
   variants: {
     aspectRatio: {

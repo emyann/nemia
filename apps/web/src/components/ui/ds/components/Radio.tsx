@@ -30,7 +30,7 @@ const radioStyles = tv({
   slots: {
     base: [
       // min-h-12 = the 48dp touch target (spec); the state layer stays 40dp.
-      "group/rd inline-flex min-h-12 items-center gap-2 text-body-medium text-on-surface",
+      "group/rd inline-flex min-h-12 items-center gap-2 text-body-medium font-body-medium text-on-surface",
       "data-disabled:text-on-surface/38 data-disabled:pointer-events-none",
     ],
     target:
@@ -133,7 +133,7 @@ export function RadioGroup({
       )}
     >
       {label && (
-        <Label className="text-title-small text-on-surface group-data-disabled/rdg:text-on-surface/38 w-full">
+        <Label className="text-title-small font-title-small text-on-surface group-data-disabled/rdg:text-on-surface/38 w-full">
           {label}
         </Label>
       )}
@@ -141,12 +141,12 @@ export function RadioGroup({
       {supportingText && (
         <Text
           slot="description"
-          className="text-body-small text-on-surface-variant w-full group-data-invalid/rdg:hidden"
+          className="text-body-small font-body-small text-on-surface-variant w-full group-data-invalid/rdg:hidden"
         >
           {supportingText}
         </Text>
       )}
-      <FieldError className="text-body-small text-error w-full">
+      <FieldError className="text-body-small font-body-small text-error w-full">
         {errorMessage}
       </FieldError>
     </AriaRadioGroup>

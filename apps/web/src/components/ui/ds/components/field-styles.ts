@@ -91,13 +91,13 @@ export const fieldStyles = tv({
       "group-data-disabled/tf:pointer-events-none",
     ],
     input: [
-      "peer min-w-0 flex-1 bg-transparent text-body-large text-on-surface caret-primary outline-none",
+      "peer min-w-0 flex-1 bg-transparent text-body-large font-body-large text-on-surface caret-primary outline-none",
       "placeholder:text-transparent focus:placeholder:text-on-surface-variant",
       "group-data-disabled/tf:text-on-surface/38",
       "group-data-invalid/tf:caret-error",
     ],
     label: [
-      "pointer-events-none absolute z-10 origin-left text-body-large text-on-surface-variant transition-all duration-short-4 ease-standard",
+      "pointer-events-none absolute z-10 origin-left text-body-large font-body-large text-on-surface-variant transition-all duration-short-4 ease-standard",
       "group-data-invalid/tf:text-error group-data-invalid/tf:group-hover/tfc:text-on-error-container group-data-invalid/tf:group-data-open/tf:text-error group-data-invalid/tf:group-hover/tfc:group-data-open/tf:text-error",
       "group-data-disabled/tf:text-on-surface/38",
     ],
@@ -106,11 +106,11 @@ export const fieldStyles = tv({
     trailingIcon:
       "mr-3 shrink-0 text-on-surface-variant group-data-invalid/tf:text-error group-data-invalid/tf:group-hover/tfc:text-on-error-container group-data-disabled/tf:text-on-surface/38",
     affix:
-      "shrink-0 text-body-large text-on-surface-variant group-data-disabled/tf:text-on-surface/38",
+      "shrink-0 text-body-large font-body-large text-on-surface-variant group-data-disabled/tf:text-on-surface/38",
     indicator: "",
     stateLayer: "",
     supporting:
-      "flex gap-4 px-4 pt-1 text-body-small text-on-surface-variant group-data-invalid/tf:text-error group-data-disabled/tf:text-on-surface/38",
+      "flex gap-4 px-4 pt-1 text-body-small font-body-small text-on-surface-variant group-data-invalid/tf:text-error group-data-disabled/tf:text-on-surface/38",
     supportingText: "flex-1",
     counter: "ml-auto shrink-0 tabular-nums",
   },
@@ -186,7 +186,7 @@ export const fieldStyles = tv({
       class: {
         input: "px-4 pt-6 pb-2",
         label: [
-          "peer-focus:text-body-small peer-not-placeholder-shown:text-body-small",
+          "peer-focus:text-body-small peer-focus:font-body-small peer-not-placeholder-shown:text-body-small peer-not-placeholder-shown:font-body-small",
           "peer-focus:text-primary",
           "group-data-invalid/tf:peer-focus:text-error",
           "peer-focus:top-2 peer-focus:translate-y-0 peer-not-placeholder-shown:top-2 peer-not-placeholder-shown:translate-y-0",
@@ -207,7 +207,7 @@ export const fieldStyles = tv({
           "group-data-invalid/tf:focus-within:outline-error",
         ],
         label: [
-          "peer-focus:text-body-small peer-not-placeholder-shown:text-body-small",
+          "peer-focus:text-body-small peer-focus:font-body-small peer-not-placeholder-shown:text-body-small peer-not-placeholder-shown:font-body-small",
           "peer-focus:text-primary",
           "group-data-invalid/tf:peer-focus:text-error",
           "peer-focus:top-0 peer-not-placeholder-shown:top-0",
@@ -221,7 +221,7 @@ export const fieldStyles = tv({
       class: {
         container: "px-4 pt-6 pb-2",
         label: [
-          "group-focus-within/tfc:text-body-small group-data-open/tf:text-body-small group-data-populated/tfc:text-body-small",
+          "group-focus-within/tfc:text-body-small group-focus-within/tfc:font-body-small group-data-open/tf:text-body-small group-data-open/tf:font-body-small group-data-populated/tfc:text-body-small group-data-populated/tfc:font-body-small",
           "group-focus-within/tfc:text-primary group-data-open/tf:text-primary",
           FOCUSED_INVALID.composite,
           "group-focus-within/tfc:top-2 group-focus-within/tfc:translate-y-0 group-data-open/tf:top-2 group-data-open/tf:translate-y-0 group-data-populated/tfc:top-2 group-data-populated/tfc:translate-y-0",
@@ -248,7 +248,7 @@ export const fieldStyles = tv({
           "group-data-invalid/tf:focus-within:outline-error",
         ],
         label: [
-          "group-focus-within/tfc:text-body-small group-data-open/tf:text-body-small group-data-populated/tfc:text-body-small",
+          "group-focus-within/tfc:text-body-small group-focus-within/tfc:font-body-small group-data-open/tf:text-body-small group-data-open/tf:font-body-small group-data-populated/tfc:text-body-small group-data-populated/tfc:font-body-small",
           // …and its label keeps `on-surface-variant` on hover.
           "group-hover/tfc:text-on-surface-variant",
           "group-focus-within/tfc:text-primary group-data-open/tf:text-primary group-hover/tfc:group-focus-within/tfc:text-primary",
@@ -264,7 +264,7 @@ export const fieldStyles = tv({
       class: {
         container: "px-4 pt-6 pb-2",
         label: [
-          "group-data-open/tf:text-body-small group-data-populated/tfc:text-body-small",
+          "group-data-open/tf:text-body-small group-data-open/tf:font-body-small group-data-populated/tfc:text-body-small group-data-populated/tfc:font-body-small",
           // The select set turns the filled label `on-surface` on hover; the
           // text field's stays put.
           "group-hover/tfc:text-on-surface",
@@ -288,7 +288,7 @@ export const fieldStyles = tv({
           "data-focus-visible:outline-solid group-data-open/tf:outline-solid",
         ],
         label: [
-          "group-data-open/tf:text-body-small group-data-populated/tfc:text-body-small",
+          "group-data-open/tf:text-body-small group-data-open/tf:font-body-small group-data-populated/tfc:text-body-small group-data-populated/tfc:font-body-small",
           "group-data-focus-visible/tfc:text-primary group-data-open/tf:text-primary",
           FOCUSED_INVALID.trigger,
           "group-data-open/tf:top-0 group-data-populated/tfc:top-0",

@@ -38,12 +38,14 @@ export const twMergeConfig = {
         "text-body-small",
       ],
       // MD3's two faces (theme.v4.css) — `font-brand` for display/headline/
-      // title, `font-plain` for body/label. Registering them as font-family,
-      // and `font-regular` as the font-weight it is, is what lets Typography
-      // carry a face and a weight at once: tailwind-merge's stock config reads
-      // any unknown `font-*` as a family, so `font-regular font-brand` would
-      // otherwise collapse to `font-brand` and lose the weight.
-      "font-family": [{ font: ["brand", "plain"] }],
+      // title, `font-plain` for body/label — and a family per type role,
+      // `font-<role>`, written beside `text-<role>`. Registering them as
+      // font-family, and `font-regular` as the font-weight it is, is what
+      // lets a caller's `font-regular` merge as a weight beside a
+      // primitive's family: tailwind-merge's stock config reads any unknown
+      // `font-*` as a family, so `font-brand font-regular` would otherwise
+      // collapse to `font-regular` and lose the face.
+      "font-family": [{ font: ["brand", "plain", ...typeRoles()] }],
       "font-weight": [{ font: ["regular"] }],
       // State-layer opacities (theme.v4.css `@utility state-opacity-*`). In
       // the `opacity` group so they override — and are overridden by — a plain
@@ -103,6 +105,12 @@ export const twMergeConfig = {
   },
 };
 
+function typeRoles() {
+  return ["display", "headline", "title", "body", "label"].flatMap((group) =>
+    ["large", "medium", "small"].map((size) => `${group}-${size}`),
+  );
+}
+
 function shapeScale() {
   return [
     "shape-extra-small",
@@ -125,15 +133,21 @@ export function cn(...inputs: ClassValue[]) {
 export const tv = createTV({ twMergeConfig });
 
 /** The MD3 focus indicator — a 3px `secondary` ring offset 2px (Material's
-    md.comp.focus-ring) — extended or inlined by every control. Drawn as a
-    box-shadow ring, exactly like shadcn's React Aria base, rather than an
-    `outline`: outline-color/offset transitions never settle on React Aria
-    buttons in Chromium when `transition-all` is present, and the shadow ring
-    is unaffected by `overflow-hidden`. `ring` resolves to the MD3 secondary
-    role in theme.v4.css; the offset gap is painted in `background`.
+    md.comp.focus-ring) — extended or inlined by every control. Drawn as an
+    `outline` with an offset, so the 2px gap is not painted: it shows whatever
+    ground the control stands on (the page, a card, a table, a sheet), and the
+    ring stays visible in forced-colours mode, where a box-shadow is dropped.
+    The width, the offset and the colour are constant and only the style
+    flips on focus (`none` to `solid`), so nothing interpolates under a
+    control's `transition-all`: an outline whose colour or offset is
+    transitioned never settles on React Aria buttons in Chromium. An ancestor
+    that clips (`overflow-hidden`, `overflow-clip`) cuts an outline, so a part
+    that fills such a box draws its ring inside with `-outline-offset-2`, as
+    the table's cells do. `ring` resolves to the MD3 secondary role in
+    theme.v4.css.
     `composeTailwindRenderProps` lives in ./render-props (client-only). */
 export const focusRing = baseTv({
-  base: "outline-none focus-visible:ring-3 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+  base: "outline-none outline-3 outline-offset-2 outline-ring focus-visible:outline-solid",
 });
 
 export type { VariantProps } from "tailwind-variants";

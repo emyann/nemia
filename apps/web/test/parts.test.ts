@@ -109,12 +109,8 @@ test('the text link is a link to its route, underlined under the pointer and the
   assert.match(link, / hover:underline /, 'underlined under the pointer');
   assert.match(link, / focus-visible:underline /, 'and with the keyboard on it');
   assert.doesNotMatch(link, /(?<![\w:-])underline(?![\w-])/, 'never underlined at rest');
-  assert.match(
-    link,
-    /outline-none focus-visible:ring-3 focus-visible:ring-ring focus-visible:ring-offset-2/,
-    "the kit's ring, not its own",
-  );
-  assert.doesNotMatch(link, /ring-2\b/);
+  assert.match(link, /outline-none outline-3 outline-offset-2 outline-ring focus-visible:outline-solid/, "the kit's ring, not its own");
+  assert.doesNotMatch(link, /ring-2\b|ring-offset/);
   assert.match(html, />Read the review</);
 });
 
@@ -177,8 +173,8 @@ test('the pager writes its buttons in the label face, never the mono of its coun
     const button = tagWith(html, mark);
     assert.match(button, /\bfont-plain\b/, `${mark} is in the label face`);
     assert.match(button, /text-label-large uppercase/);
-    assert.match(button, /focus-visible:ring-3 focus-visible:ring-ring focus-visible:ring-offset-2/);
-    assert.doesNotMatch(button, /font-mono|ring-2\b/);
+    assert.match(button, /outline-none outline-3 outline-offset-2 outline-ring focus-visible:outline-solid/);
+    assert.doesNotMatch(button, /font-mono|ring-2\b|ring-offset/);
   }
 });
 

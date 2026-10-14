@@ -51,12 +51,18 @@ rounded:
 
 What the kit reads there, and nothing else:
 
-- **`scheme`**: `light` or `dark`, required. The format's front matter holds
-  one scheme; this top-level key says which one the file writes. The other is
-  derived.
+- **`scheme`**: `light` or `dark`. The format's front matter holds one
+  scheme; this top-level key, the kit's own, says which one the file writes.
+  The other is derived. Write it. A file that writes none (the format has no
+  such key, so a file its own tools wrote has none) has its scheme read from
+  its ground: `colors.background`, else `colors.surface`, light when that
+  colour's tone is 50 or more, dark under. That is listed as **assumed**,
+  with the token it was read from. With neither colour the file is refused.
 - **`colors`**: hex only.
-  - `seed` (required) builds Material's tonal-spot scheme
+  - `seed` builds Material's tonal-spot scheme
     (`@material/material-color-utilities`, 2021 spec, standard contrast).
+    Write it. A file that writes none has it read from `colors.primary`,
+    listed as **assumed**; with no `primary` either the file is refused.
   - `primary-key`, `secondary-key`, `tertiary-key`, `neutral-key`,
     `neutral-variant-key`, `error-key` each replace one tonal palette with the
     key's own hue and chroma, in both schemes. Without `primary-key` the
@@ -101,7 +107,25 @@ Each is `--md-sys-color-<name>` in the theme and `bg-<name>` / `text-<name>` /
 The kit reads `seed`, the six `*-key` names and the 49 roles, and no other
 colour name. A DESIGN.md written elsewhere, or a project's own vocabulary
 (`brand-pink`, `ink`, `paper`, `accent`, `neon`), is **mapped by you**, the
-agent: the generator never guesses.
+agent: the generator never guesses a name. It reads two tables of short names
+as Material's, because the format's own examples and tools write them, and
+nothing outside them:
+
+| Written                                                 | Read as                                               |
+| :------------------------------------------------------ | :---------------------------------------------------- |
+| `typography.<display, headline, title, body, label>-lg` | `-large`                                              |
+| `…-md`, `…-sm`                                          | `-medium`, `-small`                                   |
+| `rounded.xs`, `sm`, `md`, `lg`, `xl`                    | `extra-small`, `small`, `medium`, `large`, `extra-large` |
+
+A short name is read with no warning. Where a file writes both `title-md` and
+`title-medium`, Material's name is read and the short one is listed as not
+applied. Any other name (`headline-display`, `h1`, `rounded.pill`) is ignored
+and listed.
+
+A file with no `scheme` and no `seed` still generates, as said above, with
+each assumption listed. That is a first drawing, not a mapping: read the
+**assumed** lines, then write `scheme` and `seed` (and the keys) yourself, so
+the file says what it means.
 
 - A brand colour that should run through the whole scheme is a key:
   `primary-key` for the main one, `secondary-key` and `tertiary-key` for the
@@ -195,8 +219,13 @@ a previous run left behind. The kit lists a warning, and still writes the
 theme, for:
 
 - a name it does not know inside `colors`, `typography` or `rounded`
-  (`colors.brand-pink`, `typography.h1`, `rounded.sm`), or inside the
+  (`colors.brand-pink`, `typography.h1`, `rounded.pill`), or inside the
   reference rule;
+- what it **assumed**: a `scheme` read from the ground, a `seed` read from
+  `primary`, each with the token it was read from and the line to write to
+  say it;
+- a short name written beside Material's own (`title-md` with `title-medium`):
+  not applied;
 - a top-level key outside the format's own and `scheme`: a misspelt
   `typographie:` is listed, not silently taken as no typography. The format's
   `spacing` and `components` are not read by the kit and are not listed;
@@ -212,7 +241,9 @@ theme, for:
 Warnings are printed on stderr, and written to a `## Generator warnings`
 section at the end of `DESIGN.resolved.md`, which is absent when there are
 none. The command exits 1, and writes nothing, only for a file it cannot read:
-no front matter, no `scheme`, no `seed`, a colour under a name it knows that
+no front matter, no `scheme` and no ground to read one from, no `seed` and no
+`primary` to read one from, a `scheme` that is neither `light` nor `dark`, a
+colour under a name it knows that
 is not a hex, a type size, line height, tracking, weight or corner that is not
 one value of its kind, a family that cannot be a name (the mono face's
 included), or a reference value in a form it refuses. The message names the token and says what the kit reads
@@ -231,10 +262,30 @@ may hold anything a font is called (spaces, digits, accents, an apostrophe)
 on one line: it is written as one CSS string, so nothing in it is read as CSS,
 and a fallback that is not plain words (`Source Sans 3`) is quoted the same
 way. A name with no Latin letter or digit, an empty name between two commas
-and a list are refused. Material has two
-faces: the family of `display-large` sets the brand face (display, headline,
-title), the family of `body-large` the plain face (body, label). A different
-family on another token of the same face is not applied, and listed.
+and a list are refused.
+
+**A family per role.** Material gives each of the 15 roles a font of its own,
+which reads one of two faces unless told otherwise, and so does the kit:
+
+- The family of `display-large` is the brand face (display, headline, title);
+  the family of `body-large` is the plain face (body, label). They are
+  `--md-sys-typescale-brand-font` and `--md-sys-typescale-plain-font`.
+- A role that writes no `fontFamily` keeps its face's. So a file that writes
+  one family on `display-large` and one on `body-large` sets all 15 roles.
+- A role that writes a family that is not its face's takes it:
+  `--md-sys-typescale-<role>-font` reads that family's hook, and the kit's
+  primitives and components draw the role in it (`font-<role>`, written
+  beside `text-<role>`). Running text in one family and the labels in
+  another is `body-large` with the first and `label-large`, `label-medium`
+  and `label-small` with the second.
+- Each family is one hook and one font to load, whatever number of roles
+  write it. The kit does not count them: four families is four fonts the
+  project loads.
+- A hook holds one stack: the first written for it, the faces before the
+  roles. The same family written later with other fallbacks is applied, and
+  its fallbacks are listed as not applied.
+- A family whose hook would be a role's or a face's own utility (`Label Large`
+  gives `--font-label-large`, `Brand` gives `--font-brand`) is refused.
 
 ## The mono face
 
@@ -270,12 +321,12 @@ typography:
 
 ## Limits
 
-`theme.v4.css` has a weight variable only for `title-medium`, `title-small`
-and the three labels, and a tracking variable only where Material's baseline
-has tracking. A weight other than 400 or a tracking other than 0 on any other
-role is not applied, and listed: adding the variable would make `text-*`
-utilities assert a weight they do not assert today. A property outside the
-five on a known role (`fontFeature`) is not applied, and listed.
+`theme.v4.css` has a weight variable for every one of the 15 roles, so a
+`fontWeight` on any role is applied, and every `text-<role>` utility sets its
+role's weight: the type primitives write none of their own. It has a tracking
+variable only where Material's baseline has tracking: a tracking other than 0
+on any other role is not applied, and listed. A property outside the five on
+a known role (`fontFeature`) is not applied, and listed.
 
 A seeded palette is a Material-flavoured one: the tonal ramps are the Material
 look. A look that departs from it writes more roles by hand, in the written
@@ -293,8 +344,12 @@ warnings, when there are any. Where the kit read no rule under the project's
 `## Reference CSS`, that section is left as written and the complete rule goes
 in a generated `## Resolved reference CSS` section, which says the project's
 section is not in the theme. Comments inside the project's `:root` rule are
-not carried over. It passes the same linter, and generating from it gives the
-same theme and the same warnings. `## Resolved reference CSS`,
+not carried over. Every role shows the family applied to it: its own, or
+its face's where the project wrote none. A short name the kit read (`title-md`, `rounded.sm`) is
+written under Material's. A `scheme` or a `seed` the kit assumed is not
+written into it: the resolved file says what the project's file says, and the
+assumption is listed again. It passes the same linter, and generating from it
+gives the same theme and the same warnings. `## Resolved reference CSS`,
 `## Resolved schemes` and `## Generator warnings` are the kit's headings: a
 section of either name in a DESIGN.md is replaced. Never edit the resolved
 file: edit `DESIGN.md` and regenerate.

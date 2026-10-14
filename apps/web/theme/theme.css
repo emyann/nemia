@@ -1,14 +1,14 @@
 /* =============================================================================
    MD3 color scheme — light (:root) and dark (the system setting)
    -----------------------------------------------------------------------------
-   Generated from the project's DESIGN.md by tokens/generate-theme.mjs
-   (`npm run theme:generate`). Never edit this file: edit DESIGN.md and
-   regenerate; `npm run theme:resolve` then refreshes tokens/resolved.json.
+   Generated from the project's DESIGN.md by the kit's generator
+   (generate-theme.mjs, in the kit's tokens folder). Never edit this file:
+   edit DESIGN.md and run the generator again.
 
    Every role is a finished color (`hsl(...)`) under the `--md-sys-color-*`
    namespace, mirroring Material's own token names. Finished colors are what
-   Tailwind v4's `@theme inline` mapping (theme.v4.css), `color-mix()`, the
-   shadcn CLI and Claude Design all expect; opacity modifiers such as
+   Tailwind v4's `@theme inline` mapping (theme.v4.css), `color-mix()` and the
+   shadcn CLI expect; opacity modifiers such as
    `bg-primary/8` are applied by Tailwind through color-mix(), so no bare
    `H S% L%` triplet is needed anywhere.
 
@@ -28,10 +28,29 @@
    Typography primitives therefore assert no color of their own. It is declared
    once per scheme block; an app that wants a different default sets `color`
    on `<body>`, which wins over an inherited value.
+
+   Beside it, each block declares its `color-scheme` and gives scroll bars the
+   theme's roles (`scrollbar-color`: a thumb in `outline`, a lane that shows
+   the ground). So what the browser draws itself (a scroll bar, a native
+   select's list, a date field's picker) follows the theme, in light, in dark
+   and in a `.dark` subtree.
+
+   To keep what the browser drew before, write one rule in your own CSS, after
+   this file's import and outside any `@layer`: on `:root`, the two
+   declarations `color-scheme: normal` and `scrollbar-color: auto`.
+
+   It goes on the root because the page's own scroll bar and canvas read the
+   root element: the same declarations on `<body>` reach only what is inside
+   the body. And while `scrollbar-color` is set, browsers that support it ignore
+   `::-webkit-scrollbar` rules. A project that styles its bars that way
+   writes that rule, or `scrollbar-color: auto` on the scrollers it
+   styles, or moves its colours to `scrollbar-color`.
    ========================================================================== */
 
 :root {
   color: var(--md-sys-color-on-surface);
+  color-scheme: light;
+  scrollbar-color: var(--md-sys-color-outline) transparent;
 
   /* Accent roles */
   --md-sys-color-primary: hsl(56 100% 20%);
@@ -96,6 +115,8 @@
 @media (prefers-color-scheme: dark) {
   :root {
     color: var(--md-sys-color-on-surface);
+    color-scheme: dark;
+    scrollbar-color: var(--md-sys-color-outline) transparent;
 
     --md-sys-color-primary: hsl(56 92% 53%);
     --md-sys-color-on-primary: hsl(57 100% 4%);

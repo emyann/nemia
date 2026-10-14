@@ -40,7 +40,8 @@ function Now({ run, asOf }: { run: ListedRun; asOf: Date }) {
 
 /**
  * The runs in flight, as the kit's dense table in the look's cut frame, in the hue of a session at work: each run's title as a link,
- * its id with a copy control and its factory, each control and each factory at one edge from row to row; its own steps as a rail; what it does now; its wall time at `asOf` and its cost, plain.
+ * its id with a copy control and its factory, each control and each factory at one edge from row to row; its own steps as a rail;
+ * what it does now; its wall time at `asOf` and its cost, plain.
  * Narrower than its columns, the table scrolls sideways inside its frame.
  */
 export function FlightTable({ runs, asOf }: { runs: readonly ListedRun[]; asOf: Date }) {

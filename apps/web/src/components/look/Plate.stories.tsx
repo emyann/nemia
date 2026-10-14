@@ -17,5 +17,8 @@ export const Grey: StoryObj = { render: () => <Plate count={6} title="Finished" 
 /** The plate of a section that holds nothing: grey whatever its hue, with no barcode. */
 export const Quiet: StoryObj = { render: () => <Plate count={0} title="Waiting on you" quiet /> };
 
-/** A page's name, in the brand face over its rule. */
+/** A page's short name, in the brand face over its rule, lit under the name alone. */
 export const NameOfAPage: StoryObj = { render: () => <PageName>Runs</PageName> };
+
+/** A page's long name: its rule lit under the whole name, past where a short one's stops. */
+export const LongNameOfAPage: StoryObj = { render: () => <PageName>Factories</PageName> };

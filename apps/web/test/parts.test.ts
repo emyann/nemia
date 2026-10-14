@@ -285,17 +285,28 @@ test('a step done is filled in the rail whether a check says so or its own word 
   assert.match(html, /aria-label="design done, implement verified, review to come"/, 'read aloud, a check is told from a word');
 });
 
-test("a page's name stands over a rule whose first 140 pixels are lit in the hue of a session at work", async () => {
+test("a page's name stands over a hairline, lit under the name alone, as wide as the name and never a fixed width", async () => {
   // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
-  const html = await drawn(createElement(PageName, { children: 'Runs' }));
-  const [name, rule] = [tagWith(html, 'data-page-name'), tagWith(html, 'data-page-rule')];
+  const html = await drawn(createElement(PageName, { children: 'Factories' }));
+  const [name, rule, text, lit] = ['data-page-name', 'data-page-rule', 'data-page-name-text', 'data-page-rule-lit'].map((mark) =>
+    tagWith(html, `${mark}[ >=]`),
+  );
   assert.match(name, /^<h1 /);
   assert.match(name, /\bpb-4\.5\b/, '18 pixels under the name');
   assert.doesNotMatch(name, /border-b|style=/, 'the name carries no rule of its own, nor an image a contrast measure cannot read');
   assert.match(rule, /aria-hidden="true"/);
+  assert.match(rule, /\binset-x-0\b/, 'the hairline runs the whole h1');
   assert.match(rule, /\bh-px\b/);
+  assert.match(rule, /background-color:var\(--md-sys-color-outline-variant\)/);
+  assert.match(text, /\bw-fit\b/, "the name's own box is as wide as the name");
+  assert.match(lit, /aria-hidden="true"/);
+  assert.match(lit, /\binset-x-0\b/, "the lit part spans the name's box");
+  assert.match(lit, /\s-bottom-4\.5\s/, "on the h1's rule, 18 pixels under the name");
+  assert.match(lit, /background-color:var\(--meaning-alive\)/);
+  assert.doesNotMatch(lit, /\bw-|\d+px|width/, 'the lit part has no width of its own');
   assert.match(
-    rule,
-    /background-image:linear-gradient\(to right, var\(--meaning-alive\) 0 140px, var\(--md-sys-color-outline-variant\) 140px\)/,
+    html,
+    /<span data-page-name-text[^>]*>Factories<span aria-hidden="true" data-page-rule-lit/,
+    'the lit part hangs from the name',
   );
 });

@@ -731,3 +731,47 @@ test("a press on a waiting card's title, on its lowest pixels over the copy cont
     await page.context().close();
   }
 });
+
+test(
+  "a page's name lights its rule exactly under the whole name, short or long, and the hairline runs the h1's width",
+  WAITED,
+  async () => {
+    const page = await openParts(browser, built, 'dark', '?part=Plate');
+    try {
+      const measured = await page.locator('[data-page-name]').evaluateAll((names) =>
+        names.map((name) => {
+          const text = document.createRange();
+          text.selectNodeContents(name.querySelector('[data-page-name-text]')!.firstChild!);
+          const [word, lit, rule, whole] = [
+            text.getBoundingClientRect(),
+            name.querySelector('[data-page-rule-lit]')!.getBoundingClientRect(),
+            name.querySelector('[data-page-rule]')!.getBoundingClientRect(),
+            name.getBoundingClientRect(),
+          ];
+          return {
+            name: name.textContent,
+            word: [Math.round(word.left), Math.round(word.right)],
+            lit: [Math.round(lit.left), Math.round(lit.right)],
+            rule: [Math.round(rule.left), Math.round(rule.right)],
+            whole: [Math.round(whole.left), Math.round(whole.right)],
+            onTheRule: Math.round(lit.bottom) === Math.round(rule.bottom) && Math.round(lit.bottom) === Math.round(whole.bottom),
+          };
+        }),
+      );
+      assert.deepEqual(
+        measured.map((one) => one.name).sort(),
+        ['Factories', 'Runs'],
+        "the plate's stories draw a short name and a long one",
+      );
+      for (const one of measured) {
+        assert.deepEqual(one.lit, one.word, `the lit part is as wide as the name: ${JSON.stringify(one)}`);
+        assert.deepEqual(one.rule, one.whole, `the hairline runs the h1's width: ${JSON.stringify(one)}`);
+        assert.ok(one.onTheRule, `the lit part lies on the hairline, at the h1's foot: ${JSON.stringify(one)}`);
+      }
+      const [short, long] = measured.map((one) => one.lit[1] - one.lit[0]).sort((a, b) => a - b);
+      assert.ok(long > short && long > 140, `a long name's lit part reaches past a short one's: ${short} then ${long}`);
+    } finally {
+      await page.context().close();
+    }
+  },
+);

@@ -579,13 +579,20 @@ async function lookRules(page: Page): Promise<void> {
     .evaluateAll((all) => all.map((id) => getComputedStyle(id).borderTopWidth));
   if (!whole.length || whole.some((width) => width !== '0px'))
     throw new Refused(`a card's whole id stands in no box — ${whole.join(', ')}`);
-  const rule = await page.locator('[data-page-rule]').evaluate((line) => {
-    const [style, name] = [getComputedStyle(line), getComputedStyle(line.parentElement!)];
-    const lit = style.backgroundImage.includes('140px') ? 'lit for 140px' : style.backgroundImage;
-    return `${lit}, ${style.height} thick, ${name.paddingBottom} under the name`;
+  const rule = await page.locator('[data-page-name]').evaluate((name) => {
+    const text = document.createRange();
+    text.selectNodeContents(name.querySelector('[data-page-name-text]')!.firstChild!);
+    const [word, lit, line] = [
+      text.getBoundingClientRect(),
+      name.querySelector('[data-page-rule-lit]')!,
+      name.querySelector('[data-page-rule]')!,
+    ];
+    const at = lit.getBoundingClientRect();
+    const under = Math.round(at.left) === Math.round(word.left) && Math.round(at.right) === Math.round(word.right);
+    return `${under ? 'lit under the name' : `lit ${Math.round(at.width)}px under a ${Math.round(word.width)}px name`}, ${getComputedStyle(line).height} thick, ${getComputedStyle(name).paddingBottom} under the name`;
   });
-  if (rule !== 'lit for 140px, 1px thick, 18px under the name')
-    throw new Refused(`the rule under the page's name is lit at its start — ${rule}`);
+  if (rule !== 'lit under the name, 1px thick, 18px under the name')
+    throw new Refused(`the rule under the page's name is lit under the whole name — ${rule}`);
   const done = await page
     .locator('[data-runs-page] [data-step]')
     .evaluateAll((all) =>

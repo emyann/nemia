@@ -392,6 +392,28 @@ test("a card's factory: starts it in that factory, on its one repository, its wo
   assert.equal(readRun(over.run.id).repo, other);
 });
 
+test('nemia start <name> of an inbox card starts it as its path does: its body, its keys, and the card out of the inbox', async () => {
+  const { repo, build } = fresh();
+  hired();
+  fs.cpSync(path.dirname(build), path.join(repo, 'workflows'), { recursive: true });
+  const before = await runPlaced(startRun({ brief: 'read first', repo, workflowDir: build, isolate: false, factory: 'pipao' }));
+  const card = aCard('by-its-name', `---\nworkflow: build\nfactory: pipao\nfrom: ${before.id}\n---\nBuild it by name.\n`);
+  const elsewhere = fs.mkdtempSync(path.join(ROOT, 'typed-'));
+  const run = readRun(startedId(await typedFrom(elsewhere, ['start', 'by-its-name', '--no-worktree'])));
+  assert.equal(run.brief, 'Build it by name.');
+  assert.equal(run.factory, 'pipao');
+  assert.equal(run.workflowDir, path.join(repo, 'workflows', 'build'));
+  assert.deepEqual(run.context, [before.id]);
+  assert.deepEqual(run.from, { inbox: 'by-its-name' });
+  assert.equal(fs.existsSync(card), false, 'the card is removed');
+
+  const text = readRun(
+    startedId(await typedFrom(elsewhere, ['start', 'no-such-card', '--factory', 'pipao', '--workflows', build, '--no-worktree'])),
+  );
+  assert.equal(text.brief, 'no-such-card', 'a name no card has stays a text brief');
+  assert.equal('from' in text, false);
+});
+
 test('a card of a factory with two repositories runs where it is started when that is one of them, else is refused naming both, nothing written and the card kept', async () => {
   const { build } = fresh();
   const [first, second] = [aRepo(), aRepo()];

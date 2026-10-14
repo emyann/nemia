@@ -215,8 +215,6 @@
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
   --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
   --color-popover-foreground: var(--popover-foreground);
@@ -276,8 +274,6 @@
   --popover-foreground: var(--md-sys-color-on-surface);
   --primary: var(--md-sys-color-primary);
   --primary-foreground: var(--md-sys-color-on-primary);
-  --secondary: var(--md-sys-color-surface-container-highest);
-  --secondary-foreground: var(--md-sys-color-on-surface);
   --muted: var(--md-sys-color-surface-container-highest);
   --muted-foreground: var(--md-sys-color-on-surface-variant);
   --accent: var(--md-sys-color-surface-container-high);

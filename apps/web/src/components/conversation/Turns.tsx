@@ -203,7 +203,7 @@ function Closeout({ turn }: { turn: CloseoutTurn }) {
             data-outcome={closeout.outcome}
             className={cn(
               'rounded-full px-2 py-0.5 font-mono text-body-small',
-              closeout.outcome === 'blocked' ? container.yours : 'bg-secondary text-secondary-foreground',
+              closeout.outcome === 'blocked' ? container.yours : 'bg-surface-container-highest text-on-surface',
             )}
           >
             {closeout.outcome}

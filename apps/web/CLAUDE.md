@@ -33,8 +33,10 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
   `samp` and `pre` follow it. No `--font-mono` in `@theme inline`: it would win over the theme's (the `typefaces` page refuses it).
   The face has one weight: a weight class on mono text is drawn by the browser, so mono text takes a body role whole (`font-mono
   text-body-small`), untracked as the body roles are (`DESIGN.md`), never a label or title role, which carry one (`monoWeighted`, `test/type.test.ts`).
-- The kit's corners (`rounded-shape-*`) follow `DESIGN.md`; shadcn's (`--radius`) are the board's own. shadcn's `secondary` reads a
-  neutral surface, not the theme's `secondary`: that role is `alive`, a session at work. The chart colours are not the theme's.
+- The kit's corners (`rounded-shape-*`) follow `DESIGN.md`; shadcn's (`--radius`) are the board's own. `bg-secondary` is the theme's
+  secondary (the look's `alive`), as the kit's parts draw it; shadcn's quiet surface is its role, `bg-surface-container-highest
+  text-on-surface`, and no file outside the kit names `--secondary` or `secondary-foreground` (`test/secondary.test.ts`). The chart
+  colours are not the theme's.
 - A colour says one thing: `yours` (waits on a person), `alive`, `money` (an amount), `rest` (grey, and sage for done) and `failure`.
   `src/styles.css` reads each from a theme role once (`--meaning-*`, `bg-yours`); `lib/meaning.ts` holds the drawn forms, each class a
   whole literal; `test/status.test.ts` holds the table and refuses a hand-picked hue in the files that draw a state.

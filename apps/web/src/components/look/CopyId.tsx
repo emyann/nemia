@@ -61,7 +61,14 @@ export function CopyId({ id, short = false }: { id: string; short?: boolean }) {
       >
         {short ? id.slice(-4) : id}
       </span>
-      <IconButton size="xsmall" icon={copied ? COPIED : COPY} aria-label={`Copy the run id ${id}`} onPress={copy} className={PULLED} />
+      <IconButton
+        size="xsmall"
+        variant="standard"
+        icon={copied ? COPIED : COPY}
+        aria-label={`Copy the run id ${id}`}
+        onPress={copy}
+        className={PULLED}
+      />
       <span role="status" className="sr-only">
         {SAID[said]}
       </span>

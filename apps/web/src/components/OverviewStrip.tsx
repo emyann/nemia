@@ -18,7 +18,7 @@ const DAEMON_TAG: Record<DaemonTone, 'secondary' | 'neutral' | 'error'> = {
 };
 
 /** A small mono figure, in the muted ink. */
-const FIGURE = 'font-mono text-body-small text-on-surface-variant';
+const FIGURE = 'shrink-0 font-mono text-body-small whitespace-nowrap text-on-surface-variant';
 
 /**
  * The Overview's strip, above the factories' canvas: the factories' day, the agents at work and the quota, three cut frames in one row
@@ -87,7 +87,7 @@ function Slot({ basis, hue = 'none', children }: { basis: string; hue?: 'none' |
 /** A frame's heading, in small caps. */
 function Heading({ children }: { children: ReactNode }) {
   return (
-    <Label component="span" size="medium" className="uppercase">
+    <Label component="span" size="medium" className="min-w-0 truncate uppercase">
       {children}
     </Label>
   );
@@ -112,7 +112,7 @@ function Today({ strip, dot }: { strip: Strip; dot: DaemonDot }) {
           </Tag>
         </CutTag>
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-1.5">
         <Sticker hue="yours" label="Wait on you">
           {strip.waitsOnYou}
         </Sticker>

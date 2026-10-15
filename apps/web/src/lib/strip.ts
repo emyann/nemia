@@ -17,7 +17,7 @@ export type AgentRow = { agent: string; step: string; run: string; title: string
 /**
  * The strip's numbers. `waitsOnYou` and `inFlight` are the open runs, a run that waits on a person counted with the waiting alone;
  * `landed` and `failed` the runs whose work stopped since the day began; `spentUsd` what every run worked today cost, whole;
- * `perLanding` the mean cost of a landing today, null before the first. `runs` and `sessions` are at work against their caps, null where
+ * `perLanding` the mean cost of a landing today whose cost was measured, null before the first. `runs` and `sessions` are at work against their caps, null where
  * the machine has none. `agents` are the agents at work against those hired in the factories in view, `hired` null where none is; `rows`
  * the steps at work, longest first, the first `ROWS_SHOWN`, and `more` how many are left out.
  */
@@ -87,12 +87,18 @@ const hiredIn = (factories: readonly Factory[], factory: string | undefined): nu
   return names.size || null;
 };
 
+/** Whether a step of `run` is at work: a session working or the run's check of it, as the board draws its state (`stepState`). */
+const working = (run: RunSummary, step: RunSummary['steps'][number]): boolean => {
+  const state = stepState(step.status, false, run.holding != null);
+  return state === 'working' || state === 'checking';
+};
+
 /** The steps of `open` at work by an agent, longest first. */
 const rowsOf = (open: readonly RunSummary[], now: number): AgentRow[] =>
   open
     .flatMap((run) =>
       run.steps.flatMap((step) => {
-        if (step.agent === null || step.since === null) return [];
+        if (step.agent === null || step.since === null || !working(run, step)) return [];
         const minutes = Math.max(0, Math.floor((now - Date.parse(step.since)) / 60_000));
         return [{ agent: step.agent, step: step.name, run: run.id, title: titleOf(run), minutes, atWork: minutesWord(minutes) }];
       }),
@@ -101,15 +107,7 @@ const rowsOf = (open: readonly RunSummary[], now: number): AgentRow[] =>
 
 /** The sessions at work in `open`: each step working or checking, a held run's that a hold did not stop among them. */
 const sessionsOf = (open: readonly RunSummary[]): number =>
-  open.reduce(
-    (n, run) =>
-      n +
-      run.steps.filter((step) => {
-        const state = stepState(step.status, false, run.holding != null);
-        return state === 'working' || state === 'checking';
-      }).length,
-    0,
-  );
+  open.reduce((n, run) => n + run.steps.filter((step) => working(run, step)).length, 0);
 
 /**
  * The strip's numbers off what the page reads (`StripIn`), of the factory in view (`keptBy`): a run called off is in no open count, and
@@ -121,6 +119,7 @@ export function stripOf(given: StripIn): Strip {
   const flying = runs.filter((run) => !run.cancelledAt && !waitsOnYou(run) && inFlight(run));
   const finishedToday = runs.filter((run) => !waitsOnYou(run) && !inFlight(run) && Date.parse(finishedAtOf(run)) >= given.dayStart);
   const landed = finishedToday.filter((run) => outcomeOf(run) === 'succeeded');
+  const priced = landed.filter((run) => run.cost !== null);
   const open = [...waiting, ...flying];
   const worked = [...open.filter((run) => workedToday(run, given.dayStart)), ...finishedToday];
   const rows = rowsOf(open, given.now);
@@ -130,7 +129,7 @@ export function stripOf(given: StripIn): Strip {
     landed: landed.length,
     failed: finishedToday.filter((run) => outcomeOf(run) === 'failed').length,
     spentUsd: worked.reduce((sum, run) => sum + usdOf(run), 0),
-    perLanding: landed.length ? landed.reduce((sum, run) => sum + usdOf(run), 0) / landed.length : null,
+    perLanding: priced.length ? priced.reduce((sum, run) => sum + usdOf(run), 0) / priced.length : null,
     runs: { count: flying.length, cap: capOf(given.ceilings?.cap) },
     sessions: { count: sessionsOf(open), cap: capOf(given.ceilings?.last?.sessions) },
     agents: { count: new Set(rows.map((row) => row.agent)).size, hired: hiredIn(given.factories, given.factory) },
@@ -139,8 +138,11 @@ export function stripOf(given: StripIn): Strip {
   };
 }
 
-/** An amount in dollars as a sticker says it: whole from $100, to the cent below; `—` for none. */
-export const dollars = (usd: number | null): string => (usd === null ? '—' : usd >= 100 ? `$${Math.round(usd)}` : `$${usd.toFixed(2)}`);
+/**
+ * An amount in dollars as a sticker says it, never more than four figures wide below $10,000, so the six stickers keep one line: whole from
+ * $10, to the cent below; `—` for none.
+ */
+export const dollars = (usd: number | null): string => (usd === null ? '—' : usd >= 10 ? `$${Math.round(usd)}` : `$${usd.toFixed(2)}`);
 
 /** The readout of what is at work: `5 OF 7 RUNS · 2 OF 50 SESSIONS`, a part with no cap said without its `OF`. */
 export const readoutOf = ({ runs, sessions }: Pick<Strip, 'runs' | 'sessions'>): string => {

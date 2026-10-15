@@ -106,6 +106,19 @@ test("a run's work that stopped at or after the day's start counts today, landed
   assert.equal(s.perLanding, 6, "the mean of today's landings alone: yesterday's $100 is not in it");
 });
 
+test('a landing whose cost was not measured is landed, and left out of the mean cost of a landing', () => {
+  const unpriced = ended('r-unpriced', 'succeeded', DAY + 20 * MIN, 0, { cost: null });
+  const s = stripOf({ runs: [landedToday, unpriced], factories: [], ceilings: undefined, now: NOW, dayStart: DAY });
+  assert.deepEqual([s.landed, s.perLanding], [2, 6]);
+});
+
+test('a step not at work is no row, though its task started: one that asks a person waits on them', () => {
+  const asks = atWorkBy(summary([['plan', 'running']], { id: 'r-asks' }), 'plan', 'iris', NOW - 3 * MIN);
+  asks.steps[0].status = 'needs-human';
+  const s = stripOf({ runs: [asks], factories: [], ceilings: undefined, now: NOW, dayStart: DAY });
+  assert.deepEqual([s.rows.length, s.agents.count, s.sessions.count], [0, 0, 0]);
+});
+
 test('a run called off or with its result undecided is neither landed nor failed, though its cost is spent today', () => {
   const s = stripOf({ runs: [cancelledToday, undecided], factories: [], ceilings: undefined, now: NOW, dayStart: DAY });
   assert.deepEqual([s.landed, s.failed, s.spentUsd, s.perLanding], [0, 0, 6, null]);
@@ -120,7 +133,8 @@ test('a run that waits on a person counts in Wait on you alone, one that moves a
 test("Spent is every run worked today, whole, a cost not measured counting nothing; A landing is '—' before the first", () => {
   assert.equal(strip().spentUsd, 6 + 3 + 1 + 5 + 2 + 7 + 4, "each run worked or stopped today, never yesterday's landing");
   assert.equal(dollars(null), '—');
-  assert.equal(dollars(12.184), '$12.18');
+  assert.equal(dollars(7.851), '$7.85', 'to the cent below $10');
+  assert.equal(dollars(12.684), '$13', 'whole from $10, so a sticker stays as narrow');
   assert.equal(dollars(230.4), '$230');
 });
 

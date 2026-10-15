@@ -25,17 +25,19 @@ function Key({ children, className }: { children: string; className?: string }) 
   );
 }
 
-/** The agent's avatar, name and role, and the step's word as a cut tag; `no agent` where the step names none. */
+/** The agent's avatar, name and role, and the step's word as a cut tag; `no agent`, with no avatar, where the step names none. */
 function Head({ facts }: { facts: StepCardFacts }) {
   const { agent, tag } = facts;
   return (
     <div className="flex items-center gap-3">
-      <Avatar
-        size={40}
-        alt={agent?.name ?? 'no agent'}
-        fallback={agent?.initial ?? '·'}
-        className="shrink-0 bg-secondary-container text-on-secondary-container"
-      />
+      {agent && (
+        <Avatar
+          size={40}
+          alt={agent.name}
+          fallback={agent.initial}
+          className="shrink-0 bg-secondary-container text-on-secondary-container"
+        />
+      )}
       <div className="flex min-w-0 flex-1 flex-col">
         <span data-step-agent className="truncate text-title-small">
           {agent?.name ?? 'no agent'}

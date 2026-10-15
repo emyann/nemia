@@ -1,6 +1,7 @@
 /**
  * `nemia start` of a folder whose step declares a field its agent's `output:` declares too: refused with exit 2, naming the field and
- * both declarers, and no run is written. `WF_ROOT` is set before the import, since the module reads it as it loads.
+ * both declarers, and no run is written. `WF_ROOT` is set before the import, since the module reads it as it loads, and a start
+ * outside a factory is allowed, with no daemon started, whether or not the test setup's preload ran.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,6 +13,8 @@ const ROOT = scratch('wf-owners-start-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
+process.env.WF_DEFAULT_FACTORY_STARTS = '1';
+process.env.NEMIA_DAEMON_START = 'off';
 const BIN = scratch('wf-owners-start-bin-');
 for (const name of ['claude', 'codex']) fs.writeFileSync(path.join(BIN, name), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
 process.env.PATH = `${BIN}${path.delimiter}${process.env.PATH}`;

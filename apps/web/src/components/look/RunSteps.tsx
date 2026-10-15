@@ -1,5 +1,5 @@
 import type { RunSummary } from '@/lib/api';
-import type { CSSProperties } from 'react';
+import { Fragment, type CSSProperties, type ReactNode } from 'react';
 import { filled, ink, paint } from '@/lib/meaning';
 import { railSaid, railStates } from '@/lib/runWords';
 import { stateClass, stateDrawn, type StepState } from '@/lib/status';
@@ -50,39 +50,45 @@ function Breath() {
 /**
  * A run's own steps as a rail: one bar a step, in the run's order, each drawn by its state (`barClass`, `barGlow`, `Breath`), and under
  * the bars, with `names`, each step's name. Read aloud as one picture, each step and its word (`railSaid`). `cancelled` and `held` are
- * the run's, as `stepState` takes them.
+ * the run's, as `stepState` takes them. With `wrap`, each bar is put inside what it gives (a button that opens the step), and the rail
+ * is a group named by `railSaid`, each bar its own step.
  */
 export function RunSteps({
   steps,
   cancelled,
   held,
   names = false,
+  wrap,
 }: {
   steps: ReadonlyArray<Pick<RunSummary['steps'][number], 'name' | 'status'>>;
   cancelled: boolean;
   held: boolean;
   names?: boolean;
+  wrap?: (bar: ReactNode, step: { name: string; state: StepState }) => ReactNode;
 }) {
   const drawn = railStates(steps, cancelled, held);
   return (
     <div
-      role="img"
+      role={wrap ? 'group' : 'img'}
       aria-label={railSaid(steps, cancelled, held)}
       data-run-steps
       className="grid gap-1.5 text-label-small uppercase"
       style={{ gridTemplateColumns: `repeat(${Math.max(1, drawn.length)}, minmax(0, 1fr))` }}
     >
-      {drawn.map((step) => (
-        <span
-          key={step.name}
-          data-step={step.name}
-          data-state={step.state}
-          className={cn('block h-2', barClass(step.state))}
-          style={barGlow(step.state)}
-        >
-          {step.state === 'working' && <Breath />}
-        </span>
-      ))}
+      {drawn.map((step) => {
+        const bar = (
+          <span
+            key={step.name}
+            data-step={step.name}
+            data-state={step.state}
+            className={cn('block h-2', barClass(step.state))}
+            style={barGlow(step.state)}
+          >
+            {step.state === 'working' && <Breath />}
+          </span>
+        );
+        return wrap ? <Fragment key={step.name}>{wrap(bar, step)}</Fragment> : bar;
+      })}
       {names &&
         drawn.map((step) => (
           <span key={step.name} data-step-name={step.name} className={cn('truncate', nameInk(step.state))} title={step.name}>

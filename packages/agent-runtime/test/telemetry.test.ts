@@ -288,7 +288,8 @@ const collector = async (t: TestContext) => {
 };
 
 /**
- * A stub `claude` first on PATH for the rest of test `t`: it writes the telemetry variables it was started with to `env.json`, posts a
+ * A stub `claude` first on PATH for the rest of test `t`: it writes the telemetry variables and `TASK_FILES` it was started with to
+ * `env.json`, posts a
  * log to `$OTEL_EXPORTER_OTLP_ENDPOINT/v1/logs` with the resource `OTEL_RESOURCE_ATTRIBUTES` says and the trace `TRACEPARENT` names,
  * as Claude Code does, when told an endpoint, then signs off as a job.
  */
@@ -296,7 +297,7 @@ const stubClaude = (t: TestContext) => {
   const dir = scratch('ae-telemetry-bin-');
   const script = `#!${process.execPath}
 const fs = require('node:fs');
-const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => /^(OTEL_|TRACE|CLAUDE_CODE_ENABLE_TELEMETRY$|CLAUDE_CODE_ENHANCED_TELEMETRY_BETA$|CLAUDE_CODE_DISABLE_BACKGROUND_TASKS$)/.test(k)));
+const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => /^(OTEL_|TRACE|CLAUDE_CODE_ENABLE_TELEMETRY$|CLAUDE_CODE_ENHANCED_TELEMETRY_BETA$|CLAUDE_CODE_DISABLE_BACKGROUND_TASKS$|TASK_FILES$)/.test(k)));
 fs.writeFileSync(${JSON.stringify(path.join(dir, 'env.json'))}, JSON.stringify(env));
 const attributes = (process.env.OTEL_RESOURCE_ATTRIBUTES ?? '').split(',').filter(Boolean).map((pair) => {
   const at = pair.indexOf('=');
@@ -374,6 +375,22 @@ test("a job of an engine given no collector is handed no telemetry, the engine's
   assert.equal((await settled(engine, id)).state.settled, 'succeeded');
   assert.deepEqual(claude.env(), { CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1' });
   assert.deepEqual(posts, []);
+});
+
+test("a job's own env reaches its claude, laid under the job's: a task cannot turn background tasks back on", async (t) => {
+  const claude = stubClaude(t);
+  const files = scratch('ae-telemetry-files-');
+  const engine = builtEngine(EngineService.layer({ root: scratch('ae-telemetry-'), harnesses: { job: claudeJob } }));
+  const id = await Effect.runPromise(
+    engine.file({
+      brief: 'b',
+      cwd: scratch('ae-telemetry-cwd-'),
+      harness: 'job',
+      config: { env: { TASK_FILES: files, CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '0' } },
+    }),
+  );
+  assert.equal((await settled(engine, id)).state.settled, 'succeeded');
+  assert.deepEqual(claude.env(), { TASK_FILES: files, CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1' });
 });
 
 test("a command of an engine given a collector is handed no telemetry, the engine's own included; its own env still reaches it", async (t) => {

@@ -139,6 +139,7 @@ export const codex: HarnessSpec = {
   name: 'codex',
   codexArgs: true,
   checkoutMcp: true,
+  env: true,
   mounts: { readOnly: true },
   command: (r, io) => ({
     cmd: 'codex',
@@ -159,6 +160,7 @@ export const codex: HarnessSpec = {
       ...(r.resumeFrom ? ['resume', r.resumeFrom] : []),
       r.brief,
     ],
+    ...(r.config?.env ? { env: r.config.env } : {}),
   }),
   refuses: (task) => {
     const { permissionMode, effort, disallowedTools, allowedTools, mcp } = task.config ?? {};

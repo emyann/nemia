@@ -213,12 +213,12 @@ test('the command harness refuses, at file(), a task without a command, one carr
   assert.match(String(resumed), /`resumeFrom: ae\/x\/1` continues a session, and a command keeps none/);
 });
 
-test('command, env and niceness are refused on Codex, Claude Code and a remote agent, harnesses that run no command, naming the one that does', async () => {
+test('command and niceness are refused on Codex, Claude Code and a remote agent, harnesses that run no command, naming the one that does', async () => {
   const root = scratch('ae-command-');
   const harnesses = { codex, claude: 'claude', remote: { url: 'https://agent.example' }, command: commandHarness } as const;
   const engine = builtEngine(EngineService.layer({ root, harnesses }));
   for (const harness of ['codex', 'claude', 'remote']) {
-    for (const config of [{ command: ['true'] }, { env: { CI: '1' } }, { niceness: 5 }]) {
+    for (const config of [{ command: ['true'] }, { niceness: 5 }]) {
       const key = Object.keys(config)[0];
       const message = await Effect.runPromise(engine.file({ brief: 'b', cwd: root, harness, config })).then(
         () => 'filed',
@@ -230,6 +230,46 @@ test('command, env and niceness are refused on Codex, Claude Code and a remote a
       );
     }
   }
+});
+
+test("env is filed on every harness that spawns the session's process, and refused on a background session and a remote agent, naming the fix", async () => {
+  const root = scratch('ae-command-');
+  const harnesses = {
+    codex,
+    claude: 'claude',
+    bg: 'claude-bg',
+    remote: { url: 'https://agent.example' },
+    command: commandHarness,
+  } as const;
+  const engine = builtEngine(EngineService.layer({ root, harnesses }));
+  const filed = (harness: string, config: object) =>
+    Effect.runPromise(engine.file({ brief: 'b', cwd: root, harness, config })).then(
+      () => 'filed',
+      (err: Error) => err.message,
+    );
+  const env = { CI: '1' };
+  assert.equal(await filed('codex', { env }), 'filed');
+  assert.equal(await filed('claude', { env }), 'filed');
+  assert.equal(await filed('command', { command: ['true'], env }), 'filed');
+  const takers = 'File the task on `codex` or `claude` as a job or `command`, or leave `env` off.';
+  assert.equal(
+    await filed('claude', { env, background: true }),
+    `\`env\` is laid in the session's process, and the \`claude\` harness runs this task as a background session, which runs in a pre-spawned process and ignores its asker's environment: it would start without it. ${takers}`,
+  );
+  assert.equal(
+    await filed('bg', { env }),
+    `\`env\` is laid in the session's process, and the \`bg\` harness runs this task as a background session, which runs in a pre-spawned process and ignores its asker's environment: it would start without it. ${takers}`,
+  );
+  assert.equal(
+    await filed('remote', { env }),
+    `\`env\` is laid in the session's process, and the \`remote\` harness spawns none of its own: it would start without it. ${takers}`,
+  );
+});
+
+test("a Codex task's env reaches the command that runs its session", () => {
+  const r = { name: 'ae/t/1', brief: 'b', cwd: '/r' };
+  assert.deepEqual(codex.command({ ...r, config: { env: { CI: '1' } } }).env, { CI: '1' });
+  assert.equal(codex.command(r).env, undefined, 'none given, none laid');
 });
 
 test('checkoutMcp is refused on the command harness, which loads no server to leave out, naming the harnesses that hold it', async () => {

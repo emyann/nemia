@@ -225,7 +225,8 @@ What Claude Code does as the steps meet it. Where the orchestrator's code holds 
 - **A session under `~/.claude/` cannot write there in any mode**: put a probe store elsewhere.
 - **A path a fenced step's brief names is inside its own folder**; a rule offered for the next run names no path of this one (in the
   orchestrator today: `givenPlan`, `folderPlace.make`, `allowRuleOf`, `disallowedBy`).
-- **A job runs with background tasks off and a call's default timeout at 10 minutes** (`CLAUDE_JOB_ENV`, `src/harness/claude/code.ts`):
+- **A job runs with background tasks off and a call's default timeout at 10 minutes** (`CLAUDE_JOB_ENV`, `src/harness/claude/code.ts`),
+  a task's `env` laid under it and the telemetry, never over (`test/telemetry.test.ts`):
   measured on 2.1.289, `run_in_background` is ignored and the call runs in the foreground, a bare 130 s call completes (cut at 120 s
   with background tasks off alone, moved to the background with neither), and a shell `&` still detaches, its `$!` alive to `kill -0`.
 - **A job (`claude -p`) exports logs, metrics and traces from its environment over `http/json`, flushed at exit, and joins `TRACEPARENT`**;

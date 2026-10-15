@@ -6,8 +6,6 @@
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
-import http from 'node:http';
-import type { AddressInfo } from 'node:net';
 import { Effect, Logger, Metric } from 'effect';
 import { OtlpExporter } from 'effect/observability';
 import { TestClock } from 'effect/testing';
@@ -22,7 +20,8 @@ import {
   tracesUrl,
 } from './telemetry.ts';
 import { PASS_METRICS, recordStepMetrics } from '../meter/meter.verb.ts';
-import { EXPORT_BOUND_MS, exportedNow, lineLogger, telemetryLayer } from './telemetry.store.ts';
+import { EXPORT_BOUND_MS, exportedNow, lineLogger, seriesBorn, telemetryLayer } from './telemetry.store.ts';
+import { collector, seriesOf, type Attributes } from '../../test/collector.ts';
 
 test('otlpOf: no export without an endpoint, or with a blank one; its endpoint, and its service: nemia unless named', () => {
   assert.equal(otlpOf({}), undefined);
@@ -129,30 +128,6 @@ test("REFUSED: no endpoint, no export — the tracer is Effect's own, and the li
   assert.ok(exported.loggers.has(lineLogger));
 });
 
-/** A scratch collector on loopback: each body posted to it, by path, and a wait for the first post to `path` whose body has `word`. */
-async function collector(t: TestContext) {
-  const posts: { path: string; body: string }[] = [];
-  const waiting: { path: string; word: string; found: (body: string) => void }[] = [];
-  const server = http.createServer((req, res) => {
-    let body = '';
-    req.on('data', (chunk: Buffer) => (body += chunk.toString('utf8')));
-    req.on('end', () => {
-      posts.push({ path: req.url ?? '', body });
-      for (const w of waiting) if (w.path === req.url && body.includes(w.word)) w.found(body);
-      res.writeHead(200, { 'content-type': 'application/json' }).end('{}');
-    });
-  });
-  await new Promise<void>((listening) => server.listen(0, '127.0.0.1', listening));
-  t.after(() => new Promise<void>((closed) => server.close(() => closed())));
-  const posted = (path: string, word: string) =>
-    new Promise<string>((found) => {
-      const had = posts.find((p) => p.path === path && p.body.includes(word));
-      if (had) found(had.body);
-      else waiting.push({ path, word, found });
-    });
-  return { url: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, posted, posts };
-}
-
 test('with an endpoint, a span and a log reach the collector, under the service named, and the log is printed too', async (t) => {
   const c = await collector(t);
   const traced = c.posted('/v1/traces', '"tick"');
@@ -204,24 +179,9 @@ test('a collector that does not answer costs the metrics their post, never the p
   assert.equal(await Effect.runPromise(passed('ran').pipe(Effect.provide(telemetryLayer(env)))), 'ran');
 });
 
-type Point = { attributes: { key: string; value: { stringValue?: string } }[]; asDouble?: number; asInt?: number; count?: number | string };
-type Posted = {
-  resourceMetrics: {
-    scopeMetrics: { metrics: { name: string; sum?: { dataPoints: Point[] }; histogram?: { dataPoints: Point[] } }[] }[];
-  }[];
-};
-
-/** What a body posted to `/v1/metrics` says of `factory`'s series: each metric's name with its value, a histogram's with its count. */
-const seriesOf = (body: string, factory: string): Record<string, number> =>
-  Object.fromEntries(
-    (JSON.parse(body) as Posted).resourceMetrics
-      .flatMap((r) => r.scopeMetrics.flatMap((s) => s.metrics))
-      .flatMap((m) =>
-        [...(m.sum?.dataPoints ?? []), ...(m.histogram?.dataPoints ?? [])]
-          .filter((p) => p.attributes.some((a) => a.key === 'factory' && a.value.stringValue === factory))
-          .map((p) => [m.name, Number(p.asDouble ?? p.asInt ?? p.count)] as const),
-      ),
-  );
+/** Whether a point's attributes name `factory`. */
+const ofFactory = (factory: string) => (attributes: Attributes) =>
+  attributes.some((a) => a.key === 'factory' && a.value.stringValue === factory);
 
 test("a step's first try reaches the collector as two posts: each of its series at zero, then at its value, before the program ends", async (t) => {
   const c = await collector(t);
@@ -235,7 +195,7 @@ test("a step's first try reaches the collector as two posts: each of its series 
     ),
   );
   assert.deepEqual(
-    posts.map((body) => seriesOf(body, factory)),
+    posts.map((body) => seriesOf(body, ofFactory(factory))),
     [
       { 'step.tries': 0, 'step.duration': 0, 'step.cost': 0, 'step.tokens.input': 0, 'step.tokens.output': 0 },
       { 'step.tries': 1, 'step.duration': 1, 'step.cost': 1.25, 'step.tokens.input': 1200, 'step.tokens.output': 300 },
@@ -257,4 +217,58 @@ test('REFUSED: an export that never ends holds its caller for the bound and no l
     }).pipe(Effect.provide(TestClock.layer())),
   );
   assert.deepEqual(ended, { before: false, after: true });
+});
+
+/** A series of a test's own, by `born`, the attribute no other series carries. */
+const own = (attributes: Attributes) => attributes.some((a) => a.key === 'born');
+
+/** Each post to `/v1/metrics` that names one of the test's own series, read as `seriesOf` reads it, consecutive repeats collapsed. */
+const ownPosts = (posts: readonly { path: string; body: string }[]) =>
+  posts
+    .filter((p) => p.path === '/v1/metrics' && p.body.includes('"born"'))
+    .map((p) => seriesOf(p.body, own))
+    .filter((read, i, all) => i === 0 || JSON.stringify(read) !== JSON.stringify(all[i - 1]));
+
+test('a series born reaches the collector at zero, counter and histogram alike, then at its value, both before the program ends', async (t) => {
+  const c = await collector(t);
+  const counter = Metric.withAttributes(Metric.counter('test.born.counter', { incremental: true }), { born: 'wire' });
+  const histogram = Metric.withAttributes(Metric.histogram('test.born.histogram', { boundaries: [1, 10] }), { born: 'wire' });
+  const posts = await Effect.runPromise(
+    Effect.gen(function* () {
+      yield* seriesBorn([counter, histogram]);
+      yield* Metric.update(counter, 3);
+      yield* Metric.update(histogram, 5);
+      yield* exportedNow;
+      return ownPosts(c.posts);
+    }).pipe(Effect.provide(telemetryLayer({ OTEL_EXPORTER_OTLP_ENDPOINT: c.url }))),
+  );
+  assert.deepEqual(
+    posts,
+    [
+      { 'test.born.counter': 0, 'test.born.histogram': 0 },
+      { 'test.born.counter': 3, 'test.born.histogram': 1 },
+    ],
+    'both posted by the time the program has asked for them, neither left to the 10 s interval nor to the closing export',
+  );
+});
+
+test('a process started again brings each series it births back at zero, so a value at or above the last one before is read as a reset', async (t) => {
+  const c = await collector(t);
+  const series = Metric.withAttributes(Metric.counter('test.born.restarted', { incremental: true }), { born: 'restart' });
+  const lived = (values: number) =>
+    Effect.gen(function* () {
+      yield* seriesBorn([series]);
+      for (let i = 0; i < values; i++) yield* Metric.update(series, 1);
+      yield* exportedNow;
+    }).pipe(
+      Effect.provide(telemetryLayer({ OTEL_EXPORTER_OTLP_ENDPOINT: c.url })),
+      Effect.provideService(Metric.MetricRegistry, new Map()),
+    );
+  await Effect.runPromise(lived(5));
+  await Effect.runPromise(lived(7));
+  assert.deepEqual(
+    ownPosts(c.posts).map((read) => read['test.born.restarted']),
+    [0, 5, 0, 7],
+    'the second process falls to zero before it climbs past the first',
+  );
 });

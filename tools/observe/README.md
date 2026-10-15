@@ -244,11 +244,15 @@ test in the suite sees.
 ## What a restart loses
 
 A step's cost, tokens, time, tries, checks, rounds and waits are counters and histograms in the daemon's memory, read by the panels with
-`increase()`. Two things make them hold across a first try and a restart:
+`increase()`, and so are the daemon's own and the api's, read by **System** and **Passes** with `increase()` or `rate()`. Two things
+make them hold across a first try and a restart:
 
 - **Each series is born at zero.** The pass that records a step's facts first exports each series they write at zero, then at its
   value, in two posts of their own. So a step's first try in a new factory shows in its panel with its cost, and after a restart
-  Prometheus sees the series come back at zero and reads a reset.
+  Prometheus sees the series come back at zero and reads a reset. The daemon's own series are born the same way (`seriesBorn`), all at
+  once, as soon as it holds the store and before anything counts into them: the passes' histograms (`pass_duration`,
+  `pass_phase_duration` by phase, `pass_journal_reads`), the feed's live readers' `feed_follow_beats_total` and
+  `feed_follow_reads_total`, and the api's `api_step_follows_total`, which the api hands its daemon to be born with its own.
 - **Each settle is counted once, by a mark on the run's record** (`settlesCounted`), written by the pass before the metrics are
   recorded. A session that ended while no daemon ran is counted by the first daemon that reads it, and a daemon started again counts
   none twice. A session held open and answered by a person is one try when it settles, with its cost once, however many answers it took.
@@ -256,6 +260,8 @@ A step's cost, tokens, time, tries, checks, rounds and waits are counters and hi
 Measured 2026-10-11 on this stack, with one try of $1.25 posted in a factory never seen: Prometheus kept the series at 0, then at 1.25
 24 ms later, and **System**'s own Cost and Tries queries answered it. `increase()` extrapolates to the edge of its range by half the
 gap between samples, so a series reads high while it is young: 1.33 for 1.25 after a minute of exports, and less as the daemon lives on.
+The worst case is a process that ends right after its first export: its series stays at 1.56 for 1.25 (measured the same day, factory
+`probe-eo38-first`, beside 1.33 for one that lived on, `probe-eo38-lived`).
 
 What is still lost:
 
@@ -265,8 +271,11 @@ What is still lost:
   is waited for 2 s at most, and an exporter stays off for 60 s after a failed post.
 - **A run started before the mark existed** is counted as before, off the runtime's feed: a session of it that settles on the first
   pass of a daemon started again is not counted.
-- **The daemon's own counters and the api's** (the passes' histograms, `api_step_follows_total` and the others on **System**) are not
-  born at zero: each loses its first sample, and a restart that brings one back at or above its last value is not read as a reset.
+- **The api's reads by route** (`api_poll_reads`, read by **System**'s requests per minute by route) are not born at zero: a route is
+  known only once a request is served on it, and a request's runtime holds no exporter, so a series can be born neither then nor at
+  the start without a flat zero line for every route never asked. Each route loses its first request after a restart, against a poll
+  rate in the hundreds; its old count is large, so a restart is still read as a reset. The gauges are read as they stand, never by
+  increase, and need no birth.
 - **Up to 10 s of anything else the daemon held and had not exported** when it was killed: the gauges and the passes' histograms. A
   daemon stopped by a signal exports once more as it ends.
 

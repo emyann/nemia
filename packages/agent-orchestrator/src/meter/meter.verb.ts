@@ -1,14 +1,15 @@
 /**
  * The pass's meter, on the engine: each of its verbs counted in its phase (`meteredEngine`), a pass's cost from those counts and the
  * runtime's totals before and after it (`costOf`), and that cost put into the process's metrics (`recordPassMetrics`), beside the facts
- * of the steps it saw settle (`recordStepMetrics`), each series of theirs exported at zero before its first value. A controller, wrapping
+ * of the steps it saw settle (`recordStepMetrics`), each series of theirs exported at zero before its first value (`seriesBorn`), as the
+ * pass's own are once a daemon holds the store (`PASS_SERIES`). A controller, wrapping
  * the engine whose type the client gives (`runtime-client.ts`).
  */
 import { Context, Effect, Exit, Metric, Option } from 'effect';
 import type { Engine } from '../runtime-client.ts';
 import { addRuntime, asideEffect, withinEffect, type Tallies } from './tally.store.ts';
 import { PASS_BOUNDS, passCost, READ_BOUNDS, PHASES, type HarnessCost, type PassCost, type Phase } from './meter.ts';
-import { exportedNow } from '../telemetry/telemetry.store.ts';
+import { exportedNow, seriesBorn } from '../telemetry/telemetry.store.ts';
 import { boundedAttributes, type DeniedFact, type StepFact, type TimelineFact, type Wait, type WaitFact } from './step.ts';
 
 /**
@@ -147,10 +148,19 @@ export const PASS_METRICS = {
   load: Metric.gauge('machine.load', { description: "the machine's load over the last minute per core, at the last pass" }),
 } as const;
 
+/** The series of `pass.phase.duration` for `phase`. */
+const phaseSeries = (phase: Phase) => Metric.withAttributes(PASS_METRICS.phase, { phase });
+
+/**
+ * The pass's series a collector reads by their increase, each a histogram (`PASS_METRICS`): its time, each phase's (`PHASES`) and its
+ * journal reads — the ones a daemon births at zero once it holds the store (`seriesBorn`, `up`). The gauges are read as they stand.
+ */
+export const PASS_SERIES = [PASS_METRICS.duration, ...PHASES.map(phaseSeries), PASS_METRICS.reads] as const;
+
 /** A pass's cost put into the pass's metrics (`PASS_METRICS`). */
 export const recordPassMetrics = Effect.fn('recordPassMetrics')(function* (cost: PassCost) {
   yield* Metric.update(PASS_METRICS.duration, cost.ms);
-  for (const phase of PHASES) yield* Metric.update(Metric.withAttributes(PASS_METRICS.phase, { phase }), cost.phases[phase].ms);
+  for (const phase of PHASES) yield* Metric.update(phaseSeries(phase), cost.phases[phase].ms);
   yield* Metric.update(PASS_METRICS.reads, cost.phases.journals.reads);
   yield* Metric.update(PASS_METRICS.runs, cost.runs);
   yield* Metric.update(PASS_METRICS.queued, cost.queued);
@@ -279,24 +289,19 @@ const recordTimeline = (fact: TimelineFact): Effect.Effect<void> =>
     return rootSpan(TIMELINE_SPAN, now, now, own, fact.attributes);
   });
 
-/**
- * One value a fact puts into one series: the series born, at zero and with nothing counted (`born`), and the value put into it (`said`).
- */
-type Write = { born: Effect.Effect<void>; said: Effect.Effect<void> };
+/** One value a fact puts into one series: the series, to be born before it (`seriesBorn`), and the value put into it (`said`). */
+type Write = { series: Metric.Metric<never, unknown>; said: Effect.Effect<void> };
 
-/** `value` into the counter `metric`, by the fact's attributes, refused if one is not a step's (`boundedAttributes`): born by adding 0. */
+/** `value` into the counter `metric`, by the fact's attributes, refused if one is not a step's (`boundedAttributes`). */
 const counted = (metric: Metric.Counter<number>, attributes: Record<string, string>, value: number): Write => {
   const series = Metric.withAttributes(metric, boundedAttributes(attributes));
-  return { born: Metric.update(series, 0), said: Metric.update(series, value) };
+  return { series, said: Metric.update(series, value) };
 };
 
-/**
- * `value` into the histogram `metric`, by the fact's attributes, refused if one is not a step's (`boundedAttributes`): born by a read of
- * it, which makes it with nothing measured.
- */
+/** `value` into the histogram `metric`, by the fact's attributes, refused if one is not a step's (`boundedAttributes`). */
 const measured = (metric: Metric.Histogram<number>, attributes: Record<string, string>, value: number): Write => {
   const series = Metric.withAttributes(metric, boundedAttributes(attributes));
-  return { born: Effect.asVoid(Metric.value(series)), said: Metric.update(series, value) };
+  return { series, said: Metric.update(series, value) };
 };
 
 /**
@@ -329,17 +334,12 @@ function spanOf(fact: StepFact): Effect.Effect<void> {
  * The facts a pass read of its runs' steps, each recorded once: into the step's metrics (`writesOf`), and a wait, a denied call and a
  * number of a run's timeline each into its span (`spanOf`).
  *
- * Where a fact writes a metric, each series it writes is first born at zero and exported so (`exportedNow`), then the values are put in
- * and exported in turn: a collector that reads a counter by its increase counts nothing for a series first seen at a value, and reads a
- * series a process started again brings back as a reset only once it has seen it lower. A series that is there already is born for
- * nothing. A process that exports nothing waits for none, and facts that are spans alone ask for no export.
+ * Where a fact writes a metric, each series it writes is first born at zero and exported so (`seriesBorn`), then the values are put in
+ * and exported in turn (`exportedNow`). A process that exports nothing waits for none, and facts that are spans alone ask for no export.
  */
 export const recordStepMetrics = Effect.fn('recordStepMetrics')(function* (facts: readonly StepFact[]) {
   const writes = facts.flatMap(writesOf);
-  if (writes.length) {
-    for (const write of writes) yield* write.born;
-    yield* exportedNow;
-  }
+  yield* seriesBorn(writes.map((write) => write.series));
   for (const write of writes) yield* write.said;
   for (const fact of facts) yield* spanOf(fact);
   if (writes.length) yield* exportedNow;

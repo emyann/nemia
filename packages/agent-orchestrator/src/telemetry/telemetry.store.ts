@@ -2,9 +2,10 @@
  * The daemon's process's telemetry, one layer that process provides around what it runs (`telemetryLayer`): each log printed as `nemia up`
  * prints its lines, and, only when its environment names an OTLP collector, its spans, its logs and its metrics exported there too. And
  * what a pass's work on one step says of itself, the run and the step, on the spans and logs under it (`forStep`). And the export of
- * what the process holds, asked for now and waited for within a bound (`exportedNow`).
+ * what the process holds, asked for now and waited for within a bound (`exportedNow`), its series first born at zero where asked
+ * (`seriesBorn`).
  */
-import { Effect, Layer, Logger, LogLevel, Option } from 'effect';
+import { Effect, Layer, Logger, LogLevel, Metric, Option } from 'effect';
 import { FetchHttpClient } from 'effect/http';
 import { OtlpExporter, OtlpLogger, OtlpMetrics, OtlpSerialization, OtlpTracer } from 'effect/observability';
 import { lineOf, logsUrl, metricsUrl, otlpOf, stepLabels, tracesUrl } from './telemetry.ts';
@@ -55,6 +56,18 @@ export const exportedNow: Effect.Effect<void> = Effect.serviceOption(OtlpExporte
     }),
   ),
 );
+
+/**
+ * Each of `series` born in the process's registry at zero, with nothing counted or measured (a read of it makes it), then exported so
+ * (`exportedNow`): a collector that reads a counter or a histogram by its increase counts nothing for a series first seen at a value,
+ * and reads a series a process started again brings back as a reset only once it has seen it lower. A series that is there already is
+ * born for nothing; none given asks for no export. Untraced, as the export is: a pass's spans are its work, never its telemetry.
+ */
+export const seriesBorn = Effect.fnUntraced(function* (series: ReadonlyArray<Metric.Metric<never, unknown>>) {
+  if (!series.length) return;
+  for (const one of series) yield* Metric.value(one);
+  yield* exportedNow;
+});
 
 /**
  * `filing`, a pass's work on the step `step` of the run `run`, with its spans and its logs annotated with their labels (`stepLabels`):

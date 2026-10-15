@@ -16,7 +16,8 @@
  *
  * The fake telemetry a render shows the dashboards over (`tools/observe/render/seed.ts`) is held the same way: every name it sends is one
  * the code emits or a measured one (`seedUnknown`), and every panel is met by it, with two series where it draws series, or listed as
- * unseeded (`unmet`, `strayUnseeded`). Met is by name: no query is evaluated here, which the render itself does.
+ * unseeded (`unmet`, `strayUnseeded`). Met is by name: no query is evaluated here, which the render itself does. The series a daemon
+ * births at zero once it holds the store, and those alone, are seeded across a restart (`restartMismatch`).
  *
  * `WF_ROOT` is set before the runner is imported, which reads it as the module loads. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo, sessions enough are admitted for the one run, and no cap is set on runs.
@@ -55,6 +56,7 @@ const { ALL_KINDS, DISK_KINDS, DISK_PARTS } = await import('../src/disk/disk.ts'
 const { STEP_ATTRIBUTE_KEYS } = await import('../src/meter/step.ts');
 const { DEFAULT_SERVICE_NAME } = await import('../src/telemetry/telemetry.ts');
 const { PHASES } = await import('../src/meter/meter.ts');
+const { DAEMON_SERIES } = await import('../src/daemon/up.verb.ts');
 
 const REPO_ROOT = path.join(import.meta.dirname, '..', '..', '..');
 const OBSERVE = path.join(REPO_ROOT, 'tools', 'observe');
@@ -1535,6 +1537,48 @@ test('REFUSED: a seed with a renamed span, a metric of another kind, an attribut
   assert.deepEqual(seedUnknown([{ ...daemon, spans: [], logs: [], metrics: [loose] }], KNOWN), ['run']);
   const odd = { ...sessions[0], logs: [{ body: 'x', ago: 0, attributes: { 'tool.title': 'Bash' } }] };
   assert.deepEqual(seedUnknown([odd], KNOWN), ['tool_title']);
+});
+
+/**
+ * The metrics a daemon births at zero once it holds the store: its own (`DAEMON_SERIES`), and each the api hands `up` as its `series` in
+ * its `main.ts`, read off the constant of the api's source that defines it.
+ */
+const bornMetrics = (): string[] => {
+  const main = fs.readFileSync(path.join(REPO_ROOT, 'apps', 'api', 'src', 'main.ts'), 'utf8');
+  const handed = /\bseries:\s*\[([^\]]*)\]/.exec(main)?.[1] ?? '';
+  const api = handed
+    .split(',')
+    .map((name) => name.trim())
+    .filter(Boolean)
+    .map((name) => new RegExp(`const ${name} = Metric\\.\\w+\\(\\s*'([^']+)'`).exec(SOURCE_TEXT)?.[1] ?? `${name}, undefined in the api`);
+  return [...new Set([...DAEMON_SERIES.map((series) => series.id), ...api])].sort();
+};
+
+/** Each metric `seed` seeds across a restart that `born` does not hold, and each of `born` it seeds otherwise or not at all. */
+const restartMismatch = (seed: readonly ServiceSeed[], born: readonly string[]): string[] => {
+  const restarted = seed.flatMap((said) => said.metrics.filter((metric) => metric.restarted).map((metric) => metric.name));
+  return [
+    ...restarted.filter((name) => !born.includes(name)).map((name) => `${name}: restarted, never born`),
+    ...born.filter((name) => !restarted.includes(name)).map((name) => `${name}: born, not restarted`),
+  ];
+};
+
+test("the seed carries across a restart each series a daemon births at zero, the api's among them, and none other", () => {
+  const born = bornMetrics();
+  assert.ok(born.includes('api.step.follows') && born.includes('pass.duration'), born.join(', '));
+  assert.deepEqual(restartMismatch(SEED, born), []);
+  const [daemon, ...sessions] = SEED;
+  const seededAs = (name: string, restarted: boolean): ServiceSeed[] => [
+    {
+      ...daemon,
+      metrics: daemon.metrics.map(({ restarted: was, ...metric }) =>
+        (metric.name === name ? restarted : was) ? { ...metric, restarted: true as const } : metric,
+      ),
+    },
+    ...sessions,
+  ];
+  assert.deepEqual(restartMismatch(seededAs('store.runs', true), born), ['store.runs: restarted, never born'], 'one more');
+  assert.deepEqual(restartMismatch(seededAs('api.step.follows', false), born), ['api.step.follows: born, not restarted'], 'one fewer');
 });
 
 test('the seed meets every panel of every dashboard, with two series where a panel draws series, or the panel is listed unseeded', () => {

@@ -15,9 +15,9 @@ export const WAIT_KINDS = ['approve', 'blocked', 'check', 'unfinished', 'unsigne
 export type WaitKind = (typeof WAIT_KINDS)[number];
 
 /**
- * The kind of wait each state of a step is, none for a state the api lists no step in as waiting on a person: a session that asks is
- * a run still in flight there, which the bell does not count, and a held run's steps are named by none of its rows, whose wait is the
- * hold's own.
+ * The kind of wait each state of a step is, none for a state the api lists no step in as waiting on a person: a session that asks is a run
+ * still in flight there, which the rail's Runs count does not count, and a held run's steps are named by none of its rows, whose wait is
+ * the hold's own.
  */
 export const waitKindOf: Record<StepState, WaitKind | null> = {
   working: null,

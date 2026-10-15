@@ -8,7 +8,7 @@ import type { PagePlace } from './api/workflows.ts';
  * What the bar shows: the start of a run in a factory, or in none yet (`null`), which asks which first; a factory, a run, a step of a
  * run, a step of a workflow (`spec`), read from the repository's workflows or yours (`from`), a state of one of the code's state
  * machines, the machine's gauges the top bar opens: the daemon, the feed, what is at work, the quota and the version, whole, or the
- * runs waiting on you across every factory, which the header's bell opens.
+ * runs waiting on you across every factory, which the Runs page opens under what waits on you.
  */
 export type Bar =
   | { kind: 'start'; factory: string | null }
@@ -64,7 +64,7 @@ const ASKING = 'start';
 /** The address of the machine's gauges: the bare word, since there is one machine. */
 const GAUGES = 'gauges';
 
-/** The address of the runs waiting on you: the bare word, since the bell lists them across every factory. */
+/** The address of the runs waiting on you: the bare word, since the bar lists them across every factory. */
 const WAITING = 'waiting';
 
 /** Each kind of bar the address names, by its word, read from the non-empty name after its `:`; none for a name the kind refuses. */

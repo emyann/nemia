@@ -234,7 +234,7 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
 - Send what the current choice takes, not what hidden state holds (`afterFor`).
 - A form keyed on an agent's version is thrown away with its draft when a write beside the agent moves the version (`keptAfterCopy`,
   `formKeyOf` in `lib/agents.ts`).
-- The frame counts what waits and what is in flight by the api's `counts` (`atWork`, `openBlockOf`, the bell): `inFlight` and
+- The frame counts what waits and what is in flight by the api's `counts` (`atWork`, `openBlockOf`, the rail's Runs count): `inFlight` and
   `waitsOnYou` (`lib/factory.ts`) are the rule of the pages that read the whole list, and `test/one-rule.test.ts` keeps them off the
   light answer. A held run is `running` whatever its steps say: that rule takes one that waits on a person out by name.
 - `['runs-finished']` stands for every page of the finished runs, each factory's (`filterOf`, `polled`, `runsMoved`).

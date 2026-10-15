@@ -14,11 +14,11 @@ import { stepState } from './status.ts';
 export type AtWork = { runs: number; sessions: number };
 
 /**
- * What is at work in `open`, the light answer of every factory: the runs in flight by the api's own count (`counts.inFlight`), which
- * counts a run that waits on a person among the waiting alone, as the bell does; and the steps of every run of it not called off whose
- * state is `working` or `checking` — a session at work, or the run's check of one — a waiting run's among them. A step that asks a person
- * (`needs-human`) waits on them, and is not counted. A held run's step keeps its state (`stepState`), so a session a hold did not stop
- * counts.
+ * What is at work in `open`, the light answer of every factory: the runs in flight by the api's own count (`counts.inFlight`), which counts
+ * a run that waits on a person among the waiting alone, as the rail's Runs count does; and the steps of every run of it not called off
+ * whose state is `working` or `checking` — a session at work, or the run's check of one — a waiting run's among them. A step that asks a
+ * person (`needs-human`) waits on them, and is not counted. A held run's step keeps its state (`stepState`), so a session a hold did not
+ * stop counts.
  */
 export function atWork(open: Pick<OpenRuns, 'counts' | 'waiting' | 'inFlight'>): AtWork {
   let sessions = 0;

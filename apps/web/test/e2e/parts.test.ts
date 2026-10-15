@@ -879,3 +879,24 @@ test(
     }
   },
 );
+
+/** The running line's title in Trace's story of it: the animation it runs and the image its text is painted with. */
+async function shimmerOf(page: Page): Promise<{ animation: string; image: string }> {
+  return page
+    .locator('[data-story="board-trace--running"] [data-status="running"] [data-slot="trace-title"]')
+    .evaluate((title) => ({ animation: getComputedStyle(title).animationName, image: getComputedStyle(title).backgroundImage }));
+}
+
+test("a trace's running title shimmers, and holds still where the person asked for reduced motion", WAITED, async () => {
+  const moving = await openParts(browser, built, 'dark', alone('board-trace--running'));
+  const still = await openParts(browser, built, 'dark', alone('board-trace--running'), { still: true });
+  try {
+    const shimmer = await shimmerOf(moving);
+    assert.equal(shimmer.animation, 'tw-shimmer', 'it shimmers');
+    assert.match(shimmer.image, /gradient/);
+    assert.deepEqual(await shimmerOf(still), { animation: 'none', image: 'none' });
+  } finally {
+    await moving.context().close();
+    await still.context().close();
+  }
+});

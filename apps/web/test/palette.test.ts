@@ -230,7 +230,7 @@ const RAW_REFUSED: [string, string, string][] = [
   ['<path fill="#000" />', '#000', 'hex'],
   ['a { color: var(--x, #fff); }', '#fff', 'hex'],
   ['a { background: color-mix(in srgb, #fff 5%, transparent); }', '#fff', 'hex'],
-  ["url(\"data:image/svg+xml,<svg fill=%22%23000%22/>\")", '%23000', 'hex'],
+  ['url("data:image/svg+xml,<svg fill=%22%23000%22/>")', '%23000', 'hex'],
   ['a { color: #fff; }', '#fff', 'hex'],
   ['<stop stopColor="rgb(0 0 0)" />', 'rgb(0 0 0)', 'notation'],
   ['<a className="bg-[rgb(0_0_0)]">', 'rgb(0_0_0)', 'notation'],

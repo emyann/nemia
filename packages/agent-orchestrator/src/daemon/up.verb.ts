@@ -3,20 +3,22 @@
  * takes the store's lease in its scope and lets it go as the scope closes; `holdUrl` writes into the lease where the api serves; and
  * `runMain` runs either as the process's command, a signal letting go of the lease before the process exits.
  */
-import { Cause, Deferred, Effect, Exit, Fiber, type Scope } from 'effect';
+import { Cause, Deferred, Effect, Exit, Fiber, type Metric, type Scope } from 'effect';
 import type { PlaceService } from '../place/place.store.ts';
 import { over, quotaHarnesses, type Engine, type HarnessQuota } from '../runtime-client.ts';
 import { HOME } from '../record/record.store.ts';
 import { queueLine } from '../inbox/index.ts';
 import { scheduleLine } from '../schedule/schedule.ts';
 import { addPass, summaryDue, summaryLine, type Interval, type Reading } from '../meter/index.ts';
+import { PASS_SERIES } from '../meter/meter.verb.ts';
+import { seriesBorn } from '../telemetry/telemetry.store.ts';
 import { heldLines, pausedWords, RESUMED } from '../pause/pause.ts';
 import { refusalLines, tickRun, type Pass } from '../tick/tick.verb.ts';
 import { beat, heldUrl, passed, releaseStore, stillHeld, takeStore, type TakenStore } from './daemon.store.ts';
 import { takenFromLine, type HolderKind } from './daemon.ts';
 import { deliver } from '../subscription/deliver.verb.ts';
 import { DAEMON_STARTED, startedLine } from '../feed/feed.ts';
-import { emitDaemonStarted } from '../feed/feed.verb.ts';
+import { emitDaemonStarted, FEED_FOLLOW_BEATS, FEED_FOLLOW_READS } from '../feed/feed.verb.ts';
 import { keep } from '../nemia/keep.verb.ts';
 import { reconcile } from '../applied/applied.verb.ts';
 import { free } from '../prune/free.verb.ts';
@@ -27,15 +29,23 @@ import { runningRelease } from '../release/version.verb.ts';
 
 /**
  * What `up` runs with: its interval, `every` ms; the repository a queued card that names none starts on, and the folder the lease names
- * (`repo`); the kind of daemon it is (`holder`); and what to do once the lease is taken and before the first pass, in the lease's scope
+ * (`repo`); the kind of daemon it is (`holder`); the calling process's own series a collector reads by their increase, born at zero
+ * with the daemon's (`series`, `DAEMON_SERIES`); and what to do once the lease is taken and before the first pass, in the lease's scope
  * (`onTaken` — where the api serves, and `nemia up` says what it holds).
  */
 export type UpOptions = {
   every: number;
   repo: string;
   holder: HolderKind;
+  series?: ReadonlyArray<Metric.Metric<never, unknown>>;
   onTaken?: (taken: TakenStore) => Effect.Effect<void, unknown, Scope.Scope>;
 };
+
+/**
+ * The daemon's own series a collector reads by their increase, born at zero once it holds the store (`seriesBorn`): the pass's
+ * (`PASS_SERIES`) and the feed's live readers' beats and reads.
+ */
+export const DAEMON_SERIES = [...PASS_SERIES, FEED_FOLLOW_BEATS, FEED_FOLLOW_READS] as const;
 
 /** How often the daemon asks each harness for its quota: the series keep it over time. */
 export const QUOTA_EVERY_MS = 600_000;
@@ -196,7 +206,8 @@ const saidStarted = ({ held, replaced }: TakenStore): Effect.Effect<void> =>
 
 /**
  * The daemon: the store's lease taken as `holder` (`takeStore`, refused by name while another daemon of either kind ticks it) and let go
- * as its scope closes, however it ends, so a signal that stops it leaves the store free at once; its line in the feed (`saidStarted`);
+ * as its scope closes, however it ends, so a signal that stops it leaves the store free at once; its series and the caller's (`series`)
+ * born at zero and exported so (`DAEMON_SERIES`, `seriesBorn`) before anything counts into them; its line in the feed (`saidStarted`);
  * `onTaken`; then a pass on `e` every
  * interval, each written down (`passed`) and logged (`logPass`), through whatever logger the process provides. It beats on a fiber forked
  * in the scope, so a long pass is not taken for stalled and taken over mid-pass, and it fails at the first pass that finds the store taken
@@ -208,12 +219,16 @@ const saidStarted = ({ held, replaced }: TakenStore): Effect.Effect<void> =>
  * it measures what the store takes on the disk (`disk`), asking the engine what it keeps by task, and hands each pass the latest
  * reading as it does the quota: no pass walks the store, and a sweep that failed leaves the passes none.
  */
-export const up = (e: Engine, { every, repo, holder, onTaken }: UpOptions): Effect.Effect<never, unknown, Scope.Scope | PlaceService> =>
+export const up = (
+  e: Engine,
+  { every, repo, holder, series = [], onTaken }: UpOptions,
+): Effect.Effect<never, unknown, Scope.Scope | PlaceService> =>
   Effect.gen(function* () {
     const taken = yield* Effect.acquireRelease(
       Effect.try({ try: () => takeStore({ every, cwd: repo, by: holder, release: leaseRelease(runningRelease()) }), catch: (err) => err }),
       ({ held }) => Effect.sync(() => releaseStore(held)),
     );
+    yield* seriesBorn([...DAEMON_SERIES, ...series]);
     yield* Effect.forkScoped(Effect.forever(Effect.sleep(every).pipe(Effect.andThen(Effect.sync(() => beat(taken.held))))));
     let reading: Reading = {};
     yield* Effect.forkScoped(

@@ -275,6 +275,37 @@ test("the api's daemon exports its passes' spans to the collector OTEL_EXPORTER_
   assert.match(spans, /"nemia"/);
 });
 
+/** Each series a body posted to `/v1/metrics` names, by its metric's name and its attributes' values, with its value or its count. */
+const postedSeries = (body: string): Record<string, number> => {
+  type Point = { attributes: { value: { stringValue?: string } }[]; asDouble?: number; asInt?: number; count?: number | string };
+  type Posted = { name: string; sum?: { dataPoints: Point[] }; histogram?: { dataPoints: Point[] } };
+  const { resourceMetrics } = JSON.parse(body) as { resourceMetrics: { scopeMetrics: { metrics: Posted[] }[] }[] };
+  return Object.fromEntries(
+    resourceMetrics
+      .flatMap((r) => r.scopeMetrics.flatMap((s) => s.metrics))
+      .flatMap((m) =>
+        [...(m.sum?.dataPoints ?? []), ...(m.histogram?.dataPoints ?? [])].map((p) => [
+          [m.name, ...p.attributes.map((a) => a.value.stringValue)].join(' '),
+          Number(p.asDouble ?? p.asInt ?? p.count),
+        ]),
+      ),
+  );
+};
+
+test("the api's daemon posts its own series and the pass's at zero before any request, so a restart is read as a reset", async (t) => {
+  const c = await collector(t);
+  const born = c.posted('/v1/metrics', '"pass.duration"');
+  const api = startApi('0', [], undefined, c.url);
+  t.after(() => api.child.kill());
+  const body = await Promise.race([born, api.ended.then((code) => assert.fail(`the api exited ${code}:\n${api.output()}`))]);
+  const series = postedSeries(body);
+  assert.deepEqual(
+    [series['api.step.follows'], series['pass.duration'], series['feed.follow.reads']],
+    [0, 0, 0],
+    `the first post naming the pass's time: ${JSON.stringify(series)}`,
+  );
+});
+
 /** A metric of the api at `url`, as `GET /api/metrics` answers it, by its name. */
 const metricOf = async (url: string, name: string) =>
   ((await (await fetch(`${url}/api/metrics`)).json()) as MetricRead[]).find((m) => m.name === name);

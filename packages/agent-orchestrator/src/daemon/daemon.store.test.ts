@@ -23,6 +23,7 @@ import { promised } from '../../test/promised.ts';
 import { until, WAITED } from '../../test/waits.ts';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven } from '../../test/placed.ts';
+import { collector, seriesOf } from '../../test/collector.ts';
 
 const ROOT = scratch('wf-daemon-');
 process.env.WF_ROOT = ROOT;
@@ -938,6 +939,47 @@ test('`up` writes the feed a daemon started line once it holds the store, before
     'each line written before onTaken, as the daemon serves',
   );
   assert.equal(daemonLines().length, 2);
+  clear();
+});
+
+test("`up` births the daemon's series and the caller's at zero and exports them before it serves; a pass then puts its values in", async (t) => {
+  clear();
+  const { up, DAEMON_SERIES } = await import('./up.verb.ts');
+  const { telemetryLayer } = await import('../telemetry/telemetry.store.ts');
+  const { Effect, Metric } = await import('effect');
+  const c = await collector(t);
+  const theirs = Metric.counter('test.caller.series', { incremental: true });
+  const metricsPosts = () => c.posts.filter((p) => p.path === '/v1/metrics').map((p) => seriesOf(p.body, () => true, true));
+  let serving: Record<string, number>[] = [];
+  const e = engineOf((n) => {
+    if (n === 2) throw STOP;
+  });
+  await runPlaced(
+    Effect.scoped(
+      up(e, {
+        every: 10,
+        repo: ROOT,
+        holder: 'api',
+        series: [theirs],
+        onTaken: () => Effect.sync(() => (serving = metricsPosts())),
+      }),
+    ).pipe(Effect.provide(telemetryLayer({ OTEL_EXPORTER_OTLP_ENDPOINT: c.url })), Effect.provideService(Metric.MetricRegistry, new Map())),
+  ).then(
+    () => assert.fail('the daemon returned'),
+    (err: unknown) => assert.equal(err, STOP),
+  );
+  const born = {
+    'pass.duration': 0,
+    ...Object.fromEntries(PHASES.map((phase) => [`pass.phase.duration{phase=${phase}}`, 0])),
+    'pass.journal_reads': 0,
+    'feed.follow.beats': 0,
+    'feed.follow.reads': 0,
+    'test.caller.series': 0,
+  };
+  assert.equal(DAEMON_SERIES.length + 1, Object.keys(born).length, 'each series the daemon births is one the test reads');
+  assert.deepEqual(serving, [born], 'one post before it serves, every series in it at zero');
+  const last = metricsPosts().at(-1)!;
+  assert.ok(last['pass.duration'] >= 1, `a pass put its time in after: ${JSON.stringify(last)}`);
   clear();
 });
 

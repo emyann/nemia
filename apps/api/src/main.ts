@@ -4,7 +4,8 @@
  * the store's lease first (`up`, as the api), so an api refused by another daemon binds no port, then serves the app on loopback alone
  * (`HOST`, port.ts), writes where it listens into the lease (`holdUrl`) and ticks on the engine its layer built, under `runMain`: a signal
  * closes the server and lets the lease go, and a lease taken over or a pass that fails ends the process. Its passes are said as `nemia up`
- * says them, through the telemetry its environment asks for (`telemetryLayer`): OTLP too when `OTEL_EXPORTER_OTLP_ENDPOINT` is set. The
+ * says them, through the telemetry its environment asks for (`telemetryLayer`): OTLP too when `OTEL_EXPORTER_OTLP_ENDPOINT` is set, its own
+ * series a collector reads by their increase (`STEP_FOLLOWS`) born at zero with the daemon's (`up`'s `series`). The
  * feed's lines it writes are published to the hub its layer built (`FeedHub`), which the app's streams of the feed read.
  * With `--no-tick` it serves alone, holding nothing. It prints the port the server got: the one asked for, or a free one for `PORT=0`.
  * Refused first (`Conflict`), binding nothing: a checkout's api on a store that runs an install (`trialRefusal`), unless
@@ -29,6 +30,7 @@ import {
 import { app, runtime } from './app.ts';
 import { repoOf } from './capabilities/capabilities.ts';
 import { HOST, portOf, ticksOf } from './port.ts';
+import { STEP_FOLLOWS } from './steps/following.ts';
 import { Engine } from './store.ts';
 
 /** Prints `err`'s message and exits with its code: 2 for a refusal, 1 for anything else. */
@@ -92,6 +94,7 @@ else
       every: DEFAULT_EVERY_MS,
       repo: repoOf(process.env, running),
       holder: 'api',
+      series: [STEP_FOLLOWS],
       onTaken: () => Effect.map(listening, (served) => void holdUrl(`http://${HOST}:${served.port}`)),
     }).pipe(
       Effect.scoped,

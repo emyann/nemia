@@ -9,7 +9,7 @@ import type { Verdict } from '../check/check.ts';
 import { DEFAULT_ROUNDS, LOOP_REPLIES, outputFields, type Workflow } from '../step/step.ts';
 import { loopSpan } from '../workflow/index.ts';
 import type { TaskClock } from '../timeline/index.ts';
-import { declaredOutput, isLoopTarget, type Closeout } from '../closeout/index.ts';
+import { declaredOutput, envelopeRefusals, isLoopTarget, type Closeout } from '../closeout/index.ts';
 import type { Retry, RetryHow } from '../retry/index.ts';
 import {
   lackedOf,
@@ -483,13 +483,14 @@ export function ownStatus(
 
 /**
  * Whether a closeout a step gave is one the run does not accept, which reads `unsigned`: short of a field the step owes (`owedFields`), a
- * looping step's with no yes or no for `again`, or one that named a file the run did not have when it signed off, as the tick read it
- * (`lackedOf`).
+ * looping step's with no yes or no for `again`, one that named a file the run did not have when it signed off, as the tick read it
+ * (`lackedOf`), or one whose envelope the run refuses (`envelopeRefusals`: a `needs` on a `done` v1 closeout).
  */
 const unaccepted = (step: Workflow, run: Run, steps: readonly Workflow[], said: Closeout): boolean =>
   declaredOutput(step, said, owedFields(step, run, steps)).missing.length > 0 ||
   (Boolean(step.loop) && typeof said.output?.again !== 'boolean') ||
-  lackedOf(run.steps[step.name]).length > 0;
+  lackedOf(run.steps[step.name]).length > 0 ||
+  envelopeRefusals(said).length > 0;
 
 /**
  * What sessions cost, as the engine measured them: the dollars of the attempts that ended with a cost on them, how many did (`measured`),

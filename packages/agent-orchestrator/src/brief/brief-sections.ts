@@ -71,6 +71,8 @@ export type RetryBriefing = {
    * file, says why and gives a near name that is there (`lackLines`).
    */
   lacks?: readonly string[];
+  /** What the run refused of the last try's closeout's envelope (`envelopeRefusals`), when that is why it is tried again. */
+  refused?: readonly string[];
   /** What the last try's sessions were denied, in the runtime's words (`deniedOf`), when that is why it is tried again: `denied`. */
   denied?: readonly string[];
   /** What the person who asked for this try said with it (`nemia retry --message`), as they wrote it. */
@@ -148,8 +150,22 @@ const lacksSaid = (lacks: readonly string[]): string =>
     'its name off `artifacts`. The rest of your work stands: change nothing else, and sign off again.',
   ].join('\n');
 
-/** What the run's own nudge tells the session it continues: the files its closeout lacked (`lacksSaid`), else `SIGNOFF`. */
-const signoffSaid = (r: RetryBriefing): string => (r.lacks?.length ? lacksSaid(r.lacks) : SIGNOFF);
+/** What the run refused of a closeout's envelope (`envelopeRefusals`), and to sign off again once mended. */
+const refusedSaid = (refused: readonly string[]): string =>
+  [
+    'The run did not accept the closeout of the last try: nothing that waits on this step started.',
+    '',
+    ...refused,
+    '',
+    'The rest of your work stands: change nothing else, and sign off again.',
+  ].join('\n');
+
+/** Why a closeout was not accepted, where the run knows: the files it lacked (`lacksSaid`), else what its envelope was refused. */
+const notAccepted = (r: RetryBriefing): string | undefined =>
+  r.lacks?.length ? lacksSaid(r.lacks) : r.refused?.length ? refusedSaid(r.refused) : undefined;
+
+/** What the run's own nudge tells the session it continues: why its closeout was not accepted (`notAccepted`), else `SIGNOFF`. */
+const signoffSaid = (r: RetryBriefing): string => notAccepted(r) ?? SIGNOFF;
 
 /** Who filed a try the store's pause stopped (`by: 'pause'`): the run, once resumed, and no person. */
 const PAUSED_WHO =
@@ -193,11 +209,11 @@ const WHY_ENDED: Partial<Record<StepStatus, string>> = {
 };
 
 /**
- * Why a step is tried again, as `retrySection` opens with it: the files its closeout named that the run did not have (`lacksSaid`), where
- * that is why it reads `unsigned`, else the sentence of how its last try ended (`WHY_ENDED`).
+ * Why a step is tried again, as `retrySection` opens with it: the files its closeout named that the run did not have (`lacksSaid`), or
+ * what its envelope was refused (`refusedSaid`), where that is why it reads `unsigned`, else the sentence of how its last try ended (`WHY_ENDED`).
  */
 const whyEnded = (r: RetryBriefing): string =>
-  r.status === 'unsigned' && r.lacks?.length ? lacksSaid(r.lacks) : (WHY_ENDED[r.status] ?? `The last try ended \`${r.status}\`.`);
+  (r.status === 'unsigned' ? notAccepted(r) : undefined) ?? WHY_ENDED[r.status] ?? `The last try ended \`${r.status}\`.`;
 
 /**
  * `## Try <n>`: why the step is being tried again, and on whose word — then `## Your answer`, what the person who

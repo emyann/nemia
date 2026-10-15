@@ -18,7 +18,7 @@ import {
   type StepStatus,
   type TaskPhase,
 } from '../record/record.ts';
-import type { Closeout } from '../closeout/index.ts';
+import { envelopeRefusals, type Closeout } from '../closeout/index.ts';
 import {
   aboveWord,
   approvalOf,
@@ -252,7 +252,7 @@ export const pauseAsksVoid = (
  *
  * And a step `unsigned` because its closeout named a file the run did not have (`lackedOf`) is nudged the same way, under the same one
  * nudge a round (`signoffDue`): its session continued, told each file, why, and to write it or take the name off. One that names a file
- * the run does not have again stays `unsigned`, on a person.
+ * the run does not have again stays `unsigned`, on a person; so is one whose envelope the run refused (`envelopeRefusals`).
  *
  * An ask names one try, by number, so it is honoured once: an ask for a try the record already holds is
  * spent (`spentAsks`) and files nothing, whichever pass reads it.
@@ -332,12 +332,15 @@ export function retriesDue(
       retriesSpent(record) < (step.retries ?? 0)
     ) {
       due.push({ step: step.name, try: next, mode: 'nudge', by: 'retries' });
-    } else if (status === 'unsigned' && signoffDue(record, askedCloseout(record.taskId))) {
+    } else if (status === 'unsigned' && signoffDue(record, askedCloseout(record.taskId), refusedOf(closeoutOf(step.name)))) {
       due.push({ step: step.name, try: next, mode: 'nudge', by: 'signoff' });
     }
   }
   return due.filter((r) => !due.some((o) => o.back?.includes(r.step)));
 }
+
+/** Whether the run refuses a closeout's envelope (`envelopeRefusals`): a closeout not given is not. */
+const refusedOf = (said: Closeout | undefined): boolean => Boolean(said && envelopeRefusals(said).length);
 
 /** Who asked for a try by its ask: `nemia pause --now`, where the ask names the task it stopped, else a person. */
 const askedBy = (ask: RetryAsk): 'ask' | 'pause' => (ask.interrupted === undefined ? 'ask' : 'pause');

@@ -306,3 +306,38 @@ test("a picture the session's browser writes where its filed env says is the run
   assert.deepEqual(fs.readdirSync(files), ['page-1.png'], 'kept where it was written, copied onto nothing');
   assert.equal(fs.readFileSync(picture, 'utf8'), 'png');
 });
+
+/** A flat v1 closeout, as a harness writes one: `outcome`, `summary`, `needs` and `artifacts` as given. */
+const signedV1 = (outcome: string, summary: string, needs: string | null, artifacts: unknown[] = []) => ({
+  closeout: { apiVersion: 'nemia/v1', outcome, summary, body: null, artifacts, needs },
+});
+
+test('REFUSED once a round: `needs` on a done v1 closeout is unsigned before any check, nudged naming the refusal, then waits on a person', async (t) => {
+  const { id, task } = await started();
+  engine().settle(task, 'succeeded', signedV1('done', 'Did it.', 'a person should look'));
+  const pass = await advanced(id);
+  assert.deepEqual([pass.checked, pass.tried], [[], ['implement']], 'no check, and the run nudges the step');
+  assert.equal(readRun(id).steps.implement.tries?.at(-1)?.then, 'signoff');
+  assert.equal(readRun(id).steps.review?.taskId ?? null, null, 'nothing that waits on it is filed');
+  const brief = briefOf(`${task}-try2`);
+  assert.ok(brief.includes('`needs` is set on a `done` closeout'), brief);
+
+  engine().settle(`${task}-try2`, 'succeeded', signedV1('done', 'Did it.', 'still'));
+  const again = await advanced(id);
+  assert.deepEqual([again.tried, again.checked, again.filed], [[], [], []], 'no second nudge in the round');
+  const screen = await typed(t, 'decide', id);
+  assert.match(screen, /UNSIGNED: implement/);
+  assert.ok(screen.includes('!! not accepted: `needs` is set on a `done` closeout'), screen);
+});
+
+test('a v1 closeout with a 300-character summary, or one on two lines, is accepted: its check is filed and no try', async () => {
+  for (const [outcome, summary, needs] of [
+    ['done', 'word '.repeat(60), null],
+    ['done', 'Line one.\nLine two.', ''],
+  ] as const) {
+    const { id, task } = await started();
+    engine().settle(task, 'succeeded', signedV1(outcome, summary, needs));
+    const pass = await advanced(id);
+    assert.deepEqual([pass.checked, pass.tried], [['implement'], []], summary);
+  }
+});

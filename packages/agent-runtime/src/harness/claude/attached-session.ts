@@ -8,7 +8,7 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import { query, type CanUseTool, type HookCallbackMatcher, type HookEvent, type SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 import { attachedOptions } from './attached-options.ts';
-import { filesOf, writeRun, type AttachedRun, type AttachedState } from './attached-file.ts';
+import { alive, filesOf, writeRun, type AttachedRun, type AttachedState } from './attached-file.ts';
 import { claudeStreamKept } from '../detached/output.ts';
 import type { SpawnRequest } from '../seam.ts';
 
@@ -56,23 +56,28 @@ export type Live = {
   input: ReturnType<typeof inputOf>;
   calls: Map<string, { tool: string; since: string }>;
   letGo: boolean;
+  waiting: number;
   done: Promise<void>;
 };
 
 /** How long a call is held at its hook before Claude Code answers for it, in seconds: a day, longer than any drain. */
 const HOOK_HOLD_S = 86_400;
 
-/** Waits until `held` lets go, or the call's signal aborts. */
-const waitWhile = async (held: Held, signal: AbortSignal): Promise<void> => {
-  while (held() && !signal.aborted) await new Promise((r) => setTimeout(r, 250));
+/** Waits until `held` lets go, the call's signal aborts, or the session is let go. */
+const waitWhile = async (held: Held, signal: AbortSignal, live: Live): Promise<void> => {
+  while (held() && !signal.aborted && !live.letGo) await new Promise((r) => setTimeout(r, 250));
 };
 
 /** What a denied call is told: no person is there to ask, and what the fence allows is all it gets. */
 export const DENIED_HERE =
   'No person is here to approve this call, so it is denied. Do what you can with the tools you are allowed, and say in your answer what you were denied.';
 
-/** The session's run file rewritten with `patch`, its earliest call in flight as `calling`. */
+/**
+ * The session's run file rewritten with `patch`, its earliest call in flight as `calling`; nothing once the session is let go, its
+ * file its holder's last word (`parked`).
+ */
 const rewrite = (root: string, live: Live, patch: Partial<AttachedRun> = {}): void => {
+  if (live.letGo) return;
   const first = [...live.calls.values()].sort((a, b) => a.since.localeCompare(b.since))[0];
   const { calling: _, ...rest } = live.run;
   live.run = { ...rest, ...patch, ...(first ? { calling: first } : {}) };
@@ -91,7 +96,9 @@ const hooksOf = (root: string, live: Live, held: Held): Partial<Record<HookEvent
         timeout: HOOK_HOLD_S,
         hooks: [
           async (input, id, { signal }) => {
-            await waitWhile(held, signal);
+            live.waiting++;
+            await waitWhile(held, signal, live).finally(() => live.waiting--);
+            if (signal.aborted || live.letGo) return {};
             const tool = (input as { tool_name?: string }).tool_name ?? 'a tool';
             if (id) live.calls.set(id, { tool, since: new Date().toISOString() });
             rewrite(root, live);
@@ -141,6 +148,34 @@ const took = (root: string, live: Live, m: SDKMessage): void => {
   } else if (over.length) rewrite(root, live);
 };
 
+/**
+ * Hands the session the words said to it since it last heard (its say file, past `heard`), each a user message on its input, and
+ * writes how far it heard. Nothing once its input is closed or it is let go: the next holder hears them.
+ */
+export const hear = (root: string, live: Live): void => {
+  if (live.input.closed || live.letGo) return;
+  let said: Buffer;
+  try {
+    said = fs.readFileSync(filesOf(root, live.run.name).say);
+  } catch {
+    return;
+  }
+  const from = live.run.heard ?? 0;
+  const end = said.lastIndexOf(10) + 1;
+  if (end <= from) return;
+  for (const line of said.subarray(from, end).toString('utf8').split('\n').filter(Boolean))
+    live.input.push((JSON.parse(line) as { text: string }).text);
+  rewrite(root, live, { heard: end });
+};
+
+/** Waits until the process `pid` is gone. */
+export const gone = async (pid: number | undefined): Promise<void> => {
+  for (;;) {
+    if (pid === undefined || !alive(pid)) return;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+};
+
 /** Kills the process group `pid` leads, and whatever is left of it: nothing when it is gone. */
 export const killGroup = (pid: number | undefined): void => {
   if (pid === undefined) return;
@@ -164,7 +199,7 @@ export const startSession = (
   options: { held: Held; executable?: string; resume?: string },
 ): Live => {
   const abort = new AbortController();
-  const live: Live = { run, abort, input: inputOf(), calls: new Map(), letGo: false, done: Promise.resolve() };
+  const live: Live = { run, abort, input: inputOf(), calls: new Map(), letGo: false, waiting: 0, done: Promise.resolve() };
   writeRun(root, run);
   live.input.push(first);
   const given = attachedOptions(r, filesOf(root, run.name).mcp);

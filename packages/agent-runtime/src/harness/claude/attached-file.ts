@@ -1,13 +1,15 @@
 /**
  * An attached session's face to every other process: its run file under `<root>/runs/attached/`, written by the process that holds the
- * session alone, and the two files another process writes beside it, each its own: a stop (`<name>.stop`), and the drain
- * (`drain.json`), which names the holder whose new calls wait. What the session said is its capture (`<name>.out.jsonl`), the SDK's
+ * session alone, and the files another process writes beside it, each its own: a stop (`<name>.stop`), the words said to the session
+ * (`<name>.say.jsonl`, appended, which its holder hands it as it looks), and the drain (`drain.json`), which names the holder whose new
+ * calls wait. What the session said is its capture (`<name>.out.jsonl`), the SDK's
  * messages a reader reads (`claudeStreamKept`), appended as they come.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { Schema } from 'effect';
 import type { SessionState } from '../../core/index.ts';
+import { processStart } from './inbox.ts';
 import type { SpawnRequest } from '../seam.ts';
 
 /**
@@ -22,6 +24,8 @@ const RunFileSchema = Schema.StructWithRest(
     state: Schema.Literals(['working', 'parked', 'completed', 'failed', 'canceled']),
     /** The pid of the process that holds the session, and so writes this file. */
     owner: Schema.Finite,
+    /** When that process started (`processStart`), so a pid another process has taken since is not read as the holder. */
+    ownerStart: Schema.optional(Schema.String),
     startedAt: Schema.String,
     /** Claude Code's own id of the session, once its first message named it: what a resume continues. */
     sessionId: Schema.optional(Schema.String),
@@ -29,6 +33,10 @@ const RunFileSchema = Schema.StructWithRest(
     childPid: Schema.optional(Schema.Finite),
     /** The call the session is in, the earliest of those in flight: its tool, and since when, ISO. */
     calling: Schema.optional(Schema.Struct({ tool: Schema.String, since: Schema.String })),
+    /** What the session resumed from had spent, which its own results print on in theirs: taken off what it reports. */
+    carried: Schema.optional(Schema.Struct({ costUsd: Schema.optional(Schema.Finite), apiMs: Schema.optional(Schema.Finite) })),
+    /** How far into its say file the words were handed to the session, in bytes. */
+    heard: Schema.optional(Schema.Finite),
     /** The spawn, its brief left out: what a holder resumes the session with. */
     request: Schema.Record(Schema.String, Schema.Unknown),
   }),
@@ -46,10 +54,10 @@ export const attachedDir = (root: string): string => path.join(root, 'runs', 'at
 /** A session's name as a file name: the engine's `ae/<task>/<n>`, its slashes taken out. */
 const safe = (name: string): string => name.replace(/[^A-Za-z0-9._-]/g, '_');
 
-/** The files of the session under `name`: its run file, its stop, its capture, and its MCP config. */
+/** The files of the session under `name`: its run file, its stop, the words said to it, its capture, and its MCP config. */
 export const filesOf = (root: string, name: string) => {
   const base = path.join(attachedDir(root), safe(name));
-  return { run: `${base}.json`, stop: `${base}.stop`, out: `${base}.out.jsonl`, mcp: `${base}.mcp.json` };
+  return { run: `${base}.json`, stop: `${base}.stop`, say: `${base}.say.jsonl`, out: `${base}.out.jsonl`, mcp: `${base}.mcp.json` };
 };
 
 /** The run file at `file`, or undefined when there is none, or it is not one a holder writes (a holder caught mid-write is not). */
@@ -101,6 +109,22 @@ export const alive = (pid: number): boolean => {
     return (err as NodeJS.ErrnoException).code === 'EPERM';
   }
 };
+
+/** This process, as a run file names its holder: its pid, and when it started. */
+export const thisHolder = (): { owner: number; ownerStart?: string } => {
+  const start = processStart(process.pid);
+  return { owner: process.pid, ...(start ? { ownerStart: start } : {}) };
+};
+
+/**
+ * Whether the process that holds `run` is gone: no process has its pid, or the one that has it started at another time than its
+ * holder did, its pid taken since.
+ */
+export const holderGone = (run: AttachedRun): boolean =>
+  !alive(run.owner) || (run.ownerStart !== undefined && processStart(run.owner) !== run.ownerStart);
+
+/** Whether `run` is held by this very process: its pid, started when this one did. */
+export const heldHere = (run: AttachedRun): boolean => run.owner === process.pid && !holderGone(run);
 
 /**
  * A run file's state as a sighting says it. A session nobody holds now, its holder gone or its holder let it go (`parked`), is

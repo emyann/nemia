@@ -2126,14 +2126,16 @@ attached sessions (`harness/claude/attached.ts`). The process takes `hold()` in 
 no `background` session spawns attached, and any other engine, or the same one before `hold`, runs it as a `claude -p` job.
 
 - **Who holds them.** One process: the one whose engine took `hold()`. It spawns, adopts and resumes; another engine reads the
-  run files under `<root>/runs/attached/` and writes a stop beside one (`<name>.stop`), which the holder's next look reads.
+  run files under `<root>/runs/attached/` and writes a stop (`<name>.stop`) or words to say (`<name>.say.jsonl`) beside one, which
+  the holder's next look reads; the words a session has heard are counted on its run file (`heard`), so a resume hears none twice.
+  A holder is its pid and its start time (`ownerStart`): a pid another process has taken since is a holder gone.
 - **What it keeps.** Its run file (state, Claude Code's session id, the process group, the call in flight) and a capture of the
   messages a reader reads, appended as they come: a denial reaches the attempt while it works, and the statement and the usage
-  at the result. The conversation is Claude Code's own transcript (`transcript`); an attached session is not followed live.
+  at the result, less what the session it resumed had spent (`carried`, as the job's `resumeCostCarried`). The conversation is Claude Code's own transcript (`transcript`); an attached session is not followed live.
 - **The fence.** The job's, fact for fact (`attachedOptions`, held to `claudePrintFlags` by its test). A call that would ask a
   person is answered in the holder (`canUseTool`): denied, and written as a denial.
 - **Let go.** As the holder's scope closes, new calls wait at their `PreToolUse` hook, it waits with no bound for each call in
-  flight, then stops each session and writes it `parked`.
+  flight, then writes each session `parked` and stops it; a call still held at its hook then is never written in flight.
 - **Taken up.** On a look, a holder adopts a session parked, or one whose holder's process is gone: it kills what is left of
   its Claude Code's process group, then resumes it under the same id (`--resume=<id>`, no fork), told it was paused, or, after a
   crash, which call did not finish. A non-holder reads such a session as `working`.

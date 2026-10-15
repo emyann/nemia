@@ -3,9 +3,10 @@
  * attached sessions, durable by resume rather than by detaching.
  *
  * - **Who holds them.** One process at a time, the one whose engine took `hold` in a scope: it spawns, adopts and resumes. Any other
- *   engine reads the run files and writes a stop beside one; a Claude Code task it starts runs as a job (`claudeCodeOps`).
+ *   engine reads the run files and writes a stop, or words to say, beside one; a Claude Code task it starts runs as a job
+ *   (`claudeCodeOps`).
  * - **Let go.** As the holder's scope closes, new calls are held at their hook, it waits with no bound for each call in flight to end,
- *   then aborts each session and writes it `parked`.
+ *   then writes each session `parked` and aborts it; a call held at its hook then is never written in flight.
  * - **Taken up.** On each look, a holder adopts a session parked, or one whose holder's process is gone: it kills what is left of its
  *   Claude Code's process group, and resumes it under the same session id, told it was paused (`CARRY_ON`), or, when its holder ended
  *   mid-call, which call did not finish (`crashNote`).
@@ -22,20 +23,22 @@ import type { Observation, RunnerOps, SpawnRequest } from '../seam.ts';
 import { readTranscript } from '../transcript.ts';
 import { claudeStreamOutput } from '../detached/output.ts';
 import { claudeTranscriptEvents, claudeTranscriptFile } from './transcript.ts';
+import { lessCarried } from '../detached/detached.ts';
 import {
-  alive,
   attachedStateOf,
   CARRY_ON,
   crashNote,
   drainedPid,
   everyRun,
   filesOf,
+  holderGone,
   keptRequest,
   readRun,
+  thisHolder,
   writeRun,
   type AttachedRun,
 } from './attached-file.ts';
-import { killGroup, startSession, type Live } from './attached-session.ts';
+import { gone, hear, killGroup, startSession, type Live } from './attached-session.ts';
 
 /** The attached sessions of one engine: the runner's verbs, and `hold`, which makes this process their holder for a scope. */
 export type Attached = {
@@ -48,39 +51,48 @@ export type Attached = {
 /** Waits `ms`, as a promise. */
 const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** What the capture of the session under `name` says, as `claude -p`'s stream is read. */
+const saidBy = (root: string, name: string) => {
+  try {
+    return claudeStreamOutput(fs.readFileSync(filesOf(root, name).out, 'utf8'));
+  } catch {
+    return claudeStreamOutput('');
+  }
+};
+
+/**
+ * What a session resuming Claude Code's session `resumeFrom` carries on of its parent's: the totals the latest attached run of that
+ * session printed, which the resumed one's own result prints on in its. None found: nothing, and the measure is dropped, never
+ * counted twice (`lessCarried`).
+ */
+const carriedFrom = (root: string, resumeFrom: string): NonNullable<AttachedRun['carried']> => {
+  const parent = [...everyRun(root).values()]
+    .filter((r) => r.sessionId === resumeFrom)
+    .sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0];
+  const { costUsd, apiMs } = (parent && saidBy(root, parent.name).usage) || {};
+  return { ...(costUsd !== undefined ? { costUsd } : {}), ...(apiMs !== undefined ? { apiMs } : {}) };
+};
+
 /** A run file's sighting: its state, its call in flight, and what its capture says it stated, used and was denied. */
 const sightingOf = (root: string, run: AttachedRun): Sighting => {
-  let text = '';
-  try {
-    text = fs.readFileSync(filesOf(root, run.name).out, 'utf8');
-  } catch {
-    text = '';
-  }
-  const { denials, ...said } = claudeStreamOutput(text);
+  const { denials, usage, ...said } = saidBy(root, run.name);
+  const own = usage && run.carried ? lessCarried(usage, run.carried) : usage;
   return {
     sessionId: run.name,
     state: attachedStateOf(run),
     ...(run.sessionId ? { nativeId: run.sessionId } : {}),
     ...said,
+    ...(own ? { usage: own } : {}),
     ...(denials?.length ? { denials } : {}),
     ...(run.calling && run.state === 'working' ? { calling: run.calling } : {}),
   };
 };
 
-/** Whether a holder takes `run` up: parked, or at work under a process that is gone. */
-const orphaned = (run: AttachedRun): boolean =>
-  run.state === 'parked' || (run.state === 'working' && run.owner !== process.pid && !alive(run.owner));
+/** Whether a holder takes `run` up: parked, or at work under a process that is gone, its pid taken by another since included. */
+const orphaned = (run: AttachedRun): boolean => run.state === 'parked' || (run.state === 'working' && holderGone(run));
 
 /** What a resumed session is told first: why it was stopped, by its run file. */
 const noteOf = (run: AttachedRun): string => (run.state !== 'parked' && run.calling ? crashNote(run.calling.tool) : CARRY_ON);
-
-/** Waits until the process `pid` is gone. */
-const gone = async (pid: number | undefined): Promise<void> => {
-  for (;;) {
-    if (pid === undefined || !alive(pid)) return;
-    await pause(50);
-  }
-};
 
 /**
  * The attached sessions under `root`: `executable` the Claude Code they run, the SDK's own when absent (a test's stand-in otherwise).
@@ -98,8 +110,8 @@ export const attachedSessions = (root: string, executable?: string): Attached =>
   const adopt = async (run: AttachedRun): Promise<void> => {
     killGroup(run.childPid);
     await gone(run.childPid);
-    const { childPid: _, calling: __, ...rest } = run;
-    const mine: AttachedRun = { ...rest, owner: process.pid };
+    const { childPid: _, calling: __, ownerStart: ___, ...rest } = run;
+    const mine: AttachedRun = { ...rest, ...thisHolder() };
     if (stopped(run) || !run.sessionId) return writeRun(root, { ...mine, state: stopped(run) ? 'canceled' : 'failed' });
     start({ ...(run.request as Omit<SpawnRequest, 'brief'>), brief: '' }, { ...mine, state: 'working' }, noteOf(run), run.sessionId);
   };
@@ -108,6 +120,7 @@ export const attachedSessions = (root: string, executable?: string): Attached =>
     const at = live.get(run.name);
     if (!holding) return run;
     if (at && stopped(run) && at.run.state === 'working') at.abort.abort();
+    if (at?.input) hear(root, at);
     if (!at && orphaned(run)) {
       const placeholder = { run, letGo: true } as Live;
       live.set(run.name, placeholder);
@@ -129,12 +142,14 @@ export const attachedSessions = (root: string, executable?: string): Attached =>
     while ([...live.values()].some((l) => l.calls?.size)) await pause(100);
     for (const l of live.values()) {
       if (!l.abort || l.run.state !== 'working') continue;
-      l.letGo = true;
       const { calling: _, ...rest } = l.run;
-      writeRun(root, { ...rest, state: 'parked' });
+      l.run = { ...rest, state: 'parked' };
+      writeRun(root, l.run);
+      l.letGo = true;
       l.abort.abort();
     }
     await Promise.all([...live.values()].map((l) => l.done));
+    while ([...live.values()].some((l) => l.waiting)) await pause(50);
     live.clear();
     holding = false;
     draining = false;
@@ -168,12 +183,14 @@ const opsOf = (
   spawn: (r) =>
     Effect.try({
       try: () => {
-        for (const f of [filesOf(root, r.name).out, filesOf(root, r.name).stop]) fs.rmSync(f, { force: true });
+        const { out, stop, say } = filesOf(root, r.name);
+        for (const f of [out, stop, say]) fs.rmSync(f, { force: true });
         const run: AttachedRun = {
           name: r.name,
           state: 'working',
-          owner: process.pid,
+          ...thisHolder(),
           startedAt: new Date().toISOString(),
+          ...(r.resumeFrom ? { carried: carriedFrom(root, r.resumeFrom) } : {}),
           request: keptRequest(r),
         };
         start(r, run, r.brief, r.resumeFrom);
@@ -209,10 +226,13 @@ const opsOf = (
   say: (session, text) =>
     Effect.try({
       try: () => {
+        const { run: file, say } = filesOf(root, session.name);
+        const run = readRun(file);
+        if (run?.state !== 'working' && run?.state !== 'parked')
+          throw new Error(`\`${session.name}\` is ${run ? run.state : 'not an attached session'}, so nothing said to it would be heard.`);
+        fs.appendFileSync(say, `${JSON.stringify({ text })}\n`);
         const at = live.get(session.name);
-        if (!at?.input || at.input.closed)
-          throw new Error(`\`${session.name}\` is not at work in this process, so nothing can be said to it now. Say it once it is.`);
-        at.input.push(text);
+        if (at?.input) hear(root, at);
       },
       catch: failed('say'),
     }),

@@ -2,8 +2,9 @@
  * Claude Code attached on the Agent SDK, against a stand-in CLI (`fixtures/stand-in-claude.ts`) the SDK spawns as it would Claude
  * Code: a holder's let-go waits for the call in flight and parks the session, the next holder resumes it under the same id, a session
  * whose holder died mid-call is told which call did not finish, a non-holder neither adopts nor spawns attached, a denial is journalled
- * while the attempt is at work, a call that would ask is denied in the holder, a drain holds new calls, and a stop from another
- * engine cancels the session.
+ * while the attempt is at work, a call that would ask is denied in the holder, a drain holds new calls, a stop and words from another
+ * engine reach the session, a call held at its hook as the holder lets go is never written in flight, a holder whose pid another
+ * process has taken is gone, and a resumed session's cost leaves out what its parent spent.
  */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -13,7 +14,7 @@ import test, { type TestContext } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { Effect, Exit, Scope } from 'effect';
 import { attachedSessions } from '../src/harness/claude/attached.ts';
-import { alive, crashNote, CARRY_ON, filesOf, putDrain, readRun, writeRun } from '../src/harness/claude/attached-file.ts';
+import { alive, crashNote, CARRY_ON, filesOf, putDrain, readRun, thisHolder, writeRun } from '../src/harness/claude/attached-file.ts';
 import { claudeCodeOps } from '../src/harness/claude/code.ts';
 import { Engine } from '../src/index.ts';
 import type { SpawnRequest } from '../src/harness/seam.ts';
@@ -239,4 +240,92 @@ test('a stop from an engine that holds nothing cancels the session its holder ru
   await until(t, async () => (await Effect.runPromise(h.attached.ops.observe)).get(NAME)?.state === 'canceled', 'the session canceled', {
     everyMs: 50,
   });
+});
+
+test('a call held at its hook as the holder lets go is never written in flight: the session is parked with no call', WAITED, async (t) => {
+  const { root, dir, request } = place({ call: 'Read', output: {} });
+  fs.writeFileSync(path.join(dir, 'release'), '');
+  putDrain(root, process.pid);
+  const h = await holder(root);
+  await Effect.runPromise(h.attached.ops.spawn(request));
+  await until(t, () => lines(dir, 'asked.jsonl').length, 'the call asked its hook', { everyMs: 50 });
+  await h.close();
+  assert.equal(run(root)?.state, 'parked');
+  assert.equal(run(root)?.calling, undefined, 'the next holder is told of no call that did not finish');
+});
+
+test('a session at work under a pid another process has taken since is adopted, its holder gone', WAITED, async (t) => {
+  const { root, dir, request } = place({ output: { done: 1 } });
+  const taken = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', detached: true });
+  t.after(() => void (taken.pid && alive(taken.pid) && process.kill(-taken.pid, 'SIGKILL')));
+  writeRun(root, {
+    name: NAME,
+    state: 'working',
+    owner: taken.pid!,
+    ownerStart: 'when its holder started, not this process',
+    startedAt: new Date().toISOString(),
+    sessionId: 'reused-pid',
+    calling: { tool: 'Bash', since: new Date().toISOString() },
+    request: { ...request, brief: undefined },
+  });
+  const h = await holder(root);
+  t.after(h.close);
+  await Effect.runPromise(h.attached.ops.observe);
+  await until(t, () => lines(dir, 'said.jsonl').length, 'the adopted session told something', { everyMs: 50 });
+  assert.deepEqual(lines(dir, 'said.jsonl'), [crashNote('Bash')]);
+  assert.equal(alive(taken.pid!), true, "the process that took the pid is not the session's, and is left alone");
+  assert.equal(run(root)?.owner, thisHolder().owner);
+  assert.equal(run(root)?.ownerStart, thisHolder().ownerStart);
+});
+
+test('words said by an engine that holds nothing reach the session its holder runs; to no session, they are refused', WAITED, async (t) => {
+  const { root, dir, request } = place({ hold: true, output: {} });
+  t.after(() => fs.writeFileSync(path.join(dir, 'end'), ''));
+  const h = await holder(root);
+  t.after(h.close);
+  await Effect.runPromise(h.attached.ops.spawn(request));
+  await until(t, () => run(root)?.sessionId, 'the session started', { everyMs: 50 });
+  const other = claudeCodeOps({ root }, attachedSessions(root, STAND_IN));
+  await Effect.runPromise(other.say!({ name: NAME, sessionId: NAME }, 'one more thing'));
+  await until(
+    t,
+    async () => {
+      await Effect.runPromise(h.attached.ops.observe);
+      return lines(dir, 'said.jsonl').includes('one more thing');
+    },
+    'the words heard',
+    { everyMs: 50 },
+  );
+  await Effect.runPromise(h.attached.ops.observe);
+  assert.deepEqual(lines(dir, 'said.jsonl'), ['do the work', 'one more thing'], 'each word heard once');
+  const refused = await Effect.runPromise(Effect.flip(h.attached.ops.say!({ name: 'ae/none/1', sessionId: 'ae/none/1' }, 'hello')));
+  assert.ok(refused.message.includes('not an attached session'));
+});
+
+test("a session resuming another reports its own cost, its parent's left out", WAITED, async (t) => {
+  const { root, request } = place({ output: {}, cost: 0.4 });
+  const parent = 'ae/t0/1';
+  writeRun(root, {
+    name: parent,
+    state: 'completed',
+    owner: process.pid,
+    startedAt: new Date(Date.now() - 60_000).toISOString(),
+    sessionId: 'parent-session',
+    request: {},
+  });
+  const result = { type: 'result', subtype: 'success', is_error: false, session_id: 'parent-session', num_turns: 1, total_cost_usd: 0.25 };
+  fs.writeFileSync(filesOf(root, parent).out, `${JSON.stringify(result)}\n`);
+  const h = await holder(root);
+  t.after(h.close);
+  await Effect.runPromise(h.attached.ops.spawn({ ...request, resumeFrom: 'parent-session' }));
+  const seen = await until(
+    t,
+    async () => {
+      const s = (await Effect.runPromise(h.attached.ops.observe)).get(NAME);
+      return s?.state === 'completed' && s;
+    },
+    'the resumed session completed',
+    { everyMs: 50 },
+  );
+  assert.ok(Math.abs((seen.usage?.costUsd ?? 0) - 0.15) < 1e-9, `its own cost, not ${seen.usage?.costUsd}`);
 });

@@ -14,9 +14,10 @@ import readline from 'node:readline';
 /**
  * What the stand-in does after the first user message, in order: `deny`, print a `permission_denied` line for that tool; `ask`, send
  * a `can_use_tool` request for that tool; `call`, run that tool, its `PreToolUse` hooks asked first, held until the file `release`
- * appears in its folder; `hold`, wait until the file `end` appears; then its result, `output` as its `structured_output`.
+ * appears in its folder; `hold`, wait until the file `end` appears; then its result, `output` as its `structured_output` and `cost`
+ * as its `total_cost_usd` (0.01 when absent).
  */
-type Plan = { deny?: string; ask?: string; call?: string; hold?: boolean; output?: unknown };
+type Plan = { deny?: string; ask?: string; call?: string; hold?: boolean; output?: unknown; cost?: number };
 
 const dir = process.env.STANDIN_DIR!;
 const plan = JSON.parse(process.env.STANDIN_PLAN ?? '{}') as Plan;
@@ -76,7 +77,7 @@ const work = async () => {
     is_error: false,
     session_id: sessionId,
     num_turns: 1,
-    total_cost_usd: 0.01,
+    total_cost_usd: plan.cost ?? 0.01,
     usage: { input_tokens: 1, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 1 },
     ...(plan.output !== undefined ? { structured_output: plan.output } : {}),
   });

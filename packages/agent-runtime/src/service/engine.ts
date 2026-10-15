@@ -417,11 +417,6 @@ export type EngineShape = {
    */
   readonly tallied: <A, E, R>(program: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>;
   /**
-   * Tick on a timer until stopped. Ticks never overlap: a beat that comes while a tick runs is skipped, so a tick that
-   * outruns the interval is not joined by a second pass over the same board. The timer holds the process open, as a control
-   * loop must: `stop()` gives the process back.
-   */
-  /**
    * Make this process the holder of the Claude Code sessions the engine runs attached (`harness/claude/attached.ts`), for as long as the
    * scope it is taken in lasts: while held, a Claude Code task that runs to its end is spawned attached on the Agent SDK, and a session
    * parked, or left by a holder that is gone, is resumed under its own id on the next look. As the scope closes it holds back new tool
@@ -435,6 +430,11 @@ export type EngineShape = {
    * neither a process id nor null.
    */
   readonly drain: (holder: number | null) => Effect.Effect<void, DrainRefused>;
+  /**
+   * Tick on a timer until stopped. Ticks never overlap: a beat that comes while a tick runs is skipped, so a tick that
+   * outruns the interval is not joined by a second pass over the same board. The timer holds the process open, as a control
+   * loop must: `stop()` gives the process back.
+   */
   readonly start: (options?: {
     intervalMs?: number;
     onTick?: (r: TickReport) => void;

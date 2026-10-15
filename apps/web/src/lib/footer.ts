@@ -1,6 +1,7 @@
 /**
  * The words of the machine's gauges (`GaugesButton`, `GaugesBar`): what is at work, the daemon's dot, whether the board follows the feed,
- * the quota in short; the pause says its own (`pauseWords`). Each short form fits one line, and its whole sentence is its `title`. Pure: the time is handed in, the browser's own on the page.
+ * the quota in short; the pause says its own (`pauseWords`). Each short form fits one line, and its whole sentence is its `title`. Pure:
+ * the time is handed in, the browser's own on the page.
  */
 import type { Daemon, OpenRuns, Quota, Version } from './api';
 import { daemonSentence, daemonWords } from './daemon.ts';

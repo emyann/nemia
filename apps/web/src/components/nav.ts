@@ -99,7 +99,9 @@ export function pickedOf(path: string, search: Record<string, unknown>): string 
 /** `search` without its `repo`. */
 const withoutRepo = ({ repo: _repo, ...kept }: Record<string, unknown>): Record<string, unknown> => kept;
 
-/** Where a pick goes: a section's page with its search, a workflow's page or a step's in the picked factory, a factory's floor, or Overview. */
+/**
+ * Where a pick goes: a section's page with its search, a workflow's page or a step's in the picked factory, a factory's floor, or Overview.
+ */
 export type PickTarget =
   | { to: Listing; search: Record<string, unknown> }
   | { to: '/workflows/$from/$workflow'; params: { from: string; workflow: string }; search: Record<string, unknown> }

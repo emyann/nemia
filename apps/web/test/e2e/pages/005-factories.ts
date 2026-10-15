@@ -28,11 +28,11 @@ const LISTED = [FACTORIES.broken, ...FACTORIES.others.slice(0, 2), FACTORIES.hir
 export default {
   /**
    * The Factories at `/`: every factory a block on a canvas, and a file that does not read a block that says why; the default factory is
-   * none, in the canvas or the switcher, once a factory is filed, though it holds runs. The picker lists All factories, then every
-   * factory, each with its runs in flight, or that its file does not read. A block double-clicked opens its factory's floor, at
-   * `/factories/<name>`, with only its runs on it — FOLDER's, in `hiring`, once finished runs are shown — its name in the picker, Factories
-   * lit, and a start in the rail. A name no factory has says so, answered with no 4xx, and leads back. The default factory's floor still
-   * answers its address, the picker listing it after the others, its FAB asking which factory; All factories picked there leads to the Overview.
+   * none, in the canvas or the switcher, once a factory is filed, though it holds runs. The picker lists All factories, then every factory,
+   * each with its runs in flight, or that its file does not read. A block double-clicked opens its factory's floor, at `/factories/<name>`,
+   * with only its runs on it — FOLDER's, in `hiring`, once finished runs are shown — its name in the picker, Factories lit, and a start in
+   * the rail. A name no factory has says so, answered with no 4xx, and leads back. The default factory's floor still answers its address,
+   * the picker listing it after the others, its FAB asking which factory; All factories picked there leads to the Overview.
    */
   name: 'factories',
   route: '/',

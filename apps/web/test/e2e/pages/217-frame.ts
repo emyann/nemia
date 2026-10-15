@@ -106,7 +106,9 @@ async function toggles(page: Page): Promise<void> {
   await expectWidth(page, WIDTH.open, 'open, it stays open across a reload');
 }
 
-/** On a phone's screen the rail leaves the page's side: the top bar's menu button opens the destinations in a drawer, which a pick closes. */
+/**
+ * On a phone's screen the rail leaves the page's side: the top bar's menu button opens the destinations in a drawer, which a pick closes.
+ */
 async function onPhone(page: Page): Promise<void> {
   await page.setViewportSize({ width: 390, height: 844 });
   await expectCount(railColumnOf(page), 0, "on a phone the rail leaves the page's side");

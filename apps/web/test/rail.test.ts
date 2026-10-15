@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { type Destination, DESTINATIONS, destinationsLit } from '../src/components/nav.ts';
 
-/** Every full path of the board's routes, as the router's generated tree declares them, each `$param` given a value. */
+/** Every full path of the board's routes, as the router's generated tree declares them, each parameter given a value. */
 function routePaths(): string[] {
   const tree = fs.readFileSync(path.resolve(import.meta.dirname, '../src/routeTree.gen.ts'), 'utf8');
   const start = tree.indexOf('export interface FileRoutesByFullPath');

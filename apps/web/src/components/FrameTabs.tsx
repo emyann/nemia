@@ -4,9 +4,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 /**
  * The frame's strip of Settings' tabs (`SETTINGS_TABS`), under the top bar and above the page at `path`, which it holds as `children` in
- * the selected tab's panel; a page with one view is drawn bare, without a strip. Each tab is a link to its own address, so a link and a reload open the same
- * tab, and the root's `RouterProvider` navigates it once, for a click and for Enter alike. The arrow keys move between the tabs without
- * opening one (`keyboardActivation="manual"`). On a narrow screen the strip scrolls sideways.
+ * the selected tab's panel; a page with one view is drawn bare, without a strip. Each tab is a link to its own address, so a link and a
+ * reload open the same tab, and the root's `RouterProvider` navigates it once, for a click and for Enter alike. The arrow keys move between
+ * the tabs without opening one (`keyboardActivation="manual"`). On a narrow screen the strip scrolls sideways.
  */
 export function FrameTabs({ path, children }: { path: string; children: ReactNode }) {
   const tabs = tabsOf(path);

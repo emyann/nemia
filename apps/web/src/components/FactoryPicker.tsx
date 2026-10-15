@@ -60,7 +60,10 @@ const inFlightIn = (open: OpenRuns, name: string): number => open.inFlight.filte
 const aboutOf = (factory: Factory | undefined): string | undefined =>
   factory && [...factory.repos, ...(factory.error ? [`Its file does not read: ${factory.error}`] : [])].join('\n');
 
-/** What a factory's item says under its name: its runs in flight, that the api lists no factory by that name, or that its file does not read. */
+/**
+ * What a factory's item says under its name: its runs in flight, that the api lists no factory by that name, or that its file does not
+ * read.
+ */
 export function supportOf(item: PickerFactory, open: OpenRuns | undefined): string | undefined {
   if (!item.factory) return 'no such factory';
   if (item.factory.error) return 'its file does not read';

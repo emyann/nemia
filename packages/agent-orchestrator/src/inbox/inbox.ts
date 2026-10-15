@@ -34,7 +34,7 @@
  */
 import path from 'node:path';
 import { bodyOf, frontmatterKeys, type PlanFile } from '../plan/plan.ts';
-import { factoryNameRefusal, factoryRepo, type Factory } from '../factory/factory.ts';
+import { factoryNameRefusal, type Factory } from '../factory/factory.ts';
 import type { Run } from '../record/record.ts';
 import { isReadme, splitFrontmatter, WorkflowError } from '../step/step.ts';
 
@@ -253,6 +253,11 @@ export type InboxListing = {
    * and whether the package refused it or something else failed.
    */
   tried?: { at: string; repo: string; why: string; refused: boolean };
+  /**
+   * The repository the card's factory picks for it (`factoryRepoOf`): its factory's one repository, for a card that names none — null for
+   * a card that names its own, one whose factory has several or does not read, and an entry that does not read as a card.
+   */
+  factoryRepo: string | null;
 };
 
 /**
@@ -274,13 +279,15 @@ export type QueueTry = { at: string; text: string; repo: string; why: string; re
  * order; and, when the tick's last try of its start is of the card as it stands (`tries`, by name), that try. A queued card that reads but
  * for a `repo:` naming no directory keeps its place, with its workflow and repository as written, the repository keying its try: the start
  * refuses it by name, as it refuses a workflow gone, and it never leaves the queue with nothing said. An entry that does not read for
- * another reason is not queued.
+ * another reason is not queued. Each card says the repository its factory picks for it (`factoryRepo`), from the store's `factories` that
+ * read, by name: with none handed, none picks one.
  */
 export function inboxListing(
   files: readonly PlanFile[],
   runs: readonly Pick<Run, 'id' | 'from'>[],
   isDirectory: (at: string) => boolean,
   tries: ReadonlyMap<string, QueueTry> = new Map(),
+  factories: ReadonlyMap<string, Pick<Factory, 'repos'>> = new Map(),
 ): InboxListing[] {
   const triedOf = (name: string, text: string): Pick<InboxListing, 'tried'> => {
     const t = tries.get(name);
@@ -300,6 +307,7 @@ export function inboxListing(
           factory: null,
           from: [],
           startedAs: [],
+          factoryRepo: null,
           error: `${file}: not a card. The inbox holds one markdown file per card, <name>.md — move it out, or, for a card, name it <name>.md.`,
         };
       }
@@ -317,6 +325,7 @@ export function inboxListing(
           ...(card.gate !== undefined ? { gate: card.gate } : {}),
           from: card.from ?? [],
           startedAs,
+          factoryRepo: factoryRepoOf({ repo: card.repo ?? null, factory: card.factory ?? null }, factories),
           error: null,
           ...(card.queued !== undefined ? { queued: { at: card.queued, place: null }, ...triedOf(name, text) } : {}),
         };
@@ -326,15 +335,18 @@ export function inboxListing(
           lenient = parseInboxCard(file, text, () => true);
         } catch {}
         const queued = lenient?.queued;
+        const repo = queued !== undefined ? (lenient!.repo ?? null) : null;
+        const factory = queued !== undefined ? (lenient!.factory ?? null) : null;
         return {
           name,
           file,
           title: null,
           workflow: queued !== undefined ? (lenient!.workflow ?? null) : null,
-          repo: queued !== undefined ? (lenient!.repo ?? null) : null,
-          factory: queued !== undefined ? (lenient!.factory ?? null) : null,
+          repo,
+          factory,
           from: [],
           startedAs,
+          factoryRepo: factoryRepoOf({ repo, factory }, factories),
           error: (err as Error).message,
           ...(queued !== undefined ? { queued: { at: queued, place: null }, ...triedOf(name, text) } : {}),
         };
@@ -356,18 +368,32 @@ export const queueOrder = (listing: readonly InboxListing[]): InboxListing[] =>
     .sort((a, b) => a.queued!.at.localeCompare(b.queued!.at) || a.name.localeCompare(b.name));
 
 /**
- * The repository the tick tries a queued card on, from a daemon in `daemonRepo` (`factoryRepo`): its `repo:`, else its factory's one
- * repository, else the daemon's. `factories` are the store's that read, by name; a card whose factory is not among them — the default, or
- * one whose file does not read — is tried on its `repo:` or the daemon's, and its start refuses it by name. `fromDaemon` is true when the
- * repository is the daemon's because neither the card nor its factory names one: the only start that turns on where the daemon runs.
+ * The repository a card's factory picks for it: its factory's one repository, for a card with no `repo:` whose factory is among
+ * `factories`, the store's that read, by name, and has exactly one. Null for a card that names its own, one of the default factory, and one
+ * whose factory has several repositories or does not read: there the card's `repo:`, or the daemon's, is the one (`queueRepo`). Pure.
+ */
+export function factoryRepoOf(
+  l: Pick<InboxListing, 'repo' | 'factory'>,
+  factories: ReadonlyMap<string, Pick<Factory, 'repos'>>,
+): string | null {
+  if (l.repo !== null || l.factory === null) return null;
+  const repos = factories.get(l.factory)?.repos;
+  return repos?.length === 1 ? repos[0] : null;
+}
+
+/**
+ * The repository the tick tries a queued card on, from a daemon in `daemonRepo`: its `repo:`, else the one its factory picks
+ * (`factoryRepoOf`), else the daemon's. A card whose factory is not among `factories` — the default, or one whose file does not read — is
+ * tried on its `repo:` or the daemon's, and its start refuses it by name. `fromDaemon` is true when the repository is the daemon's because
+ * neither the card nor its factory names one: the only start that turns on where the daemon runs.
  */
 export function queueRepo(
   l: Pick<InboxListing, 'repo' | 'factory'>,
   daemonRepo: string,
   factories: ReadonlyMap<string, Pick<Factory, 'repos'>>,
 ): { repo: string; fromDaemon: boolean } {
-  const factory = l.factory === null ? undefined : factories.get(l.factory);
-  return { repo: factoryRepo(factory, l.repo ?? undefined, daemonRepo), fromDaemon: l.repo === null && factory?.repos.length !== 1 };
+  const chosen = l.repo ?? factoryRepoOf(l, factories);
+  return { repo: chosen ?? daemonRepo, fromDaemon: chosen === null };
 }
 
 /**
@@ -423,11 +449,30 @@ export function queueLine(q: QueueStarted): string {
 }
 
 /**
+ * What `nemia inbox` says of a queued card's last try (`inboxLines`): when, on which repository for a card that names none — the one its
+ * factory picks said as such — and why; refused, how to have it tried again, and running `nemia up` elsewhere only when the daemon's
+ * repository was the one; failed otherwise, that the tick tries it again. Empty for a card not tried.
+ */
+function triedClause(l: InboxListing, unfactoredStarts: boolean): string {
+  const t = l.tried;
+  if (!t) return '';
+  const said = l.error === null && !l.repo && (l.factory !== null || unfactoredStarts);
+  const its = t.repo === l.factoryRepo ? ", its factory's one repository" : '';
+  const on = said ? ` on ${t.repo}${its}` : '';
+  const why = t.why !== l.error ? `: ${t.why}` : '';
+  if (!t.refused) return ` — failed at ${t.at}${on}${why} — not a refusal: the tick tries it again on every pass, where it keeps its place`;
+  const elsewhere = said && l.factoryRepo === null ? ', or run nemia up in the repository it is about' : '';
+  return ` — not started at ${t.at}${on}${why} Edit the card, or take it back and queue it again${elsewhere}, and the tick tries it again`;
+}
+
+/**
  * What `nemia inbox` prints, a line per entry: the card's name, the first line of its body, its workflow and repository when it names them,
  * and the runs it was started as — or, for an entry that does not read as a card, why. A queued card says its place in the queue and, when
  * the tick's last try did not start it as it stands, why: refused, it waits for a person, not for a slot; failed otherwise, the tick tries
  * it again. A reason the entry's own error already says is not said twice. A card that names no factory is refused wherever a daemon runs,
  * and its try names no repository to run one in, unless `unfactoredStarts` (`WF_DEFAULT_FACTORY_STARTS=1`, the tests' switch) starts it.
+ * A try on the repository the card's factory picks (`factoryRepo`) says so, and names no daemon's repository to run one in: only a try on
+ * the daemon's own (`queueRepo`) does (`triedClause`).
  */
 export function inboxLines(listing: readonly InboxListing[], unfactoredStarts = false): string[] {
   const width = Math.max(0, ...listing.map((l) => l.name.length));
@@ -435,14 +480,7 @@ export function inboxLines(listing: readonly InboxListing[], unfactoredStarts = 
   return listing.map((l) => {
     const started = l.startedAs.length ? `  started as ${l.startedAs.join(', ')}` : '';
     const queued = l.queued?.place ? `  queued ${l.queued.place} of ${inLine}` : '';
-    const t = l.tried;
-    const on = t && l.error === null && !l.repo && (l.factory !== null || unfactoredStarts) ? ` on ${t.repo}` : '';
-    const why = t && t.why !== l.error ? `: ${t.why}` : '';
-    const tried = !t
-      ? ''
-      : t.refused
-        ? ` — not started at ${t.at}${on}${why} Edit the card, or take it back and queue it again${on ? ', or run nemia up in the repository it is about' : ''}, and the tick tries it again`
-        : ` — failed at ${t.at}${on}${why} — not a refusal: the tick tries it again on every pass, where it keeps its place`;
+    const tried = triedClause(l, unfactoredStarts);
     if (l.error !== null) return `${l.name.padEnd(width)}  ${l.error}${queued}${tried}${started}`;
     return `${l.name.padEnd(width)}  ${l.title!.slice(0, 56).trimEnd()}${l.workflow ? `  workflow: ${l.workflow}` : ''}${l.repo ? `  repo: ${l.repo}` : ''}${l.gate ? `  gate: ${l.gate}` : ''}${l.factory ? `  factory: ${l.factory}` : ''}${queued}${tried}${started}`;
   });

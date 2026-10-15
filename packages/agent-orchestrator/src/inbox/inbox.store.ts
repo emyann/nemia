@@ -26,7 +26,8 @@ import { workRoot } from '../record/places.store.ts';
 import { WorkflowError, type Workflow } from '../step/step.ts';
 import { isFolderTeam } from '../workflow/index.ts';
 import { loadWorkflows, workflowFolder } from '../folder/folder.store.ts';
-import { defaultStartsAllowed, factoryNames, treeOf } from '../factory/factory.store.ts';
+import { defaultStartsAllowed, factoryNames, readFactories, treeOf } from '../factory/factory.store.ts';
+import type { Factory } from '../factory/factory.ts';
 import { HOME, isDirectory, runId, runsDir } from '../record/record.store.ts';
 import { runStore } from '../record/files.store.ts';
 
@@ -39,10 +40,15 @@ export const inboxCards = (): string[] =>
 /**
  * `nemia inbox`: every card in the inbox, by name, with the runs a record says it was started as (`inboxListing`) — and every entry that
  * does not read as a card, with why. The run records are read for their `from`, so a card whose removal failed after its start is listed as
- * started; and the tick's tries, so a queued card whose start was refused, or failed, says why.
+ * started; the tick's tries, so a queued card whose start was refused, or failed, says why; and the factories that read, so a card says the
+ * repository its factory picks for it (`factoryRepo`).
  */
 export const readInbox = (): InboxListing[] =>
-  inboxListing(runStore.inbox.entries(), runStore.runs.list(), isDirectory, runStore.inbox.tries());
+  inboxListing(runStore.inbox.entries(), runStore.runs.list(), isDirectory, runStore.inbox.tries(), readableFactories());
+
+/** The store's factories that read, by name: what a queued card's repository is chosen from (`queueRepo`). One not read is none. */
+export const readableFactories = (): Map<string, Factory> =>
+  new Map(readFactories().flatMap((f) => ('error' in f ? [] : [[f.name, f] as const])));
 
 /**
  * Why a card may not name a repository, or null: `repo:` is the repository a run started from the card works on, and a team whose every
@@ -100,10 +106,17 @@ export function addToInbox(opts: { text: string; from?: string; dir?: string; wo
 }
 
 /**
- * What `nemia inbox queue` did: the card as it now reads, its file, and — once queued — its place in the queue's order and how many are in
- * it.
+ * What `nemia inbox queue` did: the card as it now reads, its file, and — once queued — its place in the queue's order, how many are in
+ * it, and the repository its factory picks for it (`factoryRepo`), null when it picks none or the card is not queued.
  */
-export type InboxQueued = { card: InboxCard; file: string; place?: number; of?: number; was: 'queued' | 'taken back' | 'not queued' };
+export type InboxQueued = {
+  card: InboxCard;
+  file: string;
+  place?: number;
+  of?: number;
+  was: 'queued' | 'taken back' | 'not queued';
+  factoryRepo: string | null;
+};
 
 /** A queue `queueRefusal` refused, by its kind: a card a run's record names, or one already queued, is a `Conflict`; the rest `Invalid`. */
 const queueRefused = (why: string, card: InboxCard, startedAs: readonly string[]): Conflict | WorkflowError =>
@@ -149,7 +162,7 @@ export function queueInInbox(name: string, how: { off?: boolean; workflow?: stri
   }
   const exists = how.off ? () => true : isDirectory;
   const card = parseInboxCard(`${name}.md`, text, exists);
-  if (how.off && card.queued === undefined) return { card, file, was: 'not queued' };
+  if (how.off && card.queued === undefined) return { card, file, was: 'not queued', factoryRepo: null };
   if (!how.off) refuseQueue(card, file, how.workflow);
   if (how.workflow !== undefined) {
     const refusedRepo = cardRepoRefusal({ workflow: how.workflow, repo: card.repo, factory: card.factory });
@@ -158,10 +171,11 @@ export function queueInInbox(name: string, how: { off?: boolean; workflow?: stri
   const written = queuedText(card, how.off ? null : new Date().toISOString(), exists, how.workflow);
   runStore.inbox.rewrite(`${name}.md`, written);
   const now = parseInboxCard(`${name}.md`, written, exists);
-  if (how.off) return { card: now, file, was: 'taken back' };
+  if (how.off) return { card: now, file, was: 'taken back', factoryRepo: null };
   const order = queueOrder(readInbox());
   const place = order.findIndex((l) => l.name === name) + 1;
-  return { card: now, file, ...(place ? { place } : {}), of: order.length, was: 'queued' };
+  const factoryRepo = order.find((l) => l.name === name)?.factoryRepo ?? null;
+  return { card: now, file, ...(place ? { place } : {}), of: order.length, was: 'queued', factoryRepo };
 }
 
 /** What `nemia inbox rm` did: the card's file removed, or no card of that name, and the cards the inbox has. */

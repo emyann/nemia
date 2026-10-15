@@ -114,9 +114,12 @@ export type HarnessArgs = {
    */
   command?: string[];
   /**
-   * What the command's environment holds on top of the worker's own, as a Pod's container gives its `env`: `{ "CI": "1" }`. Read
-   * by a `HarnessSpec` with `commandArgs` alone, and refused on any other harness. Journalled with the task, so it carries no
-   * secret. Refused unless an object whose keys are variable names and whose values are strings with no NUL in them.
+   * What the session's process holds in its environment on top of the worker's own, as a Pod's container gives its `env`:
+   * `{ "CI": "1" }`. Read by every harness that spawns the session as a process of its own — a `HarnessSpec` with `commandArgs` or
+   * `env`, and Claude Code's job — and laid under the harness's own variables, which it never overrides. Refused on a background
+   * session, whose process is spawned before it and ignores its asker's environment, and on a remote agent. Journalled with the
+   * task, so it carries no secret. Refused unless an object whose keys are variable names and whose values are strings with no
+   * NUL in them.
    */
   env?: Record<string, string>;
   /**

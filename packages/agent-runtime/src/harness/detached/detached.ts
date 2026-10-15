@@ -140,6 +140,11 @@ export type HarnessSpec = {
    */
   commandArgs?: true;
   /**
+   * The harness lays a task's `config.env` under its own environment, in the process it spawns. Absent, and no `commandArgs`:
+   * `file()` refuses a task that carries one rather than start its session without it.
+   */
+  env?: true;
+  /**
    * The harness can leave the checkout's `.mcp.json` out of a session, whole or but for the entries a task's `config.checkoutMcp`
    * names, and loads those it names. Absent: `file()` refuses a task that carries it rather than start a session with servers it
    * did not ask for, or without those it did.

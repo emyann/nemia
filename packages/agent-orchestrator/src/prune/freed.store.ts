@@ -79,6 +79,13 @@ function countedOrNot(at: string, index: number, walked: Walked): boolean | unde
   return folder;
 }
 
+/** Whether the walk just read the last name of a burst (`WALK_BURST`), the burst then counted: a plain test, no step of its own. */
+const burstEnded = (walked: Walked): boolean => {
+  if (walked.names % WALK_BURST !== 0) return false;
+  walked.bursts += 1;
+  return true;
+};
+
 /**
  * What each of `dirs` holds on disk that no name outside `dirs` holds too, by its place in `dirs` (`Walk`): the blocks of every folder
  * and of every file all of whose names are inside `dirs`, a link counted as a link and never followed. A file with a name outside
@@ -95,23 +102,18 @@ function countedOrNot(at: string, index: number, walked: Walked): boolean | unde
 export const walk = Effect.fn('walk')(function* (dirs: readonly string[]) {
   const none = () => dirs.map(() => 0);
   const walked: Walked = { bytes: none(), unread: none(), read: dirs.map(() => false), names: 0, bursts: 0, linked: new Map() };
-  const burst = Effect.suspend(() => {
-    if (walked.names % WALK_BURST !== 0) return Effect.void;
-    walked.bursts += 1;
-    return Effect.yieldNow;
-  });
   const inside: Inside[] = [];
   for (const [index, dir] of dirs.entries()) {
     const folder = countedOrNot(dir, index, walked);
     walked.read[index] = folder !== undefined;
     if (folder) inside.push({ dir, index });
-    yield* burst;
+    if (burstEnded(walked)) yield* Effect.yieldNow;
   }
   for (let next = inside.pop(); next; next = inside.pop()) {
     const { dir, index } = next;
     for (const at of namesIn(dir, index, walked)) {
       if (countedOrNot(at, index, walked)) inside.push({ dir: at, index });
-      yield* burst;
+      if (burstEnded(walked)) yield* Effect.yieldNow;
     }
   }
   const { bytes, unread, read, names, bursts } = walked;

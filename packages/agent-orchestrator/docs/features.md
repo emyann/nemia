@@ -5439,6 +5439,26 @@ environment and niceness, as the task's `config`. The runtime keeps each stream 
   `.stderr` (`wf rm` still removes those an earlier run wrote), and the api's read of a file.
 - **The daemon is restarted after landing**: until it is, it files and reads checks with the code it loaded.
 
+## Shipped: factories — add, hire, attach, and a run's and a card's factory (factory cards 2 to 5b)
+
+A factory names the repositories a body of work is on, the workflows it offers and the agents it hires into their steps, as a file of
+its own in the store. The README's *Factories* and the sections under it have the rules.
+
+- **Card 2: `nemia factory add`, `ls` and `rm`**: a factory is `$WF_ROOT/factories/<name>.json`, `{ "repos": [...] }`, written whole
+  through a hidden file; the default factory is no file, holds every run and card that names none, and `add` and `rm` refuse its name.
+- **Card 3: `nemia factory hire` and `fire`**: one agent a step, by `<workflow>/<step>`; `nemia start --factory` hands each step its
+  hire, frozen on the run, and refuses a step no agent fills (*Hiring: a factory's agents fill a workflow's steps*).
+- **Card 4: `nemia factory attach` and `detach`**: a factory offers only the workflows attached to it, and none until one is; a start
+  or a hire of another is refused, naming the attach (*Attaching: a factory offers only its workflows*).
+- **Card 5: a run names its factory and its repository**: `factory` on its record, frozen at start; a factory of one repository gives
+  the run its repository from any directory, and a repository outside the factory is refused (*A run names its factory and its
+  repository*).
+- **Card 5b: an inbox card starts in its factory**: its `factory:`, on its `repo:`, else its factory's one repository, else the one it
+  is started in; a queued card is tried on the same from a daemon anywhere (`queueRepo`), and its refusal there is remembered.
+- **What a card's factory picks is said as such** (`factoryRepoOf`, a listing's `factoryRepo`): `nemia inbox`, `nemia inbox queue`
+  and the board's Inbox name a queued card's repository as its factory's one, and offer running `nemia up` elsewhere only where the
+  daemon's repository is the one tried — a card whose factory has several repositories, or does not read.
+
 ## Shipped: mounts — a run reads its factory's other repositories (slice 2a)
 
 A runtime task now takes `config.mounts`, a list of `{ path, readOnly }`, as a Pod's container takes its `volumeMounts`: the runtime

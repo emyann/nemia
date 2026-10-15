@@ -633,11 +633,11 @@ async function lookDetails(page: Page): Promise<void> {
     throw new Refused(
       `the pager's buttons are in the face of a heading, not the mono of its counts — ${buttons.map((b) => b.face).join(' | ')}; a heading ${head.face}; a count ${count.face}`,
     );
-  for (const [state, what] of [
-    ['working', 'the step at work glows'],
-    ['awaiting-approval', 'the step that waits on a person is edged in its hue and glows'],
+  for (const [state, lit, what] of [
+    ['working', ' [data-step-breath]', 'the step at work glows, on a layer of its own'],
+    ['awaiting-approval', '', 'the step that waits on a person is edged in its hue and glows'],
   ] as const) {
-    const glows = (await drawnOf(page, `[data-step][data-state="${state}"]`)).map((drawn) => drawn.glow);
+    const glows = (await drawnOf(page, `[data-step][data-state="${state}"]${lit}`)).map((drawn) => drawn.glow);
     if (!glows.length || glows.some((glow) => glow === 'none' || (state !== 'working' && !glow.includes('inset'))))
       throw new Refused(`${what} — ${glows.join(' | ') || `no step ${state} in a rail`}`);
   }

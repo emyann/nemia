@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { Locator } from 'playwright';
-import { frameTabsOf, photograph, railOf, sidebar, themeOf } from '../board.ts';
+import { frameTabsOf, photograph, sidebar, themeOf, railPlace, litOf } from '../board.ts';
 import { expectApart, expectCount, expectInside, expectTexts, expectUncut, expectVisible, Refused } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
@@ -97,7 +97,7 @@ async function expectClearOfLabels(frame: Locator, assertion: string): Promise<v
 
 export default {
   /**
-   * The Machines page, a tab of Machines & Capabilities: the task's lifecycle drawn from the graph the api reads off the runtime's code,
+   * The Machines page, a tab of Settings: the task's lifecycle drawn from the graph the api reads off the runtime's code,
    * every state a box and every edge a line of a route's label or of its state's box, every verb a person takes a line on each route it
    * takes, a route only a verb takes dashed, the first state and the final ones marked, and nothing drawn over anything else or cut short
    * at 1280 wide.
@@ -106,10 +106,7 @@ export default {
   route: '/machines',
   expect: async (page) => {
     await sidebar(page);
-    await expectVisible(
-      railOf(page).locator('a[data-active="true"][aria-label="Machines & Capabilities"]'),
-      'the rail lights Machines & Capabilities on its page',
-    );
+    await expectVisible(railPlace(page, 'Settings').and(litOf(page)), 'the rail lights Settings on its page');
     await expectTexts(frameTabsOf(page).locator('[aria-selected="true"]'), ['Machines'], "the strip's Machines tab is selected");
     const served = (await (await page.request.get(new URL('/api/machines/lifecycle', page.url()).href)).json()) as Served;
     const section = page.locator('section[aria-label="A task\'s lifecycle"]');

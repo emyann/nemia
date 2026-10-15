@@ -1,8 +1,8 @@
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { photograph, sidebarOf, themeOf } from '../board.ts';
+import { photograph, themeOf } from '../board.ts';
 import { cardOf, showFinished } from '../canvas.ts';
-import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
+import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { FACTORIES, FOLDER, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
@@ -14,10 +14,30 @@ const RUN = { id: FOLDER.id, title: FOLDER.title, factory: FACTORIES.hiring.name
 /** The workflow the page stars, the repository's. */
 const FLOW = WORKFLOWS.good.name;
 
-/** The sidebar's Favorites. */
-const favoritesOf = (page: Page): Locator => sidebarOf(page).locator('[data-favorites]');
-/** Each favourite's link, in its order. */
-const linksOf = (page: Page): Locator => favoritesOf(page).getByRole('link');
+/** What this browser keeps of its favourites, in the order starred: each by its run's id or its workflow's name. */
+const keptOf = (page: Page): Promise<string[]> =>
+  page.evaluate((key) => {
+    const kept = JSON.parse(localStorage.getItem(key) ?? '[]') as Array<{ run?: string; workflow?: string }>;
+    return kept.map((one) => one.run ?? one.workflow ?? '');
+  }, FAVORITES_KEY);
+
+/** Refuses unless this browser keeps `want` as its favourites, in that order, waiting for the press that writes them. */
+async function expectKept(page: Page, want: string[], assertion: string): Promise<void> {
+  await page
+    .waitForFunction(
+      ([key, want]) => {
+        const kept = JSON.parse(localStorage.getItem(key) ?? '[]') as Array<{ run?: string; workflow?: string }>;
+        return kept.map((one) => one.run ?? one.workflow ?? '').join('\n') === want;
+      },
+      [FAVORITES_KEY, want.join('\n')] as const,
+      { timeout: WAIT_MS },
+    )
+    .catch(() => undefined);
+  const kept = await keptOf(page);
+  if (kept.join() !== want.join())
+    throw new Refused(`${assertion}: this browser keeps ${want.join(', ') || 'none'} — it keeps ${kept.join(', ') || 'none'}`);
+}
+
 /** The star in `scope` that stars the thing named `name`. */
 const starIn = (scope: Locator, name: string): Locator => scope.getByRole('button', { name: `Star ${name}`, exact: true });
 /** The header of the run's own page. */
@@ -47,25 +67,18 @@ async function expectStar(star: Locator, pressed: boolean, assertion: string): P
     throw new Refused(`${assertion}: the star reads pressed=${want} — it reads ${said}, marked ${marked}`);
 }
 
-/** Refuses unless Favorites says nothing is starred. */
-const expectNone = (page: Page, assertion: string) =>
-  expectVisible(favoritesOf(page).getByText('Nothing starred yet.'), `${assertion}: Favorites says nothing is starred yet`);
-
 /**
  * The Runs page has no star; the run starred on its own page's header is under Favorites by its title, a link to its page, its star
  * reads pressed, and Runs lists it under Favorites too.
  */
 async function fromItsPage(page: Page): Promise<void> {
   await visit(page, '/runs');
-  await expectNone(page, 'with none kept');
+  await expectKept(page, [], 'with none kept');
   await expectCount(page.locator('[data-runs-page]').getByRole('button', { name: /^Star / }), 0, 'the Runs page has no star');
   await visit(page, `/runs/${RUN.id}`);
   await starIn(headerOf(page), RUN.title).click();
-  await expectTexts(linksOf(page), [RUN.title], "starred on its page's header, the run is under Favorites by its title");
-  if ((await linksOf(page).getAttribute('href')) !== `/runs/${RUN.id}`) throw new Refused('its favourite links to its page');
+  await expectKept(page, [RUN.id], "starred on its page's header, the run is kept");
   await expectStar(starIn(headerOf(page), RUN.title), true, "its page's header");
-  await visit(page, '/runs');
-  await expectTexts(linksOf(page), [RUN.title], 'and on Runs it is under Favorites still');
   await settled(page);
   await photograph(page, path.join(OUT, `favorites-starred-${await themeOf(page)}.png`));
 }
@@ -80,7 +93,7 @@ async function onItsCardAndPage(page: Page): Promise<void> {
   await expectStar(star, true, "its page's header");
   await star.click();
   await expectStar(star, false, "pressed again on its page's header");
-  await expectNone(page, 'the run taken off');
+  await expectKept(page, [], 'the run taken off');
 }
 
 /**
@@ -97,14 +110,9 @@ async function fromTheFloorThenAWorkflow(page: Page): Promise<void> {
   await visit(page, '/workflows');
   await starIn(flowCard(page), FLOW).click();
   await expectStar(starIn(flowCard(page), FLOW), true, "the workflow's card");
-  await expectTexts(linksOf(page), [RUN.title, FLOW], 'the run, then the workflow, in the order starred');
+  await expectKept(page, [RUN.id, FLOW], 'the run, then the workflow, in the order starred');
   await settled(page);
   await photograph(page, path.join(OUT, `favorites-both-${await themeOf(page)}.png`));
-  await visit(page, '/runs');
-  await linksOf(page).filter({ hasText: FLOW }).click();
-  await page.waitForURL((url) => url.pathname === `/workflows/repo/${FLOW}` && url.hash === '', { timeout: WAIT_MS });
-  await visit(page, `/runs?factory=${FACTORIES.others[0]}`);
-  await expectTexts(linksOf(page), [RUN.title, FLOW], `with ${FACTORIES.others[0]} picked, every factory's favourites are listed`);
 }
 
 /** The run's floating bar, opened from its card, stars it too: taken off there and starred again, it joins the end. */
@@ -117,9 +125,9 @@ async function fromItsBar(page: Page): Promise<void> {
   const star = starIn(bar, RUN.title);
   await expectStar(star, true, 'its bar');
   await star.click();
-  await expectTexts(linksOf(page), [FLOW], 'taken off in its bar');
+  await expectKept(page, [FLOW], 'taken off in its bar');
   await star.click();
-  await expectTexts(linksOf(page), [FLOW, RUN.title], 'starred again, it joins the end');
+  await expectKept(page, [FLOW, RUN.id], 'starred again, it joins the end');
   await settled(page);
   await photograph(page, path.join(OUT, `favorites-bar-${await themeOf(page)}.png`));
 }
@@ -131,30 +139,13 @@ async function inAnotherPage(page: Page): Promise<void> {
   try {
     const { problems } = watch(other);
     await visit(other, page.url());
-    await expectTexts(linksOf(other), [FLOW, RUN.title], 'another page reads the same favourites');
+    await expectStar(starIn(flowCard(other), FLOW), true, 'another page reads the same favourites');
     await starIn(flowCard(page), FLOW).click();
-    await expectTexts(linksOf(other), [RUN.title], 'and sees the workflow taken off here, without a reload');
+    await expectStar(starIn(flowCard(other), FLOW), false, 'and sees the workflow taken off here, without a reload');
     if (problems().length) throw new Refused(`the other page did nothing it must not: ${problems().join('; ')}`);
   } finally {
     await other.close();
   }
-}
-
-/**
- * A workflow the api no longer lists is said gone, links nowhere, and its star takes it off. A run the store no longer has is the page
- * `favorite-gone`'s: its read answers a refusal, which this page's watch would count.
- */
-async function gone(page: Page): Promise<void> {
-  const kept = [{ kind: 'workflow', from: 'yours', workflow: 'no-such-flow' }];
-  await page.evaluate(([key, value]) => localStorage.setItem(key, value), [FAVORITES_KEY, JSON.stringify(kept)] as const);
-  await visit(page, '/runs');
-  const rows = favoritesOf(page).locator('li[data-gone]');
-  await expectTexts(rows, ['no-such-flow (yours)gone'], 'a favourite gone is said so, by its name');
-  await expectCount(linksOf(page), 0, 'and links nowhere');
-  await settled(page);
-  await photograph(page, path.join(OUT, `favorites-gone-${await themeOf(page)}.png`));
-  await favoritesOf(page).getByRole('button', { name: 'Unstar no-such-flow (yours)', exact: true }).click();
-  await expectNone(page, 'taken off');
 }
 
 /** Where this browser refuses its storage, the board says nothing is starred, and a star pressed lasts as long as the page. */
@@ -170,57 +161,32 @@ async function refused(page: Page): Promise<void> {
       Storage.prototype.setItem = refuse;
     });
     await visit(blocked, new URL(`/runs/${RUN.id}`, page.url()).href);
-    await expectNone(blocked, 'with storage refused');
+    await expectStar(starIn(headerOf(blocked), RUN.title), false, 'with storage refused, nothing is starred');
     await starIn(headerOf(blocked), RUN.title).click();
-    await expectTexts(linksOf(blocked), [RUN.title], 'a star pressed there is listed for the page');
+    await expectStar(starIn(headerOf(blocked), RUN.title), true, 'a star pressed there holds for the page');
     if (problems().length) throw new Refused(`refused storage breaks nothing: ${problems().join('; ')}`);
   } finally {
     await blocked.close();
   }
 }
 
-/** On a phone's screen the sheet's Favorites lists each by its title, and a favourite pressed there closes it and opens its page. */
-async function onPhone(page: Page): Promise<void> {
-  const kept = [
-    { kind: 'run', run: RUN.id },
-    { kind: 'workflow', from: 'repo', workflow: FLOW },
-  ];
-  await page.evaluate(([key, value]) => localStorage.setItem(key, value), [FAVORITES_KEY, JSON.stringify(kept)] as const);
-  await page.setViewportSize({ width: 390, height: 844 });
-  await visit(page, '/runs');
-  await page.locator('header[data-frame-header]').locator('[data-sidebar="trigger"]').click();
-  const sheet = page.getByRole('dialog');
-  await expectTexts(sheet.locator('[data-favorites]').getByRole('link'), [RUN.title, FLOW], "the sheet's Favorites");
-  await settled(page);
-  await photograph(page, path.join(OUT, `favorites-phone-${await themeOf(page)}.png`));
-  await sheet.locator('[data-favorites]').getByRole('link', { name: RUN.title }).click();
-  await expectCount(sheet, 0, 'a favourite pressed closes the sheet');
-  await page.waitForURL((url) => url.pathname === `/runs/${RUN.id}`, { timeout: WAIT_MS });
-}
-
 export default {
   /**
-   * Favourites: a run starred on its page's header, which Runs, with no star of its own, lists; then its card on the floor, its page's
-   * header and its bar, and a workflow on its card, each
-   * pressed again to take it off; Favorites lists them by title in the order starred, under any factory picked; another page sees a
-   * change; a workflow the api no longer lists is said gone (a run gone is `favorite-gone`'s); refused storage says nothing is starred;
-   * and a phone's sheet. The favourites and the window's size are taken back.
+   * The stars: a run starred on its page's header, Runs having no star of its own; then its card on the floor, its page's header and
+   * its bar, and a workflow on its card, each pressed again to take it off; this browser keeps them in the order starred; another page
+   * sees a change; refused storage stars nothing kept, and a star pressed holds for the page. The favourites are taken back.
    */
   name: 'favorites',
   route: '/runs',
   expect: async (page) => {
-    const size = page.viewportSize();
     try {
       await fromItsPage(page);
       await onItsCardAndPage(page);
       await fromTheFloorThenAWorkflow(page);
       await fromItsBar(page);
       await inAnotherPage(page);
-      await gone(page);
       await refused(page);
-      await onPhone(page);
     } finally {
-      if (size) await page.setViewportSize(size);
       await page.evaluate((key) => localStorage.removeItem(key), FAVORITES_KEY);
       await visit(page, '/runs');
     }

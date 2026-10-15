@@ -31,7 +31,7 @@ export const Route = createFileRoute('/factories/$factory')({
 });
 
 /**
- * Inside a factory: its floor, the runs it holds and the cards queued in it (`FactoryCanvas`), the factory named in the sidebar's picker
+ * Inside a factory: its floor, the runs it holds and the cards queued in it (`FactoryCanvas`), the factory named in the top bar's picker
  * (`FactoryPicker`), and above the floor the template it is made from, where it is (`TemplateCard`). A name the api lists no factory by
  * says so: no route of the api is asked about it.
  */
@@ -52,7 +52,7 @@ const RouterLinkButton = routeLink(LinkButton);
 function NoSuchFactory({ name }: { name: string }) {
   const { data: store } = useQuery(storeQuery);
   return (
-    <div className="flex h-[calc(100svh-5rem)] items-center justify-center p-6">
+    <div className="flex h-[calc(100svh-var(--frame-top))] items-center justify-center p-6">
       <Card className="w-full max-w-sm" data-no-factory={name}>
         <CardHeader>
           <CardTitle>No factory named {name}</CardTitle>

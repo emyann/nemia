@@ -1,9 +1,12 @@
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { photograph, RAIL_PLACES, railOf, railPlace, themeOf } from '../board.ts';
-import { expectCount, expectVisible, Refused, settled } from '../checks.ts';
+import { litOf, photograph, RAIL_PLACES, railColumnOf, railOf, railPlace, themeOf, topBarOf } from '../board.ts';
+import { expectCount, expectNone, expectVisible, idle, Refused, settled } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
+
+/** The rail's width with its border, closed and open. */
+const WIDTH = { closed: 97, open: 221 };
 
 /** The box of `target`, refused when it is not drawn. */
 async function boxOf(target: Locator, what: string) {
@@ -12,133 +15,175 @@ async function boxOf(target: Locator, what: string) {
   return box;
 }
 
-/** The header's button that folds the sidebar, or opens its sheet on a narrow screen. */
-const trigger = (page: Page) => page.locator('header[data-frame-header]').locator('[data-sidebar="trigger"]');
+/** The button that opens and closes the rail, or on a phone its drawer. */
+const menuOf = (page: Page) => page.locator('[data-menu-button]');
 
-/** The sidebar's own state, `expanded` or `collapsed`, as the provider draws it. */
-const foldOf = (page: Page) => page.locator('[data-slot="sidebar"][data-state]').getAttribute('data-state');
+/** Waits until the rail is `width` wide, its transition done, and refuses if it never is. */
+const expectWidth = (page: Page, width: number, assertion: string) =>
+  expectNone(async () => {
+    const box = await railColumnOf(page).boundingBox();
+    return box && Math.abs(box.width - width) <= 1 ? null : `it is ${box?.width ?? 'not drawn'} wide`;
+  }, `${assertion}: the rail is ${width} wide`);
 
-/** The list's Runs, which the sidebar shows open and leaves out folded. */
-const runsLink = (page: Page) => page.locator('[data-sidebar="sidebar"]').getByRole('link', { name: 'Runs' });
+/** Refuses unless `target` holds the keyboard's focus. */
+async function expectFocused(target: Locator, what: string): Promise<void> {
+  if (!(await target.evaluate((element) => element === document.activeElement))) throw new Refused(`${what} holds the focus`);
+}
 
-/** The header runs across the whole top of the page, and the rail starts below it, at the left. */
-async function headerOverRail(page: Page): Promise<void> {
-  const width = page.viewportSize()?.width ?? 0;
-  const header = await boxOf(page.locator('header[data-frame-header]'), 'the header');
-  if (Math.abs(header.x) > 1 || Math.abs(header.y) > 1 || Math.abs(header.width - width) > 1)
-    throw new Refused(`the header spans the top of the page, ${width} wide at 0,0 — it is ${header.width} wide at ${header.x},${header.y}`);
-  const rail = await boxOf(railOf(page), 'the rail');
-  if (rail.y < header.y + header.height - 1 || Math.abs(rail.x) > 1)
+/** The rail stands the window's height at its left, and the top bar beside it, across the rest of the top. */
+async function railBesideBar(page: Page): Promise<void> {
+  const rail = await boxOf(railColumnOf(page), 'the rail');
+  const bar = await boxOf(topBarOf(page), 'the top bar');
+  if (Math.abs(rail.x) > 1 || Math.abs(rail.y) > 1)
+    throw new Refused(`the rail starts at the window's top left — it is at ${rail.x},${rail.y}`);
+  if (Math.abs(bar.x - (rail.x + rail.width)) > 1 || Math.abs(bar.y) > 1)
     throw new Refused(
-      `the rail sits under the header at the left — the header ends at ${header.y + header.height}, the rail is at ${rail.x},${rail.y}`,
+      `the top bar starts beside the rail, at the top — it is at ${bar.x},${bar.y}, the rail ending at ${rail.x + rail.width}`,
     );
 }
 
 /**
- * Moves the mouse onto `target` in steps, as a hand does: React Aria opens a tooltip on hover only once the pointer has moved, and a
- * single jump onto the link reads as no pointer at all.
+ * The top bar holds, left to right, the page's name, the factory switcher, the search when `searched` (a window under 1024 pixels hides
+ * it), the pause, the gauges and the account, each inside the bar and clear of the one before it on its line, or on a line below.
  */
-async function pointAt(page: Page, target: Locator, what: string): Promise<void> {
-  const box = await boxOf(target, what);
-  await page.mouse.move(box.x + box.width / 2 + 40, box.y + box.height / 2 + 40);
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 8 });
-}
-
-/**
- * The rail's places stand in one column from the top, nothing pushed to its foot: each gap between two places no wider than the one between
- * Home and Agents, and the last place ending far above the rail's bottom.
- */
-async function oneColumn(page: Page): Promise<void> {
-  const rail = await boxOf(railOf(page), 'the rail');
-  const boxes = await Promise.all(RAIL_PLACES.map((place) => boxOf(railPlace(page, place), `the rail's ${place}`)));
-  const gaps = boxes.slice(1).map((box, i) => box.y - (boxes[i].y + boxes[i].height));
-  const last = boxes.at(-1)!;
-  const foot = rail.y + rail.height - (last.y + last.height);
-  if (gaps.some((gap) => gap > gaps[0] + 1) || foot < rail.height / 2)
+async function barClear(page: Page, searched: boolean): Promise<void> {
+  const bar = topBarOf(page);
+  const parts: Array<[string, Locator]> = [
+    ["the page's name", bar.locator('[data-page-name]')],
+    ['the factory switcher', bar.locator('[data-factory-picker]')],
+    ...(searched ? [['the search', bar.locator('[data-slot="search-bar"]')] as [string, Locator]] : []),
+    ['the pause', bar.locator('[data-pause]')],
+    ['the gauges', bar.locator('[data-gauges-button]')],
+    ['the account', bar.locator('[data-account-to-come]')],
+  ];
+  const whole = await boxOf(bar, 'the top bar');
+  const boxes = await Promise.all(parts.map(([what, part]) => boxOf(part, what)));
+  const wrong = boxes.flatMap((box, at) => {
+    const [what] = parts[at];
+    const outside =
+      box.x + box.width > whole.x + whole.width + 0.5 || box.y + box.height > whole.y + whole.height + 0.5
+        ? [`${what} runs out of the bar, to ${box.x + box.width},${box.y + box.height}`]
+        : [];
+    if (at === 0) return outside;
+    const before = boxes[at - 1];
+    const below = box.y >= before.y + before.height - 0.5;
+    const clear = below || box.x >= before.x + before.width - 0.5;
+    return clear ? outside : [...outside, `${parts[at - 1][0]} ends at ${before.x + before.width}, ${what} starts at ${box.x}`];
+  });
+  if (wrong.length)
     throw new Refused(
-      `the rail's places stand in one column from the top — the gaps between them are ${gaps.join(', ')}px, and the last ends ${foot}px above the bottom of a rail ${rail.height}px tall`,
+      `${page.viewportSize()?.width} wide, the top bar holds ${parts.map(([what]) => what).join(', ')} in order, each clear of the ` +
+        `last and inside the bar — ${wrong.join('; ')}`,
     );
 }
 
-/** Each place in the rail is named by a tooltip: on hover, and on focus from the keyboard. */
-async function named(page: Page): Promise<void> {
-  await pointAt(page, railPlace(page, 'Machines & Capabilities'), "the rail's Machines & Capabilities");
+/** The top bar's parts stay clear of each other on this window, and on one too narrow for the search, the rail open; it names the page. */
+async function barInOrder(page: Page): Promise<void> {
+  await barClear(page, true);
+  const size = page.viewportSize();
+  if (size) {
+    await page.setViewportSize({ width: 800, height: size.height });
+    await expectWidth(page, WIDTH.open, '800 wide, the rail stays open');
+    await barClear(page, false);
+    await settled(page);
+    await photograph(page, path.join(OUT, `frame-two-lines-${await themeOf(page)}.png`));
+    await page.setViewportSize(size);
+  }
   await expectVisible(
-    page.getByRole('tooltip').filter({ hasText: 'Machines & Capabilities' }),
-    'hovering Machines & Capabilities in the rail names it in a tooltip',
+    topBarOf(page).locator('[data-page-name]').getByText('Overview', { exact: true }),
+    'the top bar names the page Overview',
+  );
+}
+
+/**
+ * The search and the account say they are not built yet, to the eye and to a screen reader, and neither takes the keyboard: Tab from the
+ * factory switcher reaches the pause, and from the gauges leaves the bar.
+ */
+async function toCome(page: Page): Promise<void> {
+  const bar = topBarOf(page);
+  const search = bar.getByRole('searchbox', { name: 'Search, not built yet' });
+  await expectVisible(search, 'the search is named not built yet');
+  if (!(await search.isDisabled())) throw new Refused('the search is disabled: it takes no text and no focus');
+  if ((await search.getAttribute('placeholder')) !== 'Search · to come') throw new Refused('the search says to the eye it is to come');
+  const account = bar.getByRole('img', { name: 'Account, not built yet' });
+  await expectVisible(account, 'the account is an image named not built yet');
+  await expectCount(bar.locator('[data-account-to-come] [tabindex], [data-account-to-come] button'), 0, 'the account takes no focus');
+  await bar.locator('[data-factory-picker] button').first().focus();
+  await page.keyboard.press('Tab');
+  await expectFocused(bar.locator('[data-pause]'), 'Tab from the factory switcher passes the search: the pause');
+  await page.keyboard.press('Tab');
+  await expectFocused(bar.locator('[data-gauges-button] button'), 'Tab from the pause: the gauges button');
+}
+
+/** The menu button closes the rail to its icons and opens it again, and so does Ctrl+B; each state outlives a reload. */
+async function toggles(page: Page): Promise<void> {
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await expectWidth(page, WIDTH.open, 'open as this browser left it');
+  await expectVisible(menuOf(page).and(page.getByRole('button', { name: 'Close the menu' })), 'open, the menu button closes it');
+  await expectVisible(
+    railColumnOf(page).getByRole('button', { name: 'Start a run' }).getByText('Start a run'),
+    'open, the FAB says Start a run',
   );
   await settled(page);
   await photograph(page, path.join(OUT, `frame-open-${await themeOf(page)}.png`));
-  await page.mouse.move(600, 500);
-  await expectCount(page.getByRole('tooltip'), 0, 'the tooltip goes when the pointer leaves');
-  const header = page.locator('header[data-frame-header]');
-  await header.getByRole('link', { name: 'Nemia' }).focus();
-  await page.keyboard.press('Tab');
-  if (!(await header.locator('button[data-bell]').evaluate((element) => element === document.activeElement)))
-    throw new Refused("Tab from the logo reaches the header's bell, its one control before the rail");
-  await page.keyboard.press('Tab');
-  await expectVisible(
-    page.getByRole('tooltip').filter({ hasText: 'Home' }),
-    'Tab from the bell reaches Home in the rail, named in a tooltip',
-  );
-  await page.keyboard.press('Escape');
-}
-
-/** The header's button folds the sidebar to the rail alone, the list gone, and opens it again. */
-async function folds(page: Page): Promise<void> {
-  await trigger(page).click();
-  await expectCount(runsLink(page), 0, "folded, the sidebar's list is not drawn");
-  for (const place of RAIL_PLACES) await expectVisible(railPlace(page, place), `folded, the rail keeps ${place}`);
+  await menuOf(page).click();
+  await expectWidth(page, WIDTH.closed, 'the menu button closes it');
+  await expectVisible(menuOf(page).and(page.getByRole('button', { name: 'Open the menu' })), 'closed, the menu button opens it');
+  for (const place of RAIL_PLACES) await expectVisible(railPlace(page, place), `closed, the rail keeps ${place}`);
   await settled(page);
-  const folded = await boxOf(page.locator('[data-slot="sidebar-container"]'), 'the folded sidebar');
-  if (folded.width > 49) throw new Refused(`folded, the sidebar is the rail's width, 48 — it is ${folded.width}`);
-  await photograph(page, path.join(OUT, `frame-folded-${await themeOf(page)}.png`));
-  await trigger(page).click();
-  await expectVisible(runsLink(page), 'pressed again, the list is back');
+  await photograph(page, path.join(OUT, `frame-closed-${await themeOf(page)}.png`));
+  await page.reload({ waitUntil: 'load' });
+  await idle(page);
+  await expectWidth(page, WIDTH.closed, 'closed, it stays closed across a reload');
+  await page.keyboard.press('Control+b');
+  await expectWidth(page, WIDTH.open, 'Ctrl+B opens it');
+  await page.reload({ waitUntil: 'load' });
+  await idle(page);
+  await expectWidth(page, WIDTH.open, 'open, it stays open across a reload');
 }
 
-/** On a phone's screen the rail is not beside the page: the header's button opens a sheet holding the rail and the list. */
+/**
+ * On a phone's screen the rail leaves the page's side: the top bar's menu button opens the destinations in a drawer, which a pick closes.
+ */
 async function onPhone(page: Page): Promise<void> {
   await page.setViewportSize({ width: 390, height: 844 });
-  await expectCount(railOf(page).filter({ visible: true }), 0, 'on a phone the rail folds away from beside the page');
-  await trigger(page).click();
-  const sheet = page.getByRole('dialog');
-  await expectVisible(sheet, "the header's button opens the menu's sheet");
-  for (const place of RAIL_PLACES)
-    await expectVisible(
-      sheet.locator('nav[aria-label="Places"]').getByRole('link', { name: place, exact: true }),
-      `the sheet holds the rail's ${place}`,
-    );
-  await expectVisible(sheet.getByRole('link', { name: 'Runs' }), "and the list's places");
+  await expectCount(railColumnOf(page), 0, "on a phone the rail leaves the page's side");
+  await settled(page);
+  await photograph(page, path.join(OUT, `frame-narrow-page-${await themeOf(page)}.png`));
+  await topBarOf(page).locator('[data-menu-button]').click();
+  const drawer = page.getByRole('dialog');
+  await expectVisible(drawer, 'the menu button opens the drawer');
+  for (const place of RAIL_PLACES) await expectVisible(railPlace(page, place), `the drawer holds ${place}`);
   await settled(page);
   await photograph(page, path.join(OUT, `frame-narrow-${await themeOf(page)}.png`));
-  await sheet.locator('nav[aria-label="Places"]').getByRole('link', { name: 'Agents' }).click();
-  await expectCount(sheet, 0, 'a pick in the rail closes the sheet');
+  await railPlace(page, 'Agents').click();
+  await expectCount(drawer, 0, 'a pick in the drawer closes it');
+  await page.waitForURL((url) => url.pathname === '/agents');
 }
 
 export default {
   /**
-   * The frame's header and rail: the header across the whole top, the rail under it at the left, its places in one column from the top,
-   * nothing at its foot, named by a tooltip on hover
-   * and on keyboard focus, Agents lit on its page. The header's button folds the sidebar down to the rail and opens it again; on a phone's
-   * screen the rail leaves the page's side and the button's sheet holds it with the list, and a pick in it closes it. The fold and the
-   * window's size are taken back.
+   * The frame on the Overview: the rail at the left, the window's height, the top bar beside it holding the page's name, the factory
+   * switcher, the search and the account to come, the pause and the gauges; Overview alone lit. The rail opens and closes by its menu
+   * button and by Ctrl+B, each state kept across a reload; on a phone a drawer holds the destinations. The rail is left open, as a fresh
+   * browser finds it, and the window's size is taken back.
    */
   name: 'frame',
-  route: '/agents',
+  route: '/',
   expect: async (page) => {
     const size = page.viewportSize();
     try {
-      await headerOverRail(page);
-      await oneColumn(page);
-      await expectVisible(railOf(page).locator('a[data-active="true"][aria-label="Agents"]'), 'the rail lights Agents on its page');
-      await expectCount(railOf(page).locator('a[data-active="true"]'), 1, 'and no other place');
-      await named(page);
-      await folds(page);
+      await railBesideBar(page);
+      await barInOrder(page);
+      await expectVisible(railPlace(page, 'Overview').and(litOf(page)), 'the rail lights Overview on its page');
+      await expectCount(litOf(page), 1, 'and no other destination');
+      await expectCount(railOf(page), 1, 'one rail of destinations');
+      await toCome(page);
+      await toggles(page);
       await onPhone(page);
     } finally {
       if (size) await page.setViewportSize(size);
-      if ((await foldOf(page)) === 'collapsed') await trigger(page).click();
+      await page.evaluate(() => (document.cookie = 'sidebar_state=true; path=/'));
     }
   },
 } satisfies PageSpec;

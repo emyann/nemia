@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { expectKeys, expectRendered, expectSource, filesIn, sidebar } from '../board.ts';
+import { expectKeys, expectRendered, expectSource, filesIn, sidebar, railPlace, litOf } from '../board.ts';
 import { expectVisible, Refused } from '../checks.ts';
 import { WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -14,10 +14,7 @@ export default {
   route: `/workflows/repo/${WORKFLOWS.good.name}/review`,
   expect: async (page) => {
     await sidebar(page);
-    await expectVisible(
-      page.locator('[data-sidebar="sidebar"] a[data-active="true"]', { hasText: 'Workflows' }),
-      "the sidebar lights Workflows on a step's page",
-    );
+    await expectVisible(railPlace(page, 'Workflows').and(litOf(page)), "the sidebar lights Workflows on a step's page");
     const { good } = WORKFLOWS;
     const folder = path.join(store!, 'checkout', 'workflows', good.name);
     const before = filesIn(folder);

@@ -1,4 +1,4 @@
-import { nextVisit, sidebar } from '../board.ts';
+import { nextVisit, sidebar, railPlace, litOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, WAIT_MS } from '../checks.ts';
 import { WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -13,10 +13,7 @@ export default {
   route: '/workflows',
   expect: async (page) => {
     await sidebar(page);
-    await expectVisible(
-      page.locator('[data-sidebar="sidebar"] a[data-active="true"]', { hasText: 'Workflows' }),
-      'the sidebar lights Workflows on its page',
-    );
+    await expectVisible(railPlace(page, 'Workflows').and(litOf(page)), 'the sidebar lights Workflows on its page');
     const { good, broken, yours } = WORKFLOWS;
     const card = (name: string) => page.locator(`section[aria-label="Workflow ${name}"]`);
     await expectCount(page.locator('section[aria-label^="Workflow "]'), 3, "a card per workflow: the checkout's two, and yours");

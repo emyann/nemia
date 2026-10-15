@@ -274,9 +274,9 @@ test('nothing the frame reaches reads the whole list of the runs, but the picker
   const texts = sourceTexts();
   const { frame, opened } = frameReach(texts);
   assert.deepEqual(wholeListBreaks(texts), []);
-  for (const file of ['src/components/FrameHeader.tsx', 'src/components/FrameFooter.tsx', 'src/components/FrameSidebar.tsx'])
+  for (const file of ['src/components/FrameHeader.tsx', 'src/components/FrameRail.tsx', 'src/components/GaugesButton.tsx'])
     assert.ok(frame.includes(file), `the scan reaches ${file} from ${ROOT}`);
-  assert.ok(frame.includes('src/lib/bell.ts'), "and what the frame's components read in turn");
+  assert.ok(frame.includes('src/lib/footer.ts'), "and what the frame's components read in turn");
   assert.deepEqual(opened, OPENED, 'every picker let through is still reached from the root: take one that is not off the list');
   for (const file of OPENED)
     assert.match(withoutComments(texts.get(file)!), /\brunsQuery\b/, `${file} reads the whole list no more: take it off the list`);
@@ -284,7 +284,7 @@ test('nothing the frame reaches reads the whole list of the runs, but the picker
 
 test('REFUSED: a read of the whole list in a file of the frame, or in one a file of the frame imports; a JSDoc and a page are let through', () => {
   const texts = sourceTexts();
-  const footer = 'src/components/FrameFooter.tsx';
+  const footer = 'src/components/GaugesButton.tsx';
   const header = 'src/components/FrameHeader.tsx';
   const why = 'names runsQuery: the frame is drawn on every page and reads the light answer (openRunsQuery), never the whole list';
   const direct = new Map([...texts, [footer, `${texts.get(footer)!}\nimport { runsQuery } from '@/lib/api';\nvoid runsQuery;\n`]]);

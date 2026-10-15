@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { photograph, sidebarOf, themeOf } from '../board.ts';
-import { expectCount, expectInside, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
+import { photograph, themeOf } from '../board.ts';
+import { expectCount, expectInside, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
@@ -17,9 +17,6 @@ const PHONE = { width: 390, height: 844 };
 
 /** Its page, open. */
 const cardOf = (page: Page) => page.locator(`article[aria-label="Workflow ${GOING}"]`);
-
-/** The sidebar's Favorites, by the link each favourite is. */
-const favoritesOf = (page: Page) => sidebarOf(page).locator('[data-favorites]').getByRole('link');
 
 /** What the confirm says goes, and what becomes of what names the folder. */
 const asked = (dir: string): string =>
@@ -52,11 +49,7 @@ export default {
       await idle(page);
       const card = cardOf(page);
       await card.getByRole('button', { name: `Star ${GOING} (yours)` }).click();
-      await expectTexts(
-        favoritesOf(page).filter({ hasText: GOING }),
-        [`${GOING} (yours)`],
-        'starred, the workflow is under Favorites, as one of yours',
-      );
+      await page.waitForFunction((going) => localStorage.getItem('nemia:favorites')?.includes(going) === true, GOING, { timeout: WAIT_MS });
 
       await card.getByRole('button', { name: 'Remove…' }).click();
       const asks = card.locator('[data-remove-asks]');
@@ -86,11 +79,6 @@ export default {
       await idle(page);
       await expectCount(listed, 0, 'removed, its page goes back to the Workflows page, its card gone');
       if (fs.existsSync(dir)) throw new Refused(`removed, the folder goes from the disk — ${dir} is still there`);
-      await expectCount(
-        sidebarOf(page).locator('[data-favorites] li', { hasText: GOING }),
-        0,
-        'removed, its star goes from Favorites, not left there as gone',
-      );
       const kept = await page.evaluate(() => localStorage.getItem('nemia:favorites'));
       if (kept?.includes(GOING)) throw new Refused(`removed, its star goes from what the browser keeps — it keeps ${kept}`);
       await idle(page);

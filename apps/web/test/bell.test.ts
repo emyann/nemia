@@ -1,13 +1,12 @@
 /**
- * The header's bell (src/lib/bell.ts): the rows of the runs that wait on a person across every factory, in what order, what each waits for
- * and where its row opens; and how its badge says the count. Which runs wait is the api's to say (`bellRows` filters none): the rows are
- * read here over the board's own rule (`waitsOnYou`), which the pages still on the whole list keep. `npm run e2e` presses the bell itself
- * (`392-bell.ts`).
+ * The waiting bar's rows (src/lib/bell.ts): the rows of the runs that wait on a person across every factory, in what order, what each waits
+ * for and where its row opens. Which runs wait is the api's to say (`bellRows` filters none): the rows
+ * are read here over the board's own rule (`waitsOnYou`), which the pages still on the whole list keep.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { RunSummary } from '../src/lib/api.ts';
-import { bellCount, bellHash, bellLabel, bellRows } from '../src/lib/bell.ts';
+import { bellHash, bellRows } from '../src/lib/bell.ts';
 import { waitsOnYou } from '../src/lib/factory.ts';
 
 /** A run of the default factory with a step per name in `steps`, nobody waited on, and `extra` over it. */
@@ -162,15 +161,4 @@ test('a row names its factory: the one the run names, or default for one naming 
     bellRuns([atGate('d'), atGate('n', { factory: 'nemia' })]).map((row) => row.factory),
     ['default', 'nemia'],
   );
-});
-
-test("the bell's badge says nothing for none, the count up to 99, and 99+ past it", () => {
-  assert.deepEqual([0, 7, 99, 100, 120].map(bellCount), ['', '7', '99', '99+', '99+']);
-});
-
-test('REFUSED: the bell says nothing waits on you only once the runs are read; before, or when the read failed, it says no number', () => {
-  assert.equal(bellLabel(2, false), 'Waiting on you: 2');
-  assert.equal(bellLabel(0, false), 'Nothing waits on you');
-  assert.equal(bellLabel(undefined, false), 'Waiting on you', 'the runs not read yet');
-  assert.equal(bellLabel(undefined, true), 'Waiting on you: the runs could not be read');
 });

@@ -29,7 +29,7 @@ const code = (text: string) => <code className="font-mono text-body-small">{text
  * refusal stays where it was listed until dismissed. A refusal is kept by the entry's file, as `cardLines` matches them: a card and a stray
  * file beside it answer to one name, and a refusal is of one of them.
  *
- * Every factory's cards are listed, each tagged with its own, and a card that names none says so; the factory the sidebar picks, kept in
+ * Every factory's cards are listed, each tagged with its own, and a card that names none says so; the factory the top bar picks, kept in
  * the address as `?factory=<name>`, keeps only its own, and is the one the box files into until a person picks another: the counts are of
  * the cards it keeps, and a factory that keeps none says so and how to show every factory's.
  */

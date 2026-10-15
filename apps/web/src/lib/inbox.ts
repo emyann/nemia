@@ -282,7 +282,7 @@ export function capLine(ceilings: Pick<Ceilings, 'cap' | 'inFlight'>, queued: nu
 }
 
 /**
- * The cards of the factory `picked` names that are not yet started, as the sidebar's Inbox badge counts them: each card that reads and no
+ * The cards of the factory `picked` names that are not yet started, as the rail's Inbox badge counts them: each card that reads and no
  * record says was started, queued or not; every factory's while `picked` names none (`shownIn`), as the Inbox page lists them then.
  */
 export const notStarted = (entries: readonly InboxEntry[], picked: string | undefined): InboxEntry[] =>

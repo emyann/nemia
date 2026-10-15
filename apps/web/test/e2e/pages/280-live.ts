@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { fed, photograph, sidebar, themeOf } from '../board.ts';
+import { fed, photograph, sidebar, themeOf, railPlace } from '../board.ts';
 import { expectCount, expectVisible, FEED_STREAM, feedAnswered, idle, Refused, settled } from '../checks.ts';
 import { GATED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -28,9 +28,9 @@ export default {
     const asks = path.join(store!, 'runs', `${id}.asks`);
     if (fs.existsSync(asks))
       throw new Refused(`the store is as seeded before the page approves anything — ${asks} holds ${fs.readdirSync(asks).join(', ')}`);
-    const footer = page.locator('footer[data-feed]');
+    const footer = page.locator('header[data-frame-header] [data-gauges-button][data-feed]');
     await feedAnswered(page);
-    await expectVisible(page.locator('footer[data-feed="open"]'), 'the bottom bar says the feed is followed (data-feed="open")');
+    await expectVisible(footer.and(page.locator('[data-feed="open"]')), 'the gauges button says the feed is followed (data-feed="open")');
     await idle(page);
 
     let streams = 0;
@@ -41,7 +41,7 @@ export default {
       if (pathname === `/api/runs/${id}`) reads += 1;
     });
 
-    await page.locator('[data-sidebar="sidebar"]').getByRole('link', { name: 'Runs' }).click();
+    await railPlace(page, 'Runs').click();
     await page.waitForURL(/\/runs$/);
     await page.locator(`a[href="/runs/${id}"]`).first().click();
     await page.waitForURL(new RegExp(`/runs/${id}$`));
@@ -49,7 +49,9 @@ export default {
     if (streams !== 0)
       throw new Refused(`one stream of the feed a page, kept across a navigation inside the board — ${streams} more opened`);
     if ((await footer.getAttribute('data-feed')) !== 'open')
-      throw new Refused(`the feed is still followed after the navigation — the bottom bar says ${await footer.getAttribute('data-feed')}`);
+      throw new Refused(
+        `the feed is still followed after the navigation — the gauges button says ${await footer.getAttribute('data-feed')}`,
+      );
 
     const gate = page.locator(`section[aria-label="The gate of ${gated}"]`);
     const approve = gate.getByRole('button', { name: 'Approve', exact: true });

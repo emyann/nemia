@@ -7,7 +7,9 @@ import { WaitingCard } from '../components/WaitingCard';
 import { finishedRunsQuery, openRunsQuery } from '../lib/api';
 import { finishedSearch, pageAt } from '../lib/finished';
 import { ink } from '../lib/meaning';
-import { PageName, Plate, ScanLines } from '../components/look';
+import { Plate, ScanLines } from '../components/look';
+import { Button } from '../components/ui/ds';
+import { useBar } from '../lib/useBar';
 
 export const Route = createFileRoute('/runs/')({
   validateSearch: finishedSearch,
@@ -23,12 +25,11 @@ export const Route = createFileRoute('/runs/')({
   errorComponent: Failed,
 });
 
-/** The page's frame, as wide as the window lets it: its name, alone, over the look's ground, then what it holds. */
+/** The page's frame, as wide as the window lets it, over the look's ground: what it holds; the top bar names it. */
 function Page({ state, children }: { state: string; children: ReactNode }) {
   return (
     <ScanLines className="min-h-full px-4 py-6 sm:px-8">
       <article data-runs-page={state} className="mx-auto flex w-full max-w-[1360px] flex-col gap-10">
-        <PageName>Runs</PageName>
         {children}
       </article>
     </ScanLines>
@@ -60,13 +61,30 @@ function Failed({ error }: { error: unknown }) {
   );
 }
 
-/** A section of the page: its plate, alone on its line, then what it holds. */
-function Section({ name, plate, children }: { name: string; plate: ReactNode; children: ReactNode }) {
+/** A section of the page: its plate, alone on its line, then what it holds, and under it what opens more of it (`foot`). */
+function Section({ name, plate, foot, children }: { name: string; plate: ReactNode; foot?: ReactNode; children: ReactNode }) {
   return (
     <section data-section={name} className="flex flex-col gap-4">
       <div className="flex items-center">{plate}</div>
       {children}
+      {foot && <div className="flex">{foot}</div>}
     </section>
+  );
+}
+
+/** The button under the runs that wait on you that opens, and closes, the bar of the runs that wait on you in every factory. */
+function AcrossFactories() {
+  const { open, toggle } = useBar();
+  return (
+    <Button
+      data-waiting-opener
+      variant="outlined"
+      size="small"
+      aria-expanded={open?.kind === 'waiting'}
+      onPress={() => toggle({ kind: 'waiting' })}
+    >
+      Waiting in every factory
+    </Button>
   );
 }
 
@@ -82,8 +100,8 @@ function Nothing({ children }: { children: string }) {
 /**
  * The runs, in three parts, by two reads the api filters by the address' factory: what waits on a person, a card a run and never a
  * row; the runs in flight, a quiet table; and one page of the finished runs, the address' page, newest finished first. Each plate says
- * the api's own count. Every time on the page is a fact to the minute, said against the instant its answer was read at: nothing here
- * counts by itself.
+ * the api's own count, and under what waits a button opens the bar of what waits on you in every factory. Every time on the page
+ * is a fact to the minute, said against the instant its answer was read at: nothing here counts by itself.
  */
 function Runs() {
   const search = Route.useSearch();
@@ -93,7 +111,11 @@ function Runs() {
   const { counts } = open;
   return (
     <Page state="loaded">
-      <Section name="waiting" plate={<Plate count={counts.waiting} title="Waiting on you" quiet={counts.waiting === 0} />}>
+      <Section
+        name="waiting"
+        plate={<Plate count={counts.waiting} title="Waiting on you" quiet={counts.waiting === 0} />}
+        foot={<AcrossFactories />}
+      >
         {open.waiting.length === 0 ? (
           <Nothing>Nothing waits on you.</Nothing>
         ) : (

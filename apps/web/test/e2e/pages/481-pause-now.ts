@@ -9,8 +9,8 @@ import { ENDING, lines } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
-/** The bottom bar's pause: its one button. */
-const pauseOf = (page: Page) => page.locator('footer[data-frame-footer] button[data-pause]');
+/** The top bar's pause: its one button. */
+const pauseOf = (page: Page) => page.locator('header[data-frame-header] button[data-pause]');
 
 /** The pause's popover. */
 const popoverOf = (page: Page) => page.locator('[data-pause-popover]');
@@ -97,7 +97,7 @@ async function confirmOpened(page: Page): Promise<NowRead> {
 
 export default {
   /**
-   * All factories paused at once from the bottom bar, as `wf pause --now --yes` does (`POST /api/pause` with `now`). With a session at
+   * All factories paused at once from the top bar, as `wf pause --now --yes` does (`POST /api/pause` with `now`). With a session at
    * work and a landing at work (LANDING, which the page writes), Pause now…, offered beside Pause… while all factories run, names each
    * run's step it stops — the api's read (`GET /api/pause/now`), which leaves the landing out — and says what that costs. Confirmed, the
    * pause's file holds its why, each step it named is asked to stop on its journal and has the try that continues it beside its run, the

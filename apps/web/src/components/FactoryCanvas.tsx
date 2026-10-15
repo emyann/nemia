@@ -157,7 +157,7 @@ const minimapFill = (node: RunFlowNode) =>
  *
  * The inbox's queued cards of `factory` (`queuedIn`) wait at the floor's left edge, as ghosts, in the order the tick starts them
  * (`QueueLane`), and the header says the run slots taken of the cap the daemon runs with (`CapLine`), said to be this machine's, not the
- * factory's; the daemon and the quota are the frame's bottom bar's (`FrameFooter`). The cap is read again as the runs are, on each run's
+ * factory's; the daemon and the quota are the gauges' (`GaugesBar`). The cap is read again as the runs are, on each run's
  * event of the workflow feed; the queue every 5 s, since the feed carries no card's events: the daemon starts a card when a run slot frees,
  * and nothing on the board asks it to.
  *
@@ -165,7 +165,7 @@ const minimapFill = (node: RunFlowNode) =>
  */
 export function FactoryCanvas({ runs, factory, above }: { runs: readonly RunSummary[]; factory: FactoryPlace; above?: ReactNode }) {
   return (
-    <div className="flex h-[calc(100svh-5rem)] min-h-96 flex-col">
+    <div className="flex h-[calc(100svh-var(--frame-top))] min-h-96 flex-col">
       {above}
       <ReactFlowProvider>
         <Floor runs={runs} factory={factory} />
@@ -233,7 +233,7 @@ const placing = (change: NodeChange<RunFlowNode>): change is NodePositionChange 
  * - The header counts runs in flight, finished, to decide as the CLI's `ls` says them, and waiting on you. A run waiting on you, or to
  *   decide,   is counted finished too, and stays on the floor whatever Show finished says (`floorRuns`); a run at its ending's gate is in
  *   both.   Beside the counts it draws the cap (`CapLine`), and at its right the floor's options (`FloorOptions`).
- * - The floor fills the screen between the root's header and its bottom bar, its frame narrowed by what the bar covers of it
+ * - The floor fills the screen under the root's top bar, its frame narrowed by what the bar covers of it
  *   (`useBarOver`), so the card inspected and every panel over the floor stay clear of the bar. The queue lane sits at its left, and gives
  *   its room to the floor while the bar shows a run, a step, or what is the whole machine's: its gauges or the runs waiting on you. The
  *   floor's buttons wrap to a narrow floor, its hint shows only where the floor is wide enough beside them, and the legend wraps short of

@@ -1,5 +1,5 @@
 /**
- * One word for a wait and for in flight, the api's: the footer and the gauges (`atWork`), a factory's bar (`openBlockOf`) and the bell
+ * One word for a wait and for in flight, the api's: the gauges (`atWork`), a factory's bar (`openBlockOf`) and the waiting bar
  * name the same runs on the same light answer, and no reader of the frame applies the board's own rule for the whole list to it.
  */
 import { test } from 'node:test';
@@ -63,7 +63,14 @@ const wholeListRule = (text: string): string[] => [...text.matchAll(/(?<![.\w'"]
 
 test("REFUSED: no reader of the frame applies the whole list's rule to the light answer", () => {
   const read = (file: string) => fs.readFileSync(path.join(SRC, file), 'utf8');
-  const frame = ['lib/footer.ts', 'lib/bell.ts', 'components/FrameFooter.tsx', 'components/GaugesBar.tsx', 'components/FrameHeader.tsx'];
+  const frame = [
+    'lib/footer.ts',
+    'lib/bell.ts',
+    'components/GaugesButton.tsx',
+    'components/GaugesBar.tsx',
+    'components/FrameHeader.tsx',
+    'components/FrameRail.tsx',
+  ];
   for (const file of [...frame, 'components/FactoryBar.tsx', 'components/WaitingBar.tsx']) {
     assert.deepEqual(wholeListRule(read(file)), [], `${file} reads the api's counts, never inFlight nor waitsOnYou`);
   }

@@ -1,7 +1,7 @@
 /**
- * The frame's floating bar for the runs waiting on you, which the header's bell opens (`FrameHeader`): each run, across every factory, that
- * waits on a person as the api answers it (`bellRows`), oldest first, with its factory and what it waits for, a link to its run's page at
- * its gate. They are the whole machine's, not a page's, so the bar has no Open (`barOpens`).
+ * The frame's floating bar for the runs waiting on you, which the Runs page opens under what waits on you: each run, across every
+ * factory, that waits on a person as the api answers it (`bellRows`), oldest first, with its factory and what it waits for, a link to its
+ * run's page at its gate. They are the whole machine's, not a page's, so the bar has no Open (`barOpens`).
  */
 import { useQuery } from '@tanstack/react-query';
 import { openRunsQuery } from '@/lib/api';
@@ -41,8 +41,8 @@ function WaitingRow({ row }: { row: BellRow }) {
 const countWords = (count: number): string => `${count} ${count === 1 ? 'run' : 'runs'}, across every factory`;
 
 /**
- * The runs waiting on you, read as the bell reads them (`openRunsQuery`): a row each, or a line saying nothing waits on you; a read that
- * failed says so, and one still on its way says that.
+ * The runs waiting on you, read as the rail's count reads them (`openRunsQuery`): a row each, or a line saying nothing waits on you; a read
+ * that failed says so, and one still on its way says that.
  */
 export function WaitingBar() {
   const runs = useQuery(openRunsQuery());

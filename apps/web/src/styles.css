@@ -320,3 +320,32 @@
     transform: translateY(-1.5px) scale(1.04);
   }
 }
+
+/*
+ * The height of the frame's top bar, which a page that fills the window and the floating bar stand under: one line on a window 80rem
+ * wide or more, two under it, where the page's name stands over the factory switcher and the bar's buttons.
+ */
+:root {
+  --frame-top: 5rem;
+}
+
+@media (width < 80rem) {
+  :root {
+    --frame-top: 9rem;
+  }
+}
+
+/*
+ * The rail's counts in the board's meanings, never the kit's red, which on the board is failure: Runs counts what waits on you, in
+ * yours; the Inbox counts cards not started, in rest. Each destination is found by the name the kit gives it, its label then its
+ * badge's words.
+ */
+[data-frame-rail] [data-slot='navigation-rail-item'][aria-label^='Runs,'] [data-slot='badge'] {
+  background-color: var(--meaning-yours);
+  color: var(--meaning-on-yours);
+}
+
+[data-frame-rail] [data-slot='navigation-rail-item'][aria-label^='Inbox,'] [data-slot='badge'] {
+  background-color: var(--meaning-rest);
+  color: var(--meaning-on-rest);
+}

@@ -1,7 +1,7 @@
 /**
- * The frame's floating bar for the machine's gauges, which the bottom bar opens (`FrameFooter`): each of its facts whole — whether a daemon
- * ticks the store and how to start one (`DaemonLine`), whether the board follows the feed, what is at work, the quota (`QuotaLine`) and the
- * version. They are the machine's, not a page's, so the bar has no Open (`barOpens`).
+ * The frame's floating bar for the machine's gauges, which the top bar's gauges button opens (`GaugesButton`): each of its facts whole —
+ * whether a daemon ticks the store and how to start one (`DaemonLine`), whether the board follows the feed, what is at work, the quota
+ * (`QuotaLine`) and the version. They are the machine's, not a page's, so the bar has no Open (`barOpens`).
  */
 import type { ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -23,7 +23,7 @@ function Gauge({ name, children }: { name: string; children: ReactNode }) {
 }
 
 /**
- * The gauges, read as the bottom bar reads them: the daemon's sentence while nothing ticks the store, else the api's line for the daemon
+ * The gauges, read as the gauges button reads them: the daemon's sentence while nothing ticks the store, else the api's line for the daemon
  * that does; `feed` in words; the runs and sessions at work; the quota as the floor said it; and the version. A read that failed says so.
  */
 export function GaugesBar({ feed }: { feed: FeedStatus }) {

@@ -1,6 +1,6 @@
 /**
- * The frame's bottom bar (src/lib/footer.ts): what is at work, the daemon's dot, the feed's word, the quota's short form, the groups a
- * phone keeps; and no page left at the frame's height before the bar. `npm run e2e` looks at the bar itself (`389-bottom-bar.ts`).
+ * The machine's gauges (src/lib/footer.ts): what is at work, the daemon's dot, the feed's word, the quota's short form; and no page left
+ * at the frame's height of the old header. `npm run e2e` looks at the gauges button itself (`389-gauges-button.ts`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { QuotaWindow, RunSummary } from '../src/lib/api.ts';
 import { listed, waitingRun } from './run-fixtures.ts';
-import { atWork, atWorkWords, daemonDot, feedWords, footerParts, quotaShort, staleFrameHeights, versionWords } from '../src/lib/footer.ts';
+import { atWork, atWorkWords, daemonDot, feedWords, quotaShort, staleFrameHeights, versionWords } from '../src/lib/footer.ts';
 import { daemon, quota } from './factory-fixtures.ts';
 
 const NOW = new Date('2026-09-30T05:10:00.000Z');
@@ -216,11 +216,6 @@ test('the quota, short: a read that failed is a word, not a throw', () => {
   assert.equal(short.title, 'The quota could not be read: the api answered 500');
 });
 
-test('the groups: a phone keeps exactly the daemon, the pause and the quota; a wide screen all six, the pause after the daemon', () => {
-  assert.deepEqual(footerParts(true), ['daemon', 'pause', 'quota']);
-  assert.deepEqual(footerParts(false), ['daemon', 'pause', 'feed', 'work', 'quota', 'version']);
-});
-
 /** Every `.tsx` under `src`, by its path from the app. */
 const sources = (dir: string): string[] =>
   fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -235,10 +230,10 @@ test('the frame height: REFUSED, a page still at the screen less the header alon
   assert.equal(staleFrameHeights('h-[calc(100svh-5rem)]').length, 0);
 });
 
-test('the frame height: no page under the bottom bar is the screen less the header alone', () => {
+test('the frame height: no page under the top bar is the screen less the old header', () => {
   const app = path.join(import.meta.dirname, '..');
   const stale = sources(path.join(app, 'src')).filter((file) => staleFrameHeights(fs.readFileSync(file, 'utf8')).length > 0);
-  assert.equal(stale.length, 0, `less the header and the bottom bar, 100svh-5rem: ${stale.map((f) => path.relative(app, f)).join(', ')}`);
+  assert.equal(stale.length, 0, `less the top bar, 100svh-var(--frame-top): ${stale.map((f) => path.relative(app, f)).join(', ')}`);
 });
 
 test("the version says the code serving the board: an install's tag, or checkout, and the folder in its hover; the version alone without", () => {

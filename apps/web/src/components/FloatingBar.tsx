@@ -1,6 +1,6 @@
 /**
- * The frame's floating bar: a panel at the right of every page, between the header and the bottom bar, over the page, so the page keeps its
- * whole width and the bottom bar stays in view. It is as wide as this browser keeps it (`useBarWidth`), resized by dragging its left edge
+ * The frame's floating bar: a panel at the right of every page, under the top bar to the window's foot, over the page, so the page keeps
+ * its whole width and the top bar stays in view. It is as wide as this browser keeps it (`useBarWidth`), resized by dragging its left edge
  * or with the arrow keys on it, and the whole width of a narrow screen. Its Close button and Escape close it (`useBar`), and closing it
  * gives the focus back to what held it before. Beside Close, its Open button visits the page of what it shows, for everything that has one
  * (`barOpens`), read in the place the page under it is read in, the address's `factory` and `repo`.
@@ -144,7 +144,7 @@ export function FloatingBar({
       data-floating-bar
       data-bar={open ? barValue(open) : undefined}
       style={narrow ? undefined : { width }}
-      className={`fixed top-12 right-0 bottom-8 z-40 flex flex-col bg-popover text-body-medium text-popover-foreground shadow-lg outline-none ${narrow ? 'left-0' : 'border-l'}`}
+      className={`fixed top-(--frame-top) right-0 bottom-0 z-40 flex flex-col bg-popover text-body-medium text-popover-foreground shadow-lg outline-none ${narrow ? 'left-0' : 'border-l'}`}
     >
       {!narrow && <ResizeEdge width={width} most={most} onWidth={setWidth} />}
       <div className="flex items-start gap-2 border-b p-4">

@@ -6,7 +6,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { waitingRun } from './run-fixtures.ts';
+import { listed, summary } from './run-fixtures.ts';
 import './tsx.ts';
 
 const { createElement } = await import('react');
@@ -34,7 +34,6 @@ type StepReach = import('../src/lib/api.ts').StepReach;
 type ReadOnlyCommands = import('../src/lib/api.ts').ReadOnlyCommands;
 type GraphEdge = import('../src/lib/api.ts').GraphEdge;
 type RunSummary = import('../src/lib/api.ts').RunSummary;
-type OpenRuns = import('../src/lib/api.ts').OpenRuns;
 type StepUsed = import('../src/lib/api.ts').StepUsed;
 type Decidable = import('../src/lib/api.ts').Decidable;
 type StepLayers = import('../src/lib/api.ts').StepLayers;
@@ -5669,63 +5668,6 @@ test("the bar for a workflow's step says what it runs on, its keys as its node l
   assert.doesNotMatch(missing, /data-runs-on/, missing);
 });
 
-/** The rail at `path`, inside the sidebar it sits in and a router: each of its places is a route link. */
-async function railAt(path: string): Promise<string> {
-  const { FrameRail } = await import('../src/components/FrameRail.tsx');
-  const { SidebarProvider } = await import('../src/components/ui/sidebar.tsx');
-  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
-  return routedWith(createElement(SidebarProvider, { children: createElement(FrameRail, { path }) }));
-}
-
-/** The rail's links, in their order: each one's `href`, its name and whether it is lit. */
-const railLinks = (html: string) =>
-  [...(/<nav aria-label="Places"[^>]*>([\s\S]*)<\/nav>/.exec(html)?.[1] ?? '').matchAll(/<a\b[^>]*>/g)].map(([tag]) => ({
-    href: /href="([^"]*)"/.exec(tag)?.[1],
-    name: /aria-label="([^"]*)"/.exec(tag)?.[1],
-    lit: /data-active="true"/.test(tag),
-  }));
-
-/** The rail's places that are pushed to its foot: each item's link name, where the item takes the room above it (`mt-auto`). */
-const railFoot = (html: string) =>
-  (/<nav aria-label="Places"[^>]*>([\s\S]*)<\/nav>/.exec(html)?.[1] ?? '')
-    .split(/(?=<li\b)/)
-    .filter((item) => /^<li\b[^>]*\bmt-auto\b/.test(item))
-    .map((item) => /aria-label="([^"]*)"/.exec(item)?.[1]);
-
-test("no place sits at the rail's foot: its places stand in one column from the top", async () => {
-  assert.equal(railFoot(await railAt('/agents')).length, 0);
-});
-
-test("the rail is a nav of the four places, each a link named for a screen reader, and only the page's own is lit", async () => {
-  assert.deepEqual(railLinks(await railAt('/agents')), [
-    { href: '/', name: 'Home', lit: false },
-    { href: '/agents', name: 'Agents', lit: true },
-    { href: '/machines', name: 'Machines &amp; Capabilities', lit: false },
-    { href: '/settings', name: 'Settings', lit: false },
-  ]);
-  for (const path of ['/machines', '/capabilities'])
-    assert.deepEqual(
-      railLinks(await railAt(path)).map((link) => link.lit),
-      [false, false, true, false],
-      `Machines & Capabilities, and it alone, is lit on its tab ${path}`,
-    );
-  assert.deepEqual(
-    railLinks(await railAt('/machinesx')).filter((link) => link.lit),
-    [],
-    "refused: a path that only begins with a place's name lights nothing",
-  );
-  assert.deepEqual(
-    railLinks(await railAt('/factories/nemia')).map((link) => link.lit),
-    [true, false, false, false],
-    "a factory's floor lights Home",
-  );
-  assert.deepEqual(
-    railLinks(await railAt('/settings')).map((link) => link.lit),
-    [false, false, false, true],
-    'Settings, and it alone, is lit on its page',
-  );
-});
-
 /** The frame's tab strip at `path`, inside a router, around a page that reads `the page`. */
 async function frameTabsAt(path: string): Promise<string> {
   const { FrameTabs } = await import('../src/components/FrameTabs.tsx');
@@ -5744,14 +5686,11 @@ const tabsIn = (html: string) =>
     }),
   );
 
-test("a tab's page is drawn under a strip of its place's tabs, each a link to its own address, its own alone selected", async () => {
+test("a tab's page is drawn under the strip of Settings' tabs, each a link to its own address, its own alone selected", async () => {
   const html = await frameTabsAt('/capabilities');
-  assert.match(
-    html,
-    /role="tablist"[^>]*aria-label="Machines &amp; Capabilities"|aria-label="Machines &amp; Capabilities"[^>]*role="tablist"/,
-    html,
-  );
+  assert.match(html, /role="tablist"[^>]*aria-label="Settings"|aria-label="Settings"[^>]*role="tablist"/, html);
   assert.deepEqual(tabsIn(html), [
+    { tag: 'a', href: '/settings', name: 'Settings', selected: false },
     { tag: 'a', href: '/machines', name: 'Machines', selected: false },
     { tag: 'a', href: '/capabilities', name: 'Capabilities', selected: true },
   ]);
@@ -5775,7 +5714,7 @@ test('a page with one view draws no strip: its page bare', async () => {
   }
 });
 
-/** A factory as the api lists it, for the sidebar: on one repository, offering one workflow; `extra` puts keys over it. */
+/** A factory as the api lists it, for the switcher: on one repository, offering one workflow; `extra` puts keys over it. */
 const filed = (name: string, extra: Partial<import('../src/lib/api.ts').Factory> = {}): import('../src/lib/api.ts').Factory => ({
   name,
   default: false,
@@ -5794,124 +5733,6 @@ const filed = (name: string, extra: Partial<import('../src/lib/api.ts').Factory>
   untrusted: [],
   template: null,
   ...extra,
-});
-
-/**
- * The frame's sidebar at `path` with `search`, in the provider it sits in, as a loaded page, the factories `factories` read, the inbox
- * `inbox` and no run.
- */
-async function sidebarAt(
-  path: string,
-  search: Record<string, unknown>,
-  factories = [filed('nemia')],
-  inbox: import('../src/lib/api.ts').InboxEntry[] = [],
-): Promise<string> {
-  const { FrameSidebar } = await import('../src/components/FrameSidebar.tsx');
-  const { SidebarProvider } = await import('../src/components/ui/sidebar.tsx');
-  return pagedWith(
-    // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
-    createElement(SidebarProvider, { children: createElement(FrameSidebar, { path, search }) }),
-    [
-      [['factories'], factories],
-      [['runs-open'], { counts: { waiting: 0, inFlight: 0, finished: 0 }, waiting: [], inFlight: [] }],
-      [['inbox'], inbox],
-    ],
-  );
-}
-
-/** The sidebar's sections, in their order: each one's label, `href` and whether it is lit. */
-const sectionLinks = (html: string) =>
-  [...(/<ul[^>]*aria-label="Sections"[^>]*>([\s\S]*?)<\/ul>/.exec(html)?.[1] ?? '').matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/g)].map(
-    ([, tag, body]) => ({
-      label: /<span>([^<]*)<\/span>/.exec(body)?.[1],
-      href: /href="([^"]*)"/.exec(tag)?.[1]?.replaceAll('&amp;', '&'),
-      lit: /data-active="true"/.test(tag),
-    }),
-  );
-
-test("REFUSED: the sidebar's sections carry the factory the address picks, the Floor first to its floor; under All factories none carries one, and there is no Floor", async () => {
-  assert.deepEqual(sectionLinks(await sidebarAt('/runs', { factory: 'nemia' })), [
-    { label: 'Floor', href: '/factories/nemia', lit: false },
-    { label: 'Inbox', href: '/inbox?factory=nemia', lit: false },
-    { label: 'Runs', href: '/runs?factory=nemia', lit: true },
-    { label: 'Workflows', href: '/workflows?factory=nemia', lit: false },
-  ]);
-  assert.deepEqual(
-    (await sidebarAt('/factories/nemia', {})).match(/data-factory-picker[\s\S]*?<\/button>/)?.[0].includes('>nemia<'),
-    true,
-    "a floor's picker reads its factory",
-  );
-  for (const [path, search] of [
-    ['/runs', {}],
-    ['/runs/r-1', { factory: 'nemia' }],
-  ] as const) {
-    const links = sectionLinks(await sidebarAt(path, search));
-    assert.deepEqual(
-      links.map((link) => link.label),
-      ['Inbox', 'Runs', 'Workflows'],
-      `${path}: no Floor under All factories`,
-    );
-    assert.equal(links.filter((link) => link.href?.includes('factory=')).length, 0, `${path}: no section carries a factory`);
-    assert.match(await sidebarAt(path, search), /data-factory-picker[\s\S]*?All factories[\s\S]*?<\/button>/);
-  }
-});
-
-test('the sidebar starts a run in the factory picked, or in none yet under All factories, and none in a factory that starts none; favourites none yet says so', async () => {
-  const start = (html: string) => html.match(/<button[^>]*>(?:(?!<\/button>)[\s\S])*Start a run<\/button>/)?.[0];
-  assert.ok(start(await sidebarAt('/runs', {})), 'under All factories');
-  assert.ok(start(await sidebarAt('/factories/nemia', {})), 'in nemia');
-  const defaults = [filed('default', { default: true, workflows: null }), filed('nemia')];
-  assert.equal(start(await sidebarAt('/factories/default', {}, defaults)), undefined, 'refused: the default factory starts none here');
-  assert.equal(start(await sidebarAt('/factories/gone', {})), undefined, 'refused: a factory the api lists by no such name');
-  const html = await sidebarAt('/runs', {});
-  assert.match(html, /data-favorites[\s\S]*Favorites[\s\S]*Nothing starred yet\./);
-});
-
-test('a favourite run links to its page by its title, and a workflow to its own page, yours said so, each with its unstar', async () => {
-  const { FavoriteLinks } = await import('../src/components/FrameSidebar.tsx');
-  const { SidebarProvider } = await import('../src/components/ui/sidebar.tsx');
-  const rows = [
-    { favorite: { kind: 'run' as const, run: 'r-1' }, title: 'Star the runs', gone: false },
-    { favorite: { kind: 'workflow' as const, from: 'yours' as const, workflow: 'dev' }, title: 'dev', gone: false },
-    { favorite: { kind: 'workflow' as const, from: 'repo' as const, workflow: 'build' }, title: 'build', gone: false },
-  ];
-  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
-  const html = await routedWith(createElement(SidebarProvider, { children: createElement(FavoriteLinks, { rows }) }));
-  assert.deepEqual(
-    [...html.matchAll(/<a\b[^>]*href="([^"]*)"/g)].map((m) => m[1]),
-    ['/runs/r-1', '/workflows/yours/dev', '/workflows/repo/build'],
-  );
-  assert.match(html, /<li[^>]*title="r-1"[^>]*>[\s\S]*?>Star the runs<\/span>/, 'a run reads its title, its id on hover');
-  assert.match(html, />dev<span[^>]*> \(yours\)<\/span>/);
-  assert.doesNotMatch(html, /build<span[^>]*> \(yours\)/);
-  assert.deepEqual(
-    [...html.matchAll(/aria-label="(Unstar [^"]*)"/g)].map((m) => m[1]),
-    ['Unstar Star the runs', 'Unstar dev (yours)', 'Unstar build'],
-  );
-  assert.doesNotMatch(html, /Nothing starred yet|data-gone/);
-});
-
-test('REFUSED: a favourite the api no longer lists is said gone, by its id or name, linking nowhere, its unstar always shown', async () => {
-  const { FavoriteLinks } = await import('../src/components/FrameSidebar.tsx');
-  const { SidebarProvider } = await import('../src/components/ui/sidebar.tsx');
-  const rows = [
-    { favorite: { kind: 'run' as const, run: 'r-1' }, title: 'Star the runs', gone: false },
-    { favorite: { kind: 'run' as const, run: 'r-9' }, title: 'r-9', gone: true },
-    { favorite: { kind: 'workflow' as const, from: 'yours' as const, workflow: 'flow' }, title: 'flow', gone: true },
-  ];
-  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
-  const html = await routedWith(createElement(SidebarProvider, { children: createElement(FavoriteLinks, { rows }) }));
-  assert.deepEqual(
-    [...html.matchAll(/<a\b[^>]*href="([^"]*)"/g)].map((m) => m[1]),
-    ['/runs/r-1'],
-    'a gone favourite links nowhere',
-  );
-  const gone = [...html.matchAll(/<li[^>]*data-gone="true"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => m[0]);
-  assert.equal(gone.length, 2);
-  assert.match(gone[0], /title="r-9: the api no longer lists it"[\s\S]*>r-9<\/span><span[^>]*>gone<\/span>/);
-  assert.match(gone[1], />flow \(yours\)<\/span><span[^>]*>gone<\/span>[\s\S]*aria-label="Unstar flow \(yours\)"/);
-  for (const row of gone) assert.doesNotMatch(row, /md:opacity-0/, 'its unstar is shown without a hover');
-  assert.match(html, /<li[^>]*title="r-1"[\s\S]*?md:opacity-0[\s\S]*?<\/li>/, 'a live one shows its unstar on hover');
 });
 
 test('REFUSED: the star is a toggle named Star and its name, pressed only while this browser keeps its favourite', async () => {
@@ -5995,24 +5816,29 @@ test("REFUSED: the picker offers only All factories until the default's light an
   );
 });
 
-test("a factory in the picker reads its repositories by their folders' names, whole in the tooltip, and why its file does not read", async () => {
-  const { FactoryItemBody } = await import('../src/components/FactoryPicker.tsx');
-  const broken = filed('nemia', { repos: ['/code/nemia', '/code/web'], error: '/wf/factories/nemia.json is not JSON' });
-  const html = renderToStaticMarkup(createElement(FactoryItemBody, { item: { name: 'nemia', factory: broken } }));
-  assert.match(html, /data-factory="nemia"/);
-  assert.match(html, /title="\/code\/nemia\n\/code\/web"[^>]*>on nemia, web</);
-  assert.match(html, /data-error[^>]*>Its file does not read: \/wf\/factories\/nemia\.json is not JSON</);
-  const gone = renderToStaticMarkup(createElement(FactoryItemBody, { item: { name: 'gone' } }));
-  assert.match(gone, />no such factory</);
-  assert.doesNotMatch(gone, /data-error/);
-});
-
-test("REFUSED: the picker's trigger holds the picked factory's repositories whole and why its file does not read, and none under All factories", async () => {
-  const broken = filed('nemia', { repos: ['/code/nemia', '/code/web'], error: '/wf/factories/nemia.json is not JSON' });
-  const trigger = (html: string) => /data-factory-picker[\s\S]*?<button[\s\S]*?<\/button>/.exec(html)![0];
-  const picked = trigger(await sidebarAt('/factories/nemia', {}, [broken]));
-  assert.match(picked, /title="\/code\/nemia\n\/code\/web\nIts file does not read: \/wf\/factories\/nemia\.json is not JSON"/);
-  assert.doesNotMatch(trigger(await sidebarAt('/runs', {}, [broken])), /title=/);
+test("a factory in the switcher says its runs in flight, every factory's said as runs; a name no factory has, or a file that does not read, says so", async () => {
+  const { inFlightWords, supportOf } = await import('../src/components/FactoryPicker.tsx');
+  assert.equal(inFlightWords(0, true), 'none in flight');
+  assert.equal(inFlightWords(1, true), '1 run in flight');
+  assert.equal(inFlightWords(5, true), '5 runs in flight');
+  assert.equal(inFlightWords(4, false), '4 in flight');
+  const moving = (id: string, factory: string | null) => listed(summary([['build', 'checking']], { id, factory }));
+  const open = {
+    asOf: at,
+    counts: { waiting: 0, inFlight: 3, finished: 0 },
+    waiting: [],
+    inFlight: [moving('a', 'nemia'), moving('b', 'nemia'), moving('c', null)],
+  };
+  assert.equal(supportOf({ name: 'nemia', factory: filed('nemia') }, open), '2 in flight');
+  assert.equal(
+    supportOf({ name: 'default', factory: filed('default', { default: true }) }, open),
+    '1 in flight',
+    "a run naming none is the default's",
+  );
+  assert.equal(supportOf({ name: 'quay', factory: filed('quay') }, open), 'none in flight');
+  assert.equal(supportOf({ name: 'quay', factory: filed('quay') }, undefined), undefined, 'nothing before the light answer is read');
+  assert.equal(supportOf({ name: 'gone' }, open), 'no such factory');
+  assert.equal(supportOf({ name: 'quay', factory: filed('quay', { error: 'not JSON' }) }, open), 'its file does not read');
 });
 
 test('REFUSED: the start in no factory yet offers each factory a run starts in, the default left out, one that cannot start saying why', async () => {
@@ -6032,121 +5858,6 @@ test('REFUSED: the start in no factory yet offers each factory a run starts in, 
   assert.equal([...html.matchAll(/<button[^>]*>(nemia|quay)<\/button>/g)].length, 2, 'each factory a button, which a press picks');
   assert.doesNotMatch(html, /type="radio"/, 'refused: a radio, which an arrow key checks, and so picks, while moving past it');
   assert.match(await pagedWith(createElement(FactoryChoice, { factories: [factories[0]] })), /No factory is filed to start a run in/);
-});
-
-/** A card of the inbox in `factory` (none for the default factory's), not started, and `extra` over it. */
-const card = (name: string, factory: string | null, extra: Partial<import('../src/lib/api.ts').InboxEntry> = {}) => ({
-  name,
-  file: `${name}.md`,
-  title: name,
-  workflow: 'build',
-  repo: null,
-  factory,
-  startedAs: [],
-  from: [],
-  error: null,
-  body: name,
-  filedAt: null,
-  ...extra,
-});
-
-/** The sidebar's Inbox item, its `<li>` whole. */
-const inboxItem = (html: string): string =>
-  /<li[^>]*>(?:(?!<\/li>)[\s\S])*?href="\/inbox[^"]*"[\s\S]*?<\/li>/.exec(
-    /<ul[^>]*aria-label="Sections"[^>]*>([\s\S]*?)<\/ul>/.exec(html)?.[1] ?? '',
-  )?.[0] ?? '';
-
-test("REFUSED: the Inbox's badge counts the picked factory's cards not yet started, every factory's under All factories, beside its link and not in it", async () => {
-  const inbox = [
-    card('one', 'nemia'),
-    card('two', 'nemia', { queued: { at: at, place: 1 } }),
-    card('started', 'nemia', { startedAs: ['r-1'] }),
-    card('hire', 'hiring'),
-    card('broken', 'nemia', { error: 'the card has no front matter' }),
-  ];
-  const badge = (html: string) => /<div[^>]*data-inbox-badge[^>]*>[\s\S]*?<\/div>/.exec(inboxItem(html))?.[0];
-  const nemia = await sidebarAt('/runs', { factory: 'nemia' }, [filed('nemia')], inbox);
-  assert.match(badge(nemia) ?? '', />2<span class="sr-only"> 2 cards not yet started, in nemia<\/span>/);
-  assert.match(inboxItem(nemia), /^<li[^>]*title="2 cards not yet started, in nemia"/, 'said whole on hover over the Inbox');
-  assert.doesNotMatch(badge(nemia) ?? '', /pointer-events-auto/, 'a press on the count reaches the link beneath it');
-  assert.doesNotMatch(/<a\b[\s\S]*?<\/a>/.exec(inboxItem(nemia))?.[0] ?? '', /data-inbox-badge/, 'the badge is not inside the link');
-  const all = await sidebarAt('/runs', {}, [filed('nemia')], inbox);
-  assert.match(badge(all) ?? '', />3</);
-  assert.match(inboxItem(all), /^<li[^>]*title="3 cards not yet started, in every factory"/);
-  assert.equal(badge(await sidebarAt('/runs', { factory: 'quay' }, [filed('nemia')], inbox)), undefined, 'none for none');
-  assert.equal(badge(await sidebarAt('/runs', {}, [filed('nemia')], [card('started', 'nemia', { startedAs: ['r-1'] })])), undefined);
-  assert.deepEqual(
-    sectionLinks(nemia).map((link) => link.label),
-    ['Floor', 'Inbox', 'Runs', 'Workflows'],
-    'each link still reads its section alone',
-  );
-  assert.equal([...nemia.matchAll(/data-inbox-badge/g)].length, 1, 'on the Inbox alone');
-});
-
-/** The light answer holding `waiting`, which it counts unless `counted` says another number, and nothing in flight or finished. */
-const openWith = (waiting: RunSummary[], counted = waiting.length): OpenRuns => ({
-  asOf: '2026-10-12T12:00:00.000Z',
-  counts: { waiting: counted, inFlight: 0, finished: 0 },
-  waiting: waiting.map((row) => waitingRun(row)),
-  inFlight: [],
-});
-
-/** The header with the section Floor, the factories read and the light answer `open`, or not read yet for none; the whole list never. */
-async function headerWith(open?: OpenRuns): Promise<string> {
-  const { FrameHeader } = await import('../src/components/FrameHeader.tsx');
-  const { SidebarProvider } = await import('../src/components/ui/sidebar.tsx');
-  return pagedWith(
-    // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
-    createElement(SidebarProvider, { children: createElement(FrameHeader, { section: 'Floor' }) }),
-    open
-      ? [
-          [['factories'], [filed('nemia')]],
-          [['runs-open'], open],
-        ]
-      : [[['factories'], [filed('nemia')]]],
-  );
-}
-
-/** The bell's button in `html`, whole. */
-const bellOf = (html: string) => /<button[^>]*data-bell[^>]*>[\s\S]*?<\/button>/.exec(html)?.[0] ?? '';
-
-test("REFUSED: the header's bell counts the runs waiting on you, named in full; with none it says so and draws no count", async () => {
-  const waits = summaryRun();
-  const two = await headerWith(openWith([waits, { ...waits, id: 'r-2', factory: 'nemia' }]));
-  assert.match(bellOf(two), /aria-label="Waiting on you: 2"/);
-  assert.match(bellOf(two), /aria-expanded="false"/);
-  assert.doesNotMatch(bellOf(two), / disabled=""|data-disabled/, 'the bell is pressed, not drawn disabled');
-  assert.match(bellOf(two), /data-bell-count[^>]*>2<\/span>/);
-  const none = await headerWith(openWith([]));
-  assert.match(bellOf(none), /aria-label="Nothing waits on you"/);
-  assert.doesNotMatch(bellOf(none), /data-bell-count/);
-  const unread = bellOf(await headerWith());
-  assert.match(unread, /aria-label="Waiting on you"/, 'before the runs are read, the bell says no number');
-  assert.doesNotMatch(unread, /data-bell-count/);
-});
-
-test('REFUSED: the bell counts what the api says waits, never a count of its own over the rows', async () => {
-  const atGate = summaryRun();
-  const blocked = { ...atGate, id: 'r-blocked', status: 'blocked' as const, onYou: [] };
-  const movesAndWaits = { ...atGate, id: 'r-moves', status: 'running' as const, moving: true };
-  const waiting = [atGate, blocked, movesAndWaits];
-  const three = await headerWith({ ...openWith(waiting), counts: { waiting: 3, inFlight: 0, finished: 1 } });
-  assert.match(
-    bellOf(three),
-    /aria-label="Waiting on you: 3"/,
-    'a gate, a blocked step and a run that moves and waits; not the run to decide',
-  );
-  assert.match(bellOf(three), /data-bell-count[^>]*>3<\/span>/);
-  const five = await headerWith(openWith(waiting, 5));
-  assert.match(bellOf(five), /aria-label="Waiting on you: 5"/, "the api's count, not the rows the board would count");
-  const called = await headerWith(openWith([{ ...atGate, cancelledAt: at }]));
-  assert.match(bellOf(called), /aria-label="Waiting on you: 1"/, "a row the board's own rule would drop is counted all the same");
-});
-
-test("the header reads the section's name alone: a floor reads Floor, with no factory's crumb and no start of a run", async () => {
-  const html = await headerWith(openWith([]));
-  assert.match(html, /<span class="text-body-medium font-medium">Floor<\/span>/);
-  assert.doesNotMatch(html, /Start a run|aria-label="Factory"|<h1/);
 });
 
 /** The layers of a step whose agent `writer` was given `alpha` and the person's words, its line adding `gamma`, told in its prompt. */

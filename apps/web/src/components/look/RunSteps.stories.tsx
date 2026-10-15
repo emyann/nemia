@@ -21,7 +21,7 @@ export const AtItsGate: StoryObj = { render: () => <Rail steps={GATE} /> };
 /** A run whose steps are done: each filled, whether a check says so or the step's own word does. */
 export const Done: StoryObj = { render: () => <Rail steps={DONE} /> };
 
-/** A run at work: the step at work filled and lit in its hue. */
+/** A run at work: the step at work filled in its hue, its glow breathing, still where reduced motion is asked for. */
 export const AtWork: StoryObj = { render: () => <Rail steps={AT_WORK} /> };
 
 /** A run whose step its check refused. */

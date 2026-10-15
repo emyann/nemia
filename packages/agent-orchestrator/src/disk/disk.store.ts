@@ -5,24 +5,27 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { HOME } from '../record/record.store.ts';
-import { partOf, PER_RUN, type DiskPart, type DiskRoot } from './disk.ts';
+import { kindAt, partOf, PER_RUN, type DiskPart, type DiskRoot } from './disk.ts';
 
 /** The bytes a block of `lstat` counts, whatever the file system's own block is. */
 const BLOCK = 512;
 
-/** A folder counted for itself alone, as a root of `part`: its own blocks, the names under it left to roots of their own. */
-const alone = (part: DiskPart, at: string): DiskRoot => ({ part, path: at, own: fs.lstatSync(at).blocks * BLOCK });
+/**
+ * A folder counted for itself alone, as a root of `part` of its kind (`kindAt`): its own blocks, the names under it left to roots of
+ * their own.
+ */
+const alone = (part: DiskPart, at: string): DiskRoot => ({ part, kind: kindAt(part), path: at, own: fs.lstatSync(at).blocks * BLOCK });
 
 /**
- * The roots of a part kept by run, whose folder is `at`: the folder alone, and each name under it a root of its own, by its name. The
- * folder whole as one root where it does not list, so a walk says what did not read of it.
+ * The roots of a part kept by run, whose folder is `at`: the folder alone, and each name under it a root of its own, by its name and
+ * of its kind (`kindAt`). The folder whole as one root where it does not list, so a walk says what did not read of it.
  */
 function runRoots(part: DiskPart, at: string): DiskRoot[] {
   try {
     const names = fs.readdirSync(at);
-    return [alone(part, at), ...names.map((name): DiskRoot => ({ part, name, path: path.join(at, name) }))];
+    return [alone(part, at), ...names.map((name): DiskRoot => ({ part, kind: kindAt(part, name), name, path: path.join(at, name) }))];
   } catch {
-    return [{ part, path: at }];
+    return [{ part, kind: kindAt(part), path: at }];
   }
 }
 
@@ -41,7 +44,7 @@ export function storeRoots(): DiskRoot[] {
     ...names.flatMap((name): DiskRoot[] => {
       const part = partOf(name);
       const at = path.join(HOME, name);
-      return PER_RUN.includes(part) ? runRoots(part, at) : [{ part, path: at }];
+      return PER_RUN.includes(part) ? runRoots(part, at) : [{ part, kind: kindAt(part), path: at }];
     }),
   ];
 }

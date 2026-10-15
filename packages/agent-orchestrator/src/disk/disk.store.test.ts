@@ -28,6 +28,7 @@ test('REFUSED: a store whose root does not list has no roots, and says so', () =
 test('the roots are the store itself alone, each name under it by its part, and each name under a part kept by run', () => {
   file('runs', 'a', 'artifacts', 'p.png');
   file('runs', 'a.json');
+  file('runs', 'a.asks', 'approve-land-1');
   file('worktrees', 'a', 'design', 'f');
   file('engine', 'runs', 'deep');
   file('checks', 'a-work-check.stdout');
@@ -38,17 +39,18 @@ test('the roots are the store itself alone, each name under it by its part, and 
   const roots = storeRoots().map((root) => ({ ...root, path: path.relative(ROOT, root.path) }));
   const sorted = roots.sort((x, y) => x.path.localeCompare(y.path));
   assert.deepEqual(sorted, [
-    { part: 'other', path: '', own: held() },
-    { part: 'checks', path: 'checks' },
-    { part: 'engine', path: 'engine' },
-    { part: 'other', path: 'feed.jsonl' },
-    { part: 'other', path: 'inbox' },
-    { part: 'series', path: 'metrics' },
-    { part: 'runs', path: 'runs', own: held('runs') },
-    { part: 'runs', name: 'a', path: 'runs/a' },
-    { part: 'runs', name: 'a.json', path: 'runs/a.json' },
-    { part: 'worktrees', path: 'worktrees', own: held('worktrees') },
-    { part: 'worktrees', name: 'a', path: 'worktrees/a' },
+    { part: 'other', kind: 'other', path: '', own: held() },
+    { part: 'checks', kind: 'checks', path: 'checks' },
+    { part: 'engine', kind: 'engine-other', path: 'engine' },
+    { part: 'other', kind: 'other', path: 'feed.jsonl' },
+    { part: 'other', kind: 'other', path: 'inbox' },
+    { part: 'series', kind: 'series', path: 'metrics' },
+    { part: 'runs', kind: 'runs-other', path: 'runs', own: held('runs') },
+    { part: 'runs', kind: 'runs-other', name: 'a', path: 'runs/a' },
+    { part: 'runs', kind: 'marks', name: 'a.asks', path: 'runs/a.asks' },
+    { part: 'runs', kind: 'records', name: 'a.json', path: 'runs/a.json' },
+    { part: 'worktrees', kind: 'checkout', path: 'worktrees', own: held('worktrees') },
+    { part: 'worktrees', kind: 'checkout', name: 'a', path: 'worktrees/a' },
   ]);
 });
 
@@ -57,7 +59,7 @@ test('a part kept by run that does not list is one root whole, for the walk to s
   fs.writeFileSync(path.join(ROOT, 'worktrees'), 'no folder');
   assert.deepEqual(
     storeRoots().filter((root) => root.part === 'worktrees'),
-    [{ part: 'worktrees', path: path.join(ROOT, 'worktrees') }],
+    [{ part: 'worktrees', kind: 'checkout', path: path.join(ROOT, 'worktrees') }],
   );
 });
 

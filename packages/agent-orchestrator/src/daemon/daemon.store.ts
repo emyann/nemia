@@ -37,7 +37,7 @@ import {
   type Monotonic,
 } from './daemon.ts';
 import { Conflict } from '../refusal/refusal.ts';
-import { DISK_PARTS } from '../disk/disk.ts';
+import { ALL_KINDS, DISK_PARTS } from '../disk/disk.ts';
 
 /** The text as JSON, or undefined where it is not: a file half written, or another program's. */
 const jsonOr = (text: string): unknown => {
@@ -488,6 +488,7 @@ const isRecentPass = Schema.is(
           entries: Schema.Array(
             Schema.Struct({
               part: Schema.Literals(DISK_PARTS),
+              kind: Schema.optionalKey(Schema.Literals(ALL_KINDS)),
               factory: Schema.optionalKey(Schema.String),
               bytes: Schema.optionalKey(Count),
               unread: Count,

@@ -2229,7 +2229,7 @@ of pure code sits beside it.
 | `test/engine-verbs.test.ts` | the engine's verbs as a caller of `agent-runtime` drives them, over a store and a harness of its own (`test/promise-runner.ts`), and every refusal at `file()` at shipped defaults; the engine refusing `maxConcurrent` and a harness's `pool`, and `tick()` refusing an argument |
 | `test/verb-refusals.test.ts` | the `Engine` service's verbs, pinned (`VERBS`): each verb's answer, the same from an engine built once and one provided per call, and each refusal a tagged error that `refusalWords` words as `verb: …` with exit code 2 |
 | `test/forget.test.ts` | forgetting settled tasks on the files store: the count and the removal, each guard made to refuse with nothing removed, a forget cut short finished, an append to a forgotten task refused, another engine's pass, `sweep` after it, a detached run's files, and `ae forget` and `ae feed` |
-| `test/kept.boundary.test.ts` | `kept` on the files store and a real harness folder: a task's journal, bodies, files and records in bytes on disk, a person's own transcript in the same folder never counted, a body counted once, no body read, the parts no more than a walk of the root, a harness with no `kept`, one that fails, and what a forgotten task leaves |
+| `test/kept.boundary.test.ts` | `kept` on the files store and a real harness folder: a task's harness, and its journal, bodies, output, files and records in bytes on disk, a detached session's streams apart, a person's own transcript in the same folder never counted, a body counted once, no body read, the parts no more than a walk of the root, a harness with no `kept`, one that fails, and what a forgotten task leaves |
 | `test/feed-rotation.test.ts` | the feed rotated under its lock: readers parked before it read on, the forgotten counted; a feed with no header; a rotation stopped between its renames, and two racing; a stopped holder failing an append after `FEED_LOCK_WAIT_MS`, a dead one broken; a stopped writer keeping a rotation out; and what an append counts |
 | `test/release.test.ts` | letting a finished Claude Code session go, and reading what it cost once stopped, at shipped defaults — a fake `claude` that keeps a registry and writes a `cost-state` as it stops a session |
 | `test/budget.test.ts` | a spend cap, at shipped defaults — fake `claude`s: a `claude -p` that stops at its cap ends its attempt `failed` with `limit: 'budget'` and settles its task as any failure, the note naming no budget; the flag reaches both Claude runners on every attempt |
@@ -2379,10 +2379,11 @@ is no refusal: the pass lets a finished session go first. A store with no `forge
 ### What is kept on the disk, by task: `kept`
 
 `Engine.kept()` (`src/service/kept.ts`) answers, for every task the store lists, what is kept on the disk for it, in bytes as
-the file system counts them (`lstat().blocks * 512`), and removes nothing: `journal`, its journal's file; `bodies`, the bodies
-it is the first task in the store's order to name, each body counted once; `files`, what its harness keeps of its sessions and
-`forget` would remove (a run file, a stream, a registry entry); and `records`, the harness's own record of each session, which
-`forget` leaves. A harness says which paths are a session's through `RunnerOps.kept` (`sessionKept` across the A2A seam),
+the file system counts them (`lstat().blocks * 512`), and removes nothing: `harness`, the harness its journal says it was filed
+on; `journal`, its journal's file; `bodies`, the bodies it is the first task in the store's order to name, each body counted
+once; `output`, its sessions' streams the runtime keeps whole (a detached session's `.log`, `.stdout` and `.stderr`,
+`SessionKept.output`); `files`, the rest its harness keeps of its sessions (a run file, what was read of it, a registry entry),
+both of which `forget` would remove; and `records`, the harness's own record of each session, which `forget` leaves. A harness says which paths are a session's through `RunnerOps.kept` (`sessionKept` across the A2A seam),
 asked once an ask with every session of its tasks, from the list its `forget` uses. A journal is read as the store holds it:
 no body is read to measure.
 

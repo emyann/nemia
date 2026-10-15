@@ -27,8 +27,8 @@ export const forgetFiles = (
   });
 
 /**
- * The answer of the harness `harness`'s `kept`: for each of `sessions`, the paths `of` names for it that are there, and no key
- * for a session with none. `of` is asked once a session; a throw fails the verb.
+ * The answer of the harness `harness`'s `kept`: for each of `sessions`, the paths `of` names for it that are there, its `output`
+ * apart where `of` names one, and no key for a session with none. `of` is asked once a session; a throw fails the verb.
  */
 export const keptOf = <S extends { name: string }>(
   harness: string,
@@ -39,9 +39,14 @@ export const keptOf = <S extends { name: string }>(
     try: () => {
       const kept: Record<string, SessionKept> = {};
       for (const session of sessions) {
-        const { files, records } = of(session);
-        const there = { files: files.filter((file) => fs.existsSync(file)), records: records.filter((file) => fs.existsSync(file)) };
-        if (there.files.length || there.records.length) kept[session.name] = there;
+        const { files, records, output } = of(session);
+        const isThere = (file: string) => fs.existsSync(file);
+        const there: SessionKept = {
+          files: files.filter(isThere),
+          records: records.filter(isThere),
+          ...(output === undefined ? {} : { output: output.filter(isThere) }),
+        };
+        if (there.files.length || there.records.length || there.output?.length) kept[session.name] = there;
       }
       return kept;
     },

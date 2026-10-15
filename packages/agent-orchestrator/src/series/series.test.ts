@@ -101,9 +101,9 @@ test('a pass with a reading of the disk is sampled into its four series, and its
     entries: [
       { part: 'worktrees' as const, factory: 'nemia', bytes: 40, unread: 2 },
       { part: 'worktrees' as const, factory: 'pipao', unread: 1 },
-      { part: 'engine' as const, bytes: 90, unread: 0 },
-      { part: 'engine' as const, factory: 'nemia', bytes: 25, unread: 0 },
-      { part: 'sessions' as const, factory: 'nemia', bytes: 60, unread: 0 },
+      { part: 'engine' as const, kind: 'engine-other' as const, bytes: 90, unread: 0 },
+      { part: 'engine' as const, kind: 'check-output' as const, factory: 'nemia', bytes: 25, unread: 0 },
+      { part: 'sessions' as const, kind: 'harness-records' as const, factory: 'nemia', bytes: 60, unread: 0 },
     ],
   };
   const bytesOf = (entries: (typeof disk)['entries']) =>
@@ -129,9 +129,9 @@ test('a pass with a reading of the disk is sampled into its four series, and its
     read.filter((x) => x.s.startsWith('disk.')),
     [
       { s: 'disk.bytes', l: { part: 'worktrees', factory: 'nemia' }, v: 40 },
-      { s: 'disk.bytes', l: { part: 'engine' }, v: 90 },
-      { s: 'disk.bytes', l: { part: 'engine', factory: 'nemia' }, v: 25 },
-      { s: 'disk.bytes', l: { part: 'sessions', factory: 'nemia' }, v: 60 },
+      { s: 'disk.bytes', l: { part: 'engine', kind: 'engine-other' }, v: 90 },
+      { s: 'disk.bytes', l: { part: 'engine', kind: 'check-output', factory: 'nemia' }, v: 25 },
+      { s: 'disk.bytes', l: { part: 'sessions', kind: 'harness-records', factory: 'nemia' }, v: 60 },
       { s: 'disk.unread', l: { part: 'worktrees' }, v: 3 },
       { s: 'disk.unread', l: { part: 'runs' }, v: 0 },
       { s: 'disk.unread', l: { part: 'engine' }, v: 0 },

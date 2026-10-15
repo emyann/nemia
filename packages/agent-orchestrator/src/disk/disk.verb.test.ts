@@ -30,7 +30,7 @@ const { samplesOf } = await import('../series/series.ts');
 const { PHASES } = await import('../meter/meter.ts');
 const { storeRoots } = await import('./disk.store.ts');
 const { disk, DISK_METRICS, DISK_SPAN, DISK_SPAN_KEYS, diskOnce, freshDiskMemory } = await import('./disk.verb.ts');
-const { engineOf, over: overEngine } = await import('../runtime-client.ts');
+const { engineOf, HARNESSES, over: overEngine } = await import('../runtime-client.ts');
 const engine = eachTest(testEngine);
 
 /** A file of `kb` kilobytes under the store. */
@@ -134,9 +134,36 @@ const gauges = async (registry: Registry, id: string): Promise<Record<string, nu
   );
 };
 
-/** The entry of `part` and `factory` among `entries`. */
+/**
+ * `entries` by part and factory, in their order, each the sum of its kinds: bytes where any kind read, and every name that did not.
+ */
+const byPart = (entries: readonly DiskEntry[]): DiskEntry[] => {
+  const by = new Map<string, DiskEntry>();
+  for (const { part, factory, bytes, unread } of entries) {
+    const key = JSON.stringify([part, factory ?? null]);
+    const was = by.get(key) ?? { part, ...(factory === undefined ? {} : { factory }), unread: 0 };
+    const sum = bytes === undefined && was.bytes === undefined ? {} : { bytes: (was.bytes ?? 0) + (bytes ?? 0) };
+    by.set(key, { ...was, ...sum, unread: was.unread + unread });
+  }
+  return [...by.values()];
+};
+
+/** The entry of `part` and `factory` among `entries`, its kinds summed (`byPart`). */
 const entryOf = (entries: readonly DiskEntry[], part: string, factory?: string) =>
-  entries.find((entry) => entry.part === part && entry.factory === factory);
+  byPart(entries).find((entry) => entry.part === part && entry.factory === factory);
+
+/** Gauges' values by their labels in words (`gauges`), summed over their kinds: the gauges by part and factory. */
+const summedOverKinds = (values: Record<string, number>): Record<string, number> => {
+  const sums: Record<string, number> = {};
+  for (const [labels, value] of Object.entries(values)) {
+    const key = labels
+      .split(' ')
+      .filter((label) => !label.startsWith('kind='))
+      .join(' ');
+    sums[key] = (sums[key] ?? 0) + value;
+  }
+  return sums;
+};
 
 test('a store with files of known sizes is read part by part and factory by factory, and every name of it is in one entry', async () => {
   planted();
@@ -145,7 +172,7 @@ test('a store with files of known sizes is read part by part and factory by fact
   fs.linkSync(outside, path.join(ROOT, 'worktrees', 'a', 'design', 'linked.bin'));
   const registry = registryOf();
   const { value } = await over(registry, diskOnce(ANSWERS, freshDiskMemory()));
-  const { entries } = value.reading;
+  const entries = byPart(value.reading.entries);
   const expected: DiskEntry[] = [
     { part: 'worktrees', bytes: alone('worktrees'), unread: 0 },
     { part: 'worktrees', factory: 'nemia', bytes: held('worktrees/a') - held('worktrees/a/design/linked.bin'), unread: 0 },
@@ -175,7 +202,13 @@ test('a store with files of known sizes is read part by part and factory by fact
   assert.equal(value.names, whole.names - 3, 'the sweep reads each name once: all but the store, runs and worktrees, counted when listed');
   assert.equal(value.bursts, Math.floor(value.names / WALK_BURST));
 
-  const bytes = await gauges(registry, 'disk.bytes');
+  const kinds = await gauges(registry, 'disk.bytes');
+  assert.equal(Object.keys(kinds).length, value.reading.entries.length, 'a gauge for each kind of each part and factory');
+  assert.ok(
+    Object.keys(kinds).every((labels) => labels.includes(' kind=') || labels.startsWith('kind=')),
+    'each by its kind',
+  );
+  const bytes = summedOverKinds(kinds);
   assert.equal(bytes['factory=nemia part=worktrees'], entryOf(entries, 'worktrees', 'nemia')!.bytes);
   assert.equal(bytes['factory=pipao part=runs'], held('runs/b'));
   assert.equal(bytes['part=engine'], held('engine'));
@@ -194,6 +227,76 @@ test('a store with files of known sizes is read part by part and factory by fact
   assert.deepEqual([free, size], [value.reading.free, value.reading.size]);
   assert.ok(free > 0 && free <= size, `${free} of ${size}`);
   assert.deepEqual(Object.keys(DISK_METRICS).sort(), ['bytes', 'free', 'size', 'unread']);
+});
+
+/** The bytes of each kind among `entries` of `part` and `factory`, by kind. */
+const kindsOf = (entries: readonly DiskEntry[], part: string, factory?: string): Record<string, number | undefined> =>
+  Object.fromEntries(entries.filter((entry) => entry.part === part && entry.factory === factory).map((entry) => [entry.kind, entry.bytes]));
+
+test("each kind holds its own names: a file with two names inside once, for one of its kinds, one hardlinked from outside not at all, a link's own blocks", async () => {
+  planted();
+  file('worktrees/a/design/node_modules/effect/index.js', 40);
+  file('worktrees/a/design/apps/web/node_modules/.bin/vite', 24);
+  file('worktrees/a/design/src/node_modules.ts', 12);
+  file('runs/a/artifacts/implement/deep/Shot.JPG', 16);
+  file('runs/a/artifacts/implement/test-costs-x.json', 20);
+  file('runs/a/agents/ada/SKILL.md', 8);
+  file('runs/a/inputs/mock.png', 20);
+  file('runs/a/work/notes/kept.txt', 4);
+  const twice = path.join(ROOT, 'runs/a/inputs/shot-again.png');
+  fs.linkSync(path.join(ROOT, 'runs/a/artifacts/implement/shot.png'), twice);
+  const outside = path.join(BASE, 'kinds-outside.png');
+  fs.writeFileSync(outside, Buffer.alloc(256 * 1024, 1));
+  fs.linkSync(outside, path.join(ROOT, 'runs/a/artifacts/implement/outside.png'));
+  fs.symlinkSync(outside, path.join(ROOT, 'runs/a/artifacts/implement/link.png'));
+  const { value } = await over(registryOf(), diskOnce(ANSWERS, freshDiskMemory()));
+  const { entries } = value.reading;
+  const shot = held('runs/a/artifacts/implement/shot.png');
+  const runs = kindsOf(entries, 'runs', 'nemia');
+  const once = { pictures: runs.pictures! - shot, inputs: runs.inputs! - shot };
+  const pictures = held('runs/a/artifacts/implement/deep/Shot.JPG') + held('runs/a/artifacts/implement/link.png');
+  const inputs = alone('runs/a/inputs') + held('runs/a/inputs/mock.png');
+  assert.ok(
+    (once.pictures === pictures && runs.inputs === inputs) || (runs.pictures === pictures && once.inputs === inputs),
+    `the file of two names inside is in pictures or in inputs, once: ${JSON.stringify(runs)}`,
+  );
+  const handed = ['artifacts', 'artifacts/implement', 'artifacts/implement/deep'].reduce((n, at) => n + alone(`runs/a/${at}`), 0);
+  assert.deepEqual(
+    { ...runs, pictures: undefined, inputs: undefined },
+    {
+      'runs-other': alone('runs/a') + held('runs/a/work'),
+      pictures: undefined,
+      handed: handed + held('runs/a/artifacts/implement/test-costs-x.json'),
+      agents: held('runs/a/agents'),
+      inputs: undefined,
+      records: held('runs/a.json'),
+      marks: held('runs/a.asks'),
+    },
+    'each kind of the run, in their order; a file hardlinked from outside in none, a link as a link',
+  );
+  const modules = held('worktrees/a/design/node_modules') + held('worktrees/a/design/apps/web/node_modules');
+  assert.deepEqual(kindsOf(entries, 'worktrees', 'nemia'), { checkout: held('worktrees/a') - modules, dependencies: modules });
+  assert.deepEqual(
+    [kindsOf(entries, 'runs'), kindsOf(entries, 'checks'), kindsOf(entries, 'series'), kindsOf(entries, 'other')],
+    [
+      {
+        'runs-other': alone('runs') + alone('runs/forgotten'),
+        handed: alone('runs/forgotten/artifacts'),
+        pictures: held('runs/forgotten/artifacts/old.png'),
+      },
+      { checks: held('checks') },
+      { series: held('metrics') },
+      { other: alone() + held('inbox') + held('feed.jsonl') },
+    ],
+  );
+  const whole = await Effect.runPromise(walk([ROOT]));
+  const sum = entries.reduce((n, entry) => n + (entry.bytes ?? 0), 0);
+  assert.equal(sum, whole.bytes[0], 'the kinds add up to the store walked whole');
+  assert.equal(
+    sum,
+    held() - held('runs/a/artifacts/implement/outside.png') - shot,
+    'and to the fixture, each file once, none from outside',
+  );
 });
 
 test('the cost of a sweep is the names of the store and a burst yielded each WALK_BURST of them, whatever the machine', async () => {
@@ -221,6 +324,11 @@ test('REFUSED: a folder gone between the listing and the walk is unread, never z
   const others = (entries: readonly DiskEntry[]) =>
     entries.filter((entry) => !(entry.part === 'runs' && (entry.factory === 'pipao' || !entry.factory)));
   assert.deepEqual(others(reading.entries), others(first.entries), 'every other entry is whole');
+  assert.deepEqual(
+    reading.entries.filter((entry) => entry.factory === 'pipao' && entry.part === 'runs'),
+    [{ part: 'runs', kind: 'runs-other', factory: 'pipao', unread: 1 }],
+    "what did not read is on its root's own kind",
+  );
   const samples = samplesOf({ ...PASS, disk: reading }).filter((sample) => sample.s.startsWith('disk.'));
   assert.deepEqual(
     samples.filter((sample) => sample.l.part === 'runs' && sample.l.factory === 'pipao'),
@@ -233,9 +341,9 @@ test('REFUSED: a folder gone between the listing and the walk is unread, never z
   );
   assert.equal((await gauges(registry, 'disk.unread'))['part=runs'], 1);
   assert.equal(
-    (await gauges(registry, 'disk.bytes'))['factory=pipao part=runs'],
+    summedOverKinds(await gauges(registry, 'disk.bytes'))['factory=pipao part=runs'],
     before,
-    'the gauge keeps what last read, and is not zeroed',
+    'the gauges of every kind keep what last read, and none is zeroed',
   );
 });
 
@@ -244,68 +352,98 @@ test('a factory whose runs are gone is said at zero once, and not again', async 
   const registry = registryOf();
   const memory = freshDiskMemory();
   await over(registry, diskOnce(ANSWERS, memory));
-  assert.ok((await gauges(registry, 'disk.bytes'))['factory=pipao part=worktrees'] > 0);
+  assert.ok(summedOverKinds(await gauges(registry, 'disk.bytes'))['factory=pipao part=worktrees'] > 0);
   fs.rmSync(path.join(ROOT, 'worktrees', 'b'), { recursive: true });
   fs.rmSync(path.join(ROOT, 'runs', 'b'), { recursive: true });
   const second = (await over(registry, diskOnce(ANSWERS, memory))).value.reading;
   assert.equal(entryOf(second.entries, 'worktrees', 'pipao'), undefined);
   const bytes = await gauges(registry, 'disk.bytes');
-  assert.deepEqual([bytes['factory=pipao part=worktrees'], bytes['factory=pipao part=runs']], [0, 0]);
-  assert.ok(!memory.said.has(JSON.stringify(['worktrees', 'pipao'])), 'what is gone is remembered no longer');
+  const pipao = Object.entries(bytes).filter(([labels]) => labels.startsWith('factory=pipao'));
+  assert.deepEqual(
+    pipao.map(([labels, value]) => [labels.replace(/ part=.*/, ''), value]),
+    pipao.map(([labels]) => [labels.replace(/ part=.*/, ''), 0]),
+  );
+  assert.deepEqual(
+    pipao.map(([labels]) => labels).sort(),
+    ['factory=pipao kind=checkout part=worktrees', 'factory=pipao kind=handed part=runs', 'factory=pipao kind=runs-other part=runs'],
+    'every kind of it is said at zero',
+  );
+  assert.ok(![...memory.said].some((key) => key.includes('"pipao"')), 'what is gone is remembered no longer');
   const fresh = registryOf();
   await over(fresh, diskOnce(ANSWERS, memory));
-  assert.equal('factory=pipao part=worktrees' in (await gauges(fresh, 'disk.bytes')), false, 'the third sweep does not say it again');
+  const again = Object.keys(await gauges(fresh, 'disk.bytes')).filter((labels) => labels.startsWith('factory=pipao'));
+  assert.deepEqual(again, [], 'the third sweep does not say it again');
 });
 
 /** The runs of the kept fixtures: `a` of nemia with two tasks, `b` of pipao with one, `c` of no factory with one. */
 const TASKED = [answered('a', 'nemia', ['t-a1', 't-a2']), answered('b', 'pipao', ['t-b1']), answered('c', undefined, ['t-c1'])];
 
-/** Files the stand-in's tasks `ids`, in order. */
-const filed = async (ids: readonly string[]): Promise<void> => {
-  for (const id of ids) await Effect.runPromise(engineOf(engine().layer).file({ id, brief: 'b', cwd: '/r' }));
+/** Files the stand-in's tasks `ids`, in order, those among `checks` on the checks' harness. */
+const filed = async (ids: readonly string[], checks: readonly string[] = []): Promise<void> => {
+  for (const id of ids) {
+    const harness = checks.includes(id) ? { harness: HARNESSES.check.name } : {};
+    await Effect.runPromise(engineOf(engine().layer).file({ id, brief: 'b', cwd: '/r', ...harness }));
+  }
 };
 
-test('what the runtime keeps by task is said by factory: the engine, the rest of it alone, and the sessions, in the reading, the series and the gauges', async () => {
+test("what the runtime keeps by task is said by factory and kind, a check's output apart from a session's, the rest of the engine alone", async () => {
   planted();
-  await filed(['t-a1', 't-a2', 't-b1', 't-c1', 't-of-no-run']);
-  engine().keeps('t-a1', { journal: 1000, bodies: 2000, files: 4000, records: 50_000 });
-  engine().keeps('t-a2', { journal: 500, records: 10_000 });
-  engine().keeps('t-b1', { journal: 300, files: 200 });
+  await filed(['t-a1', 't-a2', 't-b1', 't-c1', 't-of-no-run'], ['t-a1', 't-b1']);
+  engine().keeps('t-a1', { journal: 1000, bodies: 2000, output: 3000, files: 4000, records: 50_000 });
+  engine().keeps('t-a2', { journal: 500, output: 700, records: 10_000 });
+  engine().keeps('t-b1', { journal: 300, output: 200 });
   engine().keeps('t-c1', { files: 64, records: 128 });
-  engine().keeps('t-of-no-run', { journal: 9000, records: 7000 });
+  engine().keeps('t-of-no-run', { journal: 9000, output: 1000, records: 7000 });
   const registry = registryOf();
   const { reading } = (await over(registry, diskOnce(TASKED, freshDiskMemory()))).value;
   const whole = held('engine');
+  const named = 1000 + 2000 + 3000 + 4000 + 500 + 700 + 300 + 200 + 64 + 9000 + 1000;
   assert.deepEqual(
     reading.entries.filter((entry) => entry.part === 'engine' || entry.part === 'sessions'),
     [
-      { part: 'engine', bytes: whole - 7500 - 500 - 64, unread: 0 },
-      { part: 'engine', factory: 'nemia', bytes: 7500, unread: 0 },
-      { part: 'engine', factory: 'pipao', bytes: 500, unread: 0 },
-      { part: 'engine', factory: DEFAULT_FACTORY, bytes: 64, unread: 0 },
-      { part: 'sessions', bytes: 7000, unread: 0 },
-      { part: 'sessions', factory: 'nemia', bytes: 60_000, unread: 0 },
-      { part: 'sessions', factory: DEFAULT_FACTORY, bytes: 128, unread: 0 },
+      { part: 'engine', kind: 'session-output', bytes: 1000, unread: 0 },
+      { part: 'engine', kind: 'journals', bytes: 9000, unread: 0 },
+      { part: 'engine', kind: 'engine-other', bytes: whole - named, unread: 0 },
+      { part: 'engine', kind: 'session-output', factory: 'nemia', bytes: 700, unread: 0 },
+      { part: 'engine', kind: 'check-output', factory: 'nemia', bytes: 3000, unread: 0 },
+      { part: 'engine', kind: 'session-files', factory: 'nemia', bytes: 4000, unread: 0 },
+      { part: 'engine', kind: 'journals', factory: 'nemia', bytes: 1500, unread: 0 },
+      { part: 'engine', kind: 'bodies', factory: 'nemia', bytes: 2000, unread: 0 },
+      { part: 'engine', kind: 'check-output', factory: 'pipao', bytes: 200, unread: 0 },
+      { part: 'engine', kind: 'journals', factory: 'pipao', bytes: 300, unread: 0 },
+      { part: 'engine', kind: 'session-files', factory: DEFAULT_FACTORY, bytes: 64, unread: 0 },
+      { part: 'sessions', kind: 'harness-records', bytes: 7000, unread: 0 },
+      { part: 'sessions', kind: 'harness-records', factory: 'nemia', bytes: 60_000, unread: 0 },
+      { part: 'sessions', kind: 'harness-records', factory: DEFAULT_FACTORY, bytes: 128, unread: 0 },
     ],
   );
+  assert.equal(entryOf(reading.entries, 'engine')!.bytes! + named - 1000 - 9000, whole, "the engine's kinds add up to the engine walked");
   const samples = samplesOf({ ...PASS, disk: reading }).filter((sample) => sample.s === 'disk.bytes');
   assert.deepEqual(
-    samples.filter((sample) => sample.l.part === 'sessions' || (sample.l.part === 'engine' && sample.l.factory !== undefined)),
+    samples.filter((sample) => sample.l.part === 'sessions' || (sample.l.part === 'engine' && sample.l.factory === 'pipao')),
     [
-      { s: 'disk.bytes', l: { part: 'engine', factory: 'nemia' }, v: 7500 },
-      { s: 'disk.bytes', l: { part: 'engine', factory: 'pipao' }, v: 500 },
-      { s: 'disk.bytes', l: { part: 'engine', factory: DEFAULT_FACTORY }, v: 64 },
-      { s: 'disk.bytes', l: { part: 'sessions' }, v: 7000 },
-      { s: 'disk.bytes', l: { part: 'sessions', factory: 'nemia' }, v: 60_000 },
-      { s: 'disk.bytes', l: { part: 'sessions', factory: DEFAULT_FACTORY }, v: 128 },
+      { s: 'disk.bytes', l: { part: 'engine', kind: 'check-output', factory: 'pipao' }, v: 200 },
+      { s: 'disk.bytes', l: { part: 'engine', kind: 'journals', factory: 'pipao' }, v: 300 },
+      { s: 'disk.bytes', l: { part: 'sessions', kind: 'harness-records' }, v: 7000 },
+      { s: 'disk.bytes', l: { part: 'sessions', kind: 'harness-records', factory: 'nemia' }, v: 60_000 },
+      { s: 'disk.bytes', l: { part: 'sessions', kind: 'harness-records', factory: DEFAULT_FACTORY }, v: 128 },
     ],
   );
   const bytes = await gauges(registry, 'disk.bytes');
   assert.deepEqual(
-    [bytes['factory=nemia part=engine'], bytes['factory=nemia part=sessions'], bytes['part=sessions'], bytes['part=engine']],
-    [7500, 60_000, 7000, whole - 8064],
+    [
+      bytes['factory=nemia kind=check-output part=engine'],
+      bytes['factory=nemia kind=session-output part=engine'],
+      bytes['factory=nemia kind=harness-records part=sessions'],
+      bytes['kind=engine-other part=engine'],
+    ],
+    [3000, 700, 60_000, whole - named],
   );
-  assert.equal('factory=pipao part=sessions' in bytes, false, 'a factory whose tasks keep no record has no sessions series');
+  assert.equal(
+    Object.keys(bytes).some((labels) => labels.startsWith('factory=pipao') && labels.endsWith('part=sessions')),
+    false,
+    'a factory whose tasks keep no record has no sessions series',
+  );
 });
 
 test('REFUSED: a runtime that keeps no record of any session leaves the reading, the series and the gauges with no sessions bytes', async () => {
@@ -340,10 +478,13 @@ test('an engine whose kept fails leaves the engine whole under no factory and th
   const { reading } = (await over(registry, diskOnce(TASKED, freshDiskMemory()))).value;
   assert.deepEqual(reading.entries, [
     ...before.filter((entry) => DISK_PARTS_BEFORE.includes(entry.part)),
-    { part: 'sessions', unread: 1 },
+    { part: 'sessions', kind: 'harness-records', unread: 1 },
     ...before.filter((entry) => !DISK_PARTS_BEFORE.includes(entry.part)),
   ]);
-  assert.deepEqual(entryOf(reading.entries, 'engine'), { part: 'engine', bytes: held('engine'), unread: 0 });
+  assert.deepEqual(
+    reading.entries.filter((entry) => entry.part === 'engine'),
+    [{ part: 'engine', kind: 'engine-other', bytes: held('engine'), unread: 0 }],
+  );
   assert.equal((await gauges(registry, 'disk.unread'))['part=sessions'], 1);
 });
 
@@ -354,14 +495,18 @@ test("a factory whose sessions' records are gone on the next sweep is said at ze
   const registry = registryOf();
   const memory = freshDiskMemory();
   await over(registry, diskOnce(TASKED, memory));
-  assert.equal((await gauges(registry, 'disk.bytes'))['factory=nemia part=sessions'], 4096);
+  assert.equal((await gauges(registry, 'disk.bytes'))['factory=nemia kind=harness-records part=sessions'], 4096);
   engine().keeps('t-a1', {});
   const second = (await over(registry, diskOnce(TASKED, memory))).value.reading;
   assert.equal(entryOf(second.entries, 'sessions', 'nemia'), undefined);
-  assert.equal((await gauges(registry, 'disk.bytes'))['factory=nemia part=sessions'], 0);
+  assert.equal((await gauges(registry, 'disk.bytes'))['factory=nemia kind=harness-records part=sessions'], 0);
   const fresh = registryOf();
   await over(fresh, diskOnce(TASKED, memory));
-  assert.equal('factory=nemia part=sessions' in (await gauges(fresh, 'disk.bytes')), false, 'the third sweep does not say it again');
+  assert.equal(
+    'factory=nemia kind=harness-records part=sessions' in (await gauges(fresh, 'disk.bytes')),
+    false,
+    'the third sweep does not say it again',
+  );
 });
 
 test('each of the ten largest runs is a span of its own carrying its run, its bytes and its factory, and an eleventh run is none', async () => {
@@ -422,7 +567,7 @@ test(
     const rested = (times: number) =>
       Promise.race([until(t, () => clock.asked.length === times, `the loop is at rest ${times}`, { bell: clock.bell }), ended]);
     await rested(1);
-    assert.deepEqual([clock.asked, kept], [[600_000], ['11 entries']], 'the rest is the shipped ten minutes');
+    assert.deepEqual([clock.asked, kept], [[600_000], ['18 entries']], 'the rest is the shipped ten minutes');
     await clock.adjust(599_999);
     assert.deepEqual([clock.woken, kept.length], [[], 1], 'a millisecond before its rest ends, no sweep');
     fs.renameSync(ROOT, `${ROOT}-away`);
@@ -430,7 +575,7 @@ test(
     await rested(2);
     assert.deepEqual(
       [clock.woken, kept],
-      [[600_000], ['11 entries', undefined]],
+      [[600_000], ['18 entries', undefined]],
       'at ten minutes, the next sweep: it fails, and no reading is left',
     );
     await clock.adjust(600_000);
@@ -440,6 +585,6 @@ test(
     fs.renameSync(`${ROOT}-away`, ROOT);
     await clock.adjust(600_000);
     await rested(4);
-    assert.deepEqual(kept, ['11 entries', undefined, undefined, '11 entries'], 'and measures again once the store reads');
+    assert.deepEqual(kept, ['18 entries', undefined, undefined, '18 entries'], 'and measures again once the store reads');
   },
 );

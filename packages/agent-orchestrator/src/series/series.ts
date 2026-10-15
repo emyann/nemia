@@ -11,7 +11,7 @@ import { unreadByPart, type DiskReading } from '../disk/disk.ts';
 import { PASS_BOUNDS, PHASES, READ_BOUNDS, type RecentPass } from '../meter/index.ts';
 
 /** The labels a line may carry: bounded keys, never a run id. A run's own detail stays in its record. */
-export const LABEL_KEYS = ['factory', 'workflow', 'step', 'agent', 'phase', 'harness', 'window', 'part'] as const;
+export const LABEL_KEYS = ['factory', 'workflow', 'step', 'agent', 'phase', 'harness', 'window', 'part', 'kind'] as const;
 export type LabelKey = (typeof LABEL_KEYS)[number];
 export type Labels = Partial<Record<LabelKey, string>>;
 
@@ -80,15 +80,25 @@ export const strangeLabels = (l: Record<string, unknown>): string[] =>
   Object.keys(l).filter((k) => !(LABEL_KEYS as readonly string[]).includes(k));
 
 /**
- * What a reading of the store's disk is sampled into: the bytes of each entry that read, by its part and its factory where it has one;
- * each part's names that did not read, zero where all did; the bytes free and the size. An entry that did not read has no sample of
- * bytes, never a zero.
+ * What a reading of the store's disk is sampled into: the bytes of each entry that read, by its part, its kind and its factory where it
+ * has one; each part's names that did not read, zero where all did; the bytes free and the size. An entry that did not read has no
+ * sample of bytes, never a zero.
  */
 const diskSamples = (disk: DiskReading): Sample[] => [
   ...disk.entries.flatMap((entry): Sample[] =>
     entry.bytes === undefined
       ? []
-      : [{ s: 'disk.bytes', l: { part: entry.part, ...(entry.factory === undefined ? {} : { factory: entry.factory }) }, v: entry.bytes }],
+      : [
+          {
+            s: 'disk.bytes',
+            l: {
+              part: entry.part,
+              ...(entry.kind === undefined ? {} : { kind: entry.kind }),
+              ...(entry.factory === undefined ? {} : { factory: entry.factory }),
+            },
+            v: entry.bytes,
+          },
+        ],
   ),
   ...unreadByPart(disk.entries).map(({ part, unread }): Sample => ({ s: 'disk.unread', l: { part }, v: unread })),
   { s: 'disk.free', l: {}, v: disk.free },

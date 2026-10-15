@@ -245,3 +245,35 @@ test(
     assert.deepEqual(stillPlanted(out), ['covered-dark.png'], said(ended));
   },
 );
+
+test(
+  'a run that visits a page and passes clears the failure pictures an earlier run left of it, in both themes',
+  { timeout: 60_000 },
+  async () => {
+    const out = planted('none-dark-failed.png', 'none-light-failed.png');
+    const ended = await e2eIn(out, 'none');
+    assert.equal(ended.code, 0, said(ended));
+    assert.deepEqual(ended.shots, [], said(ended));
+    assert.deepEqual(stillPlanted(out), [], said(ended));
+  },
+);
+
+test('a run that pictures a page touches no picture of a page it does not visit', { timeout: 60_000 }, async () => {
+  const out = planted('other-dark.png', 'other-light.png', 'other-dark-failed.png');
+  const ended = await e2eIn(out, 'none', '--photos');
+  assert.equal(ended.code, 0, said(ended));
+  assert.deepEqual(
+    ended.shots,
+    [
+      'none-dark.png',
+      'none-light.png',
+      'none-own-dark.png',
+      'none-own-light.png',
+      'other-dark-failed.png',
+      'other-dark.png',
+      'other-light.png',
+    ],
+    said(ended),
+  );
+  assert.deepEqual(stillPlanted(out), ['other-dark-failed.png', 'other-dark.png', 'other-light.png'], said(ended));
+});

@@ -436,6 +436,7 @@ const PINNED: Record<string, string[]> = {
     'advanceRun',
     'approveRun',
     'asked',
+    'askedNow',
     'cancelRun',
     'decideRun',
     'filingsRead',

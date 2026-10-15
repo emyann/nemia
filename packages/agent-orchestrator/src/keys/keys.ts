@@ -8,7 +8,7 @@ import path from 'node:path';
 import { CLOSEOUT_FIELDS, COUNTS, isObject, type OutputSchema, refuse, type StepOutput, type Workflow } from '../step/step.ts';
 import { DEFAULT_HARNESS, HARNESSES, isRemoteHarness, REMOTE_NAME, remoteNameOf } from '../harness/harness.ts';
 import { looseAt } from '../closeout/closeout.ts';
-import { expandShapes, SHAPE_KEY } from '../question/question.ts';
+import { expandShapes, SHAPE_KEY } from '../question/index.ts';
 import type { HarnessPrompt } from '../agents/agents.ts';
 import { bareSkillOf, GIVEN_SKILL_FORMS, givenSkillOf, ONE_BARE_NAME, sameBareIn } from './given-skill.ts';
 

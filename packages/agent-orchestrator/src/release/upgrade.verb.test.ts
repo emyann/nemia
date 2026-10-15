@@ -149,6 +149,8 @@ function hostOf(world: World): { host: ServiceHost; events: string[] } {
       events.push('resume');
       return { paused: false } as never;
     },
+    calls: () => Effect.succeed([]),
+    drain: () => Effect.void,
     landings: () =>
       Effect.sync(() => {
         events.push('landings 0');

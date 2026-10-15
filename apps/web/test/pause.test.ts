@@ -104,3 +104,9 @@ test('a task asked to stop that no pause ask names is stopping, and promised no 
     "r-1's implement is stopping: its session was asked to stop",
   );
 });
+
+test('a session in a tool call is finishing its call, named by its tool', () => {
+  const finishing = { run: 'r1', step: 'implement', kind: 'session' as const, calling: 'Bash' };
+  assert.equal(finishingSentence(finishing), "r1's implement is finishing: its call to Bash runs");
+  assert.equal(finishingSentence({ ...finishing, calling: undefined }), "r1's implement is finishing: its session is at work");
+});

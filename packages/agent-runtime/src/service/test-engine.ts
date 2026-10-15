@@ -14,7 +14,7 @@
 import { Effect, Layer } from 'effect';
 import type { Attempt, Said, State } from '../core/index.ts';
 import { JournalError, StopRefused, type TaskView } from '../core/engine/index.ts';
-import { Engine, ListRefused, listRefusalOf, type EngineShape } from './engine.ts';
+import { DrainRefused, drainRefusalOf, Engine, ListRefused, listRefusalOf, type EngineShape } from './engine.ts';
 import { ForgetRefused } from './forget.ts';
 import { KeptRefused, type KeptReport } from './kept.ts';
 import type { TaskSpec } from './options.ts';
@@ -140,6 +140,8 @@ export type TestEngine = {
   readonly stopped: string[];
   readonly forgets: { taskIds: string[]; yes: boolean }[];
   readonly said: { taskId: string; text: string }[];
+  /** Each holder a drain was put for, or null where one was lifted, in order. */
+  readonly drains: (number | null)[];
   /** Refuses the next `times` says, whatever the task. */
   readonly refuseSay: (times: number) => void;
   /**
@@ -320,6 +322,7 @@ export const testEngine = (): TestEngine => {
     stopped: [] as string[],
     forgets: [] as { taskIds: string[]; yes: boolean }[],
     said: [] as { taskId: string; text: string }[],
+    drains: [] as (number | null)[],
   };
   const sayRefusals = { left: 0 };
   const sizes = new Map<string, TestKeeps>();
@@ -342,6 +345,11 @@ export const testEngine = (): TestEngine => {
       sweep: unkept('sweep'),
       removeBody: unkept('removeBody'),
       compact: unkept('compact'),
+      hold: () => Effect.void,
+      drain: (holder) =>
+        drainRefusalOf(holder) === undefined
+          ? Effect.sync(() => void held.drains.push(holder))
+          : Effect.fail(new DrainRefused({ message: drainRefusalOf(holder)! })),
     }),
   );
   const settle = (id: string, phase: string, end?: TestEnd): TestTask => {

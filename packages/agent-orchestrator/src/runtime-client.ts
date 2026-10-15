@@ -296,3 +296,10 @@ export const missingCredential: MissingCredential = (scheme, _agentUrl, harness)
   const name = remoteNameOf(harness) ?? harness;
   return `set ${envNameOf(name, scheme)} to the secret for the scheme \`${scheme}\` ${name}'s card declares, in the environment of the daemon — the api, or \`nemia up\` — and of every api that reads a run through the same engine, and restart it; then \`nemia retry\` the step. The secret is read from there on every request, and never written to disk.`;
 };
+
+/**
+ * Holds back the new tool calls of the attached sessions the daemon of pid `holder` holds, each at its hook, or with null lets them go:
+ * the runtime's `drain`, through the engine the program is given. A call in flight runs on.
+ */
+export const drained = (holder: number | null): Effect.Effect<void, never, EngineService> =>
+  Effect.flatMap(EngineService, (e) => asked('drain', e.drain(holder)));

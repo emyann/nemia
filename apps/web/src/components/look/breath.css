@@ -1,0 +1,25 @@
+/*
+ * The breath of the step at work: its glow, a layer of its own over the bar (`data-step-breath`), swells and eases in opacity, one
+ * breath in 2.6 seconds on the theme's standard easing, while the bar's fill and size stay still. Where a person asks for reduced
+ * motion the glow is still, at its full light.
+ */
+@keyframes step-breath {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+[data-step-breath] {
+  animation: step-breath 2.6s var(--md-sys-motion-easing-standard) infinite;
+  will-change: opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-step-breath] {
+    animation: none;
+  }
+}

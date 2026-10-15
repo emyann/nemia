@@ -47,6 +47,7 @@ import type { Decision, Offer } from '../decide/decide.ts';
 import { filedDenies, landedWords } from '../ending/ending.ts';
 import { allowRuleOf, disallowedBy, type DeniedAt } from '../keys/index.ts';
 import { heldLater } from '../round/round.ts';
+import { answersOr } from '../question/index.ts';
 
 /**
  * What a person may ask for a step, and the status that says why. Pure.
@@ -604,6 +605,8 @@ export function overBudgetLine(steps: readonly Workflow[], run: Run, d: Decision
  * settled, which a try would run beside, and none on a run that is not waiting on a person. None on a pruned run (`prunedRefusal`), whose
  * question stays with nothing to answer it, nor on a held one (`heldRefusal`), whose question is asked again once the hold lifts.
  *
+ * A closeout that asks questions is answered with an `--answer` for each (`answersOr`), one that asks none with `--message`.
+ *
  * @param spendOf What each task's sessions cost (`taskSpend`): a blocked step over its budget is answered with `--budget` too.
  */
 export function answerLines(
@@ -619,10 +622,11 @@ export function answerLines(
   const lines: Record<string, string> = {};
   for (const step of steps) {
     const { status, modes, raise } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, () => false, spendOf);
-    if (status === 'blocked' && modes.length) lines[step.name] = `to answer it:  nemia retry ${run.id} ${step.name} --message "<answer>"`;
+    const answer = answersOr(step, closeoutOf(step.name), '--message "<answer>"');
+    if (status === 'blocked' && modes.length) lines[step.name] = `to answer it:  nemia retry ${run.id} ${step.name} ${answer}`;
     else if (raise && modes.length && closeoutOf(step.name)?.outcome === 'blocked') {
       lines[step.name] =
-        `to answer it, its cap raised above ${aboveWord(raise)}:  nemia retry ${run.id} ${step.name} --budget <amount> --message "<answer>"`;
+        `to answer it, its cap raised above ${aboveWord(raise)}:  nemia retry ${run.id} ${step.name} --budget <amount> ${answer}`;
     }
   }
   return lines;

@@ -30,7 +30,8 @@ Bring it, a short part each:
 - **Risks**: what could go wrong, and what was left open or skipped.
 - **Cost**: what the run has spent, against its budget and the person's line.
 - **Recommendation**: one, with its reason in a sentence:
-  - let it hand on: `nemia approve <run> <step> --message "<their words>"`;
+  - let it hand on: `nemia approve <run> <step> --message "<their words>"`; where its closeout asks questions, with their answer to
+    each, numbered as `nemia decide <run>` prints them: `nemia approve <run> <step> --answer 1=a --answer "2=b: <words>"`;
   - send it back with what to change: `nemia retry <run> <step> --message "<their objection>"`.
 
 A hold is yours, at its gate too: when the step cannot hand on yet, because what it needs has not shipped, hold the run
@@ -50,7 +51,9 @@ Bring it:
 - **Recommendation**: the answer you would give to each question, and why, in a sentence.
 
 Answer with the step's session continued and told their answer:
-`nemia retry <run> <step> --nudge --message "<their answers>"`. `--nudge` is the default; `--fresh` starts a new session on its branch
+`nemia retry <run> <step> --nudge --message "<their answers>"`. Where its closeout asks questions, `nemia decide <run>` numbers them and
+letters their options: give each answer by those names, and the step reads them as the board's answers read —
+`nemia retry <run> <step> --answer 1=a --answer "2=a,c" --answer "3: <their words>"`. `--nudge` is the default; `--fresh` starts a new session on its branch
 instead, which the person may ask for. Where the step's question asks for budget, or its cap is near, the answer may raise it:
 `nemia retry <run> <step> --budget <amount> --message "<their answers>"`, the amount above its cap. Where `nemia decide` says the step is
 also at its cap, the line it offers carries `--budget <amount>`. A cap is the person's to raise.

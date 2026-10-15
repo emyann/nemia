@@ -467,7 +467,7 @@ test('REFUSED at shipped defaults: `nemia approve` on a step not gated, one not 
   const typed = (...flags: string[]) => main(['approve', 'no-such-run-zz9z', 'plan', ...flags]);
   await assert.rejects(
     typed('--mesage', 'yes'),
-    refusedWith(/^nemia approve does not take --mesage\. It takes the run, the step, and --message "<words>"/),
+    refusedWith(/^nemia approve does not take --mesage\. It takes the run, the step, --answer <n>=<letter> and --message "<words>"/),
   );
   await assert.rejects(typed('--message'), refusedWith(/^--message takes the words that go with your approval, quoted/));
   await assert.rejects(typed('--message='), (err: Error & { exitCode?: number }) => {

@@ -315,3 +315,22 @@ test('approvedAnswerText says the answers for the steps after the gate: whose qu
   );
   assert.ok(!approvedAnswerText('design', [cut], [{ question: cut.title, chose: ['a'] }]).includes('Answers to your questions'));
 });
+
+test('answerText and approvedAnswerText say where the person answered: at the terminal when it says so, on the board by default', () => {
+  const answers = [{ question: cut.title, chose: ['a'] }];
+  assert.ok(answerText([cut], answers, undefined, 'at the terminal').endsWith('\n\nAnswered by: person, at the terminal'));
+  assert.ok(
+    approvedAnswerText('design', [cut], answers, 'n', 'at the terminal').endsWith('Note: n\n\nAnswered by: person, at the terminal'),
+  );
+  assert.ok(answerText([cut], answers).endsWith('\n\nAnswered by: person, on the board'));
+  assert.ok(approvedAnswerText('design', [cut], answers).endsWith('\n\nAnswered by: person, on the board'));
+});
+
+test('answerRefusal to a step that asks none names how to say it instead: `answers` by default, the terminal’s flags when given', () => {
+  assert.match(answerRefusal([], [])!, /say what you mean in words, without `answers`\.$/);
+  const typed = answerRefusal([], [], 'with --message "<words>", without --answer');
+  assert.equal(
+    typed,
+    'The step asks no questions now, so there is nothing to answer. Read the step again, and say what you mean with --message "<words>", without --answer.',
+  );
+});

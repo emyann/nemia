@@ -13,8 +13,8 @@ export { declaredOutput, parseCloseout } from './closeout/closeout.ts';
  * Re-exported for apps/api, which reads a closeout's questions and writes a person's answers to them from the `agent-orchestrator/run`
  * subpath.
  */
-export { answerRefusal, answerText, approvedAnswerText, askedQuestions, questionsOf } from './question/question.ts';
-export type { Answer, Asked, Question, QuestionOption } from './question/question.ts';
+export { answerRefusal, answerText, approvedAnswerText, askedQuestions, questionsOf } from './question/index.ts';
+export type { Answer, Asked, Question, QuestionOption } from './question/index.ts';
 /** Re-exported for apps/api, which reads them from the `agent-orchestrator/run` subpath. */
 export { answerOf, messageRefusal, type EarlierTry } from './retry/index.ts';
 export {

@@ -51,7 +51,7 @@ const { DENIED_SPAN, DENIED_SPAN_KEYS, PASS_METRICS, STEP_METRICS, TIMELINE_SPAN
   await import('../src/meter/meter.verb.ts');
 const { TIMELINE_OF, TIMELINE_PARTS } = await import('../src/timeline/index.ts');
 const { DISK_EVERY, DISK_METRICS, DISK_SPAN, DISK_SPAN_KEYS } = await import('../src/disk/disk.verb.ts');
-const { DISK_PARTS } = await import('../src/disk/disk.ts');
+const { ALL_KINDS, DISK_KINDS, DISK_PARTS } = await import('../src/disk/disk.ts');
 const { STEP_ATTRIBUTE_KEYS } = await import('../src/meter/step.ts');
 const { DEFAULT_SERVICE_NAME } = await import('../src/telemetry/telemetry.ts');
 const { PHASES } = await import('../src/meter/meter.ts');
@@ -948,7 +948,14 @@ test("System's Disk row draws the store's disk by the code's names, and its larg
   const disk = rowPanels(system, 'Disk');
   assert.deepEqual(
     disk.map((p) => p.title),
-    ['On disk, by part', 'On disk, by factory', "Free on the store's disk", 'Names that did not read', 'Largest runs now'],
+    [
+      'On disk, by part',
+      'On disk, by factory',
+      "Free on the store's disk",
+      'Names that did not read',
+      'On disk, by kind',
+      'Largest runs now',
+    ],
   );
   const asked = new Set(disk.flatMap((p) => (p.targets ?? []).flatMap((t) => promNames(t.expr ?? '').metrics)));
   const exported = Object.keys(DISK_METRICS).flatMap((key) => METRICS.get(`disk.${key}`) ?? [`disk.${key} is no metric of the code`]);
@@ -964,13 +971,22 @@ test("System's Disk row draws the store's disk by the code's names, and its larg
   assert.ok(/WSL/.test((windowed(system, "Free on the store's disk") as { description?: string }).description ?? ''), 'the limit is said');
   const said = (windowed(system, 'On disk, by part') as { description?: string }).description ?? '';
   assert.deepEqual(unsaidParts(said, DISK_PARTS), [], 'the by-part panel says each part by the word its series carries');
+  const byKind = windowed(system, 'On disk, by kind') as Panel & { description?: string };
+  assert.deepEqual(unsaidParts(byKind.description ?? '', ALL_KINDS), [], 'the by-kind panel says each kind by the word its series carries');
+  assert.deepEqual(keptBy(byKind.targets?.[0].expr ?? '', ''), [['part', 'kind']], 'a series a kind of a part');
+  assert.equal(byKind.fieldConfig?.defaults?.custom?.drawStyle, 'bars', 'stacked bars');
   const seeded = SEED.flatMap((s) => s.metrics.filter((m) => m.name === 'disk.bytes').flatMap((m) => m.series.map(([labels]) => labels)));
   for (const part of ['engine', 'sessions'])
     assert.ok(
       seeded.some((labels) => labels.part === part && labels.factory !== undefined) && seeded.some((l) => l.part === part && !l.factory),
       `the render draws ${part} by factory and alone`,
     );
+  assert.deepEqual(oneKindParts(seeded), [], 'the render draws every part of several kinds by more than one');
 });
+
+/** The parts of `DISK_KINDS` that have several kinds and of which the seeded label sets `seeded` hold one kind or none. */
+const oneKindParts = (seeded: readonly Record<string, string | undefined>[]): string[] =>
+  DISK_PARTS.filter((part) => DISK_KINDS[part].length > 1 && new Set(seeded.filter((l) => l.part === part).map((l) => l.kind)).size < 2);
 
 /** The parts of `parts` that `description` does not say in brackets, as a panel names the word a series carries. */
 const unsaidParts = (description: string, parts: readonly string[]): string[] => parts.filter((part) => !description.includes(`(${part})`));
@@ -979,6 +995,14 @@ test('REFUSED: a by-part description that leaves a part of the disk unsaid names
   const said = (windowed(dashboardTitled('System'), 'On disk, by part') as { description?: string }).description ?? '';
   assert.deepEqual(unsaidParts(said.replace('(sessions)', ''), DISK_PARTS), ['sessions']);
   assert.deepEqual(unsaidParts(said, [...DISK_PARTS, 'elsewhere']), ['elsewhere']);
+});
+
+test('REFUSED: a by-kind description that leaves a kind unsaid, and a seed of one kind of a part, name them', () => {
+  const said = (windowed(dashboardTitled('System'), 'On disk, by kind') as { description?: string }).description ?? '';
+  assert.deepEqual(unsaidParts(said.replace('(check-output)', 'check output'), ALL_KINDS), ['check-output']);
+  assert.deepEqual(unsaidParts(said, [...ALL_KINDS, 'elsewhere']), ['elsewhere']);
+  const seeded = SEED.flatMap((s) => s.metrics.filter((m) => m.name === 'disk.bytes').flatMap((m) => m.series.map(([labels]) => labels)));
+  assert.deepEqual(oneKindParts(seeded.map((l) => (l.part === 'runs' ? { ...l, kind: 'pictures' } : l))), ['runs']);
 });
 
 test('REFUSED: a Disk panel asking a misspelt gauge, one kept by run, a largest-runs panel of one sweep, and a seed of one large run', () => {

@@ -111,7 +111,8 @@ Grafana cannot be saved, so edit the JSON here, and Grafana reads it again withi
   over the same range, which the links at the top keep.
   Its row **Disk** draws what the daemon's sweep of the store reads every ten minutes: **On disk, by part** and **On disk, by
   factory** (`disk.bytes`, stacked), **Free on the store's disk** (`disk.free`, `disk.size`), **Names that did not read**
-  (`disk.unread`: what is in no byte of its part), and **Largest runs now**, no metric: the `disk.run` spans of the last 30 minutes
+  (`disk.unread`: what is in no byte of its part), **On disk, by kind** (`disk.bytes` by `part` and `kind`, stacked bars: a part's
+  kinds add up to it, each kind said in the panel's description), and **Largest runs now**, no metric: the `disk.run` spans of the last 30 minutes
   from Tempo, a bar a run, whatever the dashboard's range. The part `sessions` is the records the runtime's sessions left where their
   harness keeps them, outside the store and perhaps on another file system, counted only while a task still names them; `engine` and
   `sessions` are drawn by factory too, as the runtime says them by task, what belongs to no run known left in the part alone. The free space is the file system's that holds the store: under WSL the
@@ -395,7 +396,8 @@ Read off a daemon exporting to this stack (2026-10-06), and a step's session (20
   takes `_ratio`, from the unit `1` the exporter gives it (`machine_load_ratio`); a counter that only grows (`incremental: true`) takes
   `_total` (`step_cost_total`); any other counter is a gauge with no suffix (`subscription_wakes`, `nemia_acts`). Every series carries
   `job` and `service_name`, both the service's name. The step metrics carry `factory`, `workflow`, `step`, `agent` and `outcome`, the
-  phases `phase`, the api's reads `route`, and the disk's `part` and, for a part kept by run or by task, `factory`: `disk_bytes_ratio`,
+  phases `phase`, the api's reads `route`, and the disk's `part`, `kind` (on `disk_bytes_ratio`) and, for a part kept by run or by
+  task, `factory`: `disk_bytes_ratio`,
   `disk_free_ratio` and `disk_size_ratio` are bytes, whatever the suffix says. A run's id is never a label.
 - **Tempo**: the resource attribute `service.name`; the span attributes `run`, `step`, `task`, `kind` and `attempt`, as `span.run` and so
   on. An `append` made outside a filing (a session's end) carries its task and kind but no run. Two spans are named `tick`: the

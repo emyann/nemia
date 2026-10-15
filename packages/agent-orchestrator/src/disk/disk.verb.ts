@@ -15,6 +15,7 @@ import { storeFree, storeRoots } from './disk.store.ts';
 import {
   entryKey,
   entryOf,
+  kindAt,
   kindIn,
   largestOf,
   readingOf,
@@ -63,11 +64,12 @@ export const freshDiskMemory = (): DiskMemory => ({ said: new Set() });
 /** What one sweep answers: the reading, the runs it named, and what the walk cost, the names it read and the bursts it yielded. */
 export type Measured = { reading: DiskReading; largest: DiskRun[]; names: number; bursts: number };
 
-/** `value` into `disk.bytes` for the part, kind and factory `key` names (`entryKey`). */
+/** `value` into `disk.bytes` for the part, kind and factory `key` names (`entryKey`), a key of no kind its part's own (`kindAt`). */
 const bytesSaid = (key: string, value: number): Effect.Effect<void> => {
-  const { part, kind, factory } = entryOf(key);
-  const labels = { part, ...(kind === undefined ? {} : { kind }), ...(factory === undefined ? {} : { factory }) };
-  return Metric.update(Metric.withAttributes(DISK_METRICS.bytes, labels), value);
+  const { part, kind = kindAt(part), factory } = entryOf(key);
+  return factory === undefined
+    ? Metric.update(Metric.withAttributes(DISK_METRICS.bytes, { part, kind }), value)
+    : Metric.update(Metric.withAttributes(DISK_METRICS.bytes, { part, kind, factory }), value);
 };
 
 /**

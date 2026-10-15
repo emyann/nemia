@@ -807,6 +807,66 @@
       }
     },
     {
+      "id": 41,
+      "type": "timeseries",
+      "title": "On disk, by kind",
+      "description": "disk.bytes by kind: what each kind inside each part of the store holds, as the daemon's last sweep read it, stacked, the kinds of a part adding up to the part beside this panel. In the runs (runs): a step's handed pictures, by their image type (pictures), the other files it handed (handed), the agents frozen for a run (agents) and its inputs (inputs), the run records (records), a person's words and marks beside them (marks), and any other name (runs-other). In the worktrees (worktrees): the checkout (checkout) and what is under a node_modules (dependencies), a file hardlinked from outside counting nothing. In the folder handed to the runtime (engine), as the runtime says what each file is: a session's output (session-output), a check's output (check-output), the rest a session keeps (session-files), the journals (journals), the bodies (bodies), and what no task names, its feed among it (engine-other). The harness's own records of the sessions (harness-records); the checks' closeouts and output (checks), the series (series), and everything else under the store's root (other).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 26,
+        "w": 24,
+        "h": 14
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A",
+          "expr": "sum by (part, kind) (disk_bytes_ratio{service_name=\"$service\"})",
+          "legendFormat": "{{part}}: {{kind}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "min": 0,
+          "custom": {
+            "fillOpacity": 80,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "normal"
+            },
+            "drawStyle": "bars",
+            "barAlignment": 0
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
       "id": 40,
       "type": "bargauge",
       "title": "Largest runs now",
@@ -817,7 +877,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 26,
+        "y": 40,
         "w": 24,
         "h": 14
       },
@@ -911,7 +971,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 40
+        "y": 54
       },
       "panels": []
     },
@@ -926,7 +986,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 41,
+        "y": 55,
         "w": 8,
         "h": 8
       },
@@ -978,7 +1038,7 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 41,
+        "y": 55,
         "w": 8,
         "h": 8
       },
@@ -1030,7 +1090,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 41,
+        "y": 55,
         "w": 8,
         "h": 8
       },
@@ -1080,7 +1140,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 49
+        "y": 63
       },
       "panels": []
     },
@@ -1095,7 +1155,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 50,
+        "y": 64,
         "w": 8,
         "h": 9
       },
@@ -1155,7 +1215,7 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 50,
+        "y": 64,
         "w": 8,
         "h": 9
       },
@@ -1215,7 +1275,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 50,
+        "y": 64,
         "w": 8,
         "h": 9
       },
@@ -1275,7 +1335,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 59,
+        "y": 73,
         "w": 8,
         "h": 9
       },
@@ -1346,7 +1406,7 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 59,
+        "y": 73,
         "w": 8,
         "h": 9
       },
@@ -1407,7 +1467,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 59,
+        "y": 73,
         "w": 8,
         "h": 9
       },
@@ -1468,7 +1528,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 68,
+        "y": 82,
         "w": 12,
         "h": 8
       },
@@ -1529,7 +1589,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 68,
+        "y": 82,
         "w": 12,
         "h": 8
       },
@@ -1600,7 +1660,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 76,
+        "y": 90,
         "w": 8,
         "h": 9
       },
@@ -1671,7 +1731,7 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 76,
+        "y": 90,
         "w": 8,
         "h": 9
       },
@@ -1742,7 +1802,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 76,
+        "y": 90,
         "w": 8,
         "h": 9
       },
@@ -1811,7 +1871,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 85
+        "y": 99
       },
       "panels": []
     },
@@ -1826,7 +1886,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 86,
+        "y": 100,
         "w": 6,
         "h": 7
       },
@@ -1878,7 +1938,7 @@
       },
       "gridPos": {
         "x": 6,
-        "y": 86,
+        "y": 100,
         "w": 6,
         "h": 7
       },
@@ -1939,7 +1999,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 86,
+        "y": 100,
         "w": 6,
         "h": 7
       },
@@ -2018,7 +2078,7 @@
       },
       "gridPos": {
         "x": 18,
-        "y": 86,
+        "y": 100,
         "w": 6,
         "h": 7
       },
@@ -2068,7 +2128,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 93
+        "y": 107
       },
       "panels": []
     },
@@ -2078,7 +2138,7 @@
       "title": "",
       "gridPos": {
         "x": 0,
-        "y": 94,
+        "y": 108,
         "w": 24,
         "h": 2
       },
@@ -2098,7 +2158,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 96,
+        "y": 110,
         "w": 12,
         "h": 16
       },
@@ -2127,7 +2187,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 96,
+        "y": 110,
         "w": 12,
         "h": 16
       },

@@ -1,7 +1,7 @@
 # Design discussion, 2026-10-15: kinds and revisions, the closeout's shape, and sessions attached to the daemon
 
-**Status: a discussion to be refined, the next time the owner and the operator take it up.** Not a spec, not a plan, and nothing is
-filed from it. It records what the owner and the operator session worked out on the night of 2026-10-14 to 15, starting from the
+**Status: the open choices are decided (section 5, the morning of 2026-10-15); handed to Iris as the input of an intake.** Not a spec,
+not a plan. It records what the owner and the operator session worked out on the night of 2026-10-14 to 15, starting from the
 store's disk footprint, at main `ab023d78`. Where it says *decided*, the owner said so; everything else is the session's reading, for
 the owner to refine, cut or overturn before any of it becomes an intake card for Iris.
 
@@ -109,17 +109,23 @@ keep, and what a closeout is.
   `apiVersion`, so an old run's closeout stays readable after the shape changes. Factories are the one kind that already applies and
   upgrades (`nemia factory apply`, `upgrade`, `plan`, `resolve`).
 
-## 5. Open choices
+## 5. Choices, decided by the owner on the morning of 2026-10-15
 
-1. **The default strategy for a live run:** resolve each step when it is filed (a run waiting `--after` takes today's edit), keep the
-   run's revisions as a Job does, or keep them and offer an explicit "take the new revision".
-2. **A field declared by both an agent and its step:** refused when applied, naming both; or one wins, and which.
-3. **Attached sessions: drain or interrupt.** May an upgrade wait for the sessions at work to end (some run for hours), or does it
-   interrupt them and resume?
-4. Smaller ones: `needs` within `blocked`; `summary` as a line and a body; artifacts typed; whether Nemia's `--bg` session moves too;
-   Codex alongside.
+1. **A live run pins its revisions, shows its drift, and takes a new one on ask.** A run that has filed nothing yet (one waiting
+   `--after`) resolves its kinds when its first step is filed. Once started, it keeps the revisions it resolved; the board shows the
+   drift ("implement: rev 3, the folder is at rev 4"); a verb takes the new revision for the steps not yet filed. Rejected: resolving
+   each step when filed (a run mixes revisions, a closeout's shape changes mid-run), and pinning with no verb (cancel and restart).
+2. **A field declared by both an agent and its step is refused when applied**, naming the field and both declarers. Each field of the
+   merged closeout has one owner, recorded; `build/review.schema.json` stops copying Agora's `findings` and `again` and declares only
+   `mutants`. Rejected: the step wins, the agent wins.
+3. **A daemon restart stops an attached session between tool calls and resumes it.** The daemon waits for each session's tool call in
+   flight (a suite, a build) to end, stops the session, and the new daemon resumes it; only the prompt cache may be lost. Rejected:
+   draining whole sessions (a restart could wait hours), interrupting at once (the turn in flight is lost).
+4. Smaller ones, **in**: `needs` only with `outcome: blocked`; `summary` as one line for the board and a body beside it; artifacts
+   typed (a file, or a value). **Later**: Nemia's own `--bg` session moving to the SDK. Not discussed: Codex alongside (the runtime's
+   seam keeps one shape per harness, section 4).
 
 ## 6. Next
 
-Take it up with the owner, settle the open choices, then hand it to Iris as the input of an intake: likely two intents, (b) and
-(c) with the kinds, which may be ordered one after the other.
+The choices are settled; the note is the input of an intake for Iris: likely two intents, (b) and (c) with the kinds, which may be
+ordered one after the other.

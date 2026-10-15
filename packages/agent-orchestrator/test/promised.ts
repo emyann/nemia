@@ -27,14 +27,15 @@ const isThenable = (value: unknown): value is PromiseLike<unknown> =>
 /**
  * `fake` as an `Engine`: each function it has becomes a verb that calls it when run, succeeding with what it returns or resolves, failing
  * with what it throws or rejects with, as it was thrown. What the fake does not have stays missing, so a call to it dies as a call to
- * nothing; a value that is no function is kept as it is.
+ * nothing; a value that is no function is kept as it is. Its `hold` holds nothing, unless `fake` gives one.
+ * A daemon takes it as it starts.
  *
  * @param fake The methods a test gives the engine, each sync or async, each answering what the Promise engine answered.
  * @returns The engine whose every verb is an Effect over `fake`'s method of that name.
  */
 export const promised = (fake: object): Engine =>
   Object.fromEntries(
-    Object.entries(fake).map(([name, value]) => [
+    Object.entries({ hold: () => undefined, ...fake }).map(([name, value]) => [
       name,
       typeof value === 'function'
         ? (...args: unknown[]) =>

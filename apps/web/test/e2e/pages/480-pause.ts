@@ -156,6 +156,23 @@ export default {
       await page.keyboard.press('Escape');
       await expectCount(popover, 0, 'Escape closes the popover');
 
+      const calling = { run: FAKE.id, step: FAKE.refused, kind: 'session', calling: 'Bash' };
+      await page.route('**/api/pause', (route) =>
+        route.request().method() === 'GET'
+          ? route.fulfill({ json: { pause: put, finishing: [calling], staged: [], held: [] } })
+          : route.fallback(),
+      );
+      await page.reload({ waitUntil: 'load' });
+      await idle(page);
+      await opened(page, 'calling');
+      await expectTexts(
+        popover.locator('[data-pause-finishing] li'),
+        [`${FAKE.id}'s ${FAKE.refused} is finishing: its call to Bash runs`],
+        'a session in a tool call is named by its call, which a restart of the daemon waits for',
+      );
+      await page.keyboard.press('Escape');
+      await page.unroute('**/api/pause');
+
       const staged = { run: GATED.id, step: 'ship', repo: '/code/app' };
       const held = { run: FAKE.id, step: FAKE.refused };
       await page.route('**/api/pause', (route) =>

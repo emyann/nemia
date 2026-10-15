@@ -15,6 +15,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
+import { Effect } from 'effect';
 import type { RefusedMove, TickReport } from 'agent-runtime';
 import type { Engine } from '../runtime-client.ts';
 import { nodeChild } from '../../test/child.ts';
@@ -287,6 +288,24 @@ test('REFUSED at shipped defaults: `nemia up` with an interval daemon.json canno
     "a store held by a live daemon is not freed by a bad interval: the refusal is the interval's, the file untouched",
   );
   clear();
+});
+
+test('`nemia up` holds the attached sessions while it holds the store, and lets them go before the store', async (t) => {
+  clear();
+  seeded(t);
+  const held: string[] = [];
+  const e = engineOf(() => {
+    held.push(`pass, store ${read().stoppedAt ? 'let go' : 'held'}`);
+    throw STOP;
+  });
+  const hold = () =>
+    Effect.acquireRelease(
+      Effect.sync(() => void held.push('hold')),
+      () => Effect.sync(() => void held.push(`let go, store ${read().stoppedAt ? 'let go' : 'held'}`)),
+    );
+  const { threw } = await typed(t, ['up', '10'], Object.assign(e, { hold }));
+  assert.equal(threw, STOP);
+  assert.deepEqual(held, ['hold', 'pass, store held', 'let go, store held']);
 });
 
 test('`nemia up` takes the store: its pid, where and how often it ticks, then each pass completed — and lets it go as it stops', async (t) => {

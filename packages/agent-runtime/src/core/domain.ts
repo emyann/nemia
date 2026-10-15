@@ -149,6 +149,12 @@ export type Sighting = {
    * whether it was asked for (`TaskView.bridge`).
    */
   bridge?: Bridge;
+  /**
+   * The tool call the session is in, the earliest of those in flight, and since when (ISO), for a harness that sees its calls start and
+   * end (Claude Code attached on the Agent SDK). Absent between two calls, and from a harness that cannot say. **Carried, never
+   * judged**: `decide` does not read it; a person learns from it which call a stop of the engine's process waits for.
+   */
+  calling?: { tool: string; since: string };
 };
 
 /** A session's bridge: the link that opens it, or no link and why, in words that say what to do. */

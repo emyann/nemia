@@ -32,12 +32,18 @@ export function pauseSince(pause: Pause, now: Date): string {
 
 /**
  * A task still finishing under the pause, in a sentence: its run, its step, and what of it is at work; or, once asked to stop, that it is
- * stopping, and tried again on the resume only where a pause at once's ask names it (`resumed`).
+ * stopping, and tried again on the resume only where a pause at once's ask names it (`resumed`); a session in a tool call names the tool.
  */
-export const finishingSentence = ({ run, step, kind, stopping, resumed }: Finishing): string =>
+export const finishingSentence = ({ run, step, kind, stopping, resumed, calling }: Finishing): string =>
   stopping
     ? `${run}'s ${step} is stopping: its ${kind === 'session' ? 'session' : 'check'} was asked to stop${resumed ? ', and is tried again on the resume' : ''}`
-    : `${run}'s ${step} is finishing: ${kind === 'session' ? 'its session is at work' : kind === 'check' ? 'its check runs' : 'the check of its landing runs'}`;
+    : `${run}'s ${step} is finishing: ${atWork(kind, calling)}`;
+
+/** What of a step is at work, in words: its session, in its call to `calling` where it is in one, its check, or its landing's. */
+const atWork = (kind: Finishing['kind'], calling: string | undefined): string => {
+  if (kind === 'session') return calling ? `its call to ${calling} runs` : 'its session is at work';
+  return kind === 'check' ? 'its check runs' : 'the check of its landing runs';
+};
 
 /** A task a pause at once would stop, in a few words: its run, then its step's session or check. */
 export const interruptSentence = ({ run, step, kind }: Interrupt): string => `${run}: ${step}'s ${kind}`;

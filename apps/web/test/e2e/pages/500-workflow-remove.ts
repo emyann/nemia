@@ -6,7 +6,7 @@ import { expectCount, expectInside, expectVisible, idle, Refused, settled, WAIT_
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
-/** The workflow of yours the page writes, stars and removes from its page. */
+/** The workflow of yours the page writes and removes from its page. */
 const GOING = 'goes-from-its-card-e2e';
 
 /** The runner's viewport, put back before the page ends. */
@@ -20,14 +20,14 @@ const cardOf = (page: Page) => page.locator(`article[aria-label="Workflow ${GOIN
 
 /** What the confirm says goes, and what becomes of what names the folder. */
 const asked = (dir: string): string =>
-  `Remove ${dir}, its 2 steps and every file in it? A run started on it goes on from the steps it froze at its start; a card that names it and is not queued is refused when it starts; its star goes with it.`;
+  `Remove ${dir}, its 2 steps and every file in it? A run started on it goes on from the steps it froze at its start; a card that names it and is not queued is refused when it starts.`;
 
 export default {
   /**
-   * A workflow of yours removed from its page: Remove… asks first, naming the folder, its steps and its star, and saying that a run started
+   * A workflow of yours removed from its page: Remove… asks first, naming the folder and its steps, and saying that a run started
    * on it goes on from what it froze and that a card naming it not queued is refused at its start; Keep it takes the question back. On a
    * phone, the question and its buttons wrap inside the page. Remove then takes the folder off the disk, goes back to the Workflows page,
-   * without its card, and takes its star off Favorites. No card on the Workflows page offers Remove. The folder is written by the page, and
+   * without its card. No card on the Workflows page offers Remove. The folder is written by the page, and
    * removed by it; a failure removes it too.
    */
   name: 'workflow-remove',
@@ -48,9 +48,6 @@ export default {
       await page.waitForURL((url) => url.pathname === `/workflows/yours/${GOING}`, { timeout: WAIT_MS });
       await idle(page);
       const card = cardOf(page);
-      await card.getByRole('button', { name: `Star ${GOING} (yours)` }).click();
-      await page.waitForFunction((going) => localStorage.getItem('nemia:favorites')?.includes(going) === true, GOING, { timeout: WAIT_MS });
-
       await card.getByRole('button', { name: 'Remove…' }).click();
       const asks = card.locator('[data-remove-asks]');
       await expectVisible(asks, 'Remove… asks before it removes');
@@ -79,8 +76,6 @@ export default {
       await idle(page);
       await expectCount(listed, 0, 'removed, its page goes back to the Workflows page, its card gone');
       if (fs.existsSync(dir)) throw new Refused(`removed, the folder goes from the disk — ${dir} is still there`);
-      const kept = await page.evaluate(() => localStorage.getItem('nemia:favorites'));
-      if (kept?.includes(GOING)) throw new Refused(`removed, its star goes from what the browser keeps — it keeps ${kept}`);
       await idle(page);
       await page.evaluate(() => window.scrollTo(0, 0));
       await photograph(page, path.join(OUT, `workflow-remove-done-${await themeOf(page)}.png`), { fullPage: true });

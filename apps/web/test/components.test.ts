@@ -5735,36 +5735,6 @@ const filed = (name: string, extra: Partial<import('../src/lib/api.ts').Factory>
   ...extra,
 });
 
-test('REFUSED: the star is a toggle named Star and its name, pressed only while this browser keeps its favourite', async () => {
-  const { FavoriteStar } = await import('../src/components/FavoriteStar.tsx');
-  const { FAVORITES_KEY } = await import('../src/lib/favorites.ts');
-  const kept = JSON.stringify([
-    { kind: 'run', run: 'r-1' },
-    { kind: 'workflow', from: 'repo', workflow: 'dev' },
-  ]);
-  Object.assign(globalThis, { localStorage: { getItem: (key: string) => (key === FAVORITES_KEY ? kept : null) } });
-  try {
-    const star = (favorite: Record<string, string>, name: string) =>
-      renderToStaticMarkup(createElement(FavoriteStar, { favorite: favorite as never, name }));
-    const on = star({ kind: 'run', run: 'r-1' }, 'Star the runs');
-    assert.match(on, /<button[^>]*aria-label="Star Star the runs"/);
-    assert.match(on, /aria-pressed="true"/);
-    assert.match(on, /data-starred="true"/);
-    assert.match(on, /title="Starred: take it off Favorites"/);
-    for (const off of [
-      star({ kind: 'run', run: 'r-2' }, 'r-2'),
-      star({ kind: 'workflow', from: 'yours', workflow: 'dev' }, 'dev'),
-      star({ kind: 'workflow', from: 'repo', workflow: 'r-1' }, 'r-1'),
-    ]) {
-      assert.match(off, /aria-pressed="false"/);
-      assert.doesNotMatch(off, /data-starred/);
-      assert.match(off, /title="Star: list it under Favorites"/);
-    }
-  } finally {
-    Reflect.deleteProperty(globalThis, 'localStorage');
-  }
-});
-
 test('REFUSED: the sidebar is drawn folded only where the cookie keeps sidebar_state=false, whole', async () => {
   const { sidebarOpenOf } = await import('../src/components/ui/sidebar.tsx');
   assert.equal(sidebarOpenOf('a=1; sidebar_state=false'), false);

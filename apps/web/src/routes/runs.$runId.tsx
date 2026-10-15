@@ -14,7 +14,6 @@ import { RunGone } from '../components/RunGone';
 import { StatusChip, StepNote } from '../components/StatusChip';
 import { Timeline } from '../components/Timeline';
 import { StartedFrom } from '../components/TryTag';
-import { FavoriteStar } from '../components/FavoriteStar';
 import { RemoveRun } from '../components/RemoveRun';
 import { LiftHold } from '../components/LiftHold';
 import { HoldRun } from '../components/HoldRun';
@@ -26,7 +25,7 @@ import { barValue } from '../lib/bar';
 import { spentTitle } from '../lib/cost';
 import { decidableRun } from '../lib/decide';
 import { duration } from '../lib/canvas';
-import { clockCounts, inFlight, runClock, titleOf, waitedMs } from '../lib/factory';
+import { clockCounts, inFlight, runClock, waitedMs } from '../lib/factory';
 import { useNow } from '../lib/useNow';
 import { container, ink } from '../lib/meaning';
 
@@ -90,7 +89,7 @@ function RunRead({ runId }: { runId: string }) {
 
 /**
  * One run, top to bottom: what is left to decide about its result, above who else it waits on, as the CLI's `ls` prints the two; the runs
- * it waits on and a person's hold; its warning; its id and its star (`RunHeading`), with what it has cost, every step's tries, once a cost
+ * it waits on and a person's hold; its warning; its id (`RunHeading`), with what it has cost, every step's tries, once a cost
  * was measured (`≥` where an ended attempt has none on it), what the same sessions read, by price, where every one of them measured it,
  * what it was started from, and, once it is over, what it holds on disk to give back as the CLI's `prune` does; then Decide, between the
  * banners and the canvas, for a run with something to decide and never while it runs: an answer to give, or a try a person has asked for,
@@ -494,14 +493,9 @@ function HeldUntil({ run }: { run: RunDetail }) {
   );
 }
 
-/** A run's id, its page's heading, and its star, named by its title, which puts it under Favorites. */
+/** A run's id, its page's heading. */
 function RunHeading({ run }: { run: RunDetail }) {
-  return (
-    <div className="flex items-center gap-1">
-      <h1 className="font-mono text-body-medium text-muted-foreground">{run.id}</h1>
-      <FavoriteStar favorite={{ kind: 'run', run: run.id }} name={titleOf(run)} />
-    </div>
-  );
+  return <h1 className="font-mono text-body-medium text-muted-foreground">{run.id}</h1>;
 }
 
 function BackToRuns() {

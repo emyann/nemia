@@ -18,7 +18,7 @@ import yaml from 'js-yaml';
 import { scratch } from './scratch.ts';
 import { until, WAITED } from './waits.ts';
 import { boundOf, HOLD_DEFAULT, heldLines, heldName } from '../../../tools/observe/render/hold.ts';
-import { locked, lockFile, release, take, type Lock } from '../../../tools/observe/render/lock.ts';
+import { dropStale, locked, lockFile, release, take, type Lock } from '../../../tools/observe/render/lock.ts';
 import { addressOf, heightOf, written, type Seen } from '../../../tools/observe/render/panels.ts';
 import { dashboardsOf, planOf } from '../../../tools/observe/render/plan.ts';
 import { NAME, nameOf, runArgv, type Compose } from '../../../tools/observe/render/stack.ts';
@@ -160,6 +160,69 @@ test('a lock is there whole or not at all: one that does not read is taken with 
   const left = fs.readdirSync(path.dirname(lockFile())).filter((file) => file.startsWith(`${path.basename(lockFile())}.`));
   assert.deepEqual(left, [], 'no file of the taking is left beside the lock');
   assert.equal(fs.statSync(lockFile()).nlink, 1);
+});
+
+/** The files of a taking or a breaking left beside the lock. */
+const leftBeside = (): string[] =>
+  fs.readdirSync(path.dirname(lockFile())).filter((file) => file.startsWith(`${path.basename(lockFile())}.`));
+
+test("a live holder's lock moved aside is put back, and no container is removed", () => {
+  fresh();
+  const live: Lock = { pid: process.pid, name: 'nemia-render-1-live00' };
+  fs.writeFileSync(lockFile(), JSON.stringify(live));
+  assert.equal(dropStale(), undefined);
+  assert.deepEqual(locked(), live, 'the live holder keeps its lock');
+  assert.deepEqual(calls(), []);
+  assert.deepEqual(leftBeside(), []);
+});
+
+test('REFUSED: a lock placed while a live one is being put back stays, and the breaker says to run again once both have ended', (t) => {
+  fresh();
+  const live: Lock = { pid: process.pid, name: 'nemia-render-1-live00' };
+  const third: Lock = { pid: process.ppid, name: 'nemia-render-2-third0' };
+  fs.writeFileSync(lockFile(), JSON.stringify(live));
+  const link = fs.linkSync;
+  t.mock.method(fs, 'linkSync', (from: fs.PathLike, to: fs.PathLike) => {
+    if (String(from).endsWith(`.stale-${process.pid}`) && String(to) === lockFile()) fs.writeFileSync(lockFile(), JSON.stringify(third));
+    link(from, to);
+  });
+  let exitCode: number | undefined;
+  const message = refused(() => {
+    try {
+      dropStale();
+    } catch (err) {
+      exitCode = (err as { exitCode?: number }).exitCode;
+      throw err;
+    }
+  });
+  assert.equal(exitCode, 2, message);
+  assert.match(message, /nemia-render-2-third0, a render in flight .* holds the slot and nemia-render-1-live00 now runs without it/);
+  assert.ok(message.endsWith('run it again once both have ended'), message);
+  assert.deepEqual(locked(), third, 'the lock in place stays');
+  assert.deepEqual(leftBeside(), []);
+  assert.deepEqual(calls(), []);
+});
+
+test('REFUSED: a lock this user cannot move, at the bound, naming its holder and its file', async (t) => {
+  fresh();
+  const dead: Lock = { pid: deadPid(), name: 'nemia-render-9-dead00' };
+  fs.writeFileSync(lockFile(), JSON.stringify(dead));
+  const rename = fs.renameSync;
+  let moves = 0;
+  t.mock.method(fs, 'renameSync', (from: fs.PathLike, to: fs.PathLike) => {
+    if (String(from) !== lockFile()) return rename(from, to);
+    moves += 1;
+    if (moves > 3) throw new Error('take looped');
+    throw Object.assign(new Error('operation not permitted'), { code: 'EPERM' });
+  });
+  const said = await take('nemia-render-3-third0', 0).then(
+    () => 'taken',
+    (err: Error & { exitCode?: number }) => `${err.exitCode}: ${err.message}`,
+  );
+  assert.ok(said.startsWith('2: '), said);
+  for (const part of [lockFile(), 'nemia-render-9-dead00', 'EPERM', 'remove it as the user who owns it']) assert.ok(said.includes(part), said);
+  assert.deepEqual(calls(), []);
+  assert.deepEqual(locked(), dead, 'the lock is left where it is');
 });
 
 test('REFUSED: a hold of no seconds, of more than half an hour, of a fraction or of a word', () => {

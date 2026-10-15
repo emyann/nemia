@@ -93,9 +93,9 @@ test("inside a run's folder, its handed files, agents and inputs are their kinds
     ['pictures', 'pictures', 'handed', 'handed', 'agents', 'agents', 'inputs', 'pictures', 'runs-other'],
   );
   assert.deepEqual(
-    [['artifact', 'x.png'], ['artifacts.png'], ['shot.png']].map((names) => under(names)),
-    ['runs-other', 'runs-other', 'runs-other'],
-    'REFUSED: a picture outside the handed files, and a folder named near one, are no handed picture',
+    [['artifact', 'x.png'], ['artifacts.png'], ['shot.png'], ['constructor', 'x.png']].map((names) => under(names)),
+    ['runs-other', 'runs-other', 'runs-other', 'runs-other'],
+    "REFUSED: a picture outside the handed files, a folder named near one, and one named as an object's own key are no handed picture",
   );
   assert.deepEqual(
     ['shot.png.txt', 'pngs', 'a.svg', 'a.webp'].map((name) => kindIn('handed', name)),

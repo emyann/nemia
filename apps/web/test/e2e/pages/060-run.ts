@@ -1,4 +1,6 @@
-import { sidebar, stepBar } from '../board.ts';
+import path from 'node:path';
+import { photograph, sidebar, stepBar, themeOf } from '../board.ts';
+import { OUT } from '../world.ts';
 import { expectCount, expectDrawn, expectInside, expectUncut, expectVisible, Refused, settled } from '../checks.ts';
 import { FAKE, SESSION } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -265,6 +267,22 @@ export default {
       page.locator(`article > section [aria-label="Artifacts"] img[alt="${FAKE.artifacts.image}"]`),
       `${FAKE.unverified}'s section on the run's page draws the image too`,
     );
+    await expectVisible(
+      output.locator('[data-summary]', { hasText: FAKE.envelope.cut }),
+      `${FAKE.unverified}'s v1 summary is one line, cut at a word with an ellipsis`,
+    );
+    await expectVisible(
+      output.locator('[data-body]', { hasText: FAKE.envelope.summary }),
+      'its whole summary leads its body, so nothing it wrote is lost',
+    );
+    await expectVisible(output.locator('[data-body] strong', { hasText: 'sky' }), 'its body is drawn as markdown');
+    await expectVisible(
+      output.locator(`[data-value="${FAKE.envelope.value.name}"] a[href="${FAKE.envelope.value.value}"][target="_blank"]`, {
+        hasText: FAKE.envelope.value.value,
+      }),
+      `the value it handed on is labelled ${FAKE.envelope.value.name} and links to its address`,
+    );
+    await photograph(output, path.join(OUT, `run-envelope-${await themeOf(page)}.png`));
     const served = await page.request.get(new URL((await full.getAttribute('href')) ?? '', page.url()).href);
     const headers = served.headers();
     if (served.status() !== 200 || headers['content-type'] !== 'image/png' || headers['cache-control'] !== 'no-store') {
@@ -282,6 +300,18 @@ export default {
     } finally {
       await tab.close();
     }
+    await settled(page);
+
+    await output.getByRole('button', { name: 'Close', exact: true }).click();
+    await expectCount(output, 0, "tokens' bar closes, and uncovers theme");
+    await graph.locator('.react-flow__node[data-id="theme"]').click();
+    const theme = stepBar(page, FAKE.id, 'theme');
+    await theme.getByRole('tab', { name: 'Output' }).click();
+    await expectVisible(
+      theme.locator('[data-summary]', { hasText: exactly(FAKE.envelope.v0.first) }),
+      "theme's v0 closeout reads its first line as its summary",
+    );
+    await expectVisible(theme.locator('[data-body]', { hasText: FAKE.envelope.v0.more }), 'and its whole text as its body');
     await settled(page);
   },
 } satisfies PageSpec;

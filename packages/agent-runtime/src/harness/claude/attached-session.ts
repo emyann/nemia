@@ -98,7 +98,6 @@ const hooksOf = (root: string, live: Live, held: Held): Partial<Record<HookEvent
           async (input, id, { signal }) => {
             live.waiting++;
             await waitWhile(held, signal, live).finally(() => live.waiting--);
-            if (signal.aborted || live.letGo) return {};
             const tool = (input as { tool_name?: string }).tool_name ?? 'a tool';
             if (id) live.calls.set(id, { tool, since: new Date().toISOString() });
             rewrite(root, live);

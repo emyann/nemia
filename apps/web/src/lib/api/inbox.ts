@@ -37,6 +37,11 @@ export type InboxEntry = {
    * package refused it — which lasts until the card is edited or queued again — or something else failed, which the tick tries again.
    */
   tried?: { at: string; repo: string; why: string; refused: boolean };
+  /**
+   * The repository the card's factory picks for it: its factory's one repository, for a card that names none — null for a card that names
+   * its own, one whose factory has several or does not read, and an entry that does not read as a card.
+   */
+  factoryRepo: string | null;
 };
 
 /** The keys of an `InboxEntry`, each decoded: a `queued` or a `tried` the api leaves out stays out. */
@@ -54,6 +59,7 @@ const inboxEntryFields = {
   filedAt: Schema.NullOr(Schema.String),
   queued: Schema.optionalKey(Schema.Struct({ at: Schema.String, place: Schema.NullOr(Schema.Number) })),
   tried: Schema.optionalKey(Schema.Struct({ at: Schema.String, repo: Schema.String, why: Schema.String, refused: Schema.Boolean })),
+  factoryRepo: Schema.NullOr(Schema.String),
 };
 
 /** Decodes an `InboxEntry`. */

@@ -46,6 +46,7 @@ const entry = (name: string, filedAt: string | null, extra: Partial<InboxEntry> 
   error: null,
   body: name,
   filedAt,
+  factoryRepo: null,
   ...extra,
 });
 
@@ -478,22 +479,31 @@ test("a start the tick tried and did not make says so as `wf inbox` does: refuse
   const at = '2026-09-16T10:00:00.000Z';
   const refused = { at, repo: '/code/app', why: 'no workflow gone in /code/app/workflows.', refused: true };
   assert.equal(
-    triedLine({ repo: '/code/app', factory: 'solo', error: null, tried: refused }, 'then'),
+    triedLine({ repo: '/code/app', factory: 'solo', factoryRepo: null, error: null, tried: refused }, 'then'),
     'Not started at then: no workflow gone in /code/app/workflows. It stays queued, and the tick does not try it again while it reads the same: edit the card, or take it off the queue and queue it again.',
   );
   assert.equal(
-    triedLine({ repo: null, factory: 'solo', error: null, tried: refused }, 'then'),
+    triedLine({ repo: null, factory: 'solo', factoryRepo: null, error: null, tried: refused }, 'then'),
     'Not started at then on /code/app: no workflow gone in /code/app/workflows. It stays queued, and the tick does not try it again while it reads the same: edit the card, or take it off the queue and queue it again, or run the daemon in the repository it is about.',
+    "a factory that picks no repository: tried on the daemon's, which may run elsewhere",
+  );
+  assert.equal(
+    triedLine({ repo: null, factory: 'solo', factoryRepo: '/code/app', error: null, tried: refused }, 'then'),
+    "Not started at then on /code/app, its factory's one repository: no workflow gone in /code/app/workflows. It stays queued, and the tick does not try it again while it reads the same: edit the card, or take it off the queue and queue it again.",
+    "tried on its factory's one repository, from a daemon anywhere: no daemon is told to run elsewhere",
   );
   const unfactored = 'card.md: this card names no factory, and a card is started only in the factory named for it.';
   assert.equal(
-    triedLine({ repo: null, factory: null, error: null, tried: { ...refused, why: unfactored } }, 'then'),
+    triedLine({ repo: null, factory: null, factoryRepo: null, error: null, tried: { ...refused, why: unfactored } }, 'then'),
     `Not started at then: ${unfactored} It stays queued, and the tick does not try it again while it reads the same: edit the card, or take it off the queue and queue it again.`,
     'a card that names no factory is refused wherever a daemon runs: no repository is named to run one in',
   );
   const gone = 'card.md: `repo: /code/gone` names no directory.';
   assert.equal(
-    triedLine({ repo: '/code/gone', factory: null, error: gone, tried: { ...refused, repo: '/code/gone', why: gone } }, 'then'),
+    triedLine(
+      { repo: '/code/gone', factory: null, factoryRepo: null, error: gone, tried: { ...refused, repo: '/code/gone', why: gone } },
+      'then',
+    ),
     'Not started at then. It stays queued, and the tick does not try it again while it reads the same: edit the card, or take it off the queue and queue it again.',
   );
   assert.equal(
@@ -501,6 +511,7 @@ test("a start the tick tried and did not make says so as `wf inbox` does: refuse
       {
         repo: '/code/app',
         factory: 'solo',
+        factoryRepo: null,
         error: null,
         tried: { at, repo: '/code/app', why: 'git: not a git repository', refused: false },
       },

@@ -50,7 +50,7 @@ test('REFUSED: words said before the entry was written are never taken for it', 
   const { e, id, dir } = await filed();
   engine().settle(id, 'running (working)');
   await runWith(e, e.say(id, framedForHer('Again')));
-  appendOutbox(dir, { id: 'o1', at: new Date(Date.now() + 1000).toISOString(), text: 'Again' });
+  appendOutbox(dir, { id: 'o1', at: '2999-01-01T00:00:00.000Z', text: 'Again' });
   assert.deepEqual(await delivered(e, id, dir), { marked: [], said: ['o1'], left: [] });
   assert.equal(engine().said.length, 2);
 });

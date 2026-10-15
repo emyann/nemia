@@ -110,11 +110,10 @@ export function nemiaState(keeping: Keeping, task: HerTask | undefined, subscrib
 
 /**
  * What the keeper owes on a beat, in order: at `due`, file; at `filed`, subscribe, dropping first a subscription left for another task or
- * without her floor; at `kept`, tell her the person's custom words where they are not those her task was filed with (`stale`), then deliver the person's
- * chat words where some are owed and her session is live (`owed`, `up`); at
- * `leaving`, stop the open task and drop the subscription; at `stopped`, drop a subscription left; else nothing, at `untrusted` too: a
- * session filed in a folder her harness does not trust would be refused at its start. A task settled from outside is never filed again:
- * the person said so by stopping it. Pure.
+ * without her floor; at `kept`, tell her the person's custom words where they are not those her task was filed with (`stale`), then
+ * deliver the person's chat words where some are owed and her session is live (`owed`, `up`); at `leaving`, stop the open task and drop
+ * the subscription; at `stopped`, drop a subscription left; else nothing, at `untrusted` too: a session filed in a folder her harness does
+ * not trust would be refused at its start. A task settled from outside is never filed again: the person said so by stopping it. Pure.
  */
 export function nemiaDue(keeping: Keeping, task: HerTask | undefined, subscribed: HerSubscription | undefined): NemiaAct[] {
   const state = nemiaState(keeping, task, subscribed);
@@ -167,8 +166,8 @@ export type NemiaGraph = { initial: NemiaState; states: NemiaState[]; final: Nem
 const STATES: NemiaState[] = ['off', 'due', 'untrusted', 'filed', 'kept', 'stopped', 'leaving'];
 
 /**
- * The keeper's moves, her folder's trust read each beat, a change of her custom words told, the person's chat words delivered, a stop or end from outside, which it never
- * undoes, and the end of the last raise above `manual` as it passes.
+ * The keeper's moves, her folder's trust read each beat, a change of her custom words told, the person's chat words delivered, a stop or
+ * end from outside, which it never undoes, and the end of the last raise above `manual` as it passes.
  */
 const EDGES: NemiaEdge[] = [
   { from: 'due', to: 'filed', event: 'NO_TASK', action: 'file' },

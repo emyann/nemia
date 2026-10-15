@@ -1,22 +1,33 @@
 /**
- * The engine's stand-in, `testEngine()`: the `Engine` service kept by hand in a layer (`layer`), with no journal, no harness and no
- * pass, for a test of a layer above the runtime. A test settles a task itself (`settle`), leaving with its end the text its session
- * printed (`printed`), which `output` then answers stream by stream, and reads back what the engine was asked:
- * each task (`tasks`), every filing by id (`filings`) and by what it was filed with (`specs`), each stop taken (`stopped`), each word
- * said (`said`) and each `forget` call by call (`forgets`); `refuseSay(n)` refuses the next `n` says as the runtime refuses a session
- * not running; `keeps(id, sizes)` plants what `kept` answers of a task, and `failKept(n)` fails the next `n` as a store that does not
- * list fails one; `plantTranscript(id, n, events)` plants what `transcript` reads of an attempt, and `restart(id)` starts a task's next.
+ * The engine's stand-in, `testEngine()`: the `Engine` service kept by hand in a layer (`layer`), with no journal, no harness and no pass,
+ * for a test of a layer above the runtime. A test settles a task itself (`settle`), leaving with its end the text its session printed
+ * (`printed`), which `output` then answers stream by stream, and reads back what the engine was asked: each task (`tasks`), every filing
+ * by id (`filings`) and by what it was filed with (`specs`), each stop taken (`stopped`), each word said (`said`) and each `forget` call
+ * by call (`forgets`); `refuseSay(n)` refuses the next `n` says as the runtime refuses a session not running; `keeps(id, sizes)` plants
+ * what `kept` answers of a task, and `failKept(n)` fails the next `n` as a store that does not list fails one; `plantTranscript(id, n,
+ * events)` plants what `transcript` reads of an attempt, and `restart(id)` starts a task's next.
  *
- * It keeps `file`, `view`, `list`, `stop`, `logs`, `feed`, `output`, `say`, `transcript`, `forget` and `kept`, each answering what the real engine
- * answers over a harness that costs nothing: `test/engine-walks.ts` holds the walks both run, and `APART` there what this one cannot
- * say. Every other verb dies naming itself. Reached from another package through `agent-runtime/testing` alone, and by no file of a `src`.
+ * It keeps `file`, `view`, `list`, `stop`, `logs`, `feed`, `output`, `say`, `transcript`, `forget` and `kept`, each answering what the
+ * real engine answers over a harness that costs nothing: `test/engine-walks.ts` holds the walks both run, and `APART` there what this one
+ * cannot say. Every other verb dies naming itself. Reached from another package through `agent-runtime/testing` alone, and by no file of a
+ * `src`.
  */
 import { Effect, Layer } from 'effect';
 import type { Attempt, Said, State } from '../core/index.ts';
 import { JournalError, StopRefused, type TaskView } from '../core/engine/index.ts';
-import { attemptRefusal, Engine, ListRefused, listRefusalOf, TranscriptRefused, type EngineShape } from './engine.ts';
-import { cursorOf, isTranscriptCursor, noTranscript } from '../harness/transcript.ts';
-import type { TranscriptEvent } from '../harness/seam.ts';
+import {
+  attemptRefusal,
+  Engine,
+  isTranscriptCursor,
+  ListRefused,
+  listRefusalOf,
+  TRANSCRIPT_START,
+  TranscriptRefused,
+  type EngineShape,
+} from './engine.ts';
+
+/** One event of a session's transcript, as `transcript` answers it. */
+type TranscriptEvent = Effect.Success<ReturnType<EngineShape['transcript']>>['events'][number];
 import { ForgetRefused } from './forget.ts';
 import { KeptRefused, type KeptReport } from './kept.ts';
 import type { TaskSpec } from './options.ts';
@@ -128,7 +139,7 @@ const attemptOf = (t: TestTask, phase: string, end: Partial<Attempt>): Attempt =
 };
 
 /** The cursor after the first `count` events of a planted transcript: the real reader's shape, its offset the count. */
-const plantedCursor = (count: number): string => (count === 0 ? noTranscript().cursor : cursorOf(count, Buffer.from(String(count))));
+const plantedCursor = (count: number): string => (count === 0 ? TRANSCRIPT_START : `${count}.${'0'.repeat(16)}`);
 
 /**
  * `transcript` over the tasks a stand-in holds: refuses a task not held, an attempt it has not and a cursor no read gave, as the engine

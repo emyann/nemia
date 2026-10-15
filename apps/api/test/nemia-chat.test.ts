@@ -1,55 +1,69 @@
 /**
- * Nemia's chat on the api, over the engine's stand-in with her task at work on it and her level file naming it: a page of her history
- * with where she is, a send put in her outbox and refused when empty, a read mark moved and refused for an event she does not hold,
- * and the stream: presence first, then her events with the cursor, resumed after Last-Event-ID with nothing repeated, and a cursor no
- * read gave refused before it opens.
+ * Nemia's chat on the api, over the app's engine, her task journalled at work in its store and her transcript Claude Code's, and her level
+ * file naming it: a page of her history with where she is, a send put in her outbox and refused when empty, a read mark moved and refused
+ * for an event she does not hold, and the stream: presence first, then her events with the cursor, resumed after Last-Event-ID with nothing
+ * repeated, and a cursor no read gave refused before it opens.
  */
-import { root } from './harness.ts';
+import { config, registry, root } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Effect, Layer } from 'effect';
-import { Engine as RuntimeEngine } from 'agent-runtime';
-import { testEngine } from 'agent-runtime/testing';
+import { randomUUID } from 'node:crypto';
 import type { ChatEvent, ChatHistory } from 'agent-orchestrator';
-import { appOf, liveOf } from '../src/app.ts';
-import { Engine } from '../src/store.ts';
+import { app } from '../src/app.ts';
 
 const BOARD = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' };
 
-const event = (id: string, words: string) => ({
-  id,
-  at: '2026-10-15T12:00:00.000Z',
-  role: 'assistant' as const,
-  kind: 'text' as const,
-  text: words,
+const T0 = Date.parse('2026-10-15T12:00:00.000Z');
+const at = (s: number) => new Date(T0 + s * 1000).toISOString();
+const jsonl = (lines: object[]) => lines.map((line) => `${JSON.stringify(line)}\n`).join('');
+
+/** One line of her session's transcript, as Claude Code writes it: her words `text`. */
+const herLine = (sessionId: string, uuid: string, s: number, text: string) => ({
+  sessionId,
+  isSidechain: false,
+  userType: 'external',
+  cwd: '/code/app',
+  version: '2.1.270',
+  type: 'assistant',
+  uuid,
+  timestamp: at(s),
+  message: { role: 'assistant', content: [{ type: 'text', text }] },
 });
 
-/** An app over a stand-in on which her task is at work, its transcript `words`, and her level file naming it. */
-async function withHer(words: string[]) {
-  const stand = testEngine();
-  const e = Effect.runSync(Effect.provide(Effect.service(RuntimeEngine), stand.layer));
-  const task = await Effect.runPromise(e.file({ id: `nemia-${Date.now()}`, brief: 'be there', cwd: '/r', restartPolicy: 'Always' }));
-  stand.settle(task, 'running (working)');
-  stand.plantTranscript(
-    task,
-    1,
-    words.map((w, i) => event(`e${i}`, w)),
-  );
+/** Her session's transcript, `words` appended to it. */
+const said = (sessionId: string, words: string[], from = 0) => {
+  const file = path.join(config, 'projects', '-code-app', `${sessionId}.jsonl`);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.appendFileSync(file, jsonl(words.map((w, i) => herLine(sessionId, `e${from + i}`, from + i + 1, w))));
+};
+
+/**
+ * Her task at work: journalled as filed long-lived and spawned, its session listed working by `claude agents`, its transcript `words`,
+ * and her level file naming it; her chat's files none.
+ */
+function withHer(words: string[]) {
+  const task = `nemia-${randomUUID().slice(0, 8)}`;
+  const sessionId = randomUUID();
+  const journal = path.join(root, 'engine', 'tasks', `${task}.jsonl`);
+  fs.mkdirSync(path.dirname(journal), { recursive: true });
+  const filed = { kind: 'filed', at: at(0), brief: 'Be there.', cwd: '/code/app', maxAttempts: 1, harness: 'claude' };
+  fs.writeFileSync(journal, jsonl([filed, { kind: 'starting', at: at(0), attempt: 1 }, { kind: 'spawned', at: at(0), attempt: 1 }]));
+  const rows = fs.existsSync(registry) ? (JSON.parse(fs.readFileSync(registry, 'utf8')) as object[]) : [];
+  rows.push({ name: `ae/${task}/1`, sessionId, kind: 'background', state: 'working', status: 'busy', startedAt: T0 });
+  fs.writeFileSync(registry, JSON.stringify(rows));
+  said(sessionId, words);
   fs.mkdirSync(path.join(root, 'nemia'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'nemia', 'level.json'), JSON.stringify({ level: 'semi-auto', since: new Date().toISOString(), task }));
+  fs.writeFileSync(path.join(root, 'nemia', 'level.json'), JSON.stringify({ level: 'semi-auto', since: at(0), task }));
   fs.rmSync(path.join(root, 'nemia', 'chat'), { recursive: true, force: true });
-  const { app } = appOf(Layer.merge(liveOf(), Layer.succeed(Engine)({ ...e, io: undefined } as never)));
-  const asked = async (method: string, url: string, body?: unknown, headers: Record<string, string> = {}) => {
-    const res = await app.request(url, {
-      method,
-      headers: { ...BOARD, ...headers },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    });
-    return { status: res.status, body: (await res.json()) as Record<string, unknown> };
-  };
-  return { app, stand, task, asked };
+  return { task, sessionId };
+}
+
+/** The api's answer to `method` on `url` with `body`, as the board sends it. */
+async function asked(method: string, url: string, body?: unknown) {
+  const res = await app.request(url, { method, headers: BOARD, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+  return { status: res.status, body: (await res.json()) as Record<string, unknown> };
 }
 
 type Block = { event?: string; data?: string; id?: string };
@@ -84,7 +98,7 @@ const textsOf = (said: Block[]) =>
   said.filter((b) => b.event === 'chat').map((b) => (JSON.parse(b.data!) as ChatEvent & { text?: string }).text);
 
 test('a page of her history, with where she is', async () => {
-  const { asked } = await withHer(['One.', 'Two.', 'Three.']);
+  withHer(['One.', 'Two.', 'Three.']);
   const page = await asked('GET', '/api/nemia/chat?limit=2');
   assert.equal(page.status, 200);
   const body = page.body as unknown as ChatHistory;
@@ -93,12 +107,12 @@ test('a page of her history, with where she is', async () => {
     ['Two.', 'Three.'],
   );
   assert.deepEqual(body.presence, { up: true, answering: true, waitsOnYou: 0, unread: 3 });
-  assert.equal(body.before, 'm:1:e1');
+  assert.equal(body.before, 'm:1:e1:0');
   assert.equal((await asked('GET', '/api/nemia/chat?limit=0')).status, 422, 'a page of no size');
 });
 
 test('REFUSED: a send with no words is a 422 and a body that is none a 400; one with words is put in her outbox, 201', async () => {
-  const { asked } = await withHer([]);
+  withHer([]);
   const empty = await asked('POST', '/api/nemia/chat/send', { text: '   ' });
   assert.equal(empty.status, 422);
   assert.match(String(empty.body.error), /^The message is empty/);
@@ -118,23 +132,23 @@ test('REFUSED: a send with no words is a 422 and a body that is none a 400; one 
 });
 
 test('REFUSED: a read mark on an event she does not hold is a 404; one she holds is a 200, and unread follows it', async () => {
-  const { asked } = await withHer(['One.', 'Two.']);
+  withHer(['One.', 'Two.']);
   assert.equal((await asked('POST', '/api/nemia/chat/read', { through: 'm:9:z' })).status, 404);
-  const marked = await asked('POST', '/api/nemia/chat/read', { through: 'm:1:e0' });
+  const marked = await asked('POST', '/api/nemia/chat/read', { through: 'm:1:e0:0' });
   assert.equal(marked.status, 200);
-  assert.equal(marked.body.through, 'm:1:e0');
+  assert.equal(marked.body.through, 'm:1:e0:0');
   assert.equal(((await asked('GET', '/api/nemia/chat')).body as unknown as ChatHistory).presence.unread, 1);
 });
 
 test('the stream sends presence first, then her events with the cursor, and resumes after Last-Event-ID with nothing repeated', async () => {
-  const { app, stand, task } = await withHer(['One.', 'Two.']);
+  const { sessionId } = withHer(['One.', 'Two.']);
   const first = await streamed(await app.request('/api/nemia/chat/stream'), (said) => textsOf(said).length >= 2);
   assert.equal(first[0]?.event, 'presence');
   assert.deepEqual(JSON.parse(first[0].data!), { up: true, answering: true, waitsOnYou: 0, unread: 2 });
   assert.deepEqual(textsOf(first), ['One.', 'Two.']);
   const cursor = first.filter((b) => b.id !== undefined).at(-1)?.id;
   assert.equal(cursor, '1.2.0.0.0');
-  stand.plantTranscript(task, 1, [event('e0', 'One.'), event('e1', 'Two.'), event('e2', 'Three.')]);
+  said(sessionId, ['Three.'], 2);
   const resumed = await streamed(
     await app.request('/api/nemia/chat/stream', { headers: { 'Last-Event-ID': cursor } }),
     (said) => textsOf(said).length >= 1,
@@ -144,7 +158,7 @@ test('the stream sends presence first, then her events with the cursor, and resu
 });
 
 test('REFUSED: a stream from a cursor no read gave is a 422 before it opens', async () => {
-  const { app } = await withHer(['One.']);
+  withHer(['One.']);
   for (const headers of [{ 'Last-Event-ID': 'page-2' }, { 'Last-Event-ID': '9.0.0.0.0' }]) {
     const res = await app.request('/api/nemia/chat/stream', { headers });
     assert.equal(res.status, 422);

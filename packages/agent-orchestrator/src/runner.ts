@@ -8,24 +8,25 @@
  * tasks say), `start.verb.ts`, `plan.verb.ts` and `inbox.verb.ts` (starting runs, plans and inbox cards), `tick.verb.ts` and
  * `advance.verb.ts` (a pass — `tickRun`, `advanceRun` — and the filings it adopts), what a person asks of a run (`cancel.verb.ts`,
  * `retry.verb.ts`, `gate.verb.ts`, `say.verb.ts`, `wait.verb.ts`, `round.verb.ts`), the table of the commands that call them, each defined
- * once (`commands.verb.ts`), `forget.verb.ts` and `prune.verb.ts` (`nemia rm` and `nemia prune`), `list.verb.ts` and `decide.verb.ts` (what
- * a person reads of a run: `nemia ls` and `nemia decide`), `stats.verb.ts` (what the store's runs add up to: `nemia stats`), and `chat.verb.ts` (a chat with a long-lived task, read and written). They
- * import one way — views and starting beneath the tick, the tick beneath the rest — so no cycle forms among them (`test/boundary.test.ts`).
+ * once (`commands.verb.ts`), `forget.verb.ts` and `prune.verb.ts` (`nemia rm` and `nemia prune`), `list.verb.ts` and `decide.verb.ts`
+ * (what a person reads of a run: `nemia ls` and `nemia decide`), `stats.verb.ts` (what the store's runs add up to: `nemia stats`), and
+ * `chat.verb.ts` (a chat with a long-lived task, read and written). They import one way — views and starting beneath the tick, the tick
+ * beneath the rest — so no cycle forms among them (`test/boundary.test.ts`).
  *
  * What of the I/O never names the engine sits beneath the controllers, and this file re-exports what it exported of them:
  * `record.store.ts` (a run's id, its files' names, a step's check stderr, artifacts and inputs), `files.store.ts` (the run store a run's
  * record, a person's files beside it and the inbox's are read and written through, `runStore`, and the inbox's folder, `inboxDir`),
  * `daemon.store.ts` (`tick.json` and who ticks the store), `feed.store.ts` (the feed's file), `worktree.store.ts` (git, a step's worktree,
- * its `node_modules`, the hand-off commit), `branches.store.ts` (what git says of a run's result branches), `artifacts.store.ts` (the files
- * a step hands over), `folder.store.ts` and `write.store.ts` (a workflow folder read and written), `agents/read.store.ts` and
- * `skills/read.store.ts` (the agents and the skills a folder's steps may name, read), `lookup.store.ts` (the workflow folders
- * a place holds), `agents.store.ts`, `roster.store.ts`, `fills.store.ts`, `try.store.ts`, `custom.store.ts` and `skills.store.ts` (an
- * agent, the agents of both places read, the steps each fills, an agent's try folder written, a person's custom instructions for one, and
- * a skill read and written), `place.store.ts` (a place skill's verbs run and heard), `plan.store.ts` (a plan folder read),
- * `inbox.store.ts` (the inbox's cards filed, queued and dropped), `factory.store.ts` (the factories, `factoriesDir`), `config.store.ts`
- * (the `WF_` environment) and `telemetry.store.ts` (what a daemon's process logs and exports, `telemetryLayer`). They import neither
- * the runtime nor a controller, and load as a tree: the bottom, beneath `record.store.ts`, beneath `worktree.store.ts` and
- * `write.store.ts`, beneath the rest, so no cycle can form (`test/boundary.test.ts`).
+ * its `node_modules`, the hand-off commit), `branches.store.ts` (what git says of a run's result branches), `artifacts.store.ts` (the
+ * files a step hands over), `folder.store.ts` and `write.store.ts` (a workflow folder read and written), `agents/read.store.ts` and
+ * `skills/read.store.ts` (the agents and the skills a folder's steps may name, read), `lookup.store.ts` (the workflow folders a place
+ * holds), `agents.store.ts`, `roster.store.ts`, `fills.store.ts`, `try.store.ts`, `custom.store.ts` and `skills.store.ts` (an agent, the
+ * agents of both places read, the steps each fills, an agent's try folder written, a person's custom instructions for one, and a skill
+ * read and written), `place.store.ts` (a place skill's verbs run and heard), `plan.store.ts` (a plan folder read), `inbox.store.ts` (the
+ * inbox's cards filed, queued and dropped), `factory.store.ts` (the factories, `factoriesDir`), `config.store.ts` (the `WF_` environment)
+ * and `telemetry.store.ts` (what a daemon's process logs and exports, `telemetryLayer`). They import neither the runtime nor a controller,
+ * and load as a tree: the bottom, beneath `record.store.ts`, beneath `worktree.store.ts` and `write.store.ts`, beneath the rest, so no
+ * cycle can form (`test/boundary.test.ts`).
  */
 export { attemptVerdict, verdictWord } from './check/check.ts';
 export { VERSION } from './version/version.ts';

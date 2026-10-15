@@ -13,8 +13,7 @@ import { ceilingsOf, metricsOf, passesOf, seriesOf, pauseNowOf, pauseOf, feed, Q
 import { inbox } from './inbox/inbox.ts';
 import { ApiConfig, type ApiEnv, type ApiRuntime, ReadMemo, served, type Services } from './layer.ts';
 import { machines } from './machines/machines.ts';
-import { nemia } from './nemia/nemia.ts';
-import { nemiaChat } from './nemia/chat.ts';
+import { nemia, nemiaChat } from './nemia/index.ts';
 import { runs } from './runs/runs.ts';
 import { stats } from './stats/stats.ts';
 import { step } from './step/step.ts';

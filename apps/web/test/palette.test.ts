@@ -139,17 +139,8 @@ export interface Kept {
   why: string;
 }
 
-const TINTED =
-  "a message said while the session ran is drawn in a pale tone of yours, hand-picked per scheme; which role it takes is the owner's " +
-  "look to choose (yours' container recommended)";
-
 /** The raw colours no role gives yet, each valid in its file alone. */
-export const KEPT: Kept[] = [
-  { file: 'src/components/ui/bubble.tsx', colour: 'oklch(from_var(--primary)_0.93_calc(c*0.4)_h)', why: TINTED },
-  { file: 'src/components/ui/bubble.tsx', colour: 'oklch(from_var(--primary)_0.3_calc(c*0.4)_h)', why: TINTED },
-  { file: 'src/components/ui/bubble.tsx', colour: 'oklch(from_var(--primary)_0.88_calc(c*0.5)_h)', why: TINTED },
-  { file: 'src/components/ui/bubble.tsx', colour: 'oklch(from_var(--primary)_0.35_calc(c*0.5)_h)', why: TINTED },
-];
+export const KEPT: Kept[] = [];
 
 /** Every raw colour in `root`'s `src` outside the kit that `kept` does not list for its file, as `file:line:column (colour)`. */
 export function rawIn(root: string, kept: Kept[] = KEPT): string[] {

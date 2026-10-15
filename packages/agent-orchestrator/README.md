@@ -2940,6 +2940,14 @@ board's Settings, though no place names her), read as her session is filed; a wr
 session at the keeper's next beat, through the runtime's `say`, with no restart, then recorded in her filed instruction; a factory's rules are its
 instruction (above), which she reads before acting in it. Her machine and what was built: `docs/features.md`, *Nemia at Semi-auto*.
 
+Her chat, `src/chat/`, keeps only what nobody else holds, under `$WF_ROOT/nemia/chat/`: the person's words (`outbox.jsonl`) and read
+mark (`read.json`), written by the api's routes (`chatSend`, `chatRead`), and the keeper's marks of what it delivered
+(`delivered.jsonl`). The rest is projected on every read (`projectChat`): her words and her tool calls from her transcripts, attempt
+by attempt with a line between them, and what was said to her from the runtime's `said`, the person's where a mark claims it, else
+the keeper's quiet marker. The keeper delivers while she is kept and her session live, framed as the person's
+(`framedForHer`), and before it says it looks for the same words said since and unclaimed, so a restart between the say and the mark
+never says them twice. Her fence denies the folder.
+
 ## How much runs at once: `WF_MAX_CONCURRENT` and `WF_MAX_RUNS`
 
 Two ceilings, both read from the environment the store's daemon runs in — the api's process or `wf up` — through Effect's `Config` (`src/config/config.store.ts`), and both said in

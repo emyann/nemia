@@ -319,3 +319,18 @@
     transform: translateY(-1.5px) scale(1.04);
   }
 }
+
+/*
+ * The rail's counts in the board's meanings, until the kit's Badge takes a colour role (kit card a-badge-takes-a-colour-role-2udj): the
+ * kit draws every badge in Material's error red, and on the board red is failure. Runs counts what waits on you, in yours; the Inbox
+ * counts cards not started, in rest. Each destination is found by the name the kit gives it, its label then its badge's words.
+ */
+[data-frame-rail] [data-slot='navigation-rail-item'][aria-label^='Runs,'] [data-slot='badge'] {
+  background-color: var(--meaning-yours);
+  color: var(--meaning-on-yours);
+}
+
+[data-frame-rail] [data-slot='navigation-rail-item'][aria-label^='Inbox,'] [data-slot='badge'] {
+  background-color: var(--meaning-rest);
+  color: var(--meaning-on-rest);
+}

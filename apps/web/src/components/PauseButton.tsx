@@ -183,7 +183,7 @@ function PauseFacts({
 }
 
 /**
- * The pause of all factories, in the frame's bottom bar right after the daemon's dot: one button, a pause icon while they run,
+ * The pause of all factories, in the frame's top bar: one button, a pause icon while they run,
  * `Pausing · N` while what runs finishes, and a play icon with `Paused` once nothing does (`pauseWords`, read again on each poll of
  * `GET /api/pause`).
  * It opens a popover with the whole of it — since when, by whom and why, each task still finishing, each landing held with its merge
@@ -220,7 +220,7 @@ export function PauseButton() {
     >
       <Button
         variant="ghost"
-        size="xs"
+        size="sm"
         aria-label={words.label}
         data-pause={words.state}
         data-finishing={read.data?.finishing.length ?? 0}
@@ -233,7 +233,7 @@ export function PauseButton() {
           </span>
         )}
       </Button>
-      <Popover placement="top start" offset={6} className={POPOVER}>
+      <Popover placement="bottom end" offset={6} className={POPOVER}>
         <Dialog aria-label="The pause of all factories" data-pause-popover className="flex flex-col gap-2 outline-none">
           <Heading slot="title" className="font-medium">
             {asking === 'pause' ? 'Pause all factories' : asking === 'now' ? 'Pause all factories now' : HEADINGS[words.state]}

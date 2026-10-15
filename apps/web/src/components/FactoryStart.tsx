@@ -1,13 +1,14 @@
 /**
- * A run's start: the sidebar's button that opens it in the frame's floating bar (`FloatingBar`), and what the bar then shows — with no
+ * A run's start: the rail's FAB that opens it in the frame's floating bar (`FloatingBar`), and what the bar then shows — with no
  * factory yet, the factories to start it in; then the repository the run starts on, the factory's one or picked among its several, the
  * workflows the factory offers there, each that cannot start saying why, and `StartRun` in the factory for the one picked, as
  * the CLI's `start --factory` starts it.
  */
 import { useId, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import KitButton from '@/components/ui/ds/components/Button';
+import { PlusIcon } from '@/components/ui/ds/icons';
 import { factoriesQuery, factoryWorkflowsQuery, type Factory, type Place, type WorkflowListing } from '@/lib/api';
 import { floorPlace, whyNotStarted } from '@/lib/factories';
 import { workflowKey } from '@/lib/inbox';
@@ -19,31 +20,32 @@ import { StartRun } from './StartRun';
 const code = (text: string) => <code className="font-mono text-body-small">{text}</code>;
 const path = (text: string) => <code className="font-mono text-body-small break-all">{text}</code>;
 
+/** The factory a run is started in from the rail with `name` picked: the picked one when its floor starts runs, else none yet. */
+function startIn(factories: readonly Factory[] | undefined, name: string | undefined): string | null {
+  const factory = factories?.find((f) => f.name === name);
+  return factory && floorPlace(factory) ? factory.name : null;
+}
+
 /**
- * The sidebar's 'Start a run' in the factory `name`, or in none yet, which asks which first, that opens the bar on its start, pressed while
- * it is open on its start or not, and runs `onPress`. Nothing is drawn for a name the api lists no factory by, nor for the default
- * factory, whose floor starts no run (`floorPlace`), nor before the factories are read, unless it names none.
+ * The rail's FAB, 'Start a run': the kit's FAB, its plus alone on a closed rail and named in words beside it on an open one (`isExtended`).
+ * A press opens the bar on the start of a run in the factory `name`, or, where the picked factory starts none from its floor or none is
+ * picked, on the question which; it runs `onPress` first.
  */
-export function FactoryStart({ name, onPress }: { name?: string; onPress?: () => void }) {
+export function StartFab({ name, isExtended, onPress }: { name?: string; isExtended: boolean; onPress?: () => void }) {
   const factories = useQuery(factoriesQuery);
   const { open, show } = useBar();
-  const factory = factories.data?.find((f) => f.name === name);
-  const place = factory ? floorPlace(factory) : null;
-  if (name !== undefined && !place) return null;
-  return (
-    <Button
-      variant="outline"
-      size="sm"
-      aria-expanded={open?.kind === 'start' && open.factory === (name ?? null)}
-      onPress={() => {
-        onPress?.();
-        show({ kind: 'start', factory: name ?? null });
-      }}
-      className="w-full justify-start"
-    >
-      <Play data-icon="inline-start" />
+  const factory = startIn(factories.data, name);
+  const press = () => {
+    onPress?.();
+    show({ kind: 'start', factory });
+  };
+  const expanded = open?.kind === 'start' && open.factory === factory;
+  return isExtended ? (
+    <KitButton variant="fab" icon={PlusIcon} aria-expanded={expanded} onPress={press}>
       Start a run
-    </Button>
+    </KitButton>
+  ) : (
+    <KitButton variant="fab" icon={PlusIcon} aria-label="Start a run" aria-expanded={expanded} onPress={press} />
   );
 }
 

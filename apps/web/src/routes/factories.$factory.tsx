@@ -31,7 +31,7 @@ export const Route = createFileRoute('/factories/$factory')({
 });
 
 /**
- * Inside a factory: its floor, the runs it holds and the cards queued in it (`FactoryCanvas`), the factory named in the sidebar's picker
+ * Inside a factory: its floor, the runs it holds and the cards queued in it (`FactoryCanvas`), the factory named in the top bar's picker
  * (`FactoryPicker`), and above the floor the template it is made from, where it is (`TemplateCard`). A name the api lists no factory by
  * says so: no route of the api is asked about it.
  */

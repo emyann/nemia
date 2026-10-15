@@ -1,7 +1,6 @@
 /**
- * The words of the frame's bottom bar (`FrameFooter`): what is at work, the daemon's dot, whether the board follows the feed, the quota in
- * short, and which of them a phone keeps; the pause says its own (`pauseWords`). Each short form fits the bar's one line, and its whole
- * sentence is its `title`. Pure: the time is handed in, the browser's own on the page.
+ * The words of the machine's gauges (`GaugesButton`, `GaugesBar`): what is at work, the daemon's dot, whether the board follows the feed,
+ * the quota in short; the pause says its own (`pauseWords`). Each short form fits one line, and its whole sentence is its `title`. Pure: the time is handed in, the browser's own on the page.
  */
 import type { Daemon, OpenRuns, Quota, Version } from './api';
 import { daemonSentence, daemonWords } from './daemon.ts';
@@ -150,18 +149,8 @@ export function quotaShort(
   return { text: quota.state.replace('-', ' '), marked: false, stale: false, title: said };
 }
 
-/** A group of the bottom bar. */
-export type FooterPart = 'daemon' | 'pause' | 'feed' | 'work' | 'quota' | 'version';
-
 /**
- * The groups the bar shows, left to right: all six, the pause right after the daemon's dot; and on a `narrow` screen the daemon's
- * dot, the pause and the quota alone.
- */
-export const footerParts = (narrow: boolean): readonly FooterPart[] =>
-  narrow ? ['daemon', 'pause', 'quota'] : ['daemon', 'pause', 'feed', 'work', 'quota', 'version'];
-
-/**
- * Each place in `source` that sizes a page as the screen less the header alone (`100svh-3rem`), a line break inside or not: under the
- * bottom bar a page is the screen less both, `100svh-5rem`.
+ * Each place in `source` that sizes a page as the screen less the old header (`100svh-3rem`), a line break inside or not: under the top
+ * bar a page is the screen less its `h-20`, `100svh-5rem`.
  */
 export const staleFrameHeights = (source: string): string[] => [...source.matchAll(/h-\[calc\(100svh-\s*3rem\)\]/g)].map((m) => m[0]);

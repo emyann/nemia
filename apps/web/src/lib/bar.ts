@@ -7,7 +7,7 @@ import type { PagePlace } from './api/workflows.ts';
 /**
  * What the bar shows: the start of a run in a factory, or in none yet (`null`), which asks which first; a factory, a run, a step of a
  * run, a step of a workflow (`spec`), read from the repository's workflows or yours (`from`), a state of one of the code's state
- * machines, the machine's gauges the bottom bar opens: the daemon, the feed, what is at work, the quota and the version, whole, or the
+ * machines, the machine's gauges the top bar opens: the daemon, the feed, what is at work, the quota and the version, whole, or the
  * runs waiting on you across every factory, which the header's bell opens.
  */
 export type Bar =

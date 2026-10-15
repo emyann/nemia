@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link, redirect } from '@tanstack/react-router';
+import { Values } from '../components/Artifacts';
 import { Artifacts, bytesWord, ClosedNeeds, Statement } from '../components/Closeout';
 import { Decide } from '../components/Decide';
 import { Markdown } from '../components/Markdown';
@@ -305,6 +306,7 @@ function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; 
           <Artifacts artifacts={closeout.artifacts} />
         </div>
       )}
+      <Values values={closeout.values} />
     </div>
   );
 

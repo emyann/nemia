@@ -268,6 +268,12 @@ export default {
       `${FAKE.unverified}'s section on the run's page draws the image too`,
     );
     await expectVisible(
+      page.locator(`article > section [data-value="${FAKE.envelope.value.name}"] a[href="${FAKE.envelope.value.value}"]`, {
+        hasText: FAKE.envelope.value.value,
+      }),
+      `${FAKE.unverified}'s section on the run's page draws the value it handed on, linked, beside its files`,
+    );
+    await expectVisible(
       output.locator('[data-summary]', { hasText: FAKE.envelope.cut }),
       `${FAKE.unverified}'s v1 summary is one line, cut at a word with an ellipsis`,
     );

@@ -60,7 +60,7 @@ function SheetPreview({ run, step, asOf, children }: { run: RailRun; step: RailS
   );
 }
 
-/** A bar of the rail as a button that opens its step's card: by the kit's preview, or as a sheet where it cannot hover (`useSheetPreview`). */
+/** A bar of the rail as a button that opens its step's card: by the kit's preview, or as a sheet where it cannot hover. */
 function BarPreview(props: { run: RailRun; step: RailStep; asOf: Date; children: ReactNode }) {
   return useSheetPreview() ? <SheetPreview {...props} /> : <HoverPreview {...props} />;
 }

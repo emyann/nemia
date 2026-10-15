@@ -24,6 +24,8 @@ const READERS: Readonly<Record<string, string>> = {
   'lib/factory.ts': 'whether the run is in flight: running, or still moving',
   'lib/hold.ts': 'whether a hold is offered, and what a hold may wait on: not succeeded, not cancelled',
   'lib/prune.ts': 'whether a prune is offered: not running',
+  'lib/strip.ts':
+    'how a finished run ended, as the api says it: landed only when succeeded, failed otherwise once not called off or undecided',
 };
 
 /** A status compared to a quoted word of the run's, either way round, across line breaks. */

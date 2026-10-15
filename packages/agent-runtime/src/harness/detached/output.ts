@@ -279,18 +279,21 @@ const assistantKept = (line: Printed<'assistant'>, denied: ReadonlySet<string>):
 export const claudeStreamKept = (output: string): string => {
   const facts: StreamFacts = { events: [], inputs: new Map(), started: false, skills: new Map(), files: new Map(), denied: new Set() };
   for (const printed of decoded(output, STREAM_KINDS)) gather(facts, printed);
-  const kept: string[] = [];
-  for (const text of output.split('\n')) {
-    const kind = printedKindOf(text);
-    if (kind === undefined) kept.push(text);
-    else if (kind === 'assistant') {
-      const read = printedLinesOf(text, ['assistant']);
-      const line = 'lines' in read ? read.lines[0] : undefined;
-      const cut = line?.kind === 'assistant' ? assistantKept(line.line, facts.denied) : undefined;
-      if (cut !== undefined) kept.push(cut);
-    } else if (kind !== 'other' && STREAM_KINDS.includes(kind)) kept.push(text);
-  }
-  return kept.join('\n');
+  return output
+    .split('\n')
+    .flatMap((text) => lineKept(text, facts.denied) ?? [])
+    .join('\n');
+};
+
+/** What a capture keeps of its line `text` (`claudeStreamKept`), the calls `denied` named whole, or nothing. */
+const lineKept = (text: string, denied: ReadonlySet<string>): string | undefined => {
+  const kind = printedKindOf(text);
+  if (kind === undefined) return text;
+  if (kind === 'other' || !STREAM_KINDS.includes(kind)) return undefined;
+  if (kind !== 'assistant') return text;
+  const read = printedLinesOf(text, ['assistant']);
+  const line = 'lines' in read ? read.lines[0] : undefined;
+  return line?.kind === 'assistant' ? assistantKept(line.line, denied) : undefined;
 };
 
 /**

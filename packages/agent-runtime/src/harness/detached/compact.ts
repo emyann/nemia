@@ -2,10 +2,11 @@
  * The captures a detached harness keeps, rewritten once to what its readers read (`HarnessSpec.keepOutput`): the pass over every run
  * of a spec that the read of an ended run does for itself (`said.ts`), for the captures written before it did. One capture at a time.
  */
+import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { readText } from '../../core/engine/tally.ts';
-import type { SessionsCompacted } from '../seam.ts';
+import { RunnerError, type RunnerOps, type SessionsCompacted } from '../seam.ts';
 import type { HarnessSpec } from './detached.ts';
 import { runFileIn, type RunFile } from './run-file.ts';
 import { captureAt, keepSaid, keptText, replaceCapture, type SaidKey } from './said.ts';
@@ -119,3 +120,15 @@ export const compactRuns = (
   }
   return report;
 };
+
+/** A detached runner's `compact`, for a spec that keeps less of an ended capture (`keepOutput`): its runs' captures (`compactRuns`). */
+export const compactOps = (spec: HarnessSpec, dir: string): Pick<RunnerOps, 'compact'> =>
+  spec.keepOutput
+    ? {
+        compact: ({ dry }) =>
+          Effect.try({
+            try: () => compactRuns(spec, dir, { dry }),
+            catch: (cause) => new RunnerError({ verb: 'compact', message: `${spec.name}: ${String(cause)}` }),
+          }),
+      }
+    : {};

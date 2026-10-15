@@ -32,10 +32,10 @@ import { countRead, countSpawn, readText } from '../../core/engine/tally.ts';
 import { instantNow } from '../../core/engine/now.ts';
 import type { Instant } from '../../core/clock.ts';
 import { quote } from '../../core/quote.ts';
-import { outputIn, type SaidMemo } from './said.ts';
-import { compactRuns } from './compact.ts';
+import { outputIn, saidFilesAt, saidWhen, type SaidMemo } from './said.ts';
+import { compactOps } from './compact.ts';
 import { lookedFor } from './looked.ts';
-import { detachedStateOf, firstRunFile, leased, overNow, runFileIn, type Carried, type Run, type RunFile } from './run-file.ts';
+import { detachedStateOf, firstRunFile, leased, runFileIn, type Carried, type Run, type RunFile } from './run-file.ts';
 
 export { detachedStateOf, STALE_MS } from './run-file.ts';
 import { followOf, type PartialMark } from './follow.ts';
@@ -600,18 +600,6 @@ const followOps = (spec: HarnessSpec, root: string, dir: string): Pick<RunnerOps
   };
 };
 
-/** A detached runner's `compact`, for a spec that keeps less of an ended capture (`keepOutput`): its runs' captures (`compactRuns`). */
-const compactOps = (spec: HarnessSpec, dir: string): Pick<RunnerOps, 'compact'> =>
-  spec.keepOutput
-    ? {
-        compact: ({ dry }) =>
-          Effect.try({
-            try: () => compactRuns(spec, dir, { dry }),
-            catch: (cause) => new RunnerError({ verb: 'compact', message: `${spec.name}: ${String(cause)}` }),
-          }),
-      }
-    : {};
-
 /**
  * The verbs of a detached runner over the files beside a run's: its streams (`outputOps`, `followOps`), `forget`, `kept` and
  * `compact`.
@@ -731,7 +719,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
   const mcpFile = (name: string) => path.join(dir, `${safe(name)}.mcp.json`);
   const inboxFile = (name: string) => inboxFileOf(spec, root, name);
   const stopFile = (name: string) => path.join(dir, `${safe(name)}.stop`);
-  const saidFile = (name: string) => path.join(dir, `${safe(name)}.said`);
+  const saidFiles = (name: string) => saidFilesAt(path.join(dir, safe(name)), spec.streams);
 
   const readAll = (): Run[] => {
     if (!fs.existsSync(dir)) return [];
@@ -764,14 +752,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
 
   const outputs: SaidMemo = new Map();
   const outputOf = (name: string, run: RunFile): { read: HarnessOutput } | { wrong: string } | undefined =>
-    spec.readOutput &&
-    outputIn(
-      spec.readOutput,
-      outputs,
-      name,
-      { log: logFile(name), kept: saidFile(name), ...(spec.streams ? { stdout: streamFileOf(dir, name, 'stdout') } : {}) },
-      { over: overNow(run), ended: run.state !== 'working', ...(spec.keepOutput ? { keep: spec.keepOutput } : {}) },
-    );
+    spec.readOutput && outputIn(spec.readOutput, outputs, name, saidFiles(name), saidWhen(run, spec.keepOutput));
 
   const carriedBy = (all: readonly Run[], resumeFrom: string, before: number, except?: string): Carried => {
     const parent = parentOf(all, resumeFrom, before, except);
@@ -800,7 +781,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
           if (!isDirectory(r.cwd)) throw new Error(`cwd ${r.cwd} is not a directory`);
           fs.mkdirSync(dir, { recursive: true });
           const streams = { stdout: streamFileOf(dir, r.name, 'stdout'), stderr: streamFileOf(dir, r.name, 'stderr') };
-          for (const f of [closeoutFile(r.name), logFile(r.name), saidFile(r.name), stopFile(r.name), ...Object.values(streams)]) {
+          for (const f of [closeoutFile(r.name), logFile(r.name), saidFiles(r.name).kept, stopFile(r.name), ...Object.values(streams)]) {
             fs.rmSync(f, { force: true });
           }
           outputs.delete(r.name);

@@ -341,6 +341,7 @@ export const testEngine = (): TestEngine => {
       start: unkept('start'),
       sweep: unkept('sweep'),
       removeBody: unkept('removeBody'),
+      compact: unkept('compact'),
     }),
   );
   const settle = (id: string, phase: string, end?: TestEnd): TestTask => {

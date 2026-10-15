@@ -21,6 +21,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { UsageSchema } from '../../core/event-schema.ts';
 import { readText } from '../../core/engine/tally.ts';
 import type { HarnessOutput, HarnessSpec } from './detached.ts';
+import { overNow, type RunFile } from './run-file.ts';
 
 /**
  * The shipped readers' version — `claudeResultOutput`, `claudeStreamOutput` and `codexOutput`: a kept output of another
@@ -179,11 +180,25 @@ export const captureAt = (file: string): { key: SaidKey; text: string } | undefi
 /** Where a run's capture is (`log`), what was read of it is kept (`kept`), and, for a spec that keeps it, its whole stdout (`stdout`). */
 export type SaidFiles = { log: string; kept: string; stdout?: string };
 
+/** The files of the run whose files begin `base`: `.log`, `.said`, and `.stdout` for a spec that keeps its `streams` whole. */
+export const saidFilesAt = (base: string, streams?: true): SaidFiles => ({
+  log: `${base}.log`,
+  kept: `${base}.said`,
+  ...(streams ? { stdout: `${base}.stdout` } : {}),
+});
+
 /**
  * What to do with a run's capture once read: `over`, the run no longer works, so what was read is kept on disk; `ended`, its run
  * file says its worker wrote its end, so nothing writes the capture again, and `keep`, a spec's `keepOutput`, rewrites it.
  */
 export type SaidWhen = { over: boolean; ended?: boolean; keep?: (output: string) => string };
+
+/** When `run`'s capture is read (`SaidWhen`): over as of now, its lease gone included; ended once its worker wrote its end. */
+export const saidWhen = (run: RunFile, keep?: (output: string) => string): SaidWhen => ({
+  over: overNow(run),
+  ended: run.state !== 'working',
+  ...(keep ? { keep } : {}),
+});
 
 /**
  * What the capture `log`, known by `key`, says, and the key it is known by now: kept in `kept`, else read; once the run is `over`,

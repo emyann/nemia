@@ -109,6 +109,7 @@ const VERBS = [
   'admit',
   'answer',
   'close',
+  'compact',
   'feed',
   'file',
   'follow',
@@ -407,6 +408,19 @@ test('each refusal is a tagged error, and refusalWords words it behind the verb,
       () => effect((e) => untyped(e.kept)({ yes: true })),
       /^takes nothing, and measures every task the store lists; it was handed \{"yes":true\}: nothing was measured\.$/,
     ],
+    ...[[{ yes: 'y' }], [{ other: 1 }], [{ yes: true }, { yes: true }], ['--yes']].map(
+      (args): [string, string, () => Promise<unknown>, RegExp] => [
+        'compact',
+        'CompactRefused',
+        () => effect((e) => untyped(e.compact)(...args)),
+        new RegExp(
+          `^takes nothing to count .* or \`\\{ yes: true \\}\` to rewrite them; it was handed ${args
+            .map((a) => JSON.stringify(a))
+            .join(', ')
+            .replace(/[[\]{}]/g, '\\$&')}: nothing was written\\.$`,
+        ),
+      ],
+    ),
   ];
   for (const [verb, tag, refused, words] of cases) {
     const tagged = await failure(refused());

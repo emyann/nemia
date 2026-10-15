@@ -14,9 +14,8 @@ import {
 import { askedSaid } from '../lib/asks';
 import { decidableRun, decisionStamp, isDecidable } from '../lib/decide';
 import { cn } from '../lib/utils';
-import { Artifacts, HandedOn } from './Closeout';
+import { Artifacts, HandedOn, Statement } from './Closeout';
 import { BUTTON, MODES, Refusal, TEXTAREA, useAsk } from './Ask';
-import { Markdown } from './Markdown';
 import { answersFrom, QuestionFields, RecommendButton, unanswered, type Draft } from './Questions';
 import { when } from './Facts';
 import { runsMoved } from '@/lib/runWrites';
@@ -497,7 +496,7 @@ export function ActsOn({ run, step }: { run: RunDetail; step: RunDetail['steps']
             What <span className="font-semibold text-foreground">{one.name}</span> handed on
           </h3>
           {one.closeout ? (
-            <Markdown>{one.closeout.summary}</Markdown>
+            <Statement closeout={one.closeout} />
           ) : (
             <p className="text-body-small text-muted-foreground">It signed off with nothing to read.</p>
           )}

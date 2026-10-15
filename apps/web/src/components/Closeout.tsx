@@ -3,8 +3,9 @@ import { Switch } from '@/components/ui/switch';
 import type { StepAttempts, StepCloseout, StepTry } from '../lib/api';
 import { duration } from '../lib/canvas';
 import { foldsAtGate, imagePaths, type Outcome, outcomeOf, outcomeWord } from '../lib/outcome';
+import { bodyLeadsWith, summaryShown } from '../lib/transcript';
 import { cn } from '../lib/utils';
-import { Artifacts } from './Artifacts';
+import { Artifacts, Values } from './Artifacts';
 import { Markdown } from './Markdown';
 import { FieldView, Json, OutcomeHead } from './Outcome';
 import { Questions } from './Questions';
@@ -188,7 +189,7 @@ export function CloseoutView({ closeout, outcome }: { closeout: StepCloseout; ou
     <div data-closeout className="space-y-3">
       <OutcomeHead outcome={outcome} aside={toggle} />
       {closeout.needs && <ClosedNeeds needs={closeout.needs} />}
-      <Markdown>{closeout.summary}</Markdown>
+      <Statement closeout={closeout} />
       {raw ? (
         <AsItCame raw={closeout.raw} />
       ) : (
@@ -197,6 +198,7 @@ export function CloseoutView({ closeout, outcome }: { closeout: StepCloseout; ou
           <div>
             <p className="text-body-small text-muted-foreground">artifacts</p>
             <Artifacts artifacts={closeout.artifacts} />
+            <Values values={closeout.values} />
           </div>
         </>
       )}
@@ -276,7 +278,7 @@ export function HandedOn({ closeout, answeredBeside = false }: { closeout: StepC
   return (
     <div data-handed-on className="min-w-0 space-y-3">
       {closeout.needs && <ClosedNeeds needs={closeout.needs} />}
-      <Markdown>{closeout.summary}</Markdown>
+      <Statement closeout={closeout} />
       <DeclaredFields closeout={closeout} fold answered={answeredBeside} />
       {closeout.artifacts.length > 0 && (
         <div aria-label="Artifacts" className="text-body-small text-muted-foreground">
@@ -284,7 +286,30 @@ export function HandedOn({ closeout, answeredBeside = false }: { closeout: StepC
           <Artifacts artifacts={closeout.artifacts} />
         </div>
       )}
+      <Values values={closeout.values} />
     </div>
+  );
+}
+
+/**
+ * What a closeout says in words: its summary, one line as the api cut it, then its body as markdown, and what the run did not accept of
+ * it, each under `not accepted`. A body that opens with the summary (`bodyLeadsWith`) is drawn alone, so the line is said once.
+ */
+export function Statement({ closeout }: { closeout: StepCloseout }) {
+  return (
+    <>
+      {!bodyLeadsWith(closeout.summary, closeout.body) && (
+        <p data-summary className="text-body-medium text-foreground">
+          {summaryShown(closeout.summary)}
+        </p>
+      )}
+      {closeout.body && <Markdown data-body>{closeout.body}</Markdown>}
+      {closeout.refused.map((why) => (
+        <p key={why} data-refused className="text-body-small text-failure">
+          not accepted: {why}
+        </p>
+      ))}
+    </>
   );
 }
 

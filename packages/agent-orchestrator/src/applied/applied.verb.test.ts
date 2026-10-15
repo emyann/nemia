@@ -117,6 +117,23 @@ test('apply refuses a key not declared, a value of the wrong type and a required
   assert.deepEqual(filed(), before);
 });
 
+test("REFUSED: apply of a template whose step declares an `output:` of its own: a templated step's output is its agent's alone", async () => {
+  const { dir, repo } = template();
+  edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
+    spec.steps[2].output = 'own.schema.json';
+  });
+  fs.writeFileSync(
+    path.join(dir, 'workflows', 'dev', 'own.schema.json'),
+    JSON.stringify({ type: 'object', properties: { message: { type: 'string' } }, required: ['message'], additionalProperties: false }),
+  );
+  const before = filed();
+  await assert.rejects(
+    apply('owned', dir, repo, '--set', 'budget=3'),
+    refusedWith('Invalid', /spec\.steps\[2\]\.output is no key of spec\.steps\[2\]/),
+  );
+  assert.deepEqual(filed(), before);
+});
+
 test("apply files only the factory's file, naming its template, version and parameters; the controller renders the rest", async (t) => {
   t.mock.method(console, 'log', () => {});
   const { dir, repo } = template();

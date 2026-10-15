@@ -2801,12 +2801,12 @@ test('a step is filed with the closeout and the fields it declares, merged — s
   assert.equal(closeoutSchemaOf(step('implement'), []), CLOSEOUT_SCHEMA, 'a step that declares nothing is filed as before');
   const merged = closeoutSchemaOf(REVIEW, []);
   assert.equal(merged.additionalProperties, false);
-  assert.deepEqual(merged.required, ['outcome', 'summary', 'artifacts', 'needs', 'findings']);
+  assert.deepEqual(merged.required, ['apiVersion', 'outcome', 'summary', 'body', 'artifacts', 'needs', 'findings']);
   assert.deepEqual([...merged.required].sort(), Object.keys(merged.properties).sort(), 'every property required');
   assert.deepEqual(merged.properties.findings, FINDINGS.properties.findings);
   assert.deepEqual(
     Object.keys(CLOSEOUT_SCHEMA.properties),
-    ['outcome', 'summary', 'artifacts', 'needs'],
+    ['apiVersion', 'outcome', 'summary', 'body', 'artifacts', 'needs'],
     'merging did not write into the base',
   );
   assert.deepEqual(Object.keys(CLOSEOUT_SCHEMA.properties), [...CLOSEOUT_FIELDS], 'the parser refuses exactly the fields the schema has');
@@ -2927,7 +2927,7 @@ test('a step that declares an output is told so where it is told of its closeout
   const told = composeBrief(REVIEW, run({ implement: 't1', review: null }), [step('implement'), REVIEW]);
   assert.match(
     told,
-    /- `findings`: what this step declares \(`output: review\.schema\.json`\), in the shape the session\n  asks for\. It is handed, as data, to a step that reads it; your `summary` is not\./,
+    /- `findings`: what this step declares \(`output: review\.schema\.json`\), in the shape the session\n  asks for\. It is handed, as data, to a step that reads it\. A closeout/,
   );
   assert.ok(told.indexOf('`findings`') > told.indexOf('## When you are finished'));
   assert.doesNotMatch(
@@ -3043,7 +3043,10 @@ test('a declared field named `__proto__` travels like any other — into the bri
   const brief = composeBrief(reader, r, [producer, reader], (name) => (name === 'review' ? said : undefined));
   assert.equal(JSON.stringify(jsonIn(brief)), '{"__proto__":"product"}');
   assert.deepEqual(outputLines(producer, said), ['__proto__: product']);
-  assert.equal(JSON.stringify(closeoutSchemaOf(producer, []).required), '["outcome","summary","artifacts","needs","__proto__"]');
+  assert.equal(
+    JSON.stringify(closeoutSchemaOf(producer, []).required),
+    '["apiVersion","outcome","summary","body","artifacts","needs","__proto__"]',
+  );
 });
 
 const FILES = '/wf/runs/r-1/artifacts/implement';
@@ -3627,7 +3630,7 @@ test("UNSIGNED: from round 2 a loop's target owes `replies`, and is filed asking
   );
 
   const filed = closeoutSchemaOf(IMPLEMENT, LOOP);
-  assert.deepEqual(filed.required, ['outcome', 'summary', 'artifacts', 'needs', 'replies']);
+  assert.deepEqual(filed.required, ['apiVersion', 'outcome', 'summary', 'body', 'artifacts', 'needs', 'replies']);
   assert.equal(filed.properties.replies, REPLIES_SCHEMA);
   assert.deepEqual(
     [REPLIES_SCHEMA.items.additionalProperties, REPLIES_SCHEMA.items.required],
@@ -3663,7 +3666,7 @@ test("one schema for a loop's target, every round: `replies` is asked for from r
   assert.equal(closeoutSchemaOf(LOOP[2], LOOP), CLOSEOUT_SCHEMA, 'a step no step loops to is filed as before');
   assert.deepEqual(
     closeoutSchemaOf(LOOPING_REVIEW, LOOP).required,
-    ['outcome', 'summary', 'artifacts', 'needs', 'findings', 'again'],
+    ['apiVersion', 'outcome', 'summary', 'body', 'artifacts', 'needs', 'findings', 'again'],
     'the looping step included',
   );
   assert.equal(closeoutSchemaOf(IMPLEMENT, [IMPLEMENT]), CLOSEOUT_SCHEMA, 'and the target in a workflow without the loop');

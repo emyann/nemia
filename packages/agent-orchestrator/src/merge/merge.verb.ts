@@ -10,7 +10,7 @@ import { asked, tried, type Engine } from '../runtime-client.ts';
 import { isRepositoryRun, type CloseoutAsked, type Run, type TaskPhase } from '../record/record.ts';
 import type { Args } from '../command/command.ts';
 import { endingStopped, merged, standing, type RoundAsk, type SpendOf } from '../status/status.ts';
-import { parseCloseout, type Closeout } from '../closeout/closeout.ts';
+import { parseCloseout, type Closeout } from '../closeout/index.ts';
 import { roundsDue } from '../round/round.ts';
 import { stepsOf } from '../record/record.store.ts';
 import { runStore } from '../record/files.store.ts';

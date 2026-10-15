@@ -28,11 +28,11 @@ import { assess, type Assessment } from './assess.ts';
 import { feedPhase, feedWords, type FeedWords } from '../feed/feed.ts';
 import { listing } from '../list/list.ts';
 import { roundFiled, roundsDue } from '../round/round.ts';
-import type { Closeout } from '../closeout/closeout.ts';
+import type { Closeout } from '../closeout/index.ts';
 import { nextTry, pauseAsksVoid, retriesDue, turnsOf, type RetryAsk } from '../retry/index.ts';
 import { runsDir, stepsOf } from '../record/record.store.ts';
 import { runStore } from '../record/files.store.ts';
-import { collectArtifacts, filesLacked } from '../artifacts/artifacts.store.ts';
+import { collectArtifacts, filesLacked, handCloseout } from '../artifacts/artifacts.store.ts';
 import {
   headsFor,
   headsNow,
@@ -488,7 +488,8 @@ const stopCancelled = Effect.fnUntraced(function* (e: Engine, run: Run, r: PassR
 });
 
 /**
- * Hand off every step owed it (`handOffOwed`) while the run is there, and collect what each named: answers with the notes collecting said,
+ * Hand off every step owed it (`handOffOwed`) while the run is there, collect what each named, and write its closeout beside them
+ * (`handCloseout`): answers with the notes collecting said,
  * and with why a hand-off was not made, and whether a hand-off was marked on the record. A repository run's step is handed off by its
  * `handoff`, asked of `place`, and marked only on its answer: one refused or not heard is asked again on the next pass.
  */
@@ -504,6 +505,8 @@ const handOffAll = Effect.fnUntraced(function* (run: Run, r: PassReads, place: P
       marked = true;
     }
     collected.push(...(unhanded === undefined ? [] : [`${name}: ${unhanded}`]), ...collectArtifacts(run, name, r.signedOff(name)));
+    const step = r.steps.find((s) => s.name === name);
+    if (step) collected.push(...handCloseout(run, step, r.signedOff(name)));
   }
   return { collected, marked };
 });

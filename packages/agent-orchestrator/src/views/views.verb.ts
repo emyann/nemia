@@ -28,7 +28,7 @@ import type { Said } from '../say/say.ts';
 import { taskSpend, type SpendOf, type Consumed } from '../status/status.ts';
 import { waitedOn, type ParentRun } from '../wait/wait.ts';
 import { decision } from '../decide/decide.ts';
-import { parseCloseout, type Closeout } from '../closeout/closeout.ts';
+import { parseCloseout, type Closeout } from '../closeout/index.ts';
 import { taskUsage } from '../timeline/index.ts';
 import { runStore } from '../record/files.store.ts';
 import { stepsOf } from '../record/record.store.ts';

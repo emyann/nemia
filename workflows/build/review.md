@@ -12,8 +12,11 @@ mcp: playwright
 output: review.schema.json
 disallowedTools: Bash(cd:*), mcp__playwright__browser_run_code_unsafe, mcp__playwright__browser_console_messages(filename:*), mcp__playwright__browser_evaluate(filename:*), mcp__playwright__browser_network_request(filename:*), mcp__playwright__browser_network_requests(filename:*), mcp__playwright__browser_snapshot(filename:*), mcp__playwright__browser_take_screenshot(filename:*), Bash(npm run build), Bash(npm run e2e), Bash(npm test), Bash(npx turbo run test), Bash(npx turbo run test --force), Bash(npx turbo run test --continue), Bash(npx turbo run test --force --continue), Bash(npx turbo run test --continue --force), mcp__playwright__browser_navigate(url:*:8787*), mcp__playwright__browser_navigate(url:*:5173*), mcp__playwright__browser_tabs(url:*:8787*), mcp__playwright__browser_tabs(url:*:5173*)
 ---
-When the change touches `apps/web`, read the pictures the implement step named in its `artifacts`, from its handed files your brief
-lists, in light and dark, with the `look` skill. A page or a state the change touches with no picture of it is a finding.
+Judge what was asked and what the diff does. The steps before you each left their whole closeout in their folder's `closeout.json`:
+its summary and body are that step's own account, to check against the change, never taken as the answer to a finding.
+
+When the change touches `apps/web`, read the pictures the implement step named in its `artifacts`, by their paths in its folder's
+`closeout.json`, in light and dark, with the `look` skill. A page or a state the change touches with no picture of it is a finding.
 When the change touches `apps/web`, read `.claude/skills/shadcn/SKILL.md` with Read for how the board's components are meant to be used.
 
 When the change touches `apps/web`, load `change-the-board` first: it says which of the design system kit's skills you are given the

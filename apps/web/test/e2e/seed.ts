@@ -74,6 +74,19 @@ export const FAKE = {
    * What `tokens` named in its closeout: an image and a text file in its files directory, which the api serves, and a path on its branch.
    */
   artifacts: { image: 'palette.png', text: 'tokens.txt', path: 'TOKENS.md' },
+  /**
+   * `tokens`' closeout is v1's envelope: a summary longer than one line may be, which the board shows cut, its whole text leading the
+   * body, a markdown body, and a value handed on beside its files, an address the board links. `theme`'s is v0's, given before the
+   * envelope was versioned: its first line is its summary, its whole text its body.
+   */
+  envelope: {
+    summary:
+      'Picked the colour tokens for the board: ten hues, each with a light and a dark tone, and a picture of every swatch side by side.',
+    cut: 'Picked the colour tokens for the board: ten hues, each with a light and a dark tone, and a picture of every swatch…',
+    body: 'The **sky** and **rose** hues sit at the ends of the range.',
+    value: { name: 'Palette', value: 'https://example.com/palette' },
+    v0: { first: 'Applied them to every page.', more: 'Every page reads the tokens now.' },
+  },
   /** One per `after` between its steps: implement → review, review → respond, implement → respond, tokens → theme. */
   edges: 4,
   /**
@@ -2146,10 +2159,17 @@ export function seed(root: string, now = Date.now()): void {
   write(path.join(files, FAKE.artifacts.image), palette());
   write(path.join(files, FAKE.artifacts.text), 'sky blue emerald amber orange red neutral violet teal rose\n');
   const tokensCloseout = {
+    apiVersion: 'nemia/v1',
     outcome: 'done',
-    summary: 'Picked the colour tokens.',
+    summary: FAKE.envelope.summary,
+    body: FAKE.envelope.body,
     needs: null,
-    artifacts: [path.join(files, FAKE.artifacts.image), path.join(files, FAKE.artifacts.text), FAKE.artifacts.path],
+    artifacts: [
+      { path: path.join(files, FAKE.artifacts.image) },
+      { path: path.join(files, FAKE.artifacts.text) },
+      { path: FAKE.artifacts.path },
+      FAKE.envelope.value,
+    ],
   };
   signedOff(`${id}-tokens`, 'codex', lane, 'Pick the colour tokens.', 40, 30, tokensCloseout, undefined, {
     turns: 14,
@@ -2164,7 +2184,7 @@ export function seed(root: string, now = Date.now()): void {
     'Apply them to every page.',
     30,
     10,
-    { outcome: 'done', summary: 'Applied them to every page.', needs: null, artifacts: [] },
+    { outcome: 'done', summary: `${FAKE.envelope.v0.first}\n\n${FAKE.envelope.v0.more}`, needs: null, artifacts: [] },
     undefined,
     undefined,
     FAKE.denied.denials,

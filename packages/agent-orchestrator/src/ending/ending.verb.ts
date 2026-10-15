@@ -16,7 +16,7 @@ import { isRepositoryRun, type CloseoutAsked, type RepositoryRun, type Landed, t
 import { landsOnCheck, ownStatus, type SpendOf } from '../status/status.ts';
 import { runReady } from '../wait/wait.ts';
 import { assess } from '../tick/assess.ts';
-import type { Closeout } from '../closeout/closeout.ts';
+import type { Closeout } from '../closeout/index.ts';
 import { runStore } from '../record/files.store.ts';
 import { stepsOf } from '../record/record.store.ts';
 import { checkoutStatus, landThrough, stagedHere, type StatusMemo } from '../place/landing.store.ts';

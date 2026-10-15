@@ -913,6 +913,21 @@ anchor it on the very context that produced the work, and would put unverifiable
 verifiable evidence. So: **intent and artifacts travel, process does not.** A step that wants to
 say something to the next one writes a file, deliberately, like a person would — or declares it.
 
+### The closeout's envelope
+
+Every closeout is asked for in one versioned envelope, `apiVersion: "nemia/v1"`: `outcome`; `summary`, one line of at most 120
+characters; `body`, markdown or null; `artifacts`, each a file `{path}` or a value `{name, value}`, shown labelled and as a link when
+it is an http(s) address; and `needs`, only with `outcome: blocked` — a `done` closeout with a `needs` is refused and asked again,
+once a round, as a closeout naming a file the run does not have is. A summary is never refused for its length: every reader cuts it
+to a line at a word with an ellipsis, and the whole text leads the body. A closeout given before the envelope (no `apiVersion`) is
+read as v0 and converted on read — its first line the summary, its whole summary the body, its strings file artifacts — and nothing
+stored is rewritten.
+
+When a step signs off, the tick writes its closeout in v1's shape, its files by absolute path and its declared output beside the
+envelope, as `closeout.json` in its files directory; the name is the run's, and a closeout that names it is refused. A later step's
+brief names each earlier step's folder and says once what `closeout.json` holds, listing a folder's files only where it holds none, as a
+folder handed before the file was written does.
+
 ### Declared output: `output:` and `input:`
 
 Two keys, neither control flow — one declares, one reads. Two steps of a workflow for a change to a web app:
@@ -947,8 +962,11 @@ Review the change in this workspace as a second engineer would, and look at it a
   Its properties are merged into the closeout schema the step is filed with. The merged schema stays
   strict: every property required and no others allowed, because Codex enforces strict output
   schemas. At load, the run refuses a schema whose objects are not strict or that uses `$ref`, a schema that names
-  `outcome`, `summary`, `artifacts` or `needs`, a file that is not there, and a file outside the folder — absolute, or up
-  and out with `..` — before it is read. Each refusal names the fix.
+  a field of the envelope (`apiVersion`, `outcome`, `summary`, `body`, `artifacts` or `needs`), a file that is not there, and a file
+  outside the folder — absolute, or up and out with `..` — before it is read. Each refusal names the fix.
+- **A step that hires an agent declares one output, merged from the agent's `output:` and its own**: the agent's fields first, then
+  the step's, each with one owner, recorded on the frozen step (`owners`). A field both declare is refused at every load — a board
+  save, a factory apply, a start — naming the field and both declarers: the step declares only what it adds.
 - **`tally: <field>, <field>.<flag>, <field>.<key>=<value>`** names what `wf stats` counts of the step's
   closeouts: a field of its `output:` schema that is an array (its items are counted), an integer or a
   number (its value is summed), an array's field and a boolean of its items (the items where it is
@@ -961,8 +979,8 @@ Review the change in this workspace as a second engineer would, and look at it a
   one `=`, or an empty part, and an entry given twice. It is frozen with the step, and counted by what
   each run froze.
 - **`input: <step>`** hands this step the producer's declared fields, under `## From <step>` in its
-  brief, as JSON labelled as data. It gets those fields only, never the producer's summary, needs or
-  artifacts. The producer must be a step this one waits on — directly, through the steps between, or
+  brief, as JSON labelled as data. Its summary, body, needs and artifacts are in the producer's folder's
+  `closeout.json` (*The closeout's envelope*), never inline. The producer must be a step this one waits on — directly, through the steps between, or
   through `resume` — and must declare an `output:`. Anything else is refused at load: a step cannot read the product of work that
   has not finished.
 - **A producer whose closeout lacks a declared field, or cannot be read, is `unsigned`.** It did not
@@ -971,8 +989,9 @@ Review the change in this workspace as a second engineer would, and look at it a
 **The anchoring rule stands, and it is why both ends are declared.** *Intent and artifacts travel,
 process does not* was written against handing the implementer's account to the reviewer. A declared
 output is an artifact: the step's deliberate product, exactly what `REVIEW.md` used to be. What
-changed is the transport, not the rule. The summary still goes to the person who decides and nowhere
-else. Nothing from any step's closeout reaches a step that did not ask for it. Where `implement`
+changed is the transport, not the rule. A step's whole closeout, its summary included, is in its folder's
+`closeout.json`, which a later step may read as the step's own account, to check against the change and never as
+a finding's answer; its brief inlines only what it asked for. Where `implement`
 declares nothing and `review` reads nothing, the reviewer judges the diff — and in a round, it is
 handed implement's replies to the last findings and nothing else, because its own `loop:` asked for
 them. In the web workflow above, `review` also reads implement's `screenshots` and `pages`: pictures
@@ -1022,8 +1041,8 @@ What review declared in its closeout — `findings`, `again`:
 - **What is read.** Each of the parent's terminal steps, off the engine's record of its current try, as `wf decide`
   reads a closeout: its `summary`, and the fields its `output:` declares, as `## From <step>` gives them. Each is
   fenced, in a fence longer than any backticks inside it, under a label saying whose it is.
-- **Why a summary travels here, and never between steps.** Between two steps of one run, the author's account of
-  work nobody has judged would anchor whoever judges it. A parent that has shipped is past that: a person read its
+- **Why a summary travels here, inline.** Between two steps of one run, the author's account of work nobody has judged
+  stays in its folder's `closeout.json`, never in the brief, for a later step to check against the change. A parent that has shipped is past that: a person read its
   summary beside its diff and put the work on the base the child is cut from. One run later the summary is the record
   of what is already in the workspace, the way a merged pull request's description is to the next person who opens
   the code. It is still another run's words, and the change is on disk to weigh them against.

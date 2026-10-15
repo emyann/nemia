@@ -240,7 +240,7 @@ test("a loop's target that declares an `output:` of its own keeps one schema too
   assert.deepEqual(chainDifferences(filed), []);
   assert.deepEqual(
     (filed[0].closeoutSchema as { required: string[] }).required,
-    ['outcome', 'summary', 'artifacts', 'needs', 'notes', 'replies'],
+    ['apiVersion', 'outcome', 'summary', 'body', 'artifacts', 'needs', 'notes', 'replies'],
     'the first try',
   );
 });

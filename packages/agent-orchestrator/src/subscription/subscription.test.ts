@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { feedWords, type FeedLine, type RunLine } from '../feed/feed.ts';
 import type { Listing } from '../list/list.ts';
-import type { Closeout } from '../closeout/closeout.ts';
+import type { Closeout } from '../closeout/index.ts';
 import type { Instant } from '../daemon/daemon.ts';
 import { DEFAULT_WAKE, digestDue, digestOf, messageOf, readDelivered, sortLine, subscribeRefusalOf } from './subscription.ts';
 

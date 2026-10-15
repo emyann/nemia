@@ -346,7 +346,7 @@ test("REFUSED: a hired agent there is not, in the factory's words — the agents
   for (const words of [unknown, none, broken]) assert.doesNotMatch(words, /`agent: ada`/);
 });
 
-test("a schema the agent's output: names is read beside the agent, and one the step names beside the step", () => {
+test("a schema the agent's output: names is read beside the agent, one the step names beside the step, and the two are merged", () => {
   const dir = workflows({
     'agents/reviewer.md': '---\noutput: review.schema.json\n---\nReview it.\n',
     'agents/review.schema.json':
@@ -361,7 +361,30 @@ test("a schema the agent's output: names is read beside the agent, and one the s
   assert.equal(check.output?.file, 'review.schema.json');
   assert.deepEqual(Object.keys((check.output.schema as { properties: object }).properties), ['verdict']);
   const judge = steps.find((s) => s.name === 'judge')!;
-  assert.deepEqual(Object.keys((judge.output!.schema as { properties: object }).properties), ['ok']);
+  assert.deepEqual(Object.keys((judge.output!.schema as { properties: object }).properties), ['verdict', 'ok']);
+  assert.deepEqual(judge.output!.schema.required, ['verdict', 'ok']);
+  assert.equal(judge.output!.file, 'judge.schema.json', "the step's own line is what its file says");
+  assert.deepEqual(judge.output!.owners, {
+    verdict: { by: 'agent', name: 'reviewer', file: 'review.schema.json' },
+    ok: { by: 'step', name: 'judge', file: 'judge.schema.json' },
+  });
+});
+
+test('REFUSED at load: a field both a step and its agent declare, naming the field and both declarers', () => {
+  const dir = workflows({
+    'agents/reviewer.md': '---\noutput: review.schema.json\n---\nReview it.\n',
+    'agents/review.schema.json':
+      '{"type":"object","properties":{"findings":{"type":"string"},"again":{"type":"boolean"}},"required":["findings","again"],"additionalProperties":false}',
+    'dev/implement.md': '---\nplace: git\n---\nImplement it.\n',
+    'dev/judge.md': '---\nplace: git\nagent: reviewer\nafter: implement\noutput: judge.schema.json\n---\n',
+    'dev/judge.schema.json':
+      '{"type":"object","properties":{"findings":{"type":"string"},"mutants":{"type":"string"}},"required":["findings","mutants"],"additionalProperties":false}',
+  });
+  assert.equal(
+    refusal(() => loadWorkflows(path.join(dir, 'dev'))),
+    'judge: `findings` is declared by agent reviewer (agents/reviewer.md, `output: review.schema.json`) and by step judge ' +
+      '(judge.md, `output: judge.schema.json`): a field has one owner. Delete it from one of the two.',
+  );
 });
 
 test('REFUSED at shipped defaults: a broken agent, only when a step names it, naming agents/<file> — a linked one too', () => {

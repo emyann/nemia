@@ -6,6 +6,7 @@ import {
   askedQuestions,
   declaredOutput,
   type EarlierTry,
+  envelopeRefusals,
   parseCloseout,
   roundIn,
   type Run,
@@ -13,7 +14,7 @@ import {
   tryNote,
 } from 'agent-orchestrator/run';
 import { LOOP_REPLIES, outputFields, type Workflow } from 'agent-orchestrator/workflow';
-import { artifactOf, type StepArtifact } from '../steps/artifacts.ts';
+import { artifactOf, valueOf, type StepArtifact, type StepValue } from '../steps/artifacts.ts';
 import { checkIn, type CheckStderr, type StepCheck } from '../steps/logs.ts';
 
 /** A loop's target's answer to one finding it was handed, as its closeout gave it. */
@@ -24,7 +25,12 @@ export type StepReply = { finding: string; answer: string; why: string };
  *
  * `output` is what it gave of the fields its `output:` declares, and `missing` those it did not (`declaredOutput`). `replies`
  * is a loop's target's answer to each finding it was handed, when its closeout gave them. `artifacts` are the files it named,
- * each as `artifactOf` reads it: a file the api serves from the step's files directory, or the path alone.
+ * each as `artifactOf` reads it: a file the api serves from the step's files directory, or the path alone; `values` the values it
+ * handed on, each with a `link` where it is an http(s) address (`valueOf`).
+ *
+ * `apiVersion` is the version it was given in, null for one given before v1, which is converted on read; `summary` is one line, cut
+ * (`summaryLine`), and `body` the markdown beneath it, null for none. `refused` is what the run does not accept of its envelope
+ * (`envelopeRefusals`), each a sentence.
  *
  * `schema` is the JSON Schema of each field asked about — given or missing — off the workflow the run froze, so the board can
  * draw a value by what it was declared to be and say what a field means. `raw` is the statement as the engine recorded it,
@@ -35,10 +41,14 @@ export type StepReply = { finding: string; answer: string; why: string };
  * is in `output` alone, drawn as any other.
  */
 export type StepCloseout = {
+  apiVersion: string | null;
   outcome: 'done' | 'blocked';
   summary: string;
+  body: string | null;
   needs: string | null;
   artifacts: StepArtifact[];
+  values: StepValue[];
+  refused: string[];
   output: Record<string, unknown>;
   missing: string[];
   replies: StepReply[] | null;
@@ -129,10 +139,14 @@ export function closeoutIn(
   const replies = c.output?.[LOOP_REPLIES];
   const declared = step.output?.schema.properties ?? {};
   return {
+    apiVersion: c.apiVersion ?? null,
     outcome: c.outcome,
     summary: c.summary,
+    body: c.body ?? null,
     needs: c.needs ?? null,
     artifacts: c.artifacts.map((file) => artifactOf(run, name, file)),
+    values: (c.values ?? []).map(valueOf),
+    refused: envelopeRefusals(c),
     output: given,
     missing,
     replies: Array.isArray(replies) ? replies.map(replyOf) : null,

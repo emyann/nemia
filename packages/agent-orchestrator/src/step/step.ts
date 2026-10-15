@@ -299,8 +299,14 @@ export const DEFAULT_ROUNDS = 3;
  */
 export const LOOP_REPLIES = 'replies';
 
-/** A step's declared output: the file as the step names it, and the schema that file held at `nemia start`. */
-export type StepOutput = { file: string; schema: OutputSchema };
+/**
+ * A step's declared output: the file as the step names it (its agent's where the step names none), the schema at `nemia start` — its
+ * agent's fields and its own, merged (`mergedOutput`) — and the one owner of each field, where the step hires an agent.
+ */
+export type StepOutput = { file: string; schema: OutputSchema; owners?: Record<string, OutputOwner> };
+
+/** Who declares a field of a merged output: the agent or the step, by its name and the schema file its `output:` line names. */
+export type OutputOwner = { by: 'agent' | 'step'; name: string; file: string };
 
 /** An output schema, checked strict: an object whose every property is required and nothing else allowed. */
 export type OutputSchema = {
@@ -412,11 +418,11 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
 };
 
 /**
- * The four fields every closeout has. They are the run's: `summary` goes to the person who decides and
- * nowhere else, so an `output:` may not declare one of them and have it travel to a step. The schema
- * itself is `CLOSEOUT_SCHEMA` in closeout.ts, and a test holds the two to each other.
+ * The six fields of every closeout's envelope in v1. They are the run's: `summary` and `body` are the step's own account, for
+ * the person who decides, so an `output:` may not declare one of them. The schema itself is `CLOSEOUT_SCHEMA` in closeout.ts, and a
+ * test holds the two to each other.
  */
-export const CLOSEOUT_FIELDS = ['outcome', 'summary', 'artifacts', 'needs'] as const;
+export const CLOSEOUT_FIELDS = ['apiVersion', 'outcome', 'summary', 'body', 'artifacts', 'needs'] as const;
 
 /**
  * Where a step works: its `place:`, or `git` for a step frozen on a run record before the key, as every step worked then; a step file

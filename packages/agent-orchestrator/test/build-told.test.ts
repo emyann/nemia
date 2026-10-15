@@ -4,8 +4,8 @@
  * skill it adds to its agent's, as a deny of its own, or as a field its own `output:` declares. `untold` reads each step as `nemia start`
  * freezes it, and is first made to refuse a copy of the shipped team with one of each taken away.
  *
- * The build workflow's review declares its own closeout, the reviewer's and the mutants it judged: `schemaDrift` holds the copy to the
- * agent's schema, field for field.
+ * The build workflow's review declares only the mutants it judged; the reviewer's own schema gives its findings and the round, merged
+ * into one output with one owner a field (`mergedOutput`).
  *
  * The design system kit's skills sit in a folder of the board's (`KIT_SKILLS`): build's design, implement and review are each given
  * every one on their `skills:` line, named with the folder, and `kitDrift` holds the names given to the folders that are there and to
@@ -20,7 +20,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { isDeepStrictEqual } from 'node:util';
 import { loadWorkflows } from '../src/folder/folder.store.ts';
 import { outputFields } from '../src/step/step.ts';
 import { skillFolders } from '../src/skills/skills.store.ts';
@@ -525,29 +524,15 @@ test("REFUSED: design, implement or review told of the look's parts no more is n
   assert.match(fs.readFileSync(path.join(REPO, TRIGGER), 'utf8'), /`apps\/web\/src\/components\/look`,\s+taken\s+through\s+its\s+door/);
 });
 
-/**
- * Why the schema a step declares, `ours`, is not the agent's `theirs` with the field `field` added and required: undefined when it is.
- */
-function schemaDrift(ours: string, theirs: string, field: string): string | undefined {
-  const step = JSON.parse(ours) as Schema;
-  if (!Object.hasOwn(step.properties, field) || !step.required.includes(field)) return `declares no required ${field}`;
-  const { [field]: _added, ...properties } = step.properties;
-  const less = { ...step, properties, required: step.required.filter((name) => name !== field) };
-  return isDeepStrictEqual(less, JSON.parse(theirs)) ? undefined : `is not the agent's schema with ${field} added`;
-}
-
-test("the build review's schema is the reviewer's with `mutants` added, field for field", () => {
-  const ours = fs.readFileSync(path.join(HOLDER, 'build', 'review.schema.json'), 'utf8');
-  const theirs = fs.readFileSync(path.join(HOLDER, 'agents', 'review.schema.json'), 'utf8');
-  assert.equal(schemaDrift(ours, theirs, 'mutants'), undefined);
-  assert.ok(theirs.includes('"again"') && theirs.includes('"findings"'), 'the reviewer declares its findings and the round');
-  assert.equal(
-    schemaDrift(ours.replace('one finding each', 'a finding each'), theirs, 'mutants'),
-    "is not the agent's schema with mutants added",
-  );
-  assert.equal(schemaDrift(theirs, theirs, 'mutants'), 'declares no required mutants');
-  assert.equal(
-    schemaDrift(ours.replace('["findings", "mutants", "again"]', '["findings", "again"]'), theirs, 'mutants'),
-    'declares no required mutants',
-  );
+test("the shipped review declares only `mutants`: Agora's own schema gives `findings` and `again`, each field with one owner", () => {
+  const review = buildSteps().find((s) => s.name === 'review')!;
+  assert.deepEqual(outputFields(review), ['findings', 'again', 'mutants']);
+  assert.deepEqual(Object.fromEntries(Object.entries(review.output!.owners!).map(([field, o]) => [field, `${o.by} ${o.name} ${o.file}`])), {
+    findings: 'agent agora review.schema.json',
+    again: 'agent agora review.schema.json',
+    mutants: 'step review review.schema.json',
+  });
+  assert.equal(review.loop, 'implement');
+  const own = JSON.parse(fs.readFileSync(path.join(HOLDER, 'build', 'review.schema.json'), 'utf8')) as { properties: object };
+  assert.deepEqual(Object.keys(own.properties), ['mutants']);
 });

@@ -39,6 +39,7 @@ import {
   ownNote,
   prunedKept,
   questionLines,
+  envelopeRefusals,
   prunedWords,
   runStore,
   roundDueNote,
@@ -431,8 +432,19 @@ function printTries({ used, costs, timeline, answers, said }: Decided, name: str
 }
 
 /**
- * A step's closeout: its summary, its output's fields — those that ask questions numbered, as `--answer` names them (`questionLines`) —
- * its needs and how to answer them, and its files; or why it does not read.
+ * A closeout's envelope as `nemia decide` prints it: its summary, its body beneath, each value as `name: value`, and what the run refused
+ * of it (`envelopeRefusals`), each marked `!! not accepted`.
+ */
+const envelopeLines = (c: Exclude<Closeout, { error: string }>): string[] => [
+  ...(c.summary ? [c.summary] : []),
+  ...(c.body ? c.body.split('\n').map((l) => `  ${l}`) : []),
+  ...(c.values ?? []).map((v) => `${v.name}: ${v.value}`),
+  ...envelopeRefusals(c).map((r) => `!! not accepted: ${r}`),
+];
+
+/**
+ * A step's closeout: its envelope (`envelopeLines`), its output's fields — those that ask questions numbered, as `--answer` names them
+ * (`questionLines`) — its needs and how to answer them, and its files; or why it does not read.
  */
 function printCloseout(
   { run, answering }: Decided,
@@ -443,7 +455,7 @@ function printCloseout(
   place: Place,
 ): void {
   if ('error' in c) return console.log(`    closeout unreadable — ${c.error}`);
-  if (c.summary) console.log(`    ${c.summary.split('\n').join('\n    ')}`);
+  for (const line of envelopeLines(c)) console.log(`    ${line}`);
   const asked = askedQuestions(step, c);
   const fields = step ? owedFields(step, run, steps).filter((f) => !asked.some((a) => a.field === f)) : [];
   for (const line of step ? [...outputLines(step, c, fields), ...questionLines(asked)] : []) console.log(`    ${line}`);

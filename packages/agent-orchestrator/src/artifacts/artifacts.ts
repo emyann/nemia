@@ -123,18 +123,28 @@ const configurationRefused = (done: string): string[] => [
  *              folder a harness reads as its own configuration (`configFolderIn`) — refused, and never
  *              collected: the steps after read the files directory as a mounted folder, and their harness
  *              would take the file as its own. Asked after `escapes` and `outside`.
+ *   reserved   `closeout.json` at the workspace root or at the root of the files directory (`HANDED_CLOSEOUT`): the run's own name
+ *              for the step's closeout it writes there — refused, and never collected.
  */
-export type ArtifactPlace = 'workspace' | 'files' | 'escapes' | 'outside' | 'configuration';
+export type ArtifactPlace = 'workspace' | 'files' | 'escapes' | 'outside' | 'configuration' | 'reserved';
+
+/**
+ * The file the tick writes in a step's files directory once it signs off (`handCloseout` in artifacts.store.ts): the step's closeout in
+ * v1's shape, which the steps after it read there. Its name is the run's: a closeout that names it is refused (`reserved`).
+ */
+export const HANDED_CLOSEOUT = 'closeout.json';
 
 /** Where a declared artifact is looked for (`ArtifactPlace`). Pure. The files directory itself is no file in it, and is `outside`. */
 export function artifactPlace(file: string, dir: string): ArtifactPlace {
   if (!path.isAbsolute(file)) {
     const rel = path.normalize(file);
     if (rel === '..' || rel.startsWith(`..${path.sep}`)) return 'escapes';
+    if (rel === HANDED_CLOSEOUT) return 'reserved';
     return configFolderIn(rel) ? 'configuration' : 'workspace';
   }
   const within = path.relative(path.resolve(dir), path.resolve(file));
   if (!within || within === '..' || within.startsWith(`..${path.sep}`) || path.isAbsolute(within)) return 'outside';
+  if (within === HANDED_CLOSEOUT) return 'reserved';
   return configFolderIn(within) ? 'configuration' : 'files';
 }
 
@@ -154,10 +164,11 @@ export type ArtifactFile = { path: string; bytes: number };
  *   escapes        a path that climbs out of the workspace, as written or through a link in it: refused, and not read
  *   outside        an absolute path outside the step's files directory: refused, and not read
  *   configuration  a path through a folder a harness reads as its own configuration (`ArtifactPlace`): refused, and not handed over
+ *   reserved       the run's own name for the closeout it writes (`HANDED_CLOSEOUT`): refused, and not handed over
  */
 export type MissingArtifact = {
   path: string;
-  why: 'not there' | 'not known' | 'directory' | 'not collected' | 'missing' | 'escapes' | 'outside' | 'configuration';
+  why: 'not there' | 'not known' | 'directory' | 'not collected' | 'missing' | 'escapes' | 'outside' | 'configuration' | 'reserved';
   said?: string;
 };
 
@@ -203,6 +214,7 @@ export function artifactLines(dir: string, missing: readonly MissingArtifact[], 
         `!! declared through a folder a harness reads as its own configuration, and not handed over: ${names}` +
         `  — the steps after it would read it as theirs; name it outside ${CONFIG_FOLDERS.map((f) => `\`${f}\``).join(' or ')}`,
     ),
+    ...line('reserved', (names) => `!! declared the run's own name, and not handed over: ${names}  — ${HANDED_CLOSEOUT} is the run's`),
     ...(files.length ? ['files:', ...files.map((f) => `  ${f.path}  ${sizeOf(f.bytes)}`)] : []),
   ];
 }
@@ -219,6 +231,7 @@ export const REFUSING: ReadonlySet<MissingArtifact['why']> = new Set([
   'escapes',
   'outside',
   'configuration',
+  'reserved',
 ]);
 
 /** Why the run does not have a file a closeout named, said of that one file to the step that named it: `why` as `REFUSING` holds it. */
@@ -229,6 +242,7 @@ export function lackWords(why: string, dir: string): string {
     directory: 'it is a directory, and a closeout names each file',
     escapes: 'it leads out of the workspace, so it was not read',
     outside: `it is an absolute path outside \`${dir}\`, so it was not read`,
+    reserved: `\`${HANDED_CLOSEOUT}\` is the run's own name for the closeout it writes in \`${dir}\`, so it was not handed over: rename the file`,
     configuration: `it passes through ${CONFIG_FOLDERS.map((f) => `\`${f}\``).join(' or ')}, a folder a harness reads as its own configuration, so it was not handed over`,
   };
   return words[why] ?? `the run does not have it (${why})`;

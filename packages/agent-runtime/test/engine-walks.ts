@@ -468,6 +468,19 @@ const KEPT: readonly Walk[] = [
     },
     says: [{ refused: 'KeptRefused' }, ['b']],
   },
+  {
+    name: 'kept names the harness each task was filed on, the default one for a task filed on none',
+    walk: async ({ engine }) => {
+      await asked(engine.file({ ...task('a'), harness: 'test' }));
+      await asked(engine.file(task('b')));
+      const report = await asked(engine.kept());
+      return report && 'tasks' in report ? report.tasks.map((t) => [t.taskId, t.harness ?? null]).sort() : report;
+    },
+    says: [
+      ['a', 'test'],
+      ['b', 'test'],
+    ],
+  },
 ];
 
 /** The contract: every kept verb's walks. */
@@ -612,7 +625,7 @@ export const APART: readonly Apart[] = [
       await asked(engine.file(task('a')));
       return asked(engine.kept());
     },
-    standIn: { tasks: [{ taskId: 'a', journal: 0, bodies: 0, files: 0 }] },
+    standIn: { tasks: [{ taskId: 'a', harness: 'test', journal: 0, bodies: 0, output: 0, files: 0 }] },
   },
 ];
 

@@ -251,18 +251,21 @@ export const unreadWorkflows = <T extends Pick<WorkflowListing, 'error'>>(workfl
 /**
  * What the tick's last try of a queued card's start says, as the CLI's `inbox` says it beside the card: refused, it waits for a person, not
  * for a slot; failed otherwise, the tick tries it again. The repository it was tried on is said for a card that names none but names its
- * factory, whose start turns on where the daemon runs — never for a card that names no factory, refused wherever a daemon runs; and `why`
+ * factory — never for a card that names no factory, refused wherever a daemon runs: the one its factory picks said as such
+ * (`factoryRepo`), and running the daemon elsewhere offered only when its factory picks none, where the try was on the daemon's own. `why`
  * is left out where the card's own refusal already says it. `at` is the try's time as the page shows one.
  */
 export function triedLine(
-  entry: Pick<InboxEntry, 'repo' | 'factory' | 'error'> & { tried: NonNullable<InboxEntry['tried']> },
+  entry: Pick<InboxEntry, 'repo' | 'factory' | 'error' | 'factoryRepo'> & { tried: NonNullable<InboxEntry['tried']> },
   at: string,
 ): string {
   const { tried } = entry;
-  const on = entry.repo === null && entry.factory !== null && entry.error === null ? ` on ${tried.repo}` : '';
+  const said = entry.repo === null && entry.factory !== null && entry.error === null;
+  const on = said ? ` on ${tried.repo}${tried.repo === entry.factoryRepo ? ", its factory's one repository" : ''}` : '';
+  const elsewhere = said && entry.factoryRepo === null ? ', or run the daemon in the repository it is about' : '';
   const why = tried.why !== entry.error ? `: ${tried.why.trim()}${/[.!?]$/.test(tried.why.trim()) ? '' : '.'}` : '.';
   return tried.refused
-    ? `Not started at ${at}${on}${why} It stays queued, and the tick does not try it again while it reads the same: edit the card, or take it off the queue and queue it again${on ? ', or run the daemon in the repository it is about' : ''}.`
+    ? `Not started at ${at}${on}${why} It stays queued, and the tick does not try it again while it reads the same: edit the card, or take it off the queue and queue it again${elsewhere}.`
     : `Failed at ${at}${on}${why} Not a refusal: the tick tries it again on every pass, where it keeps its place.`;
 }
 

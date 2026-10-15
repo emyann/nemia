@@ -306,6 +306,7 @@ test("`inboxListing`: each card by file name, with the runs whose record's `from
       factory: null,
       startedAs: ['broken-gh78'],
       from: [],
+      factoryRepo: null,
       error:
         'broken-a1b2.md: `after` is not a key an inbox card has: what a card waits on is said when it is started, once the runs it could wait on are known — nemia start <inbox>/broken-a1b2.md --after <runId>. Delete the line.',
     },
@@ -318,6 +319,7 @@ test("`inboxListing`: each card by file name, with the runs whose record's `from
       factory: null,
       startedAs: [],
       from: [],
+      factoryRepo: null,
       error: null,
     },
     {
@@ -329,6 +331,7 @@ test("`inboxListing`: each card by file name, with the runs whose record's `from
       factory: null,
       startedAs: [],
       from: [],
+      factoryRepo: null,
       error: 'drafts/: not a card. The inbox holds one markdown file per card, <name>.md — move it out, or, for a card, name it <name>.md.',
     },
     {
@@ -340,6 +343,7 @@ test("`inboxListing`: each card by file name, with the runs whose record's `from
       factory: null,
       startedAs: [],
       from: [],
+      factoryRepo: null,
       error:
         'notes.txt: not a card. The inbox holds one markdown file per card, <name>.md — move it out, or, for a card, name it <name>.md.',
     },
@@ -352,6 +356,7 @@ test("`inboxListing`: each card by file name, with the runs whose record's `from
       factory: null,
       startedAs: ['parse-the-flag-ab12', 'parse-the-flag-ef56'],
       from: [],
+      factoryRepo: null,
       error: null,
     },
   ] satisfies InboxListing[]);
@@ -793,6 +798,28 @@ test("a queued card of a factory is tried on the factory's one repository, and i
   );
   assert.deepEqual(queueRepo(card(null, null), '/daemon', factories), { repo: '/daemon', fromDaemon: true });
   assert.deepEqual(queueRepo(card('/repos/mine', null), '/daemon', factories), { repo: '/repos/mine', fromDaemon: false });
+
+  const listed = (factory: string, repo: string, own = '') =>
+    inboxListing(
+      [{ file: `${factory}-a1b2.md`, text: text.replace('factory: solo', `factory: ${factory}${own}`) }],
+      [],
+      isDirectory,
+      new Map([[`${factory}-a1b2`, { ...refused, text: text.replace('factory: solo', `factory: ${factory}${own}`), repo }]]),
+      factories,
+    );
+  const solo = listed('solo', '/repos/solo');
+  assert.equal(solo[0].factoryRepo, '/repos/solo');
+  assert.equal(listed('duo', '/daemon')[0].factoryRepo, null, 'a factory of several repositories picks none');
+  assert.equal(listed('gone', '/daemon')[0].factoryRepo, null, 'a factory that does not read picks none');
+  assert.equal(listed('solo', '/home/me/code/app', '\nrepo: /home/me/code/app')[0].factoryRepo, null, 'a card that names its repository');
+  assert.equal(listing[0].factoryRepo, null, 'no factories handed');
+  assert.deepEqual(inboxLines(solo), [
+    "solo-a1b2  Solo  workflow: build  factory: solo  queued 1 of 1 — not started at 2026-09-16T10:06:00.000Z on /repos/solo, its factory's one repository: build: not offered. Edit the card, or take it back and queue it again, and the tick tries it again",
+  ]);
+  assert.match(
+    inboxLines(listed('duo', '/daemon'))[0],
+    /on \/daemon: build: not offered\. Edit the card, or take it back and queue it again, or run nemia up in the repository it is about, and the tick tries it again$/,
+  );
 });
 
 test('`queueLine`: what `nemia up` logs of the queue — `started <card> as <runId>`, a removal that failed with what then, a start refused with how to have it tried again, and one that failed otherwise, tried again', () => {

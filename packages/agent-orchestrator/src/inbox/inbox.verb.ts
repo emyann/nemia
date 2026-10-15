@@ -27,12 +27,12 @@ import { gateRefusal } from '../ending/ending.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
 import { isDirectory } from '../record/record.store.ts';
 import { inboxDir, runStore } from '../record/files.store.ts';
-import { inboxCards } from './inbox.store.ts';
+import { inboxCards, readableFactories } from './inbox.store.ts';
 import { repoFor, startRun } from '../start/start.verb.ts';
 import { contextRefusal } from '../start/index.ts';
 import { placesOf } from '../folder/lookup.store.ts';
-import { defaultStartsAllowed, factoryNames, readFactories, treeOf } from '../factory/factory.store.ts';
-import { DEFAULT_FACTORY, defaultStartRefusal, type Factory } from '../factory/factory.ts';
+import { defaultStartsAllowed, factoryNames, treeOf } from '../factory/factory.store.ts';
+import { DEFAULT_FACTORY, defaultStartRefusal } from '../factory/factory.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 
 /** How to start an inbox card (`startFromInbox`): the card, and what its start says over it or beside it. */
@@ -240,9 +240,6 @@ export function setFrom(name: string, runs: readonly string[]): InboxFrom {
   runStore.inbox.rewrite(`${name}.md`, written);
   return { card: parseInboxCard(`${name}.md`, written, () => true), file, was: card.from ?? [] };
 }
-
-/** The store's factories that read, by name: what a queued card's repository is chosen from (`queueRepo`). One not read is none. */
-const readableFactories = (): Map<string, Factory> => new Map(readFactories().flatMap((f) => ('error' in f ? [] : [[f.name, f] as const])));
 
 /**
  * The tries in `names` of cards `listing` does not list as tried — no longer queued as they were — removed; one that cannot be is left for

@@ -19,7 +19,7 @@ function SearchToCome() {
       isDisabled
       placeholder="Search · to come"
       aria-label="Search, not built yet"
-      className="hidden w-90 max-w-full shrink lg:flex"
+      className="hidden w-90 min-w-40 shrink lg:flex"
     />
   );
 }
@@ -49,7 +49,7 @@ export function FrameHeader({ path, search, feed }: { path: string; search: Reco
   return (
     <header
       data-frame-header
-      className="sticky top-0 z-20 flex min-h-20 shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-outline-variant bg-surface px-6 py-2 max-md:px-3"
+      className="sticky top-0 z-20 flex min-h-20 shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-outline-variant bg-surface px-6 py-2 max-md:px-3 md:flex-nowrap"
     >
       {isMobile && <MenuButton />}
       {name && <PageName>{name}</PageName>}

@@ -29,7 +29,7 @@ export default {
   /**
    * The Factories at `/`: every factory a block on a canvas, and a file that does not read a block that says why; the default factory is
    * none, in the canvas or the switcher, once a factory is filed, though it holds runs. The picker lists All factories, then every
-   * factory, each with its repositories and why its file does not read. A block double-clicked opens its factory's floor, at
+   * factory, each with its runs in flight, or that its file does not read. A block double-clicked opens its factory's floor, at
    * `/factories/<name>`, with only its runs on it — FOLDER's, in `hiring`, once finished runs are shown — its name in the picker, Factories
    * lit, and a start in the rail. A name no factory has says so, answered with no 4xx, and leads back. The default factory's floor still
    * answers its address, the picker listing it after the others, its FAB asking which factory; All factories picked there leads to the Overview.
@@ -67,10 +67,13 @@ export default {
 
     await pickerLists(page, LISTED, 'the picker lists every factory, the default none');
     const brokenItem = page.getByRole('listbox').locator(`[data-factory="${FACTORIES.broken}"]`);
-    await expectVisible(brokenItem.locator('[data-error]', { hasText: 'Its file does not read: ' }), `${FACTORIES.broken}'s item says why`);
     await expectVisible(
-      page.getByRole('listbox').locator(`[data-factory="${FACTORIES.hiring.name}"]`).getByText('on checkout', { exact: true }),
-      `${FACTORIES.hiring.name}'s item names its repository by its folder`,
+      brokenItem.getByText('its file does not read', { exact: true }),
+      `${FACTORIES.broken}'s item says its file does not read`,
+    );
+    await expectVisible(
+      page.getByRole('listbox').locator(`[data-factory="${FACTORIES.hiring.name}"]`).getByText(/^(none|\d+) in flight$/),
+      `${FACTORIES.hiring.name}'s item says its runs in flight`,
     );
     await settled(page);
     await photograph(page, path.join(OUT, `factories-picker-${await themeOf(page)}.png`));

@@ -80,13 +80,15 @@ export function FrameRail({ path, search }: { path: string; search: Record<strin
     <div
       data-frame-rail
       data-state={open ? 'expanded' : 'collapsed'}
-      className="sticky top-0 z-30 flex h-svh shrink-0 flex-col overflow-y-auto border-r border-outline-variant bg-surface"
+      className="sticky top-0 z-30 flex h-svh shrink-0 border-r border-outline-variant bg-surface"
     >
-      <div className={cn('flex flex-col gap-1.5 pt-2.5 pb-3.5', open ? 'items-start px-5' : 'items-center')}>
-        <MenuButton />
-        <StartFab name={picked} isExtended={open} />
+      <div data-rail-scroll className="flex min-h-0 flex-col overflow-y-auto">
+        <div className={cn('flex flex-col gap-1.5 pt-2.5 pb-3.5', open ? 'items-start px-5' : 'items-center')}>
+          <MenuButton />
+          <StartFab name={picked} isExtended={open} />
+        </div>
+        <NavigationRail aria-label="Places" items={items} selectedKey={selected} isExpanded={open} className="h-auto flex-1" />
       </div>
-      <NavigationRail aria-label="Places" items={items} selectedKey={selected} isExpanded={open} className="h-auto flex-1" />
     </div>
   );
 }

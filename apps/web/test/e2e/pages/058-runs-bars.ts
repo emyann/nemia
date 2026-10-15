@@ -116,7 +116,7 @@ async function barsTakeTheLooksRoom(from: Page): Promise<void> {
     if (!lane.scrolls || lane.taken !== 8)
       throw new Refused(`the page is longer than its window and keeps an 8-pixel lane — ${JSON.stringify(lane)}`);
     await page.setViewportSize({ width: 1280, height: 300 });
-    const list = await measured(page, '[data-frame-rail]');
+    const list = await measured(page, '[data-rail-scroll]');
     if (list.inside[1] <= list.room[1] || list.upright !== 8)
       throw new Refused(`the rail, longer than a short window, keeps an 8-pixel lane — ${JSON.stringify(list)}`);
     await page.setViewportSize({ width: 390, height: 844 });
@@ -162,7 +162,7 @@ async function pictured(from: Page, kind: Bars): Promise<void> {
     await shown(page, BOXES[0][0]);
     await photograph(page, fileOf('table'));
     const short = await sameIn(browser, from, 1280, 300);
-    await shown(short, '[data-frame-rail]');
+    await shown(short, '[data-rail-scroll]');
     await photograph(short, fileOf('rail'));
     const large = await sameIn(browser, from, 1280, 800, 4);
     await shown(large, 'html');

@@ -35,3 +35,15 @@ export const UnderTitle: StoryObj = {
     </div>
   ),
 };
+
+/** Two whole ids of different lengths given one room, as the rows of a table hold them: their controls stand at one edge. */
+export const Lined: StoryObj = {
+  render: () => (
+    <div data-id-ground style={ON_CARD}>
+      <div data-lined style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 16 }}>
+        <CopyId id="lay-the-diamond-top-e2e4" room={33} />
+        <CopyId id="the-board-s-frame-on-the-kit-04ys" room={33} />
+      </div>
+    </div>
+  ),
+};

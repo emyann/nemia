@@ -79,6 +79,8 @@ const row = (extra: object = {}): RunSummary => ({
       status: 'blocked',
       note: 'try 1',
       roundDue: false,
+      agent: null,
+      since: null,
       needs: 'a decision',
       blockedByHarness: false,
       waitingFor: { words: 'a permission', advice: 'answer it' },

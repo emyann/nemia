@@ -264,6 +264,8 @@ test('runs are read from the workflow store and summarized, with what each step 
           status: 'unknown',
           note: null,
           roundDue: false,
+          agent: null,
+          since: null,
           needs: null,
           blockedByHarness: false,
           waitingFor: null,
@@ -278,6 +280,8 @@ test('runs are read from the workflow store and summarized, with what each step 
           status: 'waiting',
           note: null,
           roundDue: false,
+          agent: null,
+          since: null,
           needs: null,
           blockedByHarness: false,
           waitingFor: null,
@@ -1065,6 +1069,8 @@ test('each step says how many attempts it has had, when the latest began, and ho
       'status',
       'note',
       'roundDue',
+      'agent',
+      'since',
       'needs',
       'blockedByHarness',
       'waitingFor',
@@ -1072,7 +1078,7 @@ test('each step says how many attempts it has had, when the latest began, and ho
       'denied',
       'sessionUnread',
     ],
-    'the list carries the note `nemia ls` prints beside a step, and what a person has to know to act on it',
+    'the list carries the note `nemia ls` prints beside a step, its agent and since when it works, and what a person has to know to act on it',
   );
   assert.equal((await listed('r-7')).steps[0].note, null, 'no note for a step on its first try');
 });

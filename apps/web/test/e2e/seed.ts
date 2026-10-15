@@ -218,6 +218,8 @@ export const NEIGHBOUR = {
   running: 'plan->draft',
   /** Into ship, which will never be filed behind the failed sketch: to come, and still. */
   still: 'sketch->ship',
+  /** The agent `draft` is given, at work in it: the Overview's strip shows it among the agents at work. */
+  agent: 'drafter',
 } as const;
 
 /**
@@ -2207,7 +2209,13 @@ export function seed(root: string, now = Date.now()): void {
         workflowDir: besideDir,
         workflow: [
           { name: 'plan', after: [], body: 'Plan it.', harness: 'claude' },
-          { name: 'draft', after: ['plan'], body: 'Draft it.', harness: 'claude' },
+          {
+            name: 'draft',
+            after: ['plan'],
+            body: 'Draft it.',
+            harness: 'claude',
+            agent: { name: NEIGHBOUR.agent, keys: [], body: 'Draft it.', given: {} },
+          },
           { name: 'sketch', after: [], body: 'Sketch it.', harness: 'codex' },
           { name: 'ship', after: ['sketch'], body: 'Ship it.', harness: 'claude' },
         ],

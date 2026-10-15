@@ -6,6 +6,7 @@
  * branches stand off `standing.json` (`standingSnapshot`).
  */
 import { Effect } from 'effect';
+import type { Workflow } from '../step/step.ts';
 import type { Engine } from '../runtime-client.ts';
 import { type AtWork, atWork, runStartedAt, type RunTokens, runTokens } from '../timeline/index.ts';
 import { unjudgedWord } from '../views/views.verb.ts';
@@ -124,10 +125,21 @@ export type RunSummary = {
    * `status` is what `nemia ls` prints for the step — see `judge` for the one word it corrects. `note` is what `nemia ls` prints
    * beside it, for a step tried again or about to be, or in a loop past its first round — `try 2, by retries: 1`,
    * `round 2 of 3`, `round 3 asked (nemia round) — …` — and null where it prints nothing. `roundDue`: whether a looping step's next
-   * round is due, which its note words.
+   * round is due, which its note words. `agent`: the agent the step is given, a hire's included, as the workflow it is judged by
+   * resolves it (`judgedSteps`); null for a step given none. `since`: when the step's task still at work started (`atWork` of the step
+   * alone), null while none of its tasks runs.
    */
   steps: Array<
-    { name: string; taskId: string | null; branch: string | null; status: string; note: string | null; roundDue: boolean } & StepNeeds
+    {
+      name: string;
+      taskId: string | null;
+      branch: string | null;
+      status: string;
+      note: string | null;
+      roundDue: boolean;
+      agent: string | null;
+      since: string | null;
+    } & StepNeeds
   >;
   /** The steps as a graph, as the run's page has it (`runGraph`): the Factory's card draws its flow off it, with no read of the run. */
   graph: RunGraph;
@@ -154,6 +166,18 @@ export type RunSummary = {
   unreadable: string | null;
 };
 
+/** The agent each step of a run is given, by its name, off the workflow it is judged by (`judgedSteps`); null for a step given none. */
+function agentsOf(run: Run, folder: readonly Workflow[] | null): (name: string) => string | null {
+  const steps = judgedSteps(run, folder);
+  return (name) => steps.find((step) => step.name === name)?.agent?.name ?? null;
+}
+
+/** When the task of a run's step still at work started (`atWork` of that step alone); null while none of its tasks runs. */
+function stepSince(run: Run, name: string, views: Views): string | null {
+  const step = run.steps[name];
+  return step ? atWork({ steps: { [name]: step } }, views).since : null;
+}
+
 /** A run's summary but when it started, which is read off the feed on each request, and what git was asked for it. */
 type Judged = { summary: Omit<RunSummary, 'startedAt'>; asked: GitAsked };
 
@@ -161,6 +185,7 @@ const summarize = Effect.fnUntraced(function* (run: Run, views: Views, reader: E
   const folder = workflowsOf(run, home).steps;
   const names = stepNames(run, folder);
   const asked: GitAsked = { branches: [], failed: false };
+  const agentOf = agentsOf(run, folder);
   const judged = yield* judge(run, names, folder, views, {
     reader,
     git,
@@ -195,6 +220,8 @@ const summarize = Effect.fnUntraced(function* (run: Run, views: Views, reader: E
       status: judged.words.get(name)!,
       note: judged.notes.get(name) ?? null,
       roundDue: judged.roundDue.has(name),
+      agent: agentOf(name),
+      since: stepSince(run, name, views),
       ...needsOf(run, name, views, judged),
     })),
     graph: runGraph(judgedSteps(run, folder), names),
@@ -216,6 +243,7 @@ function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, 
   const folder = workflowsOf(run, home).steps;
   const names = stepNames(run, folder);
   const wordOf = unjudgedWord(views, unreadable);
+  const agentOf = agentsOf(run, folder);
   return {
     id: run.id,
     repo: run.repo ?? null,
@@ -245,6 +273,8 @@ function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, 
       status: wordOf(run.steps[name]),
       note: null,
       roundDue: false,
+      agent: agentOf(name),
+      since: null,
       needs: null,
       blockedByHarness: false,
       waitingFor: null,

@@ -344,6 +344,7 @@ export const claudeCodeOps = (options: ClaudeOptions = {}): RunnerOps => {
               {
                 files: [...new Set([...(jobs[name]?.files ?? []), ...(held[name]?.files ?? [])])],
                 records: [...new Set([...(jobs[name]?.records ?? []), ...(held[name]?.records ?? [])])],
+                output: [...new Set([...(jobs[name]?.output ?? []), ...(held[name]?.output ?? [])])],
               },
             ]),
           ),

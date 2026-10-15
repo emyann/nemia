@@ -3270,7 +3270,12 @@ written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on 
   zero; a record whose run was removed is named by no task and leaves the part, though it stays on the disk. An ask that fails leaves
   `engine` whole and `sessions` unread, with no bytes. A file hardlinked from
   outside the store, as a worktree's packages are, counts nothing; a name that does not read is counted unread and is in no byte,
-  never a zero. The reading is handed to each pass, which keeps it among the recent and so in the series: `disk.bytes` (by `part`, and
+  never a zero. Each part is said by kind too (`DISK_KINDS`), its kinds adding up to it, in the walk itself (`kindAt`, `kindIn`): under
+  `runs`, a step's handed `pictures` (by their image type) and other `handed` files, the frozen `agents` and `inputs`, the `records`,
+  a person's `marks` and `runs-other`; under `worktrees`, the `checkout` and its `dependencies` (under a `node_modules`); under
+  `engine`, as the runtime says it (`kept`'s `output` and `harness`), `session-output`, `check-output` (a task filed on
+  `HARNESSES.check`), `session-files`, `journals`, `bodies`, and `engine-other`, what no task names; `sessions` is `harness-records`.
+  The reading is handed to each pass, which keeps it among the recent and so in the series: `disk.bytes` (by `part`, `kind`, and
   `factory`), `disk.unread` (by `part`), `disk.free` and `disk.size`, the room on the file system that holds the store — under WSL
   the Linux virtual disk, not the Windows drive that is the real limit. The same four are exported as gauges (`DISK_METRICS`), a
   label set that is gone said at zero once, and each of the ten largest runs is a span, `disk.run`, with its `run` and its bytes as

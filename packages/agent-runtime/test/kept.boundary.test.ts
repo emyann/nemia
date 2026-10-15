@@ -90,12 +90,28 @@ test("a task's records are the transcript its journal names by id, and the folde
   const folder = blocksOf(path.dirname(path.dirname(beside))) + blocksOf(path.dirname(beside)) + blocksOf(beside);
   assert.deepEqual(kept, {
     taskId: 't1',
+    harness: HARNESS,
     journal: blocksOf(path.join(root, 'tasks', 't1.jsonl')),
     bodies: 0,
-    files: blocksOf(runFile),
+    output: blocksOf(runFile),
+    files: 0,
     records: blocksOf(transcript) + folder,
   });
-  assert.ok(kept.records > 0 && kept.journal > 0 && kept.files > 0, 'each part was measured');
+  assert.ok(kept.records > 0 && kept.journal > 0 && kept.output > 0, 'each part was measured');
+});
+
+test("a detached session's streams are its output, and its run file and what was read of it its files, together all it keeps", async () => {
+  const root = scratch('ae-kept-root-');
+  await journalled(root, 'o2');
+  const runs = path.join(root, 'runs', HARNESS);
+  const streams = ['ae_o2_1.log', 'ae_o2_1.stdout', 'ae_o2_1.stderr'].map((name) => plant(path.join(runs, name), 4096));
+  const others = ['ae_o2_1.json', 'ae_o2_1.said', 'ae_o2_1.closeout.json', 'ae_o2_1.logs'].map((name) =>
+    plant(path.join(runs, name), 8192),
+  );
+  const kept = await keptOf(engineOn(root), 'o2');
+  const sum = (files: string[]) => files.reduce((n, file) => n + blocksOf(file), 0);
+  assert.deepEqual([kept?.harness, kept?.output, kept?.files], [HARNESS, sum(streams), sum(others)]);
+  assert.equal(kept!.output + kept!.files, sum([...streams, ...others]), 'nothing left out, nothing counted twice');
 });
 
 test("REFUSED, a person's own: a transcript in the same project folder under an id no journal names changes no number", async () => {
@@ -138,7 +154,7 @@ test('the parts of every task add up to no more than a walk of the root in the s
   plant(path.join(root, 'runs', HARNESS, 'ae_i1_1.stdout'), 50000);
   plant(path.join(root, 'runs', HARNESS, 'ae_i2_1.json'), 100);
   const { tasks } = await Effect.runPromise(engineOn(root).kept());
-  const parts = tasks.reduce((sum, t) => sum + t.journal + t.bodies + t.files, 0);
+  const parts = tasks.reduce((sum, t) => sum + t.journal + t.bodies + t.output + t.files, 0);
   assert.ok(parts > 80000, `the parts were measured: ${parts}`);
   assert.ok(parts <= diskBytesOf(root)!, `${parts} is no more than the root's ${diskBytesOf(root)}`);
 });
@@ -150,7 +166,14 @@ test('a task at work is answered, where forget would refuse it, and the record o
   plant(transcriptAt('-r', 'sess-w1'));
   const engine = engineOn(root);
   const kept = await keptOf(engine, 'w1');
-  assert.deepEqual(kept, { taskId: 'w1', journal: blocksOf(path.join(root, 'tasks', 'w1.jsonl')), bodies: 0, files: blocksOf(running) });
+  assert.deepEqual(kept, {
+    taskId: 'w1',
+    harness: HARNESS,
+    journal: blocksOf(path.join(root, 'tasks', 'w1.jsonl')),
+    bodies: 0,
+    output: blocksOf(running),
+    files: 0,
+  });
   const refused = await Effect.runPromise(Effect.flip(engine.forget(['w1'])));
   assert.equal(refused._tag, 'ForgetRefused');
 });
@@ -174,7 +197,7 @@ test('REFUSED: a name of the run folder with no dot is no file of a session whos
   const own = plant(path.join(root, 'runs', HARNESS, 'ae_d1_1.stdout'), 4096);
   const dotless = plant(path.join(root, 'runs', HARNESS, 'ae_d1_12'), 65536);
   const engine = engineOn(root);
-  assert.equal((await keptOf(engine, 'd1'))?.files, blocksOf(own));
+  assert.equal((await keptOf(engine, 'd1'))?.output, blocksOf(own));
   await Effect.runPromise(engine.forget(['d1'], { yes: true }));
   assert.deepEqual([fs.existsSync(own), fs.existsSync(dotless)], [false, true], 'forget removes the session file, and leaves the other');
 });
@@ -188,9 +211,11 @@ test("Claude Code's harness names what either mode keeps of a session once: a jo
   const engine = builtEngine(Engine.layer({ root, harnesses: { claude: 'claude' }, defaultHarness: 'claude' }));
   assert.deepEqual(await keptOf(engine, 'c1'), {
     taskId: 'c1',
+    harness: 'claude',
     journal: blocksOf(path.join(root, 'tasks', 'c1.jsonl')),
     bodies: 0,
-    files: blocksOf(job) + blocksOf(parent),
+    output: blocksOf(job),
+    files: blocksOf(parent),
     records: blocksOf(transcript),
   });
 });
@@ -217,7 +242,14 @@ test('a harness with no kept answers no records and no files, and its task is st
   await journalled(root, 'n1', { harness: 'bare', nativeId: 'sess-n1' });
   plant(transcriptAt('-r', 'sess-n1'));
   const kept = await keptOf(engineOn(root, { bare: nothing }), 'n1');
-  assert.deepEqual(kept, { taskId: 'n1', journal: blocksOf(path.join(root, 'tasks', 'n1.jsonl')), bodies: 0, files: 0 });
+  assert.deepEqual(kept, {
+    taskId: 'n1',
+    harness: 'bare',
+    journal: blocksOf(path.join(root, 'tasks', 'n1.jsonl')),
+    bodies: 0,
+    output: 0,
+    files: 0,
+  });
   assert.equal(Object.hasOwn(kept, 'records'), false, 'no record is no key, never zero');
 });
 
@@ -241,12 +273,12 @@ test("a harness's kept reaches the answer through the Engine service, and one wh
   const journal = (id: string) => blocksOf(path.join(root, 'tasks', `${id}.jsonl`));
   assert.deepEqual(asked, [[{ name: 'ae/s1/1', nativeId: 'n-1' }, { name: 'ae/s2/1' }]]);
   assert.deepEqual(tasks.slice(1), [
-    { taskId: 's1', journal: journal('s1'), bodies: 0, files: blocksOf(file), records: blocksOf(record) },
-    { taskId: 's2', journal: journal('s2'), bodies: 0, files: 0 },
+    { taskId: 's1', harness: 'keeping', journal: journal('s1'), bodies: 0, output: 0, files: blocksOf(file), records: blocksOf(record) },
+    { taskId: 's2', harness: 'keeping', journal: journal('s2'), bodies: 0, output: 0, files: 0 },
   ]);
   assert.deepEqual(
     { ...tasks[0], unread: tasks[0].unread?.length },
-    { taskId: 'f1', journal: journal('f1'), bodies: 0, files: 0, unread: 1 },
+    { taskId: 'f1', harness: 'failing', journal: journal('f1'), bodies: 0, output: 0, files: 0, unread: 1 },
   );
   assert.match(tasks[0].unread![0], /^the `failing` harness did not say what it keeps: .*fake: no disk today/);
 });
@@ -277,8 +309,16 @@ test('REFUSED: a journal that does not read is named with its bytes and why, and
   assert.deepEqual(
     tasks.map((t) => (t.unread ? { ...t, unread: t.unread.length } : t)),
     [
-      { taskId: 'u1', journal: blocksOf(bad) + blocksOf(path.join(bad, 'inside')), bodies: 0, files: 0, unread: 1 },
-      { taskId: 'u2', journal: blocksOf(path.join(root, 'tasks', 'u2.jsonl')), bodies: 0, files: 0, records: blocksOf(transcript) },
+      { taskId: 'u1', journal: blocksOf(bad) + blocksOf(path.join(bad, 'inside')), bodies: 0, output: 0, files: 0, unread: 1 },
+      {
+        taskId: 'u2',
+        harness: HARNESS,
+        journal: blocksOf(path.join(root, 'tasks', 'u2.jsonl')),
+        bodies: 0,
+        output: 0,
+        files: 0,
+        records: blocksOf(transcript),
+      },
     ],
   );
   assert.match(tasks[0].unread![0], /EISDIR/);
@@ -291,8 +331,10 @@ test('REFUSED: a task that ran on a harness this engine does not have is said un
   plant(path.join(root, 'runs', HARNESS, 'ae_h1_1.stdout'));
   assert.deepEqual(await keptOf(engineOn(root), 'h1'), {
     taskId: 'h1',
+    harness: 'gone',
     journal: blocksOf(path.join(root, 'tasks', 'h1.jsonl')),
     bodies: 0,
+    output: 0,
     files: 0,
     unread: ["task h1 ran on the `gone` harness, which this engine does not have: its sessions' files are not counted"],
   });

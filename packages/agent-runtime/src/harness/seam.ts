@@ -278,9 +278,11 @@ export type SessionForgotten = { files: string[]; left: string[] };
 
 /**
  * Where a harness keeps what it has of a session (`RunnerOps.kept`), by path: `files`, what its `forget` would remove, and
- * `records`, its own record of the session, which `forget` leaves, a file or a folder found by the session's id.
+ * `records`, its own record of the session, which `forget` leaves, a file or a folder found by the session's id; and `output`, the
+ * session's streams the runtime keeps whole, which its `forget` removes too and which are in no `files`, absent from a harness that
+ * keeps none apart.
  */
-export type SessionKept = { files: string[]; records: string[] };
+export type SessionKept = { files: string[]; records: string[]; output?: string[] };
 
 export class Runner extends Context.Service<Runner, RunnerOps>()('engine/Runner') {
   /**

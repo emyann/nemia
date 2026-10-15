@@ -15,14 +15,25 @@ export class KeptRefused extends Schema.TaggedError<KeptRefused>()('KeptRefused'
 
 /**
  * What is kept on the disk for each task the store lists, in the store's order, in bytes as the file system counts them
- * (`lstat().blocks * 512`): `journal`, its journal's file; `bodies`, the bodies it is the first task to name; `files`, what its
- * harness keeps of its sessions and `forget` would remove; and `records`, the harness's own record of each session its journal
- * names by id, which `forget` leaves, absent where the harness keeps none or none was found; an attempt still at work has no id
- * on its journal yet, so its record is counted only once it has ended or its task settled. A path is counted once, for the
- * first task that names it. `unread` says, in words, what could not be measured of the task, and is absent when all was.
+ * (`lstat().blocks * 512`): `harness`, the harness the task was filed on, absent where its journal names none; `journal`, its
+ * journal's file; `bodies`, the bodies it is the first task to name; `output`, its sessions' streams the runtime keeps whole, and
+ * `files`, the rest its harness keeps of its sessions, both of which `forget` would remove; and `records`, the harness's own record
+ * of each session its journal names by id, which `forget` leaves, absent where the harness keeps none or none was found; an attempt
+ * still at work has no id on its journal yet, so its record is counted only once it has ended or its task settled. A path is
+ * counted once, for the first task that names it. `unread` says, in words, what could not be measured of the task, and is absent
+ * when all was.
  */
 export type KeptReport = {
-  tasks: { taskId: string; journal: number; bodies: number; files: number; records?: number; unread?: string[] }[];
+  tasks: {
+    taskId: string;
+    harness?: string;
+    journal: number;
+    bodies: number;
+    output: number;
+    files: number;
+    records?: number;
+    unread?: string[];
+  }[];
 };
 
 /** A harness's answer for its sessions, or why it gave none. */
@@ -70,6 +81,11 @@ const taskKept = (task: JournalKept, asked: Asked | string | undefined, seen: Se
     const name = nameFor(task.taskId, a.n);
     return Object.hasOwn(answered, name) ? [answered[name]] : [];
   });
+  const output = bytesOf(
+    sessions.flatMap((s) => s.output ?? []),
+    seen,
+    unread,
+  );
   const files = bytesOf(
     sessions.flatMap((s) => s.files),
     seen,
@@ -78,8 +94,10 @@ const taskKept = (task: JournalKept, asked: Asked | string | undefined, seen: Se
   const records = sessions.flatMap((s) => s.records);
   return {
     taskId: task.taskId,
+    ...(task.harness === undefined ? {} : { harness: task.harness }),
     journal: task.journal,
     bodies: task.bodies,
+    output,
     files,
     ...(records.length ? { records: bytesOf(records, seen, unread) } : {}),
     ...(unread.length ? { unread } : {}),

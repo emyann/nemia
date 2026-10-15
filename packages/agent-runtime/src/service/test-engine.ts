@@ -173,7 +173,13 @@ const outputOf =
   };
 
 /** What a test plants of a task for `kept` to answer, in bytes: a part left out is 0, and `records` left out is no record kept. */
-export type TestKeeps = { readonly journal?: number; readonly bodies?: number; readonly files?: number; readonly records?: number };
+export type TestKeeps = {
+  readonly journal?: number;
+  readonly bodies?: number;
+  readonly output?: number;
+  readonly files?: number;
+  readonly records?: number;
+};
 
 /**
  * `kept` over the tasks a stand-in holds and the sizes planted: refuses an argument as the engine does, fails while `failures` has
@@ -194,8 +200,16 @@ const keptVerbOf = (tasks: Map<string, TestTask>, sizes: Map<string, TestKeeps>,
       return Effect.fail(new JournalError({ taskId: '*', message: 'the test engine was told to fail this kept: its store does not list' }));
     }
     const of = (taskId: string): KeptReport['tasks'][number] => {
-      const { journal = 0, bodies = 0, files = 0, records } = sizes.get(taskId) ?? {};
-      return { taskId, journal, bodies, files, ...(records === undefined ? {} : { records }) };
+      const { journal = 0, bodies = 0, output = 0, files = 0, records } = sizes.get(taskId) ?? {};
+      return {
+        taskId,
+        harness: tasks.get(taskId)?.spec.harness ?? 'test',
+        journal,
+        bodies,
+        output,
+        files,
+        ...(records === undefined ? {} : { records }),
+      };
     };
     return Effect.sync(() => ({ tasks: [...tasks.keys()].map(of) }));
   };

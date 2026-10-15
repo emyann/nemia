@@ -23,7 +23,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import type { Denial, Sighting, Usage } from '../../core/index.ts';
-import { RunnerError, type McpServer, type RunnerOps, type SpawnRequest, type TranscriptEvent } from '../seam.ts';
+import { RunnerError, type McpServer, type RunnerOps, type SessionKept, type SpawnRequest, type TranscriptEvent } from '../seam.ts';
 import { sessionMcp, writeMcpConfig } from '../mcp.ts';
 import { forgetFiles, keptOf } from '../forget.ts';
 import { withoutTelemetry } from '../telemetry.ts';
@@ -524,14 +524,26 @@ const forgetRunOf =
       return forgetFiles(spec.name, keeps.files(session.name), () => keeps.records([session]).get(session.name) ?? [], dry);
     });
 
-/** A detached runner's `kept`: what `forgetRunOf` would remove of each session, and the record it leaves, off one listing. */
+/** The ends of the files a detached runner keeps a session's streams in: its log, and each stream kept whole (`streamFileOf`). */
+const OUTPUT_ENDS = ['.log', '.stdout', '.stderr'];
+
+/** A session's `files`, beside its run file, split into its streams (`output`, by `OUTPUT_ENDS`) and the rest (`files`). */
+const outputApart = (files: readonly string[]): Pick<SessionKept, 'files' | 'output'> => {
+  const isOutput = (file: string) => OUTPUT_ENDS.some((end) => file.endsWith(end));
+  return { files: files.filter((file) => !isOutput(file)), output: files.filter(isOutput) };
+};
+
+/**
+ * A detached runner's `kept`: what `forgetRunOf` would remove of each session, its streams apart (`outputApart`), and the record it
+ * leaves, off one listing.
+ */
 const keptRunOf =
   (spec: HarnessSpec, root: string): NonNullable<RunnerOps['kept']> =>
   (sessions) =>
     Effect.suspend(() => {
       const keeps = sessionFilesOf(spec, root);
       const records = keeps.records(sessions);
-      return keptOf(spec.name, sessions, ({ name }) => ({ files: keeps.files(name), records: records.get(name) ?? [] }));
+      return keptOf(spec.name, sessions, ({ name }) => ({ ...outputApart(keeps.files(name)), records: records.get(name) ?? [] }));
     });
 
 /**

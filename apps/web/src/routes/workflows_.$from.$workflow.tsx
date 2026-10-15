@@ -2,7 +2,6 @@ import type { ReactNode } from 'react';
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { FactoryTags } from '../components/FactoryTag';
-import { FavoriteStar } from '../components/FavoriteStar';
 import { Markdown } from '../components/Markdown';
 import { RemoveWorkflow } from '../components/RemoveWorkflow';
 import { StartRun } from '../components/StartRun';
@@ -165,7 +164,7 @@ function InFactory({ from, name, address, place, building, factory }: Asked & { 
 }
 
 /**
- * The page of `workflow`: what it is, its star, the factories in `tags`, its README whole — the workflow level's instruction — then, for
+ * The page of `workflow`: what it is, the factories in `tags`, its README whole — the workflow level's instruction — then, for
  * one that reads, its graph, `children`, its steps a row each, and `start`; for one that does not, the loader's refusal in their
  * place. `own` is the folder as the list read with no factory has it, which the board writes: where it is one of yours that reads, it is
  * built here, its builder in place of the README, the graph, the rows and the start while `building` — the README is edited there — and
@@ -241,7 +240,7 @@ function Workflow({
 }
 
 /**
- * The workflow's head: its name, its star, which puts it under Favorites, where it is read from, in `factory` when it is read in a named
+ * The workflow's head: its name, where it is read from, in `factory` when it is read in a named
  * one, the factories in `tags`, each linked to its floor, its step count and its folder, as the api names it; Build where `onBuild` is
  * given, Remove for `removable`, the folder the board removes, and why it has no builder.
  */
@@ -265,7 +264,6 @@ function WorkflowHeader({
     <header className="space-y-1">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <h1 className="font-mono text-body-large font-semibold">{name}</h1>
-        <FavoriteStar favorite={{ kind: 'workflow', from, workflow: name }} name={from === 'yours' ? `${name} (yours)` : name} />
         <FromBadge from={from} factory={factory} />
         <FactoryTags names={tags} linked />
         {!error && (

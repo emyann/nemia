@@ -109,9 +109,9 @@ async function threeParts(page: Page, open: OpenRuns, finished: FinishedPage): P
   await expectBeneath(section(page, 'in-flight'), section(page, 'waiting'), 'the runs in flight are beneath what waits on you');
   await expectBeneath(section(page, 'finished'), section(page, 'in-flight'), 'and the finished beneath those');
   await expectCount(
-    page.locator('[data-favorite], [data-in-flight], [data-to-decide], [data-filtered-out], [data-pruned], main [role="switch"]'),
+    page.locator('[data-in-flight], [data-to-decide], [data-filtered-out], [data-pruned], main [role="switch"]'),
     0,
-    'no star, no switch, nothing to decide from the list',
+    'no switch, nothing to decide from the list',
   );
   const said = (
     await page.locator('[data-sentence], [data-wait-tag], [data-now-word], [data-now-note], th, [data-ended], [data-pager]').allInnerTexts()

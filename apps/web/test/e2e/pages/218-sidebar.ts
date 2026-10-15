@@ -44,7 +44,11 @@ async function answer<T>(page: Page, pathname: string): Promise<T> {
 async function countsAre(page: Page, picked: string | undefined, where: string): Promise<void> {
   const open = await answer<OpenRuns>(page, `/api/runs-open${picked ? `?ofFactory=${picked}` : ''}`);
   const cards = notStarted(await answer<InboxEntry[]>(page, '/api/inbox'), picked).length;
-  await expectTexts(badgeOf(page, 'Runs'), open.counts.waiting ? [String(open.counts.waiting)] : [], `${where}: Runs counts what waits on you`);
+  await expectTexts(
+    badgeOf(page, 'Runs'),
+    open.counts.waiting ? [String(open.counts.waiting)] : [],
+    `${where}: Runs counts what waits on you`,
+  );
   await expectTexts(badgeOf(page, 'Inbox'), cards ? [String(cards)] : [], `${where}: the Inbox counts its cards not yet started`);
 }
 

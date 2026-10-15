@@ -49,7 +49,9 @@ export default {
     if (streams !== 0)
       throw new Refused(`one stream of the feed a page, kept across a navigation inside the board — ${streams} more opened`);
     if ((await footer.getAttribute('data-feed')) !== 'open')
-      throw new Refused(`the feed is still followed after the navigation — the gauges button says ${await footer.getAttribute('data-feed')}`);
+      throw new Refused(
+        `the feed is still followed after the navigation — the gauges button says ${await footer.getAttribute('data-feed')}`,
+      );
 
     const gate = page.locator(`section[aria-label="The gate of ${gated}"]`);
     const approve = gate.getByRole('button', { name: 'Approve', exact: true });

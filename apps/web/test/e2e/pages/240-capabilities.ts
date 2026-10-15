@@ -13,10 +13,7 @@ export default {
   route: '/capabilities',
   expect: async (page) => {
     await sidebar(page);
-    await expectVisible(
-      railPlace(page, 'Settings').and(litOf(page)),
-      'the rail lights Settings on its page',
-    );
+    await expectVisible(railPlace(page, 'Settings').and(litOf(page)), 'the rail lights Settings on its page');
     await expectTexts(frameTabsOf(page).locator('[aria-selected="true"]'), ['Capabilities'], "the strip's Capabilities tab is selected");
     const { skill, bareSkill, agent, server, missing, denied, asked } = CHECKOUT;
     const section = (title: string) => page.locator(`section[aria-label="${title}"]`);

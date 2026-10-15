@@ -24,11 +24,7 @@ export default {
     await expectVisible(talk, 'the conversation');
     const prompt = page.locator(`section[aria-label="Say something to ${SESSION.step}"]`);
     await expectVisible(prompt, 'a prompt box below the conversation');
-    const [box, below, foot] = [
-      await talk.boundingBox(),
-      await prompt.boundingBox(),
-      { y: page.viewportSize()?.height ?? 0 },
-    ];
+    const [box, below, foot] = [await talk.boundingBox(), await prompt.boundingBox(), { y: page.viewportSize()?.height ?? 0 }];
     if (!box || !below || !foot || Math.abs(box.y + box.height - below.y) > 2 || Math.abs(below.y + below.height - foot.y) > 2) {
       throw new Refused(
         `the conversation takes the page's height down to the prompt box, which ends at the window's foot — the conversation ends at ${box ? Math.round(box.y + box.height) : 'nothing'} px, ` +

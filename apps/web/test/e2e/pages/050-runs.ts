@@ -752,10 +752,7 @@ async function withRegated(page: Page): Promise<void> {
   await contrastHolds(page, ['[data-sentence]']);
 
   await enterOnPlace(page, 'Inbox', '/inbox');
-  await expectVisible(
-    railPlace(page, 'Inbox').and(litOf(page)),
-    'reached with Enter, the Inbox is lit in the menu',
-  );
+  await expectVisible(railPlace(page, 'Inbox').and(litOf(page)), 'reached with Enter, the Inbox is lit in the menu');
   await enterOnPlace(page, 'Runs', '/runs');
   await expectCount(
     section(page, 'waiting').locator('article[data-run]'),

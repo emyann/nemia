@@ -14,10 +14,7 @@ export default {
   route: `/workflows/repo/${WORKFLOWS.good.name}/review`,
   expect: async (page) => {
     await sidebar(page);
-    await expectVisible(
-      railPlace(page, 'Workflows').and(litOf(page)),
-      "the sidebar lights Workflows on a step's page",
-    );
+    await expectVisible(railPlace(page, 'Workflows').and(litOf(page)), "the sidebar lights Workflows on a step's page");
     const { good } = WORKFLOWS;
     const folder = path.join(store!, 'checkout', 'workflows', good.name);
     const before = filesIn(folder);

@@ -34,7 +34,8 @@ async function expectKept(page: Page, want: string[], assertion: string): Promis
     )
     .catch(() => undefined);
   const kept = await keptOf(page);
-  if (kept.join() !== want.join()) throw new Refused(`${assertion}: this browser keeps ${want.join(', ') || 'none'} — it keeps ${kept.join(', ') || 'none'}`);
+  if (kept.join() !== want.join())
+    throw new Refused(`${assertion}: this browser keeps ${want.join(', ') || 'none'} — it keeps ${kept.join(', ') || 'none'}`);
 }
 
 /** The star in `scope` that stars the thing named `name`. */

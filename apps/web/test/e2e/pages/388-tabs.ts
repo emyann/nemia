@@ -29,7 +29,11 @@ async function expectTab(page: Page, name: string, assertion: string): Promise<v
 async function underHeader(page: Page): Promise<void> {
   const header = page.locator('header[data-frame-header]');
   await expectVisible(header.locator('[data-page-name]').getByText(PLACE, { exact: true }), `the header names the place, ${PLACE}`);
-  await expectTexts(frameTabsOf(page).getByRole('tab'), ['Settings', 'Machines', 'Capabilities'], 'the strip holds Settings, Machines, then Capabilities');
+  await expectTexts(
+    frameTabsOf(page).getByRole('tab'),
+    ['Settings', 'Machines', 'Capabilities'],
+    'the strip holds Settings, Machines, then Capabilities',
+  );
   await expectTab(page, 'Machines', 'on /machines the Machines tab is selected');
   const top = (await header.boundingBox())!;
   const strip = await frameTabsOf(page).boundingBox();
@@ -82,7 +86,10 @@ async function onPhone(page: Page): Promise<void> {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await expectUncut(frameTabsOf(page).getByRole('tab'), 'on a phone each tab is read whole');
-  await expectUncut(page.locator('header[data-frame-header] [data-page-name]').getByText(PLACE, { exact: true }), 'and the header names the place whole');
+  await expectUncut(
+    page.locator('header[data-frame-header] [data-page-name]').getByText(PLACE, { exact: true }),
+    'and the header names the place whole',
+  );
   const strip = await frameTabsOf(page).locator('xpath=..').boundingBox();
   if (!strip || strip.x < -1 || strip.x + strip.width > 391)
     throw new Refused(`the strip fits a 390 wide screen, scrolling sideways — it is ${strip?.width} wide at ${strip?.x}`);

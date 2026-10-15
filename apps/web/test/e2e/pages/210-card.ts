@@ -16,10 +16,7 @@ export default {
   route: `/inbox/${CARDS.rich.name}`,
   expect: async (page) => {
     await sidebar(page);
-    await expectVisible(
-      railPlace(page, 'Inbox').and(litOf(page)),
-      "the sidebar lights Inbox on a card's page",
-    );
+    await expectVisible(railPlace(page, 'Inbox').and(litOf(page)), "the sidebar lights Inbox on a card's page");
     const { rich } = CARDS;
     const inbox = path.join(store!, 'inbox');
     const before = filesIn(inbox);

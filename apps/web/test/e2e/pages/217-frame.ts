@@ -34,9 +34,12 @@ async function expectFocused(target: Locator, what: string): Promise<void> {
 async function railBesideBar(page: Page): Promise<void> {
   const rail = await boxOf(railColumnOf(page), 'the rail');
   const bar = await boxOf(topBarOf(page), 'the top bar');
-  if (Math.abs(rail.x) > 1 || Math.abs(rail.y) > 1) throw new Refused(`the rail starts at the window's top left — it is at ${rail.x},${rail.y}`);
+  if (Math.abs(rail.x) > 1 || Math.abs(rail.y) > 1)
+    throw new Refused(`the rail starts at the window's top left — it is at ${rail.x},${rail.y}`);
   if (Math.abs(bar.x - (rail.x + rail.width)) > 1 || Math.abs(bar.y) > 1)
-    throw new Refused(`the top bar starts beside the rail, at the top — it is at ${bar.x},${bar.y}, the rail ending at ${rail.x + rail.width}`);
+    throw new Refused(
+      `the top bar starts beside the rail, at the top — it is at ${bar.x},${bar.y}, the rail ending at ${rail.x + rail.width}`,
+    );
 }
 
 /** The top bar holds, left to right, the page's name, the factory switcher, the search, the pause, the gauges and the account. */
@@ -80,7 +83,10 @@ async function toCome(page: Page): Promise<void> {
 async function toggles(page: Page): Promise<void> {
   await expectWidth(page, WIDTH.open, 'open as this browser left it');
   await expectVisible(menuOf(page).and(page.getByRole('button', { name: 'Close the menu' })), 'open, the menu button closes it');
-  await expectVisible(railColumnOf(page).getByRole('button', { name: 'Start a run' }).getByText('Start a run'), 'open, the FAB says Start a run');
+  await expectVisible(
+    railColumnOf(page).getByRole('button', { name: 'Start a run' }).getByText('Start a run'),
+    'open, the FAB says Start a run',
+  );
   await settled(page);
   await photograph(page, path.join(OUT, `frame-open-${await themeOf(page)}.png`));
   await menuOf(page).click();

@@ -106,10 +106,7 @@ export default {
   route: '/machines',
   expect: async (page) => {
     await sidebar(page);
-    await expectVisible(
-      railPlace(page, 'Settings').and(litOf(page)),
-      'the rail lights Settings on its page',
-    );
+    await expectVisible(railPlace(page, 'Settings').and(litOf(page)), 'the rail lights Settings on its page');
     await expectTexts(frameTabsOf(page).locator('[aria-selected="true"]'), ['Machines'], "the strip's Machines tab is selected");
     const served = (await (await page.request.get(new URL('/api/machines/lifecycle', page.url()).href)).json()) as Served;
     const section = page.locator('section[aria-label="A task\'s lifecycle"]');

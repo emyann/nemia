@@ -17,7 +17,10 @@ export default {
     await page.waitForURL((url) => url.pathname === '/stats');
     await expectVisible(railPlace(page, 'Stats').and(litOf(page)), 'the rail lights Stats on its page');
     await expectCount(litOf(page), 1, 'and no other destination');
-    await expectVisible(page.locator('header[data-frame-header] [data-page-name]').getByText('Stats', { exact: true }), 'the top bar names it');
+    await expectVisible(
+      page.locator('header[data-frame-header] [data-page-name]').getByText('Stats', { exact: true }),
+      'the top bar names it',
+    );
     await expectVisible(page.locator('[data-stats]').getByText('Stats is to come', { exact: true }), 'the page says Stats is to come');
     await settled(page);
     await photograph(page, path.join(OUT, `stats-to-come-${await themeOf(page)}.png`));

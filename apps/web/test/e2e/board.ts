@@ -30,7 +30,9 @@ export const railOf = (page: Page): Locator => page.locator('nav[aria-label="Pla
 
 /** The rail's destination named `name`, by its label, whatever its badge adds to its name. */
 export const railPlace = (page: Page, name: string): Locator =>
-  railOf(page).getByRole('link').filter({ has: page.getByText(name, { exact: true }) });
+  railOf(page)
+    .getByRole('link')
+    .filter({ has: page.getByText(name, { exact: true }) });
 
 /** The destinations the rail lights: the page's own, one on every page of the board. */
 export const litOf = (page: Page): Locator => railOf(page).locator('a[aria-current="page"]');
@@ -45,7 +47,10 @@ export const topBarOf = (page: Page): Locator => page.locator('header[data-frame
 export const pickerOf = (page: Page): Locator => page.locator('[data-factory-picker]');
 
 /** The rail's lists that carry the factory picked, each a link. */
-export const sectionsOf = (page: Page): Locator => railOf(page).getByRole('link').filter({ hasText: /^(Inbox|Runs|Workflows)/ });
+export const sectionsOf = (page: Page): Locator =>
+  railOf(page)
+    .getByRole('link')
+    .filter({ hasText: /^(Inbox|Runs|Workflows)/ });
 
 /** The rail's FAB, Start a run, which opens the floating bar on the start of a run. */
 export const startOf = (page: Page): Locator => railColumnOf(page).getByRole('button', { name: 'Start a run' });
@@ -64,7 +69,10 @@ export async function gaugesOf(page: Page): Promise<Locator> {
 /** Picks `choice` in the top bar's factory switcher, a factory's name or All factories. */
 export async function pick(page: Page, choice: string): Promise<void> {
   await pickerOf(page).locator('button').first().click();
-  await page.getByRole('option').filter({ has: page.getByText(choice, { exact: true }) }).click();
+  await page
+    .getByRole('option')
+    .filter({ has: page.getByText(choice, { exact: true }) })
+    .click();
 }
 
 /** Opens the Select pressed at `trigger` and picks the level said `word` among its options. */

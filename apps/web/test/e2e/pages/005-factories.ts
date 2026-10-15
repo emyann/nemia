@@ -72,7 +72,10 @@ export default {
       `${FACTORIES.broken}'s item says its file does not read`,
     );
     await expectVisible(
-      page.getByRole('listbox').locator(`[data-factory="${FACTORIES.hiring.name}"]`).getByText(/^(none|\d+) in flight$/),
+      page
+        .getByRole('listbox')
+        .locator(`[data-factory="${FACTORIES.hiring.name}"]`)
+        .getByText(/^(none|\d+) in flight$/),
       `${FACTORIES.hiring.name}'s item says its runs in flight`,
     );
     await settled(page);

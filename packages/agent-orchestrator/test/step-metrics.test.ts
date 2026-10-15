@@ -3,9 +3,9 @@
  * cost is recorded once, on the first pass that reads it settled and does not find it in the run's own mark (`settlesCounted`), by the
  * five attributes alone, and never again: neither on a pass that answers the run from its memo of runs at rest, nor by a daemon started
  * again, which counts the settle its first pass makes and none a daemon before it counted. A session held open and answered is one try.
- * A record with no mark is counted on the pass whose read of the feed names its task settled (`settledIn`). And each call a harness
- * denied a session is a span of its own (`DENIED_SPAN`) on the pass that reads its attempt ended, whatever the turn signed, counted once
- * by the run's own mark (`deniedCounted`): a daemon started again, with no memo, records none twice.
+ * A record with no mark counts no settle. And each call a harness denied a session is a span of its own (`DENIED_SPAN`) on the pass that
+ * reads its attempt ended, whatever the turn signed, counted once by the run's own mark (`deniedCounted`): a daemon started again, with
+ * no memo, records none twice.
  *
  * Walked through the runtime itself, `plainEngine` over an in-memory journal and a harness signed by hand, ticked by `tickRun` under a
  * registry of the test's own. `WF_ROOT` is set before the runner is imported: it is read as the module loads. `WF_VERIFY_REST=1` judges
@@ -295,18 +295,17 @@ test('a blocked try answered in its session and signed done is one try, with its
   assert.deepEqual(readRun(run.id).settlesCounted, [taskId]);
 });
 
-test('a record with no settlesCounted, started before the mark, is counted off the feed once, and never by a daemon started again', async () => {
+test('REFUSED: a record with no settlesCounted counts no settle, though the feed names it settled', async () => {
   const { run, taskId } = await working('unmarked');
   const file = path.join(ROOT, 'runs', `${run.id}.json`);
   const { settlesCounted: _, ...before } = JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
   fs.writeFileSync(file, JSON.stringify(before));
   sign(taskId, 1.5);
   for (let i = 0; i < 4; i++) await tick();
-  assert.deepEqual(await counted('step.cost', 'unmarked'), [['done', 1.5]]);
+  assert.equal((await Effect.runPromise(engine.view(taskId))).state.settled, 'succeeded', 'the session settled');
+  assert.deepEqual(
+    [await counted('step.cost', 'unmarked'), await counted('step.tries', 'unmarked'), await counted('step.duration', 'unmarked')],
+    [[], [], []],
+  );
   assert.equal(readRun(run.id).settlesCounted, undefined, 'no mark is made for it');
-
-  const restarted = daemon();
-  for (let i = 0; i < 3; i++) await tick(restarted);
-  assert.deepEqual(await counted('step.cost', 'unmarked'), [['done', 1.5]], 'REFUSED: an old record is never counted again');
-  assert.deepEqual(await counted('step.tries', 'unmarked'), [['done', 1]]);
 });

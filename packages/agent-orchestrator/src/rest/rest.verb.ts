@@ -6,23 +6,18 @@
  */
 import { Effect } from 'effect';
 import type { Engine } from '../runtime-client.ts';
-import { evictedBy, settledIn } from './rest.ts';
+import { evictedBy } from './rest.ts';
 
-/**
- * A memo of runs by id, `cursor`, where on the engine's feed it has read to: undefined until it first reads the feed, and `settled`, the
- * tasks its last read of the feed said settled (`settledIn`): none until it has read one, and none after a read that failed or went back.
- */
-export type FollowedMemo = { cursor?: number; runs: Map<string, unknown>; settled?: ReadonlySet<string> };
+/** A memo of runs by id, and `cursor`, where on the engine's feed it has read to: undefined until it first reads the feed. */
+export type FollowedMemo = { cursor?: number; runs: Map<string, unknown> };
 
 /**
  * Whether `memo` was brought up to the engine's feed: every run a task of which appended since is taken out of it (`evictedBy`). A memo
  * that has read nothing reads the feed from its end: it holds no run a line before could concern. A journal with no feed yet answers with
  * the cursor it was given, and the memo then reads from the start on the next call. A feed that went back — a journal replaced or cut —
- * empties the memo; one that cannot be read empties it too, forgets its place on the feed, and answers false. Each call says anew which
- * tasks settled since the last (`settled`), so a task's settle is named by one call alone. Never fails.
+ * empties the memo; one that cannot be read empties it too, forgets its place on the feed, and answers false. Never fails.
  */
 export const followedFeed = Effect.fn('followedFeed')(function* (e: Engine, memo: FollowedMemo) {
-  memo.settled = new Set();
   const read = Effect.gen(function* () {
     if (memo.cursor === undefined) {
       memo.runs.clear();
@@ -38,7 +33,6 @@ export const followedFeed = Effect.fn('followedFeed')(function* (e: Engine, memo
         new Set(memo.runs.keys()),
       ))
         memo.runs.delete(id);
-      memo.settled = settledIn(entries);
     }
     memo.cursor = cursor;
     return true;

@@ -1,14 +1,13 @@
 /**
  * The tick records each wait of a run's steps once, off its records alone, across a restart: a session's queue and a check's run on the
- * pass whose read of the feed names the task settled, which a restarted tick reads from the feed's end and so never again; a gate's wait
- * on the pass that first reads its approval, marked on the run's `gatesTimed` in the record that pass writes, so a restarted tick reads it
- * timed.
+ * first pass that reads the task settled and does not find it in the run's mark (`settlesCounted`), which that pass writes, so a
+ * restarted tick reads it counted; a gate's wait on the pass that first reads its approval, marked on the run's `gatesTimed` in the record
+ * that pass writes, so a restarted tick reads it timed.
  *
  * Walked through the runtime itself, `plainEngine` over an in-memory journal and a harness signed by hand, ticked by `tickRun` under a
- * registry of the test's own; a restart is a fresh memo of runs at rest (`freshRestMemo`), whose first pass reads the feed from its end:
- * a task the runtime settles on that very pass is recorded nowhere, the loss the tick takes rather than a double, so each restart here
- * makes its first pass before the work moves on. `WF_ROOT` is set before the runner is imported: it is read as the module loads.
- * `WF_VERIFY_REST=1` judges in full every run a pass answers from its memo, and dies where the two differ.
+ * registry of the test's own; a restart is a fresh memo of runs at rest (`freshRestMemo`). `WF_ROOT` is set before the runner is
+ * imported: it is read as the module loads. `WF_VERIFY_REST=1` judges in full every run a pass answers from its memo, and dies where the
+ * two differ.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

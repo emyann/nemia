@@ -3,6 +3,7 @@ import { Switch } from '@/components/ui/switch';
 import type { StepAttempts, StepCloseout, StepTry } from '../lib/api';
 import { duration } from '../lib/canvas';
 import { foldsAtGate, imagePaths, type Outcome, outcomeOf, outcomeWord } from '../lib/outcome';
+import { summaryShown } from '../lib/transcript';
 import { cn } from '../lib/utils';
 import { Artifacts, Values } from './Artifacts';
 import { Markdown } from './Markdown';
@@ -298,7 +299,7 @@ export function Statement({ closeout }: { closeout: StepCloseout }) {
   return (
     <>
       <p data-summary className="text-body-medium text-foreground">
-        {closeout.summary}
+        {summaryShown(closeout.summary)}
       </p>
       {closeout.body && <Markdown data-body>{closeout.body}</Markdown>}
       {closeout.refused.map((why) => (

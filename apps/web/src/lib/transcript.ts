@@ -364,6 +364,12 @@ export function detailOf(call: ToolCall): string | null {
 export const SUMMARY_MAX = 120;
 
 /**
+ * A summary's one line as the board draws it, as text: a markdown heading's marks dropped, since a closeout given before v1 opens its
+ * summary with its body's first line, often a heading, which its body draws as one beneath it.
+ */
+export const summaryShown = (summary: string): string => summary.replace(/^#{1,6}\s+/, '');
+
+/**
  * A summary as every reader shows it: its first non-empty line, trimmed, and when that is longer than `SUMMARY_MAX` it is cut at the
  * last space that leaves room for an ellipsis, or hard where it has none, and ends `…`.
  */

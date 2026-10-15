@@ -10,6 +10,7 @@ import {
   mergeEvents,
   sessionToRead,
   summaryLine,
+  summaryShown,
   summaryOf,
   tailStart,
   type ToolCall,
@@ -286,6 +287,13 @@ const CUTS: Array<[string, string]> = [
 
 test("the transcript's cut of a summary answers the orchestrator's cases", () => {
   for (const [given, shown] of CUTS) assert.equal(summaryLine(given), shown, JSON.stringify(given));
+});
+
+test("a summary's line is drawn without a heading's marks, and any other line as it is", () => {
+  assert.deepEqual(
+    ['## What I found', '# The plan', '###### Six', '#hashtag', 'Capped the runs, ## kept', 'C# is a language'].map(summaryShown),
+    ['What I found', 'The plan', 'Six', '#hashtag', 'Capped the runs, ## kept', 'C# is a language'],
+  );
 });
 
 test('closeoutOf reads a v0 and a v1 statement into one shape: one line, its body, files by path and values by name', () => {

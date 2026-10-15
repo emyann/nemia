@@ -12,6 +12,7 @@ import { timeOfDay } from '@/lib/timeOfDay';
 import {
   closeoutOf,
   CLOSEOUT_TOOL,
+  summaryShown,
   detailOf,
   type CloseoutTurn,
   type ThinkingTurn,
@@ -215,7 +216,7 @@ function Closeout({ turn }: { turn: CloseoutTurn }) {
       </header>
       {closeout ? (
         <>
-          <p data-summary>{closeout.summary}</p>
+          <p data-summary>{summaryShown(closeout.summary)}</p>
           {closeout.body && <Markdown>{closeout.body}</Markdown>}
           {closeout.needs && (
             <div data-needs className="text-yours">

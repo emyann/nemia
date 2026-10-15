@@ -1,9 +1,11 @@
 /**
  * The questions a step asks now, read off its current closeout and its frozen step (`askedNow`), for the board's answers and the
  * terminal's alike; and the words a person's `--answer`s at the terminal become (`typedAnswers`), through the same refusal and the same
- * words the board's answers go through. Programs over `EngineService`, run by a caller with `runWith`.
+ * words the board's answers go through. Programs over `EngineService`, run by a caller with `runWith`. Beside them, the `--answer` flag
+ * `nemia retry` and `nemia approve` take (`answerFlag`), what their help says of it (`ANSWER_HELP`) and the values typed (`typedOf`).
  */
 import { Effect } from 'effect';
+import type { Args, Flag } from '../command/command.ts';
 import { EngineService, asked, tried, type TaskView } from '../runtime-client.ts';
 import { runStore } from '../record/files.store.ts';
 import type { Run } from '../record/record.ts';
@@ -53,3 +55,34 @@ export const typedAnswers = Effect.fn('typedAnswers')(function* (
     ? approvedAnswerText(step, questions, answers, note, AT_THE_TERMINAL)
     : answerText(questions, answers, note, AT_THE_TERMINAL);
 });
+
+/** What `nemia retry`'s and `nemia approve`'s help say of `--answer`. */
+export const ANSWER_HELP = [
+  '--answer <n>=<letter>: answer question n, numbered as nemia decide',
+  '<runId> prints them, with the option its letter names; once for each',
+  'question: "<n>=a,c" chooses several where it takes several,',
+  '"<n>=a: <words>" adds your own words, "<n>: <words>" says words',
+  'alone; --message is then the note under your answers',
+];
+
+/** The `--answer` flag of `nemia <verb>`, given once for each question: the command line's alone, the api taking `answers` as data. */
+export const answerFlag = (verb: 'retry' | 'approve'): Flag => ({
+  flag: '--answer',
+  kind: 'text',
+  key: 'answer',
+  many: true,
+  takes: `--answer takes a question's number and the letter of its option, as nemia decide <runId> prints them: nemia ${verb} <runId> <step> --answer 1=a`,
+  only: { side: 'cli', why: 'the api takes the answers as data, by question title and option label (`answers`)' },
+});
+
+/** The `--answer` values typed, in the order given: none where none were. */
+export const typedOf = (args: Args): readonly string[] => {
+  const value = args.answer;
+  return Array.isArray(value) ? value : typeof value === 'string' ? [value] : [];
+};
+
+/** The refusal of `--answer` beside `--recheck`, which files no session to read the answers, or null. */
+export const recheckAnswerRefusal = (args: Args, command: string): string | null =>
+  args.mode === 'recheck' && typedOf(args).length
+    ? `--answer carries your answers into the try's brief, and --recheck files no session to read them — it runs the check again, and nothing else. Recheck without answers (${command} --recheck), or give them to a session: ${command} --answer <n>=<letter>.`
+    : null;

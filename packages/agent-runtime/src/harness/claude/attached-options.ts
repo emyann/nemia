@@ -35,21 +35,46 @@ export type AttachedOptions = Pick<
   | 'env'
 >;
 
-/** A flag of `config.claude` as `extraArgs` takes it: its name without `--`, its value a string, or null for a switch. */
-const extraOf = (flags: ClaudeFlags | undefined): { extra: Record<string, string | null>; plugins: string[] } => {
-  const extra: Record<string, string | null> = {};
-  const plugins: string[] = [];
-  for (const [key, value] of Object.entries(flags ?? {})) {
-    if (value === undefined) continue;
-    if (key === 'pluginDir') plugins.push(...(Array.isArray(value) ? value : [String(value)]));
-    else if (Array.isArray(value) && value.length > 1)
-      throw new Error(
-        `\`config.claude.${key}\` gives ${value.length} values, and an attached session takes one per flag. Give one, or file the task on \`claude-detached\`.`,
-      );
-    else extra[claudeFlagName(key).slice(2)] = value === true ? null : Array.isArray(value) ? value[0] : String(value);
-  }
-  return { extra, plugins };
+/** One flag's value as `extraArgs` takes it: a string, or null for a switch; refused where it repeats the flag. */
+const extraValueOf = (key: string, value: string | number | true | string[]): string | null => {
+  if (value === true) return null;
+  if (!Array.isArray(value)) return String(value);
+  if (value.length === 1) return value[0];
+  throw new Error(
+    `\`config.claude.${key}\` gives ${value.length} values, and an attached session takes one per flag. Give one, or file the task on \`claude-detached\`.`,
+  );
 };
+
+/** `config.claude` as `extraArgs` takes it, each flag by its name without `--`, and its plugin folders apart. */
+const extraOf = (flags: ClaudeFlags | undefined): { extra: Record<string, string | null>; plugins: string[] } => {
+  const { pluginDir, ...rest } = flags ?? {};
+  const given = Object.entries(rest).filter((e): e is [string, string | number | true | string[]] => e[1] !== undefined);
+  return {
+    extra: Object.fromEntries(given.map(([key, value]) => [claudeFlagName(key).slice(2), extraValueOf(key, value)])),
+    plugins: pluginDir ?? [],
+  };
+};
+
+/** The fence: the tools, the denies and allows (`claudeDenies`, `claudeAllows`), and the mounts as added folders. */
+const fenceOf = (c: SpawnRequest['config']): AttachedOptions => {
+  const denies = claudeDenies(c);
+  const allows = claudeAllows(c);
+  return {
+    ...(c?.tools ? { tools: c.tools } : {}),
+    ...(denies.length ? { disallowedTools: denies } : {}),
+    ...(allows.length ? { allowedTools: allows } : {}),
+    ...(c?.mounts?.length ? { additionalDirectories: c.mounts.map((m) => m.path) } : {}),
+  };
+};
+
+/** The model, the effort, the closing statement's schema handed on unread, the session to resume, and the spend cap. */
+const askedOf = (r: SpawnRequest): AttachedOptions => ({
+  ...(r.config?.model ? { model: r.config.model } : {}),
+  ...(r.config?.effort ? { effort: r.config.effort as Options['effort'] } : {}),
+  ...(r.closeoutSchema ? { outputFormat: { type: 'json_schema', schema: r.closeoutSchema as Record<string, unknown> } } : {}),
+  ...(r.resumeFrom ? { resume: r.resumeFrom } : {}),
+  ...(r.config?.budgetUsd !== undefined ? { maxBudgetUsd: r.config.budgetUsd } : {}),
+});
 
 /**
  * The session's MCP servers, the checkout's `.mcp.json` and the task's own as `claude -p` reads its two configs, merged into the one
@@ -79,22 +104,13 @@ export const attachedOptions = (r: SpawnRequest, mcpFile: string): AttachedOptio
   const c = r.config;
   const { extra, plugins } = extraOf(admittedFlags(c));
   const mcp = mcpFileOf(r, mcpFile);
-  const denies = claudeDenies(c);
-  const allows = claudeAllows(c);
   return {
     cwd: r.cwd,
-    ...(c?.tools ? { tools: c.tools } : {}),
-    ...(denies.length ? { disallowedTools: denies } : {}),
-    ...(allows.length ? { allowedTools: allows } : {}),
-    ...(c?.mounts?.length ? { additionalDirectories: c.mounts.map((m) => m.path) } : {}),
+    ...fenceOf(c),
     ...(plugins.length ? { plugins: plugins.map((p) => ({ type: 'local' as const, path: path.resolve(r.cwd, p) })) } : {}),
     permissionMode: (c?.permissionMode ?? CLAUDE_DEFAULT_MODE) as Options['permissionMode'],
     settingSources: ['project'],
-    ...(c?.model ? { model: c.model } : {}),
-    ...(c?.effort ? { effort: c.effort as Options['effort'] } : {}),
-    ...(r.closeoutSchema ? { outputFormat: { type: 'json_schema', schema: r.closeoutSchema as Record<string, unknown> } } : {}),
-    ...(r.resumeFrom ? { resume: r.resumeFrom } : {}),
-    ...(c?.budgetUsd !== undefined ? { maxBudgetUsd: c.budgetUsd } : {}),
+    ...askedOf(r),
     extraArgs: {
       ...extra,
       ...(mcp ? { 'mcp-config': mcp } : {}),

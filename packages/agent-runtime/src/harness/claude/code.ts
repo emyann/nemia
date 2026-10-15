@@ -256,7 +256,8 @@ export const claudeCodeOps = (options: ClaudeOptions = {}, attached?: Attached):
   const root = options.root ?? path.join(os.homedir(), '.agent-engine');
   const plain = detachedOps(claudeJob, root);
   const job = attached ? withAttached(plain, attached) : plain;
-  const findJob = detachedFind(claudeJob, root);
+  const plainFind = detachedFind(claudeJob, root);
+  const findJob = (name: string) => (attached?.has(name) ? Effect.succeed({ sessionId: name }) : plainFind(name));
   const bg = claudeOps({ ...options, root });
   const of = (sessionId: string) => (isClaudeJob(sessionId) ? job : bg);
 
@@ -306,10 +307,7 @@ export const claudeCodeOps = (options: ClaudeOptions = {}, attached?: Attached):
         }),
       ),
 
-    find: (name) =>
-      attached?.has(name)
-        ? Effect.succeed({ sessionId: name })
-        : findJob(name).pipe(Effect.flatMap((found) => (found ? Effect.succeed(found) : bg.find!(name)))),
+    find: (name) => findJob(name).pipe(Effect.flatMap((found) => (found ? Effect.succeed(found) : bg.find!(name)))),
 
     stop: (sessionId) => of(sessionId).stop(sessionId),
     logs: (sessionId) => of(sessionId).logs(sessionId),
@@ -319,14 +317,12 @@ export const claudeCodeOps = (options: ClaudeOptions = {}, attached?: Attached):
     transcript: (sessionId, after) => of(sessionId).transcript!(sessionId, after),
     follow: (sessionId) =>
       isClaudeJob(sessionId)
-        ? attached?.has(sessionId)
-          ? Stream.fail(attachedUnfollowed(sessionId))
-          : Stream.unwrap(
-              findJob(sessionId).pipe(
-                Effect.map((found) => (found ? job.follow!(sessionId) : bg.follow!(sessionId))),
-                Effect.catchCause(() => Effect.succeed(job.follow!(sessionId))),
-              ),
-            )
+        ? Stream.unwrap(
+            findJob(sessionId).pipe(
+              Effect.map((found) => (found ? job.follow!(sessionId) : bg.follow!(sessionId))),
+              Effect.catchCause(() => Effect.succeed(job.follow!(sessionId))),
+            ),
+          )
         : bg.follow!(sessionId),
 
     say: (session, text) => of(session.sessionId).say!(session, text),
@@ -396,5 +392,6 @@ const withAttached = (job: RunnerOps, attached: Attached): RunnerOps => {
     logs: (name) => to(name).logs(name),
     transcript: (name, after) => to(name).transcript!(name, after),
     say: (session, text) => to(session.name).say!(session, text),
+    follow: (name) => (attached.has(name) ? Stream.fail(attachedUnfollowed(name)) : job.follow!(name)),
   };
 };

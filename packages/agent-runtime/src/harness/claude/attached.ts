@@ -80,7 +80,10 @@ const noteOf = (run: AttachedRun): string => (run.state !== 'parked' && run.call
 
 /** Waits until the process `pid` is gone. */
 const gone = async (pid: number | undefined): Promise<void> => {
-  while (pid !== undefined && alive(pid)) await pause(50);
+  for (;;) {
+    if (pid === undefined || !alive(pid)) return;
+    await pause(50);
+  }
 };
 
 /**
@@ -141,9 +144,6 @@ export const attachedSessions = (root: string, executable?: string): Attached =>
     draining = false;
   });
 
-  const failed = (verb: string) => (cause: unknown) =>
-    new RunnerError({ verb, message: `claude: ${cause instanceof Error ? cause.message : String(cause)}` });
-
   return {
     hold: Effect.acquireRelease(
       Effect.sync(() => void (holding = true)),
@@ -151,59 +151,73 @@ export const attachedSessions = (root: string, executable?: string): Attached =>
     ),
     holding: () => holding,
     has: (name) => fs.existsSync(filesOf(root, name).run),
-    ops: {
-      spawn: (r) =>
-        Effect.try({
-          try: () => {
-            for (const f of [filesOf(root, r.name).out, filesOf(root, r.name).stop]) fs.rmSync(f, { force: true });
-            const run: AttachedRun = {
-              name: r.name,
-              state: 'working',
-              owner: process.pid,
-              startedAt: new Date().toISOString(),
-              request: keptRequest(r),
-            };
-            start(r, run, r.brief, r.resumeFrom);
-          },
-          catch: failed('spawn'),
-        }),
-      observe: Effect.sync(() => runs()),
-      observeFor: (expected) =>
-        Effect.sync((): Observation => ({ seen: runs(expected.map((e) => e.name)), unread: new Set<string>() })),
-      stop: (name) =>
-        Effect.try({
-          try: () => {
-            fs.writeFileSync(filesOf(root, name).stop, String(process.pid));
-            live.get(name)?.abort?.abort();
-          },
-          catch: failed('stop'),
-        }),
-      logs: (name) =>
-        Effect.try({
-          try: () => {
-            const run = readRun(filesOf(root, name).run);
-            return `${run?.state ?? 'unknown'}${run?.sessionId ? ` ${run.sessionId}` : ''}${run?.calling ? `, calling ${run.calling.tool}` : ''}`;
-          },
-          catch: failed('logs'),
-        }),
-      transcript: (name, after) =>
-        Effect.tryPromise({
-          try: () => {
-            const id = readRun(filesOf(root, name).run)?.sessionId;
-            return readTranscript(id ? claudeTranscriptFile(id) : undefined, after, claudeTranscriptEvents);
-          },
-          catch: failed('transcript'),
-        }),
-      say: (session, text) =>
-        Effect.try({
-          try: () => {
-            const at = live.get(session.name);
-            if (!at?.input || at.input.closed)
-              throw new Error(`\`${session.name}\` is not at work in this process, so nothing can be said to it now. Say it once it is.`);
-            at.input.push(text);
-          },
-          catch: failed('say'),
-        }),
-    },
+    ops: opsOf(root, live, start, runs),
   };
 };
+
+/** Why a verb failed, as the runner's error. */
+const failed = (verb: string) => (cause: unknown) =>
+  new RunnerError({ verb, message: `claude: ${cause instanceof Error ? cause.message : String(cause)}` });
+
+/**
+ * The runner's verbs over the sessions under `root`: `live`, those at work in this process, and `start`, how one is started. A name is
+ * the engine's (`ae/<task>/<n>`), and every verb reads the session's run file, so another process reads and stops what the holder runs.
+ */
+const opsOf = (
+  root: string,
+  live: Map<string, Live>,
+  start: (r: SpawnRequest, run: AttachedRun, first: string, resume?: string) => void,
+  runs: (names?: readonly string[]) => Map<string, Sighting>,
+): Attached['ops'] => ({
+  spawn: (r) =>
+    Effect.try({
+      try: () => {
+        for (const f of [filesOf(root, r.name).out, filesOf(root, r.name).stop]) fs.rmSync(f, { force: true });
+        const run: AttachedRun = {
+          name: r.name,
+          state: 'working',
+          owner: process.pid,
+          startedAt: new Date().toISOString(),
+          request: keptRequest(r),
+        };
+        start(r, run, r.brief, r.resumeFrom);
+      },
+      catch: failed('spawn'),
+    }),
+  observe: Effect.sync(() => runs()),
+  observeFor: (expected) => Effect.sync((): Observation => ({ seen: runs(expected.map((e) => e.name)), unread: new Set<string>() })),
+  stop: (name) =>
+    Effect.try({
+      try: () => {
+        fs.writeFileSync(filesOf(root, name).stop, String(process.pid));
+        live.get(name)?.abort?.abort();
+      },
+      catch: failed('stop'),
+    }),
+  logs: (name) =>
+    Effect.try({
+      try: () => {
+        const run = readRun(filesOf(root, name).run);
+        return `${run?.state ?? 'unknown'}${run?.sessionId ? ` ${run.sessionId}` : ''}${run?.calling ? `, calling ${run.calling.tool}` : ''}`;
+      },
+      catch: failed('logs'),
+    }),
+  transcript: (name, after) =>
+    Effect.tryPromise({
+      try: () => {
+        const id = readRun(filesOf(root, name).run)?.sessionId;
+        return readTranscript(id ? claudeTranscriptFile(id) : undefined, after, claudeTranscriptEvents);
+      },
+      catch: failed('transcript'),
+    }),
+  say: (session, text) =>
+    Effect.try({
+      try: () => {
+        const at = live.get(session.name);
+        if (!at?.input || at.input.closed)
+          throw new Error(`\`${session.name}\` is not at work in this process, so nothing can be said to it now. Say it once it is.`);
+        at.input.push(text);
+      },
+      catch: failed('say'),
+    }),
+});

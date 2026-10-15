@@ -77,6 +77,7 @@ import {
   admissionOf,
   type EngineIo,
   type EngineOptions,
+  type HarnessConfig,
   type ObserveCount,
   type TaskSpec,
   type TickReport,
@@ -117,7 +118,7 @@ export class DrainRefused extends Schema.TaggedError<DrainRefused>()('DrainRefus
 export const drainRefusalOf = (holder: unknown): string | undefined =>
   holder === null || (Number.isInteger(holder) && (holder as number) > 0)
     ? undefined
-    : `takes the process id of the engine that holds the attached sessions, a whole number from 1, or null to let their calls go; it was handed ${JSON.stringify(holder) ?? String(holder)}.`;
+    : `takes the process id of the engine that holds the attached sessions, a whole number from 1, or null to let their calls go; it was handed ${JSON.stringify(holder) ?? 'nothing'}.`;
 
 /** Why `list` refuses what it was handed, or `undefined` for nothing or one list of task ids. */
 export const listRefusalOf = (args: readonly unknown[]): string | undefined => {
@@ -611,11 +612,9 @@ const make = (options: EngineOptions) =>
     const counted = countedInto(observed);
     const observedNow = () => copyOf(observed);
     const attached = attachedSessions(root);
-    const runners = Object.fromEntries(
-      Object.entries(runnersOf(harnesses, root, options.credentials, options.missingCredential, options.telemetry, attached)).map(
-        ([name, ops]): [string, SeamOps] => [name, counted(name, isRemote(harnesses[name]) ? ops : a2aOps(name, ops, events))],
-      ),
-    );
+    const { credentials, missingCredential, telemetry } = options;
+    const made = runnersOf(harnesses, root, credentials, missingCredential, telemetry, attached);
+    const runners = Object.fromEntries(Object.entries(made).map(seamOf(harnesses, events, counted)));
     const layer = Layer.mergeAll(journal, Runner.layer(composite(runners, fallback)), tickMemoLayer(), admissionOf(options, harnesses));
     const go = <A, E>(e: Effect.Effect<A, E, Journal | Runner>): Effect.Effect<A, E> => e.pipe(Effect.provide(layer));
     const read = (taskId: string) => go(Effect.flatMap(Journal, (j) => j.read(taskId)));
@@ -759,6 +758,14 @@ const make = (options: EngineOptions) =>
       ...attachVerbsOf(attached, root),
     });
   });
+
+/** A harness's runner as the engine runs it: through its A2A agent unless it is a remote one already, its observes counted. */
+const seamOf =
+  (harnesses: Record<string, HarnessConfig>, events: Parameters<typeof a2aOps>[2], counted: ReturnType<typeof countedInto>) =>
+  ([name, ops]: [string, RunnerOps]): [string, SeamOps] => [
+    name,
+    counted(name, isRemote(harnesses[name]) ? ops : a2aOps(name, ops, events)),
+  ];
 
 /** The verbs of the sessions run attached: `hold`, and `drain`, which writes the drain's file or removes it. */
 const attachVerbsOf = (attached: Attached, root: string): Pick<EngineShape, 'hold' | 'drain'> => ({

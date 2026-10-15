@@ -14,7 +14,7 @@ import { Engine as EngineService, type HarnessConfig, type TaskView } from '../s
 import type { SpawnRequest } from '../src/harness/seam.ts';
 import { traceparentOf, withoutTelemetry, type Telemetry } from '../src/harness/telemetry.ts';
 import { claudeTelemetryEnv, telemeteredFlags } from '../src/harness/claude/telemetry.ts';
-import { CLAUDE_JOB_ENV, claudeJob } from '../src/harness/claude/code.ts';
+import { CLAUDE_JOB_ENV, claudeDetached, claudeJob } from '../src/harness/claude/code.ts';
 import { claudeArgv, claudeOps } from '../src/harness/claude/bg.ts';
 import { commandHarness } from '../src/harness/command/command.ts';
 import { asyncOps } from './promise-runner.ts';
@@ -391,6 +391,12 @@ test("a job's own env reaches its claude, laid under the job's: a task cannot tu
   );
   assert.equal((await settled(engine, id)).state.settled, 'succeeded');
   assert.deepEqual(claude.env(), { TASK_FILES: files, CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1' });
+});
+
+test("a claude-detached task's own env reaches its command, laid under the job's", () => {
+  const env = claudeDetached.command({ ...told, config: { env: { X: '1', CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '0' } } }).env;
+  assert.equal(env?.X, '1');
+  assert.equal(env?.CLAUDE_CODE_DISABLE_BACKGROUND_TASKS, '1');
 });
 
 test("a command of an engine given a collector is handed no telemetry, the engine's own included; its own env still reaches it", async (t) => {

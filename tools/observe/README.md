@@ -214,7 +214,9 @@ node tools/observe/render/render.ts --stop <name>
   it. The `see-a-dashboard` skill says how to read them.
 - **One at a time** (`render/lock.ts`): about 0.8 GiB and a minute and a half, so a second render waits for the first, `--wait`
   seconds (600), and is refused naming the holder. The lock is a file in the system's temp directory; one left by a process that is
-  gone is stale, and the next render removes the container it names first.
+  gone is stale, and the next render removes the container it names first. A stale lock this user cannot move is waited on to
+  `--wait` and refused naming its holder and its file; a lock placed while a live one was being put back stays, and the render that
+  moved it is refused, saying to run it again once both have ended.
 - **Held for a browser** (`render/hold.ts`, `render/reap.ts`): `--hold` writes the same files, then leaves the stack up, 600 seconds
   unless told and 1800 at most, and prints where Grafana listens, where its collector listens (the `OTEL_EXPORTER_OTLP_ENDPOINT` of a
   probe, which exports to this stack and never the live one) and each dashboard's address. A detached reaper removes the container

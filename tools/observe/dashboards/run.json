@@ -90,20 +90,8 @@
       ],
       "asDropdown": false,
       "title": "Nemia",
-      "includeVars": false,
+      "includeVars": true,
       "keepTime": true
-    },
-    {
-      "type": "link",
-      "title": "Time",
-      "tooltip": "Where this run's steps spent their time",
-      "url": "/d/nemia-time?var-run=${run}",
-      "icon": "dashboard",
-      "keepTime": true,
-      "includeVars": false,
-      "targetBlank": false,
-      "asDropdown": false,
-      "tags": []
     }
   ],
   "panels": [

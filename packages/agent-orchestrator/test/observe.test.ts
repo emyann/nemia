@@ -1327,7 +1327,13 @@ test("Steps picks a run and a session as Time does: the run's tag, and the runti
 });
 
 /** A dashboard's links, as far as the checker reads them. */
-type Link = { type: string; url?: string; title?: string };
+type Link = { type: string; url?: string; title?: string; tags?: string[]; includeVars?: boolean };
+
+/** The links of `dashboard`, and the tags it carries. */
+const linked = (dashboard: Dashboard): { links: Link[]; tags: string[] } => {
+  const { links, tags } = dashboard as Dashboard & { links?: Link[]; tags?: string[] };
+  return { links: links ?? [], tags: tags ?? [] };
+};
 
 test('Steps and A run link to Time, with their own choices', () => {
   const texts = allPanels(dashboardTitled('Steps').panels).filter((p) => p.type === 'text');
@@ -1335,11 +1341,40 @@ test('Steps and A run link to Time, with their own choices', () => {
   assert.ok(steps, "Steps' note links to Time");
   for (const name of ['factory', 'workflow', 'step', 'agent']) assert.ok(steps.includes(`\${${name}:queryparam}`), name);
   assert.ok(steps.includes('${__url_time_range}'), "Steps' range");
-  const links = (dashboardTitled('A run') as Dashboard & { links?: Link[] }).links ?? [];
-  assert.ok(
-    links.some((l) => l.type === 'link' && (l.url ?? '').startsWith('/d/nemia-time?') && (l.url ?? '').includes('var-run=${run}')),
-    'A run links to Time for its run',
+  const time = dashboardTitled('Time');
+  const list = linked(dashboardTitled('A run')).links.find(
+    (l) => l.type === 'dashboards' && (l.tags ?? []).length > 0 && (l.tags ?? []).every((tag) => linked(time).tags.includes(tag)),
   );
+  assert.ok(list, "A run's tag list lists Time");
+  assert.equal(list.includeVars, true, "A run's tag list carries its choices");
+  assert.ok(
+    time.templating?.list.some((v) => v.name === 'run'),
+    'Time picks the run A run hands it',
+  );
+});
+
+/** The uids `dashboard` reaches through its links, a uid as many times as a link reaches it: a tag list's and a `/d/<uid>` link's. */
+const reachedBy = (dashboard: Dashboard): string[] =>
+  linked(dashboard).links.flatMap((link) => {
+    if (link.type === 'dashboards')
+      return [...DASHBOARDS.values()]
+        .filter((d) => d.uid !== dashboard.uid && (link.tags ?? []).every((tag) => linked(d).tags.includes(tag)))
+        .map((d) => d.uid);
+    const uid = /^\/d\/([^/?]+)/.exec(link.url ?? '')?.[1];
+    return uid === undefined ? [] : [uid];
+  });
+
+/** The uids `dashboard` reaches more than once through its links. */
+const reachedTwice = (dashboard: Dashboard): string[] => {
+  const reached = reachedBy(dashboard);
+  return [...new Set(reached.filter((uid, i) => reached.indexOf(uid) !== i))];
+};
+
+test('REFUSED: a dashboard that reaches another twice through its links', () => {
+  for (const [file, dashboard] of DASHBOARDS) assert.deepEqual(reachedTwice(dashboard), [], file);
+  const run = dashboardTitled('A run');
+  (run as Dashboard & { links: Link[] }).links.push({ type: 'link', title: 'Time', url: '/d/nemia-time?var-run=${run}' });
+  assert.deepEqual(reachedTwice(run), ['nemia-time']);
 });
 
 /** The span attribute the collector's transforms read, as measured, which a session sends only under `NEMIA_TOOL_DETAILS=1`. */

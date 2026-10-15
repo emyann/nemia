@@ -51,24 +51,47 @@ const holderOf = (lock: Lock): string =>
     : `${lock.name}, a render in flight (pid ${lock.pid})`;
 
 /**
+ * Put back the lock of `moved`, a live holder's, from `aside`, where it was moved as stale. Refuses, leaving the lock in place, when
+ * another render placed its own between the move and the put-back: it names the holder now without the slot and the one holding it.
+ */
+function putBack(aside: string, moved: Lock): void {
+  try {
+    fs.linkSync(aside, lockFile());
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
+    const placer = locked();
+    throw refusal(
+      `the lock of ${holderOf(moved)} was moved aside as stale while it still held the slot, and ` +
+        `${placer === undefined ? 'another render' : holderOf(placer)} placed its own before it could be put back: ` +
+        `that one holds the slot and ${moved.name} now runs without it; run it again once both have ended`,
+    );
+  }
+}
+
+/**
  * Take a lock no live process holds out of the way: moved aside first, so two renders that both read it stale cannot both drop it,
  * then read where it was moved. One a live process holds, taken between the read and the move, is put back; any other is dropped,
  * and the container it records removed by that name.
+ *
+ * Returns undefined when the slot may be tried again at once (the lock moved, put back or already gone), else the code of the error
+ * that kept the lock from being moved, which stays where it is. Refuses as `putBack` does.
  */
-function dropStale(): void {
+export function dropStale(): string | undefined {
   const aside = `${lockFile()}.stale-${process.pid}`;
   try {
     fs.renameSync(lockFile(), aside);
-  } catch {
-    return;
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    return code === 'ENOENT' ? undefined : (code ?? 'an unknown error');
   }
   const moved = lockAt(aside);
   try {
-    if (moved !== undefined && alive(moved.pid)) fs.linkSync(aside, lockFile());
+    if (moved !== undefined && alive(moved.pid)) putBack(aside, moved);
   } finally {
     fs.rmSync(aside, { force: true });
   }
   if (moved !== undefined && !alive(moved.pid) && NAME.test(moved.name)) remove(moved.name);
+  return undefined;
 }
 
 /**
@@ -90,8 +113,26 @@ function placed(text: string): boolean {
 }
 
 /**
+ * Why a wait of `waitSeconds` ended with the slot not taken: held by the live `lock`, or, when `stuck` names the code of a move that
+ * failed, a lock this user cannot move, named with its holder and its file.
+ */
+function unfreed(lock: Lock | undefined, stuck: string | undefined, waitSeconds: number): string {
+  if (stuck !== undefined || lock === undefined)
+    return (
+      `this machine's one render slot is held by a lock this user cannot move (${stuck ?? 'it does not read'}), at ${lockFile()}, ` +
+      `left by ${lock === undefined ? 'a lock that does not read' : holderOf(lock)} and no longer alive: ` +
+      'remove it as the user who owns it, then run it again'
+    );
+  return (
+    `this machine's one render slot is held by ${holderOf(lock)}, and ${waitSeconds}s of waiting did not free it: ` +
+    'run it again when that one has ended, or wait longer with --wait <seconds>'
+  );
+}
+
+/**
  * Take the slot for the container `name`, waiting up to `waitSeconds` on a monotonic clock for whoever holds it. Refuses, naming the
- * holder and how to wait longer, when the wait ends with the slot still held.
+ * holder and how to wait longer, when the wait ends with the slot still held; naming the holder and the file, when it ends on a lock
+ * this user cannot move.
  */
 export async function take(name: string, waitSeconds: number): Promise<void> {
   const began = performance.now();
@@ -99,15 +140,12 @@ export async function take(name: string, waitSeconds: number): Promise<void> {
   for (;;) {
     if (placed(mine)) return;
     const lock = locked();
+    let stuck: string | undefined;
     if (lock === undefined || !alive(lock.pid)) {
-      dropStale();
-      continue;
+      stuck = dropStale();
+      if (stuck === undefined) continue;
     }
-    if (performance.now() - began >= waitSeconds * 1000)
-      throw refusal(
-        `this machine's one render slot is held by ${holderOf(lock)}, and ${waitSeconds}s of waiting did not free it: ` +
-          'run it again when that one has ended, or wait longer with --wait <seconds>',
-      );
+    if (performance.now() - began >= waitSeconds * 1000) throw refusal(unfreed(lock, stuck, waitSeconds));
     await sleep(500);
   }
 }

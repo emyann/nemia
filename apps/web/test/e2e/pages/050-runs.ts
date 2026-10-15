@@ -684,6 +684,54 @@ async function closeUps(page: Page): Promise<void> {
   }
 }
 
+/** Each row in flight's id, the left edges of its copy control and its factory, and what the line holds inside its cell, in pixels. */
+const flightLines = (page: Page) =>
+  section(page, 'in-flight')
+    .locator('tr[data-run]:has([data-factory])')
+    .evaluateAll((rows) =>
+      rows.map((row) => {
+        const [control, factory] = [row.querySelector('[data-copy-id] button')!, row.querySelector('[data-factory]')!];
+        const [button, named, cell] = [control, factory, factory.closest('td')!].map((part) => part.getBoundingClientRect());
+        const y = named.top + named.height / 2;
+        return {
+          id: row.getAttribute('data-run')!,
+          control: Math.round(button.left),
+          factory: Math.round(named.left),
+          over: Math.round(named.right - (cell.right - parseFloat(getComputedStyle(factory.closest('td')!).paddingRight))),
+          pressed: document.elementFromPoint(named.left + 1, y)?.closest('[data-factory]') !== factory,
+        };
+      }),
+    );
+
+/**
+ * The second line of every row in flight lines up: each copy control at one edge and each factory at one edge, whatever the length of
+ * each id; and the seed holds ids of more than one length, or the rule would hold for nothing.
+ */
+async function flightAligned(page: Page): Promise<void> {
+  const lines = await flightLines(page);
+  if (new Set(lines.map((line) => line.id.length)).size < 2)
+    throw new Refused(`the runs in flight hold ids of more than one length — ${lines.map((line) => line.id).join(', ')}`);
+  for (const edge of ['control', 'factory'] as const) {
+    const at = lines.map((line) => line[edge]);
+    if (Math.max(...at) - Math.min(...at) > 1)
+      throw new Refused(
+        `every ${edge} of a row in flight stands at one left edge — ${lines.map((line) => `${line.id} ${line[edge]}`).join(', ')}`,
+      );
+  }
+}
+
+/** Each row in flight's second line inside its cell, its factory under no copy control's target. */
+async function flightWhole(page: Page): Promise<void> {
+  for (const line of await flightLines(page)) {
+    await section(page, 'in-flight').locator(`tr[data-run="${line.id}"] [data-factory]`).scrollIntoViewIfNeeded();
+    const [again] = (await flightLines(page)).filter((each) => each.id === line.id);
+    if (again.over > 0 || again.pressed)
+      throw new Refused(
+        `at 390 wide the second line of ${line.id} is whole, its factory clear of the copy control — ${JSON.stringify(again)}`,
+      );
+  }
+}
+
 /** At 390 wide nothing breaks: the document does not scroll sideways, the cards stack, and each table scrolls inside its frame. */
 async function narrow(page: Page): Promise<void> {
   const size = page.viewportSize() ?? { width: 1280, height: 800 };
@@ -703,6 +751,7 @@ async function narrow(page: Page): Promise<void> {
       .evaluateAll((all) => all.map((box) => [box.scrollWidth, box.clientWidth, getComputedStyle(box).overflowX] as const));
     if (boxes.length !== 2 || boxes.some(([wide, shown, how]) => wide <= shown || how !== 'auto'))
       throw new Refused(`at 390 wide each table scrolls sideways inside its frame — ${JSON.stringify(boxes)}`);
+    await flightWhole(page);
   } finally {
     await page.setViewportSize(size);
   }
@@ -747,6 +796,7 @@ async function withRegated(page: Page): Promise<void> {
   await tableByKeyboard(page, finished);
   await finger(page, open, finished);
   await rowsSay(page, open, finished);
+  await flightAligned(page);
   await lookDetails(page);
   await narrow(page);
   await contrastHolds(page, ['[data-sentence]']);

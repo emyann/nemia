@@ -220,7 +220,8 @@ test('REFUSED: a lock this user cannot move, at the bound, naming its holder and
     (err: Error & { exitCode?: number }) => `${err.exitCode}: ${err.message}`,
   );
   assert.ok(said.startsWith('2: '), said);
-  for (const part of [lockFile(), 'nemia-render-9-dead00', 'EPERM', 'remove it as the user who owns it']) assert.ok(said.includes(part), said);
+  for (const part of [lockFile(), 'nemia-render-9-dead00', 'EPERM', 'remove it as the user who owns it'])
+    assert.ok(said.includes(part), said);
   assert.deepEqual(calls(), []);
   assert.deepEqual(locked(), dead, 'the lock is left where it is');
 });

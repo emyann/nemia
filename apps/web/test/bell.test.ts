@@ -1,7 +1,7 @@
 /**
- * The waiting bar's rows (src/lib/bell.ts): the rows of the runs that wait on a person across every factory, in what order, what each waits for
- * and where its row opens; and how its badge says the count. Which runs wait is the api's to say (`bellRows` filters none): the rows are
- * read here over the board's own rule (`waitsOnYou`), which the pages still on the whole list keep.
+ * The waiting bar's rows (src/lib/bell.ts): the rows of the runs that wait on a person across every factory, in what order, what each waits
+ * for and where its row opens; and how its badge says the count. Which runs wait is the api's to say (`bellRows` filters none): the rows
+ * are read here over the board's own rule (`waitsOnYou`), which the pages still on the whole list keep.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

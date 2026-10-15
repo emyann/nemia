@@ -61,9 +61,9 @@ export const exportedNow: Effect.Effect<void> = Effect.serviceOption(OtlpExporte
  * Each of `series` born in the process's registry at zero, with nothing counted or measured (a read of it makes it), then exported so
  * (`exportedNow`): a collector that reads a counter or a histogram by its increase counts nothing for a series first seen at a value,
  * and reads a series a process started again brings back as a reset only once it has seen it lower. A series that is there already is
- * born for nothing; none given asks for no export.
+ * born for nothing; none given asks for no export. Untraced, as the export is: a pass's spans are its work, never its telemetry.
  */
-export const seriesBorn = Effect.fn('seriesBorn')(function* (series: ReadonlyArray<Metric.Metric<never, unknown>>) {
+export const seriesBorn = Effect.fnUntraced(function* (series: ReadonlyArray<Metric.Metric<never, unknown>>) {
   if (!series.length) return;
   for (const one of series) yield* Metric.value(one);
   yield* exportedNow;

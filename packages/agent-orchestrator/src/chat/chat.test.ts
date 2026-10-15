@@ -160,7 +160,8 @@ test('a cursor round-trips, and what changed since it is the new events and thos
     said: [{ at: at(13), attempt: 2, text: framedForHer('Hi'), after: { kind: 'text', id: 'a2' } }],
     delivered: [{ id: 'o1', said: at(13), attempt: 2 }],
   });
-  now.sessions[1] = { ...now.sessions[1]!, events: [...now.sessions[1]!.events, text('a3', 14, 'Hello again.')] };
+  const [first, second] = now.sessions;
+  now.sessions = [first, { attempt: 2, startedAt: at(10), events: [...(second?.events ?? []), text('a3', 14, 'Hello again.')] }];
   const changed = changedSince(projectChat(sourcesAt(now, readChatCursor(cursor), cursor)), projectChat(now));
   assert.deepEqual(shape(changed), ['person:Hi', 'agent:Hello again.']);
   assert.equal(changed[0]?.kind === 'message' && changed[0].delivered, at(13));

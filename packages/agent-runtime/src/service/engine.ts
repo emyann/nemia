@@ -114,7 +114,17 @@ export class QuotaRefused extends Schema.TaggedError<QuotaRefused>()('QuotaRefus
 export const attemptRefusal = (attempts: readonly { readonly n: number }[], attempt: unknown): string | undefined => {
   if (attempt === undefined || attempts.some((a) => a.n === attempt)) return undefined;
   const has = attempts.length ? `its attempts are ${attempts.map((a) => a.n).join(', ')}` : 'it has no attempt yet';
-  return `\`attempt: ${String(attempt)}\` is no attempt of this task: ${has}. Name one of them, or none to read the latest.`;
+  return `\`attempt: ${JSON.stringify(attempt)}\` is no attempt of this task: ${has}. Name one of them, or none to read the latest.`;
+};
+
+/** What a transcript read names of a task's attempts (`TranscriptRefused` naming those it has where it names none of them). */
+type Asked = { readonly attempt?: number };
+
+/** The attempt a transcript read names, the latest where it names none, or none where the task has none; refused as `attemptRefusal`. */
+const attemptAsked = <A extends { readonly n: number }>(attempts: readonly A[], attempt: number | undefined) => {
+  const refused = attemptRefusal(attempts, attempt);
+  if (refused !== undefined) return Effect.fail(new TranscriptRefused({ message: refused }));
+  return Effect.succeed(attempt === undefined ? attempts.at(-1) : attempts.find((a) => a.n === attempt));
 };
 
 /** Why `list` refuses what it was handed, or `undefined` for nothing or one list of task ids. */
@@ -677,11 +687,7 @@ const make = (options: EngineOptions) =>
       return yield* go(taskIds === undefined ? everyView() : viewsOf(taskIds));
     });
 
-    const transcriptVerb = Effect.fn('Engine.transcript')(function* (
-      taskId: string,
-      after?: TranscriptCursor,
-      options: { readonly attempt?: number } = {},
-    ) {
+    const transcriptVerb = Effect.fn('Engine.transcript')(function* (taskId: string, after?: TranscriptCursor, asked: Asked = {}) {
       const refuse = (message: string) => Effect.fail(new TranscriptRefused({ message }));
       const events = yield* read(taskId);
       if (!events.length)
@@ -701,9 +707,7 @@ const make = (options: EngineOptions) =>
       }
       const start = noTranscript().cursor;
       const nothing: Transcript = { events: [], cursor: after ?? start };
-      const named = attemptRefusal(state.attempts, options.attempt);
-      if (named !== undefined) return yield* refuse(named);
-      const last = options.attempt === undefined ? state.attempts.at(-1) : state.attempts.find((a) => a.n === options.attempt);
+      const last = yield* attemptAsked(state.attempts, asked.attempt);
       if (!last) return nothing;
       return (yield* go(transcriptOf(nameFor(taskId, last.n), after === start ? undefined : after))) ?? nothing;
     });

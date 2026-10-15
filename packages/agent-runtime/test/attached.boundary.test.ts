@@ -75,6 +75,11 @@ test('a holder let go waits for the call in flight, then parks the session, its 
   assert.equal(run(root)?.state, 'working');
   fs.writeFileSync(path.join(dir, 'release'), '');
   await closing;
+  assert.deepEqual(
+    (lines(dir, 'answers.jsonl') as { event: string }[]).map((a) => a.event),
+    ['PreToolUse', 'PostToolUse'],
+    'the call ran to its end before the session was let go',
+  );
   assert.equal(run(root)?.state, 'parked');
   assert.equal(run(root)?.calling, undefined);
   assert.equal(alive(Number(fs.readFileSync(path.join(dir, 'pid'), 'utf8'))), false, "the session's Claude Code is gone");

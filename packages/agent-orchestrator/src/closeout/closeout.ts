@@ -12,6 +12,7 @@ import {
   bodyOf,
   CLOSEOUT_V1,
   ENVELOPE_SCHEMA,
+  SUMMARY_MAX,
   summaryLine,
   V0_FIELDS,
   V1_FIELDS,
@@ -268,33 +269,38 @@ export const closeoutContract = (step?: Workflow, replies: 'owed' | 'none' | fal
     '',
     '- `outcome`: `"done"` if you finished the work; `"blocked"` if you cannot honestly finish. A step',
     '  that reports success it did not have is worse than one that stops and says why.',
-    '- `summary`: one to three sentences on what you did, for the person who decides what ships.',
+    '- `apiVersion`: `"nemia/v1"`.',
+    `- \`summary\`: one line of at most ${SUMMARY_MAX} characters on what you did, for the person who decides what ships. A longer`,
+    '  one is cut where it is shown.',
+    '- `body`: markdown, everything the summary has no room for; `null` when there is nothing more.',
     ...(inFolder
       ? [
-          '- `artifacts`: files you wrote for someone else to read, such as `note.md`. The run keeps each one you',
+          '- `artifacts`: files you wrote for someone else to read, each `{"path"}`, such as `note.md`. The run keeps each one you',
           '  name when you finish, so the steps after you and the person who decides receive it. A file you list',
           '  that the run does not then have refuses this closeout: you are asked again, told which.',
         ]
       : [
-          '- `artifacts`: files you wrote for someone else to read, such as `RESPONSE.md`. Leave them in this',
+          '- `artifacts`: files you wrote for someone else to read, each `{"path"}`, such as `RESPONSE.md`. Leave them in this',
           '  workspace: when you finish, the run commits whatever you left, so the next step receives it.',
           '  Commit your own work if you can. If you cannot — some sandboxes keep git read-only — that is',
           '  **not** a reason to block. A file you list that the run does not then have refuses this closeout:',
           '  you are asked again, told which.',
         ]),
-    '- `needs`: when blocked, what a person has to settle; otherwise `null`.',
+    '  An artifact may be a value instead, `{"name", "value"}`, such as a pull request\'s address: shown labelled, and as a link',
+    "  when it is an http(s) address. `closeout.json` is the run's own name: an artifact that names it is refused.",
+    '- `needs`: only when blocked, what a person has to settle; `null` when done. A `done` closeout with a `needs` is refused.',
     ...(declared
       ? [
           `- ${declared}: what this step declares (\`output: ${step!.output!.file}\`), in the shape the session`,
-          '  asks for. It is handed, as data, to a step that reads it; your `summary` is not. A closeout',
+          '  asks for. It is handed, as data, to a step that reads it. A closeout',
           '  without it is unsigned, and nothing that waits on this step starts.',
         ]
       : []),
     ...(replies === 'owed'
       ? [
           `- \`${LOOP_REPLIES}\`: your answer to each finding you were handed this round — \`fixed\` and what you changed, or`,
-          "  `won't fix` and why — in the shape the session asks for. The next round's review is handed it, as data;",
-          '  your `summary` is not. A closeout without it, or with an empty list, is unsigned.',
+          "  `won't fix` and why — in the shape the session asks for. The next round's review is handed it, as data.",
+          '  A closeout without it, or with an empty list, is unsigned.',
         ]
       : []),
     ...(replies === 'none'

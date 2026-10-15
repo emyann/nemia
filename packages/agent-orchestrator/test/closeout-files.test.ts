@@ -187,7 +187,7 @@ test('a task an earlier pass read settled is not read back into a refusal: its s
   }
 });
 
-test('the step after is told the named files that are there by absolute path, and never the name of one that is gone', async () => {
+test('a folder with no closeout.json, as one handed before it was written: the step after is told the named files that are there by absolute path, and never the name of one that is gone', async () => {
   const { id, files, task } = await started();
   const kept = path.join(files, 'kept-dark.png');
   const removed = path.join(files, 'removed-dark.png');
@@ -195,6 +195,7 @@ test('the step after is told the named files that are there by absolute path, an
   engine().settle(task, 'succeeded', signed(kept, removed));
   assert.deepEqual((await advanced(id)).checked, ['implement']);
 
+  fs.rmSync(path.join(files, 'closeout.json'));
   fs.rmSync(removed);
   engine().settle(`${task}-check`, 'succeeded', { exitCode: 0 });
   assert.deepEqual((await advanced(id)).filed, ['review']);
@@ -303,7 +304,7 @@ test("a picture the session's browser writes where its filed env says is the run
   assert.deepEqual(pass.tried, [], 'the closeout is not refused');
   assert.deepEqual(pass.checked, ['implement'], 'its check is filed');
   assert.deepEqual(lackedOf(readRun(id).steps.implement) ?? [], []);
-  assert.deepEqual(fs.readdirSync(files), ['page-1.png'], 'kept where it was written, copied onto nothing');
+  assert.deepEqual(fs.readdirSync(files).sort(), ['closeout.json', 'page-1.png'], 'kept where it was written, beside the closeout');
   assert.equal(fs.readFileSync(picture, 'utf8'), 'png');
 });
 
@@ -339,5 +340,62 @@ test('a v1 closeout with a 300-character summary, or one on two lines, is accept
     engine().settle(task, 'succeeded', signedV1(outcome, summary, needs));
     const pass = await advanced(id);
     assert.deepEqual([pass.checked, pass.tried], [['implement'], []], summary);
+  }
+});
+
+test("a step's closeout is written as closeout.json in its files directory on its hand-off, and the step after is sent there, not listed its files", async () => {
+  const { id, files, task } = await started();
+  const workspace = readRun(id).steps.implement.workspace!;
+  fs.writeFileSync(path.join(workspace, 'report.md'), 'left in the workspace');
+  const summary = `${'word '.repeat(30)}and more`;
+  engine().settle(task, 'succeeded', {
+    closeout: {
+      apiVersion: 'nemia/v1',
+      outcome: 'done',
+      summary,
+      body: 'The rest.',
+      artifacts: [{ path: 'report.md' }, { path: 'gone.md' }, { name: 'PR', value: 'https://example.com/pr/1' }],
+      needs: null,
+    },
+  });
+  await advanced(id);
+  const handed = JSON.parse(fs.readFileSync(path.join(files, 'closeout.json'), 'utf8')) as Record<string, unknown>;
+  assert.equal(handed.apiVersion, 'nemia/v1');
+  assert.ok(String(handed.summary).endsWith('…') && String(handed.summary).length <= 120);
+  assert.equal(handed.body, `${summary}\n\nThe rest.`);
+  assert.deepEqual(handed.artifacts, [{ path: path.join(files, 'report.md') }, { name: 'PR', value: 'https://example.com/pr/1' }]);
+  assert.deepEqual([handed.outcome, handed.needs, handed.output], ['done', null, {}]);
+});
+
+test('a second try rewrites closeout.json with its own closeout, a v0 one converted, and the brief after names the file once', async (t) => {
+  const { id, files, task } = await started();
+  engine().settle(task, 'succeeded', signed());
+  assert.deepEqual((await advanced(id)).checked, ['implement']);
+  engine().settle(`${task}-check`, 'failed', { exitCode: 1 });
+  await typed(t, 'retry', id, 'implement');
+  await advanced(id);
+  engine().settle(`${task}-try2`, 'succeeded', {
+    closeout: { outcome: 'done', summary: 'Second try.\nIn detail.', artifacts: [], needs: null },
+  });
+  await advanced(id);
+  const handed = JSON.parse(fs.readFileSync(path.join(files, 'closeout.json'), 'utf8')) as Record<string, unknown>;
+  assert.deepEqual([handed.apiVersion, handed.summary, handed.body], ['nemia/v1', 'Second try.', 'Second try.\nIn detail.']);
+
+  engine().settle(`${task}-try2-check`, 'succeeded', { exitCode: 0 });
+  assert.deepEqual((await advanced(id)).filed, ['review']);
+  const brief = briefOf(`${id}-review`);
+  assert.equal(brief.split('holds `closeout.json`').length, 2, `said once\n${brief}`);
+  assert.ok(!brief.includes('The files implement named'), brief);
+});
+
+test('REFUSED: a closeout naming closeout.json, at the workspace root or the files directory, the run\'s own name, is unsigned and asked again', async () => {
+  for (const named of ['closeout.json', 'files']) {
+    const { id, files, task } = await started();
+    const file = named === 'files' ? path.join(files, 'closeout.json') : 'closeout.json';
+    fs.writeFileSync(path.join(readRun(id).steps.implement.workspace!, 'closeout.json'), '{}');
+    engine().settle(task, 'succeeded', signed(file));
+    const pass = await advanced(id);
+    assert.deepEqual([pass.checked, pass.tried], [[], ['implement']], named);
+    assert.ok(briefOf(`${task}-try2`).includes("is the run's own name for the closeout it writes"), named);
   }
 });

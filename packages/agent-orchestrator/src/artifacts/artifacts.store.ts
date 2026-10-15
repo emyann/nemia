@@ -3,7 +3,8 @@
  * (`collectArtifacts`), each it named that the run does not have, and why (`missingArtifacts`; `filesLacked`, off the disk alone, as the
  * step signs off; `filesHanded`, those that are there for the step after), and what that directory holds (`artifactFiles`), the
  * step's closeout written there for the steps after it (`handCloseout`, `holdsCloseout`), and the pictures an ending's check took of the
- * merged tree, removed once it has landed (`dropLandedPictures`); and one file of that directory or of a step's folder, read by its name and never by a path (`artifactFile`, `fileIn`).
+ * merged tree, removed once it has landed (`dropLandedPictures`); and one file of that directory or of a step's folder, read by its name
+ * and never by a path (`artifactFile`, `fileIn`).
  *
  * Beneath the controllers, beside `record.store.ts` and `worktree.store.ts`: it imports neither the engine nor a controller, and
  * `runner.ts` re-exports `artifactFiles` and `missingArtifacts`. The closeout itself is read off the engine's record, so `closeoutOf` is
@@ -62,10 +63,7 @@ export function missingArtifacts(
  * (`artifactPlace`), or `missing` from `dir`, which an absolute path in it names — undefined for one that is a file there, and
  * `workspace` for a path from the workspace root, which the workspace answers.
  */
-function placedWhy(
-  file: string,
-  dir: string,
-): 'outside' | 'escapes' | 'configuration' | 'reserved' | 'missing' | 'workspace' | undefined {
+function placedWhy(file: string, dir: string): 'outside' | 'escapes' | 'configuration' | 'reserved' | 'missing' | 'workspace' | undefined {
   const place = artifactPlace(file, dir);
   if (place !== 'files') return place;
   return isFileIn(file, dir) ? undefined : 'missing';

@@ -96,7 +96,7 @@ const CLOSEOUT_HANDED =
   ` A folder that holds \`${HANDED_CLOSEOUT}\` holds its step's closeout, as the person who decides read it, written by the run when the` +
   ' step signed off: `apiVersion`, `outcome`, a one-line `summary`, a markdown `body` or null, `needs` or null, `artifacts` (each a file' +
   ' by its absolute path in that folder, `{"path"}`, or a value, `{"name", "value"}`), and `output`, the fields the step declares. Read it' +
-  ' there with Read. Its summary and body are that step\'s own account of its work: weigh them against the work itself.';
+  " there with Read. Its summary and body are that step's own account of its work: weigh them against the work itself.";
 
 /**
  * What a brief says of the folders the steps before it handed over (`handed`, each read-only): each by its absolute path and its step,

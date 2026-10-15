@@ -527,10 +527,11 @@ test("REFUSED: design, implement or review told of the look's parts no more is n
 test("the shipped review declares only `mutants`: Agora's own schema gives `findings` and `again`, each field with one owner", () => {
   const review = buildSteps().find((s) => s.name === 'review')!;
   assert.deepEqual(outputFields(review), ['findings', 'again', 'mutants']);
-  assert.deepEqual(
-    Object.fromEntries(Object.entries(review.output!.owners!).map(([field, o]) => [field, `${o.by} ${o.name} ${o.file}`])),
-    { findings: 'agent agora review.schema.json', again: 'agent agora review.schema.json', mutants: 'step review review.schema.json' },
-  );
+  assert.deepEqual(Object.fromEntries(Object.entries(review.output!.owners!).map(([field, o]) => [field, `${o.by} ${o.name} ${o.file}`])), {
+    findings: 'agent agora review.schema.json',
+    again: 'agent agora review.schema.json',
+    mutants: 'step review review.schema.json',
+  });
   assert.equal(review.loop, 'implement');
   const own = JSON.parse(fs.readFileSync(path.join(HOLDER, 'build', 'review.schema.json'), 'utf8')) as { properties: object };
   assert.deepEqual(Object.keys(own.properties), ['mutants']);

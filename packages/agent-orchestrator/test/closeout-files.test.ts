@@ -388,7 +388,7 @@ test('a second try rewrites closeout.json with its own closeout, a v0 one conver
   assert.ok(!brief.includes('The files implement named'), brief);
 });
 
-test('REFUSED: a closeout naming closeout.json, at the workspace root or the files directory, the run\'s own name, is unsigned and asked again', async () => {
+test("REFUSED: a closeout naming closeout.json, at the workspace root or the files directory, the run's own name, is unsigned and asked again", async () => {
   for (const named of ['closeout.json', 'files']) {
     const { id, files, task } = await started();
     const file = named === 'files' ? path.join(files, 'closeout.json') : 'closeout.json';

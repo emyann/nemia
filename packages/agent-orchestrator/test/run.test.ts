@@ -3043,7 +3043,10 @@ test('a declared field named `__proto__` travels like any other — into the bri
   const brief = composeBrief(reader, r, [producer, reader], (name) => (name === 'review' ? said : undefined));
   assert.equal(JSON.stringify(jsonIn(brief)), '{"__proto__":"product"}');
   assert.deepEqual(outputLines(producer, said), ['__proto__: product']);
-  assert.equal(JSON.stringify(closeoutSchemaOf(producer, []).required), '["apiVersion","outcome","summary","body","artifacts","needs","__proto__"]');
+  assert.equal(
+    JSON.stringify(closeoutSchemaOf(producer, []).required),
+    '["apiVersion","outcome","summary","body","artifacts","needs","__proto__"]',
+  );
 });
 
 const FILES = '/wf/runs/r-1/artifacts/implement';

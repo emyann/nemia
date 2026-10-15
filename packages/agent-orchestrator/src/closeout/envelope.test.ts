@@ -7,7 +7,6 @@ import assert from 'node:assert/strict';
 import { envelopeRefusals, SUMMARY_MAX, summaryLine } from './envelope.ts';
 import { CLOSEOUT_SCHEMA, looseAt, parseCloseout, type Closeout } from './closeout.ts';
 
-
 /** The cases every copy of the cut answers alike: the board's transcript (`apps/web/test/transcript.test.ts`) asks the same. */
 const CUTS: Array<[string, string]> = [
   ['a'.repeat(119), 'a'.repeat(119)],
@@ -88,7 +87,11 @@ test('REFUSED: `needs` on a done v1 closeout, and nothing else of its envelope, 
   assert.deepEqual(envelopeRefusals(v1('done', '')), []);
   assert.deepEqual(envelopeRefusals(v1('blocked', 'x')), []);
   assert.deepEqual(envelopeRefusals(v1('done', null, 'y'.repeat(10_000))), []);
-  assert.deepEqual(envelopeRefusals(read({ outcome: 'done', summary: 's', artifacts: [], needs: 'x' })), [], 'a v0 closeout is never refused');
+  assert.deepEqual(
+    envelopeRefusals(read({ outcome: 'done', summary: 's', artifacts: [], needs: 'x' })),
+    [],
+    'a v0 closeout is never refused',
+  );
 });
 
 test('the v1 envelope a harness is handed is strict all the way down', () => {

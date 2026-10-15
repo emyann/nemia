@@ -97,6 +97,11 @@ test('a step done carries its duration; the last one open is running, or waits w
   assert.deepEqual(open('needs-human'), ['pending', 'waits']);
 });
 
+test("the words the person's text is framed in are the approved sentence, to the letter", () => {
+  assert.equal(framedForHer('Merge it.'), 'The person writes from the board: Merge it.');
+  assert.equal(framedForHer(''), 'The person writes from the board: ');
+});
+
 test("the keeper's words are a marker after the event they followed; a said a mark claims is the person's message with their text", () => {
   const framed = framedForHer('Merge it.');
   const said = [

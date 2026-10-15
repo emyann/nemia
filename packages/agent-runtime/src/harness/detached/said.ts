@@ -96,7 +96,8 @@ export const keepSaid = (file: string, key: SaidKey, read: HarnessOutput): void 
   }
 };
 
-const saidOf = (reader: NonNullable<HarnessSpec['readOutput']>, text: string): Said => {
+/** What `reader` says of `text`: what it read, or why it refused it, in its words. */
+export const saidOf = (reader: NonNullable<HarnessSpec['readOutput']>, text: string): Said => {
   try {
     return { read: reader(text) };
   } catch (e) {
@@ -105,34 +106,40 @@ const saidOf = (reader: NonNullable<HarnessSpec['readOutput']>, text: string): S
 };
 
 /**
- * Rewrites the capture `file`, known by `key`, to what `keep` keeps of its `text`, which `reader` reads as `read` (read here when
- * not given), and answers its key now; or answers nothing and leaves it whole: when `keep` throws or keeps all of it, when the
- * reader refused the whole text or reads the kept text otherwise, when the file has changed since `key`, or when the write fails. Written beside it under this process's name, given the file's own
- * access and modification times, then renamed over it, so a reader finds the whole capture or the kept one, never a part.
+ * What `keep` keeps of a capture's `text`, which `reader` reads as `read` (read here when not given): `{ kept, read }`, all of it
+ * for a capture already kept, and what both read; or why it is left whole (`why`): the reader refuses the whole text, `keep` throws, or the reader reads the
+ * kept text otherwise.
  */
-export const keepCapture = (
+export const keptText = (
   reader: NonNullable<HarnessSpec['readOutput']>,
   keep: (output: string) => string,
-  file: string,
-  key: SaidKey,
   text: string,
   read?: HarnessOutput,
-): SaidKey | undefined => {
+): { kept: string; read: HarnessOutput } | { why: string } => {
   const whole = read ? { read } : saidOf(reader, text);
-  if ('wrong' in whole) return undefined;
+  if ('wrong' in whole) return { why: `its reader refuses it: ${whole.wrong}` };
   let kept: string;
   try {
     kept = keep(text);
-  } catch {
-    return undefined;
+  } catch (e) {
+    return { why: `what it keeps could not be told: ${e instanceof Error ? e.message : String(e)}` };
   }
-  if (kept === text || !isDeepStrictEqual(saidOf(reader, kept), whole)) return undefined;
+  if (kept !== text && !isDeepStrictEqual(saidOf(reader, kept), whole)) return { why: 'its reader reads it otherwise once kept' };
+  return { kept, read: whole.read };
+};
+
+/**
+ * Writes `kept` over the capture `file`, known by `key`, and answers its key now; or answers nothing and leaves it whole, when the
+ * file has changed since `key` or the write fails. Written beside it under this process's name, given the file's own access and
+ * modification times, then renamed over it, so a reader finds the whole capture or the kept one, never a part.
+ */
+export const replaceCapture = (file: string, key: SaidKey, kept: string): SaidKey | undefined => {
   const own = `${file}.${process.pid}.tmp`;
   try {
-    const { size, mtimeMs, atime, mtime } = fs.statSync(file);
+    const { size, mtimeMs, atimeMs } = fs.statSync(file);
     if (size !== key.size || mtimeMs !== key.mtimeMs) return undefined;
     fs.writeFileSync(own, kept);
-    fs.utimesSync(own, atime, mtime);
+    fs.utimesSync(own, atimeMs / 1000, mtimeMs / 1000);
     fs.renameSync(own, file);
     const now = fs.statSync(file);
     return { size: now.size, mtimeMs: now.mtimeMs };
@@ -144,8 +151,23 @@ export const keepCapture = (
   }
 };
 
+/**
+ * Rewrites the capture `file`, known by `key`, to what `keep` keeps of its `text` (`keptText`, `replaceCapture`), and answers its key
+ * now; or answers nothing and leaves it whole, where either says so, or `keep` keeps all of it.
+ */
+const keepCapture = (
+  reader: NonNullable<HarnessSpec['readOutput']>,
+  keep: (output: string) => string,
+  file: string,
+  capture: { key: SaidKey; text: string },
+  read?: HarnessOutput,
+): SaidKey | undefined => {
+  const told = keptText(reader, keep, capture.text, read);
+  return 'kept' in told && told.kept !== capture.text ? replaceCapture(file, capture.key, told.kept) : undefined;
+};
+
 /** A capture `file`'s key and text, or nothing when it cannot be read. */
-const captureAt = (file: string): { key: SaidKey; text: string } | undefined => {
+export const captureAt = (file: string): { key: SaidKey; text: string } | undefined => {
   try {
     const { size, mtimeMs } = fs.statSync(file);
     return { key: { size, mtimeMs }, text: readText(file) };
@@ -185,9 +207,9 @@ const saidAt = (
   if (!when.over || !('read' in said)) return { said, key };
   let now = key;
   if (when.ended && when.keep) {
-    now = keepCapture(reader, when.keep, files.log, key, text, said.read) ?? key;
+    now = keepCapture(reader, when.keep, files.log, { key, text }, said.read) ?? key;
     const stdout = files.stdout === undefined ? undefined : captureAt(files.stdout);
-    if (files.stdout && stdout) keepCapture(reader, when.keep, files.stdout, stdout.key, stdout.text);
+    if (files.stdout && stdout) keepCapture(reader, when.keep, files.stdout, stdout);
   }
   keepSaid(files.kept, now, said.read);
   return { said, key: now };

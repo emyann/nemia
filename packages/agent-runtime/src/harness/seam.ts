@@ -271,6 +271,25 @@ export type RunnerOps = {
    * nothing and reads no file's content. A session it keeps nothing of has no key, and a path is one that was there when asked.
    */
   readonly kept?: (sessions: readonly { name: string; nativeId?: string }[]) => Effect.Effect<Record<string, SessionKept>, RunnerError>;
+  /**
+   * Rewrite each capture this harness keeps of a session whose worker has ended to what its readers read, as a capture is once its
+   * session ends: optional, for a harness that keeps less of an ended capture (`HarnessSpec.keepOutput`). With `dry`, nothing is
+   * written and the answer says what would be. One capture at a time; a capture already kept is counted and left as it is.
+   */
+  readonly compact?: (options: { dry: boolean }) => Effect.Effect<SessionsCompacted, RunnerError>;
+};
+
+/**
+ * What a harness's `compact` did, or would do: `captures`, the capture files it found; `compacted`, those it rewrote; their bytes
+ * `before` and `after`, as their sizes say, a capture left counted alike in both; and `left`, each capture it did not rewrite that
+ * still holds more than its readers read, or could not be told, by file name, and why.
+ */
+export type SessionsCompacted = {
+  captures: number;
+  compacted: number;
+  before: number;
+  after: number;
+  left: { name: string; why: string }[];
 };
 
 /** What a harness removed of a session (`RunnerOps.forget`), or would remove, by path, and what it leaves, by name. */

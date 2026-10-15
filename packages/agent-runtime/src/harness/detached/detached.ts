@@ -33,6 +33,7 @@ import { instantNow } from '../../core/engine/now.ts';
 import type { Instant } from '../../core/clock.ts';
 import { quote } from '../../core/quote.ts';
 import { outputIn, type SaidMemo } from './said.ts';
+import { compactRuns } from './compact.ts';
 import { lookedFor } from './looked.ts';
 import { detachedStateOf, firstRunFile, leased, overNow, runFileIn, type Carried, type Run, type RunFile } from './run-file.ts';
 
@@ -599,10 +600,26 @@ const followOps = (spec: HarnessSpec, root: string, dir: string): Pick<RunnerOps
   };
 };
 
-/** The verbs of a detached runner over the files beside a run's: its streams (`outputOps`, `followOps`), `forget` and `kept`. */
+/** A detached runner's `compact`, for a spec that keeps less of an ended capture (`keepOutput`): its runs' captures (`compactRuns`). */
+const compactOps = (spec: HarnessSpec, dir: string): Pick<RunnerOps, 'compact'> =>
+  spec.keepOutput
+    ? {
+        compact: ({ dry }) =>
+          Effect.try({
+            try: () => compactRuns(spec, dir, { dry }),
+            catch: (cause) => new RunnerError({ verb: 'compact', message: `${spec.name}: ${String(cause)}` }),
+          }),
+      }
+    : {};
+
+/**
+ * The verbs of a detached runner over the files beside a run's: its streams (`outputOps`, `followOps`), `forget`, `kept` and
+ * `compact`.
+ */
 const runFileOps = (spec: HarnessSpec, root: string, dir: string) => ({
   ...outputOps(spec, dir),
   ...followOps(spec, root, dir),
+  ...compactOps(spec, dir),
   forget: forgetRunOf(spec, root),
   kept: keptRunOf(spec, root),
 });

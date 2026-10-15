@@ -254,6 +254,7 @@ export const isClaudeJob = (sessionId: string) => nameParts(sessionId) !== undef
  * - `forget` removes what either mode keeps under the session's name, since a name the engine gave does not say which mode
  *   ran it, and names the transcript once.
  * - `kept` names what either mode keeps under each session's name, joined the same way, a path named once.
+ * - `compact` rewrites the jobs' ended captures to what their readers read (`claudeStreamKept`); a background session keeps none.
  */
 export const claudeCodeOps = (options: ClaudeOptions = {}): RunnerOps => {
   const root = options.root ?? path.join(os.homedir(), '.agent-engine');
@@ -337,6 +338,8 @@ export const claudeCodeOps = (options: ClaudeOptions = {}): RunnerOps => {
           left: [...new Set([...jobs.left, ...sessions.left])],
         })),
       ),
+
+    compact: job.compact!,
 
     kept: (sessions) =>
       Effect.all([job.kept!(sessions), bg.kept!(sessions)]).pipe(

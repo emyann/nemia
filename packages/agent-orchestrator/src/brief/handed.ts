@@ -5,7 +5,7 @@
  */
 import { outputFields, type Workflow } from '../step/step.ts';
 import { dataBlock, fenced } from '../record/record.ts';
-import { declaredOutput, type Closeout } from '../closeout/closeout.ts';
+import { declaredOutput, type Closeout } from '../closeout/index.ts';
 
 /** A terminal step of a run another waited on: its step and how it signed off — or its name, and why that cannot be given. */
 export type ParentStep = { step: Workflow; said: Closeout } | { name: string; unreadable: string };
@@ -49,10 +49,10 @@ function concludedLines(parent: Extract<ParentCloseout, { steps: readonly Parent
  * `## From run <id>`: what a run this one waited on concluded, as data, on each of this run's roots.
  *
  * The first line of what it was asked, and for each of its terminal steps the closeout's `summary` and what its `output:` declares, as
- * `## From <step>` gives it. The summary travels here, and never between two steps of a run, because it is not an account nobody has
- * judged: the parent shipped, which means a person read that summary beside its diff and put the work on the base this run is cut from.
- * Between steps it would anchor a reviewer on the author's view of unjudged work; one run later it is the record of work already in the
- * workspace, as a merged pull request's description is to the next person who opens the code. It is still another run's words — fenced,
+ * `## From <step>` gives it. The summary travels here as an account a person has judged: the parent shipped, which means a person read
+ * that summary beside its diff and put the work on the base this run is cut from. Between steps of a run it is in the step's
+ * `closeout.json`, the author's view of unjudged work; one run later it is the record of work already in the workspace, as a merged pull
+ * request's description is to the next person who opens the code. It is still another run's words — fenced,
  * under a label saying whose — and the change it describes is on disk to weigh it against.
  *
  * A parent whose record or closeout cannot be read says so and why, rather than handing nothing silently: the run starts all the same.

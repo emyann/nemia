@@ -121,6 +121,8 @@ type MarkdownProps = {
   className?: string;
   /** The heading a text's `#` is drawn as: 3 by default, under the page's own; deeper in a panel whose own heading is an h4. */
   level?: Level;
+  /** Marks a text by what it is on its page (`data-body`, a closeout's body), on the element that holds it. */
+  'data-body'?: boolean;
 };
 
 /**
@@ -132,10 +134,14 @@ type MarkdownProps = {
  * line break joins its lines into one paragraph: nothing here keeps a source's breaks. A text's footnote ids have a prefix of its own, so
  * two closeouts with a `[^1]` on one page each link to their own.
  */
-function MarkdownText({ children, className, level = 3 }: MarkdownProps): ReactNode {
+function MarkdownText({ children, className, level = 3, 'data-body': body }: MarkdownProps): ReactNode {
   const prefix = `md${useId().replace(/[^\w-]/g, '')}-`;
   return (
-    <div data-markdown className={cn('min-w-0 break-words [&>*:first-child]:mt-0 [&>*:last-child]:mb-0', className)}>
+    <div
+      data-markdown
+      data-body={body || undefined}
+      className={cn('min-w-0 break-words [&>*:first-child]:mt-0 [&>*:last-child]:mb-0', className)}
+    >
       <ReactMarkdown
         remarkPlugins={PLUGINS}
         remarkRehypeOptions={{ clobberPrefix: prefix }}
@@ -151,6 +157,10 @@ function MarkdownText({ children, className, level = 3 }: MarkdownProps): ReactN
 /** Parsed once per text: a conversation redraws as it grows, and its earlier turns do not change. */
 export const Markdown = memo(
   MarkdownText,
-  (before, after) => before.children === after.children && before.className === after.className && before.level === after.level,
+  (before, after) =>
+    before.children === after.children &&
+    before.className === after.className &&
+    before.level === after.level &&
+    before['data-body'] === after['data-body'],
 );
 Markdown.displayName = 'Markdown';

@@ -78,13 +78,19 @@ export const AskedQuestionsSchema = Schema.Struct({
 /**
  * Mirrors `StepCloseout` in apps/api/src/detail/tries.ts: with what it gave of its declared output, what it did not, and its `replies`;
  * each declared field's JSON Schema off the workflow the run froze; the `questions` of each question field that decoded, in the schema's
- * order; and the statement as the engine recorded it (`raw`).
+ * order; and the statement as the engine recorded it (`raw`). `summary` is one line, `body` the markdown beneath it, `values` what it
+ * handed on beside its files, each with its `link` where the api found it an http(s) address, and `refused` what the run did not accept of
+ * it; `apiVersion` is null for a closeout given before the envelope was versioned.
  */
 export type StepCloseout = {
+  apiVersion: string | null;
   outcome: 'done' | 'blocked';
   summary: string;
+  body: string | null;
   needs: string | null;
   artifacts: StepArtifact[];
+  values: StepValue[];
+  refused: string[];
   output: Record<string, unknown>;
   missing: string[];
   replies: StepReply[] | null;
@@ -93,15 +99,29 @@ export type StepCloseout = {
   raw: unknown;
 };
 
+/** Mirrors `StepValue` in apps/api/src/steps/artifacts.ts: a value a closeout handed on, by its name, and its link or null. */
+export type StepValue = { name: string; value: string; link: string | null };
+
+/** Decodes a `StepValue`. */
+export const StepValueSchema = Schema.Struct({
+  name: Schema.String,
+  value: Schema.String,
+  link: Schema.NullOr(Schema.String),
+}) satisfies Schema.Schema<StepValue>;
+
 /** A JSON object whose values the board reads as they came: a closeout's output, or the JSON Schema of each of its fields. */
 const ObjectSchema = Schema.Record(Schema.String, Schema.Unknown);
 
 /** Decodes a `StepCloseout`: its output, its fields' schemas and the statement itself (`raw`) are read as they came. */
 export const StepCloseoutSchema = Schema.Struct({
+  apiVersion: Schema.NullOr(Schema.String),
   outcome: Schema.Literals(['done', 'blocked']),
   summary: Schema.String,
+  body: Schema.NullOr(Schema.String),
   needs: Schema.NullOr(Schema.String),
   artifacts: Schema.mutable(Schema.Array(StepArtifactSchema)),
+  values: Schema.mutable(Schema.Array(StepValueSchema)),
+  refused: StringsSchema,
   output: ObjectSchema,
   missing: StringsSchema,
   replies: Schema.NullOr(Schema.mutable(Schema.Array(StepReplySchema))),

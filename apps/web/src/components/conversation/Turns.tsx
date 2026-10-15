@@ -12,6 +12,8 @@ import { timeOfDay } from '@/lib/timeOfDay';
 import {
   closeoutOf,
   CLOSEOUT_TOOL,
+  bodyLeadsWith,
+  summaryShown,
   detailOf,
   type CloseoutTurn,
   type ThinkingTurn,
@@ -184,7 +186,10 @@ export function ToolRun({
   );
 }
 
-/** The step's closeout, named: its outcome, summary, what it needs and what it left — or, in any other shape, the statement as given. */
+/**
+ * The step's closeout, named: its outcome, summary and body, what it needs, the files it left and the values it handed on — or, in any
+ * other shape, the statement as given.
+ */
 function Closeout({ turn }: { turn: CloseoutTurn }) {
   const closeout = closeoutOf(turn.call);
   const refused = turn.call.result?.isError ? turn.call.result.text : null;
@@ -212,7 +217,8 @@ function Closeout({ turn }: { turn: CloseoutTurn }) {
       </header>
       {closeout ? (
         <>
-          <Markdown>{closeout.summary}</Markdown>
+          {!bodyLeadsWith(closeout.summary, closeout.body) && <p data-summary>{summaryShown(closeout.summary)}</p>}
+          {closeout.body && <Markdown>{closeout.body}</Markdown>}
           {closeout.needs && (
             <div data-needs className="text-yours">
               <p className="font-medium">Needs:</p>
@@ -224,6 +230,11 @@ function Closeout({ turn }: { turn: CloseoutTurn }) {
               Artifacts: <span className="font-mono">{closeout.artifacts.join(', ')}</span>
             </p>
           )}
+          {closeout.values.map((v) => (
+            <p key={v.name} className="text-body-small text-muted-foreground">
+              {v.name}: <span className="font-mono">{v.value}</span>
+            </p>
+          ))}
         </>
       ) : (
         <CodeBlock code={JSON.stringify(turn.call.input ?? null, null, 2)} language="json" />

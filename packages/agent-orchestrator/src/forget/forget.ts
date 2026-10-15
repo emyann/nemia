@@ -5,7 +5,7 @@
  */
 import type { Workflow } from '../step/step.ts';
 import { andList, type CloseoutAsked, type Run, type TaskPhase } from '../record/record.ts';
-import type { Closeout } from '../closeout/closeout.ts';
+import type { Closeout } from '../closeout/index.ts';
 import type { Verdict } from '../check/check.ts';
 import { modeWord, spentAsks, type Retry, type RetryAsk } from '../retry/index.ts';
 import {

@@ -52,6 +52,8 @@ function fresh(): { repos: string[]; loop: string; notes: string } {
   fs.rmSync(path.join(ROOT, 'factories'), { recursive: true, force: true });
   const team = teamCopy();
   const loop = path.join(team, 'loop');
+  const reviewer = path.join(team, 'agents', 'reviewer.md');
+  fs.writeFileSync(reviewer, fs.readFileSync(reviewer, 'utf8').replace('output: review.schema.json\n', ''));
   fs.mkdirSync(loop);
   fs.writeFileSync(path.join(loop, 'implement.md'), '---\nplace: git\n---\nBuild what was asked.\n');
   fs.writeFileSync(

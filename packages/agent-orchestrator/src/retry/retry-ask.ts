@@ -147,11 +147,11 @@ export const signoffsSpent = (record: StepRecord | undefined): number => {
 
 /**
  * Whether the run nudges an `unsigned` step itself, once a round (`signoffsSpent`): its session ended without the closeout it was asked
- * for (`asked`, the engine's word), or its closeout named a file the run did not have (`lackedOf`). Not a closeout short of a declared
- * field alone, which a reminder would not mend.
+ * for (`asked`, the engine's word), its closeout named a file the run did not have (`lackedOf`), or its envelope was `refused`
+ * (`envelopeRefusals`). Not a closeout short of a declared field alone, which a reminder would not mend.
  */
-export const signoffDue = (record: StepRecord, asked: CloseoutAsked): boolean =>
-  (asked === 'unsigned' || lackedOf(record).length > 0) && signoffsSpent(record) < 1;
+export const signoffDue = (record: StepRecord, asked: CloseoutAsked, refused = false): boolean =>
+  (asked === 'unsigned' || lackedOf(record).length > 0 || refused) && signoffsSpent(record) < 1;
 
 /** How a try was asked for, as a person typed it: `--nudge`, `--fresh`, `--model <m>`, `--recheck`. */
 export const modeWord = (how: { mode: RetryMode; model?: string }): string => (how.model ? `--model ${how.model}` : `--${how.mode}`);

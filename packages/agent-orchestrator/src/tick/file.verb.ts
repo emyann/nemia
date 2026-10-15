@@ -54,7 +54,7 @@ import type { BranchReader } from '../branches/branches.store.ts';
 import { roundBriefed, roundFiled, roundFiledNote } from '../round/round.ts';
 import { closeoutsAfterMerge } from '../merge/merge.verb.ts';
 import { filedConfig, tryModel } from '../filed/filed.ts';
-import { closeoutSchemaOf, parseCloseout, type Closeout } from '../closeout/closeout.ts';
+import { closeoutSchemaOf, envelopeRefusals, parseCloseout, type Closeout } from '../closeout/index.ts';
 import { modeWord, nextTry, sessionModel, tryWord, type Retry, type RetryAsk } from '../retry/index.ts';
 import { artifactsDir, inputsDir } from '../record/record.store.ts';
 import { checkCloseout, writeCheckCloseout } from '../check/check.store.ts';
@@ -291,6 +291,12 @@ const endingSaid = (f: Filing, ending: Workflow): EndingStopped => {
   };
 };
 
+/** What the run refused of the last try's closeout's envelope (`envelopeRefusals`), as its next try is told it; nothing for none. */
+const refusedTold = (said: Closeout | undefined): Pick<RetryBriefing, 'refused'> => {
+  const refused = said ? envelopeRefusals(said) : [];
+  return refused.length ? { refused } : {};
+};
+
 /**
  * What a local try's brief is told of its try (`RetryBriefing`): how it came and on whose word, the session it continues and what was said
  * to it, how the try before it ended, what its check refused, what was denied it, and the ending it was sent back from.
@@ -314,6 +320,7 @@ const tryTold = (
   ...(t.refusal ? { refusal: t.refusal } : {}),
   ...(t.status === 'denied' ? { denied: f.reads.spendOf(record.taskId!)?.denied ?? [] } : {}),
   ...(t.status === 'unsigned' ? lacksTold(f.run, r.step, record) : {}),
+  ...(t.status === 'unsigned' ? refusedTold(f.reads.signedOff(r.step)) : {}),
   ...(r.back?.length ? { ending: endingSaid(f, stepNamed(f, r.back[0])) } : {}),
 });
 

@@ -40,3 +40,4 @@ export { ALLOW_EXAMPLE, allowRuleOf, DISALLOW_EXAMPLE, disallowedBy, rulesOf, TO
 export type { DeniedAt } from './tools.ts';
 export { FILED_AS, filedRefusal, lineOf } from './filed-as.ts';
 export type { FiledFlags, FiledStep } from './filed-as.ts';
+export { mergedOutput } from './merged-output.ts';

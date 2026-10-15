@@ -6,7 +6,7 @@
  * asks for it with `"x-shape": "questions"`, which the loader expands (`expandShapes`) before it checks the schema is strict, so the
  * harness is handed standard JSON Schema only.
  */
-import type { Closeout } from '../closeout/closeout.ts';
+import type { Closeout } from '../closeout/index.ts';
 import { isObject, type Workflow } from '../step/step.ts';
 
 /** One option of a question: its label, which an answer names, and what choosing it means. */

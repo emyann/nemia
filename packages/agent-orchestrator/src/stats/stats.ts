@@ -14,7 +14,7 @@
 import path from 'node:path';
 import { Invalid } from '../refusal/refusal.ts';
 import { isRepositoryRun, tryOf, type Run } from '../record/record.ts';
-import type { Closeout } from '../closeout/closeout.ts';
+import type { Closeout } from '../closeout/index.ts';
 import type { Workflow } from '../step/step.ts';
 import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import { askedAgain, landsOnCheck } from '../status/status.ts';

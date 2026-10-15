@@ -54,11 +54,11 @@ function folder(): string {
   return dir;
 }
 
-/** A run of `folder` started on a repository of the test place, its first pass made: `implement` is filed. */
-async function started(): Promise<{ id: string; files: string; task: string }> {
+/** A run of `dir` started on a repository of the test place, its first pass made: `implement` is filed. */
+async function started(dir = folder()): Promise<{ id: string; files: string; task: string }> {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   stand().world.repository(repo, { 'a.txt': 'one\n' });
-  const run = await runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: folder() }));
+  const run = await runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: dir }));
   assert.deepEqual((await advanced(run.id)).filed, ['implement']);
   return { id: run.id, files: artifactsDir(run, 'implement'), task: `${run.id}-implement` };
 }
@@ -187,7 +187,7 @@ test('a task an earlier pass read settled is not read back into a refusal: its s
   }
 });
 
-test('the step after is told the named files that are there by absolute path, and never the name of one that is gone', async () => {
+test('a folder with no closeout.json, as one handed before it was written: the step after is told the named files that are there by absolute path, and never the name of one that is gone', async () => {
   const { id, files, task } = await started();
   const kept = path.join(files, 'kept-dark.png');
   const removed = path.join(files, 'removed-dark.png');
@@ -195,6 +195,7 @@ test('the step after is told the named files that are there by absolute path, an
   engine().settle(task, 'succeeded', signed(kept, removed));
   assert.deepEqual((await advanced(id)).checked, ['implement']);
 
+  fs.rmSync(path.join(files, 'closeout.json'));
   fs.rmSync(removed);
   engine().settle(`${task}-check`, 'succeeded', { exitCode: 0 });
   assert.deepEqual((await advanced(id)).filed, ['review']);
@@ -303,6 +304,141 @@ test("a picture the session's browser writes where its filed env says is the run
   assert.deepEqual(pass.tried, [], 'the closeout is not refused');
   assert.deepEqual(pass.checked, ['implement'], 'its check is filed');
   assert.deepEqual(lackedOf(readRun(id).steps.implement) ?? [], []);
-  assert.deepEqual(fs.readdirSync(files), ['page-1.png'], 'kept where it was written, copied onto nothing');
+  assert.deepEqual(fs.readdirSync(files).sort(), ['closeout.json', 'page-1.png'], 'kept where it was written, beside the closeout');
   assert.equal(fs.readFileSync(picture, 'utf8'), 'png');
+});
+
+/** A flat v1 closeout, as a harness writes one: `outcome`, `summary`, `needs` and `artifacts` as given. */
+const signedV1 = (outcome: string, summary: string, needs: string | null, artifacts: unknown[] = []) => ({
+  closeout: { apiVersion: 'nemia/v1', outcome, summary, body: null, artifacts, needs },
+});
+
+test('REFUSED once a round: `needs` on a done v1 closeout is unsigned before any check, nudged naming the refusal, then waits on a person', async (t) => {
+  const { id, task } = await started();
+  engine().settle(task, 'succeeded', signedV1('done', 'Did it.', 'a person should look'));
+  const pass = await advanced(id);
+  assert.deepEqual([pass.checked, pass.tried], [[], ['implement']], 'no check, and the run nudges the step');
+  assert.equal(readRun(id).steps.implement.tries?.at(-1)?.then, 'signoff');
+  assert.equal(readRun(id).steps.review?.taskId ?? null, null, 'nothing that waits on it is filed');
+  const brief = briefOf(`${task}-try2`);
+  assert.ok(brief.includes('`needs` is set on a `done` closeout'), brief);
+
+  engine().settle(`${task}-try2`, 'succeeded', signedV1('done', 'Did it.', 'still'));
+  const again = await advanced(id);
+  assert.deepEqual([again.tried, again.checked, again.filed], [[], [], []], 'no second nudge in the round');
+  const screen = await typed(t, 'decide', id);
+  assert.match(screen, /UNSIGNED: implement/);
+  assert.ok(screen.includes('!! not accepted: `needs` is set on a `done` closeout'), screen);
+});
+
+test('a v1 closeout with a 300-character summary, or one on two lines, is accepted: its check is filed and no try', async () => {
+  for (const [outcome, summary, needs] of [
+    ['done', 'word '.repeat(60), null],
+    ['done', 'Line one.\nLine two.', ''],
+  ] as const) {
+    const { id, task } = await started();
+    engine().settle(task, 'succeeded', signedV1(outcome, summary, needs));
+    const pass = await advanced(id);
+    assert.deepEqual([pass.checked, pass.tried], [['implement'], []], summary);
+  }
+});
+
+test("a step's closeout is written as closeout.json in its files directory on its hand-off, and the step after is sent there, not listed its files", async () => {
+  const { id, files, task } = await started();
+  const workspace = readRun(id).steps.implement.workspace!;
+  fs.writeFileSync(path.join(workspace, 'report.md'), 'left in the workspace');
+  const summary = `${'word '.repeat(30)}and more`;
+  engine().settle(task, 'succeeded', {
+    closeout: {
+      apiVersion: 'nemia/v1',
+      outcome: 'done',
+      summary,
+      body: 'The rest.',
+      artifacts: [{ path: 'report.md' }, { path: 'gone.md' }, { name: 'PR', value: 'https://example.com/pr/1' }],
+      needs: null,
+    },
+  });
+  await advanced(id);
+  const handed = JSON.parse(fs.readFileSync(path.join(files, 'closeout.json'), 'utf8')) as Record<string, unknown>;
+  assert.equal(handed.apiVersion, 'nemia/v1');
+  assert.ok(String(handed.summary).endsWith('…') && String(handed.summary).length <= 120);
+  assert.equal(handed.body, `${summary}\n\nThe rest.`);
+  assert.deepEqual(handed.artifacts, [{ path: path.join(files, 'report.md') }, { name: 'PR', value: 'https://example.com/pr/1' }]);
+  assert.deepEqual([handed.outcome, handed.needs, handed.output], ['done', null, {}]);
+});
+
+test('the closeout.json a step hands on holds the fields its `output:` declares and its `replies`, and nothing it did not declare', async () => {
+  const dir = fs.mkdtempSync(path.join(ROOT, 'wf-declared-'));
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\ncheck: npm test\noutput: implement.schema.json\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\nplace: git\n---\nreview it\n');
+  fs.writeFileSync(
+    path.join(dir, 'implement.schema.json'),
+    JSON.stringify({
+      type: 'object',
+      properties: { mutants: { type: 'array', items: { type: 'string' } }, noMutants: { type: 'string' } },
+      required: ['mutants', 'noMutants'],
+      additionalProperties: false,
+    }),
+  );
+  const { id, files, task } = await started(dir);
+  const mutants = ['keys/merged-output.ts: `if (first)` → `if (first && false)`'];
+  const replies = [{ finding: 'the body says its summary twice', answer: 'fixed', why: 'bodyLeadsWith' }];
+  engine().settle(task, 'succeeded', {
+    closeout: {
+      apiVersion: 'nemia/v1',
+      outcome: 'done',
+      summary: 'Did the work.',
+      artifacts: [],
+      needs: null,
+      mutants,
+      noMutants: null,
+      replies,
+      aside: 'a field the step declares nowhere',
+    },
+  });
+  await advanced(id);
+  const handed = JSON.parse(fs.readFileSync(path.join(files, 'closeout.json'), 'utf8')) as Record<string, unknown>;
+  assert.deepEqual(
+    handed.output,
+    { mutants, noMutants: null, replies },
+    'the step after reads what implement declared, and the replies it gave, out of the file',
+  );
+  assert.deepEqual(
+    Object.keys(handed.output as object).sort(),
+    ['mutants', 'noMutants', 'replies'],
+    'and `aside`, declared nowhere, is not handed on',
+  );
+});
+
+test('a second try rewrites closeout.json with its own closeout, a v0 one converted, and the brief after names the file once', async (t) => {
+  const { id, files, task } = await started();
+  engine().settle(task, 'succeeded', signed());
+  assert.deepEqual((await advanced(id)).checked, ['implement']);
+  engine().settle(`${task}-check`, 'failed', { exitCode: 1 });
+  await typed(t, 'retry', id, 'implement');
+  await advanced(id);
+  engine().settle(`${task}-try2`, 'succeeded', {
+    closeout: { outcome: 'done', summary: 'Second try.\nIn detail.', artifacts: [], needs: null },
+  });
+  await advanced(id);
+  const handed = JSON.parse(fs.readFileSync(path.join(files, 'closeout.json'), 'utf8')) as Record<string, unknown>;
+  assert.deepEqual([handed.apiVersion, handed.summary, handed.body], ['nemia/v1', 'Second try.', 'Second try.\nIn detail.']);
+
+  engine().settle(`${task}-try2-check`, 'succeeded', { exitCode: 0 });
+  assert.deepEqual((await advanced(id)).filed, ['review']);
+  const brief = briefOf(`${id}-review`);
+  assert.equal(brief.split('holds `closeout.json`').length, 2, `said once\n${brief}`);
+  assert.ok(!brief.includes('The files implement named'), brief);
+});
+
+test("REFUSED: a closeout naming closeout.json, at the workspace root or the files directory, the run's own name, is unsigned and asked again", async () => {
+  for (const named of ['closeout.json', 'files']) {
+    const { id, files, task } = await started();
+    const file = named === 'files' ? path.join(files, 'closeout.json') : 'closeout.json';
+    fs.writeFileSync(path.join(readRun(id).steps.implement.workspace!, 'closeout.json'), '{}');
+    engine().settle(task, 'succeeded', signed(file));
+    const pass = await advanced(id);
+    assert.deepEqual([pass.checked, pass.tried], [[], ['implement']], named);
+    assert.ok(briefOf(`${task}-try2`).includes("is the run's own name for the closeout it writes"), named);
+  }
 });

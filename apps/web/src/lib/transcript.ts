@@ -360,16 +360,88 @@ export function detailOf(call: ToolCall): string | null {
   return null;
 }
 
-/** A closeout in the shape every step's is asked for, or null for a statement in any other. */
-export type Closeout = { outcome: string; summary: string; needs: string | null; artifacts: string[] };
+/** The longest summary a reader shows, an ellipsis included: the api's rule, said again here since the board imports no package. */
+export const SUMMARY_MAX = 120;
+
+/**
+ * A summary's one line as the board draws it, as text: a markdown heading's marks dropped, since a closeout given before v1 opens its
+ * summary with its body's first line, often a heading, which its body draws as one beneath it.
+ */
+export const summaryShown = (summary: string): string => summary.replace(/^#{1,6}\s+/, '');
+
+/**
+ * Whether `body` opens with `summary`: its first non-empty line, a heading's marks dropped, begins with the summary as drawn, a cut one
+ * up to its ellipsis. A reader that draws the body whole then draws no summary line above it, which would say the line twice.
+ */
+export function bodyLeadsWith(summary: string, body: string | null): boolean {
+  if (!body) return false;
+  const first = summaryShown(
+    body
+      .split('\n')
+      .map((line) => line.trim())
+      .find(Boolean) ?? '',
+  );
+  const shown = summaryShown(summary.trim());
+  const lead = shown.endsWith('…') ? shown.slice(0, -1).trimEnd() : shown;
+  return lead !== '' && first.startsWith(lead);
+}
+
+/**
+ * A summary as every reader shows it: its first non-empty line, trimmed, and when that is longer than `SUMMARY_MAX` it is cut at the
+ * last space that leaves room for an ellipsis, or hard where it has none, and ends `…`.
+ */
+export function summaryLine(text: string): string {
+  const line =
+    text
+      .split('\n')
+      .map((l) => l.trim())
+      .find(Boolean) ?? '';
+  if (line.length <= SUMMARY_MAX) return line;
+  const room = line.slice(0, SUMMARY_MAX - 1);
+  const space = room.lastIndexOf(' ');
+  return `${(space > 0 ? room.slice(0, space) : room).trimEnd()}…`;
+}
+
+/**
+ * A closeout in the shape every step's is asked for, either version, or null for a statement in any other: its summary one line
+ * (`summaryLine`), its body the markdown beneath, led by the whole summary where the cut changed it; its files by path and its values by
+ * name. One given before the envelope was versioned has no body of its own.
+ */
+export type Closeout = {
+  outcome: string;
+  summary: string;
+  body: string | null;
+  needs: string | null;
+  artifacts: string[];
+  values: Array<{ name: string; value: string }>;
+};
 
 export function closeoutOf(call: ToolCall): Closeout | null {
   const input = inputOf(call);
   if (typeof input.outcome !== 'string' || typeof input.summary !== 'string') return null;
+  const summary = summaryLine(input.summary);
+  const lead = input.summary.trim() !== summary ? input.summary.trim() : '';
+  const given = input.apiVersion !== undefined && typeof input.body === 'string' ? input.body.trim() : '';
+  const list: unknown[] = Array.isArray(input.artifacts) ? input.artifacts : [];
+  const files = list.flatMap((a) => (typeof a === 'string' ? [a] : isPath(a) ? [a.path] : []));
   return {
     outcome: input.outcome,
-    summary: input.summary,
+    summary,
+    body: [lead, given].filter(Boolean).join('\n\n') || null,
     needs: typeof input.needs === 'string' && input.needs ? input.needs : null,
-    artifacts: Array.isArray(input.artifacts) ? input.artifacts.filter((a): a is string => typeof a === 'string') : [],
+    artifacts: files,
+    values: list.filter(isValue).map((a) => ({ name: a.name, value: a.value })),
   };
 }
+
+/** Whether an artifact is a file by its path, `{path}`. */
+const isPath = (a: unknown): a is { path: string } =>
+  typeof a === 'object' && a !== null && typeof (a as { path?: unknown }).path === 'string';
+
+/** Whether an artifact is a value by its name, `{name, value}`, and no file. */
+const isValue = (a: unknown): a is { name: string; value: string } =>
+  !isPath(a) &&
+  typeof a === 'object' &&
+  a !== null &&
+  typeof (a as { name?: unknown }).name === 'string' &&
+  typeof (a as { value?: unknown }).value === 'string';

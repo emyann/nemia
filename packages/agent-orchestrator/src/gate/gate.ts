@@ -4,7 +4,7 @@
  */
 import type { Verdict } from '../check/check.ts';
 import type { Workflow } from '../step/step.ts';
-import type { Closeout } from '../closeout/closeout.ts';
+import type { Closeout } from '../closeout/index.ts';
 import { andList, tryOf, type CloseoutAsked, type Run, type StepStatus, type TaskPhase } from '../record/record.ts';
 import { heard, modeWord, retryable, type RetryAsk } from '../retry/index.ts';
 import {

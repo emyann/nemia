@@ -59,6 +59,7 @@ import {
 } from '../former/former.ts';
 import type { Agent, Agents, SkillsFound } from '../agents/agents.ts';
 import { tallyOf } from '../tally/tally.ts';
+import { mergedOutput } from '../keys/index.ts';
 import { addedSkillsRefusal, fenceRefusal, refuseUnwritable } from './fence.ts';
 
 /** A factory's `rules` as a step on `harness` is told them, trimmed: none for blank rules, and none on a remote agent. */
@@ -87,7 +88,9 @@ const wordsAbove = (agent: Agent, factoryRules: string | undefined) => ({
  * told is the agent's instructions, then a person's custom instructions for it (`Agent.customInstructions`), then the step's own note,
  * each after a blank line — the agent's alone when the step has none. Custom instructions are words and set no key. The step's own
  * lines are read against the harness it runs on, its agent's where it names none, before the two are merged: a step's `permissionMode:`
- * on codex is its own `sandbox:`. A schema the agent's `output:` names is read beside the agent, and one the step names beside the step.
+ * on codex is its own `sandbox:`. A schema the agent's `output:` names is read beside the agent, and one the step names beside the
+ * step; the step's output is both, merged (`mergedOutput`), each field with one owner, and a field both declare is refused naming it
+ * and both declarers.
  * Everything downstream of the parser sees the resolved step; `agent` on it says what was the step's own.
  *
  * `hired` is the agent a factory hires into a step (`Hire`): a step whose file names no agent is resolved with it exactly as if its file
@@ -139,8 +142,10 @@ export function parseWorkflow(
     throw new WorkflowError(
       `${name}: the body is empty, and so is ${AGENTS_FOLDER}/${agent.name}.md's — a step with nothing to say is not a step. Write what the agent is told in its file, or this step's own note below its frontmatter.`,
     );
-  const fromAgent = meta.output === undefined && agent.keys.output !== undefined;
-  const step = stepFrom(name, { ...inherited, ...meta }, body, fromAgent ? agent.read : read, spelled);
+  const output = mergedOutput(name, agent.name, outputOf(name, agent.keys.output, agent.read), outputOf(name, meta.output, read));
+  const resolved = { ...inherited, ...meta };
+  delete resolved.output;
+  const step = stepFrom(name, resolved, body, read, spelled, output);
   agentStepRefusal(name, agent, meta, step, skills);
   refuseUnwritable(step, agent.name);
   const added = step.skills?.filter((skill) => !agent.skills?.includes(skill));
@@ -293,8 +298,8 @@ function notAnAgent(step: string, name: string, there: readonly string[], hired:
 /**
  * A step from its keys as written and its body: each value read into the form the run uses, or refused in `name`'s words. `spelled` names a
  * key read under a former name (`FORMER_KEYS`) by that name, so a refusal quotes the line as the file has it. `resume: x` adds `x` to
- * `after`. Refused: `model: inherit`, what Claude Code's `/agents` wizard writes for the parent's model, since a step's session has no
- * parent.
+ * `after`. `merged` is the output `parseWorkflow` resolved from a step and its agent, read in place of `meta.output`. Refused:
+ * `model: inherit`, what Claude Code's `/agents` wizard writes for the parent's model, since a step's session has no parent.
  */
 export function stepFrom(
   name: string,
@@ -302,6 +307,7 @@ export function stepFrom(
   body: string,
   read: ((file: string) => string | undefined) | undefined,
   spelled: Spelled = {},
+  merged?: StepOutput,
 ): Workflow {
   const after = (meta.after ?? '')
     .split(',')
@@ -311,7 +317,7 @@ export function stepFrom(
   const harness = harnessOf(name, meta.harness);
   if (harness !== undefined && isRemoteHarness(harness)) remoteRefusal(name, meta, harness);
   const background = backgroundOf(name, meta.background);
-  const output = outputOf(name, meta.output, read);
+  const output = merged ?? outputOf(name, meta.output, read);
   if (meta.model?.trim() === 'inherit') {
     refuse(
       `${name}: \`model: inherit\` is Claude Code's word for a subagent that runs on the model of the conversation that called it, and a step's session is called by no conversation: it would be started as \`--model inherit\`. Delete the line for the harness's own default, or name a model: \`model: sonnet\`.`,

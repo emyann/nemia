@@ -8,7 +8,7 @@
  */
 export { durationWord } from './status/status.ts';
 /** Re-exported for apps/api, which reads them from the `agent-orchestrator/run` subpath; closeout.ts imports nothing from here. */
-export { declaredOutput, parseCloseout } from './closeout/closeout.ts';
+export { declaredOutput, envelopeRefusals, parseCloseout } from './closeout/index.ts';
 /**
  * Re-exported for apps/api, which reads a closeout's questions and writes a person's answers to them from the `agent-orchestrator/run`
  * subpath.
@@ -123,7 +123,7 @@ export {
 } from './wait/wait.ts';
 export type { ParentRun, Wait } from './wait/wait.ts';
 export type { Interrupt, Pause, Paused, PausedNow, PauseHeld, PauseStaged } from './pause/pause.ts';
-export { artifactLines, artifactPlace, artifactsContract, sizeOf } from './artifacts/artifacts.ts';
+export { artifactLines, artifactPlace, artifactsContract, HANDED_CLOSEOUT, sizeOf } from './artifacts/artifacts.ts';
 export type { ArtifactFile, ArtifactPlace, MissingArtifact } from './artifacts/artifacts.ts';
 export { heldRefusal, pruneAgain, prunedBytes, prunedKept, prunedRefusal, pruneLines, pruneRefusal, pruningBytes } from './prune/prune.ts';
 export type { PruneFacts, Pruning } from './prune/prune.ts';

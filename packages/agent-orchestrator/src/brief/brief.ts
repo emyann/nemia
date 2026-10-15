@@ -5,7 +5,7 @@
 import type { Workflow } from '../step/step.ts';
 import { fenced, isRepositoryRun, placeOf, type RepositoryRun, type Run } from '../record/record.ts';
 import type { FiledFolders } from '../filed/filed.ts';
-import { closeoutContract, isLoopTarget, type Closeout } from '../closeout/closeout.ts';
+import { closeoutContract, isLoopTarget, type Closeout } from '../closeout/index.ts';
 import { handedSection, type ParentCloseout } from './handed.ts';
 import { depsLines, givenPlan, workspacePlan, type Provisioned } from '../workspace/workspace.ts';
 import {

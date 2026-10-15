@@ -68,3 +68,11 @@ export async function edgesOf(page: Page, selector: string) {
     },
   };
 }
+
+/**
+ * The names of the `found` points painted over `ground`, each name cut at its first `:`, without repetition and in one order: a name
+ * is kept when its colour is more than `apartBy` from `ground`. Sorted, so that which of two cuts a borderline pixel was first seen
+ * in does not decide what the caller compares, and the set of names is what is read.
+ */
+export const spilledOver = (found: Record<string, Rgb>, ground: Rgb, apartBy: number): string[] =>
+  [...new Set(Object.entries(found).flatMap(([where, colour]) => (apart(colour, ground) > apartBy ? [where.split(':')[0]] : [])))].sort();

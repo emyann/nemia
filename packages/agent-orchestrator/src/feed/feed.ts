@@ -27,7 +27,7 @@
 import { onYouWords, shownStatus, type Listing } from '../list/list.ts';
 import { oneLine, type Run } from '../record/record.ts';
 import type { Assessment } from '../tick/assess.ts';
-import type { Closeout } from '../closeout/closeout.ts';
+import type { Closeout } from '../closeout/index.ts';
 import { holdWord } from '../wait/wait.ts';
 import { SLOT_WAIT, slotWord } from '../cap/cap.ts';
 import { takeoverLine, type DaemonStanding } from '../daemon/daemon.ts';

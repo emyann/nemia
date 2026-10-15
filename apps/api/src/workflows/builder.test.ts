@@ -444,6 +444,40 @@ test("REFUSED at shipped defaults: a step's `own` that is not the listing's shap
   assert.deepEqual(snapshot(dir), before);
 });
 
+test("REFUSED at shipped defaults: a save whose step declares a field its agent's `output:` declares too is the package's 422, naming the field and both declarers — and nothing is written", async () => {
+  const fields = (...names: string[]) =>
+    JSON.stringify({
+      type: 'object',
+      properties: Object.fromEntries(names.map((n) => [n, { type: 'string' }])),
+      required: names,
+      additionalProperties: false,
+    });
+  write(path.join(STORE, 'agents', 'judger.md'), '---\noutput: judger.schema.json\n---\nYou judge.\n');
+  write(path.join(STORE, 'agents', 'judger.schema.json'), fields('findings'));
+  const dir = path.join(STORE, 'owned-twice');
+  write(path.join(dir, 'judge.md'), '---\nplace: git\nagent: judger\n---\n');
+  const before = snapshot(dir);
+  const res = await put('owned-twice', {
+    steps: [
+      {
+        name: 'judge',
+        spec: spec({ agent: 'judger', output: 'judge.schema.json' }),
+        body: '',
+        own: { keys: ['place', 'output'], body: '' },
+      },
+    ],
+    schemas: [{ file: 'judge.schema.json', text: fields('findings', 'mutants') }],
+  });
+  assert.equal(res.status, 422, await res.clone().text());
+  const refused = (await res.json()) as BuildRefused;
+  assert.equal(
+    refused.error,
+    'judge: `findings` is declared by agent judger (agents/judger.md, `output: judger.schema.json`) and by step judge ' +
+      '(judge.md, `output: judge.schema.json`): a field has one owner. Delete it from one of the two.',
+  );
+  assert.deepEqual(snapshot(dir), before);
+});
+
 test("versionOf covers the agents a folder's steps name: an edit of one changes it, and an agent no step names does not", () => {
   const dir = attached('versioned');
   const at = versionOf(dir);

@@ -9,6 +9,8 @@ import {
   foldTranscript,
   mergeEvents,
   sessionToRead,
+  summaryLine,
+  summaryShown,
   summaryOf,
   tailStart,
   type ToolCall,
@@ -131,7 +133,14 @@ test('the closeout is its own turn, named, with its result — never folded, and
     { text: 'Structured output provided successfully', isError: false },
     'paired by id, whatever came between',
   );
-  assert.deepEqual(closeoutOf(closeout.call), { outcome: 'done', summary: 'Shipped.', needs: null, artifacts: ['RESPONSE.md'] });
+  assert.deepEqual(closeoutOf(closeout.call), {
+    outcome: 'done',
+    summary: 'Shipped.',
+    body: null,
+    needs: null,
+    artifacts: ['RESPONSE.md'],
+    values: [],
+  });
   assert.equal(closeoutOf({ ...closeout.call, input: { verdict: 'yes' } }), null, 'a statement in another shape is not read as a closeout');
 });
 
@@ -264,4 +273,57 @@ test('a step has a conversation to read once a session of its current task has s
     { taskId: 'run-review-2', attempts: none },
   ];
   assert.equal(sessionToRead({ taskId: 'run-review-2', attempts: none, tries: fresh }), null);
+});
+
+/** The cases every copy of the cut answers alike: the orchestrator's `closeout/envelope.test.ts` asks the same. */
+const CUTS: Array<[string, string]> = [
+  ['a'.repeat(119), 'a'.repeat(119)],
+  ['a'.repeat(120), 'a'.repeat(120)],
+  [`${'word '.repeat(24)}x`, `${'word '.repeat(22)}word…`],
+  ['a'.repeat(200), `${'a'.repeat(119)}…`],
+  ['\n\n  First line.  \nSecond line.', 'First line.'],
+  ['', ''],
+];
+
+test("the transcript's cut of a summary answers the orchestrator's cases", () => {
+  for (const [given, shown] of CUTS) assert.equal(summaryLine(given), shown, JSON.stringify(given));
+});
+
+test("a summary's line is drawn without a heading's marks, and any other line as it is", () => {
+  assert.deepEqual(
+    ['## What I found', '# The plan', '###### Six', '#hashtag', 'Capped the runs, ## kept', 'C# is a language'].map(summaryShown),
+    ['What I found', 'The plan', 'Six', '#hashtag', 'Capped the runs, ## kept', 'C# is a language'],
+  );
+});
+
+test('closeoutOf reads a v0 and a v1 statement into one shape: one line, its body, files by path and values by name', () => {
+  const call = (input: Record<string, unknown>): ToolCall => ({ id: 'c', name: 'StructuredOutput', input, result: null }) as ToolCall;
+  assert.deepEqual(closeoutOf(call({ outcome: 'done', summary: 'First.\n\nMore.', artifacts: ['a.md'], needs: null })), {
+    outcome: 'done',
+    summary: 'First.',
+    body: 'First.\n\nMore.',
+    needs: null,
+    artifacts: ['a.md'],
+    values: [],
+  });
+  assert.deepEqual(
+    closeoutOf(
+      call({
+        apiVersion: 'nemia/v1',
+        outcome: 'done',
+        summary: 'First.',
+        body: 'The rest.',
+        artifacts: [{ path: 'a.md' }, { name: 'PR', value: 'https://x.test/1' }],
+        needs: null,
+      }),
+    ),
+    {
+      outcome: 'done',
+      summary: 'First.',
+      body: 'The rest.',
+      needs: null,
+      artifacts: ['a.md'],
+      values: [{ name: 'PR', value: 'https://x.test/1' }],
+    },
+  );
 });

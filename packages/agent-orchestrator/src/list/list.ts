@@ -16,7 +16,7 @@ import {
   type StepStatus,
   type TaskPhase,
 } from '../record/record.ts';
-import type { Closeout } from '../closeout/closeout.ts';
+import type { Closeout } from '../closeout/index.ts';
 import { verdictWord, type Verdict } from '../check/check.ts';
 import { answerOf, dueNote, modeWord, retriesDue, tryNote, HOLDS_THE_RUN, type RetryAsk } from '../retry/index.ts';
 import {

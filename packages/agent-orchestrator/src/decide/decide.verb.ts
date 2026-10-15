@@ -18,7 +18,7 @@ import { deniedWords, harnessWaitLine } from '../list/list.ts';
 import { choicesOf, costLine, decision, runCostLines, type DecideCommand, type Decision } from './decide.ts';
 import { assess } from '../tick/assess.ts';
 import { acceptedLines, gateLines } from '../brief/index.ts';
-import { parseCloseout, type Closeout } from '../closeout/closeout.ts';
+import { parseCloseout, type Closeout } from '../closeout/index.ts';
 import { answerLines, answerOf, overBudgetLine, retriesDue, retryOffers, type Retry, type RetryAsk } from '../retry/index.ts';
 import { timeline, type Timeline } from '../timeline/index.ts';
 import { runStore } from '../record/files.store.ts';

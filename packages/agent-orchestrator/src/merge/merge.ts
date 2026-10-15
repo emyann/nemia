@@ -18,7 +18,7 @@ import {
   type StepRecord,
   type StepStatus,
 } from '../record/record.ts';
-import { declaredOutput, type Closeout } from '../closeout/closeout.ts';
+import { declaredOutput, type Closeout } from '../closeout/index.ts';
 import { loopSpan } from '../workflow/index.ts';
 import {
   approvalOf,

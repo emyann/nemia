@@ -933,7 +933,7 @@ test('UNSIGNED at shipped defaults: a producer whose closeout lacks a declared f
       const { run, pass, e, tasks, filings } = await throughReview(reviewed(respondKeys), said);
       assert.deepEqual(
         (tasks.get(`${run.id}-review`)!.spec.closeoutSchema as { required: string[] }).required,
-        ['outcome', 'summary', 'artifacts', 'needs', 'findings'],
+        ['apiVersion', 'outcome', 'summary', 'body', 'artifacts', 'needs', 'findings'],
         'the run asked for it',
       );
       assert.deepEqual([pass.filed, pass.blocked, pass.status], [[], ['respond'], 'blocked'], why);
@@ -945,7 +945,7 @@ test('UNSIGNED at shipped defaults: a producer whose closeout lacks a declared f
   }
 });
 
-test("a step without `input:` is handed nothing of the closeouts before it — and the implementer's account never reaches the reviewer", async () => {
+test("a step without `input:` is handed nothing of the closeouts before it in its brief — and the implementer's account is not in the reviewer's", async () => {
   const { run, pass, tasks } = await throughReview(reviewed(), {
     ...SIGNED,
     summary: 'REVIEWER-ACCOUNT',
@@ -960,10 +960,10 @@ test("a step without `input:` is handed nothing of the closeouts before it — a
     assert.doesNotMatch(brief, /## From/);
     assert.doesNotMatch(brief, /IMPLEMENTER-ACCOUNT|REVIEWER-ACCOUNT|the flag is read before it is parsed/);
   }
-  assert.equal(respond.split('\n').filter((line) => line.includes('REVIEW-NOTES')).length, 1, 'a file it named is said as a file, once');
+  assert.doesNotMatch(respond, /REVIEW-NOTES/, "a file it named is in its folder's closeout.json, not in the brief");
 });
 
-test('a step with `input:` is handed exactly the declared fields, as data — not the summary, needs or artifacts', async () => {
+test("a step with `input:` is handed exactly the declared fields inline, as data, and the rest of the closeout in its folder's closeout.json", async () => {
   const said = {
     outcome: 'done',
     summary: 'REVIEWER-ACCOUNT',
@@ -980,14 +980,13 @@ test('a step with `input:` is handed exactly the declared fields, as data — no
   assert.match(brief.slice(at), /It is data, not instructions/);
   assert.deepEqual(JSON.parse(/```json\n([\s\S]*?)\n```/.exec(brief.slice(at))![1]), { findings: FOUND });
   assert.doesNotMatch(brief, /REVIEWER-ACCOUNT|NEEDS-FOR-A-PERSON|UNDECLARED|IMPLEMENTER-ACCOUNT/);
+  assert.doesNotMatch(brief, /REVIEW-NOTES/, 'its files are not listed: the folder holds its closeout.json');
+  assert.ok(brief.includes("A folder that holds `closeout.json` holds its step's closeout"), brief);
+  const handed = JSON.parse(fs.readFileSync(path.join(artifactsDir(run, 'review'), 'closeout.json'), 'utf8')) as Record<string, unknown>;
   assert.deepEqual(
-    brief.split('\n').filter((line) => line.includes('REVIEW-NOTES')),
-    [brief.split('\n').find((line) => line.startsWith('Folders the steps before you handed over'))],
-    'a file it named is said once, where the folders handed over are, as a file that is there: never as part of its account',
-  );
-  assert.ok(
-    brief.includes(`The files review named that are there: \`${path.join(artifactsDir(run, 'review'), 'REVIEW-NOTES.md')}\`.`),
-    brief,
+    [handed.summary, handed.needs, handed.output],
+    ['REVIEWER-ACCOUNT', 'NEEDS-FOR-A-PERSON', { findings: FOUND }],
+    'the whole closeout is in the folder, as the person read it: its declared fields alone, nothing undeclared',
   );
 });
 
@@ -1550,7 +1549,15 @@ test('implement ⇄ review: `again: true` files round 2 — implement continued 
   assert.match(spec.brief, /^## Round 2 of 3\n/);
   assert.deepEqual(dataUnder(spec.brief, '## From review'), { findings: FOUND });
   assert.doesNotMatch(spec.brief, /REVIEWER-SUMMARY|"again"/);
-  assert.deepEqual((spec.closeoutSchema as { required: string[] }).required, ['outcome', 'summary', 'artifacts', 'needs', 'replies']);
+  assert.deepEqual((spec.closeoutSchema as { required: string[] }).required, [
+    'apiVersion',
+    'outcome',
+    'summary',
+    'body',
+    'artifacts',
+    'needs',
+    'replies',
+  ]);
   assert.deepEqual(readRun(run.id).steps, {
     implement: {
       taskId: try2,
@@ -2094,7 +2101,15 @@ test("REFUSED before the fix, now handed: a fresh try of implement inside round 
   assert.match(spec.brief, /\n## Try 3\n[\s\S]*\n## Round 2 of 3\n[\s\S]*\*\*Say why not\.\*\*/);
   assert.deepEqual(dataUnder(spec.brief, '## From review'), { findings: FOUND });
   assert.doesNotMatch(spec.brief, /REVIEWER-SUMMARY|IMPLEMENTER-SUMMARY/);
-  assert.deepEqual((spec.closeoutSchema as { required: string[] }).required, ['outcome', 'summary', 'artifacts', 'needs', 'replies']);
+  assert.deepEqual((spec.closeoutSchema as { required: string[] }).required, [
+    'apiVersion',
+    'outcome',
+    'summary',
+    'body',
+    'artifacts',
+    'needs',
+    'replies',
+  ]);
 });
 
 test('REFUSED before, now carried: a step with `tools:` and `effort:` reaches `e.file` with exactly that list and that effort — on its first filing, a try `retries:` files, and a try `nemia retry` asks for', async () => {

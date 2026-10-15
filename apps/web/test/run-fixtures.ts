@@ -106,6 +106,10 @@ export const step = (extra: Partial<Step> = {}): Step => ({
     outcome: 'done',
     summary: 'Built.',
     needs: null,
+    apiVersion: null,
+    body: null,
+    values: [],
+    refused: [],
     artifacts: [
       { path: 'shot.png', name: 'shot.png', url: '/api/runs/r-1/steps/implement/files/shot.png', kind: 'image', size: 2048 },
       { path: 'old.log', pruned: 'removed by wf prune --artifacts', prunedAt: '2026-09-30T06:00:00.000Z' },

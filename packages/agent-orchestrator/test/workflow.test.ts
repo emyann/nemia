@@ -1533,7 +1533,7 @@ test('an output schema that names a field every closeout already has is refused'
     assert.match(
       refusal({ 'review.schema.json': schema }),
       new RegExp(
-        `review: \`output: review\\.schema\\.json\` declares \`${field}\`, which every closeout already has\\. .*\`summary\` goes to the person who decides, never to a step`,
+        `review: \`output: review\\.schema\\.json\` declares \`${field}\`, which every closeout already has\\. .*\`summary\` and \`body\` are the step.s own account, for the person who decides`,
       ),
       field,
     );

@@ -27,7 +27,8 @@ const ctx = new ServerCallContext();
 
 /**
  * A harness a test moves by hand, what it was asked, and a journal in memory, behind one handler. It has every verb a
- * driver may have — `find`, `release`, `quota`, `say`, `output`, `transcript`, `observeFor`, `forget` — unless `bare`, which leaves
+ * driver may have — `find`, `release`, `quota`, `say`, `output`, `transcript`, `observeFor`, `forget`, `kept`, `compact` — unless
+ * `bare`, which leaves
  * it the four every driver has; `noFind` takes `find` alone away. `acted` is what the harness was asked, reads left out.
  */
 const harness = (
@@ -126,6 +127,11 @@ const harness = (
             Effect.suspend(() => {
               asked.push(['kept', [sessions]]);
               return Effect.succeed(Object.fromEntries(sessions.map((s) => [s.name, { files: [`/runs/${s.name}.json`], records: [] }])));
+            }),
+          compact: (options: { dry: boolean }) =>
+            Effect.suspend(() => {
+              asked.push(['compact', options]);
+              return Effect.succeed({ captures: 2, compacted: 1, before: 900, after: 300, left: [{ name: 'a.log', why: 'at work' }] });
             }),
           transcript: (sessionId: string, after?: string) =>
             Effect.suspend(() => {
@@ -548,6 +554,17 @@ const REFUSALS: Array<[string, (h: H) => Promise<unknown>, (e: Error) => boolean
       RequestMalformedError,
       'the request names no sessions: send `{ sessions: [{ name }] }`, each name `ae/<task>/<n>`, n from 1.',
     ),
+  ],
+  [
+    'a compact on a harness that keeps every capture whole',
+    (h) => h.handler.compactSessions({ dry: true }, ctx),
+    refusedWith(UnsupportedOperationError, 'the `fake` harness keeps every capture whole: it has none to compact.'),
+    { bare: true },
+  ],
+  [
+    'a compact not told whether to rewrite',
+    (h) => h.handler.compactSessions({ dry: 'no' as never }, ctx),
+    refusedWith(RequestMalformedError, '`dry: no` is not a yes or no: send `dry: true` to count, `false` to rewrite.'),
   ],
   [
     'a forget of a name that is not a session name',
@@ -1047,6 +1064,7 @@ test("the harness's card: its name, no streaming, no notifications, text in and 
             'harnessQuota',
             'forgetSession',
             'sessionKept',
+            'compactSessions',
           ],
           say: true,
         },
@@ -1062,6 +1080,22 @@ test('REFUSED on the card: a verb the driver lacks is not offered, and logs, whi
     card.capabilities!.extensions.map((e) => e.params),
     [{ methods: ['sessionLogs'], say: false }],
   );
+});
+
+test("compactSessions hands the driver's compact whether to rewrite, and answers what it found", async () => {
+  const h = harness();
+  assert.deepEqual(await h.handler.compactSessions({ dry: true }, ctx), {
+    captures: 2,
+    compacted: 1,
+    before: 900,
+    after: 300,
+    left: [{ name: 'a.log', why: 'at work' }],
+  });
+  await h.handler.compactSessions({ dry: false }, ctx);
+  assert.deepEqual(h.acted(), [
+    ['compact', { dry: true }],
+    ['compact', { dry: false }],
+  ]);
 });
 
 test("sessionKept hands the driver's kept every session at once, and answers where each is kept", async () => {

@@ -44,6 +44,7 @@ import {
   type RunnerOps,
   type SessionForgotten,
   type SessionKept,
+  type SessionsCompacted,
   type SpawnRequest,
   type Transcript,
   type TranscriptCursor,
@@ -164,6 +165,10 @@ export class InProcessTransport implements Transport {
   sessionKept(params: KeptRequest): Promise<Record<string, SessionKept>> {
     return this.handler.sessionKept(params, new ServerCallContext());
   }
+
+  compactSessions(params: { dry: boolean }): Promise<SessionsCompacted> {
+    return this.handler.compactSessions(params, new ServerCallContext());
+  }
 }
 
 /** One harness's seam: its card, a client over its handler in this process, and the transport the extension's methods take. */
@@ -249,6 +254,9 @@ const askedOfTransport = (offered: RuntimeExtensionParams, transport: InProcessT
   ...(offered.methods.includes('harnessQuota') ? { quota: call('quota', () => transport.harnessQuota({})) } : {}),
   ...(offered.methods.includes('forgetSession') ? { forget: forgetThrough(transport) } : {}),
   ...(offered.methods.includes('sessionKept') ? { kept: keptThrough(transport) } : {}),
+  ...(offered.methods.includes('compactSessions')
+    ? { compact: (options: { dry: boolean }) => call('compact', () => transport.compactSessions({ dry: options.dry })) }
+    : {}),
 });
 
 /**

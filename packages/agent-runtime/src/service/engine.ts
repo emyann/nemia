@@ -64,6 +64,7 @@ import { a2aOps, type SeamOps } from '../a2a/index.ts';
 import { bodyVerbsOf } from './bodies.ts';
 import type { ForgetFailure, ForgetReport } from './forget.ts';
 import { keepingVerbsOf, type KeptRefused, type KeptReport } from './kept.ts';
+import type { CompactRefused, CompactReport } from './compact.ts';
 import { watchOf } from './watch.ts';
 import { sayVerbOf, type SayRefused, type SayUnsent } from './say.ts';
 import {
@@ -118,7 +119,7 @@ export const listRefusalOf = (args: readonly unknown[]): string | undefined => {
  * The engine's verbs, each an Effect with what refuses it on its error channel, a tagged error whose message says what to do
  * instead: `FileRefused`, `TickRefused`, `AdmitRefused`, `ListRefused`, `TranscriptRefused`, `OutputRefused`, `FollowRefused`,
  * `SayRefused`, `QuotaRefused`, `StopRefused` for `stop`, `InputRefused` for `answer` and `close`, `BodyRefused` for `sweep` and
- * `removeBody`, `ForgetRefused` for `forget`, and `KeptRefused` for `kept`.
+ * `removeBody`, `ForgetRefused` for `forget`, `KeptRefused` for `kept`, and `CompactRefused` for `compact`.
  * `SayUnsent` is `say`'s failure that is not a refusal; a `JournalError` or a `RunnerError` is the store's or the harness's.
  * `refusalWords(verb)` words a refusal as `ae` says it.
  * `watch`, `io` and `start` succeed at once: `watch` and `start` with a handle that stops them.
@@ -358,6 +359,15 @@ export type EngineShape = {
    * on its `unread`, and stops no other. Refused — `KeptRefused`, nothing measured — for any argument.
    */
   readonly kept: () => Effect.Effect<KeptReport, KeptRefused | JournalError>;
+  /**
+   * Count the captures each harness keeps of its sessions whose worker has ended, with their bytes and what they would keep of the
+   * conversation's lines: only what the harness's readers read, as a capture is once its session ends (`RunnerOps.compact`); given
+   * `{ yes: true }`, rewrite them so, one at a time, and keep what was read of each anew. Each capture reads the same after as before,
+   * or is left whole and named, as is one at work, one no run file names and one its reader refuses; no journal, no final answer and no
+   * other file is written. A harness that keeps every capture whole is not asked. Refused — `CompactRefused`, nothing written — for
+   * an argument other than nothing or `{ yes }`.
+   */
+  readonly compact: (options?: { yes?: boolean }) => Effect.Effect<CompactReport, CompactRefused | RunnerError>;
   /**
    * Everything that has happened since `after`, and where to resume. An entry no runtime wrote is skipped, the cursor past it, and
    * said on `refused` (`FeedRefusal`), so it is met by one read and stops no reader. Lines of tasks forgotten since are counted on

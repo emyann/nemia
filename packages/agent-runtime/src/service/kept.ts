@@ -9,6 +9,7 @@ import type { Runner, SessionKept } from '../harness/index.ts';
 import type { SeamOps } from '../a2a/index.ts';
 import type { EngineShape } from './engine.ts';
 import { forgetVerbOf, journalBytesOf } from './forget.ts';
+import { compactVerbOf } from './compact.ts';
 
 /** Why `kept` measured nothing: an argument, where it takes none. */
 export class KeptRefused extends Schema.TaggedError<KeptRefused>()('KeptRefused', { message: Schema.String }) {}
@@ -146,9 +147,9 @@ export const keptVerbOf = (store: StoreOps, runners: Record<string, SeamOps>, ha
 };
 
 /**
- * The engine's two verbs over what a task keeps, `forget` (`forgetVerbOf`) and `kept` (`keptVerbOf`), over `go`, the engine's store
- * and runners, its store as a plain value, `runners` by harness, `harnessOf`, the harness that answers for a task, and `fallback`,
- * the one that takes a task that names none: `kept` asks only a harness this engine has.
+ * The engine's three verbs over what a task keeps, `forget` (`forgetVerbOf`), `kept` (`keptVerbOf`) and `compact` (`compactVerbOf`),
+ * over `go`, the engine's store and runners, its store as a plain value, `runners` by harness, `harnessOf`, the harness that answers
+ * for a task, and `fallback`, the one that takes a task that names none: `kept` asks only a harness this engine has.
  */
 export const keepingVerbsOf = (
   go: <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.Effect<A, E>,
@@ -156,7 +157,8 @@ export const keepingVerbsOf = (
   runners: Record<string, SeamOps>,
   harnessOf: (state: State) => string,
   fallback: string,
-): Pick<EngineShape, 'forget' | 'kept'> => ({
+): Pick<EngineShape, 'forget' | 'kept' | 'compact'> => ({
   forget: forgetVerbOf(go, runners, harnessOf, journalBytesOf(store)),
+  compact: compactVerbOf(runners),
   kept: keptVerbOf(store, runners, (harness = fallback) => (Object.hasOwn(runners, harness) ? harness : undefined)),
 });

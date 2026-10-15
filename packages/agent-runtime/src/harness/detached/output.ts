@@ -7,7 +7,7 @@
  */
 import path from 'node:path';
 import type { Denial, Usage } from '../../core/index.ts';
-import { printedLinesOf, type PrintedKind, type PrintedLine, type Printed } from '../claude/print.ts';
+import { printedKindOf, printedLinesOf, type PrintedKind, type PrintedLine, type Printed } from '../claude/print.ts';
 import type { HarnessOutput } from './detached.ts';
 import type { PartialMark } from './follow.ts';
 
@@ -100,17 +100,27 @@ const FILE_KEYS: Readonly<Record<string, string>> = {
 };
 
 /**
+ * The one key of each tool's input a reader reads: a command (`denialOf` reads its first word), a skill, and each file tool's path
+ * (`FILE_KEYS`). Every other key of a call's input, and every key of another tool's, is read by none.
+ */
+export const READ_INPUT_KEYS: Readonly<Record<string, string>> = { Bash: 'command', Skill: 'skill', ...FILE_KEYS };
+
+/** The key of `tool`'s input a reader reads (`READ_INPUT_KEYS`), or none. */
+const readKeyOf = (tool: string): string | undefined => (Object.hasOwn(READ_INPUT_KEYS, tool) ? READ_INPUT_KEYS[tool] : undefined);
+
+/** The first word of a command, as `denialOf` names a denied one. */
+const firstWord = (command: string): string => command.trim().split(/\s+/)[0];
+
+/**
  * A denied call as a person reads it, and as a permission rule would name it: a command by its first word
  * (`Bash(pytest)`), a skill by its name (`Skill(look)`), a file tool by its path. Any other tool, or an input that says
  * none of these, is the tool alone — never a guess at what the rest of its input meant.
  */
 export const denialOf = (tool: string, input: unknown): Denial => {
-  const at = (key: string): string | undefined => {
-    const v = (input as Record<string, unknown> | null | undefined)?.[key];
-    return typeof v === 'string' && v.trim() ? v.trim() : undefined;
-  };
-  const what =
-    tool === 'Bash' ? at('command')?.split(/\s+/)[0] : tool === 'Skill' ? at('skill') : FILE_KEYS[tool] ? at(FILE_KEYS[tool]) : undefined;
+  const key = readKeyOf(tool);
+  const v = key === undefined ? undefined : (input as Record<string, unknown> | null | undefined)?.[key];
+  const given = typeof v === 'string' && v.trim() ? v.trim() : undefined;
+  const what = tool === 'Bash' && given ? firstWord(given) : given;
   return what ? { tool, what } : { tool };
 };
 
@@ -134,7 +144,7 @@ const deniedCalls = (entries: readonly DeniedEntry[], inputs: ReadonlyMap<string
 };
 
 /** The kinds of line a stream is read for. */
-const STREAM_KINDS: readonly PrintedKind[] = ['result', 'system permission_denied', 'system init', 'assistant'];
+export const STREAM_KINDS: readonly PrintedKind[] = ['result', 'system permission_denied', 'system init', 'assistant'];
 
 /** A call an assistant's line makes, as its `tool_use` block decodes. */
 type ToolUse = Extract<Exclude<Printed<'assistant'>['message']['content'], string>[number], { type: 'tool_use' }>;
@@ -205,7 +215,7 @@ export const claudeStreamOutput = (output: string): HarnessOutput => {
 
 /** The skill a `Skill` call's input names, after its last `:` — a plugin's skill by its bare name — or none. */
 const skillNamed = (input: unknown): string | undefined => {
-  const v = (input as Record<string, unknown> | null | undefined)?.skill;
+  const v = (input as Record<string, unknown> | null | undefined)?.[READ_INPUT_KEYS.Skill];
   const name = typeof v === 'string' ? v.slice(v.lastIndexOf(':') + 1).trim() : '';
   return name || undefined;
 };
@@ -221,7 +231,7 @@ const loadedSkills = ({ skills, denied }: StreamFacts): string[] =>
 
 /** The file a file tool's call names, as `FILE_KEYS` reads it, made relative to `cwd`: none when it names none, or one outside `cwd`. */
 const fileIn = (cwd: string, tool: string, input: unknown): string | undefined => {
-  const v = (input as Record<string, unknown> | null | undefined)?.[FILE_KEYS[tool]];
+  const v = (input as Record<string, unknown> | null | undefined)?.[READ_INPUT_KEYS[tool]];
   if (typeof v !== 'string' || !v.trim()) return undefined;
   const rel = path.relative(cwd, path.resolve(cwd, v.trim()));
   return rel && !rel.startsWith('..') && !path.isAbsolute(rel) ? rel : undefined;
@@ -236,6 +246,54 @@ const fileIn = (cwd: string, tool: string, input: unknown): string | undefined =
 const touchedFiles = (cwd: string, { files, denied }: StreamFacts): string[] => {
   const touched = [...files].flatMap(([id, [tool, input]]) => (denied.has(id) ? [] : (fileIn(cwd, tool, input) ?? [])));
   return [...new Set(touched)];
+};
+
+/** An assistant's `tool_use` block, written again: its id, its tool, and its input whole, or only what a reader reads of it. */
+const callKept = ({ id, name, input }: ToolUse, denied: ReadonlySet<string>): object => {
+  if (input === undefined) return { type: 'tool_use', id, name };
+  if (denied.has(id)) return { type: 'tool_use', id, name, input };
+  const key = readKeyOf(name);
+  if (key === undefined || !Object.hasOwn(input, key)) return { type: 'tool_use', id, name };
+  const v = input[key];
+  return { type: 'tool_use', id, name, input: { [key]: name === 'Bash' && typeof v === 'string' ? firstWord(v) : v } };
+};
+
+/** An assistant's line cut to the calls it makes (`callKept`), or none when it makes none. */
+const assistantKept = (line: Printed<'assistant'>, denied: ReadonlySet<string>): string | undefined => {
+  const { content } = line.message;
+  const calls = typeof content === 'string' ? [] : content.filter(isCall);
+  return calls.length ? JSON.stringify({ type: 'assistant', message: { content: calls.map((c) => callKept(c, denied)) } }) : undefined;
+};
+
+/**
+ * What a `claude -p --output-format stream-json --verbose` capture keeps once its session has ended: what the shipped readers read of
+ * it, and nothing of the conversation they do not, in the order printed. Kept whole: a line that is no JSON object (stderr, the
+ * worker's own words, a line torn mid-write), and each line of a kind `claudeStreamOutput` reads whole — its `result`, its `system`
+ * `init` and `permission_denied` lines. An `assistant` line is cut to its `tool_use` blocks, each its id, its tool and its input:
+ * whole for a call the stream says was denied, else only the key a reader reads (`READ_INPUT_KEYS`), a command by its first word;
+ * one that makes no call is dropped. Every other JSON line is dropped: tool results, partial messages, text and thinking, other
+ * `system` lines. A capture kept so keeps the same, and reads the same.
+ *
+ * Throws, as `claudeStreamOutput` does, when a line of a kind it reads does not decode: a refused capture is kept whole.
+ */
+export const claudeStreamKept = (output: string): string => {
+  const facts: StreamFacts = { events: [], inputs: new Map(), started: false, skills: new Map(), files: new Map(), denied: new Set() };
+  for (const printed of decoded(output, STREAM_KINDS)) gather(facts, printed);
+  return output
+    .split('\n')
+    .flatMap((text) => lineKept(text, facts.denied) ?? [])
+    .join('\n');
+};
+
+/** What a capture keeps of its line `text` (`claudeStreamKept`), the calls `denied` named whole, or nothing. */
+const lineKept = (text: string, denied: ReadonlySet<string>): string | undefined => {
+  const kind = printedKindOf(text);
+  if (kind === undefined) return text;
+  if (kind === 'other' || !STREAM_KINDS.includes(kind)) return undefined;
+  if (kind !== 'assistant') return text;
+  const read = printedLinesOf(text, ['assistant']);
+  const line = 'lines' in read ? read.lines[0] : undefined;
+  return line?.kind === 'assistant' ? assistantKept(line.line, denied) : undefined;
 };
 
 /**

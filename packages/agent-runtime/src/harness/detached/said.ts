@@ -9,12 +9,19 @@
  * One writer, the harness's own `observe` — the daemon's, the api's or a command's: each writes the same content for a key,
  * through a file of its own renamed into place, so a reader only finds a whole one. Neither name ends in `.json`, so
  * neither is ever read as a run file.
+ *
+ * A spec that keeps less of a capture once its session has ended (`HarnessSpec.keepOutput`) has it rewritten at that read, once its
+ * run file says its worker wrote its end: the capture, and its stdout kept whole beside it, each to what `keepOutput` keeps, through a
+ * file of its own renamed over it, its times kept, and only when the reader reads the kept text as it read the whole (`keepCapture`);
+ * what was read is then kept under the kept capture's key. `SAID_VERSION` stays the readers': a capture kept so reads the same.
  */
 import { Schema } from 'effect';
 import fs from 'node:fs';
+import { isDeepStrictEqual } from 'node:util';
 import { UsageSchema } from '../../core/event-schema.ts';
 import { readText } from '../../core/engine/tally.ts';
 import type { HarnessOutput, HarnessSpec } from './detached.ts';
+import { overNow, type RunFile } from './run-file.ts';
 
 /**
  * The shipped readers' version — `claudeResultOutput`, `claudeStreamOutput` and `codexOutput`: a kept output of another
@@ -90,7 +97,8 @@ export const keepSaid = (file: string, key: SaidKey, read: HarnessOutput): void 
   }
 };
 
-const saidOf = (reader: NonNullable<HarnessSpec['readOutput']>, text: string): Said => {
+/** What `reader` says of `text`: what it read, or why it refused it, in its words. */
+export const saidOf = (reader: NonNullable<HarnessSpec['readOutput']>, text: string): Said => {
   try {
     return { read: reader(text) };
   } catch (e) {
@@ -98,15 +106,112 @@ const saidOf = (reader: NonNullable<HarnessSpec['readOutput']>, text: string): S
   }
 };
 
-/** What the capture `log`, known by `key`, says: kept in `kept`, else read, and kept there when the run is `over`. */
+/**
+ * What `keep` keeps of a capture's `text`, which `reader` reads as `read` (read here when not given): `{ kept, read }`, all of it
+ * for a capture already kept, and what both read; or why it is left whole (`why`): the reader refuses the whole text, `keep`
+ * throws, or the reader reads the kept text otherwise.
+ */
+export const keptText = (
+  reader: NonNullable<HarnessSpec['readOutput']>,
+  keep: (output: string) => string,
+  text: string,
+  read?: HarnessOutput,
+): { kept: string; read: HarnessOutput } | { why: string } => {
+  const whole = read ? { read } : saidOf(reader, text);
+  if ('wrong' in whole) return { why: `its reader refuses it: ${whole.wrong}` };
+  let kept: string;
+  try {
+    kept = keep(text);
+  } catch (e) {
+    return { why: `what it keeps could not be told: ${e instanceof Error ? e.message : String(e)}` };
+  }
+  if (kept !== text && !isDeepStrictEqual(saidOf(reader, kept), whole)) return { why: 'its reader reads it otherwise once kept' };
+  return { kept, read: whole.read };
+};
+
+/**
+ * Writes `kept` over the capture `file`, known by `key`, and answers its key now; or answers nothing and leaves it whole, when the
+ * file has changed since `key` or the write fails. Written beside it under this process's name, given the file's own access and
+ * modification times, then renamed over it, so a reader finds the whole capture or the kept one, never a part.
+ */
+export const replaceCapture = (file: string, key: SaidKey, kept: string): SaidKey | undefined => {
+  const own = `${file}.${process.pid}.tmp`;
+  try {
+    const { size, mtimeMs, atimeMs } = fs.statSync(file);
+    if (size !== key.size || mtimeMs !== key.mtimeMs) return undefined;
+    fs.writeFileSync(own, kept);
+    fs.utimesSync(own, atimeMs / 1000, mtimeMs / 1000);
+    fs.renameSync(own, file);
+    const now = fs.statSync(file);
+    return { size: now.size, mtimeMs: now.mtimeMs };
+  } catch {
+    try {
+      fs.rmSync(own, { force: true });
+    } catch {}
+    return undefined;
+  }
+};
+
+/**
+ * Rewrites the capture `file`, known by `key`, to what `keep` keeps of its `text` (`keptText`, `replaceCapture`), and answers its key
+ * now; or answers nothing and leaves it whole, where either says so, or `keep` keeps all of it.
+ */
+const keepCapture = (
+  reader: NonNullable<HarnessSpec['readOutput']>,
+  keep: (output: string) => string,
+  file: string,
+  capture: { key: SaidKey; text: string },
+  read?: HarnessOutput,
+): SaidKey | undefined => {
+  const told = keptText(reader, keep, capture.text, read);
+  return 'kept' in told && told.kept !== capture.text ? replaceCapture(file, capture.key, told.kept) : undefined;
+};
+
+/** A capture `file`'s key and text, or nothing when it cannot be read. */
+export const captureAt = (file: string): { key: SaidKey; text: string } | undefined => {
+  try {
+    const { size, mtimeMs } = fs.statSync(file);
+    return { key: { size, mtimeMs }, text: readText(file) };
+  } catch {
+    return undefined;
+  }
+};
+
+/** Where a run's capture is (`log`), what was read of it is kept (`kept`), and, for a spec that keeps it, its whole stdout (`stdout`). */
+export type SaidFiles = { log: string; kept: string; stdout?: string };
+
+/** The files of the run whose files begin `base`: `.log`, `.said`, and `.stdout` for a spec that keeps its `streams` whole. */
+export const saidFilesAt = (base: string, streams?: true): SaidFiles => ({
+  log: `${base}.log`,
+  kept: `${base}.said`,
+  ...(streams ? { stdout: `${base}.stdout` } : {}),
+});
+
+/**
+ * What to do with a run's capture once read: `over`, the run no longer works, so what was read is kept on disk; `ended`, its run
+ * file says its worker wrote its end, so nothing writes the capture again, and `keep`, a spec's `keepOutput`, rewrites it.
+ */
+export type SaidWhen = { over: boolean; ended?: boolean; keep?: (output: string) => string };
+
+/** When `run`'s capture is read (`SaidWhen`): over as of now, its lease gone included; ended once its worker wrote its end. */
+export const saidWhen = (run: RunFile, keep?: (output: string) => string): SaidWhen => ({
+  over: overNow(run),
+  ended: run.state !== 'working',
+  ...(keep ? { keep } : {}),
+});
+
+/**
+ * What the capture `log`, known by `key`, says, and the key it is known by now: kept in `kept`, else read; once the run is `over`,
+ * what was read is kept there, after the capture and its stdout are rewritten to what `keep` keeps, once `ended` (`keepCapture`).
+ */
 const saidAt = (
   reader: NonNullable<HarnessSpec['readOutput']>,
-  files: { log: string; kept: string },
+  files: SaidFiles,
   key: SaidKey,
-  over: boolean,
-): Said | undefined => {
+  when: SaidWhen,
+): { said: Said; key: SaidKey } | undefined => {
   const kept = keptSaid(files.kept, key);
-  if (kept) return { read: kept };
+  if (kept) return { said: { read: kept }, key };
   let text: string;
   try {
     text = readText(files.log);
@@ -114,8 +219,15 @@ const saidAt = (
     return undefined;
   }
   const said = saidOf(reader, text);
-  if (over && 'read' in said) keepSaid(files.kept, key, said.read);
-  return said;
+  if (!when.over || !('read' in said)) return { said, key };
+  let now = key;
+  if (when.ended && when.keep) {
+    now = keepCapture(reader, when.keep, files.log, { key, text }, said.read) ?? key;
+    const stdout = files.stdout === undefined ? undefined : captureAt(files.stdout);
+    if (files.stdout && stdout) keepCapture(reader, when.keep, files.stdout, stdout);
+  }
+  keepSaid(files.kept, now, said.read);
+  return { said, key: now };
 };
 
 /**
@@ -124,14 +236,15 @@ const saidAt = (
  * that has its key. A refusal is kept in `memo` alone: it leaves that run unread, or failed once ended, and is read again by the
  * next process.
  *
- * @param over the run is no longer working, so its capture no longer grows: only then is what was read kept on disk.
+ * @param when whether the run is over, so its capture no longer grows: only then is what was read kept on disk; and whether its
+ *   worker wrote its end, so its capture is rewritten to what `keep` keeps of it (`SaidWhen`).
  */
 export const outputIn = (
   reader: NonNullable<HarnessSpec['readOutput']>,
   memo: SaidMemo,
   name: string,
-  files: { log: string; kept: string },
-  over: boolean,
+  files: SaidFiles,
+  when: SaidWhen,
 ): { read: HarnessOutput } | { wrong: string } | undefined => {
   let key: SaidKey;
   try {
@@ -142,9 +255,9 @@ export const outputIn = (
   }
   let known = memo.get(name);
   if (!known || known.size !== key.size || known.mtimeMs !== key.mtimeMs) {
-    const said = saidAt(reader, files, key, over);
-    if (!said) return undefined;
-    known = { ...key, said };
+    const at = saidAt(reader, files, key, when);
+    if (!at) return undefined;
+    known = { ...at.key, said: at.said };
     memo.set(name, known);
   }
   return 'wrong' in known.said ? known.said : { read: known.said.read };

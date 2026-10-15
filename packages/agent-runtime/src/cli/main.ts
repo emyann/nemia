@@ -12,6 +12,7 @@ import { admissionHook, Engine as EngineService, refusalWords, type EngineOption
 import { refusedText, retiredKeyRefusal, type CodexArgs, type ForgetReport, type HarnessArgs } from '../index.ts';
 import type { SweepReport, TaskSpec } from '../index.ts';
 import { attemptLine, entryLine, limitLines, taskLine } from './lines.ts';
+import { compactAsked, compactLines } from './compact.ts';
 
 /**
  * Every key a brief may have — a closed list, on purpose.
@@ -310,6 +311,8 @@ const HELP = `ae — an engine for agent sessions
                                the feed, their sessions' files; --yes removes them
   ae sweep [--yes]             count the bodies no journal names, put over a day ago: a long
                                text is kept once, named by its sha256; --yes removes them
+  ae compact [--yes]           count the captures of ended sessions and what they would keep:
+                               what their readers read; --yes rewrites them so, once
   ae watch [cursor]            the same, followed
 
   a brief is markdown with optional frontmatter:
@@ -499,6 +502,23 @@ const listTasks = async (engine: EngineShape): Promise<void> => {
 const run = <A, E>(verb: string, effect: Effect.Effect<A, E>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.mapError(refusalWords(verb))));
 
+/** `ae compact [--yes]`: the captures of ended sessions, counted, and rewritten to what their readers read given `--yes`. */
+const compactCaptures = async (engine: EngineShape, rest: readonly string[]): Promise<void> => {
+  const { yes } = compactAsked(rest);
+  for (const line of compactLines(await run('compact', engine.compact({ yes })))) console.log(line);
+};
+
+/** The verbs over what the store keeps, each given the arguments after it: `sweep`, `forget` and `compact`. */
+const KEEPING: Readonly<Record<string, (engine: EngineShape, rest: readonly string[]) => Promise<void>>> = {
+  sweep: sweepBodies,
+  forget: forgetTasks,
+  compact: compactCaptures,
+};
+
+/** The verb `verb` names among `KEEPING`, or, for any other word, the help printed. */
+const keepingVerb = (verb: string | undefined) =>
+  verb !== undefined && Object.hasOwn(KEEPING, verb) ? KEEPING[verb] : async () => console.log(HELP);
+
 /**
  * The engine over `options`, its layer built once and kept for the process. Refused — rejects with an `Error` whose `exitCode` is 2, led
  * by `ae` (`refusalWords`) — for options the engine refuses; any other failure to build it is rejected as it is.
@@ -636,12 +656,6 @@ export async function main(argv: string[]): Promise<void> {
     case 'feed':
       return printFeed(engine, Number(arg) || 0);
 
-    case 'sweep':
-      return sweepBodies(engine, argv.slice(1));
-
-    case 'forget':
-      return forgetTasks(engine, argv.slice(1));
-
     case 'watch': {
       const from = Number(arg) || 0;
       console.log(`watching from ${from}, ^C to stop`);
@@ -661,6 +675,6 @@ export async function main(argv: string[]): Promise<void> {
       return up(engine, Number(arg) || 3_000);
 
     default:
-      return console.log(HELP);
+      return keepingVerb(verb)(engine, argv.slice(1));
   }
 }

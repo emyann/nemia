@@ -8,6 +8,8 @@ export { ForgetRefused } from './forget.ts';
 export type { ForgetReport } from './forget.ts';
 export { KeptRefused } from './kept.ts';
 export type { KeptReport } from './kept.ts';
+export { CompactRefused } from './compact.ts';
+export type { CompactReport } from './compact.ts';
 export { refusalWords } from './refusal.ts';
 export { testEngine } from './test-engine.ts';
 export type { Printed, TestEnd, TestEngine, TestFiling, TestKeeps, TestTask } from './test-engine.ts';

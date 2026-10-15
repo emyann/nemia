@@ -144,7 +144,7 @@ export const claudeDetached: HarnessSpec = {
   command: (r, io) => ({
     cmd: 'claude',
     args: claudePrintArgs(r, io, ['--output-format', 'json']),
-    env: { ...CLAUDE_JOB_ENV, ...claudeTelemetryEnv(r) },
+    env: { ...r.config?.env, ...CLAUDE_JOB_ENV, ...claudeTelemetryEnv(r) },
   }),
   readOutput: claudeResultOutput,
   start: CLAUDE_RESULT_START,
@@ -155,6 +155,7 @@ export const claudeDetached: HarnessSpec = {
   refuses: claudePrintRefuses,
   contextTokens: CLAUDE_CONTEXT_TOKENS,
   checkoutMcp: true,
+  env: true,
   claudeFlags: true,
   mounts: { readOnly: true, writable: true },
   callAdmission: true,
@@ -197,7 +198,7 @@ export const claudeJob: HarnessSpec = {
       'none',
       ...claudePrintFlags(r, io),
     ],
-    env: { ...CLAUDE_JOB_ENV, ...claudeTelemetryEnv(r) },
+    env: { ...r.config?.env, ...CLAUDE_JOB_ENV, ...claudeTelemetryEnv(r) },
   }),
   input: {
     line: (text) => JSON.stringify({ type: 'user', message: { role: 'user', content: text } }),
@@ -213,6 +214,7 @@ export const claudeJob: HarnessSpec = {
   refuses: claudePrintRefuses,
   contextTokens: CLAUDE_CONTEXT_TOKENS,
   checkoutMcp: true,
+  env: true,
   claudeFlags: true,
   mounts: { readOnly: true, writable: true },
   callAdmission: true,

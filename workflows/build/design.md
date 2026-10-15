@@ -27,4 +27,5 @@ The checks you may run here, each bare: `npx turbo run test --force --continue`,
 To see a board in the browser, run `npm run board:serve`, bare, and open the address it prints with the `look` skill: this workspace's
 board, built outside the workspace and served on ports of its own against a store of its own that holds the e2e's seed. Never the live
 board on :8787 or :5173, which your fence refuses by address. Give no browser tool a `filename`, which your fence refuses: a picture
-taken without one is saved outside the workspace, where the tool says. Run `npm run board:stop` before you sign off.
+taken without one is saved in your files directory, `$WF_STEP_FILES`, where the tool says. Name each picture you show the person
+in `artifacts` by its absolute path there, and by the same path in the question that asks about it. Run `npm run board:stop` before you sign off.

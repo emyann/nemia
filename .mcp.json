@@ -9,7 +9,7 @@
         "chromium",
         "--isolated",
         "--output-dir",
-        "/tmp/playwright-mcp"
+        "${WF_STEP_FILES:-/tmp/playwright-mcp}"
       ]
     }
   }

@@ -33,7 +33,7 @@ import { Effect } from 'effect';
 import { Engine as EngineService } from 'agent-runtime';
 import { type Engine } from '../src/runtime-client.ts';
 import { parseAgent, parseWorkflow } from '../src/workflow.ts';
-import { filedConfig } from '../src/filed/filed.ts';
+import { filedConfig, STEP_FILES } from '../src/filed/filed.ts';
 import { loadWorkflows } from '../src/folder/folder.store.ts';
 import { scratch } from './scratch.ts';
 import { placesOf, shippedFolders } from './team.ts';
@@ -64,12 +64,33 @@ const refusals = (config: unknown, repo: string): string[] => {
   if (value('--browser') !== 'chromium') out.push(`asks for --browser ${value('--browser')}, not chromium from ~/.cache/ms-playwright`);
   if (!flags.includes('--isolated')) out.push('is not --isolated: the profile is kept on disk and shared by every step');
   if (flags.includes('--user-data-dir')) out.push('names a --user-data-dir: a profile shared by every step');
-  const dir = value('--output-dir');
-  if (!dir || !path.isAbsolute(dir))
-    out.push(`writes its files to ${dir ?? '.playwright-mcp'}, relative to the workspace, where the run commits them`);
-  else if (!path.relative(repo, dir).startsWith('..')) out.push(`writes its files to ${dir}, inside the repository`);
-  return out;
+  return [...out, ...outputDirRefusals(value('--output-dir'), repo)];
 };
+
+/**
+ * Why an `--output-dir` is not a step's files directory with an absolute default outside the repository, `${WF_STEP_FILES:-/abs}`,
+ * one sentence each — none when it is. Claude Code expands the variable as it spawns the server; a nested one it does not.
+ */
+const outputDirRefusals = (dir: string | undefined, repo: string): string[] => {
+  if (dir === undefined) return ['writes its files to .playwright-mcp, relative to the workspace, where the run commits them'];
+  const read = /^\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-(.*))?\}$/.exec(dir);
+  if (!read)
+    return [
+      `writes its files to ${dir} for every step alike: give \`\${${STEP_FILES}:-<an absolute folder>}\`, so a step writes where its run keeps them`,
+    ];
+  const [, name, fallback] = read;
+  if (name !== STEP_FILES) return [`writes its files to the folder \`${name}\` names, not a step's own: read \`${STEP_FILES}\``];
+  if (fallback === undefined) return [`gives \`${STEP_FILES}\` no default, and a session outside a run is given none`];
+  if (fallback.includes('${')) return [`nests a variable in its default, ${fallback}, which Claude Code does not expand`];
+  if (!path.isAbsolute(fallback))
+    return [`writes its files to ${fallback} outside a run, relative to the workspace, where the run commits them`];
+  if (!path.relative(repo, fallback).startsWith('..')) return [`writes its files to ${fallback} outside a run, inside the repository`];
+  return [];
+};
+
+/** `args` as Claude Code spawns the server in an environment `env`: each `${NAME:-default}` read from it, else its default. */
+const expanded = (args: string[], env: Record<string, string | undefined>): string[] =>
+  args.map((a) => a.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*):-([^}]*)\}/g, (_, name: string, fallback: string) => env[name] || fallback));
 
 /** Where `command` is found on PATH, as the harness finds it. */
 const onPath = (command: string) =>
@@ -149,18 +170,46 @@ test('each way out of that shape is refused', () => {
       /\.playwright-mcp, relative to the workspace/,
     ],
     [
-      'a relative output dir',
+      'an output dir no variable names',
       (s) => {
-        s.args[s.args.indexOf('--output-dir') + 1] = 'shots';
+        s.args[s.args.indexOf('--output-dir') + 1] = '/tmp/x';
       },
-      /shots, relative to the workspace/,
+      /\/tmp\/x for every step alike/,
     ],
     [
-      'an output dir in the repository',
+      "another variable's folder",
       (s) => {
-        s.args[s.args.indexOf('--output-dir') + 1] = path.join(REPO, 'shots');
+        s.args[s.args.indexOf('--output-dir') + 1] = '${OTHER:-/tmp/x}';
+      },
+      /the folder `OTHER` names/,
+    ],
+    [
+      'the variable with no default',
+      (s) => {
+        s.args[s.args.indexOf('--output-dir') + 1] = '${WF_STEP_FILES}';
+      },
+      /no default/,
+    ],
+    [
+      'a relative default',
+      (s) => {
+        s.args[s.args.indexOf('--output-dir') + 1] = '${WF_STEP_FILES:-shots}';
+      },
+      /shots outside a run, relative to the workspace/,
+    ],
+    [
+      'a default in the repository',
+      (s) => {
+        s.args[s.args.indexOf('--output-dir') + 1] = `\${WF_STEP_FILES:-${path.join(REPO, 'shots')}}`;
       },
       /inside the repository/,
+    ],
+    [
+      'a nested default',
+      (s) => {
+        s.args[s.args.indexOf('--output-dir') + 1] = '${WF_STEP_FILES:-${HOME}/x}';
+      },
+      /nests a variable/,
     ],
     [
       'a second server',
@@ -194,7 +243,7 @@ test('an interactive session in the checkout is given the same server, and it is
 
 test('the server starts as configured, from the repository root, and offers browser_navigate', async () => {
   const { command, args } = shipped().mcpServers.playwright;
-  const child = spawn(command, args, { cwd: REPO, stdio: ['pipe', 'pipe', 'pipe'] });
+  const child = spawn(command, expanded(args, { [STEP_FILES]: scratch('wf-mcp-files-') }), { cwd: REPO, stdio: ['pipe', 'pipe', 'pipe'] });
   let stderr = '';
   child.stderr.on('data', (d) => {
     stderr += d;
@@ -459,5 +508,66 @@ test(
         } catch {}
       }
     }
+  },
+);
+
+const SHOT = [
+  'Use the browser: navigate to `data:text/html,<h1>hello</h1>`, then take one screenshot, giving no filename.',
+  'Then give your closing statement: in saved, the path the screenshot tool said it saved the picture to, or an empty string if it said none.',
+  'Call no other tool.',
+].join(' ');
+
+test(
+  "a job filed a step's files directory has the browser write a screenshot given no filename there, outside the workspace",
+  {
+    skip: live ? false : 'set AE_LIVE=1 to run against Claude Code (spends money)',
+    timeout: 8 * 60_000,
+  },
+  async (t) => {
+    const config = process.env.CLAUDE_CONFIG_DIR;
+    delete process.env.CLAUDE_CONFIG_DIR;
+    t.after(() => {
+      process.env.CLAUDE_CONFIG_DIR = config;
+    });
+    const files = scratch('wf-live-files-');
+    const engine: Engine = plainEngine(EngineService.layer({ root: scratch('wf-live-shot-') }));
+    const id = await Effect.runPromise(
+      engine.file({
+        brief: SHOT,
+        cwd: REPO,
+        closeoutSchema: { type: 'object', properties: { saved: { type: 'string' } }, required: ['saved'], additionalProperties: false },
+        deadlineSeconds: 360,
+        config: {
+          model: 'haiku',
+          effort: 'low',
+          permissionMode: 'dontAsk',
+          allowedTools: ['mcp__playwright__browser_navigate', 'mcp__playwright__browser_take_screenshot'],
+          checkoutMcp: ['playwright'],
+          budgetUsd: 1,
+          env: { [STEP_FILES]: files },
+        },
+      }),
+    );
+    let view: TaskView | undefined;
+    await until(
+      t,
+      async () => {
+        await Effect.runPromise(engine.tick());
+        view = await Effect.runPromise(engine.view(id));
+        return view.state.settled;
+      },
+      `${id} settled on Claude Code`,
+      { everyMs: 5_000 },
+    );
+    const said = view?.state.attempts.at(-1)?.closeout as { saved?: string } | undefined;
+    const pictures = fs
+      .readdirSync(files, { recursive: true })
+      .map(String)
+      .filter((f) => f.endsWith('.png'));
+    const logs = await Effect.runPromise(engine.logs(id)).catch((e: Error) => e.message);
+    t.diagnostic(`logs ${JSON.stringify(logs).slice(-3000)}`);
+    t.diagnostic(`settled ${view?.state.settled}; it said ${JSON.stringify(said)}; ${files} holds ${JSON.stringify(pictures)}`);
+    assert.equal(view?.state.settled, 'succeeded', `settled: ${view?.phase}`);
+    assert.equal(pictures.length, 1, `one picture in ${files}; it said ${JSON.stringify(said)}`);
   },
 );

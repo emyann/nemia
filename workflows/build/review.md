@@ -58,5 +58,6 @@ picture shows. Run `npm run board:serve`, bare: it builds this round's board out
 against a store of its own that holds the e2e's seed, and prints where. Open that address with the `look` skill's browser tools, press
 what the change is about, and say in your closeout what you opened and what it showed. The pictures are enough for a change of layout
 or of words that they show. Never the live board on :8787 or :5173, which your fence refuses by address. Give no browser tool a
-`filename`, which your fence refuses: a picture taken without one is saved outside the workspace, where the tool says. Run
+`filename`, which your fence refuses: a picture taken without one is saved in your files directory, `$WF_STEP_FILES`, where the tool says: name each one you
+report in `artifacts` by its absolute path there. Run
 `npm run board:stop` before you sign off.

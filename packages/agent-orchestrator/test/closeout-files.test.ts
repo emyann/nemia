@@ -36,6 +36,7 @@ const { roundFiled } = await import('../src/round/round.ts');
 const { sentBack } = await import('../src/status/status.ts');
 const { lackedOf } = await import('../src/record/record.ts');
 const { filesDue, nearName } = await import('../src/artifacts/artifacts.ts');
+const { STEP_FILES } = await import('../src/filed/filed.ts');
 
 const stand = eachTest(testPlace);
 const engine = eachTest(testEngine);
@@ -288,4 +289,20 @@ test('a near name is one with the same last name, letter case aside, in the fold
   assert.equal(nearName('/files/factory-dark.png', there), '/files/shots/factory-dark.png');
   assert.equal(nearName('/files/builder-agent-dark.png', there), undefined, 'an unrelated name gives none');
   assert.equal(nearName('/files/builder-dark.png', there), undefined, 'nor the file itself');
+});
+
+test("a picture the session's browser writes where its filed env says is the run's, signed by its absolute path, and copied nowhere", async () => {
+  const { id, files, task } = await started();
+  const env = engine().tasks.get(task)?.spec.config?.env;
+  assert.deepEqual(env, { [STEP_FILES]: files }, "the step's session is filed its files directory");
+  const picture = path.join(env?.[STEP_FILES] ?? '', 'page-1.png');
+  fs.writeFileSync(picture, 'png');
+  engine().settle(task, 'succeeded', signed(picture));
+
+  const pass = await advanced(id);
+  assert.deepEqual(pass.tried, [], 'the closeout is not refused');
+  assert.deepEqual(pass.checked, ['implement'], 'its check is filed');
+  assert.deepEqual(lackedOf(readRun(id).steps.implement) ?? [], []);
+  assert.deepEqual(fs.readdirSync(files), ['page-1.png'], 'kept where it was written, copied onto nothing');
+  assert.equal(fs.readFileSync(picture, 'utf8'), 'png');
 });

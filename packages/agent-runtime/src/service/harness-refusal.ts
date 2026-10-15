@@ -25,8 +25,10 @@ import { isClaude, isRemote, isSpec, type HarnessConfig, type TaskSpec } from '.
  *    system prompt would be read by nobody;
  * 6. a `codex` on any harness but a `HarnessSpec` with `codexArgs` (`codexArgsMisplaced`): its session would start without
  *    the trust it names;
- * 7. a `command`, an `env` or a `niceness` on any harness but a `HarnessSpec` with `commandArgs` (`commandArgsMisplaced`): its
+ * 7. a `command` or a `niceness` on any harness but a `HarnessSpec` with `commandArgs` (`commandArgsMisplaced`): its
  *    session would run something else than the process they name;
+ * 7a. an `env` on a harness that spawns no process of the session's own (`envMisplaced`): a background session, a remote agent, a
+ *    `HarnessSpec` with neither `commandArgs` nor `env`; its session would start without it;
  * 7b. a mount in `mounts` on a harness that does not hold its mode (`mountsMisplaced`): a remote agent, a `HarnessSpec` whose
  *    `mounts` leaves the mode out; its session would not reach the folder as asked;
  * 7c. a `callAdmission` on a harness that runs no command before a call (`admissionMisplaced`): Codex, a remote agent, a `HarnessSpec`
@@ -145,6 +147,7 @@ const codexArgsMisplaced = (spec: TaskSpec & { harness: string }, harnesses: Rec
 const argsMisplaced = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined =>
   codexArgsMisplaced(spec, harnesses) ??
   commandArgsMisplaced(spec, harnesses) ??
+  envMisplaced(spec, harnesses) ??
   mountsMisplaced(spec, harnesses) ??
   admissionMisplaced(spec, harnesses) ??
   checkoutMcpMisplaced(spec, harnesses);
@@ -207,17 +210,42 @@ const mountsMisplaced = (spec: TaskSpec & { harness: string }, harnesses: Record
 };
 
 /**
- * Why a task's `command`, `env` or `niceness` cannot go on its harness — or `undefined`: they are the arguments of a harness
- * that runs a process (`commandArgs`), and any other would run its own session without them. A `RunnerOps` brought as its own is not asked.
+ * Why a task's `command` or `niceness` cannot go on its harness — or `undefined`: they are the arguments of a harness that runs a
+ * process (`commandArgs`), and any other would run its own session without them. A `RunnerOps` brought as its own is not asked.
  */
 const commandArgsMisplaced = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined => {
   const runsCommands = (o: HarnessConfig) => isSpec(o) && o.commandArgs === true;
   const h = harnesses[spec.harness];
   const ownRunner = !(isClaude(h) || isSpec(h) || isRemote(h));
-  const key = (['command', 'env', 'niceness'] as const).find((k) => spec.config?.[k] !== undefined);
+  const key = (['command', 'niceness'] as const).find((k) => spec.config?.[k] !== undefined);
   if (key === undefined || ownRunner || runsCommands(h)) return undefined;
   const takers = Object.keys(harnesses)
     .filter((name) => runsCommands(harnesses[name]))
     .map((name) => `\`${name}\``);
   return `\`${key}\` names a process to run, and the \`${spec.harness}\` harness runs a session of its own: it would start without it. ${takers.length ? `File the task on ${takers.join(' or ')}, or leave \`${key}\` off.` : `Leave \`${key}\` off: none of this engine's harnesses runs a command.`}`;
+};
+
+/** Whether a harness spawns a task's session as a process of its own, given its `env`: a `HarnessSpec` that says so, Claude Code's job. */
+const takesEnv = (h: HarnessConfig, background: boolean): boolean =>
+  (isSpec(h) && (h.commandArgs === true || h.env === true)) || (h === 'claude' && !background);
+
+/**
+ * Why a task's `config.env` cannot go on its harness — or `undefined`: a Claude Code background session, whose process is spawned
+ * before it and ignores its asker's environment, a remote agent, which runs on none of this machine's processes, and a `HarnessSpec`
+ * that neither runs a command nor takes an `env`. The refusal names the harnesses of this engine that take one. A `RunnerOps` brought
+ * as its own is not asked.
+ */
+const envMisplaced = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined => {
+  const h = harnesses[spec.harness];
+  const ownRunner = !(isClaude(h) || isSpec(h) || isRemote(h));
+  if (spec.config?.env === undefined || ownRunner || takesEnv(h, spec.config.background === true)) return undefined;
+  const takers = Object.keys(harnesses)
+    .filter((name) => takesEnv(harnesses[name], false))
+    .map((name) => (harnesses[name] === 'claude' ? `\`${name}\` as a job` : `\`${name}\``));
+  const fix = takers.length
+    ? `File the task on ${takers.join(' or ')}, or leave \`env\` off.`
+    : "Leave `env` off: none of this engine's harnesses spawns a session's process.";
+  if (isClaude(h))
+    return `\`env\` is laid in the session's process, and the \`${spec.harness}\` harness runs this task as a background session, which runs in a pre-spawned process and ignores its asker's environment: it would start without it. ${fix}`;
+  return `\`env\` is laid in the session's process, and the \`${spec.harness}\` harness spawns none of its own: it would start without it. ${fix}`;
 };

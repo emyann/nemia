@@ -207,9 +207,9 @@ const saidStarted = ({ held, replaced }: TakenStore): Effect.Effect<void> =>
 /**
  * The daemon: the store's lease taken as `holder` (`takeStore`, refused by name while another daemon of either kind ticks it) and let go
  * as its scope closes, however it ends, so a signal that stops it leaves the store free at once; the engine's attached sessions held
- * (`hold`) inside it, so as the scope closes each is let go between two tool calls, before the lease; its series and the caller's (`series`)
- * born at zero and exported so (`DAEMON_SERIES`, `seriesBorn`) before anything counts into them; its line in the feed (`saidStarted`);
- * `onTaken`; then a pass on `e` every
+ * (`hold`) inside it, so as the scope closes each is let go between two tool calls, before the lease; its series and the caller's
+ * (`series`) born at zero and exported so (`DAEMON_SERIES`, `seriesBorn`) before anything counts into them; its line in the feed
+ * (`saidStarted`); `onTaken`; then a pass on `e` every
  * interval, each written down (`passed`) and logged (`logPass`), through whatever logger the process provides. It beats on a fiber forked
  * in the scope, so a long pass is not taken for stalled and taken over mid-pass, and it fails at the first pass that finds the store taken
  * over (`stillHeld`, `takenFromLine`). On another fiber in the scope it asks each harness for its quota, at once and every

@@ -544,7 +544,6 @@ const OTHER_PROGRAMS = new Set([
   'AUTH_REQUIRED',
   'TaskStore',
   'agentCardHandler',
-  'canUseTool',
   'crossSessionInbound',
   'claudeInChromeDefaultEnabled',
   '$CLAUDE_CONFIG_DIR',

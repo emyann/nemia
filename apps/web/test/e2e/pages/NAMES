@@ -70,7 +70,6 @@ sidebar
 tabs
 gauges-button
 pause-now
-favorites
 after-long-title
 workflow-remove
 workflow-remove-refused
@@ -101,7 +100,6 @@ factory-workflows
 unknown-address
 typefaces
 frame-reads
-favorite-gone
 factory-untrusted
 inbox-file
 finished-read

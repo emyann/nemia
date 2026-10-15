@@ -2,7 +2,6 @@ import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { RouteLink } from '../components/AgentParts';
 import { FactoryTags } from '../components/FactoryTag';
-import { FavoriteStar } from '../components/FavoriteStar';
 import { Markdown } from '../components/Markdown';
 import { NewWorkflow } from '../components/NewWorkflow';
 import { FromBadge, Unplaced, YoursFolder } from '../components/WorkflowParts';
@@ -142,7 +141,7 @@ function InFactory({ place, address }: { place: Place; address: PagePlace }) {
 
 /**
  * A workflow's card, compact: its name, linked to its page at `address`, which holds the rest — its README, its graph, its steps and a
- * start, and for one of yours its builder; its star, which puts it under Favorites, shown for one that does not read too; where it is
+ * start, and for one of yours its builder; where it is
  * read from, in `factory` when the list is a named factory's; the factories in `tags`, each linked to its floor; its step count and its
  * description; or, for one that does not read, a line saying so.
  */
@@ -175,7 +174,6 @@ function WorkflowCard({
             {name}
           </RouteLink>
         </h2>
-        <FavoriteStar favorite={{ kind: 'workflow', from, workflow: name }} name={from === 'yours' ? `${name} (yours)` : name} />
         <FromBadge from={from} factory={factory} />
         <FactoryTags names={tags} linked />
         {!error && (

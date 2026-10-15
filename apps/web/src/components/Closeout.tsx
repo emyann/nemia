@@ -3,7 +3,7 @@ import { Switch } from '@/components/ui/switch';
 import type { StepAttempts, StepCloseout, StepTry } from '../lib/api';
 import { duration } from '../lib/canvas';
 import { foldsAtGate, imagePaths, type Outcome, outcomeOf, outcomeWord } from '../lib/outcome';
-import { summaryShown } from '../lib/transcript';
+import { bodyLeadsWith, summaryShown } from '../lib/transcript';
 import { cn } from '../lib/utils';
 import { Artifacts, Values } from './Artifacts';
 import { Markdown } from './Markdown';
@@ -293,14 +293,16 @@ export function HandedOn({ closeout, answeredBeside = false }: { closeout: StepC
 
 /**
  * What a closeout says in words: its summary, one line as the api cut it, then its body as markdown, and what the run did not accept of
- * it, each under `not accepted`.
+ * it, each under `not accepted`. A body that opens with the summary (`bodyLeadsWith`) is drawn alone, so the line is said once.
  */
 export function Statement({ closeout }: { closeout: StepCloseout }) {
   return (
     <>
-      <p data-summary className="text-body-medium text-foreground">
-        {summaryShown(closeout.summary)}
-      </p>
+      {!bodyLeadsWith(closeout.summary, closeout.body) && (
+        <p data-summary className="text-body-medium text-foreground">
+          {summaryShown(closeout.summary)}
+        </p>
+      )}
       {closeout.body && <Markdown data-body>{closeout.body}</Markdown>}
       {closeout.refused.map((why) => (
         <p key={why} data-refused className="text-body-small text-failure">

@@ -274,12 +274,13 @@ export default {
       `${FAKE.unverified}'s section on the run's page draws the value it handed on, linked, beside its files`,
     );
     await expectVisible(
-      output.locator('[data-summary]', { hasText: FAKE.envelope.cut }),
-      `${FAKE.unverified}'s v1 summary is one line, cut at a word with an ellipsis`,
-    );
-    await expectVisible(
       output.locator('[data-body]', { hasText: FAKE.envelope.summary }),
-      'its whole summary leads its body, so nothing it wrote is lost',
+      `${FAKE.unverified}'s whole v1 summary leads its body, so nothing it wrote is lost`,
+    );
+    await expectCount(
+      output.locator('[data-summary]'),
+      0,
+      `and its cut line (${FAKE.envelope.cut}) is not drawn above the body that opens with it`,
     );
     await expectVisible(output.locator('[data-body] strong', { hasText: 'sky' }), 'its body is drawn as markdown');
     await expectVisible(
@@ -314,10 +315,11 @@ export default {
     const theme = stepBar(page, FAKE.id, 'theme');
     await theme.getByRole('tab', { name: 'Output' }).click();
     await expectVisible(
-      theme.locator('[data-summary]', { hasText: exactly(FAKE.envelope.v0.first) }),
-      "theme's v0 closeout reads its first line as its summary",
+      theme.locator('[data-body]', { hasText: FAKE.envelope.v0.more }),
+      "theme's v0 closeout reads its whole text as its body",
     );
-    await expectVisible(theme.locator('[data-body]', { hasText: FAKE.envelope.v0.more }), 'and its whole text as its body');
+    await expectVisible(theme.locator('[data-body]', { hasText: FAKE.envelope.v0.first }), 'which opens with its first line, its summary');
+    await expectCount(theme.locator('[data-summary]'), 0, 'so the summary is said once, in the body, not again above it');
     await settled(page);
   },
 } satisfies PageSpec;

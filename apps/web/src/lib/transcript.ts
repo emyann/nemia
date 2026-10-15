@@ -370,6 +370,23 @@ export const SUMMARY_MAX = 120;
 export const summaryShown = (summary: string): string => summary.replace(/^#{1,6}\s+/, '');
 
 /**
+ * Whether `body` opens with `summary`: its first non-empty line, a heading's marks dropped, begins with the summary as drawn, a cut one
+ * up to its ellipsis. A reader that draws the body whole then draws no summary line above it, which would say the line twice.
+ */
+export function bodyLeadsWith(summary: string, body: string | null): boolean {
+  if (!body) return false;
+  const first = summaryShown(
+    body
+      .split('\n')
+      .map((line) => line.trim())
+      .find(Boolean) ?? '',
+  );
+  const shown = summaryShown(summary.trim());
+  const lead = shown.endsWith('…') ? shown.slice(0, -1).trimEnd() : shown;
+  return lead !== '' && first.startsWith(lead);
+}
+
+/**
  * A summary as every reader shows it: its first non-empty line, trimmed, and when that is longer than `SUMMARY_MAX` it is cut at the
  * last space that leaves room for an ellipsis, or hard where it has none, and ends `…`.
  */

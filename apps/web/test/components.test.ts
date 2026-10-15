@@ -4483,6 +4483,39 @@ function gatedRun(closeout: StepCloseout | null, status = 'awaiting approval'): 
 
 const tabSelected = (html: string): string | undefined => /aria-selected="true"[^>]*>([A-Za-z]+)</.exec(html)?.[1];
 
+test('a closeout whose body opens with its summary draws the body alone, its line said once: a heading, and a cut line up to its ellipsis', () => {
+  const handed = (summary: string, body: string | null) =>
+    renderToStaticMarkup(createElement(HandedOn, { closeout: { ...planCloseout, summary, body, output: {}, schema: {} } }));
+  const heading = handed('## What I found', '## What I found\n\n- The cap is read on every pass');
+  assert.doesNotMatch(heading, /data-summary/, 'a v0 body, its whole text, opens with the summary drawn as its heading');
+  assert.match(heading, /<h4[^>]*>What I found<\/h4>/);
+  const long = 'Picked the colour tokens for the sky, the sea and the sand, then wrote each down where the theme reads them, with a note';
+  const cut = handed(
+    'Picked the colour tokens for the sky, the sea and the sand, then wrote each down where the theme reads them, with…',
+    long,
+  );
+  assert.doesNotMatch(cut, /data-summary/, 'a cut summary leads a body that holds it whole');
+  assert.match(cut, new RegExp(long));
+});
+
+test('a closeout whose body does not open with its summary draws both, and one with no body its summary', () => {
+  const handed = (summary: string, body: string | null) =>
+    renderToStaticMarkup(createElement(HandedOn, { closeout: { ...planCloseout, summary, body, output: {}, schema: {} } }));
+  const both = handed('Capped the runs in flight.', 'The cap is read on every pass, and stored nowhere.');
+  assert.match(both, /<p data-summary="true"[^>]*>Capped the runs in flight\.<\/p>/);
+  assert.match(both, /data-body="true"[^>]*>.*The cap is read on every pass/s);
+  assert.match(handed('Capped the runs in flight.', null), /<p data-summary="true"[^>]*>Capped the runs in flight\.<\/p>/);
+});
+
+test('what the run did not accept of a closeout is drawn under its words, each under `not accepted`', () => {
+  const why = '`needs` is said on a done closeout: needs is for a blocked one alone.';
+  const html = renderToStaticMarkup(
+    createElement(HandedOn, { closeout: { ...planCloseout, needs: 'A word from you', refused: [why], output: {}, schema: {} } }),
+  );
+  assert.ok(textsOf(html).includes(`not accepted: ${why}`), html);
+  assert.match(html, /<p data-refused="true"/);
+});
+
 test('the inspector opens on Output for a step that has a closeout — at its gate, blocked or done — and on Details for one that has none', () => {
   const inspect = (run: RunDetail) => withClient(createElement(StepTabs, { run, step: run.steps[0] }));
   const atGate = inspect(gatedRun(planCloseout));

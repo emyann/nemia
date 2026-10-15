@@ -137,7 +137,6 @@ export function ArrowBackIcon(props: SvgProps) {
   );
 }
 
-/** Globe: the phone field's "international" (no country) state. */
 export function UserIcon(props: SvgProps) {
   return (
     <Svg {...props}>
@@ -147,6 +146,7 @@ export function UserIcon(props: SvgProps) {
   );
 }
 
+/** Globe: the phone field's "international" (no country) state. */
 export function GlobeIcon(props: SvgProps) {
   return (
     <Svg {...props}>

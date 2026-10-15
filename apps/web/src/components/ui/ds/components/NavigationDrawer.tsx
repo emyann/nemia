@@ -20,56 +20,6 @@ import StateLayer from "../primitives/StateLayer";
 import { Label, Title } from "../primitives/Typography";
 import { cn, focusRing, tv } from "../utils";
 
-/**
- * Material navigation drawer — the full-height list of destinations an
- * expanded window can keep open, or a compact one can pull over the content.
- *
- *   <NavigationDrawer items={items} selectedKey="orders" />          standard
- *   <NavigationDrawer variant="modal" isOpen={open} onClose={close}  modal
- *                     items={items} headline="Acme" />
- *
- * Spec: https://m3.material.io/components/navigation-drawer/overview ·
- * .../specs · .../guidelines · .../accessibility
- *
- * Both forms the spec defines:
- *
- * - **standard** sits inline in the layout on `surface` at elevation 0. It is
- *   the persistent drawer of a wide window: no scrim, nothing to dismiss.
- * - **modal** floats over a scrim on `surface-container-low` at elevation 1,
- *   traps focus, and closes on Escape or a click outside — React Aria's
- *   `ModalOverlay` + `Modal` + `Dialog`, animated by its `data-entering` /
- *   `data-exiting` states exactly as `SideSheet` and `Modal` are, with no
- *   animation library.
- *
- * The measurements are the spec's: a 360dp container with 16dp rounded
- * trailing corners (`md.comp.navigation-drawer.container.{width,shape}`,
- * `…{standard,modal}.container.{color,elevation}`), 28dp of side padding,
- * and destinations that are a 56dp full-pill active indicator inset 12dp
- * (`…active-indicator.{height,shape}`, "Active indicator padding 12dp"). An
- * active destination is `secondary-container` behind an
- * `on-secondary-container` icon and a **bold** label — the spec's
- * `label-large.weight.prominent`, so the selection is carried by weight as
- * well as colour. `headline` is the optional `title-small`
- * `on-surface-variant` line above the list, and `sections` puts a `Divider`
- * (the kit's, not a hand-rolled border) between groups.
- *
- * Like the rail and the bar, it is a `<nav>` of links or buttons with
- * `aria-current="page"` on the active one, not a tab set: Tab moves between
- * destinations and the arrow keys are not bound.
- *
- * **Badges.** A destination's `badge` is the drawer's own "badge label
- * text" (its anatomy, element 5): the count as `label-large` text at the
- * trailing end of the row, `on-surface-variant`, `on-secondary-container`
- * on the active one, never the red `Badge` the bar and the rail draw. It is
- * read after the name ("Inbox, 24"). A badge of `true`, which has no text,
- * shows its `badgeLabel` as that text; without one it falls back to the small
- * `Badge` dot, so that an unread mark is never drawn as nothing.
- *
- * Deviations: no bottom-anchored drawer
- * (`…bottom.container.shape` describes a compact-window variant the kit's
- * `SideSheet` already covers), and — as with the rail — no filled active icon
- * unless the item carries an `activeIcon`.
- */
 const styles = tv({
   slots: {
     // 360dp, 16dp on the trailing corners only (`corner.large.end`).
@@ -153,6 +103,56 @@ export type NavigationDrawerProps = {
   className?: string;
 };
 
+/**
+ * Material navigation drawer — the full-height list of destinations an
+ * expanded window can keep open, or a compact one can pull over the content.
+ *
+ *   <NavigationDrawer items={items} selectedKey="orders" />          standard
+ *   <NavigationDrawer variant="modal" isOpen={open} onClose={close}  modal
+ *                     items={items} headline="Acme" />
+ *
+ * Spec: https://m3.material.io/components/navigation-drawer/overview ·
+ * .../specs · .../guidelines · .../accessibility
+ *
+ * Both forms the spec defines:
+ *
+ * - **standard** sits inline in the layout on `surface` at elevation 0. It is
+ *   the persistent drawer of a wide window: no scrim, nothing to dismiss.
+ * - **modal** floats over a scrim on `surface-container-low` at elevation 1,
+ *   traps focus, and closes on Escape or a click outside — React Aria's
+ *   `ModalOverlay` + `Modal` + `Dialog`, animated by its `data-entering` /
+ *   `data-exiting` states exactly as `SideSheet` and `Modal` are, with no
+ *   animation library.
+ *
+ * The measurements are the spec's: a 360dp container with 16dp rounded
+ * trailing corners (`md.comp.navigation-drawer.container.{width,shape}`,
+ * `…{standard,modal}.container.{color,elevation}`), 28dp of side padding,
+ * and destinations that are a 56dp full-pill active indicator inset 12dp
+ * (`…active-indicator.{height,shape}`, "Active indicator padding 12dp"). An
+ * active destination is `secondary-container` behind an
+ * `on-secondary-container` icon and a **bold** label — the spec's
+ * `label-large.weight.prominent`, so the selection is carried by weight as
+ * well as colour. `headline` is the optional `title-small`
+ * `on-surface-variant` line above the list, and `sections` puts a `Divider`
+ * (the kit's, not a hand-rolled border) between groups.
+ *
+ * Like the rail and the bar, it is a `<nav>` of links or buttons with
+ * `aria-current="page"` on the active one, not a tab set: Tab moves between
+ * destinations and the arrow keys are not bound.
+ *
+ * **Badges.** A destination's `badge` is the drawer's own "badge label
+ * text" (its anatomy, element 5): the count as `label-large` text at the
+ * trailing end of the row, `on-surface-variant`, `on-secondary-container`
+ * on the active one, never the red `Badge` the bar and the rail draw. It is
+ * read after the name ("Inbox, 24"). A badge of `true`, which has no text,
+ * shows its `badgeLabel` as that text; without one it falls back to the small
+ * `Badge` dot, so that an unread mark is never drawn as nothing.
+ *
+ * Deviations: no bottom-anchored drawer
+ * (`…bottom.container.shape` describes a compact-window variant the kit's
+ * `SideSheet` already covers), and — as with the rail — no filled active icon
+ * unless the item carries an `activeIcon`.
+ */
 export function NavigationDrawer({
   items,
   sections,

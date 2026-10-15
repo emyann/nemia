@@ -39,6 +39,72 @@ import { ChevronDownIcon } from "../icons";
 import { composeTailwindRenderProps } from "../render-props";
 import { cn, focusRing, tv } from "../utils";
 
+const styles = tv({
+  slots: {
+    table: "w-full border-collapse overflow-clip text-on-surface",
+    header: "",
+    column: [
+      focusRing(),
+      "h-14 px-4 text-start align-middle text-label-large font-label-large text-on-surface-variant",
+      "border-b border-outline-variant -outline-offset-2",
+    ],
+    columnContent: "flex items-center gap-1",
+    sortIcon:
+      "inline-flex size-[18px] shrink-0 opacity-0 transition-transform duration-short-4 group-data-[sort-direction]/column:opacity-100 group-data-[sort-direction=ascending]/column:rotate-180",
+    body: "",
+    row: [
+      focusRing(),
+      "group/row relative h-[52px] border-b border-outline-variant bg-surface text-body-medium font-body-medium transition-colors duration-short-4 -outline-offset-2",
+      "data-[href]:cursor-pointer data-selected:bg-secondary-container data-selected:text-on-secondary-container",
+      "data-[interactive]:hover:bg-on-surface/8 data-[interactive]:data-pressed:bg-on-surface/10 data-[interactive]:data-focus-visible:bg-on-surface/10",
+      "data-disabled:text-on-surface/38",
+    ],
+    cell: [focusRing(), "px-4 align-middle -outline-offset-2"],
+    cellText: "block truncate",
+    footer: "text-label-large font-label-large text-on-surface",
+  },
+  variants: {
+    align: {
+      start: { column: "text-start", cell: "text-start" },
+      center: { column: "text-center", cell: "text-center" },
+      end: { column: "text-end", cell: "text-end" },
+    },
+    density: {
+      default: {},
+      dense: { column: "h-11", row: "h-10" },
+    },
+    showLastRowDivider: {
+      true: {},
+      // The last row of the table's last section: a footer's, or the body's.
+      false: { row: "[:last-child>&]:last:border-b-0" },
+    },
+    // A cut cell takes no width of its own: its column's decides.
+    truncate: {
+      true: { cell: "max-w-0" },
+    },
+  },
+});
+
+type TableAlign = "start" | "center" | "end";
+type TableDensity = "default" | "dense";
+
+/** The table's density, for the rows and the header cells under it. */
+const TableDensityContext = createContext<TableDensity>("default");
+
+/** Whether the table's last row draws its line, for the rows under it. */
+const TableLastRowDividerContext = createContext(true);
+
+export type TableProps = Omit<AriaTableProps, "className"> & {
+  className?: string;
+  /** `dense` draws 40dp rows under a 44dp header. Default 52dp under 56dp. */
+  density?: TableDensity;
+  /**
+   * `false` leaves the table's last row without its line: the footer's when
+   * a `TableFooter` follows, otherwise the body's. Default `true`.
+   */
+  showLastRowDivider?: boolean;
+};
+
 /**
  * Data table on React Aria `Table`: keyboard-navigable grid, optional
  * sorting (`sortDescriptor` / `onSortChange`, `allowsSorting` per column)
@@ -116,72 +182,6 @@ import { cn, focusRing, tv } from "../utils";
  * `table-header`, `table-column`, `table-body`, `table-row`, `table-cell` and
  * `table-footer`, and each takes `className`.
  */
-const styles = tv({
-  slots: {
-    table: "w-full border-collapse overflow-clip text-on-surface",
-    header: "",
-    column: [
-      focusRing(),
-      "h-14 px-4 text-start align-middle text-label-large font-label-large text-on-surface-variant",
-      "border-b border-outline-variant -outline-offset-2",
-    ],
-    columnContent: "flex items-center gap-1",
-    sortIcon:
-      "inline-flex size-[18px] shrink-0 opacity-0 transition-transform duration-short-4 group-data-[sort-direction]/column:opacity-100 group-data-[sort-direction=ascending]/column:rotate-180",
-    body: "",
-    row: [
-      focusRing(),
-      "group/row relative h-[52px] border-b border-outline-variant bg-surface text-body-medium font-body-medium transition-colors duration-short-4 -outline-offset-2",
-      "data-[href]:cursor-pointer data-selected:bg-secondary-container data-selected:text-on-secondary-container",
-      "data-[interactive]:hover:bg-on-surface/8 data-[interactive]:data-pressed:bg-on-surface/10 data-[interactive]:data-focus-visible:bg-on-surface/10",
-      "data-disabled:text-on-surface/38",
-    ],
-    cell: [focusRing(), "px-4 align-middle -outline-offset-2"],
-    cellText: "block truncate",
-    footer: "text-label-large font-label-large text-on-surface",
-  },
-  variants: {
-    align: {
-      start: { column: "text-start", cell: "text-start" },
-      center: { column: "text-center", cell: "text-center" },
-      end: { column: "text-end", cell: "text-end" },
-    },
-    density: {
-      default: {},
-      dense: { column: "h-11", row: "h-10" },
-    },
-    showLastRowDivider: {
-      true: {},
-      // The last row of the table's last section: a footer's, or the body's.
-      false: { row: "[:last-child>&]:last:border-b-0" },
-    },
-    // A cut cell takes no width of its own: its column's decides.
-    truncate: {
-      true: { cell: "max-w-0" },
-    },
-  },
-});
-
-type TableAlign = "start" | "center" | "end";
-type TableDensity = "default" | "dense";
-
-/** The table's density, for the rows and the header cells under it. */
-const TableDensityContext = createContext<TableDensity>("default");
-
-/** Whether the table's last row draws its line, for the rows under it. */
-const TableLastRowDividerContext = createContext(true);
-
-export type TableProps = Omit<AriaTableProps, "className"> & {
-  className?: string;
-  /** `dense` draws 40dp rows under a 44dp header. Default 52dp under 56dp. */
-  density?: TableDensity;
-  /**
-   * `false` leaves the table's last row without its line: the footer's when
-   * a `TableFooter` follows, otherwise the body's. Default `true`.
-   */
-  showLastRowDivider?: boolean;
-};
-
 export function Table({
   className,
   density = "default",

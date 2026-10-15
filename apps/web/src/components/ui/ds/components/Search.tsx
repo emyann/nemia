@@ -32,72 +32,6 @@ import { ArrowBackIcon, renderIcon, SearchIcon, XIcon, type IconProp } from "../
 import { composeTailwindRenderProps } from "../render-props";
 import { cn, focusRing, tv } from "../utils";
 
-/**
- * Material 3 search: the search bar, and the search view it opens, where
- * suggestions and results are listed as one types.
- *
- *   <SearchBar placeholder="Search messages" onSubmit={run} />
- *
- *   <SearchView placeholder="Search messages" onAction={open}>
- *     <SearchViewSection title="Recent">
- *       <SearchViewItem id="plants" label="Plants" leadingIcon={History} />
- *     </SearchViewSection>
- *   </SearchView>
- *
- * Spec: https://m3.material.io/components/search/overview · .../specs ·
- * .../guidelines · .../accessibility
- *
- * **`SearchBar`** is React Aria's `SearchField` drawn as Material's bar
- * (`md.comp.search-bar.*`): 56dp, fully rounded, `surface-container-high` at
- * elevation 3, `body-large` text in `on-surface` over an `on-surface-variant`
- * hint, a leading search icon in `on-surface` (or the caller's `leading`, a
- * menu or back `IconButton`), and `trailing` for one or two icon buttons or a
- * 30dp avatar. Hover and press lay `on-surface` over it at the state
- * opacities, and keyboard focus draws the kit's `focusRing()`. It is the
- * `searchbox` role, named by its hint ("Search messages"), as the
- * accessibility page asks; Enter calls `onSubmit`, and Escape, or the clear
- * button that appears once there is text, empties it.
- *
- * **`SearchView`** is the bar a person opens to search: a `DialogTrigger`
- * whose trigger is drawn as the bar, opening a `Dialog` that holds React
- * Aria's `Autocomplete` (a `SearchField` and a `ListBox` of `SearchViewItem`
- * and `SearchViewSection`). Typing filters the list (`filter`, by default a
- * case- and accent-blind "contains"), the arrow keys move through it while
- * the caret stays in the field, Enter on a highlighted item calls `onAction`
- * and on none calls `onSubmit` with the query; both close the view. Escape
- * empties the field, a second Escape closes the view, as does the back
- * button, and the focus returns to the bar. A polite live region says how
- * many results the list holds as it changes ("3 results", "No results"),
- * which is the accessibility page's "the screen reader must announce the
- * change".
- *
- * `layout` is Material's two layouts. `"docked"` (default) opens over the bar
- * in a popover as wide as it, at least 240dp and at most two thirds of the
- * window high, over a scrim. `"full-screen"` fills the window. Material
- * swaps from full screen in a compact window to docked from a medium one;
- * the app chooses, by the window it knows.
- *
- * `variant` is Material's two styles. `"divided"` (default) is the baseline
- * view: one container, `surface-container-high` with extra-large corners
- * docked and none full screen, its header 56dp docked and 72dp full screen,
- * and an `outline` divider between the header and the list. `"contained"`
- * is the expressive one: the header stays a 56dp pill, and the list is a
- * container of its own 2dp below it, medium corners, docked; full screen, the
- * pill sits 12dp from the edges on `surface-container-low`.
- *
- * Parts, by `data-slot`: `search-bar` (the bar's root), `search-view` (the
- * closed view's bar), `search-view-trigger`, `search-view-dialog`,
- * `search-view-header`, `search-view-list`, `search-view-item`,
- * `search-view-section`.
- *
- * Deviations:
- * - **Width.** The bar takes its container's width up to Material's 720dp;
- *   the 360dp minimum is the layout's to keep, so a bar in a narrow pane
- *   still fits.
- * - **Motion.** The expressive bar's widening on focus and the view's spring
- *   are not drawn: the view fades in, as the kit's other overlays do.
- * - **Predictive back** is Android's gesture and is not the web's.
- */
 const barStyles = tv({
   slots: {
     base: [
@@ -252,6 +186,37 @@ export type SearchBarProps = Omit<SearchFieldProps, "children" | "className"> & 
   className?: string;
 };
 
+/**
+ * Material 3 search: the search bar, and the search view it opens, where
+ * suggestions and results are listed as one types.
+ *
+ *   <SearchBar placeholder="Search messages" onSubmit={run} />
+ *
+ *   <SearchView placeholder="Search messages" onAction={open}>
+ *     <SearchViewSection title="Recent">
+ *       <SearchViewItem id="plants" label="Plants" leadingIcon={History} />
+ *     </SearchViewSection>
+ *   </SearchView>
+ *
+ * Spec: https://m3.material.io/components/search/overview · .../specs ·
+ * .../guidelines · .../accessibility
+ *
+ * **`SearchBar`** is React Aria's `SearchField` drawn as Material's bar
+ * (`md.comp.search-bar.*`): 56dp, fully rounded, `surface-container-high` at
+ * elevation 3, `body-large` text in `on-surface` over an `on-surface-variant`
+ * hint, a leading search icon in `on-surface` (or the caller's `leading`, a
+ * menu or back `IconButton`), and `trailing` for one or two icon buttons or a
+ * 30dp avatar. Hover and press lay `on-surface` over it at the state
+ * opacities, and keyboard focus draws the kit's `focusRing()`. It is the
+ * `searchbox` role, named by its hint ("Search messages"), as the
+ * accessibility page asks; Enter calls `onSubmit`, and Escape, or the clear
+ * button that appears once there is text, empties it.
+ *
+ * Deviations:
+ * - **Width.** The bar takes its container's width up to Material's 720dp;
+ *   the 360dp minimum is the layout's to keep, so a bar in a narrow pane
+ *   still fits.
+ */
 export function SearchBar({
   placeholder,
   leading,
@@ -339,6 +304,44 @@ export type SearchViewProps<T extends object> = {
   className?: string;
 };
 
+/**
+ * **`SearchView`** is the bar a person opens to search: a `DialogTrigger`
+ * whose trigger is drawn as the bar, opening a `Dialog` that holds React
+ * Aria's `Autocomplete` (a `SearchField` and a `ListBox` of `SearchViewItem`
+ * and `SearchViewSection`). Typing filters the list (`filter`, by default a
+ * case- and accent-blind "contains"), the arrow keys move through it while
+ * the caret stays in the field, Enter on a highlighted item calls `onAction`
+ * and on none calls `onSubmit` with the query; both close the view. Escape
+ * empties the field, a second Escape closes the view, as does the back
+ * button, and the focus returns to the bar. A polite live region says how
+ * many results the list holds as it changes ("3 results", "No results"),
+ * which is the accessibility page's "the screen reader must announce the
+ * change".
+ *
+ * `layout` is Material's two layouts. `"docked"` (default) opens over the bar
+ * in a popover as wide as it, at least 240dp and at most two thirds of the
+ * window high, over a scrim. `"full-screen"` fills the window. Material
+ * swaps from full screen in a compact window to docked from a medium one;
+ * the app chooses, by the window it knows.
+ *
+ * `variant` is Material's two styles. `"divided"` (default) is the baseline
+ * view: one container, `surface-container-high` with extra-large corners
+ * docked and none full screen, its header 56dp docked and 72dp full screen,
+ * and an `outline` divider between the header and the list. `"contained"`
+ * is the expressive one: the header stays a 56dp pill, and the list is a
+ * container of its own 2dp below it, medium corners, docked; full screen, the
+ * pill sits 12dp from the edges on `surface-container-low`.
+ *
+ * Parts, by `data-slot`: `search-bar` (the bar's root), `search-view` (the
+ * closed view's bar), `search-view-trigger`, `search-view-dialog`,
+ * `search-view-header`, `search-view-list`, `search-view-item`,
+ * `search-view-section`.
+ *
+ * Deviations:
+ * - **Motion.** The expressive bar's widening on focus and the view's spring
+ *   are not drawn: the view fades in, as the kit's other overlays do.
+ * - **Predictive back** is Android's gesture and is not the web's.
+ */
 export function SearchView<T extends object>({
   placeholder,
   layout = "docked",

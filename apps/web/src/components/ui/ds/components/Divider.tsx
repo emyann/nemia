@@ -2,6 +2,37 @@ import { type HTMLAttributes } from "react";
 
 import { tv, type VariantProps } from "../utils";
 
+const styles = tv({
+  base: "shrink-0 bg-outline-variant forced-colors:bg-[ButtonBorder]",
+  variants: {
+    orientation: {
+      horizontal: "h-px w-full",
+      vertical: "w-px self-stretch",
+    },
+    variant: {
+      "full-width": "",
+      inset: "",
+      "middle-inset": "",
+    },
+  },
+  compoundVariants: [
+    // 16dp leading inset; the trailing edge stays flush (spec: right margin 0).
+    { orientation: "horizontal", variant: "inset", class: "ms-4 w-auto" },
+    { orientation: "horizontal", variant: "middle-inset", class: "mx-4 w-auto" },
+    { orientation: "vertical", variant: "inset", class: "mt-4 self-auto" },
+    { orientation: "vertical", variant: "middle-inset", class: "my-4 self-auto" },
+  ],
+  defaultVariants: { orientation: "horizontal", variant: "full-width" },
+});
+
+export type DividerProps = VariantProps<typeof styles> &
+  Omit<HTMLAttributes<HTMLDivElement>, "role" | "children"> & {
+    /** Hidden from assistive technology (the MD3 default). Set `false` where
+        the line is the only boundary marker and should be a `separator`. */
+    decorative?: boolean;
+    className?: string;
+  };
+
 /**
  * A divider — the 1dp `outline-variant` line that groups content and implies
  * hierarchy. Presentational and server-safe: no React Aria, no `"use client"`.
@@ -38,37 +69,6 @@ import { tv, type VariantProps } from "../utils";
  * layout — every other component here does — so a caller adds `my-2` rather
  * than the divider asserting margin it cannot know is wanted.
  */
-const styles = tv({
-  base: "shrink-0 bg-outline-variant forced-colors:bg-[ButtonBorder]",
-  variants: {
-    orientation: {
-      horizontal: "h-px w-full",
-      vertical: "w-px self-stretch",
-    },
-    variant: {
-      "full-width": "",
-      inset: "",
-      "middle-inset": "",
-    },
-  },
-  compoundVariants: [
-    // 16dp leading inset; the trailing edge stays flush (spec: right margin 0).
-    { orientation: "horizontal", variant: "inset", class: "ms-4 w-auto" },
-    { orientation: "horizontal", variant: "middle-inset", class: "mx-4 w-auto" },
-    { orientation: "vertical", variant: "inset", class: "mt-4 self-auto" },
-    { orientation: "vertical", variant: "middle-inset", class: "my-4 self-auto" },
-  ],
-  defaultVariants: { orientation: "horizontal", variant: "full-width" },
-});
-
-export type DividerProps = VariantProps<typeof styles> &
-  Omit<HTMLAttributes<HTMLDivElement>, "role" | "children"> & {
-    /** Hidden from assistive technology (the MD3 default). Set `false` where
-        the line is the only boundary marker and should be a `separator`. */
-    decorative?: boolean;
-    className?: string;
-  };
-
 export function Divider({
   orientation = "horizontal",
   variant = "full-width",

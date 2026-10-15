@@ -16,54 +16,6 @@ import StateLayer from "../primitives/StateLayer";
 import { Label } from "../primitives/Typography";
 import { focusRing, tv } from "../utils";
 
-/**
- * Material navigation rail — the vertical destination list a medium or
- * expanded window carries down its leading edge, in the spec's two states.
- *
- *   <NavigationRail items={items} selectedKey="orders" header={<Fab />} />
- *   <NavigationRail items={items} isExpanded />
- *
- * Spec: https://m3.material.io/components/navigation-rail/overview ·
- * .../specs · .../guidelines · .../accessibility
- *
- * **Collapsed** (the default) is 96dp wide — 80dp with `isNarrow` — with 44dp
- * of top space and vertical items: a 56×32 pill indicator behind a 24dp icon,
- * the label 4dp under it, in a 64dp row
- * (`md.comp.nav-rail.collapsed.container.width`, `…collapsed.top-space`,
- * `…item.container.height`, `…item.vertical.active-indicator.{width,height}`).
- * **Expanded** is the same rail at 220dp — the spec's minimum; widen it up to
- * the 360dp maximum with `className` — with the items turned horizontal: icon
- * then label inside
- * a full-width 56dp pill, 16dp of leading and trailing space
- * (`…expanded.container.width.{minimum,maximum}`,
- * `…item.horizontal.active-indicator.height`,
- * `…item.horizontal.full-width.{leading,trailing}-space`). Both states are one
- * component because they are one component in the spec, and because an app
- * that lets the reader collapse its rail needs the transition between them.
- *
- * Colours are the tokens: the active indicator is `secondary-container` with
- * an `on-secondary-container` icon, the active label is `secondary`, and
- * everything inactive is `on-surface-variant` (`md.comp.nav-rail.item.*`).
- *
- * Like `BottomNavigation`, this is a `<nav>` of links (items with `href`) or
- * buttons with `aria-current="page"` on the active one — **not** a tab set. A
- * rail navigates; it does not swap a panel, so Tab moves between destinations
- * and the arrow keys are not bound.
- *
- * `header` is the spec's own slot for what sits above the destinations — a
- * menu button, a FAB, or both (its "Configurations" figure). It keeps the 40dp
- * minimum gap the spec asks for (`…item.header-space-minimum`).
- *
- * A destination's `badge` is the kit's `Badge`, read after its name. It sits
- * on the icon; on an expanded rail, where the label follows the icon, a large
- * badge goes to the trailing edge of the pill instead, as Material's badge
- * guidelines ask, and the small dot stays on the icon.
- *
- * Deviations, the two `BottomNavigation` documents: no filled active icon
- * unless the item carries an `activeIcon` (the kit ships no icon library to
- * pull the filled member from), and the baseline rail rather than any
- * Expressive variant.
- */
 const styles = tv({
   slots: {
     // `…container.color` = surface, elevation 0, square corners.
@@ -153,6 +105,54 @@ export type NavigationRailProps = Omit<
   footer?: React.ReactNode;
 };
 
+/**
+ * Material navigation rail — the vertical destination list a medium or
+ * expanded window carries down its leading edge, in the spec's two states.
+ *
+ *   <NavigationRail items={items} selectedKey="orders" header={<Fab />} />
+ *   <NavigationRail items={items} isExpanded />
+ *
+ * Spec: https://m3.material.io/components/navigation-rail/overview ·
+ * .../specs · .../guidelines · .../accessibility
+ *
+ * **Collapsed** (the default) is 96dp wide — 80dp with `isNarrow` — with 44dp
+ * of top space and vertical items: a 56×32 pill indicator behind a 24dp icon,
+ * the label 4dp under it, in a 64dp row
+ * (`md.comp.nav-rail.collapsed.container.width`, `…collapsed.top-space`,
+ * `…item.container.height`, `…item.vertical.active-indicator.{width,height}`).
+ * **Expanded** is the same rail at 220dp — the spec's minimum; widen it up to
+ * the 360dp maximum with `className` — with the items turned horizontal: icon
+ * then label inside
+ * a full-width 56dp pill, 16dp of leading and trailing space
+ * (`…expanded.container.width.{minimum,maximum}`,
+ * `…item.horizontal.active-indicator.height`,
+ * `…item.horizontal.full-width.{leading,trailing}-space`). Both states are one
+ * component because they are one component in the spec, and because an app
+ * that lets the reader collapse its rail needs the transition between them.
+ *
+ * Colours are the tokens: the active indicator is `secondary-container` with
+ * an `on-secondary-container` icon, the active label is `secondary`, and
+ * everything inactive is `on-surface-variant` (`md.comp.nav-rail.item.*`).
+ *
+ * Like `BottomNavigation`, this is a `<nav>` of links (items with `href`) or
+ * buttons with `aria-current="page"` on the active one — **not** a tab set. A
+ * rail navigates; it does not swap a panel, so Tab moves between destinations
+ * and the arrow keys are not bound.
+ *
+ * `header` is the spec's own slot for what sits above the destinations — a
+ * menu button, a FAB, or both (its "Configurations" figure). It keeps the 40dp
+ * minimum gap the spec asks for (`…item.header-space-minimum`).
+ *
+ * A destination's `badge` is the kit's `Badge`, read after its name. It sits
+ * on the icon; on an expanded rail, where the label follows the icon, a large
+ * badge goes to the trailing edge of the pill instead, as Material's badge
+ * guidelines ask, and the small dot stays on the icon.
+ *
+ * Deviations, the two `BottomNavigation` documents: no filled active icon
+ * unless the item carries an `activeIcon` (the kit ships no icon library to
+ * pull the filled member from), and the baseline rail rather than any
+ * Expressive variant.
+ */
 export function NavigationRail({
   items,
   selectedKey,

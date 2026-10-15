@@ -19,56 +19,6 @@ import { composeTailwindRenderProps } from "../render-props";
 import { cn, focusRing, tv } from "../utils";
 import { Title } from "../primitives/Typography";
 
-/**
- * Material tabs — one row of destinations over the region they control.
- *
- *   <Tabs>
- *     <TabList aria-label="Time range">
- *       <Tab id="day">Today</Tab>
- *       <Tab id="week">This week</Tab>
- *     </TabList>
- *     <TabPanel id="day">…</TabPanel>
- *     <TabPanel id="week">…</TabPanel>
- *   </Tabs>
- *
- * Spec: https://m3.material.io/components/tabs/overview · .../specs ·
- * .../guidelines · .../accessibility
- *
- * **`primary` vs `secondary` is the spec's own split**, not a look: primary
- * tabs are the only set on a screen; secondary tabs are the second level,
- * always placed *below* a primary set, with a quieter indicator and the same
- * function. The measurements are the spec's — 48dp rows (64dp once a tab
- * stacks an icon over its label), a 24dp icon, a 1dp `surface-variant` divider
- * under the row, and an active indicator 3dp tall with rounded top corners and
- * a 24dp minimum length for primary, 2dp and square for secondary
- * (`md.comp.{primary,secondary}-navigation-tab.*`). Colours follow the tokens:
- * a primary set paints its active label, icon and indicator `primary` and its
- * inactive ones `on-surface-variant`; a secondary set paints the active label
- * `on-surface` and keeps the indicator `primary`.
- *
- * The primary indicator hugs its label rather than spanning the tab — that is
- * what "inset on each side, minimum length 24dp" means — so the label and the
- * indicator share a two-row grid inside the tab, and the indicator is the
- * width of the row above it. The secondary indicator spans the whole tab.
- *
- * Behaviour is React Aria's `Tabs`, which is what the accessibility page asks
- * for: arrows move between tabs, the selected tab is the only one in the tab
- * order, and each panel is labelled by its tab. Every tab is at least 48dp
- * tall, so nothing here goes under the 48×48 touch target the spec's
- * "avoid applying density" note protects.
- *
- * **Badges.** `badge` draws the kit's `Badge`: on the icon of a tab whose
- * icon is stacked over its label, and after the label, at the tab's trailing
- * edge, where the label follows the icon on one line or there is no icon (the
- * badge guidelines: a large badge must not overlap what follows the icon).
- * It is read after the tab's name ("Inbox, 3").
- *
- * Deviations: **no swipe** between panels (a pointer gesture the kit does not
- * own, and the spec itself warns it collides with other swipeable content).
- * Vertical orientation is React
- * Aria's, not Material's: the spec has horizontal tabs only, so a vertical set
- * gets the behaviour but keeps the horizontal anatomy.
- */
 
 const styles = tv({
   slots: {
@@ -184,6 +134,56 @@ export type TabsProps = AriaTabsProps & {
   children: ReactNode;
 };
 
+/**
+ * Material tabs — one row of destinations over the region they control.
+ *
+ *   <Tabs>
+ *     <TabList aria-label="Time range">
+ *       <Tab id="day">Today</Tab>
+ *       <Tab id="week">This week</Tab>
+ *     </TabList>
+ *     <TabPanel id="day">…</TabPanel>
+ *     <TabPanel id="week">…</TabPanel>
+ *   </Tabs>
+ *
+ * Spec: https://m3.material.io/components/tabs/overview · .../specs ·
+ * .../guidelines · .../accessibility
+ *
+ * **`primary` vs `secondary` is the spec's own split**, not a look: primary
+ * tabs are the only set on a screen; secondary tabs are the second level,
+ * always placed *below* a primary set, with a quieter indicator and the same
+ * function. The measurements are the spec's — 48dp rows (64dp once a tab
+ * stacks an icon over its label), a 24dp icon, a 1dp `surface-variant` divider
+ * under the row, and an active indicator 3dp tall with rounded top corners and
+ * a 24dp minimum length for primary, 2dp and square for secondary
+ * (`md.comp.{primary,secondary}-navigation-tab.*`). Colours follow the tokens:
+ * a primary set paints its active label, icon and indicator `primary` and its
+ * inactive ones `on-surface-variant`; a secondary set paints the active label
+ * `on-surface` and keeps the indicator `primary`.
+ *
+ * The primary indicator hugs its label rather than spanning the tab — that is
+ * what "inset on each side, minimum length 24dp" means — so the label and the
+ * indicator share a two-row grid inside the tab, and the indicator is the
+ * width of the row above it. The secondary indicator spans the whole tab.
+ *
+ * Behaviour is React Aria's `Tabs`, which is what the accessibility page asks
+ * for: arrows move between tabs, the selected tab is the only one in the tab
+ * order, and each panel is labelled by its tab. Every tab is at least 48dp
+ * tall, so nothing here goes under the 48×48 touch target the spec's
+ * "avoid applying density" note protects.
+ *
+ * **Badges.** `badge` draws the kit's `Badge`: on the icon of a tab whose
+ * icon is stacked over its label, and after the label, at the tab's trailing
+ * edge, where the label follows the icon on one line or there is no icon (the
+ * badge guidelines: a large badge must not overlap what follows the icon).
+ * It is read after the tab's name ("Inbox, 3").
+ *
+ * Deviations: **no swipe** between panels (a pointer gesture the kit does not
+ * own, and the spec itself warns it collides with other swipeable content).
+ * Vertical orientation is React
+ * Aria's, not Material's: the spec has horizontal tabs only, so a vertical set
+ * gets the behaviour but keeps the horizontal anatomy.
+ */
 export function Tabs({
   variant = "primary",
   className,

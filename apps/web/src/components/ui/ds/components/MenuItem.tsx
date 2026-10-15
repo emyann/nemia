@@ -3,16 +3,6 @@ import React from "react";
 import { renderIcon, type IconProp } from "../icons";
 import { Body, Label } from "../primitives/Typography";
 
-/**
- * MD3 (baseline) menu item: 48dp row, 12dp padding, 24dp icons in
- * on-surface-variant, text on-surface, selected container
- * surface-container-highest.
- * Spec: https://m3.material.io/components/menus/{overview,specs,guidelines,accessibility}
- * Deviation: the overview recommends the M3 Expressive *vertical menu*
- * (new shapes, standard / vibrant colour styles, gaps) for new designs and
- * keeps this baseline menu available; the kit follows the baseline token
- * set, and the vertical menu would be a new variant.
- */
 const styles = tv({
   extend: focusRing,
   slots: {
@@ -88,6 +78,16 @@ export type MenuItemProps = VariantProps<typeof styles> & {
   className?: string;
 };
 
+/**
+ * MD3 (baseline) menu item: 48dp row, 12dp padding, 24dp icons in
+ * on-surface-variant, text on-surface, selected container
+ * surface-container-highest.
+ * Spec: https://m3.material.io/components/menus/{overview,specs,guidelines,accessibility}
+ * Deviation: the overview recommends the M3 Expressive *vertical menu*
+ * (new shapes, standard / vibrant colour styles, gaps) for new designs and
+ * keeps this baseline menu available; the kit follows the baseline token
+ * set, and the vertical menu would be a new variant.
+ */
 export function MenuItem(props: MenuItemProps) {
   const {
     label,

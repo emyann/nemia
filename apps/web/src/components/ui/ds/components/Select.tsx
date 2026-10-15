@@ -28,32 +28,6 @@ import { fieldStyles, type FieldVariantProps } from "./field-styles";
 import { MenuItem } from "./MenuItem";
 import { tv } from "../utils";
 
-/**
- * MD3 exposed dropdown menu — a text-field-shaped trigger (filled or
- * outlined, floating label) that opens a menu of options. Built on React
- * Aria `Select` + `ListBox`; options render with the kit's `MenuItem`.
- *
- *   <Select label="Table" items={tables}>
- *     {(t) => <SelectItem id={t.id} label={t.name} />}
- *   </Select>
- *
- * The field itself is the shared `./field-styles.ts` module at
- * `kind="trigger"` — the container *is* the React Aria `Button`, so its
- * focused look keys on `data-focus-visible` and the label floats off
- * `data-populated` (set here from `SelectStateContext`) or `data-open`. The
- * outlined label notch uses `--md3-field-notch` like `TextField`. Only the
- * menu the trigger opens is styled locally, below.
- *
- * Spec: text field + menus —
- * https://m3.material.io/components/text-fields/specs (trigger anatomy) and
- * https://m3.material.io/components/menus/{specs,guidelines,accessibility}
- * (baseline menu: 4dp corners, 48dp items, a checkmark as the second
- * selection cue). Deviations: the spec says disabled items stay focusable;
- * React Aria's ListBox skips them (no `disabledBehavior` on ListBox in RAC
- * 1.20), so they are visible but not focusable. A closed trigger that merely
- * has keyboard focus keeps its resting label — MD3 floats the label on focus,
- * but there is nothing to type into until the menu opens.
- */
 const styles = fieldStyles;
 
 /**
@@ -94,6 +68,32 @@ export type SelectProps<T extends object> = Omit<
     className?: string;
   };
 
+/**
+ * MD3 exposed dropdown menu — a text-field-shaped trigger (filled or
+ * outlined, floating label) that opens a menu of options. Built on React
+ * Aria `Select` + `ListBox`; options render with the kit's `MenuItem`.
+ *
+ *   <Select label="Table" items={tables}>
+ *     {(t) => <SelectItem id={t.id} label={t.name} />}
+ *   </Select>
+ *
+ * The field itself is the shared `./field-styles.ts` module at
+ * `kind="trigger"` — the container *is* the React Aria `Button`, so its
+ * focused look keys on `data-focus-visible` and the label floats off
+ * `data-populated` (set here from `SelectStateContext`) or `data-open`. The
+ * outlined label notch uses `--md3-field-notch` like `TextField`. Only the
+ * menu the trigger opens is styled locally, below.
+ *
+ * Spec: text field + menus —
+ * https://m3.material.io/components/text-fields/specs (trigger anatomy) and
+ * https://m3.material.io/components/menus/{specs,guidelines,accessibility}
+ * (baseline menu: 4dp corners, 48dp items, a checkmark as the second
+ * selection cue). Deviations: the spec says disabled items stay focusable;
+ * React Aria's ListBox skips them (no `disabledBehavior` on ListBox in RAC
+ * 1.20), so they are visible but not focusable. A closed trigger that merely
+ * has keyboard focus keeps its resting label — MD3 floats the label on focus,
+ * but there is nothing to type into until the menu opens.
+ */
 export function Select<T extends object>(props: SelectProps<T>) {
   const {
     label,

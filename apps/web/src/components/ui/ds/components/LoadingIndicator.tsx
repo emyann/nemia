@@ -8,90 +8,6 @@ import {
 import { composeTailwindRenderProps } from "../render-props";
 import { tv } from "../utils";
 
-/**
- * Loading indicator — Material 3 Expressive's looping shape morph, for a short
- * wait whose length is not known (between 200ms and 5s), on React Aria's
- * `ProgressBar` with `isIndeterminate` always on, so the `progressbar` role
- * with no value comes from the behaviour layer.
- *
- *   <LoadingIndicator aria-label="Loading news article" />
- *   <LoadingIndicator variant="contained" aria-label="Refreshing page" />
- *   <LoadingIndicator aria-label="Checking for updates" size={24} />
- *
- * Spec: https://m3.material.io/components/loading-indicator/overview ·
- * .../specs · .../guidelines · .../accessibility (pages updated 2026-07-29,
- * token table revision 2026-05-27, read 2026-10-14).
- *
- * Anatomy is the spec's two parts: the **active indicator** and an optional
- * **container**. `variant="default"` draws the active indicator alone, in
- * `primary` (`md.comp.loading-indicator.active-indicator.color`), for a loader
- * placed directly on a surface. `variant="contained"` puts it in
- * `on-primary-container` on a `primary-container` circle
- * (`md.comp.loading-indicator.contained.active-indicator.color`,
- * `…contained.container.color`, `…container.shape` = corner full), for a
- * loader placed over other content. The size is 48dp with a 38dp active
- * indicator (`…container.width/height`, `…active-indicator.size`); `size`
- * scales it from 24 to 240dp, the spec's range, and the 38/48 ratio holds at
- * every size.
- *
- * There is no `value`: the spec says a loading indicator never turns into a
- * determinate one. A process whose progress becomes known uses
- * `ProgressIndicator` from the start.
- *
- * Accessibility: it is a visual cue, so it needs a label that says what is
- * loading ("Loading news article", "Refreshing page"), passed as `aria-label`
- * or `aria-labelledby`. Without one the role has no name and axe fails it. It
- * is not focusable. The active indicator meets 3:1 against its surface or
- * container; the container itself need not.
- *
- * **The seven shapes.** The spec calls the active indicator "a looping shape
- * morph sequence composed of seven unique Material 3 shapes", and Material's
- * shape-morph page says web is not currently available. The sequence is the
- * one Compose's loading indicator uses (`LoadingIndicatorDefaults.
- * IndeterminateIndicatorPolygons`, androidx `compose/material3/…/
- * LoadingIndicator.kt`), and each shape's parameters are the published ones in
- * Compose's `MaterialShapes` reference
- * (https://developer.android.com/reference/kotlin/androidx/compose/material3/MaterialShapes,
- * source `compose/material3/…/MaterialShapes.kt`), read 2026-10-14:
- *
- *   1. Soft burst — 10 repeats of (0.193, 0.277) and (0.176, 0.055), rounding 0.053
- *   2. 9-sided cookie — a 9-point star, inner radius 0.8, rounding 0.5, turned -90°
- *   3. Pentagon — (0.5, -0.009), (1.03, 0.365), (0.828, 0.97) mirrored,
- *      roundings 0.172, 0.164, 0.169
- *   4. Pill — (0.961, 0.039) r 0.426, (1.001, 0.428), (1.0, 0.609) r 1,
- *      mirrored, 2 repeats
- *   5. Sunny — an 8-point star, inner radius 0.8, rounding 0.15
- *   6. 4-sided cookie — 4 repeats of (1.237, 1.236) r 0.258 and (0.5, 0.918) r 0.233
- *   7. Oval — a circle scaled to 0.64 in height, turned -45°
- *
- * The geometry is the kit's own code, not a port: each shape's points are
- * placed in the unit square, each corner is cut by an arc of its rounding,
- * and the outline is sampled from the centre at the same angles for every
- * shape, so CSS can interpolate one path into the next without twisting.
- *
- * Motion. The paths become one `@keyframes` on `d`, each step one
- * `--md3-duration-long-4` (Compose steps every 650ms; 600ms is the nearest
- * token) on `--md-sys-motion-easing-emphasized`, with a turn of 720°/7 per
- * step so the loop closes on a whole turn; the whole indicator also turns once
- * every eight steps. The keyframes ship as a `<style>` element inside this
- * file, as `ProgressIndicator`'s sweep does, so a copied component carries its
- * own motion and React emits it once per page. Under
- * `prefers-reduced-motion: reduce` both animations stop on the first shape.
- *
- * Deviations, each recorded:
- *
- * - **The shapes are drawn by the kit, from Compose's parameters**, so their
- *   curves may differ slightly from Compose's own; each is scaled to fill the
- *   38dp circle as it turns, where Compose scales the set as one.
- * - **The morph eases** on the emphasized curve where Compose springs.
- * - **Where CSS cannot animate `d`** (WebKit, today), the first shape turns
- *   without morphing; it still says "working".
- * - **No pull-to-refresh.** The spec gives it to Jetpack Compose only.
- *
- * Parts, each reachable through `classNames` and by `data-slot`:
- * `container` (`loading-indicator-container`, contained only) and
- * `activeIndicator` (`loading-indicator-active-indicator`).
- */
 const styles = tv({
   slots: {
     base: "inline-flex shrink-0 items-center justify-center align-middle",
@@ -407,6 +323,90 @@ export type LoadingIndicatorProps = Omit<
   classNames?: { container?: string; activeIndicator?: string };
 };
 
+/**
+ * Loading indicator — Material 3 Expressive's looping shape morph, for a short
+ * wait whose length is not known (between 200ms and 5s), on React Aria's
+ * `ProgressBar` with `isIndeterminate` always on, so the `progressbar` role
+ * with no value comes from the behaviour layer.
+ *
+ *   <LoadingIndicator aria-label="Loading news article" />
+ *   <LoadingIndicator variant="contained" aria-label="Refreshing page" />
+ *   <LoadingIndicator aria-label="Checking for updates" size={24} />
+ *
+ * Spec: https://m3.material.io/components/loading-indicator/overview ·
+ * .../specs · .../guidelines · .../accessibility (pages updated 2026-07-29,
+ * token table revision 2026-05-27, read 2026-10-14).
+ *
+ * Anatomy is the spec's two parts: the **active indicator** and an optional
+ * **container**. `variant="default"` draws the active indicator alone, in
+ * `primary` (`md.comp.loading-indicator.active-indicator.color`), for a loader
+ * placed directly on a surface. `variant="contained"` puts it in
+ * `on-primary-container` on a `primary-container` circle
+ * (`md.comp.loading-indicator.contained.active-indicator.color`,
+ * `…contained.container.color`, `…container.shape` = corner full), for a
+ * loader placed over other content. The size is 48dp with a 38dp active
+ * indicator (`…container.width/height`, `…active-indicator.size`); `size`
+ * scales it from 24 to 240dp, the spec's range, and the 38/48 ratio holds at
+ * every size.
+ *
+ * There is no `value`: the spec says a loading indicator never turns into a
+ * determinate one. A process whose progress becomes known uses
+ * `ProgressIndicator` from the start.
+ *
+ * Accessibility: it is a visual cue, so it needs a label that says what is
+ * loading ("Loading news article", "Refreshing page"), passed as `aria-label`
+ * or `aria-labelledby`. Without one the role has no name and axe fails it. It
+ * is not focusable. The active indicator meets 3:1 against its surface or
+ * container; the container itself need not.
+ *
+ * **The seven shapes.** The spec calls the active indicator "a looping shape
+ * morph sequence composed of seven unique Material 3 shapes", and Material's
+ * shape-morph page says web is not currently available. The sequence is the
+ * one Compose's loading indicator uses (`LoadingIndicatorDefaults.
+ * IndeterminateIndicatorPolygons`, androidx `compose/material3/…/
+ * LoadingIndicator.kt`), and each shape's parameters are the published ones in
+ * Compose's `MaterialShapes` reference
+ * (https://developer.android.com/reference/kotlin/androidx/compose/material3/MaterialShapes,
+ * source `compose/material3/…/MaterialShapes.kt`), read 2026-10-14:
+ *
+ *   1. Soft burst — 10 repeats of (0.193, 0.277) and (0.176, 0.055), rounding 0.053
+ *   2. 9-sided cookie — a 9-point star, inner radius 0.8, rounding 0.5, turned -90°
+ *   3. Pentagon — (0.5, -0.009), (1.03, 0.365), (0.828, 0.97) mirrored,
+ *      roundings 0.172, 0.164, 0.169
+ *   4. Pill — (0.961, 0.039) r 0.426, (1.001, 0.428), (1.0, 0.609) r 1,
+ *      mirrored, 2 repeats
+ *   5. Sunny — an 8-point star, inner radius 0.8, rounding 0.15
+ *   6. 4-sided cookie — 4 repeats of (1.237, 1.236) r 0.258 and (0.5, 0.918) r 0.233
+ *   7. Oval — a circle scaled to 0.64 in height, turned -45°
+ *
+ * The geometry is the kit's own code, not a port: each shape's points are
+ * placed in the unit square, each corner is cut by an arc of its rounding,
+ * and the outline is sampled from the centre at the same angles for every
+ * shape, so CSS can interpolate one path into the next without twisting.
+ *
+ * Motion. The paths become one `@keyframes` on `d`, each step one
+ * `--md3-duration-long-4` (Compose steps every 650ms; 600ms is the nearest
+ * token) on `--md-sys-motion-easing-emphasized`, with a turn of 720°/7 per
+ * step so the loop closes on a whole turn; the whole indicator also turns once
+ * every eight steps. The keyframes ship as a `<style>` element inside this
+ * file, as `ProgressIndicator`'s sweep does, so a copied component carries its
+ * own motion and React emits it once per page. Under
+ * `prefers-reduced-motion: reduce` both animations stop on the first shape.
+ *
+ * Deviations, each recorded:
+ *
+ * - **The shapes are drawn by the kit, from Compose's parameters**, so their
+ *   curves may differ slightly from Compose's own; each is scaled to fill the
+ *   38dp circle as it turns, where Compose scales the set as one.
+ * - **The morph eases** on the emphasized curve where Compose springs.
+ * - **Where CSS cannot animate `d`** (WebKit, today), the first shape turns
+ *   without morphing; it still says "working".
+ * - **No pull-to-refresh.** The spec gives it to Jetpack Compose only.
+ *
+ * Parts, each reachable through `classNames` and by `data-slot`:
+ * `container` (`loading-indicator-container`, contained only) and
+ * `activeIndicator` (`loading-indicator-active-indicator`).
+ */
 export function LoadingIndicator({
   variant = "default",
   size = DEFAULT_SIZE,

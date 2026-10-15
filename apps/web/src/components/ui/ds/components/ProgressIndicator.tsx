@@ -10,61 +10,6 @@ import {
 import { composeTailwindRenderProps } from "../render-props";
 import { tv } from "../utils";
 
-/**
- * Progress indicators — the linear bar and the circular ring, each determinate
- * or indeterminate, on React Aria's `ProgressBar` so the `progressbar` role,
- * `aria-valuenow` / `aria-valuetext` and the locale-formatted value label come
- * from the behaviour layer.
- *
- *   <ProgressIndicator label="Uploading menu" value={62} showValue />
- *   <ProgressIndicator label="Loading activity" isIndeterminate />
- *   <ProgressIndicator variant="circular" label="Saving" value={40} />
- *   <ProgressIndicator variant="circular" aria-label="Loading" isIndeterminate size={24} />
- *
- * Spec: https://m3.material.io/components/progress-indicators/overview ·
- * .../specs · .../guidelines · .../accessibility
- *
- * Anatomy is the spec's three parts — active indicator, track, stop indicator.
- * The active indicator and the stop indicator are `primary`
- * (`md.comp.progress-indicator.active-indicator.color`,
- * `…stop-indicator.color`), the track is `secondary-container`
- * (`…track.color`), and every end is `rounded-shape-full`
- * (`…active-indicator.shape` = circular). Defaults are the baseline tokens:
- * 4dp thickness (`…linear.track.thickness`, `…circular.active-indicator.
- * thickness`), a 4dp gap between the active indicator and the track
- * (`…track-active-indicator-space`), a 4dp stop indicator flush with the
- * trailing end (`…linear.stop-indicator.size`, trailing space 0dp), and a 40dp
- * circle (`…circular.size`). `size` and `thickness` are props because the spec
- * makes both configurable — circles range 24–240dp — so a 20dp spinner fits
- * inside a button and a 240dp one fits a desktop empty state.
- *
- * The **stop indicator** is drawn on the determinate linear indicator only, as
- * the spec requires: it marks the end of the track, and it is not used for
- * indeterminate or circular indicators.
- *
- * Accessibility: this is a visual cue, so it needs a name that says what is
- * loading — "Loading news article", not "Loading". Pass `label` for a visible
- * one (a React Aria `Label`, wired through `aria-labelledby`) or `aria-label`
- * when the surrounding copy already says it. Without either, the role has no
- * accessible name and axe fails the story.
- *
- * Deviations from the spec, all for the same reason — the kit ships no
- * animation library and every component must survive being copied into another
- * project as one file:
- *
- * - **The wavy active indicator is not implemented.** M3 Expressive offers
- *   flat and wavy; the kit ships flat, which is the spec default.
- * - **The indeterminate circle rotates at a constant sweep angle** instead of
- *   growing and shrinking as it turns. The grow/shrink cycle needs keyframes
- *   parameterised by each instance's circumference; a constant arc on
- *   Tailwind's own `animate-spin` reads the same and costs no CSS.
- * - **The indeterminate linear sweep is one segment**, not the spec's two, and
- *   it is the one thing here that needs a keyframe. It ships as a `<style>`
- *   element inside this file rather than a token or a dependency, so a copied
- *   component carries its own motion; React de-duplicates it by `href`, so a
- *   page with twenty progress bars still emits one rule. Both animations
- *   respect `prefers-reduced-motion`.
- */
 const styles = tv({
   slots: {
     base: "flex w-full flex-col gap-2",
@@ -132,6 +77,61 @@ export type ProgressIndicatorProps = Omit<AriaProgressBarProps, "children"> & {
   className?: string;
 };
 
+/**
+ * Progress indicators — the linear bar and the circular ring, each determinate
+ * or indeterminate, on React Aria's `ProgressBar` so the `progressbar` role,
+ * `aria-valuenow` / `aria-valuetext` and the locale-formatted value label come
+ * from the behaviour layer.
+ *
+ *   <ProgressIndicator label="Uploading menu" value={62} showValue />
+ *   <ProgressIndicator label="Loading activity" isIndeterminate />
+ *   <ProgressIndicator variant="circular" label="Saving" value={40} />
+ *   <ProgressIndicator variant="circular" aria-label="Loading" isIndeterminate size={24} />
+ *
+ * Spec: https://m3.material.io/components/progress-indicators/overview ·
+ * .../specs · .../guidelines · .../accessibility
+ *
+ * Anatomy is the spec's three parts — active indicator, track, stop indicator.
+ * The active indicator and the stop indicator are `primary`
+ * (`md.comp.progress-indicator.active-indicator.color`,
+ * `…stop-indicator.color`), the track is `secondary-container`
+ * (`…track.color`), and every end is `rounded-shape-full`
+ * (`…active-indicator.shape` = circular). Defaults are the baseline tokens:
+ * 4dp thickness (`…linear.track.thickness`, `…circular.active-indicator.
+ * thickness`), a 4dp gap between the active indicator and the track
+ * (`…track-active-indicator-space`), a 4dp stop indicator flush with the
+ * trailing end (`…linear.stop-indicator.size`, trailing space 0dp), and a 40dp
+ * circle (`…circular.size`). `size` and `thickness` are props because the spec
+ * makes both configurable — circles range 24–240dp — so a 20dp spinner fits
+ * inside a button and a 240dp one fits a desktop empty state.
+ *
+ * The **stop indicator** is drawn on the determinate linear indicator only, as
+ * the spec requires: it marks the end of the track, and it is not used for
+ * indeterminate or circular indicators.
+ *
+ * Accessibility: this is a visual cue, so it needs a name that says what is
+ * loading — "Loading news article", not "Loading". Pass `label` for a visible
+ * one (a React Aria `Label`, wired through `aria-labelledby`) or `aria-label`
+ * when the surrounding copy already says it. Without either, the role has no
+ * accessible name and axe fails the story.
+ *
+ * Deviations from the spec, all for the same reason — the kit ships no
+ * animation library and every component must survive being copied into another
+ * project as one file:
+ *
+ * - **The wavy active indicator is not implemented.** M3 Expressive offers
+ *   flat and wavy; the kit ships flat, which is the spec default.
+ * - **The indeterminate circle rotates at a constant sweep angle** instead of
+ *   growing and shrinking as it turns. The grow/shrink cycle needs keyframes
+ *   parameterised by each instance's circumference; a constant arc on
+ *   Tailwind's own `animate-spin` reads the same and costs no CSS.
+ * - **The indeterminate linear sweep is one segment**, not the spec's two, and
+ *   it is the one thing here that needs a keyframe. It ships as a `<style>`
+ *   element inside this file rather than a token or a dependency, so a copied
+ *   component carries its own motion; React de-duplicates it by `href`, so a
+ *   page with twenty progress bars still emits one rule. Both animations
+ *   respect `prefers-reduced-motion`.
+ */
 export function ProgressIndicator({
   variant = "linear",
   label,

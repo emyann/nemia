@@ -9,65 +9,6 @@ import {
 import { composeTailwindRenderProps } from "../render-props";
 import { tv } from "../utils";
 
-/**
- * Material 3 toolbar: a row (or a column) of the actions that belong to the
- * current page, docked to the bottom of the window or floating over the
- * content, optionally beside a FAB.
- *
- *   <Toolbar aria-label="Message">                       docked, standard
- *     <IconButton variant="standard" icon={Archive} aria-label="Archive" />
- *     …
- *   </Toolbar>
- *   <Toolbar variant="floating" color="vibrant"          floating, vibrant,
- *            fab={<Button variant="fab" icon={Plus} aria-label="New" />}>  FAB
- *     …
- *   </Toolbar>
- *
- * Spec: https://m3.material.io/components/toolbars/overview · .../specs ·
- * .../guidelines · .../accessibility
- *
- * **The two variants** (`md.comp.toolbar.{docked,floating}.*`):
- *
- * - **docked** (default) spans its container's width, 64dp high, square, on
- *   `surface-container`, with 16dp at each end. Its items are spaced evenly
- *   in a compact window and centred, 32dp apart, from a medium one (600dp)
- *   up, as the adaptive guidelines show. It replaces the baseline bottom app
- *   bar, which Material no longer recommends and the kit does not ship.
- * - **floating** is only as wide as its items, 64dp high (64dp wide when
- *   `orientation="vertical"`), fully rounded at elevation 3, with 8dp at
- *   each end and 4dp between items. Keep it 16dp from the window's edge
- *   (24dp when vertical); the margin is the layout's, not the toolbar's.
- *
- * **The two colours** (`color`): `standard` is `surface-container` with
- * `on-surface-variant` icons and a selected toggle on `secondary-container`;
- * `vibrant` is `primary-container` with `on-primary-container` icons and a
- * selected toggle on `surface-container` / `on-surface`. The toolbar paints
- * them onto the kit's own children by their slots: a `standard` `IconButton`
- * (its icon, its state layer, its selected container) and a `text` `Button`
- * (its label), so a child needs no colour props. Filled and tonal buttons
- * keep their own colours, which is how the guidelines emphasise one action.
- * A disabled child keeps the kit's `on-surface` at 38 %.
- *
- * **`fab`** sets a FAB 8dp after a floating toolbar
- * (`md.comp.toolbar.floating.fab.*`): pass the kit's `Button variant="fab"`,
- * and the toolbar draws it at Material's toolbar FAB, `secondary-container`
- * beside a standard toolbar and `tertiary-container` beside a vibrant one,
- * with large corners at elevation 1. It is outside the `toolbar` role, a tab
- * stop of its own.
- *
- * **Behaviour** is React Aria's `Toolbar`: the `toolbar` role (the
- * accessibility page's "on web, use the toolbar role"), `aria-orientation`,
- * and the arrow keys between its controls (Up and Down when vertical). Give
- * it an `aria-label` when a page has more than one.
- *
- * Deviations:
- * - **Tab.** Material's keyboard table reads "Tab or Arrows" between the
- *   controls. React Aria's toolbar is the WAI-ARIA toolbar: the arrows move
- *   between its controls and Tab leaves it, so the toolbar is one stop in the
- *   tab order, and Tab comes back to the control last focused.
- * - **Scrolling.** Hiding or collapsing on scroll needs a scroll container
- *   the kit does not own, as with `TopAppBar`.
- */
 const styles = tv({
   slots: {
     base: "flex items-center",
@@ -148,6 +89,65 @@ export type ToolbarProps = AriaToolbarProps & {
   fab?: ReactNode;
 };
 
+/**
+ * Material 3 toolbar: a row (or a column) of the actions that belong to the
+ * current page, docked to the bottom of the window or floating over the
+ * content, optionally beside a FAB.
+ *
+ *   <Toolbar aria-label="Message">                       docked, standard
+ *     <IconButton variant="standard" icon={Archive} aria-label="Archive" />
+ *     …
+ *   </Toolbar>
+ *   <Toolbar variant="floating" color="vibrant"          floating, vibrant,
+ *            fab={<Button variant="fab" icon={Plus} aria-label="New" />}>  FAB
+ *     …
+ *   </Toolbar>
+ *
+ * Spec: https://m3.material.io/components/toolbars/overview · .../specs ·
+ * .../guidelines · .../accessibility
+ *
+ * **The two variants** (`md.comp.toolbar.{docked,floating}.*`):
+ *
+ * - **docked** (default) spans its container's width, 64dp high, square, on
+ *   `surface-container`, with 16dp at each end. Its items are spaced evenly
+ *   in a compact window and centred, 32dp apart, from a medium one (600dp)
+ *   up, as the adaptive guidelines show. It replaces the baseline bottom app
+ *   bar, which Material no longer recommends and the kit does not ship.
+ * - **floating** is only as wide as its items, 64dp high (64dp wide when
+ *   `orientation="vertical"`), fully rounded at elevation 3, with 8dp at
+ *   each end and 4dp between items. Keep it 16dp from the window's edge
+ *   (24dp when vertical); the margin is the layout's, not the toolbar's.
+ *
+ * **The two colours** (`color`): `standard` is `surface-container` with
+ * `on-surface-variant` icons and a selected toggle on `secondary-container`;
+ * `vibrant` is `primary-container` with `on-primary-container` icons and a
+ * selected toggle on `surface-container` / `on-surface`. The toolbar paints
+ * them onto the kit's own children by their slots: a `standard` `IconButton`
+ * (its icon, its state layer, its selected container) and a `text` `Button`
+ * (its label), so a child needs no colour props. Filled and tonal buttons
+ * keep their own colours, which is how the guidelines emphasise one action.
+ * A disabled child keeps the kit's `on-surface` at 38 %.
+ *
+ * **`fab`** sets a FAB 8dp after a floating toolbar
+ * (`md.comp.toolbar.floating.fab.*`): pass the kit's `Button variant="fab"`,
+ * and the toolbar draws it at Material's toolbar FAB, `secondary-container`
+ * beside a standard toolbar and `tertiary-container` beside a vibrant one,
+ * with large corners at elevation 1. It is outside the `toolbar` role, a tab
+ * stop of its own.
+ *
+ * **Behaviour** is React Aria's `Toolbar`: the `toolbar` role (the
+ * accessibility page's "on web, use the toolbar role"), `aria-orientation`,
+ * and the arrow keys between its controls (Up and Down when vertical). Give
+ * it an `aria-label` when a page has more than one.
+ *
+ * Deviations:
+ * - **Tab.** Material's keyboard table reads "Tab or Arrows" between the
+ *   controls. React Aria's toolbar is the WAI-ARIA toolbar: the arrows move
+ *   between its controls and Tab leaves it, so the toolbar is one stop in the
+ *   tab order, and Tab comes back to the control last focused.
+ * - **Scrolling.** Hiding or collapsing on scroll needs a scroll container
+ *   the kit does not own, as with `TopAppBar`.
+ */
 export function Toolbar({
   variant = "docked",
   color = "standard",

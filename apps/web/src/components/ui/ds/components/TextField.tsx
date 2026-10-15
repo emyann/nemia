@@ -16,6 +16,30 @@ import { ErrorIcon, renderIcon, type IconProp } from "../icons";
 import { composeTailwindRenderProps } from "../render-props";
 import { fieldStyles, type FieldVariantProps } from "./field-styles";
 
+const styles = fieldStyles;
+
+export type TextFieldProps = Omit<AriaTextFieldProps, "className"> &
+  Pick<FieldVariantProps, "variant"> & {
+    label?: string;
+    /** Helper text under the field; replaced by `errorMessage` when invalid. */
+    supportingText?: ReactNode;
+    errorMessage?: string | ((validation: ValidationResult) => string);
+    leadingIcon?: IconProp;
+    trailingIcon?: IconProp;
+    /** Only shown while the label is floated, like MD3. */
+    placeholder?: string;
+    /** Text before the input, e.g. a currency symbol. */
+    prefix?: string;
+    /** Text after the input, e.g. a unit or an email domain. */
+    suffix?: string;
+    /** Render a `<textarea>` instead of an `<input>`. */
+    multiline?: boolean;
+    /** Show `n / maxLength` under the field. Needs `maxLength`. */
+    showCharacterCount?: boolean;
+    className?: string;
+    inputClassName?: string;
+  };
+
 /**
  * MD3 text field on React Aria `TextField`: floating label, leading /
  * trailing icons, prefix / suffix text, supporting text swapped for the error
@@ -50,30 +74,6 @@ import { fieldStyles, type FieldVariantProps } from "./field-styles";
  *   so an invalid field with one loses that second error cue; the field has
  *   a single trailing slot.
  */
-const styles = fieldStyles;
-
-export type TextFieldProps = Omit<AriaTextFieldProps, "className"> &
-  Pick<FieldVariantProps, "variant"> & {
-    label?: string;
-    /** Helper text under the field; replaced by `errorMessage` when invalid. */
-    supportingText?: ReactNode;
-    errorMessage?: string | ((validation: ValidationResult) => string);
-    leadingIcon?: IconProp;
-    trailingIcon?: IconProp;
-    /** Only shown while the label is floated, like MD3. */
-    placeholder?: string;
-    /** Text before the input, e.g. a currency symbol. */
-    prefix?: string;
-    /** Text after the input, e.g. a unit or an email domain. */
-    suffix?: string;
-    /** Render a `<textarea>` instead of an `<input>`. */
-    multiline?: boolean;
-    /** Show `n / maxLength` under the field. Needs `maxLength`. */
-    showCharacterCount?: boolean;
-    className?: string;
-    inputClassName?: string;
-  };
-
 export function TextField(props: TextFieldProps) {
   const {
     label,

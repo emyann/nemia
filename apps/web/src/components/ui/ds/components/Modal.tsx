@@ -7,6 +7,12 @@ import {
 } from "react-aria-components";
 import { cn } from "../utils";
 
+export type ModalProps = AriaModalOverlayProps & {
+  className?: string;
+  /** Scale the panel on open, in addition to the scrim fade. Default true. */
+  isAnimated?: boolean;
+};
+
 /**
  * Scrim + centering layer for dialogs.
  *
@@ -22,12 +28,6 @@ import { cn } from "../utils";
  * Spec (the scrim and where a dialog sits):
  * https://m3.material.io/components/dialogs/{specs,guidelines}
  */
-export type ModalProps = AriaModalOverlayProps & {
-  className?: string;
-  /** Scale the panel on open, in addition to the scrim fade. Default true. */
-  isAnimated?: boolean;
-};
-
 export function Modal(props: ModalProps) {
   const {
     children,

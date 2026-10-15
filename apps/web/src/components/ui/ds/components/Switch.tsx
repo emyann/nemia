@@ -11,16 +11,6 @@ import { CheckIcon, XIcon } from "../icons";
 import { composeTailwindRenderProps } from "../render-props";
 import { tv } from "../utils";
 
-/**
- * MD3 switch: a 52×32dp track whose handle grows from 16dp (off) to 24dp
- * (on) and 28dp while pressed, with a 40dp state layer inside a 48dp touch
- * target. `icons` shows a check on the handle when on and a cross when off;
- * `icons="selected"` is the spec's "icon on selected switch" configuration.
- *
- * Spec: https://m3.material.io/components/switch/{overview,specs,guidelines,accessibility}
- * Deviation: the spec lists Enter as a toggle key; React Aria's switch (a
- * native checkbox input) toggles with Space only.
- */
 const styles = tv({
   slots: {
     base: [
@@ -81,6 +71,16 @@ export type SwitchProps = Omit<AriaSwitchProps, "className" | "children"> & {
   className?: string;
 };
 
+/**
+ * MD3 switch: a 52×32dp track whose handle grows from 16dp (off) to 24dp
+ * (on) and 28dp while pressed, with a 40dp state layer inside a 48dp touch
+ * target. `icons` shows a check on the handle when on and a cross when off;
+ * `icons="selected"` is the spec's "icon on selected switch" configuration.
+ *
+ * Spec: https://m3.material.io/components/switch/{overview,specs,guidelines,accessibility}
+ * Deviation: the spec lists Enter as a toggle key; React Aria's switch (a
+ * native checkbox input) toggles with Space only.
+ */
 export function Switch({
   children,
   icons = false,

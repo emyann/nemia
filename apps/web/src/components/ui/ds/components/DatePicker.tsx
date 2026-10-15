@@ -68,70 +68,6 @@ import IconButton from "./IconButton";
 import Modal from "./Modal";
 import { pickerDialogStyles } from "./picker-dialog-styles";
 
-/**
- * MD3 date pickers — `DatePicker` selects one date, `DateRangePicker` a
- * start and an end. Both are a segmented text field (the shared
- * `./field-styles.ts` module at `kind="segmented"`) whose calendar button
- * opens the picker; the value is an `@internationalized/date` value, as in
- * React Aria's `DatePicker` and `DateRangePicker`, which they are built on.
- *
- *   <DatePicker label="Date" defaultValue={parseDate("2026-06-15")} />
- *   <DatePicker label="Date" layout="modal" />
- *   <DateRangePicker label="Stay" />
- *
- * Material's variants, as `layout` and `defaultMode`:
- *
- * - **Docked** (`layout="docked"`, the default): the calendar in a popover
- *   under the field, with a month menu and a year menu, each between its
- *   previous and next buttons, and neighbouring months' dates at 38 %.
- * - **Modal** (`layout="modal"`): a 360dp dialog with supporting text, the
- *   picked date as headline, the switch to input (the pencil), a "June 2026"
- *   menu button that opens the year grid, and Cancel / OK.
- * - **Full screen** (`layout="fullscreen"`): the same in a dialog that
- *   covers the window, with a close (X) and Save, as Material recommends on
- *   compact windows. `DateRangePicker` is always full screen, as Material's
- *   range picker is, and lists its months in a vertical scroll.
- * - **Modal date input** (`defaultMode="input"`, or the pencil): a 328dp
- *   dialog holding an outlined date field (two for a range).
- *
- * Every picker holds a draft: the calendar and the input change it, OK or
- * Save commits it, and Cancel, Escape, the close button or a press outside
- * drop it. OK and Save are disabled while the draft is one the constraints
- * refuse (outside `minValue` / `maxValue`, unavailable, or a reversed or
- * half-typed range). Typing in the field itself commits as it is typed.
- *
- * Accessibility, as Material's page asks: the calendar button is the one way
- * into the picker and every segment of the field is a tab stop; the grid is
- * a `grid` whose cells announce the whole date ("Monday, June 15, 2026") and
- * whose weekdays are column headers; Page Up / Down move a month and
- * Shift + Page Up / Down a year (React Aria's); Shift + M and Shift + Y move
- * to the docked picker's month and year menus. The helper text gives the
- * date's format ("MM/DD/YYYY" in en-US) unless `supportingText` is set.
- *
- * Strings: `labels`, in English by default, for every word the pickers
- * draw or announce that React Aria does not translate itself.
- *
- * Deviations, by name:
- * - **Typed dates are segmented.** Material asks for free text formatted on
- *   Enter or blur, with no input mask, and for many formats accepted. The
- *   field is React Aria's segmented `DateInput`: each part is a spin button
- *   that takes digits and arrow keys in the locale's order, which reads the
- *   same to a screen reader before and after a value is typed, and accepts
- *   no other format.
- * - **The docked picker confirms.** Its anatomy draws Cancel and OK under
- *   the calendar, so a pick there is a draft as well.
- * - **No swipe** between months and no clear button: the arrows and the
- *   keyboard move months, and Material calls the clear button optional.
- * - **No tooltips**: Material shows a weekday's full name on hover, and an
- *   arrow's keyboard shortcut (Shift + Page Up for the previous year) on
- *   focus. The column headers carry the full weekday name for assistive
- *   technology (React Aria's); the shortcuts are React Aria's and are not
- *   shown. Wrap an arrow in the kit's `TooltipTrigger` where they should be.
- * - **Full screen** takes the range selection's tokens (corner none,
- *   elevation 0, a `title-large` headline) for both pickers.
- *
- * Spec: https://m3.material.io/components/date-pickers/{overview,specs,guidelines,accessibility}
- */
 
 /** The words the pickers draw or announce, English by default. */
 export type DatePickerLabels = {
@@ -232,6 +168,70 @@ type Constraints = {
 
 type Mode = "calendar" | "input";
 
+/**
+ * MD3 date pickers — `DatePicker` selects one date, `DateRangePicker` a
+ * start and an end. Both are a segmented text field (the shared
+ * `./field-styles.ts` module at `kind="segmented"`) whose calendar button
+ * opens the picker; the value is an `@internationalized/date` value, as in
+ * React Aria's `DatePicker` and `DateRangePicker`, which they are built on.
+ *
+ *   <DatePicker label="Date" defaultValue={parseDate("2026-06-15")} />
+ *   <DatePicker label="Date" layout="modal" />
+ *   <DateRangePicker label="Stay" />
+ *
+ * Material's variants, as `layout` and `defaultMode`:
+ *
+ * - **Docked** (`layout="docked"`, the default): the calendar in a popover
+ *   under the field, with a month menu and a year menu, each between its
+ *   previous and next buttons, and neighbouring months' dates at 38 %.
+ * - **Modal** (`layout="modal"`): a 360dp dialog with supporting text, the
+ *   picked date as headline, the switch to input (the pencil), a "June 2026"
+ *   menu button that opens the year grid, and Cancel / OK.
+ * - **Full screen** (`layout="fullscreen"`): the same in a dialog that
+ *   covers the window, with a close (X) and Save, as Material recommends on
+ *   compact windows. `DateRangePicker` is always full screen, as Material's
+ *   range picker is, and lists its months in a vertical scroll.
+ * - **Modal date input** (`defaultMode="input"`, or the pencil): a 328dp
+ *   dialog holding an outlined date field (two for a range).
+ *
+ * Every picker holds a draft: the calendar and the input change it, OK or
+ * Save commits it, and Cancel, Escape, the close button or a press outside
+ * drop it. OK and Save are disabled while the draft is one the constraints
+ * refuse (outside `minValue` / `maxValue`, unavailable, or a reversed or
+ * half-typed range). Typing in the field itself commits as it is typed.
+ *
+ * Accessibility, as Material's page asks: the calendar button is the one way
+ * into the picker and every segment of the field is a tab stop; the grid is
+ * a `grid` whose cells announce the whole date ("Monday, June 15, 2026") and
+ * whose weekdays are column headers; Page Up / Down move a month and
+ * Shift + Page Up / Down a year (React Aria's); Shift + M and Shift + Y move
+ * to the docked picker's month and year menus. The helper text gives the
+ * date's format ("MM/DD/YYYY" in en-US) unless `supportingText` is set.
+ *
+ * Strings: `labels`, in English by default, for every word the pickers
+ * draw or announce that React Aria does not translate itself.
+ *
+ * Deviations, by name:
+ * - **Typed dates are segmented.** Material asks for free text formatted on
+ *   Enter or blur, with no input mask, and for many formats accepted. The
+ *   field is React Aria's segmented `DateInput`: each part is a spin button
+ *   that takes digits and arrow keys in the locale's order, which reads the
+ *   same to a screen reader before and after a value is typed, and accepts
+ *   no other format.
+ * - **The docked picker confirms.** Its anatomy draws Cancel and OK under
+ *   the calendar, so a pick there is a draft as well.
+ * - **No swipe** between months and no clear button: the arrows and the
+ *   keyboard move months, and Material calls the clear button optional.
+ * - **No tooltips**: Material shows a weekday's full name on hover, and an
+ *   arrow's keyboard shortcut (Shift + Page Up for the previous year) on
+ *   focus. The column headers carry the full weekday name for assistive
+ *   technology (React Aria's); the shortcuts are React Aria's and are not
+ *   shown. Wrap an arrow in the kit's `TooltipTrigger` where they should be.
+ * - **Full screen** takes the range selection's tokens (corner none,
+ *   elevation 0, a `title-large` headline) for both pickers.
+ *
+ * Spec: https://m3.material.io/components/date-pickers/{overview,specs,guidelines,accessibility}
+ */
 export function DatePicker<T extends DateValue>(props: DatePickerProps<T>) {
   const {
     label,

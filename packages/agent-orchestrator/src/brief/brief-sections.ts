@@ -211,7 +211,8 @@ const WHY_ENDED: Partial<Record<StepStatus, string>> = {
 
 /**
  * Why a step is tried again, as `retrySection` opens with it: the files its closeout named that the run did not have (`lacksSaid`), or
- * what its envelope was refused (`refusedSaid`), where that is why it reads `unsigned`, else the sentence of how its last try ended (`WHY_ENDED`).
+ * what its envelope was refused (`refusedSaid`), where that is why it reads `unsigned`, else the sentence of how its last try ended
+ * (`WHY_ENDED`).
  */
 const whyEnded = (r: RetryBriefing): string =>
   (r.status === 'unsigned' ? notAccepted(r) : undefined) ?? WHY_ENDED[r.status] ?? `The last try ended \`${r.status}\`.`;

@@ -443,8 +443,8 @@ const envelopeLines = (c: Exclude<Closeout, { error: string }>): string[] => [
 ];
 
 /**
- * A step's closeout: its summary, its body, its values, its output's fields — those that ask questions numbered, as `--answer` names them (`questionLines`) —
- * its needs and how to answer them, and its files; or why it does not read.
+ * A step's closeout: its envelope (`envelopeLines`), its output's fields — those that ask questions numbered, as `--answer` names them
+ * (`questionLines`) — its needs and how to answer them, and its files; or why it does not read.
  */
 function printCloseout(
   { run, answering }: Decided,

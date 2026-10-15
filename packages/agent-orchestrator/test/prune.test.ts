@@ -728,7 +728,7 @@ test("`nemia prune --artifacts` of a run whose worktrees a plain prune already r
     `${bare.command}: the command it offers is the one that prunes them, since the plain --unmerged of a run that cut no worktree has nothing to prune`,
   );
   assert.ok(
-    bare.printed.includes(`${inPlace.id}  pruned: removed its files, 40.0 KB freed; its record and branches are kept`),
+    bare.printed.includes(`${inPlace.id}  pruned: removed its files, 44.0 KB freed; its record and branches are kept`),
     bare.printed.join('\n'),
   );
   assert.ok(!under('runs', inPlace.id, 'artifacts'), 'its files gone');
@@ -852,7 +852,7 @@ test('REFUSED at shipped defaults under --artifacts: a run not over, a finished 
     `${offered.command}: the command it offers is the one that takes them, not the plain --unmerged already run, which now has nothing to prune`,
   );
   assert.ok(
-    offered.printed.includes(`${unmerged.run.id}  pruned: removed its files, 40.0 KB freed; its record and branches are kept`),
+    offered.printed.includes(`${unmerged.run.id}  pruned: removed its files, 44.0 KB freed; its record and branches are kept`),
     offered.printed.join('\n'),
   );
   assert.ok(!fs.existsSync(unmergedShot) && !under('runs', unmerged.run.id, 'artifacts'), 'its files gone');

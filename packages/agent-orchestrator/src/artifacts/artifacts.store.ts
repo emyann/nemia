@@ -1,9 +1,9 @@
 /**
  * The files a step hands over: each one its closeout names, copied out of its workspace into the step's files directory
  * (`collectArtifacts`), each it named that the run does not have, and why (`missingArtifacts`; `filesLacked`, off the disk alone, as the
- * step signs off; `filesHanded`, those that are there for the step after), and what that directory holds
- * (`artifactFiles`), the step's closeout written there for the steps after it (`handCloseout`), and the pictures an ending's check took of the merged tree, removed once it has landed (`dropLandedPictures`); and
- * one file of that directory or of a step's folder, read by its name and never by a path (`artifactFile`, `fileIn`).
+ * step signs off; `filesHanded`, those that are there for the step after), and what that directory holds (`artifactFiles`), the
+ * step's closeout written there for the steps after it (`handCloseout`, `holdsCloseout`), and the pictures an ending's check took of the
+ * merged tree, removed once it has landed (`dropLandedPictures`); and one file of that directory or of a step's folder, read by its name and never by a path (`artifactFile`, `fileIn`).
  *
  * Beneath the controllers, beside `record.store.ts` and `worktree.store.ts`: it imports neither the engine nor a controller, and
  * `runner.ts` re-exports `artifactFiles` and `missingArtifacts`. The closeout itself is read off the engine's record, so `closeoutOf` is
@@ -283,10 +283,12 @@ function isFileIn(file: string, dir: string): boolean {
 /**
  * Every file in a step's files directory, every level down, with its size: what `nemia decide` lists after
  * the step's closeout. Regular files only, and no link is followed, so nothing outside the directory is
- * listed because something inside it points there.
+ * listed because something inside it points there. Not the closeout the run wrote there (`HANDED_CLOSEOUT`), which is no file the step
+ * handed over.
  */
 export function artifactFiles(run: Pick<Run, 'id'>, stepName: string): ArtifactFile[] {
   const found: ArtifactFile[] = [];
+  const top = artifactsDir(run, stepName);
   const walk = (dir: string): void => {
     let entries;
     try {
@@ -296,11 +298,12 @@ export function artifactFiles(run: Pick<Run, 'id'>, stepName: string): ArtifactF
     }
     for (const entry of entries) {
       const at = path.join(dir, entry.name);
+      if (dir === top && entry.name === HANDED_CLOSEOUT) continue;
       if (entry.isDirectory()) walk(at);
       else if (entry.isFile()) found.push({ path: at, bytes: fs.lstatSync(at).size });
     }
   };
-  walk(artifactsDir(run, stepName));
+  walk(top);
   return found.sort((a, b) => a.path.localeCompare(b.path));
 }
 

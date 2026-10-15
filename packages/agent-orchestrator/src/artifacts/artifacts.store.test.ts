@@ -61,7 +61,17 @@ test('each reason a named file is not one the run has is read off the disk, and 
   const lacked = filesLacked(
     run,
     'build',
-    naming('gone.md', path.join(dir, 'gone.png'), 'shots', 'link.txt', '../up.md', path.join(beside, 'secret.txt'), '.claude/note.md'),
+    naming(
+      'gone.md',
+      path.join(dir, 'gone.png'),
+      'shots',
+      'link.txt',
+      '../up.md',
+      path.join(beside, 'secret.txt'),
+      '.claude/note.md',
+      'closeout.json',
+      path.join(dir, 'closeout.json'),
+    ),
   );
   assert.deepEqual(lacked, [
     { path: 'gone.md', why: 'not there' },
@@ -71,6 +81,8 @@ test('each reason a named file is not one the run has is read off the disk, and 
     { path: '../up.md', why: 'escapes' },
     { path: path.join(beside, 'secret.txt'), why: 'outside' },
     { path: '.claude/note.md', why: 'configuration' },
+    { path: 'closeout.json', why: 'reserved' },
+    { path: path.join(dir, 'closeout.json'), why: 'reserved' },
   ]);
   for (const { why } of lacked) assert.ok(REFUSING.has(why as never), `${why} refuses`);
   assert.deepEqual([...REFUSING].sort(), [...new Set(lacked.map((l) => l.why))].sort(), 'and no other reason does');

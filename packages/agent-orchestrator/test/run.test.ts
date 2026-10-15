@@ -2927,7 +2927,7 @@ test('a step that declares an output is told so where it is told of its closeout
   const told = composeBrief(REVIEW, run({ implement: 't1', review: null }), [step('implement'), REVIEW]);
   assert.match(
     told,
-    /- `findings`: what this step declares \(`output: review\.schema\.json`\), in the shape the session\n  asks for\. It is handed, as data, to a step that reads it; your `summary` is not\./,
+    /- `findings`: what this step declares \(`output: review\.schema\.json`\), in the shape the session\n  asks for\. It is handed, as data, to a step that reads it\. A closeout/,
   );
   assert.ok(told.indexOf('`findings`') > told.indexOf('## When you are finished'));
   assert.doesNotMatch(

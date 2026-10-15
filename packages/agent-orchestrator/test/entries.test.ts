@@ -153,6 +153,7 @@ const PINNED: Record<string, string[]> = {
     'engine',
     'ensureDaemon',
     'envNameOf',
+    'envelopeRefusals',
     'everyOf',
     'evictedBy',
     'exitVerdicts',
@@ -459,6 +460,7 @@ const PINNED: Record<string, string[]> = {
   'agent-orchestrator/run': [
     'BY_CAP',
     'GIVEN',
+    'HANDED_CLOSEOUT',
     'MOMENTUM',
     'SIGNOFF',
     'WHY_CAP',
@@ -508,6 +510,7 @@ const PINNED: Record<string, string[]> = {
     'durationWord',
     'endingAsked',
     'endingSteps',
+    'envelopeRefusals',
     'endingStopped',
     'feedPhase',
     'feedWords',

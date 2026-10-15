@@ -130,6 +130,10 @@ down is in `docs/architecture.md`, *Who owns what*.
   2026-10-06: `codex exec --json` (0.154.0) prints `thread.started` first; `claude -p` (2.1.291) prints `system`/`init` first under
   `--output-format stream-json --verbose`, and one `result` line under `--output-format json`.
 
+- **The Agent SDK (0.3.270) speaks to its CLI in control requests both ways, and writes a resume as one argument, `--resume=<id>`**: the
+  stand-in CLI (`test/fixtures/stand-in-claude.ts`) answers `initialize` and asks `hook_callback` and `can_use_tool` as it does, and
+  `test/attached.boundary.test.ts` pins it; an SDK update that moves the protocol fails there first.
+
 ## A2A and remote agents
 
 - **The SDK's `Transport` and `A2ARequestHandler` spell three methods differently**, and its `Client` answers some calls itself

@@ -12,6 +12,24 @@ import { OUT } from '../world.ts';
 /** The window the strip is read in: 1440 pixels wide, the rail open. */
 const WIDE = { width: 1440, height: 1000 };
 
+/** A phone's window, under the width the strip holds one row from. */
+const PHONE = { width: 390, height: 844 };
+
+/** That on a phone the three frames stack, each under the one before it, each as wide as the others. */
+async function expectStacked(strip: Locator): Promise<void> {
+  const boxes = await strip
+    .locator('[data-strip-frame]')
+    .evaluateAll((frames) =>
+      frames.map((f) => ({
+        top: Math.round(f.getBoundingClientRect().top),
+        bottom: Math.round(f.getBoundingClientRect().bottom),
+        width: Math.round(f.getBoundingClientRect().width),
+      })),
+    );
+  const stacked = boxes.every((box, at) => at === 0 || box.top >= boxes[at - 1].bottom) && new Set(boxes.map((b) => b.width)).size === 1;
+  if (!stacked) throw new Refused(`on a phone the three frames stack at one width — ${JSON.stringify(boxes)}`);
+}
+
 /** What the api answers at `url`, read in the page as the board reads it. */
 const answer = <T>(page: Page, url: string): Promise<T> =>
   page.evaluate(async (at) => (await (await fetch(at)).json()) as unknown, url) as Promise<T>;
@@ -74,7 +92,8 @@ export default {
    * The Overview's strip at `/`, at 1440 pixels with the rail open: its three cut frames on one row, the six stickers on one line. Each
    * number is the board's rule (`stripOf`) of the api's own answer, from the browser's midnight; Landed and Failed are the finished
    * page's today too, the api's own words for how a run ended. The readout reads the caps, the daemon's tag says what the api judged of it (none ticks the e2e's store), each agent's
-   * row says the agent, its step and the run's title, cut short, never wrapped, and the quota, past its mark in the seed, says so.
+   * row says the agent, its step and the run's title, cut short, never wrapped, and the quota, past its mark in the seed, says so. On a
+   * phone the frames stack, one under the other.
    */
   name: 'overview-strip',
   route: '/',
@@ -120,6 +139,10 @@ export default {
       await expectOneRow(strip);
       await settled(page);
       await photograph(page, path.join(OUT, `overview-strip-day-${await themeOf(page)}.png`));
+      await page.setViewportSize(PHONE);
+      await expectStacked(strip);
+      await settled(page);
+      await photograph(page, path.join(OUT, `overview-strip-phone-${await themeOf(page)}.png`), { fullPage: true });
     } finally {
       if (size) await page.setViewportSize(size);
     }

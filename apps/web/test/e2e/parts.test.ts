@@ -775,3 +775,47 @@ test(
     }
   },
 );
+
+test(
+  "REFUSED: the step at work's glow breathes on a layer of its own, and nothing else on a rail moves, nor it under reduced motion",
+  WAITED,
+  async () => {
+    const moving = await openParts(browser, built, 'dark', '?part=RunSteps');
+    const still = await openParts(browser, built, 'dark', '?part=RunSteps', { still: true });
+    const animated = (page: Page) =>
+      page.locator('[data-run-steps]').evaluateAll((rails) =>
+        rails.flatMap((rail) =>
+          [rail, ...rail.querySelectorAll('*')]
+            .map((element) => ({ element, style: getComputedStyle(element) }))
+            .filter(({ style }) => style.animationName !== 'none')
+            .map(({ element, style }) => ({
+              at: element.closest('[data-step]')?.getAttribute('data-state') ?? 'the rail',
+              layer: element.hasAttribute('data-step-breath'),
+              name: style.animationName,
+              duration: style.animationDuration,
+              count: style.animationIterationCount,
+              easing: style.animationTimingFunction,
+            })),
+        ),
+      );
+    try {
+      const states = await moving
+        .locator('[data-run-steps] [data-step]')
+        .evaluateAll((bars) => bars.map((bar) => bar.getAttribute('data-state')));
+      assert.ok(states.includes('awaiting-approval') && states.includes('failed-check'), `the stories draw other states: ${states}`);
+      const breath = {
+        at: 'working',
+        layer: true,
+        name: 'step-breath',
+        duration: '2.6s',
+        count: 'infinite',
+        easing: 'cubic-bezier(0.2, 0, 0, 1)',
+      };
+      assert.deepEqual(await animated(moving), [breath, breath], 'the two rails at work breathe, each on its layer alone');
+      assert.deepEqual(await animated(still), [], 'under reduced motion, nothing on a rail moves');
+    } finally {
+      await moving.context().close();
+      await still.context().close();
+    }
+  },
+);

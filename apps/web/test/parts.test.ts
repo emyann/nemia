@@ -64,7 +64,14 @@ test('the steps rail: one bar a step by its state, its names in the hue of what 
     /box-shadow:inset 0 0 0 1\.5px var\(--meaning-yours\), 0 0 10px color-mix\(in srgb, var\(--meaning-yours\) 45%, transparent\)/,
     'edged in its hue, and glowing',
   );
-  assert.match(atWork, /box-shadow:0 0 12px color-mix\(in srgb, var\(--meaning-alive\) 70%, transparent\)/, 'the step at work glows');
+  assert.doesNotMatch(atWork, /box-shadow/, "the step at work's bar carries no glow of its own");
+  assert.match(
+    tagWith(html, 'data-step-breath'),
+    /box-shadow:0 0 12px color-mix\(in srgb, var\(--meaning-alive\) 70%, transparent\)/,
+    'the step at work glows, on a layer of its own',
+  );
+  assert.match(html, /data-step="implement"[^>]*><span aria-hidden="true" data-step-breath/, "the layer is the step at work's");
+  assert.equal(html.match(/data-step-breath/g)?.length, 1, 'and no other step has one');
   for (const dark of ['design', 'review'])
     assert.doesNotMatch(tagWith(html, `data-step="${dark}"`), /box-shadow/, `${dark} neither waits nor works: no glow`);
   assert.match(tagWith(html, 'data-step="implement"'), /bg-alive /, 'the step at work is the lit bar, in its hue itself');

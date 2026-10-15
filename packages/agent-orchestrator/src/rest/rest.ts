@@ -1,7 +1,7 @@
 /**
  * A run at rest: one whose pass would read the same things and decide the same nothing until one of its inputs changes — the pure half of
  * the tick's memo of such runs (`restMemo` in tick.verb.ts). What makes a run at rest (`atRest`), which task ids name a run on the engine's
- * feed (`evictedBy`), and which tasks the feed says settled (`settledIn`). Whether its result branches still stand where it saw them is
+ * feed (`evictedBy`). Whether its result branches still stand where it saw them is
  * `tipsSeen`'s, as a full pass asks it.
  *
  * The memo is a cache of a pure function, never a source of truth: a pass answers a run at rest from it only while the run's inputs are as
@@ -95,10 +95,3 @@ export function evictedBy(taskIds: Iterable<string>, ids: ReadonlySet<string>): 
   }
   return out;
 }
-
-/**
- * The tasks whose `settled` entry is among `entries`, a read of the engine's feed: each task settles once, so each is named by one read
- * alone. An entry of any other kind — a task ended, measured or closed — names none, nor one that carries no event. Pure.
- */
-export const settledIn = (entries: ReadonlyArray<{ taskId: string; event?: { kind?: string } }>): Set<string> =>
-  new Set(entries.flatMap((f) => (f.event?.kind === 'settled' ? [f.taskId] : [])));

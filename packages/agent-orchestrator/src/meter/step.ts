@@ -8,7 +8,7 @@
  *
  * Pure: the tick hands it the run and what the pass already read of its tasks; it reads nothing more, and nothing is carried from one pass
  * to the next. A settle is counted on the first pass that reads its task settled and does not find it among those the tick has counted
- * (`settlesCounted`, `settlesDue`); on a record with no such mark, on the pass whose read of the feed names it (`settledIn`). A gate is
+ * (`settlesCounted`, `settlesDue`); a record with no such mark counts none. A gate is
  * timed on the first pass that reads its approval and does not find it among those the tick has timed (`gatesTimed`), and a denied call is
  * counted on the first pass that reads its attempt ended and past those the tick has counted (`deniedCounted`). A gate approved on a try
  * that answered an earlier try's session is timed only while the run's timeline is still to hand over (`runTimed` is `false`).
@@ -188,12 +188,12 @@ export function settledFacts(run: Run, steps: readonly Workflow[], settled: Read
 /**
  * The tasks of `run` whose settle the tick has not handed the metrics: each task of its steps' records, a session's and a check's alike,
  * that its view says settled and the run's mark (`settlesCounted`) does not hold. Read off the record and the views alone, so a task
- * that settled while no daemon read is due on the first pass that reads it. A task the pass has no view of is not due. Undefined on a
- * record with no mark, written before the tick kept one: its settles are those the engine's feed names (`settledIn`).
+ * that settled while no daemon read is due on the first pass that reads it. A task the pass has no view of is not due, nor any
+ * task of a record with no mark, written before the tick kept one.
  */
-export function settlesDue(run: Run, steps: readonly Workflow[], views: ReadonlyMap<string, FactView>): Set<string> | undefined {
+export function settlesDue(run: Run, steps: readonly Workflow[], views: ReadonlyMap<string, FactView>): Set<string> {
   const counted = run.settlesCounted;
-  if (!counted) return undefined;
+  if (!counted) return new Set();
   const tasks = steps.flatMap((step) => tasksOf(run.steps[step.name] ?? { status: 'pending' }).map((t) => t.taskId));
   return new Set(tasks.filter((taskId) => views.get(taskId)?.state.settled && !counted.includes(taskId)));
 }
@@ -201,18 +201,16 @@ export function settlesDue(run: Run, steps: readonly Workflow[], views: Readonly
 /**
  * What a pass hands the metrics of `run`'s settled tasks, once: their facts (`settledFacts`) and the waits they ended (`settledWaits`),
  * for the tasks due by the run's mark (`settlesDue`), with that mark as it stands once they are handed over (`marks`), for the tick to
- * write. On a record with no mark, for the tasks the feed named since its last read (`fed`), and no mark is made.
+ * write. A record with no mark counts none, and no mark is made.
  */
 export function settledOnce(
   run: Run,
   steps: readonly Workflow[],
-  fed: ReadonlySet<string> | undefined,
   reads: FactReads,
 ): { facts: StepFact[]; marks: Pick<Run, 'settlesCounted'> } {
   const due = settlesDue(run, steps, reads.views);
-  const settled = due ?? fed ?? new Set<string>();
-  const facts = [...settledFacts(run, steps, settled, reads), ...settledWaits(run, steps, settled, reads)];
-  return { facts, marks: due?.size ? { settlesCounted: [...(run.settlesCounted ?? []), ...due] } : {} };
+  const facts = [...settledFacts(run, steps, due, reads), ...settledWaits(run, steps, due, reads)];
+  return { facts, marks: due.size ? { settlesCounted: [...(run.settlesCounted ?? []), ...due] } : {} };
 }
 
 /** A round `granted` for each looping step whose loop the pass took round again (`looped`). */

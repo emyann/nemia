@@ -3219,7 +3219,7 @@ written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on 
   marked on the run record by the pass that counts them, before the metrics are recorded: a settle is counted once, by whichever daemon
   first reads it settled, one that happened while no daemon read included; a daemon that dies between the two loses that pass's facts,
   and none is counted twice. A session held open and answered is one try, however many answers it took. A run started before the mark
-  existed is counted off the engine's feed (`settledIn`), which a daemon restarted reads from its end. Each series a pass's facts write
+  existed counts no settle. Each series a pass's facts write
   is first exported at zero, then at its value (`recordStepMetrics`, `seriesBorn` and `exportedNow` in
   `src/telemetry/telemetry.store.ts`, each export waited for 2 s at most): a collector that reads a counter by its increase counts a step's first try, and reads a series a daemon
   restarted brings back as a reset.

@@ -176,7 +176,7 @@ type RunBase = {
    * The tasks whose settle the tick has handed the metrics (`settlesDue`), a session's and a check's alike: each written by the pass that
    * first reads it settled, so a pass after a restart, which reads the same task settled, counts none again, and a task that settled
    * while no daemon read is counted by the first that does. `[]` on a run started with it; absent on a record written before it, whose
-   * settles are counted off the engine's feed (`settledIn`).
+   * settles are never counted.
    */
   settlesCounted?: string[];
   /**

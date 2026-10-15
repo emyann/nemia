@@ -269,8 +269,6 @@ What is still lost:
   are marked and were never exported. Nothing is counted twice.
 - **A series born while the collector does not answer** arrives later at its value, and that first value is not counted. The export
   is waited for 2 s at most, and an exporter stays off for 60 s after a failed post.
-- **A run started before the mark existed** is counted as before, off the runtime's feed: a session of it that settles on the first
-  pass of a daemon started again is not counted.
 - **The api's reads by route** (`api_poll_reads`, read by **System**'s requests per minute by route) are not born at zero: a route is
   known only once a request is served on it, and a request's runtime holds no exporter, so a series can be born neither then nor at
   the start without a flat zero line for every route never asked. Each route loses its first request after a restart, against a poll

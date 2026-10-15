@@ -75,12 +75,15 @@ const outputDirRefusals = (dir: string | undefined, repo: string): string[] => {
   if (dir === undefined) return ['writes its files to .playwright-mcp, relative to the workspace, where the run commits them'];
   const read = /^\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-(.*))?\}$/.exec(dir);
   if (!read)
-    return [`writes its files to ${dir} for every step alike: give \`\${${STEP_FILES}:-<an absolute folder>}\`, so a step writes where its run keeps them`];
+    return [
+      `writes its files to ${dir} for every step alike: give \`\${${STEP_FILES}:-<an absolute folder>}\`, so a step writes where its run keeps them`,
+    ];
   const [, name, fallback] = read;
   if (name !== STEP_FILES) return [`writes its files to the folder \`${name}\` names, not a step's own: read \`${STEP_FILES}\``];
   if (fallback === undefined) return [`gives \`${STEP_FILES}\` no default, and a session outside a run is given none`];
   if (fallback.includes('${')) return [`nests a variable in its default, ${fallback}, which Claude Code does not expand`];
-  if (!path.isAbsolute(fallback)) return [`writes its files to ${fallback} outside a run, relative to the workspace, where the run commits them`];
+  if (!path.isAbsolute(fallback))
+    return [`writes its files to ${fallback} outside a run, relative to the workspace, where the run commits them`];
   if (!path.relative(repo, fallback).startsWith('..')) return [`writes its files to ${fallback} outside a run, inside the repository`];
   return [];
 };
@@ -557,7 +560,10 @@ test(
       { everyMs: 5_000 },
     );
     const said = view?.state.attempts.at(-1)?.closeout as { saved?: string } | undefined;
-    const pictures = fs.readdirSync(files, { recursive: true }).map(String).filter((f) => f.endsWith('.png'));
+    const pictures = fs
+      .readdirSync(files, { recursive: true })
+      .map(String)
+      .filter((f) => f.endsWith('.png'));
     const logs = await Effect.runPromise(engine.logs(id)).catch((e: Error) => e.message);
     t.diagnostic(`logs ${JSON.stringify(logs).slice(-3000)}`);
     t.diagnostic(`settled ${view?.state.settled}; it said ${JSON.stringify(said)}; ${files} holds ${JSON.stringify(pictures)}`);

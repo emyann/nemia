@@ -971,10 +971,14 @@ test("System's Disk row draws the store's disk by the code's names, and its larg
   assert.ok(/WSL/.test((windowed(system, "Free on the store's disk") as { description?: string }).description ?? ''), 'the limit is said');
   const said = (windowed(system, 'On disk, by part') as { description?: string }).description ?? '';
   assert.deepEqual(unsaidParts(said, DISK_PARTS), [], 'the by-part panel says each part by the word its series carries');
-  const byKind = windowed(system, 'On disk, by kind') as Panel & { description?: string };
+  const byKind = windowed(system, 'On disk, by kind') as Panel & {
+    description?: string;
+    fieldConfig?: { defaults?: { custom?: { drawStyle?: string; stacking?: { mode?: string } } } };
+  };
   assert.deepEqual(unsaidParts(byKind.description ?? '', ALL_KINDS), [], 'the by-kind panel says each kind by the word its series carries');
   assert.deepEqual(keptBy(byKind.targets?.[0].expr ?? '', ''), [['part', 'kind']], 'a series a kind of a part');
-  assert.equal(byKind.fieldConfig?.defaults?.custom?.drawStyle, 'bars', 'stacked bars');
+  const drawn = byKind.fieldConfig?.defaults?.custom;
+  assert.deepEqual([drawn?.drawStyle, drawn?.stacking?.mode], ['bars', 'normal'], 'stacked bars');
   const seeded = SEED.flatMap((s) => s.metrics.filter((m) => m.name === 'disk.bytes').flatMap((m) => m.series.map(([labels]) => labels)));
   for (const part of ['engine', 'sessions'])
     assert.ok(

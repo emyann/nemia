@@ -10,6 +10,7 @@ import { createMemoryHistory, createRootRoute, createRouter, RouterContextProvid
 import './tsx.ts';
 
 const { CutFrame } = await import('../src/components/look/CutFrame.tsx');
+const { CutCue } = await import('../src/components/look/CutCue.tsx');
 const { CutTag } = await import('../src/components/look/CutTag.tsx');
 const { Pager } = await import('../src/components/look/Pager.tsx');
 const { PageName, Plate } = await import('../src/components/look/Plate.tsx');
@@ -252,6 +253,30 @@ test('the cut frame: a shape nobody reads or presses, before what the frame hold
   // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
   const alive = await drawn(createElement(CutFrame, { hue: 'alive', children: child }));
   assert.doesNotMatch(tagWith(alive, 'data-cut-shape'), /filter/, 'nor one of a session at work');
+});
+
+test('a frame of what failed: its edge in failure, and no glow', async () => {
+  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
+  const html = await drawn(createElement(CutFrame, { hue: 'failure', children: createElement('span', null, 'Not sent') }));
+  assert.match(tagWith(html, 'data-cut-frame'), /data-cut-frame="failure"/);
+  assert.match(tagWith(html, 'data-cut-edge'), /background-color:var\(--meaning-failure\);/);
+  assert.doesNotMatch(tagWith(html, 'data-cut-shape'), /filter/);
+});
+
+test('a cue: its words in small caps, in the ink of its hue, in a frame of that hue cut 9', async () => {
+  const inks = { yours: 'text-yours', alive: 'text-alive', failure: 'text-failure', none: 'text-on-surface-variant' } as const;
+  for (const [hue, ink] of Object.entries(inks)) {
+    // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
+    const html = await drawn(createElement(CutCue, { hue: hue as keyof typeof inks, children: 'Answering' }));
+    assert.match(tagWith(html, 'data-cut-frame'), new RegExp(`data-cut-frame="${hue}"`));
+    assert.match(tagWith(html, 'data-cut-edge'), /clip-path:polygon\(0px 0px, calc\(100% - 9px\) 0px, 100% 9px,/, `${hue}: cut 9`);
+    const words = tagWith(html, 'data-cue');
+    assert.match(words, new RegExp(`data-cue="${hue}"`));
+    assert.match(words, /text-label-small/);
+    assert.match(words, /uppercase/);
+    assert.match(words, new RegExp(`\\b${ink}\\b`), `${hue}: its ink`);
+    assert.equal(/filter/.test(tagWith(html, 'data-cut-shape')), hue === 'yours', `${hue}: only what waits on you glows`);
+  }
 });
 
 /** How many elements of `markup` name a grain. */

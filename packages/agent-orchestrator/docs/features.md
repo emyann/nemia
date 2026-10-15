@@ -2395,6 +2395,7 @@ stateDiagram-v2
   filed --> stopped: SETTLED_OUTSIDE / nothing
   kept --> stopped: SETTLED_OUTSIDE / nothing
   kept --> kept: CUSTOM_CHANGED / tell
+  kept --> kept: OUTBOX_OWED / deliver
   stopped --> stopped: SUBSCRIBED / drop
   leaving --> off: OPEN_OR_SUBSCRIBED / stop, drop
   due --> off: RAISE_ENDED / nothing

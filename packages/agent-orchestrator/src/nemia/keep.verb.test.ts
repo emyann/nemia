@@ -28,6 +28,7 @@ process.env.CLAUDE_CONFIG_DIR = CONFIG;
 const { keep, keepOnce } = await import('./keep.verb.ts');
 const { LEVEL } = await import('./level.verb.ts');
 const { MEMORY } = await import('./memory.verb.ts');
+const { chatDir } = await import('../chat/chat.store.ts');
 const { levelFile, memoryDir, nemiaDir, ownBin, promptFile, readLevel, readNemia, toldFile } = await import('./level.store.ts');
 const { listSubscriptions } = await import('../subscription/subscription.store.ts');
 const { customInstructionsFile } = await import('../agents/read.store.ts');
@@ -206,8 +207,8 @@ test("at semi-auto the keeper files her task long-lived in auto, the daemon's bi
   );
   assert.deepEqual(
     [...settings.permissions.ask, ...denies].filter((rule) => rule.startsWith(`Edit(/${nemiaDir()}`)),
-    [`Edit(/${levelFile()})`, `Edit(/${promptFile()})`, `Edit(/${toldFile()})`],
-    'her memory is denied and asked by no rule',
+    [`Edit(/${levelFile()})`, `Edit(/${promptFile()})`, `Edit(/${toldFile()})`, `Edit(/${chatDir(nemiaDir())}/**)`],
+    "her memory is denied and asked by no rule, and the person's chat files are denied",
   );
   for (const rule of fence.allow) assert.ok((spec.config.allowedTools as string[]).includes(rule), `${rule} allowed`);
   assert.deepEqual(

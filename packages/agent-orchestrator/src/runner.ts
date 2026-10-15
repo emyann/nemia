@@ -9,7 +9,7 @@
  * `advance.verb.ts` (a pass — `tickRun`, `advanceRun` — and the filings it adopts), what a person asks of a run (`cancel.verb.ts`,
  * `retry.verb.ts`, `gate.verb.ts`, `say.verb.ts`, `wait.verb.ts`, `round.verb.ts`), the table of the commands that call them, each defined
  * once (`commands.verb.ts`), `forget.verb.ts` and `prune.verb.ts` (`nemia rm` and `nemia prune`), `list.verb.ts` and `decide.verb.ts` (what
- * a person reads of a run: `nemia ls` and `nemia decide`), and `stats.verb.ts` (what the store's runs add up to: `nemia stats`). They
+ * a person reads of a run: `nemia ls` and `nemia decide`), `stats.verb.ts` (what the store's runs add up to: `nemia stats`), and `chat.verb.ts` (a chat with a long-lived task, read and written). They
  * import one way — views and starting beneath the tick, the tick beneath the rest — so no cycle forms among them (`test/boundary.test.ts`).
  *
  * What of the I/O never names the engine sits beneath the controllers, and this file re-exports what it exported of them:
@@ -489,3 +489,7 @@ export type { RestingMemo, RestingRead } from './rest/resting.verb.ts';
 export { judgedNow, runsSummarized } from './summary/summary.verb.ts';
 export type { RunSummary, SummaryHow } from './summary/summary.verb.ts';
 export type { FinishedPage, FinishedRun, ListedRun, OpenRuns, RunClock, RunOutcome, StepCost, WaitingRun } from './runlist/runlist.verb.ts';
+export { chatHistory, chatRead, chatSend, chatSince } from './chat/chat.verb.ts';
+export type { ChatChanges, ChatHistory, ChatPlace, ChatReads } from './chat/chat.verb.ts';
+export type { ChatEvent, ChatFrom, Presence, StepState } from './chat/chat.ts';
+export { nemiaChatPlace } from './nemia/level.store.ts';

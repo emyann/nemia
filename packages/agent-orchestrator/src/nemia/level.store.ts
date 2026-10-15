@@ -162,8 +162,12 @@ export function storeDenies(root: string = ROOT): string[] {
     `Edit(/${levelFile()})`,
     `Edit(/${promptFile()})`,
     `Edit(/${toldFile()})`,
+    `Edit(/${path.join(nemiaDir(), 'chat')}/**)`,
   ];
 }
+
+/** Her chat as the chat's verbs and its delivery are given it: the task her session is filed under, if any, and her folder. */
+export const nemiaChatPlace = (): { task: string | undefined; dir: string } => ({ task: readLevel()?.task, dir: nemiaDir() });
 
 /** The person's custom words for her in the store `home`, or undefined where there are none (`readCustomInstructions`). */
 export const nemiaCustom = (home: string = ROOT): string | undefined => readCustomInstructions(home, 'nemia');

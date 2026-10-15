@@ -180,9 +180,10 @@ async function onAPhone(page: Page): Promise<void> {
   const size = page.viewportSize() ?? { width: 1280, height: 800 };
   await page.setViewportSize(PHONE);
   try {
-    const bar = page.locator('article [data-step-bar]').first();
-    const run = (await bar.evaluate((found) => found.closest('[data-run]')?.getAttribute('data-run'))) ?? '';
-    if (!run) throw new Refused("a waiting card's bar stands in its run's card");
+    const card = page.locator('section[data-section="waiting"] article[data-run]').first();
+    const run = (await card.getAttribute('data-run')) ?? '';
+    const bar = card.locator('[data-step-bar][data-step-preview="sheet"]').first();
+    await expectVisible(bar, 'narrowed to a phone, the bars of a waiting card open their cards as a sheet');
     const want = await expected(page, run, (await bar.getAttribute('data-step-bar')) ?? '');
     const name = (await bar.getAttribute('aria-label')) ?? '';
     await bar.click();

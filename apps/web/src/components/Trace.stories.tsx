@@ -49,13 +49,13 @@ export const Lines: StoryObj = {
     <div style={PANEL}>
       <Trace>
         <Line icon={<FileTextIcon />} fact="212 lines">
-          Read <code>harness/claude/attached.ts</code>
+          Read <code>src/lib/feed.ts</code>
         </Line>
         <Line icon={<TerminalIcon />} status="running" fact="14s">
           Running <code>npm run lint</code>
         </Line>
         <Line icon={<TerminalIcon />} status="error" fact="exit 1">
-          Failed to run <code>node --test attached.boundary</code>
+          Failed to run <code>node --test feed.boundary</code>
         </Line>
         <Line icon={<SquareIcon />} status="pending">
           Run the whole suite
@@ -83,9 +83,9 @@ export const Running: StoryObj = {
 
 /** What a search asked and what came back. */
 const SEARCHED = `rg -n drainsThis packages/agent-runtime/src
-attached.ts:88        const held = () => draining || drainsThis(root);
-attached-file.ts:141  export const drainsThis = (root: string) => …
-1 more, in attached.boundary.test.ts`;
+feed.ts:88        const held = () => draining || drainsThis(root);
+feed-file.ts:141  export const drainsThis = (root: string) => …
+1 more, in feed.boundary.test.ts`;
 
 /** A step opened: what it asked and what came back. */
 export const Opened: StoryObj = {

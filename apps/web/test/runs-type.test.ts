@@ -16,6 +16,7 @@ const FILES = [
   'components/look/StatTile.tsx',
   'components/look/CopyId.tsx',
   'components/look/CutButton.tsx',
+  'components/look/CutCue.tsx',
   'components/FlightTable.tsx',
   'components/FinishedTable.tsx',
   'components/look/Plate.tsx',

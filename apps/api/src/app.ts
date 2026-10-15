@@ -121,7 +121,7 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
  *   and the pass's (`pass.duration`, `pass.phase.duration`, `pass.journal_reads`, `store.runs`, `sessions.queued`, `sessions.admitted`)
  *   only where this process ticks: an api started with `--no-tick`, or beside a `nemia up`, has none of them.
  * - `GET /api/pause` — the store's pause, `{ pause, finishing, staged, held }`: since when, by whom and why, or null; each task still
- *   finishing under it (`{ run, step, kind }`, a `session`, `check` or `landing`), none once it is Paused; each landing it holds with its
+ *   finishing under it (`{ run, step, kind, calling? }`, a `session`, `check` or `landing`, and the tool a session is in a call to), none once it is Paused; each landing it holds with its
  *   merge staged in the repository's checkout (MERGE_HEAD), and each other step signed off (`{ run, step }`), its check not filed until
  *   it resumes (`pausedRead`). Put on
  *   `POST /api/pause` and lifted on `DELETE /api/pause` (commands/routes.ts).

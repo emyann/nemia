@@ -18,9 +18,17 @@ export type PauseHeld = { run: string; step: string };
 
 /**
  * Mirrors the package's `Finishing`: `run`'s `step`, still at work under the pause, as a session, a check, or a landing's check;
- * `stopping` once it was asked to stop, and `resumed` while a pause at once's ask names it, which tries it again on the resume.
+ * `stopping` once it was asked to stop, and `resumed` while a pause at once's ask names it, which tries it again on the resume;
+ * `calling`, the tool a session is in a call to, which a restart of the daemon waits for.
  */
-export type Finishing = { run: string; step: string; kind: 'session' | 'check' | 'landing'; stopping?: true; resumed?: true };
+export type Finishing = {
+  run: string;
+  step: string;
+  kind: 'session' | 'check' | 'landing';
+  stopping?: true;
+  resumed?: true;
+  calling?: string;
+};
 
 /** Mirrors the package's `Interrupt`: `run`'s `step`, its session at work or its check, which a pause at once stops. */
 export type Interrupt = { run: string; step: string; kind: 'session' | 'check' };
@@ -50,7 +58,7 @@ const PauseSchema = Schema.Struct({
 }) satisfies Schema.Schema<Pause>;
 
 /** Decodes a `Paused`. */
-const PausedSchema = Schema.Struct({
+export const PausedSchema = Schema.Struct({
   pause: Schema.NullOr(PauseSchema),
   finishing: Schema.Array(
     Schema.Struct({
@@ -59,6 +67,7 @@ const PausedSchema = Schema.Struct({
       kind: Schema.Literals(['session', 'check', 'landing']),
       stopping: Schema.optional(Schema.Literal(true)),
       resumed: Schema.optional(Schema.Literal(true)),
+      calling: Schema.optional(Schema.String),
     }),
   ),
   staged: Schema.Array(Schema.Struct({ run: Schema.String, step: Schema.String, repo: Schema.String })),

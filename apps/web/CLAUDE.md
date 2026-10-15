@@ -35,14 +35,14 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
   text-body-small`), untracked as the body roles are (`DESIGN.md`), never a label or title role, which carry one (`monoWeighted`, `test/type.test.ts`).
 - The kit's corners (`rounded-shape-*`) follow `DESIGN.md`; shadcn's (`--radius`) are the board's own. `bg-secondary` is the theme's
   secondary (the look's `alive`), as the kit's parts draw it; shadcn's quiet surface is its role, `bg-surface-container-highest
-  text-on-surface`, and no file outside the kit names `--secondary` or `secondary-foreground` (`test/secondary.test.ts`). The chart
-  colours are not the theme's.
+  text-on-surface`, and no file outside the kit names `--secondary` or `secondary-foreground` (`test/secondary.test.ts`).
 - A colour says one thing: `yours` (waits on a person), `alive`, `money` (an amount), `rest` (grey, and sage for done) and `failure`.
   `src/styles.css` reads each from a theme role once (`--meaning-*`, `bg-yours`); `lib/meaning.ts` holds the drawn forms, each class a
   whole literal; `test/status.test.ts` holds the table and refuses a hand-picked hue in the files that draw a state.
-- `test/palette.test.ts` refuses a palette colour (`bg-amber-100`, `text-white`, `--color-neutral-400`) in `src` outside the kit: a ground
-  or an outline reads a role (`bg-card`, `border-outline`), one class for both schemes, no `dark:` twin. A use that means none of the
-  five is rest; a caution is failure for a write refused, yours drawn light for what a person weighs, rest for a note.
+- `test/palette.test.ts` refuses a palette colour (`bg-amber-100`, `text-white`, `--color-neutral-400`) in `src` outside the kit, and a
+  raw colour outside a comment (`#fff`, `rgb()`, `oklch()` and kin, a relative one included, but its `KEPT`, each in its file with its
+  reason): a ground or an outline reads a role (`bg-card`, `border-outline`), one class for both schemes, no `dark:` twin. A use that
+  means none of the five is rest; a caution is failure for a write refused, yours drawn light for what a person weighs, rest for a note.
 - `test/type.test.ts` refuses a text size written by hand in `src` outside the kit (`text-sm`, `text-[11px]`, `leading-[18px]`, a
   `fontSize`): 12, 14 and 16px are `text-body-small`, `-medium` and `-large`, small caps a label role and `uppercase`, a heading a title
   role, and neither a label nor a title has a weight or a tracking beside it (`dressed`). The sizes no role gives are its `OUTSIDE`, each
@@ -170,6 +170,8 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
   `checks.ts`). An age a page asserts is written mid-minute, never on the minute the board floors to (`290-daemon.ts`).
 - A page that holds a read with `route` routes before its `goto`: the feed's replay reads the run again right after the load.
 - A page whose state changes at its end waits for what it reads again before its last assertion, or its picture is taken mid-read.
+- A window resized across 600 pixels swaps every rail bar's button a render later (`useSheetPreview`): wait for the mode the bar
+  says (`data-step-preview`) before reading one, and scope it by its section, since the runs page itself is an `article` (`059-runs-preview.ts`).
 - Name a page's own pictures `<name>-<what>-<theme>.png`; `<name>-<theme>.png` is the runner's: a run
   that pictures the page overwrites it, and a run that does not leaves an earlier run's where it is (`visitAll`, `test/e2e/visit.test.ts`).
 - Take every picture with `photograph` (`board.ts`), which stills every animation for the shot: an agent's face moves at all times.

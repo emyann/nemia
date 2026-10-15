@@ -199,6 +199,7 @@ type Queued = {
   place: number | null;
   of: number | null;
   card: InboxCard;
+  factoryRepo: string | null;
 };
 
 /**
@@ -235,14 +236,15 @@ export const INBOX_QUEUE: Command<Queued> = {
         place: done.place ?? null,
         of: done.of ?? null,
         card: done.card,
+        factoryRepo: done.factoryRepo,
       };
     }),
-  print({ name, file, was, place, of, card }) {
+  print({ name, file, was, place, of, card, factoryRepo }) {
     if (was === 'not queued') return [`${name}  not queued — nothing to take back`];
     if (was === 'taken back') return [`${name}  taken back: it no longer starts on its own — start it with nemia start ${file}`];
     return [
       `${name}  queued at ${card.queued}, ${place} of ${of}  workflow: ${card.workflow}${card.repo ? `  repo: ${card.repo}` : ''}${card.factory ? `  factory: ${card.factory}` : ''}`,
-      `the tick starts it on its own once its turn comes and a run slot is free${card.repo ? '' : ', on the repository nemia up runs in'} — take it back with nemia inbox queue ${name} --off`,
+      `the tick starts it on its own once its turn comes and a run slot is free${card.repo ? '' : factoryRepo ? `, on ${factoryRepo}, its factory's one repository` : ', on the repository nemia up runs in'} — take it back with nemia inbox queue ${name} --off`,
     ];
   },
 };

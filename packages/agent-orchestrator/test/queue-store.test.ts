@@ -1012,7 +1012,11 @@ test("a queued card of a factory with one repository starts in it, on that repos
   const solo = aSoloFactory(['dev']);
   const daemons = aRepoWith('dev');
   aCard('solo-card', { workflow: 'dev', factory: 'solo' }, 'Build it in solo.');
-  await printedBy(t, b.e, 'inbox', 'queue', 'solo-card');
+  const [, queued] = await printedBy(t, b.e, 'inbox', 'queue', 'solo-card');
+  assert.equal(
+    queued,
+    `the tick starts it on its own once its turn comes and a run slot is free, on ${solo}, its factory's one repository — take it back with nemia inbox queue solo-card --off`,
+  );
   const pass = await runWith(b.e, tickRun({ repo: daemons }));
   const [run] = fromCard('solo-card');
   assert.deepEqual(
@@ -1038,6 +1042,9 @@ test("REFUSED at shipped defaults, on its factory's repository: a queued card of
     [undefined, []],
     'passed over on the same repository',
   );
+  const [line] = await printedBy(t, b.e, 'inbox');
+  assert.ok(line.includes(` — not started at `) && line.includes(`on ${solo}, its factory's one repository: dev: `), line);
+  assert.doesNotMatch(line, /run nemia up/);
 });
 
 test("REFUSED as shipped: a queued card that names no factory is refused from a daemon in a repository one factory alone holds, said with no start's flag and no repository to run nemia up in, and not tried again; with its factory: written, it starts in it", async (t) => {

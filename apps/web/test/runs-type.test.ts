@@ -26,6 +26,8 @@ const FILES = [
   'components/look/CutFrame.tsx',
   'components/look/CutTag.tsx',
   'components/look/ScanLines.tsx',
+  'components/StepPreview.tsx',
+  'components/StepCard.tsx',
 ];
 
 /** The files a folder's door exports from, when `at` is a folder with a door (`index.ts`): each sibling it names, as a component's file. */

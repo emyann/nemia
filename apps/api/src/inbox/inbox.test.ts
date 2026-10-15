@@ -159,6 +159,7 @@ test("POST /api/inbox files a card as `nemia inbox add` does: the idea alone; a 
       error: null,
       body: 'Cache the views between passes\n\nThe tick reads each task twice.',
       filedAt: old.toISOString(),
+      factoryRepo: null,
     },
     'listed with its body and a filing time, and started as none',
   );

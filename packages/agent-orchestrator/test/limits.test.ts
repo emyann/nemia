@@ -92,7 +92,7 @@ const RECORD: Record<string, Partial<Record<Rule, number>>> = {
   'packages/agent-orchestrator/src/feed/feed.store.ts': { 'max-lines-per-function': 1, 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/former/former.ts': { 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/inbox/inbox.store.ts': { 'sonarjs/cognitive-complexity': 1 },
-  'packages/agent-orchestrator/src/inbox/inbox.ts': { 'sonarjs/cognitive-complexity': 2 },
+  'packages/agent-orchestrator/src/inbox/inbox.ts': { 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/keys/keys.ts': { 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/plan/plan.ts': { 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/rest/rest.ts': { 'sonarjs/cognitive-complexity': 1 },

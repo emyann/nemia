@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import type { RunSummary } from '../src/lib/api.ts';
 import { stateMeaning, type StepState } from '../src/lib/status.ts';
 import {
+  barSaid,
   endedWords,
   nowOf,
   openWord,
@@ -343,4 +344,11 @@ test("REFUSED: a finished row's time carries its date on the day itself, each of
     assert.equal(words.length, 15, words);
     assert.match(words, PLAIN, words);
   }
+});
+
+test("a bar as a button says its step's name and the rail's word for its state", () => {
+  assert.equal(barSaid('implement', 'working'), 'implement, at work');
+  assert.equal(barSaid('design', 'awaiting-approval'), 'design, waits for you');
+  assert.equal(barSaid('land', 'failed-check'), 'land, failed its check');
+  assert.equal(barSaid('review', 'waiting'), 'review, to come');
 });

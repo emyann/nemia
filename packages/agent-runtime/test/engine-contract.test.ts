@@ -35,6 +35,8 @@ const LIES: { readonly [V in Kept]: (answer: Answer) => Answer } = {
   transcript: Effect.catch(() => Effect.succeed({ events: [], cursor: 'elsewhere' })),
   forget: Effect.map((report) => ({ ...(report as object), forgotten: !(report as { forgotten: boolean }).forgotten })),
   kept: Effect.match({ onFailure: () => ({ tasks: [] }), onSuccess: () => ({ tasks: [{ taskId: 'elsewhere' }] }) }),
+  hold: Effect.map(() => 'elsewhere'),
+  drain: Effect.catch(() => Effect.void),
 };
 
 /** A new stand-in whose `verb` does what it does and answers `lie` of its true answer. */

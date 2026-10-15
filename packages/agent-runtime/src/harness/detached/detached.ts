@@ -391,7 +391,7 @@ const parentOf = (all: readonly Run[], resumeFrom: string, before: number, excep
     .sort((a, b) => startOf(b.run) - startOf(a.run))[0];
 
 /** `usage` with the parent's `carried` totals taken off: a measure either lacks, or that would go below nothing, dropped. */
-const lessCarried = (usage: Usage, carried: Carried): Usage | undefined => {
+export const lessCarried = (usage: Usage, carried: Carried): Usage | undefined => {
   const { costUsd, apiMs, ...own } = usage;
   const less = (mine: number | undefined, theirs: number | undefined) =>
     mine !== undefined && theirs !== undefined && mine >= theirs ? { value: mine - theirs } : undefined;

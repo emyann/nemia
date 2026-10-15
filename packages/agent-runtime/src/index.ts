@@ -43,6 +43,7 @@ export {
   SayRefused,
   SayUnsent,
   QuotaRefused,
+  DrainRefused,
   ForgetRefused,
   KeptRefused,
   CompactRefused,

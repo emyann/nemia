@@ -2,7 +2,7 @@
  * The engine as an Effect service: `Engine`, built by `Engine.layer(options)` over the harnesses, the store and the memo, whose verbs
  * are Effects with typed errors.
  */
-import { Context, Effect, Exit, Fiber, Layer, Schema, type Stream } from 'effect';
+import { Context, Effect, Exit, Fiber, Layer, Schema, type Scope, type Stream } from 'effect';
 import path from 'node:path';
 import os from 'node:os';
 import { fold, nameFor, pathOf, type Input, type LifecycleStep, type Said, type Sighting, type State } from '../core/index.ts';
@@ -77,12 +77,14 @@ import {
   admissionOf,
   type EngineIo,
   type EngineOptions,
+  type HarnessConfig,
   type ObserveCount,
   type TaskSpec,
   type TickReport,
 } from './options.ts';
 import { harnessRefusalOf } from './harness-refusal.ts';
 import { traceparentOf } from '../harness/telemetry.ts';
+import { attachedSessions, putDrain, liftDrain, type Attached } from '../harness/claude/index.ts';
 
 /** Options an engine cannot be built from (`optionsRefusalOf`), and why. Nothing was built. */
 export class EngineRefused extends Schema.TaggedError<EngineRefused>()('EngineRefused', {
@@ -131,6 +133,17 @@ const attemptAsked = <A extends { readonly n: number }>(attempts: readonly A[], 
   return Effect.succeed(attempt === undefined ? attempts.at(-1) : attempts.find((a) => a.n === attempt));
 };
 
+/** A drain this engine will not put, and why: a holder that is no process id. Nothing was written. */
+export class DrainRefused extends Schema.TaggedError<DrainRefused>()('DrainRefused', {
+  message: Schema.String,
+}) {}
+
+/** Why `drain` refuses its holder, or `undefined` for a process id or null. */
+export const drainRefusalOf = (holder: unknown): string | undefined =>
+  holder === null || (Number.isInteger(holder) && (holder as number) > 0)
+    ? undefined
+    : `takes the process id of the engine that holds the attached sessions, a whole number from 1, or null to let their calls go; it was handed ${JSON.stringify(holder) ?? 'nothing'}.`;
+
 /** Why `list` refuses what it was handed, or `undefined` for nothing or one list of task ids. */
 export const listRefusalOf = (args: readonly unknown[]): string | undefined => {
   const [taskIds] = args;
@@ -143,7 +156,7 @@ export const listRefusalOf = (args: readonly unknown[]): string | undefined => {
  * The engine's verbs, each an Effect with what refuses it on its error channel, a tagged error whose message says what to do
  * instead: `FileRefused`, `TickRefused`, `AdmitRefused`, `ListRefused`, `TranscriptRefused`, `OutputRefused`, `FollowRefused`,
  * `SayRefused`, `QuotaRefused`, `StopRefused` for `stop`, `InputRefused` for `answer` and `close`, `BodyRefused` for `sweep` and
- * `removeBody`, `ForgetRefused` for `forget`, `KeptRefused` for `kept`, and `CompactRefused` for `compact`.
+ * `removeBody`, `ForgetRefused` for `forget`, `KeptRefused` for `kept`, `CompactRefused` for `compact`, and `DrainRefused` for `drain`.
  * `SayUnsent` is `say`'s failure that is not a refusal; a `JournalError` or a `RunnerError` is the store's or the harness's.
  * `refusalWords(verb)` words a refusal as `ae` says it.
  * `watch`, `io` and `start` succeed at once: `watch` and `start` with a handle that stops them.
@@ -432,6 +445,20 @@ export type EngineShape = {
    */
   readonly tallied: <A, E, R>(program: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>;
   /**
+   * Make this process the holder of the Claude Code sessions the engine runs attached (`harness/claude/attached.ts`), for as long as the
+   * scope it is taken in lasts: while held, a Claude Code task that runs to its end is spawned attached on the Agent SDK, and a session
+   * parked, or left by a holder that is gone, is resumed under its own id on the next look. As the scope closes it holds back new tool
+   * calls, waits with no bound for each call in flight to end, then stops each session and parks it for the next holder. An engine
+   * that never takes it runs such a task as a `claude -p` job.
+   */
+  readonly hold: () => Effect.Effect<void, never, Scope.Scope>;
+  /**
+   * Hold back the new tool calls of the attached sessions the process `holder` holds, each at its hook until the drain is lifted, or with
+   * `null` lift it. A call in flight runs on; another process's holder is not held. Refused — `DrainRefused` — for a holder that is
+   * neither a process id nor null.
+   */
+  readonly drain: (holder: number | null) => Effect.Effect<void, DrainRefused>;
+  /**
    * Tick on a timer until stopped. Ticks never overlap: a beat that comes while a tick runs is skipped, so a tick that
    * outruns the interval is not joined by a second pass over the same board. The timer holds the process open, as a control
    * loop must: `stop()` gives the process back.
@@ -612,11 +639,10 @@ const make = (options: EngineOptions) =>
     const observed: Record<string, ObserveCount> = {};
     const counted = countedInto(observed);
     const observedNow = () => copyOf(observed);
-    const runners = Object.fromEntries(
-      Object.entries(runnersOf(harnesses, root, options.credentials, options.missingCredential, options.telemetry)).map(
-        ([name, ops]): [string, SeamOps] => [name, counted(name, isRemote(harnesses[name]) ? ops : a2aOps(name, ops, events))],
-      ),
-    );
+    const attached = attachedSessions(root);
+    const { credentials, missingCredential, telemetry } = options;
+    const made = runnersOf(harnesses, root, credentials, missingCredential, telemetry, attached);
+    const runners = Object.fromEntries(Object.entries(made).map(seamOf(harnesses, events, counted)));
     const layer = Layer.mergeAll(journal, Runner.layer(composite(runners, fallback)), tickMemoLayer(), admissionOf(options, harnesses));
     const go = <A, E>(e: Effect.Effect<A, E, Journal | Runner>): Effect.Effect<A, E> => e.pipe(Effect.provide(layer));
     const read = (taskId: string) => go(Effect.flatMap(Journal, (j) => j.read(taskId)));
@@ -757,8 +783,27 @@ const make = (options: EngineOptions) =>
       watch: watchOf(feedVerb, journalOps.subscribe),
       ...ioVerbsOf(observedNow),
       start: startOf(tickVerb),
+      ...attachVerbsOf(attached, root),
     });
   });
+
+/** A harness's runner as the engine runs it: through its A2A agent unless it is a remote one already, its observes counted. */
+const seamOf =
+  (harnesses: Record<string, HarnessConfig>, events: Parameters<typeof a2aOps>[2], counted: ReturnType<typeof countedInto>) =>
+  ([name, ops]: [string, RunnerOps]): [string, SeamOps] => [
+    name,
+    counted(name, isRemote(harnesses[name]) ? ops : a2aOps(name, ops, events)),
+  ];
+
+/** The verbs of the sessions run attached: `hold`, and `drain`, which writes the drain's file or removes it. */
+const attachVerbsOf = (attached: Attached, root: string): Pick<EngineShape, 'hold' | 'drain'> => ({
+  hold: () => attached.hold,
+  drain: Effect.fn('Engine.drain')(function* (holder: number | null) {
+    const refused = drainRefusalOf(holder);
+    if (refused) return yield* Effect.fail(new DrainRefused({ message: refused }));
+    yield* Effect.sync(() => (holder === null ? liftDrain(root) : putDrain(root, holder)));
+  }),
+});
 
 /**
  * The engine, as a service. `Engine.layer(options)` builds one from `EngineOptions`, failing with `EngineRefused` for what

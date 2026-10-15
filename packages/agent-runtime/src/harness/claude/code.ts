@@ -40,8 +40,11 @@ import {
 } from './vocabulary.ts';
 import { admittedFlags } from './admission.ts';
 import { claudeTelemetryEnv } from './telemetry.ts';
+import { CLAUDE_JOB_ENV } from './job-env.ts';
 import { claudePartials, claudeResultOutput, claudeStreamKept, claudeStreamOutput } from '../detached/output.ts';
 import { checkoutMcpConfig, claudeMcpArgs } from '../mcp.ts';
+import { RunnerError } from '../error.ts';
+import type { Attached } from './attached.ts';
 
 /**
  * The arguments `claude -p` is given, whichever of the engine's specs runs it, given how its output is to be printed: the
@@ -104,16 +107,7 @@ export const claudePrintFlags = (r: SpawnRequest, io: HarnessIO | undefined): st
   ...(r.config?.budgetUsd !== undefined ? ['--max-budget-usd', String(r.config.budgetUsd)] : []),
 ];
 
-/**
- * The environment a `claude -p` job runs in, laid over the worker's own. A job's turn ends with its result, and a command
- * left running in the background then reports to nothing, so background tasks are off: `run_in_background` is ignored and
- * a call runs in the foreground. A call given no timeout may then run as long as Claude Code lets any call run, 10 minutes,
- * where by default it is cut at 2.
- */
-export const CLAUDE_JOB_ENV: Record<string, string> = {
-  CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1',
-  BASH_DEFAULT_TIMEOUT_MS: '600000',
-};
+export { CLAUDE_JOB_ENV } from './job-env.ts';
 
 /** How `claude -p --output-format stream-json`'s start decodes: its first line, `system`/`init`, and its `session_id`. */
 export const CLAUDE_INIT_START: StartEvent = { event: { type: 'system', subtype: 'init' }, id: 'session_id' };
@@ -258,10 +252,12 @@ export const isClaudeJob = (sessionId: string) => nameParts(sessionId) !== undef
  * - `kept` names what either mode keeps under each session's name, joined the same way, a path named once.
  * - `compact` rewrites the jobs' ended captures to what their readers read (`claudeStreamKept`); a background session keeps none.
  */
-export const claudeCodeOps = (options: ClaudeOptions = {}): RunnerOps => {
+export const claudeCodeOps = (options: ClaudeOptions = {}, attached?: Attached): RunnerOps => {
   const root = options.root ?? path.join(os.homedir(), '.agent-engine');
-  const job = detachedOps(claudeJob, root);
-  const findJob = detachedFind(claudeJob, root);
+  const plain = detachedOps(claudeJob, root);
+  const job = attached ? withAttached(plain, attached) : plain;
+  const plainFind = detachedFind(claudeJob, root);
+  const findJob = (name: string) => (attached?.has(name) ? Effect.succeed({ sessionId: name }) : plainFind(name));
   const bg = claudeOps({ ...options, root });
   const of = (sessionId: string) => (isClaudeJob(sessionId) ? job : bg);
 
@@ -358,5 +354,44 @@ export const claudeCodeOps = (options: ClaudeOptions = {}): RunnerOps => {
           ),
         ),
       ),
+  };
+};
+
+/** Why an attached session is not followed live: its conversation is read again through `transcript`. */
+const attachedUnfollowed = (name: string) =>
+  new RunnerError({
+    verb: 'follow',
+    message: `\`${name}\` runs attached, and is not followed live: read its conversation with \`transcript\`, again from its cursor.`,
+    refused: true,
+  });
+
+/**
+ * The jobs' runner `job`, with the sessions `attached` runs beside them, both named by the engine (`ae/<task>/<n>`): a spawn runs
+ * attached while this process holds them, a job otherwise; each verb given a name goes to the one whose run file it has, so a job
+ * spawned before goes on being read; a look lists both.
+ */
+const withAttached = (job: RunnerOps, attached: Attached): RunnerOps => {
+  const a = attached.ops;
+  const to = (name: string) => (attached.has(name) ? a : job);
+  return {
+    ...job,
+    spawn: (r) => (attached.holding() ? a.spawn(r) : job.spawn(r)),
+    observe: Effect.all([job.observe, a.observe]).pipe(Effect.map(([jobs, ours]) => new Map([...jobs, ...ours]))),
+    observeFor: (expected) => {
+      const ours = expected.filter((e) => attached.has(e.name));
+      const theirs = expected.filter((e) => !attached.has(e.name));
+      return Effect.all([theirs.length ? job.observeFor!(theirs) : Effect.succeed(undefined), a.observeFor!(ours)]).pipe(
+        Effect.map(([jobs, mine]): Observation => ({
+          ...jobs,
+          seen: new Map([...(jobs?.seen ?? []), ...mine.seen]),
+          unread: jobs?.unread ?? new Set(),
+        })),
+      );
+    },
+    stop: (name) => to(name).stop(name),
+    logs: (name) => to(name).logs(name),
+    transcript: (name, after) => to(name).transcript!(name, after),
+    say: (session, text) => to(session.name).say!(session, text),
+    follow: (name) => (attached.has(name) ? Stream.fail(attachedUnfollowed(name)) : job.follow!(name)),
   };
 };

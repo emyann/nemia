@@ -107,6 +107,8 @@ export type TaskView = {
    * session that stops waiting loses it on the next.
    */
   waitingFor?: string;
+  /** The tool call the attempt in flight is in, and since when, as its harness sees it (`Sighting.calling`). Absent between calls. */
+  calling?: { tool: string; since: string };
   /**
    * Where a task filed `queued` stands with the layer above: `queued` while its current turn waits for the word to start,
    * `admitted` once given and until the next pass starts it. Beside the phase, never in it: the phase of either is `pending`
@@ -876,6 +878,7 @@ export function viewOfState(state: State, observed: ReadonlyMap<string, Sighting
     sessionId: sighting?.sessionId ?? last?.nativeId ?? null,
     usage: state.restartPolicy === 'Always' ? (last?.usage ?? undefined) : sighting?.usage,
     ...(waitingFor ? { waitingFor } : {}),
+    ...(sighting?.calling ? { calling: sighting.calling } : {}),
     ...(admission ? { admission } : {}),
     ...(bridge ? { bridge } : {}),
     ...(unread ? { unreadWhy: unread } : {}),

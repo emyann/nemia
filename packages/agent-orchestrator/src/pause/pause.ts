@@ -30,9 +30,16 @@ export type PauseHeld = { run: string; step: string };
  * A task still at work under the pause, which it lets finish: `run`'s `step`, as a `session` at work, the `check` of its work, or the
  * check of a `landing` (an ending that lands on its check) — `stopping` once the engine was asked to stop it, and `resumed` while an ask
  * `nemia pause --now` wrote names it (`interrupted`), which tries it again on the resume. A stop asked by another hand carries no
- * `resumed`.
+ * `resumed`. `calling` is the tool a session is in a call to, which a stop of the daemon waits for.
  */
-export type Finishing = { run: string; step: string; kind: 'session' | 'check' | 'landing'; stopping?: true; resumed?: true };
+export type Finishing = {
+  run: string;
+  step: string;
+  kind: 'session' | 'check' | 'landing';
+  stopping?: true;
+  resumed?: true;
+  calling?: string;
+};
 
 /**
  * A task a pause at once stops (`nemia pause --now`): `run`'s `step`, its `session` at work or the `check` of its work, by the task's id. A
@@ -54,9 +61,13 @@ export type PauseStanding = { pause: Pause; finishing: Finishing[]; staged: Paus
 
 /**
  * A task's view as `finishingOf` reads it: the words' view (`WordView`), whether the runtime holds it queued for a slot, and whether it was
- * asked to stop (`stopRequested`).
+ * asked to stop (`stopRequested`), and the tool call its session is in (`calling`).
  */
-export type FinishingView = WordView & { admission?: string; state: WordView['state'] & { stopRequested?: boolean } };
+export type FinishingView = WordView & {
+  admission?: string;
+  calling?: { tool: string };
+  state: WordView['state'] & { stopRequested?: boolean };
+};
 
 /** What a pause at once costs, as `nemia pause --now` and the board's confirm say it before it is paid. */
 export const NOW_COST = 'An interrupted step redoes its unfinished work and reads its context again.';
@@ -82,6 +93,7 @@ export function finishingOf(
       kind: kind === 'check' && landsOnCheck(step, run) ? ('landing' as const) : kind,
       ...(view.state.stopRequested ? { stopping: true as const } : {}),
       ...(asks.some((a) => a.step === step.name && a.interrupted === taskId) ? { resumed: true as const } : {}),
+      ...(kind === 'session' && view.calling ? { calling: view.calling.tool } : {}),
     })),
   );
 }
@@ -185,12 +197,23 @@ export const pausedWords = (paused: Pick<Paused, 'pause' | 'finishing' | 'staged
 
 /**
  * A task still finishing under the pause, in one line: its run, its step, and what of it is at work; once asked to stop, that it is
- * stopping, and that nemia resume tries it again only where a pause at once's ask names it (`resumed`).
+ * stopping, and that nemia resume tries it again only where a pause at once's ask names it (`resumed`); a session in a tool call names
+ * the tool.
  */
-export const finishingWords = ({ run, step, kind, stopping, resumed }: Finishing): string =>
+export const finishingWords = ({ run, step, kind, stopping, resumed, calling }: Finishing): string =>
   stopping
     ? `${run}'s ${step} is stopping: its ${kind === 'session' ? 'session' : 'check'} was asked to stop${resumed ? `, and is tried again on ${RESUME_LINE}` : ''}`
-    : `${run}'s ${step} is finishing: ${kind === 'session' ? 'its session is at work' : kind === 'check' ? 'its check runs' : 'the check of its landing runs'}`;
+    : `${run}'s ${step} is finishing: ${atWorkWords(kind, calling)}`;
+
+/** What of a step is at work, in words: its session, in its call to `calling` where it is in one, its check, or its landing's. */
+const atWorkWords = (kind: Finishing['kind'], calling: string | undefined): string => {
+  if (kind === 'session') return calling ? `its call to ${calling} runs` : 'its session is at work';
+  return kind === 'check' ? 'its check runs' : 'the check of its landing runs';
+};
+
+/** Each session still finishing under the pause that is in a tool call (`calling`): what a stop of the daemon waits for. */
+export const callsOf = (paused: { finishing: readonly Finishing[] }): Finishing[] =>
+  paused.finishing.filter((f) => f.calling !== undefined);
 
 /** A task a pause at once stops, in words: its run, its step, and whether its session or its check. */
 export const interruptWords = ({ run, step, kind }: Interrupt): string =>

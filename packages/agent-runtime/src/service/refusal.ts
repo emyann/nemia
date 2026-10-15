@@ -18,6 +18,7 @@ const REFUSALS = new Set([
   'ForgetRefused',
   'KeptRefused',
   'CompactRefused',
+  'DrainRefused',
 ]);
 
 /**

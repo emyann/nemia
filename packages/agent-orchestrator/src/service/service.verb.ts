@@ -11,7 +11,8 @@ import { daemonStanding } from '../daemon/daemon.store.ts';
 import { pausedRead } from '../list/list.verb.ts';
 import { putPause, resumePause } from '../pause/pause.store.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
-import { tried } from '../runtime-client.ts';
+import { drained, tried } from '../runtime-client.ts';
+import { callsOf } from '../pause/pause.ts';
 import { pointedEntry } from '../release/release.ts';
 import { runningRelease } from '../release/version.verb.ts';
 import {
@@ -92,6 +93,8 @@ export const liveHost = (): ServiceHost => ({
   pause: putPause,
   resume: resumePause,
   landings: () => Effect.map(pausedRead(), landingsOf),
+  calls: () => Effect.map(pausedRead(), callsOf),
+  drain: drained,
   say: (line) => console.error(line),
   pollMs: 2_000,
   waitMs: 60_000,

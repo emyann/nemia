@@ -157,9 +157,16 @@ export type HarnessSpec = {
   callAdmission?: true;
   /**
    * The worker keeps the harness's stdout and its stderr each whole, in a file of its own beside the log (`.stdout`, `.stderr`),
-   * and the runner reads them (`output`). Absent: the log alone, both streams in one, and the runner has no `output`.
+   * and the runner reads them (`output`), until its session has ended: then stdout as `keepOutput` keeps it, where the spec has one.
+   * Absent: the log alone, both streams in one, and the runner has no `output`.
    */
   streams?: true;
+  /**
+   * What a capture of this harness keeps once its session has ended, as text: the log, and stdout where it is kept whole (`streams`),
+   * each rewritten so at the read that keeps what was read (`outputIn`, `keepCapture`), and only when `readOutput` reads the kept
+   * text as it read the whole. Pure, and keeping what it keeps of a kept capture. Absent: a capture is kept whole.
+   */
+  keepOutput?: (output: string) => string;
   /**
    * What the harness's stdout says of the text it is writing, before the text is whole (`PartialMark`), read from its whole lines
    * after `before` lines: set, with `streams` and `transcript`, the runner follows a session live (`follow`, `followOf`).
@@ -740,7 +747,14 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
 
   const outputs: SaidMemo = new Map();
   const outputOf = (name: string, run: RunFile): { read: HarnessOutput } | { wrong: string } | undefined =>
-    spec.readOutput && outputIn(spec.readOutput, outputs, name, { log: logFile(name), kept: saidFile(name) }, overNow(run));
+    spec.readOutput &&
+    outputIn(
+      spec.readOutput,
+      outputs,
+      name,
+      { log: logFile(name), kept: saidFile(name), ...(spec.streams ? { stdout: streamFileOf(dir, name, 'stdout') } : {}) },
+      { over: overNow(run), ended: run.state !== 'working', ...(spec.keepOutput ? { keep: spec.keepOutput } : {}) },
+    );
 
   const carriedBy = (all: readonly Run[], resumeFrom: string, before: number, except?: string): Carried => {
     const parent = parentOf(all, resumeFrom, before, except);

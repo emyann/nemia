@@ -40,7 +40,7 @@ import {
 } from './vocabulary.ts';
 import { admittedFlags } from './admission.ts';
 import { claudeTelemetryEnv } from './telemetry.ts';
-import { claudePartials, claudeResultOutput, claudeStreamOutput } from '../detached/output.ts';
+import { claudePartials, claudeResultOutput, claudeStreamKept, claudeStreamOutput } from '../detached/output.ts';
 import { checkoutMcpConfig, claudeMcpArgs } from '../mcp.ts';
 
 /**
@@ -178,6 +178,8 @@ export const claudeDetached: HarnessSpec = {
  * - `resumeCostCarried`: `claude -p --resume` prints its parent's cost and API time on in its own.
  * - `streams` and `partials`: `--include-partial-messages` prints each text block in pieces as it is written, read from the stdout
  *   the worker keeps whole, so the job is followed live (`follow`, `claudePartials`).
+ * - `keepOutput`: once the job has ended, its capture keeps only what the readers read (`claudeStreamKept`); the conversation is
+ *   Claude Code's own transcript's (`transcript`).
  */
 export const claudeJob: HarnessSpec = {
   name: 'claude',
@@ -202,6 +204,7 @@ export const claudeJob: HarnessSpec = {
     closesOn: { key: 'type', value: 'result' },
   },
   readOutput: claudeStreamOutput,
+  keepOutput: claudeStreamKept,
   start: CLAUDE_INIT_START,
   transcript: { file: claudeTranscriptFile, events: claudeTranscriptEvents, records: claudeTranscriptRecords },
   streams: true,

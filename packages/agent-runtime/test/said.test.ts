@@ -12,13 +12,7 @@ import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { detachedOps, type HarnessOutput, type HarnessSpec } from '../src/harness/detached/detached.ts';
-import {
-  claudeResultOutput,
-  claudeStreamKept,
-  claudeStreamOutput,
-  READ_INPUT_KEYS,
-  STREAM_KINDS,
-} from '../src/harness/detached/output.ts';
+import { claudeResultOutput, claudeStreamKept, claudeStreamOutput, READ_INPUT_KEYS, STREAM_KINDS } from '../src/harness/detached/output.ts';
 import { printedKindOf } from '../src/harness/claude/print.ts';
 import { SAID_DIGEST, SAID_EXTENDED, SAID_VERSION } from '../src/harness/detached/said.ts';
 import { codexOutput } from '../src/harness/codex/stream.ts';
@@ -38,11 +32,11 @@ const counted = () => {
 };
 
 /** A run `name` of the spec `sh`, written into `dir` as its worker leaves it: in `state`, its capture `text`. */
-const runOf = (dir: string, name: string, text: string, state = 'done') => {
+const runOf = (dir: string, name: string, text: string, state = 'done', heartbeatAt = new Date().toISOString()) => {
   const runs = path.join(dir, 'runs', 'sh');
   fs.mkdirSync(runs, { recursive: true });
   const base = path.join(runs, name.replace(/[^a-zA-Z0-9]+/g, '_'));
-  const run = { name, state, pid: 999999, exitCode: 0, logFile: `${base}.log`, heartbeatAt: new Date().toISOString() };
+  const run = { name, state, pid: 999999, exitCode: 0, logFile: `${base}.log`, heartbeatAt };
   fs.writeFileSync(`${base}.json`, JSON.stringify(run));
   fs.writeFileSync(`${base}.log`, text);
   return { log: `${base}.log`, kept: `${base}.said` };
@@ -351,4 +345,78 @@ test('a kept capture says what its whole stream says, and keeps the init, the de
   const whole = CONVERSATION_STREAM.split('\n');
   for (const at of [0, 6, 10, 11, 12]) assert.ok(kept.split('\n').includes(whole[at]), `line ${at + 1} kept as printed`);
   assert.ok(kept.length < CONVERSATION_STREAM.length, `${kept.length} of ${CONVERSATION_STREAM.length} characters`);
+});
+
+/** A spec of `claude -p`'s stream that keeps its streams apart and keeps of an ended capture what `keep` keeps, its reads counted. */
+const keeping = (keep: (output: string) => string = claudeStreamKept) => {
+  const { spec, reads } = counted();
+  return { spec: { ...spec, streams: true, keepOutput: keep } satisfies HarnessSpec, reads };
+};
+
+/** A run of `keeping`'s spec whose log and stdout are `CONVERSATION_STREAM`, its stderr a line, with their times set long ago. */
+const conversationRun = (dir: string, name: string, state = 'done', heartbeatAt?: string) => {
+  const files = runOf(dir, name, CONVERSATION_STREAM, state, heartbeatAt);
+  const stdout = files.log.replace(/\.log$/, '.stdout');
+  const stderr = files.log.replace(/\.log$/, '.stderr');
+  fs.writeFileSync(stdout, CONVERSATION_STREAM);
+  fs.writeFileSync(stderr, 'a warning on stderr\n');
+  const long = new Date('2026-01-02T03:04:05.678Z');
+  for (const file of [files.log, stdout, stderr]) fs.utimesSync(file, long, long);
+  return { ...files, stdout, stderr, long };
+};
+
+test("an ended job's capture and its stdout are rewritten to what its readers read, their times kept, and read as before", async () => {
+  const dir = scratch('ae-said-');
+  const { spec, reads } = keeping();
+  const { log, kept, stdout, stderr, long } = conversationRun(dir, 'ae/k1/1');
+  const whole = claudeStreamOutput(CONVERSATION_STREAM);
+  const seen = (await observe(spec, dir)).get('ae/k1/1');
+  assert.equal(fs.readFileSync(log, 'utf8'), claudeStreamKept(CONVERSATION_STREAM));
+  assert.equal(fs.readFileSync(stdout, 'utf8'), claudeStreamKept(CONVERSATION_STREAM));
+  assert.equal(fs.readFileSync(stderr, 'utf8'), 'a warning on stderr\n', 'stderr is no stream the readers read: left');
+  for (const file of [log, stdout]) assert.equal(fs.statSync(file).mtimeMs, long.getTime(), `${path.basename(file)} keeps its time`);
+  assert.equal(JSON.parse(fs.readFileSync(kept, 'utf8')).size, fs.statSync(log).size, 'what was read is kept under the kept key');
+  assert.deepEqual(seen?.closeout?.payload, whole.closeout?.payload);
+  assert.deepEqual([seen?.usage, seen?.denials, seen?.skills, seen?.files], [whole.usage, whole.denials, whole.skills, whole.files]);
+  const read = reads.n;
+  const again = (await observe(spec, dir)).get('ae/k1/1');
+  assert.deepEqual(again, seen, 'a fresh runner takes what was kept');
+  assert.equal(reads.n, read, 'and reads no capture');
+});
+
+test('a capture is left whole while its worker has not written its end, a lease gone included', async () => {
+  const dir = scratch('ae-said-');
+  const { spec } = keeping();
+  const stale = conversationRun(dir, 'ae/k2/1', 'working', new Date(Date.now() - 600_000).toISOString());
+  const fresh = conversationRun(dir, 'ae/k2/2', 'working');
+  const seen = await observe(spec, dir);
+  assert.equal(seen.get('ae/k2/1')?.state, 'failed');
+  for (const file of [stale.log, stale.stdout, fresh.log, fresh.stdout]) assert.equal(fs.readFileSync(file, 'utf8'), CONVERSATION_STREAM);
+  assert.ok(fs.existsSync(stale.kept), 'a run whose lease is gone keeps what was read, as before');
+  assert.equal(fs.existsSync(fresh.kept), false);
+});
+
+test('a capture its reader refuses is left whole, its run failed', async () => {
+  const dir = scratch('ae-said-');
+  const { spec } = keeping();
+  const refused = [stream.init, JSON.stringify({ ...JSON.parse(stream.denied('toolu_b', 'Bash')), tool_use_id: 7 }), resultLine({}), ''];
+  const { log, kept } = runOf(dir, 'ae/k3/1', [...refused.slice(0, 1), stream.toolResult('x'), ...refused.slice(1)].join('\n'));
+  const text = fs.readFileSync(log, 'utf8');
+  assert.equal((await observe(spec, dir)).get('ae/k3/1')?.state, 'failed');
+  assert.equal(fs.readFileSync(log, 'utf8'), text);
+  assert.equal(fs.existsSync(kept), false);
+});
+
+test('a capture whose kept text reads otherwise is left whole, and what was read is kept under its own key', async () => {
+  const dir = scratch('ae-said-');
+  const dropsResult = (output: string) => claudeStreamKept(output).replace(/\n[^\n]*"type":"result"[^\n]*/, '');
+  const { spec } = keeping(dropsResult);
+  const { log, kept, stdout, long } = conversationRun(dir, 'ae/k4/1');
+  const seen = (await observe(spec, dir)).get('ae/k4/1');
+  assert.deepEqual(seen?.closeout?.payload, { outcome: 'done' });
+  for (const file of [log, stdout]) {
+    assert.equal(fs.readFileSync(file, 'utf8'), CONVERSATION_STREAM, `${path.basename(file)} left whole`);
+    assert.equal(fs.statSync(file).mtimeMs, long.getTime());
+  }
+  assert.equal(JSON.parse(fs.readFileSync(kept, 'utf8')).size, Buffer.byteLength(CONVERSATION_STREAM));
 });

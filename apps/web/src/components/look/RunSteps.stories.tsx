@@ -45,4 +45,4 @@ function pressable(bar: ReactNode, step: { name: string; state: string }) {
 }
 
 /** A rail whose bars are buttons, as the runs page wraps them to open each step's card: read aloud as a group of steps. */
-export const Pressable: StoryObj = { render: () => <Rail steps={AT_WORK} wrap={pressable} /> };
+export const Pressable: StoryObj = { render: () => <Rail steps={GATE} wrap={pressable} /> };

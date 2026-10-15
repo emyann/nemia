@@ -271,6 +271,27 @@ const FEED: readonly Walk[] = [
   },
 ];
 
+const HOLD: readonly Walk[] = [
+  {
+    name: 'holding the attached sessions for a scope that holds none ends with the scope',
+    walk: ({ engine }) => asked(Effect.scoped(engine.hold())),
+    says: null,
+  },
+];
+
+const DRAIN: readonly Walk[] = [
+  {
+    name: 'a drain is put for a holder and lifted with null',
+    walk: async ({ engine }) => [await asked(engine.drain(4242)), await asked(engine.drain(null))],
+    says: [null, null],
+  },
+  {
+    name: 'a drain for a holder that is no process id is refused',
+    walk: ({ engine }) => asked(engine.drain(-1)),
+    says: { refused: 'DrainRefused' },
+  },
+];
+
 const OUTPUT: readonly Walk[] = [
   {
     name: 'a stream of a task nothing was filed under is refused',
@@ -495,6 +516,8 @@ export const WALKS = {
   say: SAY,
   forget: FORGET,
   kept: KEPT,
+  hold: HOLD,
+  drain: DRAIN,
 } as const;
 
 /** A verb the stand-in keeps. */

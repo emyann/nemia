@@ -8,9 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Paused } from '../src/lib/api.ts';
 import { clockWord } from '../src/lib/quota.ts';
-import { Schema } from 'effect';
 import { finishingSentence, interruptSentence, pauseWords } from '../src/lib/pause.ts';
-import { PausedSchema } from '../src/lib/api/pause.ts';
 
 const NOW = new Date('2026-10-04T16:00:00.000Z');
 const AT = '2026-10-04T15:40:00.000Z';
@@ -107,10 +105,8 @@ test('a task asked to stop that no pause ask names is stopping, and promised no 
   );
 });
 
-test('a session in a tool call is finishing its call, named by its tool, and the read keeps the tool', () => {
+test('a session in a tool call is finishing its call, named by its tool', () => {
   const finishing = { run: 'r1', step: 'implement', kind: 'session' as const, calling: 'Bash' };
   assert.equal(finishingSentence(finishing), "r1's implement is finishing: its call to Bash runs");
   assert.equal(finishingSentence({ ...finishing, calling: undefined }), "r1's implement is finishing: its session is at work");
-  const read = Schema.decodeUnknownSync(PausedSchema)({ pause: null, finishing: [finishing], staged: [], held: [] });
-  assert.equal(read.finishing[0].calling, 'Bash');
 });

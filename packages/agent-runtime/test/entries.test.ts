@@ -34,6 +34,7 @@ const PINNED: Record<string, string[]> = {
     'ListRefused',
     'OutputRefused',
     'QuotaRefused',
+    'DrainRefused',
     'Runner',
     'RunnerError',
     'STALE_MS',

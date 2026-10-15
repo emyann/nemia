@@ -58,7 +58,7 @@ const PauseSchema = Schema.Struct({
 }) satisfies Schema.Schema<Pause>;
 
 /** Decodes a `Paused`. */
-export const PausedSchema = Schema.Struct({
+const PausedSchema = Schema.Struct({
   pause: Schema.NullOr(PauseSchema),
   finishing: Schema.Array(
     Schema.Struct({

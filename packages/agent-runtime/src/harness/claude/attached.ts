@@ -56,17 +56,13 @@ const sightingOf = (root: string, run: AttachedRun): Sighting => {
   } catch {
     text = '';
   }
-  const said = claudeStreamOutput(text);
+  const { denials, ...said } = claudeStreamOutput(text);
   return {
     sessionId: run.name,
     state: attachedStateOf(run),
     ...(run.sessionId ? { nativeId: run.sessionId } : {}),
-    ...(said.closeout ? { closeout: { payload: said.closeout.payload } } : {}),
-    ...(said.usage ? { usage: said.usage } : {}),
-    ...(said.limit ? { limit: said.limit } : {}),
-    ...(said.denials?.length ? { denials: said.denials } : {}),
-    ...(said.skills ? { skills: said.skills } : {}),
-    ...(said.files ? { files: said.files } : {}),
+    ...said,
+    ...(denials?.length ? { denials } : {}),
     ...(run.calling && run.state === 'working' ? { calling: run.calling } : {}),
   };
 };

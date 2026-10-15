@@ -12,6 +12,7 @@
 import assert from 'node:assert/strict';
 import { Cause, Effect, Exit } from 'effect';
 import type { EngineShape } from '../src/index.ts';
+import { noTranscript } from '../src/harness/transcript.ts';
 
 /** Where a walk moves a task: at work, or settled. */
 export type Moved = 'running (working)' | 'succeeded' | 'failed' | 'stopped';
@@ -411,6 +412,33 @@ const SAY: readonly Walk[] = [
   },
 ];
 
+const TRANSCRIPT: readonly Walk[] = [
+  {
+    name: 'a transcript of a task nothing was filed under, or of an attempt the task has not, is refused',
+    walk: async ({ engine, settle }) => {
+      await asked(engine.file(task('a')));
+      const unstarted = [await asked(engine.transcript('nope')), await asked(engine.transcript('a', undefined, { attempt: 1 }))];
+      await settle('a', 'running (working)');
+      return [...unstarted, await asked(engine.transcript('a', undefined, { attempt: 2 }))];
+    },
+    says: [{ refused: 'TranscriptRefused' }, { refused: 'TranscriptRefused' }, { refused: 'TranscriptRefused' }],
+  },
+  {
+    name: 'a transcript of a task not started reads nothing, and one at work reads its latest attempt or the one named',
+    walk: async ({ engine, settle }) => {
+      await asked(engine.file(task('a')));
+      const unstarted = await asked(engine.transcript('a'));
+      await settle('a', 'running (working)');
+      return [unstarted, await asked(engine.transcript('a')), await asked(engine.transcript('a', undefined, { attempt: 1 }))];
+    },
+    says: [
+      { events: [], cursor: noTranscript().cursor },
+      { events: [], cursor: noTranscript().cursor },
+      { events: [], cursor: noTranscript().cursor },
+    ],
+  },
+];
+
 /** A forget's report, as far as both sides say it: whether anything went, and the tasks it names. */
 const reported = (report: Awaited<ReturnType<typeof asked<{ forgotten: boolean; tasks: { taskId: string }[] }, unknown>>>): unknown =>
   report && 'tasks' in report ? { forgotten: report.forgotten, tasks: report.tasks.map((t) => t.taskId) } : report;
@@ -493,6 +521,7 @@ export const WALKS = {
   output: OUTPUT,
   list: LIST,
   say: SAY,
+  transcript: TRANSCRIPT,
   forget: FORGET,
   kept: KEPT,
 } as const;
@@ -504,7 +533,6 @@ export type Kept = keyof typeof WALKS;
 export const UNKEPT = [
   'tick',
   'admit',
-  'transcript',
   'follow',
   'path',
   'quota',

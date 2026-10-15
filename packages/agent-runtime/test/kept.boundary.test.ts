@@ -105,7 +105,9 @@ test("a detached session's streams are its output, and its run file and what was
   await journalled(root, 'o2');
   const runs = path.join(root, 'runs', HARNESS);
   const streams = ['ae_o2_1.log', 'ae_o2_1.stdout', 'ae_o2_1.stderr'].map((name) => plant(path.join(runs, name), 4096));
-  const others = ['ae_o2_1.json', 'ae_o2_1.said', 'ae_o2_1.closeout.json', 'ae_o2_1.logs'].map((name) => plant(path.join(runs, name), 8192));
+  const others = ['ae_o2_1.json', 'ae_o2_1.said', 'ae_o2_1.closeout.json', 'ae_o2_1.logs'].map((name) =>
+    plant(path.join(runs, name), 8192),
+  );
   const kept = await keptOf(engineOn(root), 'o2');
   const sum = (files: string[]) => files.reduce((n, file) => n + blocksOf(file), 0);
   assert.deepEqual([kept?.harness, kept?.output, kept?.files], [HARNESS, sum(streams), sum(others)]);

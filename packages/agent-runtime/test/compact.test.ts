@@ -11,7 +11,7 @@ import path from 'node:path';
 import { compactRuns } from '../src/harness/detached/compact.ts';
 import type { HarnessSpec } from '../src/harness/detached/detached.ts';
 import { claudeStreamKept, claudeStreamOutput } from '../src/harness/detached/output.ts';
-import { keptSaid } from '../src/harness/detached/said.ts';
+import { keptSaid, replaceCapture } from '../src/harness/detached/said.ts';
 import { CONVERSATION_STREAM, stream } from './reader-streams.ts';
 import { scratch } from './scratch.ts';
 
@@ -146,4 +146,44 @@ test('a spec that keeps every capture whole finds none', () => {
   const dir = runsIn();
   const { keepOutput: _, ...whole } = spec;
   assert.deepEqual(compactRuns(whole, dir, { dry: false, alive }), { captures: 0, compacted: 0, before: 0, after: 0, left: [] });
+});
+
+test('a capture that changed since it was read is not written over: left whole, with nothing beside it', () => {
+  const dir = scratch('ae-compact-');
+  const file = path.join(dir, 'a.log');
+  fs.writeFileSync(file, CONVERSATION_STREAM);
+  const { size, mtimeMs } = fs.statSync(file);
+  const kept = claudeStreamKept(CONVERSATION_STREAM);
+  fs.appendFileSync(file, 'a line written after the read\n');
+  assert.equal(replaceCapture(file, { size, mtimeMs }, kept), undefined, 'its size moved');
+  const later = new Date(mtimeMs + 5_000);
+  fs.writeFileSync(file, CONVERSATION_STREAM);
+  fs.utimesSync(file, later, later);
+  assert.equal(replaceCapture(file, { size, mtimeMs }, kept), undefined, 'its time moved, its size the same');
+  assert.equal(fs.readFileSync(file, 'utf8'), CONVERSATION_STREAM);
+  assert.deepEqual(fs.readdirSync(dir), ['a.log'], 'no file of its own left beside it');
+  assert.ok(replaceCapture(file, fs.statSync(file), kept), 'and with its key as it is, written');
+  assert.equal(fs.readFileSync(file, 'utf8'), kept);
+});
+
+test('a capture that changes while compact reads it is left whole, and named', () => {
+  const dir = runsIn();
+  const log = path.join(dir, 'ended.log');
+  const writes = (output: string) => {
+    fs.appendFileSync(log, 'late\n');
+    return claudeStreamKept(output);
+  };
+  const report = compactRuns({ ...spec, keepOutput: writes }, dir, { dry: false, alive });
+  assert.deepEqual(
+    report.left.find((l) => l.name === 'ended.log'),
+    {
+      name: 'ended.log',
+      why: 'it changed while it was read, or could not be written',
+    },
+  );
+  assert.ok(fs.readFileSync(log, 'utf8').startsWith(CONVERSATION_STREAM), 'its text as written, never the kept one');
+  assert.deepEqual(
+    fs.readdirSync(dir).filter((f) => f.endsWith('.tmp')),
+    [],
+  );
 });

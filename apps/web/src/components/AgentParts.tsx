@@ -1,5 +1,6 @@
 import { Blobatar } from '@blobatar/react';
 import { useGaze } from '@blobatar/react/gaze';
+import type { Expression } from 'blobatar';
 import type { ReactNode } from 'react';
 import { Link as AriaLink } from 'react-aria-components';
 import type { AgentListing, AgentSkill, AgentUser, GivenSkill, SkillSource } from '../lib/api';
@@ -127,7 +128,7 @@ const FACE = 'shrink-0 rounded-full bg-muted';
 
 const PLATE = 'shrink-0 dark:[&>path]:opacity-25';
 
-type FaceProps = { name: string; size: number; follows?: boolean; plate?: boolean; className?: string };
+type FaceProps = { name: string; size: number; follows?: boolean; plate?: boolean; expression?: Expression; className?: string };
 
 /**
  * An agent's face: a Blobatar drawn from its name, so the same agent has the same face wherever it shows, and no two names share one by
@@ -135,15 +136,16 @@ type FaceProps = { name: string; size: number; follows?: boolean; plate?: boolea
  * `follows` by its title. `size` in pixels. It is an inline drawing alive at all times — it breathes, bobs, blinks and glances with nothing
  * hovering it — and with `follows` its eyes also turn toward the pointer; still where the person asked for reduced motion, and with no eyes
  * following where there is no fine pointer. It stands on a grey round, or with `plate` on Blobatar's own backdrop, in its face's colours,
- * dimmed in the dark theme.
+ * dimmed in the dark theme. With `expression` it wears that pose of the library's, still breathing under it.
  */
-export function AgentFace({ name, size, follows, plate, className }: FaceProps) {
-  if (follows) return <FollowingFace name={name} size={size} plate={plate} className={className} />;
+export function AgentFace({ name, size, follows, plate, expression, className }: FaceProps) {
+  if (follows) return <FollowingFace name={name} size={size} plate={plate} expression={expression} className={className} />;
   return (
     <Blobatar
       animate="always"
       name={name}
       size={size}
+      expression={expression}
       background={plate ? 'squircle' : false}
       role="img"
       aria-label={personOf(name)}
@@ -158,7 +160,7 @@ export function AgentFace({ name, size, follows, plate, className }: FaceProps) 
  * An agent's face, alive at all times, whose eyes follow the pointer: Blobatar's gaze driver on its drawing, three units of a hundred at
  * most.
  */
-function FollowingFace({ name, size, plate, className }: Omit<FaceProps, 'follows'>) {
+function FollowingFace({ name, size, plate, expression, className }: Omit<FaceProps, 'follows'>) {
   const { ref } = useGaze({ travel: 3, lookAt: 'pointer' });
   return (
     <Blobatar
@@ -166,6 +168,7 @@ function FollowingFace({ name, size, plate, className }: Omit<FaceProps, 'follow
       animate="always"
       name={name}
       size={size}
+      expression={expression}
       background={plate ? 'squircle' : false}
       title={personOf(name)}
       data-agent-face={name}

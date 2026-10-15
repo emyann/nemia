@@ -48,7 +48,7 @@ async function enlarged(page: Page, selector: string, times: number, name: strin
 
 /** Presses Tab until what has the focus is inside what `selector` finds. */
 async function tabInto(page: Page, selector: string): Promise<void> {
-  for (let i = 0; i < 80; i += 1) {
+  for (let i = 0; i < 200; i += 1) {
     await page.keyboard.press('Tab');
     if (await page.locator(selector).evaluate((found) => found.contains(document.activeElement))) return;
   }

@@ -81,6 +81,7 @@ async function toCome(page: Page): Promise<void> {
 
 /** The menu button closes the rail to its icons and opens it again, and so does Ctrl+B; each state outlives a reload. */
 async function toggles(page: Page): Promise<void> {
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await expectWidth(page, WIDTH.open, 'open as this browser left it');
   await expectVisible(menuOf(page).and(page.getByRole('button', { name: 'Close the menu' })), 'open, the menu button closes it');
   await expectVisible(
@@ -98,7 +99,6 @@ async function toggles(page: Page): Promise<void> {
   await page.reload({ waitUntil: 'load' });
   await idle(page);
   await expectWidth(page, WIDTH.closed, 'closed, it stays closed across a reload');
-  await page.locator('body').click({ position: { x: 600, y: 600 } });
   await page.keyboard.press('Control+b');
   await expectWidth(page, WIDTH.open, 'Ctrl+B opens it');
   await page.reload({ waitUntil: 'load' });
@@ -110,6 +110,8 @@ async function toggles(page: Page): Promise<void> {
 async function onPhone(page: Page): Promise<void> {
   await page.setViewportSize({ width: 390, height: 844 });
   await expectCount(railColumnOf(page), 0, "on a phone the rail leaves the page's side");
+  await settled(page);
+  await photograph(page, path.join(OUT, `frame-narrow-page-${await themeOf(page)}.png`));
   await topBarOf(page).locator('[data-menu-button]').click();
   const drawer = page.getByRole('dialog');
   await expectVisible(drawer, 'the menu button opens the drawer');

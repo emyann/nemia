@@ -325,6 +325,20 @@
  * kit draws every badge in Material's error red, and on the board red is failure. Runs counts what waits on you, in yours; the Inbox
  * counts cards not started, in rest. Each destination is found by the name the kit gives it, its label then its badge's words.
  */
+/*
+ * The height of the frame's top bar, which a page that fills the window and the floating bar stand under: one line on a wide window, two
+ * on a narrow one, where the page's name stands over the factory switcher and the bar's buttons.
+ */
+:root {
+  --frame-top: 5rem;
+}
+
+@media (width < 48rem) {
+  :root {
+    --frame-top: 9rem;
+  }
+}
+
 [data-frame-rail] [data-slot='navigation-rail-item'][aria-label^='Runs,'] [data-slot='badge'] {
   background-color: var(--meaning-yours);
   color: var(--meaning-on-yours);

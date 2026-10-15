@@ -86,7 +86,7 @@ export function FactoryPicker({ path, search, picked }: { path: string; search: 
     if (target) void navigate(target);
   };
   return (
-    <div data-factory-picker title={aboutOf(shown?.factory)} className="w-60 shrink-0">
+    <div data-factory-picker title={aboutOf(shown?.factory)} className="w-60 shrink-0 max-md:w-full">
       <Select aria-label="Factory" label="Factory" value={picked ?? ALL} onChange={choose} className="w-full">
         <SelectItem
           id={ALL}

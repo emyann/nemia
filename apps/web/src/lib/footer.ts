@@ -151,6 +151,6 @@ export function quotaShort(
 
 /**
  * Each place in `source` that sizes a page as the screen less the old header (`100svh-3rem`), a line break inside or not: under the top
- * bar a page is the screen less its `h-20`, `100svh-5rem`.
+ * bar a page is the screen less its height, `100svh-var(--frame-top)`.
  */
 export const staleFrameHeights = (source: string): string[] => [...source.matchAll(/h-\[calc\(100svh-\s*3rem\)\]/g)].map((m) => m[0]);

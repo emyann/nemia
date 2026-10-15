@@ -233,7 +233,7 @@ test('the frame height: REFUSED, a page still at the screen less the header alon
 test('the frame height: no page under the top bar is the screen less the old header', () => {
   const app = path.join(import.meta.dirname, '..');
   const stale = sources(path.join(app, 'src')).filter((file) => staleFrameHeights(fs.readFileSync(file, 'utf8')).length > 0);
-  assert.equal(stale.length, 0, `less the top bar, 100svh-5rem: ${stale.map((f) => path.relative(app, f)).join(', ')}`);
+  assert.equal(stale.length, 0, `less the top bar, 100svh-var(--frame-top): ${stale.map((f) => path.relative(app, f)).join(', ')}`);
 });
 
 test("the version says the code serving the board: an install's tag, or checkout, and the folder in its hover; the version alone without", () => {

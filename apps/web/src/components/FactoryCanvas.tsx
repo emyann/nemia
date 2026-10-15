@@ -165,7 +165,7 @@ const minimapFill = (node: RunFlowNode) =>
  */
 export function FactoryCanvas({ runs, factory, above }: { runs: readonly RunSummary[]; factory: FactoryPlace; above?: ReactNode }) {
   return (
-    <div className="flex h-[calc(100svh-5rem)] min-h-96 flex-col">
+    <div className="flex h-[calc(100svh-var(--frame-top))] min-h-96 flex-col">
       {above}
       <ReactFlowProvider>
         <Floor runs={runs} factory={factory} />

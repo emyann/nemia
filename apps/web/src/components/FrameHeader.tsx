@@ -37,11 +37,11 @@ function AccountToCome() {
 }
 
 /**
- * The frame's top bar, across the top of the page beside the rail, `h-20` wherever it fits on one line: the page's name (`PageName`), the
+ * The frame's top bar, across the top of the page beside the rail, as tall as `--frame-top` says: the page's name (`PageName`), the
  * destination the page at `path` lights, none on an address no route has; the factory switcher (`FactoryPicker`) of the factory the
  * address with `search` picks; then at its right the search and the account, both to come, the pause of every factory (`PauseButton`) and
  * the machine's gauges (`GaugesButton`, which carries `feed`). On a narrow screen the menu button that opens the drawer of destinations
- * comes first, and the bar wraps.
+ * comes first, and the bar takes two lines.
  */
 export function FrameHeader({ path, search, feed }: { path: string; search: Record<string, unknown>; feed: FeedStatus }) {
   const { isMobile } = useSidebar();
@@ -49,14 +49,15 @@ export function FrameHeader({ path, search, feed }: { path: string; search: Reco
   return (
     <header
       data-frame-header
-      className="sticky top-0 z-20 flex min-h-20 shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-outline-variant bg-surface px-6 py-2 max-md:px-3 md:flex-nowrap"
+      className="sticky top-0 z-20 flex h-(--frame-top) shrink-0 flex-wrap content-center items-center gap-x-3 gap-y-2 border-b border-outline-variant bg-surface px-6 py-2 max-md:px-3 md:flex-nowrap"
     >
       {isMobile && <MenuButton />}
       {name && <PageName>{name}</PageName>}
-      <div className="md:ml-4">
+      {isMobile && <span className="basis-full" />}
+      <div className="min-w-0 max-md:flex-1 md:ml-4">
         <FactoryPicker path={path} search={search} picked={pickedOf(path, search)} />
       </div>
-      <span className="min-w-0 flex-1" />
+      <span className="min-w-0 flex-1 max-md:hidden" />
       <SearchToCome />
       <PauseButton />
       <GaugesButton feed={feed} />

@@ -19,7 +19,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 /**
  * The frame of every page: the rail at the left, the whole height of the window (`FrameRail`), open or closed as this browser's
- * `sidebar_state` cookie last left it (`sidebarOpenOf`), a modal drawer on a narrow screen; beside it the top bar (`FrameHeader`), `h-20`,
+ * `sidebar_state` cookie last left it (`sidebarOpenOf`), a modal drawer on a narrow screen; beside it the top bar (`FrameHeader`), as tall as `--frame-top`,
  * naming the page, then the page, under the strip of Settings' tabs on one of them (`FrameTabs`), in a centred column unless a matched
  * route's `staticData` asks for `fullBleed`. Over the page, under the top bar, the floating bar (`OpenBar`) shows what the address's `?bar=`
  * names, the same on every page, and a link to another page, which carries no `bar`, closes it. It follows the workflow feed once for the

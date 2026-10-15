@@ -52,7 +52,7 @@ const RouterLinkButton = routeLink(LinkButton);
 function NoSuchFactory({ name }: { name: string }) {
   const { data: store } = useQuery(storeQuery);
   return (
-    <div className="flex h-[calc(100svh-5rem)] items-center justify-center p-6">
+    <div className="flex h-[calc(100svh-var(--frame-top))] items-center justify-center p-6">
       <Card className="w-full max-w-sm" data-no-factory={name}>
         <CardHeader>
           <CardTitle>No factory named {name}</CardTitle>

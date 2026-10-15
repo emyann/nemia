@@ -144,7 +144,7 @@ export function FloatingBar({
       data-floating-bar
       data-bar={open ? barValue(open) : undefined}
       style={narrow ? undefined : { width }}
-      className={`fixed top-20 right-0 bottom-0 z-40 flex flex-col bg-popover text-body-medium text-popover-foreground shadow-lg outline-none ${narrow ? 'left-0' : 'border-l'}`}
+      className={`fixed top-(--frame-top) right-0 bottom-0 z-40 flex flex-col bg-popover text-body-medium text-popover-foreground shadow-lg outline-none ${narrow ? 'left-0' : 'border-l'}`}
     >
       {!narrow && <ResizeEdge width={width} most={most} onWidth={setWidth} />}
       <div className="flex items-start gap-2 border-b p-4">

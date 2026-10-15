@@ -12,7 +12,7 @@ import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Duration, Effect, Fiber, Layer, Logger, ManagedRuntime, Metric, PubSub, Schedule } from 'effect';
+import { Duration, Effect, Fiber, Layer, Logger, ManagedRuntime, Metric, Schedule } from 'effect';
 import { scratch } from '../../test/scratch.ts';
 import { testEngine } from 'agent-runtime/testing';
 import { bell, until, WAITED } from '../../test/waits.ts';
@@ -25,7 +25,7 @@ const { DELIVER_DEFAULTS, SUBSCRIPTION_DIGEST_CHECKS, deliver, sayBackoff } = aw
 const { deliveryFile, dropSubscription, putSubscription, readDelivery, writeDelivery } = await import('./subscription.store.ts');
 const { DEFAULT_WAKE } = await import('./subscription.ts');
 const { feedFile, feedSize, readFeed } = await import('../feed/feed.store.ts');
-const { emitFeed, FEED_FOLLOWERS, FeedHub, feedHubLayer } = await import('../feed/feed.verb.ts');
+const { emitFeed, FEED_FOLLOW_LINES, FEED_FOLLOWERS, feedHubLayer } = await import('../feed/feed.verb.ts');
 const { engineOf, over } = await import('../runtime-client.ts');
 const { addFactory } = await import('../factory/factory.store.ts');
 const { writeFactoryLevel } = await import('../level/level.store.ts');
@@ -201,7 +201,7 @@ test(
     t.after(() => Effect.runPromise(Fiber.interrupt(fiber)));
     await held(t, () => following() > was, 'the deliverer following the hub');
     const awaiting = { run: { word: 'awaiting approval', note: 'waiting on you: approve land' }, steps: [] };
-    const takenAll = () => rt.runSync(Effect.map(FeedHub, (hub) => (hub ? PubSub.sizeUnsafe(hub) : 1))) === 0;
+    const handed = () => Effect.runSync(Metric.value(FEED_FOLLOW_LINES)).count;
     const published = (run: string) =>
       rt.runPromise(
         emitFeed(new Map([[run, awaiting]]), {
@@ -214,10 +214,11 @@ test(
       );
     await published('r-40');
     await held(t, () => (asked.get('t-busy') ?? []).length >= 1, 'the first message asked, its say failing');
+    const mark = handed();
     await published('r-41');
-    await held(t, takenAll, 'r-41 taken off the hub by the reader');
+    await held(t, () => handed() >= mark + 1, 'r-41 handed on by the reader');
     await published('r-42');
-    await held(t, takenAll, 'r-42 taken off the hub by the reader');
+    await held(t, () => handed() >= mark + 2, 'r-42 handed on by the reader');
     failing.delete('t-busy');
     await held(t, () => readDelivery('busy')?.cursor === feedSize(), 'the cursor at the end of the feed');
     assert.deepEqual(

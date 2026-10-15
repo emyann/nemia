@@ -208,12 +208,15 @@ test('REFUSED: a lock this user cannot move, at the bound, naming its holder and
   const dead: Lock = { pid: deadPid(), name: 'nemia-render-9-dead00' };
   fs.writeFileSync(lockFile(), JSON.stringify(dead));
   const rename = fs.renameSync;
-  let moves = 0;
   t.mock.method(fs, 'renameSync', (from: fs.PathLike, to: fs.PathLike) => {
     if (String(from) !== lockFile()) return rename(from, to);
-    moves += 1;
-    if (moves > 3) throw new Error('take looped');
     throw Object.assign(new Error('operation not permitted'), { code: 'EPERM' });
+  });
+  const write = fs.writeFileSync;
+  let tries = 0;
+  t.mock.method(fs, 'writeFileSync', (file: fs.PathOrFileDescriptor, data: string) => {
+    if (String(file).startsWith(`${lockFile()}.own-`) && ++tries > 3) throw new Error('take looped');
+    write(file, data);
   });
   const said = await take('nemia-render-3-third0', 0).then(
     () => 'taken',

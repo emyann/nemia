@@ -3030,7 +3030,10 @@ function endingRun(over: Partial<RunDetail> = {}): RunDetail {
     branch: 'wf/r-1/implement',
     gate: null,
     approve: null,
-    closeout: closeoutSaying('## What changed\n\n- the cap on runs in flight', { artifacts: [{ path: 'RESPONSE.md' }] }),
+    closeout: closeoutSaying('## What changed', {
+      body: '## What changed\n\n- the cap on runs in flight',
+      artifacts: [{ path: 'RESPONSE.md' }],
+    }),
   };
   const ship = {
     ...base,

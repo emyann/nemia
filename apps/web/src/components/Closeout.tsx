@@ -294,17 +294,13 @@ export function HandedOn({ closeout, answeredBeside = false }: { closeout: StepC
  * What a closeout says in words: its summary, one line as the api cut it, then its body as markdown, and what the run did not accept of
  * it, each under `not accepted`.
  */
-function Statement({ closeout }: { closeout: StepCloseout }) {
+export function Statement({ closeout }: { closeout: StepCloseout }) {
   return (
     <>
       <p data-summary className="text-body-medium text-foreground">
         {closeout.summary}
       </p>
-      {closeout.body && (
-        <div data-body>
-          <Markdown>{closeout.body}</Markdown>
-        </div>
-      )}
+      {closeout.body && <Markdown data-body>{closeout.body}</Markdown>}
       {closeout.refused.map((why) => (
         <p key={why} data-refused className="text-body-small text-failure">
           not accepted: {why}

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link, redirect } from '@tanstack/react-router';
-import { Artifacts, bytesWord, ClosedNeeds } from '../components/Closeout';
+import { Artifacts, bytesWord, ClosedNeeds, Statement } from '../components/Closeout';
 import { Decide } from '../components/Decide';
 import { Markdown } from '../components/Markdown';
 import { NeedsBanner, ToDecideBanner } from '../components/Needs';
@@ -297,7 +297,7 @@ function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; 
   const acts = atGate && ends && step.taskId === null;
   const handedOn = closeout && (
     <div className="min-w-0 space-y-2 rounded border border-outline-variant p-3 text-body-medium">
-      <Markdown>{closeout.summary}</Markdown>
+      <Statement closeout={closeout} />
       {closeout.needs && <ClosedNeeds needs={closeout.needs} />}
       {closeout.artifacts.length > 0 && (
         <div aria-label="Artifacts" className="text-body-small text-muted-foreground">

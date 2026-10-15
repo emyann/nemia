@@ -28,7 +28,8 @@ process.env.CLAUDE_CONFIG_DIR = CONFIG;
 const { keep, keepOnce } = await import('./keep.verb.ts');
 const { LEVEL } = await import('./level.verb.ts');
 const { MEMORY } = await import('./memory.verb.ts');
-const { chatDir } = await import('../chat/chat.store.ts');
+const { appendOutbox, chatDir } = await import('../chat/chat.store.ts');
+const { framedForHer } = await import('../chat/chat.ts');
 const { levelFile, memoryDir, nemiaDir, ownBin, promptFile, readLevel, readNemia, toldFile } = await import('./level.store.ts');
 const { listSubscriptions } = await import('../subscription/subscription.store.ts');
 const { customInstructionsFile } = await import('../agents/read.store.ts');
@@ -52,7 +53,7 @@ const e = {
       const settled = t && ['succeeded', 'failed', 'stopped'].includes(t.phase) ? t.phase : null;
       const attempts = [{ n: 1, endedAt: '2026-10-05T16:30:00.000Z', reason: null, usage: { costUsd: 0.42 } }];
       const state = t
-        ? { filedAt: '2026-10-05T16:00:00.000Z', settled, stopRequested: b.stopped.includes(id), attempts }
+        ? { filedAt: '2026-10-05T16:00:00.000Z', settled, stopRequested: b.stopped.includes(id), attempts, said: t.said }
         : { settled: null, attempts: [] };
       return { id, phase: t?.phase ?? 'pending', sessionId: t ? '0123456789abcdef' : null, state } as unknown as TaskView;
     }),
@@ -412,6 +413,20 @@ test('a custom instruction written while she is kept is told to her open task, n
   assert.equal(fs.readFileSync(promptFile(), 'utf8'), `${readNemia().body.trim()}\n`, 'her shipped instruction alone');
   assert.deepEqual(await beat(), []);
   assert.equal(b.said.length, told + 2);
+});
+
+test("the person's chat words are delivered once she is kept and her session is live, and once only", async () => {
+  const task = await keptAnew();
+  const told = b.said.length;
+  appendOutbox(nemiaDir(), { id: 'kept-o1', at: new Date().toISOString(), text: 'Hi' });
+  assert.deepEqual(await beat(), [], 'kept, her session not live: kept for later');
+  b.settle(task, 'running (working)');
+  assert.deepEqual(await beat(), ['deliver']);
+  assert.deepEqual(
+    b.said.slice(told).map((s) => [s.taskId, s.text]),
+    [[task, framedForHer('Hi')]],
+  );
+  assert.deepEqual(await beat(), [], 'delivered once: level-triggered off the marks');
 });
 
 test('REFUSED: a tell the runtime refuses leaves her filed instruction and what she was told as they were, owed again on the next beat', async () => {

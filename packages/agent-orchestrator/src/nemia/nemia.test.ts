@@ -50,6 +50,17 @@ test('the keeper tells her a changed custom instruction while she is kept, and i
   assert.deepEqual(nemiaDue({ ...MANUAL, stale: true }, OPEN, HERS), ['stop', 'drop'], 'leaving: stopped, not told');
 });
 
+test("REFUSED: the keeper delivers the person's chat words only while she is kept and her session is live", () => {
+  const OWED = { ...SEMI, owed: true, up: true };
+  assert.deepEqual(nemiaDue(OWED, OPEN, HERS), ['deliver']);
+  assert.deepEqual(nemiaDue({ ...OWED, stale: true }, OPEN, HERS), ['tell', 'deliver'], 'told first, then delivered');
+  assert.deepEqual(nemiaDue({ ...OWED, up: false }, OPEN, HERS), [], 'kept but down: kept for later');
+  assert.deepEqual(nemiaDue({ ...OWED, owed: false }, OPEN, HERS), [], 'nothing owed');
+  assert.deepEqual(nemiaDue(OWED, OPEN, undefined), ['subscribe'], 'filed: not yet kept');
+  assert.deepEqual(nemiaDue({ ...OWED, trusted: false }, undefined, undefined), [], 'untrusted');
+  assert.deepEqual(nemiaDue({ ...MANUAL, owed: true, up: true }, OPEN, HERS), ['stop', 'drop'], 'leaving');
+});
+
 test('her custom words changed are those she was not last filed or told with; her shipped instruction is never compared', () => {
   const FILED = 'Her shipped instruction.\n\nAnswer in French.\n';
   assert.equal(customChanged({ words: 'Answer in French.' }, 'Answer in French.', 'Another instruction.\n'), false);

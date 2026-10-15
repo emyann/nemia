@@ -136,7 +136,8 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
 - The shadcn skill's CLI runs from `apps/web` (where `components.json` is). Its rules know radix and base; on aria the reference is what
   `npx shadcn@latest add <component> --view <file>` prints, and `add` installs no `react-aria-components`.
 - `@/` is declared once, in `tsconfig.json`'s `paths`; Vite reads it from there (`resolve.tsconfigPaths` in `vite.config.ts`).
-- `browser_take_screenshot` resolves a relative `filename` against the workspace: give it an absolute path under `/tmp/playwright-mcp`,
+- `browser_take_screenshot` resolves a relative `filename` against the workspace: give it an absolute path under `$WF_STEP_FILES` in a run
+  (`/tmp/playwright-mcp` outside one),
   and in a checking step (design, review), whose fence refuses every `filename`, none: the call answers with the picture.
 - `npm run board:serve` (`e2e/serve.ts`) builds outside the workspace and serves one board a workspace, on a seeded store of its own
   (`e2e/served.ts`, the worker's serving code too), and the look's stories beside it; `npm run board:stop` ends its holder, which

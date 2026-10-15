@@ -133,14 +133,16 @@ What it leaves:
 
 The browser the plan gives the ui `implement` step, through the content route: the repository's
 `.mcp.json` names one server, `playwright`, run as `node node_modules/@playwright/mcp/cli.js --headless
---browser chromium --isolated --output-dir /tmp/playwright-mcp`, with `@playwright/mcp` pinned exactly in
+--browser chromium --isolated --output-dir ${WF_STEP_FILES:-/tmp/playwright-mcp}`, with `@playwright/mcp` pinned exactly in
 the root devDependencies. The engine names that file on every Claude spawn, beside `--strict-mcp-config`
 and `--no-chrome` (E4), so a step in any worktree of the repository has the `browser_*` tools and none of
 the operator's servers. `.claude/settings.json` enables it for an interactive session in the checkout.
 `node`, not `npx`, so nothing is downloaded at a spawn, and the relative path resolves through each
 worktree's `node_modules` link. `--isolated` keeps each session's profile in memory, so no two steps share
 cookies or storage. `--output-dir` keeps the snapshots and screenshots the tools write out of the
-workspace, where the run would otherwise commit `.playwright-mcp/`. `workflows/ui/implement.md` tells the
+workspace, where the run would otherwise commit `.playwright-mcp/`: in a run, in the step's files directory, which the
+orchestrator files each local step's session as `WF_STEP_FILES` and Claude Code expands in the entry; outside one, in
+`/tmp/playwright-mcp`. `workflows/ui/implement.md` tells the
 step it can drive the page it builds. `test/mcp-config.test.ts` holds the file to that shape, makes each
 way out of it refuse, and starts the server as configured to list its tools. A live test (`AE_LIVE=1`)
 files a `--bg` task in the checkout and reads back its MCP servers and tools. Run on 2026-09-13 in a
@@ -516,9 +518,9 @@ What it leaves:
   start that way: a second server in `.mcp.json` given `--config` with `browser.contextOptions.colorScheme`, or a
   per-step `mcp:`.
 - **The browser saves only under its output directory or the workspace.** Playwright MCP refuses any other
-  path, so a step's own photographs reach its files directory by a copy, which a `dontAsk` step cannot make.
-  They stay in `/tmp/playwright-mcp`, one directory for every step on the machine (plan §4b); the skill names a
-  folder per run and step inside it.
+  path; in a run its output directory is the step's files directory (`WF_STEP_FILES`), so a picture a
+  `dontAsk` step takes is kept with the run without a copy. A background session is filed no environment, and
+  its pictures still go to `/tmp/playwright-mcp`.
 - **`wf decide` prints a ui finding's place as JSON.** `itemLines` (`src/closeout/closeout.ts`) heads a finding with
   `file:line` only when `file` is at its top level, so a `where` finding prints
   `- where: {"file":"…","line":12}` and then `what:`, and a page finding `where: {"page":"/workflows","theme":"dark"}`.

@@ -19,19 +19,20 @@ picture goes outside it.
   under *Files for the steps after you*, which is the one the run gives your check as `$WF_ARTIFACTS`.
   With neither, a directory of your own under the system's temp directory
   (`node -p "require('os').tmpdir()"`).
-- **The browser saves only where its server lets it:** its output directory, `/tmp/playwright-mcp`
-  (`--output-dir` in `.mcp.json`, in the system's temp directory), or the workspace, which is never
-  where you save. Give `browser_take_screenshot` an *absolute* `filename` under `/tmp/playwright-mcp`, in
-  a folder named for your run and your step (`/tmp/playwright-mcp/<run>/<step>/<page>-<theme>.png`): every
-  step on this machine shares that directory. A relative `filename` is resolved against the workspace,
+- **The browser saves only where its server lets it:** its output directory (`--output-dir` in
+  `.mcp.json`), or the workspace, which is never where you save. In a run, its output directory is your
+  step's files directory, `$WF_STEP_FILES`, kept with the run; outside one, `/tmp/playwright-mcp`, shared by
+  every session on the machine. Give `browser_take_screenshot` an *absolute* `filename` under that
+  directory (`$WF_STEP_FILES/<page>-<theme>.png`). A relative `filename` is resolved against the workspace,
   where you never save, and an absolute path anywhere else is refused (`File access denied … outside
-  allowed roots`). (Measured with Claude Code 2.1.296 and `@playwright/mcp` 0.0.80.) When you can run `cp`,
-  copy what the steps after you should see into your files directory, and name them there.
+  allowed roots`). (Measured with Claude Code 2.1.296 and `@playwright/mcp` 0.0.80.)
 - **A step that only reads gives no `filename` at all.** A design or a review step is refused one on every
   browser tool that takes it (`browser_take_screenshot`, `browser_snapshot`, `browser_console_messages`,
   `browser_network_requests`, `browser_network_request`, `browser_evaluate`), since a file named could be
-  the workspace's. Called without one, the tool saves under `/tmp/playwright-mcp`, says where, and
-  answers with the picture itself: judge that, and name the path in what you report.
+  the workspace's. Called without one, the tool saves in its output directory, says where, and answers
+  with the picture itself: judge that. In a run it says a path relative to your workspace that lands in
+  `$WF_STEP_FILES`: name the picture you show a person by its absolute path there, `$WF_STEP_FILES/<file>`
+  written out, in `artifacts` and in the question that asks about it, never a `/tmp` path.
 - **The e2e too:** run it with `WF_ARTIFACTS` set. Without it, it writes its pictures into `.e2e/` at the
   repository root.
 
@@ -81,8 +82,8 @@ Then, for every page you are looking at, in the browser tools (`browser_*`, from
 - `browser_resize` to 1280 × 800, the e2e's window, once.
 - `browser_navigate` to the page. `browser_snapshot` says what is on it and what can be pressed, and
   `browser_console_messages` what went wrong.
-- `browser_take_screenshot` with `fullPage: true`: with an absolute `filename` under `/tmp/playwright-mcp`,
-  then read the file; or, in a design or a review step, with no `filename`, and judge the picture the
+- `browser_take_screenshot` with `fullPage: true`: with an absolute `filename` under `$WF_STEP_FILES` (in a
+  run; `/tmp/playwright-mcp` outside one), then read the file; or, in a design or a review step, with no `filename`, and judge the picture the
   call answers with.
 - Use the page as a person would — `browser_click`, `browser_hover`, `browser_type`, `browser_press_key` on
   what the change is about — and photograph what it shows.

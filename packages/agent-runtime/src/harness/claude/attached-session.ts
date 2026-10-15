@@ -73,14 +73,14 @@ export const DENIED_HERE =
   'No person is here to approve this call, so it is denied. Do what you can with the tools you are allowed, and say in your answer what you were denied.';
 
 /**
- * The session's run file rewritten with `patch`, its earliest call in flight as `calling`; nothing once the session is let go, its
- * file its holder's last word (`parked`).
+ * The session's run file rewritten with `patch`, its earliest call in flight as `calling` and how many wait at their hook as
+ * `heldBack`; nothing once the session is let go, its file its holder's last word (`parked`).
  */
 const rewrite = (root: string, live: Live, patch: Partial<AttachedRun> = {}): void => {
   if (live.letGo) return;
   const first = [...live.calls.values()].sort((a, b) => a.since.localeCompare(b.since))[0];
-  const { calling: _, ...rest } = live.run;
-  live.run = { ...rest, ...patch, ...(first ? { calling: first } : {}) };
+  const { calling: _, heldBack: __, ...rest } = live.run;
+  live.run = { ...rest, ...patch, ...(first ? { calling: first } : {}), ...(live.waiting ? { heldBack: live.waiting } : {}) };
   writeRun(root, live.run);
 };
 
@@ -97,6 +97,7 @@ const hooksOf = (root: string, live: Live, held: Held): Partial<Record<HookEvent
         hooks: [
           async (input, id, { signal }) => {
             live.waiting++;
+            if (held()) rewrite(root, live);
             await waitWhile(held, signal, live).finally(() => live.waiting--);
             const tool = (input as { tool_name?: string }).tool_name ?? 'a tool';
             if (id) live.calls.set(id, { tool, since: new Date().toISOString() });

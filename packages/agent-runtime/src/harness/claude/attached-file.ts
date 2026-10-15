@@ -35,6 +35,8 @@ const RunFileSchema = Schema.StructWithRest(
     childStart: Schema.optional(Schema.String),
     /** The call the session is in, the earliest of those in flight: its tool, and since when, ISO. */
     calling: Schema.optional(Schema.Struct({ tool: Schema.String, since: Schema.String })),
+    /** How many new calls wait at their hook now, held back by a drain; absent when none waits. */
+    heldBack: Schema.optional(Schema.Finite),
     /** What the session resumed from had spent, which its own results print on in theirs: taken off what it reports. */
     carried: Schema.optional(Schema.Struct({ costUsd: Schema.optional(Schema.Finite), apiMs: Schema.optional(Schema.Finite) })),
     /** How far into its say file the words were handed to the session, in bytes. */

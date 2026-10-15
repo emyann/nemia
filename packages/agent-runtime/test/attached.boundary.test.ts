@@ -235,12 +235,12 @@ test('a drain naming the holder holds its new call until lifted; one naming anot
   const h = await holder(root);
   t.after(h.close);
   await Effect.runPromise(h.attached.ops.spawn(request));
-  await until(t, () => lines(dir, 'asked.jsonl').length, 'the call asked its hook', { everyMs: 50 });
-  await Effect.runPromise(h.attached.ops.observe);
+  assert.equal(await until(t, () => run(root)?.heldBack, 'the call held at its hook', { everyMs: 50 }), 1);
   assert.deepEqual(lines(dir, 'answers.jsonl'), [], 'the call waits at its hook while drained');
   assert.equal(run(root)?.calling, undefined, 'a call held is not in flight');
   putDrain(root, process.pid + 1_000_000);
   await until(t, () => run(root)?.state === 'completed', 'the call let through and the session completed', { everyMs: 50 });
+  assert.equal(run(root)?.heldBack, undefined, 'no call waits once the drain names another process');
 });
 
 test('a stop from an engine that holds nothing cancels the session its holder runs', WAITED, async (t) => {

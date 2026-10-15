@@ -252,10 +252,7 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
   const pause = yield* tried(() => readPause());
   const judging: Judging = { done: new Map(), unjudged: new Map() };
   const standing = yield* passStanding(runs, memo.standing);
-  const read: PassRead = {
-    ...passRead(e, runs, process.env, standing),
-    ...(resting?.memo.settled ? { settled: resting.memo.settled } : {}),
-  };
+  const read: PassRead = passRead(e, runs, process.env, standing);
   for (const run of runs.filter(hasStarted)) yield* judged(e, judging, read, run, resting);
   const counted = yield* waitingJudged(e, judging, read, resting, ran.runs);
   const queue =
@@ -390,11 +387,9 @@ const passOf = (
  * What the tick remembers of the runs at rest (`atRest`), in memory and nowhere else: for each, what its last full pass answered, and the
  * inputs it answered on — its files in the store (`restStamps`), the run as read, and the result branches whose tips it would read. And
  * `cursor`, where on the engine's feed the memo has read to: every task of every run appends to it (the runtime's journal), so an event for
- * a task of a run the memo holds takes the run out of it (`evictedBy`). Undefined until the first pass reads the feed. And `settled`, the
- * tasks the last read of the feed said settled (`settledIn`): a run with one is judged in full on the pass, which reads its facts
- * (`StepFact`), and its answer is kept without them, so a run answered from memory records none again. And `standing`, what the pass's
- * `standing` last read of each result branch against its run's `baseRef` (`StandingMemo`), which the place believes only while the branch's
- * commit is the one it was read of.
+ * a task of a run the memo holds takes the run out of it (`evictedBy`). Undefined until the first pass reads the feed. And `standing`,
+ * what the pass's `standing` last read of each result branch against its run's `baseRef` (`StandingMemo`), which the place believes only
+ * while the branch's commit is the one it was read of.
  *
  * A cache of a pure function, never a source of truth: nothing is written for it, a restarted daemon starts with an empty one and reads
  * and judges every run afresh, and no verb, `nemia ls` or the api reads it. While a run's stamp holds, the pass is handed the memo's run in

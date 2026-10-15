@@ -1,11 +1,11 @@
 /**
- * What makes a run at rest (`atRest`), and which runs the engine's feed takes out of the tick's memo (`evictedBy`), and which tasks it says
- * settled (`settledIn`): pure, so each guard is made to refuse on data. What the memo saves a pass, and that every input moves it, is
+ * What makes a run at rest (`atRest`), and which runs the engine's feed takes out of the tick's memo (`evictedBy`): pure, so each guard is
+ * made to refuse on data. What the memo saves a pass, and that every input moves it, is
  * proven on a store in rest-store.test.ts.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { atRest, evictedBy, restBlockers, settledIn, type RestFacts } from './rest.ts';
+import { atRest, evictedBy, restBlockers, type RestFacts } from './rest.ts';
 
 /** A run at rest: succeeded, frozen, every task settled, nothing due, nothing done, nothing said, nothing of another run read. */
 const RESTING: RestFacts = {
@@ -135,18 +135,4 @@ test('a task on the feed takes out the run whose id and a dash begin it — a st
     "an id that only begins with the run's letters, or is the run's own, is none of its tasks",
   );
   assert.deepEqual([...evictedBy([], ids)], []);
-});
-
-test('settledIn: the tasks a read of the feed says settled, and REFUSED: no task whose entries are of any other kind', () => {
-  const entries = [
-    { taskId: 'r-1-work', event: { kind: 'ended' } },
-    { taskId: 'r-1-work', event: { kind: 'measured' } },
-    { taskId: 'r-1-work', event: { kind: 'settled' } },
-    { taskId: 'r-1-review', event: { kind: 'ended' } },
-    { taskId: 'r-1-review', event: { kind: 'closed' } },
-    { taskId: 'r-2-work', event: { kind: 'measured' } },
-    { taskId: 'r-3-work' },
-  ];
-  assert.deepEqual([...settledIn(entries)], ['r-1-work']);
-  assert.deepEqual([...settledIn([])], []);
 });

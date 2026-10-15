@@ -359,7 +359,7 @@ export const advancePass = Effect.fn('advancePass')(
     const checkout = yield* checkoutHold(e, run, steps, from, process.env, memo);
     const liftNotes = yield* liftHold(e, run, parents);
     const assessed = assess(steps, run, phaseOf, signedOff, asked, verdictOf, asks, roundAsks, sessionBlocked, spendOf, [], checkout);
-    const settled = settledOf(run, reads, pass?.settled);
+    const settled = settledOf(run, reads);
     const marked = markedOnce(run, reads);
     const timed = yield* timedOnce(e, run, reads, assessed.status);
     const closer = closerOf(e, reads.views);
@@ -392,12 +392,12 @@ export const advancePass = Effect.fn('advancePass')(
 /**
  * What the pass hands the metrics of the run's settled tasks (`settledOnce`), off what it read of them, before it files anything over
  * them: a try filed moves the step's task among its earlier tries. Each task it reads settled that the run's mark does not hold is added
- * to the mark (`settlesCounted`) for the record this pass writes, as `markedOnce`'s are. A record with no mark is handed the tasks the
- * feed named (`fed`), and gets no mark.
+ * to the mark (`settlesCounted`) for the record this pass writes, as `markedOnce`'s are. A record with no mark counts none, and gets
+ * no mark.
  */
-function settledOf(run: Run, r: PassReads, fed: ReadonlySet<string> | undefined): ReturnType<typeof settledOnce> {
+function settledOf(run: Run, r: PassReads): ReturnType<typeof settledOnce> {
   const statusOf = (step: Workflow) => stepStatus(step, run, r.phaseOf, r.signedOff, r.asked, r.steps, r.spendOf, r.verdictOf);
-  const once = settledOnce(run, r.steps, fed, { views: r.views, spendOf: r.spendOf, signedOff: r.signedOff, statusOf });
+  const once = settledOnce(run, r.steps, { views: r.views, spendOf: r.spendOf, signedOff: r.signedOff, statusOf });
   Object.assign(run, once.marks);
   return once;
 }

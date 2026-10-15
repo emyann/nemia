@@ -166,28 +166,30 @@ test('a settle is due once: a task its view says settled that the mark does not 
     ['r-1-review', { state: { brief: 'Do it.', settled: null, attempts: [] } }],
     ['r-2-work', view('succeeded')],
   ]);
-  assert.deepEqual([...settlesDue(marked([]), [WORK, REVIEW], views)!], ['r-1-work-try2', 'r-1-work-try2-check', 'r-1-work']);
-  assert.deepEqual([...settlesDue(marked(['r-1-work-try2', 'r-1-work']), [WORK, REVIEW], views)!], ['r-1-work-try2-check']);
-  assert.deepEqual([...settlesDue(marked([]), [WORK, REVIEW], new Map())!], [], 'REFUSED: a task the pass has no view of is not due');
-  assert.deepEqual([...settlesDue(marked([...views.keys()]), [WORK, REVIEW], views)!], [], 'REFUSED: a task the mark holds is not due');
-  assert.equal(settlesDue(RUN, [WORK, REVIEW], views), undefined, 'a record with no mark: the feed says which');
-  const once = settledOnce(marked(['r-1-work']), [WORK, REVIEW], new Set(['r-1-work']), reads({ views }));
+  assert.deepEqual([...settlesDue(marked([]), [WORK, REVIEW], views)], ['r-1-work-try2', 'r-1-work-try2-check', 'r-1-work']);
+  assert.deepEqual([...settlesDue(marked(['r-1-work-try2', 'r-1-work']), [WORK, REVIEW], views)], ['r-1-work-try2-check']);
+  assert.deepEqual([...settlesDue(marked([]), [WORK, REVIEW], new Map())], [], 'REFUSED: a task the pass has no view of is not due');
+  assert.deepEqual([...settlesDue(marked([...views.keys()]), [WORK, REVIEW], views)], [], 'REFUSED: a task the mark holds is not due');
+  const once = settledOnce(marked(['r-1-work']), [WORK, REVIEW], reads({ views }));
   assert.deepEqual(once.marks, { settlesCounted: ['r-1-work', 'r-1-work-try2', 'r-1-work-try2-check'] }, 'the mark, moved past them');
   assert.deepEqual(
     once.facts.map((f) => f.metric),
     ['try', 'check', 'wait'],
-    'what the feed names is not asked of a marked record',
   );
-  assert.deepEqual(settledOnce(marked([...views.keys()]), [WORK, REVIEW], new Set(['r-1-work']), reads({ views })), {
+  assert.deepEqual(settledOnce(marked([...views.keys()]), [WORK, REVIEW], reads({ views })), {
     facts: [],
     marks: {},
   });
-  const fed = settledOnce(RUN, [WORK, REVIEW], new Set(['r-1-work']), reads({ views }));
-  assert.deepEqual(
-    [fed.facts.map((f) => f.metric), fed.marks],
-    [['try'], {}],
-    'a record with no mark is counted off the feed, and gets none',
-  );
+});
+
+test('REFUSED: a record with no mark counts no settle and gets none', () => {
+  const views = new Map<string, FactView>([
+    ['r-1-work-try2', view('succeeded')],
+    ['r-1-work-try2-check', view('failed', 1)],
+    ['r-1-work', view('stopped')],
+  ]);
+  assert.deepEqual([...settlesDue(RUN, [WORK, REVIEW], views)], [], 'no task is due on a record with no mark');
+  assert.deepEqual(settledOnce(RUN, [WORK, REVIEW], reads({ views })), { facts: [], marks: {} }, 'nothing counted, and no mark made');
 });
 
 /** `program` over a registry of its own, and what it holds after. */

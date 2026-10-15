@@ -32,7 +32,7 @@ delete process.env.WF_MAX_CONCURRENT;
 const { beat, daemonFile, daemonStanding, lastCeilings, procStartOf, readFeed } = await import('../runner.ts');
 const stand = eachTest(testPlace);
 const runPlaced = runGiven(() => stand().layer);
-const { parseDaemonFile, parsePassCost, passed, recentFile, recentPasses, recordRecentPass, releaseStore, takeStore } =
+const { parseDaemonFile, parsePassCost, parseRecentPasses, passed, recentFile, recentPasses, recordRecentPass, releaseStore, takeStore } =
   await import('./daemon.store.ts');
 const { PHASES, passCost } = await import('../meter/meter.ts');
 const { main: cli } = await import('../cli/main.ts');
@@ -837,6 +837,28 @@ test('the recent passes keep the last `keep`, the oldest left out first, and an 
       [3, 5, 6],
       'the next pass writes the file without them',
     );
+  } finally {
+    fs.rmSync(recentFile(), { force: true });
+  }
+});
+
+test("a recent pass's disk reads with its kinds, and one kept before the kinds without them; REFUSED: a kind no part has", () => {
+  const disk = (kind?: string) => ({
+    at: '2026-10-15T04:00:00.000Z',
+    free: 70,
+    size: 100,
+    entries: [{ part: 'runs', ...(kind === undefined ? {} : { kind }), factory: 'nemia', bytes: 40, unread: 0 }],
+  });
+  const kept = (kind?: string) => {
+    fs.rmSync(recentFile(), { force: true });
+    recordRecentPass({ ...COST, ms: 1 }, 3);
+    const [pass] = JSON.parse(fs.readFileSync(recentFile(), 'utf8')) as object[];
+    return parseRecentPasses(JSON.stringify([{ ...pass, disk: disk(kind) }]));
+  };
+  try {
+    assert.deepEqual(kept('pictures').passes[0].disk, disk('pictures'));
+    assert.deepEqual(kept().passes[0].disk, disk(), 'a pass kept before the kinds');
+    assert.deepEqual([kept('photos').passes.length, kept('photos').unread], [0, 1]);
   } finally {
     fs.rmSync(recentFile(), { force: true });
   }

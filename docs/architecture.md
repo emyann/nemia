@@ -131,10 +131,10 @@ read and removed only by `sweep` (`agent-runtime/src/core/engine/bodies.ts`, `ae
 A task's journal, its session files and its feed lines are removed only by `forget` (`agent-runtime/src/service/forget.ts`,
 `ae forget`), and only of a settled task; a body still only by `sweep`. Which tasks a run removed had is the orchestrator's: `nemia rm`
 asks `forget` of every task its record names, and the tick asks again for one that had not settled (`src/forgetting/forgetting.verb.ts`).
-What all of it takes on the disk is the runtime's to say, by task (`kept`, `agent-runtime/src/service/kept.ts`): a task's journal, the
-bodies it is first to name, its harness's files, and the harness's own record of each session its journal names by id, never one
-found by its folder, where a person's own sessions live too. Which factory a task is of is the orchestrator's (`withKept`,
-`src/disk/disk.ts`). `forget` leaves a harness's record: once its task is forgotten no journal names it, and it is counted for no task.
+What all of it takes on the disk is the runtime's to say, by task (`kept`, `agent-runtime/src/service/kept.ts`): the harness it was
+filed on, a task's journal, the bodies it is first to name, its sessions' output kept whole, its harness's other files, and the harness's own record of each session its journal names by id, never one
+found by its folder, where a person's own sessions live too. Which factory a task is of, and which output is a check's, are the orchestrator's (`withKept`,
+`src/disk/disk.ts`; `keptOf`, `src/disk/disk.verb.ts`). `forget` leaves a harness's record: once its task is forgotten no journal names it, and it is counted for no task.
 
 **Logs and traces**: each layer logs and spans in its own words — the runtime its task, kind and attempt (`appendFields` in
 `agent-runtime/src/core/engine/journal.ts`), the orchestrator its run and step (`advancePass`, `forStep`); each spans the work it does, never an item it looks at and skips, which it

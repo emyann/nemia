@@ -474,7 +474,7 @@ const KEPT: readonly Walk[] = [
       await asked(engine.file({ ...task('a'), harness: 'test' }));
       await asked(engine.file(task('b')));
       const report = await asked(engine.kept());
-      return report && 'tasks' in report ? report.tasks.map((t) => [t.taskId, t.harness ?? null]).sort() : report;
+      return report && 'tasks' in report ? report.tasks.map((t) => [t.taskId, t.harness ?? null]) : report;
     },
     says: [
       ['a', 'test'],

@@ -8,13 +8,14 @@ import { Cause, Effect, Metric, type Duration } from 'effect';
 import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import { rootSpan } from '../meter/meter.verb.ts';
 import { runTasks } from '../record/record.ts';
-import { EngineService, tried, type KeptReport } from '../runtime-client.ts';
+import { EngineService, HARNESSES, tried, type KeptReport } from '../runtime-client.ts';
 import { walk } from '../prune/freed.store.ts';
 import type { Answered } from '../prune/prune.ts';
 import { storeFree, storeRoots } from './disk.store.ts';
 import {
   entryKey,
   entryOf,
+  kindIn,
   largestOf,
   readingOf,
   unreadByPart,
@@ -22,6 +23,7 @@ import {
   withKept,
   type DiskReading,
   type DiskRoot,
+  type DiskKind,
   type DiskRun,
   type TaskKept,
 } from './disk.ts';
@@ -30,13 +32,14 @@ import {
 export const DISK_EVERY: Duration.Input = '10 minutes';
 
 /**
- * The metrics of the store's disk, in the registry of whoever runs the sweep: the bytes a part holds (`disk.bytes`, by `part`, and by
- * `factory` where the part is kept by run or by task: `worktrees`, `runs`, `engine` and `sessions`), the names that did not read and
- * are in no byte (`disk.unread`, by `part`), and the bytes free on the file system that holds the store and its size (`disk.free`,
- * `disk.size`). `sessions` is kept outside the store, perhaps on another file system than the two describe.
+ * The metrics of the store's disk, in the registry of whoever runs the sweep: the bytes a kind of a part holds (`disk.bytes`, by `part`
+ * and `kind`, `DISK_KINDS`, and by `factory` where the part is kept by run or by task: `worktrees`, `runs`, `engine` and `sessions`),
+ * the names that did not read and are in no byte (`disk.unread`, by `part`), and the bytes free on the file system that holds the
+ * store and its size (`disk.free`, `disk.size`). `sessions` is kept outside the store, perhaps on another file system than the two
+ * describe.
  */
 export const DISK_METRICS = {
-  bytes: Metric.gauge('disk.bytes', { description: 'the bytes a part of the store holds on disk, as the last sweep read them' }),
+  bytes: Metric.gauge('disk.bytes', { description: 'the bytes a kind of a part of the store holds on disk, as the last sweep read them' }),
   unread: Metric.gauge('disk.unread', { description: 'the names of a part of the store the last sweep could not read' }),
   free: Metric.gauge('disk.free', { description: 'the bytes free on the file system that holds the store' }),
   size: Metric.gauge('disk.size', { description: 'the size in bytes of the file system that holds the store' }),
@@ -60,12 +63,11 @@ export const freshDiskMemory = (): DiskMemory => ({ said: new Set() });
 /** What one sweep answers: the reading, the runs it named, and what the walk cost, the names it read and the bursts it yielded. */
 export type Measured = { reading: DiskReading; largest: DiskRun[]; names: number; bursts: number };
 
-/** `value` into `disk.bytes` for the part and factory `key` names (`entryKey`). */
+/** `value` into `disk.bytes` for the part, kind and factory `key` names (`entryKey`). */
 const bytesSaid = (key: string, value: number): Effect.Effect<void> => {
-  const { part, factory } = entryOf(key);
-  return factory === undefined
-    ? Metric.update(Metric.withAttributes(DISK_METRICS.bytes, { part }), value)
-    : Metric.update(Metric.withAttributes(DISK_METRICS.bytes, { part, factory }), value);
+  const { part, kind, factory } = entryOf(key);
+  const labels = { part, ...(kind === undefined ? {} : { kind }), ...(factory === undefined ? {} : { factory }) };
+  return Metric.update(Metric.withAttributes(DISK_METRICS.bytes, labels), value);
 };
 
 /**
@@ -98,14 +100,22 @@ const named = (run: DiskRun, at: string): Effect.Effect<void> =>
     run.factory === undefined ? {} : { factory: run.factory },
   );
 
+/** The kind a task's output is: a check's where the task was filed on the checks' harness (`HARNESSES.check`), else a session's. */
+const outputKind = (harness: string | undefined): DiskKind => (harness === HARNESSES.check.name ? 'check-output' : 'session-output');
+
 /**
- * What the runtime answered of each task, as the pure half takes it: its journal, bodies and files as `engine`, its records as
- * `sessions`.
+ * What the runtime answered of each task, as the pure half takes it: its journal, bodies, output (`outputKind`) and files as the
+ * kinds of `engine`, its records as `sessions`.
  */
 const keptOf = (report: KeptReport): TaskKept[] =>
   report.tasks.map((task) => ({
     taskId: task.taskId,
-    engine: task.journal + task.bodies + task.files,
+    engine: {
+      journals: task.journal,
+      bodies: task.bodies,
+      [outputKind(task.harness)]: task.output,
+      'session-files': task.files,
+    },
     ...(task.records === undefined ? {} : { sessions: task.records }),
     unread: task.unread?.length ?? 0,
   }));
@@ -130,7 +140,7 @@ const keptAsked = Effect.gen(function* () {
  *   outside the store are the part `sessions` (`withKept`); a runtime that keeps no record of a session answers none, and none is said;
  * - the store's root is listed (`storeRoots`, or `given` where a caller listed it), each name under a part kept by run a root of its own;
  * - every root is walked in one walk (`walk`), a burst of names at a time, so a file with two names in the store is counted once, and
- *   one with a name outside it not at all;
+ *   one with a name outside it not at all, each name of its kind (`kindIn`) from its root's (`DiskRoot.kind`);
  * - each root of a run answered is its factory's, or the default factory's; a name of no run answered is its part's alone;
  * - the reading goes into the gauges (`DISK_METRICS`), and each of the largest runs into a span (`DISK_SPAN`), which may carry a run.
  *
@@ -147,10 +157,19 @@ export const diskOnce = Effect.fn('diskOnce')(function* (answers: readonly Answe
   const factories = new Map(answers.map((a) => [a.run.id, a.run.factory ?? DEFAULT_FACTORY]));
   const runs = { ids: new Set(factories.keys()), factoryOf: (id: string) => factories.get(id) };
   const walking = roots.flatMap((root, k) => (root.own === undefined ? [k] : []));
-  const walked = yield* walk(walking.map((k) => roots[k].path));
-  const read = { bytes: roots.map((root) => root.own ?? 0), unread: roots.map(() => 0), read: roots.map(() => true) };
+  const walked = yield* walk(
+    walking.map((k) => roots[k].path),
+    { kinds: walking.map((k) => roots[k].kind), kindIn: (kind, name) => kindIn(kind as DiskKind, name) },
+  );
+  const read = {
+    bytes: roots.map((root) => root.own ?? 0),
+    kinds: roots.map((): Record<string, number> | undefined => undefined),
+    unread: roots.map(() => 0),
+    read: roots.map(() => true),
+  };
   for (const [at, k] of walking.entries()) {
     read.bytes[k] = walked.bytes[at];
+    read.kinds[k] = walked.kinds[at];
     read.unread[k] = walked.unread[at];
     read.read[k] = walked.read[at];
   }

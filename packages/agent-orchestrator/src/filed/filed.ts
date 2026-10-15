@@ -66,9 +66,16 @@ const stepFilesEnv = (step: Pick<Workflow, 'name' | 'background'>, runArtifacts:
 /**
  * The folders a step is filed with beyond its factory's, each read-only: those the steps before it handed over, then the store's, then
  * the run's inputs folder. And `named`, for its brief alone and no part of the filing: by the path of a handed folder, which of the
- * files its step's closeout named are there as the step is filed (`HandedFiles`), where the tick read them.
+ * files its step's closeout named are there as the step is filed (`HandedFiles`), where the tick read them; and `closeouts`, the paths of
+ * the handed folders that hold the step's `closeout.json` (`HANDED_CLOSEOUT`), whose files the brief does not list.
  */
-export type FiledFolders = { handed: Mount[]; store: Mount[]; inputs: Mount[]; named?: Readonly<Record<string, HandedFiles>> };
+export type FiledFolders = {
+  handed: Mount[];
+  store: Mount[];
+  inputs: Mount[];
+  named?: Readonly<Record<string, HandedFiles>>;
+  closeouts?: readonly string[];
+};
 
 /**
  * The folders a step is filed with beyond its factory's, the one source of the filing's (`filedConfig`) and of what its brief names

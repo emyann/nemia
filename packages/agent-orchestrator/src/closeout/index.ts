@@ -14,3 +14,5 @@ export {
 export type { Closeout, CloseoutSchema } from './closeout.ts';
 export { CLOSEOUT_V1, envelopeRefusals, SUMMARY_MAX, summaryLine } from './envelope.ts';
 export type { ValueArtifact } from './envelope.ts';
+export { handedCloseout } from './handed-closeout.ts';
+export type { HandedCloseout } from './handed-closeout.ts';

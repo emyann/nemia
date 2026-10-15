@@ -9,7 +9,7 @@ import type { ClaudeFlags, CodexArgs } from '../runtime-client.ts';
 import { lackedOf, type Run, type StepRecord } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { filedFolders, type FiledFolders } from '../filed/filed.ts';
-import { artifactFiles, filesHanded } from '../artifacts/artifacts.store.ts';
+import { artifactFiles, filesHanded, holdsCloseout } from '../artifacts/artifacts.store.ts';
 import { lackLines } from '../artifacts/artifacts.ts';
 import type { RetryBriefing } from '../brief/index.ts';
 import type { Workflow } from '../step/step.ts';
@@ -108,8 +108,9 @@ export const lacksTold = (run: Run, name: string, record: StepRecord): Pick<Retr
 };
 
 /**
- * The folders a step is filed with and its brief names (`filedFolders`), and for each a step before it handed over, which of the files
- * that step's closeout named are there now (`filesHanded`): the brief lists those, and hands on no name with no file.
+ * The folders a step is filed with and its brief names (`filedFolders`), those a step before it handed over that hold its
+ * `closeout.json` (`holdsCloseout`), which the brief sends the step to, and for each other, which of the files that step's closeout named
+ * are there now (`filesHanded`): the brief lists those, and hands on no name with no file.
  */
 export const foldersTold = (
   run: Run,
@@ -117,9 +118,12 @@ export const foldersTold = (
   step: Workflow,
 ): FiledFolders => {
   const folders = filedFolders(step, reads.steps, filedAt(run));
-  const named = folders.handed.map((m) => {
-    const from = path.basename(m.path);
-    return [m.path, filesHanded(run, from, reads.signedOff(from))] as const;
-  });
-  return { ...folders, named: Object.fromEntries(named) };
+  const closeouts = folders.handed.filter((m) => holdsCloseout(run, path.basename(m.path))).map((m) => m.path);
+  const named = folders.handed
+    .filter((m) => !closeouts.includes(m.path))
+    .map((m) => {
+      const from = path.basename(m.path);
+      return [m.path, filesHanded(run, from, reads.signedOff(from))] as const;
+    });
+  return { ...folders, named: Object.fromEntries(named), closeouts };
 };

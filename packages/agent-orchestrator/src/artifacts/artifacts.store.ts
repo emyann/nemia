@@ -2,7 +2,7 @@
  * The files a step hands over: each one its closeout names, copied out of its workspace into the step's files directory
  * (`collectArtifacts`), each it named that the run does not have, and why (`missingArtifacts`; `filesLacked`, off the disk alone, as the
  * step signs off; `filesHanded`, those that are there for the step after), and what that directory holds
- * (`artifactFiles`), and the pictures an ending's check took of the merged tree, removed once it has landed (`dropLandedPictures`); and
+ * (`artifactFiles`), the step's closeout written there for the steps after it (`handCloseout`), and the pictures an ending's check took of the merged tree, removed once it has landed (`dropLandedPictures`); and
  * one file of that directory or of a step's folder, read by its name and never by a path (`artifactFile`, `fileIn`).
  *
  * Beneath the controllers, beside `record.store.ts` and `worktree.store.ts`: it imports neither the engine nor a controller, and
@@ -11,9 +11,10 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Closeout } from '../closeout/index.ts';
+import { handedCloseout, type Closeout } from '../closeout/index.ts';
+import type { Workflow } from '../step/step.ts';
 import { inside } from '../workspace/workspace.ts';
-import { artifactPlace, sizeOf, type ArtifactFile, type HandedFiles, type MissingArtifact } from './artifacts.ts';
+import { artifactPlace, HANDED_CLOSEOUT, sizeOf, type ArtifactFile, type HandedFiles, type MissingArtifact } from './artifacts.ts';
 import { isRepositoryRun, type LackedFile, type Run } from '../record/record.ts';
 import { artifactsDir, lstatOf } from '../record/record.store.ts';
 import { presentOn } from '../branches/changes.store.ts';
@@ -61,7 +62,10 @@ export function missingArtifacts(
  * (`artifactPlace`), or `missing` from `dir`, which an absolute path in it names — undefined for one that is a file there, and
  * `workspace` for a path from the workspace root, which the workspace answers.
  */
-function placedWhy(file: string, dir: string): 'outside' | 'escapes' | 'configuration' | 'missing' | 'workspace' | undefined {
+function placedWhy(
+  file: string,
+  dir: string,
+): 'outside' | 'escapes' | 'configuration' | 'reserved' | 'missing' | 'workspace' | undefined {
   const place = artifactPlace(file, dir);
   if (place !== 'files') return place;
   return isFileIn(file, dir) ? undefined : 'missing';
@@ -95,6 +99,30 @@ function workspaceLacks(workspace: string | undefined, rel: string, dir: string)
   if (at.kind === 'file') return undefined;
   return at.kind === 'outside' ? 'escapes' : at.kind === 'directory' ? 'directory' : 'not there';
 }
+
+/**
+ * Write step `step`'s closeout `said` into its files directory as `closeout.json` (`HANDED_CLOSEOUT`), in v1's shape
+ * (`handedCloseout`), with each file it named that is there now (`filesHanded`): what the steps after it read there. The tick's alone,
+ * on the pass that hands the step off, after it collected what the closeout named, so it holds the current try's closeout. A link a step
+ * left at that name is taken away first, and never written through. Answers a note when the write failed; it never throws.
+ */
+export function handCloseout(run: Run, step: Workflow, said: Closeout | undefined): string[] {
+  if (!said) return [];
+  const dir = artifactsDir(run, step.name);
+  const file = path.join(dir, HANDED_CLOSEOUT);
+  try {
+    if (lstatOf(file)?.isSymbolicLink()) fs.unlinkSync(file);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(file, `${JSON.stringify(handedCloseout(step, said, filesHanded(run, step.name, said).there), null, 2)}\n`);
+    return [];
+  } catch (e) {
+    return [`${step.name}: ${HANDED_CLOSEOUT} not written — ${(e as Error).message}`];
+  }
+}
+
+/** Whether step `stepName`'s files directory holds the closeout the tick writes there (`handCloseout`): a file, never a link. */
+export const holdsCloseout = (run: Pick<Run, 'id'>, stepName: string): boolean =>
+  lstatOf(path.join(artifactsDir(run, stepName), HANDED_CLOSEOUT))?.isFile() ?? false;
 
 /**
  * Which of the files a step's closeout named are in its files directory now, each by its absolute path there, and how many are not: what

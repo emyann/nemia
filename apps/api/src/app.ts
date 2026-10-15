@@ -13,7 +13,7 @@ import { ceilingsOf, metricsOf, passesOf, seriesOf, pauseNowOf, pauseOf, feed, Q
 import { inbox } from './inbox/inbox.ts';
 import { ApiConfig, type ApiEnv, type ApiRuntime, ReadMemo, served, type Services } from './layer.ts';
 import { machines } from './machines/machines.ts';
-import { nemia } from './nemia/nemia.ts';
+import { nemia, nemiaChat } from './nemia/index.ts';
 import { runs } from './runs/runs.ts';
 import { stats } from './stats/stats.ts';
 import { step } from './step/step.ts';
@@ -144,6 +144,7 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
  * - machines/machines.ts — the state machines the board draws, listed, and one machine's graph, read off its code.
  * - nemia/nemia.ts — Nemia, the store's own agent: where she is (`nemia level`'s read), and the facts she keeps (`nemia memory`). Her
  *   level is set on the route the table generates from `nemia level`.
+ * - nemia/chat.ts — Nemia's chat: her history paged and followed, the person's words sent, and their read mark moved.
  *
  * A route lets the orchestrator's refusals through, and `onError` answers each from `REFUSAL_STATUS`, `{ error }` in its words
  * (`answerError`). Any other error is a 500 there: a route that has better words for one, or a truer status, answers it itself.
@@ -193,6 +194,7 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .route('/', feed)
     .route('/', machines)
     .route('/', nemia)
+    .route('/', nemiaChat)
     .onError(answerError);
   return { app, runtime };
 }

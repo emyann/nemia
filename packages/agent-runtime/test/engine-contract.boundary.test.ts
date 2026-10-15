@@ -9,6 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import { Engine, testOps, type RunnerOps, type Sighting } from '../src/index.ts';
+import { noTranscript } from '../src/harness/transcript.ts';
 import { builtEngine } from './engine.ts';
 import { APART, apartOn, UNKEPT, unwalked, walksOn, type End, type Moved, type Side } from './engine-walks.ts';
 import { scratch } from './scratch.ts';
@@ -30,6 +31,7 @@ function realSide(): Side {
   const harness: RunnerOps = {
     ...testOps({ sessions }),
     say: () => Effect.void,
+    transcript: () => Effect.succeed(noTranscript()),
     output: (name, stream, lastBytes) => Effect.succeed(tailOf(printed.get(name)?.[stream], lastBytes)),
   };
   const engine = builtEngine(Engine.layer({ root: scratch('ae-engine-walks-'), harnesses: { test: harness }, defaultHarness: 'test' }));

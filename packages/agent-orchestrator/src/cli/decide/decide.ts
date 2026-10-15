@@ -7,8 +7,10 @@ import {
   CHECK_AFFECTING,
   LESSON,
   parseGlobs,
+  answersOr,
   approvedFirst,
   artifactFiles,
+  askedQuestions,
   artifactLines,
   artifactsDir,
   branchWord,
@@ -36,6 +38,7 @@ import {
   owedFields,
   ownNote,
   prunedKept,
+  questionLines,
   prunedWords,
   runStore,
   roundDueNote,
@@ -76,6 +79,17 @@ long it queued for a slot and how long it ran; after the steps, each round's and
 each step, before its closeout, what a person said to its sessions while they ran (nemia say), with when.
 Under a gated step's name, its gate: approved, when and with what words — or awaiting approval, with the
 nemia approve that lets what follows be filed and the nemia retry --message that sends it back.
+
+A closeout's questions are numbered, 1, 2… across its fields, each option lettered a, b… on its own line,
+the recommended one marked; you answer them by those names with --answer, once for each question, on the
+nemia retry of a step that signed off blocked or the nemia approve of one at its gate:
+
+  --answer 1=a            question 1, option a
+  --answer "2=a,c"        options a and c, where the question takes several
+  --answer "3=b: words"   option b, and your own words
+  --answer "3: words"     your own words alone
+
+--message beside them is the note under your answers.
 
 Last, the result: where each branch stands against the base branch — on it, ahead by N commits, gone —
 and, at an ending's gate or after its landing check refused the merged tree, read live: whether each branch
@@ -416,7 +430,10 @@ function printTries({ used, costs, timeline, answers, said }: Decided, name: str
   for (const line of saidLines(said[name] ?? []).flatMap((l) => l.split('\n'))) console.log(`    ${line}`);
 }
 
-/** A step's closeout: its summary, its output's fields, its needs and how to answer them, and its files — or why it does not read. */
+/**
+ * A step's closeout: its summary, its output's fields — those that ask questions numbered, as `--answer` names them (`questionLines`) —
+ * its needs and how to answer them, and its files; or why it does not read.
+ */
 function printCloseout(
   { run, answering }: Decided,
   name: string,
@@ -427,7 +444,9 @@ function printCloseout(
 ): void {
   if ('error' in c) return console.log(`    closeout unreadable — ${c.error}`);
   if (c.summary) console.log(`    ${c.summary.split('\n').join('\n    ')}`);
-  for (const line of step ? outputLines(step, c, owedFields(step, run, steps)) : []) console.log(`    ${line}`);
+  const asked = askedQuestions(step, c);
+  const fields = step ? owedFields(step, run, steps).filter((f) => !asked.some((a) => a.field === f)) : [];
+  for (const line of step ? [...outputLines(step, c, fields), ...questionLines(asked)] : []) console.log(`    ${line}`);
   if (c.needs) console.log(`    needs: ${c.needs}`);
   if (answering[name]) console.log(`    ${answering[name]}`);
   const files = artifactLines(artifactsDir(run, name), missingArtifacts(place, run, name, c), artifactFiles(run, name), run.pruned);
@@ -494,8 +513,8 @@ function printCollisions({ collisions }: Decided): void {
  * What is left to decide, as the run's commands say it (`Decided.commands`): the gated step to approve or send back, `nemia rm` for a
  * folder run, or the git commands to ship or drop.
  */
-function printChoice({ toDecide, commands }: Decided, steps: Steps): void {
-  if (toDecide?.kind === 'approve') return printApprove(toDecide, steps, commands);
+function printChoice({ toDecide, commands, closeouts }: Decided, steps: Steps): void {
+  if (toDecide?.kind === 'approve') return printApprove(toDecide, steps, commands, closeouts[toDecide.step]);
   const said = (label: DecideCommand['label']) => commands.find((c) => c.label === label);
   const forget = said('forget it');
   if (forget) return console.log(`\n  done with it   ${forget.command}  — ${forget.said}`);
@@ -508,9 +527,15 @@ function printChoice({ toDecide, commands }: Decided, steps: Steps): void {
 
 /**
  * The step at its gate: that it signed off, or that it is the ending not yet run, with the first paragraph of its own note (`ownNote`)
- * where it has one; then its approval and the send-backs after it, as the run's commands say them.
+ * where it has one; then its approval — with an `--answer` for each question its closeout `said` asks — and the send-backs after it, as the
+ * run's commands say them.
  */
-function printApprove(toDecide: Extract<Decided['toDecide'], { kind: 'approve' }>, steps: Steps, commands: readonly DecideCommand[]): void {
+function printApprove(
+  toDecide: Extract<Decided['toDecide'], { kind: 'approve' }>,
+  steps: Steps,
+  commands: readonly DecideCommand[],
+  said: Closeout | undefined,
+): void {
   const step = steps.find((s) => s.name === toDecide.step)!;
   const unrun = ` has not run: this workflow's ending, and your approval is what runs it${toDecide.says === null ? '' : ':'}`;
   console.log(`\n  to decide  ${step.name}${toDecide.filed ? ' has signed off and waits for your word:' : unrun}`);
@@ -518,7 +543,7 @@ function printApprove(toDecide: Extract<Decided['toDecide'], { kind: 'approve' }
   for (const line of paragraph?.split('\n') ?? []) console.log(`    ${line}`);
   const at = commands.findIndex((c) => c.label === 'approve' && c.command.endsWith(` ${step.name}`));
   if (at < 0) return;
-  console.log(`\n  approve it    ${commands[at].command} [--message "<words>"]`);
+  console.log(`\n  approve it    ${commands[at].command} ${answersOr(step, said, '[--message "<words>"]')}`);
   for (const back of commands.slice(at + 1)) {
     if (back.label !== 'send back' || back.said !== null) break;
     console.log(`  send it back  ${back.command}`);

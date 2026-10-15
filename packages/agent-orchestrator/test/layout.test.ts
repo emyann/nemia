@@ -226,6 +226,7 @@ test("REFUSED on the source: a value import from the format's leaf back to a fol
       'src/keys/keys.ts',
       'src/keys/tools.ts',
       'src/question/index.ts',
+      'src/question/numbered.ts',
       'src/question/question.ts',
       'src/step/step.ts',
     ],

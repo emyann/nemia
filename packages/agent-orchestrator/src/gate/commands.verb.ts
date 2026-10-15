@@ -72,6 +72,9 @@ export const APPROVE: Command<{ try: number; at: string; message: string | null;
         : next === 'waiting'
           ? 'the next tick files what waits on it'
           : 'nothing waits on it: its run can be decided';
-    return [`${runId}  approved: try ${tryNo} of ${step}${typedOf(args).length ? ', with your answers' : message !== null ? ', with your words' : ''} — ${then}`, `   ${file}`];
+    return [
+      `${runId}  approved: try ${tryNo} of ${step}${typedOf(args).length ? ', with your answers' : message !== null ? ', with your words' : ''} — ${then}`,
+      `   ${file}`,
+    ];
   },
 };

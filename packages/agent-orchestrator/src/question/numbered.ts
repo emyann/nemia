@@ -4,7 +4,9 @@
  * (`questionLines`), and `--answer 1=a` names them back, resolved to the board's own answers, by question title and option label
  * (`numberedAnswers`), before the package's `answerRefusal` and `answerText` read them. Pure.
  */
-import type { Answer, Asked, Question } from './question.ts';
+import type { Closeout } from '../closeout/closeout.ts';
+import type { Workflow } from '../step/step.ts';
+import { askedQuestions, type Answer, type Asked, type Question } from './question.ts';
 
 /** The letter of the option at `index` from 0: `a` to `z`, then `aa`, `ab`… */
 export const letterOf = (index: number): string =>
@@ -13,7 +15,12 @@ export const letterOf = (index: number): string =>
 /** One question as `nemia decide` prints it: its number and title, its body, each option lettered, the recommended one marked, and how. */
 const questionBlock = (q: Question, n: number): string[] => [
   `  ${n}. ${q.title}`,
-  ...(q.body.trim() ? q.body.trim().split('\n').map((line) => `     ${line}`) : []),
+  ...(q.body.trim()
+    ? q.body
+        .trim()
+        .split('\n')
+        .map((line) => `     ${line}`)
+    : []),
   ...q.options.map(
     (o, i) => `     ${letterOf(i)}  ${o.label}${o.meaning ? ` — ${o.meaning}` : ''}${o.label === q.recommended ? '  (recommended)' : ''}`,
   ),
@@ -27,11 +34,19 @@ export function questionLines(asked: readonly Asked[]): string[] {
 }
 
 /** The `--answer` a line that offers the verb shows, one for each question asked: `--answer 1=<letter> --answer 2=<letter>`. */
-export const answerForm = (count: number): string =>
-  Array.from({ length: count }, (_, i) => `--answer ${i + 1}=<letter>`).join(' ');
+export const answerForm = (count: number): string => Array.from({ length: count }, (_, i) => `--answer ${i + 1}=<letter>`).join(' ');
+
+/**
+ * What a line offering `nemia retry` or `nemia approve` to `step` gives after its name: an `--answer` for each question its closeout
+ * `said` asks, and the note beside them; or `words`, the `--message` it offers where the closeout asks none.
+ */
+export const answersOr = (step: Workflow | undefined, said: Closeout | { error: string } | undefined, words: string): string => {
+  const count = askedQuestions(step, said).flatMap((a) => a.questions).length;
+  return count ? `${answerForm(count)} [--message "<note>"]` : words;
+};
 
 /** The forms an `--answer` takes, as its refusal says them. */
-const FORMS = '`n=a`, `n=a,c` where the question takes several, `n=a: words` or `n: words`, n the question\'s number';
+const FORMS = "`n=a`, `n=a,c` where the question takes several, `n=a: words` or `n: words`, n the question's number";
 
 /** One `--answer` value read: the question's number, the letters chosen, and the person's own words. */
 type Typed = { n: number; letters: string[]; own?: string };

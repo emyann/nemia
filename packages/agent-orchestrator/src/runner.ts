@@ -131,6 +131,7 @@ export {
   waitWord,
 } from './run.ts';
 export { outputLines } from './closeout/closeout.ts';
+export { answersOr, askedQuestions, questionLines } from './question/index.ts';
 export { dueNote, messageRefusal, signoffsSpent } from './retry/index.ts';
 export { atWork, firstFiledAt, runStartedAt, runTokens, timeline, timelineLines, timelineTotalLines } from './timeline/index.ts';
 export type { FolderRun, RepositoryRun, PlaceKind } from './run.ts';

@@ -42,6 +42,7 @@ import {
 } from '../status/status.ts';
 import { acceptedNote, exhaustedNote, heldLater, heldNote, roundDueNote, roundsDue } from '../round/round.ts';
 import { saidWord } from '../say/say.ts';
+import { askedQuestions } from '../question/index.ts';
 import { assess } from '../tick/assess.ts';
 import { neverApproved } from '../prune/prune.ts';
 import { daemonLine, staleAfterMs, type DaemonStanding } from '../daemon/daemon.ts';
@@ -55,7 +56,8 @@ export type Listing = {
    * Beside the status and never in it, so the words stay the vocabulary a reader of them keys on: so are `waits`, what the harness says a
    * `needs-human` session waits for (`waitingWords`), and `denied`, what its current try was denied (`deniedWords`), which `nemia ls`
    * prints in the line (`shownStatus`, `shownNote`) and the board does not. `roundDue`, only on a looping step whose next round is due
-   * (`roundsDue`) and which no retry takes first: what its note words as `roundDueNote`.
+   * (`roundsDue`) and which no retry takes first: what its note words as `roundDueNote`. `asks`, only on a step waiting on a person whose
+   * closeout asks questions: how many (`askedQuestions`), which `nemia ls` counts in the note and `nemia decide` prints whole.
    */
   steps: Array<{
     name: string;
@@ -66,6 +68,7 @@ export type Listing = {
     waits?: string;
     denied?: string;
     roundDue?: true;
+    asks?: number;
   }>;
   /**
    * Steps a person has to act on — blocked, unsigned, refused by their check, or awaiting approval, with no try due — on a run nobody has
@@ -383,7 +386,7 @@ export function listing({
   const total = runSpend(run, spendOf);
   const decide = assessed.toDecide;
   return {
-    steps: rows,
+    steps: asking(rows, steps, run, waitingOnYou, closeoutOf),
     waitingOnYou: run.cancelledAt || run.pruned || run.hold ? [] : waitingOnYou,
     waiting,
     ...(run.hold && !run.cancelledAt ? { holding: holds ? [...holds] : run.hold.until.map((id) => ({ run: id })) } : {}),
@@ -494,9 +497,31 @@ const deniedRow = (denied: readonly string[]): { denied?: string } => (denied.le
 export const shownStatus = (s: Pick<Listing['steps'][number], 'status' | 'waits'>): string =>
   s.waits ? s.status.replace(/^needs-human/, (word) => `${word}: ${s.waits}`) : s.status;
 
-/** A step's note as `nemia ls` prints it: the row's note, then what its current try was denied (`denied`), last. */
-export const shownNote = (s: Pick<Listing['steps'][number], 'note' | 'denied'>): string | undefined =>
-  [s.note, s.denied].filter(Boolean).join(' · ') || undefined;
+/**
+ * Each row of a step waiting on a person (`onYou`) whose closeout asks questions, with how many (`asks`); every other as it is. None on a
+ * run cancelled, pruned or held, which waits on no one.
+ */
+function asking(
+  rows: Listing['steps'],
+  steps: readonly Workflow[],
+  run: Pick<Run, 'cancelledAt' | 'pruned' | 'hold'>,
+  onYou: readonly string[],
+  closeoutOf: (step: string) => Closeout | { error: string } | undefined,
+): Listing['steps'] {
+  const waits = !run.cancelledAt && !run.pruned && !run.hold;
+  return rows.map((row) => {
+    const step = waits && onYou.includes(row.name) ? steps.find((s) => s.name === row.name) : undefined;
+    const asks = step ? askedQuestions(step, closeoutOf(row.name)).flatMap((a) => a.questions).length : 0;
+    return asks ? { ...row, asks } : row;
+  });
+}
+
+/**
+ * A step's note as `nemia ls` prints it: the row's note, then how many questions its closeout asks (`asks`), then what its current try was
+ * denied (`denied`), last.
+ */
+export const shownNote = (s: Pick<Listing['steps'][number], 'note' | 'denied' | 'asks'>): string | undefined =>
+  [s.note, s.asks ? `asks ${s.asks} question${s.asks === 1 ? '' : 's'}` : '', s.denied].filter(Boolean).join(' · ') || undefined;
 
 /**
  * A step at its gate, beside its line on `nemia ls`: the two things a person can say, as the commands that say them. The send-back goes to

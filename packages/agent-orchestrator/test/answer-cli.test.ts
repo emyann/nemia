@@ -185,3 +185,65 @@ test('REFUSED: --answer to a step that asks no questions, naming --message inste
   );
   assert.deepEqual(asksOf(run.id), [], 'nothing written');
 });
+
+test('`nemia decide` prints a blocked step’s questions numbered, each option lettered on its own line, the recommended one marked, and the `--answer` to give — not the field dumped', async (t) => {
+  const { run, e } = await asking();
+  const screen = await printedBy(t, ['decide', run.id], e);
+  const at = screen.indexOf('    open:');
+  assert.ok(at > 0, screen.join('\n'));
+  assert.deepEqual(screen.slice(at, at + 12), [
+    '    open:',
+    '      1. How is the card cut?',
+    '         It is big.',
+    '         a  one card — All at once.',
+    '         b  two cards — The shape first.  (recommended)',
+    '         c  three — Thin.',
+    '         choose one, or answer in your own words',
+    '      2. Where do the answers go?',
+    '         Either or both.',
+    '         a  retry — Into the next try.',
+    '         b  gate — With the approval.',
+    '         choose one or more, or answer in your own words',
+  ]);
+  assert.ok(!screen.some((l) => l.includes('title: How is the card cut?')), 'the field is not dumped as well');
+  assert.ok(
+    screen.includes(`    to answer it:  nemia retry ${run.id} plan --answer 1=<letter> --answer 2=<letter> [--message "<note>"]`),
+    screen.join('\n'),
+  );
+});
+
+test('`nemia decide` prints a question field that does not decode as any other field, and offers `--message` for it', async (t) => {
+  const { run, e } = await asking({ open: [{ title: 'Half a question' }] });
+  const screen = await printedBy(t, ['decide', run.id], e);
+  assert.ok(screen.includes('    open:'), screen.join('\n'));
+  assert.ok(!screen.some((l) => /^ {6}1\. /.test(l)), screen.join('\n'));
+  assert.ok(screen.includes(`    to answer it:  nemia retry ${run.id} plan --message "<answer>"`), screen.join('\n'));
+});
+
+test('`nemia decide` at a gate whose step asks questions says its gate’s approval with an `--answer` for each, and one that asks none with `--message`', async (t) => {
+  const { run, e } = await asking({ gate: true });
+  const screen = await printedBy(t, ['decide', run.id], e);
+  const form = '--answer 1=<letter> --answer 2=<letter> [--message "<note>"]';
+  assert.ok(
+    screen.some((l) => l.startsWith(`    gate  awaiting approval:  nemia approve ${run.id} plan ${form}  — or send it back:`)),
+    screen.join('\n'),
+  );
+
+  const bare = await asking({ gate: true, open: [] });
+  const plain = await printedBy(t, ['decide', bare.run.id], bare.e);
+  assert.ok(
+    plain.some((l) =>
+      l.startsWith(`    gate  awaiting approval:  nemia approve ${bare.run.id} plan [--message "<words>"]  — or send it back:`),
+    ),
+    plain.join('\n'),
+  );
+});
+
+test('`nemia ls` counts the questions a step waiting on you asks in its note, and says nothing of them for a step that asks none', async (t) => {
+  const { run, e } = await asking();
+  const bare = await asking({ open: [] });
+  const listed = await printedBy(t, ['ls'], e);
+  const planOf = (id: string) => listed.slice(listed.findIndex((l) => l.startsWith(`${id}  `))).find((l) => l.startsWith('   plan '));
+  assert.match(planOf(run.id) ?? '', /^ {3}plan +succeeded · BLOCKED +main +· asks 2 questions$/, listed.join('\n'));
+  assert.match(planOf(bare.run.id) ?? '', /^ {3}plan +succeeded · BLOCKED +main$/, listed.join('\n'));
+});

@@ -319,7 +319,9 @@ test('approvedAnswerText says the answers for the steps after the gate: whose qu
 test('answerText and approvedAnswerText say where the person answered: at the terminal when it says so, on the board by default', () => {
   const answers = [{ question: cut.title, chose: ['a'] }];
   assert.ok(answerText([cut], answers, undefined, 'at the terminal').endsWith('\n\nAnswered by: person, at the terminal'));
-  assert.ok(approvedAnswerText('design', [cut], answers, 'n', 'at the terminal').endsWith('Note: n\n\nAnswered by: person, at the terminal'));
+  assert.ok(
+    approvedAnswerText('design', [cut], answers, 'n', 'at the terminal').endsWith('Note: n\n\nAnswered by: person, at the terminal'),
+  );
   assert.ok(answerText([cut], answers).endsWith('\n\nAnswered by: person, on the board'));
   assert.ok(approvedAnswerText('design', [cut], answers).endsWith('\n\nAnswered by: person, on the board'));
 });

@@ -158,7 +158,7 @@ test('a step that failed: no hue, failed at its end, and its check refusal as th
   assert.deepEqual(card.tag, { word: 'failed its check', color: 'error', variant: 'tonal' });
   assert.equal(card.time?.label, 'Failed');
   assert.equal(card.time?.ink, 'failure');
-  assert.deepEqual(card.note, { text: 'Its check refused it (exit exit 1).', icon: 'fail' });
+  assert.deepEqual(card.note, { text: 'Its check refused it (exit 1).', icon: 'fail' });
 });
 
 test("the agent's last line comes first in the note, before the calls denied", () => {

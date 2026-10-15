@@ -18,6 +18,8 @@ const step = (name: string, status: string, i: number): WaitingRun['steps'][numb
   status,
   note: null,
   roundDue: false,
+  agent: null,
+  since: null,
   needs: null,
   blockedByHarness: false,
   waitingFor: null,

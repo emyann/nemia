@@ -87,11 +87,21 @@ export type RunSummary = {
   tokens: RunTokens | null;
   /**
    * `note` is what the CLI's `ls` prints beside the status — the try or round a step is on, or the one due — and null where it prints
-   * nothing. `roundDue`: whether a looping step's next round is due, which the note words. `needs` and `blockedByHarness` are what a person
-   * has to know to act on it (`StepNeeds`).
+   * nothing. `roundDue`: whether a looping step's next round is due, which the note words. `agent`: the agent the step is given, null for
+   * none; `since`: when its task at work started, null while none runs. `needs` and `blockedByHarness` are what a person has to know to
+   * act on it (`StepNeeds`).
    */
   steps: Array<
-    { name: string; taskId: string | null; branch: string | null; status: string; note: string | null; roundDue: boolean } & StepNeeds
+    {
+      name: string;
+      taskId: string | null;
+      branch: string | null;
+      status: string;
+      note: string | null;
+      roundDue: boolean;
+      agent: string | null;
+      since: string | null;
+    } & StepNeeds
   >;
   /** The steps as a graph, as the run's page has it: the Factory's card draws its flow off it, with no read of the run. */
   graph: RunGraph;
@@ -148,6 +158,8 @@ const RunSummarySchema = Schema.Struct({
         status: Schema.String,
         note: Schema.NullOr(Schema.String),
         roundDue: Schema.Boolean,
+        agent: Schema.NullOr(Schema.String),
+        since: Schema.NullOr(Schema.String),
         ...StepNeedsFields,
       }),
     ),

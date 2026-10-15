@@ -373,6 +373,8 @@ export const summary = (steps: ReadonlyArray<readonly [string, string]>, extra: 
     status,
     note: null,
     roundDue: false,
+    agent: null,
+    since: null,
     needs: null,
     blockedByHarness: false,
     waitingFor: null,

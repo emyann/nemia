@@ -3,13 +3,14 @@ import { paint } from '@/lib/meaning';
 import { cn } from '@/components/ui/ds/utils';
 import { cutPoints, cutShape, type CutSize } from './cut';
 
-/** The hue of a cut frame's edge: what waits on a person, a session at work, or none, a quiet outline. */
-export type FrameHue = 'yours' | 'alive' | 'none';
+/** The hue of a cut frame's edge: what waits on a person, a session at work, what failed, or none, a quiet outline. */
+export type FrameHue = 'yours' | 'alive' | 'failure' | 'none';
 
 /** The colour of a frame's edge, by its hue. */
 const EDGE: Record<FrameHue, string> = {
   yours: paint.yours,
   alive: paint.alive,
+  failure: paint.failure,
   none: 'var(--md-sys-color-outline-variant)',
 };
 
@@ -17,6 +18,7 @@ const EDGE: Record<FrameHue, string> = {
 const GLOW: Record<FrameHue, string | undefined> = {
   yours: `drop-shadow(0 0 10px color-mix(in srgb, ${paint.yours} 26%, transparent))`,
   alive: undefined,
+  failure: undefined,
   none: undefined,
 };
 

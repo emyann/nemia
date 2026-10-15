@@ -163,3 +163,14 @@ export const TableOfSeveralRows: StoryObj = {
 export const TableNarrowerThanItsColumns: StoryObj = {
   render: () => <Framed name="narrow" rows={['the-tool-errors-panels-2e13', 'lay-the-diamond-top-e2e4']} width={390} />,
 };
+
+/** A frame in the hue of what failed: its edge in failure, and no glow. */
+export const Failure: StoryObj = {
+  render: () => (
+    <div data-ground="plain" style={ON_PLAIN}>
+      <CutFrame hue="failure">
+        <div style={EMPTY} />
+      </CutFrame>
+    </div>
+  ),
+};

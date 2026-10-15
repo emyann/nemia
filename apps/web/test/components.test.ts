@@ -7044,3 +7044,79 @@ test('REFUSED: the start of a card that names no factory draws no start form bef
   assert.match(none, /data-no-factory="true"[^>]*>A card starts in a factory, and the store has none yet: file one with /);
   assert.doesNotMatch(none, /<select|<form/);
 });
+
+const { Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceDescription, TraceIcon, TraceLine, TraceTitle } =
+  await import('../src/components/ui/trace.tsx');
+
+/** A line of a trace in `status`, its icon, title and fact. */
+const traceLine = (status?: 'running' | 'error' | 'pending' | 'yours') =>
+  renderToStaticMarkup(
+    createElement(
+      TraceLine,
+      { status },
+      createElement(TraceIcon, null, '*'),
+      createElement(TraceTitle, null, 'Ran ', createElement('code', null, 'npm run lint')),
+      createElement(TraceDescription, null, '14s'),
+    ),
+  );
+
+test("a trace's line says its state in the board's meanings: running alive and shimmering, error failure, pending at rest, yours its own", () => {
+  const done = traceLine();
+  assert.doesNotMatch(done, /data-status=/, 'a line done carries no state');
+  assert.doesNotMatch(done, /shimmer |text-alive|text-failure|border-yours/);
+  const running = traceLine('running');
+  assert.match(running, /data-status="running"/);
+  assert.match(running, /\*:data-\[slot=trace-title\]:shimmer /);
+  assert.match(running, /\*:data-\[slot=trace-title\]:shimmer-color-alive/);
+  assert.match(running, /\*:data-\[slot=trace-icon\]:text-alive/);
+  assert.match(running, /motion-reduce:\*:data-\[slot=trace-title\]:animate-none/, 'still under reduced motion');
+  const error = traceLine('error');
+  assert.match(error, /data-status="error"[^>]*text-failure|text-failure[^>]*data-status="error"/);
+  assert.match(error, /\*:data-\[slot=trace-description\]:text-failure/);
+  const pending = traceLine('pending');
+  assert.match(pending, /text-on-surface-variant/);
+  assert.doesNotMatch(pending, /opacity-/, 'at rest by its ink, never by an opacity');
+  const yours = traceLine('yours');
+  assert.match(yours, /border-l-2 border-yours/);
+  assert.match(yours, /\*:data-\[slot=trace-icon\]:text-yours/);
+  assert.match(traceLine(), /data-slot="trace-description" class="[^"]*font-mono text-body-small/, 'the fact in mono');
+});
+
+/** A step of a trace, open or not, holding `held` under its `kind`. */
+const traceStep = (open: boolean, kind: 'nest' | 'body') =>
+  renderToStaticMarkup(
+    createElement(
+      Trace,
+      null,
+      createElement(
+        TraceCollapsible,
+        { defaultExpanded: open },
+        createElement(TraceCollapsibleTrigger, null, createElement(TraceLine, null, createElement(TraceTitle, null, 'Searched'))),
+        createElement(TraceCollapsibleContent, { kind }, createElement('span', { 'data-held': true }, 'attached.ts:88')),
+      ),
+    ),
+  );
+
+test('a step of a trace draws what it holds only while open, nested on a rule or as a mono body', () => {
+  assert.doesNotMatch(traceStep(false, 'body'), /data-held/, 'a closed step lays out nothing it holds');
+  const body = traceStep(true, 'body');
+  assert.match(body, /data-held/);
+  assert.match(body, /data-kind="body"[^>]*font-mono text-body-small/);
+  assert.match(traceStep(true, 'nest'), /data-kind="nest"[^>]*border-l border-outline-variant/);
+  assert.match(body, /lucide-chevron-right/, 'the chevron that opens it');
+});
+
+const { NemiaFace } = await import('../src/components/NemiaFace.tsx');
+const { UP } = await import('../src/lib/presence.ts');
+
+test("Nemia's face is her blobatar on its plate, dimmed in dark, and wears the expression her presence picks", () => {
+  const up = renderToStaticMarkup(createElement(NemiaFace, { presence: UP }));
+  const waits = renderToStaticMarkup(createElement(NemiaFace, { presence: { ...UP, waitsOnYou: 2, answering: true } }));
+  assert.match(up, /data-agent-face="nemia"/);
+  assert.match(up, /dark:\[&amp;&gt;path\]:opacity-25|dark:\[&>path\]:opacity-25/, 'the plate, dimmed in dark');
+  assert.match(up, /data-nemia-face="idle"/);
+  assert.match(waits, /data-nemia-face="surprised"/);
+  const drawing = (html: string) => html.slice(html.indexOf('<svg'));
+  assert.notEqual(drawing(up), drawing(waits), 'the expression reaches the drawing');
+  assert.equal(drawing(renderToStaticMarkup(createElement(NemiaFace, { presence: UP }))), drawing(up), 'one presence, one drawing');
+});

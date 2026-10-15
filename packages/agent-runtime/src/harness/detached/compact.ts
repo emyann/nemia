@@ -24,14 +24,17 @@ const pidAlive = (pid: number): boolean => {
   }
 };
 
-/** The run files in `dir` and the captures beside them, each by the run's file name less its end. */
+/**
+ * The run files in `dir` and the captures beside them, each by the run's file name less its end: a run's name is kept with no dot
+ * (`safe`), so a `.json` file whose name less its end holds one is another file of a run's.
+ */
 const listed = (dir: string): { runs: Map<string, RunFile>; captures: Map<string, string[]> } => {
   const runs = new Map<string, RunFile>();
   const captures = new Map<string, string[]>();
   for (const f of fs.existsSync(dir) ? fs.readdirSync(dir).sort() : []) {
     const end = CAPTURE_ENDS.find((e) => f.endsWith(e));
     if (end) captures.set(f.slice(0, -end.length), [...(captures.get(f.slice(0, -end.length)) ?? []), f]);
-    if (!f.endsWith('.json') || f.endsWith('.closeout.json') || f.endsWith('.schema.json') || f.endsWith('.mcp.json')) continue;
+    if (!f.endsWith('.json') || f.slice(0, -'.json'.length).includes('.')) continue;
     try {
       const run = runFileIn(readText(path.join(dir, f)));
       if (typeof run !== 'string') runs.set(f.slice(0, -'.json'.length), run);

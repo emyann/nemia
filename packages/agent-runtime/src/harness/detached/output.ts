@@ -248,7 +248,7 @@ const touchedFiles = (cwd: string, { files, denied }: StreamFacts): string[] => 
   return [...new Set(touched)];
 };
 
-/** An assistant's `tool_use` block, written again: its id, its tool, and the input it was called with, or only what a reader reads of it. */
+/** An assistant's `tool_use` block, written again: its id, its tool, and its input whole, or only what a reader reads of it. */
 const callKept = ({ id, name, input }: ToolUse, denied: ReadonlySet<string>): object => {
   if (input === undefined) return { type: 'tool_use', id, name };
   if (denied.has(id)) return { type: 'tool_use', id, name, input };

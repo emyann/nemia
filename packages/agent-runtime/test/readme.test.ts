@@ -37,10 +37,17 @@ const missingFiles = (readme: string, exists: (p: string) => boolean) =>
     (p) => !exists(p),
   );
 
-/** `ae <verb>` uses — at a line's start, after a backtick or a prompt — with no case in the CLI. */
+/** The verbs the CLI's `KEEPING` table holds, by their keys: the slice from its name to the first `};` after it, none without it. */
+const keepingVerbs = (cli: string): string[] => {
+  const at = cli.indexOf('const KEEPING');
+  if (at < 0) return [];
+  return [...cli.slice(at, cli.indexOf('};', at)).matchAll(/^\s*([a-z]+):\s*\w+,?\s*$/gm)].map((m) => m[1]);
+};
+
+/** `ae <verb>` uses — at a line's start, after a backtick or a prompt — with no case in the CLI, nor a key of its `KEEPING`. */
 const unknownVerbs = (readme: string, cli: string) =>
   unique([...readme.matchAll(/(?:^|`|\$ )(?:ae|node bin\/ae\.ts) ([a-z]+)/gm)].map((m) => m[1])).filter(
-    (verb) => !cli.includes(`case '${verb}'`),
+    (verb) => !cli.includes(`case '${verb}'`) && !keepingVerbs(cli).includes(verb),
   );
 
 /** Hand-kept counts of tests or lines: true the day they are written, and never again. */
@@ -64,7 +71,7 @@ test('each check refuses a README that says what the code does not', () => {
     'A brief takes `cwd` and `model`.',
   ].join('\n');
   const code = 'const root = process.env.AE_ROOT;';
-  const cli = "case 'start':";
+  const cli = "case 'start':\nconst KEEPING = {\n  sweep: sweepBodies,\n};\nconst other = {\n  frobnicate: x,\n};";
   assert.deepEqual(unreadEnv(planted, code), ['AE_RUNNER']);
   assert.deepEqual(
     missingFiles(planted, (p) => p === 'src/domain.ts'),
@@ -81,6 +88,8 @@ test('each check refuses a README that says what the code does not', () => {
     'a path into a folder is read whole',
   );
   assert.deepEqual(unknownVerbs(planted, cli), ['frobnicate']);
+  assert.deepEqual(unknownVerbs('`ae sweep`', cli), [], 'a key of the KEEPING table is a verb');
+  assert.deepEqual(unknownVerbs('`ae sweep`', "case 'start':"), ['sweep'], 'and no verb without it');
   assert.deepEqual(counts(planted), ['25 tests', '180 lines']);
   assert.deepEqual(undocumented(planted, ['src/domain.ts', 'src/engine.ts']), ['src/engine.ts']);
   assert.ok(filesIn('test').includes('test/fixtures/decide-corpus.json'), 'the walk goes into folders');

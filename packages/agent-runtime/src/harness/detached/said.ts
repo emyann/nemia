@@ -108,8 +108,8 @@ export const saidOf = (reader: NonNullable<HarnessSpec['readOutput']>, text: str
 
 /**
  * What `keep` keeps of a capture's `text`, which `reader` reads as `read` (read here when not given): `{ kept, read }`, all of it
- * for a capture already kept, and what both read; or why it is left whole (`why`): the reader refuses the whole text, `keep` throws, or the reader reads the
- * kept text otherwise.
+ * for a capture already kept, and what both read; or why it is left whole (`why`): the reader refuses the whole text, `keep`
+ * throws, or the reader reads the kept text otherwise.
  */
 export const keptText = (
   reader: NonNullable<HarnessSpec['readOutput']>,

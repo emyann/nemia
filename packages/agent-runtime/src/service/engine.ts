@@ -363,7 +363,7 @@ export type EngineShape = {
    * Count the captures each harness keeps of its sessions whose worker has ended, with their bytes and what they would keep of the
    * conversation's lines: only what the harness's readers read, as a capture is once its session ends (`RunnerOps.compact`); given
    * `{ yes: true }`, rewrite them so, one at a time, and keep what was read of each anew. Each capture reads the same after as before,
-   * or is left whole and named, as is one at work, one no run file names and one its reader refuses; no journal, no closeout and no
+   * or is left whole and named, as is one at work, one no run file names and one its reader refuses; no journal, no final answer and no
    * other file is written. A harness that keeps every capture whole is not asked. Refused — `CompactRefused`, nothing written — for
    * an argument other than nothing or `{ yes }`.
    */

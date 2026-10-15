@@ -140,7 +140,7 @@ export function StepCard({ facts }: { facts: StepCardFacts }) {
 /** What the card holds inside its frame, top to bottom. */
 function Content({ facts }: { facts: StepCardFacts }) {
   return (
-    <div data-step-card data-step-kind={facts.kind} className="flex flex-col gap-3.5 p-4 text-on-surface">
+    <div data-step-card data-step-name={facts.step} data-step-kind={facts.kind} className="flex flex-col gap-3.5 p-4 text-on-surface">
       <Head facts={facts} />
       <div className="flex flex-wrap items-baseline gap-x-2.5">
         <Label component="span" size="large" className="uppercase">

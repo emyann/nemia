@@ -1,12 +1,12 @@
-import { useState, type KeyboardEvent, type ReactNode } from 'react';
-import { Button } from 'react-aria-components';
+import { useContext, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { Button, PopoverContext } from 'react-aria-components';
 import { useQuery } from '@tanstack/react-query';
 import { BottomSheet, PreviewCard, PreviewTrigger } from '@/components/ui/ds';
 import { agentsQuery, runQuery, type RunSummary } from '@/lib/api';
 import { barSaid } from '@/lib/runWords';
 import type { StepState } from '@/lib/status';
 import { stepCardOf, type StepCardInput } from '@/lib/stepCard';
-import { useSheetPreview } from '@/lib/useSheetPreview';
+import { cardOpened, previewSide, useACardOpen, useSheetPreview, type PreviewSide } from '@/lib/useSheetPreview';
 import { cn, focusRing } from '@/components/ui/ds/utils';
 import { StepCard } from './StepCard';
 
@@ -38,21 +38,49 @@ const intoTheCard = (event: KeyboardEvent): void => {
   if (event.key === 'Tab' && document.activeElement?.closest('[data-slot="preview-card"]')) event.stopPropagation();
 };
 
-/**
- * The preview's gap to its bar: the kit's 8 pixels less the 12 the transparent box keeps around the frame (`p-3`), room for the glow
- * of a frame at a gate, which the box's scroll would otherwise clip; the frame stands 8 pixels from the bar.
- */
-const GLOW_ROOM_OFFSET = -4;
+/** The rail a bar stands in, or null outside one. */
+const railOf = (bar: Element | null | undefined): HTMLElement | null => bar?.closest<HTMLElement>('[data-run-steps]') ?? null;
+
+/** A ref that reads the rail of the bar `bar` holds, or the bar outside a rail, each time it is read. */
+const railRefOf = (bar: { current: Element | null } | undefined): { readonly current: Element | null } =>
+  Object.defineProperty<{ readonly current: Element | null }>({ current: null }, 'current', {
+    get: () => railOf(bar?.current) ?? bar?.current ?? null,
+  });
 
 /**
- * A bar where a pointer hovers and the window has room: the trigger of the kit's preview, whose card stands beside the bar, after it
- * or before it where the window has no room after, so that it keeps the window's whole height and shows its action unscrolled; it
- * gives up its surface to the frame, keeps room around it for its glow, and scrolls only in a window shorter than itself.
+ * Gives the kit's preview card its trigger's popover, positioned by the bar's whole rail rather than the bar, so that the card stands
+ * clear of every bar of the rail and the pointer slides from one bar to the next; and with no entering animation, during which a card
+ * that grows as its run is read is not placed again by its new height, and stays capped to the height its first answer took.
+ */
+function ByTheRail({ children }: { children: ReactNode }) {
+  const context = useContext(PopoverContext) as { triggerRef?: { current: Element | null } } | null;
+  const bar = context?.triggerRef;
+  const rail = useMemo(() => railRefOf(bar), [bar]);
+  return <PopoverContext.Provider value={{ ...context, triggerRef: rail, shouldSkipAnimation: true }}>{children}</PopoverContext.Provider>;
+}
+
+/**
+ * A bar where a pointer hovers and the window has room: the trigger of the kit's preview, whose card stands by the bar's rail
+ * (`previewSide`, read as it opens), clear of its bars, and beside it where the window has room, so that it keeps the window's whole
+ * height and shows its action unscrolled; it gives up its surface to the frame, keeps 12 pixels around it for its glow, and scrolls
+ * only in a window shorter than itself. While another bar's card is open it opens at once (`useACardOpen`), so that a pointer sliding
+ * along a rail opens each card in turn.
  */
 function HoverPreview({ run, step, asOf, children }: { run: RailRun; step: RailStep; asOf: Date; children: ReactNode }) {
+  const id = useId();
+  const bar = useRef<HTMLButtonElement>(null);
+  const [side, setSide] = useState<PreviewSide>('end top');
+  const warm = useACardOpen();
+  useEffect(() => () => cardOpened(id, false), [id]);
+  const opened = (open: boolean): void => {
+    cardOpened(id, open);
+    const rail = railOf(bar.current);
+    if (open && rail) setSide(previewSide(rail.getBoundingClientRect(), innerWidth));
+  };
   return (
-    <PreviewTrigger>
+    <PreviewTrigger delay={warm ? 0 : undefined} onOpenChange={opened}>
       <Button
+        ref={bar}
         aria-label={barSaid(step.name, step.state)}
         data-step-bar={step.name}
         data-step-preview="card"
@@ -61,13 +89,15 @@ function HoverPreview({ run, step, asOf, children }: { run: RailRun; step: RailS
       >
         {children}
       </Button>
-      <PreviewCard
-        placement="end top"
-        offset={GLOW_ROOM_OFFSET}
-        className="max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain rounded-none bg-transparent p-3 shadow-none"
-      >
-        <OpenedCard run={run} step={step.name} asOf={asOf} />
-      </PreviewCard>
+      <ByTheRail>
+        <PreviewCard
+          placement={side}
+          offset={0}
+          className="max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain rounded-none bg-transparent p-3 shadow-none"
+        >
+          <OpenedCard run={run} step={step.name} asOf={asOf} />
+        </PreviewCard>
+      </ByTheRail>
     </PreviewTrigger>
   );
 }

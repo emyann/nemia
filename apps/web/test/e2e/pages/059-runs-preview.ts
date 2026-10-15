@@ -10,59 +10,89 @@ import { OUT } from '../world.ts';
 /** The rail of the table in flight. */
 const FLIGHT = 'section[data-section="in-flight"]';
 
-/** A laptop's window, where a card opened from any bar shows its action whole, with no scroll. */
+/** A laptop's window, where a card opened from any bar stands beside its rail and shows its action whole, with no scroll. */
 const LAPTOP = { width: 1280, height: 800 };
+
+/** A window too narrow for a card beside a waiting card's rail, where the card stands under the rail or over it. */
+const MEDIUM = { width: 1000, height: 800 };
 
 /** Every rail on the page, in flight and in the waiting cards, as the group its bars stand in. */
 const railsOf = (page: Page): Locator =>
   page
-    .locator(`${FLIGHT} [role="group"], section[data-section="waiting"] [role="group"]`)
+    .locator(`${FLIGHT} [data-run-steps], section[data-section="waiting"] [data-run-steps]`)
     .filter({ has: page.locator('button[data-step-bar][data-step-preview="card"]') });
 
-/** Where the action of the card `bar` opened stands: inside the window, inside the preview's box, and how far the box is scrolled. */
-async function actionOf(page: Page, bar: Locator, edge: 'center' | 'end'): Promise<Record<string, unknown>> {
-  await bar.evaluate((found, block) => found.scrollIntoView({ block }), edge);
-  await page.mouse.move(0, 0);
-  await expectCount(previewOf(page), 0, 'no card open before the bar is hovered');
-  await bar.hover();
-  await expectVisible(previewOf(page).locator('[data-step-facts]'), 'the bar opens its card, its run read');
-  await idle(page);
-  return page.locator('[data-slot="preview-card"]').evaluate((box) => {
+/**
+ * What the one open card shows, read beside `rail`: its action inside the window and inside the preview's box, how far the box is
+ * scrolled, whether the box stands inside the window across, and the bars of the rail whose centre the box stands over.
+ */
+const seenBy = (rail: Locator): Promise<Record<string, unknown> & { covered: string[] }> =>
+  rail.evaluate((found) => {
+    const box = document.querySelector('[data-slot="preview-card"]')!;
     const action = box.querySelector('[data-step-action]')!.getBoundingClientRect();
     const own = box.getBoundingClientRect();
+    const covered = [...found.querySelectorAll<HTMLElement>('button[data-step-bar]')].flatMap((bar) => {
+      const rect = bar.getBoundingClientRect();
+      const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+      return hit?.closest('button') === bar ? [] : [bar.getAttribute('data-step-bar')!];
+    });
     return {
       inWindow: action.top >= 0 && action.left >= 0 && action.bottom <= innerHeight && action.right <= innerWidth,
       inBox: action.top >= own.top && action.bottom <= own.bottom && action.left >= own.left && action.right <= own.right,
       scrollTop: box.scrollTop,
+      across: own.left >= 0 && own.right <= innerWidth,
+      covered,
     };
   });
+
+/**
+ * Brings `rail` to the window's `edge`, then slides the pointer from bar to bar of `bars`, never leaving the rail: each bar opens its own
+ * card, read once its run is, which stands over no bar of the rail and inside the window across; where `unscrolled`, its action shows
+ * whole inside the window and the preview, the preview unscrolled. Refuses the first bar that does not, naming the window.
+ */
+async function slideAlong(page: Page, rail: Locator, bars: Locator[], edge: 'center' | 'end', unscrolled: boolean): Promise<void> {
+  const where = JSON.stringify(page.viewportSize());
+  await rail.evaluate((found, block) => found.scrollIntoView({ block }), edge);
+  await page.mouse.move(0, 0);
+  await expectCount(previewOf(page), 0, 'no card open before the pointer comes to the rail');
+  for (const bar of bars) {
+    const [name, said, box] = await Promise.all([bar.getAttribute('data-step-bar'), bar.getAttribute('aria-label'), bar.boundingBox()]);
+    if (!box) throw new Refused(`the bar "${said}" is drawn`);
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 4 });
+    await expectCount(previewOf(page), 1, `in ${where}, the pointer slid onto "${said}" leaves one card open`);
+    await expectVisible(page.locator(`[data-step-card][data-step-name="${name}"] [data-step-facts]`), `"${said}" opens its own card`);
+    await idle(page);
+    const seen = await seenBy(rail);
+    const whole = seen.inWindow && seen.inBox && seen.scrollTop === 0;
+    if (seen.covered.length > 0 || !seen.across || (unscrolled && !whole))
+      throw new Refused(
+        `in ${where}, the card of "${said}" at the window's ${edge} stands clear of its rail, inside the window` +
+          `${unscrolled ? ', its action whole and unscrolled' : ''} — ${JSON.stringify(seen)}`,
+      );
+  }
 }
 
 /**
- * In a laptop's window, the card of the first and the last bar of every rail, each brought to the window's top and to its foot, shows its
- * action whole, inside the window and the preview, the preview unscrolled; the window is put back after.
+ * The pointer slides along every rail, in flight and in the waiting cards, from bar to bar: in a laptop's window, each rail brought to
+ * the window's centre, every bar's card stands clear of the rail and shows its action unscrolled, and so does the last bar's with its
+ * rail at the window's foot; in a medium window, each rail at the centre, every card stands clear of its rail and inside the window
+ * across. The window is put back after.
  */
-async function anActionInSight(page: Page): Promise<void> {
+async function alongEachRail(page: Page): Promise<void> {
   const size = page.viewportSize() ?? LAPTOP;
-  await page.setViewportSize(LAPTOP);
   try {
-    const rails = railsOf(page);
-    const count = await rails.count();
-    if (count < 2) throw new Refused(`rails in flight and in the waiting cards — ${count}`);
-    for (let i = 0; i < count; i += 1) {
-      const bars = rails.nth(i).locator('button[data-step-bar]');
-      for (const [bar, edge] of [
-        [bars.first(), 'center'],
-        [bars.last(), 'center'],
-        [bars.last(), 'end'],
-      ] as const) {
-        const seen = await actionOf(page, bar, edge);
-        if (!seen.inWindow || !seen.inBox || seen.scrollTop !== 0) {
-          const said = await bar.getAttribute('aria-label');
-          throw new Refused(
-            `at 1280×800, the card of "${said}" at the window's ${edge} shows its action unscrolled — ${JSON.stringify(seen)}`,
-          );
-        }
+    for (const [sized, unscrolled] of [
+      [LAPTOP, true],
+      [MEDIUM, false],
+    ] as const) {
+      await page.setViewportSize(sized);
+      await expectCount(page.locator('[data-step-bar][data-step-preview="sheet"]'), 0, 'a wide window opens no sheet');
+      const rails = await railsOf(page).all();
+      if (rails.length < 2) throw new Refused(`rails in flight and in the waiting cards — ${rails.length}`);
+      for (const rail of rails) {
+        const bars = await rail.locator('button[data-step-bar]').all();
+        await slideAlong(page, rail, bars, 'center', unscrolled);
+        if (unscrolled) await slideAlong(page, rail, bars.slice(-1), 'end', unscrolled);
       }
     }
     await page.mouse.move(0, 0);
@@ -313,7 +343,7 @@ export default {
     await byTheKeyboard(page, bar, run, step, want);
     await byThePointer(page, bar, run, step, want);
     await aGateGlows(page);
-    await anActionInSight(page);
+    await alongEachRail(page);
     await inAShortWindow(page, (await aBar(page)).bar);
     await onAPhone(page);
   },

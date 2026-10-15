@@ -302,7 +302,16 @@ const frozenStepFields = {
   check: Schema.optionalKey(Schema.String),
   retries: Schema.optionalKey(Schema.Finite),
   gate: Schema.optionalKey(Schema.Literal(true)),
-  output: Schema.optionalKey(Schema.StructWithRest(Schema.Struct({ file: Schema.String, schema: OutputSchemaSchema }), Rest)),
+  output: Schema.optionalKey(Schema.StructWithRest(Schema.Struct({
+        file: Schema.String,
+        schema: OutputSchemaSchema,
+        owners: Schema.optionalKey(
+          Schema.Record(
+            Schema.String,
+            Schema.Struct({ by: Schema.Literals(['agent', 'step']), name: Schema.String, file: Schema.String }),
+          ),
+        ),
+      }), Rest)),
   tally: Schema.optionalKey(Strings),
   loop: Schema.optionalKey(Schema.String),
   rounds: Schema.optionalKey(Schema.Finite),

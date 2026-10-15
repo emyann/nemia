@@ -299,8 +299,14 @@ export const DEFAULT_ROUNDS = 3;
  */
 export const LOOP_REPLIES = 'replies';
 
-/** A step's declared output: the file as the step names it, and the schema that file held at `nemia start`. */
-export type StepOutput = { file: string; schema: OutputSchema };
+/**
+ * A step's declared output: the file as the step names it (its agent's where the step names none), the schema at `nemia start` — its
+ * agent's fields and its own, merged (`mergedOutput`) — and the one owner of each field, where the step hires an agent.
+ */
+export type StepOutput = { file: string; schema: OutputSchema; owners?: Record<string, OutputOwner> };
+
+/** Who declares a field of a merged output: the agent or the step, by its name and the schema file its `output:` line names. */
+export type OutputOwner = { by: 'agent' | 'step'; name: string; file: string };
 
 /** An output schema, checked strict: an object whose every property is required and nothing else allowed. */
 export type OutputSchema = {

@@ -239,11 +239,19 @@ test('`nemia decide` at a gate whose step asks questions says its gate’s appro
   );
 });
 
-test('`nemia ls` counts the questions a step waiting on you asks in its note, and says nothing of them for a step that asks none', async (t) => {
+test('`nemia ls` counts the questions a step waiting on you asks in its note, and says nothing of them for a step that asks none, nor once it waits on no one', async (t) => {
   const { run, e } = await asking();
   const bare = await asking({ open: [] });
   const listed = await printedBy(t, ['ls'], e);
   const planOf = (id: string) => listed.slice(listed.findIndex((l) => l.startsWith(`${id}  `))).find((l) => l.startsWith('   plan '));
   assert.match(planOf(run.id) ?? '', /^ {3}plan +succeeded · BLOCKED +main +· asks 2 questions$/, listed.join('\n'));
   assert.match(planOf(bare.run.id) ?? '', /^ {3}plan +succeeded · BLOCKED +main$/, listed.join('\n'));
+
+  const gated = await asking({ gate: true });
+  const atGate = await printedBy(t, ['ls'], gated.e);
+  const gateLine = () => atGate.slice(atGate.findIndex((l) => l.startsWith(`${gated.run.id}  `))).find((l) => l.startsWith('   plan '));
+  assert.ok(gateLine()?.includes(' · asks 2 questions'), atGate.join('\n'));
+  await printedBy(t, ['approve', gated.run.id, 'plan', '--answer', '1=a', '--answer', '2=a'], gated.e);
+  atGate.splice(0, atGate.length, ...(await printedBy(t, ['ls'], gated.e)));
+  assert.ok(gateLine() !== undefined && !gateLine()!.includes('asks'), `approved, it waits on no one: ${atGate.join('\n')}`);
 });

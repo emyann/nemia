@@ -54,7 +54,7 @@ type Typed = { n: number; letters: string[]; own?: string };
 /** An `--answer` value read (`1=a`, `2=a,c`, `3=b: words`, `3: words`), or null where it takes no form of them. */
 function typedOf(value: string): Typed | null {
   const m = /^\s*(\d+)\s*(?:=\s*([a-z]+(?:\s*,\s*[a-z]+)*))?\s*(?::([\s\S]*))?$/i.exec(value);
-  if (!m || (m[2] === undefined && m[3] === undefined)) return null;
+  if (!m) return null;
   const own = m[3]?.trim();
   if (m[2] === undefined && !own) return null;
   return { n: Number(m[1]), letters: m[2] ? m[2].split(',').map((l) => l.trim().toLowerCase()) : [], ...(own ? { own } : {}) };

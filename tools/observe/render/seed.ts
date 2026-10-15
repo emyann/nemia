@@ -23,9 +23,18 @@ export type LogSeed = { body: string; ago: number; attributes: Record<string, st
 
 /**
  * A metric of the seed, by the name the code gives it: a `histogram`, a `gauge` (unit `1`), a `total` (a sum that only grows) or a
- * `counter` (any other sum); each series its attributes and the value it reaches, or for a histogram the one value it observes.
+ * `counter` (any other sum); each series its attributes and the value it reaches, or for a histogram the one value it observes; and
+ * `restarted` for a series a daemon births at zero once it holds the store, seeded across a restart of its process.
  */
-export type MetricSeed = { name: string; kind: 'histogram' | 'gauge' | 'total' | 'counter'; series: [Record<string, string>, number][] };
+export type MetricSeed = {
+  name: string;
+  kind: 'histogram' | 'gauge' | 'total' | 'counter';
+  series: [Record<string, string>, number][];
+  restarted?: true;
+};
+
+/** `metric`, seeded across a restart of the daemon (`MetricSeed`'s `restarted`). */
+const restarted = (metric: MetricSeed): MetricSeed => ({ ...metric, restarted: true });
 
 /** What one service says in the seed: its resource's attributes beside its name, its root spans, its logs and its metrics. */
 export type ServiceSeed = {
@@ -225,9 +234,13 @@ const DAEMON: ServiceSeed = {
     { body: 'another run, never shown for the seeded one', ago: 29_000, attributes: { run: OTHER_RUN, step: 'design' } },
   ],
   metrics: [
-    lone('pass.duration', 'histogram', 180),
-    { name: 'pass.phase.duration', kind: 'histogram', series: ['records', 'place', 'assess'].map((phase, i) => [{ phase }, 20 + i * 40]) },
-    lone('pass.journal_reads', 'histogram', 12),
+    restarted(lone('pass.duration', 'histogram', 180)),
+    restarted({
+      name: 'pass.phase.duration',
+      kind: 'histogram',
+      series: ['records', 'place', 'assess'].map((phase, i) => [{ phase }, 20 + i * 40]),
+    }),
+    restarted(lone('pass.journal_reads', 'histogram', 12)),
     lone('store.runs', 'gauge', 24),
     lone('sessions.queued', 'gauge', 2),
     lone('sessions.admitted', 'gauge', 5),
@@ -276,9 +289,9 @@ const DAEMON: ServiceSeed = {
     lone('disk.free', 'gauge', 953_000_000_000),
     lone('disk.size', 'gauge', 1_007_000_000_000),
     lone('feed.followers', 'gauge', 2),
-    lone('feed.follow.beats', 'total', 40),
-    lone('feed.follow.reads', 'total', 12),
-    lone('api.step.follows', 'total', 6),
+    restarted(lone('feed.follow.beats', 'total', 40)),
+    restarted(lone('feed.follow.reads', 'total', 12)),
+    restarted(lone('api.step.follows', 'total', 6)),
     { name: 'api.poll.reads', kind: 'histogram', series: ['/api/runs', '/api/runs/:id'].map((route, i) => [{ route }, 3 + i * 4]) },
     lone('subscription.wakes', 'counter', 9),
     lone('subscription.digests', 'counter', 4),
@@ -419,26 +432,36 @@ function spansOf(span: SpanSeed, now: number, id: (width: number) => string, tra
   return [own, ...(span.children ?? []).flatMap((child) => spansOf(child, now, id, traceId, spanId))];
 }
 
-/** The data points of one metric series, a sample every `POINT_GAP_MS` up to `now`, growing to `value` unless it is a gauge. */
-function pointsOf(kind: MetricSeed['kind'], attributes: Record<string, string>, value: number, now: number): object[] {
-  const began = now - POINTS * POINT_GAP_MS;
+/** The sample at which a restarted series' second process begins, born at zero. */
+const RESTART = Math.floor(POINTS / 2);
+
+/**
+ * The data points of one metric series, a sample every `POINT_GAP_MS` up to `now`, growing to `value` unless it is a gauge; a series
+ * `restarted` grows to it twice, from zero at the first sample and again at `RESTART`, its second process started there.
+ */
+function pointsOf(metric: MetricSeed, attributes: Record<string, string>, value: number, now: number): object[] {
+  const { kind } = metric;
+  const timeOf = (i: number) => now - (POINTS - 1 - i) * POINT_GAP_MS;
   const bucket = BOUNDS.findIndex((bound) => value <= bound);
   return Array.from({ length: POINTS }, (_, i) => {
+    const second = metric.restarted === true && i >= RESTART;
+    const n = second ? i - RESTART : i;
+    const of = metric.restarted === true ? (second ? POINTS - 1 - RESTART : RESTART - 1) : POINTS - 1;
     const at = {
       attributes: listed(attributes),
-      startTimeUnixNano: nanos(began),
-      timeUnixNano: nanos(now - (POINTS - 1 - i) * POINT_GAP_MS),
+      startTimeUnixNano: nanos(second ? timeOf(RESTART) : now - POINTS * POINT_GAP_MS),
+      timeUnixNano: nanos(timeOf(i)),
     };
     if (kind === 'gauge') return { ...at, asDouble: value };
-    if (kind !== 'histogram') return { ...at, asDouble: (value * i) / (POINTS - 1) };
-    const counts = [...BOUNDS, Infinity].map((_, at) => String(at === (bucket < 0 ? BOUNDS.length : bucket) ? i : 0));
-    return { ...at, count: String(i), sum: value * i, bucketCounts: counts, explicitBounds: BOUNDS };
+    if (kind !== 'histogram') return { ...at, asDouble: (value * n) / of };
+    const counts = [...BOUNDS, Infinity].map((_, at) => String(at === (bucket < 0 ? BOUNDS.length : bucket) ? n : 0));
+    return { ...at, count: String(n), sum: value * n, bucketCounts: counts, explicitBounds: BOUNDS };
   });
 }
 
 /** One metric of the seed as OTLP's, stamped against `now`. */
 function metricOf(metric: MetricSeed, now: number): object {
-  const dataPoints = metric.series.flatMap(([attributes, value]) => pointsOf(metric.kind, attributes, value, now));
+  const dataPoints = metric.series.flatMap(([attributes, value]) => pointsOf(metric, attributes, value, now));
   if (metric.kind === 'gauge') return { name: metric.name, unit: '1', gauge: { dataPoints } };
   if (metric.kind === 'histogram') return { name: metric.name, histogram: { aggregationTemporality: 2, dataPoints } };
   return { name: metric.name, sum: { aggregationTemporality: 2, isMonotonic: metric.kind === 'total', dataPoints } };

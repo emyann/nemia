@@ -299,7 +299,7 @@ test('REFUSED: a raw colour in any file of src, a stylesheet and a story include
     'src/routes/z.css': 'a { color: rgb(0 0 0) }\n',
     'src/components/look/A.stories.tsx': "<a style={{ color: '#000' }}>\n",
     'src/components/k.tsx': '<a className="bg-[#123]">\n',
-    'src/components/ui/bubble.tsx': '<a className="bg-[#123]">\n',
+    'src/components/ui/bubble.tsx': '<a className="bg-[#123]">\n<a className="bg-[#fff]">\n',
     'test/x.test.ts': "assert.equal(c, '#fff');\n",
     'src/lib/clean.ts': 'export const a = "bg-card";\n',
   });
@@ -307,6 +307,7 @@ test('REFUSED: a raw colour in any file of src, a stylesheet and a story include
   assert.deepEqual(rawIn(root, kept), [
     'src/components/k.tsx:1:19 (#123)',
     'src/components/look/A.stories.tsx:1:21 (#000)',
+    'src/components/ui/bubble.tsx:2:19 (#fff)',
     'src/components/ui/y.tsx:1:19 (#fff)',
     'src/routes/z.css:1:12 (rgb(0 0 0))',
   ]);

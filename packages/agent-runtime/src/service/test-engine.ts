@@ -142,7 +142,9 @@ const transcriptOf =
     const t = tasks.get(id);
     if (!t) return refuse(unknown(id));
     if (after !== undefined && !isTranscriptCursor(after))
-      return refuse(`\`${after}\` is not a cursor a transcript read gave. Pass the \`cursor\` the last read returned, or none to read from the start.`);
+      return refuse(
+        `\`${after}\` is not a cursor a transcript read gave. Pass the \`cursor\` the last read returned, or none to read from the start.`,
+      );
     const attempts = stateOf(id, t).attempts;
     const named = attemptRefusal(attempts, options.attempt);
     if (named !== undefined) return refuse(named);

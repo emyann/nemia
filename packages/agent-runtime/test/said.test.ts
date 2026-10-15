@@ -12,11 +12,18 @@ import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { detachedOps, type HarnessOutput, type HarnessSpec } from '../src/harness/detached/detached.ts';
-import { claudeResultOutput, claudeStreamOutput } from '../src/harness/detached/output.ts';
+import {
+  claudeResultOutput,
+  claudeStreamKept,
+  claudeStreamOutput,
+  READ_INPUT_KEYS,
+  STREAM_KINDS,
+} from '../src/harness/detached/output.ts';
+import { printedKindOf } from '../src/harness/claude/print.ts';
 import { SAID_DIGEST, SAID_EXTENDED, SAID_VERSION } from '../src/harness/detached/said.ts';
 import { codexOutput } from '../src/harness/codex/stream.ts';
 import { ioCounts } from '../src/core/engine/tally.ts';
-import { FILES_STREAM, READER_STREAMS, resultLine, stream } from './reader-streams.ts';
+import { CONVERSATION_STREAM, FILES_STREAM, READER_STREAMS, resultLine, stream } from './reader-streams.ts';
 import { scratch } from './scratch.ts';
 
 /** A spec of `claude -p`'s stream, whose reads of an output are counted. */
@@ -216,8 +223,8 @@ test('a re-spawn of the same attempt removes what was kept of the last one’s o
   assert.equal((await observe(quiet, dir)).get('ae/s6/1')?.closeout, undefined);
 });
 
-/** What each shipped reader reads of its streams, a refusal in its words, as one digest. */
-const digestOfReaders = (): string => {
+/** What each shipped reader reads of its streams, each stream first given to `kept`, a refusal in its words, as one digest. */
+const digestOfReaders = (kept: (name: string, text: string) => string = (_, text) => text): string => {
   const readers: Record<keyof typeof READER_STREAMS, (text: string) => HarnessOutput> = {
     claudeResultOutput,
     claudeStreamOutput,
@@ -227,7 +234,7 @@ const digestOfReaders = (): string => {
     name,
     streams.map((text) => {
       try {
-        return readers[name as keyof typeof READER_STREAMS](text);
+        return readers[name as keyof typeof READER_STREAMS](kept(name, text));
       } catch (e) {
         return { wrong: e instanceof Error ? e.message : String(e) };
       }
@@ -243,4 +250,105 @@ test('what the shipped readers read is pinned beside SAID_VERSION: a reader that
     'a reader reads otherwise: a kept output of the old reading would be taken for the new. Raise SAID_VERSION in ' +
       '`harness/detached/said.ts`, and record this digest as SAID_DIGEST beside it',
   );
+});
+
+/** A Claude stream as a finished job's capture keeps it (`claudeStreamKept`), or whole where the reader refuses it. */
+const keptOrWhole = (name: string, text: string): string => {
+  if (name === 'codexOutput') return text;
+  try {
+    return claudeStreamKept(text);
+  } catch {
+    return text;
+  }
+};
+
+test('a capture kept to what the readers read reads the same as the whole one, over every stream of the corpus', () => {
+  assert.equal(digestOfReaders(keptOrWhole), SAID_DIGEST, 'a kept capture reads otherwise than its whole stream');
+  const refused = READER_STREAMS.claudeStreamOutput.filter((text) => keptOrWhole('claudeStreamOutput', text) === text);
+  assert.ok(refused.length < READER_STREAMS.claudeStreamOutput.length, 'some streams were cut');
+});
+
+test('a capture kept once is kept the same again', () => {
+  for (const text of [...READER_STREAMS.claudeStreamOutput.map((t) => keptOrWhole('claudeStreamOutput', t)), CONVERSATION_STREAM]) {
+    const once = keptOrWhole('claudeStreamOutput', text);
+    assert.equal(keptOrWhole('claudeStreamOutput', once), once);
+  }
+});
+
+test('a session killed before its result still reads, kept, what it was denied, the call named whole', () => {
+  const killed = CONVERSATION_STREAM.split('\n').slice(0, -2).join('\n');
+  const kept = claudeStreamKept(killed);
+  assert.deepEqual(claudeStreamOutput(kept), claudeStreamOutput(killed));
+  assert.deepEqual(claudeStreamOutput(kept).denials, [{ tool: 'Bash', what: 'git' }]);
+  assert.match(kept, /git push origin main/, 'a denied call keeps its input whole');
+  const lone = [stream.init, stream.denied('toolu_b', 'Bash')].join('\n');
+  assert.deepEqual(claudeStreamOutput(claudeStreamKept(lone)), { denials: [{ tool: 'Bash' }], skills: [] });
+});
+
+/** The ids of the calls a capture says were denied: by a `permission_denied` line or its result's `permission_denials`. */
+const deniedIn = (capture: string): Set<string> => {
+  const ids = new Set<string>();
+  for (const text of capture.split('\n')) {
+    const kind = printedKindOf(text);
+    if (kind === 'system permission_denied') ids.add(JSON.parse(text).tool_use_id);
+    if (kind === 'result') for (const d of JSON.parse(text).permission_denials ?? []) ids.add(d.tool_use_id);
+  }
+  return ids;
+};
+
+/**
+ * What of the conversation a capture keeps that no reader reads, named: a JSON line of a kind no reader reads, an assistant's block
+ * that is no call, an input key no reader reads of a call that was not denied, and a command kept past its first word.
+ */
+const conversationIn = (capture: string): string[] => {
+  const denied = deniedIn(capture);
+  return capture.split('\n').flatMap((text, i): string[] => {
+    const kind = printedKindOf(text);
+    if (kind === undefined) return [];
+    if (kind === 'other' || !STREAM_KINDS.includes(kind)) return [`line ${i + 1}: a ${JSON.parse(text).type} line`];
+    if (kind !== 'assistant') return [];
+    const blocks: { type: string; id?: string; name?: string; input?: Record<string, unknown> }[] = JSON.parse(text).message.content;
+    return blocks.flatMap((b): string[] => {
+      if (b.type !== 'tool_use') return [`line ${i + 1}: a ${b.type} block`];
+      if (denied.has(b.id ?? '')) return [];
+      const keys = Object.keys(b.input ?? {}).filter((k) => k !== READ_INPUT_KEYS[b.name ?? '']);
+      const command = b.name === 'Bash' && typeof b.input?.command === 'string' && /\s/.test(b.input.command.trim());
+      return [...keys.map((k) => `line ${i + 1}: ${b.name}'s ${k}`), ...(command ? [`line ${i + 1}: a whole command`] : [])];
+    });
+  });
+};
+
+test('a kept capture holds nothing of the conversation no reader reads; a capture that does is named', () => {
+  assert.deepEqual(conversationIn(claudeStreamKept(CONVERSATION_STREAM)), []);
+  for (const text of READER_STREAMS.claudeStreamOutput) assert.deepEqual(conversationIn(keptOrWhole('claudeStreamOutput', text)), []);
+  assert.deepEqual(conversationIn(CONVERSATION_STREAM), [
+    'line 2: a stream_event line',
+    'line 3: a stream_event line',
+    'line 4: a thinking block',
+    'line 4: a text block',
+    "line 4: Write's content",
+    "line 4: Edit's old_string",
+    "line 4: Edit's new_string",
+    "line 4: Bash's description",
+    'line 4: a whole command',
+    "line 4: Grep's pattern",
+    "line 4: Grep's path",
+    'line 5: a text block',
+    'line 6: a user line',
+    'line 8: a system line',
+    'line 9: a rate_limit_event line',
+    'line 10: a stream_event line',
+  ]);
+  assert.deepEqual(conversationIn([stream.init, stream.toolResult('x')].join('\n')), ['line 2: a user line']);
+  const written = stream.calls(['toolu_w', 'Write', { file_path: '/w/a.ts', content: 'all of it' }]);
+  assert.deepEqual(conversationIn(written), ["line 1: Write's content"]);
+});
+
+test('a kept capture says what its whole stream says, and keeps the init, the denial, the result and stderr as printed', () => {
+  const kept = claudeStreamKept(CONVERSATION_STREAM);
+  assert.deepEqual(claudeStreamOutput(kept), claudeStreamOutput(CONVERSATION_STREAM));
+  assert.deepEqual(claudeStreamOutput(kept).files, ['a.ts', 'b.ts']);
+  const whole = CONVERSATION_STREAM.split('\n');
+  for (const at of [0, 6, 10, 11, 12]) assert.ok(kept.split('\n').includes(whole[at]), `line ${at + 1} kept as printed`);
+  assert.ok(kept.length < CONVERSATION_STREAM.length, `${kept.length} of ${CONVERSATION_STREAM.length} characters`);
 });

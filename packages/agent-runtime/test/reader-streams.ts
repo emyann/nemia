@@ -146,6 +146,44 @@ export const FILES_STREAM = [
   resultLine({ structured_output: { outcome: 'done' } }),
 ].join('\n');
 
+/**
+ * A session's whole conversation as `claude -p --verbose --include-partial-messages` prints it, outside `READER_STREAMS` so the
+ * digest stays: an `init`, partial messages, an assistant's text and thinking beside calls whose input holds more than a reader
+ * reads, a tool's result, a `system` line of another subtype, a rate limit, a denial and a result.
+ */
+export const CONVERSATION_STREAM = [
+  JSON.stringify({ ...JSON.parse(stream.init), cwd: '/w' }),
+  JSON.stringify({ type: 'stream_event', event: { type: 'message_start', message: { id: 'msg_1' } }, session_id: SESSION }),
+  JSON.stringify({ type: 'stream_event', event: { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'Let' } } }),
+  JSON.stringify({
+    type: 'assistant',
+    session_id: SESSION,
+    message: {
+      id: 'msg_1',
+      role: 'assistant',
+      usage: { input_tokens: 3, output_tokens: 9 },
+      content: [
+        { type: 'thinking', thinking: 'the secret plan', signature: 'sig' },
+        { type: 'text', text: 'Let me write the file.' },
+        { type: 'tool_use', id: 'toolu_c1', name: 'Write', input: { file_path: '/w/a.ts', content: 'export const a = 1;' } },
+        { type: 'tool_use', id: 'toolu_c2', name: 'Edit', input: { file_path: '/w/b.ts', old_string: 'x', new_string: 'y' } },
+        { type: 'tool_use', id: 'toolu_c3', name: 'Bash', input: { command: 'npm test -- --force', description: 'run the tests' } },
+        { type: 'tool_use', id: 'toolu_c4', name: 'Grep', input: { pattern: 'secret', path: '/w' } },
+        { type: 'tool_use', id: 'toolu_c5', name: 'Bash', input: { command: 'git push origin main', description: 'push it' } },
+      ],
+    },
+  }),
+  JSON.stringify({ type: 'assistant', session_id: SESSION, message: { content: [{ type: 'text', text: 'Only words here.' }] } }),
+  stream.toolResult('toolu_c1'),
+  stream.denied('toolu_c5', 'Bash'),
+  JSON.stringify({ type: 'system', subtype: 'compact_boundary', compact_metadata: { trigger: 'auto', pre_tokens: 160000 } }),
+  JSON.stringify({ type: 'rate_limit_event', rate_limit_info: { status: 'allowed' } }),
+  JSON.stringify({ type: 'stream_event', event: { type: 'content_block_stop', index: 0 } }),
+  'a warning on stderr',
+  resultLine({ structured_output: { outcome: 'done' }, total_cost_usd: 0.3, result: 'All done.' }),
+  '',
+].join('\n');
+
 const LONE = [stream.init, stream.denied('toolu_b', 'Bash')].join('\n');
 
 const STREAMS = [

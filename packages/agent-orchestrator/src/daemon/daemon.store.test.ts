@@ -974,6 +974,7 @@ test("`up` births the daemon's series and the caller's at zero and exports them 
     'pass.journal_reads': 0,
     'feed.follow.beats': 0,
     'feed.follow.reads': 0,
+    'feed.follow.lines': 0,
     'test.caller.series': 0,
   };
   assert.equal(DAEMON_SERIES.length + 1, Object.keys(born).length, 'each series the daemon births is one the test reads');

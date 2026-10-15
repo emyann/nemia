@@ -3206,7 +3206,7 @@ written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on 
   route's pattern. A process that does not tick (an api started with `--no-tick`, or beside a `wf up`) has none of the pass's. Once
   `up` holds the store, before its first pass and before `onTaken`, it births at zero and exports so the series a collector reads by
   their increase (`seriesBorn` in `src/telemetry/telemetry.store.ts`): the pass's histograms (`PASS_SERIES`), the feed's
-  `feed.follow.beats` and `feed.follow.reads` (`DAEMON_SERIES` in `src/daemon/up.verb.ts`), and the series its caller hands it
+  `feed.follow.beats`, `feed.follow.reads` and `feed.follow.lines` (`DAEMON_SERIES` in `src/daemon/up.verb.ts`), and the series its caller hands it
   (`UpOptions.series`: the api's `api.step.follows`). `api.poll.reads` is not born: its routes are known only once served.
 - **And metrics of its steps** (`STEP_METRICS`, `recordStepMetrics` in `src/meter/meter.verb.ts`), recorded by the tick once a pass, off
   what each run's full pass already read — no read of the store or the engine of their own. A run's pass takes each of its tasks it

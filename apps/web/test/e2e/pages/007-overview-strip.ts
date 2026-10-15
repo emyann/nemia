@@ -4,7 +4,7 @@ import { photograph, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled } from '../checks.ts';
 import type { Ceilings, Daemon, Factory, FinishedPage, RunSummary } from '../../../src/lib/api.ts';
 import { daemonDot } from '../../../src/lib/footer.ts';
-import { dollars, readoutOf, stripOf } from '../../../src/lib/strip.ts';
+import { dollars, readoutOf, type Strip, stripOf } from '../../../src/lib/strip.ts';
 import { NEIGHBOUR } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
@@ -41,7 +41,7 @@ const stickerOf = (strip: Locator, label: string): Locator =>
     .last();
 
 /** The strip the board's rule gives for the api's own answer, at the page's instant and from the browser's midnight. */
-async function expected(page: Page) {
+async function expected(page: Page, factory?: string) {
   const [runs, factories, ceilings] = await Promise.all([
     answer<RunSummary[]>(page, '/api/runs'),
     answer<Factory[]>(page, '/api/factories'),
@@ -52,7 +52,27 @@ async function expected(page: Page) {
     day.setHours(0, 0, 0, 0);
     return { now: Date.now(), dayStart: day.getTime() };
   });
-  return { strip: stripOf({ runs, factories, ceilings, now, dayStart }), dayStart };
+  return { strip: stripOf({ runs, factories, ceilings, now, dayStart, factory }), dayStart };
+}
+
+/** The factory whose runs name none, read at `?factory=`: it hires no agent, where every factory hires one. */
+const DEFAULT_FACTORY = 'default';
+
+/** The agents' count as the strip says it: `1 OF 2`, the count alone with no total. */
+const agentsSaid = ({ agents }: Strip): string => `${agents.count}${agents.hired === null ? '' : ` OF ${agents.hired}`}`;
+
+/** That each of the six stickers reads what `want` says. */
+async function expectStickers(strip: Locator, want: Strip): Promise<void> {
+  const stickers: Array<[string, string]> = [
+    ['Wait on you', String(want.waitsOnYou)],
+    ['In flight', String(want.inFlight)],
+    ['Landed', String(want.landed)],
+    ['Spent', dollars(want.spentUsd)],
+    ['Per landing', dollars(want.perLanding)],
+    ['Failed', String(want.failed)],
+  ];
+  for (const [label, value] of stickers)
+    await expectTexts(stickerOf(strip, label), [value], `the ${label} sticker reads the rule's ${value}`);
 }
 
 /** That the three frames' tops stand on one line, and the six stickers on one line: the row did not wrap. */
@@ -91,7 +111,8 @@ export default {
    * number is the board's rule (`stripOf`) of the api's own answer, from the browser's midnight; Landed and Failed are the finished
    * page's today too, the api's own words for how a run ended. The readout reads the caps, the daemon's tag says what the api judged
    * of it (none ticks the e2e's store), each agent's row says the agent, its step and the run's title, cut short, never wrapped, and the
-   * quota, past its mark in the seed, says so. On a phone the frames stack, one under the other.
+   * quota, past its mark in the seed, says so. On a phone the frames stack, one under the other. At `?factory=default` the strip
+   * counts that factory's runs alone, and its agents against those of its own.
    */
   name: 'overview-strip',
   route: '/',
@@ -103,16 +124,7 @@ export default {
       const strip = page.locator('[data-overview-strip]');
       await expectVisible(strip, 'the Overview opens on its strip');
       const { strip: want, dayStart } = await expected(page);
-      const stickers: Array<[string, string]> = [
-        ['Wait on you', String(want.waitsOnYou)],
-        ['In flight', String(want.inFlight)],
-        ['Landed', String(want.landed)],
-        ['Spent', dollars(want.spentUsd)],
-        ['Per landing', dollars(want.perLanding)],
-        ['Failed', String(want.failed)],
-      ];
-      for (const [label, value] of stickers)
-        await expectTexts(stickerOf(strip, label), [value], `the ${label} sticker reads the rule's ${value}`);
+      await expectStickers(strip, want);
       const finished = await answer<FinishedPage>(page, '/api/runs-finished?size=100');
       const today = finished.runs.filter((run) => Date.parse(run.finishedAt) >= dayStart);
       const said = (outcome: string) => today.filter((run) => run.outcome === outcome).length;
@@ -121,8 +133,7 @@ export default {
       await expectTexts(strip.locator('[data-strip-readout]'), [readoutOf(want)], 'the readout says what is at work against the caps');
       const dot = daemonDot(await answer<Daemon>(page, '/api/daemon'), null, new Date());
       await expectTexts(strip.locator('[data-strip-daemon]'), [dot.word], "the daemon's tag says what the api judged of it");
-      const hired = want.agents.hired === null ? '' : ` OF ${want.agents.hired}`;
-      await expectTexts(strip.locator('[data-strip-agents]'), [`${want.agents.count}${hired}`], 'the agents at work, of those hired');
+      await expectTexts(strip.locator('[data-strip-agents]'), [agentsSaid(want)], 'the agents at work, of those of the factories');
       if (!want.rows.some((row) => row.agent === NEIGHBOUR.agent))
         throw new Refused(`the seed's ${NEIGHBOUR.agent} is at work in ${NEIGHBOUR.id}, for its row to be read`);
       await expectTexts(
@@ -141,6 +152,14 @@ export default {
       await expectStacked(strip);
       await settled(page);
       await photograph(page, path.join(OUT, `overview-strip-phone-${await themeOf(page)}.png`), { fullPage: true });
+      await page.setViewportSize(WIDE);
+      await page.goto(new URL(`/?factory=${DEFAULT_FACTORY}`, page.url()).href);
+      await idle(page);
+      const { strip: theirs } = await expected(page, DEFAULT_FACTORY);
+      if (agentsSaid(theirs) === agentsSaid(want))
+        throw new Refused(`the default factory's strip differs from every factory's, for its scope to be read: both ${agentsSaid(want)}`);
+      await expectStickers(strip, theirs);
+      await expectTexts(strip.locator('[data-strip-agents]'), [agentsSaid(theirs)], "the default factory's agents, of those of its own");
     } finally {
       if (size) await page.setViewportSize(size);
     }

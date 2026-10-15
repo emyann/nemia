@@ -132,6 +132,9 @@ test('a run that waits on a person counts in Wait on you alone, one that moves a
 
 test("Spent is every run worked today, whole, a cost not measured counting nothing; A landing is '—' before the first", () => {
   assert.equal(strip().spentUsd, 6 + 3 + 1 + 5 + 2 + 7 + 4, "each run worked or stopped today, never yesterday's landing");
+  const idleSinceYesterday = ended('r-idle', 'awaiting approval', DAY - 30 * MIN, 50, { waitingOnYou: ['plan'] });
+  const quiet = stripOf({ runs: [idleSinceYesterday], factories: [], ceilings: undefined, now: NOW, dayStart: DAY });
+  assert.deepEqual([quiet.waitsOnYou, quiet.spentUsd], [1, 0], 'an open run not worked since midnight spends nothing today');
   assert.equal(dollars(null), '—');
   assert.equal(dollars(7.851), '$7.85', 'to the cent below $10');
   assert.equal(dollars(12.684), '$13', 'whole from $10, so a sticker stays as narrow');
@@ -152,7 +155,16 @@ test('the agents at work are counted once each against those hired in view, thei
     s.rows.map((r) => `${r.agent} · ${r.step} · ${r.title} ${r.atWork}`),
     ['ada · implement · The kit batch 17m', 'otto · land · The runs page 9m', 'ada · review · The kit batch 5m'],
   );
-  assert.equal(strip('default').agents.hired, null, 'none hired in the default factory');
+  assert.deepEqual(strip('default').agents, { count: 1, hired: 1 }, 'none hired in the default factory, and ada at work there');
+});
+
+test('an agent at work that no factory in view hires counts in the total too, so the count is never past it', () => {
+  const kit = (hires: Record<string, string>) =>
+    stripOf({ runs: [flying, kitFlying], factories: [factory('kit', hires)], ceilings: undefined, now: NOW, dayStart: DAY });
+  assert.deepEqual(kit({ 'build/land': 'otto' }).agents, { count: 2, hired: 2 }, 'ada at work by its step file, otto hired');
+  assert.deepEqual(kit({ 'build/land': 'otto', 'build/plan': 'iris' }).agents, { count: 2, hired: 3 }, 'and iris hired, idle');
+  const idle = stripOf({ runs: [], factories: [factory('kit', {})], ceilings: undefined, now: NOW, dayStart: DAY });
+  assert.equal(idle.agents.hired, null, 'no agent hired and none at work: no total');
 });
 
 test('three rows are shown, and the rest said as how many more', () => {

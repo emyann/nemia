@@ -18,8 +18,9 @@ export type AgentRow = { agent: string; step: string; run: string; title: string
  * The strip's numbers. `waitsOnYou` and `inFlight` are the open runs, a run that waits on a person counted with the waiting alone;
  * `landed` and `failed` the runs whose work stopped since the day began; `spentUsd` what every run worked today cost, whole;
  * `perLanding` the mean cost of a landing today whose cost was measured, null before the first. `runs` and `sessions` are at work against
- * their caps, null where the machine has none. `agents` are the agents at work against those hired in the factories in view, `hired` null
- * where none is; `rows` the steps at work, longest first, the first `ROWS_SHOWN`, and `more` how many are left out.
+ * their caps, null where the machine has none. `agents` are the agents at work against the agents of the factories in view
+ * (`agentsOf`), `hired` null where there are none; `rows` the steps at work, longest first, the first `ROWS_SHOWN`, and `more` how many
+ * are left out.
  */
 export type Strip = {
   waitsOnYou: number;
@@ -81,10 +82,18 @@ const usdOf = (run: RunSummary): number => run.cost?.usd ?? 0;
 const workedToday = (run: RunSummary, dayStart: number): boolean =>
   Boolean(run.atWork?.since) || (run.atWork?.endedAt != null && Date.parse(run.atWork.endedAt) >= dayStart);
 
-/** The distinct agents hired in the factories in view, every factory where none is; null where none is hired. */
-const hiredIn = (factories: readonly Factory[], factory: string | undefined): number | null => {
-  const names = new Set(factories.filter((f) => factory === undefined || f.name === factory).flatMap((f) => Object.values(f.hires)));
-  return names.size || null;
+/** The agents hired in the factories in view, every factory where none is. */
+const hiredIn = (factories: readonly Factory[], factory: string | undefined): Set<string> =>
+  new Set(factories.filter((f) => factory === undefined || f.name === factory).flatMap((f) => Object.values(f.hires)));
+
+/**
+ * The agents at work, each once, against the agents of the factories in view: those hired there, and one at work there that its step's
+ * own file names, so the count is never past its total. The total is null where there are none.
+ */
+const agentsOf = (rows: readonly AgentRow[], hired: ReadonlySet<string>): Strip['agents'] => {
+  const atWork = new Set(rows.map((row) => row.agent));
+  const all = new Set([...hired, ...atWork]);
+  return { count: atWork.size, hired: all.size || null };
 };
 
 /** Whether a step of `run` is at work: a session working or the run's check of it, as the board draws its state (`stepState`). */
@@ -132,7 +141,7 @@ export function stripOf(given: StripIn): Strip {
     perLanding: priced.length ? priced.reduce((sum, run) => sum + usdOf(run), 0) / priced.length : null,
     runs: { count: flying.length, cap: capOf(given.ceilings?.cap) },
     sessions: { count: sessionsOf(open), cap: capOf(given.ceilings?.last?.sessions) },
-    agents: { count: new Set(rows.map((row) => row.agent)).size, hired: hiredIn(given.factories, given.factory) },
+    agents: agentsOf(rows, hiredIn(given.factories, given.factory)),
     rows: rows.slice(0, ROWS_SHOWN),
     more: Math.max(0, rows.length - ROWS_SHOWN),
   };

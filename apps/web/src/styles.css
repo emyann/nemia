@@ -203,11 +203,6 @@
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -283,11 +278,6 @@
   --border: var(--md-sys-color-outline-variant);
   --input: var(--md-sys-color-outline);
   --ring: var(--md-sys-color-secondary);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
   --radius: 0.625rem;
   --sidebar: var(--md-sys-color-surface-container-low);
   --sidebar-foreground: var(--md-sys-color-on-surface);
@@ -298,16 +288,6 @@
   --sidebar-border: var(--md-sys-color-outline-variant);
   --sidebar-ring: var(--md-sys-color-secondary);
   --destructive-foreground: var(--md-sys-color-on-error);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-  }
 }
 
 /*

@@ -226,6 +226,16 @@ test(
 );
 
 /**
+ * Whether a `fetch` made with `args` asks for a subscription, on either binding: REST's `:subscribe`, or JSON-RPC's `SubscribeToTask`.
+ * Counted where the client makes it, a request given up before the server reads it included.
+ */
+const subscribes = ([input, init]: unknown[]): boolean => {
+  const url = input instanceof Request ? input.url : String(input);
+  const body = (init as RequestInit | undefined)?.body;
+  return new URL(url).pathname.endsWith(':subscribe') || (typeof body === 'string' && body.includes('"SubscribeToTask"'));
+};
+
+/**
  * The remote harness's ops on `s`, its bounds made short, and a session `name` spawned on it. The agent is given its card, read
  * once here with no bound, so no read of it is held to `requestMs`; the spawn waits for the send's answer unless `o` says otherwise.
  */
@@ -317,6 +327,7 @@ test(
     const s = await serve();
     const ops = await opsOn(s, 'ae/quiet/1', { quietMs: 100 });
     s.subscriptions.mute = true;
+    const made = t.mock.method(globalThis, 'fetch');
     const got: Followed[] = [];
     const ended = drained(ops.follow!('ae/quiet/1'), got);
     await holds(t, got, 1);
@@ -325,7 +336,7 @@ test(
     s.move(s.tasks()[0], { state: 'completed', words: 'done' });
     assert.ok(Exit.isSuccess(await ended), 'silence is no drop: the follow ends as the session does');
     assert.deepEqual(shown(got), ['state working', 'events assistant "reading"', 'events assistant "done"', 'state completed']);
-    assert.ok((s.counts.resubscribe ?? 0) >= 2, 'subscribed again after each silence');
+    assert.ok(made.mock.calls.filter((call) => subscribes(call.arguments)).length >= 2, 'subscribed again after each silence');
   },
 );
 

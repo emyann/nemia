@@ -47,6 +47,15 @@ export const FEED_FOLLOW_READS = Metric.counter('feed.follow.reads', {
   incremental: true,
 });
 
+/**
+ * The lines the live readers handed on, as each leaves its reader (`followFeed`): from its first read, from the hub and from a later read
+ * alike. A beat, a failed read and an item already handed are no line.
+ */
+export const FEED_FOLLOW_LINES = Metric.counter('feed.follow.lines', {
+  description: 'the lines of the workflow feed its live readers handed on',
+  incremental: true,
+});
+
 /** Logs one line of the feed at Info, annotated with its run and its step when it names one, or its daemon's pid, and its word. */
 const logged = (line: FeedLine): Effect.Effect<void> =>
   Effect.logInfo(feedSaidWords(line)).pipe(
@@ -163,7 +172,8 @@ const wakeAll = (at: Following, taken: NonEmptyReadonlyArray<FeedPublished | und
  * file from the cursor (`readOn`); and only then is counted in `FEED_FOLLOWERS`, so a reader counted is one that will be handed every line
  * from then on. It then wakes on each item of the hub and on each `beat`, the first a beat after it opened (`wake`). The beat brings every
  * line no item did: one the sliding hub dropped while the reader lagged and none came after, one another process wrote (a `nemia tick` by
- * hand), and every line where the process has no hub. The subscription and the count are held in the stream's scope.
+ * hand), and every line where the process has no hub. The subscription and the count are held in the stream's scope. Each line is
+ * counted as it is handed on (`FEED_FOLLOW_LINES`), its chunk kept whole.
  *
  * Fails with the refusal of a cursor the feed cannot be read from (exit 2): not a whole number, inside a line, or past the end — a feed
  * cut under the cursor, truncated below it or replaced, whether before the stream opens or while it is open.
@@ -182,6 +192,10 @@ export const followFeed = (from: number, { beat = '1 second' }: { beat?: Duratio
         Stream.map(() => undefined),
       );
       const live = Stream.merge(published, beats).pipe(Stream.mapAccumArrayEffect((): Following => following, wakeAll));
-      return Stream.concat(Stream.fromIterable(caught), live);
+      return Stream.concat(Stream.fromIterable(caught), live).pipe(
+        Stream.mapArrayEffect((chunk) =>
+          Metric.update(FEED_FOLLOW_LINES, chunk.filter((f) => f.kind === 'line').length).pipe(Effect.as(chunk)),
+        ),
+      );
     }),
   );

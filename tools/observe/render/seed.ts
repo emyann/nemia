@@ -291,6 +291,7 @@ const DAEMON: ServiceSeed = {
     lone('feed.followers', 'gauge', 2),
     restarted(lone('feed.follow.beats', 'total', 40)),
     restarted(lone('feed.follow.reads', 'total', 12)),
+    restarted(lone('feed.follow.lines', 'total', 20)),
     restarted(lone('api.step.follows', 'total', 6)),
     { name: 'api.poll.reads', kind: 'histogram', series: ['/api/runs', '/api/runs/:id'].map((route, i) => [{ route }, 3 + i * 4]) },
     lone('subscription.wakes', 'counter', 9),

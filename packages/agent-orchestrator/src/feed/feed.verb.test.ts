@@ -20,7 +20,7 @@ const ROOT = scratch('wf-feed-verb-');
 const FEED = path.join(ROOT, 'feed.jsonl');
 
 process.env.WF_ROOT = ROOT;
-const { emitFeed, FEED_FOLLOW_BEATS, FEED_FOLLOW_READS, FEED_FOLLOWERS, FeedHub, feedHubLayer, followFeed } =
+const { emitFeed, FEED_FOLLOW_BEATS, FEED_FOLLOW_LINES, FEED_FOLLOW_READS, FEED_FOLLOWERS, FeedHub, feedHubLayer, followFeed } =
   await import('./feed.verb.ts');
 const { feedSize } = await import('./feed.store.ts');
 
@@ -50,15 +50,15 @@ const followers = () => Effect.runSync(Metric.value(FEED_FOLLOWERS)).value;
 const read = (t: TestContext, ok: () => boolean, what: string) => until(t, ok, what, { everyMs: 5 });
 
 /**
- * A reader from the feed's end on `rt`, each item it is handed kept in `got`, counted once it holds its cursor: stopped once the test `t`
- * ends, and no longer counted. `handed(ok, what)` waits until `ok()` holds, asked as each item is handed.
+ * A reader from `from` on `rt`, the feed's end by default, each item it is handed kept in `got`, counted once it holds its cursor: stopped
+ * once the test `t` ends, and no longer counted. `handed(ok, what)` waits until `ok()` holds, asked as each item is handed.
  */
-async function following(t: TestContext, rt: ReturnType<typeof hubbed>, beat: Duration.Input) {
+async function following(t: TestContext, rt: ReturnType<typeof hubbed>, beat: Duration.Input, from = feedSize()) {
   const got: Followed[] = [];
   const pushed = bell();
   const was = followers();
   const fiber = rt.runFork(
-    Stream.runForEach(followFeed(feedSize(), { beat }), (f) =>
+    Stream.runForEach(followFeed(from, { beat }), (f) =>
       Effect.sync(() => {
         got.push(f);
         pushed.ring();
@@ -125,6 +125,32 @@ test(
 );
 
 test(
+  'REFUSED: a reader counts each line it hands on, from its first read, from the hub and from a later read, and nothing else',
+  WAITED,
+  async (t) => {
+    const rt = hubbed(t);
+    const from = feedSize();
+    await foreign('caught');
+    const lines = counted(FEED_FOLLOW_LINES);
+    const reader = await following(t, rt, '5 millis', from);
+    await reader.handed(() => reader.words().length >= 1, 'the line before it opened handed');
+    assert.equal(counted(FEED_FOLLOW_LINES) - lines, 1, 'the line of its first read');
+
+    await rt.runPromise(emitFeed(judged('a pass', 'build')));
+    await reader.handed(() => reader.words().length >= 3, "the pass's two lines handed");
+    assert.equal(counted(FEED_FOLLOW_LINES) - lines, 3, 'the two lines of one item of the hub');
+
+    await foreign('theirs');
+    rt.runSync(Effect.forEach(['one', 'two'], (word) => emitFeed(judged(word))));
+    await reader.handed(() => reader.words().length >= 6, 'the three lines after it handed');
+    const beats = counted(FEED_FOLLOW_BEATS);
+    await read(t, () => counted(FEED_FOLLOW_BEATS) >= beats + 3, 'three beats on a feed that did not move');
+    assert.deepEqual(reader.words(), ['caught', 'a pass', 'a pass', 'theirs', 'one', 'two']);
+    assert.equal(counted(FEED_FOLLOW_LINES) - lines, 6, 'each line once: an item a read handed already, and a beat, count nothing');
+  },
+);
+
+test(
   "a line another process wrote is read from the file before the next line the hub brings, as the item's bytes are past the cursor",
   WAITED,
   async (t) => {
@@ -178,8 +204,10 @@ test(
       'a beat that cannot stat the feed reads it, and the read fails',
     );
 
+    const lines = counted(FEED_FOLLOW_LINES);
     await rt.runPromise(emitFeed(judged('after a failed read')));
     await reader.handed(() => reader.words().length >= 1, 'the line handed');
+    assert.equal(counted(FEED_FOLLOW_LINES) - lines, 1, '`readable` is no line handed on');
     assert.deepEqual(
       reader.got.map((f) => f.kind),
       ['unreadable', 'readable', 'line'],

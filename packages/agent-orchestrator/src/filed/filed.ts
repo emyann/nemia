@@ -1,4 +1,5 @@
 /** The configuration a step's task is filed with, built in one place for its first filing, a try, a round, and the asks before them. */
+import path from 'node:path';
 import { modeOf, sessionContext, type Workflow } from '../workflow.ts';
 import { isFolderTeam, sandboxed } from '../workflow/index.ts';
 import { filedAllows, filedDenies } from '../ending/ending.ts';
@@ -16,7 +17,8 @@ import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
  * writable where the step's `writable:` names one (`stepMounts`), then the folders its brief names beside them (`filedFolders`): the
  * artifacts folder of each step it comes after, read-only, then the store's folders its `reads:` names, read-only, the inbox at `t.inbox`,
  * then the run's inputs folder at `t.inputs`, read-only, given only for a run given inputs; the key left out with none, the servers of
- * the checkout its sessions load (`checkoutMcpOf`), and the harness's own arguments (`own`) last. The runtime judges no budget:
+ * the checkout its sessions load (`checkoutMcpOf`), the step's files directory in its session's environment (`stepFilesEnv`), and the
+ * harness's own arguments (`own`) last. The runtime judges no budget:
  * `budgetUsd` is the harness's own cap, and whether the step went over is this package's (`ownStatus`). Pure.
  */
 export const filedConfig = <Own extends object>(
@@ -44,8 +46,22 @@ export const filedConfig = <Own extends object>(
   budgetUsd: t.budgetUsd,
   ...mountsOf([...(stepMounts(step, run.mounts) ?? []), ...folders(filedFolders(step, steps, t))]),
   ...checkoutMcpOf(step),
+  ...stepFilesEnv(step, t.runArtifacts),
   ...t.own,
 });
+
+/**
+ * The variable a step's session finds its files directory in: the run's artifacts folder of the step (`artifactsDir`), outside every
+ * workspace, where a file it or a process it starts writes is kept with the run and named in its closeout by its absolute path.
+ */
+export const STEP_FILES = 'WF_STEP_FILES';
+
+/**
+ * A step's session's own environment: its files directory under `runArtifacts` as `STEP_FILES`. None for a background session, whose
+ * process ignores its asker's environment and is refused one.
+ */
+const stepFilesEnv = (step: Pick<Workflow, 'name' | 'background'>, runArtifacts: string): { env?: Record<string, string> } =>
+  step.background ? {} : { env: { [STEP_FILES]: path.join(runArtifacts, step.name) } };
 
 /**
  * The folders a step is filed with beyond its factory's, each read-only: those the steps before it handed over, then the store's, then

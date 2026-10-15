@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Button } from 'react-aria-components';
 import { useQuery } from '@tanstack/react-query';
 import { BottomSheet, PreviewCard, PreviewTrigger } from '@/components/ui/ds';
@@ -30,14 +30,28 @@ function OpenedCard({ run, step, asOf }: { run: RailRun; step: string; asOf: Dat
   return <StepCard facts={stepCardOf(input)} />;
 }
 
-/** A bar where a pointer hovers and the window has room: the trigger of the kit's preview, whose card gives up its surface to the frame. */
+/**
+ * Ends a Tab on the bar that the preview has already moved into its card, so the grid the bar stands in (the table in flight), which
+ * takes Tab as leaving the grid, does not move the focus back out of the card.
+ */
+const intoTheCard = (event: KeyboardEvent): void => {
+  if (event.key === 'Tab' && document.activeElement?.closest('[data-slot="preview-card"]')) event.stopPropagation();
+};
+
+/**
+ * A bar where a pointer hovers and the window has room: the trigger of the kit's preview, whose card gives up its surface to the frame
+ * and scrolls within the height the window leaves it.
+ */
 function HoverPreview({ run, step, asOf, children }: { run: RailRun; step: RailStep; asOf: Date; children: ReactNode }) {
   return (
     <PreviewTrigger>
-      <Button aria-label={barSaid(step.name, step.state)} data-step-bar={step.name} className={BAR_BUTTON}>
+      <Button aria-label={barSaid(step.name, step.state)} data-step-bar={step.name} className={BAR_BUTTON} onKeyDown={intoTheCard}>
         {children}
       </Button>
-      <PreviewCard placement="bottom start" className="max-w-[calc(100vw-2rem)] rounded-none bg-transparent p-0 shadow-none">
+      <PreviewCard
+        placement="bottom start"
+        className="max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain rounded-none bg-transparent p-0 shadow-none"
+      >
         <OpenedCard run={run} step={step.name} asOf={asOf} />
       </PreviewCard>
     </PreviewTrigger>

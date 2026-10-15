@@ -75,23 +75,46 @@ const previewOf = (page: Page): Locator => page.locator('[data-slot="preview-car
 const focusedOn = (bar: Locator): Promise<boolean> => bar.evaluate((found) => found === document.activeElement);
 
 /**
- * By the keyboard: the row in flight takes the focus, as the table's arrows move it, and Right walks it along the row's controls to
- * the bar; the card opens, reading what the api says of the step.
+ * That `press` on the card's action opens the step's page, which is left once its session's stream is open, every read before it
+ * answered, for the runs page again.
  */
-async function byTheKeyboard(page: Page, bar: Locator, run: string, want: StepCardFacts): Promise<void> {
-  await page.locator(`${FLIGHT} tr[data-run="${run}"]`).focus();
-  for (let step = 0; step < 12 && !(await focusedOn(bar)); step += 1) await page.keyboard.press('ArrowRight');
-  if (!(await focusedOn(bar))) throw new Refused("the table's arrows reach the bar along its row");
-  await expectVisible(previewOf(page), 'a bar the keyboard focuses opens its step card');
-  await readsAsExpected(previewOf(page), want, 'by the keyboard');
-  await page.keyboard.press('Escape');
-  await expectCount(previewOf(page), 0, 'Escape closes the preview');
+async function followed(page: Page, run: string, step: string, press: () => Promise<void>): Promise<void> {
+  const streaming = page.waitForRequest((request) => request.url().includes('/transcript/stream'));
+  await press();
+  const at = `/runs/${encodeURIComponent(run)}/steps/${encodeURIComponent(step)}`;
+  await expectNone(async () => (new URL(page.url()).pathname === at ? null : page.url()), `the action opens ${at}`);
+  await streaming;
+  await page.goto(new URL('/runs', page.url()).href, { waitUntil: 'load' });
+  await idle(page);
 }
 
 /**
- * By the pointer: hovering the bar opens the card, which stays while the pointer moves onto it, and its action opens the step's page,
- * left once its session's stream is open, every read before it answered.
+ * By the keyboard: the row in flight takes the focus, as the table's arrows move it, and Right walks it along the row's controls to
+ * the bar; the card opens, reading what the api says of the step; Tab moves into it, to its action, and Enter on the action opens
+ * the step's page. Escape on the bar closes it.
  */
+async function byTheKeyboard(page: Page, bar: Locator, run: string, step: string, want: StepCardFacts): Promise<void> {
+  const reach = async () => {
+    await page.locator(`${FLIGHT} tr[data-run="${run}"]`).focus();
+    for (let at = 0; at < 12 && !(await focusedOn(bar)); at += 1) await page.keyboard.press('ArrowRight');
+    if (!(await focusedOn(bar))) throw new Refused("the table's arrows reach the bar along its row");
+    await expectVisible(previewOf(page), 'a bar the keyboard focuses opens its step card');
+  };
+  await reach();
+  await readsAsExpected(previewOf(page), want, 'by the keyboard');
+  await page.keyboard.press('Escape');
+  await expectCount(previewOf(page), 0, 'Escape closes the preview');
+  await reach();
+  await page.keyboard.press('Tab');
+  const action = previewOf(page).locator('[data-step-action]');
+  await expectNone(
+    async () => ((await focusedOn(action)) ? null : 'focus is elsewhere'),
+    'Tab from the bar moves into the card, to its action',
+  );
+  await followed(page, run, step, () => page.keyboard.press('Enter'));
+}
+
+/** By the pointer: hovering the bar opens the card, which stays while the pointer moves onto it, and its action opens the step's page. */
 async function byThePointer(page: Page, bar: Locator, run: string, step: string, want: StepCardFacts): Promise<void> {
   await page.mouse.move(0, 0);
   await bar.hover();
@@ -100,13 +123,48 @@ async function byThePointer(page: Page, bar: Locator, run: string, step: string,
   await photographCard(page, 'card');
   const action = previewOf(page).locator('[data-step-action]');
   await action.hover();
-  const streaming = page.waitForRequest((request) => request.url().includes('/transcript/stream'));
-  await action.click();
-  const at = `/runs/${encodeURIComponent(run)}/steps/${encodeURIComponent(step)}`;
-  await expectNone(async () => (new URL(page.url()).pathname === at ? null : page.url()), `the action opens ${at}`);
-  await streaming;
-  await page.goto(new URL('/runs', page.url()).href, { waitUntil: 'load' });
-  await idle(page);
+  await followed(page, run, step, () => action.click());
+}
+
+/** A window too short for the card on either side of a bar: 1280 wide, 420 tall. */
+const SHORT = { width: 1280, height: 420 };
+
+/**
+ * In a window too short for the card on either side of its bar: the card stays inside the window and scrolls within itself, so its
+ * action is brought into view with the preview still open.
+ */
+async function inAShortWindow(page: Page, bar: Locator): Promise<void> {
+  const size = page.viewportSize() ?? { width: 1280, height: 800 };
+  await page.setViewportSize(SHORT);
+  try {
+    await bar.evaluate((found) => found.scrollIntoView({ block: 'center' }));
+    await page.mouse.move(0, 0);
+    await bar.hover();
+    await expectVisible(previewOf(page), 'in a short window, the bar opens its step card');
+    const popover = page.locator('[data-slot="preview-card"]');
+    const box = await popover.evaluate((found) => {
+      const rect = found.getBoundingClientRect();
+      const scroller = getComputedStyle(found).overflowY;
+      const scrolls = found.scrollHeight > found.clientHeight && (scroller === 'auto' || scroller === 'scroll');
+      return { top: rect.top, bottom: rect.bottom, inner: innerHeight, scrolls };
+    });
+    if (box.top < 0 || box.bottom > box.inner || !box.scrolls)
+      throw new Refused(`the card stays inside a short window and scrolls within itself — ${JSON.stringify(box)}`);
+    const action = previewOf(page).locator('[data-step-action]');
+    const seen = await action.evaluate((found) => {
+      const before = scrollY;
+      found.scrollIntoView({ block: 'nearest' });
+      const rect = found.getBoundingClientRect();
+      return { inside: rect.top >= 0 && rect.bottom <= innerHeight, pageMoved: scrollY !== before };
+    });
+    if (!seen.inside || seen.pageMoved)
+      throw new Refused(`the card's action is brought into the short window by the card's own scroll — ${JSON.stringify(seen)}`);
+    await expectCount(previewOf(page), 1, 'with the preview still open');
+    await page.mouse.move(0, 0);
+    await expectCount(previewOf(page), 0, 'the pointer gone, the preview closes');
+  } finally {
+    await page.setViewportSize(size);
+  }
 }
 
 /** The page with the card open, in the page's theme. */
@@ -152,8 +210,9 @@ export default {
   expect: async (page) => {
     const { bar, run, step } = await aBar(page);
     const want = await expected(page, run, step);
-    await byTheKeyboard(page, bar, run, want);
+    await byTheKeyboard(page, bar, run, step, want);
     await byThePointer(page, bar, run, step, want);
+    await inAShortWindow(page, (await aBar(page)).bar);
     await onAPhone(page);
   },
 } satisfies PageSpec;

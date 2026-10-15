@@ -177,8 +177,7 @@ export function spendOf(step: DetailStep, kind: StepKind): CardSpend {
 }
 
 /** The check's refusal, or null where its check did not refuse. */
-const refusalOf = (step: DetailStep): string | null =>
-  step.check?.refused ? `Its check refused it (${step.check.refused.exit}).` : null;
+const refusalOf = (step: DetailStep): string | null => (step.check?.refused ? `Its check refused it (${step.check.refused.exit}).` : null);
 
 /** What the gate asks, or what a person said when they approved it; null for a step with no gate. */
 function gateWords(step: DetailStep, now: Date): string | null {

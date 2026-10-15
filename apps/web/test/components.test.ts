@@ -6,7 +6,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { listed, summary, waitingRun } from './run-fixtures.ts';
+import { listed, summary } from './run-fixtures.ts';
 import './tsx.ts';
 
 const { createElement } = await import('react');
@@ -34,7 +34,6 @@ type StepReach = import('../src/lib/api.ts').StepReach;
 type ReadOnlyCommands = import('../src/lib/api.ts').ReadOnlyCommands;
 type GraphEdge = import('../src/lib/api.ts').GraphEdge;
 type RunSummary = import('../src/lib/api.ts').RunSummary;
-type OpenRuns = import('../src/lib/api.ts').OpenRuns;
 type StepUsed = import('../src/lib/api.ts').StepUsed;
 type Decidable = import('../src/lib/api.ts').Decidable;
 type StepLayers = import('../src/lib/api.ts').StepLayers;
@@ -5689,11 +5688,7 @@ const tabsIn = (html: string) =>
 
 test("a tab's page is drawn under the strip of Settings' tabs, each a link to its own address, its own alone selected", async () => {
   const html = await frameTabsAt('/capabilities');
-  assert.match(
-    html,
-    /role="tablist"[^>]*aria-label="Settings"|aria-label="Settings"[^>]*role="tablist"/,
-    html,
-  );
+  assert.match(html, /role="tablist"[^>]*aria-label="Settings"|aria-label="Settings"[^>]*role="tablist"/, html);
   assert.deepEqual(tabsIn(html), [
     { tag: 'a', href: '/settings', name: 'Settings', selected: false },
     { tag: 'a', href: '/machines', name: 'Machines', selected: false },
@@ -5828,15 +5823,23 @@ test("a factory in the switcher says its runs in flight, every factory's said as
   assert.equal(inFlightWords(5, true), '5 runs in flight');
   assert.equal(inFlightWords(4, false), '4 in flight');
   const moving = (id: string, factory: string | null) => listed(summary([['build', 'checking']], { id, factory }));
-  const open = { asOf: at, counts: { waiting: 0, inFlight: 3, finished: 0 }, waiting: [], inFlight: [moving('a', 'nemia'), moving('b', 'nemia'), moving('c', null)] };
+  const open = {
+    asOf: at,
+    counts: { waiting: 0, inFlight: 3, finished: 0 },
+    waiting: [],
+    inFlight: [moving('a', 'nemia'), moving('b', 'nemia'), moving('c', null)],
+  };
   assert.equal(supportOf({ name: 'nemia', factory: filed('nemia') }, open), '2 in flight');
-  assert.equal(supportOf({ name: 'default', factory: filed('default', { default: true }) }, open), '1 in flight', 'a run naming none is the default\'s');
+  assert.equal(
+    supportOf({ name: 'default', factory: filed('default', { default: true }) }, open),
+    '1 in flight',
+    "a run naming none is the default's",
+  );
   assert.equal(supportOf({ name: 'quay', factory: filed('quay') }, open), 'none in flight');
   assert.equal(supportOf({ name: 'quay', factory: filed('quay') }, undefined), undefined, 'nothing before the light answer is read');
   assert.equal(supportOf({ name: 'gone' }, open), 'no such factory');
   assert.equal(supportOf({ name: 'quay', factory: filed('quay', { error: 'not JSON' }) }, open), 'its file does not read');
 });
-
 
 test('REFUSED: the start in no factory yet offers each factory a run starts in, the default left out, one that cannot start saying why', async () => {
   const { FactoryChoice } = await import('../src/components/FactoryStart.tsx');
@@ -5855,22 +5858,6 @@ test('REFUSED: the start in no factory yet offers each factory a run starts in, 
   assert.equal([...html.matchAll(/<button[^>]*>(nemia|quay)<\/button>/g)].length, 2, 'each factory a button, which a press picks');
   assert.doesNotMatch(html, /type="radio"/, 'refused: a radio, which an arrow key checks, and so picks, while moving past it');
   assert.match(await pagedWith(createElement(FactoryChoice, { factories: [factories[0]] })), /No factory is filed to start a run in/);
-});
-
-/** A card of the inbox in `factory` (none for the default factory's), not started, and `extra` over it. */
-const card = (name: string, factory: string | null, extra: Partial<import('../src/lib/api.ts').InboxEntry> = {}) => ({
-  name,
-  file: `${name}.md`,
-  title: name,
-  workflow: 'build',
-  repo: null,
-  factory,
-  startedAs: [],
-  from: [],
-  error: null,
-  body: name,
-  filedAt: null,
-  ...extra,
 });
 
 /** The layers of a step whose agent `writer` was given `alpha` and the person's words, its line adding `gamma`, told in its prompt. */

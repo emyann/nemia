@@ -26,7 +26,7 @@ test("each page lights its destination — a run's steps Runs, a card's page the
     assert.equal(lit(path), undefined, `refused: ${path} is no destination's page`);
 });
 
-test('Settings has three tabs, Settings, Machines then Capabilities, each its own page\'s address', () => {
+test("Settings has three tabs, Settings, Machines then Capabilities, each its own page's address", () => {
   assert.deepEqual(SETTINGS_TABS, [
     { to: '/settings', label: 'Settings' },
     { to: '/machines', label: 'Machines' },
@@ -96,7 +96,11 @@ test("a pick on a section's page stays there, keeping its other keys; on a facto
   );
   assert.deepEqual(pickTo('/factories/nemia', {}, undefined), { to: '/' });
   assert.deepEqual(pickTo('/factories/nemia', {}, 'hiring'), { to: '/factories/$factory', params: { factory: 'hiring' } });
-  assert.deepEqual(pickTo('/factories/nemia/settings', {}, undefined), { to: '/' }, "All factories leaves a factory's settings for Overview");
+  assert.deepEqual(
+    pickTo('/factories/nemia/settings', {}, undefined),
+    { to: '/' },
+    "All factories leaves a factory's settings for Overview",
+  );
   assert.deepEqual(pickTo('/factories/nemia/settings', {}, 'hiring'), { to: '/factories/$factory', params: { factory: 'hiring' } });
   assert.deepEqual(pickTo('/runs/r-1', {}, 'nemia'), { to: '/factories/$factory', params: { factory: 'nemia' } });
   assert.deepEqual(pickTo('/inbox/card', { factory: 'x' }, 'nemia'), { to: '/factories/$factory', params: { factory: 'nemia' } });

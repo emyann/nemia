@@ -43,8 +43,17 @@ export function GaugesButton({ feed }: { feed: FeedStatus }) {
       title={dot.title}
       className="relative inline-flex shrink-0 items-center"
     >
-      <IconButton variant="standard" icon={Gauge} aria-label={name} aria-expanded={open?.kind === 'gauges'} onPress={() => toggle(GAUGES)} />
-      <span aria-hidden className={`pointer-events-none absolute top-1.5 right-1.5 size-2.5 rounded-full ring-2 ring-surface ${DOT[dot.tone]}`} />
+      <IconButton
+        variant="standard"
+        icon={Gauge}
+        aria-label={name}
+        aria-expanded={open?.kind === 'gauges'}
+        onPress={() => toggle(GAUGES)}
+      />
+      <span
+        aria-hidden
+        className={`pointer-events-none absolute top-1.5 right-1.5 size-2.5 rounded-full ring-2 ring-surface ${DOT[dot.tone]}`}
+      />
       {short.marked && <TriangleAlert aria-hidden data-quota-mark className="pointer-events-none size-4 text-money" />}
     </span>
   );

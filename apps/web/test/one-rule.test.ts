@@ -63,7 +63,14 @@ const wholeListRule = (text: string): string[] => [...text.matchAll(/(?<![.\w'"]
 
 test("REFUSED: no reader of the frame applies the whole list's rule to the light answer", () => {
   const read = (file: string) => fs.readFileSync(path.join(SRC, file), 'utf8');
-  const frame = ['lib/footer.ts', 'lib/bell.ts', 'components/GaugesButton.tsx', 'components/GaugesBar.tsx', 'components/FrameHeader.tsx', 'components/FrameRail.tsx'];
+  const frame = [
+    'lib/footer.ts',
+    'lib/bell.ts',
+    'components/GaugesButton.tsx',
+    'components/GaugesBar.tsx',
+    'components/FrameHeader.tsx',
+    'components/FrameRail.tsx',
+  ];
   for (const file of [...frame, 'components/FactoryBar.tsx', 'components/WaitingBar.tsx']) {
     assert.deepEqual(wholeListRule(read(file)), [], `${file} reads the api's counts, never inFlight nor waitsOnYou`);
   }

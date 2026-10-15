@@ -54,8 +54,7 @@ export function inFlightWords(count: number, runs: boolean): string {
 }
 
 /** How many runs of the light answer `open` are in flight in the factory `name`, a run of the default factory naming none. */
-const inFlightIn = (open: OpenRuns, name: string): number =>
-  open.inFlight.filter((row) => (row.factory ?? DEFAULT_NAME) === name).length;
+const inFlightIn = (open: OpenRuns, name: string): number => open.inFlight.filter((row) => (row.factory ?? DEFAULT_NAME) === name).length;
 
 /** What the trigger's title says of the factory picked: its repositories whole, one a line, and why its file does not read. */
 const aboutOf = (factory: Factory | undefined): string | undefined =>
@@ -96,7 +95,13 @@ export function FactoryPicker({ path, search, picked }: { path: string; search: 
           data-factory-all
         />
         {items.map((item) => (
-          <SelectItem key={item.name} id={item.name} label={item.name} supportingText={supportOf(item, open.data)} data-factory={item.name} />
+          <SelectItem
+            key={item.name}
+            id={item.name}
+            label={item.name}
+            supportingText={supportOf(item, open.data)}
+            data-factory={item.name}
+          />
         ))}
       </Select>
     </div>

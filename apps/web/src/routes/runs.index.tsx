@@ -7,7 +7,7 @@ import { WaitingCard } from '../components/WaitingCard';
 import { finishedRunsQuery, openRunsQuery } from '../lib/api';
 import { finishedSearch, pageAt } from '../lib/finished';
 import { ink } from '../lib/meaning';
-import { PageName, Plate, ScanLines } from '../components/look';
+import { Plate, ScanLines } from '../components/look';
 
 export const Route = createFileRoute('/runs/')({
   validateSearch: finishedSearch,
@@ -23,12 +23,11 @@ export const Route = createFileRoute('/runs/')({
   errorComponent: Failed,
 });
 
-/** The page's frame, as wide as the window lets it: its name, alone, over the look's ground, then what it holds. */
+/** The page's frame, as wide as the window lets it, over the look's ground: what it holds; the top bar names it. */
 function Page({ state, children }: { state: string; children: ReactNode }) {
   return (
     <ScanLines className="min-h-full px-4 py-6 sm:px-8">
       <article data-runs-page={state} className="mx-auto flex w-full max-w-[1360px] flex-col gap-10">
-        <PageName>Runs</PageName>
         {children}
       </article>
     </ScanLines>

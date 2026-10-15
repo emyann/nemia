@@ -11,7 +11,11 @@ export const Route = createFileRoute('/stats')({
 function StatsPage() {
   return (
     <div data-stats className="flex min-h-96 items-center">
-      <EmptyState media={ChartColumn} title="Stats is to come" description="Nothing is counted here yet: this page waits for its own card." />
+      <EmptyState
+        media={ChartColumn}
+        title="Stats is to come"
+        description="Nothing is counted here yet: this page waits for its own card."
+      />
     </div>
   );
 }

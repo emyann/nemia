@@ -31,6 +31,8 @@ const RunFileSchema = Schema.StructWithRest(
     sessionId: Schema.optional(Schema.String),
     /** The process group the session's Claude Code runs in, killed whole before a new holder resumes it. */
     childPid: Schema.optional(Schema.Finite),
+    /** When that process started (`processStart`), so a pid another process has taken since is never killed or waited for. */
+    childStart: Schema.optional(Schema.String),
     /** The call the session is in, the earliest of those in flight: its tool, and since when, ISO. */
     calling: Schema.optional(Schema.Struct({ tool: Schema.String, since: Schema.String })),
     /** What the session resumed from had spent, which its own results print on in theirs: taken off what it reports. */
@@ -135,23 +137,46 @@ export const attachedStateOf = (run: AttachedRun): SessionState => (run.state ==
 /** The drain's file name, beside the run files. */
 const DRAIN = 'drain.json';
 
-/** The drain put for the holder `pid`: its new calls wait until it is lifted. Written by the process that puts it. */
+/**
+ * The drain put for the holder `pid`: its new calls wait until it is lifted. Written by the process that puts it, with when `pid`
+ * started, so a later process given the same pid is not held.
+ */
 export const putDrain = (root: string, pid: number): void => {
+  const start = processStart(pid);
   fs.mkdirSync(attachedDir(root), { recursive: true });
-  fs.writeFileSync(path.join(attachedDir(root), DRAIN), JSON.stringify({ pid }));
+  fs.writeFileSync(path.join(attachedDir(root), DRAIN), JSON.stringify({ pid, ...(start ? { start } : {}) }));
 };
 
 /** The drain lifted: none waits. */
 export const liftDrain = (root: string): void => fs.rmSync(path.join(attachedDir(root), DRAIN), { force: true });
 
-/** The pid the drain names, or undefined when none is put. */
-export const drainedPid = (root: string): number | undefined => {
+/** Whether the drain put names this very process: its pid, and, where the drain says it, when it started. */
+export const drainsThis = (root: string): boolean => {
+  let drain: { pid?: unknown; start?: unknown };
   try {
-    const { pid } = JSON.parse(fs.readFileSync(path.join(attachedDir(root), DRAIN), 'utf8')) as { pid?: unknown };
-    return typeof pid === 'number' ? pid : undefined;
+    drain = JSON.parse(fs.readFileSync(path.join(attachedDir(root), DRAIN), 'utf8')) as typeof drain;
   } catch {
-    return undefined;
+    return false;
   }
+  return drain.pid === process.pid && (drain.start === undefined || drain.start === processStart(process.pid));
+};
+
+/**
+ * The process group `run`'s Claude Code led, to kill and wait for, unless its pid is another process's now: alive, and started at
+ * another time than the recorded one. A leader gone leaves its group's number to its members, never to a new process, so a group
+ * whose leader died is still the session's.
+ */
+export const childOf = (run: AttachedRun): number | undefined => {
+  const pid = run.childPid;
+  if (pid === undefined) return undefined;
+  const taken = run.childStart !== undefined && alive(pid) && processStart(pid) !== run.childStart;
+  return taken ? undefined : pid;
+};
+
+/** `pid` as a run file names a session's Claude Code: the pid, and when it started. */
+export const childFacts = (pid: number): { childPid: number; childStart?: string } => {
+  const start = processStart(pid);
+  return { childPid: pid, ...(start ? { childStart: start } : {}) };
 };
 
 /** What a resumed session is told first, when it was let go between two calls. */

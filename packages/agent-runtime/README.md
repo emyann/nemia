@@ -2137,10 +2137,11 @@ no `background` session spawns attached, and any other engine, or the same one b
 - **Let go.** As the holder's scope closes, new calls wait at their `PreToolUse` hook, it waits with no bound for each call in
   flight, then writes each session `parked` and stops it; a call still held at its hook then is never written in flight.
 - **Taken up.** On a look, a holder adopts a session parked, or one whose holder's process is gone: it kills what is left of
-  its Claude Code's process group, then resumes it under the same id (`--resume=<id>`, no fork), told it was paused, or, after a
+  its Claude Code's process group, unless that pid is another process's now (`childStart`), then resumes it under the same id (`--resume=<id>`, no fork), told it was paused, or, after a
   crash, which call did not finish. A non-holder reads such a session as `working`.
-- **The drain.** `drain(pid)` writes a file naming a holder: its new calls wait until `drain(null)`, so a restart can wait for the
-  calls in flight before it signals. A drain naming a process that is gone holds nothing.
+- **The drain.** `drain(pid)` writes a file naming a holder and when it started: its new calls wait until `drain(null)`, so a
+  restart can wait for the calls in flight before it signals. A drain naming a process that is gone holds nothing, nor one left
+  for a process whose pid a later one was given.
 
 ### Why the name is the key
 

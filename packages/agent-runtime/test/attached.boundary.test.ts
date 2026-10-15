@@ -4,7 +4,8 @@
  * whose holder died mid-call is told which call did not finish, a non-holder neither adopts nor spawns attached, a denial is journalled
  * while the attempt is at work, a call that would ask is denied in the holder, a drain holds new calls, a stop and words from another
  * engine reach the session, a call held at its hook as the holder lets go is never written in flight, a holder whose pid another
- * process has taken is gone, and a resumed session's cost leaves out what its parent spent.
+ * process has taken is gone, neither a drain nor a kill reaches a process given a pid since, and a resumed session's cost leaves out
+ * what its parent spent.
  */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -14,7 +15,18 @@ import test, { type TestContext } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { Effect, Exit, Scope } from 'effect';
 import { attachedSessions } from '../src/harness/claude/attached.ts';
-import { alive, crashNote, CARRY_ON, filesOf, putDrain, readRun, thisHolder, writeRun } from '../src/harness/claude/attached-file.ts';
+import {
+  alive,
+  attachedDir,
+  crashNote,
+  CARRY_ON,
+  filesOf,
+  putDrain,
+  readRun,
+  thisHolder,
+  writeRun,
+} from '../src/harness/claude/attached-file.ts';
+import { processStart } from '../src/harness/claude/inbox.ts';
 import { claudeCodeOps } from '../src/harness/claude/code.ts';
 import { Engine } from '../src/index.ts';
 import type { SpawnRequest } from '../src/harness/seam.ts';
@@ -83,6 +95,7 @@ test('a holder let go waits for the call in flight, then parks the session, its 
   );
   assert.equal(run(root)?.state, 'parked');
   assert.equal(run(root)?.calling, undefined);
+  assert.equal(run(root)?.childPid, undefined, 'a parked session names no Claude Code: the let-go ended it');
   assert.equal(alive(Number(fs.readFileSync(path.join(dir, 'pid'), 'utf8'))), false, "the session's Claude Code is gone");
 });
 
@@ -131,6 +144,7 @@ test(
       startedAt: new Date().toISOString(),
       sessionId: 'crashed-session',
       childPid: left.pid!,
+      childStart: processStart(left.pid!),
       calling: { tool: 'Bash', since: new Date().toISOString() },
       request: { ...request, brief: undefined },
     });
@@ -328,4 +342,38 @@ test("a session resuming another reports its own cost, its parent's left out", W
     { everyMs: 50 },
   );
   assert.ok(Math.abs((seen.usage?.costUsd ?? 0) - 0.15) < 1e-9, `its own cost, not ${seen.usage?.costUsd}`);
+});
+
+test('a drain naming this pid with another start time holds nothing: it was put for a process gone since', WAITED, async (t) => {
+  const { root, dir, request } = place({ call: 'Read', output: {} });
+  fs.writeFileSync(path.join(dir, 'release'), '');
+  putDrain(root, process.pid);
+  assert.ok(JSON.parse(fs.readFileSync(path.join(attachedDir(root), 'drain.json'), 'utf8')).start, 'a drain says when its holder started');
+  fs.writeFileSync(path.join(attachedDir(root), 'drain.json'), JSON.stringify({ pid: process.pid, start: 'an earlier process' }));
+  const h = await holder(root);
+  t.after(h.close);
+  await Effect.runPromise(h.attached.ops.spawn(request));
+  await until(t, () => run(root)?.state === 'completed', 'the call let through and the session completed', { everyMs: 50 });
+});
+
+test("adopting a session leaves alone a process that has taken its Claude Code's pid since", WAITED, async (t) => {
+  const { root, dir, request } = place({ output: { done: 1 } });
+  const taken = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', detached: true });
+  t.after(() => void (taken.pid && alive(taken.pid) && process.kill(-taken.pid, 'SIGKILL')));
+  writeRun(root, {
+    name: NAME,
+    state: 'parked',
+    owner: process.pid,
+    startedAt: new Date().toISOString(),
+    sessionId: 'pid-taken',
+    childPid: taken.pid!,
+    childStart: "when the session's Claude Code started, not this process",
+    request: { ...request, brief: undefined },
+  });
+  const h = await holder(root);
+  t.after(h.close);
+  await Effect.runPromise(h.attached.ops.observe);
+  await until(t, () => run(root)?.state === 'completed', 'the session resumed and completed', { everyMs: 50 });
+  assert.deepEqual(lines(dir, 'said.jsonl'), [CARRY_ON]);
+  assert.equal(alive(taken.pid!), true, 'the process that took the pid is not killed');
 });

@@ -8,7 +8,7 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import { query, type CanUseTool, type HookCallbackMatcher, type HookEvent, type SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 import { attachedOptions } from './attached-options.ts';
-import { alive, filesOf, writeRun, type AttachedRun, type AttachedState } from './attached-file.ts';
+import { alive, childFacts, filesOf, writeRun, type AttachedRun, type AttachedState } from './attached-file.ts';
 import { claudeStreamKept } from '../detached/output.ts';
 import type { SpawnRequest } from '../seam.ts';
 
@@ -214,7 +214,7 @@ export const startSession = (
       spawnClaudeCodeProcess: (o) => {
         const child = spawn(o.command, o.args, { cwd: o.cwd, env: o.env, stdio: ['pipe', 'pipe', 'pipe'], detached: true });
         o.signal.addEventListener('abort', () => killGroup(child.pid), { once: true });
-        if (child.pid !== undefined) rewrite(root, live, { childPid: child.pid });
+        if (child.pid !== undefined) rewrite(root, live, childFacts(child.pid));
         return child;
       },
     },

@@ -8,10 +8,10 @@
  * - **Let go.** As the holder's scope closes, new calls are held at their hook, it waits with no bound for each call in flight to end,
  *   then writes each session `parked` and aborts it; a call held at its hook then is never written in flight.
  * - **Taken up.** On each look, a holder adopts a session parked, or one whose holder's process is gone: it kills what is left of its
- *   Claude Code's process group, and resumes it under the same session id, told it was paused (`CARRY_ON`), or, when its holder ended
- *   mid-call, which call did not finish (`crashNote`).
- * - **The drain.** A file naming the holder's pid (`putDrain`): while it names this process, its new calls wait at their hook, so a
- *   restart can wait for the calls in flight before it signals.
+ *   Claude Code's process group, unless that pid is another process's now (`childOf`), and resumes it under the same session id, told
+ *   it was paused (`CARRY_ON`), or, when its holder ended mid-call, which call did not finish (`crashNote`).
+ * - **The drain.** A file naming the holder's pid and when it started (`putDrain`): while it names this process, its new calls wait at
+ *   their hook, so a restart can wait for the calls in flight before it signals.
  * - **What it keeps.** Its run file, and a capture of the messages a reader reads (denials as they come, the result's statement and
  *   usage); the conversation is Claude Code's own transcript.
  */
@@ -28,7 +28,8 @@ import {
   attachedStateOf,
   CARRY_ON,
   crashNote,
-  drainedPid,
+  childOf,
+  drainsThis,
   everyRun,
   filesOf,
   holderGone,
@@ -101,16 +102,17 @@ export const attachedSessions = (root: string, executable?: string): Attached =>
   const live = new Map<string, Live>();
   let holding = false;
   let draining = false;
-  const held = () => draining || drainedPid(root) === process.pid;
+  const held = () => draining || drainsThis(root);
   const start = (r: SpawnRequest, run: AttachedRun, first: string, resume?: string) =>
     live.set(run.name, startSession(root, r, run, first, { held, ...(executable ? { executable } : {}), ...(resume ? { resume } : {}) }));
 
   const stopped = (run: AttachedRun) => fs.existsSync(filesOf(root, run.name).stop);
 
   const adopt = async (run: AttachedRun): Promise<void> => {
-    killGroup(run.childPid);
-    await gone(run.childPid);
-    const { childPid: _, calling: __, ownerStart: ___, ...rest } = run;
+    const child = childOf(run);
+    killGroup(child);
+    await gone(child);
+    const { childPid: _, childStart: __, calling: ___, ownerStart: ____, ...rest } = run;
     const mine: AttachedRun = { ...rest, ...thisHolder() };
     if (stopped(run) || !run.sessionId) return writeRun(root, { ...mine, state: stopped(run) ? 'canceled' : 'failed' });
     start({ ...(run.request as Omit<SpawnRequest, 'brief'>), brief: '' }, { ...mine, state: 'working' }, noteOf(run), run.sessionId);
@@ -142,7 +144,7 @@ export const attachedSessions = (root: string, executable?: string): Attached =>
     while ([...live.values()].some((l) => l.calls?.size)) await pause(100);
     for (const l of live.values()) {
       if (!l.abort || l.run.state !== 'working') continue;
-      const { calling: _, ...rest } = l.run;
+      const { calling: _, childPid: __, childStart: ___, ...rest } = l.run;
       l.run = { ...rest, state: 'parked' };
       writeRun(root, l.run);
       l.letGo = true;

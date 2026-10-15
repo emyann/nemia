@@ -197,8 +197,9 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
 - **A test waits in its process with `until` (`test/waits.ts`, the runtime's copy, held by `test/waits.test.ts`)**, asked on a `bell`
   its event's source rings or at a pace for a state, its test given `WAITED`: the runner's timeout is its one bound, which the `test`
   script's `--test-timeout` gives a test given none. `DEADLINES` (`test/waits.test.ts`) refuses a hand-written deadline.
-- **A test that lets a deliverer's `say` through first waits until each line it expects gathered is taken off the hub** (`takenAll`,
-  `src/subscription/deliver.verb.test.ts`), and drops its subscription in `t.after`: one left by a failure is followed by the next test.
+- **A test that lets a deliverer's `say` through first waits until each line it expects gathered is handed on by the reader**
+  (`FEED_FOLLOW_LINES`), not only taken off the hub; and puts its subscription through `kept`, which drops it in `t.after`: one left by a
+  failure is followed by the next test (`src/subscription/deliver.verb.test.ts` refuses a put outside `kept`).
 - **`execFileSync` with no `stdio` copies the child's stderr onto yours**: pass `stdio: ['ignore', 'pipe', 'pipe']`.
 - **A `readdirSync` entry for a symlink is not `isFile()`, and every write follows it**: refuse a link by name where a folder's files are
   its own (`writeWorkflow`).

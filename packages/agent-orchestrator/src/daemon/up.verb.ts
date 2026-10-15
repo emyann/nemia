@@ -18,7 +18,7 @@ import { beat, heldUrl, passed, releaseStore, stillHeld, takeStore, type TakenSt
 import { takenFromLine, type HolderKind } from './daemon.ts';
 import { deliver } from '../subscription/deliver.verb.ts';
 import { DAEMON_STARTED, startedLine } from '../feed/feed.ts';
-import { emitDaemonStarted, FEED_FOLLOW_BEATS, FEED_FOLLOW_READS } from '../feed/feed.verb.ts';
+import { emitDaemonStarted, FEED_FOLLOW_BEATS, FEED_FOLLOW_LINES, FEED_FOLLOW_READS } from '../feed/feed.verb.ts';
 import { keep } from '../nemia/keep.verb.ts';
 import { reconcile } from '../applied/applied.verb.ts';
 import { free } from '../prune/free.verb.ts';
@@ -43,9 +43,9 @@ export type UpOptions = {
 
 /**
  * The daemon's own series a collector reads by their increase, born at zero once it holds the store (`seriesBorn`): the pass's
- * (`PASS_SERIES`) and the feed's live readers' beats and reads.
+ * (`PASS_SERIES`) and the feed's live readers' beats, reads and lines.
  */
-export const DAEMON_SERIES = [...PASS_SERIES, FEED_FOLLOW_BEATS, FEED_FOLLOW_READS] as const;
+export const DAEMON_SERIES = [...PASS_SERIES, FEED_FOLLOW_BEATS, FEED_FOLLOW_READS, FEED_FOLLOW_LINES] as const;
 
 /** How often the daemon asks each harness for its quota: the series keep it over time. */
 export const QUOTA_EVERY_MS = 600_000;

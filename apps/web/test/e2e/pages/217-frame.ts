@@ -42,21 +42,57 @@ async function railBesideBar(page: Page): Promise<void> {
     );
 }
 
-/** The top bar holds, left to right, the page's name, the factory switcher, the search, the pause, the gauges and the account. */
-async function barInOrder(page: Page): Promise<void> {
+/**
+ * The top bar holds, left to right, the page's name, the factory switcher, the search when `searched` (a window under 1024 pixels hides
+ * it), the pause, the gauges and the account, each inside the bar and clear of the one before it on its line, or on a line below.
+ */
+async function barClear(page: Page, searched: boolean): Promise<void> {
   const bar = topBarOf(page);
   const parts: Array<[string, Locator]> = [
     ["the page's name", bar.locator('[data-page-name]')],
     ['the factory switcher', bar.locator('[data-factory-picker]')],
-    ['the search', bar.locator('[data-slot="search-bar"]')],
+    ...(searched ? [['the search', bar.locator('[data-slot="search-bar"]')] as [string, Locator]] : []),
     ['the pause', bar.locator('[data-pause]')],
     ['the gauges', bar.locator('[data-gauges-button]')],
     ['the account', bar.locator('[data-account-to-come]')],
   ];
-  const xs = await Promise.all(parts.map(async ([what, part]) => (await boxOf(part, what)).x));
-  if (xs.some((x, at) => at > 0 && x <= xs[at - 1]))
-    throw new Refused(`the top bar holds ${parts.map(([what]) => what).join(', ')}, left to right — at ${xs.join(', ')}`);
-  await expectVisible(bar.locator('[data-page-name]').getByText('Overview', { exact: true }), 'the top bar names the page Overview');
+  const whole = await boxOf(bar, 'the top bar');
+  const boxes = await Promise.all(parts.map(([what, part]) => boxOf(part, what)));
+  const wrong = boxes.flatMap((box, at) => {
+    const [what] = parts[at];
+    const outside =
+      box.x + box.width > whole.x + whole.width + 0.5 || box.y + box.height > whole.y + whole.height + 0.5
+        ? [`${what} runs out of the bar, to ${box.x + box.width},${box.y + box.height}`]
+        : [];
+    if (at === 0) return outside;
+    const before = boxes[at - 1];
+    const below = box.y >= before.y + before.height - 0.5;
+    const clear = below || box.x >= before.x + before.width - 0.5;
+    return clear ? outside : [...outside, `${parts[at - 1][0]} ends at ${before.x + before.width}, ${what} starts at ${box.x}`];
+  });
+  if (wrong.length)
+    throw new Refused(
+      `${page.viewportSize()?.width} wide, the top bar holds ${parts.map(([what]) => what).join(', ')} in order, each clear of the ` +
+        `last and inside the bar — ${wrong.join('; ')}`,
+    );
+}
+
+/** The top bar's parts stay clear of each other on this window, and on one too narrow for the search, the rail open; it names the page. */
+async function barInOrder(page: Page): Promise<void> {
+  await barClear(page, true);
+  const size = page.viewportSize();
+  if (size) {
+    await page.setViewportSize({ width: 800, height: size.height });
+    await expectWidth(page, WIDTH.open, '800 wide, the rail stays open');
+    await barClear(page, false);
+    await settled(page);
+    await photograph(page, path.join(OUT, `frame-two-lines-${await themeOf(page)}.png`));
+    await page.setViewportSize(size);
+  }
+  await expectVisible(
+    topBarOf(page).locator('[data-page-name]').getByText('Overview', { exact: true }),
+    'the top bar names the page Overview',
+  );
 }
 
 /**

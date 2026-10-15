@@ -282,6 +282,9 @@ export const railSaid = (
     .map((step) => `${step.name} ${railWord[step.state]}`)
     .join(', ');
 
+/** A bar of the rail as a button says it: its step's name and the rail's word for its state, `implement, at work`. */
+export const barSaid = (name: string, state: StepState): string => `${name}, ${railWord[state]}`;
+
 /**
  * The parts of a date as a person reads it in `timeZone`, theirs by default: its year, its month in three letters and its day; each
  * empty for a date that does not parse, which the writers that compose them say as `UNREADABLE` before they ask.

@@ -5,6 +5,7 @@ import { titleOf } from '@/lib/factory';
 import { ink } from '@/lib/meaning';
 import { nowOf, sinceShort } from '@/lib/runWords';
 import { cn } from '@/components/ui/ds/utils';
+import { previewBar } from './StepPreview';
 import { CopyId, CutFrame, CutTag, FRAMED_BOX, FRAMED_END, FRAMED_ROW, FRAMED_TABLE, RunSteps, TextLink } from './look';
 
 /** A column's heading, in the look's small caps. */
@@ -40,8 +41,8 @@ function Now({ run, asOf }: { run: ListedRun; asOf: Date }) {
 
 /**
  * The runs in flight, as the kit's dense table in the look's cut frame, in the hue of a session at work: each run's title as a link,
- * its id with a copy control and its factory, each control and each factory at one edge from row to row; its own steps as a rail;
- * what it does now; its wall time at `asOf` and its cost, plain.
+ * its id with a copy control and its factory, each control and each factory at one edge from row to row; its own steps as a rail, each
+ * bar a button that opens its step's card; what it does now; its wall time at `asOf` and its cost, plain.
  * Narrower than its columns, the table scrolls sideways inside its frame.
  */
 export function FlightTable({ runs, asOf }: { runs: readonly ListedRun[]; asOf: Date }) {
@@ -84,7 +85,12 @@ export function FlightTable({ runs, asOf }: { runs: readonly ListedRun[]; asOf: 
                   </span>
                 </Cell>
                 <Cell>
-                  <RunSteps steps={run.steps} cancelled={run.cancelledAt !== null} held={run.holding != null} />
+                  <RunSteps
+                    steps={run.steps}
+                    cancelled={run.cancelledAt !== null}
+                    held={run.holding != null}
+                    wrap={previewBar(run, asOf)}
+                  />
                 </Cell>
                 <Cell>
                   <Now run={run} asOf={asOf} />

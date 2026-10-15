@@ -82,6 +82,25 @@ test('the steps rail: one bar a step by its state, its names in the hue of what 
   assert.match(tagWith(bare, 'data-step="land"'), /data-state="held"/, "a held run's gate is drawn held");
 });
 
+test('the steps rail with a wrap: a group named as the rail is said, each bar inside what the wrap gives, its step and state handed', async () => {
+  const wrap = (bar: unknown, step: { name: string; state: string }) =>
+    createElement('button', { 'data-wrapped': `${step.name} ${step.state}` }, bar as ReactElement);
+  const html = await drawn(createElement(RunSteps, { steps: STEPS, cancelled: false, held: false, wrap }));
+  const rail = tagWith(html, 'data-run-steps');
+  assert.match(rail, /role="group"/);
+  assert.doesNotMatch(rail, /role="img"/);
+  assert.match(rail, /aria-label="design verified, implement at work, review failed its check, land waits for you"/);
+  assert.deepEqual(
+    [...html.matchAll(/data-wrapped="([^"]+)"><span data-step="([^"]+)"/g)].map((m) => [m[1], m[2]]),
+    [
+      ['design verified', 'design'],
+      ['implement working', 'implement'],
+      ['review failed-check', 'review'],
+      ['land awaiting-approval', 'land'],
+    ],
+  );
+});
+
 test('the pager: Newer and Older keep the address and change its page alone, and say the rows and where it stands', async () => {
   const html = await drawn(createElement(Pager, { page: 2, pages: 3, total: 25, size: 9 }), '/?factory=nemia&page=2');
   assert.match(html, /role="group" aria-label="Pages of finished runs"/);

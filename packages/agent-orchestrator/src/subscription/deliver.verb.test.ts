@@ -192,6 +192,7 @@ test(
     const rt = ManagedRuntime.make(Layer.merge(feedHubLayer(), Logger.layer([])));
     t.after(() => rt.dispose());
     subscribed('busy', 't-busy');
+    t.after(() => dropSubscription('busy'));
     failing.add('t-busy');
     const following = () => Effect.runSync(Metric.value(FEED_FOLLOWERS)).value;
     const was = following();
@@ -216,6 +217,7 @@ test(
     await published('r-41');
     await held(t, takenAll, 'r-41 taken off the hub by the reader');
     await published('r-42');
+    await held(t, takenAll, 'r-42 taken off the hub by the reader');
     failing.delete('t-busy');
     await held(t, () => readDelivery('busy')?.cursor === feedSize(), 'the cursor at the end of the feed');
     assert.deepEqual(
@@ -224,7 +226,6 @@ test(
       'the first message alone, then one say for both lines that came while it was in flight',
     );
     await Effect.runPromise(Fiber.interrupt(fiber));
-    dropSubscription('busy');
   },
 );
 

@@ -9,7 +9,7 @@ import { afterEach, test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { Cause, Effect, Exit, Stream } from 'effect';
 import { Engine as EngineService, type EngineShape, type TaskSpec } from '../src/index.ts';
-import { remoteOps, type RemoteOptions } from '../src/a2a/remote.ts';
+import { remoteOps, SEND_MS, type RemoteOptions } from '../src/a2a/remote.ts';
 import { RESUBSCRIBES } from '../src/a2a/remote-follow.ts';
 import type { Followed, RunnerError } from '../src/harness/seam.ts';
 import { bearer, remoteServer, type Binding, type RemoteServer, type ServerOptions } from './remote-server.ts';
@@ -225,9 +225,17 @@ test(
   },
 );
 
-/** The remote harness's ops on `s`, its bounds made short, and a session `name` spawned on it. */
+/**
+ * The remote harness's ops on `s`, its bounds made short, and a session `name` spawned on it. The agent is given its card, read
+ * once here with no bound, so no read of it is held to `requestMs`; the spawn waits for the send's answer unless `o` says otherwise.
+ */
 const opsOn = async (s: RemoteServer, name: string, o: RemoteOptions = {}, requestMs?: number) => {
-  const ops = remoteOps('remote', { url: s.url }, scratch('ae-remote-follow-'), undefined, requestMs, { resubscribeMs: 1, ...o });
+  const card = (await (await fetch(`${s.url}/.well-known/agent-card.json`)).json()) as Record<string, unknown>;
+  const ops = remoteOps('remote', { card }, scratch('ae-remote-follow-'), undefined, requestMs, {
+    resubscribeMs: 1,
+    spawnWaitMs: SEND_MS,
+    ...o,
+  });
   await Effect.runPromise(ops.spawn({ name, brief: 'paint the fence', cwd: '/w' }));
   return ops;
 };
@@ -459,12 +467,28 @@ for (const binding of BINDINGS)
       const got: Followed[] = [];
       const ended = drained(ops.follow!('ae/long/1'), got);
       await holds(t, got, 1);
+      let warm = 0;
+      await until(
+        t,
+        async () => {
+          const asked = s.paths.length;
+          const had = got.length;
+          s.move(s.tasks()[0], { state: 'working', words: `warm ${++warm}` });
+          await holds(t, got, had + 1);
+          return s.paths.length === asked;
+        },
+        () => `a moment carried by a subscription already held: ${s.paths.join(', ')}`,
+        { everyMs: 20 },
+      );
+      const mark = s.paths.length;
       const since = instantNow();
       await until(t, () => elapsedMs(since, instantNow()) > 300, 'three request bounds gone by', { everyMs: 20 });
       s.move(s.tasks()[0], { state: 'completed', words: 'done' });
       assert.ok(Exit.isSuccess(await ended));
-      assert.deepEqual(shown(got), ['state working', 'events assistant "done"', 'state completed']);
-      assert.equal(s.counts.resubscribe, 1, 'the one subscription, open past the bound');
+      assert.deepEqual(s.paths.slice(mark), [], 'the subscription held before the bound carried the end, and nothing was asked after');
+      assert.deepEqual(shown(got).slice(-3), [`events assistant "warm ${warm}"`, 'events assistant "done"', 'state completed']);
+      assert.equal(shown(got)[0], 'state working');
+      assert.deepEqual(ids(got), [...new Set(ids(got))], 'each event once');
       assert.ok(subscribedOn(s, binding), `subscribed on ${binding}: ${s.paths.join(', ')}`);
 
       const held = await opsOn(s, 'ae/held/1', {}, 100);

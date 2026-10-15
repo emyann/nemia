@@ -20,6 +20,7 @@ export type {
   RunnerOps,
   SessionForgotten,
   SessionKept,
+  SessionsCompacted,
   SpawnRequest,
   Transcript,
   TranscriptCursor,

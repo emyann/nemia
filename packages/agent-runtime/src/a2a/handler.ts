@@ -55,6 +55,7 @@ import {
   type HarnessQuota,
   type SessionForgotten,
   type SessionKept,
+  type SessionsCompacted,
   type RunnerOps,
   type Transcript,
   type TranscriptCursor,
@@ -129,6 +130,7 @@ export const cardOf = (harness: string, ops: RunnerOps): AgentCard => ({
             ...(ops.quota ? ['harnessQuota' as const] : []),
             ...(ops.forget ? ['forgetSession' as const] : []),
             ...(ops.kept ? ['sessionKept' as const] : []),
+            ...(ops.compact ? ['compactSessions' as const] : []),
           ],
           say: ops.say !== undefined,
         } satisfies RuntimeExtensionParams,
@@ -205,6 +207,11 @@ export interface SessionMethods {
    * asked of every session at once, removing nothing. A session it keeps nothing of has no key.
    */
   sessionKept(params: KeptRequest, context: ServerCallContext): Promise<Record<string, SessionKept>>;
+  /**
+   * The captures of every session the harness keeps whose worker has ended, rewritten to what their readers read, or with `dry` only
+   * counted (`RunnerOps.compact`): asked of the harness and of no session.
+   */
+  compactSessions(params: { dry: boolean }, context: ServerCallContext): Promise<SessionsCompacted>;
 }
 
 /** Every listed session, as one listing saw them: the pages of that listing are served from here. */
@@ -545,6 +552,18 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
       );
     }
     return this.run(this.ops.kept(params.sessions));
+  }
+
+  async compactSessions(params: { dry: boolean }, _context: ServerCallContext): Promise<SessionsCompacted> {
+    if (!this.ops.compact) {
+      throw new UnsupportedOperationError(`the \`${this.harness}\` harness keeps every capture whole: it has none to compact.`);
+    }
+    if (typeof params.dry !== 'boolean') {
+      throw new RequestMalformedError(
+        `\`dry: ${String(params.dry)}\` is not a yes or no: send \`dry: true\` to count, \`false\` to rewrite.`,
+      );
+    }
+    return this.run(this.ops.compact({ dry: params.dry }));
   }
 
   async createTaskPushNotificationConfig(

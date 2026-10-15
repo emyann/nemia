@@ -516,6 +516,7 @@ export const UNKEPT = [
   'start',
   'sweep',
   'removeBody',
+  'compact',
 ] as const satisfies readonly Exclude<keyof EngineShape, Kept>[];
 
 /** The verbs of `verbs` that are neither walked in `walks` nor named in `unkept`. */

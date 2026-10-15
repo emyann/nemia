@@ -114,6 +114,9 @@ down is in `docs/architecture.md`, *Who owns what*.
   `harness/claude/bg.ts`), or refuses the `transcript` verb, never read as absent; so does a transcript found and not read
   (`TranscriptUnread`, `harness/claude/transcript.ts`), never kept by `keptRead`. A field the runtime starts reading is added to the
   schema; any other line passes undecoded.
+- **A field a Claude reader starts reading is kept by `claudeStreamKept` (`output.ts`)**, or an ended capture, rewritten to what the
+  readers read, reads otherwise: `test/said.test.ts` reads the kept corpus against `SAID_DIGEST`, and a capture is rewritten only
+  when it reads the same and its run file says its worker wrote its end (`keepCapture`, `said.ts`).
 - **A stream a runner keeps whole is read through `output`, never off the run directory** (`streamIn`, `detached.ts`, which counts
   the read); a harness that keeps its streams apart says `streams: true`. `config.env` is journalled with the task: no secret there.
 - **A test runs at whatever niceness and IO class its parent gave it, and a worker it starts inherits both**: read a niceness

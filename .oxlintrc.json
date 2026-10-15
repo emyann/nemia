@@ -751,8 +751,7 @@
     {
       "files": ["packages/agent-runtime/src/cli/main.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 82, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 36 }],
+        "complexity": ["error", { "max": 34 }],
         "sonarjs/cognitive-complexity": ["error", 29]
       }
     },

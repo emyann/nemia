@@ -1948,6 +1948,32 @@ beside it, a line torn mid-write, and a line of any other type or subtype pass u
 kept captures (2,392 `result`, 962 `permission_denied` and 2,416 `init` lines, 78,605 `tool_use` blocks): none refused, each read as
 before.
 
+What a Claude Code job's capture keeps once it has ended is what those readers read, and nothing more of the conversation
+(`claudeStreamKept`, `harness/detached/output.ts`): Claude Code keeps the conversation in its own transcript, which `transcript`
+reads. Kept whole: a line that is no JSON object (stderr, the worker's words, a torn line), the `result` line (the final answer, usage,
+cost, the denials and their inputs), the `system` `init` line (the session id, the folder) and each `permission_denied` line. An
+`assistant` line is cut to its `tool_use` blocks, each its id, its tool and its input: whole for a call the stream says was denied,
+which is the runtime's own fact, kept as it was called; for any other, only the key a reader reads (`READ_INPUT_KEYS`: a command, by
+its first word; a skill; a file tool's path). Every other line goes: text and thinking, tool results, partial messages
+(`stream_event`), other `system` lines, rate limits. The capture and its stdout kept whole (`.stdout`) are rewritten so at the read that
+keeps what was read (`.said`), once the run file says its worker wrote its end, a lease gone not counting, through a file renamed over
+each, its times kept, and only when the reader reads the kept text as it read the whole (`keepCapture`, `harness/detached/said.ts`);
+`.stderr` is left. So a kept capture says what its whole stream said, field for field, and `SAID_VERSION` (`said.ts`) stays the
+readers': the digest of the readers over the corpus kept so is `SAID_DIGEST` (`test/said.test.ts`).
+
+What the runtime can no longer re-read of a capture kept so, and accepts: an assistant's text and thinking, a tool's result or output,
+any key of a call's input but the one a reader reads (a command past its first word, unless the call was denied; a file's content, an
+edit's strings, a search's pattern), the partial messages (so `follow` of an ended job shows no open block, and `logs` of one shows the
+calls, denials, result and stderr, not the assistant's words), a response's own usage, and every `system` line but `init` and
+`permission_denied`. A reader that starts reading one of these reads it from Claude Code's transcript, or only from captures written
+after `claudeStreamKept` keeps it. The captures written before are rewritten once by `ae compact [--yes]` (`Engine.compact`,
+`compactSessions` across the A2A seam, `compactRuns` in `harness/detached/compact.ts`): it counts, and with `--yes` rewrites, each
+capture of a run whose worker has ended (its run file says so, or says `working` with a pid no longer there), one at a time, keeping
+what was read anew under the kept key; it leaves whole and names a capture at work, one no run file names, one its reader refuses
+and one read otherwise once kept. Measured 2026-10-15 on the owner's store, a count with nothing written: 4,247 captures (3,388
+`.log`, 3.71 GB; 859 `.stdout`, 1.77 GB), 5,475,575,931 bytes before and 143,325,314 after (97.4% less), two left at work, none
+refused; 42 s, 844 MiB at most.
+
 A task whose journal names a harness this engine does not have — filed by an engine that had it, a remote agent whose entry was since
 refused or removed — is routed to none, never to the fallback: the composite reads its names unread, so an attempt in flight is held,
 neither there nor gone, and followed again by an engine that has the harness; a spawn is refused (`unstartable`, in words that name the
@@ -2183,7 +2209,8 @@ of pure code sits beside it.
 | `src/harness/detached/follow.ts` | a detached session followed live (`followOf`): its run file, its whole stdout lines read for the text being written, and its transcript, each read on from where the last read stopped, on a watch's wake or each second |
 | `src/harness/detached/output.ts` | what a detached session's output says: `claude -p`'s result and stream, decoded by `print.ts` or refused, read for closeout, usage, cost, a spent budget and denials, and the stream for the skills loaded and the files touched |
 | `src/harness/detached/run-file.ts` | a detached run's file as the worker and the spawn write it: its schema (`RunFileSchema`), its read (`runFileIn`), the first one a spawn writes, and its state as a sighting says it, its heartbeat's lease (`STALE_MS`) included |
-| `src/harness/detached/said.ts` | what was read of a finished run's output, kept beside its log keyed by the log's size and mtime and the readers' version — or a former one they only added fields to (`SAID_EXTENDED`) — so each process reads a log once per change of it |
+| `src/harness/detached/said.ts` | what was read of a finished run's output, kept beside its log keyed by the log's size and mtime and the readers' version — or a former one they only added fields to (`SAID_EXTENDED`) — so each process reads a log once per change of it; and an ended run's capture rewritten there to what its spec keeps (`keepOutput`, `keepCapture`), only when it reads the same |
+| `src/harness/detached/compact.ts` | the captures already on disk rewritten once to what their readers read (`compactRuns`), a detached runner's `compact`: a run whose worker ended, one capture at a time, each left whole and named where it is at work, has no run file, or does not read the same |
 | `src/a2a/map.ts` | the runtime's words in A2A's and back, pure: a session is a Task named for it, a spawn a user Message marked with the runtime's extension and `config` in its metadata, words said to a session a follow-up on its Task, a sighting or a journalled attempt a Task, its context the harness's id for the conversation and its closeout its one Artifact |
 | `src/a2a/follow.ts` | a session followed through A2A's `SubscribeToTask`: the handler's answer over a driver's `follow` (`subscription`), each moment a status or an artifact update, and the client's read of it back (`followThrough`) |
 | `src/a2a/handler.ts` | one harness as an A2A agent: the SDK's `A2ARequestHandler` over its driver, and the runtime extension's methods (`SESSION_METHODS`), `forgetSession` and `sessionKept` among them, holding nothing — every answer read afresh off the harness and the journal |
@@ -2201,6 +2228,7 @@ of pure code sits beside it.
 | `src/service/test-engine.ts` | the engine's stand-in, `testEngine()`: the `Engine` service kept by hand in a layer, with what it was asked to read back and `settle` to move a task; it keeps `file`, `view`, `stop`, `logs`, `feed`, `output`, `say`, `forget` and `kept`, whose sizes a test plants with `keeps`, held to the real engine by `test/engine-walks.ts` |
 | `src/service/forget.ts` | the engine's `forget` verb, `forgetVerbOf`, and `ForgetRefused`: every guard asked of every id first, then each session's files through its harness, the feed's lines and the journal; without `yes`, a count (`ForgetReport`) |
 | `src/service/kept.ts` | the engine's `kept` verb, `keptVerbOf`, and `KeptRefused`: what the store and the harnesses keep on the disk by task (`KeptReport`), each harness asked once with every session, a path counted once, nothing removed |
+| `src/service/compact.ts` | the engine's `compact` verb, `compactVerbOf`, and `CompactRefused`: each harness with a `compact` asked to count, or with `{ yes: true }` rewrite, its ended sessions' captures (`CompactReport`) |
 | `src/service/bodies.ts` | the engine's verbs over the store's bodies, `sweep` and `removeBody`, behind a refusal of an argument they do not take (`BodyRefused`) |
 | `src/service/watch.ts` | the engine's `watch`, on its `feed`: each entry in order, at least once, drained on the store's push and on a timer |
 | `src/service/options.ts` | what `Engine.layer` is built from and answers with — `HarnessConfig`, `Pooled`, `EngineOptions`, `TaskSpec`, `TickReport`, `EngineIo` — and what the engine refuses of its options before it builds anything (`optionsRefusalOf`) |
@@ -2213,6 +2241,7 @@ of pure code sits beside it.
 | `src/service/refusal.ts` | `refusalWords`: a verb's refusal in words — an `Error` led by the verb whose `exitCode` is 2 — for a caller that answers with a sentence and an exit code: `ae` and the orchestrator |
 | `src/service/index.ts` | the face of `service/`, as the face takes it |
 | `src/cli/main.ts` | the verbs, and the brief: parse (closed keys), call, print |
+| `src/cli/compact.ts` | what `ae compact` is asked (`--yes` or nothing) and the lines it prints: per harness its captures, their bytes before and after, and each left with why |
 | `src/cli/lines.ts` | the lines `ae` prints for a person: a task, an attempt, a journal entry, a usage, the limits a task was filed with |
 | `bin/ae.ts` | the `ae` entry point: a refusal prints its sentence and exits 2 |
 | `bin/ae-worker.ts` | the detached worker: babysits one harness process, keeps the run file |
@@ -2286,6 +2315,7 @@ node bin/ae.ts admit <id>        # let a task filed queued start, on the next pa
 node bin/ae.ts stop <id>
 node bin/ae.ts sweep            # count the bodies no journal names; --yes removes them
 node bin/ae.ts forget <id>       # count what a settled task keeps; --yes removes it
+node bin/ae.ts compact          # count what ended sessions' captures would keep; --yes rewrites them
 ```
 
 ```bash

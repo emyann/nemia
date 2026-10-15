@@ -132,6 +132,16 @@ const parsed = (text: string): unknown => {
   }
 };
 
+/**
+ * The kind of the line `text`: one of `PRINTED`'s when it is a JSON object of that kind, `'other'` for a JSON object of another kind
+ * or subtype, and `undefined` for a line that is no JSON object (stderr, a line torn mid-write, prose). Decodes nothing.
+ */
+export const printedKindOf = (text: string): PrintedKind | 'other' | undefined => {
+  const value = parsed(text);
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
+  return kindOf(value, KINDS) ?? 'other';
+};
+
 /** Why `value`, a `kind` line at line `at`, is refused: the line, its kind, its first wrong field, what is there, and the fix. */
 const refusal = (at: number, kind: PrintedKind, value: unknown, error: Schema.SchemaError): string => {
   const { path, words } = firstRefusal(value, error, 'Claude Code prints');

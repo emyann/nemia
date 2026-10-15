@@ -463,7 +463,8 @@ const missed = (control: Locator, across: number, up: number, down: number): Pro
 /**
  * What the page guarantees a finger on a copy control: 48 pixels across everywhere; on a card from the title's lower edge, 12 above
  * its centre, to 24 below it; in a table 40 down, from 24 above its centre to 16 below, where the target of the next row's control
- * begins. Probed a pixel inside each edge; and the probe refuses a control whose target something clips.
+ * begins. Probed a pixel inside each edge, the pointer away so that no step's card stands open; and the probe refuses a control whose
+ * target something clips.
  */
 async function finger(page: Page, open: OpenRuns, finished: FinishedPage): Promise<void> {
   const controls: Array<[Locator, number, number, string]> = [
@@ -471,6 +472,8 @@ async function finger(page: Page, open: OpenRuns, finished: FinishedPage): Promi
     [section(page, 'in-flight').locator('tr[data-run] [data-copy-id] button').first(), 23, 15, 'a row in flight'],
     [section(page, 'finished').locator(`tr[data-run="${finished.runs[1].id}"] [data-copy-id] button`), 23, 15, 'a finished row'],
   ];
+  await page.mouse.move(0, 0);
+  await expectCount(page.locator('[data-slot="preview-card"]'), 0, "no step's card left open by a pointer resting on a bar");
   for (const [control, up, down, where] of controls) {
     await control.scrollIntoViewIfNeeded();
     const off = await missed(control, 23, up, down);

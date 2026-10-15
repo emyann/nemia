@@ -387,7 +387,7 @@ Each asks the person at a prompt every time it runs: say what it does before you
 Each answers what waits on the person. Bring the matter first, with the `bring-what-waits` skill, then run the verb they choose with their words as `--message`: its prompt is their decision, asked once. `nemia retry` asks only of a step that waits on the person, or with `--budget`.
 
 ```text
-  nemia retry <runId> <step> [--nudge | --fresh | --model <m> | --recheck] [--message "<answer>"] [--budget <amount>]
+  nemia retry <runId> <step> [--nudge | --fresh | --model <m> | --recheck] [--answer <n>=<letter>]... [--message "<answer>"] [--budget <amount>]
                                try a step waiting on you again, once, on the next tick:
                                --nudge (default) continues its session, told what happened;
                                --fresh a new session on its branch; --model <m> the same, on m;
@@ -398,12 +398,22 @@ Each answers what waits on the person. Bring the matter first, with the `bring-w
                                The next argument is the answer, whatever it starts with; an answer
                                that is only one of these flags' names goes as --message=<answer>;
                                --budget <amount>: for a step with a budget: that waits on you, its
-                               cap raised to that many dollars, above its cap and what it has cost
-  nemia approve <runId> <step> [--message "<words>"]
+                               cap raised to that many dollars, above its cap and what it has cost;
+                               --answer <n>=<letter>: answer question n, numbered as nemia decide
+                               <runId> prints them, with the option its letter names; once for each
+                               question: "<n>=a,c" chooses several where it takes several,
+                               "<n>=a: <words>" adds your own words, "<n>: <words>" says words
+                               alone; --message is then the note under your answers
+  nemia approve <runId> <step> [--answer <n>=<letter>]... [--message "<words>"]
                                let a step waiting at its gate hand on: what waits on it is filed on
                                the next tick, and every step after the gate is handed your words
                                under ## Approved. To send it back instead, with what to change:
                                nemia retry <runId> <step> --message "<objection>"
+                               --answer <n>=<letter>: answer question n, numbered as nemia decide
+                               <runId> prints them, with the option its letter names; once for each
+                               question: "<n>=a,c" chooses several where it takes several,
+                               "<n>=a: <words>" adds your own words, "<n>: <words>" says words
+                               alone; --message is then the note under your answers
   nemia round <runId> [<step>] [--budget <amount>]
                                once more: a loop out of rounds goes round again, once, on the
                                next tick — the step it loops to continued, then a new reviewer;

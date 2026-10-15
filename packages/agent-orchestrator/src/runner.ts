@@ -131,6 +131,7 @@ export {
   waitWord,
 } from './run.ts';
 export { outputLines } from './closeout/closeout.ts';
+export { answersOr, askedQuestions, questionLines } from './question/index.ts';
 export { dueNote, messageRefusal, signoffsSpent } from './retry/index.ts';
 export { atWork, firstFiledAt, runStartedAt, runTokens, timeline, timelineLines, timelineTotalLines } from './timeline/index.ts';
 export type { FolderRun, RepositoryRun, PlaceKind } from './run.ts';
@@ -406,6 +407,7 @@ export type { Pass } from './tick/tick.verb.ts';
 export { acceptRun, roundRun } from './round/round.verb.ts';
 export { mergeRun } from './merge/merge.verb.ts';
 export { approveRun } from './gate/gate.verb.ts';
+export { askedNow } from './question/asked.verb.ts';
 export { cancelRun } from './cancel/cancel.verb.ts';
 export { hold, unhold } from './wait/wait.verb.ts';
 export {

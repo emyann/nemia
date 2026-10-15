@@ -17,8 +17,8 @@
  */
 import { Effect } from 'effect';
 import { tried } from '../runtime-client.ts';
-import { approvalWordsRefusal } from '../gate/gate.ts';
-import { approveRun } from '../gate/gate.verb.ts';
+import { APPROVE } from '../gate/commands.verb.ts';
+import { ANSWER_HELP, answerFlag, recheckAnswerRefusal, typedAnswers, typedOf } from '../question/asked.verb.ts';
 import { runStore } from '../record/files.store.ts';
 import { stepsOf } from '../record/record.store.ts';
 import { messageRefusal, type RetryHow } from '../retry/index.ts';
@@ -94,7 +94,8 @@ const RUN_LOOP = [
 /** `nemia retry`: another try of a step asked for, the next tick files it once, and the file the ask is written to. */
 const RETRY: Command<{ try: number; file: string; stopFirst: boolean }> = {
   name: 'retry',
-  usage: '<runId> <step> [--nudge | --fresh | --model <m> | --recheck] [--message "<answer>"] [--budget <amount>]',
+  usage:
+    '<runId> <step> [--nudge | --fresh | --model <m> | --recheck] [--answer <n>=<letter>]... [--message "<answer>"] [--budget <amount>]',
   help: [
     'try a step waiting on you again, once, on the next tick:',
     '--nudge (default) continues its session, told what happened;',
@@ -106,7 +107,8 @@ const RETRY: Command<{ try: number; file: string; stopFirst: boolean }> = {
     'The next argument is the answer, whatever it starts with; an answer',
     "that is only one of these flags' names goes as --message=<answer>;",
     '--budget <amount>: for a step with a budget: that waits on you, its',
-    'cap raised to that many dollars, above its cap and what it has cost',
+    'cap raised to that many dollars, above its cap and what it has cost;',
+    ...ANSWER_HELP,
   ],
   spec: {
     positionals: RUN_STEP,
@@ -129,6 +131,7 @@ const RETRY: Command<{ try: number; file: string; stopFirst: boolean }> = {
         takes: '--message takes what to tell the step, quoted: nemia retry <runId> <step> --message "<answer>"',
         twice: 'nemia retry takes --message once: put the whole answer in it, quoted — nemia retry <runId> <step> --message "<answer>".',
       },
+      answerFlag('retry'),
       {
         flag: '--budget',
         kind: 'amount',
@@ -145,7 +148,10 @@ const RETRY: Command<{ try: number; file: string; stopFirst: boolean }> = {
     apart: (flag) =>
       `--message takes what to tell the step, and ${flag} is one of nemia retry's own flags, so the answer was left out: nemia retry <runId> <step> --message "<answer>". If ${flag} is the whole answer, give it as --message=${flag}.`,
   },
-  check: (args) => messageRefusal(howOf(args), commandLine(RETRY, args)) ?? budgetRefusal(howOf(args), commandLine(RETRY, args)),
+  check: (args) =>
+    messageRefusal(howOf(args), commandLine(RETRY, args)) ??
+    recheckAnswerRefusal(args, commandLine(RETRY, args)) ??
+    budgetRefusal(howOf(args), commandLine(RETRY, args)),
   writes: true,
   ticks: true,
   nemia: 'answers',
@@ -153,7 +159,10 @@ const RETRY: Command<{ try: number; file: string; stopFirst: boolean }> = {
   apiTakes: ['answers'],
   handler: Effect.fnUntraced(function* (args: Args) {
     const { runId, step } = named(args);
-    const { ask, file, stopFirst } = yield* retryRun(runId, step, howOf(args), { stopBlocked: true });
+    const how = howOf(args);
+    const typed = typedOf(args);
+    const message = typed.length ? { message: yield* typedAnswers(runId, step, typed, { note: how.message }) } : {};
+    const { ask, file, stopFirst } = yield* retryRun(runId, step, { ...how, ...message }, { stopBlocked: true });
     return { try: ask.try, file, stopFirst };
   }),
   print({ try: tryNo, file, stopFirst }, args) {
@@ -164,62 +173,9 @@ const RETRY: Command<{ try: number; file: string; stopFirst: boolean }> = {
       ? 'its harness blocked its session: the next tick stops it, and files the try once it has stopped'
       : 'the next tick files it, once';
     return [
-      `${runId}  asked: try ${tryNo} of ${step} (${how})${ask.message !== undefined ? ', with your answer' : ''} — ${then}`,
+      `${runId}  asked: try ${tryNo} of ${step} (${how})${typedOf(args).length ? ', with your answers' : ask.message !== undefined ? ', with your answer' : ''} — ${then}`,
       `   ${file}`,
     ];
-  },
-};
-
-/** What the next tick files once a step is approved: the step itself, what waits on it, or nothing, so its run can be decided. */
-type Next = 'step' | 'waiting' | 'nothing';
-
-/** `nemia approve`: a step's try approved at its gate, what the next tick files because of it, and the file the approval is written to. */
-const APPROVE: Command<{ try: number; at: string; message: string | null; file: string; next: Next }> = {
-  name: 'approve',
-  usage: '<runId> <step> [--message "<words>"]',
-  help: [
-    'let a step waiting at its gate hand on: what waits on it is filed on',
-    'the next tick, and every step after the gate is handed your words',
-    'under ## Approved. To send it back instead, with what to change:',
-    'nemia retry <runId> <step> --message "<objection>"',
-  ],
-  spec: {
-    positionals: RUN_STEP,
-    flags: [
-      {
-        flag: '--message',
-        kind: 'text',
-        key: 'message',
-        takes: '--message takes the words that go with your approval, quoted: nemia approve <runId> <step> --message "<words>".',
-        twice: 'nemia approve takes --message once: put all your words in it, quoted — nemia approve <runId> <step> --message "<words>".',
-      },
-    ],
-    unknown: (arg) =>
-      `nemia approve does not take ${arg}. It takes the run, the step, and --message "<words>": nemia approve <runId> <step> [--message "<words>"].`,
-  },
-  check: (args) => approvalWordsRefusal(textOf(args, 'message'), commandLine(APPROVE, args)),
-  writes: true,
-  ticks: true,
-  nemia: 'answers',
-  route: { method: 'POST', path: '/api/runs/:runId/steps/:step/approve', status: 202 },
-  apiTakes: ['answers'],
-  apiKeys: ['try', 'at', 'message', 'file'],
-  handler: Effect.fnUntraced(function* (args: Args) {
-    const { runId, step } = named(args);
-    const { approval, file } = yield* approveRun(runId, step, textOf(args, 'message'));
-    const after = runStore.runs.read(runId);
-    const next: Next = !after.steps[step]?.taskId ? 'step' : stepsOf(after).some((s) => s.after.includes(step)) ? 'waiting' : 'nothing';
-    return { try: approval.try, at: approval.at, message: approval.message ?? null, file, next };
-  }),
-  print({ try: tryNo, message, file, next }, args) {
-    const { runId, step } = named(args);
-    const then =
-      next === 'step'
-        ? `the next tick files ${step}`
-        : next === 'waiting'
-          ? 'the next tick files what waits on it'
-          : 'nothing waits on it: its run can be decided';
-    return [`${runId}  approved: try ${tryNo} of ${step}${message !== null ? ', with your words' : ''} — ${then}`, `   ${file}`];
   },
 };
 

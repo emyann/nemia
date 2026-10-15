@@ -9,7 +9,7 @@ import { stepsOf } from '../record/record.store.ts';
 import { runStore } from '../record/files.store.ts';
 import { retryable, WAITS_ON_PERSON } from '../retry/index.ts';
 import { acceptanceOf, overBudget, runSpend } from '../status/status.ts';
-import { askedQuestions } from '../question/question.ts';
+import { askedQuestions } from '../question/index.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhasesRead } from '../views/views.verb.ts';
 import type { Seen } from '../auto/index.ts';
 

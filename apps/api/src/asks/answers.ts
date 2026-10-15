@@ -3,25 +3,17 @@
  * questions its current closeout asks (`askedQuestions`), and written as the words its next try reads (`answerText`), which
  * `nemia retry --message` would carry, or as its approval's words (`approvedAnswerText`), which `nemia approve --message` would carry.
  */
-import { closeoutOf, type RetryHow, judgedSteps, workflowsOf } from 'agent-orchestrator';
-import {
-  type Answer,
-  answerRefusal,
-  answerText,
-  approvedAnswerText,
-  askedQuestions,
-  type Question,
-  type Run,
-} from 'agent-orchestrator/run';
+import { askedNow as askedOf, runWith, type RetryHow } from 'agent-orchestrator';
+import { type Answer, answerRefusal, answerText, approvedAnswerText, type Question, type Run } from 'agent-orchestrator/run';
 import type { Refusal } from '../guard.ts';
-import { engineRead, type Engine } from '../store.ts';
+import type { Engine } from '../store.ts';
 
-/** The questions `step`'s current closeout asks, in the order its fields ask them: none where it asks none, or has not signed off. */
+/**
+ * The questions `step`'s current closeout asks, in the order its fields ask them: none where it asks none, or has not signed off. The
+ * package's reading (`askedNow`), its fields flattened.
+ */
 export async function askedNow(e: Engine['Service'], run: Run, step: string, home: string): Promise<Question[]> {
-  const taskId = run.steps[step]?.taskId;
-  const views = new Map(taskId ? [[taskId, await engineRead('view', e.view(taskId))]] : []);
-  const frozen = judgedSteps(run, workflowsOf(run, home).steps).find((s) => s.name === step);
-  return askedQuestions(frozen, closeoutOf(views, run, step)).flatMap((a) => a.questions);
+  return (await runWith(e, askedOf(run, step, home))).flatMap((a) => a.questions);
 }
 
 /**

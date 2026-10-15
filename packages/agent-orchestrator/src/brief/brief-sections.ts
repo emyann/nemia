@@ -28,6 +28,7 @@ import type { Said } from '../say/say.ts';
 import { loopSpan, upstreamOf } from '../workflow/index.ts';
 import { heldLater, roundsDue } from '../round/round.ts';
 import { neverApproved } from '../prune/prune.ts';
+import { answersOr } from '../question/index.ts';
 
 /**
  * For a new session of a loop's target within a round past the first — a fresh try, or a nudge with no session left to continue — the
@@ -560,7 +561,8 @@ export function acceptedSection(
 
 /**
  * What `nemia decide` prints under each gated step whose gate has something to say: `approved 23:10Z — "ship the second reading"` for the
- * try it is on, or `awaiting approval` with the two commands a person has. Nothing for a gated step not yet signed off, nor for one with no
+ * try it is on, or `awaiting approval` with the two commands a person has, the approval with an `--answer` for each question the step's
+ * closeout asks (`answersOr`). Nothing for a gated step not yet signed off, nor for one with no
  * gate. Pure.
  *
  * An ending whose work a try or round due files again holds no gate (`unheld`), as `assess`, `listing` and `decision` read it, since
@@ -606,7 +608,7 @@ export function gateLines(
         .map((name) => `nemia retry ${run.id} ${name} --message "<objection>"`)
         .join(' or ');
       lines[step.name] =
-        `awaiting approval:  nemia approve ${run.id} ${step.name} [--message "<words>"]${back ? `  — or send it back:  ${back}` : ''}`;
+        `awaiting approval:  nemia approve ${run.id} ${step.name} ${answersOr(step, closeoutOf(step.name), '[--message "<words>"]')}${back ? `  — or send it back:  ${back}` : ''}`;
     }
   }
   return lines;

@@ -34,7 +34,7 @@ function OpenedCard({ run, step, asOf }: { run: RailRun; step: string; asOf: Dat
 function HoverPreview({ run, step, asOf, children }: { run: RailRun; step: RailStep; asOf: Date; children: ReactNode }) {
   return (
     <PreviewTrigger>
-      <Button aria-label={barSaid(step.name, step.state)} data-bar={step.name} className={BAR_BUTTON}>
+      <Button aria-label={barSaid(step.name, step.state)} data-step-bar={step.name} className={BAR_BUTTON}>
         {children}
       </Button>
       <PreviewCard placement="bottom start" className="max-w-[calc(100vw-2rem)] rounded-none bg-transparent p-0 shadow-none">
@@ -50,7 +50,7 @@ function SheetPreview({ run, step, asOf, children }: { run: RailRun; step: RailS
   const said = barSaid(step.name, step.state);
   return (
     <>
-      <Button aria-label={said} data-bar={step.name} className={BAR_BUTTON} onPress={() => setOpen(true)}>
+      <Button aria-label={said} data-step-bar={step.name} className={BAR_BUTTON} onPress={() => setOpen(true)}>
         {children}
       </Button>
       <BottomSheet variant="modal" isOpen={open} onClose={() => setOpen(false)} aria-label={said} heights={['partial', 'expanded']}>

@@ -205,7 +205,12 @@ async function cardSays(page: Page, run: WaitingRun): Promise<void> {
     [openWord(run)],
     "one filled button, which says what there is to read and opens the run's page",
   );
-  await expectCount(card.locator('button'), 1, 'and one control, the copy of its id: nothing is decided from the list');
+  await expectCount(card.locator('button[data-step-bar]'), run.steps.length, "each bar of its rail a button that opens its step's card");
+  await expectCount(
+    card.locator('button:not([data-step-bar])'),
+    1,
+    'and one control more, the copy of its id: nothing is decided from the list',
+  );
 }
 
 /** The seed's two gates name what a person reads there: the plan that waits, and the review done before a landing not yet filed. */
@@ -345,9 +350,9 @@ const focused = (page: Page): Locator => page.locator(':focus');
 const tooltip = (page: Page): Locator => page.locator('[data-slot="tooltip"]');
 
 /**
- * The keyboard's path over COSTLY's card: from its title, Tab reaches the copy control, which Enter presses; then each tile in turn,
- * whose tooltip opens on focus with its breakdown and closes on Escape, asking the api nothing; then the button. Each tooltip is
- * photographed.
+ * The keyboard's path over COSTLY's card: from its title, Tab reaches the copy control, which Enter presses, then the rail's bars;
+ * from the last bar each tile in turn, whose tooltip opens on focus with its breakdown and closes on Escape, asking the api nothing;
+ * then the button. Each tooltip is photographed.
  */
 async function byKeyboard(page: Page, run: WaitingRun): Promise<void> {
   const card = cardOf(page, run.id);
@@ -363,6 +368,11 @@ async function byKeyboard(page: Page, run: WaitingRun): Promise<void> {
   const copied = await page.evaluate(() => navigator.clipboard.readText());
   if (copied !== run.id) throw new Refused(`the copy control copies the run's whole id, ${run.id} — the clipboard holds "${copied}"`);
   await expectTexts(card.locator('[data-copy-id] [role="status"]'), ['Copied'], 'and says it to a screen reader');
+  await page.keyboard.press('Tab');
+  await expectVisible(card.locator('button[data-step-bar]').first().locator(':scope:focus'), "then Tab reaches the rail's first bar");
+  await card.locator('button[data-step-bar]').last().focus();
+  await page.keyboard.press('Escape');
+  await expectCount(page.locator('[data-slot="preview-card"]'), 0, "Escape on the rail's last bar leaves no step's card open");
 
   const heads: Record<string, RegExp> = {
     clock: /since it was created$/,

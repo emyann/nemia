@@ -14,21 +14,27 @@ const FLIGHT = 'section[data-section="in-flight"]';
 const PHONE = { width: 390, height: 844 };
 
 /** What the api answers at `url`, read in the page as the board reads it. */
-const answer = <T>(page: Page, url: string): Promise<T> =>
-  page.evaluate(async (at) => (await (await fetch(at)).json()) as unknown, url) as Promise<T>;
+async function answer<T>(page: Page, url: string): Promise<T> {
+  const text = await page.evaluate(async (at) => (await fetch(at)).text(), url);
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Refused(`the api answers ${url} with JSON — it answered ${text.slice(0, 80)}`);
+  }
+}
 
 /** A bar of the table in flight to open, the first of a step an agent works where the seed names one, and its run. */
 async function aBar(page: Page): Promise<{ bar: Locator; run: string; step: string }> {
   const bars = await page
-    .locator(`${FLIGHT} tr[data-run] [data-bar]`)
+    .locator(`${FLIGHT} tr[data-run] [data-step-bar]`)
     .evaluateAll((found) =>
-      found.map((bar) => ({ run: bar.closest('tr')!.getAttribute('data-run')!, step: bar.getAttribute('data-bar')! })),
+      found.map((bar) => ({ run: bar.closest('tr')!.getAttribute('data-run')!, step: bar.getAttribute('data-step-bar')! })),
     );
   if (bars.length === 0) throw new Refused('the table in flight draws its rails as buttons — no bar is a button');
   const runs = await answer<RunSummary[]>(page, '/api/runs');
   const worked = bars.find(({ run, step }) => runs.find((r) => r.id === run)?.steps.find((s) => s.name === step)?.agent);
   const { run, step } = worked ?? bars[0];
-  return { bar: page.locator(`${FLIGHT} tr[data-run="${run}"] [data-bar="${step}"]`), run, step };
+  return { bar: page.locator(`${FLIGHT} tr[data-run="${run}"] [data-step-bar="${step}"]`), run, step };
 }
 
 /** The card the board's rule gives for the step, from the api's own answers. */
@@ -65,18 +71,27 @@ async function readsAsExpected(card: Locator, want: StepCardFacts, where: string
 /** The preview's card, open beside its bar. */
 const previewOf = (page: Page): Locator => page.locator('[data-slot="preview-card"] [data-step-card]');
 
-/** By the keyboard: focus reaches the bar, and the card opens at once, reading what the api says of the step. */
-async function byTheKeyboard(page: Page, bar: Locator, want: StepCardFacts): Promise<void> {
-  await bar.focus();
-  await page.keyboard.press('Shift+Tab');
-  await page.keyboard.press('Tab');
+/** Whether `bar` holds the focus. */
+const focusedOn = (bar: Locator): Promise<boolean> => bar.evaluate((found) => found === document.activeElement);
+
+/**
+ * By the keyboard: the row in flight takes the focus, as the table's arrows move it, and Right walks it along the row's controls to
+ * the bar; the card opens, reading what the api says of the step.
+ */
+async function byTheKeyboard(page: Page, bar: Locator, run: string, want: StepCardFacts): Promise<void> {
+  await page.locator(`${FLIGHT} tr[data-run="${run}"]`).focus();
+  for (let step = 0; step < 12 && !(await focusedOn(bar)); step += 1) await page.keyboard.press('ArrowRight');
+  if (!(await focusedOn(bar))) throw new Refused("the table's arrows reach the bar along its row");
   await expectVisible(previewOf(page), 'a bar the keyboard focuses opens its step card');
   await readsAsExpected(previewOf(page), want, 'by the keyboard');
   await page.keyboard.press('Escape');
   await expectCount(previewOf(page), 0, 'Escape closes the preview');
 }
 
-/** By the pointer: hovering the bar opens the card, which stays while the pointer moves onto it, and its action opens the step's page. */
+/**
+ * By the pointer: hovering the bar opens the card, which stays while the pointer moves onto it, and its action opens the step's page,
+ * left once its session's stream is open, every read before it answered.
+ */
 async function byThePointer(page: Page, bar: Locator, run: string, step: string, want: StepCardFacts): Promise<void> {
   await page.mouse.move(0, 0);
   await bar.hover();
@@ -85,10 +100,12 @@ async function byThePointer(page: Page, bar: Locator, run: string, step: string,
   await photographCard(page, 'card');
   const action = previewOf(page).locator('[data-step-action]');
   await action.hover();
+  const streaming = page.waitForRequest((request) => request.url().includes('/transcript/stream'));
   await action.click();
   const at = `/runs/${encodeURIComponent(run)}/steps/${encodeURIComponent(step)}`;
   await expectNone(async () => (new URL(page.url()).pathname === at ? null : page.url()), `the action opens ${at}`);
-  await page.goBack();
+  await streaming;
+  await page.goto(new URL('/runs', page.url()).href, { waitUntil: 'load' });
   await idle(page);
 }
 
@@ -97,12 +114,18 @@ async function photographCard(page: Page, what: string): Promise<void> {
   await photograph(page, path.join(OUT, `runs-preview-${what}-${await themeOf(page)}.png`));
 }
 
-/** On a phone's window: a press on the bar opens the same card in a modal sheet named by the bar, and the scrim closes it, focus back on the bar. */
-async function onAPhone(page: Page, run: string, step: string, want: StepCardFacts): Promise<void> {
+/**
+ * On a phone's window: a press on a waiting card's bar opens the same card in a modal sheet named by the bar, and the scrim closes it,
+ * focus back on the bar.
+ */
+async function onAPhone(page: Page): Promise<void> {
   const size = page.viewportSize() ?? { width: 1280, height: 800 };
   await page.setViewportSize(PHONE);
   try {
-    const bar = page.locator(`${FLIGHT} tr[data-run="${run}"] [data-bar="${step}"]`);
+    const bar = page.locator('article [data-step-bar]').first();
+    const run = (await bar.evaluate((found) => found.closest('[data-run]')?.getAttribute('data-run'))) ?? '';
+    if (!run) throw new Refused("a waiting card's bar stands in its run's card");
+    const want = await expected(page, run, (await bar.getAttribute('data-step-bar')) ?? '');
     const name = (await bar.getAttribute('aria-label')) ?? '';
     await bar.click();
     const sheet = page.getByRole('dialog', { name });
@@ -112,10 +135,7 @@ async function onAPhone(page: Page, run: string, step: string, want: StepCardFac
     await photographCard(page, 'sheet');
     await page.mouse.click(PHONE.width / 2, 20);
     await expectCount(page.getByRole('dialog'), 0, 'a press on the scrim closes the sheet');
-    await expectNone(
-      async () => ((await bar.evaluate((found) => found === document.activeElement)) ? null : 'focus is elsewhere'),
-      'focus goes back to the bar',
-    );
+    await expectNone(async () => ((await focusedOn(bar)) ? null : 'focus is elsewhere'), 'focus goes back to the bar');
   } finally {
     await page.setViewportSize(size);
   }
@@ -132,8 +152,8 @@ export default {
   expect: async (page) => {
     const { bar, run, step } = await aBar(page);
     const want = await expected(page, run, step);
-    await byTheKeyboard(page, bar, want);
+    await byTheKeyboard(page, bar, run, want);
     await byThePointer(page, bar, run, step, want);
-    await onAPhone(page, run, step, want);
+    await onAPhone(page);
   },
 } satisfies PageSpec;

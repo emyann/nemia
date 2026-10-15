@@ -55,7 +55,7 @@ Every step ends by signing off with a structured answer, its closeout, in a vers
 `outcome` (`done` or `blocked`), a one-line `summary` for the person who decides, a markdown `body` for the rest, the `artifacts` it
 made (files, or named values such as a pull request's address), and what it `needs`, only when blocked. A workflow can ask a step for
 more fields with `output`, beside its agent's own, each field declared once, and a later step reads them with `input`, as data. Once
-a step signs off, the run keeps its whole closeout as `closeout.json` in the step's files directory, where the steps after it read it. Claude Code gives the answer through its `StructuredOutput` tool, and Codex through its output
+a step signs off, the run keeps its whole closeout as a file named closeout.json in the step's files directory, where the steps after it read it. Claude Code gives the answer through its `StructuredOutput` tool, and Codex through its output
 schema. A step that signs off `blocked` stops what waits on it, and says so to the person.
 
 ## The check

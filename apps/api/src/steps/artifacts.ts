@@ -121,9 +121,10 @@ const isDirectory = (at: string): boolean => {
  * Beside the closeout's `artifacts`, which are the files a step *named* and the run collected: these are what is in the folder,
  * named or not, which is the only way to see what a step left behind that it forgot to name.
  *
- * Two things are left out. The run's own `closeout.json` (`HANDED_CLOSEOUT`), the step's closeout it wrote there for the steps after
- * it, which the page shows as the closeout. And the run's own `given/` directory, which the run copied in before the step started — its inputs and a copy of
- * each folder the step waits on (`givenPlan`). It is not what the step made, it is the same work drawn twice for a fan-in child, and
+ * Two things are left out. The run's own `closeout.json` (`HANDED_CLOSEOUT`), the step's closeout it wrote there for the steps
+ * after it, which the page shows as the closeout. And the run's own `given/` directory, which the run copied in before the step
+ * started — its inputs and a copy of each folder the step waits on (`givenPlan`). It is not what the step made, it is the same work
+ * drawn twice for a fan-in child, and
  * listed it would stand in every folder of every run started with `--input`, so *the folder is empty* could never be said of a step
  * that made nothing. The name comes from the package, not spelled a second time here. A `given` that is not a directory is a step's
  * own file and is listed: what the run makes is a directory.

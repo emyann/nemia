@@ -120,10 +120,47 @@ async function byThePointer(page: Page, bar: Locator, run: string, step: string,
   await bar.hover();
   await expectVisible(previewOf(page), 'a bar the pointer rests on opens its step card');
   await readsAsExpected(previewOf(page), want, 'by the pointer');
+  await glowHasRoom(page, 'by the pointer');
   await photographCard(page, 'card');
   const action = previewOf(page).locator('[data-step-action]');
   await action.hover();
   await followed(page, run, step, () => action.click());
+}
+
+/** How far a frame's glow reaches past its edge: the look's `drop-shadow` of 10 pixels (`GLOW` in look/CutFrame.tsx). */
+const GLOW_REACH = 10;
+
+/**
+ * That the open preview's frame stands inset in the preview's box by the glow's reach on every side, measured along the box's own
+ * scroll: the box clips what passes its edge, so a frame that fills it loses its glow.
+ */
+async function glowHasRoom(page: Page, what: string): Promise<void> {
+  const insets = await page.locator('[data-slot="preview-card"]').evaluate((box) => {
+    const frame = box.querySelector('[data-cut-frame]')!.getBoundingClientRect();
+    const outer = box.getBoundingClientRect();
+    const top = frame.top - outer.top + box.scrollTop;
+    const left = frame.left - outer.left + box.scrollLeft;
+    return [top, left, box.scrollWidth - (left + frame.width), box.scrollHeight - (top + frame.height)].map(Math.floor);
+  });
+  if (insets.some((inset) => inset < GLOW_REACH))
+    throw new Refused(
+      `${what}: the frame stands ${GLOW_REACH} pixels inside the preview's box, room for its glow — top, left, right, bottom ${insets}`,
+    );
+}
+
+/** At a gate: a waiting card's bar that waits for you opens its card in the frame that glows, the glow drawn whole. */
+async function aGateGlows(page: Page): Promise<void> {
+  await page.mouse.move(0, 0);
+  const bar = page
+    .locator('section[data-section="waiting"] [data-step-bar][data-step-preview="card"][aria-label$="waits for you"]')
+    .first();
+  await bar.hover();
+  await expectVisible(previewOf(page), 'a bar at its gate opens its step card');
+  await expectCount(page.locator('[data-slot="preview-card"] [data-cut-frame="yours"]'), 1, 'in the frame that glows');
+  await glowHasRoom(page, 'at a gate');
+  await photographCard(page, 'gate');
+  await page.mouse.move(0, 0);
+  await expectCount(previewOf(page), 0, 'the pointer gone, the preview closes');
 }
 
 /** A window too short for the card on either side of a bar: 1280 wide, 420 tall. */
@@ -213,6 +250,7 @@ export default {
     const want = await expected(page, run, step);
     await byTheKeyboard(page, bar, run, step, want);
     await byThePointer(page, bar, run, step, want);
+    await aGateGlows(page);
     await inAShortWindow(page, (await aBar(page)).bar);
     await onAPhone(page);
   },

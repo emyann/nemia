@@ -542,7 +542,6 @@ const knownNames = (): Set<string> =>
 const OTHER_PROGRAMS = new Set([
   'UNSPECIFIED',
   'AUTH_REQUIRED',
-  'SubscribeToTask',
   'TaskStore',
   'agentCardHandler',
   'canUseTool',

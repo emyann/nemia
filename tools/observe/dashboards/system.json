@@ -1930,8 +1930,8 @@
     {
       "id": 24,
       "type": "timeseries",
-      "title": "Feed beats and reads per minute",
-      "description": "feed.follow.beats and feed.follow.reads.",
+      "title": "Feed beats, reads and lines per minute",
+      "description": "feed.follow.beats, feed.follow.reads and feed.follow.lines.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1960,6 +1960,15 @@
           "refId": "B",
           "expr": "60 * sum(rate(feed_follow_reads_total{service_name=\"$service\"}[$__rate_interval]))",
           "legendFormat": "reads"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "C",
+          "expr": "60 * sum(rate(feed_follow_lines_total{service_name=\"$service\"}[$__rate_interval]))",
+          "legendFormat": "lines"
         }
       ],
       "fieldConfig": {

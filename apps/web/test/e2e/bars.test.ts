@@ -14,7 +14,7 @@ import { scratch } from '../scratch.ts';
 import { WAITED } from '../waits.ts';
 import { expectNone } from './checks.ts';
 import { buildParts, openParts, story } from './parts/gallery.ts';
-import { apart, coloursOf, edgesOf, type Rgb } from './parts/pixels.ts';
+import { apart, coloursOf, edgesOf, spilledOver, type Rgb } from './parts/pixels.ts';
 import { launch, type Bars } from './visit.ts';
 
 const built = scratch('nemia-bars-');
@@ -97,8 +97,7 @@ async function cutSpills(kind: Bars, page: Page, name: string, shot: string): Pr
   const { ground, edge, lower, ...found } = await read(kind, page, shot, points);
   const seen = Math.max(apart(edge, ground), apart(lower, ground));
   assert.ok(seen > 8, `the frame's edge is read apart from the ground, on the row a box between two pixels is drawn from: ${seen}`);
-  const spilled = Object.entries(found).flatMap(([where, colour]) => (apart(colour, ground) > 3 ? [where.split(':')[0]] : []));
-  return [...new Set(spilled)];
+  return spilledOver(found, ground, 3);
 }
 
 /** The framed tables with a ground of their own under the header's cells and the rows, as the kit draws a row by default. */

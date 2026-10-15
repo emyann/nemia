@@ -5,7 +5,7 @@
  */
 import { LOOP_REPLIES, outputFields, type Workflow } from '../step/step.ts';
 import { andList, dataBlock, fenced, type CloseoutAsked, type Run, type StepStatus, type TaskPhase } from '../record/record.ts';
-import { declaredOutput, type Closeout } from '../closeout/closeout.ts';
+import { declaredOutput, type Closeout } from '../closeout/index.ts';
 import {
   acceptanceOf,
   approvalOf,

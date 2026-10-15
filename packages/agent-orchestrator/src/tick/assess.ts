@@ -16,7 +16,7 @@ import {
 import { toDecide, type ToDecide } from '../ending/ending.ts';
 import type { Workflow } from '../step/step.ts';
 import { satisfiesAfter, stopsFollowers, type CloseoutAsked, type Run, type StepStatus, type TaskPhase } from '../record/record.ts';
-import type { Closeout } from '../closeout/closeout.ts';
+import type { Closeout } from '../closeout/index.ts';
 import type { Verdict } from '../check/check.ts';
 import type { CheckoutHold } from '../cap/cap.ts';
 import { roundsDue } from '../round/round.ts';

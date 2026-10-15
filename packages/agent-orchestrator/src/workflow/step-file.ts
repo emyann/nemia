@@ -59,7 +59,7 @@ import {
 } from '../former/former.ts';
 import type { Agent, Agents, SkillsFound } from '../agents/agents.ts';
 import { tallyOf } from '../tally/tally.ts';
-import { mergedOutput } from '../keys/merged-output.ts';
+import { mergedOutput } from '../keys/index.ts';
 import { addedSkillsRefusal, fenceRefusal, refuseUnwritable } from './fence.ts';
 
 /** A factory's `rules` as a step on `harness` is told them, trimmed: none for blank rules, and none on a remote agent. */
@@ -88,8 +88,9 @@ const wordsAbove = (agent: Agent, factoryRules: string | undefined) => ({
  * told is the agent's instructions, then a person's custom instructions for it (`Agent.customInstructions`), then the step's own note,
  * each after a blank line — the agent's alone when the step has none. Custom instructions are words and set no key. The step's own
  * lines are read against the harness it runs on, its agent's where it names none, before the two are merged: a step's `permissionMode:`
- * on codex is its own `sandbox:`. A schema the agent's `output:` names is read beside the agent, and one the step names beside the step; the step's output is both,
- * merged (`mergedOutput`), each field with one owner, and a field both declare is refused naming it and both declarers.
+ * on codex is its own `sandbox:`. A schema the agent's `output:` names is read beside the agent, and one the step names beside the
+ * step; the step's output is both, merged (`mergedOutput`), each field with one owner, and a field both declare is refused naming it
+ * and both declarers.
  * Everything downstream of the parser sees the resolved step; `agent` on it says what was the step's own.
  *
  * `hired` is the agent a factory hires into a step (`Hire`): a step whose file names no agent is resolved with it exactly as if its file

@@ -4,7 +4,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Closeout } from '../closeout/closeout.ts';
+import type { Closeout } from '../closeout/index.ts';
 import { HOME } from '../record/record.store.ts';
 
 /**

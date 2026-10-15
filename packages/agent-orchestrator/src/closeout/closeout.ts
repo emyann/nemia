@@ -6,7 +6,17 @@
  * `advance.verb.ts` files each step with `closeoutSchemaOf`, and the controllers read the engine's record with `parseCloseout`; nothing
  * here reads a disk or calls the engine.
  */
-import { CLOSEOUT_FIELDS, isObject, LOOP_REPLIES, outputFields, type Workflow } from '../step/step.ts';
+import { isObject, LOOP_REPLIES, outputFields, type Workflow } from '../step/step.ts';
+import {
+  artifactsOf,
+  bodyOf,
+  CLOSEOUT_V1,
+  ENVELOPE_SCHEMA,
+  summaryLine,
+  V0_FIELDS,
+  V1_FIELDS,
+  type ValueArtifact,
+} from './envelope.ts';
 
 /**
  * The shape of a step's closing statement, handed to the engine as a JSON Schema.
@@ -16,7 +26,7 @@ import { CLOSEOUT_FIELDS, isObject, LOOP_REPLIES, outputFields, type Workflow } 
  * reading it. The shape and what it means live here, because they are this package's vocabulary
  * and nothing underneath should have to learn it.
  *
- * Strict on purpose: every property required and `needs` nullable rather than optional. Codex
+ * The v1 envelope (`ENVELOPE_SCHEMA`). Strict on purpose: every property required and `needs` nullable rather than optional. Codex
  * enforces strict structured outputs, and a schema has to satisfy the strictest harness it will be
  * handed to.
  *
@@ -24,17 +34,7 @@ import { CLOSEOUT_FIELDS, isObject, LOOP_REPLIES, outputFields, type Workflow } 
  * attempt that made it, and needs no path, so it never travels down the branch to the next step and is
  * not rewritten after it is given.
  */
-export const CLOSEOUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    outcome: { type: 'string', enum: ['done', 'blocked'] },
-    summary: { type: 'string' },
-    artifacts: { type: 'array', items: { type: 'string' } },
-    needs: { type: ['string', 'null'] },
-  },
-  required: ['outcome', 'summary', 'artifacts', 'needs'],
-  additionalProperties: false,
-};
+export const CLOSEOUT_SCHEMA = ENVELOPE_SCHEMA;
 
 /** A closeout schema as the engine is handed it. */
 export type CloseoutSchema = { type: string; properties: Record<string, object>; required: string[]; additionalProperties: boolean };
@@ -64,27 +64,29 @@ export function closeoutSchemaOf(step: Workflow, steps: readonly Workflow[]): Cl
 }
 
 /**
- * What a step says on its way out.
+ * What a step says on its way out, as every reader reads it, whichever version it was given in (`parseCloseout`).
  *
- * Two audiences, deliberately separated, which is the whole reason this is a record and not a
- * string. `summary` is prose for the DECIDER — a person, at the end of the run. `artifacts` is for
- * the machine and for the next step: the files this step wants read.
- *
- * The reviewer never sees `summary`. Passing the implementer's account of the work to the person
- * judging it would anchor the judgement on the context that produced the work, and offer
- * unverifiable claims beside verifiable evidence — the rule `composeBrief` keeps. The field travels
- * to the person instead.
+ * Two audiences, deliberately separated, which is the whole reason this is a record and not a string. `summary` and `body` are prose
+ * for the DECIDER — a person — and travel to a later step only inside the step's `closeout.json` in its files directory, the step's own
+ * account, never a finding's answer. `artifacts` and `values` are for the machine and for the next step.
  */
 export type Closeout = {
+  /** `nemia/v1` for a closeout given in v1's envelope; absent for one given before it (v0), converted on read. */
+  apiVersion?: typeof CLOSEOUT_V1;
   /** `done` finished the work. `blocked` finished the SESSION and needs a person. */
   outcome: 'done' | 'blocked';
+  /** One line, cut to `SUMMARY_MAX` characters (`summaryLine`). */
   summary: string;
+  /** Markdown, what the summary has no room for: led by the whole summary when the cut changed it. */
+  body?: string;
   /** Files this step produced for whoever reads next, by path from the workspace root. */
   artifacts: string[];
+  /** Values this step hands on, each by its name. */
+  values?: ValueArtifact[];
   /** Set when blocked: what the person has to settle. */
   needs?: string;
   /**
-   * Every field beyond those four, as the harness returned it — what a step's `output:` declares.
+   * Every field beyond the envelope's, as the harness returned it — what a step's `output:` declares.
    * Absent when there are none. Only the declared fields mean anything, and only they travel, to a step
    * that asks (`declaredOutput`).
    */
@@ -99,26 +101,47 @@ export type Closeout = {
  * accepted too, since that is what a harness that could not parse its own answer hands back.
  * Anything but an object, an array included, is `not an object`. `needs` is nullable in the schema,
  * since a strict harness requires every property, and absent here unless it is a non-empty string.
+ *
+ * By version: no `apiVersion` is v0 — its whole summary becomes the body when it is more than one line, its first line the summary,
+ * its strings file artifacts — and `nemia/v1` is read as it is; any other is an `error`. Every summary is cut to a line
+ * (`summaryLine`), the whole text leading the body when the cut changed it. The fields beyond the version's envelope are `output`.
  */
 export function parseCloseout(value: unknown): Closeout | { error: string } {
+  const read = objectOf(value);
+  if (typeof read === 'string') return { error: read };
+  const o = read;
+  const v1 = o.apiVersion === CLOSEOUT_V1;
+  if (o.apiVersion !== undefined && !v1) return { error: `apiVersion ${JSON.stringify(o.apiVersion)} is not one this run reads` };
+  const envelope: readonly string[] = v1 ? V1_FIELDS : V0_FIELDS;
+  const rest = Object.entries(o).filter(([k]) => !envelope.includes(k));
+  const whole = typeof o.summary === 'string' ? o.summary : '';
+  const summary = summaryLine(whole);
+  const { files, values } = artifactsOf(o.artifacts);
+  const body = bodyOf(whole, summary, v1 && typeof o.body === 'string' ? o.body : undefined);
+  return {
+    ...(v1 ? { apiVersion: CLOSEOUT_V1 } : {}),
+    outcome: o.outcome === 'blocked' ? 'blocked' : 'done',
+    summary,
+    ...(body !== undefined ? { body } : {}),
+    artifacts: files,
+    ...(values.length ? { values } : {}),
+    needs: typeof o.needs === 'string' && o.needs ? o.needs : undefined,
+    ...(rest.length ? { output: Object.fromEntries(rest) } : {}),
+  };
+}
+
+/** A closeout as the object it is, from the object the engine recorded or the text a harness handed back; else why not, in words. */
+function objectOf(value: unknown): Record<string, unknown> | string {
   let raw = value;
   if (typeof raw === 'string') {
     try {
       raw = JSON.parse(raw);
     } catch (e) {
-      return { error: `unparseable: ${(e as Error).message}` };
+      return `unparseable: ${(e as Error).message}`;
     }
   }
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { error: 'not an object' };
-  const o = raw as Record<string, unknown>;
-  const rest = Object.entries(o).filter(([k]) => !(CLOSEOUT_FIELDS as readonly string[]).includes(k));
-  return {
-    outcome: o.outcome === 'blocked' ? 'blocked' : 'done',
-    summary: typeof o.summary === 'string' ? o.summary : '',
-    artifacts: Array.isArray(o.artifacts) ? o.artifacts.filter((a): a is string => typeof a === 'string') : [],
-    needs: typeof o.needs === 'string' && o.needs ? o.needs : undefined,
-    ...(rest.length ? { output: Object.fromEntries(rest) } : {}),
-  };
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return 'not an object';
+  return raw as Record<string, unknown>;
 }
 
 /**

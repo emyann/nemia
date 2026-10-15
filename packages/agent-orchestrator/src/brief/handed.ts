@@ -5,7 +5,7 @@
  */
 import { outputFields, type Workflow } from '../step/step.ts';
 import { dataBlock, fenced } from '../record/record.ts';
-import { declaredOutput, type Closeout } from '../closeout/closeout.ts';
+import { declaredOutput, type Closeout } from '../closeout/index.ts';
 
 /** A terminal step of a run another waited on: its step and how it signed off — or its name, and why that cannot be given. */
 export type ParentStep = { step: Workflow; said: Closeout } | { name: string; unreadable: string };

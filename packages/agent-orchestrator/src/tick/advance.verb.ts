@@ -28,7 +28,7 @@ import { assess, type Assessment } from './assess.ts';
 import { feedPhase, feedWords, type FeedWords } from '../feed/feed.ts';
 import { listing } from '../list/list.ts';
 import { roundFiled, roundsDue } from '../round/round.ts';
-import type { Closeout } from '../closeout/closeout.ts';
+import type { Closeout } from '../closeout/index.ts';
 import { nextTry, pauseAsksVoid, retriesDue, turnsOf, type RetryAsk } from '../retry/index.ts';
 import { runsDir, stepsOf } from '../record/record.store.ts';
 import { runStore } from '../record/files.store.ts';

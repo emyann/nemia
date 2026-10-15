@@ -4,7 +4,7 @@
  * (`questionLines`), and `--answer 1=a` names them back, resolved to the board's own answers, by question title and option label
  * (`numberedAnswers`), before the package's `answerRefusal` and `answerText` read them. Pure.
  */
-import type { Closeout } from '../closeout/closeout.ts';
+import type { Closeout } from '../closeout/index.ts';
 import type { Workflow } from '../step/step.ts';
 import { askedQuestions, type Answer, type Asked, type Question } from './question.ts';
 

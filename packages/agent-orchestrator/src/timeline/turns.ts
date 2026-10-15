@@ -4,7 +4,7 @@
  *
  * Pure, as `timeline.ts` is, and imports nothing of it: the tries of a step's record and a task's attempts in, the turn and its span out.
  */
-import { parseCloseout } from '../closeout/closeout.ts';
+import { parseCloseout } from '../closeout/index.ts';
 
 /** A try of a step as a turn is read off it: its session's task, and what replaced it; `then` absent on the step's current try. */
 export type TurnTry = { taskId: string; then?: string };

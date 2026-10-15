@@ -54,7 +54,7 @@ import type { BranchReader } from '../branches/branches.store.ts';
 import { roundBriefed, roundFiled, roundFiledNote } from '../round/round.ts';
 import { closeoutsAfterMerge } from '../merge/merge.verb.ts';
 import { filedConfig, tryModel } from '../filed/filed.ts';
-import { closeoutSchemaOf, parseCloseout, type Closeout } from '../closeout/closeout.ts';
+import { closeoutSchemaOf, parseCloseout, type Closeout } from '../closeout/index.ts';
 import { modeWord, nextTry, sessionModel, tryWord, type Retry, type RetryAsk } from '../retry/index.ts';
 import { artifactsDir, inputsDir } from '../record/record.store.ts';
 import { checkCloseout, writeCheckCloseout } from '../check/check.store.ts';

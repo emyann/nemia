@@ -17,7 +17,7 @@ import {
   type StepStatus,
   type TaskPhase,
 } from '../record/record.ts';
-import type { Closeout } from '../closeout/closeout.ts';
+import type { Closeout } from '../closeout/index.ts';
 import {
   acceptanceOf,
   askedAgain,

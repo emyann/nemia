@@ -7,7 +7,7 @@
 import path from 'node:path';
 import type { ClaudeFlags, CodexArgs } from '../runtime-client.ts';
 import { lackedOf, type Run, type StepRecord } from '../record/record.ts';
-import type { Closeout } from '../closeout/closeout.ts';
+import type { Closeout } from '../closeout/index.ts';
 import { filedFolders, type FiledFolders } from '../filed/filed.ts';
 import { artifactFiles, filesHanded } from '../artifacts/artifacts.store.ts';
 import { lackLines } from '../artifacts/artifacts.ts';

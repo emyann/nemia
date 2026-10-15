@@ -220,10 +220,13 @@ test("REFUSED on the source: a value import from the format's leaf back to a fol
   assert.deepEqual(cycles(valueGraph(files)), [
     [
       'src/closeout/closeout.ts',
+      'src/closeout/envelope.ts',
+      'src/closeout/index.ts',
       'src/harness/harness.ts',
       'src/keys/filed-as.ts',
       'src/keys/index.ts',
       'src/keys/keys.ts',
+      'src/keys/merged-output.ts',
       'src/keys/tools.ts',
       'src/question/index.ts',
       'src/question/numbered.ts',

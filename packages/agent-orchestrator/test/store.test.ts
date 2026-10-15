@@ -933,7 +933,7 @@ test('UNSIGNED at shipped defaults: a producer whose closeout lacks a declared f
       const { run, pass, e, tasks, filings } = await throughReview(reviewed(respondKeys), said);
       assert.deepEqual(
         (tasks.get(`${run.id}-review`)!.spec.closeoutSchema as { required: string[] }).required,
-        ['outcome', 'summary', 'artifacts', 'needs', 'findings'],
+        ['apiVersion', 'outcome', 'summary', 'body', 'artifacts', 'needs', 'findings'],
         'the run asked for it',
       );
       assert.deepEqual([pass.filed, pass.blocked, pass.status], [[], ['respond'], 'blocked'], why);
@@ -1550,7 +1550,7 @@ test('implement ⇄ review: `again: true` files round 2 — implement continued 
   assert.match(spec.brief, /^## Round 2 of 3\n/);
   assert.deepEqual(dataUnder(spec.brief, '## From review'), { findings: FOUND });
   assert.doesNotMatch(spec.brief, /REVIEWER-SUMMARY|"again"/);
-  assert.deepEqual((spec.closeoutSchema as { required: string[] }).required, ['outcome', 'summary', 'artifacts', 'needs', 'replies']);
+  assert.deepEqual((spec.closeoutSchema as { required: string[] }).required, ['apiVersion', 'outcome', 'summary', 'body', 'artifacts', 'needs', 'replies']);
   assert.deepEqual(readRun(run.id).steps, {
     implement: {
       taskId: try2,
@@ -2094,7 +2094,7 @@ test("REFUSED before the fix, now handed: a fresh try of implement inside round 
   assert.match(spec.brief, /\n## Try 3\n[\s\S]*\n## Round 2 of 3\n[\s\S]*\*\*Say why not\.\*\*/);
   assert.deepEqual(dataUnder(spec.brief, '## From review'), { findings: FOUND });
   assert.doesNotMatch(spec.brief, /REVIEWER-SUMMARY|IMPLEMENTER-SUMMARY/);
-  assert.deepEqual((spec.closeoutSchema as { required: string[] }).required, ['outcome', 'summary', 'artifacts', 'needs', 'replies']);
+  assert.deepEqual((spec.closeoutSchema as { required: string[] }).required, ['apiVersion', 'outcome', 'summary', 'body', 'artifacts', 'needs', 'replies']);
 });
 
 test('REFUSED before, now carried: a step with `tools:` and `effort:` reaches `e.file` with exactly that list and that effort — on its first filing, a try `retries:` files, and a try `nemia retry` asks for', async () => {

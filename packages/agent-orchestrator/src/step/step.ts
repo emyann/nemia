@@ -418,11 +418,11 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
 };
 
 /**
- * The four fields every closeout has. They are the run's: `summary` goes to the person who decides and
- * nowhere else, so an `output:` may not declare one of them and have it travel to a step. The schema
- * itself is `CLOSEOUT_SCHEMA` in closeout.ts, and a test holds the two to each other.
+ * The six fields of every closeout's envelope in v1. They are the run's: `summary` and `body` are the step's own account, for
+ * the person who decides, so an `output:` may not declare one of them. The schema itself is `CLOSEOUT_SCHEMA` in closeout.ts, and a
+ * test holds the two to each other.
  */
-export const CLOSEOUT_FIELDS = ['outcome', 'summary', 'artifacts', 'needs'] as const;
+export const CLOSEOUT_FIELDS = ['apiVersion', 'outcome', 'summary', 'body', 'artifacts', 'needs'] as const;
 
 /**
  * Where a step works: its `place:`, or `git` for a step frozen on a run record before the key, as every step worked then; a step file

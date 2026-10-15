@@ -8,7 +8,7 @@
  */
 export { durationWord } from './status/status.ts';
 /** Re-exported for apps/api, which reads them from the `agent-orchestrator/run` subpath; closeout.ts imports nothing from here. */
-export { declaredOutput, parseCloseout } from './closeout/closeout.ts';
+export { declaredOutput, parseCloseout } from './closeout/index.ts';
 /**
  * Re-exported for apps/api, which reads a closeout's questions and writes a person's answers to them from the `agent-orchestrator/run`
  * subpath.

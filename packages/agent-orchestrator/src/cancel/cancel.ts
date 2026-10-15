@@ -2,7 +2,7 @@
 import { inFlight, type InFlight } from '../cap/cap.ts';
 import type { Workflow } from '../step/step.ts';
 import type { CloseoutAsked, Run, TaskPhase } from '../record/record.ts';
-import type { Closeout } from '../closeout/closeout.ts';
+import type { Closeout } from '../closeout/index.ts';
 import type { Verdict } from '../check/check.ts';
 import { HOLDS_THE_RUN, type RetryAsk } from '../retry/index.ts';
 import { standing, type RoundAsk, type SpendOf } from '../status/status.ts';

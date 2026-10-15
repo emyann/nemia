@@ -3203,7 +3203,11 @@ written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on 
   memory, in the registry of the runtime that ticks: `pass.duration` and `pass.phase.duration` (by `phase`), histograms in ms over
   `PASS_BOUNDS`; `pass.journal_reads`; and the gauges `store.runs`, `sessions.queued` and `sessions.admitted`, as the last pass saw them.
   The api serves its own process's at `GET /api/metrics`, with `api.poll.reads`: the files the runtime read for each request, by the
-  route's pattern. A process that does not tick (an api started with `--no-tick`, or beside a `wf up`) has none of the pass's.
+  route's pattern. A process that does not tick (an api started with `--no-tick`, or beside a `wf up`) has none of the pass's. Once
+  `up` holds the store, before its first pass and before `onTaken`, it births at zero and exports so the series a collector reads by
+  their increase (`seriesBorn` in `src/telemetry/telemetry.store.ts`): the pass's histograms (`PASS_SERIES`), the feed's
+  `feed.follow.beats` and `feed.follow.reads` (`DAEMON_SERIES` in `src/daemon/up.verb.ts`), and the series its caller hands it
+  (`UpOptions.series`: the api's `api.step.follows`). `api.poll.reads` is not born: its routes are known only once served.
 - **And metrics of its steps** (`STEP_METRICS`, `recordStepMetrics` in `src/meter/meter.verb.ts`), recorded by the tick once a pass, off
   what each run's full pass already read — no read of the store or the engine of their own. A run's pass takes each of its tasks it
   reads settled that the run's mark does not hold (`settlesCounted`, `settlesDue`), a task shared by tries once, and reads each of its
@@ -3216,8 +3220,8 @@ written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on 
   first reads it settled, one that happened while no daemon read included; a daemon that dies between the two loses that pass's facts,
   and none is counted twice. A session held open and answered is one try, however many answers it took. A run started before the mark
   existed is counted off the engine's feed (`settledIn`), which a daemon restarted reads from its end. Each series a pass's facts write
-  is first exported at zero, then at its value (`recordStepMetrics`, `exportedNow` in `src/telemetry/telemetry.store.ts`, each export
-  waited for 2 s at most): a collector that reads a counter by its increase counts a step's first try, and reads a series a daemon
+  is first exported at zero, then at its value (`recordStepMetrics`, `seriesBorn` and `exportedNow` in
+  `src/telemetry/telemetry.store.ts`, each export waited for 2 s at most): a collector that reads a counter by its increase counts a step's first try, and reads a series a daemon
   restarted brings back as a reset.
 - **A call a harness denied a session is a span, `step.denied`, and no metric** (`DENIED_SPAN`, `deniedCalls` in `src/meter/step.ts`): one
   for each denial of each attempt that ended, a call denied twice being two, whatever the attempt's turn signed and whatever came of its

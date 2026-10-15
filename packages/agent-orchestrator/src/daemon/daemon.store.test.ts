@@ -983,6 +983,34 @@ test("`up` births the daemon's series and the caller's at zero and exports them 
   clear();
 });
 
+test("REFUSED: a daemon refused the lease births no series, so the live daemon's are never read as reset", async (t) => {
+  seeded(t);
+  const { up } = await import('./up.verb.ts');
+  const { telemetryLayer } = await import('../telemetry/telemetry.store.ts');
+  const { Effect, Metric } = await import('effect');
+  const c = await collector(t);
+  holdBy(LIVE);
+  const e = engineOf();
+  const refused = await runPlaced(
+    Effect.scoped(
+      up(e, { every: 10, repo: ROOT, holder: 'api', series: [Metric.counter('test.refused.series', { incremental: true })] }),
+    ).pipe(
+      Effect.flip,
+      Effect.provide(telemetryLayer({ OTEL_EXPORTER_OTLP_ENDPOINT: c.url })),
+      Effect.provideService(Metric.MetricRegistry, new Map()),
+    ),
+  );
+  assert.match((refused as Error).message, /^api: .* is held by the nemia up of pid /);
+  assert.equal(e.passes, 0, 'none ticked');
+  const named = c.posts.filter((p) => p.path === '/v1/metrics').map((p) => Object.keys(seriesOf(p.body, () => true, true)));
+  assert.deepEqual(
+    named.flat().filter((name) => name.startsWith('pass.') || name.startsWith('feed.follow.') || name === 'test.refused.series'),
+    [],
+    'no series of the live daemon posted at zero',
+  );
+  clear();
+});
+
 test('REFUSED at shipped defaults, both ways round: an api holding the store refuses a `nemia up` and a `nemia tick`, and a `nemia up` holding it refuses an api', async (t) => {
   seeded(t);
   const { up } = await import('./up.verb.ts');

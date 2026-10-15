@@ -17,15 +17,13 @@ const PHONE = { width: 390, height: 844 };
 
 /** That on a phone the three frames stack, each under the one before it, each as wide as the others. */
 async function expectStacked(strip: Locator): Promise<void> {
-  const boxes = await strip
-    .locator('[data-strip-frame]')
-    .evaluateAll((frames) =>
-      frames.map((f) => ({
-        top: Math.round(f.getBoundingClientRect().top),
-        bottom: Math.round(f.getBoundingClientRect().bottom),
-        width: Math.round(f.getBoundingClientRect().width),
-      })),
-    );
+  const boxes = await strip.locator('[data-strip-frame]').evaluateAll((frames) =>
+    frames.map((f) => ({
+      top: Math.round(f.getBoundingClientRect().top),
+      bottom: Math.round(f.getBoundingClientRect().bottom),
+      width: Math.round(f.getBoundingClientRect().width),
+    })),
+  );
   const stacked = boxes.every((box, at) => at === 0 || box.top >= boxes[at - 1].bottom) && new Set(boxes.map((b) => b.width)).size === 1;
   if (!stacked) throw new Refused(`on a phone the three frames stack at one width — ${JSON.stringify(boxes)}`);
 }
@@ -91,9 +89,9 @@ export default {
   /**
    * The Overview's strip at `/`, at 1440 pixels with the rail open: its three cut frames on one row, the six stickers on one line. Each
    * number is the board's rule (`stripOf`) of the api's own answer, from the browser's midnight; Landed and Failed are the finished
-   * page's today too, the api's own words for how a run ended. The readout reads the caps, the daemon's tag says what the api judged of it (none ticks the e2e's store), each agent's
-   * row says the agent, its step and the run's title, cut short, never wrapped, and the quota, past its mark in the seed, says so. On a
-   * phone the frames stack, one under the other.
+   * page's today too, the api's own words for how a run ended. The readout reads the caps, the daemon's tag says what the api judged
+   * of it (none ticks the e2e's store), each agent's row says the agent, its step and the run's title, cut short, never wrapped, and the
+   * quota, past its mark in the seed, says so. On a phone the frames stack, one under the other.
    */
   name: 'overview-strip',
   route: '/',
@@ -116,7 +114,7 @@ export default {
       for (const [label, value] of stickers)
         await expectTexts(stickerOf(strip, label), [value], `the ${label} sticker reads the rule's ${value}`);
       const finished = await answer<FinishedPage>(page, '/api/runs-finished?size=100');
-      const today = finished.runs.filter((run) => Date.parse(run.finishedAt!) >= dayStart);
+      const today = finished.runs.filter((run) => Date.parse(run.finishedAt) >= dayStart);
       const said = (outcome: string) => today.filter((run) => run.outcome === outcome).length;
       if (said('succeeded') !== want.landed || said('failed') !== want.failed)
         throw new Refused(`Landed and Failed agree with the finished page's today: ${said('succeeded')} and ${said('failed')}`);

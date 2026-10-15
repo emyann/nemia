@@ -17,9 +17,9 @@ export type AgentRow = { agent: string; step: string; run: string; title: string
 /**
  * The strip's numbers. `waitsOnYou` and `inFlight` are the open runs, a run that waits on a person counted with the waiting alone;
  * `landed` and `failed` the runs whose work stopped since the day began; `spentUsd` what every run worked today cost, whole;
- * `perLanding` the mean cost of a landing today whose cost was measured, null before the first. `runs` and `sessions` are at work against their caps, null where
- * the machine has none. `agents` are the agents at work against those hired in the factories in view, `hired` null where none is; `rows`
- * the steps at work, longest first, the first `ROWS_SHOWN`, and `more` how many are left out.
+ * `perLanding` the mean cost of a landing today whose cost was measured, null before the first. `runs` and `sessions` are at work against
+ * their caps, null where the machine has none. `agents` are the agents at work against those hired in the factories in view, `hired` null
+ * where none is; `rows` the steps at work, longest first, the first `ROWS_SHOWN`, and `more` how many are left out.
  */
 export type Strip = {
   waitsOnYou: number;
@@ -150,7 +150,7 @@ export const readoutOf = ({ runs, sessions }: Pick<Strip, 'runs' | 'sessions'>):
   return `${part(runs.count, runs.cap, 'RUNS')} · ${part(sessions.count, sessions.cap, 'SESSIONS')}`;
 };
 
-/** How long each window of the quota lasts, by Claude Code's key: the five hours, and the weeks. */
+/** How long each window of the quota lasts, by the key the api gives it: the five hours, and the weeks. */
 const WINDOW_MS: ReadonlyArray<readonly [RegExp, number]> = [
   [/^five_hour$/, 5 * 3_600_000],
   [/^seven_day/, 7 * 86_400_000],

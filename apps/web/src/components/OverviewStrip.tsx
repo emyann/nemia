@@ -180,12 +180,12 @@ function Agents({ strip }: { strip: Strip }) {
   );
 }
 
-/** A window's label as a meter says it: `5-hour`, `Week`. */
+/** A window's label as a meter says it, its first letter a capital. */
 const meterLabel = (w: QuotaWindow): string => w.label.charAt(0).toUpperCase() + w.label.slice(1);
 
 /**
- * Quota · Claude Code: a meter in money for each window, `PAST 80%` once one is used past the mark, and when it runs out and resets. A
- * reading that is not fresh says why, with the last good one's meters under it and when it was.
+ * The quota of this machine: a meter in money for each window, `PAST 80%` once one is used past the mark, and when it runs out and
+ * resets. A reading that is not fresh says why, with the last good one's meters under it and when it was.
  */
 function QuotaFrame({ quota, error, now }: { quota: Quota | undefined; error: Error | null; now: number }) {
   const fresh = quota?.state === 'fresh';
@@ -196,7 +196,7 @@ function QuotaFrame({ quota, error, now }: { quota: Quota | undefined; error: Er
   return (
     <div data-strip="quota" data-quota-state={quota?.state} className="flex flex-col gap-2.5 px-[18px] py-3">
       <div className="flex items-center gap-3">
-        <Heading>Quota · Claude Code</Heading>
+        <Heading>Quota · this machine</Heading>
         {marked && (
           <span className="ml-auto">
             <CutTag>

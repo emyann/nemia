@@ -147,6 +147,8 @@ down is in `docs/architecture.md`, *Who owns what*.
 - **A paged read is served from the listing its token names** (`OPEN_LISTINGS`), never the latest.
 - **An async generator's `return` waits behind its pending `next`**: `Stream.fromAsyncIterable` calls it on interruption, so a silent
   subscription is aborted first (`abortedOnReturn`, `a2a/remote-follow.ts`), or its interruption never ends.
+- **A test that shortens a remote harness's `requestMs` hands the agent its card (`opsOn`, `test/remote-follow.test.ts`) and waits for the
+  send's answer**, or every request it does not test (the card read again after a failure, a subscription's headers) is held to it.
 - **`Stream.retry` starts its schedule again at the attempt's first output**, an empty array included: a bound on failures in a row
   is counted by hand (`drops` in `followTask`).
 

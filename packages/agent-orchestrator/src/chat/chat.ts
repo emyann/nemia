@@ -230,9 +230,12 @@ export const cursorOf = (sources: ChatSources): ChatCursor => ({
 /** A cursor as a stream's event id: its five counts, dot-separated. Pure. */
 export const chatCursor = (c: ChatCursor): string => [c.attempts, c.events, c.said, c.outbox, c.delivered].join('.');
 
-/** The words a cursor no read gave is refused with. */
+/**
+ * The words a cursor no read gave is refused with. A chat event's own id is no cursor: what a stream resumes from is the `cursor` a read
+ * answered, which the stream also writes as the `id` of each read's last event, so an `EventSource` sends it back as `Last-Event-ID`.
+ */
 const NOT_A_CURSOR = (text: string) =>
-  `${text} is not a cursor a chat read gave: pass the \`cursor\` the last read returned, or the last event's id, or none to read it whole.`;
+  `${text} is not a cursor a chat read gave: pass the \`cursor\` a read answered, which a stream writes as its last event's \`id\`, or none to read it whole.`;
 
 /** The cursor `text` names. Refused (`Invalid`) where it is not five whole counts. Pure. */
 export function readChatCursor(text: string): ChatCursor {

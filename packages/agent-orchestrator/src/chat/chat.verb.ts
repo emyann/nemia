@@ -3,6 +3,14 @@
  * (`chatHistory`), what changed since a stream's cursor (`chatSince`), the person's words put in the outbox (`chatSend`) and their read
  * mark moved (`chatRead`). Every read projects again from the task's record, its transcripts and the chat's files (`projectChat`).
  *
+ * **Every read costs the whole projection, and that is accepted here.** A read is the task's view, each of its attempts' transcripts from
+ * the start, the chat's three files and the open runs for `waitsOnYou`; a followed chat pays it again on every beat, per reader. It is
+ * bounded by the beat (`CHAT_BEAT_MS` at the api) and by how many readers are open, never by how long the chat is, and nothing is kept
+ * between reads, so a restart owes what the files and the runtime say — the cursor a reader carries counts what each source held, not
+ * where a transcript was read to, so no read resumes one. What pays it back is the move of her session to the SDK, where the projection
+ * reads from the session's own events rather than a harness's transcript file: a cursor that carries the runtime's transcript cursor, and
+ * the events of the attempts before it held between beats, belong with that move and not before it.
+ *
  * A controller: it reaches the runtime through the client, and is the one writer of the outbox and of the read mark.
  */
 import { randomBytes } from 'node:crypto';

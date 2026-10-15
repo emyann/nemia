@@ -197,6 +197,21 @@ test('presence in each state: down, up and idle, answering, waits on you, unread
   assert.equal(presenceOf('idle', 0, events, { through: 'm:1:a1', at: at(40) }).unread, 1, 'one of hers after the mark');
 });
 
+test("unread counts her messages alone: a keeper's marker and the person's own words after the mark are not unread", () => {
+  const events = projectChat(
+    twoSessions({
+      said: [{ at: at(12), attempt: 2, text: 'Woken: gate on 473Y', after: { kind: 'text', id: 'a2' } }],
+      outbox: [{ id: 'o1', at: at(30), text: 'Are you there?' }],
+    }),
+  );
+  assert.deepEqual(shape(events).slice(-3), ['agent:Back.', 'keeper:Woken: gate on 473Y', 'person:Are you there?']);
+  assert.equal(
+    presenceOf('idle', 0, events, { through: 'm:1:a1', at: at(40) }).unread,
+    1,
+    'three messages follow the mark, one of them hers',
+  );
+});
+
 test('presence in several states at once: answering, waits on you and unread', () => {
   const events = projectChat(twoSessions());
   assert.deepEqual(presenceOf('running (working)', 2, events, { through: 't:1:u1', at: at(40) }), {

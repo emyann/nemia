@@ -132,9 +132,13 @@ const ended = (reason: string, how = 'failed'): StepAttempts => ({
 });
 const said = (outcome: 'done' | 'blocked') =>
   ({
+    apiVersion: null,
     outcome,
     summary: '',
+    body: null,
     needs: null,
+    values: [],
+    refused: [],
     artifacts: [],
     output: {},
     missing: [],

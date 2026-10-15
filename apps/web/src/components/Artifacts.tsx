@@ -1,4 +1,4 @@
-import type { StepArtifact } from '../lib/api';
+import type { StepArtifact, StepValue } from '../lib/api';
 import { when } from './Facts';
 
 /** Bytes as a person reads them, as the CLI's `decide` prints a file's size and the CLI's `prune` a worktree's (`sizeOf`). */
@@ -41,6 +41,30 @@ export function Artifacts({
 }
 
 const linkClass = 'font-mono font-medium text-foreground underline underline-offset-2';
+
+/**
+ * The values a closeout handed on beside its files: each its name as a label, then the value, a link opening in a new tab where the api
+ * found it an http(s) address (`link`), else the value as text. Nothing for none.
+ */
+export function Values({ values }: { values: readonly StepValue[] }) {
+  if (!values.length) return null;
+  return (
+    <ul data-values className="mt-1 flex flex-col gap-1 text-body-small">
+      {values.map((v, i) => (
+        <li key={`${i}:${v.name}`} data-value={v.name} className="break-all">
+          <span className="text-label-small uppercase text-muted-foreground">{v.name}</span>{' '}
+          {v.link ? (
+            <a href={v.link} target="_blank" rel="noreferrer" className={linkClass}>
+              {v.value}
+            </a>
+          ) : (
+            <span className="font-mono">{v.value}</span>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 /**
  * One file a closeout named, drawn as `Artifacts` draws each: the Output tab draws an image a field names with it too. One gone with the

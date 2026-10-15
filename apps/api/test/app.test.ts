@@ -116,10 +116,14 @@ const blocked = { outcome: 'blocked', summary: 'Half of it is done.', needs: 'Wh
  * statement as the engine recorded it.
  */
 const blockedCloseout = {
+  apiVersion: null,
   outcome: 'blocked',
   summary: 'Half of it is done.',
+  body: null,
   needs: 'Which database?',
   artifacts: [{ path: 'NOTES.md' }],
+  values: [],
+  refused: [],
   output: {},
   missing: [],
   replies: null,
@@ -2000,10 +2004,14 @@ test('a step on its third try, in the second round of its loop, carries every tr
 
   const once = { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } };
   const closeout = (raw: { summary: string }, more: object = {}) => ({
+    apiVersion: null,
     outcome: 'done',
     summary: raw.summary,
+    body: null,
     needs: null,
     artifacts: [],
+    values: [],
+    refused: [],
     output: {},
     missing: [],
     replies: null,

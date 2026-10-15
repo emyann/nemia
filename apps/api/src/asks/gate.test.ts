@@ -158,7 +158,11 @@ test("a run's detail carries its gates and each gated step's gate — awaiting a
     ],
     'sketch is gated and not signed off: nothing to approve yet',
   );
-  assert.equal(run.steps[0].closeout?.summary, PLAN.summary, "the closeout a person approves is the step's own");
+  assert.deepEqual(
+    [run.steps[0].closeout?.summary, run.steps[0].closeout?.body],
+    [PLAN.summary.split('\n')[0], PLAN.summary],
+    "the closeout a person approves is the step's own: its first line the summary, the whole the body",
+  );
   assert.deepEqual(run.waitingOnYou, ['plan']);
   assert.deepEqual(run.onYou, ['approve plan']);
 

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { artifactsDir } from 'agent-orchestrator';
-import { artifactPlace, filesPrunedWords, GIVEN, type Run } from 'agent-orchestrator/run';
+import { artifactPlace, filesPrunedWords, GIVEN, HANDED_CLOSEOUT, type Run } from 'agent-orchestrator/run';
 
 /** What the board does with a file: draws it inline, links it to be read in a tab, or links it with its size. */
 export type ArtifactKind = 'image' | 'text' | 'other';
@@ -18,6 +18,24 @@ export type StepArtifact =
   | { path: string }
   | { path: string; name: string; url: string; kind: ArtifactKind; size: number }
   | { path: string; pruned: string; prunedAt: string };
+
+/** A value a closeout handed on, by its name: `link` is the value where it is an http(s) address the board may link to, else null. */
+export type StepValue = { name: string; value: string; link: string | null };
+
+/**
+ * A value a closeout handed on, as the board shows it (`StepValue`): linked only where the value is a whole URL whose protocol is
+ * `http:` or `https:`, so a `javascript:` value, or text that is no URL, is shown and never followed.
+ */
+export function valueOf(v: { name: string; value: string }): StepValue {
+  let link: string | null = null;
+  try {
+    const url = new URL(v.value.trim());
+    if (url.protocol === 'http:' || url.protocol === 'https:') link = url.href;
+  } catch {
+    link = null;
+  }
+  return { name: v.name, value: v.value, link };
+}
 
 /**
  * By extension: the type a file is served with, and what the board does with it. Text a step wrote is shown as text. An HTML or a script
@@ -103,7 +121,8 @@ const isDirectory = (at: string): boolean => {
  * Beside the closeout's `artifacts`, which are the files a step *named* and the run collected: these are what is in the folder,
  * named or not, which is the only way to see what a step left behind that it forgot to name.
  *
- * One thing is left out: the run's own `given/` directory, which the run copied in before the step started — its inputs and a copy of
+ * Two things are left out. The run's own `closeout.json` (`HANDED_CLOSEOUT`), the step's closeout it wrote there for the steps after
+ * it, which the page shows as the closeout. And the run's own `given/` directory, which the run copied in before the step started — its inputs and a copy of
  * each folder the step waits on (`givenPlan`). It is not what the step made, it is the same work drawn twice for a fan-in child, and
  * listed it would stand in every folder of every run started with `--input`, so *the folder is empty* could never be said of a step
  * that made nothing. The name comes from the package, not spelled a second time here. A `given` that is not a directory is a step's
@@ -119,6 +138,7 @@ export function folderFiles(run: Pick<Run, 'id'>, step: string, dir: string): { 
   }
   const files = names
     .filter((name) => !(name === GIVEN && isDirectory(path.join(dir, name))))
+    .filter((name) => !(name === HANDED_CLOSEOUT && fileIn(dir, name)))
     .map((name) => {
       const here = path.join(dir, name);
       const stat = refusedName(name) === null ? fileIn(dir, name) : undefined;

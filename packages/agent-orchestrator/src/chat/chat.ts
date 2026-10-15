@@ -285,13 +285,26 @@ export const upOf = (phase: string): boolean =>
 /** Whether a runtime phase is a turn in progress. */
 const answeringOf = (phase: string): boolean => phase === 'running (working)' || phase === 'working (quiescent)';
 
+/** Whether a chat event is a message of the agent's own, which is what goes unread. */
+const hers = (e: ChatEvent): boolean => e.kind === 'message' && e.from === 'agent';
+
+/**
+ * How many of the agent's messages the person has not read, off their read `mark`: those after the event it names, every one where
+ * there is no mark, and those said after the moment it was set where the chat no longer holds that event — a said drawn as the keeper's
+ * marker is drawn as the person's message under another id once a delivered mark claims it, and the mark's own moment outlives the flip.
+ */
+const unreadOf = (events: readonly ChatEvent[], mark: ReadMark | undefined): number => {
+  if (mark === undefined) return events.filter(hers).length;
+  const from = events.findIndex((e) => e.id === mark.through);
+  if (from >= 0) return events.slice(from + 1).filter(hers).length;
+  return events.filter((e) => hers(e) && e.at > mark.at).length;
+};
+
 /**
  * Where the task is, off its phase (none where no task is filed), what waits on the person (`waiting`), its chat and the person's read
- * mark: unread the agent's messages after the event it names, every one where there is none or the chat no longer holds it. Pure.
+ * mark: unread the agent's messages the mark leaves unread (`unreadOf`). Pure.
  */
 export function presenceOf(phase: string | undefined, waiting: number, events: readonly ChatEvent[], mark: ReadMark | undefined): Presence {
   const up = phase !== undefined && upOf(phase);
-  const from = mark === undefined ? -1 : events.findIndex((e) => e.id === mark.through);
-  const unread = events.slice(from + 1).filter((e) => e.kind === 'message' && e.from === 'agent').length;
-  return { up, answering: up && answeringOf(phase), waitsOnYou: waiting, unread };
+  return { up, answering: up && answeringOf(phase), waitsOnYou: waiting, unread: unreadOf(events, mark) };
 }

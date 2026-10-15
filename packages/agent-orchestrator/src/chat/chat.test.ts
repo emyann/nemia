@@ -212,6 +212,24 @@ test("unread counts her messages alone: a keeper's marker and the person's own w
   );
 });
 
+test('unread survives a said drawn again under another id: the mark on a marker a delivery claimed counts from its own moment', () => {
+  const said = [{ at: at(12), attempt: 2, text: framedForHer('Merge it.'), after: { kind: 'text' as const, id: 'a2' } }];
+  const outbox = [{ id: 'o1', at: at(11), text: 'Merge it.' }];
+  const mark = { through: `k:2:${at(12)}`, at: at(13) };
+  const marker = projectChat(twoSessions({ said, outbox }));
+  assert.ok(
+    marker.some((e) => e.id === mark.through),
+    "unmarked, her words are drawn as the keeper's marker",
+  );
+  assert.equal(presenceOf('idle', 0, marker, mark).unread, 0, 'the person read through the marker');
+  const claimed = projectChat(twoSessions({ said, outbox, delivered: [{ id: 'o1', said: at(12), attempt: 2 }] }));
+  assert.ok(
+    !claimed.some((e) => e.id === mark.through) && claimed.some((e) => e.id === 'p:o1'),
+    "the delivery draws the same said as the person's message, under another id",
+  );
+  assert.equal(presenceOf('idle', 0, claimed, mark).unread, 0, 'the marked id is gone: count her messages after the mark was set');
+});
+
 test('presence in several states at once: answering, waits on you and unread', () => {
   const events = projectChat(twoSessions());
   assert.deepEqual(presenceOf('running (working)', 2, events, { through: 't:1:u1', at: at(40) }), {

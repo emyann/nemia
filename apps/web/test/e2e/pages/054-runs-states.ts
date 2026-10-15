@@ -11,7 +11,7 @@ const EMPTY = FACTORIES.others[0];
 
 /**
  * The page while its reads are on their way: a visit of its own whose reads of the runs are held says it is loading, under the page's
- * name, and draws its three parts once they are let go.
+ * name in the top bar, and draws its three parts once they are let go.
  */
 async function loading(page: Page): Promise<void> {
   const other = await page.context().newPage();
@@ -30,11 +30,15 @@ async function loading(page: Page): Promise<void> {
       state.locator('[role="status"]', { hasText: /^Loading the runs…$/ }),
       'while its reads are held, the page says it is loading',
     );
-    await expectTexts(state.getByRole('heading', { level: 1 }), ['Runs'], "under the page's name");
+    await expectTexts(
+      other.locator('header[data-frame-header]').getByRole('heading', { level: 1 }),
+      ['Runs'],
+      "under the page's name, in the top bar",
+    );
     await expectCount(other.locator('[data-plate]'), 0, 'and draws no part yet');
     await settled(other);
     await photographBothWidths(other, OUT, 'runs-states', 'loading');
-    await contrastHolds(other, ['h1', '[role="status"]']);
+    await contrastHolds(other, ['[role="status"]']);
     release();
     await expectCount(other.locator('[data-runs-page="loaded"] [data-plate]'), 3, 'let go, it draws its three parts');
     await idle(other);

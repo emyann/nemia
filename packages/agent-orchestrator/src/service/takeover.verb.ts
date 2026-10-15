@@ -21,6 +21,8 @@ export type TakeoverHost = {
   readonly pause: (said: { why?: string; by?: string }) => Pause;
   readonly resume: () => Pause;
   readonly landings: () => Effect.Effect<readonly Finishing[], Refusal, EngineService | PlaceService>;
+  readonly calls: () => Effect.Effect<readonly Finishing[], Refusal, EngineService | PlaceService>;
+  readonly drain: (holder: number | null) => Effect.Effect<void, Refusal, EngineService>;
   readonly say: (line: string) => void;
   readonly pollMs: number;
   readonly waitMs: number;
@@ -72,19 +74,44 @@ const pauseFor = (pid: number, host: TakeoverHost, by: string) =>
     }
   });
 
-/** Waits until no landing check runs, naming each once as it is first seen; no deadline but the person's ^C. */
-const landed = (host: TakeoverHost): Effect.Effect<readonly Finishing[], Refusal, EngineService | PlaceService> => {
+/**
+ * Waits until `read` answers none, naming each it answers once as it is first seen, by `key`, in `words`; no deadline but the person's ^C.
+ */
+const waitedOut = (
+  host: TakeoverHost,
+  read: () => Effect.Effect<readonly Finishing[], Refusal, EngineService | PlaceService>,
+  key: (f: Finishing) => string,
+  words: (f: Finishing) => string,
+): Effect.Effect<readonly Finishing[], Refusal, EngineService | PlaceService> => {
   const named = new Set<string>();
-  const read = Effect.tap(host.landings(), (landings) =>
+  const told = Effect.tap(read(), (found) =>
     Effect.sync(() => {
-      for (const l of landings.filter((f) => !named.has(`${f.run} ${f.step}`))) {
-        named.add(`${l.run} ${l.step}`);
-        host.say(`waiting for ${l.run}'s ${l.step} to land: its check runs, and the daemon is stopped once it has ended`);
+      for (const f of found.filter((f) => !named.has(key(f)))) {
+        named.add(key(f));
+        host.say(words(f));
       }
     }),
   );
-  return Effect.repeat(read, { schedule: Schedule.spaced(host.pollMs), until: (landings) => landings.length === 0 });
+  return Effect.repeat(told, { schedule: Schedule.spaced(host.pollMs), until: (found) => found.length === 0 });
 };
+
+/** Waits until no landing check runs, naming each once as it is first seen. */
+const landed = (host: TakeoverHost) =>
+  waitedOut(
+    host,
+    host.landings,
+    (f) => `${f.run} ${f.step}`,
+    (l) => `waiting for ${l.run}'s ${l.step} to land: its check runs, and the daemon is stopped once it has ended`,
+  );
+
+/** Waits until no session is in a tool call, naming each call once as it is first seen. */
+const called = (host: TakeoverHost) =>
+  waitedOut(
+    host,
+    host.calls,
+    (f) => `${f.run} ${f.step} ${f.calling}`,
+    (c) => `waiting for ${c.run}'s ${c.step}: its call to ${c.calling} runs, and the daemon is stopped once it has ended`,
+  );
 
 /** Waits, at most the host's `waitMs`, until the lease reads as `done` says; else refused (`Conflict`) with `refusal`. */
 const leaseUntil = (host: TakeoverHost, done: (lease: DaemonStanding) => boolean, refusal: string) =>
@@ -137,8 +164,10 @@ export const startedPassed = (host: TakeoverHost, service: Started, by: string, 
  * Hands the store from the daemon of `pid` to the service it starts (`service`), and answers the pid that ticks it then, once that daemon
  * has completed its first pass (`startedPassed`). Refused (`Conflict`): a pid that is not the confirmed holder, before anything is done; a
  * daemon that does not stop, or a service that does not take the store, within the host's `waitMs`; or a service whose daemon ends before
- * its first pass — the store left paused, since no work starts without a daemon to judge it, and `nemia resume` said. Interrupted before
- * the signal, it lifts the pause it put. Its pause and its lines name `by`, the command that runs it.
+ * its first pass — the store left paused, since no work starts without a daemon to judge it, and `nemia resume` said. Before the signal
+ * it waits for each landing check (`landed`), then holds back the new tool calls of the daemon's attached sessions (`drain`) and waits
+ * for each call in flight (`called`), so the daemon stops between two calls. Interrupted before the signal, it lifts the drain and the
+ * pause it put; after it, the drain names a daemon that is gone, and no other is held by it. Its pause and its lines name `by`.
  */
 export const takeOver = Effect.fn('takeOver')(function* (pid: number, host: TakeoverHost, service: Started, by: string = INSTALL_BY) {
   yield* takeOverConfirmed(pid, host, by);
@@ -147,6 +176,8 @@ export const takeOver = Effect.fn('takeOver')(function* (pid: number, host: Take
     put && (exit._tag === 'Success' || !signalled) ? tried(() => host.resume()).pipe(Effect.ignore) : Effect.void,
   );
   yield* landed(host);
+  yield* Effect.acquireRelease(host.drain(pid), () => (signalled ? Effect.void : host.drain(null).pipe(Effect.ignore)));
+  yield* called(host);
   yield* takeOverConfirmed(pid, host, by);
   signalled = true;
   yield* tried(() => host.signal(pid));

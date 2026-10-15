@@ -8,6 +8,7 @@ import { assess } from '../tick/assess.ts';
 import type { RepositoryRun, TaskPhase } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
 import {
+  callsOf,
   finishingAmong,
   finishingOf,
   interruptsAmong,
@@ -283,5 +284,25 @@ test('a task a pause ask names finishes as stopping and resumed, tried again on 
   assert.deepEqual(finishing, [{ run: 'r-1', step: 'implement', kind: 'session', stopping: true, resumed: true }]);
   assert.deepEqual(pausedLines({ pause: PAUSE, finishing, staged: [], held: [] }).slice(1), [
     "   r-1's implement is stopping: its session was asked to stop, and is tried again on nemia resume",
+  ]);
+});
+
+test("a session in a tool call finishes naming its call, a check never does, and the daemon's stop waits for the session's alone", () => {
+  const steps = [step('implement', [], { check: 'npm test' })];
+  const r = run({ implement: { taskId: 't1', check: { taskId: 'c1' } } });
+  const calling = { tool: 'Bash' };
+  const views: Record<string, FinishingView> = {
+    t1: { ...view('running (working)'), calling },
+    c1: { ...view('running (working)'), calling },
+  };
+  const finishing = finishingOf(r, steps, (id) => views[id]);
+  assert.deepEqual(finishing, [
+    { run: 'r-1', step: 'implement', kind: 'session', calling: 'Bash' },
+    { run: 'r-1', step: 'implement', kind: 'check' },
+  ]);
+  assert.deepEqual(callsOf({ finishing }), [finishing[0]]);
+  assert.deepEqual(pausedLines({ pause: PAUSE, finishing, staged: [], held: [] }).slice(1), [
+    "   r-1's implement is finishing: its call to Bash runs",
+    "   r-1's implement is finishing: its check runs",
   ]);
 });

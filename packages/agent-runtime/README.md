@@ -2065,7 +2065,8 @@ what a step leaves behind. The rule is what lets Codex do it itself.
 
 ## Which runner: CLI or Agent SDK
 
-**`Engine.layer` and `ae` always use the CLI runners.** No environment variable selects another.
+**`ae` always uses the CLI runners, and so does `Engine.layer` until its process takes `hold()`**: then a Claude Code task runs
+attached on the Agent SDK (*Attached*, below). No environment variable selects another.
 `sdkRunner()` exists, but only as a `Layer`: you compose it yourself, and tick
 in the same long-lived process that spawned the sessions, because they die with it.
 
@@ -2117,6 +2118,30 @@ That is `ae logs`. `getSessionInfo` also sees our join key, as `customTitle`.
 is durable even when the execution is not, so a lost attempt can be resumed at its last completed
 turn rather than restarted. That is a policy decision — which failures resume and which start
 clean — so `decide` does not make it yet.
+
+### Attached: Claude Code on the Agent SDK, durable by resume
+
+A third way to run a Claude Code task to its end, beside the job and `--bg`: `query()` in the process that holds the engine's
+attached sessions (`harness/claude/attached.ts`). The process takes `hold()` in a scope; while it holds, a `claude` task that is
+no `background` session spawns attached, and any other engine, or the same one before `hold`, runs it as a `claude -p` job.
+
+- **Who holds them.** One process: the one whose engine took `hold()`. It spawns, adopts and resumes; another engine reads the
+  run files under `<root>/runs/attached/` and writes a stop (`<name>.stop`) or words to say (`<name>.say.jsonl`) beside one, which
+  the holder's next look reads; the words a session has heard are counted on its run file (`heard`), so a resume hears none twice.
+  A holder is its pid and its start time (`ownerStart`): a pid another process has taken since is a holder gone.
+- **What it keeps.** Its run file (state, Claude Code's session id, the process group, the call in flight) and a capture of the
+  messages a reader reads, appended as they come: a denial reaches the attempt while it works, and the statement and the usage
+  at the result, less what the session it resumed had spent (`carried`, as the job's `resumeCostCarried`). The conversation is Claude Code's own transcript (`transcript`); an attached session is not followed live.
+- **The fence.** The job's, fact for fact (`attachedOptions`, held to `claudePrintFlags` by its test). A call that would ask a
+  person is answered in the holder (`canUseTool`): denied, and written as a denial.
+- **Let go.** As the holder's scope closes, new calls wait at their `PreToolUse` hook, it waits with no bound for each call in
+  flight, then writes each session `parked` and stops it; a call still held at its hook then is never written in flight.
+- **Taken up.** On a look, a holder adopts a session parked, or one whose holder's process is gone: it kills what is left of
+  its Claude Code's process group, unless that pid is another process's now (`childStart`), then resumes it under the same id (`--resume=<id>`, no fork), told it was paused, or, after a
+  crash, which call did not finish. A non-holder reads such a session as `working`.
+- **The drain.** `drain(pid)` writes a file naming a holder and when it started: its new calls wait until `drain(null)`, so a
+  restart can wait for the calls in flight before it signals. A drain naming a process that is gone holds nothing, nor one left
+  for a process whose pid a later one was given.
 
 ### Why the name is the key
 
@@ -2186,7 +2211,12 @@ of pure code sits beside it.
 | `src/harness/claude/quiet.ts` | when a working `--bg` session's transcript was first seen at its mtime, on the monotonic clock, per attempt under the root: written by a look only when the mtime or the boot differs, cleared at spawn, read fresh on every look |
 | `src/harness/claude/parent.ts` | what a resumed `--bg` session's spawn records of its parent: the id of the parent's last StructuredOutput call, and whose a statement is by it |
 | `src/harness/claude/trust.ts` | Claude Code's trust of a folder in its `.claude.json` (`claudeConfigFile`, in `CLAUDE_CONFIG_DIR` when set): read by `claudeTrusts`, and one key set by `claudeTrust`, which keeps every other key and a write that lands meanwhile |
-| `src/harness/claude/code.ts` | Claude Code as the engine runs it by default: a step as a job (`claude -p`), or a background session (`claude --bg`) when the task asks, each verb routed by the session id's shape; and `claude -p`'s argv and the `claude-detached` spec |
+| `src/harness/claude/code.ts` | Claude Code as the engine runs it by default: a step as a job (`claude -p`), attached while the process holds (`withAttached`), or a background session (`claude --bg`) when the task asks, each verb routed by the session id's shape and its run file; and `claude -p`'s argv and the `claude-detached` spec |
+| `src/harness/claude/job-env.ts` | the environment a session run to its end is given, a job's or an attached one's (`CLAUDE_JOB_ENV`) |
+| `src/harness/claude/attached.ts` | Claude Code attached on the Agent SDK (`attachedSessions`): the holder's `hold`, adoption and resume, and the runner's verbs over the run files |
+| `src/harness/claude/attached-session.ts` | one attached session over `query()`: its input, its hooks for the call in flight and the drain, `canUseTool`, its capture |
+| `src/harness/claude/attached-file.ts` | an attached session's run file, its stop, the drain, and the two notes a resumed session is told |
+| `src/harness/claude/attached-options.ts` | a task as the SDK's `Options` (`attachedOptions`): the job's fence, folders, servers, model, budget and schema |
 | `src/harness/claude/quota.ts` | Claude Code's quota (`claudeQuota`): the `claude` on PATH asked `get_usage` with no prompt, and its answer read (`quotaOfResponse`) |
 | `src/harness/claude/registry.ts` | the rows `claude agents --all --json` prints, decoded: which are ours, and why a listing is refused; a row's state in A2A's names (`claudeStateOf`) |
 | `src/harness/claude/lines.ts` | the transcript lines the runtime reads (`LINES`), each decoded where it is read, and why a line is refused |

@@ -71,6 +71,9 @@ const lease = (
 /** A landing check running under the pause. */
 const LANDING: Finishing = { run: 'r1', step: 'ship', kind: 'landing' };
 
+/** A session in its call to Bash under the pause. */
+const CALL: Finishing = { run: 'r2', step: 'implement', kind: 'session', calling: 'Bash' };
+
 /** The lease of the service's new daemon `pid`, read once before its first pass and passed on every read after. */
 const passing = (world: World, pid: number): void => {
   world.lease = lease(pid);
@@ -87,13 +90,17 @@ type World = {
   later?: DaemonStanding[];
   unitPid: number | null;
   landings: Finishing[][];
+  calls?: Finishing[][];
   onSignal?: () => void;
   onStart?: () => void;
   root?: string;
   machine?: { platform: string; wsl: boolean; systemd: boolean };
 };
 
-/** A host over `world` that logs, in order, every program it calls, the pause, each landings read, the signal and what it says. */
+/**
+ * A host over `world` that logs, in order, every program it calls, the pause, each landings read, the signal and what it says; and,
+ * where `world.calls` is given, each calls read and each drain put or lifted.
+ */
 function hostOf(world: World): { host: ServiceHost; events: string[] } {
   const events: string[] = [];
   const host: ServiceHost = {
@@ -138,6 +145,14 @@ function hostOf(world: World): { host: ServiceHost; events: string[] } {
         events.push(`landings ${found.length}`);
         return found;
       }),
+    calls: () =>
+      Effect.sync(() => {
+        if (!world.calls) return [];
+        const found = world.calls.length > 1 ? world.calls.shift()! : (world.calls[0] ?? []);
+        events.push(`calls ${found.length}`);
+        return found;
+      }),
+    drain: (holder) => Effect.sync(() => void (world.calls && events.push(`drain ${holder}`))),
     say: (line) => events.push(`say ${line}`),
     pollMs: 1,
     waitMs: 200,
@@ -242,6 +257,41 @@ test('a take-over pauses, waits out the landing check, stops the confirmed pid, 
     done.lines.some((l) => l.includes(`took the store over from pid ${OLD}`) && l.includes(`as pid ${NEW}`)),
     done.lines.join('\n'),
   );
+});
+
+test('a take-over drains the daemon and waits for each call in flight, naming it once, before it signals', async () => {
+  const world: World = { lease: lease(OLD), unitPid: null, landings: [[]], calls: [[CALL], [CALL], []] };
+  world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
+  world.onStart = () => passing(world, NEW);
+  const { host, events } = hostOf(world);
+  assert.equal((await install({ takeOver: String(OLD) }, host)).did, 'taken');
+  const from = events.indexOf(`drain ${OLD}`);
+  assert.deepEqual(events.slice(from, from + 6), [
+    `drain ${OLD}`,
+    'calls 1',
+    "say waiting for r2's implement: its call to Bash runs, and the daemon is stopped once it has ended",
+    'calls 1',
+    'calls 0',
+    `signal ${OLD}`,
+  ]);
+  assert.ok(!events.includes('drain null'), 'the drain names the daemon that is gone, and is left');
+});
+
+test('a take-over interrupted while it waits on a call lifts its drain and its pause, and signals nothing', async () => {
+  const world: World = { lease: lease(OLD), unitPid: null, landings: [[]], calls: [[CALL]] };
+  const { host, events } = hostOf(world);
+  let said: () => void = () => undefined;
+  const waiting = new Promise<void>((resolve) => (said = resolve));
+  const fiber = Effect.runFork(
+    installService({ takeOver: String(OLD) }, { ...host, say: (l) => (events.push(`say ${l}`), said()) }).pipe(
+      Effect.provide(EngineService.layer(engineOf(engine().layer))),
+      Effect.provide(stand().layer),
+    ),
+  );
+  await waiting;
+  await Effect.runPromise(Fiber.interrupt(fiber));
+  assert.ok(!events.some((e) => e.startsWith('signal')), events.join('\n'));
+  assert.deepEqual(events.slice(-2), ['drain null', 'resume']);
 });
 
 test('REFUSED to take over a pid the lease does not name, or one it cannot confirm: Conflict, before the unit is written', async () => {

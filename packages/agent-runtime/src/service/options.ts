@@ -8,7 +8,7 @@ import type { HarnessArgs, RunnerOps } from '../harness/index.ts';
 import { Admission, type IoCounts, type ObserveCount, type RefusedMove, type StoreOps, type TaskView } from '../core/engine/index.ts';
 
 export type { ObserveCount } from '../core/engine/index.ts';
-import { claudeOps, claudeCodeOps } from '../harness/claude/index.ts';
+import { claudeOps, claudeCodeOps, type Attached } from '../harness/claude/index.ts';
 import { detachedOps, type HarnessSpec } from '../harness/detached/detached.ts';
 import { telemetered, telemetryRefusalOf, type Telemetry } from '../harness/telemetry.ts';
 import { remoteConfigRefusal, remoteOps, type Credentials, type MissingCredential, type RemoteAgent } from '../a2a/index.ts';
@@ -207,10 +207,11 @@ export const runnersOf = (
   credentials?: Credentials,
   missingCredential?: MissingCredential,
   telemetry?: Telemetry,
+  attached?: Attached,
 ): Record<string, RunnerOps> =>
   Object.fromEntries(
     Object.entries(harnesses).map(([name, h]): [string, RunnerOps] => {
-      const ops = runnerOf(name, h, root, credentials, missingCredential);
+      const ops = runnerOf(name, h, root, credentials, missingCredential, attached);
       return [name, telemetry ? telemetered(ops, telemetry) : ops];
     }),
   );
@@ -222,9 +223,10 @@ const runnerOf = (
   root: string,
   credentials?: Credentials,
   missingCredential?: MissingCredential,
+  attached?: Attached,
 ): RunnerOps =>
   h === 'claude'
-    ? claudeCodeOps({ root })
+    ? claudeCodeOps({ root }, attached)
     : h === 'claude-bg'
       ? claudeOps({ root })
       : isSpec(h)

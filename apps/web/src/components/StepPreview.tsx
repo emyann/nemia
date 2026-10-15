@@ -45,8 +45,9 @@ const intoTheCard = (event: KeyboardEvent): void => {
 const GLOW_ROOM_OFFSET = -4;
 
 /**
- * A bar where a pointer hovers and the window has room: the trigger of the kit's preview, whose card gives up its surface to the frame,
- * keeps room around it for its glow, and scrolls within the height the window leaves it.
+ * A bar where a pointer hovers and the window has room: the trigger of the kit's preview, whose card stands beside the bar, after it
+ * or before it where the window has no room after, so that it keeps the window's whole height and shows its action unscrolled; it
+ * gives up its surface to the frame, keeps room around it for its glow, and scrolls only in a window shorter than itself.
  */
 function HoverPreview({ run, step, asOf, children }: { run: RailRun; step: RailStep; asOf: Date; children: ReactNode }) {
   return (
@@ -61,7 +62,7 @@ function HoverPreview({ run, step, asOf, children }: { run: RailRun; step: RailS
         {children}
       </Button>
       <PreviewCard
-        placement="bottom start"
+        placement="end top"
         offset={GLOW_ROOM_OFFSET}
         className="max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain rounded-none bg-transparent p-3 shadow-none"
       >

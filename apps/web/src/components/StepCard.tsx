@@ -86,12 +86,22 @@ function Facts({ facts }: { facts: NonNullable<StepCardFacts['facts']> }) {
   );
 }
 
-/** The spend: the kit's meter in the money colour where a spend and a budget are measured, else its words in money. */
+/**
+ * The spend: the kit's meter in the money colour, its label the card's small caps, where a spend and a budget are measured, else its
+ * words in money.
+ */
 function Spend({ spend }: { spend: CardSpend }) {
   if (spend.kind === 'meter')
     return (
       <div data-step-spend="meter" className="border-t border-outline-variant pt-3">
-        <Meter label={spend.label} value={spend.value} maxValue={spend.max} valueLabel={spend.said} showValue color="tertiary" />
+        <Meter
+          label={<Key>{spend.label}</Key>}
+          value={spend.value}
+          maxValue={spend.max}
+          valueLabel={spend.said}
+          showValue
+          color="tertiary"
+        />
       </div>
     );
   return (

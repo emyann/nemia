@@ -856,6 +856,21 @@ test(
         assert.equal(await card.locator('[data-step-facts] dd').count(), 5, `${id}: the five facts, whole`);
         const meter = await card.locator('[data-step-spend="meter"]').count();
         assert.equal(meter, kind === 'work' || kind === 'come' ? 0 : 1, `${id}: a meter where a spend and its budget are measured`);
+        if (meter === 1) {
+          const [spent, fact] = await Promise.all(
+            [
+              card.locator('[data-step-spend="meter"]').getByText('Spent', { exact: true }),
+              card.locator('[data-step-facts] dt span').first(),
+            ].map((label) =>
+              label.evaluate((found) => ({ case: getComputedStyle(found).textTransform, size: getComputedStyle(found).fontSize })),
+            ),
+          );
+          assert.deepEqual(
+            spent,
+            { ...fact, case: 'uppercase' },
+            `${id}: the meter's label is the card's small caps, as its facts' labels`,
+          );
+        }
         assert.equal(await card.getByRole('link', { name: action }).count(), 1, `${id}: one action, ${action}`);
       }
       assert.match((await page.locator(story(STEP_CARDS[0][0])).textContent()) ?? '', /not measured yet/);

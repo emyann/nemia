@@ -10,6 +10,68 @@ import { OUT } from '../world.ts';
 /** The rail of the table in flight. */
 const FLIGHT = 'section[data-section="in-flight"]';
 
+/** A laptop's window, where a card opened from any bar shows its action whole, with no scroll. */
+const LAPTOP = { width: 1280, height: 800 };
+
+/** Every rail on the page, in flight and in the waiting cards, as the group its bars stand in. */
+const railsOf = (page: Page): Locator =>
+  page
+    .locator(`${FLIGHT} [role="group"], section[data-section="waiting"] [role="group"]`)
+    .filter({ has: page.locator('button[data-step-bar][data-step-preview="card"]') });
+
+/** Where the action of the card `bar` opened stands: inside the window, inside the preview's box, and how far the box is scrolled. */
+async function actionOf(page: Page, bar: Locator, edge: 'center' | 'end'): Promise<Record<string, unknown>> {
+  await bar.evaluate((found, block) => found.scrollIntoView({ block }), edge);
+  await page.mouse.move(0, 0);
+  await expectCount(previewOf(page), 0, 'no card open before the bar is hovered');
+  await bar.hover();
+  await expectVisible(previewOf(page).locator('[data-step-facts]'), 'the bar opens its card, its run read');
+  await idle(page);
+  return page.locator('[data-slot="preview-card"]').evaluate((box) => {
+    const action = box.querySelector('[data-step-action]')!.getBoundingClientRect();
+    const own = box.getBoundingClientRect();
+    return {
+      inWindow: action.top >= 0 && action.left >= 0 && action.bottom <= innerHeight && action.right <= innerWidth,
+      inBox: action.top >= own.top && action.bottom <= own.bottom && action.left >= own.left && action.right <= own.right,
+      scrollTop: box.scrollTop,
+    };
+  });
+}
+
+/**
+ * In a laptop's window, the card of the first and the last bar of every rail, each brought to the window's top and to its foot, shows its
+ * action whole, inside the window and the preview, the preview unscrolled; the window is put back after.
+ */
+async function anActionInSight(page: Page): Promise<void> {
+  const size = page.viewportSize() ?? LAPTOP;
+  await page.setViewportSize(LAPTOP);
+  try {
+    const rails = railsOf(page);
+    const count = await rails.count();
+    if (count < 2) throw new Refused(`rails in flight and in the waiting cards — ${count}`);
+    for (let i = 0; i < count; i += 1) {
+      const bars = rails.nth(i).locator('button[data-step-bar]');
+      for (const [bar, edge] of [
+        [bars.first(), 'center'],
+        [bars.last(), 'center'],
+        [bars.last(), 'end'],
+      ] as const) {
+        const seen = await actionOf(page, bar, edge);
+        if (!seen.inWindow || !seen.inBox || seen.scrollTop !== 0) {
+          const said = await bar.getAttribute('aria-label');
+          throw new Refused(
+            `at 1280×800, the card of "${said}" at the window's ${edge} shows its action unscrolled — ${JSON.stringify(seen)}`,
+          );
+        }
+      }
+    }
+    await page.mouse.move(0, 0);
+    await expectCount(previewOf(page), 0, 'the pointer gone, the preview closes');
+  } finally {
+    await page.setViewportSize(size);
+  }
+}
+
 /** A phone's window, under Material's compact class, where a bar opens its card as a sheet. */
 const PHONE = { width: 390, height: 844 };
 
@@ -251,6 +313,7 @@ export default {
     await byTheKeyboard(page, bar, run, step, want);
     await byThePointer(page, bar, run, step, want);
     await aGateGlows(page);
+    await anActionInSight(page);
     await inAShortWindow(page, (await aBar(page)).bar);
     await onAPhone(page);
   },

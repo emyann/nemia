@@ -105,7 +105,7 @@ export function placeOf(step: DetailStep, steps: readonly DetailStep[], kind: St
 
 /** When the step's last session started and ended and how long it ran, from its timeline, else from its latest attempt. */
 function sessionOf(step: DetailStep): { start: string | null; end: string | null; ranMs: number | null } {
-  const session = step.timeline.findLast((entry) => entry.session !== null)?.session ?? null;
+  const session = [...step.timeline].reverse().find((entry) => entry.session !== null)?.session ?? null;
   const latest = step.attempts.latest;
   return {
     start: session?.spawnedAt ?? latest?.startedAt ?? null,
@@ -153,12 +153,13 @@ const contextSaid = (tokens: number | null): string =>
 /** The session's five facts, whole: its harness, model, effort, context and permission, from what its try was filed with first. */
 export function factsOf(step: DetailStep): Array<{ key: string; value: string }> {
   const { spec, filed } = step;
+  const first = (...values: Array<string | null | undefined>): string => values.find((value) => value != null) ?? 'default';
   return [
-    { key: 'Harness', value: spec?.harness ?? 'default' },
-    { key: 'Model', value: filed?.model ?? spec?.model ?? 'default' },
-    { key: 'Effort', value: filed?.effort ?? spec?.effort ?? 'default' },
+    { key: 'Harness', value: first(spec?.harness) },
+    { key: 'Model', value: first(filed?.model, spec?.model) },
+    { key: 'Effort', value: first(filed?.effort, spec?.effort) },
     { key: 'Context', value: contextSaid(filed?.contextTokens ?? spec?.context ?? null) },
-    { key: 'Permission', value: filed?.permissionMode ?? spec?.permissionMode ?? spec?.sandbox ?? 'default' },
+    { key: 'Permission', value: first(filed?.permissionMode, spec?.permissionMode, spec?.sandbox) },
   ];
 }
 

@@ -63,7 +63,11 @@ const STATUSES = { design: 'verified ✓', implement: 'running (working)', revie
 
 test('a step at work: alive, its try and round of the loop, how long since its session started, and no spend measured yet', () => {
   const card = cardOf('implement', STATUSES, [
-    quiet('implement', 'running (working)', { tries: [aTry(1)], spent: null, denied: { words: '1 call denied: Bash(cd)', calls: ['Bash(cd)'] } }),
+    quiet('implement', 'running (working)', {
+      tries: [aTry(1)],
+      spent: null,
+      denied: { words: '1 call denied: Bash(cd)', calls: ['Bash(cd)'] },
+    }),
     quiet('review', 'waiting', { spec: { ...step().spec!, loop: 'implement', rounds: 3 }, tries: [] }),
   ]);
   assert.equal(card.kind, 'work');

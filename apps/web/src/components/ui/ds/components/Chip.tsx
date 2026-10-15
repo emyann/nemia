@@ -23,26 +23,6 @@ import {
 } from "../icons";
 import { Label } from "../primitives/Typography";
 
-/**
- * MD3 chips — assist (`Button`), filter (`ToggleButton`) and input
- * (`Button` + remove action) in one component keyed by `variant`. Filter
- * chips group into a `ChipGroup` (single or multi-select set).
- *
- *   <ChipGroup label="Days" selectionMode="multiple">
- *     <Chip id="mon" variant="filter">Mon</Chip>
- *   </ChipGroup>
- *
- * Spec: https://m3.material.io/components/chips/{overview,specs,guidelines,accessibility}
- * — 32dp container, 8dp corners, 18dp icons, 16dp padding (8dp next to an
- * icon), secondary-container when selected with a leading check.
- * Deviations: the container is the hit area (32dp, no 48dp expansion — the
- * a11y page only asks not to go *below* the default); the outline uses
- * `outline-variant` (the spec's default) rather than the `outline` role the
- * a11y page offers as one way to signal interactivity — use a labelled
- * `ChipGroup` for that instead. Of the overview's four variants the kit
- * has three: there is no *suggestion* chip (an assist chip is the nearest),
- * and no elevated configuration — chips stay at the default level 0.
- */
 const styles = tv({
   slots: {
     base: [
@@ -191,6 +171,26 @@ type InputChipProps = BaseChipProps &
 
 type ChipProps = AssistChipProps | FilterChipProps | InputChipProps;
 
+/**
+ * MD3 chips — assist (`Button`), filter (`ToggleButton`) and input
+ * (`Button` + remove action) in one component keyed by `variant`. Filter
+ * chips group into a `ChipGroup` (single or multi-select set).
+ *
+ *   <ChipGroup label="Days" selectionMode="multiple">
+ *     <Chip id="mon" variant="filter">Mon</Chip>
+ *   </ChipGroup>
+ *
+ * Spec: https://m3.material.io/components/chips/{overview,specs,guidelines,accessibility}
+ * — 32dp container, 8dp corners, 18dp icons, 16dp padding (8dp next to an
+ * icon), secondary-container when selected with a leading check.
+ * Deviations: the container is the hit area (32dp, no 48dp expansion — the
+ * a11y page only asks not to go *below* the default); the outline uses
+ * `outline-variant` (the spec's default) rather than the `outline` role the
+ * a11y page offers as one way to signal interactivity — use a labelled
+ * `ChipGroup` for that instead. Of the overview's four variants the kit
+ * has three: there is no *suggestion* chip (an assist chip is the nearest),
+ * and no elevated configuration — chips stay at the default level 0.
+ */
 function Chip(props: ChipProps): JSX.Element | null {
   switch (props.variant) {
     case "filter":

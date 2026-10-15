@@ -9,32 +9,6 @@ import Button from "./Button";
 import type { ImageRenderer } from "./Card";
 import IconButton from "./IconButton";
 
-/**
- * Image upload field. The value is the image as a data URL (or any URL for
- * an already-stored image) or `undefined` while empty. Empty, the field is a
- * drop zone with a tonal "Choose image" button (React Aria `DropZone` +
- * `FileTrigger`); with a value it shows the preview with a remove icon button
- * and a "Replace" button. Files over `maxSize` or outside `acceptedFileTypes`
- * are rejected with an inline error.
- *
- *   <ImageField label="Photo" value={photo} onChange={setPhoto} maxSize={2 * 1024 * 1024} />
- *
- * `renderImage` draws the preview (a plain `<img>` by default; pass
- * `nextImageRenderer` from `../adapters/next` for `next/image`).
- *
- * Material 3 does not describe this component. MD3 has no file or image
- * control. The pattern composes spec'd parts:
- * a tonal button for the medium-emphasis "choose" action and a text button
- * for "replace" (https://m3.material.io/components/buttons/guidelines), an
- * icon button for "remove"
- * (https://m3.material.io/components/icon-buttons/accessibility — labelled
- * "Remove image"), and the preview in an outlined-card surface
- * (https://m3.material.io/components/cards/specs: 12dp corners,
- * outline-variant border). The drop zone borrows the card surface with a
- * dashed outline and the primary colour while a drag hovers; supporting text
- * and error placement follow the text-field rules (4dp below, error in the
- * error colour with `role="alert"`).
- */
 const styles = tv({
   slots: {
     base: "group/if flex flex-col gap-2",
@@ -105,6 +79,32 @@ export type ImageFieldProps = {
   onReject?: (reason: "size" | "type", file: File) => void;
 };
 
+/**
+ * Image upload field. The value is the image as a data URL (or any URL for
+ * an already-stored image) or `undefined` while empty. Empty, the field is a
+ * drop zone with a tonal "Choose image" button (React Aria `DropZone` +
+ * `FileTrigger`); with a value it shows the preview with a remove icon button
+ * and a "Replace" button. Files over `maxSize` or outside `acceptedFileTypes`
+ * are rejected with an inline error.
+ *
+ *   <ImageField label="Photo" value={photo} onChange={setPhoto} maxSize={2 * 1024 * 1024} />
+ *
+ * `renderImage` draws the preview (a plain `<img>` by default; pass
+ * `nextImageRenderer` from `../adapters/next` for `next/image`).
+ *
+ * Material 3 does not describe this component. MD3 has no file or image
+ * control. The pattern composes spec'd parts:
+ * a tonal button for the medium-emphasis "choose" action and a text button
+ * for "replace" (https://m3.material.io/components/buttons/guidelines), an
+ * icon button for "remove"
+ * (https://m3.material.io/components/icon-buttons/accessibility — labelled
+ * "Remove image"), and the preview in an outlined-card surface
+ * (https://m3.material.io/components/cards/specs: 12dp corners,
+ * outline-variant border). The drop zone borrows the card surface with a
+ * dashed outline and the primary colour while a drag hovers; supporting text
+ * and error placement follow the text-field rules (4dp below, error in the
+ * error colour with `role="alert"`).
+ */
 export function ImageField(props: ImageFieldProps) {
   const {
     label,

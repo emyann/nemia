@@ -3,26 +3,6 @@ import { type HTMLAttributes, type ReactNode } from "react";
 import { Label } from "../primitives/Typography";
 import { tv, type VariantProps } from "../utils";
 
-/**
- * A static label — an order number, a plan name, a status, a price — drawn
- * on a colour-role container. Presentational and server-safe: not a chip
- * (chips are actions and filters, this never reacts to the pointer) and not
- * a badge (the notification dot or count anchored on an icon: `Badge`).
- *
- *   <Tag>#42</Tag>
- *   <Tag color="error">Canceled</Tag>
- *   <Tag variant="filled" color="primary">Paid</Tag>
- *   <Tag variant="outlined">Required</Tag>
- *
- * Material 3 does not describe this component. The spec has no standalone
- * label pill. The
- * anatomy borrows from chips (small-shape 8dp corners, label-medium type,
- * 8dp side padding) at 24dp so it sits inside a line of body text; colours
- * are the tonal container pairs (`<color>-container` / `on-<color>-container`,
- * default secondary) or the filled pairs (`<color>` / `on-<color>`), neutral
- * being `surface-container-highest` and `inverse-surface` respectively, so a
- * palette swap restyles every tag.
- */
 const styles = tv({
   base: "inline-flex h-6 shrink-0 items-center whitespace-nowrap rounded-shape-small px-2 align-middle",
   variants: {
@@ -96,6 +76,26 @@ export type TagProps = VariantProps<typeof styles> &
     className?: string;
   };
 
+/**
+ * A static label — an order number, a plan name, a status, a price — drawn
+ * on a colour-role container. Presentational and server-safe: not a chip
+ * (chips are actions and filters, this never reacts to the pointer) and not
+ * a badge (the notification dot or count anchored on an icon: `Badge`).
+ *
+ *   <Tag>#42</Tag>
+ *   <Tag color="error">Canceled</Tag>
+ *   <Tag variant="filled" color="primary">Paid</Tag>
+ *   <Tag variant="outlined">Required</Tag>
+ *
+ * Material 3 does not describe this component. The spec has no standalone
+ * label pill. The
+ * anatomy borrows from chips (small-shape 8dp corners, label-medium type,
+ * 8dp side padding) at 24dp so it sits inside a line of body text; colours
+ * are the tonal container pairs (`<color>-container` / `on-<color>-container`,
+ * default secondary) or the filled pairs (`<color>` / `on-<color>`), neutral
+ * being `surface-container-highest` and `inverse-surface` respectively, so a
+ * palette swap restyles every tag.
+ */
 export function Tag({
   variant = "tonal",
   color = "secondary",

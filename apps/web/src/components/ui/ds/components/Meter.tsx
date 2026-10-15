@@ -10,6 +10,52 @@ import {
 import { composeTailwindRenderProps } from "../render-props";
 import { tv } from "../utils";
 
+const styles = tv({
+  slots: {
+    base: "flex w-full flex-col gap-2",
+    header: "flex items-baseline justify-between gap-2",
+    label: "text-label-large font-label-large text-on-surface",
+    value: "text-label-medium font-label-medium text-on-surface-variant tabular-nums",
+    track: "relative w-full overflow-hidden rounded-shape-full",
+    activeIndicator:
+      "absolute inset-y-0 start-0 rounded-shape-full forced-colors:bg-[CanvasText]",
+    remainingTrack:
+      "absolute inset-y-0 rounded-shape-full bg-secondary-container forced-colors:bg-[GrayText]",
+    stopIndicator:
+      "absolute top-1/2 -translate-y-1/2 rounded-shape-full forced-colors:bg-[CanvasText]",
+  },
+  variants: {
+    color: {
+      primary: { activeIndicator: "bg-primary", stopIndicator: "bg-primary" },
+      secondary: { activeIndicator: "bg-secondary", stopIndicator: "bg-secondary" },
+      tertiary: { activeIndicator: "bg-tertiary", stopIndicator: "bg-tertiary" },
+      error: { activeIndicator: "bg-error", stopIndicator: "bg-error" },
+    },
+  },
+  defaultVariants: { color: "primary" },
+});
+
+/** MD3 baseline: 4dp thickness (`md.comp.progress-indicator.linear.active-indicator.thickness`). */
+const THICKNESS = 4;
+/** MD3: a 4dp stop indicator at every thickness (`…linear.stop-indicator.size`, `…linear.thick.stop-indicator.size`). */
+const STOP = 4;
+/** MD3 baseline: 4dp between the active indicator and the track (`…linear.track-active-indicator-space`). */
+const GAP = 4;
+
+export type MeterProps = Omit<AriaMeterProps, "children"> & {
+  /** A visible label that says what is measured. Prefer it over `aria-label`
+      where there is room. */
+  label?: ReactNode;
+  /** Show the formatted value (or `valueLabel`) beside the label. */
+  showValue?: boolean;
+  /** The colour role of the active and stop indicators; default `primary`.
+      The track stays `secondary-container`. */
+  color?: "primary" | "secondary" | "tertiary" | "error";
+  /** Track and active-indicator thickness in px; default 4. */
+  thickness?: number;
+  className?: string;
+};
+
 /**
  * A meter: a quantity within a known range — a quota, a disk's use, a score —
  * on React Aria's `Meter`, so the `meter` role, `aria-valuenow`,
@@ -78,52 +124,6 @@ import { tv } from "../utils";
  * draws as the maximum; say that it is over in the label or in `valueLabel`.
  * In forced-colours mode the bar is drawn in system colours.
  */
-const styles = tv({
-  slots: {
-    base: "flex w-full flex-col gap-2",
-    header: "flex items-baseline justify-between gap-2",
-    label: "text-label-large font-label-large text-on-surface",
-    value: "text-label-medium font-label-medium text-on-surface-variant tabular-nums",
-    track: "relative w-full overflow-hidden rounded-shape-full",
-    activeIndicator:
-      "absolute inset-y-0 start-0 rounded-shape-full forced-colors:bg-[CanvasText]",
-    remainingTrack:
-      "absolute inset-y-0 rounded-shape-full bg-secondary-container forced-colors:bg-[GrayText]",
-    stopIndicator:
-      "absolute top-1/2 -translate-y-1/2 rounded-shape-full forced-colors:bg-[CanvasText]",
-  },
-  variants: {
-    color: {
-      primary: { activeIndicator: "bg-primary", stopIndicator: "bg-primary" },
-      secondary: { activeIndicator: "bg-secondary", stopIndicator: "bg-secondary" },
-      tertiary: { activeIndicator: "bg-tertiary", stopIndicator: "bg-tertiary" },
-      error: { activeIndicator: "bg-error", stopIndicator: "bg-error" },
-    },
-  },
-  defaultVariants: { color: "primary" },
-});
-
-/** MD3 baseline: 4dp thickness (`md.comp.progress-indicator.linear.active-indicator.thickness`). */
-const THICKNESS = 4;
-/** MD3: a 4dp stop indicator at every thickness (`…linear.stop-indicator.size`, `…linear.thick.stop-indicator.size`). */
-const STOP = 4;
-/** MD3 baseline: 4dp between the active indicator and the track (`…linear.track-active-indicator-space`). */
-const GAP = 4;
-
-export type MeterProps = Omit<AriaMeterProps, "children"> & {
-  /** A visible label that says what is measured. Prefer it over `aria-label`
-      where there is room. */
-  label?: ReactNode;
-  /** Show the formatted value (or `valueLabel`) beside the label. */
-  showValue?: boolean;
-  /** The colour role of the active and stop indicators; default `primary`.
-      The track stays `secondary-container`. */
-  color?: "primary" | "secondary" | "tertiary" | "error";
-  /** Track and active-indicator thickness in px; default 4. */
-  thickness?: number;
-  className?: string;
-};
-
 export function Meter({
   label,
   showValue = false,

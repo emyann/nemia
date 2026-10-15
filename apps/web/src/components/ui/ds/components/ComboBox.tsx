@@ -40,56 +40,6 @@ import { fieldStyles, type FieldVariantProps } from "./field-styles";
 import { SelectItem } from "./Select";
 import { focusRing, tv } from "../utils";
 
-/**
- * MD3 text field with a menu (autocomplete) on React Aria `ComboBox`.
- * Typing filters the options; `selectionMode="multiple"` turns the field into
- * a chips field — every selected option becomes an input chip inline with the
- * caret, removable from its trailing icon or with Backspace on an empty input.
- *
- *   <ComboBox label="Category" items={categories}>
- *     {(c) => <ComboBoxItem id={c.id} label={c.name} />}
- *   </ComboBox>
- *   <ComboBox label="Categories" selectionMode="multiple" items={categories} …>
- *
- * Spec: text fields (the container —
- * https://m3.material.io/components/text-fields/{specs,guidelines,accessibility}:
- * 56dp container, 16dp padding / 12dp with icons, floating label, supporting
- * text 4dp below, error icon), chips (input chips "inline with the cursor in
- * a text field" — https://m3.material.io/components/chips/guidelines: 32dp,
- * 8dp corners, 16dp padding / 8dp beside an icon, trailing remove icon) and
- * menus (the autocomplete pattern —
- * https://m3.material.io/components/menus/guidelines#filtering: the list
- * filters as one types; baseline menu 4dp corners, 48dp items, a checkmark as
- * the second selection cue). Deviations: Backspace deletes the last chip
- * directly (the spec's intermediate "chip selected" step is not modelled);
- * chips wrap to new rows and the container grows (the spec's horizontally
- * scrolling variant is not offered); the chip's remove affordance is a 24dp
- * target inside the 32dp chip and the menu trigger a 40dp one — neither is
- * expanded to the 48dp touch target.
- *
- * The field itself is the shared `./field-styles.ts` module at
- * `kind="composite"` — the container holds the input *and* the chips, so it
- * carries the padding and grows past 56dp, and the label floats off
- * `data-populated` (set here: text typed or chips selected), `:focus-within`
- * or `data-open`. The outlined label notch uses `--md3-field-notch` like
- * `TextField`. Only the chips and the menu are styled locally, below.
- *
- * `items` may arrive after mount (a query), so two things are wired for it:
- * they are handed to the `ComboBox` as `defaultItems` *and* to the `ListBox`,
- * and the menu is allowed to open on an empty collection.
- * `defaultItems` is what invalidates the hidden collection React Aria builds
- * for the closed popover — the `ListBox`'s own `items` only reach it when the
- * children element changes too, so a memoised child would freeze the options
- * at whatever had loaded. `allowsEmptyCollection` is what keeps the
- * interaction: without it `state.open()`/`toggle()` are no-ops while the
- * collection is empty, so the chevron, ArrowDown and typing were all silently
- * swallowed until the options landed, and the menu closed itself again the
- * moment a filter matched nothing. The empty menu says so instead.
- *
- * A press on the menu trigger also takes the focus itself, with the scroll
- * suppressed — see `useTriggerPressWithoutScroll` below, the other half of
- * why the first press used to do nothing.
- */
 const styles = fieldStyles;
 
 /**
@@ -154,6 +104,56 @@ export type ComboBoxProps<
     className?: string;
   };
 
+/**
+ * MD3 text field with a menu (autocomplete) on React Aria `ComboBox`.
+ * Typing filters the options; `selectionMode="multiple"` turns the field into
+ * a chips field — every selected option becomes an input chip inline with the
+ * caret, removable from its trailing icon or with Backspace on an empty input.
+ *
+ *   <ComboBox label="Category" items={categories}>
+ *     {(c) => <ComboBoxItem id={c.id} label={c.name} />}
+ *   </ComboBox>
+ *   <ComboBox label="Categories" selectionMode="multiple" items={categories} …>
+ *
+ * Spec: text fields (the container —
+ * https://m3.material.io/components/text-fields/{specs,guidelines,accessibility}:
+ * 56dp container, 16dp padding / 12dp with icons, floating label, supporting
+ * text 4dp below, error icon), chips (input chips "inline with the cursor in
+ * a text field" — https://m3.material.io/components/chips/guidelines: 32dp,
+ * 8dp corners, 16dp padding / 8dp beside an icon, trailing remove icon) and
+ * menus (the autocomplete pattern —
+ * https://m3.material.io/components/menus/guidelines#filtering: the list
+ * filters as one types; baseline menu 4dp corners, 48dp items, a checkmark as
+ * the second selection cue). Deviations: Backspace deletes the last chip
+ * directly (the spec's intermediate "chip selected" step is not modelled);
+ * chips wrap to new rows and the container grows (the spec's horizontally
+ * scrolling variant is not offered); the chip's remove affordance is a 24dp
+ * target inside the 32dp chip and the menu trigger a 40dp one — neither is
+ * expanded to the 48dp touch target.
+ *
+ * The field itself is the shared `./field-styles.ts` module at
+ * `kind="composite"` — the container holds the input *and* the chips, so it
+ * carries the padding and grows past 56dp, and the label floats off
+ * `data-populated` (set here: text typed or chips selected), `:focus-within`
+ * or `data-open`. The outlined label notch uses `--md3-field-notch` like
+ * `TextField`. Only the chips and the menu are styled locally, below.
+ *
+ * `items` may arrive after mount (a query), so two things are wired for it:
+ * they are handed to the `ComboBox` as `defaultItems` *and* to the `ListBox`,
+ * and the menu is allowed to open on an empty collection.
+ * `defaultItems` is what invalidates the hidden collection React Aria builds
+ * for the closed popover — the `ListBox`'s own `items` only reach it when the
+ * children element changes too, so a memoised child would freeze the options
+ * at whatever had loaded. `allowsEmptyCollection` is what keeps the
+ * interaction: without it `state.open()`/`toggle()` are no-ops while the
+ * collection is empty, so the chevron, ArrowDown and typing were all silently
+ * swallowed until the options landed, and the menu closed itself again the
+ * moment a filter matched nothing. The empty menu says so instead.
+ *
+ * A press on the menu trigger also takes the focus itself, with the scroll
+ * suppressed — see `useTriggerPressWithoutScroll` below, the other half of
+ * why the first press used to do nothing.
+ */
 export function ComboBox<T extends object, M extends SelectionMode = "single">(
   props: ComboBoxProps<T, M>,
 ) {

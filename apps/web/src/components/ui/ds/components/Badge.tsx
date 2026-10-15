@@ -2,47 +2,6 @@ import { type HTMLAttributes } from "react";
 
 import { tv } from "../utils";
 
-/**
- * Material 3 badge: a notification dot (small) or a count (large) on the
- * trailing top corner of a destination's icon.
- *
- *   <Badge />                       small: a 6dp dot, "New notification"
- *   <Badge value={3} />             large: 16dp high, the count in it
- *   <Badge value={1200} />          "999+": four characters at most
- *   <Badge value={3} anchored />    on the icon's corner (the hosts do this)
- *
- * Spec: https://m3.material.io/components/badges/overview · .../specs ·
- * .../guidelines · .../accessibility
- *
- * The measurements are the spec's (`md.comp.badge.*`): the small badge is a
- * 6dp circle, the large one 16dp high and 16dp wide at least, growing with its
- * text to 34dp, with 4dp of padding beside the text, both fully rounded, on
- * `error` with `label-small` text in `on-error`. A number above `max` (999 by
- * default) is shown as "999+", the spec's four characters with the "+".
- *
- * **Placement.** `anchored` sets the badge on the top trailing corner of its
- * positioned parent, the icon's box: the small badge's bottom leading corner
- * 6dp from the icon's top trailing corner each way, the large one's 14dp down
- * and 12dp in, as the spec's measurements give. The offsets are logical
- * (`inset-inline-start`), so the badge moves to the left corner in a
- * right-to-left page, as the guidelines ask. Where a label follows the icon
- * on the same line (an expanded rail, an inline-icon tab), a host sets a
- * large badge after the label instead, at the trailing edge.
- *
- * **What is announced.** The badge is `aria-hidden`: a badge is read after
- * its destination, so the host joins it to the destination's own name
- * ("Inbox, 3"; "Inbox, New notification" for the small badge). The words are
- * `badgeAccessibleText`'s, which `NavigationItem`, `Tab` and `IconButton` use
- * through their `badge` and `badgeLabel`. A count of 0 draws nothing and says
- * nothing.
- *
- * Presentational and server-safe: no React Aria, no `"use client"`.
- *
- * Deviations: none of the colours can be changed by a prop, as the
- * guidelines ask (keep the default mapping). Hiding a badge once its
- * destination is opened is the app's: it owns the unread count the badge
- * shows, and passes no `badge` when there is nothing unread.
- */
 const styles = tv({
   base: "pointer-events-none inline-flex shrink-0 items-center justify-center rounded-shape-full bg-error text-on-error",
   variants: {
@@ -114,6 +73,47 @@ export type BadgeProps = Omit<HTMLAttributes<HTMLSpanElement>, "children"> & {
   anchored?: boolean;
 };
 
+/**
+ * Material 3 badge: a notification dot (small) or a count (large) on the
+ * trailing top corner of a destination's icon.
+ *
+ *   <Badge />                       small: a 6dp dot, "New notification"
+ *   <Badge value={3} />             large: 16dp high, the count in it
+ *   <Badge value={1200} />          "999+": four characters at most
+ *   <Badge value={3} anchored />    on the icon's corner (the hosts do this)
+ *
+ * Spec: https://m3.material.io/components/badges/overview · .../specs ·
+ * .../guidelines · .../accessibility
+ *
+ * The measurements are the spec's (`md.comp.badge.*`): the small badge is a
+ * 6dp circle, the large one 16dp high and 16dp wide at least, growing with its
+ * text to 34dp, with 4dp of padding beside the text, both fully rounded, on
+ * `error` with `label-small` text in `on-error`. A number above `max` (999 by
+ * default) is shown as "999+", the spec's four characters with the "+".
+ *
+ * **Placement.** `anchored` sets the badge on the top trailing corner of its
+ * positioned parent, the icon's box: the small badge's bottom leading corner
+ * 6dp from the icon's top trailing corner each way, the large one's 14dp down
+ * and 12dp in, as the spec's measurements give. The offsets are logical
+ * (`inset-inline-start`), so the badge moves to the left corner in a
+ * right-to-left page, as the guidelines ask. Where a label follows the icon
+ * on the same line (an expanded rail, an inline-icon tab), a host sets a
+ * large badge after the label instead, at the trailing edge.
+ *
+ * **What is announced.** The badge is `aria-hidden`: a badge is read after
+ * its destination, so the host joins it to the destination's own name
+ * ("Inbox, 3"; "Inbox, New notification" for the small badge). The words are
+ * `badgeAccessibleText`'s, which `NavigationItem`, `Tab` and `IconButton` use
+ * through their `badge` and `badgeLabel`. A count of 0 draws nothing and says
+ * nothing.
+ *
+ * Presentational and server-safe: no React Aria, no `"use client"`.
+ *
+ * Deviations: none of the colours can be changed by a prop, as the
+ * guidelines ask (keep the default mapping). Hiding a badge once its
+ * destination is opened is the app's: it owns the unread count the badge
+ * shows, and passes no `badge` when there is nothing unread.
+ */
 export function Badge({
   value,
   max = BADGE_MAX,

@@ -24,37 +24,6 @@ import { composeTailwindRenderProps } from "../render-props";
 import { focusRing, tv } from "../utils";
 import { fieldStyles, type FieldVariantProps } from "./field-styles";
 
-/**
- * MD3 text field for numbers on React Aria `NumberField`. The value is a
- * `number` (`NaN` while empty), typed and shown in the user's locale —
- * `formatOptions` is `Intl.NumberFormat` (currency, percent, units, fraction
- * digits) and also decides which characters may be typed. On commit (blur,
- * Enter, a stepper) the value is clamped to `minValue` / `maxValue`, snapped
- * to `step` and rounded to the format's fraction digits; the default
- * `Intl` maximum is three, so pass `maximumFractionDigits` for anything finer.
- * Arrow keys, Page Up/Down and the scroll wheel step the value; `steppers`
- * adds a trailing − / + pair for pointer users.
- *
- *   <NumberField label="Price" formatOptions={{ style: "currency", currency: "EUR" }} />
- *   <NumberField label="Quantity" steppers minValue={1} maxValue={20} defaultValue={1} />
- *   <NumberField label="Latitude" formatOptions={{ maximumFractionDigits: 6 }} />
- *
- * `onChange` fires when the value is committed, not on every keystroke —
- * React Aria's contract, kept on purpose: a half-typed number has no value.
- *
- * Spec: text fields —
- * https://m3.material.io/components/text-fields/{specs,guidelines,accessibility}.
- * Container, floating label, icons, prefix / suffix, supporting text and the
- * error icon are the shared `./field-styles.ts` (same as `TextField`).
- * Material 3 does not describe this component. The field is Material's text
- * field; MD3 has no number field or stepper, so the steppers are React
- * Aria's increment / decrement buttons drawn as 40dp trailing icon buttons
- * (icon 12dp from the edge, like a trailing icon), out of the tab order
- * (keyboard users have the arrow keys) and labelled "Increment" /
- * "Decrement" as the accessibility page asks of interactive trailing icons;
- * they keep the neutral icon colour in the error state so the error icon
- * stays the one colour-independent error signal.
- */
 const stepperStyles = tv({
   slots: {
     steppers: "mr-1 flex shrink-0 items-center",
@@ -88,6 +57,37 @@ export type NumberFieldProps = Omit<AriaNumberFieldProps, "className"> &
     inputClassName?: string;
   };
 
+/**
+ * MD3 text field for numbers on React Aria `NumberField`. The value is a
+ * `number` (`NaN` while empty), typed and shown in the user's locale —
+ * `formatOptions` is `Intl.NumberFormat` (currency, percent, units, fraction
+ * digits) and also decides which characters may be typed. On commit (blur,
+ * Enter, a stepper) the value is clamped to `minValue` / `maxValue`, snapped
+ * to `step` and rounded to the format's fraction digits; the default
+ * `Intl` maximum is three, so pass `maximumFractionDigits` for anything finer.
+ * Arrow keys, Page Up/Down and the scroll wheel step the value; `steppers`
+ * adds a trailing − / + pair for pointer users.
+ *
+ *   <NumberField label="Price" formatOptions={{ style: "currency", currency: "EUR" }} />
+ *   <NumberField label="Quantity" steppers minValue={1} maxValue={20} defaultValue={1} />
+ *   <NumberField label="Latitude" formatOptions={{ maximumFractionDigits: 6 }} />
+ *
+ * `onChange` fires when the value is committed, not on every keystroke —
+ * React Aria's contract, kept on purpose: a half-typed number has no value.
+ *
+ * Spec: text fields —
+ * https://m3.material.io/components/text-fields/{specs,guidelines,accessibility}.
+ * Container, floating label, icons, prefix / suffix, supporting text and the
+ * error icon are the shared `./field-styles.ts` (same as `TextField`).
+ * Material 3 does not describe this component. The field is Material's text
+ * field; MD3 has no number field or stepper, so the steppers are React
+ * Aria's increment / decrement buttons drawn as 40dp trailing icon buttons
+ * (icon 12dp from the edge, like a trailing icon), out of the tab order
+ * (keyboard users have the arrow keys) and labelled "Increment" /
+ * "Decrement" as the accessibility page asks of interactive trailing icons;
+ * they keep the neutral icon colour in the error state so the error icon
+ * stays the one colour-independent error signal.
+ */
 export function NumberField(props: NumberFieldProps) {
   const {
     label,

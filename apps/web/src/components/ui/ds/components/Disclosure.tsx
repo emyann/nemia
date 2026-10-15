@@ -20,51 +20,6 @@ import { ChevronDownIcon, renderIcon, type IconProp } from "../icons";
 import { composeTailwindRenderProps } from "../render-props";
 import { focusRing, tv } from "../utils";
 
-/**
- * An expand/collapse section, and a group of them — what other systems call a
- * collapsible and an accordion. Behaviour is React Aria's `Disclosure` /
- * `DisclosureGroup`, so the trigger carries `aria-expanded` and
- * `aria-controls`, the panel is labelled by its trigger, Enter and Space
- * toggle it, and focus stays on the trigger.
- *
- *   <Disclosure>
- *     <DisclosureHeader>System requirements</DisclosureHeader>
- *     <DisclosurePanel>Details…</DisclosurePanel>
- *   </Disclosure>
- *
- *   <DisclosureGroup allowsMultipleExpanded defaultExpandedKeys={["a"]}>
- *     <Disclosure id="a"> … </Disclosure>
- *     <Disclosure id="b"> … </Disclosure>
- *   </DisclosureGroup>
- *
- * **Material 3 does not describe this component.** It has no page for it, so
- * there is no spec to cite.
- * M2 had an "expansion panel"; M3 dropped it and never replaced it, and
- * m3.material.io has no accordion, disclosure or expansion-panel entry —
- * `npm run md3 -- page …` will not find one. The anatomy here is therefore
- * assembled from MD3 parts rather than copied from a page, the same way
- * `Table` follows M2's data-table measurements on M3 roles:
- *
- * - the trigger is a **list row**: 56dp minimum height, 16dp side padding,
- *   `title-medium` label, `on-surface-variant` trailing icon
- *   (`https://m3.material.io/components/lists/specs`);
- * - it carries the standard **state layer** — `on-surface` at the
- *   `state-opacity-*` values — and the kit's `focusRing`, like every other
- *   pressable (`conventions.md`, "Interaction states");
- * - **`outline-variant` hairlines** separate the rows of a `plain` group, and
- *   box each row of an `outlined` one at `rounded-shape-medium`, which is the
- *   divider role and the card shape rather than anything invented here;
- * - the chevron turns 180° over `duration-medium-1` on `ease-standard`, and
- *   the panel's height transition runs `duration-medium-2` — MD3 motion
- *   tokens, no animation library.
- *
- * Deviations worth knowing: there is no MD3 "expanded" elevation change (the
- * spec has no opinion, and raising a row on expand fights the flat list it
- * lives in), and the panel animates height only where the reader allows
- * motion — React Aria measures the panel and publishes
- * `--disclosure-panel-height`, which is what the transition reads, and the
- * whole transition is behind `motion-safe:`.
- */
 
 /* -------------------------------------------------------------------------
    Styles
@@ -164,6 +119,51 @@ export type DisclosureProps = AriaDisclosureProps & {
   children: ReactNode;
 };
 
+/**
+ * An expand/collapse section, and a group of them — what other systems call a
+ * collapsible and an accordion. Behaviour is React Aria's `Disclosure` /
+ * `DisclosureGroup`, so the trigger carries `aria-expanded` and
+ * `aria-controls`, the panel is labelled by its trigger, Enter and Space
+ * toggle it, and focus stays on the trigger.
+ *
+ *   <Disclosure>
+ *     <DisclosureHeader>System requirements</DisclosureHeader>
+ *     <DisclosurePanel>Details…</DisclosurePanel>
+ *   </Disclosure>
+ *
+ *   <DisclosureGroup allowsMultipleExpanded defaultExpandedKeys={["a"]}>
+ *     <Disclosure id="a"> … </Disclosure>
+ *     <Disclosure id="b"> … </Disclosure>
+ *   </DisclosureGroup>
+ *
+ * **Material 3 does not describe this component.** It has no page for it, so
+ * there is no spec to cite.
+ * M2 had an "expansion panel"; M3 dropped it and never replaced it, and
+ * m3.material.io has no accordion, disclosure or expansion-panel entry —
+ * `npm run md3 -- page …` will not find one. The anatomy here is therefore
+ * assembled from MD3 parts rather than copied from a page, the same way
+ * `Table` follows M2's data-table measurements on M3 roles:
+ *
+ * - the trigger is a **list row**: 56dp minimum height, 16dp side padding,
+ *   `title-medium` label, `on-surface-variant` trailing icon
+ *   (`https://m3.material.io/components/lists/specs`);
+ * - it carries the standard **state layer** — `on-surface` at the
+ *   `state-opacity-*` values — and the kit's `focusRing`, like every other
+ *   pressable (`conventions.md`, "Interaction states");
+ * - **`outline-variant` hairlines** separate the rows of a `plain` group, and
+ *   box each row of an `outlined` one at `rounded-shape-medium`, which is the
+ *   divider role and the card shape rather than anything invented here;
+ * - the chevron turns 180° over `duration-medium-1` on `ease-standard`, and
+ *   the panel's height transition runs `duration-medium-2` — MD3 motion
+ *   tokens, no animation library.
+ *
+ * Deviations worth knowing: there is no MD3 "expanded" elevation change (the
+ * spec has no opinion, and raising a row on expand fights the flat list it
+ * lives in), and the panel animates height only where the reader allows
+ * motion — React Aria measures the panel and publishes
+ * `--disclosure-panel-height`, which is what the transition reads, and the
+ * whole transition is behind `motion-safe:`.
+ */
 export function Disclosure({
   variant,
   className,

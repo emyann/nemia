@@ -25,39 +25,6 @@ import { focusRing, tv } from "../utils";
 import { fieldStyles, type FieldVariantProps } from "./field-styles";
 import { MenuItem } from "./MenuItem";
 
-/**
- * MD3 text field for phone numbers. The value is an E.164 string
- * (`"+33612345678"`) or `undefined` while empty; the input formats as you
- * type in international format (`+33 6 12 34 56 78`) and a country picker in
- * the leading slot — flag + chevron, opening a menu of countries with their
- * calling codes — pre-fills the calling code. Typing another `+` code in the
- * input switches the country back.
- *
- *   <PhoneField label="Phone" defaultCountry="FR" />
- *   <PhoneField label="Phone" value={phone} onChange={setPhone} />
- *
- * Behaviour comes from `react-phone-number-input` (parsing, formatting,
- * country detection, `libphonenumber-js` metadata); the field shell is React
- * Aria `TextField` (label, description, error, required / disabled wiring)
- * and the country picker a React Aria `Select`. Validate with the library's
- * `isValidPhoneNumber` / `isPossiblePhoneNumber` if a schema needs it.
- *
- * Spec: text fields —
- * https://m3.material.io/components/text-fields/{specs,guidelines,accessibility}
- * (container, floating label, supporting text and error icon are the shared
- * `./field-styles.ts`) and menus —
- * https://m3.material.io/components/menus/{specs,guidelines} for the country
- * list (48dp rows, a checkmark as the second selection cue, the calling code
- * in the trailing "shortcut" slot). Material 3 does not describe this component.
- * Deviations: MD3 has no phone field; the
- * country picker is a 40dp icon-button-shaped trigger in the leading-icon
- * position (a leading icon that opens a menu is not in the spec), labelled
- * "Phone number country" per the accessibility page's rule for interactive
- * leading / trailing icons. Picking a country returns focus to the trigger
- * (React Aria's popover focus restoration) rather than jumping into the
- * input — the library's `focusInputOnCountrySelection` is off to avoid the
- * two fighting over focus.
- */
 const styles = tv({
   slots: {
     container: "pl-1",
@@ -117,6 +84,39 @@ export type PhoneFieldProps = Omit<
     inputClassName?: string;
   };
 
+/**
+ * MD3 text field for phone numbers. The value is an E.164 string
+ * (`"+33612345678"`) or `undefined` while empty; the input formats as you
+ * type in international format (`+33 6 12 34 56 78`) and a country picker in
+ * the leading slot — flag + chevron, opening a menu of countries with their
+ * calling codes — pre-fills the calling code. Typing another `+` code in the
+ * input switches the country back.
+ *
+ *   <PhoneField label="Phone" defaultCountry="FR" />
+ *   <PhoneField label="Phone" value={phone} onChange={setPhone} />
+ *
+ * Behaviour comes from `react-phone-number-input` (parsing, formatting,
+ * country detection, `libphonenumber-js` metadata); the field shell is React
+ * Aria `TextField` (label, description, error, required / disabled wiring)
+ * and the country picker a React Aria `Select`. Validate with the library's
+ * `isValidPhoneNumber` / `isPossiblePhoneNumber` if a schema needs it.
+ *
+ * Spec: text fields —
+ * https://m3.material.io/components/text-fields/{specs,guidelines,accessibility}
+ * (container, floating label, supporting text and error icon are the shared
+ * `./field-styles.ts`) and menus —
+ * https://m3.material.io/components/menus/{specs,guidelines} for the country
+ * list (48dp rows, a checkmark as the second selection cue, the calling code
+ * in the trailing "shortcut" slot). Material 3 does not describe this component.
+ * Deviations: MD3 has no phone field; the
+ * country picker is a 40dp icon-button-shaped trigger in the leading-icon
+ * position (a leading icon that opens a menu is not in the spec), labelled
+ * "Phone number country" per the accessibility page's rule for interactive
+ * leading / trailing icons. Picking a country returns focus to the trigger
+ * (React Aria's popover focus restoration) rather than jumping into the
+ * input — the library's `focusInputOnCountrySelection` is off to avoid the
+ * two fighting over focus.
+ */
 export function PhoneField(props: PhoneFieldProps) {
   const {
     label,

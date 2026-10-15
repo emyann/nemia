@@ -24,62 +24,13 @@ import {
 } from "react-aria-components";
 
 import { KeyboardIcon, ScheduleIcon } from "../icons";
-import { focusRing, tv } from "../utils";
+import { cn, focusRing, tv } from "../utils";
 import { Button } from "./Button";
 import { fieldStyles, type FieldVariantProps } from "./field-styles";
 import IconButton from "./IconButton";
 import Modal from "./Modal";
 import { pickerDialogStyles } from "./picker-dialog-styles";
 
-/**
- * MD3 time picker — a modal dialog that picks an hour and a minute, on a
- * clock dial or typed, opened from a text-field-shaped trigger (the shared
- * `./field-styles.ts` module at `kind="trigger"`). The value is an
- * `@internationalized/date` `Time`.
- *
- *   <TimePicker label="Alarm" defaultValue={new Time(7, 0)} />
- *   <TimePicker label="Start" hourCycle={24} defaultMode="input" />
- *
- * - **Dial** (`defaultMode="dial"`): the hour and minute selectors (96 by
- *   80dp, 114dp wide for a 24-hour vertical dial; `display-large`;
- *   `primary-container` when selected), the period selector (52 by 80dp
- *   stacked, 216 by 38dp in a row; `tertiary-container` when selected,
- *   1dp `outline`), and the 256dp `surface-container-highest` dial with
- *   its 48dp `primary` handle, 2dp track and 8dp centre. Press or drag on
- *   the dial; letting go of an hour moves on to the minutes.
- * - **Input** (`defaultMode="input"`, or the keyboard button): React Aria's
- *   `TimeField`, its hour and minute drawn as Material's 96 by 72dp boxes in
- *   `display-medium`, `primary-container` with a 2dp `primary` outline
- *   while focused, and labelled "Hour" and "Minute" below.
- * - **Layout**: `orientation="vertical"` (the default) stacks the dial
- *   under the selectors; `horizontal` sets it beside them, as Material's
- *   landscape layout does.
- * - **12 or 24 hours**: the locale's, or `hourCycle`. A 24-hour picker has
- *   no period selector; its dial carries 00–11 on the outer ring and 12–23
- *   on the inner, as Material's figure draws it.
- *
- * Cancel, Escape and a press outside drop the draft; OK commits it.
- *
- * Accessibility, as Material's page lists it: every number on the dial is a
- * tab stop that Space or Enter selects, named "Hour 7 of 12" or
- * "Minute 15 of 60" and pressed when it is the value; AM and PM are radios
- * in a radio group; the toggle is "Toggle input picker" or "Toggle dial
- * picker"; the input's fields are named "Hour" and "Minute". Strings are
- * `labels`, English by default.
- *
- * Deviations, by name:
- * - **The dial is built on React Aria Components and pointer events**, not
- *   on the `react-aria` hooks (`useMove`, `usePress`, `useFocusRing`): the
- *   numbers are `ToggleButton`s, which bring press, keyboard and focus, and
- *   the drag is the dial's own pointer capture, so the kit adds no
- *   dependency.
- * - **The input's fields are spin buttons**, React Aria's segments, where
- *   Material's table says text input: they take digits and arrow keys.
- * - **Material's prose and figure disagree on the 24-hour rings** (odd
- *   numbers outside, or 00–11 outside); the figure is followed.
- *
- * Spec: https://m3.material.io/components/time-pickers/{overview,specs,guidelines,accessibility}
- */
 
 export type TimePickerLabels = {
   selectTime: string;
@@ -139,7 +90,7 @@ const styles = tv({
     selectors: "flex items-center",
     selector: [
       focusRing(),
-      "group/tps relative flex h-20 w-24 cursor-default items-center justify-center overflow-hidden rounded-shape-small",
+      "group/tps relative flex h-20 min-w-24 cursor-default items-center justify-center overflow-hidden rounded-shape-small px-2",
       "bg-surface-container-highest text-display-large font-display-large text-on-surface",
       "data-selected:bg-primary-container data-selected:text-on-primary-container",
     ],
@@ -152,7 +103,7 @@ const styles = tv({
     period:
       "flex shrink-0 overflow-hidden rounded-shape-small border border-outline",
     periodItem: [
-      "group/tps relative flex flex-1 cursor-default items-center justify-center text-title-medium font-title-medium text-on-surface-variant outline-none",
+      "group/tps relative flex flex-1 cursor-default items-center justify-center px-1 text-title-medium font-title-medium text-on-surface-variant outline-none",
       "data-selected:bg-tertiary-container data-selected:text-on-tertiary-container",
       "outline-3 -outline-offset-3 outline-ring data-focus-visible:outline-solid",
     ],
@@ -169,28 +120,89 @@ const styles = tv({
     center:
       "pointer-events-none absolute left-1/2 top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-shape-full bg-primary",
     inputBox: [
-      "flex h-18 w-24 items-center justify-center rounded-shape-small bg-surface-container-highest text-display-medium font-display-medium text-on-surface caret-transparent outline-none tabular-nums",
+      "flex h-18 min-w-24 items-center justify-center rounded-shape-small px-2 bg-surface-container-highest text-display-medium font-display-medium text-on-surface caret-transparent outline-none tabular-nums",
       // A segment holds only text, so its hover layer is a flat gradient
       // over its container rather than an element of its own.
       "data-hovered:bg-linear-to-r data-hovered:from-on-surface/(--md-sys-state-hover-state-layer-opacity) data-hovered:to-on-surface/(--md-sys-state-hover-state-layer-opacity)",
       "data-focused:bg-primary-container data-focused:text-on-primary-container data-focused:outline-2 data-focused:outline-solid data-focused:-outline-offset-2 data-focused:outline-primary",
       "data-placeholder:text-on-surface-variant",
     ],
+    /** The digits' cell, as wide as the widest pair the font draws. */
+    digits: "relative grid justify-items-center *:col-start-1 *:row-start-1",
     inputLabel:
       "pt-1.5 text-body-small font-body-small text-on-surface-variant",
   },
   variants: {
     orientation: {
-      vertical: { period: "ml-3 h-20 w-13 flex-col" },
-      horizontal: { period: "mt-3 h-9.5 w-54" },
+      vertical: { period: "ml-3 h-20 min-w-13 flex-col" },
+      horizontal: { period: "mt-3 h-9.5 min-w-54" },
     },
-    wide: { true: { selector: "w-28.5" } },
+    wide: { true: { selector: "min-w-28.5" } },
   },
 });
 
 type Mode = "dial" | "input";
 type Part = "hour" | "minute";
 
+/**
+ * MD3 time picker — a modal dialog that picks an hour and a minute, on a
+ * clock dial or typed, opened from a text-field-shaped trigger (the shared
+ * `./field-styles.ts` module at `kind="trigger"`). The value is an
+ * `@internationalized/date` `Time`.
+ *
+ *   <TimePicker label="Alarm" defaultValue={new Time(7, 0)} />
+ *   <TimePicker label="Start" hourCycle={24} defaultMode="input" />
+ *
+ * - **Dial** (`defaultMode="dial"`): the hour and minute selectors (96 by
+ *   80dp, 114dp wide for a 24-hour vertical dial; `display-large`;
+ *   `primary-container` when selected), the period selector (52 by 80dp
+ *   stacked, 216 by 38dp in a row; `tertiary-container` when selected,
+ *   1dp `outline`), and the 256dp `surface-container-highest` dial with
+ *   its 48dp `primary` handle, 2dp track and 8dp centre. Press or drag on
+ *   the dial; letting go of an hour moves on to the minutes.
+ * - **Input** (`defaultMode="input"`, or the keyboard button): React Aria's
+ *   `TimeField`, its hour and minute drawn as Material's 96 by 72dp boxes in
+ *   `display-medium`, `primary-container` with a 2dp `primary` outline
+ *   while focused, and labelled "Hour" and "Minute" below.
+ * - **Layout**: `orientation="vertical"` (the default) stacks the dial
+ *   under the selectors; `horizontal` sets it beside them, as Material's
+ *   landscape layout does.
+ * - **Any display face**: Material sizes the hour and minute boxes for
+ *   Roboto. Here each box's width is a minimum, and the box grows to the
+ *   widest of "00" to "99" in its face, plus 8dp each side (`DigitSizers`):
+ *   a wide face, such as Michroma, shows both digits whole, and the box
+ *   keeps one width whatever the value, so the dial does not shift under
+ *   a drag. Roboto and Inter fit Material's sizes, which then draw as
+ *   specified. The dialog, whose width is Material's "dynamic", widens
+ *   with them; past 360dp under a very wide face. The period selector's
+ *   52dp (stacked) and 216dp (in a row) are minimums the same way; in a
+ *   row it spans the selectors above it, whatever their width.
+ * - **12 or 24 hours**: the locale's, or `hourCycle`. A 24-hour picker has
+ *   no period selector; its dial carries 00–11 on the outer ring and 12–23
+ *   on the inner, as Material's figure draws it.
+ *
+ * Cancel, Escape and a press outside drop the draft; OK commits it.
+ *
+ * Accessibility, as Material's page lists it: every number on the dial is a
+ * tab stop that Space or Enter selects, named "Hour 7 of 12" or
+ * "Minute 15 of 60" and pressed when it is the value; AM and PM are radios
+ * in a radio group; the toggle is "Toggle input picker" or "Toggle dial
+ * picker"; the input's fields are named "Hour" and "Minute". Strings are
+ * `labels`, English by default.
+ *
+ * Deviations, by name:
+ * - **The dial is built on React Aria Components and pointer events**, not
+ *   on the `react-aria` hooks (`useMove`, `usePress`, `useFocusRing`): the
+ *   numbers are `ToggleButton`s, which bring press, keyboard and focus, and
+ *   the drag is the dial's own pointer capture, so the kit adds no
+ *   dependency.
+ * - **The input's fields are spin buttons**, React Aria's segments, where
+ *   Material's table says text input: they take digits and arrow keys.
+ * - **Material's prose and figure disagree on the 24-hour rings** (odd
+ *   numbers outside, or 00–11 outside); the figure is followed.
+ *
+ * Spec: https://m3.material.io/components/time-pickers/{overview,specs,guidelines,accessibility}
+ */
 export function TimePicker(props: TimePickerProps) {
   const {
     label,
@@ -383,8 +395,11 @@ function TimeDialog({
                 className={t.selector()}
               >
                 <span className={t.stateLayer()} />
-                <span className="relative">
-                  {pad(displayHour(draft.hour, hourCycle))}
+                <span className={t.digits()}>
+                  <DigitSizers />
+                  <span data-slot="time-picker-digits">
+                    {pad(displayHour(draft.hour, hourCycle))}
+                  </span>
                 </span>
               </ToggleButton>
               <span aria-hidden="true" className={t.separator()}>
@@ -398,7 +413,10 @@ function TimeDialog({
                 className={t.selector()}
               >
                 <span className={t.stateLayer()} />
-                <span className="relative">{pad(draft.minute)}</span>
+                <span className={t.digits()}>
+                  <DigitSizers />
+                  <span data-slot="time-picker-digits">{pad(draft.minute)}</span>
+                </span>
               </ToggleButton>
             </div>
             {period}
@@ -430,7 +448,10 @@ function TimeDialog({
               {(segment) =>
                 segment.type === "hour" || segment.type === "minute" ? (
                   <span className="flex flex-col">
-                    <DateSegment segment={segment} className={t.inputBox()} />
+                    <span className={t.digits({ class: "justify-items-stretch" })}>
+                      <DigitSizers className="px-2 text-display-medium font-display-medium tabular-nums" />
+                      <DateSegment segment={segment} className={t.inputBox()} />
+                    </span>
                     <span aria-hidden="true" className={t.inputLabel()}>
                       {segment.type === "hour" ? labels.hour : labels.minute}
                     </span>
@@ -508,6 +529,17 @@ function PeriodSelector({
       ))}
     </RadioGroup>
   );
+}
+
+/** Ten invisible pairs, "00" to "99", in the cell of the digits they
+    size: the cell is as wide as the widest pair, so a box holds any value
+    whole under any face and keeps its width as the value changes. */
+function DigitSizers({ className }: { className?: string }) {
+  return Array.from({ length: 10 }, (_, d) => (
+    <span key={d} aria-hidden="true" className={cn("invisible", className)}>
+      {`${d}${d}`}
+    </span>
+  ));
 }
 
 /* ---- the dial ----------------------------------------------------------- */

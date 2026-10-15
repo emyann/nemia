@@ -2,7 +2,7 @@
 
 import { type ReactNode, type RefObject } from "react";
 import {
-  Focusable,
+  Focusable as AriaFocusable,
   Tooltip as AriaTooltip,
   TooltipTrigger as AriaTooltipTrigger,
   OverlayArrow,
@@ -281,4 +281,4 @@ export function TooltipTrigger(props: TooltipTriggerProps) {
  * React Aria's `Focusable`: makes its one child a tooltip trigger when that
  * child is no button. The child must take focus and carry a role.
  */
-export { Focusable };
+export const Focusable = AriaFocusable;

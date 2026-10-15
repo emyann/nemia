@@ -16,16 +16,6 @@ import {
 import { composeTailwindRenderProps } from "../render-props";
 import { tv } from "../utils";
 
-/**
- * MD3 radio button: a 20dp ring with a 10dp dot when selected, a 40dp state
- * layer inside a 48dp touch target. `RadioGroup` carries the label,
- * supporting text, error message and orientation.
- *
- * Spec: https://m3.material.io/components/radio-button/{overview,specs,guidelines,accessibility}
- * The guidelines caution against horizontal lists and recommend one option
- * pre-selected and five or fewer options; `orientation="horizontal"` exists
- * for the rare compact case, not as a default.
- */
 const radioStyles = tv({
   slots: {
     base: [
@@ -66,6 +56,16 @@ export type RadioProps = Omit<AriaRadioProps, "className" | "children"> & {
   className?: string;
 };
 
+/**
+ * MD3 radio button: a 20dp ring with a 10dp dot when selected, a 40dp state
+ * layer inside a 48dp touch target. `RadioGroup` carries the label,
+ * supporting text, error message and orientation.
+ *
+ * Spec: https://m3.material.io/components/radio-button/{overview,specs,guidelines,accessibility}
+ * The guidelines caution against horizontal lists and recommend one option
+ * pre-selected and five or fewer options; `orientation="horizontal"` exists
+ * for the rare compact case, not as a default.
+ */
 export function Radio({ children, className, ...props }: RadioProps) {
   return (
     <AriaRadio

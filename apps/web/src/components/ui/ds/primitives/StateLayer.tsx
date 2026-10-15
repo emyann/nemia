@@ -1,14 +1,5 @@
 import { cn, tv, type VariantProps } from "../utils";
 
-// MD3 state layer: an overlay tinted with the content color whose opacity
-// follows the interaction state (hover 8%, focus/press 10%, drag 16%).
-// Colors are a static map so Tailwind can see every class at build time —
-// never build `bg-${color}` strings dynamically.
-//
-// The opacities come from `--md-sys-state-*` through the `state-opacity-*`
-// utilities (tokens/theme.v4.css), not from Tailwind's numeric opacity scale,
-// which compiles to a literal a theme cannot reach. A preset that wants
-// flatter or louder feedback moves those four variables.
 const stateLayerColors = {
   primary: "bg-primary",
   secondary: "bg-secondary",
@@ -51,6 +42,17 @@ type StateLayerProps = Omit<VariantProps<typeof styles>, "state"> & {
   className?: string;
 };
 
+/**
+ * MD3 state layer: an overlay tinted with the content color whose opacity
+ * follows the interaction state (hover 8%, focus/press 10%, drag 16%).
+ * Colors are a static map so Tailwind can see every class at build time —
+ * never build `bg-${color}` strings dynamically.
+ *
+ * The opacities come from `--md-sys-state-*` through the `state-opacity-*`
+ * utilities (tokens/theme.v4.css), not from Tailwind's numeric opacity scale,
+ * which compiles to a literal a theme cannot reach. A preset that wants
+ * flatter or louder feedback moves those four variables.
+ */
 export default function StateLayer(props: StateLayerProps) {
   const { color, isHovered, isFocusVisible, isPressed, isDragged, className } =
     props;

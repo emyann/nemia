@@ -17,14 +17,6 @@ import { CheckIcon, MinusIcon } from "../icons";
 import { composeTailwindRenderProps } from "../render-props";
 import { tv } from "../utils";
 
-/**
- * MD3 checkbox: an 18dp box with 2dp corners, a 40dp state layer inside a
- * 48dp touch target, selected / indeterminate / error / disabled states, and
- * an optional label that also toggles it. `CheckboxGroup` adds a group label,
- * supporting text and an error message.
- *
- * Spec: https://m3.material.io/components/checkbox/{overview,specs,guidelines,accessibility}
- */
 const styles = tv({
   slots: {
     base: [
@@ -71,6 +63,14 @@ export type CheckboxProps = Omit<
   className?: string;
 };
 
+/**
+ * MD3 checkbox: an 18dp box with 2dp corners, a 40dp state layer inside a
+ * 48dp touch target, selected / indeterminate / error / disabled states, and
+ * an optional label that also toggles it. `CheckboxGroup` adds a group label,
+ * supporting text and an error message.
+ *
+ * Spec: https://m3.material.io/components/checkbox/{overview,specs,guidelines,accessibility}
+ */
 export function Checkbox({ children, className, ...props }: CheckboxProps) {
   return (
     <AriaCheckbox

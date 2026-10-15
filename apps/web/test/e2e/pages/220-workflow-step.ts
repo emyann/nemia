@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { expectKeys, expectRendered, expectSource, filesIn, sidebar } from '../board.ts';
+import { expectKeys, expectRendered, expectSource, filesIn, sidebar, railPlace, litOf } from '../board.ts';
 import { expectVisible, Refused } from '../checks.ts';
 import { WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -15,7 +15,7 @@ export default {
   expect: async (page) => {
     await sidebar(page);
     await expectVisible(
-      page.locator('[data-sidebar="sidebar"] a[data-active="true"]', { hasText: 'Workflows' }),
+      railPlace(page, 'Workflows').and(litOf(page)),
       "the sidebar lights Workflows on a step's page",
     );
     const { good } = WORKFLOWS;

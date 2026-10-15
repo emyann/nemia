@@ -1,12 +1,12 @@
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { frameTabsOf, nextVisit, photograph, railOf, themeOf } from '../board.ts';
+import { frameTabsOf, nextVisit, photograph, themeOf, railPlace, litOf } from '../board.ts';
 import { expectCount, expectTexts, expectUncut, expectVisible, idle, Refused, settled } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
 
-/** The place whose tabs the strip holds, as the rail and the header name it. */
-const PLACE = 'Machines & Capabilities';
+/** The destination whose tabs the strip holds, as the rail and the top bar name it. */
+const PLACE = 'Settings';
 
 /** The strip's tab named `name`. */
 const tabOf = (page: Page, name: string) => frameTabsOf(page).getByRole('tab', { name, exact: true });
@@ -21,15 +21,15 @@ function expectAt(page: Page, pathname: string, assertion: string): void {
 /** Refuses unless the strip selects `name` alone, and the rail lights the place alone. */
 async function expectTab(page: Page, name: string, assertion: string): Promise<void> {
   await expectTexts(frameTabsOf(page).locator('[aria-selected="true"]'), [name], assertion);
-  await expectVisible(railOf(page).locator(`a[data-active="true"][aria-label="${PLACE}"]`), `${assertion}: the rail lights ${PLACE}`);
-  await expectCount(railOf(page).locator('a[data-active="true"]'), 1, `${assertion}: and no other place`);
+  await expectVisible(railPlace(page, PLACE).and(litOf(page)), `${assertion}: the rail lights ${PLACE}`);
+  await expectCount(litOf(page), 1, `${assertion}: and no other place`);
 }
 
 /** The strip sits under the header and above the page, across the page's width, the header naming the place. */
 async function underHeader(page: Page): Promise<void> {
   const header = page.locator('header[data-frame-header]');
-  await expectVisible(header.getByText(PLACE, { exact: true }), `the header names the place, ${PLACE}`);
-  await expectTexts(frameTabsOf(page).getByRole('tab'), ['Machines', 'Capabilities'], 'the strip holds Machines, then Capabilities');
+  await expectVisible(header.locator('[data-page-name]').getByText(PLACE, { exact: true }), `the header names the place, ${PLACE}`);
+  await expectTexts(frameTabsOf(page).getByRole('tab'), ['Settings', 'Machines', 'Capabilities'], 'the strip holds Settings, Machines, then Capabilities');
   await expectTab(page, 'Machines', 'on /machines the Machines tab is selected');
   const top = (await header.boundingBox())!;
   const strip = await frameTabsOf(page).boundingBox();
@@ -82,7 +82,7 @@ async function onPhone(page: Page): Promise<void> {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await expectUncut(frameTabsOf(page).getByRole('tab'), 'on a phone each tab is read whole');
-  await expectUncut(page.locator('header[data-frame-header]').getByText(PLACE, { exact: true }), 'and the header names the place whole');
+  await expectUncut(page.locator('header[data-frame-header] [data-page-name]').getByText(PLACE, { exact: true }), 'and the header names the place whole');
   const strip = await frameTabsOf(page).locator('xpath=..').boundingBox();
   if (!strip || strip.x < -1 || strip.x + strip.width > 391)
     throw new Refused(`the strip fits a 390 wide screen, scrolling sideways — it is ${strip?.width} wide at ${strip?.x}`);
@@ -92,8 +92,8 @@ async function onPhone(page: Page): Promise<void> {
 
 export default {
   /**
-   * The frame's tabs: Machines & Capabilities is one place in the rail with a tab each, Machines and Capabilities, in a strip under the
-   * header and above the page. A tab is its own address: a click opens it, closing the floating bar, and a next visit opens the same tab.
+   * The frame's tabs: Settings is one destination in the rail with a tab each, Settings, Machines and Capabilities, in a strip under the
+   * top bar and above the page. A tab is its own address: a click opens it, closing the floating bar, and a next visit opens the same tab.
    * The arrow keys move between the tabs without opening one, and Enter opens one, once. A page with one view, Agents, has no strip. The
    * window's size is taken back.
    */
@@ -109,7 +109,7 @@ export default {
       if (size) await page.setViewportSize(size);
       await page.goto(new URL('/agents', page.url()).href);
       await idle(page);
-      await expectVisible(railOf(page).locator('a[data-active="true"][aria-label="Agents"]'), 'on Agents');
+      await expectVisible(railPlace(page, 'Agents').and(litOf(page)), 'on Agents');
       await expectCount(frameTabsOf(page), 0, 'a page with one view has no strip');
     } finally {
       if (size) await page.setViewportSize(size);

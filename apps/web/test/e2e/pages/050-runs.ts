@@ -5,7 +5,7 @@ import { FINISHED_SIZE, type FinishedPage, type OpenRuns, type WaitingRun } from
 import { rowsSaid } from '../../../src/lib/finished.ts';
 import { titleOf } from '../../../src/lib/factory.ts';
 import { endedWords, openWord, presentWait, waitSentence, waitTag, whenColumn } from '../../../src/lib/runWords.ts';
-import { answered, fed, photograph, photographBothWidths, SECTIONS, sectionsOf, sidebar, themeOf } from '../board.ts';
+import { answered, fed, photograph, photographBothWidths, SECTIONS, sectionsOf, sidebar, themeOf, railPlace, litOf } from '../board.ts';
 import { expectBeneath, expectCount, expectNone, expectTexts, expectVisible, idle, literal, Refused, WAIT_MS } from '../checks.ts';
 import { timesRefused } from '../runs-times.ts';
 import { contrastHolds } from '../runs-contrast.ts';
@@ -753,7 +753,7 @@ async function withRegated(page: Page): Promise<void> {
 
   await enterOnPlace(page, 'Inbox', '/inbox');
   await expectVisible(
-    page.locator('[data-sidebar="sidebar"] a[data-active="true"]', { hasText: 'Inbox' }),
+    railPlace(page, 'Inbox').and(litOf(page)),
     'reached with Enter, the Inbox is lit in the menu',
   );
   await enterOnPlace(page, 'Runs', '/runs');

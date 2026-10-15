@@ -1,4 +1,4 @@
-import { nextVisit, sidebar } from '../board.ts';
+import { nextVisit, sidebar, railPlace, litOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, WAIT_MS } from '../checks.ts';
 import { WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -14,7 +14,7 @@ export default {
   expect: async (page) => {
     await sidebar(page);
     await expectVisible(
-      page.locator('[data-sidebar="sidebar"] a[data-active="true"]', { hasText: 'Workflows' }),
+      railPlace(page, 'Workflows').and(litOf(page)),
       'the sidebar lights Workflows on its page',
     );
     const { good, broken, yours } = WORKFLOWS;

@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { expectInstant, expectKeys, expectRendered, expectSource, filesIn, sidebar } from '../board.ts';
+import { expectInstant, expectKeys, expectRendered, expectSource, filesIn, sidebar, railPlace, litOf } from '../board.ts';
 import { expectCount, expectVisible, Refused } from '../checks.ts';
 import { CARDS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -17,7 +17,7 @@ export default {
   expect: async (page) => {
     await sidebar(page);
     await expectVisible(
-      page.locator('[data-sidebar="sidebar"] a[data-active="true"]', { hasText: 'Inbox' }),
+      railPlace(page, 'Inbox').and(litOf(page)),
       "the sidebar lights Inbox on a card's page",
     );
     const { rich } = CARDS;

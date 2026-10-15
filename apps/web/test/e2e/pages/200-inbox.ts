@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page, Response } from 'playwright';
-import { expectInstant, photograph, PLACES_SAID, sidebar, themeOf } from '../board.ts';
+import { expectInstant, photograph, PLACES_SAID, sidebar, themeOf, railPlace, litOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import {
   CARDS,
@@ -84,7 +84,7 @@ async function visit(page: Page): Promise<void> {
   {
     await sidebar(page);
     await expectVisible(
-      page.locator('[data-sidebar="sidebar"] a[data-active="true"]', { hasText: 'Inbox' }),
+      railPlace(page, 'Inbox').and(litOf(page)),
       'the sidebar lights Inbox on its page',
     );
     const { planned, bare, rich } = CARDS;

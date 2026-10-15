@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { photograph, recordedUsage, reloadForQuota, themeOf } from '../board.ts';
 import { expectClearOfEachOther } from '../canvas.ts';
-import { expectCount, expectTexts, expectUncut, expectVisible, Refused, settled } from '../checks.ts';
+import { expectCount, expectTexts, expectVisible, Refused, settled } from '../checks.ts';
 import { timeOfDay } from '../../../src/lib/timeOfDay.ts';
 import { QUOTA } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -25,7 +25,7 @@ export default {
     const file = path.join(store!, QUOTA.file);
     const written = fs.readFileSync(file, 'utf8');
     const line = page.locator('[data-gauges] [data-quota]');
-    const short = page.locator('footer[data-frame-footer] [data-quota-short]');
+    const short = page.locator('header[data-frame-header] [data-gauges-button]');
     const shoot = async (what: string) => {
       await settled(page);
       await photograph(page, path.join(OUT, `factory-quota-${what}-${await themeOf(page)}.png`), { fullPage: true });
@@ -42,10 +42,13 @@ export default {
       await expectCount(
         short.and(page.locator(`[data-quota-short="5-hour ${fiveUsed}% · week ${QUOTA.week.used}%"][data-marked]`)),
         1,
-        `the bottom bar says each window's label and percentage, marked: the week is ${QUOTA.week.used}% used`,
+        `the gauges button holds each window's label and percentage, marked: the week is ${QUOTA.week.used}% used`,
       );
-      await expectTexts(short, [`quota 5-hour ${fiveUsed}% · week ${QUOTA.week.used}%`], 'on one line, led by the word quota');
-      await expectUncut(short, 'and read whole');
+      await expectVisible(short.locator('[data-quota-mark]'), 'marked, the gauges button draws the money mark beside its dot');
+      await expectVisible(
+        short.getByRole('button', { name: /, quota near its limit$/ }),
+        'and its name says the quota nears its limit',
+      );
       await expectTexts(
         line.locator('[data-quota-machine]'),
         ['Quota on this machine:'],

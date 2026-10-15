@@ -68,9 +68,8 @@ custom-instructions
 pause
 sidebar
 tabs
-bottom-bar
+gauges-button
 pause-now
-bell
 favorites
 after-long-title
 workflow-remove
@@ -112,3 +111,4 @@ runs-error
 runs-bars
 inbox-file-places
 folder-skills
+stats

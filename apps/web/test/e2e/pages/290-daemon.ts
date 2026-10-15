@@ -32,7 +32,7 @@ const reload = async (page: Page) => {
 
 export default {
   /**
-   * Whether a daemon ticks the store: a dot at the left of the frame's bottom bar, and whole in the machine's gauges it opens. The seeded
+   * Whether a daemon ticks the store: a dot on the top bar's gauges button, and whole in the machine's gauges it opens. The seeded
    * store has no daemon.json, which is true — the e2e's api runs with `--no-tick` — so the dot is down and the gauges say so and how to
    * start one: the api. Then a wf up alive and silent for 20 minutes, past the 15 that are stale at every 4 s: the dot warns, and the
    * gauges say it stalled, with its silence and the command, each card on the floor beside them clear of the one beneath it and of the
@@ -50,7 +50,7 @@ export default {
     if (fs.existsSync(file)) throw new Refused(`the seeded store has no daemon.json — ${file} is there`);
     const line = page.locator('[data-gauges] [data-daemon]');
     const dot = (kind: string, tone: string, why: string) =>
-      expectCount(page.locator(`footer[data-frame-footer] [data-daemon-dot="${kind}"][data-tone="${tone}"]`), 1, why);
+      expectCount(page.locator(`header[data-frame-header] [data-gauges-button][data-daemon-dot="${kind}"][data-tone="${tone}"]`), 1, why);
     const shoot = async (what: string) => {
       await settled(page);
       await photograph(page, path.join(OUT, `daemon-${what}-${await themeOf(page)}.png`), { fullPage: true });
@@ -62,7 +62,7 @@ export default {
       }),
       'with no daemon.json, the gauges say nothing ticks the store, and how to start what does',
     );
-    await dot('none', 'down', "and the bottom bar's dot is down");
+    await dot('none', 'down', "and the gauges button's dot is down");
     try {
       fs.writeFileSync(file, daemonFile(20 * MIN + 30_000));
       await reload(page);
@@ -77,7 +77,7 @@ export default {
       );
       await expectVisible(stalled.locator('code', { hasText: /^npm start in apps\/api$/ }), "the api's start set apart as code");
       await expectCount(line, 1, 'one line, and no other');
-      await dot('stalled', 'warn', "the bottom bar's dot warns: the next daemon takes the store over");
+      await dot('stalled', 'warn', "the gauges button's dot warns: the next daemon takes the store over");
       const title = await page.locator('[data-daemon-dot="stalled"]').getAttribute('title');
       if (!title?.startsWith(`Nothing ticks this store, so no run moves: the wf up of pid ${process.pid} is alive but silent`))
         throw new Refused(`the dot's hover says the gauges' sentence — its title is ${JSON.stringify(title)}`);
@@ -116,7 +116,7 @@ export default {
           0,
           `${what === 'api' ? 'an api' : 'a wf up'} heard from just now is ticking, and no sentence says nothing ticks`,
         );
-        await dot('ticking', 'ok', "the bottom bar's dot is ok");
+        await dot('ticking', 'ok', "the gauges button's dot is ok");
         await expectVisible(
           page.locator('[data-gauges] [data-daemon-ticks]', { hasText: new RegExp(`^${what}: ticking, pid ${process.pid}`) }),
           "the gauges say the api's own line for the daemon that ticks",
@@ -127,9 +127,9 @@ export default {
       const unobserved = ['harness `claude`: claude agents: timed out', 'harness `codex`: its transcripts folder cannot be listed'];
       fs.writeFileSync(stats, JSON.stringify({ ...JSON.parse(seeded), at: new Date().toISOString(), unobserved }, null, 2));
       await reload(page);
-      await dot('ticking', 'warn', "a daemon that ticks while its last pass could not read a harness warns on the bottom bar's dot");
-      const warned = page.locator('footer[data-frame-footer] [data-daemon-dot="ticking"]');
-      await expectVisible(warned.getByText(/^daemon ticking, harness unread$/), 'and says so beside it');
+      await dot('ticking', 'warn', "a daemon that ticks while its last pass could not read a harness warns on the gauges button's dot");
+      const warned = page.locator('header[data-frame-header] [data-gauges-button][data-daemon-dot="ticking"]');
+      await expectVisible(warned.getByRole('button', { name: /^This machine: daemon ticking, harness unread/ }), 'and its name says so');
       const hover = (await warned.getAttribute('title'))?.split(String.fromCharCode(10)) ?? [];
       const [said = '', ...why] = hover;
       if (!said.startsWith(`api: ticking, pid ${process.pid}`) || why.join() !== unobserved.join()) {

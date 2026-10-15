@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { photograph, startOf, themeOf } from '../board.ts';
+import { photograph, startOf, themeOf, railPlace } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { FACTORIES } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -88,7 +88,7 @@ async function inTheAddress(page: Page): Promise<void> {
   await visit(page, `/runs?bar=${OPEN}`);
   await expectVisible(barOf(page), 'the same address opens the same bar on the Runs page');
   await expectVisible(page.locator('header', { hasText: 'Runs' }), 'with the Runs page under it');
-  await page.locator('[data-sidebar="sidebar"]').getByRole('link', { name: 'Inbox' }).click();
+  await railPlace(page, 'Inbox').click();
   await idle(page);
   await expectClosed(page, '/inbox', 'a link to another page closes the bar');
 }
@@ -183,9 +183,9 @@ async function onPhone(page: Page): Promise<void> {
     await expectCount(bar.getByRole('separator'), 0, 'with no edge to drag');
     await settled(page);
     await photograph(page, path.join(OUT, `floating-bar-narrow-${await themeOf(page)}.png`));
-    await page.locator('header').locator('[data-sidebar="trigger"]').click();
+    await page.locator('header[data-frame-header] [data-menu-button]').click();
     const menu = page.getByRole('dialog');
-    await expectVisible(menu, "the header's menu button opens the menu over the bar");
+    await expectVisible(menu, "the top bar's menu button opens the drawer over the bar");
     await page.keyboard.press('Escape');
     await expectCount(menu, 0, 'Escape closes the menu');
     await expectVisible(bar, 'and leaves the bar open: the menu took the key');

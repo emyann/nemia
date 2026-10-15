@@ -6,7 +6,7 @@ import type { PageSpec } from '../visit.ts';
 export default {
   /**
    * A settled step's session, read once: its chip and a link back to the run at the top, then the conversation down to the prompt box,
-   * which ends where the frame's bottom bar begins — the prompt, the calls with nothing said between them folded into one line, thoughts
+   * which ends at the window's foot — the prompt, the calls with nothing said between them folded into one line, thoughts
    * folded, the session's words from their markdown, a system line and the closeout. The session has ended, so the prompt box is closed,
    * with why and where to go instead. The conversation is photographed from its start, scrolled up as a reader scrolls to it.
    */
@@ -27,12 +27,12 @@ export default {
     const [box, below, foot] = [
       await talk.boundingBox(),
       await prompt.boundingBox(),
-      await page.locator('footer[data-frame-footer]').boundingBox(),
+      { y: page.viewportSize()?.height ?? 0 },
     ];
     if (!box || !below || !foot || Math.abs(box.y + box.height - below.y) > 2 || Math.abs(below.y + below.height - foot.y) > 2) {
       throw new Refused(
-        `the conversation takes the page's height down to the prompt box, which ends where the bottom bar begins — the conversation ends at ${box ? Math.round(box.y + box.height) : 'nothing'} px, ` +
-          `the box spans ${below ? `${Math.round(below.y)}–${Math.round(below.y + below.height)}` : 'nothing'} px, the bottom bar begins at ${foot ? Math.round(foot.y) : 'nothing'} px`,
+        `the conversation takes the page's height down to the prompt box, which ends at the window's foot — the conversation ends at ${box ? Math.round(box.y + box.height) : 'nothing'} px, ` +
+          `the box spans ${below ? `${Math.round(below.y)}–${Math.round(below.y + below.height)}` : 'nothing'} px, the window ends at ${foot.y} px`,
       );
     }
     await expectVisible(

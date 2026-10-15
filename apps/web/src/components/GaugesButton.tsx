@@ -39,6 +39,7 @@ export function GaugesButton({ feed }: { feed: FeedStatus }) {
       data-feed={feed}
       data-daemon-dot={dot.kind}
       data-tone={dot.tone}
+      data-quota-short={short.text}
       data-marked={short.marked ? '' : undefined}
       title={dot.title}
       className="relative inline-flex shrink-0 items-center"

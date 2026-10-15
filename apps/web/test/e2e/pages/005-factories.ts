@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { pick, pickerOf, photograph, sectionsOf, sidebar, startOf, themeOf } from '../board.ts';
+import { litOf, photograph, pick, pickerOf, railPlace, sectionsOf, sidebar, startOf, themeOf } from '../board.ts';
 import { cardOf, showFinished } from '../canvas.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { FACTORIES, FOLDER, WORKFLOWS } from '../seed.ts';
@@ -28,18 +28,18 @@ const LISTED = [FACTORIES.broken, ...FACTORIES.others.slice(0, 2), FACTORIES.hir
 export default {
   /**
    * The Factories at `/`: every factory a block on a canvas, and a file that does not read a block that says why; the default factory is
-   * none, in the canvas or the sidebar's picker, once a factory is filed, though it holds runs. The picker lists All factories, then every
+   * none, in the canvas or the switcher, once a factory is filed, though it holds runs. The picker lists All factories, then every
    * factory, each with its repositories and why its file does not read. A block double-clicked opens its factory's floor, at
-   * `/factories/<name>`, with only its runs on it — FOLDER's, in `hiring`, once finished runs are shown — its name in the picker, its Floor
-   * lit, and a start in the sidebar. A name no factory has says so, answered with no 4xx, and leads back. The default factory's floor still
-   * answers its address, the picker listing it after the others, with no start in the sidebar; All factories picked there leads Home.
+   * `/factories/<name>`, with only its runs on it — FOLDER's, in `hiring`, once finished runs are shown — its name in the picker, Factories
+   * lit, and a start in the rail. A name no factory has says so, answered with no 4xx, and leads back. The default factory's floor still
+   * answers its address, the picker listing it after the others, its FAB asking which factory; All factories picked there leads to the Overview.
    */
   name: 'factories',
   route: '/',
   expect: async (page) => {
     await sidebar(page);
-    await expectVisible(page.locator('nav[aria-label="Places"] a[data-active="true"][aria-label="Home"]'), 'the rail lights Home at /');
-    await expectCount(sectionsOf(page).and(page.locator('[data-active="true"]')), 0, 'and the sidebar lights no section');
+    await expectVisible(railPlace(page, 'Overview').and(litOf(page)), 'the rail lights Overview at /');
+    await expectCount(sectionsOf(page).and(litOf(page)), 0, 'and no list');
     const blocks = page.locator('.react-flow__node [data-factory]');
     await expectCount(blocks, LISTED.length, 'a block for each factory filed');
     await expectTexts(
@@ -83,10 +83,9 @@ export default {
     await page.waitForURL((url) => url.pathname === `/factories/${FACTORIES.hiring.name}`, { timeout: WAIT_MS });
     await idle(page);
     await sidebar(page);
-    await expectTexts(
-      sectionsOf(page).and(page.locator('[data-active="true"]')),
-      ['Floor'],
-      `the block opens ${FACTORIES.hiring.name}'s floor, named in the picker, its Floor lit`,
+    await expectVisible(
+      railPlace(page, 'Factories').and(litOf(page)),
+      `the block opens ${FACTORIES.hiring.name}'s floor, named in the switcher, Factories lit`,
     );
     await showFinished(page);
     await expectCount(
@@ -102,7 +101,7 @@ export default {
         `the card says where its steps work on hover, not in a row of its own, ending in runs/${FOLDER.id}/work — it says ${JSON.stringify(where)}`,
       );
     }
-    await expectVisible(startOf(page), `and the sidebar offers a start in ${FACTORIES.hiring.name}`);
+    await expectVisible(startOf(page), `and the rail offers a start in ${FACTORIES.hiring.name}`);
     await settled(page);
     await photograph(page, path.join(OUT, `factories-floor-${await themeOf(page)}.png`));
 
@@ -125,11 +124,16 @@ export default {
       "the default factory's floor answers its address, and counts its runs",
     );
     await sidebar(page);
-    await expectCount(startOf(page), 0, 'with no start in the sidebar: a run from a floor names its factory');
+    await startOf(page).click();
+    await expectVisible(
+      page.getByRole('complementary', { name: 'Start a run', exact: true }),
+      "the FAB asks which factory: the default factory's floor starts no run",
+    );
+    await page.getByRole('complementary').getByRole('button', { name: 'Close' }).click();
     await pickerLists(page, [...LISTED, 'default'], 'on its floor, the picker lists the default factory after the others');
     await page.keyboard.press('Escape');
     await pick(page, 'All factories');
     await page.waitForURL((url) => url.pathname === '/', { timeout: WAIT_MS });
-    await expectCount(blocks, LISTED.length, 'and All factories picked on a floor leads Home');
+    await expectCount(blocks, LISTED.length, 'and All factories picked on a floor leads to the Overview');
   },
 } satisfies PageSpec;

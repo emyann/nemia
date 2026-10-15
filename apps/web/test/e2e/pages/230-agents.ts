@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { expectAlive, filesIn, photograph, railOf, sidebar, themeOf } from '../board.ts';
+import { expectAlive, filesIn, photograph, sidebar, themeOf, railPlace, litOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { AGENTS, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -22,7 +22,7 @@ export default {
   route: '/agents',
   expect: async (page) => {
     await sidebar(page);
-    await expectVisible(railOf(page).locator('a[data-active="true"][aria-label="Agents"]'), 'the rail lights Agents on its page');
+    await expectVisible(railPlace(page, 'Agents').and(litOf(page)), 'the rail lights Agents on its page');
     const { good } = WORKFLOWS;
     const { seeded, made, naming } = AGENTS;
     const agentsDir = path.join(store!, 'workflows', 'agents');

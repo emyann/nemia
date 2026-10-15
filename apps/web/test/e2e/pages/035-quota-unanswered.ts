@@ -59,21 +59,10 @@ export default {
       const opacity = Number(await line.locator('[data-quota-last]').evaluate((el) => getComputedStyle(el).opacity));
       if (!(opacity < 1)) throw new Refused(`the last reading is dimmed, so that nobody takes it for now — its opacity is ${opacity}`);
       const short = page.locator(
-        `footer[data-frame-footer] [data-quota-short="5-hour ${Math.round(QUOTA.fiveHour.used)}% · week ${QUOTA.week.used}%"]`,
+        `header[data-frame-header] [data-gauges-button][data-quota-short="5-hour ${Math.round(QUOTA.fiveHour.used)}% · week ${QUOTA.week.used}%"]`,
       );
-      await expectCount(short, 1, 'the bottom bar keeps the last good reading in short');
+      await expectCount(short, 1, 'the gauges button keeps the last good reading in short');
       await expectCount(short.and(page.locator('[data-marked]')), 1, `its week, ${QUOTA.week.used}% used, still marked`);
-      const dimmed = Number(
-        await short
-          .locator('span')
-          .last()
-          .evaluate((el) => getComputedStyle(el).opacity),
-      );
-      if (!(dimmed < 1)) throw new Refused(`the bottom bar dims the last reading too — its opacity is ${dimmed}`);
-      if (!(await short.getAttribute('title'))?.includes('Last read '))
-        throw new Refused(
-          `the bottom bar's hover says when the reading was last good — ${JSON.stringify(await short.getAttribute('title'))}`,
-        );
       await settled(page);
       await photograph(page, path.join(OUT, `factory-quota-unanswered-${await themeOf(page)}.png`), { fullPage: true });
 

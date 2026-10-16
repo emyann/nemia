@@ -29,9 +29,10 @@ import { within } from '../meter/tally.store.ts';
 import { stepsOf } from '../record/steps.store.ts';
 import { hasStarted } from '../wait/wait.ts';
 import { Conflict } from '../refusal/refusal.ts';
+import type { SkillsFound } from '../agents/agents.ts';
 import type { Run } from '../record/record.ts';
 import { appendRevision } from './revisions.store.ts';
-import { kindsDrift, type KindName, type Pin } from './revisions.ts';
+import { kindsDrift, type KindName, type Pin, type Revision, type RevisionKind } from './revisions.ts';
 
 /** What a run resolved on a pass: the steps it now holds, and the revision of each kind they were read at. */
 export type Resolved = { steps: Workflow[]; pins: Pin[] };
@@ -81,10 +82,15 @@ function kindsIn(run: Pick<Run, 'workflowDir' | 'factory'>, steps: readonly Work
  * (`rulesVersion`). Null for a kind that is not there — an agent the load no longer finds, a factory with no rules — which is pinned at no
  * revision and left out of the run's pins.
  */
-function digestFor(of: KindName, run: Pick<Run, 'workflowDir' | 'factory'>, places: Places, factory: Factory | undefined): string | null {
+function digestFor(
+  of: KindName,
+  run: Pick<Run, 'workflowDir' | 'factory'>,
+  places: Places,
+  factory: Factory | undefined,
+  found: SkillsFound,
+): string | null {
   if (of.kind === 'workflow') return workflowVersion(run.workflowDir, places);
   if (of.kind === 'rules') return factory ? rulesVersion(factory) : null;
-  const found = skillsFor(run.workflowDir, places);
   if (of.kind === 'skill') {
     const at = found.at.get(of.name);
     return typeof at === 'string' ? skillVersion(at) : null;
@@ -93,25 +99,99 @@ function digestFor(of: KindName, run: Pick<Run, 'workflowDir' | 'factory'>, plac
   return root === undefined ? null : agentVersion(path.join(root, AGENTS_FOLDER), of.name, found);
 }
 
+/** A folder's run, as every memo of a pass's reader is keyed on it: the folder, the repository it looks beside, and its factory. */
+type FolderRun = Pick<Run, 'workflowDir' | 'repo' | 'factory'>;
+
+/**
+ * `f` read once for each `key`, its outcome kept — a throw included, kept and thrown again — and each read of the world charged to the
+ * `revisions` phase while a pass is metered (`within`). A key is exactly what its `f` reads, so a memo never answers for a world it did
+ * not read; `key` is given the same arguments as `f`, and may take fewer than it, leaving out those `f` does not read by (a stamp).
+ */
+function once<A extends unknown[], T>(f: (...args: A) => T, key: (...args: A) => string): (...args: A) => T {
+  const held = new Map<string, { value: T } | { thrown: unknown }>();
+  return (...args: A): T => {
+    const k = key(...args);
+    let had = held.get(k);
+    if (!had) {
+      try {
+        had = { value: within('revisions', () => f(...args)) };
+      } catch (err) {
+        had = { thrown: err };
+      }
+      held.set(k, had);
+    }
+    if ('thrown' in had) throw had.thrown;
+    return had.value;
+  };
+}
+
+/**
+ * What one pass reads once for every run whose kinds it resolves: the factory a run is in, its workflow folder loaded, the skills found
+ * beside that folder, the digest of one kind and name, and a kind's entry in the ledger. Ten runs waiting on one folder read and digest
+ * that folder once a pass between them, not ten times, and the reads are charged to the `revisions` phase.
+ *
+ * It shares a read of the world, never a judgement: what stays per run is judged per run — `stepSetRefusal` on the run's own `isolate`,
+ * `refreshedNow`'s intersection with the step set the run already names, the `rules` kind named by the run's own factory, and the steps
+ * each run is handed, which are its own copy. A read that throws is kept as the throw it was, so a folder that has stopped reading costs
+ * one read a pass and every run on it still says `unread` for itself.
+ *
+ * Made by the pass and dropped with it (`PassRead`): nothing is carried between passes, and a one-off verb that is handed none reads the
+ * world for itself.
+ */
+export type PassRevisions = {
+  readonly factory: (run: Pick<Run, 'factory'>) => Factory | undefined;
+  readonly skills: (run: FolderRun) => SkillsFound;
+  readonly steps: (run: FolderRun) => Workflow[];
+  readonly digest: (of: KindName, run: FolderRun) => string | null;
+  readonly revision: (kind: RevisionKind, name: string, hash: string, at: string) => Revision;
+};
+
+/** A pass's one reader of what a resolve reads (`PassRevisions`), holding nothing yet. */
+export function passRevisions(): PassRevisions {
+  const where = (run: FolderRun): string[] => [path.resolve(run.workflowDir), path.resolve(run.repo ?? ''), run.factory ?? ''];
+  const factory = once(factoryOf, (run) => String(run.factory ?? ''));
+  const skills = once(
+    (run: FolderRun) => skillsFor(run.workflowDir, placesOf(run.repo)),
+    (run) => JSON.stringify(where(run).slice(0, 2)),
+  );
+  const steps = once(
+    (run: FolderRun) => stepsNow(run, placesOf(run.repo), factory(run)),
+    (run) => JSON.stringify(where(run)),
+  );
+  const digest = once(
+    (of: KindName, run: FolderRun) => digestFor(of, run, placesOf(run.repo), factory(run), skills(run)),
+    (of, run) => JSON.stringify([of.kind, of.name, ...where(run)]),
+  );
+  const revision = once(appendRevision, (kind, name, hash) => JSON.stringify([kind, name, hash]));
+  return { factory, skills, steps, digest, revision };
+}
+
 /**
  * The pins of `steps` as the world holds them now, each given its number in the ledger (`appendRevision`), which appends only where the
  * digest has moved. A kind that is not there is left out: a pin says what was resolved, and nothing was.
  */
-export function pinsOf(run: Pick<Run, 'workflowDir' | 'repo' | 'factory'>, steps: readonly Workflow[], at: string): Pin[] {
-  const places = placesOf(run.repo);
-  const factory = factoryOf(run);
+export function pinsOf(
+  run: FolderRun,
+  steps: readonly Workflow[],
+  at: string,
+  read: PassRevisions = passRevisions(),
+): Pin[] {
   return kindsIn(run, steps).flatMap((of) => {
-    const hash = digestFor(of, run, places, factory);
+    const hash = read.digest(of, run);
     if (hash === null) return [];
-    const { n } = appendRevision(of.kind, of.name, hash, at);
+    const { n } = read.revision(of.kind, of.name, hash, at);
     return [{ kind: of.kind, name: of.name, n, hash }];
   });
 }
 
-/** The run's workflow folder as it stands now, or undefined where it does not load, so the run keeps the workflow it froze. */
-function folderNow(run: Pick<Run, 'workflowDir' | 'repo' | 'factory'>): Workflow[] | undefined {
+/**
+ * The run's workflow folder as it stands now, read through `read` so a pass loads it once for every run on it, or undefined where it does
+ * not load, so the run keeps the workflow it froze. Each run is handed its own copy of the steps, since `firstResolve` puts them on the
+ * record and a write onto one run's must leave the other's alone.
+ */
+function folderNow(run: FolderRun, read: PassRevisions): Workflow[] | undefined {
   try {
-    return stepsNow(run, placesOf(run.repo), factoryOf(run));
+    return structuredClone(read.steps(run));
   } catch {
     return undefined;
   }
@@ -125,11 +205,15 @@ function folderNow(run: Pick<Run, 'workflowDir' | 'repo' | 'factory'>): Workflow
  * may take (`stepSetRefusal`): `nemia start` refuses that folder, and a run taking it afresh keeps the set it froze rather than file a
  * step whose task id another step's check is read under. Judged on the run's own `isolate`, as `nemia start` judged it.
  */
-export function resolvedNow(run: Pick<Run, 'workflowDir' | 'repo' | 'factory' | 'isolate'>, at: string): Resolved | Kept | undefined {
-  const steps = folderNow(run);
+export function resolvedNow(
+  run: Pick<Run, 'workflowDir' | 'repo' | 'factory' | 'isolate'>,
+  at: string,
+  read: PassRevisions = passRevisions(),
+): Resolved | Kept | undefined {
+  const steps = folderNow(run, read);
   if (!steps) return undefined;
   const refused = stepSetRefusal(steps, run.isolate ?? true);
-  return refused ? { kept: firstLine(refused) } : { steps, pins: pinsOf(run, steps, at) };
+  return refused ? { kept: firstLine(refused) } : { steps, pins: pinsOf(run, steps, at, read) };
 }
 
 /**
@@ -137,17 +221,17 @@ export function resolvedNow(run: Pick<Run, 'workflowDir' | 'repo' | 'factory' | 
  * names, in the order the run has them, and a step the folder no longer has kept as the run froze it — the verb takes new content, never a
  * new step set. Undefined where the folder does not load, so the run keeps what it froze and its pins.
  */
-export function refreshedNow(run: Run, at: string): Resolved | undefined {
-  const found = folderNow(run);
+export function refreshedNow(run: Run, at: string, read: PassRevisions = passRevisions()): Resolved | undefined {
+  const found = folderNow(run, read);
   if (!found) return undefined;
   const byName = new Map(found.map((s) => [s.name, s]));
   const steps = stepsOf(run).map((s) => byName.get(s.name) ?? s);
-  return { steps, pins: pinsOf(run, steps, at) };
+  return { steps, pins: pinsOf(run, steps, at, read) };
 }
 
 /** Render the steps' agent files again (`writeAgentFiles`), so a pin the run took reaches the prompt its next filing is given. */
-export function renderAgain(run: Run, steps: readonly Workflow[]): void {
-  within('act', () => writeAgentFiles(run, steps, skillsFor(run.workflowDir, placesOf(run.repo))));
+export function renderAgain(run: Run, steps: readonly Workflow[], read: PassRevisions = passRevisions()): void {
+  within('act', () => writeAgentFiles(run, steps, read.skills(run)));
 }
 
 /** What one pass did about the run's revisions: whether it changed the record, what to say, and whether a refresh ask is spent. */
@@ -171,12 +255,15 @@ const NOTHING: PinnedPass = { wrote: false, notes: [], lift: false };
  * One run's world stops that run alone: a resolve that throws leaves it the revisions, the step set and the prompts it had and says why
  * (`unread`), and so does a folder whose steps are a set no run may take (`stepSetRefusal`), which `nemia start` refuses too — the pass
  * judges every other run either way.
+ *
+ * @param read What this pass reads once for every run it resolves (`PassRevisions`), so ten runs on one workflow folder read and digest
+ *   it once between them. A one-off verb that hands none — `advanceRun`, `nemia refresh`, `nemia start` — reads the world for itself.
  */
-export function pinPass(run: Run, at: string): PinnedPass {
+export function pinPass(run: Run, at: string, read: PassRevisions = passRevisions()): PinnedPass {
   if (run.cancelledAt || run.pruned) return NOTHING;
   const filed = hasStarted(run);
   try {
-    return filed ? refreshDue(run, at) : firstResolve(run, at);
+    return filed ? refreshDue(run, at, read) : firstResolve(run, at, read);
   } catch (err) {
     return unread(err, filed && runStore.refresh.stands(run.id));
   }
@@ -198,14 +285,14 @@ const unread = (err: unknown, lift: boolean): PinnedPass => ({
 });
 
 /** The run's workflow and pins taken afresh, for a run that has filed nothing: `run` is changed where anything moved, and last. */
-function firstResolve(run: Run, at: string): PinnedPass {
-  const resolved = resolvedNow(run, at);
+function firstResolve(run: Run, at: string, read: PassRevisions): PinnedPass {
+  const resolved = resolvedNow(run, at, read);
   if (!resolved) return NOTHING;
   if ('kept' in resolved) return { wrote: false, notes: [`the run keeps the step set it froze: ${resolved.kept}`], lift: false };
   const names = resolved.steps.map((s) => s.name);
   const moved = !isDeepStrictEqual([...(run.pinned ?? [])], resolved.pins) || !isDeepStrictEqual(Object.keys(run.steps), names);
   if (!moved) return NOTHING;
-  renderAgain(run, resolved.steps);
+  renderAgain(run, resolved.steps, read);
   run.workflow = resolved.steps;
   run.pinned = resolved.pins;
   run.steps = Object.fromEntries(names.map((name) => [name, run.steps[name] ?? { taskId: null }]));
@@ -219,16 +306,16 @@ function firstResolve(run: Run, at: string): PinnedPass {
  * per run for a number nothing files on. So an edit after a filing is numbered when something resolves that content — another run's first
  * filing, or this run's `nemia refresh`, which resolves to answer.
  */
-function refreshDue(run: Run, at: string): PinnedPass {
+function refreshDue(run: Run, at: string, read: PassRevisions): PinnedPass {
   if (!runStore.refresh.stands(run.id)) return NOTHING;
-  const resolved = refreshedNow(run, at);
+  const resolved = refreshedNow(run, at, read);
   if (!resolved)
     return {
       wrote: false,
       notes: ["nemia refresh: the run's workflow folder does not load, so it keeps the revisions it had"],
       lift: true,
     };
-  renderAgain(run, resolved.steps);
+  renderAgain(run, resolved.steps, read);
   run.workflow = resolved.steps;
   run.pinned = resolved.pins;
   return { wrote: true, notes: ['nemia refresh: every filing after this takes the new revisions'], lift: true };

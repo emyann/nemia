@@ -343,7 +343,7 @@ export const advanceRun = Effect.fn('advance')(function* (run: Run, slot?: RunSl
 export const advancePass = Effect.fn('advancePass')(
   function* (e: Engine, run: Run, slot?: RunSlot, pass?: PassRead) {
     yield* Effect.annotateCurrentSpan({ run: run.id });
-    const took = pinPass(run, new Date().toISOString());
+    const took = pinPass(run, new Date().toISOString(), pass?.revisions);
     const { reads, askNotes } = yield* readPass(e, run);
     const { steps, phaseOf, signedOff, asked, verdictOf, sessionBlocked, spendOf, asks, roundAsks } = reads;
     const adopted = yield* adoptAll(e, run, reads);

@@ -53,6 +53,7 @@ const runWith = runOver(runEngine, gitPlaceLayer);
 const runPlaced = runGiven(gitPlaceLayer);
 const { acceptFile, askFile, asksDir, pruneFile, readAsks, readRun, roundAskFile, stepsOf } = await import('../src/record/record.store.ts');
 const { passRead } = await import('../src/cap/cap.verb.ts');
+const { passRevisions } = await import('../src/revisions/pin.verb.ts');
 const { checkoutHold } = await import('../src/ending/ending.verb.ts');
 const { passParents, reportedEngine } = await import('../src/views/views.verb.ts');
 const { metered } = await import('../src/meter/tally.store.ts');
@@ -272,7 +273,16 @@ test("a run's own claim on the checkout reads the slot its pass gave it, and the
       b.e,
       run,
       stepsOf(run),
-      { read: { runs: [run], slots, parents: passParents(standingReader(NOTHING_READ)), standing: NOTHING_READ }, slot: undefined },
+      {
+        read: {
+          runs: [run],
+          slots,
+          parents: passParents(standingReader(NOTHING_READ)),
+          standing: NOTHING_READ,
+          revisions: passRevisions(),
+        },
+        slot: undefined,
+      },
       process.env,
       statusMemo(() => undefined, shippedGitPlace),
     ),

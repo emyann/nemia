@@ -26,6 +26,7 @@ const PASS: PassCost = {
     records: phase(20, { calls: 12, bytes: 12_000, reads: 12 }),
     asks: phase(5),
     journals: phase(40, { calls: 30, bytes: 800_000 }),
+    revisions: phase(6, { calls: 4 }),
     observe: phase(120, { spawned: 1 }),
     runtime: phase(8),
     place: phase(0, { calls: 0 }),

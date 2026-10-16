@@ -64,7 +64,7 @@ test('the mode, model, effort, budget, resume, context window, worktree and flag
   assert.deepEqual(given.settingSources, valuesOf(argv, '--setting-sources'));
   assert.equal(given.extraArgs?.autocompact, valuesOf(argv, '--autocompact')[0]);
   assert.equal(given.extraArgs?.worktree, valuesOf(argv, '--worktree')[0]);
-  assert.equal(given.extraArgs?.settings, valuesOf(argv, '--settings')[0]);
+  assert.deepEqual(given.settings, JSON.parse(valuesOf(argv, '--settings')[0]), "the job's settings, on the SDK's own option");
   assert.equal(given.extraArgs?.['append-system-prompt-file'], valuesOf(argv, '--append-system-prompt-file')[0]);
   assert.deepEqual(given.plugins, [{ type: 'local', path: path.resolve('/work', valuesOf(argv, '--plugin-dir')[0]) }]);
   assert.ok(argv.includes('--strict-mcp-config') && 'strict-mcp-config' in (given.extraArgs ?? {}));

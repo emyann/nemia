@@ -32,6 +32,7 @@ import {
 } from './transcript.ts';
 import { CLAUDE_DEFAULT_MODE, claudeAllowArgs, claudeDenyArgs, claudeFlagsOf, claudeMountArgs, worktreeName } from './vocabulary.ts';
 import { admittedFlags } from './admission.ts';
+import { memorylessFlags } from './memory.ts';
 import { telemeteredFlags } from './telemetry.ts';
 import { withoutTelemetry } from '../telemetry.ts';
 import { checkoutMcpConfig, claudeMcpArgs, sessionMcp, writeMcpConfig } from '../mcp.ts';
@@ -450,7 +451,8 @@ const mcpFileOf = (root: string, name: string) => path.join(root, 'mcp', `${name
  *    its `cwd`: unscoped (`Write`) it would write anywhere, scoped it is denied outside. A deny still beats it. An edit
  *    under each writable mount is allowed here too (`claudeAllows`). Then `--add-dir` and each mount's path
  *    (`claudeMountArgs`), variadic, ended by the flag after it.
- * 4. The caller's own flags (`claudeFlagsOf`), Remote Control among them only when the task asks (`remoteControl`), and the
+ * 4. The caller's own flags (`claudeFlagsOf`), Remote Control among them only when the task asks (`remoteControl`), the session's
+ *    auto-memory turned off in their settings (`memorylessFlags`), never a second `--settings`, and the
  *    task's admission merged into `--settings` as a hook (`admittedFlags`):
  *    the session bridged to claude.ai and listed in its agents view, where it can be driven from a browser or a
  *    phone, not only seen. A `--bg` session gets a `bridgeSessionId` only with this flag.
@@ -483,7 +485,7 @@ export const claudeArgv = (r: SpawnRequest, mcpArgs: string[]): string[] => [
   '--name',
   r.name,
   ...fenceFlags(r.config),
-  ...claudeFlagsOf(telemeteredFlags(admittedFlags(r.config), r)),
+  ...claudeFlagsOf(memorylessFlags(telemeteredFlags(admittedFlags(r.config), r))),
   '--permission-mode',
   r.config?.permissionMode ?? CLAUDE_DEFAULT_MODE,
   ...mcpArgs,

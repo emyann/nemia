@@ -372,7 +372,7 @@ test(
     assert.equal(args[args.indexOf('--plugin-dir') + 1], '/runs/r/agents/write/nemia-scribe');
     assert.equal(
       args[args.indexOf('--settings') + 1],
-      '{"outputStyle":"nemia-scribe:no-coding","skillOverrides":{"write-a-note":"off","mind-the-tone":"off"}}',
+      '{"outputStyle":"nemia-scribe:no-coding","skillOverrides":{"write-a-note":"off","mind-the-tone":"off"},"autoMemoryEnabled":false}',
     );
   },
 );

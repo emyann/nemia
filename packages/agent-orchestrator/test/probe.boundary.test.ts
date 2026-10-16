@@ -198,7 +198,7 @@ test('stop with a label stops only the live probe it names, and none for a label
   assert.deepEqual(none.out.trim().split('\n'), ['wf probe: no live probe of run r-1 named c']);
 });
 
-test("REFUSED: the check, while a probe of the run is live, naming stop; it passes when it is stopped or done, and on another run's", () => {
+test("REFUSED: the check, while a probe of the run is live, naming stop; it passes when it is stopped, done or failed, and on another run's", () => {
   const live = placed({ rows: [row('r-1-probe-a', 'blocked'), row('r-2-probe-a', 'working')] });
   const refused = probe(live, ['check'], { WF_RUN: 'r-1' });
   assert.equal(refused.code, 1, refused.out);
@@ -206,7 +206,7 @@ test("REFUSED: the check, while a probe of the run is live, naming stop; it pass
   assert.match(refused.err, /r-1-probe-a blocked/);
   assert.match(refused.err, /node workflows\/build\/probe\.ts stop/);
   assert.ok(!refused.err.includes('r-2-probe-a'), refused.err);
-  for (const state of ['stopped', 'done']) {
+  for (const state of ['stopped', 'done', 'failed']) {
     const ended = probe(placed({ rows: [row('r-1-probe-a', state), row('r-2-probe-a', 'working')] }), ['check'], { WF_RUN: 'r-1' });
     assert.equal(ended.code, 0, `${state}: ${ended.err}`);
     assert.match(ended.out, /no live probe of run r-1/);

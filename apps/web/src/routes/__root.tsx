@@ -6,11 +6,15 @@ import { RouterProvider as AriaRouterProvider } from 'react-aria-components';
 import { FrameHeader } from '@/components/FrameHeader';
 import { FrameRail } from '@/components/FrameRail';
 import { FrameTabs } from '@/components/FrameTabs';
+import { NemiaDock } from '@/components/NemiaDock';
 import { OpenBar } from '@/components/OpenBar';
 import { SidebarProvider, sidebarOpenOf } from '@/components/ui/sidebar';
 import { barSearch } from '@/lib/bar';
 import { useFeed } from '@/lib/useFeed';
 import { useScrollMark } from '@/lib/useScrollMark';
+
+/** The route Nemia's chat is a page of its own at: the page is the panel, so her docked face is not drawn over it. */
+const CHAT = '/chat';
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   validateSearch: barSearch,
@@ -55,6 +59,7 @@ function Root() {
         </div>
       </SidebarProvider>
       <OpenBar feed={feed} />
+      {path !== CHAT && <NemiaDock />}
       <ReactQueryDevtools buttonPosition="bottom-left" />
       <TanStackRouterDevtools position="bottom-right" />
     </AriaRouterProvider>

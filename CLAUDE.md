@@ -138,7 +138,7 @@ holds what every change needs.
     package gets a block of its own, and the runtime's block also covers `lint/**`, the guards' own plugin; no other block lists it
     (`comments.test.ts`, *one guard block per workspace package*).
   - A JSDoc on a parameter, a union member or a local is refused: say it as an `@param` line or in the declaration's JSDoc.
-    `comments.test.ts` refuses a comment line over 140 columns, since `oxfmt` rewraps none; a `(` `)` it drops once a comment inside
+    The lint refuses a comment line over 140 columns, since `oxfmt` rewraps none; a `(` `)` it drops once a comment inside
     them goes is its own.
 - **A limit is met by cutting the function** (500 code lines a file, 80 a function, cyclomatic 20, cognitive 15), never by raising a
   ceiling in `.oxlintrc.json`. The commit that shrinks a baselined file lowers its ceiling there and its count in

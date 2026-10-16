@@ -19,9 +19,16 @@ export class Refused extends Error {}
  * one abort pass).
  */
 export const FEED_STREAM = '/api/feed/stream';
+
+/** Nemia's chat's stream, which her docked face holds open from the root of every page on the same terms. */
+export const CHAT_STREAM = '/api/nemia/chat/stream';
+
+/** The streams the frame holds open on every page: neither ever answers in full, and either is aborted when the page itself goes. */
+const PAGE_STREAMS = [FEED_STREAM, CHAT_STREAM];
+const isPageStream = (request: Request): boolean => PAGE_STREAMS.includes(new URL(request.url()).pathname);
 const isFeedStream = (request: Request): boolean => new URL(request.url()).pathname === FEED_STREAM;
 
-/** A page's requests in flight, the feed's stream left out; when one last started or ended; whether the feed's stream answered. */
+/** A page's requests in flight, the frame's streams left out; when one last started or ended; whether the feed's stream answered. */
 type Flights = { open: Set<Request>; last: number; fed: boolean };
 const flights = new WeakMap<Page, Flights>();
 
@@ -42,7 +49,7 @@ export function track(page: Page): void {
   let uncommittedNavigation: Request | undefined;
   page.on('request', (request) => {
     if (request.isNavigationRequest() && request.frame() === page.mainFrame()) uncommittedNavigation = request;
-    if (isFeedStream(request)) return;
+    if (isPageStream(request)) return;
     f.open.add(request);
     f.last = performance.now();
   });
@@ -108,10 +115,12 @@ export async function idle(page: Page, timeout = 30_000): Promise<void> {
  * Everything a page does that it must not: a console error, an uncaught exception, a request that failed
  * or was answered 400 or worse. Listened for from before the page loads, and read with `problems()`.
  *
- * One failure passes: the feed's stream aborted (`net::ERR_ABORTED`) by the page itself navigating or reloading after that stream opened —
- * the navigation committed after it, as `track` reads a page left — which is how a browser ends every request of a page it leaves, though
- * Playwright 1.62 reports none of them, and a later one may. The board closing its own stream while it stays on the page is counted, as any
- * other failure is.
+ * One failure passes: a stream the frame holds open on every page (`PAGE_STREAMS`: the workflow feed's, and Nemia's chat's) aborted
+ * (`net::ERR_ABORTED`) once the page it was opened on was left — the window navigated or reloaded after it opened (the navigation
+ * committed after it, as `track` reads a page left), or the router moved to another address, which takes down a part the address does
+ * not draw, Nemia's docked face on her own page among them. That is how a browser and the board end a request nothing reads any more,
+ * though Playwright 1.62 reports none of a navigation's, and a later one may. A stream the board closes while the address stands is
+ * counted, as any other failure is.
  */
 export function watch(page: Page): { problems: () => string[] } {
   track(page);
@@ -119,10 +128,10 @@ export function watch(page: Page): { problems: () => string[] } {
   let order = 0;
   let navigated = 0;
   let leaving = false;
-  const opened = new WeakMap<Request, number>();
+  const opened = new WeakMap<Request, { order: number; address: string }>();
   page.on('request', (request) => {
     if (request.isNavigationRequest() && request.frame() === page.mainFrame()) leaving = true;
-    else if (isFeedStream(request)) opened.set(request, ++order);
+    else if (isPageStream(request)) opened.set(request, { order: ++order, address: page.url() });
   });
   page.on('framenavigated', (frame) => {
     if (frame !== page.mainFrame() || !leaving) return;
@@ -135,7 +144,8 @@ export function watch(page: Page): { problems: () => string[] } {
   page.on('pageerror', (error) => seen.push(`uncaught: ${error.message}`));
   page.on('requestfailed', (request) => {
     const reason = request.failure()?.errorText;
-    if (reason === 'net::ERR_ABORTED' && isFeedStream(request) && navigated > (opened.get(request) ?? Infinity)) return;
+    const was = opened.get(request);
+    if (reason === 'net::ERR_ABORTED' && was !== undefined && (navigated > was.order || page.url() !== was.address)) return;
     seen.push(`request failed: ${request.method()} ${request.url()} — ${reason ?? 'no reason given'}`);
   });
   page.on('response', (response) => {

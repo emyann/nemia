@@ -174,3 +174,23 @@ export const Failure: StoryObj = {
     </div>
   ),
 };
+
+/** A frame given a height, filled: what it holds is laid out down the whole of it, and a long child scrolls inside it. */
+export const Filled: StoryObj = {
+  render: () => (
+    <div data-ground="plain" style={ON_PLAIN}>
+      <CutFrame hue="alive" fill className="h-50">
+        <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1, padding: 12 }}>
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+            {['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'].map((word) => (
+              <p key={word} style={{ margin: 0, padding: '10px 0' }}>
+                {word}
+              </p>
+            ))}
+          </div>
+          <p style={{ margin: 0 }}>the foot stands still</p>
+        </div>
+      </CutFrame>
+    </div>
+  ),
+};

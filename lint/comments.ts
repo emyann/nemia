@@ -156,6 +156,40 @@ const noHistoryInComments: Rule = {
   },
 };
 
+/**
+ * The widest a line that holds any part of a comment may be, in code points: oxfmt's print width, which rewraps no comment.
+ * `packages/agent-orchestrator/test/comments.test.ts` holds it equal to the width oxfmt is configured with.
+ */
+export const COMMENT_WIDTH = 140;
+
+/** Each line that holds any part of a comment, measured whole in code points, indentation and code before the comment included. */
+const noWideCommentLines: Rule = {
+  meta: {
+    type: 'suggestion',
+    docs: { description: "A line that holds a comment is no wider than oxfmt's print width, which rewraps no comment." },
+  },
+  create(context) {
+    return {
+      Program() {
+        const { sourceCode } = context;
+        const reported = new Set<number>();
+        for (const comment of sourceCode.getAllComments()) {
+          for (let line = comment.loc.start.line; line <= comment.loc.end.line; line += 1) {
+            if (reported.has(line)) continue;
+            reported.add(line);
+            const width = Array.from(sourceCode.lines[line - 1] ?? '').length;
+            if (width <= COMMENT_WIDTH) continue;
+            context.report({
+              loc: { start: { line, column: 0 } },
+              message: `This line holds a comment and is ${width} columns, over ${COMMENT_WIDTH}: rewrap the comment by hand, since oxfmt rewraps none.`,
+            });
+          }
+        }
+      },
+    };
+  },
+};
+
 /** In every comment, JSDoc included: a temporary remedy, or a thing left undone until later. */
 const noDeferralInComments: Rule = {
   meta: {
@@ -182,6 +216,7 @@ export const rules = {
   'no-code-comments': noCodeComments,
   'no-history-in-comments': noHistoryInComments,
   'no-deferral-in-comments': noDeferralInComments,
+  'no-wide-comment-lines': noWideCommentLines,
 };
 
 export default { meta: { name: 'comments' }, rules };

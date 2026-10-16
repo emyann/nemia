@@ -4,13 +4,15 @@
  * her skills name is one she ships, under `nemia/skills/`, its `name:` its folder's, read as Claude Code reads her plugin. "Gate" names a
  * step's gate alone (`gateWordsIn`), but in her generated verbs skill, whose words are the command table's. Her skills and her instruction
  * keep their sections (`SECTIONS`), and the facts of her memory are said by the same names in each file that writes or reads them
- * (`FACTS`). Its wording is judged by a person at the landing step; this holds only what it names.
+ * (`FACTS`). Where her instruction tells her to act on a line of the feed, it names the words that line shows her (`feedLineWords`)
+ * beside the reason her selector asks for. Its wording is judged by a person at the landing step; this holds only what it names.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { REPO } from './team.ts';
+import { DENIED, feedLineWords, upgraded } from '../src/feed/index.ts';
 import { skillFolders, skillRead } from '../src/skills/skills.store.ts';
 import { WAITS_ON_PERSON } from '../src/retry/waits.ts';
 
@@ -229,4 +231,36 @@ test('REFUSED: a fact named otherwise, or said by another name across a line bre
     ),
     ['skills/first-meeting/SKILL.md: met', 'skills/first-meeting/SKILL.md: met-person'],
   );
+});
+
+/** A step's denied call as the feed writes one: the one-shot her `reason=ToolDenied` selector takes, and whose words wake her. */
+const DENIAL = upgraded({
+  at: '2026-10-05T16:00:00.000Z',
+  run: 'r-1',
+  step: 'build',
+  word: `${DENIED}Bash(git push)`,
+  note: 'try 2',
+  involved: { kind: 'Step', name: 'r-1/build' },
+  labels: { run: 'r-1', step: 'build' },
+  call: 'Bash(git push)',
+  try: 2,
+});
+
+/** Each of `said` that `text` does not name in backticks: a line each. */
+const unnamedWords = (text: string, said: readonly string[]): string[] => said.filter((word) => !text.includes(`\`${word}\``));
+
+test('her instruction names both the word a denial shows her and the reason her selector asks for', () => {
+  assert.equal(
+    feedLineWords(DENIAL),
+    `16:00:00  r-1  build  ${DENIED}Bash(git push)  · try 2`,
+    'the message that wakes her carries the word and the call, and no reason field',
+  );
+  assert.equal(DENIAL.reason, 'ToolDenied', 'the reason is hers to select on, not hers to read');
+  assert.deepEqual(unnamedWords(shipped().get('nemia.md') ?? '', [DENIED.trim(), 'ToolDenied']), []);
+});
+
+test('REFUSED: an instruction that names the reason alone, and not the word the message shows, is named for it', () => {
+  const only = 'When a line’s reason is `ToolDenied`, read it with the `grant-access` skill.';
+  assert.deepEqual(unnamedWords(only, [DENIED.trim(), 'ToolDenied']), [DENIED.trim()]);
+  assert.deepEqual(unnamedWords(`${only} A line says \`denied:\` and the call.`, [DENIED.trim(), 'ToolDenied']), []);
 });

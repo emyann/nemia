@@ -108,6 +108,9 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
 - **A run's kinds are resolved from the world, never from a remembered transition** (`pinPass`, `src/revisions/pin.verb.ts`, at the head
   of `advancePass`): while a run has filed nothing it takes the folder's steps and their revisions on every pass, and after that only on
   a person's `nemia refresh`. The ledger is appended by hash (`appendRevision`), so two passes over one edit give it one number.
+- **A pass resolves each workflow folder once, not once per run on it** (`passRevisions`, carried on `PassRead`, handed to `pinPass` by
+  `advancePass`): ten runs waiting on one folder load, digest and number it once between them, charged to the `revisions` phase. A memo is
+  keyed by the folder, its repository and its factory; a one-off verb (`advanceRun`, `nemia refresh`, `nemia start`) resolves for itself.
 - **A resolve on a pass stops its own run, never the pass** (`pinPass`): a kind that stops reading, a folder whose steps are a set
   `nemia start` would refuse (`stepSetRefusal`, pure, asked of both), a ledger the store cannot write — the run keeps the revisions, the
   step set and the prompts it had, and the pass says why. The record is changed after the render, which is the write that can throw.

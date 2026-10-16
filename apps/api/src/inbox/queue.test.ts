@@ -17,6 +17,7 @@ import {
   engine,
   inboxNameRefusal,
   noCardLine,
+  PHASES,
   queueInInbox,
   readInbox,
   runSlots,
@@ -569,10 +570,7 @@ const PASS = {
   overheadMs: 0.4,
   rested: 0,
   phases: Object.fromEntries(
-    ['records', 'asks', 'journals', 'observe', 'runtime', 'place', 'assess', 'act'].map((p, k) => [
-      p,
-      { ms: k * 10, calls: 1, bytes: p === 'journals' ? 812_000 : 0, reads: 1, spawned: p === 'observe' ? 1 : 0 },
-    ]),
+    PHASES.map((p, k) => [p, { ms: k * 10, calls: 1, bytes: p === 'journals' ? 812_000 : 0, reads: 1, spawned: p === 'observe' ? 1 : 0 }]),
   ),
   harnesses: { claude: { calls: 1, ms: 30, listed: 3, spawned: 1 } },
 };

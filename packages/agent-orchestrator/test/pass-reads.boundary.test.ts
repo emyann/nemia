@@ -53,6 +53,7 @@ const runWith = runOver(runEngine, gitPlaceLayer);
 const runPlaced = runGiven(gitPlaceLayer);
 const { acceptFile, askFile, asksDir, pruneFile, readAsks, readRun, roundAskFile, stepsOf } = await import('../src/record/record.store.ts');
 const { passRead } = await import('../src/cap/cap.verb.ts');
+const { passRevisions } = await import('../src/revisions/pin.verb.ts');
 const { checkoutHold } = await import('../src/ending/ending.verb.ts');
 const { passParents, reportedEngine } = await import('../src/views/views.verb.ts');
 const { metered } = await import('../src/meter/tally.store.ts');
@@ -259,6 +260,34 @@ test("the cap's slots are read once for the pass, however many claims ask", asyn
   assert.equal(second, first, 'the same slots, not read again');
 });
 
+test('a pass resolves one workflow folder once, however many runs wait on it', async () => {
+  const { b, repo, waiting } = await theStore();
+  const unfiled = () => runStore.runs.list().filter((r) => !r.steps.implement?.taskId && !r.cancelledAt).length;
+  const { tallies: before } = await onePass(b);
+  assert.ok(before.kinds.revisions.calls > 0, 'the pass resolved the kinds of the runs that have filed nothing');
+  const was = unfiled();
+  for (let i = 0; i < 6; i++)
+    await runPlaced(startRun({ brief: `on the one folder ${i}`, repo, workflowDir: oneStep, after: [waiting.id] }));
+  assert.equal(unfiled() - was, 6, 'six more runs wait on the one folder, each having filed nothing');
+  const { tallies: after } = await onePass(b);
+  assert.equal(
+    after.kinds.revisions.calls,
+    before.kinds.revisions.calls,
+    'and the folder is loaded, digested and numbered once between them: a resolve is shared by every run on one folder, never paid per run',
+  );
+});
+
+test('a one-off verb, handed no pass, resolves the folder for itself', async () => {
+  const { b, repo } = await theStore();
+  const run = await runPlaced(startRun({ brief: 'resolved for itself', repo, workflowDir: oneStep }));
+  const { tallies } = await metered(() => runWith(b.e, advanceRun(readRun(run.id))));
+  assert.ok(tallies, 'the verb was metered');
+  assert.ok(
+    tallies.kinds.revisions.calls > 0,
+    'nemia start, nemia refresh and advanceRun read the world themselves: a pass is what shares one read, and a verb is no pass',
+  );
+});
+
 test("a run's own claim on the checkout reads the slot its pass gave it, and the cap for no one", async () => {
   const { b, waiting } = await theStore();
   const run = readRun(waiting.id);
@@ -272,7 +301,16 @@ test("a run's own claim on the checkout reads the slot its pass gave it, and the
       b.e,
       run,
       stepsOf(run),
-      { read: { runs: [run], slots, parents: passParents(standingReader(NOTHING_READ)), standing: NOTHING_READ }, slot: undefined },
+      {
+        read: {
+          runs: [run],
+          slots,
+          parents: passParents(standingReader(NOTHING_READ)),
+          standing: NOTHING_READ,
+          revisions: passRevisions(),
+        },
+        slot: undefined,
+      },
       process.env,
       statusMemo(() => undefined, shippedGitPlace),
     ),

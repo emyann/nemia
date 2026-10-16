@@ -199,7 +199,15 @@ const reading = (d: Delivering): Effect.Effect<never, never, EngineService> =>
 const delivering = (name: string, sub: Subscription, o: DeliverOptions): Effect.Effect<never, never, EngineService> =>
   Effect.gen(function* () {
     const state = yield* Ref.make<Delivery>(resumedAt(readDelivery(name), sub));
-    const d: Delivering = { name, sub, selectors: parseSelectors(sub.selectors), o, state, lock: yield* Semaphore.make(1), factories: new Map() };
+    const d: Delivering = {
+      name,
+      sub,
+      selectors: parseSelectors(sub.selectors),
+      o,
+      state,
+      lock: yield* Semaphore.make(1),
+      factories: new Map(),
+    };
     const check = d.lock.withPermit(digestPass(d)).pipe(Effect.andThen(Metric.update(SUBSCRIPTION_DIGEST_CHECKS, 1)));
     yield* Effect.forkChild(Effect.forever(check.pipe(Effect.andThen(Effect.sleep(o.digestCheck)))));
     return yield* reading(d);

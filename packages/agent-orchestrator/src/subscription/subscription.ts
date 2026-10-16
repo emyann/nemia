@@ -99,8 +99,9 @@ export type ReadDelivered = { message?: string; wakes: number; next: Delivery };
 
 /**
  * What one read of the feed, ending at `cursor`, comes to for a subscriber at `at`, given the lines it carries of that read (`carried`), in
- * feed order. Where one wakes (`selects`, over the subscription's parsed selectors), every wake line is said in one message, with the digest and every routine line of the read
- * riding it, and the digest is emptied; else each routine line is folded into the digest, begun at `now` where it was empty. Pure.
+ * feed order. Where one wakes — `selects`, over the subscription's parsed selectors — every wake line is said in one message, with the
+ * digest and every routine line of the read riding it, and the digest is emptied; else each routine line is folded into the digest, begun
+ * at `now` where it was empty. Pure.
  */
 export function readDelivered(
   at: Delivery,

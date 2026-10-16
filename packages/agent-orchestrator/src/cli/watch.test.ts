@@ -1,8 +1,9 @@
 /**
  * `nemia watch`'s own lines: the store's liveness said once as it falls and once as it comes back (`livenessLines`), read off a lease
- * the test scripts; the lines kept by `--wake` and `--wake-word` (`wakeOf`, `watchedLine`); `--json`, the feed's lines with their
- * cursor on stdout and the watch's own words on stderr (`watchPrinted`); the lines a `-l` selector takes, with the cursor file that
- * reaches the feed's end whatever it drops; and the bookmark a silent watch says at its cadence, the clock steered.
+ * the test scripts; the lines `-l waits=person` takes, in place of the retired `--wake`, each of which is refused by name
+ * (`retiredWakeRefusal`); `--json`, the feed's lines with their cursor on stdout and the watch's own words on stderr (`watchPrinted`);
+ * the lines a `-l` selector takes, with the cursor file that reaches the feed's end whatever it drops; and the bookmark a silent watch
+ * says at its cadence, the clock steered.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

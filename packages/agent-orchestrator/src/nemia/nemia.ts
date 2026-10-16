@@ -1,8 +1,8 @@
 /**
  * Nemia, the store's own agent, kept on a long-lived session while a person has her on: the levels a person sets (`LEVELS`), the file
  * that says it (`LevelFile`), what the keeper owes on a beat (`nemiaDue`) off the state her session and her subscription are in
- * (`nemiaState`), the selectors of the feed that wake her (`NEMIA_SELECTORS`), the settings her session is filed with (`nemiaSettings`), and her machine as a
- * board draws it (`nemiaGraph`, `nemiaDiagram`).
+ * (`nemiaState`), the selectors of the feed that wake her (`NEMIA_SELECTORS`), the settings her session is filed with
+ * (`nemiaSettings`), and her machine as a board draws it (`nemiaGraph`, `nemiaDiagram`).
  *
  * Pure. The person's file and her folder are `level.store.ts`'s, the keeper is `keep.verb.ts`, and the commands are `level.verb.ts` and
  * `memory.verb.ts`.

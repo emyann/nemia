@@ -176,14 +176,21 @@ test('a record that holds the former wake key is converted on read, its file lef
   assert.deepEqual(listSubscriptions(), [
     { name: 'former', subscription: { task: 'nemia-1', selectors: ['waits=person', 'reason=ToolDenied'], digestEvery: 1440, from: 0 } },
   ]);
-  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), stored, 'the file is never rewritten: nothing of where its deliverer is moves');
+  assert.deepEqual(
+    JSON.parse(fs.readFileSync(file, 'utf8')),
+    stored,
+    'the file is never rewritten: nothing of where its deliverer is moves',
+  );
   fs.rmSync(file);
 });
 
 test('a wake word the table does not know is said once and the rest of its list still delivers', () => {
   fs.writeFileSync(subscriptionFile('partly'), JSON.stringify({ ...SUB, selectors: undefined, wake: ['blocked', 'verified'] }));
   const { said, say } = saying();
-  assert.deepEqual(listSubscriptions(say).map((s) => s.subscription.selectors), [['reason=Blocked']]);
+  assert.deepEqual(
+    listSubscriptions(say).map((s) => s.subscription.selectors),
+    [['reason=Blocked']],
+  );
   assert.equal(said.length, 1);
   assert.match(said[0], /the subscription partly was asked for with the word "verified", which names no selector of a feed line/);
   assert.match(said[0], /it is delivered by reason=Blocked alone/);

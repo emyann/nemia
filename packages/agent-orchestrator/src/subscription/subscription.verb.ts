@@ -53,8 +53,7 @@ const reservedRefusal = (name: string): Conflict | undefined =>
 const askedOf = (args: Args): { name: string; task: string; selectors: string[]; digestEvery: number; atLeast?: string } => ({
   name: String(args.name ?? ''),
   task: String(args.task ?? ''),
-  selectors:
-    Array.isArray(args.selectors) && args.selectors.length ? [...(args.selectors as readonly string[])] : [...DEFAULT_SELECTORS],
+  selectors: Array.isArray(args.selectors) && args.selectors.length ? [...(args.selectors as readonly string[])] : [...DEFAULT_SELECTORS],
   digestEvery: typeof args.digestEvery === 'number' ? args.digestEvery : DEFAULT_DIGEST_EVERY,
   ...(typeof args.atLeast === 'string' ? { atLeast: args.atLeast } : {}),
 });

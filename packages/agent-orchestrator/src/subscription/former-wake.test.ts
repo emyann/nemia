@@ -5,13 +5,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  FORMER_DEFAULT_WAKE,
-  FORMER_NEMIA_WAKE,
-  FORMER_WAKE,
-  retiredWakeRefusal,
-  selectorsOfWake,
-} from './former-wake.ts';
+import { FORMER_DEFAULT_WAKE, FORMER_NEMIA_WAKE, FORMER_WAKE, retiredWakeRefusal, selectorsOfWake } from './former-wake.ts';
 import { NEMIA_SELECTORS } from '../nemia/nemia.ts';
 import { DEFAULT_SELECTORS } from './subscription.ts';
 import { REASON_CODES } from '../feed/index.ts';
@@ -47,7 +41,7 @@ test('each shipped word converts to what it was selecting, and a word with no re
 test('the two lists a store holds today convert to the selectors the package ships, which is what holds a record to its constant', () => {
   assert.deepEqual(selectorsOfWake(FORMER_DEFAULT_WAKE), { selectors: [...DEFAULT_SELECTORS], unconverted: [] });
   assert.deepEqual(selectorsOfWake(FORMER_NEMIA_WAKE), { selectors: [...NEMIA_SELECTORS], unconverted: [] });
-  assert.deepEqual([...NEMIA_SELECTORS], ['waits=person', 'reason=ToolDenied'], "her record reads as the intent words it");
+  assert.deepEqual([...NEMIA_SELECTORS], ['waits=person', 'reason=ToolDenied'], 'her record reads as the intent words it');
 });
 
 test('a word the table does not know converts to nothing and is said; the rest of its list still converts', () => {

@@ -96,7 +96,7 @@ test('REFUSED: a body that is not a subscription, and a name that names no file,
   assert.equal(oneWord.status, 400);
   assert.equal(
     oneWord.body.error,
-    '`selectors` is what wakes the task, as `nemia subscribe -l <selector>` takes each: a list of text, one selector of the feed\'s ' +
+    "`selectors` is what wakes the task, as `nemia subscribe -l <selector>` takes each: a list of text, one selector of the feed's " +
       `lines each, or left out for waits=person, the lines that wait on a person. This request's was "waits=person": ${SHAPE}.`,
   );
   const soon = await asked('POST', 'b', { task: 'nemia', digestEvery: 'soon' });

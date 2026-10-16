@@ -1,7 +1,10 @@
-/** `elapsedMs`: the monotonic clock answers within a boot, the wall clock across one or where a reading has none. */
+/**
+ * `elapsedMs`: the monotonic clock answers within a boot, the wall clock across one or where a reading has none. `leftOf`: what a
+ * budget has left, never below zero. `purseOf`: the waits that share one budget add up to no more than it.
+ */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { elapsedMs, type Instant } from './clock.ts';
+import { elapsedMs, leftOf, purseOf, type Instant } from './clock.ts';
 
 const T0 = Date.parse('2026-10-02T12:00:00Z');
 const read = (wallMs: number, monoMs?: number, boot = 'b-1'): Instant => ({
@@ -18,4 +21,32 @@ test('across two boots, or with a reading missing on either side, the time elaps
   assert.equal(elapsedMs(read(0, 1_000, 'b-1'), read(60_000, 6_000, 'b-2')), 60_000, 'another boot');
   assert.equal(elapsedMs(read(0), read(60_000, 6_000)), 60_000, 'none at the start');
   assert.equal(elapsedMs(read(0, 1_000), read(60_000)), 60_000, 'none at the end');
+});
+
+test('a budget has what it has not spent left, and nothing once it is spent', () => {
+  assert.equal(leftOf(read(0, 1_000), 5_000, read(0, 1_000)), 5_000, 'nothing spent at the moment it was taken');
+  assert.equal(leftOf(read(0, 1_000), 5_000, read(0, 3_000)), 3_000, 'two of its five seconds spent');
+  assert.equal(leftOf(read(0, 1_000), 5_000, read(0, 6_000)), 0, 'spent to the millisecond');
+  assert.equal(leftOf(read(0, 1_000), 5_000, read(0, 90_000)), 0, 'long overspent: never below zero, and never its length again');
+  assert.equal(leftOf(read(0), 5_000, read(60_000)), 0, 'with no monotonic reading it is the wall clock that spends it');
+});
+
+test('the waits that share one purse add up to no more than its budget, whatever each is given', () => {
+  let mono = 1_000;
+  const purse = purseOf(1_000, () => read(0, mono));
+  mono += 400;
+  assert.equal(purse.take(0.5), 500, 'a share is a ceiling on one take, under what is left');
+  mono += 400;
+  assert.equal(purse.take(), 200, 'the next take is what the budget has left, not its length again');
+  mono += 400;
+  assert.equal(purse.take(), 0, 'and nothing once it is spent');
+  assert.deepEqual(purse.given, [500, 200, 0], 'what every take answered, in order');
+  assert.ok(purse.given.reduce((a, b) => a + b, 0) <= 1_000, 'the parts add up to no more than the whole, which is the point of a purse');
+});
+
+test('a purse spent slower than its shares still gives each take only what is left', () => {
+  const purse = purseOf(100, () => read(0, 1_000));
+  assert.deepEqual([purse.take(0.8), purse.take(), purse.take()], [80, 100, 100], 'a clock that never moves spends nothing');
+  const spent = purseOf(100, () => read(0, 1_000));
+  assert.equal(spent.take(2), 100, 'a share above the whole is still bounded by the budget');
 });

@@ -129,6 +129,16 @@ down is in `docs/architecture.md`, *Who owns what*.
   so its task settles and can be forgotten (`lookOf`, `startRefusalOf`, `test/start-event.test.ts`). Measured
   2026-10-06: `codex exec --json` (0.154.0) prints `thread.started` first; `claude -p` (2.1.291) prints `system`/`init` first under
   `--output-format stream-json --verbose`, and one `result` line under `--output-format json`.
+- **A drain or a let-go never holds a call that belongs to a call already in flight**, or the call it waits for can never end and the
+  holder waits on what it forbids: `held` (`harness/claude/attached.ts`) is a question about the session, and a `PreToolUse` input
+  carrying `agent_id` — a sub-agent's call, as the SDK's hook input documents it — is never held.
+- **A holder's whole let-go is bounded by one budget its waits share** (`LET_GO_MS`, `leftOf`, `attached.ts`), never one bound each,
+  and it says on its log what it waits for and what it cut. Every deadline that waits for such a holder to stop is set above it and
+  pinned there, reading it rather than repeating it: the unit's `TimeoutStopSec` and the plist's `ExitTimeOut`
+  (`agent-orchestrator/src/service/service.test.ts`), and the restart's wait for the lease, `stopMs`, which is not the bound it gives
+  a call in flight (`takeover.verb.ts`).
+- **A `parked` run that carries `calling` is a call its holder cut**: the next holder resumes that session with `crashNote`, the road a
+  crashed holder's session already takes (`noteOf`, `attached.ts`).
 - **The Agent SDK (0.3.270) speaks to its CLI in control requests both ways, and writes a resume as one argument, `--resume=<id>`**: the
   stand-in CLI (`test/fixtures/stand-in-claude.ts`) answers `initialize` and asks `hook_callback` and `can_use_tool` as it does, and
   `test/attached.boundary.test.ts` pins it; an SDK update that moves the protocol fails there first.

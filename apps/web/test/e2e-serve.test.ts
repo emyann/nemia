@@ -1,7 +1,7 @@
 /**
  * The served board's command (`test/e2e/serve.ts`), as far as it needs no build: the folder it serves a workspace from, a holder that is
- * gone read as no board, the ports a step given the browser could not open, and the three lines it prints. The serving itself is held by
- * `test/e2e/serve.test.ts`, under `npm run e2e`.
+ * gone read as no board, the ports a step given the browser could not open, the three lines it prints, a tree that changed over the one a
+ * board was built from, a build that changed the workspace named line by line, and a file the build rewrote put back.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

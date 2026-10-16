@@ -275,6 +275,35 @@ test("the api's daemon exports its passes' spans to the collector OTEL_EXPORTER_
   assert.match(spans, /"nemia"/);
 });
 
+test('an api started --no-tick exports a server span per request, with the HTTP attributes, to the collector it was given', async (t) => {
+  const c = await collector(t);
+  const posted = c.posted('/v1/traces', '"GET /api/version"');
+  const api = startApi('0', ['--no-tick'], undefined, c.url);
+  t.after(() => api.child.kill());
+  const [, got] = await api.said(/api listening on http:\/\/127\.0\.0\.1:(\d+)/);
+  assert.equal((await fetch(`http://127.0.0.1:${got}/api/version`)).status, 200);
+  await api.said(/\d\d:\d\d:\d\d {2}GET \/api\/version 200 \d+ms/);
+  const spans = await Promise.race([posted, api.ended.then((code) => assert.fail(`the api exited ${code}:\n${api.output()}`))]);
+  assert.match(spans, /"nemia"/, 'under the nemia service');
+  const span = JSON.parse(spans) as {
+    resourceSpans: {
+      scopeSpans: {
+        spans: { name: string; kind: number; attributes: { key: string; value: { stringValue?: string; intValue?: number | string } }[] }[];
+      }[];
+    }[];
+  };
+  const asked = span.resourceSpans.flatMap((r) => r.scopeSpans.flatMap((s) => s.spans)).filter((one) => one.name === 'GET /api/version');
+  assert.equal(asked.length, 1, `one span for the one request asked for: ${spans}`);
+  const request = asked[0];
+  assert.equal(request.kind, 2, 'of kind server');
+  assert.deepEqual(Object.fromEntries(request.attributes.map((a) => [a.key, a.value.stringValue ?? a.value.intValue])), {
+    'http.request.method': 'GET',
+    'http.route': '/api/version',
+    'url.path': '/api/version',
+    'http.response.status_code': 200,
+  });
+});
+
 /** Each series a body posted to `/v1/metrics` names, by its metric's name and its attributes' values, with its value or its count. */
 const postedSeries = (body: string): Record<string, number> => {
   type Point = { attributes: { value: { stringValue?: string } }[]; asDouble?: number; asInt?: number; count?: number | string };
@@ -382,4 +411,13 @@ test("REFUSED: a line the api's daemon writes reaches the api's stream from the 
     reads,
     'the line came as an item of the hub the daemon published to, which the reader took without reading the file: the beat found the file where the reader was',
   );
+});
+
+test("the api's daemon still says its own pass lines, in the time-first layout, through the logger the app's layer holds", async (t) => {
+  const api = startApi('0');
+  t.after(() => api.child.kill());
+  await api.said(/api listening on/);
+  signedOffRun(api.root);
+  const [line] = await api.said(/\d\d:\d\d:\d\d {2}r-hub .*/);
+  assert.match(line, /r-hub/, `the pass's line about the run it advanced:\n${api.output()}`);
 });

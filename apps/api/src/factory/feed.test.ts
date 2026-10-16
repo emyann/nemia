@@ -16,10 +16,20 @@ import fs from 'node:fs';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createAdaptorServer } from '@hono/node-server';
-import { Effect, Logger, Metric } from 'effect';
+import { type Duration, Effect, Logger, Metric, Stream } from 'effect';
 import { app, runtime } from '../app.ts';
-import { OPENED } from './feed.ts';
-import { emitFeed, FEED_FOLLOWERS, feedFile, freshFeedMemo, readFeed } from 'agent-orchestrator';
+import { feedEvents, OPENED } from './feed.ts';
+import {
+  BOOKMARK_EVERY,
+  emitFeed,
+  FEED_FOLLOWERS,
+  feedFile,
+  type FeedLine,
+  freshFeedMemo,
+  parseSelectors,
+  readFeed,
+  type Selectors,
+} from 'agent-orchestrator';
 
 type FeedWords = import('agent-orchestrator').FeedWords;
 
@@ -44,6 +54,11 @@ const planAt = (word: string, note?: string): FeedWords => ({
   steps: [{ name: 'plan', word, ...(note ? { note } : {}) }],
 });
 const end = () => readFeed(0).cursor;
+/** A run running, at each step named, all at `running`: the words a pass hands the feed for it. */
+const steps = (...named: readonly string[]): FeedWords => ({
+  run: { word: 'running' },
+  steps: named.map((name) => ({ name, word: 'running' })),
+});
 
 type Block = { event?: string; data?: string; id?: string };
 /** Server-sent events as a reader gets them: the fields of each block, a comment line read as nothing, as an EventSource reads it. */
@@ -487,3 +502,251 @@ test(
     }
   },
 );
+
+/**
+ * Every line of the feed as a stream sends it, in order: the signed line (`readFeed`) as its data, and the cursor just after it as its
+ * id, counted off the file's own bytes — so a test names what a selector must keep and what it must drop by the feed itself.
+ */
+const everySent = (): { line: FeedLine; sent: { data: string; id: string } }[] => {
+  const raw = fs
+    .readFileSync(feedFile(), 'utf8')
+    .split('\n')
+    .filter((l) => l.trim());
+  let cursor = 0;
+  return readFeed(0).lines.map((line, i) => {
+    cursor += Buffer.byteLength(raw[i], 'utf8') + 1;
+    return { line, sent: { data: JSON.stringify(line), id: String(cursor) } };
+  });
+};
+
+/** What a stream sent, by data and id alone: what a selector keeps, without the event name each line's own test holds. */
+const sentOf = (said: Block[]): { data: string; id: string }[] => said.map((b) => ({ data: b.data!, id: b.id! }));
+
+/** The label a line carries under `key`, or undefined: what a selector reads of it. */
+const labelOf = (line: FeedLine, key: string): string | undefined => (line as { labels?: Record<string, string> }).labels?.[key];
+
+/**
+ * What `feedEvents` sends from `from` under `selectors`, up to and including the first bookmark, at a cadence of the test's own. The wait
+ * is the stream's: it ends on the event it counts, never on a length of time.
+ */
+const untilBookmark = (from: number, selectors: Selectors, every: Duration.Input) =>
+  runtime.runPromise(Stream.runCollect(Stream.takeUntil(feedEvents(from, selectors, every), (m) => m.event === 'bookmark')));
+
+test(
+  'a selector sends only the lines it takes, each with its own cursor as its id, and the lines between them are not sent',
+  WAITED,
+  async (t) => {
+    const pass = emptyFeed();
+    await pass({ 'r-a': planAt('running') });
+    await pass({ 'r-a': planAt('running'), 'r-b': planAt('running') });
+    await pass({ 'r-a': planAt('succeeded'), 'r-b': planAt('running') });
+    const every = everySent();
+    const mine = every.filter((l) => labelOf(l.line, 'run') === 'r-a');
+    assert.equal(mine.length, 3, "three of run a's lines");
+    assert.ok(
+      every.some((l, i) => labelOf(l.line, 'run') === 'r-b' && i > 0 && i < every.length - 1),
+      "run b's lines are written between run a's, so a stream that sent the feed whole would carry them",
+    );
+
+    const { reader, text } = await open('?selector=run%3Dr-a');
+    try {
+      const said = await readUntil(t, reader, text, (s) => s.length >= 3);
+      assert.deepEqual(
+        sentOf(said),
+        mine.map((l) => l.sent),
+        "run a's lines alone, each its own line's cursor as its id, with no line of run b's among them",
+      );
+      assert.equal(
+        said.filter((b) => labelOf(JSON.parse(b.data!) as FeedLine, 'run') === 'r-b').length,
+        0,
+        "a line the selector does not take never crosses the wire: run b's are dropped at the source",
+      );
+    } finally {
+      await reader.cancel();
+    }
+  },
+);
+
+test(
+  'every clause of one selector must hold, and one selector of those given: a comma ands, and `selector` again ors',
+  WAITED,
+  async (t) => {
+    const pass = emptyFeed();
+    await pass({ 'r-a': steps('plan') });
+    await pass({ 'r-a': steps('plan', 'review') });
+    await pass({ 'r-a': steps('plan', 'review'), 'r-b': steps('review') });
+    const every = everySent();
+    const anded = every.filter((l) => labelOf(l.line, 'run') === 'r-a' && labelOf(l.line, 'step') === 'review');
+    const ored = every.filter((l) => labelOf(l.line, 'run') === 'r-a' || labelOf(l.line, 'step') === 'review');
+    assert.equal(anded.length, 1, "run a at review alone: run a's other lines and run b's review line are the fixture");
+    assert.equal(ored.length, 4, "run a's three lines and run b's review line");
+
+    const and = await open('?selector=run%3Dr-a,step%3Dreview');
+    try {
+      const said = await readUntil(t, and.reader, and.text, (s) => s.length >= 1);
+      assert.deepEqual(
+        sentOf(said),
+        anded.map((l) => l.sent),
+        "the clauses of one selector both hold of the line it takes: run a's own run line, which carries no step, is not sent",
+      );
+    } finally {
+      await and.reader.cancel();
+    }
+
+    const or = await open('?selector=run%3Dr-a&selector=step%3Dreview');
+    try {
+      const said = await readUntil(t, or.reader, or.text, (s) => s.length >= 4);
+      assert.deepEqual(
+        sentOf(said),
+        ored.map((l) => l.sent),
+        "one selector of the two holds: run a's lines and run b's review line, and nothing else",
+      );
+    } finally {
+      await or.reader.cancel();
+    }
+  },
+);
+
+test(
+  "a bookmark says where the stream has read to: the feed's own cursor, past a line the selector dropped, as its id, with an empty data field",
+  WAITED,
+  async (t) => {
+    const pass = emptyFeed();
+    await pass({ 'r-a': planAt('running') });
+    await pass({ 'r-a': planAt('running'), 'r-b': planAt('running') });
+    const mine = everySent().filter((l) => labelOf(l.line, 'run') === 'r-a');
+    await until(
+      t,
+      () => followers() === 0,
+      () => `${followers()} readers left behind by the tests before this one`,
+      { everyMs: 20 },
+    );
+
+    const got = await untilBookmark(0, parseSelectors(['run=r-a']), '200 millis');
+    const marked = got.at(-1)!;
+    assert.equal(marked.event, 'bookmark', 'the stream of a silent feed says where it is, named');
+    assert.equal(marked.data, '', 'the field present and empty: an EventSource both keeps the id and dispatches the event');
+    assert.match(String(marked.id), /^\d+$/);
+    assert.equal(
+      marked.id,
+      String(end()),
+      "the cursor advanced past run b's lines, which the selector dropped: a reader resuming here re-reads none of them",
+    );
+    assert.notEqual(
+      marked.id,
+      mine.at(-1)!.sent.id,
+      "not the cursor after the last line the selector took, which is short of the feed's end",
+    );
+    assert.deepEqual(
+      got.slice(0, -1).map((m) => ({ data: m.data, id: m.id! })),
+      mine.map((l) => l.sent),
+      "run a's lines alone before it",
+    );
+    await until(
+      t,
+      () => followers() === 0,
+      () => `the reader outlived the stream that ended on its bookmark: ${followers()} left`,
+      { everyMs: 20 },
+    );
+  },
+);
+
+test(
+  'a stream resumes after a bookmark: its id taken back as Last-Event-ID resends nothing, and the next line arrives',
+  WAITED,
+  async (t) => {
+    const pass = emptyFeed();
+    await pass({ 'r-a': planAt('running') });
+    await pass({ 'r-a': planAt('running'), 'r-b': planAt('running') });
+    const got = await untilBookmark(0, parseSelectors(['run=r-a']), '200 millis');
+    const marked = got.at(-1)!;
+    assert.equal(marked.event, 'bookmark');
+
+    const again = await open('?selector=run%3Dr-a', { 'Last-Event-ID': marked.id! });
+    try {
+      const [next] = await pass({ 'r-a': planAt('succeeded'), 'r-b': planAt('running') });
+      const said = await readUntil(t, again.reader, again.text, (s) => s.length >= 1);
+      assert.deepEqual(
+        sentOf(said),
+        [{ data: JSON.stringify(next), id: String(end()) }],
+        'what was written after the bookmark, and none of the lines before it',
+      );
+    } finally {
+      await again.reader.cancel();
+    }
+
+    const fresh = emptyFeed();
+    const first = await untilBookmark(0, parseSelectors(['run=r-a']), '200 millis');
+    assert.equal(first.at(-1)!.id, '0', 'a bookmark before any line carries the cursor the stream started from');
+    const empty = await open('', { 'Last-Event-ID': first.at(-1)!.id! });
+    await empty.reader.cancel();
+    await fresh({ 'r-a': planAt('running') });
+  },
+);
+
+test('a selector the grammar takes opens the stream: a bare key sends the lines that carry it', WAITED, async (t) => {
+  const pass = emptyFeed();
+  await pass({ 'r-a': planAt('running') });
+  const carried = everySent().filter((l) => labelOf(l.line, 'run') !== undefined);
+  assert.ok(carried.length >= 1, 'the feed has lines carrying a run');
+  const { reader, text } = await open('?selector=run');
+  try {
+    const said = await readUntil(t, reader, text, (s) => s.length >= carried.length);
+    assert.deepEqual(
+      sentOf(said),
+      carried.map((l) => l.sent),
+    );
+  } finally {
+    await reader.cancel();
+  }
+});
+
+test(
+  'REFUSED: a selector the grammar refuses is a 422 naming it and how this stream is asked for one, with no stream opened',
+  WAITED,
+  async (t) => {
+    const pass = emptyFeed();
+    await pass({ 'r-1': planAt('running') });
+    await until(
+      t,
+      () => followers() === 0,
+      () => `${followers()} readers left behind by the tests before this one`,
+      { everyMs: 20 },
+    );
+    const cases: [string, RegExp][] = [
+      ['?selector=message%3Dhi', /^"message" is no key of a feed line: a selector names one of /],
+      ['?selector=run%3D%3Da', /compares with ==, and a selector compares with one =/],
+      ['?selector=run%20in%20a', /names a list and spells it with no \(values\) after in/],
+      ['?selector=', /is no selector: it holds no clause/],
+      ['?selector=run%3Dr-1&selector=nope%3Dx', /^"nope" is no key of a feed line/],
+    ];
+    for (const [query, pattern] of cases) {
+      const res = await app.request(`${STREAM}${query}`);
+      assert.equal(res.status, 422, query);
+      assert.match(res.headers.get('content-type') ?? '', /^application\/json/, `${query}: an answer, not a stream`);
+      const { error } = (await res.json()) as { error: string };
+      assert.match(error, pattern, query);
+      assert.match(
+        error,
+        /A selector reaches this stream as `selector`, given again for another selector, of which one must hold; pass none to follow every line\.$/,
+        query,
+      );
+    }
+    assert.equal(followers(), 0, 'no reader was started for a selector the grammar refuses: it is answered before the stream opens');
+  },
+);
+
+test('the stream says where it has read to at the one cadence every surface reads, and the api spells no length of its own', () => {
+  const source = fs.readFileSync(new URL('./feed.ts', import.meta.url), 'utf8');
+  assert.match(
+    source,
+    /bookmarkEvery:\s*Duration\.Input\s*=\s*BOOKMARK_EVERY/,
+    "the shipped cadence is the package's constant, read by every surface that follows the feed",
+  );
+  assert.equal(
+    source.match(/'-?\d+(\.\d+)? (nanos|micros|millis|seconds|minutes|hours|days|weeks)'/g),
+    null,
+    'and the api spells no cadence of its own, which would be a second cadence to drift',
+  );
+  assert.equal(typeof BOOKMARK_EVERY, 'string', 'the constant the package owns');
+});

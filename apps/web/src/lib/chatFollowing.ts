@@ -265,8 +265,11 @@ export type ChatLink = { words: string; href: string };
 /** A markdown link in her words: its words, then its address. */
 const LINK = /\[([^\]\n]+)\]\(([^()\s]+)\)/g;
 
-/** Whether an address is a page of this board, which the look's filled button leads to through the router. */
-const ours = (href: string): boolean => href.startsWith('/');
+/**
+ * Whether an address is a page of this board, which the look's filled button leads to through the router: one leading slash and not
+ * two, since a protocol-relative address (`//evil.test/x`) begins with a slash and the browser resolves it off this board.
+ */
+const ours = (href: string): boolean => href.startsWith('/') && !href.startsWith('//');
 
 /**
  * Her words with each link to a page of this board taken out of the sentence and named beside it: `text` reads plain, the link's own

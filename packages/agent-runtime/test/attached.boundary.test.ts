@@ -47,6 +47,20 @@ import { scratch } from './scratch.ts';
 import { until, WAITED } from './waits.ts';
 import { holder, inCall, kept, lines, NAME, place, run, STAND_IN } from './attached-held.ts';
 
+/**
+ * How many results the session's capture holds, as its holder wrote them: each is written in the same take as the run file it leaves
+ * behind, so a test that reads one reads the state it left.
+ */
+const resultsOf = (root: string): number => {
+  const out = filesOf(root, NAME).out;
+  if (!fs.existsSync(out)) return 0;
+  return fs
+    .readFileSync(out, 'utf8')
+    .split('\n')
+    .filter(Boolean)
+    .filter((l) => (JSON.parse(l) as { type?: string }).type === 'result').length;
+};
+
 test('a holder let go waits for the call in flight, then parks the session, its Claude Code gone', WAITED, async (t) => {
   const { root, dir, request } = place({ call: 'Bash', hold: true, output: { ok: true } });
   const h = await holder(root);
@@ -60,9 +74,9 @@ test('a holder let go waits for the call in flight, then parks the session, its 
   fs.writeFileSync(path.join(dir, 'release'), '');
   await closing;
   assert.deepEqual(
-    (lines(dir, 'answers.jsonl') as { event: string }[]).map((a) => a.event),
+    lines(dir, 'asked.jsonl'),
     ['PreToolUse', 'PostToolUse'],
-    'the call ran to its end before the session was let go',
+    "the call ran to its end, its end asked of the session's hook, before the let-go parked it",
   );
   assert.equal(run(root)?.state, 'parked');
   assert.equal(run(root)?.calling, undefined);
@@ -486,12 +500,17 @@ test('words folded into the turn in flight are answered by its one result, which
   await until(t, () => run(root)?.sessionId, 'the session started its first turn', { everyMs: 50 });
   await Effect.runPromise(h.attached.ops.say!({ name: NAME, sessionId: NAME }, 'and this too'));
   assert.equal(run(root)?.state, 'working', 'the words it heard are a turn of its own until a result says otherwise');
+  assert.deepEqual(
+    await until(t, () => lines(dir, 'said.jsonl').length === 2 && lines(dir, 'said.jsonl'), 'the turn in flight heard the words', {
+      everyMs: 50,
+    }),
+    ['do the work', 'and this too'],
+    'both were said, into the turn in flight',
+  );
   fs.writeFileSync(path.join(dir, 'end'), '');
-  await until(t, () => fs.readFileSync(filesOf(root, NAME).out, 'utf8').includes('"result"'), 'the turn ended, with one result', {
-    everyMs: 50,
-  });
+  const results = await until(t, () => resultsOf(root) || undefined, 'the turn ended, with a result', { everyMs: 50 });
+  assert.equal(results, 1, 'the words it folded in ended in the turn it folded them into, so one result answers both');
   assert.equal(run(root)?.state, 'idle', 'one result named both messages, so nothing of it is left unanswered');
-  assert.deepEqual(lines(dir, 'said.jsonl'), ['do the work', 'and this too'], 'both were said, in one turn');
 });
 
 test(

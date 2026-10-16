@@ -1,6 +1,7 @@
 /**
  * A chat's own files, in the folder `chat/` of the folder it is kept in: what the person wrote (`outbox.jsonl`, appended by the
- * person's verb alone), the keeper's marks of what it delivered (`delivered.jsonl`, appended by the delivery alone), and the person's
+ * person's verb alone), the keeper's marks of what it delivered (`delivered.jsonl`, appended by the delivery alone), the turns the
+ * person stopped (`stops.jsonl`, appended by `chatStop` alone), and the person's
  * read mark (`read.json`, written whole by the person's verb alone). One writer each, composed on read; none is ever rewritten but the
  * read mark, which its one writer replaces.
  *
@@ -10,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Result, Schema } from 'effect';
 import { Invalid } from '../refusal/refusal.ts';
-import type { DeliveredMark, OutboxEntry, ReadMark } from './chat.ts';
+import type { DeliveredMark, OutboxEntry, ReadMark, SourceStop } from './chat.ts';
 
 /** The chat's folder within `dir`. */
 export const chatDir = (dir: string): string => path.join(dir, 'chat');
@@ -21,6 +22,9 @@ export const outboxFile = (dir: string): string => path.join(chatDir(dir), 'outb
 /** The keeper's marks of what it delivered, one a line. */
 export const deliveredFile = (dir: string): string => path.join(chatDir(dir), 'delivered.jsonl');
 
+/** The turns the person stopped, one a line. */
+export const stopsFile = (dir: string): string => path.join(chatDir(dir), 'stops.jsonl');
+
 /** The person's read mark. */
 export const readMarkFile = (dir: string): string => path.join(chatDir(dir), 'read.json');
 
@@ -29,6 +33,9 @@ const Moment = Schema.String.check(Schema.isNonEmpty());
 const OutboxSchema = Schema.Struct({ id: Moment, at: Moment, text: Schema.String });
 const DeliveredSchema = Schema.Struct({ id: Moment, said: Moment, attempt: Schema.Finite });
 const ReadSchema = Schema.Struct({ through: Moment, at: Moment });
+
+/** One turn the person stopped: when they stopped it, and which attempt of the task was answering. */
+export const StopSchema = Schema.Struct({ at: Moment, attempt: Schema.Finite });
 
 /** The text of `file`, or undefined where there is none. */
 const textOf = (file: string): string | undefined => {
@@ -79,6 +86,9 @@ export const readOutbox = (dir: string): OutboxEntry[] => linesOf(outboxFile(dir
 /** The keeper's marks of what it delivered, in the order it delivered them. */
 export const readDelivered = (dir: string): DeliveredMark[] => linesOf(deliveredFile(dir), DeliveredSchema).map((m) => ({ ...m }));
 
+/** The turns the person stopped, oldest first. */
+export const readStops = (dir: string): SourceStop[] => linesOf(stopsFile(dir), StopSchema).map((s) => ({ ...s }));
+
 /** The person's read mark, or undefined where they never set one. Refused (`Invalid`) where the file does not read as one. */
 export function readReadMark(dir: string): ReadMark | undefined {
   const text = textOf(readMarkFile(dir));
@@ -97,6 +107,9 @@ export const appendOutbox = (dir: string, entry: OutboxEntry): void => appendLin
 
 /** Appends the keeper's mark of an entry delivered. The delivery is its one writer. */
 export const appendDelivered = (dir: string, mark: DeliveredMark): void => appendLine(deliveredFile(dir), mark);
+
+/** Appends a turn the person stopped. `chatStop` is its one writer. */
+export const appendStop = (dir: string, stop: SourceStop): void => appendLine(stopsFile(dir), stop);
 
 /** Writes the person's read mark whole, through a hidden file renamed over it. The person's verb is its one writer. */
 export function writeReadMark(dir: string, mark: ReadMark): void {

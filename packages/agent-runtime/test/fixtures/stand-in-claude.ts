@@ -1,10 +1,11 @@
 /**
  * A stand-in for Claude Code as the Agent SDK runs it (`pathToClaudeCodeExecutable`), speaking the SDK's stdio protocol as
- * `@anthropic-ai/claude-agent-sdk` 0.3.270 does: control requests both ways (`initialize`, `hook_callback`, `can_use_tool`), and
- * stream-json lines out. What it does is its plan, `STANDIN_PLAN` (`Plan`), and what it saw it writes into `STANDIN_DIR`:
- * `argv.jsonl` (each start's arguments), `initialize.jsonl` (each `initialize` request's payload, the system prompt the SDK sends
- * included), `said.jsonl` (each user message's text), `asked.jsonl` (each hook it asked, as it asks), `answers.jsonl` (each answer to
- * a control request it sent), and `pid` (its own, on each start).
+ * `@anthropic-ai/claude-agent-sdk` 0.3.270 does: control requests both ways (`initialize`, `hook_callback`, `can_use_tool`,
+ * `interrupt`, `remote_control`), and stream-json lines out. What it does is its plan, `STANDIN_PLAN` (`Plan`), and what it saw it
+ * writes into `STANDIN_DIR`: `argv.jsonl` (each start's arguments), `initialize.jsonl` (each `initialize` request's payload, the
+ * system prompt the SDK sends included), `said.jsonl` (each user message's text), `asked.jsonl` (each hook it asked, as it asks),
+ * `answers.jsonl` (each answer to a control request it sent), `taken.jsonl` (each control request the SDK sent it, by subtype, with
+ * what it carried) and `pid` (its own, on each start).
  *
  * Its session id is `stand-in-session`, or the one `--resume=<id>` names, as the SDK writes it.
  */
@@ -13,12 +14,17 @@ import path from 'node:path';
 import readline from 'node:readline';
 
 /**
- * What the stand-in does after the first user message, in order: `deny`, print a `permission_denied` line for that tool; `ask`, send
+ * What the stand-in does after each user message, in order: `deny`, print a `permission_denied` line for that tool; `ask`, send
  * a `can_use_tool` request for that tool; `call`, run that tool, its `PreToolUse` hooks asked first, held until the file `release`
  * appears in its folder; `nested`, once the file `nest` appears, ask the `PreToolUse` hooks of a second call of that tool, while
  * `call`'s is still in flight and before its release, carrying `agent_id` as a sub-agent's call does where `fromSubAgent`; `hold`,
- * wait until the file `end` appears; then its result, `output` as its `structured_output` and `cost` as its `total_cost_usd` (0.01
- * when absent).
+ * wait until the file `end` appears, or until an `interrupt` request comes; then its result, `output` as its `structured_output` and
+ * `cost` as its `total_cost_usd` (0.01 when absent).
+ *
+ * `turns` says what it does after its first result: `one`, close its stdin as a job does, and `many`, keep it open and work each
+ * further user message as another turn, as a session on streaming input does. `fold` works a message that came while a turn ran into
+ * that turn instead, as Claude Code does for words pushed while a tool call runs: one result, listing every message it consumed on
+ * `user_message_uuids`, and no turn of its own.
  */
 type Plan = {
   deny?: string;
@@ -27,8 +33,10 @@ type Plan = {
   nested?: string;
   fromSubAgent?: boolean;
   hold?: boolean;
+  fold?: boolean;
   output?: unknown;
   cost?: number;
+  turns?: 'one' | 'many';
 };
 
 const dir = process.env.STANDIN_DIR!;
@@ -52,9 +60,19 @@ const ask = (request: object): Promise<unknown> => {
   return new Promise((resolve) => pending.set(id, resolve));
 };
 
-/** Waits until `file` appears in the stand-in's folder. */
+/** Whether the turn in flight was interrupted, set by the SDK's `interrupt` control request and read by the turn. */
+let interrupted = false;
+
+/** Waits until `file` appears in the stand-in's folder, and takes it so the next turn waits for its own; nothing once interrupted. */
 const appears = async (file: string) => {
-  while (!fs.existsSync(path.join(dir, file))) await new Promise((r) => setTimeout(r, 50));
+  for (;;) {
+    if (interrupted) return;
+    if (fs.existsSync(path.join(dir, file))) {
+      fs.rmSync(path.join(dir, file), { force: true });
+      return;
+    }
+    await new Promise((r) => setTimeout(r, 50));
+  }
 };
 
 /** Asks each hook of `event` for the call `id` of `tool`, in turn, `more` added to the input each is given. */
@@ -74,13 +92,16 @@ const hooked = async (event: string, tool: string, id: string, more: object = {}
     }
 };
 
-/** The work, once the first user message came. */
+/** The uuids of the user messages the turn in flight consumed: the one it took, and any it folded in as it ended. */
+let mine: string[] = [];
+
+/** One turn's work, once a user message came. */
 const work = async () => {
   print({ type: 'system', subtype: 'init', session_id: sessionId, cwd: process.cwd(), tools: [], model: 'stand-in' });
   if (plan.deny) print({ type: 'system', subtype: 'permission_denied', tool_name: plan.deny, tool_use_id: 'denied-1', session_id: sessionId });
   if (plan.ask)
     note('answers.jsonl', { event: 'can_use_tool', answer: await ask({ subtype: 'can_use_tool', tool_name: plan.ask, input: {}, tool_use_id: 'asked-1' }) });
-  if (plan.call) {
+  if (plan.call && !interrupted) {
     print({ type: 'assistant', session_id: sessionId, message: { role: 'assistant', content: [{ type: 'tool_use', id: 'call-1', name: plan.call, input: {} }] } });
     await hooked('PreToolUse', plan.call, 'call-1');
   }
@@ -94,10 +115,15 @@ const work = async () => {
     print({ type: 'user', session_id: sessionId, message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'call-1', content: 'ok' }] } });
   }
   if (plan.hold) await appears('end');
+  const cut = interrupted;
+  interrupted = false;
+  if (plan.fold) mine = [...mine, ...queued.splice(0).map((q) => q.uuid)];
   print({
     type: 'result',
-    subtype: 'success',
-    is_error: false,
+    user_message_uuids: mine,
+    subtype: cut ? 'error_during_execution' : 'success',
+    is_error: cut,
+    ...(cut ? { errors: ['Interrupted by user'] } : {}),
     session_id: sessionId,
     num_turns: 1,
     total_cost_usd: plan.cost ?? 0.01,
@@ -106,20 +132,65 @@ const work = async () => {
   });
 };
 
-let started = false;
-readline.createInterface({ input: process.stdin }).on('line', (text) => {
-  const line = JSON.parse(text) as { type: string; request_id?: string; request?: { subtype: string; hooks?: typeof hooks }; response?: { request_id: string; response?: unknown }; message?: { content: unknown } };
-  if (line.type === 'control_request' && line.request?.subtype === 'initialize') {
-    hooks = line.request.hooks ?? {};
-    note('initialize.jsonl', line.request);
+/** The bridge's facts a `remote_control` request is answered with, and the `bridge_state` messages it drives onto the stream. */
+const bridged = (request: { enabled?: unknown; reattach_session_id?: unknown }): object => {
+  const kept = typeof request.reattach_session_id === 'string' ? request.reattach_session_id : undefined;
+  const id = kept ?? `cse_${sessionId}`;
+  setTimeout(() => {
+    print({ type: 'system', subtype: 'bridge_state', session_id: sessionId, state: 'ready' });
+    print({ type: 'system', subtype: 'bridge_state', session_id: sessionId, state: 'connected' });
+  }, 10);
+  return {
+    session_url: `https://claude.ai/s/${id}`,
+    connect_url: `https://claude.ai/connect/${id}`,
+    environment_id: 'env-stand-in',
+    bridge_epoch: 1,
+    bridge_session_id: id,
+  };
+};
+
+/** The answer to a control request the SDK sent, by its subtype: what the stand-in says back as its `response`. */
+const answered = (request: { subtype?: string; hooks?: typeof hooks } & Record<string, unknown>): object => {
+  note('taken.jsonl', { subtype: request.subtype ?? null, ...request });
+  if (request.subtype === 'initialize') {
+    hooks = request.hooks ?? {};
+    note('initialize.jsonl', request);
   }
-  if (line.type === 'control_request') print({ type: 'control_response', response: { subtype: 'success', request_id: line.request_id, response: {} } });
+  if (request.subtype === 'interrupt') {
+    interrupted = true;
+    return { still_queued: [] };
+  }
+  if (request.subtype !== 'initialize' && process.env.STANDIN_NO_BRIDGE !== '1') return bridged(request as Parameters<typeof bridged>[0]);
+  return {};
+};
+
+let working = false;
+let everStarted = false;
+const queued: { text: string; uuid: string }[] = [];
+
+/**
+ * Works the next queued user message, one turn at a time, so a second message waits for the turn in flight. A plan whose session is
+ * one turn (`turns` other than `many`) works its first message and no other, as a job does.
+ */
+const next = () => {
+  if (working || queued.length === 0 || (everStarted && plan.turns !== 'many')) return;
+  mine = [queued.shift()!.uuid];
+  working = true;
+  everStarted = true;
+  void work().then(() => {
+    working = false;
+    next();
+  });
+};
+
+readline.createInterface({ input: process.stdin }).on('line', (text) => {
+  const line = JSON.parse(text) as { type: string; uuid?: string; request_id?: string; request?: { subtype: string; hooks?: typeof hooks }; response?: { request_id: string; response?: unknown }; message?: { content: unknown } };
+  if (line.type === 'control_request')
+    print({ type: 'control_response', response: { subtype: 'success', request_id: line.request_id, response: answered(line.request ?? {}) } });
   else if (line.type === 'control_response') pending.get(line.response!.request_id)?.(line.response!.response);
   else if (line.type === 'user') {
     note('said.jsonl', line.message?.content);
-    if (!started) {
-      started = true;
-      void work();
-    }
+    queued.push({ text: String(line.message?.content ?? ''), uuid: String(line.uuid ?? '') });
+    next();
   }
 }).on('close', () => process.exit(0));

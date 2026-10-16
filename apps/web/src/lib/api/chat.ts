@@ -1,7 +1,8 @@
 /**
- * Nemia's chat (`GET /api/nemia/chat`, `GET /api/nemia/chat/stream`, `POST /api/nemia/chat/send` and `POST /api/nemia/chat/read`, the
- * api's `nemia/chat.ts`): a page of her history with where she is, the same followed as server-sent events, the person's words put in
- * her outbox, and their read mark moved. Each type with the schema `get` and `send` decode it with.
+ * Nemia's chat (`GET /api/nemia/chat`, `GET /api/nemia/chat/stream`, `POST /api/nemia/chat/send`, `POST /api/nemia/chat/read` and
+ * `POST /api/nemia/chat/stop`, the api's `nemia/chat.ts`): a page of her history with where she is, the same followed as server-sent
+ * events, the person's words put in her outbox, their read mark moved, and the turn she is answering ended. Each type with the schema
+ * `get` and `send` decode it with.
  */
 import { Option, Schema } from 'effect';
 import { get, send } from './read.ts';
@@ -102,6 +103,15 @@ const ChatSentSchema = Schema.Struct({
   text: Schema.String,
 }) satisfies Schema.Schema<ChatSent>;
 
+/** Mirrors the package's `SourceStop`: when the turn she was answering was asked to end, and of which attempt of hers. */
+export type ChatStop = { at: string; attempt: number };
+
+/** Decodes a `ChatStop`. */
+const ChatStopSchema = Schema.Struct({
+  at: Schema.String,
+  attempt: Schema.Number,
+}) satisfies Schema.Schema<ChatStop>;
+
 /** Mirrors the package's `ReadMark`: the last event the person saw, and when they said so. */
 export type ChatReadMark = { through: string; at: string };
 
@@ -169,4 +179,15 @@ export const markChatRead = (through: string): Promise<ChatReadMark> =>
   send('POST', `${chatPath}/read`, ChatReadMarkSchema, {
     body: { through },
     may: 'The mark may be moved already: read her chat again before marking it again.',
+  });
+
+/**
+ * The turn she is answering ended, her session left open to hear the next words: the stop her history draws as a quiet `Stopped`
+ * marker. The route takes no words of its own, so its body is the empty object, sent as `application/json` like every other write of
+ * the person's. It refuses where she is not answering, which her presence says a beat later.
+ */
+export const stopChat = (): Promise<ChatStop> =>
+  send('POST', `${chatPath}/stop`, ChatStopSchema, {
+    body: {},
+    may: 'Her turn may be ended already: read her chat again before stopping her a second time.',
   });

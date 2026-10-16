@@ -39,6 +39,8 @@ const PINNED: Record<string, string[]> = {
     'Runner',
     'RunnerError',
     'STALE_MS',
+    'InterruptRefused',
+    'InterruptUnsent',
     'SayRefused',
     'SayUnsent',
     'StepRefused',

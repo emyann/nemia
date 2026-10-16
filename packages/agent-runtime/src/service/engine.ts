@@ -67,6 +67,7 @@ import { keepingVerbsOf, type KeptRefused, type KeptReport } from './kept.ts';
 import type { CompactRefused, CompactReport } from './compact.ts';
 import { watchOf } from './watch.ts';
 import { sayVerbOf, type SayRefused, type SayUnsent } from './say.ts';
+import { interruptVerbOf, type Interrupted, type InterruptRefused, type InterruptUnsent } from './interrupt.ts';
 import {
   handleOf,
   isSpec,
@@ -332,6 +333,24 @@ export type EngineShape = {
    * result are taken and may never be read.
    */
   readonly say: (taskId: string, text: string) => Effect.Effect<Said, SayRefused | SayUnsent | JournalError>;
+  /**
+   * End the turn the task's session is in, and leave the session open — `kubectl exec` of an escape key, not a kill. The running turn
+   * stops where it is, its own result closes it keeping what it wrote, and the session answers the next words said to it under the
+   * same id. Answers when it was asked, and of which attempt (`Interrupted`).
+   *
+   * Journals nothing, and is no lifecycle verb: no entry of it is on the record, and the next pass reads the session's state as it
+   * reads any other, so an interrupt asked twice ends one turn and refuses the second. What the session makes of being cut is its own
+   * affair: nothing of ours is said to it.
+   *
+   * Refused — `InterruptRefused`, and nothing sent — in this order, what the record says before what the harness says: a task this
+   * engine has no record of; a harness that cannot end a turn without ending its session (every harness but Claude Code attached on
+   * the Agent SDK); a task that has settled, or has been asked to stop; one with no attempt in flight; then, off its harness, an
+   * attempt its harness does not list; a session its harness lists ended; a long-lived session open and waiting for its next
+   * words, which has no turn in it (`idleOf`); and a session whose own runner cannot end a turn, in that runner's words (Claude
+   * Code's `--bg` session and its job, under the one `claude` harness that offers the verb). A harness that could not be read, or
+   * that did not take the request, fails with `InterruptUnsent`, its `cause` what failed: ask again.
+   */
+  readonly interrupt: (taskId: string) => Effect.Effect<Interrupted, InterruptRefused | InterruptUnsent | JournalError>;
   /**
    * What a harness's subscription has left (`HarnessQuota`), asked of `harness`, or of the default harness when none is named: the
    * plan's limits, each with its use and its reset, or why there are none. Claude Code answers it, as `claude` and as `claude-bg`, by
@@ -611,6 +630,15 @@ const countedInto =
   };
 
 /**
+ * The verbs a person writes to the session of a task in flight, over the journal and the harnesses: `say` and `interrupt`, which both
+ * take what `sayVerbOf` takes.
+ */
+const writtenVerbsOf = (...given: Parameters<typeof sayVerbOf>) => ({
+  say: sayVerbOf(...given),
+  interrupt: interruptVerbOf(...given),
+});
+
+/**
  * The engine over `options` that `Engine.layer` builds: the file-backed store under `root` (`~/.agent-engine` by default) or the
  * `journal` given, and the `harnesses` given — by default `claude`, `codex` and `claude-detached`. Built once, and shared by every verb:
  *
@@ -774,7 +802,7 @@ const make = (options: EngineOptions) =>
       transcript: transcriptVerb,
       output: outputVerbOf(read, runners, harnessOf),
       follow: followVerbOf(read, runners, harnessOf),
-      say: sayVerbOf(go, read, runners, harnesses, harnessOf),
+      ...writtenVerbsOf(go, read, runners, harnesses, harnessOf),
       quota: quotaVerbOf(runners, fallback),
       answer: answerVerb,
       close: (taskId) => go(close(taskId)),

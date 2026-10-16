@@ -103,12 +103,21 @@ export function chatHeaderLine(nemia: NemiaLevel | undefined, presence: Presence
 
 /**
  * What her chat's composer invites, by where she is: the daemon waited on while this browser keeps a message it would not take, her
- * reading it later while she is down, the next one while she answers — there is no stopping her until her session moves to the SDK —
- * else what she is for.
+ * reading it later while she is down, the next one or her turn stopped while she answers, else what she is for.
  */
 export function composerWords(presence: Presence): string {
   if (presence.notSent) return 'Waiting for the daemon';
   if (presence.down) return 'Write now; she reads it when she is up';
-  if (presence.answering) return 'She is answering. Write the next one';
+  if (presence.answering) return 'She is answering. Write the next one, or stop her';
   return 'Tell Nemia what to do, or ask';
 }
+
+/** What the composer's one button does: send what is written, or end the turn she is answering. */
+export type ComposerButton = 'send' | 'stop';
+
+/**
+ * What the composer's button is, by where she is: the stop while she answers, since a turn of hers can be ended without ending her
+ * session; the send otherwise, and while this browser keeps a message the api would not take, where nothing of hers can be reached at
+ * all.
+ */
+export const composerButton = (presence: Presence): ComposerButton => (presence.answering && !presence.notSent ? 'stop' : 'send');

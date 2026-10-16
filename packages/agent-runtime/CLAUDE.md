@@ -129,6 +129,20 @@ down is in `docs/architecture.md`, *Who owns what*.
   so its task settles and can be forgotten (`lookOf`, `startRefusalOf`, `test/start-event.test.ts`). Measured
   2026-10-06: `codex exec --json` (0.154.0) prints `thread.started` first; `claude -p` (2.1.291) prints `system`/`init` first under
   `--output-format stream-json --verbose`, and one `result` line under `--output-format json`.
+- **A turn's end is not the session's end for a long-lived attached request** (`took`, `harness/claude/attached-session.ts`): the run
+  file is rewritten `idle`, the input stays open, and an `is_error` result fails nothing. The SDK reads `errors` off a result whose
+  subtype is not `success`, so a stand-in's interrupted result carries one or `readMessages` throws. Words pushed on its input begin
+  the next turn, so `hear` writes `working` with them: a session heard and left `idle` is read as waiting on a person while it answers,
+  and no turn of it can be ended. It is `idle` again only once a result has named every word pushed, by `user_message_uuids` on the
+  result (`answered`), never by counting: words pushed while the model writes run as a turn of their own, and words pushed while a tool
+  call runs are folded into the turn in flight and answered by its one result (measured live 2026-10-16, SDK 0.3.270, CLI 2.1.301;
+  `queued_turn_count` was 0 on a result a second turn followed, so nothing reads it).
+- **An attached sighting says `held` and the holder's `pid` while its state is open** (`sightingOf`, `harness/claude/attached.ts`), and
+  a holder gone says `held: false`, which `decide` restarts the task under: `interrupted` reads the interrupt file on every look, never
+  as a transition, so another process's ask survives a restart of the holder, and an ask that landed after its turn ended is dropped
+  there, never kept for the next turn.
+- **The claude.ai bridge is an undeclared method on the SDK's `query()` object**, read off it in `attached-bridge.ts` alone, its answer
+  decoded before anything is written from it, and refused in words on the run file where the SDK has none.
 - **A drain or a let-go never holds a call that belongs to a call already in flight**, or the call it waits for can never end and the
   holder waits on what it forbids: `held` (`harness/claude/attached.ts`) is a question about the session, and a `PreToolUse` input
   carrying `agent_id` — a sub-agent's call, as the SDK's hook input documents it — is never held.

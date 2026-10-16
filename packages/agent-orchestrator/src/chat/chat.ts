@@ -2,7 +2,8 @@
  * A chat with a long-lived task, as the board draws it: one event shape for a turn (`ChatEvent`), its history projected from the task's
  * transcripts across its attempts and what was said to it (`projectChat`), a page of it (`chatPage`), the cursor a stream resumes from
  * (`chatCursor`, `readChatCursor`), and where the task is (`presenceOf`). Nothing of it is stored but the person's words, the marks of
- * their delivery and the person's read mark (`chat.store.ts`): the rest is what the runtime already holds, read again each time.
+ * their delivery, the person's read mark and the turns they asked to end (`chat.store.ts`): the rest is what the runtime already holds,
+ * read again each time.
  *
  * Pure. The files are `chat.store.ts`'s, the reads and the person's writes `chat.verb.ts`, and the delivery the keeper's
  * (`deliver.verb.ts`).
@@ -44,6 +45,8 @@ export type SourceEvent = {
   text?: string;
   tool?: { name: string; input: unknown };
   result?: { text: string; isError: boolean };
+  /** Where the words came from, for a `user` event: `human` where a person wrote them into the session's own face. */
+  origin?: { kind: string };
 };
 
 /** Words said to the task, as the runtime journals them (`Said`): when, to which attempt, and the transcript event they followed. */
@@ -58,6 +61,9 @@ export type OutboxEntry = { id: string; at: string; text: string };
 /** The keeper's mark of an outbox entry delivered: its `id`, and the said that carried it, by its time and attempt. */
 export type DeliveredMark = { id: string; said: string; attempt: number };
 
+/** One turn the person stopped: when, and which attempt was answering. */
+export type SourceStop = { at: string; attempt: number };
+
 /** The last event the person saw (`through`), and when they said so. */
 export type ReadMark = { through: string; at: string };
 
@@ -67,6 +73,7 @@ export type ChatSources = {
   said: readonly SourceSaid[];
   outbox: readonly OutboxEntry[];
   delivered: readonly DeliveredMark[];
+  stops: readonly SourceStop[];
   phase: string;
 };
 
@@ -78,6 +85,9 @@ export const CHAT_TEXT_MAX = 8000;
 
 /** How long a keeper's marker is, its words' first line cut there. */
 const MARKER_MAX = 120;
+
+/** What a turn the person stopped is drawn as: the keeper's quiet marker on the record, in the words the board shows. */
+export const STOPPED = 'Stopped';
 
 /** The key a said is claimed by: its attempt and its time. */
 const saidKey = (attempt: number, at: string): string => `${attempt} ${at}`;
@@ -120,10 +130,17 @@ function stepOf(attempt: number, use: SourceEvent, result: SourceEvent | undefin
   };
 }
 
-/** The chat events one transcript event is: the agent's text a message, a tool call a step, everything else none. */
+/**
+ * The chat events one transcript event is: the agent's text a message, a tool call a step, words a person wrote into the session's own
+ * face (`origin: { kind: 'human' }`, the other face her session gives a person) a message of theirs, so the board reads as one
+ * conversation whichever face it was written from; everything else none. Words the host pushed on her input carry no origin and are
+ * drawn from the outbox, where they were written, so one sent message is one bubble.
+ */
 function eventsOf(attempt: number, e: SourceEvent, results: ReadonlyMap<string, SourceEvent>, open: StepState): ChatEvent[] {
   if (e.role === 'assistant' && e.kind === 'text' && (e.text ?? '').trim() !== '')
     return [{ kind: 'message', id: `m:${attempt}:${e.id}`, at: e.at, from: 'agent', text: e.text ?? '' }];
+  if (e.role === 'user' && e.kind === 'text' && e.origin?.kind === 'human' && (e.text ?? '').trim() !== '')
+    return [{ kind: 'message', id: `h:${attempt}:${e.id}`, at: e.at, from: 'person', text: e.text ?? '' }];
   if (e.kind === 'tool_use') return [stepOf(attempt, e, results.get(e.id), open)];
   return [];
 }
@@ -163,10 +180,19 @@ function sessionEvents(session: ChatSession, said: readonly SourceSaid[], claims
   return [...out, ...placed(null).map((s) => saidEvent(s, claims))];
 }
 
+/** A turn the person stopped, as the chat draws it: the keeper's quiet marker, placed in time among the session's events. */
+const stopEvent = (stop: SourceStop): ChatEvent => ({
+  kind: 'message',
+  id: `x:${stop.attempt}:${stop.at}`,
+  at: stop.at,
+  from: 'keeper',
+  text: STOPPED,
+});
+
 /**
- * The chat, oldest first: each session's events, a session line where an attempt began after the first, then each outbox entry no
- * said carries yet, the person's, undelivered. A tool call with no result is `pending`, but the session's last, which is `running`, or
- * `waits` where the phase says the task needs the person. Pure.
+ * The chat, oldest first: each session's events with each turn the person stopped in its place in time, a session line where an attempt
+ * began after the first, then each outbox entry no said carries yet, the person's, undelivered. A tool call with no result is
+ * `pending`, but the session's last, which is `running`, or `waits` where the phase says the task needs the person. Pure.
  */
 export function projectChat(sources: ChatSources): ChatEvent[] {
   const claims = claimsOf(sources);
@@ -175,7 +201,9 @@ export function projectChat(sources: ChatSources): ChatEvent[] {
   const out: ChatEvent[] = [];
   for (const [i, session] of sources.sessions.entries()) {
     if (i > 0) out.push({ kind: 'session', id: `s:${session.attempt}`, at: session.startedAt, attempt: session.attempt });
-    out.push(...sessionEvents(session, sources.said, claims, session.attempt === lastAttempt ? live : 'pending'));
+    const own = sessionEvents(session, sources.said, claims, session.attempt === lastAttempt ? live : 'pending');
+    const stops = sources.stops.filter((stop) => stop.attempt === session.attempt).map(stopEvent);
+    out.push(...placedInTime(own, stops));
   }
   const shown = new Set(out.map((e) => e.id));
   const marked = new Map(sources.delivered.map((mark) => [mark.id, mark.said]));
@@ -189,6 +217,21 @@ export function projectChat(sources: ChatSources): ChatEvent[] {
         text: entry.text,
         delivered: marked.get(entry.id) ?? null,
       });
+  return out;
+}
+
+/**
+ * The events `own` with each of `marks` where its time puts it: after the last event not later than it, and first where every event is
+ * later. A session's own events keep their order among themselves, whatever a clock reads.
+ */
+function placedInTime(own: readonly ChatEvent[], marks: readonly ChatEvent[]): ChatEvent[] {
+  if (marks.length === 0) return [...own];
+  const out = [...own];
+  for (const mark of marks) {
+    let at = out.length;
+    while (at > 0 && (out[at - 1]?.at ?? '') > mark.at) at--;
+    out.splice(at, 0, mark);
+  }
   return out;
 }
 
@@ -216,7 +259,7 @@ export function chatPage(events: readonly ChatEvent[], before: string | undefine
  * How much of each source a stream has sent: its sessions (`attempts`), the last one's transcript events (`events`), the saids, the
  * outbox entries and the delivered marks.
  */
-export type ChatCursor = { attempts: number; events: number; said: number; outbox: number; delivered: number };
+export type ChatCursor = { attempts: number; events: number; said: number; outbox: number; delivered: number; stops: number };
 
 /** The cursor of everything `sources` holds. Pure. */
 export const cursorOf = (sources: ChatSources): ChatCursor => ({
@@ -225,10 +268,11 @@ export const cursorOf = (sources: ChatSources): ChatCursor => ({
   said: sources.said.length,
   outbox: sources.outbox.length,
   delivered: sources.delivered.length,
+  stops: sources.stops.length,
 });
 
-/** A cursor as a stream's event id: its five counts, dot-separated. Pure. */
-export const chatCursor = (c: ChatCursor): string => [c.attempts, c.events, c.said, c.outbox, c.delivered].join('.');
+/** A cursor as a stream's event id: its six counts, dot-separated. Pure. */
+export const chatCursor = (c: ChatCursor): string => [c.attempts, c.events, c.said, c.outbox, c.delivered, c.stops].join('.');
 
 /**
  * The words a cursor no read gave is refused with. A chat event's own id is no cursor: what a stream resumes from is the `cursor` a read
@@ -237,12 +281,16 @@ export const chatCursor = (c: ChatCursor): string => [c.attempts, c.events, c.sa
 const NOT_A_CURSOR = (text: string) =>
   `${text} is not a cursor a chat read gave: pass the \`cursor\` a read answered, which a stream writes as its last event's \`id\`, or none to read it whole.`;
 
-/** The cursor `text` names. Refused (`Invalid`) where it is not five whole counts. Pure. */
+/**
+ * The cursor `text` names. A cursor of five counts, which a tab open across the deploy that added the stops still carries, reads as
+ * one that had seen no stop. Refused (`Invalid`) where it is not five or six whole counts. Pure.
+ */
 export function readChatCursor(text: string): ChatCursor {
   const parts = text.split('.');
-  if (parts.length !== 5 || parts.some((p) => !/^(0|[1-9]\d*)$/.test(p))) throw new Invalid({ message: NOT_A_CURSOR(text) });
-  const [attempts, events, said, outbox, delivered] = parts.map(Number) as [number, number, number, number, number];
-  return { attempts, events, said, outbox, delivered };
+  if ((parts.length !== 5 && parts.length !== 6) || parts.some((p) => !/^(0|[1-9]\d*)$/.test(p)))
+    throw new Invalid({ message: NOT_A_CURSOR(text) });
+  const [attempts, events, said, outbox, delivered, stops = 0] = parts.map(Number) as [number, number, number, number, number, number?];
+  return { attempts, events, said, outbox, delivered, stops };
 }
 
 /**
@@ -256,7 +304,8 @@ export function sourcesAt(sources: ChatSources, c: ChatCursor, text: string): Ch
     (last === undefined ? c.events > 0 : c.events > last.events.length) ||
     c.said > sources.said.length ||
     c.outbox > sources.outbox.length ||
-    c.delivered > sources.delivered.length;
+    c.delivered > sources.delivered.length ||
+    c.stops > sources.stops.length;
   if (beyond) throw new Invalid({ message: NOT_A_CURSOR(text) });
   const sessions = sources.sessions.slice(0, c.attempts);
   return {
@@ -265,6 +314,7 @@ export function sourcesAt(sources: ChatSources, c: ChatCursor, text: string): Ch
     said: sources.said.slice(0, c.said),
     outbox: sources.outbox.slice(0, c.outbox),
     delivered: sources.delivered.slice(0, c.delivered),
+    stops: sources.stops.slice(0, c.stops),
   };
 }
 

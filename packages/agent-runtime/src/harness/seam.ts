@@ -42,6 +42,12 @@ export type SpawnRequest = {
   /** A JSON Schema the workload's final answer must satisfy. Passed through; never interpreted. */
   closeoutSchema?: object;
   /**
+   * The task's restart policy, as it was filed with it — a Pod's `restartPolicy`. `'Always'`: a session that stays open between
+   * turns until it is stopped, which a runner that keeps one open reads to know a turn's end is not the session's. Absent: a session
+   * that runs its brief to its end.
+   */
+  restartPolicy?: 'Always';
+  /**
    * What the session's telemetry says it is: the labels its task was filed with, and `task`, its id. Set by the engine at every spawn;
    * a harness that exports says it on its session's resource, and only when `telemetry` is set.
    */
@@ -83,6 +89,12 @@ export type TranscriptEvent = {
   text?: string;
   tool?: { name: string; input: unknown };
   result?: { text: string; isError: boolean };
+  /**
+   * Where the words came from, as the harness said it, for a `user` event: `human` where a person wrote them into the session itself
+   * — Claude Code's own face, a claude.ai bridge — and absent where the host pushed them on the session's input, which the caller
+   * already knows it did. **Carried, never judged**: `decide` does not read it; a layer that draws a conversation does.
+   */
+  origin?: { kind: string };
 };
 
 /** One event of a session's transcript, named as an event is unique: by its `kind` and `id` together. */
@@ -240,6 +252,13 @@ export type RunnerOps = {
    */
   readonly say?: (session: { name: string; sessionId: string }, text: string) => Effect.Effect<void, RunnerError>;
   /**
+   * End the turn the session is in, and leave the session open to hear the next words: the running turn stops where it is, its own
+   * result closes it, and the session answers again under the same id. Optional, and left off every harness that cannot end a turn
+   * without ending its session — only a session on streaming input takes it. Journals nothing and answers nothing the engine acts on:
+   * the next pass reads the session's state as it reads any other.
+   */
+  readonly interrupt?: (session: { name: string; sessionId: string }) => Effect.Effect<void, RunnerError>;
+  /**
    * What the harness's subscription has left, asked of the harness once: one process, or one request, a call, and nothing kept between
    * calls. Optional, for a harness that can tell (Claude Code: its `get_usage` control request). It touches no session and is journalled
    * nowhere. Every way an ask can go is a `HarnessQuota`, so it fails only where the seam between it and its caller does.
@@ -324,7 +343,8 @@ export class Runner extends Context.Service<Runner, RunnerOps>()('engine/Runner'
 
 /**
  * A harness that costs nothing: sessions are a map, and a test moves them by hand. Every spawn request is pushed to
- * `spawned`, so a test can assert what the harness was actually asked for.
+ * `spawned`, so a test can assert what the harness was actually asked for. It can end a turn (`interrupt`), which changes nothing of
+ * its sessions: a turn ended leaves the session as it was, at work.
  */
 export const testOps = (control?: { sessions: Map<string, Sighting>; spawned?: SpawnRequest[] }): RunnerOps => {
   const sessions = control?.sessions ?? new Map<string, Sighting>();
@@ -343,6 +363,7 @@ export const testOps = (control?: { sessions: Map<string, Sighting>; spawned?: S
         for (const [name, s] of sessions) if (s.sessionId === id) sessions.set(name, { ...s, state: 'canceled' });
       }),
     logs: () => Effect.succeed('(fake runner: no logs)'),
+    interrupt: () => Effect.void,
   };
 };
 
@@ -464,6 +485,18 @@ export const composite = (harnesses: Record<string, RunnerOps>, fallback: string
       ),
 
     stop: (sessionId) => pick(owner.get(sessionId)).stop(sessionId),
+    interrupt: (session) => {
+      const ops = pick(owner.get(session.sessionId));
+      return ops.interrupt
+        ? ops.interrupt(session)
+        : Effect.fail(
+            new RunnerError({
+              verb: 'interrupt',
+              message: `the \`${session.sessionId}\` session's harness cannot end a turn.`,
+              refused: true,
+            }),
+          );
+    },
 
     logs: (sessionId) =>
       owner.has(sessionId)

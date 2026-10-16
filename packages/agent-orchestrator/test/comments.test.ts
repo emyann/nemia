@@ -556,7 +556,6 @@ const OTHER_PROGRAMS = new Set([
   'claudeInChromeDefaultEnabled',
   '$CLAUDE_CONFIG_DIR',
   'dragTo',
-  'Origin',
   'changeOrigin',
   'pid_max',
 ]);

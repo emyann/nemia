@@ -42,8 +42,8 @@ const LINKS = [
   { words: 'Nemia', href: '/factories' },
 ];
 
-/** Her steps, as a Trace: the last call of the session she is answering in is the one running, and nothing stops it until S4. */
-async function expectWorking(page: Parameters<PageSpec['expect']>[0], panel: ReturnType<typeof chatPanelOf>): Promise<void> {
+/** Her steps, as a Trace: the last call of the session she is answering in is the one running, and the composer offers the stop. */
+async function expectWorking(panel: ReturnType<typeof chatPanelOf>): Promise<void> {
   const turn = panel.locator('[data-chat-turn="running"]');
   await expectVisible(turn, 'her steps stand as a Trace, the turn she is in drawn open');
   await expectVisible(
@@ -51,11 +51,15 @@ async function expectWorking(page: Parameters<PageSpec['expect']>[0], panel: Ret
     'the latest step runs',
   );
   await expectCount(turn.locator('[data-chat-step="running"]'), 1, 'and it alone runs: every step before it is done');
-  await expectCount(page.getByRole('button', { name: /stop/i }), 0, 'nothing stops her from the panel: that is S4');
+  await expectCount(
+    panel.locator('[data-chat-composer]').getByRole('button', { name: 'Stop her answer' }),
+    1,
+    'her turn can be ended from the panel, which `chat-stop` presses',
+  );
   const field = panel.locator('[data-chat-composer] textarea');
   const placeholder = await field.getAttribute('placeholder');
-  if (placeholder !== 'She is answering. Write the next one')
-    throw new Refused(`the composer asks for the next message while she answers — it says ${placeholder}`);
+  if (placeholder !== 'She is answering. Write the next one, or stop her')
+    throw new Refused(`the composer asks for the next message, or the stop, while she answers — it says ${placeholder}`);
   if (await field.isDisabled()) throw new Refused('and it takes it: a message written while she answers waits in her outbox');
 }
 
@@ -112,7 +116,7 @@ export default {
 
       const panel = await openChat(page);
       await expectVisible(panel.locator('[data-chat-where]', { hasText: 'Answering' }), 'the header says she is answering');
-      await expectWorking(page, panel);
+      await expectWorking(panel);
       await expectPanelHeld(page);
       await settled(page);
       await photograph(page, path.join(OUT, `chat-talk-working-${await themeOf(page)}.png`), { fullPage: true });

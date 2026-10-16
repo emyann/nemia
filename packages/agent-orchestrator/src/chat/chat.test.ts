@@ -64,6 +64,7 @@ const twoSessions = (over: Partial<ChatSources> = {}): ChatSources => ({
   said: [],
   outbox: [],
   delivered: [],
+  stops: [],
   phase: 'idle',
   ...over,
 });
@@ -158,7 +159,7 @@ test('a cursor round-trips, and what changed since it is the new events and thos
   const outbox = [{ id: 'o1', at: at(11), text: 'Hi' }];
   const before = twoSessions({ outbox });
   const cursor = chatCursor(cursorOf(before));
-  assert.equal(cursor, '2.1.0.1.0');
+  assert.equal(cursor, '2.1.0.1.0.0');
   assert.deepEqual(readChatCursor(cursor), cursorOf(before));
   const now = twoSessions({
     outbox,
@@ -172,8 +173,8 @@ test('a cursor round-trips, and what changed since it is the new events and thos
   assert.equal(changed[0]?.kind === 'message' && changed[0].delivered, at(13));
 });
 
-test('REFUSED: a cursor that is not five counts, or counts more than the chat holds, naming the fix', () => {
-  for (const bad of ['', '1.2.3', 'a.b.c.d.e', '1.2.3.4.-1', '01.0.0.0.0'])
+test('REFUSED: a cursor that is no five or six counts, or counts more than the chat holds, naming the fix', () => {
+  for (const bad of ['', '1.2.3', 'a.b.c.d.e', '1.2.3.4.-1', '01.0.0.0.0', '1.0.0.0.0.0.0', '1.0.0.0.0.x'])
     assert.throws(
       () => readChatCursor(bad),
       (err: Error) => err.message.includes('is not a cursor a chat read gave: pass the `cursor`'),
@@ -185,6 +186,63 @@ test('REFUSED: a cursor that is not five counts, or counts more than the chat ho
   assert.throws(
     () => sourcesAt(twoSessions(), readChatCursor('3.0.0.0.0'), '3.0.0.0.0'),
     (err: Error) => /not a cursor/.test(err.message),
+  );
+  assert.throws(
+    () => sourcesAt(twoSessions({ stops: [] }), readChatCursor('2.1.0.0.0.1'), '2.1.0.0.0.1'),
+    (err: Error) => /not a cursor/.test(err.message),
+    'a cursor that counts a stop the chat does not hold is none',
+  );
+});
+
+test('a cursor of five counts, which a tab open across the deploy still carries, reads as one that had seen no stop', () => {
+  assert.deepEqual(readChatCursor('2.1.0.1.0'), { attempts: 2, events: 1, said: 0, outbox: 1, delivered: 0, stops: 0 });
+});
+
+test("a turn the person stopped is the keeper's quiet marker, in its place in time, and no new kind of event", () => {
+  const stopped = twoSessions({ stops: [{ at: at(3), attempt: 1 }] });
+  assert.deepEqual(shape(projectChat(stopped)), [
+    'agent:Hello.',
+    'step:done:Bash: nemia ls',
+    'keeper:Stopped',
+    'step:error:Read: /x',
+    'session',
+    'agent:Back.',
+  ]);
+  const marker = projectChat(stopped).find((e) => e.kind === 'message' && e.from === 'keeper');
+  assert.deepEqual(marker, { kind: 'message', id: 'x:1:' + at(3), at: at(3), from: 'keeper', text: 'Stopped' });
+  assert.deepEqual(
+    [...new Set(projectChat(stopped).map((e) => e.kind))].sort(),
+    ['message', 'session', 'step'],
+    'no sixth kind of chat event appears',
+  );
+  const later = twoSessions({ stops: [{ at: at(12), attempt: 2 }] });
+  assert.deepEqual(shape(projectChat(later)).at(-1), 'keeper:Stopped', "a stop after a session's last event stands at its end");
+});
+
+test('a reader at a cursor taken before a stop is sent the Stopped line once, and not again', () => {
+  const now = twoSessions({ stops: [{ at: at(3), attempt: 1 }] });
+  const before = chatCursor({ ...cursorOf(now), stops: 0 });
+  const changed = changedSince(projectChat(sourcesAt(now, readChatCursor(before), before)), projectChat(now));
+  assert.deepEqual(shape(changed), ['keeper:Stopped']);
+  const after = chatCursor(cursorOf(now));
+  assert.deepEqual(changedSince(projectChat(sourcesAt(now, readChatCursor(after), after)), projectChat(now)), []);
+});
+
+test('words a person wrote into her own face are drawn as theirs; words the host pushed on her input are not drawn twice', () => {
+  const face = twoSessions();
+  const [first, second] = face.sessions;
+  face.sessions = [
+    first,
+    { ...second, events: [{ ...text('p1', 12, 'from my phone', 'user'), origin: { kind: 'human' } }, ...second.events] },
+  ];
+  assert.ok(shape(projectChat(face)).includes('person:from my phone'), 'the board reads as one conversation');
+  const pushed = twoSessions({ outbox: [{ id: 'o1', at: at(11), text: 'Hi' }] });
+  const [one, two] = pushed.sessions;
+  pushed.sessions = [one, { ...two, events: [...two.events, text('p2', 12, 'Hi', 'user')] }];
+  assert.deepEqual(
+    shape(projectChat(pushed)).filter((w) => w === 'person:Hi'),
+    ['person:Hi'],
+    'one sent message is one bubble',
   );
 });
 

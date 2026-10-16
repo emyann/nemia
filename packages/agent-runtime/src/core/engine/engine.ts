@@ -245,6 +245,7 @@ const spawnRequestOf = (taskId: string, state: State, name: string, n: number): 
     harness: state.harness,
     config: configForTurn(state.config, turnOf(state, attempt?.turn ?? 0).config),
     closeoutSchema: state.closeoutSchema,
+    ...(state.restartPolicy ? { restartPolicy: state.restartPolicy } : {}),
     resumeFrom: attempt?.resumeFrom,
     resource: { ...state.labels, [TASK_LABEL]: taskId },
     traceparent: state.traceparent,

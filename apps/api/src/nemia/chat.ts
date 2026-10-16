@@ -1,12 +1,13 @@
 /**
  * Nemia's chat on the board: her history a page at a time with where she is, the same followed as server-sent events, the person's
- * words sent, and their read mark moved. Each is a program of the package's chat (`chatHistory`, `chatSince`, `chatSend`, `chatRead`)
+ * words sent, their read mark moved, and the turn she is answering stopped. Each is a program of the package's chat (`chatHistory`,
+ * `chatSince`, `chatSend`, `chatRead`, `chatStop`)
  * over her place (`nemiaChatPlace`), and no command of the table: a write of the person's files kept out of her own fence.
  */
 import { Schema } from 'effect';
 import { Hono } from 'hono';
 import { type SSEStreamingApi, streamSSE } from 'hono/streaming';
-import { chatHistory, chatRead, chatSend, chatSince, nemiaChatPlace, type ChatChanges, type ChatReads } from 'agent-orchestrator';
+import { chatHistory, chatRead, chatSend, chatSince, chatStop, nemiaChatPlace, type ChatChanges, type ChatReads } from 'agent-orchestrator';
 import { NotBlank, readBody, type Words } from '../body.ts';
 import { refusedBeforeReading, type Guarded } from '../guard.ts';
 import { type ApiEnv, served, type Served } from '../layer.ts';
@@ -17,6 +18,7 @@ export const CHAT_BEAT_MS = 2000;
 
 const SEND_SHAPE = '`{ "text": "<what you write to Nemia>" }`';
 const READ_SHAPE = '`{ "through": "<the id of the last event you saw>" }`';
+const STOP_SHAPE = '`{}`';
 
 const SEND_BODY = Schema.Struct({ text: Schema.String });
 const READ_BODY = Schema.Struct({ through: NotBlank });
@@ -71,6 +73,10 @@ async function sent(stream: SSEStreamingApi, read: ChatChanges, shown: string): 
  *   `{ id, at, text }`. 400 for a body that is not one, 422 for text that is empty or too long.
  * - `POST /api/nemia/chat/read` — `{ through }`, the last event the person saw: 200 with the mark `{ through, at }`, never moved back.
  *   404 for an event her chat does not hold.
+ * - `POST /api/nemia/chat/stop` — the turn she is answering ended, her session left open to hear the next words: 200 with the stop
+ *   `{ at, attempt }`, which her history draws as a quiet `Stopped` marker. It says nothing of itself, so its body is `{}`, sent as
+ *   `application/json` like every other write of the person's, which its guard asks for. 409 where she is not answering — no session
+ *   of hers is filed, her turn is over, or her harness cannot end a turn without ending its session.
  */
 export const nemiaChat = new Hono<ApiEnv>()
   .get('/api/nemia/chat', (c) =>
@@ -116,6 +122,19 @@ export const nemiaChat = new Hono<ApiEnv>()
       const read = await readBody(c.req, SEND_BODY, `${route} takes a JSON body: ${SEND_SHAPE}.`, wordsOf(route, 'text', SEND_SHAPE));
       if ('status' in read) return c.json({ error: read.error }, read.status);
       return c.json(await runPlaced(s.placeService, s.e, chatSend(nemiaChatPlace(), read.body.text)), 201);
+    }),
+  )
+  .post('/api/nemia/chat/stop', (c) =>
+    served(c, async (s) => {
+      const route = 'POST /api/nemia/chat/stop';
+      const refused = refusedBeforeReading(
+        guarded(route, 'stops the turn Nemia is answering', STOP_SHAPE),
+        c.req.header('host'),
+        c.req.header('sec-fetch-site'),
+        c.req.header('content-type'),
+      );
+      if (refused) return c.json({ error: refused.error }, refused.status);
+      return c.json(await runPlaced(s.placeService, s.e, chatStop(nemiaChatPlace())));
     }),
   )
   .post('/api/nemia/chat/read', (c) =>

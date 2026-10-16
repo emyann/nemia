@@ -122,6 +122,7 @@ export const cardOf = (harness: string, ops: RunnerOps): AgentCard => ({
         params: {
           methods: [
             ...(ops.find ? ['findSession' as const] : []),
+            ...(ops.interrupt ? ['interruptSession' as const] : []),
             'sessionLogs' as const,
             ...(ops.output ? ['sessionOutput' as const] : []),
             ...(ops.release ? ['releaseSession' as const] : []),
@@ -168,6 +169,11 @@ export type OutputRequest = { name: string; stream: 'stdout' | 'stderr'; lastByt
 export interface SessionMethods {
   /** The session running under a name, found without listing every other; `null` when none does. */
   findSession(params: { name: string }, context: ServerCallContext): Promise<{ sessionId: string } | null>;
+  /**
+   * End the turn the session is in, and leave the session open to hear the next words. Only a harness that runs its sessions on
+   * streaming input can; any other refuses it, and its card does not list the method.
+   */
+  interruptSession(params: { session: { name: string; sessionId: string } }, context: ServerCallContext): Promise<void>;
   /** What a session printed, read by the id its harness lists it under, or the one its end was recorded with. */
   sessionLogs(params: { sessionId: string }, context: ServerCallContext): Promise<{ logs: string }>;
   /** One stream of the session under a name, as the harness kept it whole, or its last bytes; `null` when it kept none. */
@@ -441,6 +447,18 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
       );
     }
     return { output: (await this.run(this.ops.output(params.name, params.stream, params.lastBytes))) ?? null };
+  }
+
+  async interruptSession(params: { session: { name: string; sessionId: string } }, _context: ServerCallContext): Promise<void> {
+    if (!this.ops.interrupt) {
+      throw new UnsupportedOperationError(
+        `the \`${this.harness}\` harness cannot end a turn without ending its session: only a session on streaming input takes it.`,
+      );
+    }
+    if (typeof params.session?.name !== 'string' || !params.session.name) {
+      throw new RequestMalformedError('the request names no session: send the session by its name and the id its harness lists it under.');
+    }
+    await this.run(this.ops.interrupt(params.session));
   }
 
   async releaseSession(

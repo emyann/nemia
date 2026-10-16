@@ -9,6 +9,12 @@
  * reaches a process given a pid since, a let-go whose sessions never end still returns with its waits inside one budget, a resumed
  * session's cost leaves out what its parent spent, and a session is started on Claude Code's own system prompt with the agent's
  * appended to it.
+ *
+ * And, of a long-lived attached request (`restartPolicy: 'Always'`), which runs here by the runtime's own rule: a turn's end is not
+ * the session's end, the session is written `idle` and heard again across turns, an interrupted turn's `error_during_execution` result
+ * never fails it, a new holder resumes it under the same Claude Code session id — idle between turns as well as at work — an interrupt
+ * asked by another process is honoured on the next look, and the claude.ai bridge is opened after its first turn where its request
+ * asked for one and re-attached on a resume.
  */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -21,6 +27,7 @@ import { attachedSessions, letGoOf } from '../src/harness/claude/attached.ts';
 import {
   alive,
   attachedDir,
+  attachedStateOf,
   crashNote,
   CARRY_ON,
   filesOf,
@@ -28,7 +35,10 @@ import {
   readRun,
   thisHolder,
   writeRun,
+  type AttachedRun,
 } from '../src/harness/claude/attached-file.ts';
+import { fold, idleOf, type Event, type Sighting } from '../src/core/index.ts';
+import { respawning } from '../src/core/domain.ts';
 import { processStart } from '../src/harness/claude/inbox.ts';
 import { purseOf } from '../src/core/clock.ts';
 import { instantNow } from '../src/core/engine/now.ts';
@@ -54,6 +64,23 @@ const place = (plan: object, config: SpawnRequest['config'] = {}) => {
     config: { ...config, env: { STANDIN_DIR: dir, STANDIN_PLAN: JSON.stringify(plan) } },
   };
   return { root, dir, request };
+};
+
+/**
+ * The same, long-lived: the request carries `restartPolicy: 'Always'` with `background: true`, which is what makes it run attached, and
+ * its stand-in works every turn its input brings (`turns: 'many'`). `config` is laid over the request's own.
+ */
+const kept = (plan: object, config: Record<string, unknown> = {}) => {
+  const { root, dir, request } = place({ turns: 'many', ...plan });
+  return {
+    root,
+    dir,
+    request: {
+      ...request,
+      restartPolicy: 'Always' as const,
+      config: { background: true, ...config, ...request.config },
+    } satisfies SpawnRequest,
+  };
 };
 
 /** The lines of the stand-in's `file`, each parsed. */
@@ -395,6 +422,269 @@ test("adopting a session leaves alone a process that has taken its Claude Code's
   assert.equal(alive(taken.pid!), true, 'the process that took the pid is not killed');
 });
 
+/** A long-lived task filed and its one attempt in flight, as its journal folds: what `decide` reads a sighting against. */
+const LONG_LIVED: readonly Event[] = [
+  {
+    kind: 'filed',
+    at: '2026-01-01T00:00:00.000Z',
+    brief: 'be there',
+    cwd: '/r',
+    harness: 'claude',
+    restartPolicy: 'Always',
+    config: { background: true },
+  },
+  { kind: 'starting', at: '2026-01-01T00:00:01.000Z', attempt: 1 },
+  { kind: 'spawned', at: '2026-01-01T00:00:02.000Z', attempt: 1 },
+];
+
+/** What `decide` makes of the sighting `s` of a long-lived task: whether its session is idle, and whether its harness is taking it up. */
+const read = (s: Sighting) => ({ idle: idleOf(fold('t1', LONG_LIVED), s), respawning: respawning(fold('t1', LONG_LIVED), s) });
+
+/** Waits until the session's run file says it is idle between turns. */
+const idle = (t: TestContext, root: string, why = 'the session idle between turns') =>
+  until(t, () => run(root)?.state === 'idle' && run(root)!, why, { everyMs: 50 });
+
+test("attachedStateOf translates the harness's words: idle is input-required, parked is working, every other state is itself", () => {
+  const of = (state: AttachedRun['state']) =>
+    attachedStateOf({ name: NAME, state, owner: 1, startedAt: '2026-01-01T00:00:00.000Z', request: {} });
+  assert.equal(of('idle'), 'input-required', 'a long-lived session between turns waits on a person');
+  assert.equal(of('parked'), 'working', 'a session let go is taken up on the next look');
+  assert.deepEqual((['working', 'completed', 'failed', 'canceled'] as const).map(of), ['working', 'completed', 'failed', 'canceled']);
+});
+
+test('a turn of a long-lived attached session ends without ending it: it is idle, held, and hears the next words', WAITED, async (t) => {
+  const { root, dir, request } = kept({ output: { ok: true } });
+  const h = await holder(root);
+  t.after(h.close);
+  await Effect.runPromise(h.attached.ops.spawn(request));
+  const first = await idle(t, root);
+  assert.ok(first.sessionId, 'the idle run file keeps the session id a resume continues');
+  const seen = (await Effect.runPromise(h.attached.ops.observe)).get(NAME)!;
+  assert.deepEqual(
+    [seen.state, seen.held, seen.pid],
+    ['input-required', true, process.pid],
+    'its sighting says a person is waited on and this process holds it',
+  );
+  assert.deepEqual(read(seen), { idle: true, respawning: false }, 'and `decide` reads it as a session open between turns');
+  await Effect.runPromise(h.attached.ops.say!({ name: NAME, sessionId: NAME }, 'one more thing'));
+  await until(t, () => (lines(dir, 'said.jsonl') as string[]).includes('one more thing'), 'the second turn heard', { everyMs: 50 });
+  await idle(t, root, 'the second turn ended, the session still open');
+  assert.deepEqual(lines(dir, 'said.jsonl'), ['do the work', 'one more thing'], 'one session, two turns');
+  assert.equal(lines(dir, 'argv.jsonl').length, 1, 'and one Claude Code, never restarted between them');
+});
+
+test('an interrupt ends the turn and leaves the session answering under the same id, never failed', WAITED, async (t) => {
+  const { root, dir, request } = kept({ hold: true, output: {} });
+  const h = await holder(root);
+  t.after(() => {
+    fs.writeFileSync(path.join(dir, 'end'), '');
+    return h.close();
+  });
+  await Effect.runPromise(h.attached.ops.spawn(request));
+  await until(t, () => run(root)?.sessionId, 'the session started its first turn', { everyMs: 50 });
+  await Effect.runPromise(h.attached.ops.interrupt!({ name: NAME, sessionId: NAME }));
+  const cut = await idle(t, root, 'the interrupted turn ended');
+  assert.equal(cut.state, 'idle', 'an `error_during_execution` result ends the turn, not the session');
+  assert.equal((await Effect.runPromise(h.attached.ops.observe)).get(NAME)?.state, 'input-required');
+  await Effect.runPromise(h.attached.ops.say!({ name: NAME, sessionId: NAME }, 'carry on then'));
+  assert.equal(run(root)?.state, 'working', 'the words it heard began a turn of their own, written as they were pushed');
+  assert.equal(
+    (await Effect.runPromise(h.attached.ops.observe)).get(NAME)?.state,
+    'working',
+    'a session answering again is no session waiting on a person: its turn can be ended',
+  );
+  fs.writeFileSync(path.join(dir, 'end'), '');
+  const after = await until(t, () => run(root)?.state === 'idle' && run(root)!, 'the next turn ended', { everyMs: 50 });
+  assert.ok((lines(dir, 'said.jsonl') as string[]).includes('carry on then'), 'the next turn heard the words');
+  assert.equal(after.sessionId, cut.sessionId, 'the same session answered after the interrupt');
+  const taken = lines(dir, 'taken.jsonl') as { subtype: string | null }[];
+  assert.equal(taken.filter((r) => r.subtype === 'interrupt').length, 1, 'one interrupt control request, and one only');
+});
+
+test("an interrupt asked by another process is honoured on the holder's next look, and its file goes", WAITED, async (t) => {
+  const { root, dir, request } = kept({ hold: true, output: {} });
+  const h = await holder(root);
+  t.after(() => {
+    fs.writeFileSync(path.join(dir, 'end'), '');
+    return h.close();
+  });
+  await Effect.runPromise(h.attached.ops.spawn(request));
+  await until(t, () => run(root)?.sessionId, 'the session started its first turn', { everyMs: 50 });
+  const other = claudeCodeOps({ root }, attachedSessions(root, STAND_IN));
+  await Effect.runPromise(other.interrupt!({ name: NAME, sessionId: NAME }));
+  assert.ok(fs.existsSync(filesOf(root, NAME).interrupt), 'a process that holds nothing leaves the ask on a file of its own');
+  await until(
+    t,
+    async () => {
+      await Effect.runPromise(h.attached.ops.observe);
+      return run(root)?.state === 'idle';
+    },
+    "the holder's look honoured the ask",
+    { everyMs: 50 },
+  );
+  assert.equal(fs.existsSync(filesOf(root, NAME).interrupt), false, 'the ask goes once the request was sent');
+  const refused = await Effect.runPromise(Effect.flip(other.interrupt!({ name: NAME, sessionId: NAME })));
+  assert.match(refused.message, /is idle, so it has no turn to end/, 'and an idle session has no turn to end');
+});
+
+test('words said while a turn runs leave the session answering until the turn that answered them ends', WAITED, async (t) => {
+  const { root, dir, request } = kept({ hold: true, output: {} });
+  const h = await holder(root);
+  t.after(() => {
+    fs.writeFileSync(path.join(dir, 'end'), '');
+    return h.close();
+  });
+  await Effect.runPromise(h.attached.ops.spawn(request));
+  await until(t, () => run(root)?.sessionId, 'the session started its first turn', { everyMs: 50 });
+  await Effect.runPromise(h.attached.ops.say!({ name: NAME, sessionId: NAME }, 'and this too'));
+  fs.writeFileSync(path.join(dir, 'end'), '');
+  await until(t, () => (lines(dir, 'said.jsonl') as string[]).length === 2, 'the words it heard are worked as a turn of their own', {
+    everyMs: 50,
+  });
+  assert.equal(run(root)?.state, 'working', 'the first turn ended, and the words it did not answer leave the session answering');
+  assert.equal(
+    (await Effect.runPromise(h.attached.ops.observe)).get(NAME)?.state,
+    'working',
+    'so its sighting says a turn of it can still be ended, never that it waits on a person',
+  );
+  fs.writeFileSync(path.join(dir, 'end'), '');
+  await idle(t, root, 'and it is idle once the turn that answered them ends');
+});
+
+test('words folded into the turn in flight are answered by its one result, which leaves the session idle', WAITED, async (t) => {
+  const { root, dir, request } = kept({ hold: true, fold: true, output: {} });
+  const h = await holder(root);
+  t.after(h.close);
+  await Effect.runPromise(h.attached.ops.spawn(request));
+  await until(t, () => run(root)?.sessionId, 'the session started its first turn', { everyMs: 50 });
+  await Effect.runPromise(h.attached.ops.say!({ name: NAME, sessionId: NAME }, 'and this too'));
+  assert.equal(run(root)?.state, 'working', 'the words it heard are a turn of its own until a result says otherwise');
+  fs.writeFileSync(path.join(dir, 'end'), '');
+  await until(t, () => fs.readFileSync(filesOf(root, NAME).out, 'utf8').includes('"result"'), 'the turn ended, with one result', {
+    everyMs: 50,
+  });
+  assert.equal(run(root)?.state, 'idle', 'one result named both messages, so nothing of it is left unanswered');
+  assert.deepEqual(lines(dir, 'said.jsonl'), ['do the work', 'and this too'], 'both were said, in one turn');
+});
+
+test(
+  "REFUSED: an ask that reached the file after its turn ended is dropped on the holder's look, never kept for the next turn",
+  WAITED,
+  async (t) => {
+    const { root, dir, request } = kept({ hold: true, output: {} });
+    const h = await holder(root);
+    t.after(h.close);
+    await Effect.runPromise(h.attached.ops.spawn(request));
+    await until(t, () => run(root)?.sessionId, 'the session started its first turn', { everyMs: 50 });
+    fs.writeFileSync(path.join(dir, 'end'), '');
+    await idle(t, root, 'and ended it');
+    fs.writeFileSync(filesOf(root, NAME).interrupt, '4242');
+    await Effect.runPromise(h.attached.ops.observe);
+    assert.equal(fs.existsSync(filesOf(root, NAME).interrupt), false, 'the ask goes: there is no turn to end');
+    const taken = lines(dir, 'taken.jsonl') as { subtype: string | null }[];
+    assert.deepEqual(
+      taken.filter((r) => r.subtype === 'interrupt'),
+      [],
+      'and nothing was asked of the session, so its next turn runs to its own end',
+    );
+  },
+);
+
+test('a holder lets a long-lived session go between turns and the next resumes it under the same Claude Code id', WAITED, async (t) => {
+  const { root, dir, request } = kept({ output: {} });
+  const first = await holder(root);
+  await Effect.runPromise(first.attached.ops.spawn(request));
+  const before = await idle(t, root);
+  await first.close();
+  assert.equal(run(root)?.state, 'parked', 'a session let go between turns is parked for the next holder');
+  const second = await holder(root);
+  t.after(second.close);
+  await Effect.runPromise(second.attached.ops.observe);
+  await until(t, () => lines(dir, 'argv.jsonl').length === 2, 'the next holder started its Claude Code', { everyMs: 50 });
+  const after = await idle(t, root, 'the resumed session idle again');
+  assert.equal(after.sessionId, before.sessionId, 'the same Claude Code session, resumed');
+  const [, argv] = lines(dir, 'argv.jsonl') as string[][];
+  assert.ok(argv.includes(`--resume=${before.sessionId!}`), 'resumed by its own id');
+  assert.equal(after.carried?.costUsd ?? null, null, 'and a session resumed by its own holder carries nothing of a parent');
+  await Effect.runPromise(second.attached.ops.say!({ name: NAME, sessionId: NAME }, 'and now this'));
+  await until(t, () => (lines(dir, 'said.jsonl') as string[]).includes('and now this'), 'and she answers the next words', {
+    everyMs: 50,
+  });
+});
+
+test(
+  'a long-lived session whose holder is gone says its process is not held, so decide reads it as one being taken up',
+  WAITED,
+  async () => {
+    const { root, request } = kept({ output: {} });
+    writeRun(root, {
+      name: NAME,
+      state: 'idle',
+      owner: 2_147_483_600,
+      ownerStart: 'a holder long gone',
+      startedAt: new Date().toISOString(),
+      sessionId: 'left-idle',
+      request: { ...request, brief: undefined },
+    });
+    const seen = (await Effect.runPromise(attachedSessions(root, STAND_IN).ops.observe)).get(NAME)!;
+    assert.deepEqual([seen.state, seen.held, seen.pid], ['input-required', false, undefined]);
+    assert.deepEqual(read(seen), { idle: false, respawning: true }, 'never idle, so no end of it is recorded under its feet');
+  },
+);
+
+test('the claude.ai bridge is opened after the first turn where the request asked for one, and its state kept', WAITED, async (t) => {
+  const { root, dir, request } = kept({ output: {} }, { claude: { remoteControl: true } });
+  const h = await holder(root);
+  t.after(h.close);
+  await Effect.runPromise(h.attached.ops.spawn(request));
+  const bridged = await until(t, () => run(root)?.bridge?.url && run(root)!, 'the bridge opened', { everyMs: 50 });
+  assert.equal(bridged.bridge?.bridgeSessionId, 'cse_stand-in-session');
+  assert.equal(bridged.bridge?.url, 'https://claude.ai/s/cse_stand-in-session');
+  assert.equal(bridged.bridge?.environmentId, 'env-stand-in');
+  assert.equal(bridged.bridge?.epoch, 1);
+  await until(t, () => run(root)?.bridge?.state === 'connected', 'the bridge connected, as its stream said', { everyMs: 50 });
+  const asked = (lines(dir, 'taken.jsonl') as { subtype: string | null }[]).filter((r) => r.subtype === 'remote_control');
+  assert.equal(asked.length, 1, 'one bridge control request, after its first turn');
+  const seen = (await Effect.runPromise(h.attached.ops.observe)).get(NAME)!;
+  assert.deepEqual(seen.bridge, { url: 'https://claude.ai/s/cse_stand-in-session' }, 'and its sighting carries the link');
+});
+
+test('a long-lived request that asks for no bridge never sends the bridge control request', WAITED, async (t) => {
+  const { root, dir, request } = kept({ output: {} });
+  const h = await holder(root);
+  t.after(h.close);
+  await Effect.runPromise(h.attached.ops.spawn(request));
+  await idle(t, root);
+  assert.deepEqual(
+    (lines(dir, 'taken.jsonl') as { subtype: string | null }[]).map((r) => r.subtype),
+    ['initialize'],
+    'the SDK asked it to initialize and nothing else',
+  );
+  assert.equal(run(root)?.bridge, undefined, 'and its run file says nothing of a bridge');
+});
+
+test('a resumed session re-attaches the claude.ai session its run file kept', WAITED, async (t) => {
+  const { root, dir, request } = kept({ output: {} }, { claude: { remoteControl: true } });
+  writeRun(root, {
+    name: NAME,
+    state: 'parked',
+    owner: process.pid,
+    startedAt: new Date().toISOString(),
+    sessionId: 'kept-session',
+    bridge: { url: 'https://claude.ai/s/cse_earlier', bridgeSessionId: 'cse_earlier' },
+    request: { ...request, brief: undefined },
+  });
+  const h = await holder(root);
+  t.after(h.close);
+  await Effect.runPromise(h.attached.ops.observe);
+  const again = await until(t, () => run(root)?.bridge?.epoch !== undefined && run(root)!, 'the bridge opened again', { everyMs: 50 });
+  assert.equal(again.bridge?.bridgeSessionId, 'cse_earlier', 'the kept claude.ai session is re-attached, not a new one');
+  const [asked] = (lines(dir, 'taken.jsonl') as { subtype: string | null; reattach_session_id?: string }[]).filter(
+    (r) => r.subtype === 'remote_control',
+  );
+  assert.equal(asked?.reattach_session_id, 'cse_earlier', 'and the request names it');
+});
+
 test('a drain answers a call nested in one in flight, so the call in flight can end and the holder can let go', WAITED, async (t) => {
   const { root, dir, request } = place({ call: 'Bash', nested: 'Grep', output: {} });
   const h = await holder(root);
@@ -550,4 +840,20 @@ test("a session is started on Claude Code's own system prompt, the agent's appen
   const at = argv.indexOf('--append-system-prompt-file');
   assert.deepEqual(argv.slice(at, at + 2), ['--append-system-prompt-file', prompt], "the agent's own prompt is still appended");
   assert.ok(!argv.includes('--system-prompt'), "no prompt of ours is spawned: the preset is Claude Code's own");
+});
+
+test("a long-lived session is started on that same prompt: one path builds an attached session's options", WAITED, async (t) => {
+  const prompt = path.join(scratch('ae-attached-kept-prompt-'), 'agent.md');
+  fs.writeFileSync(prompt, 'you are the agent');
+  const { root, dir, request } = kept({ output: {} }, { claude: { appendSystemPromptFile: prompt } });
+  const h = await holder(root);
+  t.after(h.close);
+  await Effect.runPromise(h.attached.ops.spawn(request));
+  await idle(t, root, 'the long-lived session answered its first turn');
+  const [init] = lines(dir, 'initialize.jsonl') as { systemPrompt?: unknown }[];
+  assert.ok(init, 'the SDK sent an initialize request');
+  assert.equal(init.systemPrompt, undefined, 'the preset sends no prompt of ours here either');
+  const [argv] = lines(dir, 'argv.jsonl') as string[][];
+  assert.ok(argv.includes('--append-system-prompt-file'), "the agent's own prompt is appended to a long-lived session too");
+  assert.ok(!argv.includes('--system-prompt'), 'and no prompt of ours is spawned: Claude Code renders its own');
 });

@@ -136,6 +136,10 @@ export class InProcessTransport implements Transport {
     return this.handler.sessionLogs(params, new ServerCallContext());
   }
 
+  interruptSession(params: { session: { name: string; sessionId: string } }): Promise<void> {
+    return this.handler.interruptSession(params, new ServerCallContext());
+  }
+
   sessionOutput(params: OutputRequest): Promise<{ output: string | null }> {
     return this.handler.sessionOutput(params, new ServerCallContext());
   }
@@ -399,6 +403,9 @@ export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string)
   const logs = (sessionId: string): Effect.Effect<string, RunnerError> =>
     call('logs', () => transport.sessionLogs({ sessionId })).pipe(Effect.map((r) => r.logs));
 
+  const interrupt = (session: { name: string; sessionId: string }): Effect.Effect<void, RunnerError> =>
+    call('interrupt', () => transport.interruptSession({ session })).pipe(Effect.asVoid);
+
   const release = (session: Sighting, task: { worktree?: string | boolean }): Effect.Effect<Usage | void, RunnerError> =>
     call('release', () => transport.releaseSession({ session, task })).pipe(Effect.map((r) => r.usage ?? undefined));
 
@@ -412,29 +419,35 @@ export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string)
       }),
     ).pipe(Effect.asVoid);
 
-  const transcriptOf = (name: string, after?: TranscriptCursor): Effect.Effect<Transcript | null, RunnerError> =>
-    call('transcript', () => transport.sessionTranscript({ name, after }));
-
-  const transcript = (sessionId: string, after?: TranscriptCursor): Effect.Effect<Transcript, RunnerError> =>
-    call('transcript', () => transport.sessionTranscript({ sessionId, after })).pipe(
-      Effect.flatMap((read) =>
-        read ? Effect.succeed(read) : Effect.die(new Error(`the seam read no transcript for session \`${sessionId}\`, asked by id`)),
-      ),
-    );
-
   return {
     spawn,
     observe,
     stop,
     logs,
     ...askedOfTransport(offered, transport, card.capabilities?.streaming === true),
+    ...(offered.methods.includes('interruptSession') ? { interrupt } : {}),
     ...(offered.methods.includes('releaseSession') ? { release } : {}),
-    ...(offered.methods.includes('sessionTranscript') ? { transcript, transcriptOf } : {}),
+    ...(offered.methods.includes('sessionTranscript') ? transcriptsThrough(transport) : {}),
     ...(offered.methods.includes('observeSessions') ? { observeFor } : {}),
     ...(offered.say ? { say } : {}),
     ...(ops.refuses ? { refuses: ops.refuses } : {}),
   };
 };
+
+/**
+ * A session's conversation through the transport, as the seam offers it: `transcriptOf` by the session's name, `null` where no session
+ * goes by it yet, and `transcript` by its id, whose `null` is a defect — the handler answers none only for a name it did not find.
+ */
+const transcriptsThrough = (transport: InProcessTransport) => ({
+  transcriptOf: (name: string, after?: TranscriptCursor): Effect.Effect<Transcript | null, RunnerError> =>
+    call('transcript', () => transport.sessionTranscript({ name, after })),
+  transcript: (sessionId: string, after?: TranscriptCursor): Effect.Effect<Transcript, RunnerError> =>
+    call('transcript', () => transport.sessionTranscript({ sessionId, after })).pipe(
+      Effect.flatMap((read) =>
+        read ? Effect.succeed(read) : Effect.die(new Error(`the seam read no transcript for session \`${sessionId}\`, asked by id`)),
+      ),
+    ),
+});
 
 /**
  * The same seam beneath the Effect door: a runner's session verbs through the A2A client, its agent answering off the

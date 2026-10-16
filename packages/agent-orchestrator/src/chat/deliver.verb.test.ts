@@ -1,7 +1,8 @@
 /**
  * The delivery of the person's words to a long-lived task on the engine's stand-in: kept while the task is down and said once it is up,
- * never twice across a restart between the say and the mark, two entries of one text claiming two saids, a said from before the entry
- * never claimed, and a beat the task refuses leaving the rest for the next.
+ * never twice across a restart between the say and the mark, said to a session whose turn is over and open to hear the next, two
+ * entries of one text claiming two saids, a said from before the entry never claimed, and a beat the task refuses leaving the rest for
+ * the next.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -33,6 +34,19 @@ test('a send while the task is down is kept, then said once when it is up, and a
   assert.deepEqual(await delivered(e, id, dir), { marked: [], said: ['o1'], left: [] });
   assert.deepEqual(await delivered(e, id, dir), { marked: [], said: [], left: [] });
   assert.deepEqual(engine().said, [{ taskId: id, text: framedForHer('Hello') }]);
+  assert.equal(outboxOwed(dir), false);
+});
+
+test('a word written while her turn is over, her session open to hear the next, is said on the next pass', async () => {
+  const { e, id, dir } = await filed();
+  engine().settle(id, 'running (input-required)');
+  appendOutbox(dir, { id: 'o1', at: new Date().toISOString(), text: 'Next, the two kit cards' });
+  assert.deepEqual(
+    await delivered(e, id, dir),
+    { marked: [], said: ['o1'], left: [] },
+    'a long-lived session between turns is up, and hears the words as one in a turn does',
+  );
+  assert.deepEqual(engine().said, [{ taskId: id, text: framedForHer('Next, the two kit cards') }]);
   assert.equal(outboxOwed(dir), false);
 });
 

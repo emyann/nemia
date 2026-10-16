@@ -2214,6 +2214,7 @@ of pure code sits beside it.
 | `src/harness/claude/code.ts` | Claude Code as the engine runs it by default: a step as a job (`claude -p`), attached while the process holds (`withAttached`), or a background session (`claude --bg`) when the task asks, each verb routed by the session id's shape and its run file; and `claude -p`'s argv and the `claude-detached` spec |
 | `src/harness/claude/job-env.ts` | the environment a session run to its end is given, a job's or an attached one's (`CLAUDE_JOB_ENV`) |
 | `src/harness/claude/attached.ts` | Claude Code attached on the Agent SDK (`attachedSessions`): the holder's `hold`, adoption and resume, and the runner's verbs over the run files |
+| `src/harness/claude/attached-bridge.ts` | the claude.ai bridge of an attached session, behind one door: the SDK's undeclared `enableRemoteControl` read off the `query()` object, its answer decoded, and refused in words where it is absent |
 | `src/harness/claude/attached-session.ts` | one attached session over `query()`: its input, its hooks for the call in flight and the drain, `canUseTool`, its capture |
 | `src/harness/claude/attached-file.ts` | an attached session's run file, its stop, the drain, and the two notes a resumed session is told |
 | `src/harness/claude/attached-options.ts` | a task as the SDK's `Options` (`attachedOptions`): the job's fence, folders, servers, model, budget and schema |
@@ -2263,6 +2264,7 @@ of pure code sits beside it.
 | `src/service/watch.ts` | the engine's `watch`, on its `feed`: each entry in order, at least once, drained on the store's push and on a timer |
 | `src/service/options.ts` | what `Engine.layer` is built from and answers with — `HarnessConfig`, `Pooled`, `EngineOptions`, `TaskSpec`, `TickReport`, `EngineIo` — and what the engine refuses of its options before it builds anything (`optionsRefusalOf`) |
 | `src/service/harness-refusal.ts` | `harnessRefusalOf`: what the engine refuses of a task on the harness it names, in that harness's words — a knob the harness lacks, an argument only another takes (`mountsMisplaced` among them), a session that would not stay open, and the harness's own `refuses` |
+| `src/service/interrupt.ts` | the engine's `interrupt` verb, `interruptVerbOf`, and `InterruptRefused` and `InterruptUnsent`: the turn the attempt in flight is in ended through its harness, the session left open, and nothing journalled |
 | `src/service/say.ts` | the engine's `say` verb, `sayVerbOf`, and `SayRefused` and `SayUnsent`: words handed to the attempt in flight through its harness, then journalled with where its transcript stood (`after`) |
 | `src/service/transcript-end.ts` | `transcriptEndOf`: the last event of a session's transcript as a `TranscriptMark`, or null when there is none to read; never fails |
 | `src/service/follow.ts` | the engine's `follow` verb, `followVerbOf`, and `FollowRefused`: the session of a task's latest attempt, followed live by its harness |

@@ -2,7 +2,9 @@
  * One attached Claude Code session, run by the Agent SDK's `query()` in this process: its prompt a stream the brief and a person's words
  * are pushed on, its Claude Code spawned in a process group of its own, every message a reader reads appended to its capture as it
  * comes, and its run file rewritten as its facts change (`attached-file.ts`). A new call waits at its `PreToolUse` hook while this
- * process holds back its calls (`Held`); a call that would ask a person is answered here, denied, as no person is there.
+ * process holds back the session's calls (`Held`), and a call that belongs to a call already in flight — one of the session's own
+ * calls in flight, or a sub-agent's, which the SDK marks with `agent_id` — is never held, or the call it belongs to could never end;
+ * a call that would ask a person is answered here, denied, as no person is there.
  */
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -12,8 +14,8 @@ import { alive, childFacts, filesOf, writeRun, type AttachedRun, type AttachedSt
 import { claudeStreamKept } from '../detached/output.ts';
 import type { SpawnRequest } from '../seam.ts';
 
-/** What a session's new calls ask before they start: whether this process holds them back now. */
-export type Held = () => boolean;
+/** What a session's new calls ask before they start: whether this process holds back a new call of `live` now. */
+export type Held = (live: Live) => boolean;
 
 /** A user message on the session's input, as stream-json takes it. */
 type UserLine = { type: 'user'; message: { role: 'user'; content: string }; parent_tool_use_id: null; session_id: string };
@@ -63,10 +65,16 @@ export type Live = {
 /** How long a call is held at its hook before Claude Code answers for it, in seconds: a day, longer than any drain. */
 const HOOK_HOLD_S = 86_400;
 
-/** Waits until `held` lets go, the call's signal aborts, or the session is let go. */
+/** Waits until `held` lets go of `live`, the call's signal aborts, or the session is let go. */
 const waitWhile = async (held: Held, signal: AbortSignal, live: Live): Promise<void> => {
-  while (held() && !signal.aborted && !live.letGo) await new Promise((r) => setTimeout(r, 250));
+  while (held(live) && !signal.aborted && !live.letGo) await new Promise((r) => setTimeout(r, 250));
 };
+
+/**
+ * Whether the call a `PreToolUse` hook was given belongs to a call already in flight: the SDK marks a sub-agent's call with
+ * `agent_id`, and absent for the main thread (`BaseHookInput`), so such a call is answered however the session's calls are held.
+ */
+const inside = (input: unknown): boolean => typeof (input as { agent_id?: unknown }).agent_id === 'string';
 
 /** What a denied call is told: no person is there to ask, and what the fence allows is all it gets. */
 export const DENIED_HERE =
@@ -96,9 +104,11 @@ const hooksOf = (root: string, live: Live, held: Held): Partial<Record<HookEvent
         timeout: HOOK_HOLD_S,
         hooks: [
           async (input, id, { signal }) => {
-            live.waiting++;
-            if (held()) rewrite(root, live);
-            await waitWhile(held, signal, live).finally(() => live.waiting--);
+            if (!inside(input)) {
+              live.waiting++;
+              if (held(live)) rewrite(root, live);
+              await waitWhile(held, signal, live).finally(() => live.waiting--);
+            }
             const tool = (input as { tool_name?: string }).tool_name ?? 'a tool';
             if (id) live.calls.set(id, { tool, since: new Date().toISOString() });
             rewrite(root, live);

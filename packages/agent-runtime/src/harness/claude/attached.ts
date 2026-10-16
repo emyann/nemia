@@ -5,17 +5,20 @@
  * - **Who holds them.** One process at a time, the one whose engine took `hold` in a scope: it spawns, adopts and resumes. Any other
  *   engine reads the run files and writes a stop, or words to say, beside one; a Claude Code task it starts runs as a job
  *   (`claudeCodeOps`).
- * - **Let go.** As the holder's scope closes, new calls are held at their hook, it waits with no bound for each call in flight to end,
- *   then writes each session `parked` and aborts it; a call held at its hook then is never written in flight.
+ * - **Let go.** As the holder's scope closes, the new calls of each session with none in flight are held at their hook, it waits at
+ *   most `LET_GO_MS` for each call in flight to end, then writes each session `parked` and aborts it; a call held at its hook then is
+ *   never written in flight. A call that belongs to a call in flight is answered throughout, or the call it belongs to could never
+ *   end and the let-go would wait on what it forbids. Past the bound the call in flight is cut, kept on the run file as `calling` and
+ *   said on the log, so the next holder resumes the session told which call did not finish.
  * - **Taken up.** On each look, a holder adopts a session parked, or one whose holder's process is gone: it kills what is left of its
  *   Claude Code's process group, unless that pid is another process's now (`childOf`), and resumes it under the same session id, told
  *   it was paused (`CARRY_ON`), or, when its holder ended mid-call, which call did not finish (`crashNote`).
- * - **The drain.** A file naming the holder's pid and when it started (`putDrain`): while it names this process, its new calls wait at
- *   their hook, so a restart can wait for the calls in flight before it signals.
+ * - **The drain.** A file naming the holder's pid and when it started (`putDrain`): while it names this process, the new calls of each
+ *   session with none in flight wait at their hook, so a restart can wait for the calls in flight before it signals.
  * - **What it keeps.** Its run file, and a capture of the messages a reader reads (denials as they come, the result's statement and
  *   usage); the conversation is Claude Code's own transcript.
  */
-import { Effect, type Scope } from 'effect';
+import { Effect, Option, Schedule, type Scope } from 'effect';
 import fs from 'node:fs';
 import type { Sighting } from '../../core/index.ts';
 import { RunnerError } from '../error.ts';
@@ -39,7 +42,7 @@ import {
   writeRun,
   type AttachedRun,
 } from './attached-file.ts';
-import { gone, hear, killGroup, startSession, type Live } from './attached-session.ts';
+import { gone, hear, killGroup, startSession, type Held, type Live } from './attached-session.ts';
 
 /** The attached sessions of one engine: the runner's verbs, and `hold`, which makes this process their holder for a scope. */
 export type Attached = {
@@ -49,8 +52,22 @@ export type Attached = {
   readonly has: (name: string) => boolean;
 };
 
-/** Waits `ms`, as a promise. */
-const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** How long a holder waits for the calls in flight of its sessions before it cuts them, in milliseconds. */
+export const LET_GO_MS = 60_000;
+
+/** How often a let-go reads whether what it waits for is over, in milliseconds. */
+const LET_GO_EVERY_MS = 50;
+
+/**
+ * Waits until `over` answers true, read at once and every `LET_GO_EVERY_MS` after, at most `ms`.
+ *
+ * @returns whether it was over within `ms`
+ */
+const waitedOut = (over: () => boolean, ms: number): Effect.Effect<boolean> =>
+  Effect.repeat(Effect.sync(over), { schedule: Schedule.spaced(LET_GO_EVERY_MS), until: (done) => done }).pipe(
+    Effect.timeoutOption(ms),
+    Effect.map(Option.isSome),
+  );
 
 /** What the capture of the session under `name` says, as `claude -p`'s stream is read. */
 const saidBy = (root: string, name: string) => {
@@ -92,17 +109,21 @@ const sightingOf = (root: string, run: AttachedRun): Sighting => {
 /** Whether a holder takes `run` up: parked, or at work under a process that is gone, its pid taken by another since included. */
 const orphaned = (run: AttachedRun): boolean => run.state === 'parked' || (run.state === 'working' && holderGone(run));
 
-/** What a resumed session is told first: why it was stopped, by its run file. */
-const noteOf = (run: AttachedRun): string => (run.state !== 'parked' && run.calling ? crashNote(run.calling.tool) : CARRY_ON);
+/**
+ * What a resumed session is told first, by its run file: which call did not finish, where one was in flight when its holder ended or
+ * cut it at its bound (`crashNote`), else that it was paused between two calls (`CARRY_ON`).
+ */
+const noteOf = (run: AttachedRun): string => (run.calling ? crashNote(run.calling.tool) : CARRY_ON);
 
 /**
  * The attached sessions under `root`: `executable` the Claude Code they run, the SDK's own when absent (a test's stand-in otherwise).
  */
-export const attachedSessions = (root: string, executable?: string): Attached => {
+export const attachedSessions = (root: string, executable?: string, options: { letGoMs?: number } = {}): Attached => {
   const live = new Map<string, Live>();
+  const letGoMs = options.letGoMs ?? LET_GO_MS;
   let holding = false;
   let draining = false;
-  const held = () => draining || drainsThis(root);
+  const held: Held = (l) => (draining || drainsThis(root)) && l.calls.size === 0;
   const start = (r: SpawnRequest, run: AttachedRun, first: string, resume?: string) =>
     live.set(run.name, startSession(root, r, run, first, { held, ...(executable ? { executable } : {}), ...(resume ? { resume } : {}) }));
 
@@ -139,19 +160,40 @@ export const attachedSessions = (root: string, executable?: string): Attached =>
     return new Map([...found].map(([name, run]) => [name, sightingOf(root, looked(run))]));
   };
 
-  const letGo = Effect.promise(async () => {
+  const inCall = () => [...live.values()].filter((l) => l.calls?.size && l.run.state === 'working');
+
+  const park = (cut: boolean) =>
+    Effect.sync(() => {
+      for (const l of live.values()) {
+        if (!l.abort || l.run.state !== 'working') continue;
+        const kept = cut && l.calls?.size ? l.run.calling : undefined;
+        const { calling: _, childPid: __, childStart: ___, ...rest } = l.run;
+        l.run = { ...rest, state: 'parked', ...(kept ? { calling: kept } : {}) };
+        writeRun(root, l.run);
+        l.letGo = true;
+        l.abort.abort();
+      }
+    }).pipe(Effect.uninterruptible);
+
+  const letGo = Effect.gen(function* () {
     draining = true;
-    while ([...live.values()].some((l) => l.calls?.size)) await pause(100);
-    for (const l of live.values()) {
-      if (!l.abort || l.run.state !== 'working') continue;
-      const { calling: _, childPid: __, childStart: ___, ...rest } = l.run;
-      l.run = { ...rest, state: 'parked' };
-      writeRun(root, l.run);
-      l.letGo = true;
-      l.abort.abort();
-    }
-    await Promise.all([...live.values()].map((l) => l.done));
-    while ([...live.values()].some((l) => l.waiting)) await pause(50);
+    const waited = inCall();
+    if (waited.length)
+      yield* Effect.logInfo(
+        `letting go of ${live.size} session(s): waiting at most ${letGoMs} ms for ${waited.length} call(s) in flight (${waited
+          .map((l) => `${l.run.name} ${l.run.calling?.tool ?? 'a tool'}`)
+          .join(', ')})`,
+      );
+    const quiet = yield* waitedOut(() => inCall().length === 0, letGoMs);
+    const cut = quiet ? [] : inCall();
+    for (const l of cut)
+      yield* Effect.logWarning(
+        `${l.run.name} is cut in its call to ${l.run.calling?.tool ?? 'a tool'}: it did not end within ${letGoMs} ms, and the next ` +
+          'holder resumes the session told the call did not finish',
+      );
+    yield* park(!quiet);
+    yield* Effect.promise(() => Promise.all([...live.values()].map((l) => l.done))).pipe(Effect.timeoutOption(letGoMs));
+    yield* waitedOut(() => ![...live.values()].some((l) => l.waiting), letGoMs);
     live.clear();
     holding = false;
     draining = false;

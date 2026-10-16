@@ -33,7 +33,10 @@ const RunFileSchema = Schema.StructWithRest(
     childPid: Schema.optional(Schema.Finite),
     /** When that process started (`processStart`), so a pid another process has taken since is never killed or waited for. */
     childStart: Schema.optional(Schema.String),
-    /** The call the session is in, the earliest of those in flight: its tool, and since when, ISO. */
+    /**
+     * The call the session is in, the earliest of those in flight: its tool, and since when, ISO. Kept on a `parked` session whose
+     * holder cut the call rather than wait longer for it, which is what tells the next holder to resume with `crashNote`.
+     */
     calling: Schema.optional(Schema.Struct({ tool: Schema.String, since: Schema.String })),
     /** How many new calls wait at their hook now, held back by a drain; absent when none waits. */
     heldBack: Schema.optional(Schema.Finite),
@@ -184,5 +187,8 @@ export const childFacts = (pid: number): { childPid: number; childStart?: string
 /** What a resumed session is told first, when it was let go between two calls. */
 export const CARRY_ON = 'The session was paused between two tool calls and is resumed now. Carry on with the work where you left it.';
 
-/** What a resumed session is told first, when its holder ended during its call to `tool`. */
+/**
+ * What a resumed session is told first, when its call to `tool` did not finish: its holder ended during it, or let go and cut it
+ * rather than wait longer for it.
+ */
 export const crashNote = (tool: string): string => `the daemon stopped during its call to ${tool} and the call did not finish`;

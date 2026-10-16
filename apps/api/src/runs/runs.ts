@@ -86,19 +86,20 @@ const CONCLUDED = COMMANDS.find((c) => c.name === 'concluded')!;
  * The runs' routes: the list, one run in full, what `nemia decide` shows of it, and what it would hand as context. The board's writes on a
  * run — its removal and its prune among them — are the command table's routes (`commands`, commands/routes.ts).
  *
- * - `GET /api/runs` — every run's summary (`RunListing`), each with the address of its workflow's page (`workflowPageOf`), in the store's
- *   order: the package's entry (`runs`), handed the app's memo of runs at rest and its feed's filing times. One request costs, however many
- *   runs there are, one harness observation (one listing of the sessions it holds, one scan of the detached runs' files), a read of every
- *   task journal in the engine's store, and each run's record and workflow folder. That is a cold read's cost: a warm one costs the
- *   store's stamp walk (one `readdir`, and a `stat` of each run's files) and the records and journals of the runs still moving, and reads
- *   no record of a run at rest — the memo hands the store the run it judged (`given`) in place of a read of it. The records are read before the engine: `nemia` files a
- *   step's task before it writes the id on the run, so every id read is in the listing that follows; the other way round, a task filed
- *   between the two reads would show as `unknown` until the next poll. A run that waits on runs reads each of them off the same views
- *   (`seenBy`): its record and git, and its tasks as they were listed. The feed's filing times are read once, on from where the last read
- *   stopped (`filedTimes`): when each run started. A run at rest is answered from the list's memo (`restingRead`) while nothing it was
- *   judged on has moved, so a poll reads the journals of the runs still moving and of none other; the rest are read through the request's
- *   own engine and the tick's last standing (`viewsFor`, `standingSnapshot`). With `WF_VERIFY_REST` a kept answer is judged afresh
- *   too, and one that differs fails the request: such a read is handed nothing from memory and reads every record again.
+ * - `GET /api/runs` — every run's summary (`RunListing`), each with the address of its workflow's page (`workflowPageOf`), in the
+ *   store's order: the package's entry (`runs`), handed the app's memo of runs at rest and its feed's filing times. One request costs,
+ *   however many runs there are, one harness observation (one listing of the sessions it holds, one scan of the detached runs' files),
+ *   a read of every task journal in the engine's store, and each run's record and workflow folder. That is a cold read's cost: a warm
+ *   one costs the store's stamp walk (one `readdir`, and a `stat` of each run's files) and the records and journals of the runs still
+ *   moving, and reads no record of a run at rest — the memo hands the store the run it judged (`given`) in place of a read of it. The
+ *   records are read before the engine: `nemia` files a step's task before it writes the id on the run, so every id read is in the
+ *   listing that follows; the other way round, a task filed between the two reads would show as `unknown` until the next poll. A run
+ *   that waits on runs reads each of them off the same views (`seenBy`): its record and git, and its tasks as they were listed. The
+ *   feed's filing times are read once, on from where the last read stopped (`filedTimes`): when each run started. A run at rest is
+ *   answered from the list's memo (`restingRead`) while nothing it was judged on has moved, so a poll reads the journals of the runs
+ *   still moving and of none other; the rest are read through the request's own engine and the tick's last standing (`viewsFor`,
+ *   `standingSnapshot`). With `WF_VERIFY_REST` a kept answer is judged afresh too, and one that differs fails the request: such a read
+ *   is handed nothing from memory and reads every record again.
  * - `GET /api/runs-open` — the light answer (`OpenListing`), by the package's entry (`runs open`): the runs that wait on a person
  *   (`waiting`) and the runs in flight (`inFlight`), each in the store's order, and `counts` of each and of the finished runs; a run that
  *   moves and also waits is among the waiting, once. Each row is the list's own (`RunListing`) with its `wallMs`, created until now, and

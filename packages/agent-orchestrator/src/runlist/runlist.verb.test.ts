@@ -369,7 +369,6 @@ test('a warm read of the open runs costs the records of the open runs alone: as 
   await anInFlight();
   const kept = { runs: restingMemo<Omit<RunSummary, 'startedAt'>>(), filings: { filed: new Map(), cursor: 0 } };
   const unverified = { ...process.env, WF_VERIFY_REST: '0' };
-  /** The records a read warm costs: one read to warm the memo on what the store holds now, and the next one measured. */
   const warm = async (): Promise<number | undefined> => {
     await runWith(e(), RUNS_OPEN.handler({}, unverified, ROOT, kept));
     return (await metered(() => runWith(e(), RUNS_OPEN.handler({}, unverified, ROOT, kept)))).tallies?.records;

@@ -48,7 +48,7 @@ export type RestingRead<T> = {
    * stamp as they did; undefined otherwise, and undefined for every run on a verified read, which judges each kept answer against a
    * record read afresh.
    */
-  given(id: string): Run | undefined;
+  given: (id: string) => Run | undefined;
   /**
    * Refuses `fresh`, `run` judged afresh, where this read answered `run` from memory (`kept`) otherwise: something it was judged on is not
    * watched. Answers nothing where the memo gave no answer for `run`.
@@ -108,7 +108,7 @@ export const restingRead = Effect.fn('restingRead')(function* <T>(e: Engine, mem
       gave.set(run.id, kept.answer);
       return kept.answer;
     },
-    given(id) {
+    given: (id) => {
       if (verify) return undefined;
       const kept = memo.runs.get(id);
       return kept && kept.stamp === stamps.get(id) ? kept.run : undefined;

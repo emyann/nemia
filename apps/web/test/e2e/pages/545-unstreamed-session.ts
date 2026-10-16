@@ -130,7 +130,7 @@ export default {
       const talk = page.getByRole('region', { name: "The step's conversation" });
       await expectVisible(talk.getByText(UNSTREAMED.first, { exact: true }), 'what the session said is drawn, not blanked');
       await settled(page);
-      await photograph(page, path.join(OUT, `unstreamed-session-${await themeOf(page)}.png`), { fullPage: true });
+      await photograph(page, path.join(OUT, `unstreamed-session-band-${await themeOf(page)}.png`), { fullPage: true });
 
       says(f, 'e2e-unstreamed-2', UNSTREAMED.next);
       await expectVisible(

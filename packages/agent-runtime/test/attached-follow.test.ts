@@ -48,6 +48,9 @@ const partials = (got: readonly Followed[]) => got.filter((m) => m.kind === 'par
 const texts = (got: readonly Followed[]) =>
   got.flatMap((m) => (m.kind === 'events' ? m.events.map((e) => ('text' in e ? String(e.text) : '')) : []));
 
+/** The id of every event a follower was handed: unique per transcript line, so two turns' lines are told apart. */
+const ids = (got: readonly Followed[]) => got.flatMap((m) => (m.kind === 'events' ? m.events.map((e) => e.id) : []));
+
 /** How many pieces of text whose text is `text` a follower was handed. */
 const seen = (got: readonly Followed[], text: string) => partials(got).filter((m) => m.kind === 'partial' && m.text === text).length;
 
@@ -138,6 +141,9 @@ test('a follower that joins late is said the open block whole, then what is said
   fs.writeFileSync(path.join(dir, 'end'), '');
   await until(t, () => run(root)?.state === 'idle', 'the first turn ended', { everyMs: 50 });
 
+  const before = ids(early);
+  assert.equal(before.length, 1, 'the first turn left one event in the transcript, written before any late follower joins');
+
   await Effect.runPromise(h.attached.ops.say!({ name: NAME, sessionId: 'sid-follow-3' }, 'and again'));
   await until(t, () => seen(early, SAID[0]) === 2, 'the second turn’s first piece, to the follower already there', { bell: rung });
   const late: Followed[] = [];
@@ -151,10 +157,16 @@ test('a follower that joins late is said the open block whole, then what is said
     ],
     'a late follower is said the state and the block open then, whole, as what came before',
   );
-  assert.deepEqual(texts(late), [], 'it replays no event written before it joined');
   fs.writeFileSync(path.join(dir, 'more'), '');
   await said(t, late, SAID[1]);
-  await until(t, () => texts(late).includes(SAID.join('')), 'the second turn’s events, to the late follower', { bell: rung });
+  await until(t, () => ids(late).length > 0, 'the second turn’s events, to the late follower', { bell: rung });
+  assert.deepEqual(
+    ids(late).filter((id) => before.includes(id)),
+    [],
+    'it replays no event written before it joined: its first read takes the transcript’s cursor without saying what is there',
+  );
+  assert.deepEqual(ids(late), ids(early).slice(1), 'and it is said the events written after it joined, those alone');
+  assert.ok(texts(late).includes(SAID.join('')), 'the second turn’s event carries the text its pieces spelled');
   fs.writeFileSync(path.join(dir, 'end'), '');
   await Effect.runPromise(Fiber.interrupt(first));
   await Effect.runPromise(Fiber.interrupt(second));

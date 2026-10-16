@@ -2131,7 +2131,9 @@ no `background` session spawns attached, and any other engine, or the same one b
   A holder is its pid and its start time (`ownerStart`): a pid another process has taken since is a holder gone.
 - **What it keeps.** Its run file (state, Claude Code's session id, the process group, the call in flight) and a capture of the
   messages a reader reads, appended as they come: a denial reaches the attempt while it works, and the statement and the usage
-  at the result, less what the session it resumed had spent (`carried`, as the job's `resumeCostCarried`). The conversation is Claude Code's own transcript (`transcript`); an attached session is not followed live.
+  at the result, less what the session it resumed had spent (`carried`, as the job's `resumeCostCarried`). The conversation is Claude Code's own transcript (`transcript`), and a follow of the session reads its whole events from that
+  same file, with the cursor `transcript` takes back, beside its state and the pieces of the text it is writing
+  (`follow`, `attached-follow.ts`): a follower in the holder's own process, from the moment it joins.
 - **The fence.** The job's, fact for fact (`attachedOptions`, held to `claudePrintFlags` by its test). A call that would ask a
   person is answered in the holder (`canUseTool`): denied, and written as a denial.
 - **Let go.** As the holder's scope closes, new calls wait at their `PreToolUse` hook, it waits with no bound for each call in

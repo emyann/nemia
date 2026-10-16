@@ -77,8 +77,13 @@ const momentsOf = (
 
 /**
  * The fan-out of the attached sessions of `source`: `push` is called with every message of a held session, in the order the SDK gives
- * them, and `follow` is the runner's verb over it. `following(name)` is how many follow that session now — what `letGo` and a test
- * read to see a follower that left free its place.
+ * them, and `follow` is the runner's verb over it. `following(name)` is how many follow that session now — what a test reads to see a
+ * follower that left free its place.
+ *
+ * A follow takes its place behind the finalizer that frees it (`left` is installed before `joined` runs), so a follow interrupted as
+ * it joins leaves no follower behind to be pushed to for the life of the holder. `joined` takes the place and reads the block open
+ * then in one go, with nothing between: a piece pushed while a follower joins is either in the block it is handed, whole, or in its
+ * `pending`, never dropped between the two.
  */
 export const pushesOf = (source: PushSource): Pushes => {
   const sessions = new Map<string, Fanned>();
@@ -119,30 +124,32 @@ export const pushesOf = (source: PushSource): Pushes => {
     forget(name, fanned);
   };
 
-  const joined = (name: string, wake: Queue.Queue<void>): [Fanned, Follower, Followed[], SessionState] | undefined => {
+  const left = (name: string, me: Follower): void => {
+    const fanned = sessions.get(name);
+    if (fanned === undefined) return;
+    fanned.followers.delete(me);
+    forget(name, fanned);
+  };
+
+  const joined = (name: string, me: Follower): [Followed[], SessionState] | undefined => {
     const run = runOf(name);
     if (run === undefined) return undefined;
     const fanned = fannedOf(name);
-    const me: Follower = { wake, pending: [] };
     fanned.followers.add(me);
     const state = attachedStateOf(run);
-    return [fanned, me, [{ kind: 'state', state }, ...(fanned.at.open ? [openWhole(fanned.at.open)] : [])], state];
+    return [[{ kind: 'state', state }, ...(fanned.at.open ? [openWhole(fanned.at.open)] : [])], state];
   };
 
   const follow = (name: string): Stream.Stream<Followed, RunnerError> =>
     Stream.callback<Followed, RunnerError>((queue) =>
       Effect.gen(function* () {
         const wake = yield* Queue.sliding<void>(1);
-        const start = joined(name, wake);
+        const me: Follower = { wake, pending: [] };
+        yield* Effect.addFinalizer(() => Effect.sync(() => left(name, me)));
+        const start = joined(name, me);
         if (start === undefined)
           return yield* Queue.fail(queue, refusal(`no session \`${name}\` is there to follow: there is no run of it.`));
-        const [fanned, me, first, from] = start;
-        yield* Effect.addFinalizer(() =>
-          Effect.sync(() => {
-            fanned.followers.delete(me);
-            forget(name, fanned);
-          }),
-        );
+        const [first, from] = start;
         let state = from;
         let cursor: TranscriptCursor | undefined = undefined;
         yield* Queue.offerAll(queue, first);

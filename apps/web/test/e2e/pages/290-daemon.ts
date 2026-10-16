@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { photograph, themeOf } from '../board.ts';
+import { fedDaemon, photograph, themeOf } from '../board.ts';
 import { expectClearOfEachOther, expectClearOfPanels } from '../canvas.ts';
 import { expectCount, expectUncut, expectVisible, idle, Refused, settled } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
@@ -34,7 +34,8 @@ export default {
   /**
    * Whether a daemon ticks the store: a dot on the top bar's gauges button, and whole in the machine's gauges it opens. The seeded
    * store has no daemon.json, which is true — the e2e's api runs with `--no-tick` — so the dot is down and the gauges say so and how to
-   * start one: the api. Then a wf up alive and silent for 20 minutes, past the 15 that are stale at every 4 s: the dot warns, and the
+   * start one: the api. Then a daemon heard from just now, said on the feed as a daemon says it on starting (`fedDaemon`): the dot is ok
+   * with no reload, read on that line and not on the fallback a minute later. Then a wf up alive and silent for 20 minutes, past the 15 that are stale at every 4 s: the dot warns, and the
    * gauges say it stalled, with its silence and the command, each card on the floor beside them clear of the one beneath it and of the
    * panels. Then an api holder silent as long: said by its kind. Then each heard from just now: the dot is ok, the gauges say the api's
    * own line and no sentence, and the cap is still over the floor. Then the api's last pass could not read a harness (`tick-stats.json`'s
@@ -64,6 +65,14 @@ export default {
     );
     await dot('none', 'down', "and the gauges button's dot is down");
     try {
+      fs.writeFileSync(file, daemonFile(1_000));
+      fedDaemon();
+      await dot(
+        'ticking',
+        'ok',
+        "a daemon's start line on the feed is read on the line itself: the dot is ok with no reload, and long before the minute's fallback",
+      );
+
       fs.writeFileSync(file, daemonFile(20 * MIN + 30_000));
       await reload(page);
       const stalled = page.locator('[data-daemon="stalled"]', {

@@ -191,14 +191,14 @@ export type ChatTurn = { kind: 'turn'; id: string; steps: ChatStep[]; running: b
 
 /** The milliseconds from the first of `steps` to the last, 0 where either moment does not parse. */
 const spanOf = (steps: readonly ChatStep[]): number => {
-  const ms = Date.parse(steps.at(-1)!.at) - Date.parse(steps[0]!.at);
+  const ms = Date.parse(steps[steps.length - 1].at) - Date.parse(steps[0].at);
   return Number.isFinite(ms) && ms > 0 ? ms : 0;
 };
 
 /** The steps gathered so far as a turn. */
 const turnOf = (steps: ChatStep[]): ChatTurn => ({
   kind: 'turn',
-  id: steps[0]!.id,
+  id: steps[0].id,
   steps,
   running: steps.some((step) => step.state === 'running' || step.state === 'waits'),
   ms: spanOf(steps),
@@ -258,18 +258,19 @@ export type ChatLink = { words: string; href: string };
 /** A markdown link in her words: its words, then its address. */
 const LINK = /\[([^\]\n]+)\]\(([^()\s]+)\)/g;
 
-/** Whether an address is one the board draws as a control: this board's own page, a place on the page, or the web. */
-const linkable = (href: string): boolean => href.startsWith('/') || href.startsWith('#') || /^https?:\/\//.test(href);
+/** Whether an address is a page of this board, which the look's filled button leads to through the router. */
+const ours = (href: string): boolean => href.startsWith('/');
 
 /**
- * Her words with each markdown link taken out of the sentence and named beside it: `text` reads plain, the link's own words in its
- * place, and `links` holds each address in the order she wrote it, which the panel draws as the canvas's filled buttons under her
- * bubble. An address the board would not open — a protocol of its own — stays its words and is no button, as `Markdown` empties one.
+ * Her words with each link to a page of this board taken out of the sentence and named beside it: `text` reads plain, the link's own
+ * words in its place, and `links` holds each address in the order she wrote it, which the panel draws as the canvas's filled buttons
+ * under her bubble. A link that leaves the board, and one whose address the board would not open at all, is left in her words as she
+ * wrote it, for `Markdown` to draw — a button through the router leads to a route, and those are not routes.
  */
 export function linksOf(text: string): { text: string; links: ChatLink[] } {
   const links: ChatLink[] = [];
-  const plain = text.replace(LINK, (whole, words: string, href: string) => {
-    if (!linkable(href)) return words;
+  const plain = text.replace(LINK, (whole: string, words: string, href: string) => {
+    if (!ours(href)) return whole;
     links.push({ words, href });
     return words;
   });

@@ -4,6 +4,7 @@
  * never from the runtime's phase, which is shown as it came.
  */
 import type { FactoryLevel, Level, NemiaLevel, Spend } from './api/nemia.ts';
+import type { Presence } from './presence.ts';
 import { clockWord } from './quota.ts';
 
 /**
@@ -83,3 +84,31 @@ export const spendWords = ({ usd, measured, unmeasured }: Spend): string =>
 /** How a fact she keeps is pruned: by asking her, since her session alone writes her memory. */
 export const PRUNE_WORDS =
   'She keeps these facts herself, and the board only reads them. To have her forget one, or correct it, ask her to in her session.';
+
+/**
+ * The one line under her name in her chat's header, off what the api answers of her and where she is (`presence`): `Down since 6:10 PM`
+ * while her session is not up, `Answering` while a turn is in progress, else `Up: her session runs`, each followed by what her sessions
+ * cost where the api counted it. The cost is what her ended sessions cost, whole (`spendWords`, which the header carries as its title),
+ * never a day's: nothing the board reads counts a day of hers.
+ */
+export function chatHeaderLine(nemia: NemiaLevel | undefined, presence: Presence, now: Date): string {
+  const spent = nemia?.spend ? ` · ${dollars(nemia.spend.usd)}` : '';
+  if (presence.down) {
+    const since = nemia?.since === null || nemia?.since === undefined ? null : new Date(nemia.since);
+    return `Down${since === null ? '' : ` since ${clockWord(since, now)}`}${spent}`;
+  }
+  if (presence.answering) return `Answering${spent}`;
+  return `Up: her session runs${spent}`;
+}
+
+/**
+ * What her chat's composer invites, by where she is: the daemon waited on while this browser keeps a message it would not take, her
+ * reading it later while she is down, the next one while she answers — there is no stopping her until her session moves to the SDK —
+ * else what she is for.
+ */
+export function composerWords(presence: Presence): string {
+  if (presence.notSent) return 'Waiting for the daemon';
+  if (presence.down) return 'Write now; she reads it when she is up';
+  if (presence.answering) return 'She is answering. Write the next one';
+  return 'Tell Nemia what to do, or ask';
+}

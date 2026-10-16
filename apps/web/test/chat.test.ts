@@ -24,15 +24,7 @@ import {
   type ChatItem,
   type ChatStep,
 } from '../src/lib/chatFollowing.ts';
-import {
-  CHAT_OUTBOX_KEY,
-  editKept,
-  forgetKept,
-  keepUnsent,
-  parseKept,
-  readKept,
-  sendingOnce,
-} from '../src/lib/chatOutbox.ts';
+import { CHAT_OUTBOX_KEY, editKept, forgetKept, keepUnsent, parseKept, readKept, sendingOnce } from '../src/lib/chatOutbox.ts';
 import { faceOf, type Presence } from '../src/lib/presence.ts';
 import type { StreamLike } from '../src/lib/following.ts';
 import type { ChatEvent, ChatPresence } from '../src/lib/api.ts';
@@ -132,7 +124,7 @@ test('her consecutive steps fold into one turn, in the order they came, and a tu
   assert.equal(turn.running, false);
   assert.equal(turnWords(turn), 'Worked for 2m 14s · 3 steps');
   assert.equal(turnWords({ ms: 134_000, steps: turn.steps }), 'Worked for 2m 14s · 3 steps');
-  assert.equal(turnWords({ ms: 134_000, steps: [turn.steps[0]!] }), 'Worked for 2m 14s · 1 step');
+  assert.equal(turnWords({ ms: 134_000, steps: [turn.steps[0]] }), 'Worked for 2m 14s · 1 step');
   const live = foldChat([step('t:1:a', 2, 'done'), step('t:1:b', 3, 'running')])[0] as Extract<ChatItem, { kind: 'turn' }>;
   assert.equal(live.running, true, 'a turn whose step is at work is still running');
   assert.equal(
@@ -144,7 +136,7 @@ test('her consecutive steps fold into one turn, in the order they came, and a tu
   assert.equal(apart.filter((item) => item.kind === 'turn').length, 2, 'steps either side of her words are two turns');
 });
 
-test("the read-back words say how many are new, and the line is drawn over the first of her messages the person has not read", () => {
+test('the read-back words say how many are new, and the line is drawn over the first of her messages the person has not read', () => {
   assert.equal(jumpWords(2), '2 new · Jump to the latest');
   assert.equal(jumpWords(1), '1 new · Jump to the latest');
   assert.equal(newWords(2), '2 new');
@@ -162,17 +154,19 @@ test("the read-back words say how many are new, and the line is drawn over the f
   assert.equal(readableFrom([message('p:1:b', 2, 'person', 'Mine.')]), null, 'and through nothing where she has said nothing');
 });
 
-test('a markdown link in her words is taken out of the sentence and named beside it; one the board would not open stays words', () => {
+test('a link of hers to a page of the board is taken out of the sentence and named beside it; one that leaves the board stays in it', () => {
   const read = linksOf('Two gates. [Read the review](/runs/r-1) and [Read the design](/runs/r-2).');
-  assert.equal(read.text, 'Two gates. Read the review and Read the design.');
+  assert.equal(read.text, 'Two gates. Read the review and Read the design.', 'the sentence reads plain');
   assert.deepEqual(read.links, [
     { words: 'Read the review', href: '/runs/r-1' },
     { words: 'Read the design', href: '/runs/r-2' },
   ]);
-  assert.deepEqual(linksOf('[Open](https://example.test/x)').links, [{ words: 'Open', href: 'https://example.test/x' }]);
+  const away = linksOf('[Open the pull request](https://example.test/pr/25)');
+  assert.deepEqual(away.links, [], 'a button through the router leads to a route, and that is none');
+  assert.equal(away.text, '[Open the pull request](https://example.test/pr/25)', 'so it is left for Markdown to draw');
   const refused = linksOf('[Run it](javascript:doIt)');
-  assert.deepEqual(refused.links, [], 'a protocol of its own is no control');
-  assert.equal(refused.text, 'Run it');
+  assert.deepEqual(refused.links, []);
+  assert.equal(refused.text, '[Run it](javascript:doIt)', 'and so is one whose address Markdown empties');
   assert.deepEqual(linksOf('Nothing to open here.'), { text: 'Nothing to open here.', links: [] });
 });
 
@@ -238,7 +232,10 @@ test('REFUSED: data of a shape her chat does not send changes nothing', () => {
 });
 
 test('a change is taken one at a time: the presence of the later frame wins, and the events of both are held', () => {
-  const held = [{ kind: 'presence' as const, presence: up }, { kind: 'events' as const, events: [message('m:1', 1, 'agent', 'One.')] }];
+  const held = [
+    { kind: 'presence' as const, presence: up },
+    { kind: 'events' as const, events: [message('m:1', 1, 'agent', 'One.')] },
+  ];
   const after = held.reduce(changedChat, unreadChat(false));
   assert.deepEqual(after.presence, up);
   assert.equal(after.events.length, 1);

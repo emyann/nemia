@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { chatStreamPath, markChatRead, readChat, sendChat, type ChatEvent, type ChatSent } from './api/chat.ts';
 import { changedChat, followChat, mergeChatEvents, unreadChat, type ChatFollowed } from './chatFollowing.ts';
 import { forgetKept, keepUnsent, readKept, sendingOnce, editKept as writeKept, type ChatKept } from './chatOutbox.ts';
@@ -31,6 +31,43 @@ export type NemiaChat = {
   markRead: (through: string) => void;
 };
 
+/** What the read and the stream write into: the state they change, and the try they ask for again when the read did not work. */
+type Reader = { setState: Dispatch<SetStateAction<ChatFollowed>>; tryAgain: () => void };
+
+/**
+ * Reads her chat once and follows it from the cursor it answered, and asks for another try after `CHAT_RETRY_MS` where the read did not
+ * work. Returns what stops it: the read abandoned, the retry dropped, the stream closed.
+ */
+function reading({ setState, tryAgain }: Reader): () => void {
+  const read = new AbortController();
+  let stop: (() => void) | undefined;
+  let again: ReturnType<typeof setTimeout> | undefined;
+  readChat({}, read.signal).then(
+    (first) => {
+      if (read.signal.aborted) return;
+      setState((s) => ({
+        ...unreadChat(false),
+        events: mergeChatEvents(s.events, first.events),
+        presence: first.presence,
+        cursor: first.cursor,
+        live: true,
+      }));
+      const stream = new EventSource(`${chatStreamPath}?after=${encodeURIComponent(first.cursor)}`);
+      stop = followChat(stream, setState, animationFrames);
+    },
+    (err: unknown) => {
+      if (read.signal.aborted) return;
+      setState((s) => ({ ...s, loading: false, live: false, error: err instanceof Error ? err.message : String(err) }));
+      again = setTimeout(tryAgain, CHAT_RETRY_MS);
+    },
+  );
+  return () => {
+    read.abort();
+    if (again !== undefined) clearTimeout(again);
+    stop?.();
+  };
+}
+
 /**
  * Nemia's chat, read once and then followed for as long as the page lives.
  *
@@ -52,35 +89,7 @@ export function useNemiaChat(): NemiaChat {
   const [attempt, setAttempt] = useState(0);
   const marked = useRef<string | null>(null);
 
-  useEffect(() => {
-    const reading = new AbortController();
-    let stop: (() => void) | undefined;
-    let again: ReturnType<typeof setTimeout> | undefined;
-    readChat({}, reading.signal).then(
-      (first) => {
-        if (reading.signal.aborted) return;
-        setState((s) => ({
-          ...unreadChat(false),
-          events: mergeChatEvents(s.events, first.events),
-          presence: first.presence,
-          cursor: first.cursor,
-          live: true,
-        }));
-        const stream = new EventSource(`${chatStreamPath}?after=${encodeURIComponent(first.cursor)}`);
-        stop = followChat(stream, setState, animationFrames);
-      },
-      (err: unknown) => {
-        if (reading.signal.aborted) return;
-        setState((s) => ({ ...s, loading: false, live: false, error: err instanceof Error ? err.message : String(err) }));
-        again = setTimeout(() => setAttempt((n) => n + 1), CHAT_RETRY_MS);
-      },
-    );
-    return () => {
-      reading.abort();
-      if (again !== undefined) clearTimeout(again);
-      stop?.();
-    };
-  }, [attempt]);
+  useEffect(() => reading({ setState, tryAgain: () => setAttempt((n) => n + 1) }), [attempt]);
 
   const took = useCallback((entry: ChatSent) => {
     forgetKept();

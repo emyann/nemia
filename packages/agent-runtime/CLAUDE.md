@@ -131,7 +131,7 @@ down is in `docs/architecture.md`, *Who owns what*.
   `--output-format stream-json --verbose`, and one `result` line under `--output-format json`.
 - **A drain or a let-go never holds a call that belongs to a call already in flight**, or the call it waits for can never end and the
   holder waits on what it forbids: `held` (`harness/claude/attached.ts`) is a question about the session, and a `PreToolUse` input
-  carrying `agent_id` — a sub-agent's call (`BaseHookInput`, sdk.d.ts) — is never held.
+  carrying `agent_id` — a sub-agent's call, as the SDK's hook input documents it — is never held.
 - **A holder's wait for its calls in flight is bounded** (`LET_GO_MS`, `attached.ts`), and it says on its log what it waits for and
   what it cut; the restart's own wait is bounded beside it (`called`, `agent-orchestrator/src/service/takeover.verb.ts`).
 - **A `parked` run that carries `calling` is a call its holder cut**: the next holder resumes that session with `crashNote`, the road a

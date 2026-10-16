@@ -115,6 +115,55 @@ const orphaned = (run: AttachedRun): boolean => run.state === 'parked' || (run.s
  */
 const noteOf = (run: AttachedRun): string => (run.calling ? crashNote(run.calling.tool) : CARRY_ON);
 
+/** The sessions of `live` at work with a call in flight. */
+const inCallOf = (live: Map<string, Live>): Live[] => [...live.values()].filter((l) => l.calls?.size && l.run.state === 'working');
+
+/** The tool of the call `l` is in, as a line names it. */
+const toolOf = (l: Live): string => l.run.calling?.tool ?? 'a tool';
+
+/**
+ * Each session of `live` at work written `parked` and aborted, its file its holder's last word; the call it was cut in kept as
+ * `calling` where `cut`, which is what tells the next holder which call did not finish. Uninterruptible as one: a second signal
+ * leaves no session neither parked nor running.
+ */
+const parked = (root: string, live: Map<string, Live>, cut: boolean): Effect.Effect<void> =>
+  Effect.sync(() => {
+    for (const l of live.values()) {
+      if (!l.abort || l.run.state !== 'working') continue;
+      const kept = cut && l.calls?.size ? l.run.calling : undefined;
+      const { calling: _, childPid: __, childStart: ___, ...rest } = l.run;
+      l.run = { ...rest, state: 'parked', ...(kept ? { calling: kept } : {}) };
+      writeRun(root, l.run);
+      l.letGo = true;
+      l.abort.abort();
+    }
+  }).pipe(Effect.uninterruptible);
+
+/**
+ * The holder's let-go of the sessions in `live`: it says what it is waiting for, waits at most `letGoMs` for the calls in flight to
+ * end, says which session it cut and in what call where they did not, then parks each session at work (`parked`) and waits, bounded
+ * the same way, for each to end and for each call held at its hook to be let go. It always returns, so a signal always ends the
+ * process.
+ */
+const letGoOf = (root: string, live: Map<string, Live>, letGoMs: number): Effect.Effect<void> =>
+  Effect.gen(function* () {
+    const waited = inCallOf(live);
+    if (waited.length)
+      yield* Effect.logInfo(
+        `letting go of ${live.size} session(s): waiting at most ${letGoMs} ms for ${waited.length} call(s) in flight ` +
+          `(${waited.map((l) => `${l.run.name} ${toolOf(l)}`).join(', ')})`,
+      );
+    const quiet = yield* waitedOut(() => inCallOf(live).length === 0, letGoMs);
+    for (const l of quiet ? [] : inCallOf(live))
+      yield* Effect.logWarning(
+        `${l.run.name} is cut in its call to ${toolOf(l)}: it did not end within ${letGoMs} ms, and the next holder resumes the ` +
+          'session told the call did not finish',
+      );
+    yield* parked(root, live, !quiet);
+    yield* Effect.promise(() => Promise.all([...live.values()].map((l) => l.done))).pipe(Effect.timeoutOption(letGoMs));
+    yield* waitedOut(() => ![...live.values()].some((l) => l.waiting), letGoMs);
+  });
+
 /**
  * The attached sessions under `root`: `executable` the Claude Code they run, the SDK's own when absent (a test's stand-in otherwise).
  */
@@ -160,40 +209,9 @@ export const attachedSessions = (root: string, executable?: string, options: { l
     return new Map([...found].map(([name, run]) => [name, sightingOf(root, looked(run))]));
   };
 
-  const inCall = () => [...live.values()].filter((l) => l.calls?.size && l.run.state === 'working');
-
-  const park = (cut: boolean) =>
-    Effect.sync(() => {
-      for (const l of live.values()) {
-        if (!l.abort || l.run.state !== 'working') continue;
-        const kept = cut && l.calls?.size ? l.run.calling : undefined;
-        const { calling: _, childPid: __, childStart: ___, ...rest } = l.run;
-        l.run = { ...rest, state: 'parked', ...(kept ? { calling: kept } : {}) };
-        writeRun(root, l.run);
-        l.letGo = true;
-        l.abort.abort();
-      }
-    }).pipe(Effect.uninterruptible);
-
   const letGo = Effect.gen(function* () {
     draining = true;
-    const waited = inCall();
-    if (waited.length)
-      yield* Effect.logInfo(
-        `letting go of ${live.size} session(s): waiting at most ${letGoMs} ms for ${waited.length} call(s) in flight (${waited
-          .map((l) => `${l.run.name} ${l.run.calling?.tool ?? 'a tool'}`)
-          .join(', ')})`,
-      );
-    const quiet = yield* waitedOut(() => inCall().length === 0, letGoMs);
-    const cut = quiet ? [] : inCall();
-    for (const l of cut)
-      yield* Effect.logWarning(
-        `${l.run.name} is cut in its call to ${l.run.calling?.tool ?? 'a tool'}: it did not end within ${letGoMs} ms, and the next ` +
-          'holder resumes the session told the call did not finish',
-      );
-    yield* park(!quiet);
-    yield* Effect.promise(() => Promise.all([...live.values()].map((l) => l.done))).pipe(Effect.timeoutOption(letGoMs));
-    yield* waitedOut(() => ![...live.values()].some((l) => l.waiting), letGoMs);
+    yield* letGoOf(root, live, letGoMs);
     live.clear();
     holding = false;
     draining = false;

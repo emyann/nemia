@@ -72,7 +72,7 @@ const waitWhile = async (held: Held, signal: AbortSignal, live: Live): Promise<v
 
 /**
  * Whether the call a `PreToolUse` hook was given belongs to a call already in flight: the SDK marks a sub-agent's call with
- * `agent_id`, and absent for the main thread (`BaseHookInput`), so such a call is answered however the session's calls are held.
+ * `agent_id`, and absent for the main thread (the SDK's hook input), so such a call is answered however the session's calls are held.
  */
 const inside = (input: unknown): boolean => typeof (input as { agent_id?: unknown }).agent_id === 'string';
 

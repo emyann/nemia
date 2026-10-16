@@ -15,8 +15,10 @@ below its layer is in `docs/architecture.md`, *Who owns what*.
 - **An encoded `..` never reaches a route in a test**: `app.request` resolves `%2E%2E` before the router sees it. Send `..%2F…` to reach
   a name refusal.
 - **The list answers a finished run from memory** (`restingRead`, the package's `rest/resting.verb.ts`) while its record, its stamps, the feed for its tasks and its branch tips
-  stand. A new input `summarize` reads for a finished run goes into one of those, or a poll answers it stale. `WF_VERIFY_REST=1` (set by
-  the harness) judges every kept answer afresh; a test that counts reads turns that off for its request (`unverified`). Requests overlap
+  stand. A new input `summarize` reads for a finished run goes into one of those, or a poll answers it stale. The memo keeps the run it
+  judged and hands it to the store in place of a read of its record (`given`), so a warm list reads no record of a run at rest.
+  `WF_VERIFY_REST=1` (set by the harness) judges every kept answer afresh and is handed nothing from memory, so every record is read
+  again; a test that counts reads turns that off for its request (`unverified`). Requests overlap
   and share the feed cursor: a request keeps nothing once another has read the feed past where it read to.
 - **`GET /api/stats` answers a finished run's facts from the app's memo** (`ReadMemo.stats`, the package's `StatsMemo`) while its
   stamp and the feed for its tasks stand. A new input of a run's stats facts goes into one of those, or the stats answer stale. Verified

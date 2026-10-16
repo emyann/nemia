@@ -349,11 +349,15 @@ export type SummaryHow = {
 /**
  * Every run's summary, in the store's order, as the board's list answers it: through `e`, off `how.memo` (`restingRead`), verified as
  * `how.verify` says. Dies where a verified answer differs from the memo's (`answered`).
+ *
+ * The store is listed through the memo (`given`): a run whose files stamp as they did is listed as the run the memo kept, its record not
+ * read, so a warm read costs the stamp walk and the records of the runs still moving alone. A verified read is given nothing and reads
+ * every record afresh.
  */
 export const runsSummarized = Effect.fn('runsSummarized')(function* (e: Engine, { home, memo, filings, verify }: SummaryHow) {
   const git = standingReader(yield* standingSnapshot());
   const read = yield* restingRead(e, memo, verify, git);
-  const runs = runStore.runs.list();
+  const runs = runStore.runs.list(undefined, read.given);
   read.only(runs.map((run) => run.id));
   const filed = yield* filedTimes(e, filings);
   const kept = new Map<string, Omit<RunSummary, 'startedAt'>>();

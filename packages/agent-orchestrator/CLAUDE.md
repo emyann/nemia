@@ -162,8 +162,8 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
   where it changes no task (`views/views.verb.ts`); an admitted task starts on the runtime's next pass.
 - **A finished run is answered from memory while what it was judged on stands** (`restMemo`, `atRest`, `restStamps`): a new input of its
   pass goes into the stamps. A run whose stamp holds is not read off disk (`keptOf`), so an input the stamp misses is missed for good;
-  `WF_VERIFY_REST` dies on it. Every test file that ticks a store sets `WF_VERIFY_REST=1`.
-  pass goes into the stamps. Every test file that ticks a store sets `WF_VERIFY_REST=1`.
+  `WF_VERIFY_REST` dies on it. Every test file that ticks a store sets `WF_VERIFY_REST=1`. The list's own memo (`restingRead`) hands
+  `listRuns` the run it kept the same way (`given`), so a new input of a list's answer goes into `restStamps` too.
 - **The daemon frees a finished run's worktrees on a sweep beside its passes** (`freeOnce`, `src/prune/free.verb.ts`): a test that
   starts a daemon and reads a finished run's worktree afterwards sets `WF_KEEP_WORKTREES=1`.
 - **The daemon measures the store's disk on a sweep beside its passes** (`diskOnce`, `src/disk/disk.verb.ts`), after its first pass and

@@ -3,10 +3,11 @@
  * wall time as a fact to the minute; and what a run's rail of steps says aloud. Each sentence is built from the row's steps and their
  * names alone: what the api advises a person to type is never repeated here. Pure.
  */
+import { format, isSameDay, isSameYear } from 'date-fns';
 import type { RunOutcome, RunSummary } from './api/runs.ts';
 import type { Hue } from './meaning.ts';
 import { stepState, type StepState } from './status.ts';
-import { timeOfDay, unreadable, UNREADABLE } from './timeOfDay.ts';
+import { timeOfDay, unreadable, UNREADABLE, zoneOf } from './timeOfDay.ts';
 
 /** Every kind of wait on a person the page has a sentence for. */
 export const WAIT_KINDS = ['approve', 'blocked', 'check', 'unfinished', 'unsigned', 'denied', 'rounds', 'budget', 'hold', 'after'] as const;
@@ -291,9 +292,8 @@ export const barSaid = (name: string, state: StepState): string => `${name}, ${r
  */
 export function dateParts(at: Date, timeZone?: string): { year: string; month: string; day: string } {
   if (unreadable(at)) return { year: '', month: '', day: '' };
-  const parts = new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone }).formatToParts(at);
-  const of = (type: Intl.DateTimeFormatPartTypes): string => parts.find((part) => part.type === type)?.value ?? '';
-  return { year: of('year'), month: of('month'), day: of('day') };
+  const zone = zoneOf(timeZone);
+  return { year: format(at, 'y', zone), month: format(at, 'MMM', zone), day: format(at, 'd', zone) };
 }
 
 /**
@@ -303,10 +303,11 @@ export function dateParts(at: Date, timeZone?: string): { year: string; month: s
  */
 export function whenWords(at: Date, now: Date, timeZone?: string): string {
   if (unreadable(at, now)) return UNREADABLE;
-  const [then, today] = [dateParts(at, timeZone), dateParts(now, timeZone)];
+  const zone = zoneOf(timeZone);
+  const then = dateParts(at, timeZone);
   const time = timeOfDay(at, timeZone);
-  if (then.year !== today.year) return `${then.day} ${then.month} ${then.year}`;
-  return then.day === today.day && then.month === today.month ? time : `${then.day} ${then.month} ${time}`;
+  if (!isSameYear(at, now, zone)) return `${then.day} ${then.month} ${then.year}`;
+  return isSameDay(at, now, zone) ? time : `${then.day} ${then.month} ${time}`;
 }
 
 /**
@@ -319,6 +320,6 @@ export function whenColumn(at: Date, now: Date, timeZone?: string): string {
   if (unreadable(at, now)) return UNREADABLE;
   const then = dateParts(at, timeZone);
   const date = `${then.day.padStart(2)} ${then.month}`;
-  if (then.year !== dateParts(now, timeZone).year) return `${date} ${then.year}`;
+  if (!isSameYear(at, now, zoneOf(timeZone))) return `${date} ${then.year}`;
   return `${date} ${timeOfDay(at, timeZone).padStart(8)}`;
 }

@@ -1,13 +1,24 @@
 /**
- * The one place the board writes an hour: a time of day in words, on a 12-hour clock. Every word that says a time takes it from here
- * and decides its own day beside it; `test/time-of-day.test.ts` refuses a second writer. Pure, and it imports nothing.
+ * The one place the board writes an hour: a time of day in words, on a 12-hour clock, as date-fns writes `h:mm a` in its default
+ * English locale. Every word that says a time takes it from here and decides its own day beside it; `test/time-of-day.test.ts`
+ * refuses a second writer, and a date formatted anywhere in `src` but through date-fns. Pure: the instant and the time zone are
+ * handed in.
  */
+import { tz } from '@date-fns/tz';
+import { format, isValid } from 'date-fns';
 
 /** What every writer of a time or a date says of a date that does not parse, where the time would stand: none of them throws. */
 export const UNREADABLE = 'an unreadable time';
 
 /** Whether one of `dates` does not parse: a writer handed one says `UNREADABLE`, of the instant or of the clock it is said against. */
-export const unreadable = (...dates: Date[]): boolean => dates.some((date) => Number.isNaN(date.getTime()));
+export const unreadable = (...dates: Date[]): boolean => dates.some((date) => !isValid(date));
+
+/**
+ * The one place a time zone becomes what date-fns reads it as: `timeZone`'s context, and nothing where there is none, so that the
+ * browser's own zone is what date-fns falls back to and `tz` is never called without a zone. Every writer of a time or a date in
+ * `timeZone` takes its context from here.
+ */
+export const zoneOf = (timeZone?: string): { in?: ReturnType<typeof tz> } => (timeZone === undefined ? {} : { in: tz(timeZone) });
 
 /**
  * A time of day as a person reads it in `timeZone`, theirs by default, to the minute: `1:11 PM`, `12:00 PM` at noon, `12:05 AM` after
@@ -15,9 +26,7 @@ export const unreadable = (...dates: Date[]): boolean => dates.some((date) => Nu
  */
 export function timeOfDay(at: Date, timeZone?: string): string {
   if (unreadable(at)) return UNREADABLE;
-  const parts = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone }).formatToParts(at);
-  const of = (type: Intl.DateTimeFormatPartTypes): string => parts.find((part) => part.type === type)?.value ?? '';
-  return `${of('hour')}:${of('minute')} ${of('dayPeriod')}`;
+  return format(at, 'h:mm a', zoneOf(timeZone));
 }
 
 /**
@@ -27,13 +36,5 @@ export function timeOfDay(at: Date, timeZone?: string): string {
  */
 export function timeToTheSecond(at: Date, timeZone?: string): string {
   if (unreadable(at)) return UNREADABLE;
-  const parts = new Intl.DateTimeFormat('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: true,
-    timeZone,
-  }).formatToParts(at);
-  const of = (type: Intl.DateTimeFormatPartTypes): string => parts.find((part) => part.type === type)?.value ?? '';
-  return `${of('hour')}:${of('minute')}:${of('second')} ${of('dayPeriod')}`;
+  return format(at, 'h:mm:ss a', zoneOf(timeZone));
 }

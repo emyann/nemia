@@ -2,15 +2,16 @@
  * The frame's floating bar: a panel at the right of every page, under the top bar to the window's foot, over the page, so the page keeps
  * its whole width and the top bar stays in view. It is as wide as this browser keeps it (`useBarWidth`), resized by dragging its left edge
  * or with the arrow keys on it, and the whole width of a narrow screen. Its Close button and Escape close it (`useBar`), and closing it
- * gives the focus back to what held it before. Beside Close, its Open button visits the page of what it shows, for everything that has one
- * (`barOpens`), read in the place the page under it is read in, the address's `factory` and `repo`.
+ * gives the focus back to what held it before, unless the focus had already left it for the page (`focusGoesBack`). Beside Close, its
+ * Open button visits the page of what it shows, for everything that has one (`barOpens`), read in the place the page under it is read
+ * in, the address's `factory` and `repo`.
  */
 import { useEffect, useId, useLayoutEffect, useRef, type KeyboardEvent, type PointerEvent, type ReactNode, type RefObject } from 'react';
 import { useSearch } from '@tanstack/react-router';
 import { XIcon } from 'lucide-react';
 import { Button, LinkButton } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { BAR_MIN, BAR_STEP, barOpens, barValue, escapeDoes } from '@/lib/bar';
+import { BAR_MIN, BAR_STEP, barOpens, barValue, escapeDoes, focusGoesBack, type FocusPlace } from '@/lib/bar';
 import { pagePlaceOf } from '@/lib/factories';
 import { useBar, useBarWidth } from '@/lib/useBar';
 import { routeLink } from './routeLink';
@@ -51,25 +52,36 @@ function useEscape(bar: RefObject<HTMLElement | null>, close: () => void) {
   }, [bar, close]);
 }
 
+/** Where the focus stands beside the bar `self`, as `focusGoesBack` reads it. */
+const placeOf = (now: Element | null, self: HTMLElement | null): FocusPlace =>
+  self?.contains(now) ? 'in' : now === null || now === document.body ? 'nothing' : 'out';
+
 /**
  * Gives `bar` the focus as it opens, and as it closes gives it back to what held it last before it came into the bar — what opened the
- * bar, or what the focus left for the bar since, as a step switched to from its node — while that is still on the page and the focus is
- * still in the bar or on nothing: not when a link to another page or a press on the page took it.
+ * bar, or what the focus left for the bar since, as a step switched to from its node — while that is still on the page and the bar
+ * still holds the focus (`focusGoesBack`). The focus leaving the bar is read as it happens, not where it has landed by the close: a
+ * press on the page leaves the focus on nothing, which is where the close must leave it, whenever the close itself lands.
  */
 function useFocusReturn(bar: RefObject<HTMLElement | null>) {
   useLayoutEffect(() => {
     let opener = document.activeElement;
+    let left = false;
     const self = bar.current;
     const enter = (event: FocusEvent) => {
+      left = false;
       if (event.relatedTarget instanceof HTMLElement && !self?.contains(event.relatedTarget)) opener = event.relatedTarget;
     };
+    const away = (event: FocusEvent) => {
+      if (!(event.relatedTarget instanceof Node) || !self?.contains(event.relatedTarget)) left = true;
+    };
     self?.addEventListener('focusin', enter);
+    self?.addEventListener('focusout', away);
     self?.focus();
     return () => {
       self?.removeEventListener('focusin', enter);
-      const now = document.activeElement;
-      const held = now === null || now === document.body || (self?.contains(now) ?? false);
-      if (held && opener instanceof HTMLElement && opener.isConnected) opener.focus();
+      self?.removeEventListener('focusout', away);
+      if (focusGoesBack({ left, now: placeOf(document.activeElement, self) }) && opener instanceof HTMLElement && opener.isConnected)
+        opener.focus();
     };
   }, [bar]);
 }

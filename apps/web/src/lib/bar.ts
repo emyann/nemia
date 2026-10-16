@@ -232,6 +232,17 @@ export function escapeDoes(key: EscapeKey): 'ignore' | 'leave' | 'close' {
   return key.fieldText ? 'leave' : 'close';
 }
 
+/** Where the focus stands as the bar closes: `in` it, `out` of it on another element, or on `nothing` — null or the page's body. */
+export type FocusPlace = 'in' | 'out' | 'nothing';
+
+/**
+ * Whether the bar gives the focus back to what opened it as it closes (`FloatingBar`): only while it still holds the focus — `now` is
+ * `in` it, or on `nothing`, what held the focus inside it having gone with it — and never once the focus has `left` the bar for the
+ * page. A press on the page, on a canvas's empty drawing, takes the focus off on purpose and leaves it on nothing: a close that then
+ * gave it back would put the keyboard on a node nobody pressed, and the next Enter would open that node's bar.
+ */
+export const focusGoesBack = ({ left, now }: { left: boolean; now: FocusPlace }): boolean => !left && now !== 'out';
+
 /**
  * How many pixels of a frame whose right edge is at `frameRight` the bar covers, its left edge at `barLeft` (null with no bar drawn): none
  * on a `narrow` screen, where the bar is the whole width and a frame narrowed by it would have no room left, and never fewer than none.

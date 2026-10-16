@@ -27,7 +27,7 @@ const DOCK_FACE = 60;
  */
 export function NemiaDock() {
   const [mode, setMode] = useState<ChatMode | null>(null);
-  const chat = useNemiaChat();
+  const chat = useNemiaChat(mode !== null);
   const nemia = useQuery(levelQuery).data;
   const open = useQuery(openRunsQuery()).data;
   const now = new Date(useNow(30_000));

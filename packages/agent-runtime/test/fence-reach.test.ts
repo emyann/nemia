@@ -92,3 +92,27 @@ test('the first character of a path a permission rule cannot carry is answered o
 test('a harness whose fence takes no rule naming a path answers nothing, whatever the path holds', () => {
   for (const harness of ['codex', 'command', 'a2a:x', 'nobody']) assert.equal(unruledIn(harness, '/srv/wf*(x)'), undefined, harness);
 });
+
+test('the modes that refuse what no allow rule reaches are the modes of one rank, and no wider one, on either of its harnesses', () => {
+  for (const harness of CLAUDES) {
+    const { rank, refusing } = fenceReach(harness)!;
+    assert.deepEqual([...refusing].sort(), ['default', 'dontAsk', 'manual'], harness);
+    const ranks = new Set(refusing.map((mode) => rank[mode]));
+    assert.equal(ranks.size, 1, `${harness}: the refusing modes are of one rank`);
+    for (const mode of CLAUDE_PERMISSION_MODES.filter((m) => !refusing.includes(m))) {
+      assert.notEqual(rank[mode], [...ranks][0], `${harness}: ${mode} is not of the refusing rank`);
+    }
+  }
+});
+
+test('the tools a session calls with no allow rule are the three that read and a skill load, and never Bash', () => {
+  for (const harness of CLAUDES) {
+    assert.deepEqual([...fenceReach(harness)!.unfenced].sort(), ['Glob', 'Grep', 'Read', 'Skill'], harness);
+    assert.ok(!fenceReach(harness)!.unfenced.includes('Bash'), `${harness}: Bash takes a rule`);
+  }
+});
+
+test("codex's sandbox takes no allow rule, so it refuses in no word and leaves no tool unruled", () => {
+  assert.deepEqual(fenceReach('codex')!.refusing, []);
+  assert.deepEqual(fenceReach('codex')!.unfenced, []);
+});

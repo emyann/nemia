@@ -39,6 +39,21 @@ export const CLAUDE_MODE_RANK: Readonly<Record<string, number>> = {
   bypassPermissions: 4,
 };
 
+/**
+ * The permission modes a job runs what its allow rules reach in and refuses every other call in, rather than stopping to ask: `default`,
+ * `manual` and `dontAsk`, the modes of one rank in `CLAUDE_MODE_RANK`, since a job denies whatever a mode would ask. Under one of them a
+ * tool a session is given and no rule names can never be called. `plan` refuses by its own kind, and the wider modes let a classifier or
+ * the mode itself allow what no rule names, so neither is here.
+ */
+export const CLAUDE_REFUSING_MODES: readonly string[] = ['default', 'dontAsk', 'manual'];
+
+/**
+ * The tools a session calls inside its own directory with no allow rule naming them, in every permission mode: the three that only read,
+ * and the load of a skill. Every other tool is refused under a mode of `CLAUDE_REFUSING_MODES` until a rule allows it — `Bash` among
+ * them, whose built-in read-only commands run with no rule without making the tool itself unruled.
+ */
+export const CLAUDE_UNFENCED: readonly string[] = ['Read', 'Grep', 'Glob', 'Skill'];
+
 /** The permission mode a Claude Code session runs in when its task names none: `--permission-mode` is always given. */
 export const CLAUDE_DEFAULT_MODE = 'auto';
 

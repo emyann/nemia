@@ -9,7 +9,9 @@ import {
   CLAUDE_DEFAULT_MODE,
   CLAUDE_HELD_MODE,
   CLAUDE_MODE_RANK,
+  CLAUDE_REFUSING_MODES,
   CLAUDE_UNASKING_MODES,
+  CLAUDE_UNFENCED,
   CLAUDE_UNRULED,
 } from './claude/vocabulary.ts';
 import { CODEX_DEFAULT_SANDBOX, CODEX_SANDBOXES } from './codex/vocabulary.ts';
@@ -19,7 +21,9 @@ import { CODEX_DEFAULT_SANDBOX, CODEX_SANDBOXES } from './codex/vocabulary.ts';
  * is, wider higher and equal as wide; `given` the word a task naming none runs in; `writes` the lowest rank that writes in the session's
  * directory unasked; `held` the word a session held to its directory runs in, where the harness has one; `unasking` the words a
  * background session runs in without stopping to ask a person, `held` first; `dropped` the words the harness runs as another on the
- * model asked about.
+ * model asked about; `refusing` the words a session refuses in what no allow rule reaches, rather than asking about it, so that a tool
+ * the session is given and no rule names can never be called; `unfenced` the tools it calls inside its own directory with no rule
+ * naming them, whatever the word. The last two are empty for a harness whose fence takes no allow rule.
  */
 export type FenceReach = {
   by: 'mode' | 'sandbox';
@@ -29,6 +33,8 @@ export type FenceReach = {
   held?: string;
   unasking: readonly string[];
   dropped: readonly string[];
+  refusing: readonly string[];
+  unfenced: readonly string[];
 };
 
 /** Whether Claude Code drops `auto` on `model`: one of `CLAUDE_AUTO_DROPPED`, as named or with a `-` suffix. */
@@ -44,9 +50,14 @@ const claudeReach = (model: string | undefined): FenceReach => ({
   held: CLAUDE_HELD_MODE,
   unasking: CLAUDE_UNASKING_MODES,
   dropped: dropsAuto(model) ? ['auto'] : [],
+  refusing: CLAUDE_REFUSING_MODES,
+  unfenced: CLAUDE_UNFENCED,
 });
 
-/** Codex's fence: its sandboxes, narrowest first, none of which it drops or stops to ask in. */
+/**
+ * Codex's fence: its sandboxes, narrowest first, none of which it drops or stops to ask in. Its sandbox takes no allow rule, so no
+ * sandbox refuses what a rule would have reached and no tool is unruled.
+ */
 const codexReach = (): FenceReach => ({
   by: 'sandbox',
   rank: Object.fromEntries(CODEX_SANDBOXES.map((sandbox, i) => [sandbox, i])),
@@ -54,6 +65,8 @@ const codexReach = (): FenceReach => ({
   writes: CODEX_SANDBOXES.indexOf('workspace-write'),
   unasking: [],
   dropped: [],
+  refusing: [],
+  unfenced: [],
 });
 
 /**

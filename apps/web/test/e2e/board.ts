@@ -439,21 +439,40 @@ export async function openDebug(page: Page, taskId: string): Promise<{ panel: Lo
 }
 
 /**
+ * How old the clock the board drew an instant with can be when the assertion reads its words: `Instant` reads its clock every
+ * 60 s (`useNow`, src/components/Instant.tsx), and a render and this read follow it. A midnight or a new year inside that window
+ * gives the page's words and the assertion's two forms, and both are the board's.
+ */
+export const DREW_WITHIN_MS = 90_000;
+
+/**
+ * The clocks the page may have drawn an instant with, read now: the one this read sees, and the oldest `DREW_WITHIN_MS` allows.
+ * Oldest first, so a refusal names the page's own form first.
+ */
+const drewWith = (): readonly Date[] => {
+  const now = new Date();
+  return [new Date(now.getTime() - DREW_WITHIN_MS), now];
+};
+
+/**
  * Refuses a `<time>` that does not say its instant as the board writes one where the browser is: `words` of its `datetime` as its
- * text (`instantWords` by default, against now), and on hover `about`, a colon, then the instant whole (`instantWhole`). `what` names
- * the time in the refusal.
+ * text (`instantWords` by default), and on hover `about`, a colon, then the instant whole (`instantWhole`). `what` names the time in
+ * the refusal. The text is taken for every clock the page may have drawn with (`DREW_WITHIN_MS`), so a day or a year that turns
+ * between the drawing and this read refuses nothing; a text that is no clock's is refused all the same.
  */
 export async function expectInstant(
   time: Locator,
   about: string,
   what: string,
-  words: (at: Date, timeZone: string) => string = (at, timeZone) => instantWords(at, new Date(), timeZone),
+  words: (at: Date, timeZone: string, now: Date) => string = (at, timeZone, now) => instantWords(at, now, timeZone),
 ): Promise<void> {
   const timeZone = await time.page().evaluate(() => new Intl.DateTimeFormat().resolvedOptions().timeZone);
   const [at, text, title] = [await time.getAttribute('datetime'), await time.textContent(), await time.getAttribute('title')];
   if (!at) throw new Refused(`${what} is a time with its instant — it has no datetime`);
-  const [said, whole] = [words(new Date(at), timeZone), `${about}${instantWhole(new Date(at), timeZone)}`];
-  if (text !== said) throw new Refused(`${what} reads as the board writes it, ${said} — it reads ${JSON.stringify(text)}`);
+  const said = [...new Set(drewWith().map((now) => words(new Date(at), timeZone, now)))];
+  const whole = `${about}${instantWhole(new Date(at), timeZone)}`;
+  if (!said.includes(text ?? ''))
+    throw new Refused(`${what} reads as the board writes it, ${said.join(' or ')} — it reads ${JSON.stringify(text)}`);
   if (title !== whole) throw new Refused(`${what} says the whole instant on hover, ${whole} — its title is ${JSON.stringify(title)}`);
 }
 

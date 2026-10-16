@@ -98,6 +98,7 @@ export const liveHost = (): ServiceHost => ({
   say: (line) => console.error(line),
   pollMs: 2_000,
   waitMs: 60_000,
+  stopMs: 90_000,
 });
 
 /** A service's whereabouts: its name, its system, its file, and the system's own name for it. */

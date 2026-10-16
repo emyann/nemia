@@ -174,15 +174,15 @@ export default {
       throw new Refused(`the pass's title opens on its totals, ${JSON.stringify(PASS.totals)} — it says ${JSON.stringify(passLines[0])}`);
     }
     const phasesSaid = passLines
-      .slice(1, 9)
+      .slice(1, 10)
       .map((l) => l.split(':')[0])
       .join(' ');
     if (
-      phasesSaid !== 'records asks journals observe runtime place assess act' ||
-      passLines[4] !== 'observe: 120 ms, 1 call, 0 B read, 1 process started'
+      phasesSaid !== 'records asks journals revisions observe runtime place assess act' ||
+      passLines[5] !== 'observe: 120 ms, 1 call, 0 B read, 1 process started'
     ) {
       throw new Refused(
-        `the pass's title says each phase in the package's order, observe's 120 ms among them — it says ${JSON.stringify(passLines.slice(1, 9))}`,
+        `the pass's title says each phase in the package's order, observe's 120 ms among them — it says ${JSON.stringify(passLines.slice(1, 10))}`,
       );
     }
     if (

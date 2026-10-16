@@ -16,8 +16,10 @@ import readline from 'node:readline';
 /**
  * What the stand-in does after each user message, in order: `deny`, print a `permission_denied` line for that tool; `ask`, send
  * a `can_use_tool` request for that tool; `call`, run that tool, its `PreToolUse` hooks asked first, held until the file `release`
- * appears in its folder; `hold`, wait until the file `end` appears, or until an `interrupt` request comes; then its result, `output` as
- * its `structured_output` and `cost` as its `total_cost_usd` (0.01 when absent).
+ * appears in its folder; `nested`, once the file `nest` appears, ask the `PreToolUse` hooks of a second call of that tool, while
+ * `call`'s is still in flight and before its release, carrying `agent_id` as a sub-agent's call does where `fromSubAgent`; `hold`,
+ * wait until the file `end` appears, or until an `interrupt` request comes; then its result, `output` as its `structured_output` and
+ * `cost` as its `total_cost_usd` (0.01 when absent).
  *
  * `turns` says what it does after its first result: `one`, close its stdin as a job does, and `many`, keep it open and work each
  * further user message as another turn, as a session on streaming input does. `fold` works a message that came while a turn ran into
@@ -28,6 +30,8 @@ type Plan = {
   deny?: string;
   ask?: string;
   call?: string;
+  nested?: string;
+  fromSubAgent?: boolean;
   hold?: boolean;
   fold?: boolean;
   output?: unknown;
@@ -71,14 +75,19 @@ const appears = async (file: string) => {
   }
 };
 
-/** Asks each hook of `event` for the call `id` of `tool`, in turn. */
-const hooked = async (event: string, tool: string, id: string) => {
+/** Asks each hook of `event` for the call `id` of `tool`, in turn, `more` added to the input each is given. */
+const hooked = async (event: string, tool: string, id: string, more: object = {}) => {
   for (const matcher of hooks[event] ?? [])
     for (const callback of matcher.hookCallbackIds) {
       note('asked.jsonl', event);
       note('answers.jsonl', {
         event,
-        answer: await ask({ subtype: 'hook_callback', callback_id: callback, tool_use_id: id, input: { hook_event_name: event, tool_name: tool } }),
+        answer: await ask({
+          subtype: 'hook_callback',
+          callback_id: callback,
+          tool_use_id: id,
+          input: { hook_event_name: event, tool_name: tool, ...more },
+        }),
       });
     }
 };
@@ -95,6 +104,12 @@ const work = async () => {
   if (plan.call && !interrupted) {
     print({ type: 'assistant', session_id: sessionId, message: { role: 'assistant', content: [{ type: 'tool_use', id: 'call-1', name: plan.call, input: {} }] } });
     await hooked('PreToolUse', plan.call, 'call-1');
+  }
+  if (plan.nested) {
+    await appears('nest');
+    await hooked('PreToolUse', plan.nested, 'call-2', plan.fromSubAgent ? { agent_id: 'stand-in-sub-agent' } : {});
+  }
+  if (plan.call) {
     await appears('release');
     await hooked('PostToolUse', plan.call, 'call-1');
     print({ type: 'user', session_id: sessionId, message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'call-1', content: 'ok' }] } });

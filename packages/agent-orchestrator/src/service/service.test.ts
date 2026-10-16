@@ -4,6 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { LET_GO_MS } from 'agent-runtime';
 import type { DaemonStanding } from '../daemon/daemon.ts';
 import {
   envRefusal,
@@ -67,13 +68,28 @@ test('the unit is written whole: the daemon under the installer’s node, its st
       'SuccessExitStatus=129 130 143',
       'KillMode=process',
       'KillSignal=SIGTERM',
-      'TimeoutStopSec=60',
+      'TimeoutStopSec=90',
       '',
       '[Install]',
       'WantedBy=default.target',
       '',
     ].join('\n'),
   );
+});
+
+test('the unit and the plist each wait longer for a stop than the runtime takes to let its attached sessions go', () => {
+  const waits: [string, number][] = [
+    ['TimeoutStopSec', Number(/^TimeoutStopSec=(\d+)$/m.exec(unitText(SPEC))![1])],
+    ['ExitTimeOut', Number(/<key>ExitTimeOut<\/key><integer>(\d+)<\/integer>/.exec(plistText(SPEC))![1])],
+  ];
+  for (const [key, seconds] of waits) {
+    assert.ok(
+      seconds * 1_000 > LET_GO_MS,
+      `${key} is ${seconds} s and the runtime's let-go takes up to ${LET_GO_MS} ms: the daemon would be killed before it parks its ` +
+        `sessions, so raise ${key} or lower LET_GO_MS`,
+    );
+    assert.ok(seconds * 1_000 - LET_GO_MS >= 15_000, `and ${key} leaves room over it for the park, the aborts and the lease`);
+  }
 });
 
 test('REFUSED to kill the runs in flight: a stop or a restart signals the daemon’s main process alone (KillMode=process)', () => {
@@ -104,7 +120,7 @@ test('the plist is written whole: started at load, again on an unsuccessful exit
       '  <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>',
       '  <key>ThrottleInterval</key><integer>30</integer>',
       '  <key>AbandonProcessGroup</key><true/>',
-      '  <key>ExitTimeOut</key><integer>60</integer>',
+      '  <key>ExitTimeOut</key><integer>90</integer>',
       '  <key>StandardOutPath</key><string>/srv/ann/Library/Logs/nemia.log</string>',
       '  <key>StandardErrorPath</key><string>/srv/ann/Library/Logs/nemia.log</string>',
       '</dict>',

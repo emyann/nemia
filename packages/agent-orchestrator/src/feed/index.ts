@@ -19,6 +19,7 @@ export {
   lineAsRead,
   publishedOf,
   REMOVED,
+  SIGNAL_WORDS,
   startedLine,
   upgraded,
 } from './feed.ts';
@@ -35,10 +36,11 @@ export type {
   FeedWords,
   Involved,
   InvolvedKind,
+  Once,
   Reason,
   RunLine,
   SignalSource,
   SignalType,
 } from './feed.ts';
-export { DENIED, kindsOf, messageOf, reasonOf, REASONS, REASON_CODES, typeOf, waitsOf } from './reason.ts';
+export { DENIED, isOnce, kindsOf, messageOf, reasonOf, REASONS, REASON_CODES, sourceOf, typeOf, waitsOf } from './reason.ts';
 export type { Said } from './reason.ts';

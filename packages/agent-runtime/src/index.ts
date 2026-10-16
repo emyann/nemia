@@ -109,6 +109,11 @@ export type { Credentials, MissingCredential, RemoteAgent } from './a2a/index.ts
 export { remoteConfigRefusal } from './a2a/index.ts';
 export { codex } from './harness/codex/codex.ts';
 export { claudeDetached } from './harness/claude/index.ts';
+/**
+ * How long a holder's whole let-go takes at most, in milliseconds: for a caller that waits for such a process to stop — a service
+ * unit's stop timeout, a restart's wait for the lease — which is set above it rather than repeating the number.
+ */
+export { LET_GO_MS } from './harness/claude/index.ts';
 export { commandHarness } from './harness/command/command.ts';
 export { composite } from './harness/index.ts';
 export { admissionHook, sdkRunner } from './harness/index.ts';

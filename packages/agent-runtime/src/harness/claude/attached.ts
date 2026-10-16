@@ -5,18 +5,23 @@
  * - **Who holds them.** One process at a time, the one whose engine took `hold` in a scope: it spawns, adopts and resumes. Any other
  *   engine reads the run files and writes a stop, or words to say, beside one; a Claude Code task it starts runs as a job
  *   (`claudeCodeOps`).
- * - **Let go.** As the holder's scope closes, new calls are held at their hook, it waits with no bound for each call in flight to end,
- *   then writes each session `parked` and aborts it; a call held at its hook then is never written in flight.
+ * - **Let go.** As the holder's scope closes, the new calls of each session with none in flight are held at their hook, it waits at
+ *   most `LET_GO_MS` for each call in flight to end, then writes each session `parked` and aborts it; a call held at its hook then is
+ *   never written in flight. A call that belongs to a call in flight is answered throughout, or the call it belongs to could never
+ *   end and the let-go would wait on what it forbids. Past the bound the call in flight is cut, kept on the run file as `calling` and
+ *   said on the log, so the next holder resumes the session told which call did not finish.
  * - **Taken up.** On each look, a holder adopts a session parked, or one whose holder's process is gone: it kills what is left of its
  *   Claude Code's process group, unless that pid is another process's now (`childOf`), and resumes it under the same session id, told
  *   it was paused (`CARRY_ON`), or, when its holder ended mid-call, which call did not finish (`crashNote`).
- * - **The drain.** A file naming the holder's pid and when it started (`putDrain`): while it names this process, its new calls wait at
- *   their hook, so a restart can wait for the calls in flight before it signals.
+ * - **The drain.** A file naming the holder's pid and when it started (`putDrain`): while it names this process, the new calls of each
+ *   session with none in flight wait at their hook, so a restart can wait for the calls in flight before it signals.
  * - **What it keeps.** Its run file, and a capture of the messages a reader reads (denials as they come, the result's statement and
  *   usage); the conversation is Claude Code's own transcript.
  */
-import { Effect, type Scope } from 'effect';
+import { Effect, Option, Schedule, type Scope } from 'effect';
 import fs from 'node:fs';
+import { instantNow } from '../../core/engine/now.ts';
+import { purseOf, type Purse } from '../../core/clock.ts';
 import type { Sighting } from '../../core/index.ts';
 import { RunnerError } from '../error.ts';
 import type { Observation, RunnerOps, SpawnRequest } from '../seam.ts';
@@ -40,7 +45,7 @@ import {
   writeRun,
   type AttachedRun,
 } from './attached-file.ts';
-import { gone, hear, interruptTurn, killGroup, startSession, type Live } from './attached-session.ts';
+import { gone, hear, interruptTurn, killGroup, startSession, type Held, type Live } from './attached-session.ts';
 
 /** The attached sessions of one engine: the runner's verbs, and `hold`, which makes this process their holder for a scope. */
 export type Attached = {
@@ -50,8 +55,33 @@ export type Attached = {
   readonly has: (name: string) => boolean;
 };
 
-/** Waits `ms`, as a promise. */
-const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/**
+ * How long a holder's whole let-go takes at most, in milliseconds: the budget its three waits share, not the bound of each, so the
+ * process always ends within it. Whatever waits for a holder to stop — the systemd unit's `TimeoutStopSec`, the restart's wait for
+ * the lease — is set above it, and a test reads this number rather than repeat it.
+ */
+export const LET_GO_MS = 60_000;
+
+/** How often a let-go reads whether what it waits for is over, in milliseconds. */
+const LET_GO_EVERY_MS = 50;
+
+/**
+ * What share of a let-go's budget the wait for the calls in flight may take at most, the rest kept for the waits after the park:
+ * each session ending, and each call held at a hook being let go. A call that ends sooner leaves the whole remainder to them
+ * (`leftOf`), so the share is a ceiling on the one wait that can run long, never a floor on the short ones.
+ */
+const LET_GO_CALLS_SHARE = 0.8;
+
+/**
+ * Waits until `over` answers true, read at once and every `LET_GO_EVERY_MS` after, at most `ms`.
+ *
+ * @returns whether it was over within `ms`
+ */
+const waitedOut = (over: () => boolean, ms: number): Effect.Effect<boolean> =>
+  Effect.repeat(Effect.sync(over), { schedule: Schedule.spaced(LET_GO_EVERY_MS), until: (done) => done }).pipe(
+    Effect.timeoutOption(ms),
+    Effect.map(Option.isSome),
+  );
 
 /** What the capture of the session under `name` says, as `claude -p`'s stream is read. */
 const saidBy = (root: string, name: string) => {
@@ -112,17 +142,82 @@ const sightingOf = (root: string, run: AttachedRun): Sighting => {
 /** Whether a holder takes `run` up: parked, or at work under a process that is gone, its pid taken by another since included. */
 const orphaned = (run: AttachedRun): boolean => run.state === 'parked' || (isOpen(run.state) && holderGone(run));
 
-/** What a resumed session is told first: why it was stopped, by its run file. */
-const noteOf = (run: AttachedRun): string => (run.state !== 'parked' && run.calling ? crashNote(run.calling.tool) : CARRY_ON);
+/**
+ * What a resumed session is told first, by its run file: which call did not finish, where one was in flight when its holder ended or
+ * cut it at its bound (`crashNote`), else that it was paused between two calls (`CARRY_ON`).
+ */
+const noteOf = (run: AttachedRun): string => (run.calling ? crashNote(run.calling.tool) : CARRY_ON);
+
+/** The sessions of `live` at work with a call in flight. */
+const inCallOf = (live: Map<string, Live>): Live[] => [...live.values()].filter((l) => l.calls?.size && l.run.state === 'working');
+
+/** The tool of the call `l` is in, as a line names it. */
+const toolOf = (l: Live): string => l.run.calling?.tool ?? 'a tool';
+
+/**
+ * Each session of `live` at work or idle between turns written `parked`, aborted and its Claude Code's process group killed, its file its holder's last
+ * word; the call it was cut in kept as `calling` where `cut`, which is what tells the next holder which call did not finish. The park
+ * ends the session's Claude Code itself rather than leave it to the waits after it, which a spent budget can cut short: a parked
+ * session never leaves a process behind. The group it kills is the one `childOf` answers, so a pid another process has taken since
+ * is left alone. Uninterruptible as one: a second signal leaves no session neither parked nor running.
+ */
+const parked = (root: string, live: Map<string, Live>, cut: boolean): Effect.Effect<void> =>
+  Effect.sync(() => {
+    for (const l of live.values()) {
+      if (!l.abort || (l.run.state !== 'working' && l.run.state !== 'idle')) continue;
+      const kept = cut && l.calls?.size ? l.run.calling : undefined;
+      const group = childOf(l.run);
+      const { calling: _, childPid: __, childStart: ___, ...rest } = l.run;
+      l.run = { ...rest, state: 'parked', ...(kept ? { calling: kept } : {}) };
+      writeRun(root, l.run);
+      l.letGo = true;
+      l.abort.abort();
+      killGroup(group);
+    }
+  }).pipe(Effect.uninterruptible);
+
+/**
+ * The holder's let-go of the sessions in `live`: it says what it is waiting for, waits for the calls in flight to end, says which
+ * session it cut and in what call where they did not, then parks each session at work (`parked`) and waits for each to end and for
+ * each call held at its hook to be let go. Its three waits take from one `purse` of `letGoMs` (`purseOf`), the wait for the calls in
+ * flight capped at `LET_GO_CALLS_SHARE` of it and the rest spent as they go, so the whole let-go ends within the budget rather than
+ * taking their sum: it always returns, and within the bound, so a signal always ends the process and whatever waits for the process
+ * — a service unit's stop timeout, a restart's wait for the lease — can be set above one number. `purse` is the caller's so a test
+ * can read what each wait was given (`Purse.given`) and show they add up to no more than the budget.
+ */
+export const letGoOf = (
+  root: string,
+  live: Map<string, Live>,
+  letGoMs: number,
+  purse: Purse = purseOf(letGoMs, instantNow),
+): Effect.Effect<void> =>
+  Effect.gen(function* () {
+    const waited = inCallOf(live);
+    if (waited.length)
+      yield* Effect.logInfo(
+        `letting go of ${live.size} session(s): waiting at most ${letGoMs} ms for ${waited.length} call(s) in flight ` +
+          `(${waited.map((l) => `${l.run.name} ${toolOf(l)}`).join(', ')})`,
+      );
+    const quiet = yield* waitedOut(() => inCallOf(live).length === 0, purse.take(LET_GO_CALLS_SHARE));
+    for (const l of quiet ? [] : inCallOf(live))
+      yield* Effect.logWarning(
+        `${l.run.name} is cut in its call to ${toolOf(l)}: it did not end within ${letGoMs} ms, and the next holder resumes the ` +
+          'session told the call did not finish',
+      );
+    yield* parked(root, live, !quiet);
+    yield* Effect.promise(() => Promise.all([...live.values()].map((l) => l.done))).pipe(Effect.timeoutOption(purse.take()));
+    yield* waitedOut(() => ![...live.values()].some((l) => l.waiting), purse.take());
+  });
 
 /**
  * The attached sessions under `root`: `executable` the Claude Code they run, the SDK's own when absent (a test's stand-in otherwise).
  */
-export const attachedSessions = (root: string, executable?: string): Attached => {
+export const attachedSessions = (root: string, executable?: string, options: { letGoMs?: number } = {}): Attached => {
   const live = new Map<string, Live>();
+  const letGoMs = options.letGoMs ?? LET_GO_MS;
   let holding = false;
   let draining = false;
-  const held = () => draining || drainsThis(root);
+  const held: Held = (l) => (draining || drainsThis(root)) && l.calls.size === 0;
   const start = (r: SpawnRequest, run: AttachedRun, first: string, resume?: string) =>
     live.set(run.name, startSession(root, r, run, first, { held, ...(executable ? { executable } : {}), ...(resume ? { resume } : {}) }));
 
@@ -174,19 +269,9 @@ export const attachedSessions = (root: string, executable?: string): Attached =>
     return new Map([...found].map(([name, run]) => [name, sightingOf(root, looked(run))]));
   };
 
-  const letGo = Effect.promise(async () => {
+  const letGo = Effect.gen(function* () {
     draining = true;
-    while ([...live.values()].some((l) => l.calls?.size)) await pause(100);
-    for (const l of live.values()) {
-      if (!l.abort || !isOpen(l.run.state)) continue;
-      const { calling: _, childPid: __, childStart: ___, ...rest } = l.run;
-      l.run = { ...rest, state: 'parked' };
-      writeRun(root, l.run);
-      l.letGo = true;
-      l.abort.abort();
-    }
-    await Promise.all([...live.values()].map((l) => l.done));
-    while ([...live.values()].some((l) => l.waiting)) await pause(50);
+    yield* letGoOf(root, live, letGoMs);
     live.clear();
     holding = false;
     draining = false;

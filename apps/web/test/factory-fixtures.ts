@@ -193,6 +193,7 @@ export const passCost = (extra: Partial<PassCost> = {}): PassCost => ({
     records: phase(10),
     asks: phase(1),
     journals: phase(20),
+    revisions: phase(3),
     observe: phase(40),
     runtime: phase(5),
     place: phase(30),

@@ -8,6 +8,7 @@
  * repository's team from `workflows/agents/` (`words.test.ts`). Every package's test script loads the test-cost probe and reporter from
  * `tools/test-costs/`, so each package's test lists `tools/` too. The docs' tests read the packages' docs for the diagrams they draw,
  * every source for the names their pages cite, and the paths those pages cite, at the root and under `docs/` and `workflows/`.
+ * The api's test of what `npm run dev` watches reads every workspace package's `package.json` and sources (`dev-watch.test.ts`).
  * `INPUTS` names, for each such task, the globs it must list beside its own files; `missingInputs` refuses a task or a glob left out.
  */
 import { test } from 'node:test';
@@ -41,7 +42,12 @@ const INPUTS: Record<string, readonly string[]> = {
     '$TURBO_ROOT$/apps/*/*.ts',
     ...['src', 'bin', 'test', 'place'].map((dir) => `$TURBO_ROOT$/packages/agent-orchestrator/${dir}/**`),
   ],
-  'api#test': ['$TURBO_DEFAULT$', '$TURBO_ROOT$/tools/**'],
+  'api#test': [
+    '$TURBO_DEFAULT$',
+    '$TURBO_ROOT$/tools/**',
+    ...['src', 'place'].map((dir) => `$TURBO_ROOT$/packages/*/${dir}/**`),
+    '$TURBO_ROOT$/packages/*/package.json',
+  ],
   'web#test': ['$TURBO_DEFAULT$', '$TURBO_ROOT$/tools/**'],
   'docs#test': [
     '$TURBO_DEFAULT$',
@@ -100,6 +106,9 @@ test("REFUSED: a task that drops the apps' tests or root files, the team, the te
     assert.deepEqual(missingInputs(dropping(task, '$TURBO_ROOT$/tools/**')), [
       `${task} does not list $TURBO_ROOT$/tools/** among its inputs in turbo.json: add it, or turbo replays it from its cache`,
     ]);
+  assert.deepEqual(missingInputs(dropping('api#test', '$TURBO_ROOT$/packages/*/src/**')), [
+    'api#test does not list $TURBO_ROOT$/packages/*/src/** among its inputs in turbo.json: add it, or turbo replays it from its cache',
+  ]);
   assert.deepEqual(missingInputs(dropping('docs#test', '$TURBO_ROOT$/packages/**')), [
     'docs#test does not list $TURBO_ROOT$/packages/** among its inputs in turbo.json: add it, or turbo replays it from its cache',
   ]);

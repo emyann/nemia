@@ -33,7 +33,9 @@ const { engineOf } = await import('../src/runtime-client.ts');
 const { readRun, stepsOf } = await import('../src/record/record.store.ts');
 const { agentFilesDir } = await import('../src/agents/agents.store.ts');
 const { ledgerOf, topsOf } = await import('../src/revisions/revisions.store.ts');
+const { passRevisions, pinPass, resolvedNow } = await import('../src/revisions/pin.verb.ts');
 const { refreshRun } = await import('../src/revisions/pin.verb.ts');
+const { metered } = await import('../src/meter/tally.store.ts');
 const { writeRules } = await import('../src/rules/rules.store.ts');
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
@@ -517,6 +519,141 @@ test('a round files its target on the closeout schema the folder declares now: c
     undefined,
     'and asks a fresh session, since the schema it is now given is not the one its last try answered in',
   );
+});
+
+/** What the `revisions` phase counted while `f` ran as one metered pass: the reads of the world a resolve made. */
+const resolveCalls = async (f: () => void): Promise<number> => {
+  const { tallies } = await metered(async () => f());
+  assert.ok(tallies, 'the work was metered');
+  return tallies.kinds.revisions.calls;
+};
+
+/** Two runs that have filed nothing on one workflow folder in one repository: what a pass resolves once for both. */
+const twoOnOneFolder = async () => {
+  const repo = aRepo();
+  const t = team();
+  const [one, two] = [await started(t.dir, repo, { isolate: true }), await started(t.dir, repo, { isolate: true })];
+  return { repo, t, one: readRun(one.id), two: readRun(two.id) };
+};
+
+const AT = '2026-10-16T12:00:00.000Z';
+
+test('a pass resolves one workflow folder once for every run on it, and each run is given the pins it would be given alone', async () => {
+  const { one, two } = await twoOnOneFolder();
+  const alone = await resolveCalls(() => resolvedNow(one, AT, passRevisions()));
+  assert.ok(alone > 0, 'resolving a run reads the world');
+
+  const shared = passRevisions();
+  let pins: Pin[][] = [];
+  const together = await resolveCalls(() => {
+    pins = [one, two].map((run) => {
+      const resolved = resolvedNow(run, AT, shared);
+      assert.ok(resolved && 'pins' in resolved, 'each run resolved');
+      return resolved.pins;
+    });
+  });
+  assert.equal(together, alone, 'the second run on the folder costs no read of its own: the folder, its digests and its ledger are shared');
+
+  const apart = await resolveCalls(() => {
+    for (const run of [one, two]) resolvedNow(run, AT, passRevisions());
+  });
+  assert.equal(apart, alone * 2, 'a reader each — a one-off verb, which is handed no pass — pays for each run, as it did before');
+  assert.deepEqual(pins[0], pins[1], 'and the pins the two runs are given are the same');
+  assert.deepEqual(
+    pins[0].map((p) => p.kind),
+    ['workflow', 'agent', 'skill'],
+    'each kind the folder names pinned once',
+  );
+});
+
+test('a memo is keyed by what it reads: one folder read once, and again for another repository or another factory', async () => {
+  const { one, t } = await twoOnOneFolder();
+  const alone = await resolveCalls(() => resolvedNow(one, AT, passRevisions()));
+  const elsewhere = { ...one, repo: aRepo() };
+  const factory = `factory-${t.name}`;
+  addFactory({ name: factory, repos: [one.repo!] });
+  attachWorkflow({ factory, workflow: t.name });
+  writeRules({ name: factory }, 'Never push on a Friday.');
+  const hired = { ...one, factory };
+
+  const read = passRevisions();
+  assert.equal(read.steps(one), read.steps(one), 'the folder of one run is loaded once, and the one load answered again');
+  assert.equal(read.skills(one), read.skills(one), 'and the skills beside it found once');
+  assert.notEqual(read.steps(one), read.steps(elsewhere), 'the repository is in the key: it is where the folder looks for its agents');
+  assert.notEqual(read.skills(one), read.skills(elsewhere), 'and where it looks for its skills');
+  assert.notEqual(read.steps(one), read.steps(hired), "the factory is in the key: it fills the folder's hires and rules");
+  assert.equal(read.digest({ kind: 'rules', name: factory }, one), null, 'a run in no factory has no rules to digest');
+  assert.equal(
+    typeof read.digest({ kind: 'rules', name: factory }, hired),
+    'string',
+    "and a digest is keyed by the factory it was taken of, so the hired run's rules are digested rather than answered as none",
+  );
+
+  const twoRepos = await resolveCalls(() => {
+    const apart = passRevisions();
+    for (const run of [one, elsewhere]) resolvedNow(run, AT, apart);
+  });
+  assert.ok(
+    twoRepos > alone,
+    `two repositories cost a second read of the folder and its digests, the ledger entries of one content apart — ${twoRepos} reads against ${alone}`,
+  );
+});
+
+test('a run with no repository is keyed apart, never as the ticking process\u2019s own directory', () => {
+  const t = team();
+  const folderRun = { workflowDir: t.dir, repo: undefined, factory: undefined };
+  const atCwd = { workflowDir: t.dir, repo: process.cwd(), factory: undefined };
+  const read = passRevisions();
+  assert.notEqual(
+    read.skills(folderRun),
+    read.skills(atCwd),
+    "a run on a folder place looks for its skills beside the store alone; a run whose repository is the daemon's own directory looks beside that repository too, and the two are not one read",
+  );
+  assert.notEqual(
+    read.steps(folderRun),
+    read.steps(atCwd),
+    'and the folder is loaded with the places each was given, never with the other\u2019s',
+  );
+  assert.equal(
+    read.skills(folderRun),
+    read.skills({ ...folderRun }),
+    'a second run with no repository shares the first\u2019s read, as two runs on one folder do',
+  );
+});
+
+test('a workflow folder that has stopped reading is read once a pass, and every run on it keeps what it froze', async () => {
+  const { one, two, t } = await twoOnOneFolder();
+  const read = passRevisions();
+  const alone = await resolveCalls(() => resolvedNow(one, AT, read));
+  fs.rmSync(t.dir, { recursive: true, force: true });
+
+  const gone = passRevisions();
+  let answers: unknown[] = [];
+  const both = await resolveCalls(() => {
+    answers = [one, two].map((run) => resolvedNow(run, AT, gone));
+  });
+  assert.deepEqual(answers, [undefined, undefined], 'each run keeps the workflow and the revisions it froze');
+  assert.ok(both < alone, `the folder that does not load costs less than one that does — ${both} reads against ${alone}`);
+
+  const apart = await resolveCalls(() => {
+    for (const run of [one, two]) resolvedNow(run, AT, passRevisions());
+  });
+  assert.equal(both * 2, apart, 'and the throw is kept, so the second run on it reads nothing: one read a pass, not one a run');
+
+  const took = pinPass(two, AT, gone);
+  assert.deepEqual(took, { wrote: false, notes: [], lift: false }, 'the pass writes nothing for it, and judges every other run');
+});
+
+test('each run on one folder is handed its own steps, so a write onto one run’s record leaves the other’s alone', async () => {
+  const { one, two } = await twoOnOneFolder();
+  const read = passRevisions();
+  const [first, second] = [one, two].map((run) => resolvedNow(run, AT, read));
+  assert.ok(first && 'steps' in first && second && 'steps' in second, 'both resolved');
+  assert.notEqual(first.steps, second.steps, 'not the one array');
+  assert.notEqual(first.steps[0], second.steps[0], 'nor the one step object');
+  assert.deepEqual(first.steps, second.steps, 'the same steps all the same');
+  first.steps[0].after = ['nothing of the other run'];
+  assert.deepEqual(second.steps[0].after, [], "a write onto one run's steps leaves the other's as the folder holds them");
 });
 
 test('the pure parts: a revision already given keeps its number, a gap gives no number twice, and the drift reads per kind and per step', () => {

@@ -134,6 +134,11 @@ const rootOf = (spec: ServiceSpec): string => spec.env.find(([k]) => k === 'WF_R
  * The systemd user unit for `spec`: started at login (`default.target`), restarted on failure five seconds on but never after a refusal
  * (exit 2), and a stop by a signal counted as a clean one. A stop signals the main process alone (`KillMode=process`), so the sessions and
  * checks the runtime started detached live on.
+ *
+ * `TimeoutStopSec` stands above the runtime's own let-go of its attached sessions, so a `systemctl stop` or `restart` of a daemon
+ * whose session is in a call that never ends is not killed in the middle of it: the daemon parks each session with the call it cut,
+ * says so on its log and releases the lease, instead of leaving the store to be taken over as one gone without a stop. The number is
+ * written here and held above the runtime's in `service.test.ts`, which reads the runtime's rather than repeat it.
  */
 export const unitText = (spec: ServiceSpec): string =>
   [
@@ -152,7 +157,7 @@ export const unitText = (spec: ServiceSpec): string =>
     'SuccessExitStatus=129 130 143',
     'KillMode=process',
     'KillSignal=SIGTERM',
-    'TimeoutStopSec=60',
+    'TimeoutStopSec=90',
     '',
     '[Install]',
     'WantedBy=default.target',
@@ -187,7 +192,7 @@ export const plistText = (spec: ServiceSpec): string =>
     '  <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>',
     '  <key>ThrottleInterval</key><integer>30</integer>',
     '  <key>AbandonProcessGroup</key><true/>',
-    '  <key>ExitTimeOut</key><integer>60</integer>',
+    '  <key>ExitTimeOut</key><integer>90</integer>',
     `  <key>StandardOutPath</key>${str(spec.logs)}`,
     `  <key>StandardErrorPath</key>${str(spec.logs)}`,
     '</dict>',

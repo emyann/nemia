@@ -143,6 +143,28 @@ test('nemia watch --once keeps its place in --cursor-file, and a watch given one
   assert.equal(fs.readFileSync(file, 'utf8'), `${more}\n`);
 });
 
+test('a cursor file the feed cannot be read from starts the watch over, says why once, and keeps 0', async (t) => {
+  const end = feedOf(LINES);
+  const file = path.join(ROOT, 'stale.cursor');
+  fs.writeFileSync(file, `${end + 900}\n`);
+  const said: string[] = [];
+  const err: string[] = [];
+  const log = t.mock.method(console, 'log', (...a: unknown[]) => said.push(a.join(' ')));
+  const wrote = t.mock.method(console, 'error', (...a: unknown[]) => err.push(a.join(' ')));
+  try {
+    await main(['watch', '--once', '--cursor-file', file], engineOf(engine().layer), undefined, stand().place);
+  } finally {
+    log.mock.restore();
+    wrote.mock.restore();
+  }
+  assert.equal(said.at(-1), `cursor: ${end}`, 'it read the feed there is now, from its start');
+  assert.equal(said.length, LINES.length + 1, 'every line of it');
+  assert.equal(err.length, 1, 'said once');
+  assert.match(err[0], new RegExp(`^nemia watch: ${file.replaceAll('.', '\\.')} held cursor ${end + 900}, which the feed cannot be read`));
+  assert.match(err[0], /a line said before may be said again\.$/);
+  assert.equal(fs.readFileSync(file, 'utf8'), `${end}\n`, 'and it kept its place, as any watch does');
+});
+
 test('REFUSED: every malformed selector, a cursor beside a cursor file, and a cursor file in no directory — before a line is read', async (t) => {
   const end = feedOf(LINES);
   const log = t.mock.method(console, 'log', () => {});

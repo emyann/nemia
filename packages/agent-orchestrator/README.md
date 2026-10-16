@@ -157,7 +157,9 @@ carry, so `-l factory=nemia` passes over a daemon's line and `-l factory!=nemia`
 and written after every line it reads — selected or not, so a filtered watcher resumes at the feed's end and
 not at the last line it printed — and after every bookmark. A cursor typed beside it is refused, naming which
 to drop; a feed cut under the watch rewrites it to `0`, as the watch reads on from the start of the feed there
-is now.
+is now. A saved cursor the feed cannot be read from — the feed was cut while no watch of that file ran — does
+the same at the start, said once on stderr, rather than refusing an unattended watch on every start; a cursor a
+person typed is still refused, since that is a typo and not a feed that moved.
 
 **A watch that has fallen silent says where it is every 30 seconds** (`BOOKMARK_EVERY`, one constant every
 surface reads): under `--json`, a line of its own carrying `cursor` and nothing else — no `word`, which is how

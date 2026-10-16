@@ -304,25 +304,40 @@ async function watchedOnce(
 /**
  * Where a watch starts: the cursor its cursor file holds, where the file is there — a watch resumes its own place — else the cursor it was
  * given, else the start of the feed. A cursor given beside a cursor file is refused before this (`WATCH.check`).
+ *
+ * **A saved cursor the feed cannot be read from starts the watch over**, at 0, said once on stderr: the feed was cut while no watch of
+ * this file ran, which is the same world a cut under a running watch leaves (`feedCut`), read at the start instead of noticed in flight.
+ * Refusing it would leave an unattended watch dead on every start until a person deleted the file, and the fix the cursor's refusal names
+ * (`nemia watch --once 0`) is itself refused beside `--cursor-file`. A cursor a person typed is refused as it always was: that is a typo,
+ * not a feed that moved.
  */
 function watchFrom(args: Args, cursorFile: string | undefined): number {
-  const kept = cursorFile === undefined ? undefined : cursorFileStart(cursorFile);
-  if (kept !== undefined) return kept;
-  return typeof args.cursor === 'string' ? Number(args.cursor) : 0;
+  const saved = cursorFile === undefined ? undefined : cursorFileStart(cursorFile);
+  if (saved !== undefined) {
+    const refusal = feedCursorRefusal(saved);
+    if (refusal === undefined) return saved;
+    console.error(
+      `nemia watch: ${cursorFile} held cursor ${saved}, which the feed cannot be read from (${refusal}) — reading the feed there is ` +
+        'now from its start, and keeping 0 there: a line said before may be said again.',
+    );
+    return 0;
+  }
+  const given = typeof args.cursor === 'string' ? Number(args.cursor) : 0;
+  const refusal = feedCursorRefusal(given);
+  if (refusal) usage(refusal);
+  return given;
 }
 
 /**
  * `nemia watch`: the feed's lines its selectors take, from a cursor — read once to the feed's end with `--once`, else followed with the
- * store's liveness until it is stopped (`watching`). Its cursor file, where it has one, is written at once, so a path in a directory that
- * is not there is refused before a line is read.
+ * store's liveness until it is stopped (`watching`). Where it starts is `watchFrom`; its cursor file, where it has one, is written at
+ * once, so a path in a directory that is not there is refused before a line is read.
  */
 function watchVerb(args: Args, e: Engine, place: Place): void | Promise<void> {
   const how: Watched = { json: args.json === true, wake: wakeOf(args) };
   const selectors = parseSelectors(Array.isArray(args.selector) ? args.selector : []);
   const cursorFile = typeof args.cursorFile === 'string' ? args.cursorFile : undefined;
   const from = watchFrom(args, cursorFile);
-  const refusal = feedCursorRefusal(from);
-  if (refusal) usage(refusal);
   kept(cursorFile, from);
   if (args.once === true) return watchedOnce(from, how, selectors, cursorFile, e, place);
   return runMain(watching(from, how, undefined, { selectors, cursorFile }));

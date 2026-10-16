@@ -5955,8 +5955,11 @@ cares about: it read them all and matched the prose a person reads. One watcher 
 - **`--cursor-file <path>`** is where a watch keeps its place (`src/watch/cursor.store.ts`): read when it starts, where the file is
   there, written at once — so a directory that is not there is refused before a line is read — and after every line and every bookmark,
   to a temp name beside it and renamed, so a reader never sees half a number. The cursor written is the feed's, selected or not, so a
-  filtered watcher resumes at the feed's end. A cut rewrites it to `0` and says why on stderr. A cursor typed beside it is refused,
-  naming which to drop. A file holding anything but a whole number is refused, never read as 0.
+  filtered watcher resumes at the feed's end. A cut rewrites it to `0` and says why on stderr, and a saved cursor the feed cannot be read
+  from does the same as the watch starts (`watchFrom`): level-triggered, since the cut that happened while no watch ran leaves the same
+  world as one under a running watch, and refusing it would leave an unattended watch dead on every start. A cursor typed beside it is
+  refused, naming which to drop — and a cursor typed alone is refused as it always was, a typo and not a feed that moved. A file holding
+  anything but a whole number is refused, never read as 0.
 - **The bookmark**: a watch that has fallen silent says where it is every `BOOKMARK_EVERY` — 30 seconds, one constant every surface
   reads (`src/subscription/subscription.ts`, beside `watchedLine`). Under `--json` it is a line carrying `cursor` and nothing else, no
   `word`, which is how a reader tells it from a feed line; in words nothing is printed.

@@ -13,8 +13,8 @@ import { processStart } from './inbox.ts';
 import type { SpawnRequest } from '../seam.ts';
 
 /**
- * What a holder writes of a session: `working` while a holder runs it, `parked` once a holder let it go between two calls for the next
- * to resume, `completed`, `failed` or `canceled` once it ended.
+ * What a holder writes of a session: `working` while a holder runs it, `parked` once a holder let it go, between two calls or with the
+ * call it cut kept as `calling`, for the next to resume; `completed`, `failed` or `canceled` once it ended.
  */
 export type AttachedState = 'working' | 'parked' | 'completed' | 'failed' | 'canceled';
 

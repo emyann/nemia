@@ -129,6 +129,13 @@ down is in `docs/architecture.md`, *Who owns what*.
   so its task settles and can be forgotten (`lookOf`, `startRefusalOf`, `test/start-event.test.ts`). Measured
   2026-10-06: `codex exec --json` (0.154.0) prints `thread.started` first; `claude -p` (2.1.291) prints `system`/`init` first under
   `--output-format stream-json --verbose`, and one `result` line under `--output-format json`.
+- **A drain or a let-go never holds a call that belongs to a call already in flight**, or the call it waits for can never end and the
+  holder waits on what it forbids: `held` (`harness/claude/attached.ts`) is a question about the session, and a `PreToolUse` input
+  carrying `agent_id` — a sub-agent's call (`BaseHookInput`, sdk.d.ts) — is never held.
+- **A holder's wait for its calls in flight is bounded** (`LET_GO_MS`, `attached.ts`), and it says on its log what it waits for and
+  what it cut; the restart's own wait is bounded beside it (`called`, `agent-orchestrator/src/service/takeover.verb.ts`).
+- **A `parked` run that carries `calling` is a call its holder cut**: the next holder resumes that session with `crashNote`, the road a
+  crashed holder's session already takes (`noteOf`, `attached.ts`).
 - **The Agent SDK (0.3.270) speaks to its CLI in control requests both ways, and writes a resume as one argument, `--resume=<id>`**: the
   stand-in CLI (`test/fixtures/stand-in-claude.ts`) answers `initialize` and asks `hook_callback` and `can_use_tool` as it does, and
   `test/attached.boundary.test.ts` pins it; an SDK update that moves the protocol fails there first.

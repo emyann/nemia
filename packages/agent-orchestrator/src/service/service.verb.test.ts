@@ -277,6 +277,42 @@ test('a take-over drains the daemon and waits for each call in flight, naming it
   assert.ok(!events.includes('drain null'), 'the drain names the daemon that is gone, and is left');
 });
 
+test('a take-over gives up on a call that never ends, says which, and goes on to stop the daemon', async () => {
+  const world: World = { lease: lease(OLD), unitPid: null, landings: [[]], calls: [[CALL]] };
+  world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
+  world.onStart = () => passing(world, NEW);
+  const { host, events } = hostOf(world);
+  assert.equal((await install({ takeOver: String(OLD) }, { ...host, waitMs: 30 })).did, 'taken');
+  const gave =
+    "say giving up on r2's implement: its call to Bash has not ended in 30 ms, and the daemon is stopped now; its holder cuts the " +
+    'call, and the next one resumes the session told the call did not finish';
+  assert.ok(events.includes(gave), events.join('\n'));
+  assert.ok(events.indexOf(`signal ${OLD}`) > events.indexOf(gave), 'it gives up, says so, and only then signals');
+});
+
+test(
+  'a take-over waits past its bound for a landing check that never ends: a check that did not finish is no refusal',
+  WAITED,
+  async (t) => {
+    const world: World = { lease: lease(OLD), unitPid: null, landings: [[LANDING]], calls: [[]] };
+    const { host, events } = hostOf(world);
+    const fiber = Effect.runFork(
+      installService({ takeOver: String(OLD) }, { ...host, waitMs: 1 }).pipe(
+        Effect.provide(EngineService.layer(engineOf(engine().layer))),
+        Effect.provide(stand().layer),
+      ),
+    );
+    await until(
+      t,
+      () => events.filter((e) => e === 'landings 1').length >= 5,
+      'the landing read five times, each long past the bound of one millisecond',
+      { everyMs: 5 },
+    );
+    await Effect.runPromise(Fiber.interrupt(fiber));
+    assert.ok(!events.some((e) => e.startsWith('drain') || e.startsWith('signal')), events.join('\n'));
+  },
+);
+
 test('a take-over interrupted while it waits on a call lifts its drain and its pause, and signals nothing', async () => {
   const world: World = { lease: lease(OLD), unitPid: null, landings: [[]], calls: [[CALL]] };
   const { host, events } = hostOf(world);

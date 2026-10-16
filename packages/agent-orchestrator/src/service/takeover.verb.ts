@@ -13,7 +13,8 @@ import { tried, type EngineService } from '../runtime-client.ts';
 
 /**
  * What the take-over is handed of its host (`ServiceHost` in `service.verb.ts`): the lease, a signal to a pid, the store's pause put and
- * lifted, the landing checks running under it, a line said while it waits, how often it polls and how long it waits for the lease.
+ * lifted, the landing checks running under it, a line said while it waits, how often it polls, and how long it waits for the lease and
+ * for the calls in flight.
  */
 export type TakeoverHost = {
   readonly lease: () => DaemonStanding;
@@ -104,14 +105,35 @@ const landed = (host: TakeoverHost) =>
     (l) => `waiting for ${l.run}'s ${l.step} to land: its check runs, and the daemon is stopped once it has ended`,
   );
 
-/** Waits until no session is in a tool call, naming each call once as it is first seen. */
-const called = (host: TakeoverHost) =>
-  waitedOut(
+/**
+ * Waits until no session is in a tool call, naming each call once as it is first seen; at most the host's `waitMs`, past which it says
+ * which call it gives up on and goes on to the signal, since the daemon's own holder cuts a call that never ends and the next holder
+ * resumes that session told which did not finish. A landing check is waited for with no bound (`landed`): a check that did not
+ * finish is not a refusal.
+ */
+const called = (host: TakeoverHost) => {
+  let left: readonly Finishing[] = [];
+  const read = () => Effect.tap(host.calls(), (found) => Effect.sync(() => void (left = found)));
+  return waitedOut(
     host,
-    host.calls,
+    read,
     (f) => `${f.run} ${f.step} ${f.calling}`,
     (c) => `waiting for ${c.run}'s ${c.step}: its call to ${c.calling} runs, and the daemon is stopped once it has ended`,
+  ).pipe(
+    Effect.timeoutOrElse({
+      duration: host.waitMs,
+      orElse: () =>
+        Effect.sync(() => {
+          for (const c of left)
+            host.say(
+              `giving up on ${c.run}'s ${c.step}: its call to ${c.calling} has not ended in ${host.waitMs} ms, and the daemon is ` +
+                'stopped now; its holder cuts the call, and the next one resumes the session told the call did not finish',
+            );
+          return left;
+        }),
+    }),
   );
+};
 
 /** Waits, at most the host's `waitMs`, until the lease reads as `done` says; else refused (`Conflict`) with `refusal`. */
 const leaseUntil = (host: TakeoverHost, done: (lease: DaemonStanding) => boolean, refusal: string) =>
@@ -166,7 +188,8 @@ export const startedPassed = (host: TakeoverHost, service: Started, by: string, 
  * daemon that does not stop, or a service that does not take the store, within the host's `waitMs`; or a service whose daemon ends before
  * its first pass — the store left paused, since no work starts without a daemon to judge it, and `nemia resume` said. Before the signal
  * it waits for each landing check (`landed`), then holds back the new tool calls of the daemon's attached sessions (`drain`) and waits
- * for each call in flight (`called`), so the daemon stops between two calls. Interrupted before the signal, it lifts the drain and the
+ * at most the host's `waitMs` for each call in flight (`called`), so the daemon stops between two calls where it can, and says which
+ * call it gave up on where it cannot. Interrupted before the signal, it lifts the drain and the
  * pause it put; after it, the drain names a daemon that is gone, and no other is held by it. Its pause and its lines name `by`.
  */
 export const takeOver = Effect.fn('takeOver')(function* (pid: number, host: TakeoverHost, service: Started, by: string = INSTALL_BY) {

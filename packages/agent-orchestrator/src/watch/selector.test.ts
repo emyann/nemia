@@ -6,6 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { startedLine, upgraded, type FeedLabels, type FeedLine } from '../feed/index.ts';
+import { stepLabels } from '../telemetry/telemetry.ts';
 import {
   labelKeysRefusal,
   LABEL_KEYS,
@@ -35,6 +36,20 @@ const step = (
     labels: { run, factory, workflow, step: name, agent },
   });
 
+/**
+ * A step with no agent, its line's labels written by the one writer of a step's labels (`stepLabels` → `stepKeys`, `src/meter/step.ts`),
+ * which says `agent: none` where a step has none: so what a selector does with such a line is held to what the tick actually signs.
+ */
+const agentless = ({ run, factory, workflow, name }: { run: string; factory: string; workflow: string; name: string }): FeedLine =>
+  upgraded({
+    at: AT,
+    run,
+    step: name,
+    word: 'running',
+    involved: { kind: 'Step', name: `${run}/${name}` },
+    labels: stepLabels({ id: run, factory, workflowDir: `/workflows/${workflow}` }, { name, after: [], body: '' }),
+  });
+
 /** A run's own line, which carries no step and no agent. */
 const runLine = (run: string, factory: string, workflow: string, word = 'running'): FeedLine =>
   upgraded({ at: AT, run, word, involved: { kind: 'Run', name: run }, labels: { run, factory, workflow } });
@@ -46,6 +61,7 @@ const AGORA_IMPLEMENT = step({ run: 'r-3', factory: 'pipao', workflow: 'build', 
 const AGORA_REVIEW = step({ run: 'r-7', factory: 'nemia', workflow: 'build', name: 'review', agent: 'agora' });
 const SELDON_DESIGN = step({ run: 'r-6', factory: 'pipao', workflow: 'build', name: 'design', agent: 'seldon' });
 const IRIS_INTAKE = step({ run: 'r-4', factory: 'pipao', workflow: 'intake', name: 'interview', agent: 'iris' });
+const NO_AGENT = agentless({ run: 'r-8', factory: 'pipao', workflow: 'intake', name: 'file' });
 const RUN_LINE = runLine('r-1', 'nemia', 'build');
 const DAEMON = startedLine(4242, { kind: 'none' }, AT, Date.parse(AT));
 const EVERY: readonly FeedLine[] = [
@@ -56,6 +72,7 @@ const EVERY: readonly FeedLine[] = [
   AGORA_REVIEW,
   SELDON_DESIGN,
   IRIS_INTAKE,
+  NO_AGENT,
   RUN_LINE,
   DAEMON,
 ];
@@ -145,7 +162,7 @@ test('`=` and `in` never match a key the line does not carry, and `!=`, `notin` 
   assert.deepEqual(selected(['factory=nemia']), ['r-1/implement', 'r-2/design', 'r-5/implement', 'r-7/review', 'r-1/—']);
   assert.deepEqual(
     selected(['factory!=nemia']),
-    ['r-3/implement', 'r-6/design', 'r-4/interview', 'pid 4242'],
+    ['r-3/implement', 'r-6/design', 'r-4/interview', 'r-8/file', 'pid 4242'],
     "a daemon's line carries no factory",
   );
   assert.deepEqual(selected(['agent']), [
@@ -156,6 +173,7 @@ test('`=` and `in` never match a key the line does not carry, and `!=`, `notin` 
     'r-7/review',
     'r-6/design',
     'r-4/interview',
+    'r-8/file',
   ]);
   assert.deepEqual(selected(['waits']), [], 'and no line of these waits on a person');
   assert.deepEqual(selected(['reason notin (Running)']), ['pid 4242'], 'a line with another reason, and one with none, are selected');
@@ -202,6 +220,18 @@ test('the selections a person types, each failing when one clause of it is dropp
     assert.notDeepEqual(after, c.selects, `${c.typed} without ${c.drop || 'its one clause'} must not select the same lines`);
     if (left) assert.deepEqual(after, c.then, left);
   }
+});
+
+test('a step with no agent carries agent: none, which the bare clause takes and agent!=none leaves out', () => {
+  assert.equal(selectableOf(NO_AGENT).agent, 'none', 'the one writer of a step’s labels gives an agentless step the word none');
+  assert.equal(selected(['agent']).includes('r-8/file'), true, 'so the bare agent clause takes its line: the key is there');
+  assert.equal(selected(['agent!=none']).includes('r-8/file'), false, 'and agent!=none is how a person leaves agentless steps out');
+  assert.deepEqual(
+    selected(['agent!=none']),
+    ['r-1/implement', 'r-2/design', 'r-5/implement', 'r-3/implement', 'r-7/review', 'r-6/design', 'r-4/interview', 'r-1/—', 'pid 4242'],
+    'a line that carries no agent at all is still taken by !=, as of any key it does not carry',
+  );
+  assert.deepEqual(selected(['agent=none']), ['r-8/file'], 'and agent=none takes the agentless steps alone');
 });
 
 test('no selector at all selects every line', () => {

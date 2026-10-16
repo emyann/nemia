@@ -76,11 +76,14 @@ const ModelUsageSchema = Schema.Struct({
   outputTokens: Schema.optional(Count),
 });
 
+/** Where a line's words came from, as Claude Code writes it: `human` for a person typing into the session, `peer` for another process. */
+const Origin = Schema.Struct({ kind: Schema.optional(Schema.String) });
+
 const QueuedCommand = Schema.Struct({
   type: Schema.Literal('queued_command'),
   prompt: Schema.optional(Content),
   commandMode: Schema.optional(Schema.String),
-  origin: Schema.optional(Schema.Struct({ kind: Schema.optional(Schema.String) })),
+  origin: Schema.optional(Origin),
 });
 
 /**
@@ -88,7 +91,12 @@ const QueuedCommand = Schema.Struct({
  * field the runtime starts reading is added here.
  */
 export const LINES = {
-  user: Schema.Struct({ type: Schema.Literal('user'), ...Said, message: Schema.Struct({ content: Schema.optional(Content) }) }),
+  user: Schema.Struct({
+    type: Schema.Literal('user'),
+    ...Said,
+    origin: Schema.optional(Origin),
+    message: Schema.Struct({ content: Schema.optional(Content) }),
+  }),
   assistant: Schema.Struct({
     type: Schema.Literal('assistant'),
     ...Said,

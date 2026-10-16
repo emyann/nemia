@@ -34,12 +34,15 @@ export const RUNTIME_EXTENSION = 'urn:agent-runtime:session:v1';
  * journal expects. Each keeps its own key — a name, a session id, the sighting — since none of them is a Task's to answer: a
  * transcript is a history read with a cursor, of a session that may have ended, where A2A's `SubscribeToTask` is a live stream
  * refused on a Task in a terminal state. One is no session's at all: `harnessQuota`, what the harness's subscription has left,
- * asked of the harness itself. `forgetSession` removes what the harness keeps of a settled session, or, dry, lists it.
+ * asked of the harness itself. `interruptSession` ends the turn the session is in and leaves it open, which only a harness that runs
+ * its sessions on streaming input can do, and which A2A has no call for: cancelling a Task ends it.
+ * `forgetSession` removes what the harness keeps of a settled session, or, dry, lists it.
  * `sessionKept` names where the harness keeps what it has of many sessions at once, and removes nothing. `compactSessions` rewrites
  * the captures of every ended session to what their readers read, or, dry, counts them.
  */
 export const SESSION_METHODS = [
   'findSession',
+  'interruptSession',
   'sessionLogs',
   'sessionOutput',
   'releaseSession',

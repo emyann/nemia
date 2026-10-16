@@ -435,21 +435,23 @@ const SAY: readonly Walk[] = [
 
 const INTERRUPT: readonly Walk[] = [
   {
-    name: 'an interrupt of a task nothing was filed under, of one not started, of one at work on a harness that cannot end a turn, and of one settled is refused',
+    name: 'an interrupt of a task nothing was filed under, of one not started and of one settled is refused; of one at work it ends the turn and journals nothing',
     walk: async ({ engine, settle }) => {
       await asked(engine.file(task('a')));
       const unstarted = [await asked(engine.interrupt('nope')), await asked(engine.interrupt('a'))];
       await settle('a', 'running (working)');
       const working = await asked(engine.interrupt('a'));
+      const after = (await Effect.runPromise(engine.view('a'))).state;
       await settle('a', 'succeeded', { exitCode: 0 });
-      return [...unstarted, working, await asked(engine.interrupt('a')), (await Effect.runPromise(engine.view('a'))).state.said];
+      return [...unstarted, working, after.said, after.attempts.at(-1)?.ended ?? null, await asked(engine.interrupt('a'))];
     },
     says: [
       { refused: 'InterruptRefused' },
       { refused: 'InterruptRefused' },
-      { refused: 'InterruptRefused' },
-      { refused: 'InterruptRefused' },
+      { at: '<time>', attempt: 1 },
       [],
+      null,
+      { refused: 'InterruptRefused' },
     ],
   },
 ];

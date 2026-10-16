@@ -136,6 +136,10 @@ export class InProcessTransport implements Transport {
     return this.handler.sessionLogs(params, new ServerCallContext());
   }
 
+  interruptSession(params: { session: { name: string; sessionId: string } }): Promise<void> {
+    return this.handler.interruptSession(params, new ServerCallContext());
+  }
+
   sessionOutput(params: OutputRequest): Promise<{ output: string | null }> {
     return this.handler.sessionOutput(params, new ServerCallContext());
   }
@@ -399,6 +403,9 @@ export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string)
   const logs = (sessionId: string): Effect.Effect<string, RunnerError> =>
     call('logs', () => transport.sessionLogs({ sessionId })).pipe(Effect.map((r) => r.logs));
 
+  const interrupt = (session: { name: string; sessionId: string }): Effect.Effect<void, RunnerError> =>
+    call('interrupt', () => transport.interruptSession({ session })).pipe(Effect.asVoid);
+
   const release = (session: Sighting, task: { worktree?: string | boolean }): Effect.Effect<Usage | void, RunnerError> =>
     call('release', () => transport.releaseSession({ session, task })).pipe(Effect.map((r) => r.usage ?? undefined));
 
@@ -428,6 +435,7 @@ export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string)
     stop,
     logs,
     ...askedOfTransport(offered, transport, card.capabilities?.streaming === true),
+    ...(offered.methods.includes('interruptSession') ? { interrupt } : {}),
     ...(offered.methods.includes('releaseSession') ? { release } : {}),
     ...(offered.methods.includes('sessionTranscript') ? { transcript, transcriptOf } : {}),
     ...(offered.methods.includes('observeSessions') ? { observeFor } : {}),

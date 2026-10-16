@@ -376,10 +376,7 @@ const keptOf = (
         if (settledIn(taskId))
           return yield* refuse(`\`${taskId}\` has settled (${t.phase}): no session of it is running, and no turn is in it.`);
         if (!t.attempt) return yield* refuse(`\`${taskId}\` has not started an attempt yet, so there is no turn to end.`);
-        return yield* refuse(
-          'the `test` harness cannot end a turn without ending its session: only a session on streaming input takes it.' +
-            ' Stop the task (`ae stop`) to end its session, or leave the turn to finish.',
-        );
+        return { at: new Date().toISOString(), attempt: t.attempt.n };
       }),
     transcript: transcriptOf(tasks),
     forget: forgetVerbOf(tasks, forgets, settledIn),

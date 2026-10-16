@@ -1593,3 +1593,37 @@ test("REFUSED: at shipped defaults, a background task whose transcript does not 
     assert.equal(Object.hasOwn(await Effect.runPromise(engine.view(id)), 'unreadWhy'), false, 'nor does view');
   });
 });
+
+test("a `user` line's own origin is carried: words a person wrote into the session itself say `human`, and words the host pushed on its input say nothing", () => {
+  const line = (origin?: object) => ({
+    parentUuid: null,
+    isSidechain: false,
+    type: 'user',
+    uuid: 'said',
+    timestamp: at(0),
+    sessionId: 's',
+    ...(origin ? { origin } : {}),
+    message: { role: 'user', content: 'what is left to land?' },
+  });
+  assert.deepEqual(claudeTranscriptEvents(line({ kind: 'human', from: 'web' }), 0), [
+    { id: 'said:0', at: at(0), role: 'user', kind: 'text', text: 'what is left to land?', origin: { kind: 'human' } },
+  ]);
+  assert.deepEqual(
+    claudeTranscriptEvents(line(), 0),
+    [{ id: 'said:0', at: at(0), role: 'user', kind: 'text', text: 'what is left to land?' }],
+    'a line with no origin says none: the host that pushed the words knows it did',
+  );
+  assert.deepEqual(
+    claudeTranscriptEvents(
+      { ...line({ kind: 'human' }), message: { role: 'user', content: [{ type: 'text', text: 'and this?' }] } },
+      0,
+    ),
+    [{ id: 'said:0', at: at(0), role: 'user', kind: 'text', text: 'and this?', origin: { kind: 'human' } }],
+    'and a line written in blocks carries it onto each',
+  );
+  assert.deepEqual(
+    claudeTranscriptEvents({ ...line({ kind: 'human' }), isMeta: true }, 0).map((e) => e.origin),
+    [undefined],
+    "a line the harness itself put in is the system's, and carries no origin of a person",
+  );
+});

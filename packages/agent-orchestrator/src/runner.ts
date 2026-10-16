@@ -490,7 +490,7 @@ export type { RestingMemo, RestingRead } from './rest/resting.verb.ts';
 export { judgedNow, runsSummarized } from './summary/summary.verb.ts';
 export type { RunSummary, SummaryHow } from './summary/summary.verb.ts';
 export type { FinishedPage, FinishedRun, ListedRun, OpenRuns, RunClock, RunOutcome, StepCost, WaitingRun } from './runlist/runlist.verb.ts';
-export { chatHistory, chatRead, chatSend, chatSince } from './chat/chat.verb.ts';
+export { chatHistory, chatRead, chatSend, chatSince, chatStop } from './chat/chat.verb.ts';
 export type { ChatChanges, ChatHistory, ChatPlace, ChatReads } from './chat/chat.verb.ts';
 export type { ChatEvent, ChatFrom, Presence, StepState } from './chat/chat.ts';
 export { nemiaChatPlace } from './nemia/level.store.ts';

@@ -89,6 +89,12 @@ export type TranscriptEvent = {
   text?: string;
   tool?: { name: string; input: unknown };
   result?: { text: string; isError: boolean };
+  /**
+   * Where the words came from, as the harness said it, for a `user` event: `human` where a person wrote them into the session itself
+   * — Claude Code's own face, a claude.ai bridge — and absent where the host pushed them on the session's input, which the caller
+   * already knows it did. **Carried, never judged**: `decide` does not read it; a layer that draws a conversation does.
+   */
+  origin?: { kind: string };
 };
 
 /** One event of a session's transcript, named as an event is unique: by its `kind` and `id` together. */
@@ -337,7 +343,8 @@ export class Runner extends Context.Service<Runner, RunnerOps>()('engine/Runner'
 
 /**
  * A harness that costs nothing: sessions are a map, and a test moves them by hand. Every spawn request is pushed to
- * `spawned`, so a test can assert what the harness was actually asked for.
+ * `spawned`, so a test can assert what the harness was actually asked for. It can end a turn (`interrupt`), which changes nothing of
+ * its sessions: a turn ended leaves the session as it was, at work.
  */
 export const testOps = (control?: { sessions: Map<string, Sighting>; spawned?: SpawnRequest[] }): RunnerOps => {
   const sessions = control?.sessions ?? new Map<string, Sighting>();
@@ -356,6 +363,7 @@ export const testOps = (control?: { sessions: Map<string, Sighting>; spawned?: S
         for (const [name, s] of sessions) if (s.sessionId === id) sessions.set(name, { ...s, state: 'canceled' });
       }),
     logs: () => Effect.succeed('(fake runner: no logs)'),
+    interrupt: () => Effect.void,
   };
 };
 

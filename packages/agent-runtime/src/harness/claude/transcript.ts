@@ -214,9 +214,26 @@ const resultText = (content: BlockOf<'tool_result'>['content']): string =>
       ? content.map((b) => (b.type === 'text' && 'text' in b && typeof b.text === 'string' ? b.text : `[${b.type}]`)).join('\n')
       : '';
 
-/** One content block of a conversation line said by `role` at `at` as events, its id the line's `id` and its place `i` when it has none. */
-const blockEvents = (block: ContentBlock, i: number, id: string, at: string, role: TranscriptEvent['role']): TranscriptEvent[] => {
-  const said = (text: string): TranscriptEvent => ({ id: `${id}:${i}`, at, role, kind: role === 'system' ? 'system' : 'text', text });
+/**
+ * One content block of a conversation line said by `role` at `at` as events, its id the line's `id` and its place `i` when it has none.
+ * `origin` is where the line said its words came from, carried onto the text events of a `user` line and no other.
+ */
+const blockEvents = (
+  block: ContentBlock,
+  i: number,
+  id: string,
+  at: string,
+  role: TranscriptEvent['role'],
+  origin?: { kind: string },
+): TranscriptEvent[] => {
+  const said = (text: string): TranscriptEvent => ({
+    id: `${id}:${i}`,
+    at,
+    role,
+    kind: role === 'system' ? 'system' : 'text',
+    text,
+    ...(origin ? { origin } : {}),
+  });
   if (isBlock('text')(block)) return [said(block.text ?? '')];
   if (isBlock('thinking')(block) || isBlock('redacted_thinking')(block)) {
     return [{ id: `${id}:${i}`, at, role, kind: 'thinking', ...(block.thinking ? { text: block.thinking } : {}) }];
@@ -276,6 +293,10 @@ const isQueued = (a: Attached): a is Extract<Attached, { type: 'queued_command' 
  * is idle, as the `isMeta` user line that starts its next turn, wrapped in Claude Code's own sentence about
  * where it came from: read as any `isMeta` line is.
  *
+ * A `user` line's own `origin` is carried onto its text events (`kind: 'human'` for a person writing into the session itself, a
+ * claude.ai bridge among them), and onto no other line's: words the host pushed on the session's input carry none, so a caller that
+ * pushed them knows which words are the session's own user's.
+ *
  * Words the session's own user said while it worked are the same attachment with the user's origin: `human` for a person
  * typing into it, and none at all for a job's next message on its stdin (`-p --input-format stream-json`, which Claude
  * Code renders to the model as "The user sent a new message while you were working"). Read as a `user`
@@ -298,9 +319,11 @@ export const claudeTranscriptEvents = (entry: unknown, offset: number, file?: st
   if (line.type === 'system') return [{ id, at, role: 'system', kind: 'system', text: line.content ?? line.subtype ?? 'system' }];
   if (line.type === 'attachment') return queuedEvents(line, id, at);
   const role = line.isMeta === true ? 'system' : line.type;
+  const from = line.type === 'user' && role === 'user' && typeof line.origin?.kind === 'string' ? { kind: line.origin.kind } : undefined;
   const content = line.message.content;
-  if (typeof content === 'string') return [{ id: `${id}:0`, at, role, kind: role === 'system' ? 'system' : 'text', text: content }];
-  return (content ?? []).flatMap((block, i) => blockEvents(block, i, id, at, role));
+  if (typeof content === 'string')
+    return [{ id: `${id}:0`, at, role, kind: role === 'system' ? 'system' : 'text', text: content, ...(from ? { origin: from } : {}) }];
+  return (content ?? []).flatMap((block, i) => blockEvents(block, i, id, at, role, from));
 };
 
 /**

@@ -1,6 +1,7 @@
 /**
  * The package's entries are Effect: no function an entry exports hands back a Promise, or an object whose methods do — the shapes of a
- * plain face that runs a program for its caller, and of a Promise engine — but one named in `PROMISED`, which is empty. A pure function
+ * plain face that runs a program for its caller, and of a Promise engine — but one named in `PROMISED`, where only the testing door's
+ * wait is. A pure function
  * answers a plain value, as it may; a verb is an Effect of the engine. Read by the TypeScript checker, over the entries `package.json`
  * names, and proven on `fixtures/promise-face.ts`, which exports both shapes.
  */
@@ -20,8 +21,13 @@ const ENTRIES = Object.values(
   .filter((f) => f.endsWith('.ts'))
   .map((f) => path.normalize(f));
 
-/** The functions an entry may export that answer a Promise, or methods that do: none. */
-const PROMISED = new Set<string>();
+/**
+ * The functions an entry may export that answer a Promise, or methods that do: `until` alone, the wait a test makes on its event
+ * (`src/waits/`), which `agent-runtime/testing` gives a test of a layer above. A test awaits it in its own process, with the runner's
+ * signal as its one bound; it is composed into no program, and the door that gives it is for tests alone (`test/contract.test.ts`).
+ * Nothing of `agent-runtime` or `agent-runtime/vocabulary` is here: a verb is an Effect of the engine.
+ */
+const PROMISED = new Set<string>(['until']);
 
 /** The names of the functions each entry in `files` exports whose call answers a Promise, or methods that do, as `entry: name`. */
 const promisedExports = (files: string[]): string[] => {

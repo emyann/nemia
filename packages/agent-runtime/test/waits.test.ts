@@ -3,7 +3,7 @@
  * package's tests (`DEADLINES`).
  *
  * `src/waits/waits.ts` is the one copy: a test of a layer above takes it from `agent-runtime/testing`, and the board, which imports no
- * package, keeps a copy its own `waits.test.ts` holds to it byte for byte. A wait asks at once, on each ring and
+ * package, keeps a copy this file holds to it byte for byte, since the board's own test builds no path into a package. A wait asks at once, on each ring and
  * at its pace, and ends at its test's timeout saying what never came: that is read off a nested `node --test` of
  * `test/fixtures/waits/never.ts`, since a test's timeout is reported only outside it. `DEADLINES` counts, file by file, each `now()` of
  * `Date` or `performance` a number is added to, or a start taken from and held under a bound, in the package's tests: each left is a
@@ -19,6 +19,7 @@ import { bell, until, WAITED, type Waiter } from '../src/waits/index.ts';
 
 const TEST = import.meta.dirname;
 const PACKAGE = path.join(TEST, '..');
+const ROOT = path.join(PACKAGE, '..', '..');
 
 /**
  * A test's signal and diagnostics, as `until` reads them, with what it said kept and its abort in the test's hands: aborted once the test
@@ -177,6 +178,15 @@ test('REFUSED: a wait that cannot read its test fails at once, and its process e
   );
   assert.equal(ran.status, 0, `ended by itself, not by \`timeout\` (124): ${ran.stdout}${ran.stderr}`);
   assert.match(ran.stdout, /^# pass 1$/m, ran.stdout);
+});
+
+test("the board's copy of the helper is this package's, byte for byte", () => {
+  assert.equal(
+    fs.readFileSync(path.join(ROOT, 'apps', 'web', 'test', 'waits.ts'), 'utf8'),
+    fs.readFileSync(path.join(PACKAGE, 'src', 'waits', 'waits.ts'), 'utf8'),
+    'copy packages/agent-runtime/src/waits/waits.ts over apps/web/test/waits.ts: a change to the wait is made here, and the board, ' +
+      'which imports no package, keeps the one copy of it',
+  );
 });
 
 /** The default timeout a `test` script gives every test (`--test-timeout=<ms>`, one word), or null for none. */

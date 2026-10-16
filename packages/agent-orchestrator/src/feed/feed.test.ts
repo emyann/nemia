@@ -375,7 +375,10 @@ test('REFUSED: a one-shot holds no entry in the fold — the step says its own w
   const memo = freshFeedMemo();
   const at = '2026-10-16T04:00:00.000Z';
   const denied = { step: 'plan', try: 1, call: 'Bash(git push)' };
-  const state = () => lines().filter((l) => l.step === 'plan' && l.reason !== 'ToolDenied').map((l) => l.word);
+  const state = () =>
+    lines()
+      .filter((l) => l.step === 'plan' && l.reason !== 'ToolDenied')
+      .map((l) => l.word);
   for (let i = 0; i < 3; i++) recordFeed(new Map([['r-1', atWork([denied])]]), { at, memo });
   assert.deepEqual(state(), ['running'], "the step's word is said once");
   const done = { ...atWork([denied]), steps: [{ name: 'plan', word: 'unverified · done' }] };
@@ -470,7 +473,11 @@ test('REFUSED: a finished run writes no state line for a denial read late — th
     runs.map(() => ['plan', 'denied: Bash(git push)']),
     'one one-shot for each run\u2019s one denial, over two passes',
   );
-  assert.deepEqual(lines().filter((l) => l.note?.includes('denied:')), [], 'and no step\u2019s note says it');
+  assert.deepEqual(
+    lines().filter((l) => l.note?.includes('denied:')),
+    [],
+    'and no step\u2019s note says it',
+  );
 });
 
 test("a step whose attempt ends with a new denial says it on the pass that reads it ended, as the run finishes: no rest hides a step's own end", async () => {
@@ -535,10 +542,18 @@ test('a running step’s every denial is a one-shot of its own, as the runtime j
   const denied = () => lines().filter((l) => l.run === run.id && l.step === 'plan' && l.reason === 'ToolDenied');
   b.deny(id, [ls], true);
   await runWith(b.e, tickRun());
-  assert.deepEqual(denied().map((l) => l.call), ['Bash(ls)'], 'said while the attempt runs, and not held until it ends');
+  assert.deepEqual(
+    denied().map((l) => l.call),
+    ['Bash(ls)'],
+    'said while the attempt runs, and not held until it ends',
+  );
   b.deny(id, [ls, ls], true);
   await runWith(b.e, tickRun());
-  assert.deepEqual(denied().map((l) => l.call), ['Bash(ls)', 'Bash(ls)'], 'the same call denied again is a denial of its own, and one more line');
+  assert.deepEqual(
+    denied().map((l) => l.call),
+    ['Bash(ls)', 'Bash(ls)'],
+    'the same call denied again is a denial of its own, and one more line',
+  );
   b.deny(id, [ls, ls, glob], true);
   await runWith(b.e, tickRun());
   b.deny(id, [ls, ls, glob]);

@@ -226,7 +226,16 @@ test('a daemon’s line, as up writes it once it holds the store, is sent as a d
   const lines = readFeed(0).lines;
   const daemon = lines.at(-1)!;
   assert.deepEqual(
-    { ...v0, apiVersion: 'nemia/v1', involved: { kind: 'Daemon', name: '4242' }, labels: {}, reason: 'DaemonStarted', type: 'Normal', source: 'daemon', message: 'daemon started · first daemon on this store' },
+    {
+      ...v0,
+      apiVersion: 'nemia/v1',
+      involved: { kind: 'Daemon', name: '4242' },
+      labels: {},
+      reason: 'DaemonStarted',
+      type: 'Normal',
+      source: 'daemon',
+      message: 'daemon started · first daemon on this store',
+    },
     daemon,
     'the package reads a line written before the feed was signed back as a signed one',
   );
@@ -240,26 +249,30 @@ test('a daemon’s line, as up writes it once it holds the store, is sent as a d
   assert.equal(all[2].data, JSON.stringify(daemon));
 });
 
-test("a tool denial comes out as a step event, its data the line whole: the api names an event by what the line is about, not by its reason", WAITED, async (t) => {
-  const pass = emptyFeed();
-  await pass({
-    'r-1': { ...planAt('running'), denials: [{ step: 'plan', try: 2, call: 'Bash(git push)' }] },
-  });
-  const opened = await open();
-  const all = await readUntil(t, opened.reader, opened.text, (s) => s.length >= 3);
-  await opened.reader.cancel();
-  assert.deepEqual(
-    all.map((b) => b.event),
-    ['run', 'step', 'step'],
-    'the run, its step, and the denial of that step — each an event of what it is about',
-  );
-  const shot = JSON.parse(all[2].data!);
-  assert.deepEqual(
-    { reason: shot.reason, type: shot.type, source: shot.source, call: shot.call, try: shot.try, step: shot.step },
-    { reason: 'ToolDenied', type: 'Warning', source: 'runtime', call: 'Bash(git push)', try: 2, step: 'plan' },
-    'and the body a reader gets is the whole line, the fields a selector will match among them',
-  );
-});
+test(
+  'a tool denial comes out as a step event, its data the line whole: the api names an event by what the line is about, not by its reason',
+  WAITED,
+  async (t) => {
+    const pass = emptyFeed();
+    await pass({
+      'r-1': { ...planAt('running'), denials: [{ step: 'plan', try: 2, call: 'Bash(git push)' }] },
+    });
+    const opened = await open();
+    const all = await readUntil(t, opened.reader, opened.text, (s) => s.length >= 3);
+    await opened.reader.cancel();
+    assert.deepEqual(
+      all.map((b) => b.event),
+      ['run', 'step', 'step'],
+      'the run, its step, and the denial of that step — each an event of what it is about',
+    );
+    const shot = JSON.parse(all[2].data!);
+    assert.deepEqual(
+      { reason: shot.reason, type: shot.type, source: shot.source, call: shot.call, try: shot.try, step: shot.step },
+      { reason: 'ToolDenied', type: 'Warning', source: 'runtime', call: 'Bash(git push)', try: 2, step: 'plan' },
+      'and the body a reader gets is the whole line, the fields a selector will match among them',
+    );
+  },
+);
 
 test('REFUSED: a cursor the feed never gave is a 400 that names it and says what to pass — inside a line, past the end, not a number; by address and by Last-Event-ID — and one it gave is taken', async () => {
   const pass = emptyFeed();

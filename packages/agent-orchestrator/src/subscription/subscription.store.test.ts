@@ -67,7 +67,11 @@ test("the deliverer's file is written whole and read back, the deliverer's own f
     since: { at: 1_000, mono: { boot: 'b', ms: 5 } },
   };
   writeDelivery('round', delivery);
-  assert.deepEqual(readDelivery('round'), delivery, 'every field of a signed line survives the round trip, a one-shot’s call and try included');
+  assert.deepEqual(
+    readDelivery('round'),
+    delivery,
+    'every field of a signed line survives the round trip, a one-shot’s call and try included',
+  );
 
   const newer = { at, run: 'r-1', word: 'running', apiVersion: 'nemia/v9', aKeyThisNemiaDoesNotName: 'kept' };
   const v0 = { at, run: 'r-1', step: 'plan', word: 'awaiting approval' };

@@ -82,8 +82,7 @@ test('a watch started while the store is down says so at once', async () => {
 });
 
 /** A run's line of the feed, signed as the tick signs one (`upgraded`), its word and note as given. */
-const line = (word: string, note?: string): FeedLine =>
-  upgraded({ at: AT, run: 'r-1', step: 'build', word, ...(note ? { note } : {}) });
+const line = (word: string, note?: string): FeedLine => upgraded({ at: AT, run: 'r-1', step: 'build', word, ...(note ? { note } : {}) });
 
 const WAKES: FeedLine[] = [
   line('awaiting approval'),

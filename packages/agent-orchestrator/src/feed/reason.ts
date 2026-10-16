@@ -193,12 +193,11 @@ const WAITING_NOTES: readonly string[] = ['waiting on you:', 'needs:'];
  */
 export const waitsOf = (reason: Reason, note?: string): boolean =>
   entryOf(reason).waits === true ||
-  (note ?? '')
-    .split(PART)
-    .some((part) => WAITING_NOTES.some((waiting) => part.trim().toLowerCase().startsWith(waiting)));
+  (note ?? '').split(PART).some((part) => WAITING_NOTES.some((waiting) => part.trim().toLowerCase().startsWith(waiting)));
 
 /**
  * What a person reads of `said`: the word, and the note after it — `awaiting approval · approve it: nemia approve r-1 plan`. The one
  * writer of a line's `message`, for a v1 line stamped and for a v0 line upgraded on read alike, so both say the same sentence. Pure.
  */
-export const messageOf = (said: Said): string => (said.note === undefined || said.note === '' ? said.word : `${said.word}${PART}${said.note}`);
+export const messageOf = (said: Said): string =>
+  said.note === undefined || said.note === '' ? said.word : `${said.word}${PART}${said.note}`;

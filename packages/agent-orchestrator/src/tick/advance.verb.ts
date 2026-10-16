@@ -10,23 +10,22 @@
 import fs from 'node:fs';
 import { Effect } from 'effect';
 import { EngineService, asked as engineAsked, denialText, over, type Engine, type TaskView } from '../runtime-client.ts';
-import { runLabels, stepLabels } from '../telemetry/telemetry.ts';
+import { wordFeed } from '../feed/word-feed.verb.ts';
 import type { Verdict } from '../check/check.ts';
 import type { Workflow } from '../workflow.ts';
 import { folderPlace } from '../record/places.store.ts';
 import { tipBranches, tipsSeen } from '../branches/index.ts';
-import { inFlight, runAdmitted, slotNeed, slotWord, takesNoSlot, type CheckoutHold, type RunSlot } from '../cap/cap.ts';
+import { inFlight, runAdmitted, slotNeed, slotWord, takesNoSlot, type RunSlot } from '../cap/cap.ts';
 import { endingAsked } from '../ending/ending.ts';
 import { holdsOpen } from '../gate/gate.ts';
 import { checkTaskId, isRepositoryRun, stepTaskId, tryOf, type CloseoutAsked, type Run, type TaskPhase } from '../record/record.ts';
 import { budgetOf, landsOnCheck, sentBack, stepStatus, type RoundAsk, type SpendOf } from '../status/status.ts';
-import { hasStarted, holdsOf, runReady, waitedOn, waitsOf, type ParentRun, type Wait } from '../wait/wait.ts';
+import { hasStarted, runReady, waitedOn, waitsOf, type ParentRun, type Wait } from '../wait/wait.ts';
 import { handOffDue } from '../workspace/workspace.ts';
 import { filesDue } from '../artifacts/artifacts.ts';
 import { inParts } from '../brief/index.ts';
 import { assess, type Assessment } from './assess.ts';
-import { feedPhase, feedWords, type FeedDenial, type FeedWords } from '../feed/index.ts';
-import { listing } from '../list/list.ts';
+import type { FeedWords } from '../feed/index.ts';
 import { roundFiled, roundsDue } from '../round/round.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { nextTry, pauseAsksVoid, retriesDue, turnsOf, type RetryAsk } from '../retry/index.ts';
@@ -46,7 +45,6 @@ import { restBlockers, type RestFacts } from '../rest/rest.ts';
 import {
   answersIn,
   closeoutAsked,
-  closeoutOf,
   closeoutReader,
   everyTryOf,
   exitVerdicts,
@@ -54,13 +52,11 @@ import {
   keptParent,
   parentsRead,
   passParents,
-  saidCount,
   spendReader,
   taskPhasesRead,
-  waitingOf,
   type Parents,
 } from '../views/views.verb.ts';
-import { engineWord, waitsForWord } from '../views/views-words.ts';
+import { waitsForWord } from '../views/views-words.ts';
 import { withinEffect } from '../meter/tally.store.ts';
 import { PlaceService, type Place } from '../place/place.store.ts';
 import { onceFacts, roundsGranted, settledOnce, timelineFacts, type StepFact } from '../meter/index.ts';
@@ -621,63 +617,6 @@ const admit = Effect.fnUntraced(function* (
   const admission: Admission = { parent, starting, need, held, ready, waiting: waitsOf(run, parent) };
   return admission;
 });
-
-/** The feed's words for the run and each step (`feedWords`), off what the pass read before it filed anything. */
-function wordFeed(run: Run, r: PassReads, assessed: Assessment, admission: Admission, checkout: CheckoutHold | undefined): FeedWords {
-  const { views, steps } = r;
-  return feedWords(
-    listing({
-      steps,
-      run,
-      phaseOf: (taskId) => feedPhase(engineWord(views)(taskId)),
-      closeoutOf: (name) => closeoutOf(views, run, name),
-      askedCloseout: r.asked,
-      verdictOf: r.verdictOf,
-      asks: r.asks,
-      roundAsks: r.roundAsks,
-      answers: runStore.asks.answers(run.id),
-      waits: admission.waiting,
-      saidTo: saidCount(views, run),
-      spendOf: r.spendOf,
-      slot: admission.held,
-      standings: [],
-      checkout,
-      waitingOf: waitingOf(views),
-      holds: holdsOf(run, admission.parent),
-    }),
-    run,
-    assessed,
-    (name) => closeoutOf(views, run, name),
-    {
-      run: runLabels(run),
-      step: (name) => {
-        const step = steps.find((s) => s.name === name);
-        return step ? stepLabels(run, step) : { run: run.id, step: name };
-      },
-      denials: denialsOf(run, r),
-    },
-  );
-}
-
-/**
- * Every call the sessions of `run`'s steps have been denied, as the pass read their views: the step, its current try (`tryOf`, from 1)
- * and the call in the runtime's words (`denialText`), in the order the runtime journalled them — each attempt of the step's task in
- * order, and each denial of it.
- *
- * It is the whole of what the step's current try was denied, not what is new: the feed's own lines say what has been written already
- * (`denialLines`), so the pass carries nothing between passes and a restarted daemon writes a denial neither again nor never. An earlier
- * try's denials were said on the passes it was the current one, and the try is part of what counts them.
- */
-function denialsOf(run: Run, r: PassReads): FeedDenial[] {
-  const out: FeedDenial[] = [];
-  for (const step of r.steps) {
-    const view = r.views.get(run.steps[step.name]?.taskId ?? '');
-    const tried = tryOf(run, step.name);
-    for (const attempt of view?.state.attempts ?? [])
-      for (const denial of attempt.denials ?? []) out.push({ step: step.name, try: tried, call: denialText(denial) });
-  }
-  return out;
-}
 
 /** Write when the cap first held the run (`slotHeldAt`), and say so once, while the pass may file still: answers whether it did. */
 function holdFirst(f: Filing, held: RunSlot | undefined, ready: readonly string[]): boolean {

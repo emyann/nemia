@@ -206,8 +206,8 @@ const reasonOfLine = (line: FeedLine, involved: Involved): Reason => line.reason
 /** A run and every step and one-shot of it taken out of the fold: what a `removed` line says the store no longer has. */
 function forget(fold: FeedFold, run: string): void {
   fold.said.delete(foldKey({ kind: 'Run', name: run }));
-  for (const key of [...fold.said.keys()]) if (key.startsWith(`Step/${run}/`)) fold.said.delete(key);
-  for (const key of [...fold.shots.keys()]) if (key.startsWith(`${run}/`)) fold.shots.delete(key);
+  for (const key of fold.said.keys()) if (key.startsWith(`Step/${run}/`)) fold.said.delete(key);
+  for (const key of fold.shots.keys()) if (key.startsWith(`${run}/`)) fold.shots.delete(key);
 }
 
 /**

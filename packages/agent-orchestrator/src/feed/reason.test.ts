@@ -128,7 +128,9 @@ test('a reason is only named of a kind the table gives it', () => {
 });
 
 test('every entry of the table is one some word reaches', () => {
-  const reached = new Set(CASES.map((c) => `${reasonOf({ word: c.word, ...(c.note !== undefined ? { note: c.note } : {}) }, c.kind)}/${c.kind}`));
+  const reached = new Set(
+    CASES.map((c) => `${reasonOf({ word: c.word, ...(c.note !== undefined ? { note: c.note } : {}) }, c.kind)}/${c.kind}`),
+  );
   const entries = REASON_CODES.flatMap((reason) => kindsOf(reason).map((kind) => `${reason}/${kind}`));
   assert.equal(entries.length, 32, 'the table the owner named has 32 entries');
   assert.equal(REASON_CODES.length, 27, 'of 27 distinct codes');
@@ -141,7 +143,13 @@ test('every entry of the table is one some word reaches', () => {
 
 test('the waiting set is the one a subscriber is woken by today', () => {
   for (const c of CASES) {
-    const line = { at: '2026-10-16T04:00:00.000Z', run: 'r-1', ...(c.kind === 'Step' ? { step: 'plan' } : {}), word: c.word, ...(c.note !== undefined ? { note: c.note } : {}) };
+    const line = {
+      at: '2026-10-16T04:00:00.000Z',
+      run: 'r-1',
+      ...(c.kind === 'Step' ? { step: 'plan' } : {}),
+      word: c.word,
+      ...(c.note !== undefined ? { note: c.note } : {}),
+    };
     assert.equal(
       waitsOf(c.reason, c.note),
       sortLine(line, DEFAULT_WAKE) === 'wake',
@@ -153,7 +161,10 @@ test('the waiting set is the one a subscriber is woken by today', () => {
 test('a type is the table its reason comes from, and a message is the word and its note', () => {
   assert.equal(typeOf('Failed'), 'Warning');
   assert.equal(typeOf('Running'), 'Normal');
-  assert.equal(messageOf({ word: 'awaiting approval', note: 'approve it: nemia approve r-1 plan' }), 'awaiting approval · approve it: nemia approve r-1 plan');
+  assert.equal(
+    messageOf({ word: 'awaiting approval', note: 'approve it: nemia approve r-1 plan' }),
+    'awaiting approval · approve it: nemia approve r-1 plan',
+  );
   assert.equal(messageOf({ word: 'running' }), 'running', 'a word with no note is the message whole');
   assert.equal(messageOf({ word: 'running', note: '' }), 'running', 'and so is an empty note');
   assert.equal(messageOf({ word: `${DENIED}Bash(grep)`, note: 'try 2' }), 'denied: Bash(grep) · try 2', "the owner's wording for a denial");

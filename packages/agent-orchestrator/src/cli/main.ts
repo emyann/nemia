@@ -147,9 +147,9 @@ const bookmarked = (at: number, how: Watched, cursorFile: string | undefined): v
 /**
  * `nemia watch` as an Effect: `watchPrinted(from, how, keeps)` held in its scope until it is interrupted, and stopped as that scope closes,
  * so an interrupted watch leaves no watcher and no timer behind; beside it, the store's liveness read off `lease` and printed as it changes
- * (`livenessLines`), whatever the wake words, and the bookmark of where it has read to every `BOOKMARK_EVERY` (`bookmarked`) — the tick's
- * first emission dropped, since it comes at once and a watch that has just started has said where it is in its banner. It never ends of
- * itself; a cursor it cannot read from fails it.
+ * (`livenessLines`), whatever its selectors take, and the bookmark of where it has read to every `BOOKMARK_EVERY` (`bookmarked`) — the
+ * tick's first emission dropped, since it comes at once and a watch that has just started has said where it is in its banner. It never
+ * ends of itself; a cursor it cannot read from fails it.
  */
 export const watching = (
   from: number,

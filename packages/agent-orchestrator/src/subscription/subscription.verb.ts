@@ -49,6 +49,9 @@ const reservedRefusal = (name: string): Conflict | undefined =>
 /**
  * The words a subscription is asked for in: its name, its task, the selectors given (else the default), its minutes, and the level its
  * runs' factories are at least at (`atLeast`), where given.
+ *
+ * A list given empty comes to the default too, and never to an empty filter, which `selects` takes every line of the feed for: the api's
+ * body schema takes `"selectors": []` as a list of text, and `-l` given no selector is refused before this.
  */
 const askedOf = (args: Args): { name: string; task: string; selectors: string[]; digestEvery: number; atLeast?: string } => ({
   name: String(args.name ?? ''),

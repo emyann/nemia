@@ -145,9 +145,9 @@ test('every entry of the table is one some word reaches', () => {
 
 /**
  * The retired prose rule, kept here as this file's yardstick: whether `line` held a word of `wake` in its word, or leading a part of its
- * note, whatever the case — the five lines `sortLine` was before this slice retired it. It is what the conversion of a stored wake list
- * (`selectorsOfWake`) is held equal to below; deleted as dead code, the old-versus-new equivalence goes with it and nothing refuses a
- * wrong table entry in `former-wake.ts`.
+ * note, whatever the case — the prose a subscription's filter was matched on before it took selectors. It is what the conversion of a
+ * stored wake list (`selectorsOfWake`) is held equal to below; deleted as dead code, the old-versus-new equivalence goes with it and
+ * nothing refuses a wrong table entry in `former-wake.ts`.
  */
 function wokenByFormerWake(line: FeedLine, wake: readonly string[]): boolean {
   const word = line.word.toLowerCase();

@@ -68,6 +68,14 @@ test('a long-lived task is given a subscription, 201, by its words or the defaul
   assert.deepEqual((await asked('DELETE', 'own')).status, 200);
 });
 
+test('a selectors list sent empty comes to the default: nothing is stored with a filter that takes every line', async () => {
+  const blank = await asked('POST', 'blank', { task: 'nemia', selectors: [] });
+  assert.equal(blank.status, 201);
+  assert.deepEqual((blank.body.subscription as { selectors: string[] }).selectors, [...DEFAULT_SELECTORS]);
+  assert.deepEqual(JSON.parse(fs.readFileSync(file('blank'), 'utf8')).selectors, [...DEFAULT_SELECTORS], "the store's file holds it");
+  assert.equal((await asked('DELETE', 'blank')).status, 200);
+});
+
 test('REFUSED: a task never filed is a 404, one not long-lived, a selector refused and minutes not above zero a 422, each before anything is written', async () => {
   const nowhere = await asked('POST', 'a', { task: 'nowhere' });
   assert.equal(nowhere.status, 404);

@@ -77,6 +77,27 @@ test("a long-lived task is subscribed from the feed's end, told by the default s
   await typed(UNSUBSCRIBE, ['own']);
 });
 
+/**
+ * `args` as the api hands them over — a body read, with no command line to read them off — refused as the route refuses them, then handed
+ * to the handler over `e`.
+ */
+const handed = async <D extends object>(args: Record<string, unknown>): Promise<D> => {
+  const refused = SUBSCRIBE.check?.(args as never);
+  if (refused) throw Object.assign(new Error(refused), { exitCode: 2 });
+  return (await runWith(e, SUBSCRIBE.handler(args as never) as never)) as D;
+};
+
+test('a selectors list given empty comes to the default, never to an empty filter that takes every line of the feed', async () => {
+  const put = await handed<{ subscription: { selectors: string[] } }>({ name: 'blank', task: 'nemia', selectors: [] });
+  assert.deepEqual(put.subscription.selectors, [...DEFAULT_SELECTORS], 'the api takes a list sent empty, and this is the door against it');
+  assert.deepEqual(
+    listSubscriptions().find((s) => s.name === 'blank')?.subscription.selectors,
+    [...DEFAULT_SELECTORS],
+    'and the file holds the default, not []',
+  );
+  await typed(UNSUBSCRIBE, ['blank']);
+});
+
 test('a subscription given a floor is scoped by it; REFUSED: a floor that is no level, before anything is put', async () => {
   await typed(SUBSCRIBE, ['floored', 'nemia', '--at-least', 'semi-auto']);
   assert.deepEqual(listSubscriptions().find((s) => s.name === 'floored')?.subscription.scope, { atLeast: 'semi-auto' });

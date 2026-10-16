@@ -29,7 +29,11 @@ test('each shipped word converts to what it was selecting, and a word with no re
     ['reason in (Failed,CheckFailed)'],
     'one word was a substring of two words of the feed, and a reason that waits survives while waits=person is not there',
   );
-  assert.deepEqual(selectorsOfWake([' BLOCKED ']).selectors, ['reason=Blocked'], 'a word is keyed as sortLine folded its case and spaces');
+  assert.deepEqual(
+    selectorsOfWake([' BLOCKED ']).selectors,
+    ['reason=Blocked'],
+    'a word is keyed as the prose match folded its case and spaces',
+  );
   assert.deepEqual(selectorsOfWake(['Needs:']).selectors, ['waits=person'], 'the note words too');
   assert.deepEqual(
     selectorsOfWake(['denied:', 'blocked']).selectors,

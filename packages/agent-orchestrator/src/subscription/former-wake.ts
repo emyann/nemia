@@ -1,11 +1,12 @@
 /**
  * The subscription record's former key, `wake`, converted to selectors on every read, and the refusal of the flags that typed one.
  *
- * A subscription asked for before this slice held a list of words, and a line woke it where one of them was found in the line's word or
- * led a part of its note (`sortLine`, retired with them). Eight such words were ever shipped — the seven of the package's own default and
- * `denied:` beside them in Nemia's — and `FORMER_WAKE` says what each was really selecting: a reason of the feed's closed table
- * (`reason.ts`), or the `waits` a note carried. A stored list is turned into selectors every time it is read
- * (`subscription.store.ts`), never rewritten, as the package turns a v0 feed line (`upgraded`) and a renamed step key (`FORMER_KEYS`).
+ * A subscription's filter was once a list of words, and a line woke it where one of them was found in the line's word or led a part of
+ * its note, whatever the case: the prose a line's word and note were matched on, which no selector reads. Eight such words were ever
+ * shipped — the seven of the package's own default and `denied:` beside them in Nemia's — and `FORMER_WAKE` says what each was really
+ * selecting: a reason of the feed's closed table (`reason.ts`), or the `waits` a note carried. A stored list is turned into selectors
+ * every time it is read (`subscription.store.ts`), never rewritten, as the package turns a v0 feed line (`upgraded`) and a renamed step
+ * key (`FORMER_KEYS`).
  *
  * **The conversion never selects fewer lines, and for two words selects more.** `waiting on you:` and `needs:` read a note's prose, which
  * no selector does: they convert to `waits=person`, which takes every line the tick writes a wait on a person for — the two words' own
@@ -61,7 +62,7 @@ export const FORMER_NEMIA_WAKE: readonly string[] = [...FORMER_DEFAULT_WAKE, 'de
 const reasonSelector = (reasons: readonly Reason[]): string =>
   reasons.length === 1 ? `reason=${reasons[0]}` : `reason in (${reasons.join(',')})`;
 
-/** The word as the table keys one, whatever the case and the spaces a person typed it with (`sortLine` folded both). */
+/** The word as the table keys one, whatever the case and the spaces a person typed it with: the prose match folded both. */
 const asKeyed = (word: string): string => word.trim().toLowerCase();
 
 /**

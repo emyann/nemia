@@ -11,6 +11,8 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
 
 - **A file in `src/<feature>/` says its kind by its name**: `x.store.ts`, `x.verb.ts`, else pure; only a top-level file is listed in
   `boundary.test.ts`. A test beside its file reaches the helpers one folder further up (`../../test/scratch.ts`).
+- **A feature folder holds six source files at most** (`FOLDER_MAX`, `test/layout.test.ts`), tests not counted: a seventh belongs in a
+  folder of its own, named for its own feature, never in a ceiling raised there (`src/watch/` was cut from a full `src/feed/`).
 - **The place is a service with no default (`PlaceService`, `src/place/place.store.ts`)**: a controller asks it (`yield* PlaceService`),
   a store helper takes it as an argument, and whoever runs the program gives it by name — `gitPlaceLayer` at the daemon and the api,
   `runOver(runEngine, () => stand().layer)` at a test's head (`test/placed.ts`). A program given none does not compile. A test answers
@@ -139,6 +141,16 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
   wrong field (`UnreadableRecord`), and left out of `listRuns`, said once on stderr, so one bad file stops no other run. A frozen step is
   decoded by `FrozenStepSchema` (`folder/folder.store.ts`), a field per `StepKey` (a key added without one fails the typecheck): the shape, not
   the words.
+
+## The feed
+
+- **A line is signed once, through one door**: `upgraded` (`src/feed/feed.ts`) fills in `apiVersion`, `involved`, `labels`, `reason`,
+  `type`, `waits`, `source` and `message` for a line with no version, and is what `feedChanges`, `startedLine` and `denialLines` stamp a
+  new line with; a line that already names an `apiVersion` is passed on as its writer judged it.
+- **The fold keys on `involved`, not on `run`/`step`**: a hand-built fixture that spreads a run's line and adds a `step` keeps the run's
+  `involved` and folds under the run (it cost a pass in `apps/api/src/factory/feed.test.ts`). Build a line's fields, never spread another's.
+- **A reason comes from the table alone** (`src/feed/reason.ts`): a status reworded in `list.ts`, `cap.ts`, `wait.ts`, `ending.ts` or
+  `assess.ts` falls to `Unknown`, and `src/feed/reason.test.ts` is the only thing that refuses it — add the word to its fixture.
 
 ## The tick
 

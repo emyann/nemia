@@ -17,20 +17,24 @@ const dir = scratch('e2e-feed-');
 after(() => setStore(undefined));
 
 /**
- * The feed as the package reads it back: `wf feed 0` over the store, its CLI. The web imports nothing of the package, and reaching into its
- * `src` is refused (`packages/agent-orchestrator/test/contract.test.ts`), so it is asked as a person asks it. Each line is printed as
- * `<time>  <run>  <step or —>  <word>`, and the last is `cursor: <bytes>`. Answers the words after each line's time, which is the line's
- * own and says nothing of what the package read, and the cursor.
+ * The feed as the package reads it back: `nemia watch --once 0` over the store, its CLI. The web imports nothing of the package, and
+ * reaching into its `src` is refused (`packages/agent-orchestrator/test/contract.test.ts`), so it is asked as a person asks it. Each
+ * line is printed as `<time>  <run>  <step or —>  <word>`, and the last is `cursor: <bytes>`. Answers the words after each line's time,
+ * which is the line's own and says nothing of what the package read, and the cursor.
  */
 function wfFeed(store: string): { said: string[]; cursor: number } {
-  const out = execFileSync(process.execPath, [path.join(REPO, 'packages', 'agent-orchestrator', 'bin', 'nemia.ts'), 'feed', '0'], {
-    env: { ...process.env, WF_ROOT: store },
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
+  const out = execFileSync(
+    process.execPath,
+    [path.join(REPO, 'packages', 'agent-orchestrator', 'bin', 'nemia.ts'), 'watch', '--once', '0'],
+    {
+      env: { ...process.env, WF_ROOT: store },
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    },
+  );
   const lines = out.trimEnd().split('\n');
   const last = /^cursor: (\d+)$/.exec(lines.at(-1) ?? '');
-  assert.ok(last, `nemia feed ends with its cursor: ${out}`);
+  assert.ok(last, `nemia watch --once ends with its cursor: ${out}`);
   return { said: lines.slice(0, -1).map((l) => l.replace(/^\S+ {2}/, '')), cursor: Number(last[1]) };
 }
 

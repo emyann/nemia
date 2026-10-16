@@ -39,6 +39,7 @@ export {
   settledFacts,
   settledOnce,
   settledWaits,
+  runKeys,
   stepKeys,
   timelineFacts,
 } from './step.ts';

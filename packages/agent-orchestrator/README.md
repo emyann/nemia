@@ -37,7 +37,7 @@ person theirs under `~/.agent-workflows/workflows/`; the board's builder and its
 `dev`, `dev-planned` — are a repository's own folders, not ones this package brings. The tests run the machinery on a small team
 of their own, `test/fixtures/team/`, which is never shipped.
 
-## Following it: `wf watch` and `ae watch`
+## Following it: `nemia watch` and `ae watch`
 
 Two feeds, one a layer. The engine's says what happened to its tasks — filed, started, ended,
 settled — and a run's task ids carry the run and the step, so its output already names the work:
@@ -48,12 +48,12 @@ AE_ROOT="$HOME/.agent-workflows/engine" ae watch
 
 What this package decides on top of that — a step at its gate, one signed off blocked, a loop out
 of rounds, a run waiting on another or for a run slot, a run done — the engine cannot say. That is
-`wf watch`, and `wf feed` beside it for a read that ends:
+`nemia watch`, which reads once and ends with `--once`:
 
 ```bash
-wf feed              # every line so far, then  cursor: <n>
-wf feed 1834         # the lines after that cursor, then the next one
-wf watch             # the same from the start, then each line as the tick writes it, until ^C
+nemia watch --once        # every line so far, then  cursor: <n>
+nemia watch --once 1834   # the lines after that cursor, then the next one
+nemia watch               # the same from the start, then each line as the tick writes it, until ^C
 ```
 
 ```
@@ -66,7 +66,18 @@ wf watch             # the same from the start, then each line as the tick write
 20:59:02  the-gate-yd1g  plan  unverified · done
 ```
 
-It is `$WF_ROOT/feed.jsonl`, a line of JSON per change — `{at, run, step?, word, note?}` — for the
+It is `$WF_ROOT/feed.jsonl`, a line of JSON per change. Every line a `nemia` of this version writes is a
+typed, labelled signal, as a Kubernetes `Event` is: `apiVersion: "nemia/v1"`, `involved` what it is about
+(`{kind, name}`, kind `Run`, `Step` or `Daemon`, a step named `<run>/<step>`), `labels` the run, its factory,
+its workflow and, on a step's line, the step and its agent — the same `stepLabels` a filing gives its
+session — `reason` a stable code a machine selects on, from the closed table in `src/feed/reason.ts`,
+`type` `Normal` or `Warning`, `waits: "person"` where the line waits on somebody, `source` the `tick`,
+the `runtime`, a `person` or a `daemon`, and `message` the sentence a person reads. Beside them it keeps
+the four fields it has always had — `{at, run, step?, word, note?}` — for one release, since every reader
+still reads them; a line written before this version has none of the rest, and is **upgraded on read**
+(`upgraded`, `parseLine`): its run and step become its `involved`, its word its `reason`, its word and
+note its `message`. Nothing on disk is ever rewritten, so every cursor ever handed out still means
+what it meant. The word is the
 run's status (`assess`'s, as `wf tick` prints it, `(pruned)` beside it for a pruned run, and what
 waits on you as its note) and for each step's word and note as `wf ls` prints them. A run stopped on
 a person's word and not on anything that broke says what `wf decide` says of it rather than `failed`:
@@ -78,7 +89,7 @@ closeout's `needs`, made one line and clipped at 200 characters — as the first
 `needs: …`, so the question is on the watcher's screen and `wf decide` has it whole. **The daemon is its
 one writer**: its tick appends a line only where what it judged is not what the feed said last, and a run
 whose record is gone (`wf rm`) gets one `removed`. `up`, once it holds the store, appends one line of its
-own — `{at, daemon, word: "daemon started", note}`, its pid and how the daemon before it ended:
+own — its pid and `word: "daemon started"`, `reason: "DaemonStarted"`, and how the daemon before it ended:
 `first daemon on this store`, `last stopped at <time>`, or `last gone without a stop: took … over from pid …`
 — so a follower sees a restart, and a crash before it, in the feed it already reads. It is routine to a
 subscription, and no run's: the fold and a run's `removed` leave it out. **Nothing reads it to decide**: every pass still
@@ -94,8 +105,14 @@ cost is said, and no git standing is read (`wf ls`'s `→ to decide` for a finis
 ending step is not in the feed). A step's filing reaches it a pass late, as `pending`: the words
 are read before the pass files anything. A run the pass finds at rest (`atRest`) whose words are
 the feed's writes nothing when only a note is worded anew, so a new or reworded note does not say
-again every finished run; a run in flight writes every change of word or note, a live step's new
-`denied:` among them.
+again every finished run; a run in flight writes every change of word or note.
+
+**A call a step's session was denied is a signal of its own**, not a part of the step's note: one line per
+denial the runtime journalled, `reason: "ToolDenied"`, `source: "runtime"`, `type: "Warning"`, carrying the
+`call` as a permission rule names it (`Bash(git push)`) and the `try` it belongs to, from 1, as fields a
+selector matches — `denied: Bash(git push)  · try 2` on a screen. It waits on nobody, holds no place in the
+fold, and is written once however many passes read it: what says it has been written already is the feed's
+own lines with that step and that try, counted, so a restarted daemon writes it neither again nor never.
 
 **The cursor is the engine's**: a byte offset, 0 or the number a `cursor:` line printed, that never
 expires. A read stops at the last newline, so it never passes a line half written, and one after
@@ -123,14 +140,43 @@ nemia watch --json              # one JSON object a line: a feed line whole with
                                 # or {"liveness": "down"|"up", "at", "note"}; the banner and a cut on stderr
 nemia watch --wake              # only the lines that wait on a person: the default wake words of a subscription
 nemia watch --wake-word landing # only the lines that word finds; repeatable, and beside --wake's
+nemia watch -l factory=nemia    # only the lines a selector takes (below); given again, a line either takes
+nemia watch --cursor-file ~/.cache/nemia.cursor   # resume where the last watch read to, and keep its place
 ```
+
+**A selector takes the lines a machine asks for** (`-l`, `src/watch/selector.ts`), in Kubernetes' grammar:
+`key=value`, `key!=value`, `key in (a,b)`, `key notin (a,b)`, and a bare `key` for a line that carries it at
+all. Clauses of one `-l` are separated by commas and all must hold; `-l` given again is another selector, and
+a line one of them takes is printed. The keys are the line's own: its labels — `run`, `factory`, `workflow`,
+`step`, `agent` — and the five a signed line names of itself, `kind`, `reason`, `type`, `waits` and `source`.
+The message a person reads is no key of it: it is prose, reworded whenever a status is, so nothing selects on
+it, and `-l message=…` is refused with the keys there are. `=` and `in` never match a key the line does not
+carry, so `-l factory=nemia` passes over a daemon's line and `-l factory!=nemia` takes it.
+
+**`--cursor-file <path>` is where a watch keeps its place**: read when it starts, where the file is there,
+and written after every line it reads — selected or not, so a filtered watcher resumes at the feed's end and
+not at the last line it printed — and after every bookmark. A cursor typed beside it is refused, naming which
+to drop; a feed cut under the watch rewrites it to `0`, as the watch reads on from the start of the feed there
+is now. A saved cursor the feed cannot be read from — the feed was cut while no watch of that file ran — does
+the same at the start, said once on stderr, rather than refusing an unattended watch on every start; a cursor a
+person typed is still refused, since that is a typo and not a feed that moved.
+
+**A watch that has fallen silent says where it is every 30 seconds** (`BOOKMARK_EVERY`, one constant every
+surface reads): under `--json`, a line of its own carrying `cursor` and nothing else — no `word`, which is how
+a reader tells it from a feed line — and nothing printed in words. So a watcher that crashes re-reads at most
+half a minute of a still feed.
 
 A wake word is found as a subscription finds it (`sortLine`): in the line's word, or leading a part of
 its note, whatever the case. The liveness lines are printed whatever the words.
 
 The api streams the same feed at `GET /api/feed/stream`, one server-sent event a line — `run`,
 `step`, `removed` or `daemon`, by what the line is about — its id the cursor just after that line, so an
-EventSource that reconnects resumes after the last line it was sent.
+EventSource that reconnects resumes after the last line it was sent. It takes `?selector=`, given again
+for each further selector, in the same grammar as `-l`, and selects at the source: a line the selectors
+do not take never crosses the wire, while the cursor still advances past it. A selector the grammar
+refuses is a 422 before the stream opens. Every stream says where it has read to every
+`BOOKMARK_EVERY` as a `bookmark` event, carrying that cursor as its id and no data, so a reader of a
+silent feed knows where it is and can resume there.
 
 `wf` once had a `watch` verb that followed the engine, and gave it back: observing the engine is
 the engine's job. This one follows what only this package knows.
@@ -2477,7 +2523,7 @@ What finishes is each step's current task and its check's, pending or running on
 work, a check that runs, or the check of a landing (an ending that lands on its check). A task the runtime
 holds queued for a slot is not, since no pass admits it under the pause; nor is a session that waits on a
 person (`needs-human`), which holds no slot and does no work until answered. The board, `wf ls` and
-`wf feed` say the first line, and `wf ls` names each task under it; `wf start` says it after how to start the
+`nemia watch` say the first line, and `wf ls` names each task under it; `wf start` says it after how to start the
 run, and `wf up` once when it is put, again each time its words change, and once more when it is resumed.
 `--by` defaults to the OS user; `--why` and `--by` are refused blank, twice, or over their caps (200
 characters, 64), as a hold's are. A landing whose merge the ending has staged in the repository's checkout,
@@ -3487,7 +3533,7 @@ What is under `WF_ROOT` (`~/.agent-workflows` by default), and what `wf rm` does
 | `worktrees/<id>/<step>/` | a step's worktree, with its own `node_modules` | the tick (`git worktree add`) | committed, then removed through git |
 | `tick-stats.json` | what the last pass cost, phase by phase, the tick's to write (`src/meter/meter.ts`): what `wf up --stats`, the api and the Factory's header read |
 | `tick-recent.json` | the last 150 passes, oldest first, each its time, phases and what it saw (`RecentPass`): what `wf passes` and the api's `GET /api/passes` read | the tick (`recordRecentPass`), through a hidden file and a rename, the oldest dropped past 150 | not touched |
-| `feed.jsonl` | what the tick judged of each run and step, a line each time it changed, and a line each time a daemon takes the store (`wf feed`, `wf watch`) | the daemon: its tick, and `up`'s start | kept: the run's lines stay, and the next pass writes its one `removed` |
+| `feed.jsonl` | what the tick judged of each run and step, a line each time it changed, and a line each time a daemon takes the store (`nemia watch`) | the daemon: its tick, and `up`'s start | kept: the run's lines stay, and the next pass writes its one `removed` |
 | `forgetting/<id>.json` | the engine's tasks of a run `wf rm` removed, until the engine forgets them | `wf rm`; the tick lifts it | written, then lifted once each task is forgotten |
 | `engine/` | the engine's board: tasks, journal, feed | the engine | each task of the run forgotten through the runtime's `forget`, once settled |
 | `wf/<id>/<step>`, in the repository | a step's branch | the tick | kept; `--delete-branches` |
@@ -3738,6 +3784,7 @@ holding a concurrency slot forever.
 | `src/agents/read.store.ts` | the agents read: every agent a workflow's steps may name, in its own folder and its places (`agentsFor`), the agents of one folder (`loadAgents`) and an agent's version (`agentVersion`), with a person's custom instructions for each (`customInstructionsFile`, `readCustomInstructions`); one level above the bottom of the store's tree, on the skills read alone |
 | `src/daemon/daemon.store.ts` | `tick.json` (the two ceilings, `ceilings` and `lastCeilings`), `tick-stats.json` (what the last pass cost, `recordPassCost` and `lastPassCost`), `tick-recent.json` (the recent passes, `recordRecentPass` and `recentPasses`) and `daemon.json` read, judged by `src/daemon/daemon.ts`, and written: the store taken, held, beaten and let go (`takeStore`, `beat`, `releaseStore`), each stamp with its monotonic reading (`instantNow`) |
 | `src/feed/feed.store.ts` | the feed's file: the store's `feed.jsonl` read, appended to and followed, a cursor refused where it falls inside a line or past the end, and this process's one fold of it (`recordFeed`, `recordDaemonLine`, `readFeed`, `watchFeed`, `feedCursorRefusal`), its size and the ends of its lines from a cursor (`feedSize`, `readFeedEnds`) |
+| `src/watch/cursor.store.ts` | a watcher's cursor file, a person's path: the cursor it holds or none (`cursorFileStart`), written whole through a temp name and a rename (`keepCursor`), rewritten to 0 on a cut (`cutCursorFile`), a directory that is not there and a file that holds no whole number each refused by name |
 | `src/feed/feed.verb.ts` | the feed's one verb and its live readers: a pass's lines and a daemon's start written once — appended, logged and published to the process's hub (`emitFeed`, `emitDaemonStarted`, `FeedHub`, `feedHubLayer`) — and read as they come, from the hub where it can and the file where it must (`followFeed`, `FEED_FOLLOWERS`) |
 | `src/following/following.ts` | one step's session followed live, pure: the moments a follower is handed (`StepMoment`), and where a following goes each time the step is read again — another attempt, a wait on the feed, or its end (`nextOf`) |
 | `src/following/following.verb.ts` | one step's session followed live across a person's answer, the next turn and a try, waking on the step's lines of the feed between them (`followStep`) |
@@ -3778,6 +3825,7 @@ holding a concurrency slot forever.
 | `src/runner.ts` | the package's root: each name it exports re-exported by name from the file that holds it, and nothing else |
 | `src/meter/meter.ts` | what a pass costs — pure: its phases (`PHASES`), its cost composed (`passCost`) and read off disk (`parsePassCost`), the passes of an interval (`addPass`, `summaryDue`), and the line `wf up` says once a minute and the breakdown `--stats` prints (`summaryLine`, `breakdownLines`) |
 | `src/feed/feed.ts` | the feed of what the tick judged — pure: the line, a run's or a daemon's (`startedLine`), the fold of the lines and what a pass owes it (`foldFeed`, `feedChanges`), a line in words (`feedLineWords`), and a run's steps as the feed says them (`feedWords`); the file is `src/feed/feed.store.ts`'s |
+| `src/watch/selector.ts` | the feed's selector grammar — pure: the keys a selector may name (`SELECTABLE_KEYS`, the labels and the five reserved, which no label may take: `labelKeysRefusal`), every malformed form refused by name (`selectorsRefusal`), the parse of checked text (`parseSelectors`), what a line offers a selector (`selectableOf`) and whether it is selected (`selects`) |
 | `src/cli/main.ts` | the verbs' table: `main`, which looks up the command in the table or the verb in `VERBS` and runs it, or prints the help; and the runners of the commands the CLI runs itself (`RUNS`): `wf tick`, `wf up` and `wf watch` — with its liveness (`livenessLines`) — and `wf rm` and `wf prune` |
 | `src/daemon/up.verb.ts` | the daemon's loop, one for its two kinds, the api's process and `wf up`: `up`, which takes the store's lease in its scope and lets it go as the scope closes; `holdUrl`, which writes into the lease where the api serves; and `runMain`, which runs either as the process's command |
 | `src/cli/flags.ts`, `src/cli/start.ts`, `src/cli/runs.ts` | what the CLI's verbs and runners share: the help, a verb's shape (`Verb`), a usage refusal, a person's yes; the runners of `wf start`, `wf plan` and `wf inbox add`, which read the files and folders their command line names; and the runners of `wf agents custom`, `wf rm` and `wf prune` |
@@ -3810,7 +3858,7 @@ for the same reason, and so does the `wf` command.
 | `daemon.json` | the store taken by one `wf up`, its to write alone: pid, start, cwd, interval, last completed pass, and `stoppedAt` once it stopped (`src/daemon/daemon.ts`) |
 | `tick.json` | the ceilings the last pass ran with, the tick's to write: what `wf ls` and `wf decide` judge the cap on runs in flight by |
 | `standing.json` | where the result branches stood on the last pass, the tick's to write (`src/standing/standing.store.ts`): for each repository, place and base branch, the place's `standing` answer or the words it was not read with, and when |
-| `feed.jsonl` | what the tick judged of each run and each step, a line each time it changed, and a line each time a daemon takes the store, the daemon's to append (`src/feed/feed.ts`, `src/feed/feed.store.ts`): what `wf feed` reads and `wf watch` follows, and nothing decides on |
+| `feed.jsonl` | what the tick judged of each run and each step, a line each time it changed, and a line each time a daemon takes the store, the daemon's to append (`src/feed/feed.ts`, `src/feed/feed.store.ts`): what `nemia watch` reads and follows, and nothing decides on |
 | `worktrees/<id>/<step>/` | each step's workspace |
 | `checks/` | each check's stderr |
 | `engine/` | the engine's board: `AE_ROOT` for `ae watch` |

@@ -1,19 +1,14 @@
 /**
- * The reads of the store, each defined once: `nemia show` (a run's record), `nemia logs` (a step's session output), `nemia feed` (what the
- * tick judged, from a cursor), `nemia stats` (what the store's runs add up to) and `nemia series` (what the system's passes were, kept
- * a minute and an hour at a time; listed in the help beside the passes). Their handlers answer data, and the CLI prints it; the
- * api serves a step's log and the stats on their routes from the same entries, and the board reads a run and the feed through reads of its
- * own (`only`).
+ * The reads of the store, each defined once: `nemia show` (a run's record), `nemia logs` (a step's session output), `nemia stats` (what
+ * the store's runs add up to) and `nemia series` (what the system's passes were, kept a minute and an hour at a time; listed in the help
+ * beside the passes). Their handlers answer data, and the CLI prints it; the api serves a step's log and the stats on their routes from
+ * the same entries, and the board reads a run through a read of its own (`only`). The feed is `nemia watch`'s, which the CLI runs itself.
  */
 import { Effect } from 'effect';
 import { EngineService, asked, tried } from '../runtime-client.ts';
 import { runStore } from '../record/files.store.ts';
 import type { Run } from '../record/record.ts';
-import { cursorTakes, feedLineWords, type FeedLine } from '../feed/feed.ts';
-import { readFeed } from '../feed/feed.store.ts';
 import { verifiesRest } from '../config/config.store.ts';
-import { pausedWords, type Paused } from '../pause/pause.ts';
-import { pausedRead } from '../list/list.verb.ts';
 import { BY_KEYS, statsLine, statsLines, statsQueryOf, type QueryKey, type Stats } from '../stats/index.ts';
 import { statsRun } from '../stats/stats.verb.ts';
 import { RANGE_TAKES, seriesRead } from '../series/series.store.ts';
@@ -77,39 +72,6 @@ export const LOGS: Command<{ taskId?: string; output?: string }> = {
     return taskId ? { taskId, output: yield* asked('logs', e.logs(taskId)) } : {};
   }),
   print: ({ output }, args) => [output ?? `${textOf(args, 'step') ?? ''} has not run yet`],
-};
-
-/**
- * `nemia feed`: the store's pause while one stands, the feed's lines after a cursor, 0 when none is given, and the cursor to read on from;
- * printed in that order.
- */
-export const FEED: Command<{ pause: Paused; lines: FeedLine[]; cursor: number }> = {
-  name: 'feed',
-  usage: '[cursor]',
-  help: [
-    "what the tick judged, a line each time it changed: a run's status, a",
-    "step's word as nemia ls says it, and what a person's word changed — then",
-    'cursor: <n>, to read on from with nemia feed <n>; from the start with none',
-  ],
-  spec: {
-    positionals: [{ key: 'cursor', takes: 'optional', kind: 'text' }],
-    flags: [],
-    unknown: () => cursorTakes('feed'),
-  },
-  check: (args) => {
-    const cursor = textOf(args, 'cursor');
-    return cursor === undefined || /^\d+$/.test(cursor) ? null : cursorTakes('feed');
-  },
-  writes: false,
-  nemia: 'read',
-  only: { side: 'cli', why: 'the board follows the feed through GET /api/feed/stream, the counterpart of nemia watch' },
-  handler: Effect.fnUntraced(function* (args: Args) {
-    return { ...readFeed(Number(textOf(args, 'cursor') ?? 0)), pause: yield* pausedRead() };
-  }),
-  print: ({ pause, lines, cursor }) => {
-    const paused = pausedWords(pause);
-    return [...(paused ? [paused] : []), ...lines.map(feedLineWords), `cursor: ${cursor}`];
-  },
 };
 
 /** The value flags `nemia stats` takes, by the query key each sets, and what each takes. */
@@ -243,4 +205,4 @@ export const SERIES: Command<SeriesRead> = {
 };
 
 /** The reads, in the order `nemia`'s help lists them. */
-export const READS: readonly Command[] = [SHOW, LOGS, FEED, STATS];
+export const READS: readonly Command[] = [SHOW, LOGS, STATS];

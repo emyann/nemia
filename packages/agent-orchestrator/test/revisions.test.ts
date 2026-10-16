@@ -30,7 +30,7 @@ const runWith = runOver(runEngine, () => stand().layer);
 const runPlaced = runGiven(() => stand().layer);
 const engine = eachTest(testEngine);
 const { engineOf } = await import('../src/runtime-client.ts');
-const { readRun } = await import('../src/record/record.store.ts');
+const { readRun, stepsOf } = await import('../src/record/record.store.ts');
 const { agentFilesDir } = await import('../src/agents/agents.store.ts');
 const { ledgerOf, topsOf } = await import('../src/revisions/revisions.store.ts');
 const { passRevisions, pinPass, resolvedNow } = await import('../src/revisions/pin.verb.ts');
@@ -343,6 +343,35 @@ test("`nemia refresh` adds and removes no step, and a run that has filed nothing
     ['build'],
     'and the step the folder has since dropped goes with it: the step set is the one the folder holds now',
   );
+});
+
+test('`nemia refresh` keeps a step the folder has lost since the run filed, with its whole record', async () => {
+  const t = team();
+  fs.writeFileSync(path.join(t.dir, 'review.md'), `---\nplace: git\nafter: build\nagent: ${t.agent}\n---\nReview it.\n`);
+  const run = await started(t.dir, aRepo());
+  const b = board();
+  await runWith(b.e, advanceRun(readRun(run.id)));
+  b.settle(`${run.id}-build`, 'succeeded', { closeout: SIGNED });
+  await runWith(b.e, advanceRun(readRun(run.id)));
+  b.settle(`${run.id}-review`, 'failed');
+  await runWith(b.e, retryRun(run.id, 'review', { mode: 'fresh' }));
+  await runWith(b.e, advanceRun(readRun(run.id)));
+  const before = readRun(run.id).steps.review;
+  assert.equal(before?.taskId, `${run.id}-review-try2`, 'the removed-to-be step has filed a second try');
+  assert.equal(before?.tries?.length, 1, 'so its record holds the try it already ran');
+  assert.ok(before?.pinned?.length, 'and the revisions that try was filed on');
+
+  fs.rmSync(path.join(t.dir, 'review.md'));
+  await runPlaced(refreshRun(run.id));
+  await runWith(b.e, advanceRun(readRun(run.id)));
+
+  const after = readRun(run.id);
+  assert.deepEqual(
+    stepsOf(after).map((s) => s.name),
+    ['build', 'review'],
+    'the verb takes new content, never a new step set: the step the folder lost after the run filed is kept',
+  );
+  assert.deepEqual(after.steps.review, before, "and the kept step's whole record — its task, its tries, its pins — is untouched");
 });
 
 /** A run of `t` that waits `--after` a run that never settles: one that has filed nothing, and will not file while the test edits. */

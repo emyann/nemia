@@ -282,25 +282,25 @@ test('an api started --no-tick exports a server span per request, with the HTTP 
   t.after(() => api.child.kill());
   const [, got] = await api.said(/api listening on http:\/\/127\.0\.0\.1:(\d+)/);
   assert.equal((await fetch(`http://127.0.0.1:${got}/api/version`)).status, 200);
+  await api.said(/\d\d:\d\d:\d\d {2}GET \/api\/version 200 \d+ms/);
   const spans = await Promise.race([posted, api.ended.then((code) => assert.fail(`the api exited ${code}:\n${api.output()}`))]);
   assert.match(spans, /"nemia"/, 'under the nemia service');
   const span = JSON.parse(spans) as {
-    resourceSpans: { scopeSpans: { spans: { name: string; kind: number; attributes: { key: string; value: { stringValue?: string; intValue?: number | string } }[] }[] }[] }[];
+    resourceSpans: {
+      scopeSpans: {
+        spans: { name: string; kind: number; attributes: { key: string; value: { stringValue?: string; intValue?: number | string } }[] }[];
+      }[];
+    }[];
   };
-  const request = span.resourceSpans
-    .flatMap((r) => r.scopeSpans.flatMap((s) => s.spans))
-    .find((one) => one.name === 'GET /api/version');
+  const request = span.resourceSpans.flatMap((r) => r.scopeSpans.flatMap((s) => s.spans)).find((one) => one.name === 'GET /api/version');
   assert.ok(request, `a span named GET /api/version: ${spans}`);
   assert.equal(request.kind, 2, 'of kind server');
-  assert.deepEqual(
-    Object.fromEntries(request.attributes.map((a) => [a.key, a.value.stringValue ?? a.value.intValue])),
-    {
-      'http.request.method': 'GET',
-      'http.route': '/api/version',
-      'url.path': '/api/version',
-      'http.response.status_code': 200,
-    },
-  );
+  assert.deepEqual(Object.fromEntries(request.attributes.map((a) => [a.key, a.value.stringValue ?? a.value.intValue])), {
+    'http.request.method': 'GET',
+    'http.route': '/api/version',
+    'url.path': '/api/version',
+    'http.response.status_code': 200,
+  });
 });
 
 /** Each series a body posted to `/v1/metrics` names, by its metric's name and its attributes' values, with its value or its count. */

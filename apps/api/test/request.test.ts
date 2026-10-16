@@ -82,7 +82,12 @@ test('a stream says two lines: one when it opens, and one when it is closed, wit
   assert.match(said[0].text, /^GET \/api\/feed\/stream 200 \d+ms stream open$/);
   assert.equal(said[0].annotations['http.route'], '/api/feed/stream');
   await res.body!.cancel();
-  await until(t, () => said.length === 2, () => `the closing line: ${JSON.stringify(said)}`, { everyMs: 10 });
+  await until(
+    t,
+    () => said.length === 2,
+    () => `the closing line: ${JSON.stringify(said)}`,
+    { everyMs: 10 },
+  );
   assert.match(said[1].text, /^GET \/api\/feed\/stream 200 (?:\d+ms|\d+\.\ds) stream closed$/);
   assert.deepEqual(said[1].annotations, said[0].annotations, 'the closing line carries the same attributes');
 });

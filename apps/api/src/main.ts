@@ -16,17 +16,7 @@
  */
 import { serve } from '@hono/node-server';
 import { Context, Effect } from 'effect';
-import {
-  Conflict,
-  currentRelease,
-  DEFAULT_EVERY_MS,
-  HOME,
-  holdUrl,
-  runMain,
-  runningRelease,
-  trialRefusal,
-  up,
-} from 'agent-orchestrator';
+import { Conflict, currentRelease, DEFAULT_EVERY_MS, HOME, holdUrl, runMain, runningRelease, trialRefusal, up } from 'agent-orchestrator';
 import { app, runtime } from './app.ts';
 import type { Services } from './layer.ts';
 import { repoOf } from './capabilities/capabilities.ts';
@@ -94,9 +84,5 @@ else
       holder: 'api',
       series: [STEP_FOLLOWS],
       onTaken: () => Effect.map(listening, (served) => void holdUrl(`http://${HOST}:${served.port}`)),
-    }).pipe(
-      Effect.scoped,
-      Effect.provideContext(services!),
-      Effect.ensuring(runtime.disposeEffect),
-    ),
+    }).pipe(Effect.scoped, Effect.provideContext(services!), Effect.ensuring(runtime.disposeEffect)),
   ).catch(fail);

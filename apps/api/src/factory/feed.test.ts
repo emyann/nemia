@@ -722,7 +722,8 @@ test(
     ];
     for (const [query, pattern] of cases) {
       const res = await app.request(`${STREAM}${query}`);
-      assert.equal(res.status, 422, query);
+      if (res.status !== 422) await res.body?.cancel();
+      assert.equal(res.status, 422, `${query}: a stream opened for it is let go, and the refusal is what this test waits on`);
       assert.match(res.headers.get('content-type') ?? '', /^application\/json/, `${query}: an answer, not a stream`);
       const { error } = (await res.json()) as { error: string };
       assert.match(error, pattern, query);

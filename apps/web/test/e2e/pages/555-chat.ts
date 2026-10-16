@@ -31,6 +31,9 @@ async function expectClosed(page: Parameters<PageSpec['expect']>[0]): Promise<vo
     cuesOf(presence).map((cue) => cue.words),
     'every cue that holds stands beside her face, in the owner’s order',
   );
+  for (const cue of await dock.locator('[data-cue]').all())
+    if ((await cue.evaluate((words) => getComputedStyle(words).pointerEvents)) !== 'none')
+      throw new Refused("a cue takes no press: a page's own control under one is still reached, and her face carries the words");
   const label = await dockFaceOf(page).getAttribute('aria-label');
   if (label !== dockWords(presence, false)) throw new Refused(`her face says what pressing it does — it says ${label}`);
   await expectCount(chatPanelOf(page), 0, 'no panel is drawn until it is opened');

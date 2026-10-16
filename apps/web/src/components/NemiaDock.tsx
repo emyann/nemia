@@ -21,7 +21,10 @@ import type { ChatMode } from './chat/ChatHeader';
 /** How wide her docked face is drawn, in pixels. */
 const DOCK_FACE = 60;
 
-/** Her face at the bottom right, its cues, and the panel over it, open as the person last left it on this page. */
+/**
+ * Her face at the bottom right, its cues, and the panel over it, open as the person last left it on this page. Her face alone takes a
+ * press: the cues beside it are words, and a page's own control under one is still reached, as the step's Send is.
+ */
 export function NemiaDock() {
   const [mode, setMode] = useState<ChatMode | null>(null);
   const chat = useNemiaChat();
@@ -50,7 +53,7 @@ export function NemiaDock() {
           />
         </div>
       )}
-      <div className="pointer-events-auto flex shrink-0 items-center gap-3">
+      <div className="pointer-events-none flex shrink-0 items-center gap-3">
         {cues.map((cue) => (
           <CutCue key={cue.words} hue={cue.hue}>
             {cue.words}
@@ -60,7 +63,7 @@ export function NemiaDock() {
           data-nemia-dock-face
           aria-label={dockWords(presence, mode !== null)}
           onPress={() => setMode((at) => (at === null ? 'float' : null))}
-          className="cursor-pointer rounded-xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+          className="pointer-events-auto cursor-pointer rounded-xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
         >
           <NemiaFace presence={presence} size={DOCK_FACE} />
         </Button>

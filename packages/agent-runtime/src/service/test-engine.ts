@@ -1,20 +1,35 @@
 /**
- * The engine's stand-in, `testEngine()`: the `Engine` service kept by hand in a layer (`layer`), with no journal, no harness and no
- * pass, for a test of a layer above the runtime. A test settles a task itself (`settle`), leaving with its end the text its session
- * printed (`printed`), which `output` then answers stream by stream, and reads back what the engine was asked:
- * each task (`tasks`), every filing by id (`filings`) and by what it was filed with (`specs`), each stop taken (`stopped`), each word
- * said (`said`) and each `forget` call by call (`forgets`); `refuseSay(n)` refuses the next `n` says as the runtime refuses a session
- * not running; `keeps(id, sizes)` plants what `kept` answers of a task, and `failKept(n)` fails the next `n` as a store that does not
- * list fails one.
+ * The engine's stand-in, `testEngine()`: the `Engine` service kept by hand in a layer (`layer`), with no journal, no harness and no pass,
+ * for a test of a layer above the runtime. A test settles a task itself (`settle`), leaving with its end the text its session printed
+ * (`printed`), which `output` then answers stream by stream, and reads back what the engine was asked: each task (`tasks`), every filing
+ * by id (`filings`) and by what it was filed with (`specs`), each stop taken (`stopped`), each word said (`said`) and each `forget` call
+ * by call (`forgets`); `refuseSay(n)` refuses the next `n` says as the runtime refuses a session not running; `keeps(id, sizes)` plants
+ * what `kept` answers of a task, and `failKept(n)` fails the next `n` as a store that does not list fails one; `plantTranscript(id, n,
+ * events)` plants what `transcript` reads of an attempt, and `restart(id)` starts a task's next.
  *
- * It keeps `file`, `view`, `list`, `stop`, `logs`, `feed`, `output`, `say`, `forget` and `kept`, each answering what the real engine
- * answers over a harness that costs nothing: `test/engine-walks.ts` holds the walks both run, and `APART` there what this one cannot
- * say. Every other verb dies naming itself. Reached from another package through `agent-runtime/testing` alone, and by no file of a `src`.
+ * It keeps `file`, `view`, `list`, `stop`, `logs`, `feed`, `output`, `say`, `transcript`, `forget` and `kept`, each answering what the
+ * real engine answers over a harness that costs nothing: `test/engine-walks.ts` holds the walks both run, and `APART` there what this one
+ * cannot say. Every other verb dies naming itself. Reached from another package through `agent-runtime/testing` alone, and by no file of a
+ * `src`.
  */
 import { Effect, Layer } from 'effect';
 import type { Attempt, Said, State } from '../core/index.ts';
 import { JournalError, StopRefused, type TaskView } from '../core/engine/index.ts';
-import { DrainRefused, drainRefusalOf, Engine, ListRefused, listRefusalOf, type EngineShape } from './engine.ts';
+import {
+  attemptRefusal,
+  DrainRefused,
+  drainRefusalOf,
+  Engine,
+  isTranscriptCursor,
+  ListRefused,
+  listRefusalOf,
+  TRANSCRIPT_START,
+  TranscriptRefused,
+  type EngineShape,
+} from './engine.ts';
+
+/** One event of a session's transcript, as `transcript` answers it. */
+type TranscriptEvent = Effect.Success<ReturnType<EngineShape['transcript']>>['events'][number];
 import { ForgetRefused } from './forget.ts';
 import { KeptRefused, type KeptReport } from './kept.ts';
 import type { TaskSpec } from './options.ts';
@@ -32,7 +47,8 @@ export type TestEnd = Partial<Attempt> & { readonly printed?: Printed };
 
 /**
  * A task the stand-in holds: what it was filed with and when, the phase `settle` left it in, whether a stop was asked, what was said to
- * it, its one attempt, `null` until it starts, and the text its session printed.
+ * it, its attempt in flight or last, `null` until it starts, those before it (`earlier`, by `restart`), the transcript planted for each
+ * attempt by its `n`, and the text its session printed.
  */
 export type TestTask = {
   spec: TestFiling;
@@ -41,6 +57,8 @@ export type TestTask = {
   stopRequested: boolean;
   said: Said[];
   attempt: Attempt | null;
+  earlier: Attempt[];
+  transcripts: Map<number, TranscriptEvent[]>;
   printed: Printed;
 };
 
@@ -82,7 +100,7 @@ const stateOf = (id: string, t: TestTask): State => ({
   queued: t.spec.queued === true,
   ...(t.spec.priority === undefined ? {} : { priority: t.spec.priority }),
   ...(t.spec.labels === undefined ? {} : { labels: t.spec.labels }),
-  attempts: t.attempt ? [t.attempt] : [],
+  attempts: [...t.earlier, ...(t.attempt ? [t.attempt] : [])],
   said: [...t.said],
   stopRequested: t.stopRequested,
   settled: outcomeOf(t.phase),
@@ -109,7 +127,7 @@ const attemptOf = (t: TestTask, phase: string, end: Partial<Attempt>): Attempt =
   const at = new Date().toISOString();
   const outcome = outcomeOf(phase);
   return {
-    n: 1,
+    n: t.attempt?.n ?? t.earlier.length + 1,
     startedAt: t.attempt?.startedAt ?? at,
     spawnedAt: t.attempt?.spawnedAt ?? at,
     ended: outcome ? ENDED[outcome] : null,
@@ -121,6 +139,33 @@ const attemptOf = (t: TestTask, phase: string, end: Partial<Attempt>): Attempt =
     ...end,
   };
 };
+
+/** The cursor after the first `count` events of a planted transcript: the real reader's shape, its offset the count. */
+const plantedCursor = (count: number): string => (count === 0 ? TRANSCRIPT_START : `${count}.${'0'.repeat(16)}`);
+
+/**
+ * `transcript` over the tasks a stand-in holds: refuses a task not held, an attempt it has not and a cursor no read gave, as the engine
+ * does over Claude Code; then the events planted for the attempt named, or the latest, after the cursor's count, and the cursor after
+ * them. A task not started reads no events.
+ */
+const transcriptOf =
+  (tasks: Map<string, TestTask>): EngineShape['transcript'] =>
+  (id, after, options = {}) => {
+    const refuse = (message: string) => Effect.fail(new TranscriptRefused({ message }));
+    const t = tasks.get(id);
+    if (!t) return refuse(unknown(id));
+    if (after !== undefined && !isTranscriptCursor(after))
+      return refuse(
+        `\`${after}\` is not a cursor a transcript read gave. Pass the \`cursor\` the last read returned, or none to read from the start.`,
+      );
+    const attempts = stateOf(id, t).attempts;
+    const named = attemptRefusal(attempts, options.attempt);
+    if (named !== undefined) return refuse(named);
+    const n = options.attempt ?? attempts.at(-1)?.n;
+    const events = n === undefined ? [] : (t.transcripts.get(n) ?? []);
+    const from = after === undefined ? 0 : Number(after.split('.')[0]);
+    return Effect.succeed({ events: events.slice(from), cursor: plantedCursor(Math.max(from, events.length)) });
+  };
 
 /** A verb the stand-in does not keep: a test that reaches it has outgrown the stand-in. */
 const unkept = (verb: string) => () =>
@@ -151,6 +196,13 @@ export type TestEngine = {
    * printed, which the task keeps until a settle gives another. Throws for a task never filed.
    */
   readonly settle: (id: string, phase: string, end?: TestEnd) => TestTask;
+  /** Plants the transcript the attempt `n` of the task `id` read, in place of what was planted before. Throws for a task never filed. */
+  readonly plantTranscript: (id: string, n: number, events: readonly TranscriptEvent[]) => void;
+  /**
+   * Ends the task `id`'s attempt in flight as its harness ended it, failed, and starts the next at work, as a long-lived task restarts.
+   * Throws for a task never filed or not started.
+   */
+  readonly restart: (id: string) => TestTask;
   /** Plants what `kept` answers of the task `id`, in bytes, in place of what was planted before; a task not held is never named. */
   readonly keeps: (id: string, sizes: TestKeeps) => void;
   /** Fails the next `times` asks of `kept` with a `JournalError`, as the engine fails one over a store that does not list. */
@@ -240,7 +292,7 @@ const forgetVerbOf =
 
 /** The kept verbs over what a stand-in holds. */
 const keptOf = (
-  held: Omit<TestEngine, 'layer' | 'refuseSay' | 'settle' | 'keeps' | 'failKept'>,
+  held: Omit<TestEngine, 'layer' | 'refuseSay' | 'settle' | 'keeps' | 'failKept' | 'plantTranscript' | 'restart'>,
   sayRefusals: { left: number },
   sizes: Map<string, TestKeeps>,
   keptFailures: { left: number },
@@ -263,6 +315,8 @@ const keptOf = (
           stopRequested: false,
           said: [],
           attempt: null,
+          earlier: [],
+          transcripts: new Map(),
           printed: {},
         });
         return filed.id;
@@ -299,11 +353,18 @@ const keptOf = (
           sayRefusals.left -= 1;
           return yield* refuse(`${taskId}'s attempt is not running yet: ask again`);
         }
-        const heard: Said = { at: new Date().toISOString(), attempt: 1, text, after: null };
+        const last = t.transcripts.get(t.attempt.n)?.at(-1);
+        const heard: Said = {
+          at: new Date().toISOString(),
+          attempt: t.attempt.n,
+          text,
+          after: last === undefined ? null : { kind: last.kind, id: last.id },
+        };
         t.said.push(heard);
         said.push({ taskId, text });
         return heard;
       }),
+    transcript: transcriptOf(tasks),
     forget: forgetVerbOf(tasks, forgets, settledIn),
     kept: keptVerbOf(tasks, sizes, keptFailures),
   } satisfies Partial<EngineShape>;
@@ -332,7 +393,6 @@ export const testEngine = (): TestEngine => {
       ...keptOf(held, sayRefusals, sizes, keptFailures),
       tick: unkept('tick'),
       admit: unkept('admit'),
-      transcript: unkept('transcript'),
       follow: unkept('follow'),
       path: unkept('path'),
       quota: unkept('quota'),
@@ -362,6 +422,20 @@ export const testEngine = (): TestEngine => {
     t.phase = phase;
     return t;
   };
+  const plantTranscript = (id: string, n: number, events: readonly TranscriptEvent[]) => {
+    const t = held.tasks.get(id);
+    if (!t) throw new Error(`the test engine holds no task ${id}: file it before planting its transcript`);
+    t.transcripts.set(n, [...events]);
+  };
+  const restart = (id: string): TestTask => {
+    const t = held.tasks.get(id);
+    if (!t?.attempt) throw new Error(`the test engine holds no started task ${id}: settle it at work before restarting it`);
+    t.earlier.push(attemptOf(t, 'failed', {}));
+    t.attempt = null;
+    t.attempt = attemptOf(t, 'running (working)', {});
+    t.phase = 'running (working)';
+    return t;
+  };
   const refuseSay = (times: number) => {
     sayRefusals.left = times;
   };
@@ -371,5 +445,5 @@ export const testEngine = (): TestEngine => {
   const failKept = (times: number) => {
     keptFailures.left = times;
   };
-  return { layer, ...held, refuseSay, settle, keeps, failKept };
+  return { layer, ...held, refuseSay, settle, keeps, failKept, plantTranscript, restart };
 };

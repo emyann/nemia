@@ -176,6 +176,10 @@ her task's view, and subscribes to the feed under the name `nemia`, which no per
 admission carry her floor, `semi-auto`, so a factory at `manual` is left alone. What she is
 — her instruction, her fence and her skills — ships in the package's `nemia/` folder, outside `src`, and holds no word of this
 repository's team (`test/nemia-shipped.test.ts`); how her session runs is the runtime's (`restartPolicy: 'Always'`, Remote Control).
+Her chat is the orchestrator's too, written over a long-lived task and a folder (`src/chat/`): projected on every read from her
+transcripts across her attempts and the runtime's `said`, never a copy; what the person writes (`outbox.jsonl`) and their read mark
+(`read.json`) are theirs, written by the api's programs alone, and delivered by the keeper's `deliver` act, the one writer of
+`delivered.jsonl`, which reconciles with `said` before it says (`test/chat-writers.test.ts`).
 
 **The library's writers** are the orchestrator's: an agent, a skill or a workflow of yours written, or removed, against the version it
 was read at, and an agent of yours tried on a short brief, each one entry of the command table served on both sides

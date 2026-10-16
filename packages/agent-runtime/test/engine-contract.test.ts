@@ -32,6 +32,7 @@ const LIES: { readonly [V in Kept]: (answer: Answer) => Answer } = {
   output: Effect.catch(() => Effect.succeed('elsewhere')),
   list: Effect.map((list) => ({ ...(list as object), unreadable: [{ taskId: 'elsewhere', why: 'elsewhere' }] })),
   say: Effect.map((said) => ({ ...(said as object), attempt: 2 })),
+  transcript: Effect.catch(() => Effect.succeed({ events: [], cursor: 'elsewhere' })),
   forget: Effect.map((report) => ({ ...(report as object), forgotten: !(report as { forgotten: boolean }).forgotten })),
   kept: Effect.match({ onFailure: () => ({ tasks: [] }), onSuccess: () => ({ tasks: [{ taskId: 'elsewhere' }] }) }),
   hold: Effect.map(() => 'elsewhere'),
@@ -110,5 +111,44 @@ test('REFUSED: settling a task never filed, by a sentence naming the fix', () =>
   assert.throws(
     () => testEngine().settle('nope', 'succeeded'),
     (err: Error) => err.message === 'the test engine holds no task nope: file it before settling it',
+  );
+});
+
+test('a transcript planted for each attempt reads by its cursor, a restart starts the next attempt, and a word follows its last event', async () => {
+  const made = testEngine();
+  const engine = builtEngine(made.layer);
+  await Effect.runPromise(engine.file({ id: 'a', brief: 'do a', cwd: '/r' }));
+  made.settle('a', 'running (working)');
+  const event = (id: string) => ({ id, at: '2026-10-15T00:00:00.000Z', role: 'assistant' as const, kind: 'text' as const, text: id });
+  made.plantTranscript('a', 1, [event('one'), event('two')]);
+  made.restart('a');
+  made.plantTranscript('a', 2, [event('three')]);
+  const first = await Effect.runPromise(engine.transcript('a', undefined, { attempt: 1 }));
+  const rest = await Effect.runPromise(
+    engine.transcript('a', undefined, { attempt: 1 }).pipe(Effect.andThen((t) => engine.transcript('a', t.cursor, { attempt: 1 }))),
+  );
+  const latest = await Effect.runPromise(engine.transcript('a'));
+  const said = await Effect.runPromise(engine.say('a', 'hi'));
+  const view = await Effect.runPromise(engine.view('a'));
+  assert.deepEqual(
+    [
+      first.events.map((e) => e.id),
+      rest.events,
+      latest.events.map((e) => e.id),
+      said.attempt,
+      said.after,
+      view.state.attempts.map((a) => [a.n, a.ended]),
+    ],
+    [
+      ['one', 'two'],
+      [],
+      ['three'],
+      2,
+      { kind: 'text', id: 'three' },
+      [
+        [1, 'failed'],
+        [2, null],
+      ],
+    ],
   );
 });

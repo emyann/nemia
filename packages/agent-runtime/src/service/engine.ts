@@ -109,6 +109,30 @@ export class QuotaRefused extends Schema.TaggedError<QuotaRefused>()('QuotaRefus
   message: Schema.String,
 }) {}
 
+/**
+ * Why a transcript read refuses the attempt it names, or `undefined` where it names none or one the task has: `attempt` a whole number
+ * among `attempts`' `n`.
+ */
+export const attemptRefusal = (attempts: readonly { readonly n: number }[], attempt: unknown): string | undefined => {
+  if (attempt === undefined || attempts.some((a) => a.n === attempt)) return undefined;
+  const has = attempts.length ? `its attempts are ${attempts.map((a) => a.n).join(', ')}` : 'it has no attempt yet';
+  return `\`attempt: ${JSON.stringify(attempt)}\` is no attempt of this task: ${has}. Name one of them, or none to read the latest.`;
+};
+
+/** The cursor a transcript read from the start is handed, and whether a cursor is one a read of the engine's readers could give. */
+export const TRANSCRIPT_START: TranscriptCursor = noTranscript().cursor;
+export { isTranscriptCursor };
+
+/** What a transcript read names of a task's attempts (`TranscriptRefused` naming those it has where it names none of them). */
+type Asked = { readonly attempt?: number };
+
+/** The attempt a transcript read names, the latest where it names none, or none where the task has none; refused as `attemptRefusal`. */
+const attemptAsked = <A extends { readonly n: number }>(attempts: readonly A[], attempt: number | undefined) => {
+  const refused = attemptRefusal(attempts, attempt);
+  if (refused !== undefined) return Effect.fail(new TranscriptRefused({ message: refused }));
+  return Effect.succeed(attempt === undefined ? attempts.at(-1) : attempts.find((a) => a.n === attempt));
+};
+
 /** A drain this engine will not put, and why: a holder that is no process id. Nothing was written. */
 export class DrainRefused extends Schema.TaggedError<DrainRefused>()('DrainRefused', {
   message: Schema.String,
@@ -243,10 +267,14 @@ export type EngineShape = {
    * a harness that keeps no conversation this engine can read (a `HarnessSpec` or a `RunnerOps`
    * without `transcript`); and, for the engine's own readers (`claude`, `claude-bg` and a `HarnessSpec`), an
    * `after` that none of them gave. A brought runner's cursor is its own, and passed through.
+   *
+   * `options.attempt` names an earlier attempt to read, by its `n` — `kubectl logs --previous` — and the latest is read where it names
+   * none; refused for a number that is no attempt the task has, naming those it has.
    */
   readonly transcript: (
     taskId: string,
     after?: TranscriptCursor,
+    options?: { readonly attempt?: number },
   ) => Effect.Effect<Transcript, TranscriptRefused | JournalError | RunnerError>;
   /**
    * One stream of the task's latest attempt, `stdout` or `stderr`, as its harness kept it whole, or its last `lastBytes` bytes:
@@ -689,7 +717,7 @@ const make = (options: EngineOptions) =>
       return yield* go(taskIds === undefined ? everyView() : viewsOf(taskIds));
     });
 
-    const transcriptVerb = Effect.fn('Engine.transcript')(function* (taskId: string, after?: TranscriptCursor) {
+    const transcriptVerb = Effect.fn('Engine.transcript')(function* (taskId: string, after?: TranscriptCursor, asked: Asked = {}) {
       const refuse = (message: string) => Effect.fail(new TranscriptRefused({ message }));
       const events = yield* read(taskId);
       if (!events.length)
@@ -709,7 +737,7 @@ const make = (options: EngineOptions) =>
       }
       const start = noTranscript().cursor;
       const nothing: Transcript = { events: [], cursor: after ?? start };
-      const last = state.attempts.at(-1);
+      const last = yield* attemptAsked(state.attempts, asked.attempt);
       if (!last) return nothing;
       return (yield* go(transcriptOf(nameFor(taskId, last.n), after === start ? undefined : after))) ?? nothing;
     });

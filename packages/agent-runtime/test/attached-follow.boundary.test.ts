@@ -111,7 +111,7 @@ test(
 );
 
 test('the cursor a follow speaks is one `transcript` takes, and no cursor it did not give', WAITED, async (t) => {
-  const { root, dir, h } = await followable('sid-follow-2');
+  const { dir, h } = await followable('sid-follow-2');
   const got: Followed[] = [];
   const fiber = following(h.attached, got);
   await said(t, got, SAID[0]);

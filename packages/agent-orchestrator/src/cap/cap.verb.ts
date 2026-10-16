@@ -25,6 +25,7 @@ import {
   type Parents,
 } from '../views/views.verb.ts';
 import { standingReader, standingSnapshot, type PassStanding } from '../standing/standing.verb.ts';
+import { passRevisions, type PassRevisions } from '../revisions/pin.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
 
 /** A run a task of which does not read (`unreadableJournal`), as a pass counts it: in flight, and asking the cap for nothing more. */
@@ -142,13 +143,15 @@ export const runSlots = Effect.fn('runSlots')(function* (e: Engine, runs: readon
  * (`runSlots`), read on the first claim on a checkout that asks for them and kept for the rest of the pass, a read that failed asked again;
  * and the runs others wait on (`Parents`); and where the pass read its repositories stand (`passStanding`), which its parents are read
  * off — or, outside the tick's pass, where its caller read them (`standingNow`, `standingSnapshot`). Made by the pass and dropped with
- * it: the next reads the world again.
+ * it: the next reads the world again. And what resolving each run's kinds reads (`revisions`, `passRevisions`): one load and one
+ * digest of each workflow folder a pass, shared by every run on it.
  */
 export type PassRead = {
   runs: readonly Run[];
   slots: Effect.Effect<Map<string, RunSlot>, Refusal>;
   parents: Parents;
   standing: PassStanding;
+  revisions: PassRevisions;
 };
 
 /**
@@ -170,5 +173,5 @@ export const passRead = (e: Engine, runs: readonly Run[], env: NodeJS.ProcessEnv
       }),
     );
   });
-  return { runs, slots, parents, standing };
+  return { runs, slots, parents, standing, revisions: passRevisions() };
 };

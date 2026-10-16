@@ -80,5 +80,8 @@ below its layer is in `docs/architecture.md`, *Who owns what*.
   off `Served`, never `?repo=` itself, and the api serves no repository but its own and those a factory names (`factories.test.ts`).
 - **An agent fills a step by the file a start would run it with** (`stepsFilled`, the package's `roster/fills.store.ts`), never by its
   name alone: the same name in the repository and in yours are two agents. `usedBy` is the package's by-name, same-place list the delete refusal reads.
+- **The app's layer holds the process's telemetry** (`telemetryLayer` in `liveOf`, `app.ts`), so every request says a line
+  (`saidRequest`, `src/request/request.ts`) in a test too: a test that reads the lines merges its own `Logger.layer([keeper])` after
+  `liveOf()` (`test/request.test.ts`), one that wants silence `Logger.layer([])`.
 - **Only `main.ts`, `app.ts` and `layer.ts` touch the machine or read `process.env` and `fetch`**: a new reach in any other file is
   refused by `test/kinds.test.ts`. Reach it through the orchestrator; when a move lands, take the reach off its entry in `MOVES`.

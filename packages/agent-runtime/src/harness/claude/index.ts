@@ -15,5 +15,5 @@ export {
   claudeCodeRefuses,
 } from './vocabulary.ts';
 export type { ClaudeFlags } from './vocabulary.ts';
-export { attachedSessions, type Attached } from './attached.ts';
+export { attachedSessions, LET_GO_MS, type Attached } from './attached.ts';
 export { putDrain, liftDrain } from './attached-file.ts';

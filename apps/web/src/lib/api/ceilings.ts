@@ -5,7 +5,7 @@ import { Schema } from 'effect';
 import { get } from './read.ts';
 
 /** The phases of a pass (`PHASES` in agent-orchestrator's meter.ts; `PASS_PHASES` in lib/pass.ts keeps their order). */
-export type PassPhase = 'records' | 'asks' | 'journals' | 'observe' | 'runtime' | 'place' | 'assess' | 'act';
+export type PassPhase = 'records' | 'asks' | 'journals' | 'revisions' | 'observe' | 'runtime' | 'place' | 'assess' | 'act';
 
 /**
  * Mirrors the package's `PassCost`: what the last pass cost — its time, and each phase's time, calls, bytes read and processes started;
@@ -46,6 +46,7 @@ const PassCostSchema = Schema.Struct({
     records: PhaseCostSchema,
     asks: PhaseCostSchema,
     journals: PhaseCostSchema,
+    revisions: PhaseCostSchema,
     observe: PhaseCostSchema,
     runtime: PhaseCostSchema,
     place: PhaseCostSchema,

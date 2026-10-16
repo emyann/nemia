@@ -2,7 +2,7 @@ import { Layer, ManagedRuntime, Metric } from 'effect';
 import { type ErrorHandler, Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
-import { feedHubLayer, gitPlaceLayer, leaseRelease, runningRelease, VERSION } from 'agent-orchestrator';
+import { feedHubLayer, gitPlaceLayer, leaseRelease, runningRelease, telemetryLayer, VERSION } from 'agent-orchestrator';
 import { isRefusal, type Refusal } from 'agent-orchestrator';
 import { agents, skills } from './agents/index.ts';
 import { customInstructions } from './custom/custom.ts';
@@ -15,6 +15,7 @@ import { ApiConfig, type ApiEnv, type ApiRuntime, ReadMemo, served, type Service
 import { machines } from './machines/machines.ts';
 import { nemia, nemiaChat } from './nemia/index.ts';
 import { runs } from './runs/runs.ts';
+import { saidRequest } from './request/request.ts';
 import { stats } from './stats/stats.ts';
 import { step } from './step/step.ts';
 import { Followings, steps } from './steps/index.ts';
@@ -52,6 +53,12 @@ const RELEASE = leaseRelease(runningRelease());
  * (`Engine`) and root (`StoreRoot`), an MCP asker and a quota asker with nothing asked yet (`McpAsker`, `QuotaAsker`), reads that have
  * kept nothing yet (`ReadMemo`), the steps followed live, none yet (`Followings`), the hub the feed's lines are published to as the
  * process's daemon writes them (`feedHubLayer`), and the git place (`gitPlaceLayer`).
+ *
+ * And the process's telemetry (`telemetryLayer`): the line logger every log of the app goes through — each request's among them — and,
+ * where `env` names an OTLP collector, the tracer, the exporters and their `Flusher` besides. Held here and not around the process's
+ * program, since the handlers run on this runtime and nothing provided around `main.ts`'s program reaches them, and `--no-tick` runs no
+ * program of its own; once per process, since `Metric.MetricRegistry`'s default map is shared and a second provider exports every metric
+ * twice. Merged last, so a test's own `Logger.layer` given after it still wins.
  */
 export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Services> =>
   Layer.mergeAll(
@@ -64,6 +71,7 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
     Followings.live,
     feedHubLayer(),
     gitPlaceLayer,
+    telemetryLayer(env),
   );
 
 /**
@@ -148,6 +156,9 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
  *
  * A route lets the orchestrator's refusals through, and `onError` answers each from `REFUSAL_STATUS`, `{ error }` in its words
  * (`answerError`). Any other error is a 500 there: a route that has better words for one, or a truer status, answers it itself.
+ *
+ * Every request, whichever route answers it, says one line and is traced as a server span: `saidRequest` (request/request.ts), registered
+ * after the runtime's middleware and before every router, on the runtime the request carries.
  */
 export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtime: ApiRuntime } {
   const runtime = ManagedRuntime.make(layer);
@@ -156,6 +167,7 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
       c.set('runtime', runtime);
       await next();
     })
+    .use(saidRequest)
     .get('/api/health', (c) => c.json({ ok: true }))
     .get('/api/version', (c) => c.json({ version: VERSION, release: RELEASE }))
     .get('/api/capabilities', (c) =>

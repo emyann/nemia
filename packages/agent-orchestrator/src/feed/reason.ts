@@ -7,8 +7,8 @@
  * free to be reworded; the code a watcher matches on is not. So this table is the one place that classifies a word, and every reason it
  * can answer is named here: a selector written against it keeps meaning what it meant when the prose moves.
  *
- * **The codes are the owner's.** The 32 entries below — 8 of a run, 23 of a step, 1 of a daemon, 27 distinct codes, five of them shared
- * between a run and a step — were named at this slice's design gate, and a rename breaks every selector and every stored subscription
+ * **The codes are the owner's.** The 38 entries below — 11 of a run, 26 of a step, 1 of a daemon, 33 distinct codes, five of them shared
+ * between a run and a step — were named at their slices' design gates, and a rename breaks every selector and every stored subscription
  * that quotes one.
  *
  * **Recognition is ordered** (`reasonOf`): the prefix `denied: ` of a one-shot before the bare `denied` of a check a person refused; the
@@ -29,11 +29,21 @@ export type InvolvedKind = 'Run' | 'Step' | 'Daemon';
 /** How serious a signal is, as Kubernetes types an `Event`: routine news, or something gone wrong. */
 export type SignalType = 'Normal' | 'Warning';
 
+/**
+ * Who a line is the deed of: the tick's own judgement, the runtime's journal read through the client, a person's verb, or a daemon that
+ * took the store. A property of the reason (`sourceOf`), since a machine selects on it — and so the table's, not a branch in the stamp.
+ */
+export type SignalSource = 'tick' | 'runtime' | 'person' | 'daemon';
+
 /** What a line of the feed says of a thing, without its time: the word the tick judged, and the note beside it. */
 export type Said = { word: string; note?: string };
 
-/** What the feed knows of one reason: the kinds it is written of, how serious it is, and whether it waits on a person. */
-type Entry = { kinds: readonly InvolvedKind[]; type: SignalType; waits?: true };
+/**
+ * What the feed knows of one reason: the kinds it is written of, how serious it is, whether it waits on a person, who it is the deed of
+ * (`source`, the tick's where it names none) and whether it is a one-shot — a fact written exactly once per occurrence rather than a word
+ * that stands until it changes, counted off the feed's own lines and never a thing's last word (`isOnce`, `foldFeed`).
+ */
+type Entry = { kinds: readonly InvolvedKind[]; type: SignalType; waits?: true; source?: SignalSource; once?: true };
 
 /** The word a run's line says once its record is gone from the store (`nemia rm`): the fold forgets the run on reading it. */
 export const REMOVED = 'removed';
@@ -45,8 +55,27 @@ export const DAEMON_STARTED = 'daemon started';
 export const DENIED = 'denied: ';
 
 /**
- * Every reason a line of the feed names, with the kinds it belongs to, its type and whether it waits on a person. Closed: a word this
- * table does not recognise is `Unknown`, never a new code, and a code is added only by the owner naming it.
+ * The word each of a person's acts and each of the two runtime faults says, the one place it is spelled: the owner named these six at this
+ * slice's design gate, and `reason.test.ts` holds each literally beside the rule below that reads it back.
+ *
+ * **None of them may carry a word a subscriber was woken by.** The prose match is retired, but `reason.test.ts` still holds `waitsOf`
+ * identical to it over every word the package writes (`FORMER_DEFAULT_WAKE`, and the selectors `selectorsOfWake` converts it to): that
+ * match found its words anywhere inside a line's word, so `failed`, `blocked` or `needs:` in one of these would break the identity for a
+ * fact the owner said waits on nobody — which is why a refused spawn is `nothing started` and not `spawn failed`.
+ */
+export const SIGNAL_WORDS = {
+  Approved: 'approved',
+  CancelAsked: 'cancel asked',
+  HoldPut: 'hold put',
+  HoldLifted: 'hold lifted',
+  SpawnFailed: 'nothing started',
+  SessionLost: 'session lost',
+} as const satisfies Partial<Record<keyof typeof REASONS, string>>;
+
+/**
+ * Every reason a line of the feed names, with the kinds it belongs to, its type, whether it waits on a person, whose deed it is
+ * (`source`) and whether it is a one-shot (`once`). Closed: a word this table does not recognise is `Unknown`, never a new code, and a
+ * code is added only by the owner naming it.
  */
 export const REASONS = {
   Running: { kinds: ['Run', 'Step'], type: 'Normal' },
@@ -73,9 +102,15 @@ export const REASONS = {
   Stopped: { kinds: ['Step'], type: 'Warning' },
   Unsigned: { kinds: ['Step'], type: 'Warning' },
   UnreadableCloseout: { kinds: ['Step'], type: 'Warning' },
-  ToolDenied: { kinds: ['Step'], type: 'Warning' },
+  ToolDenied: { kinds: ['Step'], type: 'Warning', source: 'runtime', once: true },
+  Approved: { kinds: ['Step'], type: 'Normal', source: 'person', once: true },
+  CancelAsked: { kinds: ['Run'], type: 'Normal', source: 'person', once: true },
+  HoldPut: { kinds: ['Run'], type: 'Normal', source: 'person', once: true },
+  HoldLifted: { kinds: ['Run'], type: 'Normal', source: 'person', once: true },
+  SpawnFailed: { kinds: ['Step'], type: 'Warning', source: 'runtime', once: true },
+  SessionLost: { kinds: ['Step'], type: 'Warning', source: 'runtime', once: true },
   Unknown: { kinds: ['Step'], type: 'Warning' },
-  DaemonStarted: { kinds: ['Daemon'], type: 'Normal' },
+  DaemonStarted: { kinds: ['Daemon'], type: 'Normal', source: 'daemon' },
 } as const satisfies Record<string, Entry>;
 
 /** One of the feed's reasons, the code a machine selects on. */
@@ -92,6 +127,23 @@ export const typeOf = (reason: Reason): SignalType => entryOf(reason).type;
 
 /** The kinds a reason is written of, by the table: what a line's `involved.kind` may be where it names that reason. */
 export const kindsOf = (reason: Reason): readonly InvolvedKind[] => entryOf(reason).kinds;
+
+/**
+ * Who a line of `reason` is the deed of, by the table: the tick's where the table names none, so a reason added without a source is the
+ * tick's judgement, which is what every word it judges is.
+ */
+export const sourceOf = (reason: Reason): SignalSource => entryOf(reason).source ?? 'tick';
+
+/**
+ * Whether `reason` is a one-shot: a fact written exactly once per occurrence — a call denied, a person's act, a spawn refused, a session
+ * lost — rather than a word that stands until it changes. A one-shot is counted off the feed (`foldFeed`'s `shots`) and never becomes a
+ * thing's last word, or the next pass would say the thing's real word again.
+ *
+ * **The reason this is asked of is a line's own, as its writer wrote it** (`reasonOfLine`), so it may be a code a newer `nemia` names and
+ * this table does not have: such a line is no one-shot of ours and folds as a word does. The type says the code is one of ours; the line
+ * came off a journal, which does not. Every other reader of the table is handed what `reasonOf` classified, which is total.
+ */
+export const isOnce = (reason: Reason): boolean => (REASONS as Partial<Record<string, Entry>>)[reason]?.once === true;
 
 /** Where the parts of a note are joined, and where a message joins a word to its note. */
 const PART = ' · ';
@@ -115,6 +167,9 @@ const RUN_WORDS: readonly Rule[] = [
   { is: 'awaiting approval', reason: 'AwaitingApproval' },
   { is: 'blocked', reason: 'Blocked' },
   { is: REMOVED, reason: 'Removed' },
+  { is: SIGNAL_WORDS.CancelAsked, reason: 'CancelAsked' },
+  { is: SIGNAL_WORDS.HoldPut, reason: 'HoldPut' },
+  { is: SIGNAL_WORDS.HoldLifted, reason: 'HoldLifted' },
   { starts: 'failed', reason: 'Failed' },
 ];
 
@@ -145,6 +200,9 @@ const STEP_WORDS: readonly Rule[] = [
   { starts: 'failed', reason: 'Failed' },
   { is: 'stopped', reason: 'Stopped' },
   { is: 'unsigned', reason: 'Unsigned' },
+  { is: SIGNAL_WORDS.Approved, reason: 'Approved' },
+  { is: SIGNAL_WORDS.SpawnFailed, reason: 'SpawnFailed' },
+  { is: SIGNAL_WORDS.SessionLost, reason: 'SessionLost' },
   { is: 'unknown', reason: 'Unknown' },
 ];
 

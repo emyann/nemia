@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { app } from '../app.ts';
 import { daemonOf } from './daemon.ts';
-import { daemonLine, procStartOf, staleAfterMs, STALE_FLOOR_MS } from 'agent-orchestrator';
+import { daemonLine, PHASES, procStartOf, staleAfterMs, STALE_FLOOR_MS } from 'agent-orchestrator';
 const FILE = path.join(root, 'daemon.json');
 const STATS = path.join(root, 'tick-stats.json');
 
@@ -215,12 +215,7 @@ const passAt = (at: string, unobserved?: string[]): PassCostRead => ({
   spawned: 1,
   overheadMs: 0.4,
   rested: 0,
-  phases: Object.fromEntries(
-    ['records', 'asks', 'journals', 'observe', 'runtime', 'place', 'assess', 'act'].map((p) => [
-      p,
-      { ms: 10, calls: 1, bytes: 0, reads: 1, spawned: 0 },
-    ]),
-  ) as PassCostRead['phases'],
+  phases: Object.fromEntries(PHASES.map((p) => [p, { ms: 10, calls: 1, bytes: 0, reads: 1, spawned: 0 }])) as PassCostRead['phases'],
   harnesses: { claude: { calls: 1, ms: 30, listed: 3, spawned: 1, unread: 1 } },
   ...(unobserved ? { unobserved } : {}),
 });

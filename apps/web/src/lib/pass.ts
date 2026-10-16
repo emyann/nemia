@@ -7,7 +7,17 @@ import type { PassCost, PassPhase } from './api';
 import { clockWord } from './quota.ts';
 
 /** The phases in the order the package prints them (`PHASES` in agent-orchestrator's meter.ts). */
-export const PASS_PHASES: readonly PassPhase[] = ['records', 'asks', 'journals', 'observe', 'runtime', 'place', 'assess', 'act'];
+export const PASS_PHASES: readonly PassPhase[] = [
+  'records',
+  'asks',
+  'journals',
+  'revisions',
+  'observe',
+  'runtime',
+  'place',
+  'assess',
+  'act',
+];
 
 /** A time in ms as the package says it: whole from 100, one place from 10, two below. */
 export const msWord = (ms: number): string => (ms >= 100 ? `${Math.round(ms)}` : ms >= 10 ? ms.toFixed(1) : ms.toFixed(2));

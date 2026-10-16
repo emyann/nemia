@@ -11,6 +11,7 @@ import './tsx.ts';
 
 const { CutFrame } = await import('../src/components/look/CutFrame.tsx');
 const { CutCue } = await import('../src/components/look/CutCue.tsx');
+const { CutField } = await import('../src/components/look/CutField.tsx');
 const { CutTag } = await import('../src/components/look/CutTag.tsx');
 const { Pager } = await import('../src/components/look/Pager.tsx');
 const { PageName, Plate } = await import('../src/components/look/Plate.tsx');
@@ -261,6 +262,40 @@ test('a frame of what failed: its edge in failure, and no glow', async () => {
   assert.match(tagWith(html, 'data-cut-frame'), /data-cut-frame="failure"/);
   assert.match(tagWith(html, 'data-cut-edge'), /background-color:var\(--meaning-failure\);/);
   assert.doesNotMatch(tagWith(html, 'data-cut-shape'), /filter/);
+});
+
+test("the cut field: its edge drawn in the cut shape, the whole of it in a session's hue when the focus is in it", async () => {
+  const field = createElement('input', { 'aria-label': 'Message' });
+  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
+  const html = await drawn(createElement(CutField, { size: 10, children: field }));
+  const shape = tagWith(html, 'data-cut-shape');
+  assert.match(shape, /aria-hidden="true"/);
+  assert.match(shape, /pointer-events-none/);
+  assert.doesNotMatch(shape, /filter/, 'a field casts no glow');
+  assert.match(tagWith(html, 'data-cut-field'), /group\/field/, 'the focus in it is read from the box itself');
+  const edge = tagWith(html, 'data-cut-edge');
+  assert.match(edge, /clip-path:polygon\(0px 0px, calc\(100% - 10px\) 0px, 100% 10px, 100% 100%, 10px 100%, 0px calc\(100% - 10px\)\)/);
+  assert.match(edge, /\bbg-outline-variant\b/, "quiet, the outline's hue");
+  assert.match(edge, /\bgroup-focus-within\/field:bg-alive\b/, "with the focus in it, a session's hue, the diagonals with the sides");
+  assert.match(
+    tagWith(html, 'data-cut-ground="quiet"'),
+    /group-focus-within\/field:hidden[^>]*clip-path:polygon\(1px 1px,/,
+    'quiet, the ground a pixel inside the edge',
+  );
+  assert.match(
+    tagWith(html, 'data-cut-ground="focus"'),
+    /hidden group-focus-within\/field:block[^>]*clip-path:polygon\(2px 2px,/,
+    'focused, two pixels inside it: the edge the width it has quiet and a pixel more',
+  );
+  assert.deepEqual(
+    html.match(/(?:focus-within:|focus-visible:|data-focus-visible:)?ring-[\w[]/g),
+    null,
+    'no rectangular ring on the field or on the frame: a clip would take it off the two cut corners',
+  );
+  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
+  const quiet = await drawn(createElement(CutField, { ground: 'bg-surface-container', children: field }));
+  assert.match(tagWith(quiet, 'data-cut-edge'), /calc\(100% - 12px\) 0px/, 'a field cut 12 by default');
+  for (const layer of ['quiet', 'focus']) assert.match(tagWith(quiet, `data-cut-ground="${layer}"`), /\bbg-surface-container\b/);
 });
 
 test('a cue: its words in small caps, in the ink of its hue, in a frame of that hue cut 9', async () => {

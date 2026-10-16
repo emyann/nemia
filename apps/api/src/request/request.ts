@@ -27,8 +27,9 @@ const WILDCARD = '/*';
 
 /**
  * The route the router matched the request to, as its pattern (`/api/runs/:id`), or undefined where nothing but the middleware's own
- * wildcard matched. The last of the matched routes, never `routePath(c)`, which indexes them by `c.req.routeIndex` — inside a middleware,
- * the middleware's own line.
+ * wildcard matched, which is what OTel asks of a request that reached no route. The last of the matched routes, not `routePath(c)`, which
+ * reads the one at `c.req.routeIndex`: the dispatcher moves that index as it runs each handler, so what it names depends on when it is
+ * read, and the last line matched is the route whichever handler is running.
  */
 const routeOf = (c: Context<ApiEnv>): string | undefined => {
   const path = matchedRoutes(c).at(-1)?.path;

@@ -1,8 +1,8 @@
 /**
  * The calls a try was refused, as the stats count them: which steps' tries are measured at all (`deniesRecorded`), which sessions ran as
- * jobs that record them (`ranAsJob`), and every call each ended attempt of a session was denied, one per call (`deniedCallsOf`); the feed
- * reads those and a running attempt's so far (`deniedSoFarOf`). And the skills a try loaded: every skill each ended attempt of a session
- * loaded, one per load, where each ended attempt says (`skillsLoadedOf`).
+ * jobs that record them (`ranAsJob`), and every call each ended attempt of a session was denied, one per call (`deniedCallsOf`), read by
+ * the stats (`stats.verb.ts`) and by the step meter (`src/meter/step.ts`); nothing reads a running attempt's denials. And the skills a try
+ * loaded: every skill each ended attempt of a session loaded, one per load, where each ended attempt says (`skillsLoadedOf`).
  * And the skills a try was due to load: those whose `applies:` names a file its sessions read or wrote (`filesTouchedOf`, `skillsDueOf`).
  * And the rules those skills declare (`SkillRule`): on each try whose denials were measured, a rule is broken when a call the try was
  * denied matches one of its `breaks`, as a `disallowedTools:` rule matches a call (`disallowedBy`), and kept otherwise — "no refused call
@@ -42,7 +42,7 @@ export const ranAsJob = (session: Pick<TaskSpan, 'filedAt' | 'spawnedAt'>): bool
   return since !== null && Date.parse(since) >= Date.parse(JOBS_SINCE);
 };
 
-/** What `deniedCallsOf` and `deniedSoFarOf` read of a task's view: its attempts, whether each ended, and what each was denied. */
+/** What `deniedCallsOf` reads of a task's view: its attempts, whether each ended, and what each was denied. */
 export type DeniedClock<D> = { state: { attempts: ReadonlyArray<{ ended: unknown; denials?: readonly D[] }> } };
 
 /**
@@ -51,22 +51,6 @@ export type DeniedClock<D> = { state: { attempts: ReadonlyArray<{ ended: unknown
  */
 export const deniedCallsOf = <D>(view: DeniedClock<D> | undefined): D[] =>
   (view?.state.attempts ?? []).flatMap((a) => (a.ended === null || a.ended === undefined ? [] : [...(a.denials ?? [])]));
-
-/** What a task's sessions have been denied so far: `ended`, every call of its ended attempts; `running`, each distinct call of the rest. */
-export type DeniedSoFar<D> = { ended: D[]; running: D[] };
-
-/**
- * Every call a task's sessions have been denied so far, for its step's line in the feed: each denial of each attempt that ended, one per
- * call (`deniedCallsOf`), and apart, each distinct call of an attempt still running, once, by `key`, in the order first denied — a running
- * attempt's call is named as the harness reports it, and counted only once its attempt ends. Both empty for a task with no view, and for
- * one denied nothing.
- */
-export const deniedSoFarOf = <D>(view: DeniedClock<D> | undefined, key: (d: D) => string): DeniedSoFar<D> => {
-  const running = new Map<string, D>();
-  for (const a of view?.state.attempts ?? [])
-    if (a.ended === null || a.ended === undefined) for (const d of a.denials ?? []) if (!running.has(key(d))) running.set(key(d), d);
-  return { ended: deniedCallsOf(view), running: [...running.values()] };
-};
 
 /** What `skillsLoadedOf` reads of a task's view: its attempts, whether each ended, and the skills each loaded, where its end says. */
 export type SkillsClock = { state: { attempts: ReadonlyArray<{ ended: unknown; skills?: readonly string[] }> } };

@@ -150,7 +150,9 @@ a line one of them takes is printed. The keys are the line's own: its labels —
 `step`, `agent` — and the five a signed line names of itself, `kind`, `reason`, `type`, `waits` and `source`.
 The message a person reads is no key of it: it is prose, reworded whenever a status is, so nothing selects on
 it, and `-l message=…` is refused with the keys there are. `=` and `in` never match a key the line does not
-carry, so `-l factory=nemia` passes over a daemon's line and `-l factory!=nemia` takes it.
+carry, so `-l factory=nemia` passes over a daemon's line and `-l factory!=nemia` takes it. A step with no
+agent carries `agent: none`, the word the one writer of a step's labels gives it (`stepKeys`, `src/meter/step.ts`),
+so the bare `-l agent` takes its line and `-l agent!=none` is how a person leaves agentless steps out.
 
 **`--cursor-file <path>` is where a watch keeps its place**: read when it starts, where the file is there,
 and written after every line it reads — selected or not, so a filtered watcher resumes at the feed's end and

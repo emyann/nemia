@@ -572,7 +572,8 @@ const WATCH: Ran = {
     'cursor read to in a file, and start from it where it is there.',
     '--json: one JSON object a line, a feed line with its cursor, and a',
     'cursor of its own every 30 seconds while the feed is still. With no -l,',
-    'every line; -l waits=person takes the lines that wait on a person.',
+    'every line; -l waits=person takes the lines that wait on a person. A',
+    'step with no agent carries agent: none, which -l agent!=none leaves out.',
   ],
   spec: {
     positionals: [{ key: 'cursor', takes: 'optional', kind: 'text' }],

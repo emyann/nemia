@@ -37,7 +37,9 @@ export const filedOn = (f: PinsRead, step: Workflow | undefined): Pick<StepRecor
 /**
  * The session a filing continues, or none where the closeout schema has moved since that session was filed: a session is asked for its
  * closeout by the tool it was given, and asked in another shape would pay for the whole conversation again for an answer in the wrong one.
- * `record` is the step whose session it is — the step's own for a nudge and a round, the step it resumes for a `resume:`.
+ * `record` is the filing step's own record, whosever session it continues: what is compared is the schema this step was last filed with,
+ * never another step's, so a `resume:` whose schema differs from the step it resumes — which `docs/features.md` allows on purpose — still
+ * continues that session, and pays one fresh session only when its own schema moves.
  *
  * A record with no `closeoutHash`, written before this was kept, resumes as it always did: the hash says a schema moved, and an absent one
  * says nothing. Pure.

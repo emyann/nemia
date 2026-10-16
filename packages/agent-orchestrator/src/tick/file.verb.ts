@@ -629,7 +629,7 @@ function readySpec(
         own: told.own,
         landingDenied: () => said.words?.denied ?? [],
       }),
-      resumeFrom: step.resume ? resumeOn(sessionOf(f, step.resume), step, f, run.steps[step.resume]) : undefined,
+      resumeFrom: step.resume ? resumeOn(sessionOf(f, step.resume), step, f, run.steps[step.name]) : undefined,
       ...(holdsOpenOn(step) ? { holdOpen: true as const } : {}),
       /**
        * The engine hands it to the harness and records the answer without reading it: what the fields mean is this package's (`Closeout`).

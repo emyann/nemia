@@ -68,6 +68,7 @@ import type { CompactRefused, CompactReport } from './compact.ts';
 import { watchOf } from './watch.ts';
 import { sayVerbOf, type SayRefused, type SayUnsent } from './say.ts';
 import { interruptVerbOf, type Interrupted, type InterruptRefused, type InterruptUnsent } from './interrupt.ts';
+import { answerVerbOf, type Answering, type AnswerRefused, type AnswerUnsent, type AskAnswered } from './answer.ts';
 import {
   handleOf,
   isSpec,
@@ -351,6 +352,23 @@ export type EngineShape = {
    * that did not take the request, fails with `InterruptUnsent`, its `cause` what failed: ask again.
    */
   readonly interrupt: (taskId: string) => Effect.Effect<Interrupted, InterruptRefused | InterruptUnsent | JournalError>;
+  /**
+   * Answer a call of the task's running session that is held open waiting on a person (`TaskView.asks`): the ask by the id the view
+   * gave it, and each question's answer by the question's own text. The held call returns the answer to the session as its own
+   * result, so the session reads it as if it had asked a person at a terminal. Answers when it was answered, and of which attempt
+   * (`AskAnswered`).
+   *
+   * Journals nothing, and is no lifecycle verb: no entry of it is on the record, and the next pass reads the session's asks as it
+   * reads any other fact of it, so the same ask answered twice answers it once and refuses the second.
+   *
+   * Refused — `AnswerRefused`, and nothing answered — in this order, what the record says before what the harness says: a task this
+   * engine has no record of; a harness that holds no call open for a person (every harness but Claude Code attached on the Agent
+   * SDK, where the task says a person can be asked, `config.mayAsk`); a task that has settled, or has been asked to stop; one with
+   * no attempt in flight; then, off its harness, an attempt its harness does not list; a session its harness lists ended; and an ask
+   * its session does not hold open, a question already answered included. A harness that could not be read, or that did not take the
+   * answer, fails with `AnswerUnsent`, its `cause` what failed: ask again.
+   */
+  readonly answerAsk: (taskId: string, given: Answering) => Effect.Effect<AskAnswered, AnswerRefused | AnswerUnsent | JournalError>;
   /**
    * What a harness's subscription has left (`HarnessQuota`), asked of `harness`, or of the default harness when none is named: the
    * plan's limits, each with its use and its reset, or why there are none. Claude Code answers it, as `claude` and as `claude-bg`, by
@@ -636,6 +654,7 @@ const countedInto =
 const writtenVerbsOf = (...given: Parameters<typeof sayVerbOf>) => ({
   say: sayVerbOf(...given),
   interrupt: interruptVerbOf(...given),
+  answerAsk: answerVerbOf(...given),
 });
 
 /**

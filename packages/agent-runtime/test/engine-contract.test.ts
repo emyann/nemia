@@ -33,6 +33,7 @@ const LIES: { readonly [V in Kept]: (answer: Answer) => Answer } = {
   list: Effect.map((list) => ({ ...(list as object), unreadable: [{ taskId: 'elsewhere', why: 'elsewhere' }] })),
   say: Effect.map((said) => ({ ...(said as object), attempt: 2 })),
   interrupt: Effect.catch(() => Effect.succeed({ at: '2026-01-01T00:00:00.000Z', attempt: 1 })),
+  answerAsk: Effect.catch(() => Effect.succeed({ at: '2026-01-01T00:00:00.000Z', attempt: 1 })),
   transcript: Effect.catch(() => Effect.succeed({ events: [], cursor: 'elsewhere' })),
   forget: Effect.map((report) => ({ ...(report as object), forgotten: !(report as { forgotten: boolean }).forgotten })),
   kept: Effect.match({ onFailure: () => ({ tasks: [] }), onSuccess: () => ({ tasks: [{ taskId: 'elsewhere' }] }) }),

@@ -29,7 +29,11 @@ import readline from 'node:readline';
 type Plan = {
   deny?: string;
   ask?: string;
+  /** The input the `can_use_tool` request for `ask` carries; `{}` when none. */
+  askInput?: unknown;
   call?: string;
+  /** The `tool_input` the `PreToolUse` hooks of `call` are given; absent when none. */
+  callInput?: unknown;
   nested?: string;
   fromSubAgent?: boolean;
   hold?: boolean;
@@ -100,10 +104,13 @@ const work = async () => {
   print({ type: 'system', subtype: 'init', session_id: sessionId, cwd: process.cwd(), tools: [], model: 'stand-in' });
   if (plan.deny) print({ type: 'system', subtype: 'permission_denied', tool_name: plan.deny, tool_use_id: 'denied-1', session_id: sessionId });
   if (plan.ask)
-    note('answers.jsonl', { event: 'can_use_tool', answer: await ask({ subtype: 'can_use_tool', tool_name: plan.ask, input: {}, tool_use_id: 'asked-1' }) });
+    note('answers.jsonl', {
+      event: 'can_use_tool',
+      answer: await ask({ subtype: 'can_use_tool', tool_name: plan.ask, input: plan.askInput ?? {}, tool_use_id: 'asked-1' }),
+    });
   if (plan.call && !interrupted) {
     print({ type: 'assistant', session_id: sessionId, message: { role: 'assistant', content: [{ type: 'tool_use', id: 'call-1', name: plan.call, input: {} }] } });
-    await hooked('PreToolUse', plan.call, 'call-1');
+    await hooked('PreToolUse', plan.call, 'call-1', plan.callInput === undefined ? {} : { tool_input: plan.callInput });
   }
   if (plan.nested) {
     await appears('nest');

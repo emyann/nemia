@@ -30,8 +30,12 @@ import { claudeStreamOutput } from '../detached/output.ts';
 import { claudeTranscriptEvents, claudeTranscriptFile } from './transcript.ts';
 import { lessCarried } from '../detached/detached.ts';
 import {
+  appendAnswer,
+  asksTaken,
   attachedStateOf,
   CARRY_ON,
+  cutAsks,
+  openAsks,
   crashNote,
   childOf,
   drainsThis,
@@ -49,7 +53,7 @@ import { gone, hear, interruptTurn, killGroup, startSession, type Held, type Liv
 
 /** The attached sessions of one engine: the runner's verbs, and `hold`, which makes this process their holder for a scope. */
 export type Attached = {
-  readonly ops: Pick<RunnerOps, 'spawn' | 'observe' | 'observeFor' | 'stop' | 'logs' | 'transcript' | 'say' | 'interrupt'>;
+  readonly ops: Pick<RunnerOps, 'spawn' | 'observe' | 'observeFor' | 'stop' | 'logs' | 'transcript' | 'say' | 'interrupt' | 'answer'>;
   readonly hold: Effect.Effect<void, never, Scope.Scope>;
   readonly holding: () => boolean;
   readonly has: (name: string) => boolean;
@@ -136,7 +140,19 @@ const sightingOf = (root: string, run: AttachedRun): Sighting => {
     ...(held === true ? { pid: run.owner } : {}),
     ...bridgeOf(run),
     ...(run.calling && run.state === 'working' ? { calling: run.calling } : {}),
+    ...asksOf(root, run),
   };
+};
+
+/**
+ * The asks of `run` as a sighting says them, for a session whose task may ask a person (`config.mayAsk`): those still waiting on one
+ * (`openAsks`) and those whose call took an answer (`asksTaken`). Nothing at all for a session that may ask nobody, so a sighting says
+ * `asks` only where the harness can hold one.
+ */
+const asksOf = (root: string, run: AttachedRun): Pick<Sighting, 'asks' | 'asksTaken'> => {
+  if ((run.request as { config?: { mayAsk?: unknown } }).config?.mayAsk !== true) return {};
+  const taken = asksTaken(root, run.name);
+  return { asks: openAsks(root, run.name), ...(taken.length ? { asksTaken: taken } : {}) };
 };
 
 /** Whether a holder takes `run` up: parked, or at work under a process that is gone, its pid taken by another since included. */
@@ -148,8 +164,15 @@ const orphaned = (run: AttachedRun): boolean => run.state === 'parked' || (isOpe
  */
 const noteOf = (run: AttachedRun): string => (run.calling ? crashNote(run.calling.tool) : CARRY_ON);
 
+/**
+ * How many calls of `l` are in flight doing work: those of its calls that are not waiting on a person (`Live.asking`). A call held
+ * open for a person to answer is not work a let-go waits for — nothing of it will finish until someone answers, and the park cuts it
+ * and leaves the answer to be said as words.
+ */
+const workingIn = (l: Live): number => [...(l.calls?.keys() ?? [])].filter((id) => l.asking?.has(id) !== true).length;
+
 /** The sessions of `live` at work with a call in flight. */
-const inCallOf = (live: Map<string, Live>): Live[] => [...live.values()].filter((l) => l.calls?.size && l.run.state === 'working');
+const inCallOf = (live: Map<string, Live>): Live[] => [...live.values()].filter((l) => workingIn(l) > 0 && l.run.state === 'working');
 
 /** The tool of the call `l` is in, as a line names it. */
 const toolOf = (l: Live): string => l.run.calling?.tool ?? 'a tool';
@@ -166,7 +189,8 @@ const parked = (root: string, live: Map<string, Live>, cut: boolean): Effect.Eff
   Effect.sync(() => {
     for (const l of live.values()) {
       if (!l.abort || (l.run.state !== 'working' && l.run.state !== 'idle')) continue;
-      const kept = cut && l.calls?.size ? l.run.calling : undefined;
+      cutAsks(root, l.run.name);
+      const kept = cut && workingIn(l) > 0 ? l.run.calling : undefined;
       const group = childOf(l.run);
       const { calling: _, childPid: __, childStart: ___, ...rest } = l.run;
       l.run = { ...rest, state: 'parked', ...(kept ? { calling: kept } : {}) };
@@ -239,6 +263,7 @@ export const attachedSessions = (root: string, executable?: string, options: { l
   };
 
   const adopt = async (run: AttachedRun): Promise<void> => {
+    cutAsks(root, run.name);
     const child = childOf(run);
     killGroup(child);
     await gone(child);
@@ -289,6 +314,27 @@ export const attachedSessions = (root: string, executable?: string, options: { l
   };
 };
 
+/**
+ * `answer` over the sessions under `root`: the person's answers written beside the session (`appendAnswer`), where its held call reads
+ * them. Refused for a session no holder runs, and for an ask it does not hold open — one already answered included.
+ */
+const answerOn =
+  (root: string): NonNullable<RunnerOps['answer']> =>
+  (session, given) =>
+    Effect.try({
+      try: () => {
+        const run = readRun(filesOf(root, session.name).run);
+        if (run === undefined || !isOpen(run.state))
+          throw new Error(
+            `\`${session.name}\` is ${run ? run.state : 'not an attached session'}, so no call of it is waiting on a person.`,
+          );
+        if (!openAsks(root, session.name).some((ask) => ask.id === given.id))
+          throw new Error(`\`${session.name}\` has no ask \`${given.id}\` waiting on a person: read its asks again (\`ae ls\`).`);
+        appendAnswer(root, session.name, { id: given.id, at: new Date().toISOString(), answers: given.answers });
+      },
+      catch: failed('answer'),
+    });
+
 /** Why a verb failed, as the runner's error. */
 const failed = (verb: string) => (cause: unknown) =>
   new RunnerError({ verb, message: `claude: ${cause instanceof Error ? cause.message : String(cause)}` });
@@ -306,8 +352,8 @@ const opsOf = (
   spawn: (r) =>
     Effect.try({
       try: () => {
-        const { out, stop, interrupt, say } = filesOf(root, r.name);
-        for (const f of [out, stop, interrupt, say]) fs.rmSync(f, { force: true });
+        const { out, stop, interrupt, say, asks, answers } = filesOf(root, r.name);
+        for (const f of [out, stop, interrupt, say, asks, answers]) fs.rmSync(f, { force: true });
         const run: AttachedRun = {
           name: r.name,
           state: 'working',
@@ -360,6 +406,7 @@ const opsOf = (
       },
       catch: failed('interrupt'),
     }),
+  answer: answerOn(root),
   say: (session, text) =>
     Effect.try({
       try: () => {

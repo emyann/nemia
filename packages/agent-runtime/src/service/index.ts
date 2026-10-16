@@ -3,6 +3,8 @@ export { DrainRefused, Engine, EngineRefused, ListRefused, TranscriptRefused, Qu
 export { SayRefused, SayUnsent } from './say.ts';
 export { InterruptRefused, InterruptUnsent } from './interrupt.ts';
 export type { Interrupted } from './interrupt.ts';
+export { AnswerRefused, AnswerUnsent } from './answer.ts';
+export type { Answering, AskAnswered } from './answer.ts';
 export type { EngineShape } from './engine.ts';
 export { OutputRefused } from './output.ts';
 export { FollowRefused } from './follow.ts';

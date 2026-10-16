@@ -22,6 +22,7 @@ import {
   type Bridge,
   type Event,
   type Now,
+  type SessionAsk,
   type Sighting,
   type State,
   type Usage,
@@ -109,6 +110,13 @@ export type TaskView = {
   waitingFor?: string;
   /** The tool call the attempt in flight is in, and since when, as its harness sees it (`Sighting.calling`). Absent between calls. */
   calling?: { tool: string; since: string };
+  /**
+   * The questions the attempt in flight is waiting on a person for, as its harness holds them (`Sighting.asks`). Absent from a
+   * harness that cannot say, and from a task whose session may ask nobody. Carried, never judged.
+   */
+  asks?: SessionAsk[];
+  /** The asks of the attempt in flight whose held call took the person's answer (`Sighting.asksTaken`). Carried, never judged. */
+  asksTaken?: string[];
   /**
    * Where a task filed `queued` stands with the layer above: `queued` while its current turn waits for the word to start,
    * `admitted` once given and until the next pass starts it. Beside the phase, never in it: the phase of either is `pending`
@@ -880,6 +888,8 @@ export function viewOfState(state: State, observed: ReadonlyMap<string, Sighting
     usage: state.restartPolicy === 'Always' ? (last?.usage ?? undefined) : sighting?.usage,
     ...(waitingFor ? { waitingFor } : {}),
     ...(sighting?.calling ? { calling: sighting.calling } : {}),
+    ...(sighting?.asks ? { asks: sighting.asks } : {}),
+    ...(sighting?.asksTaken ? { asksTaken: sighting.asksTaken } : {}),
     ...(admission ? { admission } : {}),
     ...(bridge ? { bridge } : {}),
     ...(unread ? { unreadWhy: unread } : {}),

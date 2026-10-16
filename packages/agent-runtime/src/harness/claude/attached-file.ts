@@ -1,14 +1,16 @@
 /**
  * An attached session's face to every other process: its run file under `<root>/runs/attached/`, written by the process that holds the
  * session alone, and the files another process writes beside it, each its own: a stop (`<name>.stop`), the words said to the session
- * (`<name>.say.jsonl`, appended, which its holder hands it as it looks), and the drain (`drain.json`), which names the holder whose new
- * calls wait. What the session said is its capture (`<name>.out.jsonl`), the SDK's
+ * (`<name>.say.jsonl`, appended, which its holder hands it as it looks), the person's answers to the questions it holds open
+ * (`<name>.answers.jsonl`, appended by the answer verb), and the drain (`drain.json`), which names the holder whose new calls wait.
+ * The questions it asked, each opened and closed, are its own (`<name>.asks.jsonl`), written by its holder alone and composed on read
+ * (`openAsks`, `asksTaken`). What the session said is its capture (`<name>.out.jsonl`), the SDK's
  * messages a reader reads (`claudeStreamKept`), appended as they come.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { Schema } from 'effect';
-import type { SessionState } from '../../core/index.ts';
+import type { AskQuestion, SessionAsk, SessionState } from '../../core/index.ts';
 import { processStart } from './inbox.ts';
 import type { SpawnRequest } from '../seam.ts';
 
@@ -93,9 +95,88 @@ export const filesOf = (root: string, name: string) => {
     stop: `${base}.stop`,
     interrupt: `${base}.interrupt`,
     say: `${base}.say.jsonl`,
+    asks: `${base}.asks.jsonl`,
+    answers: `${base}.answers.jsonl`,
     out: `${base}.out.jsonl`,
     mcp: `${base}.mcp.json`,
   };
+};
+
+/**
+ * One line of a session's asks file: the call that asked a person opened, with its questions, or the same call closed once its answer
+ * reached it. Appended by the session's holder alone, and read by any process, which composes the two on read (`openAsks`).
+ */
+export type AskLine = { id: string; at: string; questions?: AskQuestion[]; closed?: string; how?: 'taken' | 'cut' };
+
+/** One line of a session's answers file: a person's answer to the ask `id`, each question's by the question's own text. */
+export type AnswerLine = { id: string; at: string; answers: Record<string, string> };
+
+/** The lines of the JSONL file `file`, each parsed, a line that does not parse left out; none where there is no file. */
+const jsonLines = <A>(file: string): A[] => {
+  let text: string;
+  try {
+    text = fs.readFileSync(file, 'utf8');
+  } catch {
+    return [];
+  }
+  return text
+    .split('\n')
+    .filter((line) => line.trim() !== '')
+    .flatMap((line) => {
+      try {
+        return [JSON.parse(line) as A];
+      } catch {
+        return [];
+      }
+    });
+};
+
+/** Appends `line` to `file`, its folder made first. */
+const append = (file: string, line: unknown): void => {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.appendFileSync(file, `${JSON.stringify(line)}\n`);
+};
+
+/** Appends `line` to the asks file of the session `name`. Its holder is the one writer. */
+export const appendAsk = (root: string, name: string, line: AskLine): void => append(filesOf(root, name).asks, line);
+
+/** Appends `line` to the answers file of the session `name`. The answer verb is the one writer. */
+export const appendAnswer = (root: string, name: string, line: AnswerLine): void => append(filesOf(root, name).answers, line);
+
+/** Every answer written for the session `name`, oldest first. */
+export const readAnswers = (root: string, name: string): AnswerLine[] => jsonLines<AnswerLine>(filesOf(root, name).answers);
+
+/**
+ * The asks of the session `name` still waiting on a person: each opened and not closed, oldest first, in the order they were asked.
+ * Composed on read, so a holder that was cut before it could write a close leaves the ask open, which is what tells the layer above
+ * the answer is owed as words rather than through the call.
+ */
+export const openAsks = (root: string, name: string): SessionAsk[] => {
+  const lines = jsonLines<AskLine>(filesOf(root, name).asks);
+  const closed = new Set(lines.filter((l) => l.closed !== undefined).map((l) => l.id));
+  return lines.flatMap((l) =>
+    l.questions === undefined || closed.has(l.id) ? [] : [{ id: l.id, at: l.at, questions: l.questions } satisfies SessionAsk],
+  );
+};
+
+/**
+ * The asks of the session `name` whose held call took the person's answer, by their ids: what tells an answer that reached the session
+ * through its own call from one whose call was cut, which is owed to the session as words instead.
+ */
+export const asksTaken = (root: string, name: string): string[] =>
+  jsonLines<AskLine>(filesOf(root, name).asks)
+    .filter((l) => l.how === 'taken')
+    .map((l) => l.id);
+
+/**
+ * Every ask of the session `name` still open closed as cut: no answer reached its call, and the layer above owes the answer as words.
+ * Written where a call can no longer be waiting — a turn that ended, a session parked, a session taken up by a new holder.
+ */
+export const cutAsks = (root: string, name: string): void => {
+  for (const ask of openAsks(root, name)) {
+    const at = new Date().toISOString();
+    appendAsk(root, name, { id: ask.id, at, closed: at, how: 'cut' });
+  }
 };
 
 /** The run file at `file`, or undefined when there is none, or it is not one a holder writes (a holder caught mid-write is not). */

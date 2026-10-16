@@ -110,14 +110,17 @@ const SETTINGS = JSON.parse(fs.readFileSync(path.join(REPO, '.claude', 'settings
 
 /**
  * A call a session makes: a shell command, or a tool by its name, an edit or a write with the absolute path it writes when one is said, a
- * browser tool with the address it opens or the file it is told to write when one is given.
+ * browser tool with the address it opens or the file it is told to write when one is given, a fetch with the host it reads.
  */
 type Call =
-  | { tool: 'Bash'; command: string; path?: undefined; url?: undefined; filename?: undefined }
-  | { tool: string; command?: undefined; path?: string; url?: string; filename?: string };
+  | { tool: 'Bash'; command: string; path?: undefined; url?: undefined; filename?: undefined; domain?: undefined }
+  | { tool: string; command?: undefined; path?: string; url?: string; filename?: string; domain?: string };
 
 /** The parameters of an MCP tool a rule may name here, each read off the call as it wrote it. */
-const PARAMS = ['url', 'filename'] as const;
+const MCP_PARAMS = ['url', 'filename'] as const;
+
+/** Every parameter a rule may name here: an MCP tool's, and the host `WebFetch` reads. */
+const PARAMS = [...MCP_PARAMS, 'domain'] as const;
 
 /** What no shipped step may run, in the spellings a session types. */
 const FENCED: Call[] = [
@@ -173,8 +176,9 @@ const shown = (call: Call): string => {
  * covers it (`covers`). Claude Code matches a write against `Edit` rules, so an `Edit` rule reaches `Write` too. A rule on an MCP tool's
  * parameter, `mcp__<server>__<tool>(url:<glob>)` or `(filename:<glob>)`, reaches a call of that tool whose parameter the glob covers
  * whole, each `*` any run of characters, compared as the call wrote it, and no call that gives none: so Claude Code was measured to
- * read one in a deny list, and an allow list is read through `granting`, which refuses one. Throws on a `*` in a tool's name and on any
- * other parameter, which this matcher does not model.
+ * read one in a deny list, and an allow list is read through `granting`, which refuses one. A rule on `WebFetch`'s host,
+ * `WebFetch(domain:<host>)`, reaches a fetch of exactly that host and no other, and no fetch that says none; a bare `WebFetch` reaches
+ * every one. Throws on a `*` in a tool's name and on any other parameter, which this matcher does not model.
  */
 function reaches(rule: string, call: Call): boolean {
   const bash = /^Bash\((.*)\)$/s.exec(rule)?.[1];
@@ -182,13 +186,19 @@ function reaches(rule: string, call: Call): boolean {
     const tool = rule.includes('(') ? rule.slice(0, rule.indexOf('(')) : undefined;
     if (tool?.startsWith('mcp__')) {
       const said = rule.slice(tool.length + 1, -1);
-      const param = PARAMS.find((name) => said.startsWith(`${name}:`));
+      const param = MCP_PARAMS.find((name) => said.startsWith(`${name}:`));
       if (param === undefined || tool.includes('*'))
         throw new Error(
           `${rule}: a parameter rule on an MCP tool is modelled for \`url:\` and \`filename:\` alone; say how it reads, here`,
         );
       const given = call[param];
       return tool === call.tool && given !== undefined && globbed(said.slice(param.length + 1), false).test(given);
+    }
+    if (tool === 'WebFetch') {
+      const said = rule.slice(tool.length + 1, -1);
+      if (!said.startsWith('domain:'))
+        throw new Error(`${rule}: a rule on WebFetch is modelled for \`domain:\` alone; say how it reads, here`);
+      return call.tool === 'WebFetch' && call.domain === said.slice('domain:'.length);
     }
     const pathed = call.path !== undefined && tool !== undefined;
     if (pathed && (tool === call.tool || (call.tool === 'Write' && tool === 'Edit')))
@@ -413,9 +423,20 @@ test('the matcher reads the rule shapes the fences use, and throws on a wildcard
   assert.equal(reaches(store, { tool: 'Bash', command: 'nemia factory instruction f' }), false);
   assert.equal(reaches('Bash(git (x) *.md)', { tool: 'Bash', command: 'git (x) a.md' }), true, "a rule's other characters are its own");
   assert.equal(reaches('Bash(git (x) *.md)', { tool: 'Bash', command: 'git (x) a_md' }), false);
+  const fetch = { tool: 'WebFetch', domain: 'code.claude.com' } as const;
+  assert.equal(reaches('WebFetch(domain:code.claude.com)', fetch), true);
+  assert.equal(reaches('WebFetch(domain:docs.claude.com)', fetch), false, 'a rule on a host is that host alone');
+  assert.equal(reaches('WebFetch(domain:claude.com)', fetch), false, 'a host is matched whole, never as a suffix');
+  assert.equal(reaches('WebFetch(domain:code.claude.com)', { tool: 'WebFetch' }), false, 'and reaches no fetch that says no host');
+  assert.equal(reaches('WebFetch', fetch), true, 'a bare WebFetch is every host');
+  assert.equal(reaches('WebFetch(domain:code.claude.com)', { tool: 'WebSearch' }), false);
   assert.throws(
     () => reaches('mcp__play*', unsafe),
     (err: Error) => err.message.includes('not modelled'),
+  );
+  assert.throws(
+    () => reaches('WebFetch(url:https://code.claude.com/docs)', fetch),
+    (err: Error) => err.message.includes('a rule on WebFetch is modelled for `domain:` alone'),
   );
 });
 
@@ -1522,6 +1543,50 @@ test("REFUSED: cd to Seldon, Agora and Iris, each by a deny of its own, where th
     assert.deepEqual(unbreakable(step, cd), [], `${agent} is refused cd`);
     const unDenied = { ...step, disallowedTools: (step.disallowedTools ?? []).filter((rule) => rule !== 'Bash(cd:*)') };
     assert.deepEqual(unbreakable(unDenied, cd), [`${step.name}: never-cd Bash(cd:*)`], `${agent}: without its deny, cd is open`);
+  }
+});
+
+/** The agents that design, review and interview, each of which reads Anthropic's documentation. */
+const READERS = ['seldon', 'agora', 'iris'];
+
+/** Anthropic's documentation, by the host a fetch reads: the only hosts those agents open. */
+const DOCUMENTATION: Call[] = ['code.claude.com', 'docs.claude.com', 'platform.claude.com', 'docs.anthropic.com'].map((domain) => ({
+  tool: 'WebFetch',
+  domain,
+}));
+
+/** Another site, in the spellings a session reaches one: a host near Anthropic's, and a host of its own. */
+const ELSEWHERE: Call[] = ['claude.com', 'code.claude.com.example.test', 'example.com', 'github.com'].map((domain) => ({
+  tool: 'WebFetch',
+  domain,
+}));
+
+test("Seldon, Agora and Iris read Anthropic's documentation and search the web by their own allow, each host by name, and no other host", () => {
+  for (const agent of READERS) {
+    const step = shippedStepOf(agent);
+    assert.ok(step.tools?.includes('WebFetch') && step.tools.includes('WebSearch'), `${agent} is given WebFetch and WebSearch`);
+    assert.deepEqual(
+      runs(step, [...DOCUMENTATION, { tool: 'WebSearch' }], {}, []),
+      [...DOCUMENTATION.map(shown), 'WebSearch'],
+      `${agent}: by its own allow, no settings read`,
+    );
+    assert.deepEqual(runs(step, ELSEWHERE, {}, []), [], `${agent} opens no other host`);
+    assert.deepEqual(runs(step, [{ tool: 'WebFetch' }], {}, []), [], `${agent} reaches no fetch that names no host`);
+  }
+});
+
+test('REFUSED: a host an agent allows no more is read no more, and a bare WebFetch allowed opens every site', () => {
+  for (const agent of READERS) {
+    const cut = shippedEdited(agent, agent === 'iris' ? 'intake' : 'build', 'an allow of docs.claude.com', (text) =>
+      text.replace(' WebFetch(domain:docs.claude.com),', ''),
+    );
+    assert.deepEqual(
+      runs(cut, DOCUMENTATION, {}, []),
+      DOCUMENTATION.filter((call) => call.domain !== 'docs.claude.com').map(shown),
+      `${agent}: without its allow, docs.claude.com is refused`,
+    );
+    const bare = shippedAllowed(agent, agent === 'iris' ? 'intake' : 'build', 'Agent, WebFetch, WebSearch');
+    assert.deepEqual(runs(bare, ELSEWHERE, {}, []), ELSEWHERE.map(shown), `${agent}: a bare WebFetch opens every site`);
   }
 });
 

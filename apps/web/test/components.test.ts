@@ -6,7 +6,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { listed, summary } from './run-fixtures.ts';
+import { behind, detail as detailOf, listed, summary, unpinned } from './run-fixtures.ts';
 import './tsx.ts';
 
 const { createElement } = await import('react');
@@ -27,6 +27,7 @@ const { TemplateCard } = await import('../src/components/TemplateCard.tsx');
 const { stateMeaning } = await import('../src/lib/status.ts');
 const { StepBody, StepPolicy, Told } = await import('../src/components/Told.tsx');
 const { RunGone } = await import('../src/components/RunGone.tsx');
+const { KindsBehind } = await import('../src/components/KindsBehind.tsx');
 const { instantWhole, instantWords } = await import('../src/lib/instant.ts');
 const { timeToTheSecond } = await import('../src/lib/timeOfDay.ts');
 type RunDetail = import('../src/lib/api.ts').RunDetail;
@@ -7163,4 +7164,15 @@ test("Nemia's face is her blobatar on its plate, dimmed in dark, and wears the e
   const drawing = (html: string) => html.slice(html.indexOf('<svg'));
   assert.notEqual(drawing(up), drawing(waits), 'the expression reaches the drawing');
   assert.equal(drawing(renderToStaticMarkup(createElement(NemiaFace, { presence: UP }))), drawing(up), 'one presence, one drawing');
+});
+
+test('the run page draws one tag per kind the run is behind on, and the verb to type; nothing at all for a run with none', () => {
+  const drawn = renderToStaticMarkup(createElement(KindsBehind, { run: behind() }));
+  assert.match(drawn, /agent coder: rev 5, now 6/, 'what a filing after this would take');
+  assert.match(drawn, /skill look: implement ran on rev 1, now 2/, 'and what a step that already ran ran on');
+  assert.match(drawn, /nemia refresh r-1/, 'the verb to type, as the api said it');
+  assert.match(drawn, /data-kinds-behind="2"/);
+
+  assert.equal(renderToStaticMarkup(createElement(KindsBehind, { run: detailOf({ kinds: [] }) })), '', 'a run on the newest draws none');
+  assert.equal(renderToStaticMarkup(createElement(KindsBehind, { run: unpinned() })), '', 'and so does one the api pinned nothing for');
 });

@@ -28,9 +28,6 @@ import {
   fileNames,
   heldIn,
   holdFile,
-  refreshFile,
-  removeRefresh,
-  writeRefresh,
   isDirectory,
   listRuns,
   lstatOf,
@@ -197,6 +194,40 @@ function runIds(): string[] {
 }
 
 /** The run's files directory, `runs/<id>/artifacts`. */
+/**
+ * That a person asked the run to take the new revisions (`nemia refresh`): `{ at }`, a person's fact in a file of its own for the reason
+ * `cancelFile` is. Written by `refresh` alone, exclusively; removed by the pass that takes the revisions it asked for (`removeRefresh`).
+ * Never composed onto the record: the pass reads the file itself (`stands`), as a level-triggered reader must.
+ */
+const refreshFile = (id: string): string => path.join(runsDir(), `${id}.refresh`);
+
+/**
+ * Write down that a person asked this run to take the new revisions, and answer with the ask written — or null, when one already stands.
+ * `wx`, so two people asking at once make one ask, and an ask is never edited: the pass that takes the revisions lifts it.
+ */
+const writeRefresh = (id: string): { at: string } | null => {
+  fs.mkdirSync(runsDir(), { recursive: true });
+  const ask = { at: new Date().toISOString() };
+  try {
+    fs.writeFileSync(refreshFile(id), JSON.stringify(ask, null, 2), { flag: 'wx' });
+    return ask;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'EEXIST') return null;
+    throw err;
+  }
+};
+
+/** Lift the refresh ask: whether a file was there. Taken by the pass that wrote the pins it asked for, after the record is written. */
+const removeRefresh = (id: string): boolean => {
+  try {
+    fs.rmSync(refreshFile(id));
+    return true;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return false;
+    throw err;
+  }
+};
+
 const filesDir = (id: string): string => path.join(runsDir(), id, 'artifacts');
 
 /** The run's files directory while it is a directory and no link; else undefined. */

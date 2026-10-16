@@ -428,6 +428,8 @@ test("a run in full: the brief, each step's spec and prose, what it was told, an
       /** Gated at no step: no gate to wait at. */
       gates: [],
       warning: null,
+      kinds: [],
+      refresh: 'nemia refresh r-2',
       graph: { roots: ['implement'], edges: [{ from: 'implement', to: 'review', kind: 'after' }] },
       steps: undefined,
       timeline: oneTaskTotals(),

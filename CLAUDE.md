@@ -121,8 +121,9 @@ holds what every change needs.
 - **A check that did not finish is not a refusal.** Only a numeric exit is a verdict on the work (`refusedCheck`); `wf retry <run> <step>
   --recheck` runs it again — never a hand edit of a journal or a record (`agent-orchestrator/test/run.test.ts`, *a check that did not
   finish is no refusal*).
-- **No command from a checkout.** A `check:` comes from the workflow folder frozen on the run record at `wf start`
-  (`agent-orchestrator/test/store.test.ts`, *the frozen command*).
+- **No command from a checkout.** A `check:` comes from the workflow folder frozen on the run record, never from the workspace a step
+  works in: resolved at `wf start`, afresh at the run's first filing while it has filed nothing, and on `nemia refresh`
+  (`agent-orchestrator/test/store.test.ts`, *the frozen command*; `test/revisions.test.ts`).
 - **Prose is not a constraint.** If the packages need an agent to do something, the machinery refuses the alternative
   `(no test yet)`.
 - **Errors say what to do next.** Throw `Error` with `.exitCode = 2` and a message naming the fix; in the orchestrator, a refusal by

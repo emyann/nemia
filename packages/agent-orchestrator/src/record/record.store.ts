@@ -18,7 +18,7 @@ import { FrozenStepSchema } from '../folder/folder.store.ts';
 import { inputsRoot } from './places.store.ts';
 import type { AsksRead, MergeAskHeld } from './record.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
-import { REVISION_KINDS } from '../revisions/revisions.ts';
+import { Pins } from '../revisions/revisions.store.ts';
 import { wfRoot } from '../config/config.store.ts';
 import { countRecord, readText, within } from '../meter/tally.store.ts';
 
@@ -44,16 +44,6 @@ const LandedSchema = Schema.Union([
   Schema.StructWithRest(Schema.Struct({ aborted: Schema.String, refusedOn: Schema.optional(Schema.String) }), Rest),
   Schema.StructWithRest(Schema.Struct({ untouched: Schema.String }), Rest),
 ]);
-
-/** What a run or one of its steps resolved of one kind and name (`Pin`), as any version of the tick writes one. */
-const PinSchema = Kept({
-  kind: Schema.Literals([...REVISION_KINDS]),
-  name: Schema.String,
-  n: Schema.Number,
-  hash: Schema.String,
-});
-
-const Pins = Schema.optional(Schema.mutable(Schema.Array(PinSchema)));
 
 const StepRecordSchema = Kept({
   taskId: Schema.NullOr(Schema.String),
@@ -232,13 +222,9 @@ export function readPruned(id: string): Pruned | undefined {
   if (!marker) return undefined;
   const [at, worktrees, artifacts] = [fieldOf(marker.json, 'at'), fieldOf(marker.json, 'worktrees'), fieldOf(marker.json, 'artifacts')];
   const [artifactsAt, artifactsBytes] = [fieldOf(artifacts, 'at'), fieldOf(artifacts, 'bytes')];
-  return {
-    at: isText(at) ? at : '',
-    worktrees: isList(worktrees) ? worktrees.filter(isPrunedWorktree) : [],
-    ...(artifacts === undefined
-      ? {}
-      : { artifacts: { at: isText(artifactsAt) ? artifactsAt : '', bytes: isAmount(artifactsBytes) ? artifactsBytes : 0 } }),
-  };
+  const pruned = { at: isText(at) ? at : '', worktrees: isList(worktrees) ? worktrees.filter(isPrunedWorktree) : [] };
+  if (artifacts === undefined) return pruned;
+  return { ...pruned, artifacts: { at: isText(artifactsAt) ? artifactsAt : '', bytes: isAmount(artifactsBytes) ? artifactsBytes : 0 } };
 }
 
 /**
@@ -296,51 +282,6 @@ export const removeHold = (id: string, at: string): boolean => {
 };
 
 /**
- * That a person asked the run to take the new revisions (`nemia refresh`): `{ at }`, a person's fact in a file of its own for the reason
- * `cancelFile` is. Written by `refresh` alone, exclusively; removed by the pass that takes the revisions it asked for (`removeRefresh`),
- * and by `nemia rm` with the run. Composed onto the run on read as `refresh`.
- */
-export const refreshFile = (id: string) => path.join(runsDir(), `${id}.refresh`);
-
-/**
- * The refresh ask, read: undefined for a run nobody asked. A file that does not read as one still asks, at no time: the next pass takes the
- * new revisions and lifts it either way.
- */
-function readRefresh(id: string): { at: string } | undefined {
-  const marker = markerOf(refreshFile(id));
-  if (!marker) return undefined;
-  const at = fieldOf(marker.json, 'at');
-  return { at: isText(at) ? at : '' };
-}
-
-/**
- * Write down that a person asked this run to take the new revisions, and answer with the ask written — or null, when one already stands.
- * `wx`, so two people asking at once make one ask, and an ask is never edited: the pass that takes the revisions lifts it.
- */
-export const writeRefresh = (id: string): { at: string } | null => {
-  fs.mkdirSync(runsDir(), { recursive: true });
-  const ask = { at: new Date().toISOString() };
-  try {
-    fs.writeFileSync(refreshFile(id), JSON.stringify(ask, null, 2), { flag: 'wx' });
-    return ask;
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'EEXIST') return null;
-    throw err;
-  }
-};
-
-/** Lift the refresh ask: whether a file was there. Taken by the pass that wrote the pins it asked for, after the record is written. */
-export const removeRefresh = (id: string): boolean => {
-  try {
-    fs.rmSync(refreshFile(id));
-    return true;
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return false;
-    throw err;
-  }
-};
-
-/**
  * A run: its record, with what people own beside it composed on read — the cancellation (`cancelFile`), its pruning (`pruneFile`), its
  * hold (`holdFile`), each approval at a gate (`readApprovals`), and each loop a person ended as it stands (`readAcceptances`), off one
  * listing of its asks directory. None of them is ever written into the record (`rewriteRun`), and whatever the record carries under their
@@ -365,11 +306,11 @@ const readRecord = (id: string): Run => {
   }
   if (!isRunRecord(raw)) throw new UnreadableRecord(id, recordRefusal(raw));
   const read = { ...raw };
-  for (const key of ['approvals', 'acceptances', 'pruned', 'hold', 'refresh', 'pause', 'cordon']) delete read[key];
+  for (const key of ['approvals', 'acceptances', 'pruned', 'hold', 'pause', 'cordon']) delete read[key];
   const { workflow, ...unfrozen } = read;
   const run = workflow ? { ...read, workflow: workflow.map(asNamed) } : unfrozen;
   const at = fs.existsSync(cancelFile(id)) ? readText(cancelFile(id)).trim() : '';
-  const [pruned, hold, refresh] = [readPruned(id), readHold(id), readRefresh(id)];
+  const [pruned, hold] = [readPruned(id), readHold(id)];
   const { approvals, acceptances } = within('asks', () => {
     const names = fileNames(asksDir(id));
     return { ...readApprovalsNow(id, names), ...readAcceptancesNow(id, names) };
@@ -379,7 +320,6 @@ const readRecord = (id: string): Run => {
     ...(at ? { cancelledAt: at } : {}),
     ...(pruned ? { pruned } : {}),
     ...(hold ? { hold } : {}),
-    ...(refresh ? { refresh } : {}),
     ...(approvals.length ? { approvals } : {}),
     ...(acceptances.length ? { acceptances } : {}),
   };
@@ -803,7 +743,7 @@ export const writeRun = ({ pause: _, ...run }: Run) => {
  */
 export const rewriteRun = (run: Run): boolean => within('act', () => rewriteNow(run));
 
-const rewriteNow = ({ approvals: _, acceptances: __, pruned: ___, hold: ____, refresh: _____, pause: ______, ...run }: Run): boolean => {
+const rewriteNow = ({ approvals: _, acceptances: __, pruned: ___, hold: ____, pause: _____, ...run }: Run): boolean => {
   let fd: number;
   try {
     fd = fs.openSync(runFile(run.id), 'r+');

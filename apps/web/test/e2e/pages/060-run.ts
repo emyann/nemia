@@ -21,6 +21,15 @@ export default {
       `the run's header names its workflow (${FAKE.workflow}), a folder the board pages on no address, linked to the Workflows page`,
     );
     await expectCount(page.locator('[data-from]'), 0, 'a run started with no card says it came from none');
+    const behind = page.locator('section[aria-label="The revisions this run is behind on"]');
+    await expectCount(
+      behind.locator('[data-kind-behind]'),
+      FAKE.behind.kinds,
+      `the run says the drift of every kind it resolved (${FAKE.behind.kinds})`,
+    );
+    for (const words of [FAKE.behind.agent, FAKE.behind.skill, FAKE.behind.ran])
+      await expectVisible(behind.locator('[data-kind-behind]', { hasText: words }), `the drift reads ${words}`);
+    await expectVisible(behind.getByText(`nemia refresh ${FAKE.id}`), 'it says the verb that takes the new revisions');
     const graph = page.locator(`section[aria-label="The run's steps as a graph"]`);
     await expectCount(
       graph.locator('.react-flow__node'),

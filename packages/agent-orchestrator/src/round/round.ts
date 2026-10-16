@@ -2,6 +2,7 @@
  * A loop's rounds: those due now (`roundsDue`) and the steps once one is filed (`roundFiled`), what `nemia round` and `nemia accept` ask
  * and refuse (`roundAsk`, `acceptAsk`), and what `nemia ls` and `nemia decide` say of a loop (`roundDueNote`, `roundLines`). Pure.
  */
+import { filedOn } from '../pinned/pinned.ts';
 import { DEFAULT_ROUNDS, type Workflow } from '../step/step.ts';
 import {
   andList,
@@ -130,9 +131,16 @@ function askedRound(
  * verified — a new session, under its next try's id (`stepTaskId`). So the looping step's closeout that asked for the round is behind it,
  * and a pass that reads the record after this files no second round. A cap a person raised with the round is kept on each step it was
  * raised for, in force from its next try (`budgetOf`).
+ *
+ * The target's record keeps what its new try is filed on (`filedOn`): the revisions of its agent and its skills, and the digest of the
+ * closeout schema it is given, as every other filing keeps them.
  */
 export function roundFiled(steps: readonly Workflow[], run: Run, r: Round, taskId: string): Run['steps'] {
   const looping = steps.find((s) => s.name === r.step);
+  const filed = filedOn(
+    { run, reads: { steps } },
+    steps.find((s) => s.name === r.target),
+  );
   const next = { ...run.steps };
   const then = r.by === 'merge' ? 'merge' : 'round';
   for (const name of looping ? loopSpan(steps, looping) : []) {
@@ -141,7 +149,8 @@ export function roundFiled(steps: readonly Workflow[], run: Run, r: Round, taskI
     const over: EarlierTry[] = rest.taskId ? [{ taskId: rest.taskId, ...(check ? { check } : {}), then, ...raised }] : [];
     next[name] = { ...rest, taskId: name === r.target ? taskId : null, tries: [...tries, ...over] };
   }
-  return { ...next, ...Object.fromEntries((r.back ?? []).filter((b) => next[b]).map((b) => [b, sentBack(next[b])])) };
+  const refiled = { ...next, ...Object.fromEntries((r.back ?? []).filter((b) => next[b]).map((b) => [b, sentBack(next[b])])) };
+  return { ...refiled, [r.target]: { ...refiled[r.target], ...filed } };
 }
 
 /** The pass's line for a round it filed: its round and on whose word, or the merge it files (`mergeNote`). */

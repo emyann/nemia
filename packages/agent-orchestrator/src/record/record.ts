@@ -224,13 +224,6 @@ type RunBase = {
    */
   pinned?: readonly Pin[];
   /**
-   * That a person asked the run to take the new revisions (`nemia refresh`), and when — composed on read from a file of its own,
-   * `runs/<id>.refresh`, as `cancelledAt` is, and never written into the record. The next pass re-pins the run and renders its steps'
-   * agent files again, so every filing after it — a new step, a retry, a round — is filed on the new revisions, then lifts the file.
-   * Absent on a run nobody asked.
-   */
-  refresh?: { at: string };
-  /**
    * That a person paused the whole store (`nemia pause`), by whom and why — composed on read onto every run from the store's one file,
    * `$WF_ROOT/cordon`, and never written into a record. While it stands the run files nothing new, no step, try, round or check, and
    * what a person writes meanwhile waits on its own files for the lift (`assess`); what is in flight runs on. Absent while the store is not

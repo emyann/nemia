@@ -54,8 +54,8 @@ import type { BranchReader } from '../branches/branches.store.ts';
 import { roundBriefed, roundFiled, roundFiledNote } from '../round/round.ts';
 import { closeoutsAfterMerge } from '../merge/merge.verb.ts';
 import { filedConfig, tryModel } from '../filed/filed.ts';
-import { closeoutHashOf, closeoutSchemaOf, envelopeRefusals, parseCloseout, type Closeout } from '../closeout/index.ts';
-import { stepPins } from '../revisions/pin.verb.ts';
+import { filedOn, resumeOn } from '../pinned/pinned.ts';
+import { closeoutSchemaOf, envelopeRefusals, parseCloseout, type Closeout } from '../closeout/index.ts';
 import { modeWord, nextTry, sessionModel, tryWord, type Retry, type RetryAsk } from '../retry/index.ts';
 import { artifactsDir, inputsDir } from '../record/record.store.ts';
 import { checkCloseout, writeCheckCloseout } from '../check/check.store.ts';
@@ -229,11 +229,7 @@ const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: Workflow
   const files = artifactsDir(run, r.step);
   fs.mkdirSync(files, { recursive: true });
   const remote = isRemoteHarness(step.harness);
-  const resumeFrom = resumeOn(
-    r.mode === 'nudge' && !remote ? sessionIn(reads.views, record.taskId!) : undefined,
-    closeoutHashOf(step, reads.steps),
-    record,
-  );
+  const resumeFrom = resumeOn(r.mode === 'nudge' && !remote ? sessionIn(reads.views, record.taskId!) : undefined, step, f, record);
   const refusal = record.check && step.check ? yield* refusalRead(step.check, record.check.taskId).pipe(over(asRead(f))) : undefined;
   const closeouts = yield* askingReads(f, r, resumeFrom);
   const checked = remote ? [] : yield* checksHandedRead(run, reads.steps, step).pipe(over(asRead(f)));
@@ -359,27 +355,6 @@ const trySpec = (
 });
 
 /**
- * What a step's record keeps of the filing: the agent and skill revisions it was filed on, off the run's pins (`stepPins`), and the digest
- * of the closeout schema it was given (`closeoutHashOf`). Written at every filing, so a step that has shipped says which revisions its try
- * ran on even once a refresh has moved the run's own past them.
- */
-const filedOn = (f: Filing, step: Workflow): Pick<StepRecord, 'pinned' | 'closeoutHash'> => {
-  const pins = stepPins(step, f.run.pinned ?? []);
-  return { ...(pins.length ? { pinned: pins } : {}), closeoutHash: closeoutHashOf(step, f.reads.steps) };
-};
-
-/**
- * The session a filing continues, or none where the closeout schema has moved since that session was filed: a session is asked for its
- * closeout by the tool it was given, and asked in another shape would pay for the whole conversation again for an answer in the wrong one.
- * `record` is the step whose session it is — the step's own for a nudge and a round, the step it resumes for a `resume:`.
- *
- * A record with no `closeoutHash`, written before this was kept, resumes as it always did: the hash says a schema moved, and an absent one
- * says nothing.
- */
-const resumeOn = (session: string | undefined, hash: string, record: StepRecord | undefined): string | undefined =>
-  record?.closeoutHash === undefined || record.closeoutHash === hash ? session : undefined;
-
-/**
  * File the rounds due (the assessment's `round`), in order, until the pass may file no more: answers with the looping steps it took round.
  */
 export const fileRounds = Effect.fn('fileRounds')(function* (f: Filing, round: readonly Round[]) {
@@ -419,7 +394,6 @@ const fileRound = Effect.fnUntraced(function* (f: Filing, r: Round, looped: stri
     yield* asked('file', e.file(roundSpec(f, r, looping, target, taskId, said)));
   }
   Object.assign(run.steps, roundFiled(f.reads.steps, run, r, taskId));
-  run.steps[r.target] = { ...run.steps[r.target], ...filedOn(f, target) };
   if (r.merge && isRepositoryRun(run)) run.baseRef = r.merge.sha;
 });
 
@@ -450,11 +424,7 @@ function roundSpec(
   const record = run.steps[r.target];
   const files = artifactsDir(run, r.target);
   fs.mkdirSync(files, { recursive: true });
-  const resumeFrom = resumeOn(
-    record.taskId ? sessionIn(reads.views, record.taskId) : undefined,
-    closeoutHashOf(target, reads.steps),
-    record,
-  );
+  const resumeFrom = resumeOn(record.taskId ? sessionIn(reads.views, record.taskId) : undefined, target, f, record);
   const told = toldOf(run, target);
   return {
     id: taskId,
@@ -659,7 +629,7 @@ function readySpec(
         own: told.own,
         landingDenied: () => said.words?.denied ?? [],
       }),
-      resumeFrom: step.resume ? resumeOn(sessionOf(f, step.resume), closeoutHashOf(step, reads.steps), run.steps[step.resume]) : undefined,
+      resumeFrom: step.resume ? resumeOn(sessionOf(f, step.resume), step, f, run.steps[step.resume]) : undefined,
       ...(holdsOpenOn(step) ? { holdOpen: true as const } : {}),
       /**
        * The engine hands it to the harness and records the answer without reading it: what the fields mean is this package's (`Closeout`).

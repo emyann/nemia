@@ -176,6 +176,7 @@ import {
 } from '../src/timeline/timeline.ts';
 import type { TaskView } from 'agent-runtime';
 import type { Verdict } from '../src/check/check.ts';
+import { closeoutHashOf } from '../src/closeout/index.ts';
 import { CLOSEOUT_FIELDS, parseAgent, parseWorkflow, type OutputSchema, type Workflow } from '../src/workflow.ts';
 
 const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: `do ${name}` });
@@ -3578,6 +3579,10 @@ test("a round moves every step of the loop behind it: the target continued under
       taskId: 'r-1-implement-try2',
       ...where,
       tries: [{ taskId: 'r-1-implement', check: { taskId: 'r-1-implement-check' }, then: 'round' }],
+      closeoutHash: closeoutHashOf(
+        chain.find((s) => s.name === 'implement')!,
+        chain,
+      ),
     },
     test: { taskId: null, ...where, tries: [{ taskId: 'r-1-test', then: 'round' }] },
     review: { taskId: null, ...where, tries: [{ taskId: 'r-1-review', then: 'round' }] },

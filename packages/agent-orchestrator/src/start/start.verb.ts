@@ -538,6 +538,10 @@ export const repoFor = (name: string | undefined, named: string | undefined, fal
  * is frozen on the record as `mounts`, filed with every local step and named on its brief, so a later change to the factory changes
  * no run started. Left out when none is mounted, and in the default factory.
  *
+ * The revision of every kind the run resolved — its workflow, each agent, each of their skills and the factory's rules — is appended to
+ * the ledger and pinned on the record as `pinned` (`pinsOf`); a run that has filed nothing resolves them again on every pass, so an
+ * edit made while it waits `--after` reaches its first filing.
+ *
  * Fails with the refusal it met, every one before anything is written (`stepsToStart`, the place's `open` — a `.worktreeinclude` it
  * refuses among them, for a run that cuts worktrees — and those above); dies of anything else, an `open` not heard and the copy's and the
  * render's `Error` included (`tried`).

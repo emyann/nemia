@@ -29,8 +29,8 @@ import { stepsOf } from '../record/steps.store.ts';
 import { hasStarted } from '../wait/wait.ts';
 import { Conflict } from '../refusal/refusal.ts';
 import type { Run } from '../record/record.ts';
-import { appendRevision, topsOf } from './revisions.store.ts';
-import { digestOf, kindsDrift, type KindName, type Pin } from './revisions.ts';
+import { appendRevision } from './revisions.store.ts';
+import { kindsDrift, type KindName, type Pin } from './revisions.ts';
 
 /** What a run resolved on a pass: the steps it now holds, and the revision of each kind they were read at. */
 export type Resolved = { steps: Workflow[]; pins: Pin[] };
@@ -100,17 +100,6 @@ export function pinsOf(run: Pick<Run, 'workflowDir' | 'repo' | 'factory'>, steps
     return [{ kind: of.kind, name: of.name, n, hash }];
   });
 }
-
-/**
- * The agent and skill pins one step was filed on, off the run's pins: what the step's own record keeps, so a shipped step says which
- * revisions it ran on once a refresh has moved the run's own past them.
- */
-export const stepPins = (step: Workflow, pins: readonly Pin[]): Pin[] => {
-  const agent = step.agent;
-  if (!agent) return [];
-  const names = new Set(agent.skills ?? []);
-  return pins.filter((p) => (p.kind === 'agent' && p.name === agent.name) || (p.kind === 'skill' && names.has(p.name)));
-};
 
 /** The run's workflow folder as it stands now, or undefined where it does not load, so the run keeps the workflow it froze. */
 function folderNow(run: Pick<Run, 'workflowDir' | 'repo' | 'factory'>): Workflow[] | undefined {
@@ -186,9 +175,12 @@ function firstResolve(run: Run, at: string): PinnedPass {
   return { wrote: true, notes: [`took the revisions of ${resolved.pins.length} kinds: nothing of it is filed yet`], lift: false };
 }
 
-/** The run's steps and pins taken again on a person's ask (`nemia refresh`), for a run that has filed: the ask is spent either way. */
+/**
+ * The run's steps and pins taken again on a person's ask (`nemia refresh`), for a run that has filed: the ask is spent either way. The ask
+ * is read off its own file every pass (`runStore.refresh.stands`), never off the record, which never holds it.
+ */
 function refreshDue(run: Run, at: string): PinnedPass {
-  if (!run.refresh) return NOTHING;
+  if (!runStore.refresh.stands(run.id)) return NOTHING;
   const resolved = refreshedNow(run, at);
   if (!resolved)
     return {
@@ -206,9 +198,12 @@ function refreshDue(run: Run, at: string): PinnedPass {
  * `nemia refresh <run>`: write down that a person asked this run to take the new revisions, so every filing after it — a new step, a retry,
  * a round — is filed on them, and answers with the drift it was asked on.
  *
- * Refused (`Conflict`): a run that has filed nothing, which resolves its kinds afresh at its first filing anyway; and a run whose pins are
- * already the ledger's top, since nothing would be taken, and an ask nothing acts on is an ask the tick reads for ever. A run with no
- * record is refused `Missing` by the store's read.
+ * It resolves the kinds now to answer, which is what gives an edit its number in the ledger: a content nobody has resolved yet has no
+ * entry, so the drift cannot be read off the ledger alone.
+ *
+ * Refused (`Conflict`): a run that has filed nothing, which resolves its kinds afresh at its first filing anyway; a run whose pins are
+ * already the newest of every kind, since nothing would be taken, and an ask nothing acts on is an ask the tick reads for ever; and a run
+ * whose folder does not load, which has no revision to take. A run with no record is refused `Missing` by the store's read.
  */
 export const refreshRun = Effect.fn('refresh')(function* (id: string) {
   const run = yield* tried(() => runStore.runs.read(id));
@@ -218,7 +213,14 @@ export const refreshRun = Effect.fn('refresh')(function* (id: string) {
         message: `run ${id} has filed nothing yet: it resolves its kinds afresh at its first filing, so an edit made while it waits reaches its first step with no refresh. Nothing was written.`,
       }),
     );
-  const drift = yield* tried(() => kindsDrift(run.pinned, topsOf(kindsIn(run, stepsOf(run)))));
+  const resolved = yield* tried(() => refreshedNow(run, new Date().toISOString()));
+  if (!resolved)
+    return yield* Effect.fail(
+      new Conflict({
+        message: `run ${id}: its workflow folder, ${run.workflowDir}, does not load, so there is no revision to take. Mend the folder, and nemia refresh ${id} again. Nothing was written.`,
+      }),
+    );
+  const drift = kindsDrift(run.pinned, resolved.pins);
   if (!drift.length)
     return yield* Effect.fail(
       new Conflict({
@@ -229,3 +231,12 @@ export const refreshRun = Effect.fn('refresh')(function* (id: string) {
     return yield* Effect.fail(new Conflict({ message: `run ${id} is already asked to refresh: the next pass takes the new revisions.` }));
   return drift;
 });
+
+/**
+ * What a pass owes the store once it has decided: the record, written where this pass or the pins changed it, and then the refresh ask the
+ * pins answered, lifted — in that order, so an ask is never spent on a record that was not written.
+ */
+export const pinsWritten = (run: Run, took: PinnedPass, wrote: boolean): void => {
+  if (wrote || took.wrote) runStore.runs.rewrite(run);
+  if (took.lift) runStore.refresh.lift(run.id);
+};

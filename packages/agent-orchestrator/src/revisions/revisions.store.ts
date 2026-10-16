@@ -8,11 +8,30 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { revisionNow, type KindName, type Pin, type Revision, type RevisionKind } from './revisions.ts';
-import { HOME } from '../record/record.store.ts';
+import { Schema } from 'effect';
+import { revisionNow, REVISION_KINDS, type KindName, type Pin, type Revision, type RevisionKind } from './revisions.ts';
+import { wfRoot } from '../config/config.store.ts';
+
+/** The store whose ledger this is, read once as the package loads, as `record.store.ts` reads its `HOME`. */
+const ROOT = wfRoot();
 
 /** Where the ledger lives: `$WF_ROOT/revisions`, beside `runs/`. */
-export const revisionsDir = (): string => path.join(HOME, 'revisions');
+export const revisionsDir = (): string => path.join(ROOT, 'revisions');
+
+/**
+ * What a run or one of its steps resolved of one kind and name (`Pin`), as a record keeps it: absent where nothing was resolved, and each
+ * entry kept whole, so a pin a newer tick writes more of comes back as it was written.
+ */
+export const Pins = Schema.optional(
+  Schema.mutable(
+    Schema.Array(
+      Schema.StructWithRest(
+        Schema.Struct({ kind: Schema.Literals([...REVISION_KINDS]), name: Schema.String, n: Schema.Number, hash: Schema.String }),
+        [Schema.Record(Schema.String, Schema.Unknown)],
+      ),
+    ),
+  ),
+);
 
 /**
  * The file a kind and name's entries are kept in. The name is escaped (`encodeURIComponent`), since a skill's name holds a folder and a

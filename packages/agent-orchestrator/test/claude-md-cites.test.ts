@@ -157,7 +157,6 @@ test('every test file each CLAUDE.md cites is there, and every test name it quot
   const files = testFiles(ROOT);
   assert.ok(files.length > 200, `the walk found ${files.length} test files, far fewer than the repository has`);
   const docs = claudeFiles(ROOT);
-  const cited = docs.flatMap((doc) => citesOf(fs.readFileSync(path.join(ROOT, doc), 'utf8')));
   const citing = docs.filter((doc) => citesOf(fs.readFileSync(path.join(ROOT, doc), 'utf8')).length > 0);
   assert.ok(citing.length > 1, `${citing.length} CLAUDE.md cite a test: the path pattern matches almost nothing the files write`);
   const broken = docs.flatMap((doc) => brokenCites(ROOT, doc, files));

@@ -1792,14 +1792,13 @@ test('the fold keeps the last word of each run and step, forgets a removed run, 
 test("a removed run's one-shots go with it: a run back under an id it had says its acts again, and never reads them as already written", () => {
   const at = '2026-09-22T10:00:00.000Z';
   const put = '2026-09-22T09:00:00.000Z';
-  /** Every one-shot the two runs hold: the run's own acts, and its steps'. */
-  const of = (run: string): FeedLine[] => [
+  const oneShotsOf = (run: string): FeedLine[] => [
     { at, run, word: 'cancel asked', note: `at ${put}` },
     { at, run, word: 'hold put', note: `since ${put}` },
     { at, run, step: 'plan', word: 'approved', note: `try 1 · at ${put}`, try: 1 },
     { at, run, step: 'plan', word: 'denied: Bash(git push)', note: 'try 1', call: 'Bash(git push)', try: 1 },
   ];
-  const fold = foldFeed(freshFold(), [...of('r-1'), ...of('r-1x'), { at, run: 'r-1', word: 'running' }]);
+  const fold = foldFeed(freshFold(), [...oneShotsOf('r-1'), ...oneShotsOf('r-1x'), { at, run: 'r-1', word: 'running' }]);
   assert.equal([...fold.shots.keys()].length, 8, 'the fixture holds four one-shots of each run, of its own kind and of its step');
 
   foldFeed(fold, [{ at, run: 'r-1', word: 'removed' }]);

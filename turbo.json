@@ -56,7 +56,13 @@
     },
     "web#test": {
       "dependsOn": ["^transit"],
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/tools/**", "$TURBO_ROOT$/.claude/skills/change-the-board/SKILL.md"]
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/tools/**",
+        "$TURBO_ROOT$/.claude/skills/change-the-board/SKILL.md",
+        "$TURBO_ROOT$/CLAUDE.md",
+        "$TURBO_ROOT$/.gitattributes"
+      ]
     },
     "docs#test": {
       "dependsOn": ["^transit"],

@@ -11,7 +11,8 @@
  * every source for the names their pages cite, and the paths those pages cite, at the root and under `docs/` and `workflows/`.
  * The api's test of what `npm run dev` watches reads every workspace package's `package.json` and sources (`dev-watch.test.ts`).
  * The board's test of the look's parts reads the trigger skill of a change to the board, which names each part
- * (`apps/web/test/look.test.ts`), so the web's test lists that skill's `SKILL.md` too.
+ * (`apps/web/test/look.test.ts`), and its test of a merge reads the root's `CLAUDE.md` and `.gitattributes`
+ * (`apps/web/test/e2e-merge.test.ts`), so the web's test lists all three.
  * `INPUTS` names, for each such task, the globs it must list beside its own files; `missingInputs` refuses a task or a glob left out.
  */
 import { test } from 'node:test';
@@ -56,7 +57,7 @@ const INPUTS: Record<string, readonly string[]> = {
     ...['src', 'place'].map((dir) => `$TURBO_ROOT$/packages/*/${dir}/**`),
     '$TURBO_ROOT$/packages/*/package.json',
   ],
-  'web#test': ['$TURBO_DEFAULT$', '$TURBO_ROOT$/tools/**', BOARD_SKILL],
+  'web#test': ['$TURBO_DEFAULT$', '$TURBO_ROOT$/tools/**', BOARD_SKILL, '$TURBO_ROOT$/CLAUDE.md', '$TURBO_ROOT$/.gitattributes'],
   'docs#test': [
     '$TURBO_DEFAULT$',
     '$TURBO_ROOT$/tools/**',
@@ -114,6 +115,9 @@ test("REFUSED: a task that drops the apps' tests or root files, the team, the te
     assert.deepEqual(missingInputs(dropping(task, '$TURBO_ROOT$/tools/**')), [
       `${task} does not list $TURBO_ROOT$/tools/** among its inputs in turbo.json: add it, or turbo replays it from its cache`,
     ]);
+  assert.deepEqual(missingInputs(dropping('web#test', '$TURBO_ROOT$/.gitattributes')), [
+    'web#test does not list $TURBO_ROOT$/.gitattributes among its inputs in turbo.json: add it, or turbo replays it from its cache',
+  ]);
   assert.deepEqual(missingInputs(dropping('web#test', BOARD_SKILL)), [
     `web#test does not list ${BOARD_SKILL} among its inputs in turbo.json: add it, or turbo replays it from its cache`,
   ]);

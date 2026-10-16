@@ -8,14 +8,10 @@ import { Effect } from 'effect';
 import { EngineService, asked } from '../runtime-client.ts';
 import { tryOf, type Run } from '../record/record.ts';
 import { keptRuns, runStore } from '../record/files.store.ts';
-import type { RecordMemo } from '../rest/kept.ts';
 import { stepsOf } from '../record/record.store.ts';
 import { stopAsked } from '../tick/held.verb.ts';
 import { putPause, readPause } from './pause.store.ts';
-import { currentTasks, interruptsAmong, liveAmong, type Interrupt, type PausedNow, type RunTasks } from './pause.ts';
-
-/** What a pause at once reads of every run before it reads a record, and the memo a caller that polls keeps of it between its reads. */
-export type PauseRuns = RecordMemo<RunTasks>;
+import { currentTasks, interruptsAmong, liveAmong, type Interrupt, type PauseRuns, type PausedNow, type RunTasks } from './pause.ts';
 
 /** A run as a pause at once first reads it: whether a person called it off, and every current task of its steps. */
 const runTasks = (run: Run): RunTasks => ({

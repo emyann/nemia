@@ -836,3 +836,28 @@ test("a step that names a server its agent does not is listed with its own line 
   );
   assert.deepEqual([of('plain')?.spec.mcp, of('plain')?.mcp], [[], ['browser']], "the agent's alone is no line of the step");
 });
+
+test("a step's page read twice reads no record of a run that has not moved, and says the same: its recent runs are read off the app's memo", async () => {
+  const runs = path.join(root, 'runs');
+  fs.mkdirSync(runs, { recursive: true });
+  const record = (id: string) => ({
+    id,
+    workspace: root,
+    brief: `the brief of ${id}`,
+    workflowDir: good,
+    place: { kind: 'folder' },
+    steps: { review: { taskId: `${id}-review` } },
+    createdAt: '2099-10-16T00:00:00.000Z',
+  });
+  fs.writeFileSync(path.join(runs, 'r-of-good.json'), JSON.stringify(record('r-of-good')));
+
+  const cold = (await (await stepPage('repo', 'good', 'review')).json()) as WorkflowStepPage;
+  assert.ok(
+    cold.recentRuns.some((r) => r.id === 'r-of-good'),
+    `the fixture run is on the page: ${cold.recentRuns.map((r) => r.id).join(', ')}`,
+  );
+  for (let n = 0; n < 50; n++)
+    fs.writeFileSync(path.join(runs, `other-${n}.json`), JSON.stringify({ ...record(`other-${n}`), workflowDir: mine }));
+  const warm = (await (await stepPage('repo', 'good', 'review')).json()) as WorkflowStepPage;
+  assert.deepEqual(warm, cold, "the warm answer is the cold read's own: nothing the board shows changes");
+});

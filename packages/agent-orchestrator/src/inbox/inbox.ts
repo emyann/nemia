@@ -36,6 +36,7 @@ import path from 'node:path';
 import { bodyOf, frontmatterKeys, type PlanFile } from '../plan/plan.ts';
 import { factoryNameRefusal, type Factory } from '../factory/factory.ts';
 import type { Run } from '../record/record.ts';
+import type { RecordMemo } from '../rest/index.ts';
 import { isReadme, splitFrontmatter, WorkflowError } from '../step/step.ts';
 
 export type InboxCard = {
@@ -282,6 +283,9 @@ export type QueueTry = { at: string; text: string; repo: string; why: string; re
  * another reason is not queued. Each card says the repository its factory picks for it (`factoryRepo`), from the store's `factories` that
  * read, by name: with none handed, none picks one.
  */
+/** The memo a caller that polls the inbox keeps of what its listing reads of every run: the card it was started from, under its id. */
+export type InboxRuns = RecordMemo<Pick<Run, 'id' | 'from'>>;
+
 export function inboxListing(
   files: readonly PlanFile[],
   runs: readonly Pick<Run, 'id' | 'from'>[],

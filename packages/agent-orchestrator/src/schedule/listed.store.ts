@@ -3,6 +3,7 @@
  * or not (`isDue`), and listed as `nemia ls` and the api list them (`schedulesListed`).
  */
 import type { Run } from '../record/record.ts';
+import type { RecordMemo } from '../rest/index.ts';
 import { readFactories } from '../factory/factory.store.ts';
 import type { Factory, Schedule } from '../factory/factory.ts';
 import { firesOf, readScheduleTry } from './schedule.store.ts';
@@ -10,6 +11,9 @@ import { scheduleDue, settledFire, type ScheduleListed, type ScheduleTry } from 
 
 /** What a schedule reads of a run: which fire of which schedule started it, and the run itself, for its last run's line. */
 export type ScheduleRun = Pick<Run, 'id' | 'createdAt' | 'scheduled'>;
+
+/** The memo a caller that polls the factories keeps of what their schedules read of every run. */
+export type ScheduleRuns = RecordMemo<ScheduleRun>;
 
 /** A schedule as a pass reads it: its factory and workflow, what the factory's file says, its fires around now, and the tick's kept try. */
 export type Read = {

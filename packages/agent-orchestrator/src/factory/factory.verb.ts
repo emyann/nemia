@@ -25,10 +25,9 @@ import { FACTORY_RULES } from '../rules/rules.verb.ts';
 import { FACTORY_APPLY } from '../applied/applied.verb.ts';
 import { FACTORY_PLAN, FACTORY_RESOLVE, FACTORY_UPGRADE } from '../upgrade/upgrade.verb.ts';
 import { FACTORY_SCHEDULE, FACTORY_UNSCHEDULE } from '../schedule/schedule.verb.ts';
-import { schedulesListed, type ScheduleRun } from '../schedule/listed.store.ts';
+import { schedulesListed, type ScheduleRun, type ScheduleRuns } from '../schedule/listed.store.ts';
 import type { ScheduleListed } from '../schedule/schedule.ts';
 import { keptRuns } from '../record/files.store.ts';
-import type { RecordMemo } from '../rest/kept.ts';
 import type { Run } from '../record/record.ts';
 import { trustedLines, type PlaceTrust, type Untrusted } from '../trust/trust.ts';
 import { FACTORY_TRUST, NO_TRUST, trustPlaces, untrustedPlaces } from '../trust/trust.verb.ts';
@@ -156,9 +155,6 @@ const textOf = (args: Args, key: string): string => {
  * their places a harness does not trust now, as `untrustedPlaces` reads them.
  */
 type Listed = { factories: FactoryListing[]; schedules: ScheduleListed[]; untrusted: Untrusted[] };
-
-/** What a schedule's listing reads of a run, and the memo a caller that polls the factories keeps of it between its reads. */
-export type ScheduleRuns = RecordMemo<ScheduleRun>;
 
 /** A run as a schedule's listing reads it: which fire of which schedule started it, and when the run was created. */
 const scheduleRun = (run: Run): ScheduleRun => ({

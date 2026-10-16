@@ -6,6 +6,7 @@
  * it are `assess` and the tick's `pass`.
  */
 import type { Run } from '../record/record.ts';
+import type { RecordMemo } from '../rest/index.ts';
 import type { RetryAsk } from '../retry/index.ts';
 import type { Workflow } from '../step/step.ts';
 import { landsOnCheck } from '../status/status.ts';
@@ -165,6 +166,9 @@ export const currentTasks = (run: Pick<Run, 'steps'>): string[] =>
  * (`currentTasks`). What a reader that polls keeps between its reads, so that the records it then reads are the live runs' alone.
  */
 export type RunTasks = Pick<Run, 'id' | 'cancelledAt'> & { tasks: readonly string[] };
+
+/** The memo a caller that polls what a pause at once would stop keeps of what it reads of every run (`RunTasks`). */
+export type PauseRuns = RecordMemo<RunTasks>;
 
 /**
  * The ids among `runs` one of whose current tasks is at work: the runs whose records a pause at once then reads, and no other. A run a

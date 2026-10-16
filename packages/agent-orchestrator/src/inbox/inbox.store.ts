@@ -19,6 +19,7 @@ import {
   queueRefusal,
   type InboxCard,
   type InboxListing,
+  type InboxRuns,
 } from './inbox.ts';
 import { queueFactoryRefusal } from './queue-factory.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
@@ -30,8 +31,6 @@ import { defaultStartsAllowed, factoryNames, readFactories, treeOf } from '../fa
 import type { Factory } from '../factory/factory.ts';
 import { HOME, isDirectory, runId, runsDir } from '../record/record.store.ts';
 import { keptRuns, runStore } from '../record/files.store.ts';
-import type { RecordMemo } from '../rest/kept.ts';
-import type { Run } from '../record/record.ts';
 
 /** The names of the inbox's cards, as `nemia inbox` lists them. */
 export const inboxCards = (): string[] =>
@@ -57,9 +56,6 @@ export const readInbox = (memo?: InboxRuns): InboxListing[] =>
     runStore.inbox.tries(),
     readableFactories(),
   );
-
-/** What the inbox's listing reads of a run: the card it was started from, under the run's id. */
-export type InboxRuns = RecordMemo<Pick<Run, 'id' | 'from'>>;
 
 /** The store's factories that read, by name: what a queued card's repository is chosen from (`queueRepo`). One not read is none. */
 export const readableFactories = (): Map<string, Factory> =>

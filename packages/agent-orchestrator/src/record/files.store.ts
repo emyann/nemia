@@ -53,7 +53,7 @@ import {
   When,
 } from './record.store.ts';
 import { mergeSpent } from '../merge/merge.ts';
-import { keptRecords, type RecordMemo } from '../rest/kept.ts';
+import { keptRecords, type RecordMemo } from '../rest/index.ts';
 import { verifiesRest } from '../config/config.store.ts';
 
 /** Each kind of ask: the file it is written at, by run, step and number, and its reader, as the tick reads it. */

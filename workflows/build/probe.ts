@@ -29,8 +29,8 @@ const LABEL = /^[a-z0-9]+$/;
 /** The command that lists every background session, ended ones included. */
 const LISTING = ['agents', '--all', '--json'];
 
-/** The states of a listed session that has ended. */
-const ENDED = new Set(['done', 'stopped']);
+/** The states of a listed session that has ended: a session that failed is over too, and `claude stop` leaves it as it is. */
+const ENDED = new Set(['done', 'stopped', 'failed']);
 
 /** How long a call of `claude` may take, in milliseconds. */
 const BOUND = 60_000;

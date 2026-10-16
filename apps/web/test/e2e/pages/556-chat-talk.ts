@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { Route } from 'playwright';
-import { chatPanelOf, dockOf, herChat, herEvent, openChat, photograph, themeOf, type HerLine } from '../board.ts';
+import { chatPanelOf, dockOf, expectPanelHeld, herChat, herEvent, openChat, photograph, themeOf, type HerLine } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
@@ -113,6 +113,7 @@ export default {
       const panel = await openChat(page);
       await expectVisible(panel.locator('[data-chat-where]', { hasText: 'Answering' }), 'the header says she is answering');
       await expectWorking(page, panel);
+      await expectPanelHeld(page);
       await settled(page);
       await photograph(page, path.join(OUT, `chat-talk-working-${await themeOf(page)}.png`), { fullPage: true });
 

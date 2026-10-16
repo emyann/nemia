@@ -1,6 +1,7 @@
 /**
  * The two lines inside Nemia's chat that are about the chat itself, neither of them a part of the look (`change-the-board` names none,
- * and `test/look.test.ts` refuses one it does not): her session stopped, with a way to start it, and the board having lost the daemon.
+ * and `test/look.test.ts` refuses one it does not): her session stopped, with a way to start it, the board having lost the daemon, and
+ * her chat the board cannot read at all.
  */
 import type { ReactNode } from 'react';
 import { CircleXIcon, PauseIcon } from 'lucide-react';
@@ -71,6 +72,19 @@ export function ChatLostBand({ since, now }: { since: string; now: Date }) {
   return (
     <Band role="alert" what="lost" icon={<CircleXIcon />} title="No answer from the daemon">
       {`Since ${clockWord(new Date(since), now)}. The board tries again every few seconds; nothing you wrote is lost.`}
+    </Band>
+  );
+}
+
+/**
+ * Her chat unread: the board asked the api for it and was refused or not answered, `why` as the read said it. Nothing of her is drawn
+ * beside it — a greeting with a level and counts read from nothing would say what the board does not know — and the board reads again
+ * on its own every few seconds.
+ */
+export function ChatUnreadableBand({ why }: { why: string }) {
+  return (
+    <Band role="alert" what="unreadable" icon={<CircleXIcon />} title="The board cannot read her chat">
+      {`${why}. It reads again every few seconds; what you write is kept here until the api takes it.`}
     </Band>
   );
 }

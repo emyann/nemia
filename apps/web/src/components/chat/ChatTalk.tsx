@@ -53,7 +53,7 @@ export function ChatTalk({ events, unread, onRead }: { events: readonly ChatEven
   }, [atEnd, events.length]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
       <div
         ref={box}
         data-chat-talk={atEnd ? 'latest' : 'back'}
@@ -61,7 +61,7 @@ export function ChatTalk({ events, unread, onRead }: { events: readonly ChatEven
         aria-label={atEnd ? "Nemia's talk" : 'Earlier messages'}
         // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a box that scrolls is reached by the keyboard
         tabIndex={0}
-        className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto"
+        className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto"
       >
         {items.map((item) => (
           <div key={item.kind === 'turn' ? item.id : item.event.id} className="contents">

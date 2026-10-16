@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { chatFieldOf, chatPanelOf, dockFaceOf, dockOf, herChat, openChat, photograph, themeOf } from '../board.ts';
+import { chatFieldOf, chatPanelOf, dockFaceOf, dockOf, expectPanelHeld, herChat, openChat, photograph, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
@@ -75,6 +75,7 @@ export default {
       await expectVisible(panel.getByRole('heading', { name: 'Nemia' }), 'her name in the header');
       await expectVisible(panel.locator('[data-chat-where]', { hasText: 'Up: her session runs' }), 'where she is');
       await expectEmpty(panel);
+      await expectPanelHeld(page);
       await settled(page);
       await photograph(page, path.join(OUT, `chat-empty-${await themeOf(page)}.png`), { fullPage: true });
 

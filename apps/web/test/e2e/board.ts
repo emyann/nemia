@@ -628,5 +628,28 @@ export async function openChat(page: Page): Promise<Locator> {
   return panel;
 }
 
+/**
+ * The panel stands wholly inside the window, and its composer wholly inside its frame: the header's three controls can be reached, the
+ * frame's cut corners are drawn, and nothing of the panel is laid over the page beneath it.
+ */
+export async function expectPanelHeld(page: Page): Promise<void> {
+  const room = page.viewportSize();
+  const panel = await chatPanelOf(page).boundingBox();
+  if (room === null || panel === null) throw new Refused('the panel has a size to measure');
+  const past = [
+    panel.y < -1 && `its top is at ${Math.round(panel.y)}`,
+    panel.x < -1 && `its left is at ${Math.round(panel.x)}`,
+    panel.x + panel.width > room.width + 1 && `its right is at ${Math.round(panel.x + panel.width)} of ${room.width}`,
+    panel.y + panel.height > room.height + 1 && `its foot is at ${Math.round(panel.y + panel.height)} of ${room.height}`,
+  ].filter((said) => said !== false);
+  if (past.length > 0) throw new Refused(`the panel stands inside the window — ${past.join(', ')}`);
+  const composer = await page.locator('[data-chat-composer]').boundingBox();
+  if (composer === null) throw new Refused('the composer has a size to measure');
+  if (composer.y + composer.height > panel.y + panel.height + 1)
+    throw new Refused(
+      `the composer stands inside the panel — it ends at ${Math.round(composer.y + composer.height)}, the panel at ${Math.round(panel.y + panel.height)}`,
+    );
+}
+
 /** The composer's field in her chat. */
 export const chatFieldOf = (page: Page): Locator => page.locator('[data-chat-composer] textarea');

@@ -7166,7 +7166,7 @@ test("Nemia's face is her blobatar on its plate, dimmed in dark, and wears the e
 });
 
 const { ChatTurn } = await import('../src/components/chat/ChatTurn.tsx');
-const { ChatLostBand, ChatStoppedBand } = await import('../src/components/chat/ChatBand.tsx');
+const { ChatLostBand, ChatStoppedBand, ChatUnreadableBand } = await import('../src/components/chat/ChatBand.tsx');
 const { foldChat } = await import('../src/lib/chatFollowing.ts');
 const { dockWords } = await import('../src/lib/presence.ts');
 type ChatEvent = import('../src/lib/api.ts').ChatEvent;
@@ -7230,4 +7230,13 @@ test("her docked face is called by the presence that gives it its expression, in
     "Open Nemia's chat. 2 wait on you.",
     'what waits on a person comes first, as her face does',
   );
+});
+
+test("a chat the board cannot read says so as an alarm, in the read's own words, and says the board reads again on its own", () => {
+  const html = renderToStaticMarkup(createElement(ChatUnreadableBand, { why: 'the api answered 503' }));
+  assert.match(html, /data-chat-band="unreadable"/);
+  assert.match(html, /role="alert"/);
+  assert.match(html, /The board cannot read her chat/);
+  assert.match(html, /the api answered 503\. It reads again every few seconds/);
+  assert.match(html, /what you write is kept here until the api takes it/);
 });

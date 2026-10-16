@@ -45,11 +45,11 @@ function Line({ step }: { step: ChatStep }) {
   const status = traceStatusOf(step.state);
   const Glyph = step.state === 'waits' ? PauseIcon : (TOOL_ICON[step.tool] ?? WrenchIcon);
   return (
-    <TraceLine data-chat-step={step.state} status={status}>
+    <TraceLine data-chat-step={step.state} status={status} className="min-w-0">
       <TraceIcon>
         <Glyph />
       </TraceIcon>
-      <TraceTitle>{step.sentence}</TraceTitle>
+      <TraceTitle className="min-w-0 break-words">{step.sentence}</TraceTitle>
       {step.fact !== undefined && <TraceDescription>{step.fact}</TraceDescription>}
     </TraceLine>
   );

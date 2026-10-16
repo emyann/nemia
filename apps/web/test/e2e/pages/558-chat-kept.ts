@@ -1,12 +1,15 @@
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { chatFieldOf, chatPanelOf, dockOf, herChat, openChat, photograph, themeOf } from '../board.ts';
+import { chatFieldOf, chatPanelOf, dockOf, expectPanelHeld, herChat, openChat, photograph, themeOf } from '../board.ts';
 import { expectCount, expectNone, expectTexts, expectVisible, idle, Refused, settled, watch } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
 
 /** Where the person's words are sent, which this page refuses for as long as the daemon is to read as unreachable. */
 const SEND = '/api/nemia/chat/send';
+
+/** Where her chat is read, which this page refuses first of all, to see what the board says of a chat it cannot read. */
+const READ = '/api/nemia/chat';
 
 /** The line Chromium writes to the console for a resource it could not reach at all, which names no address. */
 const REFUSED_LINE = 'console error: Failed to load resource: net::ERR_CONNECTION_REFUSED';
@@ -30,15 +33,9 @@ async function expectKept(panel: ReturnType<typeof chatPanelOf>, words: string):
     throw new Refused(`and that the board keeps trying — it says ${JSON.stringify(said)}`);
 }
 
-/** The panel's top edge is on the screen, so the header's Close, Grow and Open as a page can be reached. */
-async function expectHeld(panel: ReturnType<typeof chatPanelOf>): Promise<void> {
-  const box = await panel.boundingBox();
-  if (box === null || box.y < 0) throw new Refused(`the panel stands inside the window — its top is at ${box?.y ?? 'nowhere'}`);
-}
-
 /** The composer, and a message Enter sends: answers the panel it was written in. */
-async function wrote(page: Page, words: string): Promise<ReturnType<typeof chatPanelOf>> {
-  const panel = await openChat(page);
+async function wrote(page: Page, words: string, open = false): Promise<ReturnType<typeof chatPanelOf>> {
+  const panel = open ? chatPanelOf(page) : await openChat(page);
   const field = chatFieldOf(page);
   await field.fill(words);
   await field.press('Enter');
@@ -66,15 +63,31 @@ export default {
       down.on('response', (answer) => {
         if (isSend(new URL(answer.url())) && answer.status() === 201) took += 1;
       });
+      const isRead = (url: URL) => url.pathname === READ;
+      await down.route(isRead, (route) => route.abort('connectionrefused'));
       await down.route(isSend, (route) => route.abort('connectionrefused'));
       await down.goto(page.url(), { waitUntil: 'load' });
+
+      const unread = await openChat(down);
+      const band = unread.locator('[data-chat-band="unreadable"]');
+      await expectVisible(band, 'the api refusing the read, the panel says the board cannot read her chat');
+      if ((await band.getAttribute('role')) !== 'alert') throw new Refused('said as an alarm: the board has what it cannot read');
+      await expectCount(
+        unread.locator('[data-chat-empty]'),
+        0,
+        'and no greeting with a level and counts beside it: the board would be saying what it does not know',
+      );
+      await settled(down);
+      await photograph(down, path.join(OUT, `chat-kept-unread-${await themeOf(down)}.png`), { fullPage: true });
+      await down.unroute(isRead);
+      await expectVisible(unread.locator('[data-chat-empty]'), 'the api answering again, her chat reads, and the greeting is drawn');
       await idle(down);
 
-      const panel = await wrote(down, WROTE);
+      const panel = await wrote(down, WROTE, true);
       await expectKept(panel, WROTE);
       await expectCount(panel.locator('[data-chat-bubble="person"]'), 0, 'and no bubble of theirs stands for a message nobody has');
       await expectVisible(dockOf(down).locator('[data-cue]', { hasText: 'Not sent' }), 'a cue beside her face says one was not sent');
-      await expectHeld(panel);
+      await expectPanelHeld(down);
       for (const chip of await panel.locator('[data-chat-chip]').all())
         if (!(await chip.isDisabled()))
           throw new Refused('a chip is off while a message is kept: pressing one would take the place of the words nobody has yet');
@@ -90,6 +103,7 @@ export default {
       await field.fill(CHANGED);
       await settled(down);
       await photograph(down, path.join(OUT, `chat-kept-editing-${await themeOf(down)}.png`), { fullPage: true });
+      await expectPanelHeld(down);
       await panel.locator('[data-chat-kept]').getByRole('button', { name: 'Keep the change' }).click();
       await expectKept(panel, CHANGED);
 
@@ -112,7 +126,9 @@ export default {
       await settled(down);
       await photograph(down, path.join(OUT, `chat-kept-taken-${await themeOf(down)}.png`), { fullPage: true });
 
-      const unexpected = problems().filter((problem) => !problem.includes(SEND) && problem !== REFUSED_LINE);
+      const unexpected = problems().filter(
+        (problem) => !problem.includes(SEND) && !problem.includes(`${READ} `) && !problem.endsWith(READ) && problem !== REFUSED_LINE,
+      );
       if (unexpected.length > 0)
         throw new Refused(`the only failures are the sends this page refused — it also saw:\n${unexpected.join('\n')}`);
       if (problems().length === 0) throw new Refused('the sends this page refused are seen by its watch — or it proves nothing');

@@ -177,10 +177,13 @@ function firstResolve(run: Run, at: string): PinnedPass {
 
 /**
  * The run's steps and pins taken again on a person's ask (`nemia refresh`), for a run that has filed: the ask is spent either way. The ask
- * is read off its own file every pass (`runStore.refresh.stands`), never off the record, which never holds it.
+ * is read off its own file every pass (`runStore.refresh.stands`), never off the record, which never holds it. A filed run nobody asked
+ * resolves nothing: a resolve is every `.md` of the folder and a digest of every agent and skill file it names, which a pass may not pay
+ * per run for a number nothing files on. So an edit after a filing is numbered when something resolves that content — another run's first
+ * filing, or this run's `nemia refresh`, which resolves to answer.
  */
 function refreshDue(run: Run, at: string): PinnedPass {
-  if (!runStore.refresh.stands(run.id)) return numbered(run, at);
+  if (!runStore.refresh.stands(run.id)) return NOTHING;
   const resolved = refreshedNow(run, at);
   if (!resolved)
     return {
@@ -192,17 +195,6 @@ function refreshDue(run: Run, at: string): PinnedPass {
   run.pinned = resolved.pins;
   renderAgain(run, resolved.steps);
   return { wrote: true, notes: ['nemia refresh: every filing after this takes the new revisions'], lift: true };
-}
-
-/**
- * The kinds of a filed run, numbered in the ledger and nothing more: the folder as it stands is resolved every pass, so an edit of an
- * agent, a skill, the workflow or the factory's rules has a number as soon as it is made, which is what the board reads a run's drift
- * off (`kindsOf`, the api's `detail/tries.ts`). It moves no pin and renders nothing: what the run files stays the revisions it holds
- * until a person types `nemia refresh`. An append is by digest, so a pass over an unedited folder adds no entry and writes no record.
- */
-function numbered(run: Run, at: string): PinnedPass {
-  resolvedNow(run, at);
-  return NOTHING;
 }
 
 /**

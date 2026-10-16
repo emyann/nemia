@@ -140,8 +140,8 @@ test('a run that has filed keeps its pins: the folder edited after its first fil
   assert.doesNotMatch(promptOf(run.id, 'build'), /Something else/, 'and the prompt is the one it was rendered with');
   assert.deepEqual(
     ledgerOf('agent', t.agent).map((r) => r.n),
-    [1, 2],
-    'and the edit is numbered all the same, so the board can say what the run is behind on',
+    [1],
+    'and nothing of the edit is resolved on its account: a filed run nobody asked pays for no resolve',
   );
 });
 
@@ -293,6 +293,14 @@ test("`nemia refresh` adds and removes no step, and a run that has filed nothing
     Object.keys(readRun(waiting.id).steps),
     ['build', 'review'],
     'a run that has filed nothing takes the folder as it stands, the added step included',
+  );
+
+  fs.rmSync(path.join(t.dir, 'review.md'));
+  await runWith(b.e, advanceRun(readRun(waiting.id)));
+  assert.deepEqual(
+    Object.keys(readRun(waiting.id).steps),
+    ['build'],
+    'and the step the folder has since dropped goes with it: the step set is the one the folder holds now',
   );
 });
 

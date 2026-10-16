@@ -218,7 +218,26 @@ export type {
 export { cursorTakes, feedLineWords, REMOVED } from './feed/index.ts';
 export type { FeedLine, FeedPublished } from './feed/index.ts';
 export type { FeedSaid, FeedWords } from './run.ts';
-export { DEFAULT_WAKE, subscriptionNameRefusal, wakeOf, watchedLine } from './subscription/subscription.ts';
+export {
+  BOOKMARK_EVERY,
+  bookmarkLine,
+  DEFAULT_WAKE,
+  subscriptionNameRefusal,
+  wakeOf,
+  watchedLine,
+} from './subscription/subscription.ts';
+export {
+  LABEL_KEYS,
+  labelKeysRefusal,
+  parseSelectors,
+  RESERVED_KEYS,
+  selectableOf,
+  SELECTABLE_KEYS,
+  SELECTOR_FORM,
+  selectorsRefusal,
+  selects,
+} from './watch/selector.ts';
+export type { Clause, Selectors } from './watch/selector.ts';
 export type { Watched } from './subscription/subscription.ts';
 export {
   DAEMON_FILE,
@@ -291,6 +310,7 @@ export type {
   RecentPass,
 } from './meter/index.ts';
 export { feedCursorRefusal, feedFile, freshFeedMemo, readFeed, watchFeed } from './feed/feed.store.ts';
+export { cursorFileStart, cutCursorFile, keepCursor } from './watch/cursor.store.ts';
 export { emitFeed, FEED_FOLLOW_BEATS, FEED_FOLLOW_READS, FEED_FOLLOWERS, FeedHub, feedHubLayer, followFeed } from './feed/feed.verb.ts';
 export { followStep } from './following/following.verb.ts';
 export type { StepMoment } from './following/following.ts';

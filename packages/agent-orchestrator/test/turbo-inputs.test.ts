@@ -5,7 +5,8 @@
  * lint tests here read `.oxlintrc.json` and `lint/`, and this package's suite reads the apps' tests (`suite.test.ts`, `comments.test.ts`).
  * The declared-imports scan here reads every workspace package's `package.json` and source, the apps' configs and the runtime's files
  * among them, and the runtime's contract test reads the `.ts` files at each app's root too. The vocabulary test here reads this
- * repository's team from `workflows/agents/` (`words.test.ts`). Every package's test script loads the test-cost probe and reporter from
+ * repository's team from `workflows/agents/` (`words.test.ts`), and the citation test here reads every `CLAUDE.md` of the repository,
+ * the root's and the apps' among them (`claude-md-cites.test.ts`). Every package's test script loads the test-cost probe and reporter from
  * `tools/test-costs/`, so each package's test lists `tools/` too. The docs' tests read the packages' docs for the diagrams they draw,
  * every source for the names their pages cite, and the paths those pages cite, at the root and under `docs/` and `workflows/`.
  * The api's test of what `npm run dev` watches reads every workspace package's `package.json` and sources (`dev-watch.test.ts`).
@@ -30,6 +31,8 @@ const INPUTS: Record<string, readonly string[]> = {
     ...APPS,
     '$TURBO_ROOT$/apps/*/*.ts',
     '$TURBO_ROOT$/apps/*/package.json',
+    '$TURBO_ROOT$/apps/*/CLAUDE.md',
+    '$TURBO_ROOT$/CLAUDE.md',
     '$TURBO_ROOT$/workflows/agents/**',
     '$TURBO_ROOT$/packages/agent-runtime/**',
     '!$TURBO_ROOT$/packages/agent-runtime/.turbo/**',

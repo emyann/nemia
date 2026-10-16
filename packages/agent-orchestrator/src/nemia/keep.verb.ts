@@ -47,7 +47,7 @@ import {
   NEMIA_DIGEST_EVERY,
   NEMIA_FLOOR,
   NEMIA_SUBSCRIPTION,
-  NEMIA_WAKE,
+  NEMIA_SELECTORS,
   customChanged,
   nemiaDue,
   nemiaPrompt,
@@ -175,7 +175,7 @@ const ACTS: Record<NemiaAct, (e: Engine, id: string) => Effect.Effect<void>> = {
     Effect.sync(() =>
       putSubscription(NEMIA_SUBSCRIPTION, {
         task: id,
-        wake: [...NEMIA_WAKE],
+        selectors: [...NEMIA_SELECTORS],
         digestEvery: NEMIA_DIGEST_EVERY,
         from: feedSize(),
         scope: { atLeast: NEMIA_FLOOR },

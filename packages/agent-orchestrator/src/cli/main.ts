@@ -28,7 +28,6 @@ import {
   daemonStanding,
   livenessLine,
   livenessWords,
-  wakeOf,
   watchedLine,
   type DaemonStanding,
   type Liveness,
@@ -102,7 +101,7 @@ const kept = (cursorFile: string | undefined, cursor: number): void => {
 
 /**
  * `nemia watch` from a cursor already checked: the feed's lines as they are written, on stdout, until `stop()` — those its selectors take
- * (`selects`), as `how` prints them (`watchedLine`), in words or as JSON, every line or the wake lines alone; a feed cut under the watch is
+ * (`selects`), as `how` prints them (`watchedLine`), in words or as JSON; a feed cut under the watch is
  * said once on stderr, and followed from the start of the feed there is now (`watchFeed`), its cursor file rewritten to 0 with it. In JSON
  * the banner goes to stderr too, so stdout holds nothing but JSON.
  *
@@ -121,8 +120,7 @@ export function watchPrinted(from: number, how: Watched = {}, keeps: WatchKept =
       at = cursor;
       kept(keeps.cursorFile, cursor);
       if (!selects(selectors, line)) return;
-      const printed = watchedLine(line, cursor, how);
-      if (printed !== undefined) console.log(printed);
+      console.log(watchedLine(line, cursor, how));
     },
     onCut: (said) => {
       console.error(`nemia watch: ${said}`);
@@ -291,8 +289,7 @@ async function watchedOnce(
   const { lines, ends, cursor } = readFeedEnds(from);
   for (const [i, line] of lines.entries()) {
     if (!selects(selectors, line)) continue;
-    const printed = watchedLine(line, ends[i], how);
-    if (printed !== undefined) console.log(printed);
+    console.log(watchedLine(line, ends[i], how));
   }
   if (how.json === true) bookmarked(cursor, how, cursorFile);
   else {
@@ -334,7 +331,7 @@ function watchFrom(args: Args, cursorFile: string | undefined): number {
  * once, so a path in a directory that is not there is refused before a line is read.
  */
 function watchVerb(args: Args, e: Engine, place: Place): void | Promise<void> {
-  const how: Watched = { json: args.json === true, wake: wakeOf(args) };
+  const how: Watched = { json: args.json === true };
   const selectors = parseSelectors(Array.isArray(args.selector) ? args.selector : []);
   const cursorFile = typeof args.cursorFile === 'string' ? args.cursorFile : undefined;
   const from = watchFrom(args, cursorFile);

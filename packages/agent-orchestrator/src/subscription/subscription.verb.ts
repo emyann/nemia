@@ -15,14 +15,19 @@ import { EngineService, asked, tried, type TaskView } from '../runtime-client.ts
 import { dropSubscription, putSubscription } from './subscription.store.ts';
 import { NEMIA_SUBSCRIPTION } from '../nemia/nemia.ts';
 import { LEVELS, type Level } from '../level/level.ts';
+import { SELECTOR_FORM } from '../watch/selector.ts';
+import { retiredWakeRefusal } from './former-wake.ts';
 import {
   DEFAULT_DIGEST_EVERY,
-  DEFAULT_WAKE,
+  DEFAULT_SELECTORS,
   SUBSCRIBE_FORM,
   subscribeRefusalOf,
   subscriptionNameRefusal,
   type Subscription,
 } from './subscription.ts';
+
+/** The refusal of a `-l` given no selector, or one of the command's own flags for it. */
+const SUBSCRIBE_SELECTOR_TAKES = `nemia subscribe -l takes a selector of the feed's lines: ${SELECTOR_FORM}`;
 
 /** What `nemia subscribe` answers: the subscription put, under its name. */
 export type Subscribed = { name: string; subscription: Subscription };
@@ -42,13 +47,14 @@ const reservedRefusal = (name: string): Conflict | undefined =>
     : undefined;
 
 /**
- * The words a subscription is asked for in: its name, its task, the wake words given (else the default), its minutes, and the level its
+ * The words a subscription is asked for in: its name, its task, the selectors given (else the default), its minutes, and the level its
  * runs' factories are at least at (`atLeast`), where given.
  */
-const askedOf = (args: Args): { name: string; task: string; wake: string[]; digestEvery: number; atLeast?: string } => ({
+const askedOf = (args: Args): { name: string; task: string; selectors: string[]; digestEvery: number; atLeast?: string } => ({
   name: String(args.name ?? ''),
   task: String(args.task ?? ''),
-  wake: Array.isArray(args.wake) && args.wake.length ? [...(args.wake as readonly string[])] : [...DEFAULT_WAKE],
+  selectors:
+    Array.isArray(args.selectors) && args.selectors.length ? [...(args.selectors as readonly string[])] : [...DEFAULT_SELECTORS],
   digestEvery: typeof args.digestEvery === 'number' ? args.digestEvery : DEFAULT_DIGEST_EVERY,
   ...(typeof args.atLeast === 'string' ? { atLeast: args.atLeast } : {}),
 });
@@ -71,7 +77,7 @@ function taskRefusal(task: string, state: TaskView['state']): Missing | Invalid 
 
 /** Puts the subscription asked for, its news starting at the feed's end, once the engine says its task is long-lived and open. */
 const subscribe = Effect.fn('subscribe')(function* (args: Args) {
-  const { name, task, wake, digestEvery, atLeast } = askedOf(args);
+  const { name, task, selectors, digestEvery, atLeast } = askedOf(args);
   const reserved = reservedRefusal(name);
   if (reserved) return yield* Effect.fail(reserved);
   const e = yield* EngineService;
@@ -79,7 +85,7 @@ const subscribe = Effect.fn('subscribe')(function* (args: Args) {
   if (refused) return yield* Effect.fail(refused);
   const subscription: Subscription = {
     task,
-    wake,
+    selectors,
     digestEvery,
     from: feedSize(),
     ...(atLeast === undefined ? {} : { scope: { atLeast: atLeast as Level } }),
@@ -91,14 +97,15 @@ const subscribe = Effect.fn('subscribe')(function* (args: Args) {
 /** `nemia subscribe`: a long-lived task given a subscription to the feed (`subscribe`). */
 export const SUBSCRIBE: Command<Subscribed> = {
   name: 'subscribe',
-  usage: '<name> <task> [--wake <word>]... [--digest-every <minutes>] [--at-least <level>]',
+  usage: '<name> <task> [-l <selector>]... [--digest-every <minutes>] [--at-least <level>]',
   help: [
     "give the engine's long-lived task <task> a subscription to the feed,",
-    'named <name>, from its end: a line holding a wake word is said to it at',
-    'once, and the rest folded into a digest said with the next wake, or',
-    'after --digest-every minutes (default 60) with none.',
-    "--wake: a word that wakes it, once for each (default: the feed's words",
-    'for a wait on a person). Refused for a task not long-lived.',
+    'named <name>, from its end: a line one of its selectors takes is said to',
+    'it at once, and the rest folded into a digest said with the next wake,',
+    'or after --digest-every minutes (default 60) with none.',
+    '-l: the lines a selector takes, given again for another (default:',
+    'waits=person, the lines that wait on a person). Refused for a task not',
+    'long-lived.',
     "--at-least: only the lines of runs whose factory's level is at least",
     `this (${LEVELS.join(', ')}), read as each line is delivered.`,
   ],
@@ -108,7 +115,7 @@ export const SUBSCRIBE: Command<Subscribed> = {
       { key: 'task', takes: 'required', kind: 'name' },
     ],
     flags: [
-      { flag: '--wake', kind: 'text', key: 'wake', many: true, takes: `--wake takes a word that wakes the subscriber: ${SUBSCRIBE_FORM}.` },
+      { flag: '-l', kind: 'text', key: 'selectors', many: true, takes: SUBSCRIBE_SELECTOR_TAKES },
       { flag: '--digest-every', kind: 'amount', key: 'digestEvery', takes: 'the minutes a digest waits for a wake', form: SUBSCRIBE_FORM },
       {
         flag: '--at-least',
@@ -117,7 +124,7 @@ export const SUBSCRIBE: Command<Subscribed> = {
         takes: `--at-least takes a level, one of ${LEVELS.join(', ')}: ${SUBSCRIBE_FORM}.`,
       },
     ],
-    unknown: (arg) => `nemia subscribe does not take ${arg}: ${SUBSCRIBE_FORM}.`,
+    unknown: (arg) => retiredWakeRefusal('nemia subscribe', arg) ?? `nemia subscribe does not take ${arg}: ${SUBSCRIBE_FORM}.`,
     missing: `nemia subscribe takes the subscription's name and the task it tells: ${SUBSCRIBE_FORM}.`,
   },
   check: (args) => subscribeRefusalOf(askedOf(args)) ?? null,
@@ -126,7 +133,7 @@ export const SUBSCRIBE: Command<Subscribed> = {
   route: { method: 'POST', path: '/api/subscriptions/:name', status: 201 },
   handler: subscribe,
   print: ({ name, subscription: s }) => [
-    `subscribed ${name}: ${s.task} is told at once of a line holding ${s.wake.join(', ')}, and of the rest in a digest every ` +
+    `subscribed ${name}: ${s.task} is told at once of a line taken by ${s.selectors.join(' or ')}, and of the rest in a digest every ` +
       `${s.digestEvery} minute${s.digestEvery === 1 ? '' : 's'} with no wake.`,
   ],
 };

@@ -12,7 +12,8 @@ import { Result, Schema } from 'effect';
 import { wfRoot } from '../config/config.store.ts';
 import { firstRefusal } from '../record/record.store.ts';
 import { countRead } from '../meter/tally.store.ts';
-import { DAEMON_STARTED } from '../feed/feed.ts';
+import { FeedLineSchema } from '../feed/feed.store.ts';
+import { lineAsRead } from '../feed/feed.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 import type { KeptDelivery, Subscription } from './subscription.ts';
 import { LEVELS } from '../level/level.ts';
@@ -46,23 +47,6 @@ const SubscriptionSchema = Schema.StructWithRest(
   }),
   Rest,
 );
-
-/** A line of the feed as the deliverer folds it into a digest: a run's, or a daemon's. */
-const FeedLineSchema = Schema.Union([
-  Schema.Struct({
-    at: Schema.String,
-    run: Schema.String,
-    step: Schema.optionalKey(Schema.String),
-    word: Schema.String,
-    note: Schema.optionalKey(Schema.String),
-  }),
-  Schema.Struct({
-    at: Schema.String,
-    daemon: Schema.Finite,
-    word: Schema.Literal(DAEMON_STARTED),
-    note: Schema.optionalKey(Schema.String),
-  }),
-]);
 
 /** A moment as the deliverer stamps a digest's first line: the wall clock, and the boot's monotonic reading where the machine has one. */
 const InstantSchema = Schema.Struct({
@@ -178,6 +162,9 @@ export function dropSubscription(name: string): void {
 /**
  * Where the deliverer is with a subscription, or undefined where it has not begun. A file that does not read is said once on stderr and
  * read as not begun: the subscription starts again from its `from`.
+ *
+ * A line kept in the digest is read as the feed's own are (`lineAsRead`): one written before the feed's lines were signed reads back
+ * upgraded, so the deliverer says of it what it would say of a line read now.
  */
 export function readDelivery(name: string, said: (line: string) => void = sayOnce): KeptDelivery | undefined {
   const text = textOf(deliveryFile(name));
@@ -188,7 +175,7 @@ export function readDelivery(name: string, said: (line: string) => void = sayOnc
     return undefined;
   }
   const { of, cursor, digest, since } = read.value;
-  return { of: { task: of.task, from: of.from }, cursor, digest: [...digest], ...(since ? { since } : {}) };
+  return { of: { task: of.task, from: of.from }, cursor, digest: digest.map(lineAsRead), ...(since ? { since } : {}) };
 }
 
 /** Writes where the deliverer is with a subscription, whole, through a hidden file renamed over it, so a reader never reads half of it. */

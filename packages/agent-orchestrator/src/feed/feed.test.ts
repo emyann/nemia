@@ -16,7 +16,19 @@ import { Cause, Effect, Exit, Fiber } from 'effect';
 import type { Engine } from '../runtime-client.ts';
 import type { Run } from '../record/record.ts';
 import { listing } from '../list/list.ts';
-import { deniedNote, feedChanges, feedPhase, feedWords, foldFeed, isRunLine, publishedOf, type FeedLine, type RunLine } from './feed.ts';
+import {
+  feedChanges,
+  feedPhase,
+  feedWords,
+  foldFeed,
+  freshFold,
+  isRunLine,
+  publishedOf,
+  upgraded,
+  type FeedLine,
+  type FeedWords,
+  type RunLine,
+} from './feed.ts';
 import { nodeChild } from '../../test/child.ts';
 import { scratch } from '../../test/scratch.ts';
 import { promised } from '../../test/promised.ts';
@@ -291,7 +303,88 @@ test("a run waiting at its ending's gate reads `awaiting approval` in the feed, 
   );
 });
 
-test('a step whose ended attempt was denied a call says it on its line in the feed, denied:, once over passes', async () => {
+/** What a pass judged of a step at work, with the calls `denials` says it was denied, and the labels a filing gives it. */
+const atWork = (denials: readonly { step: string; try: number; call: string }[]): FeedWords => ({
+  run: { word: 'running' },
+  labels: { run: 'r-1', factory: 'nemia', workflow: 'build' },
+  steps: [{ name: 'plan', word: 'running', labels: { run: 'r-1', factory: 'nemia', workflow: 'build', step: 'plan', agent: 'ada' } }],
+  denials,
+});
+
+/** Every one-shot the feed holds, in order, with the fields a selector matches one by. */
+const shots = () =>
+  lines()
+    .filter((l) => l.reason === 'ToolDenied')
+    .map((l) => ({ step: l.step, word: l.word, note: l.note, call: l.call, try: l.try, type: l.type, source: l.source, waits: l.waits }));
+
+test('a denial journalled once writes one one-shot line over ten passes, counted by the step and the try alone — and a restart writes it neither again nor never', () => {
+  emptyStore();
+  const push = { step: 'plan', try: 1, call: 'Bash(git push)' };
+  const memo = freshFeedMemo();
+  const at = '2026-10-16T04:00:00.000Z';
+  for (let i = 0; i < 10; i++) recordFeed(new Map([['r-1', atWork([push])]]), { at, memo });
+  assert.deepEqual(
+    shots(),
+    [
+      {
+        step: 'plan',
+        word: 'denied: Bash(git push)',
+        note: 'try 1',
+        call: 'Bash(git push)',
+        try: 1,
+        type: 'Warning',
+        source: 'runtime',
+        waits: undefined,
+      },
+    ],
+    'one denial the runtime journalled is one line, however many passes read it',
+  );
+  assert.equal(
+    lines().find((l) => l.reason === 'ToolDenied')!.message,
+    'denied: Bash(git push) · try 1',
+    "the message a person reads is the owner's wording",
+  );
+
+  recordFeed(new Map([['r-1', atWork([push, push])]]), { at, memo });
+  recordFeed(new Map([['r-1', atWork([push, push])]]), { at, memo });
+  assert.equal(shots().length, 2, 'the same call denied a second time in the same try is one more line, and no repeat of the first');
+
+  const restarted = freshFeedMemo();
+  recordFeed(new Map([['r-1', atWork([push, push])]]), { at, memo: restarted });
+  assert.equal(shots().length, 2, 'a daemon with no fold reads the feed and writes neither of them again');
+  recordFeed(new Map([['r-1', atWork([push, push, push])]]), { at, memo: restarted });
+  assert.equal(shots().length, 3, 'nor misses the third');
+});
+
+test('REFUSED: a one-shot is counted by the step and the try, not by what it reads back as a message', () => {
+  emptyStore();
+  const memo = freshFeedMemo();
+  const at = '2026-10-16T04:00:00.000Z';
+  const first = { step: 'plan', try: 1, call: 'Bash(ls)' };
+  recordFeed(new Map([['r-1', atWork([first])]]), { at, memo });
+  assert.equal(shots().length, 1);
+  const reworded = freshFeedMemo();
+  recordFeed(new Map([['r-1', atWork([{ ...first, call: 'Bash(ls) — reworded by a newer nemia' }])]]), { at, memo: reworded });
+  assert.equal(shots().length, 1, 'a denial of the same step and try, worded anew, is the one the feed holds — not a second');
+  recordFeed(new Map([['r-1', atWork([first, { ...first, try: 2 }])]]), { at, memo: freshFeedMemo() });
+  assert.equal(shots().length, 2, 'and the same call on another try is its own line');
+});
+
+test('REFUSED: a one-shot holds no entry in the fold — the step says its own word once, however many denials it carries', () => {
+  emptyStore();
+  const memo = freshFeedMemo();
+  const at = '2026-10-16T04:00:00.000Z';
+  const denied = { step: 'plan', try: 1, call: 'Bash(git push)' };
+  const state = () => lines().filter((l) => l.step === 'plan' && l.reason !== 'ToolDenied').map((l) => l.word);
+  for (let i = 0; i < 3; i++) recordFeed(new Map([['r-1', atWork([denied])]]), { at, memo });
+  assert.deepEqual(state(), ['running'], "the step's word is said once");
+  const done = { ...atWork([denied]), steps: [{ name: 'plan', word: 'unverified · done' }] };
+  for (let i = 0; i < 10; i++) recordFeed(new Map([['r-1', done]]), { at, memo });
+  assert.deepEqual(state(), ['running', 'unverified · done'], 'and its next word once — never again on every pass');
+  assert.equal(shots().length, 1, 'and its denial stays one line');
+});
+
+test('a step denied a call writes a one-shot of the runtime and leaves the step’s own note alone', async () => {
   emptyStore();
   const b = board();
   const run = await started('the denial');
@@ -302,11 +395,26 @@ test('a step whose ended attempt was denied a call says it on its line in the fe
   ]);
   b.set(`${run.id}-plan`, 'running (working)');
   for (let i = 0; i < 3; i++) await runWith(b.e, tickRun());
-  const denied = lines().filter((l) => l.run === run.id && l.step === 'plan' && l.note?.startsWith('denied:'));
+  const denied = lines().filter((l) => l.run === run.id && l.reason === 'ToolDenied');
   assert.deepEqual(
-    denied.map((l) => l.note),
-    ['denied: Bash(git push) ×2'],
-    'said once, over three passes',
+    denied.map((l) => [l.step, l.word, l.note]),
+    [
+      ['plan', 'denied: Bash(git push)', 'try 1'],
+      ['plan', 'denied: Bash(git push)', 'try 1'],
+    ],
+    'two denials of the runtime are two lines, over three passes',
+  );
+  assert.deepEqual(
+    denied.map((l) => l.labels),
+    Array(2).fill(denied[0].labels),
+    'each carries the step’s labels',
+  );
+  assert.equal(denied[0].labels?.step, 'plan');
+  assert.equal(denied[0].labels?.run, run.id);
+  assert.deepEqual(
+    lines().filter((l) => l.note?.includes('denied:')),
+    [],
+    'and no step’s note says a word of it: the denial is a signal of its own',
   );
 });
 
@@ -321,7 +429,7 @@ const ungated = (() => {
 /** The run's last word in the feed, and each step's. */
 const lastSaid = (run: string): string[] => [words(run).at(-1)!, ...['plan', 'implement'].map((s) => words(run, s).at(-1)!)];
 
-test('REFUSED: finished runs whose notes are worded anew, as a new denied: part words them, write no line — a restarted daemon judges them at rest', async () => {
+test('REFUSED: a finished run writes no state line for a denial read late — the one-shot alone, once, and a restarted daemon judges the run at rest', async () => {
   emptyStore();
   const b = board();
   const runs = await Promise.all(
@@ -337,24 +445,32 @@ test('REFUSED: finished runs whose notes are worded anew, as a new denied: part 
 
   for (const r of runs) b.deny(`${r.id}-plan`, [{ tool: 'Bash', what: 'git push' }]);
   for (const r of runs) rewriteRun({ ...readRun(r.id), deniedCounted: [{ task: `${r.id}-plan`, attempts: 1 }] });
-  const quiet = size();
+  const quiet = lines().filter((l) => l.reason !== 'ToolDenied').length;
   for (let i = 0; i < 2; i++) {
     const pass = await runWith(b.e, tickRun({ memo: freshRestMemo() }));
     for (const r of runs) {
       const said = judged(pass).get(r.id)!;
       assert.equal(said.atRest, true, 'the pass found the run at rest');
-      assert.equal(
-        said.steps.find((s) => s.name === 'plan')?.note,
-        'denied: Bash(git push) ×1',
-        "the listing's words for its plan did change",
+      assert.deepEqual(
+        said.denials,
+        [{ step: 'plan', try: 1, call: 'Bash(git push)' }],
+        'and read the denial its plan carries, which is no part of the step\u2019s word',
       );
     }
   }
-  assert.equal(size(), quiet, 'and the feed wrote nothing for runs nothing happened to');
-  assert.deepEqual(
-    lines().filter((l) => l.note?.startsWith('denied:')),
-    [],
+  assert.equal(
+    lines().filter((l) => l.reason !== 'ToolDenied').length,
+    quiet,
+    'no state line is written for a run nothing happened to, at rest',
   );
+  assert.deepEqual(
+    lines()
+      .filter((l) => l.reason === 'ToolDenied')
+      .map((l) => [l.step, l.word]),
+    runs.map(() => ['plan', 'denied: Bash(git push)']),
+    'one one-shot for each run\u2019s one denial, over two passes',
+  );
+  assert.deepEqual(lines().filter((l) => l.note?.includes('denied:')), [], 'and no step\u2019s note says it');
 });
 
 test("a step whose attempt ends with a new denial says it on the pass that reads it ended, as the run finishes: no rest hides a step's own end", async () => {
@@ -371,9 +487,14 @@ test("a step whose attempt ends with a new denial says it on the pass that reads
   for (let i = 0; i < 2; i++) await runWith(b.e, tickRun({ memo: freshRestMemo() }));
   const implement = lines().filter((l) => l.run === run.id && l.step === 'implement');
   assert.deepEqual(
-    { word: implement.at(-1)!.word, note: implement.at(-1)!.note },
-    { word: 'unverified · done', note: 'denied: Bash(git push) ×1' },
-    'the step that ended denied a call says it',
+    implement.map((l) => [l.word, l.note]),
+    [
+      ['waiting', undefined],
+      ['pending', undefined],
+      ['unverified · done', undefined],
+      ['denied: Bash(git push)', 'try 1'],
+    ],
+    'the denial of the step that ended is its own line, once, beside the word it ended on',
   );
   assert.equal(words(run.id).at(-1), 'succeeded', 'and the run says it finished');
 });
@@ -392,13 +513,18 @@ test('a step at work that is denied a call says it while its word stands at runn
   assert.equal(judged(pass).get(run.id)!.atRest, undefined, 'a run with a step at work is not at rest');
   const plan = lines().filter((l) => l.run === run.id && l.step === 'plan');
   assert.deepEqual(
-    { word: plan.at(-1)!.word, note: plan.at(-1)!.note },
-    { word: 'running', note: 'denied: Bash(git push) ×1' },
-    'the same word, with the denial beside it, is a line',
+    { word: plan.at(-1)!.word, note: plan.at(-1)!.note, reason: plan.at(-1)!.reason, source: plan.at(-1)!.source },
+    { word: 'denied: Bash(git push)', note: 'try 1', reason: 'ToolDenied', source: 'runtime' },
+    'the denial of a step at work is its own line, of the runtime, while the step\u2019s word stands',
+  );
+  assert.deepEqual(
+    plan.filter((l) => l.reason !== 'ToolDenied').map((l) => l.word),
+    ['waiting', 'running'],
+    'and the step\u2019s own word is said once, not again beside the denial',
   );
 });
 
-test('a running step says each distinct call it is denied on its line in the feed as it is denied, and the counts once its attempt ends', async () => {
+test('a running step’s every denial is a one-shot of its own, as the runtime journals it: a call denied twice is two lines', async () => {
   emptyStore();
   const b = board();
   const run = await started('the live denial');
@@ -406,25 +532,25 @@ test('a running step says each distinct call it is denied on its line in the fee
   const [ls, glob] = [{ tool: 'Bash', what: 'ls' }, { tool: 'Glob' }];
   const id = `${run.id}-plan`;
   b.set(id, 'running (working)');
-  const denied = () => lines().filter((l) => l.run === run.id && l.step === 'plan' && l.note?.startsWith('denied:'));
+  const denied = () => lines().filter((l) => l.run === run.id && l.step === 'plan' && l.reason === 'ToolDenied');
   b.deny(id, [ls], true);
   await runWith(b.e, tickRun());
-  assert.deepEqual(
-    denied().map((l) => l.note),
-    ['denied: Bash(ls)'],
-    'said while the attempt runs, with no count: the attempt has not ended',
-  );
+  assert.deepEqual(denied().map((l) => l.call), ['Bash(ls)'], 'said while the attempt runs, and not held until it ends');
   b.deny(id, [ls, ls], true);
   await runWith(b.e, tickRun());
-  assert.equal(denied().length, 1, 'the same call denied again says nothing new');
+  assert.deepEqual(denied().map((l) => l.call), ['Bash(ls)', 'Bash(ls)'], 'the same call denied again is a denial of its own, and one more line');
   b.deny(id, [ls, ls, glob], true);
   await runWith(b.e, tickRun());
   b.deny(id, [ls, ls, glob]);
   for (let i = 0; i < 2; i++) await runWith(b.e, tickRun());
   assert.deepEqual(
-    denied().map((l) => l.note),
-    ['denied: Bash(ls)', 'denied: Bash(ls), Glob', 'denied: Bash(ls) ×2, Glob ×1'],
-    'a new call says itself, and the end counts each',
+    denied().map((l) => [l.call, l.try]),
+    [
+      ['Bash(ls)', 1],
+      ['Bash(ls)', 1],
+      ['Glob', 1],
+    ],
+    'each denial once, in the order the runtime journalled them, each on the step\u2019s first try — and the attempt ending adds none',
   );
 });
 
@@ -660,8 +786,35 @@ test('a line whose step or note is not text is read by nobody, and the lines aft
   const good = { at, run: 'r-a', step: 'plan', word: 'pending', note: 'waits on you' };
   fs.writeFileSync(FEED, [...bad, good].map((l) => `${JSON.stringify(l)}\n`).join(''));
   const read = readFeed(0);
-  assert.deepEqual(read.lines, [good]);
+  assert.deepEqual(read.lines, [upgraded(good)], 'the one line that reads is read, upgraded to a v1 signal');
   assert.equal(read.cursor, size());
+});
+
+test('a v1 line only half signed is read all the same, and every key it lacks is filled in from its word and its note', () => {
+  emptyStore();
+  const at = '2026-09-22T10:00:00.000Z';
+  const half = [
+    { at, run: 'r-a', step: 'plan', word: 'awaiting approval', involved: { kind: 'Step', name: 'r-a/plan' } },
+    { at, run: 'r-a', step: 'plan', word: 'denied: Bash(ls)', note: 'try 1', call: 'Bash(ls)' },
+    { at, run: 'r-a', word: 'running', reason: 'ReasonANewerNemiaNamed', apiVersion: 'nemia/v2' },
+  ];
+  fs.writeFileSync(FEED, half.map((l) => `${JSON.stringify(l)}\n`).join(''));
+  const read = readFeed(0).lines;
+  assert.equal(read.length, 3, 'no line is dropped for a key it lacks, or for one this nemia does not know');
+  assert.deepEqual(
+    { reason: read[0].reason, waits: read[0].waits, source: read[0].source },
+    { reason: 'AwaitingApproval', waits: 'person', source: 'tick' },
+    'a line with an involved and no reason is read by its word',
+  );
+  assert.deepEqual(
+    { reason: read[1].reason, call: read[1].call, try: read[1].try, source: read[1].source },
+    { reason: 'ToolDenied', call: 'Bash(ls)', try: undefined, source: 'runtime' },
+    'a one-shot with no try is a one-shot, and the try it lacks is not invented',
+  );
+  assert.equal(read[2].reason, 'ReasonANewerNemiaNamed', 'a line a newer nemia signed is passed on as its writer judged it');
+  const fold = foldFeed(freshFold(), read);
+  assert.deepEqual([...fold.said.keys()], ['Step/r-a/plan', 'Run/r-a'], 'and the fold reads each by what it is about');
+  assert.deepEqual([...fold.shots.entries()], [['r-a/plan#0', 1]], 'the one-shot with no try is counted under none');
 });
 
 test('a line a writer died in the middle of is ended by the next pass, and costs that line alone', async () => {
@@ -1188,41 +1341,9 @@ test("the feed's word for a step waiting on a person is the word `nemia ls` prin
   );
 });
 
-test("a step's denied calls are its note's denied: part, each distinct ended call counted, a running one named, in the order first denied, the rest past five counted", () => {
-  assert.equal(deniedNote([]), '', 'a step denied nothing says nothing of it');
-  assert.equal(deniedNote(['Bash(git push)', 'WebFetch', 'Bash(git push)']), 'denied: Bash(git push) ×2, WebFetch ×1');
-  assert.equal(deniedNote(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'a']), 'denied: a ×2, b ×1, c ×1, d ×1, e ×1, and 2 more');
-  assert.equal(deniedNote(['Bash(echo\nrm)']), 'denied: Bash(echo rm) ×1', 'one line');
-  assert.equal(
-    deniedNote(['WebFetch', 'Bash(ls)'], ['Bash(ls)', 'Glob']),
-    'denied: WebFetch ×1, Bash(ls) ×1, Glob',
-    'a running call is named with no count, and one an ended attempt was denied keeps that count',
-  );
-  assert.equal(deniedNote([], ['a', 'b', 'c', 'd', 'e', 'f']), 'denied: a, b, c, d, e, and 1 more', 'running calls are capped alike');
-  const steps = [{ name: 'build', after: [], brief: 'build it' }] as unknown as Parameters<typeof listing>[0]['steps'];
-  const run = {
-    id: 'r-1',
-    brief: 'b',
-    createdAt: '2026-09-22T10:00:00.000Z',
-    steps: {},
-    repo: '/r',
-    branch: 'wf/r-1',
-    base: 'main',
-  } as unknown as Run;
-  const l = listing({ steps, run, phaseOf: () => 'unknown', closeoutOf: () => undefined, asks: [], roundAsks: [], answers: [], waits: [] });
-  const words = feedWords(
-    l,
-    run,
-    { status: 'running' },
-    () => undefined,
-    (step) => ({ ended: step === 'build' ? ['Bash(git push)'] : [], running: [] }),
-  );
-  assert.equal(words.steps[0].note?.split(' · ')[0], 'denied: Bash(git push) ×1', 'a part of its own, first beside a need');
-});
-
 test('the fold keeps the last word of each run and step, forgets a removed run, and the diff owes a line only for what moved', () => {
   const at = '2026-09-22T10:00:00.000Z';
-  const fold = foldFeed(new Map(), [
+  const fold = foldFeed(freshFold(), [
     { at, run: 'r-1', word: 'running' },
     { at, run: 'r-1', step: 'plan', word: 'pending' },
     { at, run: 'r-1', step: 'plan', word: 'running' },
@@ -1230,7 +1351,7 @@ test('the fold keeps the last word of each run and step, forgets a removed run, 
     { at, run: 'r-2', word: 'removed' },
     { at, run: 'r-3', word: 'running', note: 'waiting on you: approve plan' },
   ]);
-  assert.deepEqual([...fold.keys()], ['r-1', 'r-3']);
+  assert.deepEqual([...fold.said.keys()], ['Run/r-1', 'Step/r-1/plan', 'Run/r-3']);
   const now = new Map([
     [
       'r-1',
@@ -1251,25 +1372,28 @@ test('the fold keeps the last word of each run and step, forgets a removed run, 
       { at, run: 'r-1', step: 'implement', word: 'waiting' },
       { at, run: 'r-3', word: 'running' },
       { at, run: 'r-2', word: 'running' },
-    ],
+    ].map(upgraded),
     'a new step, a note gone, and a run back under an id it had',
   );
-  assert.deepEqual(feedChanges(fold, new Map(), at), [
-    { at, run: 'r-1', word: 'removed' },
-    { at, run: 'r-3', word: 'removed' },
-  ]);
+  assert.deepEqual(
+    feedChanges(fold, new Map(), at),
+    [
+      { at, run: 'r-1', word: 'removed' },
+      { at, run: 'r-3', word: 'removed' },
+    ].map(upgraded),
+  );
 });
 
 test('REFUSED: a run at rest whose words stand owes no line for a note reworded — a word moved, a step new to the fold and a run gone still do', () => {
   const at = '2026-10-05T19:29:00.000Z';
-  const fold = foldFeed(new Map(), [
+  const fold = foldFeed(freshFold(), [
     { at, run: 'r-1', word: 'succeeded' },
     { at, run: 'r-1', step: 'plan', word: 'done' },
     { at, run: 'r-2', word: 'succeeded' },
   ]);
   const reworded = {
     run: { word: 'succeeded', note: 'a note it never had' },
-    steps: [{ name: 'plan', word: 'done', note: 'denied: Bash(git push) ×1' }],
+    steps: [{ name: 'plan', word: 'done', note: 'said to 2 times' }],
   };
   assert.deepEqual(
     feedChanges(fold, new Map([['r-1', { ...reworded, atRest: true as const }]]), at, new Set(['r-2'])),
@@ -1280,25 +1404,25 @@ test('REFUSED: a run at rest whose words stand owes no line for a note reworded 
     feedChanges(fold, new Map([['r-1', reworded]]), at, new Set(['r-2'])),
     [
       { at, run: 'r-1', word: 'succeeded', note: 'a note it never had' },
-      { at, run: 'r-1', step: 'plan', word: 'done', note: 'denied: Bash(git push) ×1' },
-    ],
+      { at, run: 'r-1', step: 'plan', word: 'done', note: 'said to 2 times' },
+    ].map(upgraded),
     'in flight, a note that moved is a line',
   );
-  const moved = { ...reworded, atRest: true as const, steps: [{ name: 'plan', word: 'failed', note: 'denied: Bash(git push) ×1' }] };
+  const moved = { ...reworded, atRest: true as const, steps: [{ name: 'plan', word: 'failed', note: 'said to 2 times' }] };
   assert.deepEqual(
     feedChanges(fold, new Map([['r-1', moved]]), at, new Set(['r-2'])),
-    [{ at, run: 'r-1', step: 'plan', word: 'failed', note: 'denied: Bash(git push) ×1' }],
+    [upgraded({ at, run: 'r-1', step: 'plan', word: 'failed', note: 'said to 2 times' })],
     'at rest, a word that moved is a line, with its note',
   );
   const added = { ...reworded, atRest: true as const, steps: [...reworded.steps, { name: 'ship', word: 'done' }] };
   assert.deepEqual(
     feedChanges(fold, new Map([['r-1', added]]), at, new Set(['r-2'])),
-    [{ at, run: 'r-1', step: 'ship', word: 'done' }],
+    [upgraded({ at, run: 'r-1', step: 'ship', word: 'done' })],
     'at rest, a step the feed never named says its word',
   );
   assert.deepEqual(
     feedChanges(fold, new Map([['r-1', { ...reworded, atRest: true as const }]]), at),
-    [{ at, run: 'r-2', word: 'removed' }],
+    [upgraded({ at, run: 'r-2', word: 'removed' })],
     'a run gone from the store is removed, at rest or not',
   );
 });

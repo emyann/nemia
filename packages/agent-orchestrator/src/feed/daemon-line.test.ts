@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { DaemonFile, DaemonStanding } from '../daemon/daemon.ts';
-import { feedChanges, feedLineWords, foldFeed, startedLine, type FeedLine, type FeedWords } from './feed.ts';
+import { feedChanges, feedLineWords, foldFeed, freshFold, startedLine, upgraded, type FeedLine, type FeedWords } from './feed.ts';
 import { scratch } from '../../test/scratch.ts';
 
 const ROOT = scratch('wf-daemon-line-');
@@ -40,12 +40,23 @@ const standing = (kind: 'stopped' | 'gone' | 'stalled', over: Partial<DaemonFile
 });
 
 test('a daemon’s line says how the one before it ended: stopped and when, gone without a stop and how, or none before it', () => {
-  assert.deepEqual(startedLine(5151, { kind: 'none' }, AT, NOW), {
-    at: AT,
-    daemon: 5151,
-    word: 'daemon started',
-    note: 'first daemon on this store',
-  });
+  assert.deepEqual(
+    startedLine(5151, { kind: 'none' }, AT, NOW),
+    {
+      at: AT,
+      daemon: 5151,
+      word: 'daemon started',
+      note: 'first daemon on this store',
+      apiVersion: 'nemia/v1',
+      involved: { kind: 'Daemon', name: '5151' },
+      labels: {},
+      reason: 'DaemonStarted',
+      type: 'Normal',
+      source: 'daemon',
+      message: 'daemon started · first daemon on this store',
+    },
+    'a daemon is involved by its pid, carries no run\u2019s labels, and is the daemon\u2019s own source',
+  );
   assert.equal(startedLine(5151, standing('stopped', { stoppedAt: ago(1) }), AT, NOW).note, `last stopped at ${ago(1)}`);
   assert.match(
     startedLine(5151, standing('gone'), AT, NOW).note ?? '',
@@ -72,8 +83,8 @@ test('a person reads a daemon’s line by its pid, where a run’s names its run
 test('REFUSED: a daemon’s line is no run’s — the fold keeps none of it, and a pass owes no `removed` for it', () => {
   const running: FeedWords = { run: { word: 'running' }, steps: [] };
   const lines: FeedLine[] = [{ at: AT, run: 'r-1', word: 'running' }, startedLine(5151, { kind: 'none' }, AT, NOW)];
-  const fold = foldFeed(new Map(), lines);
-  assert.deepEqual([...fold.keys()], ['r-1']);
+  const fold = foldFeed(freshFold(), lines);
+  assert.deepEqual([...fold.said.keys()], ['Run/r-1'], "a daemon's line is of no run, and the fold keys on what a line is about");
   assert.deepEqual(feedChanges(fold, new Map([['r-1', running]]), AT), [], 'nothing moved, and nothing is gone');
 });
 
@@ -89,7 +100,8 @@ test('the store appends a daemon’s line after a torn one, reads it back, and a
 
   const memo = freshFeedMemo();
   const running: FeedWords = { run: { word: 'running' }, steps: [] };
-  assert.deepEqual(recordFeed(new Map([['r-1', running]]), { at: AT, memo }).lines, [{ at: AT, run: 'r-1', word: 'running' }]);
+  const ran = upgraded({ at: AT, run: 'r-1', word: 'running' });
+  assert.deepEqual(recordFeed(new Map([['r-1', running]]), { at: AT, memo }).lines, [ran]);
   assert.deepEqual(recordFeed(new Map([['r-1', running]]), { at: AT, memo }).lines, [], 'a daemon line read back owes nothing');
-  assert.deepEqual(readFeed(0).lines, [line, { at: AT, run: 'r-1', word: 'running' }]);
+  assert.deepEqual(readFeed(0).lines, [line, ran]);
 });

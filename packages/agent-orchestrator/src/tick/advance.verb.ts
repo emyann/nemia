@@ -10,7 +10,7 @@
 import fs from 'node:fs';
 import { Effect } from 'effect';
 import { EngineService, asked as engineAsked, denialText, over, type Engine, type TaskView } from '../runtime-client.ts';
-import { deniedSoFarOf } from '../stats/index.ts';
+import { runLabels, stepLabels } from '../telemetry/telemetry.ts';
 import type { Verdict } from '../check/check.ts';
 import type { Workflow } from '../workflow.ts';
 import { folderPlace } from '../record/places.store.ts';
@@ -25,7 +25,7 @@ import { handOffDue } from '../workspace/workspace.ts';
 import { filesDue } from '../artifacts/artifacts.ts';
 import { inParts } from '../brief/index.ts';
 import { assess, type Assessment } from './assess.ts';
-import { feedPhase, feedWords, type FeedWords } from '../feed/feed.ts';
+import { feedPhase, feedWords, type FeedDenial, type FeedWords } from '../feed/feed.ts';
 import { listing } from '../list/list.ts';
 import { roundFiled, roundsDue } from '../round/round.ts';
 import type { Closeout } from '../closeout/index.ts';
@@ -648,11 +648,35 @@ function wordFeed(run: Run, r: PassReads, assessed: Assessment, admission: Admis
     run,
     assessed,
     (name) => closeoutOf(views, run, name),
-    (name) => {
-      const { ended, running } = deniedSoFarOf(views.get(run.steps[name]?.taskId ?? ''), denialText);
-      return { ended: ended.map(denialText), running: running.map(denialText) };
+    {
+      run: runLabels(run),
+      step: (name) => {
+        const step = steps.find((s) => s.name === name);
+        return step ? stepLabels(run, step) : { run: run.id, step: name };
+      },
+      denials: denialsOf(run, r),
     },
   );
+}
+
+/**
+ * Every call the sessions of `run`'s steps have been denied, as the pass read their views: the step, its current try (`tryOf`, from 1)
+ * and the call in the runtime's words (`denialText`), in the order the runtime journalled them — each attempt of the step's task in
+ * order, and each denial of it.
+ *
+ * It is the whole of what the step's current try was denied, not what is new: the feed's own lines say what has been written already
+ * (`denialLines`), so the pass carries nothing between passes and a restarted daemon writes a denial neither again nor never. An earlier
+ * try's denials were said on the passes it was the current one, and the try is part of what counts them.
+ */
+function denialsOf(run: Run, r: PassReads): FeedDenial[] {
+  const out: FeedDenial[] = [];
+  for (const step of r.steps) {
+    const view = r.views.get(run.steps[step.name]?.taskId ?? '');
+    const tried = tryOf(run, step.name);
+    for (const attempt of view?.state.attempts ?? [])
+      for (const denial of attempt.denials ?? []) out.push({ step: step.name, try: tried, call: denialText(denial) });
+  }
+  return out;
 }
 
 /** Write when the cap first held the run (`slotHeldAt`), and say so once, while the pass may file still: answers whether it did. */

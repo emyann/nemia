@@ -5,7 +5,7 @@
  */
 import type { Run } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
-import { stepKeys, type StepKeys } from '../meter/index.ts';
+import { runKeys, stepKeys, type StepKeys } from '../meter/index.ts';
 
 /** Where the process exports its traces, logs and metrics over OTLP: the collector's base `url`, and the service they are filed under. */
 export type Otlp = { url: string; serviceName: string };
@@ -57,6 +57,15 @@ export const stepLabels = (run: Pick<Run, 'id' | 'factory' | 'workflowDir'>, ste
 
 /** What `stepLabels` answers: a run's id beside the step's own labels. */
 export type StepLabels = StepKeys & { run: string };
+
+/**
+ * The labels a run is known by whatever the step, from the same source as a step's (`runKeys`): its id, its factory and its workflow.
+ * What a line of the feed about the run itself carries.
+ */
+export const runLabels = (run: Pick<Run, 'id' | 'factory' | 'workflowDir'>): Pick<StepLabels, 'run' | 'factory' | 'workflow'> => ({
+  run: run.id,
+  ...runKeys(run),
+});
 
 /** Where an OTLP collector at `otlp` takes traces. */
 export const tracesUrl = (otlp: Otlp): string => `${otlp.url}/v1/traces`;

@@ -56,11 +56,18 @@ export const FEED_FOLLOW_LINES = Metric.counter('feed.follow.lines', {
   incremental: true,
 });
 
-/** Logs one line of the feed at Info, annotated with its run and its step when it names one, or its daemon's pid, and its word. */
+/**
+ * Logs one line of the feed at Info, annotated with its labels as a filing's spans and logs are (`stepLabels`) — the run, its factory and
+ * its workflow, and on a step's line the step and its agent — its daemon's pid where it is a daemon's, the reason a machine selects on,
+ * how serious it is, and its word.
+ */
 const logged = (line: FeedLine): Effect.Effect<void> =>
   Effect.logInfo(feedSaidWords(line)).pipe(
     Effect.annotateLogs({
+      ...line.labels,
       ...(isRunLine(line) ? { run: line.run, ...(line.step !== undefined ? { step: line.step } : {}) } : { daemon: line.daemon }),
+      ...(line.reason !== undefined ? { reason: line.reason } : {}),
+      ...(line.type !== undefined ? { type: line.type } : {}),
       word: line.word,
     }),
   );

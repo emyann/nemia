@@ -1,13 +1,13 @@
 ---
 name: grant-access
-description: "When a step was denied a call (a feed line's denied: note), read what it was denied and why, and propose to the person the narrowest grant that would have let it through, or say the deny is kept on purpose."
+description: "When a step was denied a call (a feed line whose word says denied:), read what it was denied and why, and propose to the person the narrowest grant that would have let it through, or say the deny is kept on purpose."
 ---
 # Grant access
 
-A step's line in the feed says `denied: <call>, …` as soon as the harness reports a call its fence refused, while the step still
-works: each distinct call once as it is first refused, by its name alone. When its attempt ends the note says it once more, each call
-counted, `<call> ×<n>`; a count is only ever an ended attempt's. A step on a harness that reports no denial while it runs says it only
-at the end. The fence is its agent's: what it may call unasked (`allowedTools:`), what it may never call (`disallowedTools:`), the tools it is given at all
+The feed carries a line of its own for each call a step's fence refused, as soon as the harness reports it and while the step still
+works: its word is `denied: <call>`, the call by its name alone, and the line says which step and which of its tries it belongs to. One
+denial is one line, however many passes read it, and a call refused twice is two lines. A step on a harness that reports no denial while
+it runs says them only at the end. The fence is its agent's: what it may call unasked (`allowedTools:`), what it may never call (`disallowedTools:`), the tools it is given at all
 (`tools:`), and the folders it may write. A denial is either the fence doing its work, or a grant the agent lacks to do its job.
 
 ## Read it

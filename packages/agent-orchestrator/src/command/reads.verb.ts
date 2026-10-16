@@ -9,7 +9,7 @@ import { Effect } from 'effect';
 import { EngineService, asked, tried } from '../runtime-client.ts';
 import { runStore } from '../record/files.store.ts';
 import type { Run } from '../record/record.ts';
-import { cursorTakes, feedLineWords, type FeedLine } from '../feed/feed.ts';
+import { cursorTakes, feedLineWords, type FeedLine } from '../feed/index.ts';
 import { readFeed } from '../feed/feed.store.ts';
 import { verifiesRest } from '../config/config.store.ts';
 import { pausedWords, type Paused } from '../pause/pause.ts';

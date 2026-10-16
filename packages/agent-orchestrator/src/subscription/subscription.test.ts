@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { feedWords, type FeedLine, type RunLine } from '../feed/feed.ts';
+import { feedWords, upgraded, type FeedLine, type RunLine } from '../feed/index.ts';
 import type { Listing } from '../list/list.ts';
 import type { Closeout } from '../closeout/index.ts';
 import type { Instant } from '../daemon/daemon.ts';
@@ -20,14 +20,20 @@ const listed = (status: string, { onYou = false, waits }: { onYou?: boolean; wai
     waiting: [],
   }) as unknown as Listing;
 
-/** The feed's lines for a pass that judged the run `status`, and its step as `listed` says it: the run's, then the step's. */
+/**
+ * The feed's lines for a pass that judged the run `status`, and its step as `listed` says it: the run's, then the step's, each signed as
+ * the tick signs one (`upgraded`) — so every rule this file holds is held on a v1 line.
+ */
 const linesOf = (
   l: Listing,
   status: { status: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting approval' | 'blocked' },
   closeout?: Closeout,
 ): RunLine[] => {
   const words = feedWords(l, {}, status, () => closeout);
-  return [{ at: AT, run: 'r-1', ...words.run }, ...words.steps.map(({ name, ...said }) => ({ at: AT, run: 'r-1', step: name, ...said }))];
+  return [
+    upgraded({ at: AT, run: 'r-1', ...words.run }) as RunLine,
+    ...words.steps.map(({ name, ...said }) => upgraded({ at: AT, run: 'r-1', step: name, ...said }) as RunLine),
+  ];
 };
 
 const BLOCKED: Closeout = { outcome: 'blocked', summary: 's', artifacts: [], needs: 'a decision on the schema' };
@@ -47,9 +53,24 @@ test('the default wake words wake on each line the feed writes for a wait on a p
     );
 });
 
+test('a tool denial is routine for the default wake words, as a step’s denied: note was before it became a signal of its own', () => {
+  const shot = upgraded({
+    at: AT,
+    run: 'r-1',
+    step: 'review',
+    word: 'denied: Bash(git push)',
+    note: 'try 2',
+    call: 'Bash(git push)',
+    try: 2,
+  });
+  assert.equal(shot.reason, 'ToolDenied');
+  assert.equal(sortLine(shot, DEFAULT_WAKE), 'routine', 'nobody woken by the default words is woken by a denial, then or now');
+});
+
 test("a run blocked, its note waiting on you: review, wakes on the run's own line, and a loop out of rounds on the step's", () => {
   const [run] = linesOf(listed('rounds exhausted', { onYou: true }), { status: 'blocked' });
-  assert.deepEqual(run, { at: AT, run: 'r-1', word: 'blocked', note: 'waiting on you: review' });
+  assert.deepEqual(run, upgraded({ at: AT, run: 'r-1', word: 'blocked', note: 'waiting on you: review' }));
+  assert.deepEqual({ reason: run.reason, type: run.type, waits: run.waits }, { reason: 'Blocked', type: 'Warning', waits: 'person' });
   assert.equal(sortLine(run, DEFAULT_WAKE), 'wake');
   assert.equal(
     sortLine({ at: AT, run: 'r-1', word: 'running', note: 'waiting on you: review' }, DEFAULT_WAKE),

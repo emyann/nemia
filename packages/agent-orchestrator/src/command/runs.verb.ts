@@ -8,7 +8,7 @@
 import { cancelRun } from '../cancel/cancel.verb.ts';
 import type { CancelPlan } from '../cancel/cancel.ts';
 import { everyOf } from '../daemon/daemon.ts';
-import { cursorTakes } from '../feed/feed.ts';
+import { cursorTakes } from '../feed/index.ts';
 import { forgetLine, type Forgot } from '../forget/forget.ts';
 import { forgetRun } from '../forget/forget.verb.ts';
 import type { EngineForgetting } from '../forgetting/forgetting.ts';

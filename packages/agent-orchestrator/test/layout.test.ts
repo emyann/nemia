@@ -250,6 +250,8 @@ test('REFUSED on the source: a value import from a leaf cut out of run.ts back t
       'src/cap/cap.ts',
       'src/decide/decide.ts',
       'src/feed/feed.ts',
+      'src/feed/index.ts',
+      'src/feed/reason.ts',
       'src/forget/forget.ts',
       'src/gate/gate.ts',
       'src/list/list.ts',

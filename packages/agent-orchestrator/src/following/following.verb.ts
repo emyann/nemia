@@ -7,7 +7,7 @@ import { Effect, Stream } from 'effect';
 import { EngineService, asked, tried, type Engine, type TranscriptEvent } from '../runtime-client.ts';
 import { runStore } from '../record/files.store.ts';
 import { Missing, type Refusal } from '../refusal/refusal.ts';
-import { isRunLine } from '../feed/feed.ts';
+import { isRunLine } from '../feed/index.ts';
 import { feedSize } from '../feed/feed.store.ts';
 import { followFeed } from '../feed/feed.verb.ts';
 import { nextOf, type FollowedAttempt, type StepMoment, type StepNow } from './following.ts';

@@ -20,6 +20,7 @@ import {
   type FeedLine,
   type FeedMemo,
   type FeedWords,
+  lineAsRead,
 } from './feed.ts';
 import { Invalid } from '../refusal/refusal.ts';
 
@@ -118,32 +119,86 @@ function cursorRefusalAt(file: string, after: number): string | undefined {
   return undefined;
 }
 
-/** A line of the feed as `recordFeed` and `recordDaemonLine` write one (`FeedLine`): a run's, or a daemon's. */
-const FeedLineSchema = Schema.Union([
-  Schema.Struct({
-    at: Schema.String,
-    run: Schema.String,
-    step: Schema.optionalKey(Schema.String),
-    word: Schema.String,
-    note: Schema.optionalKey(Schema.String),
-  }),
-  Schema.Struct({
-    at: Schema.String,
-    daemon: Schema.Finite,
-    word: Schema.Literal(DAEMON_STARTED),
-    note: Schema.optionalKey(Schema.String),
-  }),
+/** What every key a line does not name is kept as, so a line a newer `nemia` wrote keeps it through a read and a write back. */
+const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
+
+/**
+ * What a v1 line signs itself with (`Signal` in `feed.ts`), each key optional so a line written before this version still decodes and is
+ * upgraded on read (`upgraded`) rather than dropped.
+ *
+ * Every one of them is as loose as the JSON it came from — a string where this version writes a literal — on purpose: a `nemia` newer
+ * than this one may name a reason, a type or a source this one does not, and a closed literal here would drop its line whole and leave
+ * the fold reading a feed with a hole in it.
+ */
+const SIGNAL_KEYS = {
+  apiVersion: Schema.optionalKey(Schema.String),
+  involved: Schema.optionalKey(Schema.Struct({ kind: Schema.String, name: Schema.String })),
+  labels: Schema.optionalKey(
+    Schema.Struct({
+      run: Schema.optionalKey(Schema.String),
+      factory: Schema.optionalKey(Schema.String),
+      workflow: Schema.optionalKey(Schema.String),
+      step: Schema.optionalKey(Schema.String),
+      agent: Schema.optionalKey(Schema.String),
+    }),
+  ),
+  reason: Schema.optionalKey(Schema.String),
+  type: Schema.optionalKey(Schema.String),
+  waits: Schema.optionalKey(Schema.String),
+  source: Schema.optionalKey(Schema.String),
+  message: Schema.optionalKey(Schema.String),
+  call: Schema.optionalKey(Schema.String),
+  try: Schema.optionalKey(Schema.Finite),
+};
+
+/**
+ * A line of the feed as `recordFeed` and `recordDaemonLine` write one (`FeedLine`): a run's, or a daemon's, each with what a v1 line signs
+ * itself with. `StructWithRest`, so a key this version does not name survives a read and a write back — a digest the deliverer keeps holds
+ * whole lines (`subscription.store.ts`, which decodes with this very schema).
+ */
+export const FeedLineSchema = Schema.Union([
+  Schema.StructWithRest(
+    Schema.Struct({
+      at: Schema.String,
+      run: Schema.String,
+      step: Schema.optionalKey(Schema.String),
+      word: Schema.String,
+      note: Schema.optionalKey(Schema.String),
+      ...SIGNAL_KEYS,
+    }),
+    Rest,
+  ),
+  Schema.StructWithRest(
+    Schema.Struct({
+      at: Schema.String,
+      daemon: Schema.Finite,
+      word: Schema.Literal(DAEMON_STARTED),
+      note: Schema.optionalKey(Schema.String),
+      ...SIGNAL_KEYS,
+    }),
+    Rest,
+  ),
 ]);
 
 /** Whether a value read off the feed is one of its lines; a key the line does not name is kept, as a newer `nemia` may write one. */
 const isFeedLine = Schema.is(FeedLineSchema);
 
-/** A line of the feed as it was written, or nothing for one that is not: a line a writer died in the middle of, ended by the next one. */
+/**
+ * A line of the feed as it was written, upgraded to a v1 signal (`upgraded`) — or nothing for text that is no line: one a writer died in
+ * the middle of, ended by the next one.
+ *
+ * **Every reader downstream of this sees v1 alone**, the fold included, so a feed of old lines and one of new fold to the same state and
+ * no reader upgrades a line a second way. Nothing on disk is rewritten: the line read is left exactly as it lies, and the cursor it was
+ * read at means what it always meant.
+ *
+ * The decoded line goes through the one door between the loose shape the JSON held and the typed line (`lineAsRead`), which fills in from
+ * the word and the note every key that is missing, and passes on a line a newer `nemia` signed as its writer judged it.
+ */
 function parseLine(text: string): FeedLine[] {
   if (!text) return [];
   try {
     const line: unknown = JSON.parse(text);
-    return isFeedLine(line) ? [line] : [];
+    return isFeedLine(line) ? [lineAsRead(line)] : [];
   } catch {
     return [];
   }

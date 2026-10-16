@@ -64,6 +64,9 @@ holds what every change needs.
   transition is wrong after a restart `(no test yet)`.
 - **Prose is not a constraint.** If the packages need an agent to do something, the machinery refuses the alternative
   `(no test yet)`.
+- **A state machine is drawn by its code.** A new machine prints its own Mermaid diagram, held between `diagram:<name>` markers in its
+  package's docs whose begin line names the command; never a drawing `(no test yet)`. A diagram that has drifted from what its
+  command prints is another matter, and refused.
 - **The Kubernetes test for a new field on the runtime's task: does the Pod spec (`core/v1`) have one?** A container's command, args,
   env, volumes, restart policy, resources and priority are the runtime's; what a workflow means — a step, a gate, a check's verdict, a
   budget across tries — is not `(no test yet)`.

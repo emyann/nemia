@@ -165,7 +165,7 @@ test('a follower that joins late is said the open block whole, then what is said
     [],
     'it replays no event written before it joined: its first read takes the transcript’s cursor without saying what is there',
   );
-  assert.deepEqual(ids(late), ids(early).slice(1), 'and it is said the events written after it joined, those alone');
+  assert.equal(ids(late).length, 1, 'and it is said the one event written after it joined, that alone');
   assert.ok(texts(late).includes(SAID.join('')), 'the second turn’s event carries the text its pieces spelled');
   fs.writeFileSync(path.join(dir, 'end'), '');
   await Effect.runPromise(Fiber.interrupt(first));

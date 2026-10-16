@@ -142,12 +142,19 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
 ## The feed
 
 - **A line is signed once, through one door**: `upgraded` (`src/feed/feed.ts`) fills in `apiVersion`, `involved`, `labels`, `reason`,
-  `type`, `waits`, `source` and `message` for a line with no version, and is what `feedChanges`, `startedLine` and `denialLines` stamp a
-  new line with; a line that already names an `apiVersion` is passed on as its writer judged it.
+  `type`, `waits`, `source` and `message` for a line with no version, and is what `feedChanges`, `startedLine` and `onceLines` stamp a
+  new line with; a line that already names an `apiVersion` is passed on as its writer judged it. A line's `source` is the reason's by the
+  table, unless the offer named one of its own.
 - **The fold keys on `involved`, not on `run`/`step`**: a hand-built fixture that spreads a run's line and adds a `step` keeps the run's
   `involved` and folds under the run (it cost a pass in `apps/api/src/factory/feed.test.ts`). Build a line's fields, never spread another's.
 - **A reason comes from the table alone** (`src/feed/reason.ts`): a status reworded in `list.ts`, `cap.ts`, `wait.ts`, `ending.ts` or
-  `assess.ts` falls to `Unknown`, and `src/feed/reason.test.ts` is the only thing that refuses it — add the word to its fixture.
+  `assess.ts` falls to `Unknown`, and `src/feed/reason.test.ts` is the only thing that refuses it — add the word to its fixture. A code
+  the table marks `once` is a one-shot: counted off the feed's own lines under its reason, what it is about, its try and its note
+  (`onceKey`, `oncePast`), never remembered and never a thing's last word. A new one-shot is offered from `word-feed.verb.ts`, off what
+  the pass already read, and the note is what tells one occurrence from another.
+- **One occurrence is offered once**: counting by place cannot tell two offers of one fact from two facts (`oncePast`). A hold's lift is
+  the tick's where the pass lifted it (`liftHold`'s `lifted`, sourced `tick`) and the person's where the hold is merely gone, and that
+  one put is the absence rule's exception — never both.
 
 ## The tick
 

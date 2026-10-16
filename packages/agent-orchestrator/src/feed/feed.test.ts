@@ -29,6 +29,7 @@ import {
   upgraded,
   type FeedLine,
   type FeedWords,
+  type Reason,
   type RunLine,
 } from './feed.ts';
 import { DEFAULT_FACTORY } from '../factory/factory.ts';
@@ -50,6 +51,8 @@ delete process.env.WF_MAX_CONCURRENT;
 const {
   approveRun,
   cancelRun,
+  hold,
+  unhold,
   feedCursorRefusal,
   feedFile,
   freshFeedMemo,
@@ -82,7 +85,14 @@ const refusedWith = (pattern: RegExp) => (err: Error & { exitCode?: number }) =>
 const board = () => {
   const tasks = new Map<
     string,
-    { spec: { id: string; brief: string; closeoutSchema?: object }; phase: string; closeout?: unknown; denials?: object[]; live?: boolean }
+    {
+      spec: { id: string; brief: string; closeoutSchema?: object };
+      phase: string;
+      closeout?: unknown;
+      denials?: object[];
+      live?: boolean;
+      ends?: readonly string[];
+    }
   >();
   const settledPhase = (p: string) => ['succeeded', 'failed', 'stopped'].includes(p);
   let views = 0;
@@ -106,10 +116,23 @@ const board = () => {
             !t || t.phase === 'pending'
               ? []
               : [
+                  ...(t.ends ?? []).map((reason, i) => ({
+                    n: i + 1,
+                    ended: { at: '2026-09-22T10:05:00.000Z' },
+                    denials: undefined,
+                    nativeId: `native-${id}-${i}`,
+                    closeout: undefined as unknown,
+                    exitCode: null,
+                    usage: null,
+                    startedAt: '2026-09-22T10:00:00.000Z',
+                    spawnedAt: '2026-09-22T10:00:00.000Z',
+                    endedAt: '2026-09-22T10:05:00.000Z',
+                    reason: reason as string | null,
+                  })),
                   {
-                    n: 1,
+                    n: (t.ends?.length ?? 0) + 1,
                     ended: t.denials && !t.live ? { at: '2026-09-22T10:05:00.000Z' } : null,
-                    ...(t.denials ? { denials: t.denials } : {}),
+                    denials: t.denials,
                     nativeId: `native-${id}`,
                     closeout: t.closeout,
                     exitCode: null,
@@ -136,7 +159,9 @@ const board = () => {
   });
   const set = (id: string, phase: string, closeout?: unknown) => Object.assign(tasks.get(id)!, { phase, closeout });
   const deny = (id: string, denials: object[], live = false) => Object.assign(tasks.get(id)!, { denials, live });
-  return { e, set, deny, views: () => views };
+  /** The attempts of `id` before its current one, each ended for the reason named: what the runtime journalled of a restarted session. */
+  const ends = (id: string, reasons: readonly string[]) => Object.assign(tasks.get(id)!, { ends: reasons });
+  return { e, set, deny, ends, views: () => views };
 };
 
 /** A store with no runs and no feed. */
@@ -372,6 +397,287 @@ test('REFUSED: a one-shot is counted by the step and the try, not by what it rea
   assert.equal(shots().length, 1, 'a denial of the same step and try, worded anew, is the one the feed holds — not a second');
   recordFeed(new Map([['r-1', atWork([first, { ...first, try: 2 }])]]), { at, memo: freshFeedMemo() });
   assert.equal(shots().length, 2, 'and the same call on another try is its own line');
+});
+
+/**
+ * What a pass judged of a run a person has acted on, with the one-shots the pass read of it beside its words: a person's acts
+ * (`actsOf`), the runtime's faults (`faultsOf`), and the two moments a hold is paired by.
+ */
+const withOnce = (once: Pick<FeedWords, 'acts' | 'faults' | 'held' | 'lifted'>): FeedWords => ({
+  run: { word: 'running' },
+  labels: { run: 'r-1', factory: 'nemia', workflow: 'build' },
+  steps: [{ name: 'plan', word: 'running', labels: { run: 'r-1', factory: 'nemia', workflow: 'build', step: 'plan', agent: 'ada' } }],
+  ...once,
+});
+
+/** Every line of one reason the feed holds, in order, with the fields a selector matches one by. */
+const said = (reason: Reason) =>
+  lines()
+    .filter((l) => l.reason === reason)
+    .map((l) => ({ run: l.run, step: l.step, word: l.word, note: l.note, try: l.try, type: l.type, source: l.source, waits: l.waits }));
+
+/** A person's three acts on one run, each as the record carries them after the verb wrote the person's own file. */
+const AT = '2026-10-16T04:00:00.000Z';
+const APPROVED = { run: 'r-1', step: 'plan', word: 'approved', note: 'try 1 · at 2026-10-16T03:00:00.000Z', try: 1 };
+const CANCELLED = { word: 'cancel asked', note: 'at 2026-10-16T03:30:00.000Z' };
+
+test("a person's act is one line per act, never one per pass — and a restarted daemon writes it neither again nor never", () => {
+  emptyStore();
+  const memo = freshFeedMemo();
+  const acts = withOnce({ acts: [APPROVED, CANCELLED], held: '2026-10-16T03:45:00.000Z' });
+  for (let i = 0; i < 10; i++) recordFeed(new Map([['r-1', acts]]), { at: AT, memo });
+  assert.deepEqual(
+    [...said('Approved'), ...said('CancelAsked'), ...said('HoldPut')],
+    [
+      {
+        run: 'r-1',
+        step: 'plan',
+        word: 'approved',
+        note: 'try 1 · at 2026-10-16T03:00:00.000Z',
+        try: 1,
+        type: 'Normal',
+        source: 'person',
+        waits: undefined,
+      },
+      {
+        run: 'r-1',
+        step: undefined,
+        word: 'cancel asked',
+        note: 'at 2026-10-16T03:30:00.000Z',
+        try: undefined,
+        type: 'Normal',
+        source: 'person',
+        waits: undefined,
+      },
+      {
+        run: 'r-1',
+        step: undefined,
+        word: 'hold put',
+        note: 'since 2026-10-16T03:45:00.000Z',
+        try: undefined,
+        type: 'Normal',
+        source: 'person',
+        waits: undefined,
+      },
+    ],
+    "each of a person's three acts is one line, the person's deed, over ten passes that read the same record",
+  );
+  assert.equal(
+    lines().find((l) => l.reason === 'Approved')!.message,
+    'approved · try 1 · at 2026-10-16T03:00:00.000Z',
+    'and what a person reads of it is the word and its note',
+  );
+
+  const restarted = freshFeedMemo();
+  for (let i = 0; i < 3; i++) recordFeed(new Map([['r-1', acts]]), { at: AT, memo: restarted });
+  assert.equal(
+    [...said('Approved'), ...said('CancelAsked'), ...said('HoldPut')].length,
+    3,
+    'a daemon with no fold reads the feed and writes none of them again',
+  );
+});
+
+test('a second act of the same kind gets its own line: the try an approval opens is part of what counts it', () => {
+  emptyStore();
+  const memo = freshFeedMemo();
+  const first = { acts: [APPROVED] };
+  recordFeed(new Map([['r-1', withOnce(first)]]), { at: AT, memo });
+  const again = { run: 'r-1', step: 'plan', word: 'approved', note: 'try 2 · at 2026-10-16T05:00:00.000Z', try: 2 };
+  for (let i = 0; i < 3; i++) recordFeed(new Map([['r-1', withOnce({ acts: [APPROVED, again] })]]), { at: AT, memo });
+  assert.deepEqual(
+    said('Approved').map((l) => [l.try, l.note]),
+    [
+      [1, 'try 1 · at 2026-10-16T03:00:00.000Z'],
+      [2, 'try 2 · at 2026-10-16T05:00:00.000Z'],
+    ],
+    'a step approved again on a later try says so once more, and the first approval is not repeated',
+  );
+});
+
+test('a hold a person lifted by hand says so once, read off the put the feed holds and the hold the record no longer has', () => {
+  emptyStore();
+  const memo = freshFeedMemo();
+  const put = '2026-10-16T03:45:00.000Z';
+  const none = { acts: [] };
+  for (let i = 0; i < 2; i++) recordFeed(new Map([['r-1', withOnce({ ...none, held: put })]]), { at: AT, memo });
+  assert.equal(said('HoldLifted').length, 0, 'while the hold stands, no lift is due');
+  for (let i = 0; i < 10; i++) recordFeed(new Map([['r-1', withOnce(none)]]), { at: AT, memo });
+  assert.deepEqual(
+    said('HoldLifted'),
+    [
+      {
+        run: 'r-1',
+        step: undefined,
+        word: 'hold lifted',
+        note: `since ${put}`,
+        try: undefined,
+        type: 'Normal',
+        source: 'person',
+        waits: undefined,
+      },
+    ],
+    "a hold gone with no pass having lifted it is the person's deed, said exactly once over ten passes after it",
+  );
+
+  const again = '2026-10-16T06:00:00.000Z';
+  for (let i = 0; i < 2; i++) recordFeed(new Map([['r-1', withOnce({ ...none, held: again })]]), { at: AT, memo });
+  for (let i = 0; i < 5; i++) recordFeed(new Map([['r-1', withOnce(none)]]), { at: AT, memo });
+  assert.deepEqual(
+    [said('HoldPut').map((l) => l.note), said('HoldLifted').map((l) => l.note)],
+    [
+      [`since ${put}`, `since ${again}`],
+      [`since ${put}`, `since ${again}`],
+    ],
+    'a hold put, lifted, put and lifted again is two puts and two lifts, each told apart by the moment its hold was put',
+  );
+  const restarted = freshFeedMemo();
+  for (let i = 0; i < 3; i++) recordFeed(new Map([['r-1', withOnce(none)]]), { at: AT, memo: restarted });
+  assert.equal(said('HoldLifted').length, 2, 'and a daemon with no fold writes neither lift a second time');
+});
+
+test("a hold the tick lifted itself is the tick's deed, not the person's — the pass that lifted it is the only thing that knows", () => {
+  emptyStore();
+  const memo = freshFeedMemo();
+  const put = '2026-10-16T03:45:00.000Z';
+  recordFeed(new Map([['r-1', withOnce({ acts: [], held: put })]]), { at: AT, memo });
+  for (let i = 0; i < 10; i++) recordFeed(new Map([['r-1', withOnce({ acts: [], lifted: put })]]), { at: AT, memo });
+  assert.deepEqual(
+    said('HoldLifted'),
+    [
+      {
+        run: 'r-1',
+        step: undefined,
+        word: 'hold lifted',
+        note: `since ${put}`,
+        try: undefined,
+        type: 'Normal',
+        source: 'tick',
+        waits: undefined,
+      },
+    ],
+    "one line, sourced tick: the pass's own offer and the absence rule's are one occurrence, so the absence rule adds none",
+  );
+});
+
+test('each fault the runtime journalled is one line per occurrence, and neither waits on a person', () => {
+  emptyStore();
+  const memo = freshFeedMemo();
+  const faults = [
+    { run: 'r-1', step: 'plan', word: 'nothing started', note: 'try 1', try: 1 },
+    { run: 'r-1', step: 'plan', word: 'session lost', note: 'try 1', try: 1 },
+    { run: 'r-1', step: 'plan', word: 'session lost', note: 'try 1', try: 1 },
+  ];
+  for (let i = 0; i < 10; i++) recordFeed(new Map([['r-1', withOnce({ acts: [], faults })]]), { at: AT, memo });
+  assert.deepEqual(
+    [...said('SpawnFailed'), ...said('SessionLost')],
+    [
+      { run: 'r-1', step: 'plan', word: 'nothing started', note: 'try 1', try: 1, type: 'Warning', source: 'runtime', waits: undefined },
+      { run: 'r-1', step: 'plan', word: 'session lost', note: 'try 1', try: 1, type: 'Warning', source: 'runtime', waits: undefined },
+      { run: 'r-1', step: 'plan', word: 'session lost', note: 'try 1', try: 1, type: 'Warning', source: 'runtime', waits: undefined },
+    ],
+    'two attempts of one try lost are two lines and the spawn refused is a third, each the runtime telling us and waking nobody',
+  );
+  const restarted = freshFeedMemo();
+  for (let i = 0; i < 3; i++) recordFeed(new Map([['r-1', withOnce({ acts: [], faults })]]), { at: AT, memo: restarted });
+  assert.equal([...said('SpawnFailed'), ...said('SessionLost')].length, 3, 'and a daemon with no fold writes none of them again');
+  for (let i = 0; i < 2; i++)
+    recordFeed(new Map([['r-1', withOnce({ acts: [], faults: [...faults, faults[1]] })]]), { at: AT, memo: restarted });
+  assert.equal(said('SessionLost').length, 3, 'nor misses a third attempt lost');
+});
+
+test("a person's verbs and the runtime's two faults are read off the store the pass already read, and said once each", async () => {
+  emptyStore();
+  const b = board();
+  const repo = aRepo();
+  const inRepo = (brief: string, isolate: boolean) => runPlaced(startRun({ brief, repo, workflowDir: gated, isolate }));
+  const other = await inRepo('the run it waits on', true);
+  const run = await inRepo('the acts', false);
+  await runWith(b.e, tickRun());
+  /** Every line of one reason this run's, with the fields the walk reads: the other run's lines are no part of it. */
+  const mine = (reason: Reason) => said(reason).filter((l) => l.run === run.id);
+
+  b.set(`${run.id}-plan`, 'running');
+  b.ends(`${run.id}-plan`, ['unstartable', 'lost', 'lost']);
+  for (let i = 0; i < 3; i++) await runWith(b.e, tickRun());
+  assert.deepEqual(
+    [...mine('SpawnFailed'), ...mine('SessionLost')].map((l) => [l.step, l.word, l.note, l.source, l.type]),
+    [
+      ['plan', 'nothing started', 'try 1', 'runtime', 'Warning'],
+      ['plan', 'session lost', 'try 1', 'runtime', 'Warning'],
+      ['plan', 'session lost', 'try 1', 'runtime', 'Warning'],
+    ],
+    "faultsOf reads the attempts the pass already read and translates each once, in the workflow layer's own words",
+  );
+
+  await runWith(b.e, hold(run.id, [other.id], { why: 'it waits on the other run', by: 'operator' }));
+  for (let i = 0; i < 3; i++) await runWith(b.e, tickRun());
+  const held = readRun(run.id)!.hold!;
+  assert.deepEqual(
+    mine('HoldPut').map((l) => [l.word, l.note, l.source]),
+    [['hold put', `since ${held.at}`, 'person']],
+    "the hold a person put is read off the record's own composed fact, once, as the person's deed",
+  );
+
+  await runWith(b.e, unhold(run.id));
+  for (let i = 0; i < 3; i++) await runWith(b.e, tickRun());
+  assert.deepEqual(
+    mine('HoldLifted').map((l) => [l.word, l.note, l.source]),
+    [['hold lifted', `since ${held.at}`, 'person']],
+    'and the hold taken off by hand, which leaves only an absence on disk, is said once off the put the feed holds',
+  );
+
+  b.set(`${run.id}-plan`, 'succeeded', SIGNED);
+  for (let i = 0; i < 3; i++) await runWith(b.e, tickRun());
+  await runWith(b.e, approveRun(run.id, 'plan'));
+  for (let i = 0; i < 3; i++) await runWith(b.e, tickRun());
+  const approval = readRun(run.id)!.approvals![0];
+  assert.deepEqual(
+    mine('Approved').map((l) => [l.step, l.word, l.note, l.try, l.source]),
+    [['plan', 'approved', `try ${approval.try} · at ${approval.at}`, approval.try, 'person']],
+    "the approval a person wrote at the gate is a line of its own, beside the state line the gate's own word already wrote",
+  );
+
+  await runWith(b.e, cancelRun(run.id));
+  for (let i = 0; i < 3; i++) await runWith(b.e, tickRun());
+  assert.deepEqual(
+    mine('CancelAsked').map((l) => [l.word, l.note, l.source]),
+    [['cancel asked', `at ${readRun(run.id)!.cancelledAt}`, 'person']],
+    'and so is the call-off',
+  );
+
+  for (const reason of ['Approved', 'CancelAsked', 'HoldPut', 'HoldLifted', 'SpawnFailed', 'SessionLost'] as const)
+    assert.equal(
+      mine(reason).every((l) => l.waits === undefined),
+      true,
+      `${reason} wakes nobody on its own`,
+    );
+});
+
+test("REFUSED: no runtime word crosses into a signal — the feed says the workflow layer's own words for the runtime's two ends", () => {
+  emptyStore();
+  const memo = freshFeedMemo();
+  const faults = [
+    { run: 'r-1', step: 'plan', word: 'nothing started', note: 'try 1', try: 1 },
+    { run: 'r-1', step: 'plan', word: 'session lost', note: 'try 1', try: 1 },
+  ];
+  for (let i = 0; i < 3; i++) recordFeed(new Map([['r-1', withOnce({ acts: [], faults })]]), { at: AT, memo });
+  assert.equal(said('SpawnFailed').length + said('SessionLost').length, 2, 'the fixture wrote the two lines the refusal is about');
+  for (const line of lines())
+    assert.equal(
+      JSON.stringify(line).includes('unstartable'),
+      false,
+      `a runtime end reason reached a line of the feed: ${JSON.stringify(line)}`,
+    );
+  const here = path.join(import.meta.dirname);
+  const names = fs
+    .readdirSync(here)
+    .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
+    .filter((f) => fs.readFileSync(path.join(here, f), 'utf8').includes('unstartable'));
+  assert.deepEqual(
+    names,
+    ['word-feed.verb.ts'],
+    "one site in the feed's code names the runtime's word, and it is the one that translates it",
+  );
 });
 
 test('REFUSED: a one-shot holds no entry in the fold — the step says its own word once, however many denials it carries', () => {

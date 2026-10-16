@@ -280,10 +280,13 @@ export type Once = { step?: string; word: string; note?: string; call?: string; 
  * The one-shots of `offers` the feed does not hold already, in the order they were offered. Pure.
  *
  * **The count is read off the feed, not remembered.** The fold counts the lines written under each occurrence's key (`shots`), and this
- * takes the rest. Two offers that come to one key are one occurrence apiece, counted by their place among them, so a second denial of the
- * same call in the same try, or a second attempt of it lost, gets its own line and a repeat of the first gets none. So a pass writes a
- * fact once however many passes read it, and a restarted daemon, which reads the whole feed, writes it neither again nor never — and two
- * offers of one occurrence on one pass, as a hold the tick lifted is both the tick's offer and a hold merely gone, are one line.
+ * takes the rest. Two offers that come to one key are two occurrences, counted by their place among them, so a second denial of the same
+ * call in the same try, or a second attempt of it lost, gets its own line and a repeat of the first gets none. So a pass writes a fact
+ * once however many passes read it, and a restarted daemon, which reads the whole feed, writes it neither again nor never.
+ *
+ * **One occurrence is offered once.** Nothing here can tell two offers of one occurrence from two occurrences — that is what counting by
+ * place means — so whoever offers is what keeps them apart: `holdOnce` leaves the absence rule silent about the hold the pass itself
+ * lifted, rather than offering the same lift twice and trusting this to notice.
  */
 function oncePast(fold: FeedFold, run: string, offers: readonly Once[]): Once[] {
   const walked = new Map<string, number>();
@@ -311,9 +314,9 @@ const holdSince = (at: string): string => `since ${at}`;
  * reads only its absence; the feed holds the put, so the lift is due, and once written the pair is matched and no pass says it again. A
  * hold put, lifted and put again is two puts and two lifts, each told apart by the moment its hold was put (`holdSince`).
  *
- * The tick lifts a hold itself once every run it names has shipped (`liftHold`), and by then the hold is already off the record: so the
- * pass that lifted it offers its own lift first, sourced `tick`, and the absence rule's offer of the same occurrence is the same line
- * (`oncePast`) — which is what keeps the tick's own deed from being read as a person's.
+ * The tick lifts a hold itself once every run it names has shipped (`liftHold`), and by then the hold is already off the record, so the
+ * absence rule would read the tick's own deed as a person's. The pass that lifted it says so (`lifted`), and that one put is the
+ * absence rule's exception: exactly one lift either way, sourced by whoever took the hold off.
  */
 function holdOnce(fold: FeedFold, run: string, held: string | undefined, lifted: string | undefined): Once[] {
   const involved = onceInvolved(run, undefined);
@@ -322,11 +325,13 @@ function holdOnce(fold: FeedFold, run: string, held: string | undefined, lifted:
     ...(standing !== undefined ? [{ word: SIGNAL_WORDS.HoldPut, note: standing }] : []),
     ...(lifted !== undefined ? [{ word: SIGNAL_WORDS.HoldLifted, note: holdSince(lifted), source: 'tick' as const }] : []),
   ];
+  const lifting = lifted === undefined ? undefined : holdSince(lifted);
   const puts = onceKey(involved, 'HoldPut', undefined, '');
   for (const key of fold.shots.keys()) {
     if (!key.startsWith(puts)) continue;
     const note = key.slice(puts.length);
-    if (note === standing || fold.shots.has(onceKey(involved, 'HoldLifted', undefined, note))) continue;
+    if (note === standing || note === lifting) continue;
+    if (fold.shots.has(onceKey(involved, 'HoldLifted', undefined, note))) continue;
     out.push({ word: SIGNAL_WORDS.HoldLifted, note });
   }
   return out;

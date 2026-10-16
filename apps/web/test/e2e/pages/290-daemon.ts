@@ -35,12 +35,12 @@ export default {
    * Whether a daemon ticks the store: a dot on the top bar's gauges button, and whole in the machine's gauges it opens. The seeded
    * store has no daemon.json, which is true — the e2e's api runs with `--no-tick` — so the dot is down and the gauges say so and how to
    * start one: the api. Then a daemon heard from just now, said on the feed as a daemon says it on starting (`fedDaemon`): the dot is ok
-   * with no reload, read on that line and not on the fallback a minute later. Then a wf up alive and silent for 20 minutes, past the 15 that are stale at every 4 s: the dot warns, and the
-   * gauges say it stalled, with its silence and the command, each card on the floor beside them clear of the one beneath it and of the
-   * panels. Then an api holder silent as long: said by its kind. Then each heard from just now: the dot is ok, the gauges say the api's
-   * own line and no sentence, and the cap is still over the floor. Then the api's last pass could not read a harness (`tick-stats.json`'s
-   * `unobserved`): the dot warns, `ticking, harness unread`, its title the api's line and each reason on a line of its own. The files are
-   * taken back, and the store reads as seeded again.
+   * with no reload, read on that line and not on the fallback a minute later. Then a wf up alive and silent for 20 minutes, past the 15
+   * that are stale at every 4 s: the dot warns, and the gauges say it stalled, with its silence and the command, each card on the floor
+   * beside them clear of the one beneath it and of the panels. Then an api holder silent as long: said by its kind. Then each heard from
+   * just now: the dot is ok, the gauges say the api's own line and no sentence, and the cap is still over the floor. Then the api's last
+   * pass could not read a harness (`tick-stats.json`'s `unobserved`): the dot warns, `ticking, harness unread`, its title the api's line
+   * and each reason on a line of its own. The files are taken back, and the store reads as seeded again.
    */
   name: 'daemon',
   route: '/factories/default?bar=gauges',

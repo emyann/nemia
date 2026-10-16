@@ -156,6 +156,9 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
  *
  * A route lets the orchestrator's refusals through, and `onError` answers each from `REFUSAL_STATUS`, `{ error }` in its words
  * (`answerError`). Any other error is a 500 there: a route that has better words for one, or a truer status, answers it itself.
+ *
+ * Every request, whichever route answers it, says one line and is traced as a server span: `saidRequest` (request/request.ts), registered
+ * after the runtime's middleware and before every router, on the runtime the request carries.
  */
 export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtime: ApiRuntime } {
   const runtime = ManagedRuntime.make(layer);

@@ -89,11 +89,13 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
   (`isSameDay`, `isSameYear`) and take the time from it, and `test/time-of-day.test.ts` refuses a second writer of an hour in `src`.
 - A writer handed no `timeZone` is proven only by a file that sets a zone that is not UTC before it loads one
   (`test/default-zone.test.ts`): every other suite names its zone, so a `zoneOf` that defaulted to UTC would leave them all green.
+  A zone-carrying comparison is pinned there with its zone named too, or a machine already in UTC makes dropping it a no-op.
 - A whole instant has one writer, `lib/instant.ts`: text on a page is `instantWords` (`7:08 PM` today, `9 Oct 5:30 PM`, `31 Dec 2025,
   4:10 PM`: a comma after a year alone), a `title` is `instantWhole` (`12 Oct 2026, 7:08:53 PM`), the Timeline's cell is
   `timeToTheSecond`; a component draws one with `Instant` (`components/Instant.tsx`). The same guard refuses any `toLocaleString(`,
-  `toLocaleTimeString(` or `toLocaleDateString(` in `src`, a number's too until its file and count are named in `NUMBERS`, and a
-  `new Intl.DateTimeFormat` in every file of `src`, the one writer's included: that family carries no exemption.
+  `toLocaleTimeString(` or `toLocaleDateString(` in `src`, a number's too until its file and count are named in `NUMBERS`, and an
+  `Intl.DateTimeFormat` — with `new` or without, both legal — in every file of `src`, the one writer's included: that family carries
+  no exemption, so a second writer of an hour cannot return to `lib/timeOfDay.ts`, where the hour options are allowed.
 - A time on the runs page is `whenWords`, or `whenColumn` in a table (`lib/runWords.ts`); its date is `dateParts`. A schedule's
   far fire is `instantWords` (`14 Oct 12:00 PM`, `1 Jan 2027, 4:00 AM`); `whenWords` keeps dropping the time in another year.
   `expectTexts` trims, so a padded time is compared trimmed or by its `textContent`.

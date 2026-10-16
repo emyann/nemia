@@ -104,7 +104,9 @@ export function ChatKeptMessage({
     <div data-chat-kept className="flex max-w-[94%] flex-col items-end gap-1.5 self-end">
       <Who who="You" at={kept.at}>
         <CutTag>
-          <span className={`inline-flex items-center px-2 py-0.5 text-label-small uppercase ${container.failure}`}>Not sent</span>
+          <span data-chat-tag="kept" className={`inline-flex items-center px-2 py-0.5 text-label-small uppercase ${container.failure}`}>
+            Not sent
+          </span>
         </CutTag>
       </Who>
       {draft === null ? (

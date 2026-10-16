@@ -4,30 +4,21 @@
  * the store's lease first (`up`, as the api), so an api refused by another daemon binds no port, then serves the app on loopback alone
  * (`HOST`, port.ts), writes where it listens into the lease (`holdUrl`) and ticks on the engine its layer built, under `runMain`: a signal
  * closes the server and lets the lease go, and a lease taken over or a pass that fails ends the process. Its passes are said as `nemia up`
- * says them, through the telemetry its environment asks for (`telemetryLayer`): OTLP too when `OTEL_EXPORTER_OTLP_ENDPOINT` is set, its own
- * series a collector reads by their increase (`STEP_FOLLOWS`) born at zero with the daemon's (`up`'s `series`). The
- * feed's lines it writes are published to the hub its layer built (`FeedHub`), which the app's streams of the feed read.
+ * says them, through the telemetry the app's layer holds (`telemetryLayer` in `liveOf`, app.ts): the pass is given the app runtime's
+ * context whole (`Effect.provideContext`), so its lines go through the same logger every request's does, its spans and its series are
+ * exported to the collector `OTEL_EXPORTER_OTLP_ENDPOINT` names, its own series a collector reads by their increase (`STEP_FOLLOWS`) born
+ * at zero with the daemon's (`up`'s `series`), and the hub its layer built (`FeedHub`), which the app's streams of the feed read, and the
+ * place its programs ask (`PlaceService`) come with it. The runtime is disposed as the pass ends, however it ends, so the exporters post
+ * what they hold once more before the process goes.
  * With `--no-tick` it serves alone, holding nothing. It prints the port the server got: the one asked for, or a free one for `PORT=0`.
  * Refused first (`Conflict`), binding nothing: a checkout's api on a store that runs an install (`trialRefusal`), unless
  * `NEMIA_ON_INSTALLED=1`; and an install's repository is the one it was built from (`repoOf`).
  */
 import { serve } from '@hono/node-server';
 import { Context, Effect } from 'effect';
-import {
-  Conflict,
-  currentRelease,
-  DEFAULT_EVERY_MS,
-  FeedHub,
-  PlaceService,
-  HOME,
-  holdUrl,
-  runMain,
-  runningRelease,
-  telemetryLayer,
-  trialRefusal,
-  up,
-} from 'agent-orchestrator';
+import { Conflict, currentRelease, DEFAULT_EVERY_MS, HOME, holdUrl, runMain, runningRelease, trialRefusal, up } from 'agent-orchestrator';
 import { app, runtime } from './app.ts';
+import type { Services } from './layer.ts';
 import { repoOf } from './capabilities/capabilities.ts';
 import { HOST, portOf, ticksOf } from './port.ts';
 import { STEP_FOLLOWS } from './steps/following.ts';
@@ -42,18 +33,15 @@ const fail = (err: unknown): never => {
 let port: number;
 let ticks: boolean;
 let e: Engine['Service'];
-let hub: (typeof FeedHub)['Service'];
-let place: PlaceService['Service'];
+let services: Context.Context<Services>;
 const running = runningRelease();
 try {
   const trial = trialRefusal(running, currentRelease(), HOME, process.env);
   if (trial !== null) throw new Conflict({ message: trial });
   ticks = ticksOf(process.argv.slice(2));
   port = portOf(process.env.PORT, ticks);
-  const services = await runtime.context();
+  services = await runtime.context();
   e = Context.get(services, Engine);
-  hub = Context.get(services, FeedHub);
-  place = Context.get(services, PlaceService);
 } catch (err) {
   fail(err);
 }
@@ -96,10 +84,5 @@ else
       holder: 'api',
       series: [STEP_FOLLOWS],
       onTaken: () => Effect.map(listening, (served) => void holdUrl(`http://${HOST}:${served.port}`)),
-    }).pipe(
-      Effect.scoped,
-      Effect.provideService(FeedHub, hub),
-      Effect.provideService(PlaceService, place!),
-      Effect.provide(telemetryLayer(process.env)),
-    ),
+    }).pipe(Effect.scoped, Effect.provideContext(services!), Effect.ensuring(runtime.disposeEffect)),
   ).catch(fail);

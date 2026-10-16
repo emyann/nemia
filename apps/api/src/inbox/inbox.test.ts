@@ -754,7 +754,11 @@ test("a card whose start fails without a refusal — its repository's `.worktree
   assert.equal(((await res.json()) as Refused).error, failure.message);
   assert.deepEqual(runFiles(), [], 'no run written');
   assert.deepEqual(cards(), [`${card.name}.md`], 'the card stays');
-  assert.equal(said.mock.calls.length, 1, 'the failure said once on stderr');
+  const errors = said.mock.calls.filter((call) => call.arguments[0] instanceof Error);
+  assert.equal(errors.length, 1, 'the failure said once on stderr');
+  const lines = said.mock.calls.filter((call) => typeof call.arguments[0] === 'string').map((call) => String(call.arguments[0]));
+  assert.equal(lines.length, 1, `beside it, the request's own line at Error: ${JSON.stringify(lines)}`);
+  assert.match(lines[0], /^\d\d:\d\d:\d\d {2}POST \/api\/runs 500 \d+ms$/);
 });
 
 test("REFUSED at shipped defaults: a `card` that is not a card's name is a 400 in the package's words, and one that is not text or with a brief that is not a 400 in the api's — before any workflow is looked for", async () => {

@@ -185,6 +185,7 @@ test('a record that holds the former wake key is converted on read, its file lef
 });
 
 test('a wake word the table does not know is said once and the rest of its list still delivers', () => {
+  fs.mkdirSync(store.subscriptionsDir(), { recursive: true });
   fs.writeFileSync(subscriptionFile('partly'), JSON.stringify({ ...SUB, selectors: undefined, wake: ['blocked', 'verified'] }));
   const { said, say } = saying();
   assert.deepEqual(
@@ -198,6 +199,7 @@ test('a wake word the table does not know is said once and the rest of its list 
 });
 
 test('REFUSED: a record with no selector at all is left out and said, never delivered against an empty filter that takes every line', () => {
+  fs.mkdirSync(store.subscriptionsDir(), { recursive: true });
   const fixtures: Array<[string, object, RegExp]> = [
     ['empty', { ...SUB, selectors: [] }, /its selectors /],
     ['neither', { task: 'nemia-1', digestEvery: 60, from: 0 }, /names no selectors/],

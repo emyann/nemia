@@ -131,10 +131,13 @@ down is in `docs/architecture.md`, *Who owns what*.
   `--output-format stream-json --verbose`, and one `result` line under `--output-format json`.
 - **A turn's end is not the session's end for a long-lived attached request** (`took`, `harness/claude/attached-session.ts`): the run
   file is rewritten `idle`, the input stays open, and an `is_error` result fails nothing. The SDK reads `errors` off a result whose
-  subtype is not `success`, so a stand-in's interrupted result carries one or `readMessages` throws.
+  subtype is not `success`, so a stand-in's interrupted result carries one or `readMessages` throws. Words pushed on its input begin
+  the next turn, so `hear` writes `working` with them: a session heard and left `idle` is read as waiting on a person while it answers,
+  and no turn of it can be ended.
 - **An attached sighting says `held` and the holder's `pid` while its state is open** (`sightingOf`, `harness/claude/attached.ts`), and
   a holder gone says `held: false`, which `decide` restarts the task under: `interrupted` reads the interrupt file on every look, never
-  as a transition, so another process's ask survives a restart of the holder.
+  as a transition, so another process's ask survives a restart of the holder, and an ask that landed after its turn ended is dropped
+  there, never kept for the next turn.
 - **The claude.ai bridge is an undeclared method on the SDK's `query()` object**, read off it in `attached-bridge.ts` alone, its answer
   decoded before anything is written from it, and refused in words on the run file where the SDK has none.
 - **The Agent SDK (0.3.270) speaks to its CLI in control requests both ways, and writes a resume as one argument, `--resume=<id>`**: the

@@ -179,6 +179,9 @@ const took = (root: string, live: Live, m: SDKMessage): void => {
 /**
  * Hands the session the words said to it since it last heard (its say file, past `heard`), each a user message on its input, and
  * writes how far it heard. Nothing once its input is closed or it is let go: the next holder hears them.
+ *
+ * Words pushed on an open session's input begin a turn, so its run file is written `working` with them: a session that heard and stayed
+ * `idle` would be read as waiting on a person while it answers, and no turn of it could be ended.
  */
 export const hear = (root: string, live: Live): void => {
   if (live.input.closed || live.letGo) return;
@@ -193,7 +196,7 @@ export const hear = (root: string, live: Live): void => {
   if (end <= from) return;
   for (const line of said.subarray(from, end).toString('utf8').split('\n').filter(Boolean))
     live.input.push((JSON.parse(line) as { text: string }).text);
-  rewrite(root, live, { heard: end });
+  rewrite(root, live, { heard: end, ...(live.open ? { state: 'working' as const } : {}) });
 };
 
 /** Waits until the process `pid` is gone. */

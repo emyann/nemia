@@ -629,6 +629,15 @@ const countedInto =
   };
 
 /**
+ * The verbs a person writes to the session of a task in flight, over the journal and the harnesses: `say` and `interrupt`, which both
+ * take what `sayVerbOf` takes.
+ */
+const writtenVerbsOf = (...given: Parameters<typeof sayVerbOf>) => ({
+  say: sayVerbOf(...given),
+  interrupt: interruptVerbOf(...given),
+});
+
+/**
  * The engine over `options` that `Engine.layer` builds: the file-backed store under `root` (`~/.agent-engine` by default) or the
  * `journal` given, and the `harnesses` given — by default `claude`, `codex` and `claude-detached`. Built once, and shared by every verb:
  *
@@ -644,15 +653,6 @@ const countedInto =
  *
  * Fails with `EngineRefused` for what `optionsRefusalOf` refuses.
  */
-/**
- * The verbs a person writes to the session of a task in flight, over the journal and the harnesses: `say` and `interrupt`, which both
- * take what `sayVerbOf` takes.
- */
-const writtenVerbsOf = (...given: Parameters<typeof sayVerbOf>) => ({
-  say: sayVerbOf(...given),
-  interrupt: interruptVerbOf(...given),
-});
-
 const make = (options: EngineOptions) =>
   Effect.gen(function* () {
     const refused = optionsRefusalOf(options);

@@ -468,10 +468,16 @@ test('an interrupt ends the turn and leaves the session answering under the same
   const cut = await idle(t, root, 'the interrupted turn ended');
   assert.equal(cut.state, 'idle', 'an `error_during_execution` result ends the turn, not the session');
   assert.equal((await Effect.runPromise(h.attached.ops.observe)).get(NAME)?.state, 'input-required');
-  fs.writeFileSync(path.join(dir, 'end'), '');
   await Effect.runPromise(h.attached.ops.say!({ name: NAME, sessionId: NAME }, 'carry on then'));
-  await until(t, () => (lines(dir, 'said.jsonl') as string[]).includes('carry on then'), 'the next turn heard', { everyMs: 50 });
-  const after = await idle(t, root, 'the next turn ended');
+  assert.equal(run(root)?.state, 'working', 'the words it heard began a turn of their own, written as they were pushed');
+  assert.equal(
+    (await Effect.runPromise(h.attached.ops.observe)).get(NAME)?.state,
+    'working',
+    'a session answering again is no session waiting on a person: its turn can be ended',
+  );
+  fs.writeFileSync(path.join(dir, 'end'), '');
+  const after = await until(t, () => run(root)?.state === 'idle' && run(root)!, 'the next turn ended', { everyMs: 50 });
+  assert.ok((lines(dir, 'said.jsonl') as string[]).includes('carry on then'), 'the next turn heard the words');
   assert.equal(after.sessionId, cut.sessionId, 'the same session answered after the interrupt');
   const taken = lines(dir, 'taken.jsonl') as { subtype: string | null }[];
   assert.equal(taken.filter((r) => r.subtype === 'interrupt').length, 1, 'one interrupt control request, and one only');
@@ -501,6 +507,25 @@ test("an interrupt asked by another process is honoured on the holder's next loo
   assert.equal(fs.existsSync(filesOf(root, NAME).interrupt), false, 'the ask goes once the request was sent');
   const refused = await Effect.runPromise(Effect.flip(other.interrupt!({ name: NAME, sessionId: NAME })));
   assert.match(refused.message, /is idle, so it has no turn to end/, 'and an idle session has no turn to end');
+});
+
+test("REFUSED: an ask that reached the file after its turn ended is dropped on the holder's look, never kept for the next turn", WAITED, async (t) => {
+  const { root, dir, request } = kept({ hold: true, output: {} });
+  const h = await holder(root);
+  t.after(h.close);
+  await Effect.runPromise(h.attached.ops.spawn(request));
+  await until(t, () => run(root)?.sessionId, 'the session started its first turn', { everyMs: 50 });
+  fs.writeFileSync(path.join(dir, 'end'), '');
+  await idle(t, root, 'and ended it');
+  fs.writeFileSync(filesOf(root, NAME).interrupt, '4242');
+  await Effect.runPromise(h.attached.ops.observe);
+  assert.equal(fs.existsSync(filesOf(root, NAME).interrupt), false, 'the ask goes: there is no turn to end');
+  const taken = lines(dir, 'taken.jsonl') as { subtype: string | null }[];
+  assert.deepEqual(
+    taken.filter((r) => r.subtype === 'interrupt'),
+    [],
+    'and nothing was asked of the session, so its next turn runs to its own end',
+  );
 });
 
 test('a holder lets a long-lived session go between turns and the next resumes it under the same Claude Code id', WAITED, async (t) => {

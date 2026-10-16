@@ -170,6 +170,9 @@ test('a link of hers to a page of the board is taken out of the sentence and nam
   const refused = linksOf('[Run it](javascript:doIt)');
   assert.deepEqual(refused.links, []);
   assert.equal(refused.text, '[Run it](javascript:doIt)', 'and so is one whose address Markdown empties');
+  const relative = linksOf('[Open it](//evil.test/x)');
+  assert.deepEqual(relative.links, [], 'a protocol-relative address is no route of this board, whatever its first character');
+  assert.equal(relative.text, '[Open it](//evil.test/x)', 'so it too is left in her words');
   assert.deepEqual(linksOf('Nothing to open here.'), { text: 'Nothing to open here.', links: [] });
 });
 

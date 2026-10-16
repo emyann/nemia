@@ -54,7 +54,15 @@ test('the default wake words wake on each line the feed writes for a wait on a p
 });
 
 test('a tool denial is routine for the default wake words, as a step’s denied: note was before it became a signal of its own', () => {
-  const shot = upgraded({ at: AT, run: 'r-1', step: 'review', word: 'denied: Bash(git push)', note: 'try 2', call: 'Bash(git push)', try: 2 });
+  const shot = upgraded({
+    at: AT,
+    run: 'r-1',
+    step: 'review',
+    word: 'denied: Bash(git push)',
+    note: 'try 2',
+    call: 'Bash(git push)',
+    try: 2,
+  });
   assert.equal(shot.reason, 'ToolDenied');
   assert.equal(sortLine(shot, DEFAULT_WAKE), 'routine', 'nobody woken by the default words is woken by a denial, then or now');
 });

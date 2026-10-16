@@ -2,15 +2,15 @@
  * The engine's stand-in, `testEngine()`: the `Engine` service kept by hand in a layer (`layer`), with no journal, no harness and no pass,
  * for a test of a layer above the runtime. A test settles a task itself (`settle`), leaving with its end the text its session printed
  * (`printed`), which `output` then answers stream by stream, and reads back what the engine was asked: each task (`tasks`), every filing
- * by id (`filings`) and by what it was filed with (`specs`), each stop taken (`stopped`), each word said (`said`) and each `forget` call
- * by call (`forgets`); `refuseSay(n)` refuses the next `n` says as the runtime refuses a session not running; `keeps(id, sizes)` plants
- * what `kept` answers of a task, and `failKept(n)` fails the next `n` as a store that does not list fails one; `plantTranscript(id, n,
- * events)` plants what `transcript` reads of an attempt, and `restart(id)` starts a task's next.
+ * by id (`filings`) and by what it was filed with (`specs`), each stop taken (`stopped`), each word said (`said`), each interrupt asked
+ * (`interrupts`) and each `forget` call by call (`forgets`); `refuseSay(n)` refuses the next `n` says as the runtime refuses a session
+ * not running; `keeps(id, sizes)` plants what `kept` answers of a task, and `failKept(n)` fails the next `n` as a store that does not
+ * list fails one; `plantTranscript(id, n, events)` plants what `transcript` reads of an attempt, and `restart(id)` starts a task's next.
  *
- * It keeps `file`, `view`, `list`, `stop`, `logs`, `feed`, `output`, `say`, `transcript`, `forget` and `kept`, each answering what the
- * real engine answers over a harness that costs nothing: `test/engine-walks.ts` holds the walks both run, and `APART` there what this one
- * cannot say. Every other verb dies naming itself. Reached from another package through `agent-runtime/testing` alone, and by no file of a
- * `src`.
+ * It keeps `file`, `view`, `list`, `stop`, `logs`, `feed`, `output`, `say`, `interrupt`, `transcript`, `forget` and `kept`, each
+ * answering what the real engine answers over a harness that costs nothing: `test/engine-walks.ts` holds the walks both run, and `APART`
+ * there what this one cannot say. Every other verb dies naming itself. Reached from another package through `agent-runtime/testing`
+ * alone, and by no file of a `src`.
  */
 import { Effect, Layer } from 'effect';
 import type { Attempt, Said, State } from '../core/index.ts';
@@ -35,6 +35,7 @@ import { KeptRefused, type KeptReport } from './kept.ts';
 import type { TaskSpec } from './options.ts';
 import { notACount, notAStream, OutputRefused } from './output.ts';
 import { SayRefused } from './say.ts';
+import { InterruptRefused } from './interrupt.ts';
 
 /** A task as it was filed: its spec, under the id it was filed with or given. */
 export type TestFiling = TaskSpec & { readonly id: string };
@@ -185,6 +186,8 @@ export type TestEngine = {
   readonly stopped: string[];
   readonly forgets: { taskIds: string[]; yes: boolean }[];
   readonly said: { taskId: string; text: string }[];
+  /** Each task an interrupt was asked of, in the order asked, whether or not it was refused. */
+  readonly interrupts: string[];
   /** Each holder a drain was put for, or null where one was lifted, in order. */
   readonly drains: (number | null)[];
   /** Refuses the next `times` says, whatever the task. */
@@ -290,6 +293,24 @@ const forgetVerbOf =
       return { forgotten: yes, tasks: taskIds.map((taskId) => ({ taskId, journalBytes: 0, feedLines: 0, sessions: [] })) };
     });
 
+/**
+ * `interrupt` over what a stand-in holds: every ask noted in `interrupts`, whether it was taken or refused, and refused in the engine's
+ * own words for a task it does not hold, one settled, and one whose attempt has not started. Any attempt in flight has a turn to end:
+ * a stand-in holds no sighting to read a session between turns by.
+ */
+const interruptAskedOf =
+  (tasks: Map<string, TestTask>, interrupts: string[], settledIn: (id: string) => string | null) => (taskId: string) =>
+    Effect.gen(function* () {
+      interrupts.push(taskId);
+      const refuse = (message: string) => Effect.fail(new InterruptRefused({ message }));
+      const t = tasks.get(taskId);
+      if (!t) return yield* refuse(unknown(taskId));
+      if (settledIn(taskId))
+        return yield* refuse(`\`${taskId}\` has settled (${t.phase}): no session of it is running, and no turn is in it.`);
+      if (!t.attempt) return yield* refuse(`\`${taskId}\` has not started an attempt yet, so there is no turn to end.`);
+      return { at: new Date().toISOString(), attempt: t.attempt.n };
+    });
+
 /** The kept verbs over what a stand-in holds. */
 const keptOf = (
   held: Omit<TestEngine, 'layer' | 'refuseSay' | 'settle' | 'keeps' | 'failKept' | 'plantTranscript' | 'restart'>,
@@ -297,7 +318,7 @@ const keptOf = (
   sizes: Map<string, TestKeeps>,
   keptFailures: { left: number },
 ) => {
-  const { tasks, filings, specs, stopped, forgets, said } = held;
+  const { tasks, filings, specs, stopped, forgets, said, interrupts } = held;
   const settledIn = (id: string) => {
     const t = tasks.get(id);
     return t ? outcomeOf(t.phase) : null;
@@ -364,6 +385,7 @@ const keptOf = (
         said.push({ taskId, text });
         return heard;
       }),
+    interrupt: interruptAskedOf(tasks, interrupts, settledIn),
     transcript: transcriptOf(tasks),
     forget: forgetVerbOf(tasks, forgets, settledIn),
     kept: keptVerbOf(tasks, sizes, keptFailures),
@@ -383,6 +405,7 @@ export const testEngine = (): TestEngine => {
     stopped: [] as string[],
     forgets: [] as { taskIds: string[]; yes: boolean }[],
     said: [] as { taskId: string; text: string }[],
+    interrupts: [] as string[],
     drains: [] as (number | null)[],
   };
   const sayRefusals = { left: 0 };

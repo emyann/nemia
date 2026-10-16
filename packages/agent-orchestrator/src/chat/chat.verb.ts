@@ -1,10 +1,11 @@
 /**
  * A chat with a long-lived task, read and written as the board asks: its history a page at a time with where the task is
- * (`chatHistory`), what changed since a stream's cursor (`chatSince`), the person's words put in the outbox (`chatSend`) and their read
- * mark moved (`chatRead`). Every read projects again from the task's record, its transcripts and the chat's files (`projectChat`).
+ * (`chatHistory`), what changed since a stream's cursor (`chatSince`), the person's words put in the outbox (`chatSend`), their read
+ * mark moved (`chatRead`) and the turn it is answering stopped (`chatStop`). Every read projects again from the task's record, its
+ * transcripts and the chat's files (`projectChat`).
  *
  * **Every read costs the whole projection, and that is accepted here.** A read is the task's view, every one of the task's attempts'
- * transcripts from the start, the chat's three files and the open runs for `waitsOnYou`; a followed chat pays it again on every beat, per
+ * transcripts from the start, the chat's four files and the open runs for `waitsOnYou`; a followed chat pays it again on every beat, per
  * reader. So one read costs what the task has said all its life, and a session that talks all day costs more each beat than it did an
  * hour before: the pace (`CHAT_BEAT_MS` at the api) and the readers open bound how often it is paid, not how much. It buys being
  * level-triggered: nothing is kept between reads, so a restart owes exactly what the files and the runtime say, and the cursor a reader
@@ -12,19 +13,19 @@
  * of the session to the SDK, where the projection reads the session's own events instead of a harness's transcript file; a cursor
  * carrying the runtime's transcript cursor, and the earlier attempts' events held between beats, belong with that move.
  *
- * A controller: it reaches the runtime through the client, and is the one writer of the outbox and of the read mark.
+ * A controller: it reaches the runtime through the client, and is the one writer of the outbox, of the read mark and of the stops.
  */
 import { randomBytes } from 'node:crypto';
 import { Effect } from 'effect';
 import { EngineService, asked, tried } from '../runtime-client.ts';
 import { verifiesRest } from '../config/config.store.ts';
 import { HOME } from '../record/record.store.ts';
-import { Invalid, Missing } from '../refusal/refusal.ts';
+import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { restingMemo, type RestingMemo } from '../rest/resting.verb.ts';
 import { kindOf } from '../runlist/runlist.ts';
 import type { Filings } from '../summary/reads.verb.ts';
 import { runsSummarized, type RunSummary } from '../summary/summary.verb.ts';
-import { appendOutbox, readDelivered, readOutbox, readReadMark, writeReadMark } from './chat.store.ts';
+import { appendOutbox, appendStop, readDelivered, readOutbox, readReadMark, readStops, writeReadMark } from './chat.store.ts';
 import {
   CHAT_TEXT_MAX,
   changedSince,
@@ -41,6 +42,7 @@ import {
   type OutboxEntry,
   type Presence,
   type ReadMark,
+  type SourceStop,
 } from './chat.ts';
 
 /** Which chat: the long-lived task it is with (none while none is filed), and the folder its files are kept in. */
@@ -80,7 +82,11 @@ const sessionOf = (task: string, attempt: { n: number; startedAt: string }) =>
 const sourcesOf = (place: ChatPlace) =>
   Effect.gen(function* () {
     const e = yield* EngineService;
-    const files = yield* tried(() => ({ outbox: readOutbox(place.dir), delivered: readDelivered(place.dir) }));
+    const files = yield* tried(() => ({
+      outbox: readOutbox(place.dir),
+      delivered: readDelivered(place.dir),
+      stops: readStops(place.dir),
+    }));
     const view = place.task === undefined ? undefined : yield* asked('view', e.view(place.task));
     if (place.task === undefined || view === undefined || !view.state.filedAt)
       return { sessions: [], said: [], ...files, phase: '' } satisfies ChatSources;
@@ -154,6 +160,29 @@ export const chatSend = Effect.fn('chatSend')(function* (place: ChatPlace, text:
   const entry: OutboxEntry = { id: entryId(), at: new Date().toISOString(), text };
   yield* tried(() => appendOutbox(place.dir, entry));
   return entry;
+});
+
+/**
+ * The turn the task of the chat at `place` is answering stopped, and the stop as its record keeps it: the runtime ends the turn through
+ * its harness and leaves the session open, and the stop is appended to the chat's own `stops.jsonl`, which the projection draws as the
+ * keeper's quiet marker. The turn is ended before the line is written: a stop on the record is a turn the runtime stopped.
+ *
+ * Refused (`Conflict`) where no task is filed, and in the runtime's own words where it will not end the turn — she is not answering,
+ * her session is not running, or her harness cannot end a turn without ending it.
+ */
+export const chatStop = Effect.fn('chatStop')(function* (place: ChatPlace) {
+  const e = yield* EngineService;
+  if (place.task === undefined)
+    return yield* Effect.fail(new Conflict({ message: 'No session of hers is filed, so there is no turn to stop.' }));
+  const ended = yield* e.interrupt(place.task).pipe(
+    Effect.catchTags({
+      InterruptRefused: (refused) => Effect.fail(new Conflict({ message: refused.message })),
+      InterruptUnsent: (unsent) => Effect.fail(new Conflict({ message: unsent.message })),
+    }),
+  );
+  const stop: SourceStop = { at: ended.at, attempt: ended.attempt };
+  yield* tried(() => appendStop(place.dir, stop));
+  return stop;
 });
 
 /**

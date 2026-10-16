@@ -87,7 +87,7 @@ export function ChatPanel({ chat, nemia, presence, atWork, now, mode, onGrow, on
           </div>
         )}
         <div className="shrink-0">
-          <ChatComposer presence={presence} onSend={chat.send} />
+          <ChatComposer presence={presence} onSend={chat.send} onStop={chat.stop} />
         </div>
       </section>
     </CutFrame>

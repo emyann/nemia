@@ -39,6 +39,24 @@ runtime's.
 **Above the runtime by design**: run slots, checkout holds, worktrees and landing, what a check means, budgets across tries, gates, the
 inbox, factories, stats, agent definitions.
 
+**A long-lived Claude Code session runs attached, by the runtime's own rule** (`attachedLongLived`,
+`agent-runtime/src/harness/claude/code.ts`): a task filed `restartPolicy: 'Always'` with `background: true` is spawned on the Agent
+SDK's streaming input while a holder of this store holds its sessions, and on `claude --bg` only where none does. Nothing above the
+runtime asks for it, and no field says it: the policy is the Pod spec's, and how the session is run is the runtime's. A turn's end is
+not that session's end — its run file says `idle`, its input stays open, and an `is_error` result (an interrupted turn's
+`error_during_execution` among them) fails nothing — so the sighting of such a session is `input-required`, which `decide` reads as
+idle (`idleOf`), with `held` and the holder's `pid` on it.
+
+**The claude.ai bridge of an attached session is the runtime's**, opened through the Agent SDK's own control request on the `query()`
+object (`enableBridge`, `src/harness/claude/attached-bridge.ts`), its facts kept on the run file and its link answered on the sighting;
+a session whose SDK carries no such request runs on without one and says why. Remote Control of a `--bg` session stays what it was
+(`claudeBridge`).
+
+**Ending the turn a session is in is an engine verb**, `interrupt` (`src/service/interrupt.ts`): the turn of the attempt in flight
+ended through its harness, the session left open to hear the next words, journalled nowhere — the next pass reads the session's state as
+it reads any other — and refused in words where the harness cannot end a turn without ending its session. The orchestrator's `chatStop`
+asks it and records the stop for the person (`src/chat/chat.verb.ts`).
+
 **A harness's trust of a folder is the runtime's to read and to give** (`trustedFolder`, `folderTrust`, `trustFolder`,
 `agent-runtime/src/harness/trust.ts`: one key of the harness's own file, every other kept), and **the repository a folder is in is the
 place's to answer** (its `root` verb). The orchestrator asks both when a place joins a factory, from one function (`trustPlaces`,
@@ -179,7 +197,8 @@ forked by `up`) files while any factory is above `manual` and stops once none is
 her task's view, and subscribes to the feed under the name `nemia`, which no person gives or takes away; her subscription and her
 admission carry her floor, `semi-auto`, so a factory at `manual` is left alone. What she is
 — her instruction, her fence and her skills — ships in the package's `nemia/` folder, outside `src`, and holds no word of this
-repository's team (`test/nemia-shipped.test.ts`); how her session runs is the runtime's (`restartPolicy: 'Always'`, Remote Control).
+repository's team (`test/nemia-shipped.test.ts`); how her session runs is the runtime's (`restartPolicy: 'Always'`, Remote Control,
+and the attached runner that rule brings).
 Her chat is the orchestrator's too, written over a long-lived task and a folder (`src/chat/`): projected on every read from her
 transcripts across her attempts and the runtime's `said`, never a copy; what the person writes (`outbox.jsonl`) and their read mark
 (`read.json`) are theirs, written by the api's programs alone, and delivered by the keeper's `deliver` act, the one writer of

@@ -40,6 +40,8 @@ export {
   TranscriptRefused,
   OutputRefused,
   FollowRefused,
+  InterruptRefused,
+  InterruptUnsent,
   SayRefused,
   SayUnsent,
   QuotaRefused,

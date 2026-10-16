@@ -269,7 +269,7 @@ export const claudeCodeOps = (options: ClaudeOptions = {}, attached?: Attached):
   const seen = (look: RunnerOps['observe']) => read(look).pipe(Effect.map((m) => m.value ?? new Map<string, Sighting>()));
 
   return {
-    spawn: (r) => (r.config?.background ? bg : job).spawn(r),
+    spawn: (r) => (r.config?.background && !attachedLongLived(r, attached) ? bg : job).spawn(r),
     refuses: claudeCodeRefuses,
 
     observe: Effect.all([seen(job.observe), seen(bg.observe)], { concurrency: 'unbounded' }).pipe(
@@ -311,6 +311,7 @@ export const claudeCodeOps = (options: ClaudeOptions = {}, attached?: Attached):
 
     stop: (sessionId) => of(sessionId).stop(sessionId),
     logs: (sessionId) => of(sessionId).logs(sessionId),
+    interrupt: (session) => interruptThrough(of(session.sessionId), session),
 
     release: (session, task) => (isClaudeJob(session.sessionId) ? Effect.succeed(undefined) : bg.release!(session, task)),
 
@@ -357,6 +358,30 @@ export const claudeCodeOps = (options: ClaudeOptions = {}, attached?: Attached):
   };
 };
 
+/**
+ * The turn of `session` ended through `ops`, or refused in words where that runner cannot end one: a `--bg` session, whose words go to
+ * Claude Code's inbox and whose turn nothing of ours can cut, and a job, which runs its brief to its end.
+ */
+const interruptThrough = (ops: RunnerOps, session: { name: string; sessionId: string }): Effect.Effect<void, RunnerError> =>
+  ops.interrupt
+    ? ops.interrupt(session)
+    : Effect.fail(
+        new RunnerError({
+          verb: 'interrupt',
+          message: `\`${session.name}\` does not run attached on the Agent SDK, and its turn cannot be ended without ending its session: stop the task to end it.`,
+          refused: true,
+        }),
+      );
+
+/**
+ * Whether a long-lived request runs attached: one filed `restartPolicy: 'Always'` while this process holds the attached sessions. A
+ * session that stays open until it is stopped runs attached whenever a holder is there — durable by resume, its turns' ends seen, its
+ * calls caught and its turn stoppable — and on `--bg` only when nothing holds it. Read off the world, never off a word invented for one
+ * kind of task: every long-lived Claude Code task goes attached without knowing it.
+ */
+export const attachedLongLived = (r: Pick<SpawnRequest, 'restartPolicy'>, attached?: Pick<Attached, 'holding'>): boolean =>
+  r.restartPolicy === 'Always' && attached?.holding() === true;
+
 /** Why an attached session is not followed live: its conversation is read again through `transcript`. */
 const attachedUnfollowed = (name: string) =>
   new RunnerError({
@@ -390,6 +415,7 @@ const withAttached = (job: RunnerOps, attached: Attached): RunnerOps => {
     },
     stop: (name) => to(name).stop(name),
     logs: (name) => to(name).logs(name),
+    interrupt: (session) => interruptThrough(to(session.name), session),
     transcript: (name, after) => to(name).transcript!(name, after),
     say: (session, text) => to(session.name).say!(session, text),
     follow: (name) => (attached.has(name) ? Stream.fail(attachedUnfollowed(name)) : job.follow!(name)),

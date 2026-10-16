@@ -20,6 +20,8 @@ const OWN: Readonly<Record<string, string>> = {
   'POST /api/nemia/chat/send':
     "the person's words to Nemia, a program of the package's chat and no command: a command would enter her fence, a second writer",
   'POST /api/nemia/chat/read': "the person's read mark of Nemia's chat, a program of the package's chat and no command, as the send",
+  'POST /api/nemia/chat/stop':
+    "the turn Nemia is answering stopped, a program of the package's chat and no command: the stop is the person's record of it, written out of her fence",
   'GET /api/store': "your store's folders as the api reads them, under its store root, which no command of the orchestrator answers",
   'GET /api/version': "the api's build, as the board's bottom bar says it",
   'GET /api/capabilities': "the machine's harnesses and MCP servers, asked by the app's asker, which it keeps between requests",

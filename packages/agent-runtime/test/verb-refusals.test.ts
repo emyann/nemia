@@ -17,6 +17,7 @@ import {
   type Sighting,
   type TickReport,
 } from '../src/index.ts';
+import { VERBS as LIFECYCLE_VERBS } from '../src/core/lifecycle.ts';
 import { scratch } from './scratch.ts';
 import { asyncOps, asyncStore, type AsyncJournal, type AsyncRunner } from './promise-runner.ts';
 import { builtEngine } from './engine.ts';
@@ -116,6 +117,7 @@ const VERBS = [
   'follow',
   'forget',
   'hold',
+  'interrupt',
   'io',
   'kept',
   'list',
@@ -337,6 +339,13 @@ test('each refusal is a tagged error, and refusalWords words it behind the verb,
     ],
     ['say', 'SayRefused', () => effect((e) => e.say('ghost', 'hi')), /^`ghost` is not a task on this board\./],
     ['say', 'SayRefused', () => effect((e) => e.say('one', ' ')), /^`text` is empty\./],
+    ['interrupt', 'InterruptRefused', () => effect((e) => e.interrupt('ghost')), /^`ghost` is not a task on this board\./],
+    [
+      'interrupt',
+      'InterruptRefused',
+      () => effect((e) => e.interrupt('one')),
+      /^the `fake` harness cannot end a turn without ending its session: only a session on streaming input takes it\./,
+    ],
     ['answer', 'InputRefused', () => effect((e) => e.answer('one', 'go on')), /`one`/],
     [
       'answer',
@@ -459,6 +468,31 @@ test("say's failure that is not a refusal is SayUnsent, with its cause, and refu
   assert.deepEqual([plain.message, plain.exitCode, plain._tag], [`say: ${unsent.message}`, undefined, undefined]);
   assert.ok(unsent.cause instanceof Error && plain.cause instanceof Error, 'each carries what failed');
   assert.equal(plain.cause.message, unsent.cause.message);
+});
+
+test('interrupt is no lifecycle verb: it is on no VERBS entry, and a refusal of it journals nothing', async () => {
+  const { effect, built } = engines();
+  assert.ok(
+    !LIFECYCLE_VERBS.map((v) => v.verb as string).includes('interrupt'),
+    'an interrupt journals no entry the next pass reads as a state',
+  );
+  await Effect.runPromise(built.file({ brief: 'one', cwd: '/r', id: 'one' }));
+  await failure(effect((e) => e.interrupt('one')));
+  assert.deepEqual(
+    (await Effect.runPromise(built.feed(0))).entries.map((e) => [e.taskId, e.event.kind]),
+    [['one', 'filed']],
+    'nothing of the interrupt was journalled',
+  );
+});
+
+test("interrupt's refusal of a task settled and of one with no attempt in flight is tagged and worded", async () => {
+  const { effect, built } = engines();
+  await Effect.runPromise(built.file({ brief: 'one', cwd: '/r', id: 'one' }));
+  await Effect.runPromise(built.stop('one'));
+  const asked = await failure(effect((e) => e.interrupt('one')));
+  assert.equal(asked._tag, 'InterruptRefused');
+  const plain = refusalWords('interrupt')(asked) as Error & { exitCode?: number };
+  assert.deepEqual([plain.message, plain.exitCode], [`interrupt: ${asked.message}`, 2]);
 });
 
 test('options an engine cannot be built from: EngineRefused from the layer, worded by refusalWords as ae says it', async () => {

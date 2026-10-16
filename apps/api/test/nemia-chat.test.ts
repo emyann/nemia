@@ -1,7 +1,8 @@
 /**
  * Nemia's chat on the api, over the app's engine, her task journalled at work in its store and her transcript Claude Code's, and her level
  * file naming it: a page of her history with where she is, a send put in her outbox and refused when empty, a read mark moved and refused
- * for an event she does not hold, and the stream: presence first, then her events with the cursor, resumed after Last-Event-ID with nothing
+ * for an event she does not hold, a stop refused where her session cannot have its turn ended and guarded as her other writes are,
+ * and the stream: presence first, then her events with the cursor, resumed after Last-Event-ID with nothing
  * repeated, and a cursor no read gave refused before it opens.
  */
 import { config, registry, root } from './harness.ts';
@@ -147,14 +148,14 @@ test('the stream sends presence first, then her events with the cursor, and resu
   assert.deepEqual(JSON.parse(first[0].data!), { up: true, answering: true, waitsOnYou: 0, unread: 2 });
   assert.deepEqual(textsOf(first), ['One.', 'Two.']);
   const cursor = first.filter((b) => b.id !== undefined).at(-1)?.id;
-  assert.equal(cursor, '1.2.0.0.0');
+  assert.equal(cursor, '1.2.0.0.0.0');
   said(sessionId, ['Three.'], 2);
   const resumed = await streamed(
     await app.request('/api/nemia/chat/stream', { headers: { 'Last-Event-ID': cursor } }),
     (said) => textsOf(said).length >= 1,
   );
   assert.deepEqual(textsOf(resumed), ['Three.']);
-  assert.equal(resumed.filter((b) => b.id !== undefined).at(-1)?.id, '1.3.0.0.0');
+  assert.equal(resumed.filter((b) => b.id !== undefined).at(-1)?.id, '1.3.0.0.0.0');
 });
 
 test('REFUSED: a stream from a cursor no read gave is a 422 before it opens', async () => {
@@ -164,4 +165,32 @@ test('REFUSED: a stream from a cursor no read gave is a 422 before it opens', as
     assert.equal(res.status, 422);
     assert.match(String(((await res.json()) as { error: string }).error), /is not a cursor a chat read gave/);
   }
+});
+
+test("REFUSED: a stop of a session whose harness cannot end a turn is a 409 in that harness's words, and leaves no Stopped line", async () => {
+  withHer(['One.']);
+  const stopped = await asked('POST', '/api/nemia/chat/stop', {});
+  assert.equal(stopped.status, 409);
+  assert.match(
+    String(stopped.body.error),
+    /does not run attached on the Agent SDK, and its turn cannot be ended without ending its session/,
+  );
+  const history = (await asked('GET', '/api/nemia/chat')).body as unknown as ChatHistory;
+  assert.deepEqual(
+    history.events.filter((e: ChatEvent) => e.kind === 'message' && e.from === 'keeper'),
+    [],
+    'a turn the runtime did not end is on no record',
+  );
+});
+
+test('REFUSED: a stop made by a page on another site, or with no JSON content-type, is refused before it reaches her', async () => {
+  withHer(['One.']);
+  const cross = await app.request('/api/nemia/chat/stop', {
+    method: 'POST',
+    headers: { ...BOARD, 'sec-fetch-site': 'cross-site' },
+    body: '{}',
+  });
+  assert.equal(cross.status, 403);
+  const plain = await app.request('/api/nemia/chat/stop', { method: 'POST', headers: { 'sec-fetch-site': 'same-origin' } });
+  assert.equal(plain.status, 415);
 });

@@ -505,7 +505,18 @@ const NEMIA_PROJECT = NEMIA_CWD.replaceAll('/', '-');
 /** One line of her session's transcript: her words, or one tool call, or its result. */
 export type HerLine = { text: string } | { tool: string; says: string; result?: string };
 
-/** What a page plants of her: her level, where her session is, her transcript, the read mark, and the person's outbox. */
+/** One question of an ask of hers, as the keeper copied it into her chat. */
+export type HerQuestion = {
+  question: string;
+  header: string;
+  options: readonly { label: string; description: string; recommended: boolean }[];
+  multiSelect?: boolean;
+};
+
+/** One ask of hers in her chat: its id, its questions, and the person's answer where the page plants one answered already. */
+export type HerAsk = { id: string; questions: readonly HerQuestion[]; answers?: Record<string, string> };
+
+/** What a page plants of her: her level, where her session is, her transcript, the read mark, the person's outbox, and her asks. */
 export type HerChat = {
   level?: 'manual' | 'semi-auto' | 'auto';
   /** Her session as `claude agents` lists it: answering a turn, up and waiting for words, or none filed at all. */
@@ -521,6 +532,8 @@ export type HerChat = {
    * an outbox entry it carried, which draws that entry as the person's own bubble.
    */
   told?: readonly { text: string; delivers?: string }[];
+  /** The questions of hers waiting on the person, each drawn in her talk by what its choices carry (`drawnAsk`). */
+  asks?: readonly HerAsk[];
 };
 
 /**
@@ -631,6 +644,24 @@ export function herChat(what: HerChat): () => void {
   if (delivered.length > 0) {
     fs.mkdirSync(path.join(nemiaDir, 'chat'), { recursive: true });
     fs.writeFileSync(path.join(nemiaDir, 'chat', 'delivered.jsonl'), lines(delivered));
+  }
+  if (what.asks?.length) {
+    const chat = path.join(nemiaDir, 'chat');
+    fs.mkdirSync(chat, { recursive: true });
+    fs.writeFileSync(
+      path.join(chat, 'asks.jsonl'),
+      lines(
+        what.asks.map((ask, i) => ({
+          id: ask.id,
+          at: at(300 + i),
+          questions: ask.questions.map((question) => ({ ...question, multiSelect: question.multiSelect ?? false })),
+        })),
+      ),
+    );
+    const answered = what.asks.flatMap((ask, i) =>
+      ask.answers === undefined ? [] : [{ id: ask.id, at: at(360 + i), answers: ask.answers }],
+    );
+    if (answered.length > 0) fs.writeFileSync(path.join(chat, 'answers.jsonl'), lines(answered));
   }
   if (what.read !== undefined) {
     fs.mkdirSync(path.join(nemiaDir, 'chat'), { recursive: true });

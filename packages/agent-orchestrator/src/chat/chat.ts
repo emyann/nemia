@@ -31,13 +31,15 @@ export type ChatEvent =
   | ({ kind: 'proposal' } & AskEvent);
 
 /**
- * A question of hers waiting on the person, or a proposal, which is one question whose choices explain nothing (`drawnAsk`): the ask's
- * own id, when she asked it, `text` the first question's words, and every question as she asked it. `chose` is the person's answer once
+ * A question of hers waiting on the person, or a proposal, which is one question whose choices explain nothing (`drawnAsk`): the
+ * event's own id, when she asked it, `call` the id of the call of hers an answer is filed against, `text` the first question's words,
+ * and every question as she asked it. `chose` is the person's answer once
  * they gave it, each question's by the question's own words, with `choseAt` when they did; both absent while it waits on them.
  */
 export type AskEvent = {
   id: string;
   at: string;
+  call: string;
   text: string;
   questions: AskQuestion[];
   chose?: Record<string, string>;
@@ -326,6 +328,7 @@ export const askEvent = (ask: Ask, answer: AskAnswer | undefined): ChatEvent => 
   kind: kindOfAsk(ask),
   id: `q:${ask.id}`,
   at: ask.at,
+  call: ask.id,
   text: ask.questions[0]?.question ?? '',
   questions: ask.questions,
   ...(answer === undefined ? {} : { chose: answer.answers, choseAt: answer.at }),

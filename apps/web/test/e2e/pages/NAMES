@@ -118,3 +118,6 @@ chat-talk
 chat-down
 chat-kept
 chat-stop
+chat-asks
+chat-asks-many
+chat-proposal

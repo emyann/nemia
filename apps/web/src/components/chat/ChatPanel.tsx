@@ -13,6 +13,7 @@
  */
 import { useEffect } from 'react';
 import { CutFrame } from '@/components/look';
+import { asksOpen } from '@/lib/chatFollowing';
 import { sessionOf } from '@/lib/nemia';
 import type { NemiaLevel } from '@/lib/api';
 import type { Presence } from '@/lib/presence';
@@ -71,7 +72,7 @@ export function ChatPanel({ chat, nemia, presence, atWork, now, mode, onGrow, on
         {presence.down && nemia !== undefined && !unreadable && <ChatStoppedBand words={sessionOf(nemia).words} />}
         {unreadable && <ChatUnreadableBand why={state.error ?? ''} />}
         {state.events.length > 0 ? (
-          <ChatTalk events={state.events} unread={state.presence.unread} onRead={chat.markRead} />
+          <ChatTalk events={state.events} unread={state.presence.unread} onRead={chat.markRead} onAnswer={chat.answer} />
         ) : (
           !state.loading &&
           !unreadable && (
@@ -87,7 +88,7 @@ export function ChatPanel({ chat, nemia, presence, atWork, now, mode, onGrow, on
           </div>
         )}
         <div className="shrink-0">
-          <ChatComposer presence={presence} onSend={chat.send} onStop={chat.stop} />
+          <ChatComposer presence={presence} asking={asksOpen(state.events).length > 0} onSend={chat.send} onStop={chat.stop} />
         </div>
       </section>
     </CutFrame>

@@ -1,14 +1,19 @@
 /**
  * Nemia's chat where it is pure: the merge of her stream's events by their id, where she is as her face reads it, a step's state as a
- * trace line's, her steps folded into a turn, the links read out of her words, the read-back words, and a message the api would not
- * take, kept in this browser and sent once. Each rule with a fixture that breaks it.
+ * trace line's, her steps folded into a turn, the links read out of her words, how an ask of hers is drawn and what is left of one,
+ * the read-back words, and a message the api would not take, kept in this browser and sent once. Each rule with a fixture that breaks
+ * it.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  askAnswered,
+  askLeft,
+  asksOpen,
   CHAT_DOWN,
   changedChat,
   drawnAs,
+  drawnAsk,
   foldChat,
   followChat,
   jumpWords,
@@ -30,7 +35,7 @@ import { CHAT_OUTBOX_KEY, editKept, forgetKept, keepUnsent, parseKept, readKept,
 import { composerButton, composerWords } from '../src/lib/nemia.ts';
 import { faceOf, UP, type Presence } from '../src/lib/presence.ts';
 import type { StreamLike } from '../src/lib/following.ts';
-import type { ChatEvent, ChatPresence } from '../src/lib/api.ts';
+import type { AskQuestion, ChatEvent, ChatPresence } from '../src/lib/api.ts';
 
 const at = (second: number): string => new Date(Date.UTC(2026, 9, 15, 17, 40, second)).toISOString();
 
@@ -335,12 +340,95 @@ test("only an outbox entry is drawn as the person's bubble: the keeper's words a
   );
 });
 
+/** One question, its two choices explained: the ask of the canvas's board 7. */
+const EXPLAINED: AskQuestion = {
+  question: 'What the board shows as an old closeout’s one line?',
+  header: 'Summary',
+  options: [
+    { label: 'Cut it on read', description: 'The first line, cut at a word to 120 characters.', recommended: true },
+    { label: 'First line as it is', description: 'The board cuts it by its layout.', recommended: false },
+  ],
+  multiSelect: false,
+};
+
+/** The same question with nothing to explain: her proposal's two actions, boards 5 and 6. */
+const PLAIN: AskQuestion = { ...EXPLAINED, options: EXPLAINED.options.map((option) => ({ ...option, description: '  ' })) };
+
+/** An ask of hers in her chat, waiting on the person. */
+const asked = (kind: 'question' | 'proposal', questions: readonly AskQuestion[], chose?: Record<string, string>): ChatEvent => ({
+  kind,
+  id: `q:${kind}`,
+  at: at(2),
+  call: kind,
+  text: 'The run waits at its gate until you answer.',
+  questions,
+  ...(chose === undefined ? {} : { chose, choseAt: at(3) }),
+});
+
+test('an ask is drawn by what its choices carry: the actions of a proposal, one question’s form, or the flow of several', () => {
+  assert.equal(drawnAsk([PLAIN]), 'actions');
+  assert.equal(drawnAsk([EXPLAINED]), 'form', 'a choice that explains itself is a row of the form, never a button');
+  assert.equal(drawnAsk([PLAIN, PLAIN]), 'many', 'several questions take the flow whatever their choices carry');
+  assert.equal(drawnAsk([EXPLAINED, EXPLAINED]), 'many');
+  assert.equal(drawnAsk([{ ...PLAIN, options: [...PLAIN.options, EXPLAINED.options[0]] }]), 'form', 'one explained choice is enough');
+  assert.equal(drawnAsk([]), 'actions', 'a question with no choice at all is nothing to form');
+});
+
+test('a question is answered by a choice or by words with something in them, and what is left is said in the recap', () => {
+  const question = EXPLAINED.question;
+  assert.equal(askAnswered({ question, labels: ['Cut it on read'] }), true);
+  assert.equal(askAnswered({ question, labels: [] }), false, 'nothing chosen');
+  assert.equal(askAnswered(undefined), false);
+  assert.equal(askAnswered({ question, words: 'Neither: cut it on write' }), true);
+  assert.equal(askAnswered({ question, words: '   ' }), false, 'blank words answer nothing');
+  assert.equal(askAnswered({ question, words: '', labels: ['Cut it on read'] }), false, 'the words are the answer once they are the pick');
+  assert.equal(askLeft(2), '2 not answered');
+  assert.equal(askLeft(0), 'All answered');
+});
+
+test('the asks waiting on the person are those with no choice on them: one answered waits on nobody', () => {
+  const open = asked('question', [EXPLAINED]);
+  const done = asked('proposal', [PLAIN], { [PLAIN.question]: 'Cut it on read' });
+  assert.deepEqual(
+    asksOpen([message('m:1', 1, 'agent', 'One.'), open, done]).map((ask) => ask.id),
+    ['q:question'],
+  );
+  assert.deepEqual(asksOpen([done]), [], 'answered: the composer asks for nothing');
+});
+
+test("an ask her stream sends is read whole — its questions, the choices and the person's answer on it", () => {
+  const { stream, now, stop } = followed();
+  stream.send('chat', asked('question', [EXPLAINED]));
+  stream.send('chat', asked('proposal', [PLAIN], { [PLAIN.question]: 'Cut it on read' }));
+  const events = now().events;
+  assert.deepEqual(
+    events.map((event) => event.kind),
+    ['question', 'proposal'],
+  );
+  const [one, two] = events;
+  assert.deepEqual(one?.kind === 'question' ? one.questions : [], [EXPLAINED], 'the questions are read as she asked them');
+  assert.deepEqual(two?.kind === 'proposal' ? two.chose : undefined, { [PLAIN.question]: 'Cut it on read' });
+  assert.equal(two?.kind === 'proposal' ? two.choseAt : undefined, at(3));
+  stop();
+});
+
+test('REFUSED: an ask whose questions are of another shape changes nothing', () => {
+  const { stream, now, stop } = followed();
+  stream.send('chat', { ...asked('question', []), questions: [{ question: 'Which?', header: 'H', options: [{ label: 'One' }] }] });
+  stream.send('chat', { ...asked('proposal', []), questions: 'none' });
+  assert.deepEqual(now().events, []);
+  stop();
+});
+
 test('the composer invites what where she is asks for, and offers the stop while she answers', () => {
   assert.equal(composerWords(UP), 'Tell Nemia what to do, or ask');
   assert.equal(composerWords({ ...UP, answering: true }), 'She is answering. Write the next one, or stop her');
   assert.equal(composerWords({ ...UP, down: true }), 'Write now; she reads it when she is up');
   assert.equal(composerWords({ ...UP, notSent: true }), 'Waiting for the daemon');
   assert.equal(composerWords({ ...UP, notSent: true, down: true, answering: true }), 'Waiting for the daemon', 'nowhere to send it');
+  assert.equal(composerWords({ ...UP, waitsOnYou: 1 }, true), 'Or answer in your own words', 'a question of hers waits on them');
+  assert.equal(composerWords({ ...UP, answering: true }, true), 'Or answer in your own words', 'her turn is held by the question');
+  assert.equal(composerWords({ ...UP, down: true }, true), 'Write now; she reads it when she is up', 'no session holds the question');
 });
 
 test("the composer's button is the stop while she answers, and the send every other time", () => {

@@ -19,6 +19,7 @@ import { RemoveRun } from '../components/RemoveRun';
 import { LiftHold } from '../components/LiftHold';
 import { HoldRun } from '../components/HoldRun';
 import { PruneRun } from '../components/PruneRun';
+import { KindsBehind } from '../components/KindsBehind';
 import { factoriesQuery, loadRun, runGone, runQuery, type RunDetail } from '../lib/api';
 import { untrustedFor, type UntrustedPlace } from '../lib/factories';
 import { answersOf, askedIn, gateOffered, stepAnchor } from '../lib/asks';
@@ -118,6 +119,8 @@ function Run({ run }: { run: RunDetail }) {
       <HeldUntil run={run} />
 
       {run.warning && <p className="rounded border border-outline px-3 py-2 text-body-medium text-muted-foreground">{run.warning}</p>}
+
+      <KindsBehind run={run} />
 
       <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <RunHeading run={run} />

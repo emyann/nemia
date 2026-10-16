@@ -10,7 +10,8 @@ import { factoryNameRefusal, fillsOf, type Factory } from '../factory/factory.ts
 import type { Fills } from '../folder/folder.ts';
 import { Conflict, Invalid } from '../refusal/refusal.ts';
 import { HOME } from '../record/record.store.ts';
-import { factoryRulesRefusal, rulesFile } from './rules.ts';
+import { factoryRulesRefusal, FACTORY_RULES_FILE, rulesFile } from './rules.ts';
+import { digestOf } from '../revisions/revisions.ts';
 
 /**
  * A factory's rules as they read: the words, trimmed, null where there is no file or a blank one; and why the file there cannot be told,
@@ -44,6 +45,17 @@ export function readRules(file: string): RulesRead {
   } catch (err) {
     return { words: null, error: `${file} does not read: ${(err as Error).message}` };
   }
+}
+
+/**
+ * What a factory's rules hold, as one word, or `null` for a factory with no rules — no file, or a blank one. A digest of the words as they
+ * read and of why they cannot be told (`readRules`), so mending a rules file that does not read moves it, as editing the words does. It is
+ * the fourth kind a run resolves, beside its workflow folder, its agents and its skills (`revisions/pin.verb.ts`).
+ */
+export function rulesVersion(factory: Pick<Factory, 'name' | 'tree'>): string | null {
+  const { words, error } = readRules(rulesAt(factory));
+  if (words === null && error === null) return null;
+  return digestOf([FACTORY_RULES_FILE, words, error]);
 }
 
 /**

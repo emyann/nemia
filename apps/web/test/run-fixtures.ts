@@ -249,6 +249,8 @@ export const detail = (extra: Partial<RunDetail> = {}): RunDetail => ({
   toDecide: { kind: 'result', branches: ['wf/r-1/implement'], said: 'merge', command: 'git merge' },
   gates: ['implement'],
   warning: null,
+  kinds: [],
+  refresh: 'nemia refresh r-1',
   graph: {
     roots: ['implement'],
     edges: [
@@ -416,3 +418,18 @@ export const waitingRun = (
   waitingSince: null,
   ...extra,
 });
+
+/** A run two revisions behind on one agent, with one step that already ran on the older one: what the run page draws the drift from. */
+export const behind = (): RunDetail =>
+  detail({
+    kinds: [
+      { kind: 'agent', name: 'coder', pinned: 5, now: 6 },
+      { kind: 'skill', name: 'look', pinned: 1, now: 2, step: 'implement' },
+    ],
+  });
+
+/** A run the api answered before revisions: no `kinds` at all, and nothing drawn. */
+export const unpinned = (): RunDetail => {
+  const { kinds: _, refresh: __, ...rest } = detail();
+  return rest;
+};

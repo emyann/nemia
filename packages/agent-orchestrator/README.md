@@ -407,7 +407,9 @@ agent's own name (`agents/reviewer.md: …`). A broken agent refuses only the st
 there is refused listing the agents there are. A link in `agents/` is refused as a linked step is. `agents` is not a
 workflow — the listings skip it, and a workflow named `agents` is refused by name.
 
-At `wf start` each node is resolved and frozen on the run, so a run never reads `agents/` again, from a worktree or
+At `wf start` each node is resolved and frozen on the run, and resolved afresh while the run has filed nothing — a run
+waiting `--after` takes the folder as it stands at its first filing — or when a person types `nemia refresh`, which takes the newest
+revision of every kind for every filing after it. Between those a run never reads `agents/` again, from a worktree or
 anywhere: the agent's keys are the defaults, a key the step writes wins — a fence key only narrows the agent's (*Five layers*, below) —
 and the refusals that depend on the harness read the merged keys and name the step. On codex, and on a step that continues another's
 session (`resume:`), the brief is the agent's instructions, then your custom instructions for it, then the rules of the run's factory

@@ -1,6 +1,10 @@
 /**
  * The store `npm run e2e` serves: six fake runs and the diamond's, written the way `wf` and the engine write theirs.
  *
+ * Written by hand, all of it: nothing here ticks, so a run's record, a step's pins and a kind's revisions ledger are planted in the
+ * shapes the store holds, never by a filing. What those shapes are is held where they are written — the orchestrator's
+ * `test/revisions.test.ts` and the api's `drift.test.ts` for the pins and the ledger. Here the pages are the subject.
+ *
  * FAKE has five steps in two lanes, frozen on the record as `wf start` freezes them, with the folder beside
  * it. `implement` signed off blocked, with its session's conversation on disk for the engine to read (SESSION),
  * `review` was filed and the engine has no record of its task
@@ -58,6 +62,16 @@ export const FAKE = {
   skills: ['look', 'effect', 'look'],
   /** Who a person has to act for: the step that signed off blocked, and the one whose check refused. */
   waitingOnYou: ['implement', 'theme'],
+  /**
+   * The revisions the run resolved, and what the ledger holds now: its agent and its skill have both moved since, and `tokens` ran on
+   * an older revision of the agent than the run is pinned to. The board draws one line per kind, the step's saying it already ran.
+   */
+  behind: {
+    agent: 'agent coder: rev 5, ledger at 6',
+    skill: 'skill look: rev 1, ledger at 2',
+    ran: 'agent coder: tokens ran on rev 4, ledger at 6',
+    kinds: 3,
+  },
   /** `tokens`' lane, which `theme` worked in too: the run's result branch, committed in its repository. */
   branch: 'wf/give-the-board-a-look-e2e0/tokens',
   /** What the Factory's card says that branch touched, once the card is opened: `apps/web` and the root. */
@@ -2089,6 +2103,17 @@ export function seed(root: string, now = Date.now()): void {
   const check = `${id}-theme-check`;
   const repo = path.join(root, 'hkb-v2');
   const baseRef = seedRepo(repo, laneBranch);
+  const ledger = (kind: string, name: string, upTo: number): void =>
+    write(
+      path.join(root, 'revisions', kind, `${name}.json`),
+      JSON.stringify(
+        Array.from({ length: upTo }, (_, i) => ({ n: i + 1, hash: `${name}${i + 1}`.padEnd(16, '0'), at: ago(60 - i) })),
+        null,
+        2,
+      ),
+    );
+  ledger('agent', 'coder', 6);
+  ledger('skill', 'look', 2);
   write(
     path.join(root, 'runs', `${id}.json`),
     JSON.stringify(
@@ -2103,12 +2128,21 @@ export function seed(root: string, now = Date.now()): void {
         workflowDir,
         workflow: STEPS.map((step) => step.frozen),
         createdAt: ago(42),
+        pinned: [
+          { kind: 'agent', name: 'coder', n: 5, hash: 'coder5'.padEnd(16, '0') },
+          { kind: 'skill', name: 'look', n: 1, hash: 'look1'.padEnd(16, '0') },
+        ],
         steps: {
           implement: { taskId: `${id}-implement`, workspace, branch },
           /** implement's only follower, so it works in implement's workspace, on its branch. */
           review: { taskId: `${id}-review`, workspace, branch },
           respond: { taskId: null },
-          tokens: { taskId: `${id}-tokens`, workspace: lane, branch: laneBranch },
+          tokens: {
+            taskId: `${id}-tokens`,
+            workspace: lane,
+            branch: laneBranch,
+            pinned: [{ kind: 'agent', name: 'coder', n: 4, hash: 'coder4'.padEnd(16, '0') }],
+          },
           theme: { taskId: `${id}-theme`, workspace: lane, branch: laneBranch, check: { taskId: check } },
         },
       },

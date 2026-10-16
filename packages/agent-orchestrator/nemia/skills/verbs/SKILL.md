@@ -193,6 +193,14 @@ They write, and are yours to run unasked, on your judgement: say what you did.
   nemia inbox from <name> <run>... | --off
                                set the runs a card is handed as context (from:), read and
                                never waited on; --off takes them off
+  nemia refresh <runId>
+                               take the new revisions: a run keeps the workflow, agents, skills and
+                               factory rules it resolved when it started, and this pins it to the
+                               ones they hold now, so every filing after it — a new step, a retry,
+                               a round — is filed on them. What has already been filed is not re-run,
+                               and the steps the run has are neither added to nor removed. Refused of
+                               a run that has filed nothing, which resolves afresh at its first filing
+                               anyway, and of one already on the newest revision of every kind
   nemia merge <runId> [<step>]
                                merge the base: a loop's work that no longer merges cleanly
                                goes back to merge it, once, on the next tick — on the round

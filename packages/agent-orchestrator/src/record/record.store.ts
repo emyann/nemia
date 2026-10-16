@@ -18,6 +18,7 @@ import { FrozenStepSchema } from '../folder/folder.store.ts';
 import { inputsRoot } from './places.store.ts';
 import type { AsksRead, MergeAskHeld } from './record.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
+import { Pins } from '../revisions/revisions.store.ts';
 import { wfRoot } from '../config/config.store.ts';
 import { countRecord, readText, within } from '../meter/tally.store.ts';
 
@@ -53,6 +54,8 @@ const StepRecordSchema = Kept({
   handedOff: Schema.optional(Schema.String),
   landed: Schema.optional(LandedSchema),
   filesRead: Schema.optional(Kept({ taskId: Schema.String, lacked: Schema.Record(Schema.String, Schema.String) })),
+  pinned: Pins,
+  closeoutHash: Schema.optional(Schema.String),
 });
 
 /**
@@ -66,6 +69,7 @@ const runBase = {
   brief: Schema.String,
   workflowDir: Schema.String,
   workflow: Schema.optional(Schema.mutable(Schema.Array(FrozenStepSchema))),
+  pinned: Pins,
   after: Schema.optional(Strings),
   context: Schema.optional(Strings),
   inputs: Schema.optional(Strings),
@@ -218,13 +222,9 @@ export function readPruned(id: string): Pruned | undefined {
   if (!marker) return undefined;
   const [at, worktrees, artifacts] = [fieldOf(marker.json, 'at'), fieldOf(marker.json, 'worktrees'), fieldOf(marker.json, 'artifacts')];
   const [artifactsAt, artifactsBytes] = [fieldOf(artifacts, 'at'), fieldOf(artifacts, 'bytes')];
-  return {
-    at: isText(at) ? at : '',
-    worktrees: isList(worktrees) ? worktrees.filter(isPrunedWorktree) : [],
-    ...(artifacts === undefined
-      ? {}
-      : { artifacts: { at: isText(artifactsAt) ? artifactsAt : '', bytes: isAmount(artifactsBytes) ? artifactsBytes : 0 } }),
-  };
+  const pruned = { at: isText(at) ? at : '', worktrees: isList(worktrees) ? worktrees.filter(isPrunedWorktree) : [] };
+  if (artifacts === undefined) return pruned;
+  return { ...pruned, artifacts: { at: isText(artifactsAt) ? artifactsAt : '', bytes: isAmount(artifactsBytes) ? artifactsBytes : 0 } };
 }
 
 /**

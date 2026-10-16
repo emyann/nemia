@@ -4,7 +4,8 @@
  * What is proven here, each at shipped defaults: a run that has filed nothing resolves the folder afresh on every pass, so an edit made
  * while it waits `--after` reaches its first step's prompt and its pins; a run that has filed keeps its freeze; the ledger appends only
  * where the digest moved; the verb re-pins and the next try is filed on the new revision with the prompt re-rendered; a filing whose
- * closeout schema has moved starts a fresh session, and one whose schema has not still resumes; and the verb's refusals.
+ * closeout schema has moved starts a fresh session, and one whose schema has not still resumes; a folder whose steps are a set
+ * `nemia start` refuses is not taken, and a kind that stops reading between passes stops that run alone; and the verb's refusals.
  *
  * The place is the stand-in (`testPlace`): the subject is the ledger and the pin, not git, and the steps work in the checkout itself. Each
  * team is given a folder, an agent and a skill named for itself, so no test's edit of a kind moves another's number.
@@ -304,6 +305,61 @@ test("`nemia refresh` adds and removes no step, and a run that has filed nothing
     Object.keys(readRun(waiting.id).steps),
     ['build'],
     'and the step the folder has since dropped goes with it: the step set is the one the folder holds now',
+  );
+});
+
+/** A run of `t` that waits `--after` a run that never settles: one that has filed nothing, and will not file while the test edits. */
+const waiting = async (t: Team, repo: string) => {
+  const parent = await started(team().dir, repo, { isolate: true });
+  return await started(t.dir, repo, { after: [parent.id], isolate: true });
+};
+
+test('a kind that stops reading between passes stops that run alone: it keeps the revisions it had, and the pass judges it', async () => {
+  const repo = aRepo();
+  const t = team();
+  const run = await waiting(t, repo);
+  const b = board();
+  await runWith(b.e, advanceRun(readRun(run.id)));
+  const before = readRun(run.id);
+  const prompt = promptOf(run.id, 'build');
+
+  fs.writeFileSync(t.agentFile, `---\nskills: ${t.skill}\n---\nYou build it differently.\n`);
+  const ledger = path.join(ROOT, 'revisions', 'agent', `${t.agent}.json`);
+  fs.rmSync(ledger);
+  fs.mkdirSync(ledger);
+  const pass = await runWith(b.e, advanceRun(readRun(run.id)));
+
+  assert.match(
+    pass.notes.join('\n'),
+    /keeps the revisions it had, since resolving them did not read: EISDIR[^\n]*revisions\/agent/,
+    'the pass says the run took nothing of the world, and what did not read',
+  );
+  assert.equal(pass.status, 'running', 'and the pass judged the run all the same, rather than dying of what did not read');
+  assert.deepEqual(readRun(run.id).pinned, before.pinned, 'the run keeps the pins it had');
+  assert.deepEqual(Object.keys(readRun(run.id).steps), Object.keys(before.steps), 'and the step set it froze');
+  assert.equal(promptOf(run.id, 'build'), prompt, 'and the prompt its next filing reads, since the record is changed after the render');
+});
+
+test('a run that has filed nothing keeps the step set it froze where the folder holds a set `nemia start` refuses', async () => {
+  const repo = aRepo();
+  const t = team();
+  fs.writeFileSync(t.stepFile, `---\nplace: git\nagent: ${t.agent}\ncheck: echo ok\n---\nBuild it.\n`);
+  const run = await waiting(t, repo);
+  const b = board();
+  await runWith(b.e, advanceRun(readRun(run.id)));
+
+  fs.writeFileSync(path.join(t.dir, 'build-check.md'), `---\nplace: git\nafter: build\nagent: ${t.agent}\n---\nCheck it.\n`);
+  const pass = await runWith(b.e, advanceRun(readRun(run.id)));
+
+  assert.deepEqual(
+    Object.keys(readRun(run.id).steps),
+    ['build'],
+    "a step named for build's check is no step set to file: the run keeps the one it froze",
+  );
+  assert.match(
+    pass.notes.join('\n'),
+    /keeps the step set it froze: build-check: a step may not be named for another step's check/,
+    'and the pass says why, in the words `nemia start` refuses that folder with',
   );
 });
 

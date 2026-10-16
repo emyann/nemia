@@ -15,7 +15,7 @@ import { filedConfig } from '../filed/filed.ts';
 import { budgetUsdFor } from '../status/status.ts';
 import { renderedFlags } from '../agents/agents.ts';
 import { ownOf } from '../tick/told.verb.ts';
-import { fansOut, isFolderTeam } from '../workflow/index.ts';
+import { isFolderTeam, stepSetRefusal } from '../workflow/index.ts';
 import { formerModesWritten, loadWorkflows } from '../folder/folder.store.ts';
 import { isShippedPlace, skillsFor, type Places } from '../skills/read.store.ts';
 import { placesOf } from '../folder/lookup.store.ts';
@@ -82,12 +82,9 @@ function stepsIn(workflowDir: string, places: Places, factory: Factory | undefin
  * before the first run is started. Refused:
  * - a folder that is not a workflow (`loadWorkflows`), and, in a factory, a workflow it has not attached, or a step its hires leave
  *   unfilled or fill twice (`stepsIn`);
+ * - a step set no run may take (`stepSetRefusal`, pure, asked of a folder a waiting run takes again too): a step named for another step's
+ *   check or try, and, with `isolate: false` (`--no-worktree`), a `place: folder` team, one that fans out, and an ending;
  * - a team that says `place: folder` whose agent is given the package's place skill (`placeSkillRefusal`);
- * - with `isolate: false` (`--no-worktree`): a team that says `place: folder`, which has no base branch to work on in place; one that
- *   can run two steps at once, which would share a directory; and an ending (`workspace: main`), which would merge a result branch the run
- *   does not have into the branch it stands on;
- * - a step named for another step's check (`<step>-check`) or try (`<step>-try<n>`, `<step>-try<n>-check`): the run files those tasks
- *   under those names, and would read one task as the other;
  * - a remote agent not declared (`undeclaredRefusal`): the engine refuses it only when the step is filed, with the run on the record;
  * - a store (`WF_ROOT`) whose path a permission rule a step would be filed cannot carry (`storeRootRefusal`), in the store's words, asked
  *   before the runtime's, which would speak of a rule or a folder the person never wrote; the run's inputs folder among them when
@@ -106,45 +103,10 @@ export function stepsToStart(
   given = false,
 ): Workflow[] {
   const steps = stepsIn(workflowDir, places, factory);
-  if (!isolate && isFolderTeam(steps)) {
-    throw new Invalid({
-      message:
-        `--no-worktree: this workflow's steps say \`place: folder\`, so each works in a folder the run makes, with no git repository — there is no base branch for them to work on in place.\n` +
-        `Start it without --no-worktree.`,
-    });
-  }
+  const set = stepSetRefusal(steps, isolate);
+  if (set) throw new Invalid({ message: set });
   const placeSkill = placeSkillRefusal(steps, workflowDir, places);
   if (placeSkill) throw new Invalid({ message: placeSkill });
-  if (!isolate && fansOut(steps)) {
-    throw new Invalid({
-      message:
-        'this workflow can run two steps at once, and --no-worktree would put them in the same directory.\n' +
-        'Either drop --no-worktree, or make the steps a chain.',
-    });
-  }
-  const ending = !isolate ? steps.find((s) => s.workspace === 'main') : undefined;
-  if (ending) {
-    throw new Invalid({
-      message:
-        `${ending.name}: \`workspace: main\` ends this workflow by merging the run's result branch onto the base branch, and --no-worktree gives the run no result branch — every step works on the base branch itself, where the work already is, so there would be nothing to merge.\n` +
-        `Either drop --no-worktree, or start a workflow whose last step is not an ending.`,
-    });
-  }
-  const clash = steps.find((s) => s.check && steps.some((other) => other.name === `${s.name}-check`));
-  if (clash) {
-    throw new Invalid({
-      message: `${clash.name}-check: a step may not be named for another step's check. ${clash.name} has a \`check:\`, and the run files it as ${clash.name}-check. Rename ${clash.name}-check.md.`,
-    });
-  }
-  const tryClash = steps
-    .map((s) => ({ s, of: /^(.+)-try\d+(?:-check)?$/.exec(s.name)?.[1] }))
-    .find(({ of }) => of && steps.some((other) => other.name === of));
-  if (tryClash) {
-    const { s, of } = tryClash;
-    throw new Invalid({
-      message: `${s.name}: a step may not be named for another step's try. The run files ${of} tried again as ${of}-try2, its check as ${of}-try2-check, and on. Rename ${s.name}.md.`,
-    });
-  }
   const undeclared = undeclaredRefusal(steps);
   if (undeclared) throw new Invalid({ message: undeclared });
   const unruled = storeRootRefusal(HOME, steps, {

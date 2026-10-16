@@ -14,6 +14,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { Effect } from 'effect';
 import { tried } from '../runtime-client.ts';
 import { AGENTS_FOLDER, type Workflow } from '../step/step.ts';
+import { stepSetRefusal } from '../workflow/index.ts';
 import { loadWorkflows } from '../folder/folder.store.ts';
 import { lookupRoots, skillsFor, skillVersion, type Places } from '../skills/read.store.ts';
 import { placesOf } from '../folder/lookup.store.ts';
@@ -34,6 +35,12 @@ import { kindsDrift, type KindName, type Pin } from './revisions.ts';
 
 /** What a run resolved on a pass: the steps it now holds, and the revision of each kind they were read at. */
 export type Resolved = { steps: Workflow[]; pins: Pin[] };
+
+/** Why a pass took nothing of the world and the run keeps what it froze, in one line, for the note the pass says. */
+export type Kept = { kept: string };
+
+/** A refusal's or an error's first line, which is what a note on the feed has room for. */
+const firstLine = (said: string): string => said.split('\n')[0];
 
 /** The factory a run was started in, read; none for the default factory, which is no file. */
 const factoryOf = (run: Pick<Run, 'factory'>): Factory | undefined =>
@@ -112,12 +119,17 @@ function folderNow(run: Pick<Run, 'workflowDir' | 'repo' | 'factory'>): Workflow
 
 /**
  * The run's workflow folder and kinds resolved again, for a run that has filed nothing: the steps the folder holds now — new and removed
- * steps included, as a run that has filed nothing takes the folder's step set whole — and their pins. Undefined where the folder does not
- * load.
+ * steps included, as a run that has filed nothing takes the folder's step set whole — and their pins.
+ *
+ * Undefined where the folder does not load. `kept`, with the reason's first line, where the folder loads but its steps are no set a run
+ * may take (`stepSetRefusal`): `nemia start` refuses that folder, and a run taking it afresh keeps the set it froze rather than file a
+ * step whose task id another step's check is read under. Judged on the run's own `isolate`, as `nemia start` judged it.
  */
-export function resolvedNow(run: Pick<Run, 'workflowDir' | 'repo' | 'factory'>, at: string): Resolved | undefined {
+export function resolvedNow(run: Pick<Run, 'workflowDir' | 'repo' | 'factory' | 'isolate'>, at: string): Resolved | Kept | undefined {
   const steps = folderNow(run);
-  return steps && { steps, pins: pinsOf(run, steps, at) };
+  if (!steps) return undefined;
+  const refused = stepSetRefusal(steps, run.isolate ?? true);
+  return refused ? { kept: firstLine(refused) } : { steps, pins: pinsOf(run, steps, at) };
 }
 
 /**
@@ -155,23 +167,48 @@ const NOTHING: PinnedPass = { wrote: false, notes: [], lift: false };
  * entry. A run a person called off is left alone: it files nothing, so there is nothing for a revision to reach. The steps' agent files are
  * rendered again wherever the pins moved (`renderAgain`), since a pin the board shows and a prompt the session reads must be the one
  * content.
+ *
+ * One run's world stops that run alone: a resolve that throws leaves it the revisions, the step set and the prompts it had and says why
+ * (`unread`), and so does a folder whose steps are a set no run may take (`stepSetRefusal`), which `nemia start` refuses too — the pass
+ * judges every other run either way.
  */
 export function pinPass(run: Run, at: string): PinnedPass {
   if (run.cancelledAt || run.pruned) return NOTHING;
-  return hasStarted(run) ? refreshDue(run, at) : firstResolve(run, at);
+  const filed = hasStarted(run);
+  try {
+    return filed ? refreshDue(run, at) : firstResolve(run, at);
+  } catch (err) {
+    return unread(err, filed && runStore.refresh.stands(run.id));
+  }
 }
 
-/** The run's workflow and pins taken afresh, for a run that has filed nothing: `run` is changed where anything moved. */
+/**
+ * What the pass says where resolving the world threw — a skill folder a person renamed or deleted between passes, which `writeAgentFiles`
+ * refuses, a digest of a file that has stopped reading, a ledger the store could not write — and the run keeps the revisions and the
+ * workflow it had: a kind that stopped reading stops this run's resolve, never the pass, which judges every other run.
+ *
+ * The record is changed last, after the one write of the pass that can throw (`renderAgain`), so a run that keeps its revisions keeps its
+ * prompts too. A person's refresh ask is spent all the same, as it is where the folder does not load: an ask nothing acts on is an ask the
+ * tick reads for ever.
+ */
+const unread = (err: unknown, lift: boolean): PinnedPass => ({
+  wrote: false,
+  notes: [`the run keeps the revisions it had, since resolving them did not read: ${firstLine(String((err as Error)?.message ?? err))}`],
+  lift,
+});
+
+/** The run's workflow and pins taken afresh, for a run that has filed nothing: `run` is changed where anything moved, and last. */
 function firstResolve(run: Run, at: string): PinnedPass {
   const resolved = resolvedNow(run, at);
   if (!resolved) return NOTHING;
+  if ('kept' in resolved) return { wrote: false, notes: [`the run keeps the step set it froze: ${resolved.kept}`], lift: false };
   const names = resolved.steps.map((s) => s.name);
   const moved = !isDeepStrictEqual([...(run.pinned ?? [])], resolved.pins) || !isDeepStrictEqual(Object.keys(run.steps), names);
   if (!moved) return NOTHING;
+  renderAgain(run, resolved.steps);
   run.workflow = resolved.steps;
   run.pinned = resolved.pins;
   run.steps = Object.fromEntries(names.map((name) => [name, run.steps[name] ?? { taskId: null }]));
-  renderAgain(run, resolved.steps);
   return { wrote: true, notes: [`took the revisions of ${resolved.pins.length} kinds: nothing of it is filed yet`], lift: false };
 }
 
@@ -191,9 +228,9 @@ function refreshDue(run: Run, at: string): PinnedPass {
       notes: ["nemia refresh: the run's workflow folder does not load, so it keeps the revisions it had"],
       lift: true,
     };
+  renderAgain(run, resolved.steps);
   run.workflow = resolved.steps;
   run.pinned = resolved.pins;
-  renderAgain(run, resolved.steps);
   return { wrote: true, notes: ['nemia refresh: every filing after this takes the new revisions'], lift: true };
 }
 

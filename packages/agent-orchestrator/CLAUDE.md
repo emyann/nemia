@@ -106,6 +106,9 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
 - **A run's kinds are resolved from the world, never from a remembered transition** (`pinPass`, `src/revisions/pin.verb.ts`, at the head
   of `advancePass`): while a run has filed nothing it takes the folder's steps and their revisions on every pass, and after that only on
   a person's `nemia refresh`. The ledger is appended by hash (`appendRevision`), so two passes over one edit give it one number.
+- **A resolve on a pass stops its own run, never the pass** (`pinPass`): a kind that stops reading, a folder whose steps are a set
+  `nemia start` would refuse (`stepSetRefusal`, pure, asked of both), a ledger the store cannot write — the run keeps the revisions, the
+  step set and the prompts it had, and the pass says why. The record is changed after the render, which is the write that can throw.
 - **A revision answered for a kind nobody has resolved has no ledger entry**: compare against what a fresh resolve returns
   (`refreshedNow`), never `topsOf` of what the record pins, or an edit reads as no drift.
 - **A refresh takes new content, never a new step set** (`refreshedNow` keeps a step the folder lost), and re-renders each step's prompt

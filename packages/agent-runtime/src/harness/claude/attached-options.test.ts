@@ -1,6 +1,7 @@
 /**
  * An attached session is fenced as a `claude -p` job is for the same task: every fact of `claudePrintFlags`' argv is in
- * `attachedOptions`, on the SDK's own option or on `extraArgs`, and the closing statement's schema is handed on unread.
+ * `attachedOptions`, on the SDK's own option or on `extraArgs`, the closing statement's schema is handed on unread, and the session
+ * is given Claude Code's own system prompt, which a job has by default.
  */
 import assert from 'node:assert/strict';
 import path from 'node:path';
@@ -75,6 +76,12 @@ test('the closing statement schema is handed on as given, and the environment is
   assert.equal(given.outputFormat?.schema, SCHEMA, 'the same object, unread');
   assert.equal(given.env?.MINE, '1');
   for (const [k, v] of Object.entries(CLAUDE_JOB_ENV)) assert.equal(given.env?.[k], v);
+});
+
+test('an attached session is given Claude Code’s own system prompt, the agent’s appended to it', () => {
+  const given = attachedOptions(RICH, '/nowhere/mcp.json');
+  assert.deepEqual(given.systemPrompt, { type: 'preset', preset: 'claude_code' }, 'Claude Code’s prompt, not the SDK’s empty default');
+  assert.equal(given.extraArgs?.['append-system-prompt-file'], '/p.md', 'the agent’s own prompt is appended to that preset');
 });
 
 test('a flag of config.claude given twice is refused, naming the detached job', () => {

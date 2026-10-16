@@ -304,7 +304,7 @@ English; never push or open a pull request unless asked.
 | A read-only reviewer cannot run mutants | implement's check runs the mutants the closeout names (`workflows/build/mutants.ts`) |
 | Agents wrapped checks in `timeout`, pipes, `cd` and were refused | the skills spell each check bare; `agent-fences.test.ts` holds skills to fences |
 | Agents explored with `head`, `grep`, `awk`, `ls` in Bash | the skills say Read, Grep, Glob; `cd` denied and counted for Seldon, Agora and Iris |
-| A comment line over 140 columns, found by review each time | `comments.test.ts` refuses it |
+| A comment line over 140 columns, found by review each time | `npm run lint` refuses it |
 | A gate quoting the agent's instructions instead of the decision | a gate quotes the step's own note |
 | Questions as unreadable Markdown | questions as data, answered by clicking |
 | A landing that could not land yet, left open | `nemia hold --until --why`, the reason shown on the board |

@@ -40,7 +40,7 @@ sends a `remote_control` control request with `reattach_session_id` and `keep_se
 facts (`session_url`, `connect_url`, `environment_id`, `bridge_epoch`, `bridge_session_id`), and drives `system`/`bridge_state`
 messages (`ready`, then `connected`) onto the session's stream. Probed live on 2026-10-16 (SDK 0.3.270, Claude Code 2.1.301) by
 design's step. Because it is undeclared, it is read off the object here and nowhere else, decoded by a schema of its own, and refused
-in words on the run file where it is absent: the session runs on with no bridge (`test/attached-bridge.test.ts` makes each refusal).
+in words on the run file where it is absent: the session runs on with no bridge (`src/harness/claude/attached-bridge.test.ts` makes each refusal).
 An SDK update that renames or drops it breaks no session; it takes the bridge away, and the run file says so.
 
 **Unmeasured.** (i) Whether a claude.ai session re-attaches as the same conversation on a phone after the daemon restarted and the

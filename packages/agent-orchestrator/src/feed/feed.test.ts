@@ -1,5 +1,5 @@
 /**
- * The feed on disk (`nemia feed`, `nemia watch`): what the tick judged of each run and each step, a line each time it changed, in a store
+ * The feed on disk (`nemia watch`): what the tick judged of each run and each step, a line each time it changed, in a store
  * of its own.
  *
  * A file of its own, since `tick` reads every run under `WF_ROOT` and writes the store's one feed: the runs of the other store tests would
@@ -782,7 +782,7 @@ test("a pruned run's word says so, once: `nemia prune`'s marker is a person's fa
   );
 });
 
-test('REFUSED: a cursor inside a line is refused by name, by the read, by `nemia feed` and by `nemia watch` — and one past the end, and one that is not a number', async (t) => {
+test('REFUSED: a cursor inside a line is refused by name, by the read and by `nemia watch` — and one past the end, and one that is not a number', async (t) => {
   emptyStore();
   const b = board();
   await started('the cursor');
@@ -792,7 +792,6 @@ test('REFUSED: a cursor inside a line is refused by name, by the read, by `nemia
   const inside = cursor - 2;
 
   assert.throws(() => readFeed(inside), refusedWith(new RegExp(`^cursor ${inside} falls inside a line of the feed, not after one`)));
-  await assert.rejects(main(['feed', String(inside)], b.e), refusedWith(/^cursor \d+ falls inside a line/));
   const log = t.mock.method(console, 'log', () => {});
   try {
     await assert.rejects(main(['watch', String(inside)], b.e), refusedWith(/^cursor \d+ falls inside a line/));
@@ -804,10 +803,10 @@ test('REFUSED: a cursor inside a line is refused by name, by the read, by `nemia
 
   assert.throws(
     () => readFeed(cursor + 10),
-    refusedWith(new RegExp(`^cursor ${cursor + 10} is past the end of the feed \\(${cursor} bytes, .*nemia feed 0$`)),
+    refusedWith(new RegExp(`^cursor ${cursor + 10} is past the end of the feed \\(${cursor} bytes, .*nemia watch --once 0$`)),
   );
-  await assert.rejects(main(['feed', 'twelve'], b.e), refusedWith(/^nemia feed takes one cursor at most, a whole number of bytes/));
-  await assert.rejects(main(['feed', '0', '1'], b.e), refusedWith(/^nemia feed takes one cursor at most/));
+  await assert.rejects(main(['watch', 'twelve'], b.e), refusedWith(/^nemia watch takes one cursor at most, a whole number of bytes/));
+  await assert.rejects(main(['watch', '0', '1'], b.e), refusedWith(/^nemia watch does not take 1: nemia watch \[cursor\]/));
   assert.throws(() => readFeed(-1), refusedWith(/^a feed cursor is a whole number of bytes/));
 
   let at = 0;
@@ -918,20 +917,24 @@ test('a line a writer died in the middle of is ended by the next pass, and costs
 });
 
 test(
-  '`nemia feed` prints each line and the cursor to read on from; `nemia watch` follows the lines as they are written, until stopped',
+  '`nemia watch --once` prints each line and the cursor to read on from; `nemia watch` follows the lines as they are written, until stopped',
   WAITED,
   async (t) => {
     emptyStore();
     const b = board();
     const run = await started('the watch');
     await runWith(b.e, tickRun());
-    const printed = await printedBy(t, b.e, 'feed');
+    const printed = await printedBy(t, b.e, 'watch', '--once');
     assert.equal(printed.at(-1), `cursor: ${size()}`);
     assert.ok(
       printed.some((l) => l.includes(run.id) && l.endsWith('running')),
       printed.join('\n'),
     );
-    assert.deepEqual(await printedBy(t, b.e, 'feed', String(size())), [`cursor: ${size()}`], 'from the end, nothing but the cursor');
+    assert.deepEqual(
+      await printedBy(t, b.e, 'watch', '--once', String(size())),
+      [`cursor: ${size()}`],
+      'from the end, nothing but the cursor',
+    );
 
     const got: FeedLine[] = [];
     const arrived = bell();
@@ -1286,10 +1289,13 @@ test(
   },
 );
 
-test('`wf --help` names nemia feed and nemia watch, and says which feed is whose', async (t) => {
+test('`wf --help` names nemia watch whole, and says which feed is whose', async (t) => {
   const printed = (await printedBy(t, board().e, '--help')).join('\n');
-  assert.match(printed, /^ {2}nemia feed \[cursor\]$/m);
-  assert.match(printed, /^ {2}nemia watch \[cursor\] \[--json\] \[--wake\] \[--wake-word <word>\]\.\.\.$/m);
+  assert.equal(/^ {2}nemia feed\b/m.test(printed), false, 'nemia feed is retired: nemia watch --once reads once');
+  assert.match(
+    printed,
+    /^ {2}nemia watch \[cursor\] \[--once\] \[-l <selector>\]\.\.\. \[--cursor-file <path>\] \[--json\] \[--wake\] \[--wake-word <word>\]\.\.\.$/m,
+  );
   assert.match(printed, /nemia watch follows what the workflow decides/);
   assert.match(printed, /ae watch/);
 });

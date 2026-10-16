@@ -245,9 +245,9 @@ const pausedOf = Effect.fnUntraced(function* (e: Engine, pause: Pause, runs: rea
 });
 
 /**
- * The store's pause, as `GET /api/pause`, `nemia feed` and `nemia start` answer it: the pause or null; each task still finishing under it,
- * read on this call while a pause stands; and each check it holds, a landing with its merge staged among them — read of the runs that can
- * hold one (`holdingReads`).
+ * The store's pause, as `GET /api/pause`, `nemia watch --once` and `nemia start` answer it: the pause or null; each task still finishing
+ * under it, read on this call while a pause stands; and each check it holds, a landing with its merge staged among them — read of the
+ * runs that can hold one (`holdingReads`).
  */
 export const pausedRead = Effect.fn('pausedRead')(function* () {
   const e = yield* EngineService;

@@ -4,7 +4,6 @@
  * is `feed.store.ts`'s, and the verbs are `feed.verb.ts`'s.
  */
 export {
-  cursorTakes,
   DAEMON_STARTED,
   feedChanges,
   feedLineWords,

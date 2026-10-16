@@ -2010,10 +2010,11 @@ What was built:
   count; no cost is said; and a note's change alone, on a run at rest (`atRest`), is not a change. Without these the feed would be
   written on every pass a session went idle, every pass a dollar was spent, and for every finished run once a note is worded anew.
 - **The engine's cursor, refused by name where it cannot be read from**: a read stops at the last newline, never past a partial line;
-  a cursor inside a line or past the end is refused with exit 2 and what to type (`wf feed 0`). A line a writer died in is ended by the
+  a cursor inside a line or past the end is refused with exit 2 and what to type (`nemia watch --once 0`). A line a writer died in is ended by the
   next append and parsed by nobody.
 - **`wf feed [cursor]`** prints the lines and `cursor: <n>`; **`wf watch [cursor]`** follows from 0 by default, pushed by `fs.watch` on
   the store and backed by a 1 s timer, one read at a time, as the engine's `watch` is. `wf --help` names both, and says which feed is whose.
+  (`wf feed` has since retired into `nemia watch --once`: *Shipped: one watcher, with selectors*, below.)
 
 Where it departs from the card, and why:
 
@@ -2032,7 +2033,7 @@ Where it departs from the card, and why:
   twice only when both passes land between the same two reads. At least once, never lost. Since *one `wf up` per store*, below, a hand
   tick is refused while a daemon ticks the store, and a second `wf up` with it.
 - **`wf watch` with no cursor starts from 0**, where the plan said the end: `ae watch`, which the card asks it to follow as, starts
-  from 0, and `wf feed`'s last line is the cursor that starts at the end. A note is printed after `·`, as `wf ls` prints a step's.
+  from 0, and a read that ends prints as its last line the cursor that starts at the end. A note is printed after `·`, as `wf ls` prints a step's.
 - **`wf rm` writes nothing to the feed itself**; the next pass sees the record gone and writes `removed`. `wf prune` the same: the run's
   word gains `(pruned)` on the next pass.
 
@@ -5935,3 +5936,103 @@ Tested in `src/subscription/subscription.test.ts` (the message of several lines 
 `src/feed/feed.verb.test.ts` (one emission reaches a reader as one chunk) and `src/subscription/deliver.verb.test.ts` (one gate one say;
 three gates in one read, the digest once; a gate over the hub; a failed `say` said again whole; a restart between a `say` and its
 cursor).
+
+## Shipped: one watcher, with selectors (2026-10-16)
+
+A person had `nemia watch` to follow the feed and `nemia feed` to read it once, and a machine had neither way of asking for the lines it
+cares about: it read them all and matched the prose a person reads. One watcher does all of it, and `nemia feed` is retired.
+
+- **One selector grammar, Kubernetes'** (`src/watch/selector.ts`, pure): `key=value`, `key!=value`, `key in (a,b)`, `key notin (a,b)`,
+  and a bare `key` for a line that carries it at all. Clauses of one `-l` are separated by commas and all must hold; `-l` given again is
+  another selector, and a line one of them takes is printed. The keys are the line's own — its labels `run`, `factory`, `workflow`,
+  `step`, `agent`, and the five a signed line names of itself, `kind`, `reason`, `type`, `waits`, `source` (`SELECTABLE_KEYS`). A label
+  may not take a reserved name (`labelKeysRefusal`). The message is no key of it: prose, reworded whenever a status is, so nothing
+  selects on it. Every malformed form is refused by name before anything is read, by the command table's `check:`
+  (`selectorsRefusal`), which a stored selector will throw at S4.
+- **`nemia watch --once [cursor]`** reads from the cursor to the feed's end, prints the store's pause first while one stands, the lines
+  its selectors take, and `cursor: <n>` — a cursor-only bookmark line under `--json`, where stdout holds JSON alone — and exits. It
+  takes `-l`, `--cursor-file` and `--json` like the streaming form.
+- **`--cursor-file <path>`** is where a watch keeps its place (`src/watch/cursor.store.ts`): read when it starts, where the file is
+  there, written at once — so a directory that is not there is refused before a line is read — and after every line and every bookmark,
+  to a temp name beside it and renamed, so a reader never sees half a number. The cursor written is the feed's, selected or not, so a
+  filtered watcher resumes at the feed's end. A cut rewrites it to `0` and says why on stderr, and a saved cursor the feed cannot be read
+  from does the same as the watch starts (`watchFrom`): level-triggered, since the cut that happened while no watch ran leaves the same
+  world as one under a running watch, and refusing it would leave an unattended watch dead on every start. A cursor typed beside it is
+  refused, naming which to drop — and a cursor typed alone is refused as it always was, a typo and not a feed that moved. A file holding
+  anything but a whole number is refused, never read as 0.
+- **The bookmark**: a watch that has fallen silent says where it is every `BOOKMARK_EVERY` — 30 seconds, one constant every surface
+  reads (`src/subscription/subscription.ts`, beside `watchedLine`). Under `--json` it is a line carrying `cursor` and nothing else, no
+  `word`, which is how a reader tells it from a feed line; in words nothing is printed.
+- **`nemia feed` is retired**: its entry and its generated api command, the CLI's help, the READMEs, `docs/`, and Nemia's `recap` skill,
+  which now keeps its `feed-cursor` fact off `nemia watch --once <cursor>`. `--wake` and `--wake-word` stay until the subscriptions
+  retire them.
+
+Where it departs from the spec, and why:
+
+- **`src/watch/`, not `src/feed/`.** A feature folder holds at most six source files (`test/layout.test.ts`), and `src/feed/` held
+  exactly six. The selector and the cursor file are the watch's, so they are a folder of its own; nothing of the feed's own vocabulary
+  moved.
+
+Tested in `src/watch/selector.test.ts` (each malformed form refused by name; the reserved-name fixture; the keys a line offers; the
+absent-key semantics; AND within and OR across; six selections a person types, each selecting different lines when one clause is
+dropped), `src/watch/cursor.store.test.ts` (the round trip, no temp left, the cut, a missing directory and a file that is no number
+refused), `src/subscription/subscription.test.ts` (the bookmark's line and its cadence), `src/command/command.test.ts` (the usage, the
+help word for word, and every refusal of what was typed), `src/cli/watch.test.ts` (a filtered watch's cursor file at the feed's end, the
+bookmark under `--json`, and a cut) and `test/watch-selectors.test.ts` (the verb typed whole: `--once` stops at the end and prints the
+cursor, a selector takes the lines it names, and a watch resumes from its cursor file).
+
+## Shipped: the api's feed stream takes selectors and sends bookmarks (2026-10-16)
+
+A machine following `GET /api/feed/stream` read every line and matched the prose a person reads, and a stream that fell silent said
+nothing, so a reader could not tell a quiet feed from a lost socket nor say where it was. The stream now selects at the source in the
+grammar the package already owns, and says where it has read to at the one cadence every surface reads. **The board is unchanged**: with
+no selector it reads what it read before, and it has no `bookmark` listener.
+
+- **`?selector=`, given again for each further selector** (`apps/api/src/factory/feed.ts`), in the same grammar as `nemia watch`'s `-l`:
+  every clause of one selector holds of a line it takes, and one selector of them does. The api adds no grammar of its own — it reads
+  `selectorsRefusal`, `parseSelectors` and `selects` off `agent-orchestrator`'s root, and the package's source did not change.
+- **Selected at the source**: `feedEvents(from, selectors, bookmarkEvery)` keeps the cursor of every line the package's live reader hands
+  on, selected or not, and sends only the lines the selectors take. A line they do not take never crosses the wire, while the cursor
+  still advances past it — so a reader resuming from a cursor this stream gave re-reads none of what it dropped. The package's reader
+  keeps handing every line on; the dropping is the api's.
+- **A `bookmark` event** carries that cursor as its id and an empty `data` field — present, so an EventSource both keeps the id and
+  dispatches a named event — every `BOOKMARK_EVERY`, the package's one constant; the api spells no length of its own. The tick's first
+  beat is dropped, so no bookmark precedes the first line, and the beats are merged into the one stream rather than written by a fiber
+  beside it, so `Stream.runForEach` stays the socket's one writer. Bookmarks go on every stream, selector or none, at one cadence.
+- **A malformed selector is a 422** before the stream opens and before any reader is started: the package's `Invalid` in its own words,
+  answered by `REFUSAL_STATUS`, with one sentence of the api's after it naming the query key, since the package's words spell the grammar
+  as `-l`. The existing cursor refusal keeps its hand-picked 400: that is the api's own rule about how a reader comes by a cursor.
+- **`atLeast` on `POST /api/subscriptions/:name`** is documented and tested: the body's `atLeast` is the level a run's factory is at
+  least at for its lines to be carried, stored as the subscription's `scope`. No code carries it — `bodySchema` builds the body from the
+  command's flags, and `--at-least` was already declared — so this is the route's contract and its proof.
+
+Where it departs from the spec, and why:
+
+- **`Stream.merge(lines, bookmarks, { haltStrategy: 'left' })`.** The spec left the halt strategy to be checked on this Effect pin. The
+  default ends the merged stream only when both sides end, and the tick never ends: a feed that *ended* would leave a stream alive on
+  bookmarks alone. A feed that *fails* ends the stream either way, which is why no test can make the default refuse — the live reader
+  never ends of itself today. `'left'` is the setting the end case needs, and is named here rather than left to be rediscovered.
+- **Where the tick's dropped first beat shows.** `Stream.tick` emits once at subscription (measured: one beat at 0 ms, two at 503 ms
+  for a 500 ms interval), so `Stream.drop(1)` is why no bookmark precedes the first line. It does not show where one would guess:
+  `Stream.merge` on this pin pulls the left side first, so with `Stream.drop(0)` the bookmark does not come *before* the lines — it
+  lands *between* them, after the first element of the chunk that one read of the feed hands on. Measured on a two-line feed:
+  `[run, step, bookmark]` with the drop, `[run, bookmark, step]` without it. That order is the test, and it is what names the mutant; a
+  test asserting only the stream's first event passes either way, which is why the first try had none.
+- **No test asserts a bookmark's bytes on the wire.** The cadence is `BOOKMARK_EVERY`, 30 seconds, and the route takes no cadence of its
+  own — rightly, since a reader must not set the daemon's beat. The bookmark's event name, id and empty data are proven against
+  `feedEvents` with a cadence of the test's own, and its id is then taken back over HTTP as `Last-Event-ID`, which is the card's resume
+  clause proven end to end.
+- **The api does not list the levels** in its 400 for an `atLeast` of the wrong type: `LEVELS` is not on the package's root, and the
+  package's own 422 names them. Widening the pinned contract for one sentence was not worth it.
+
+Tested in `apps/api/src/factory/feed.test.ts` (a selector sends only the lines it takes, each with its own cursor as its id, with the
+unselected lines written between them as the fixture; AND within one selector and OR across two, each with the line that must be absent;
+a bookmark's id is the feed's whole length, past a line the selector dropped, with an empty data field; its id taken back as
+`Last-Event-ID` resumes and resends nothing; a bare key opens the stream; five malformed selectors each a 422 naming it and the query
+key, with no follower started, each closing the package's words with a full stop before the api's own sentence; the shipped cadence read
+off the file's own text, which refuses a length spelled in the api; and the order of the first three events of a two-line feed, which
+refuses a first beat left in). `atLeast` is tested in `apps/api/test/subscriptions.test.ts` (stored as `scope`, absent where none was asked for, a
+level that is none a 422 naming `--at-least`, and one of the wrong type a 400 naming the shape).
+
+What it leaves: nothing of the slice. A reader that needs the daemon to do less work for a narrow selector — a dropped line still costs
+the stream its read — is a later intent's.

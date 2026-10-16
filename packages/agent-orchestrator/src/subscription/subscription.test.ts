@@ -8,7 +8,17 @@ import { feedWords, upgraded, type FeedLine, type RunLine } from '../feed/index.
 import type { Listing } from '../list/list.ts';
 import type { Closeout } from '../closeout/index.ts';
 import type { Instant } from '../daemon/daemon.ts';
-import { DEFAULT_WAKE, digestDue, digestOf, messageOf, readDelivered, sortLine, subscribeRefusalOf } from './subscription.ts';
+import {
+  BOOKMARK_EVERY,
+  bookmarkLine,
+  DEFAULT_WAKE,
+  digestDue,
+  digestOf,
+  messageOf,
+  readDelivered,
+  sortLine,
+  subscribeRefusalOf,
+} from './subscription.ts';
 
 const AT = '2026-10-05T12:00:00.000Z';
 
@@ -204,4 +214,13 @@ test('REFUSED: a subscription whose name is no file name, a wake word empty, or 
   assert.match(subscribeRefusalOf({ name: 'n', wake: ['failed', ' '] }) ?? '', /^--wake takes a word/);
   for (const digestEvery of [0, -1, Number.NaN])
     assert.match(subscribeRefusalOf({ name: 'n', wake: [], digestEvery }) ?? '', /^--digest-every takes the minutes/, String(digestEvery));
+});
+
+test('a silent watch bookmarks its cursor under --json and prints nothing of it in words', () => {
+  assert.equal(bookmarkLine(1834, { json: true }), '{"cursor":1834}');
+  assert.deepEqual(JSON.parse(bookmarkLine(1834, { json: true })!), { cursor: 1834 });
+  assert.equal(Object.hasOwn(JSON.parse(bookmarkLine(0, { json: true })!), 'word'), false, 'a reader that filters on the words skips it');
+  assert.equal(bookmarkLine(1834, {}), undefined, 'in words, a person reading a still feed is told nothing');
+  assert.equal(bookmarkLine(1834, { wake: ['failed'] }), undefined, 'and the wake words do not make it one');
+  assert.equal(BOOKMARK_EVERY, '30 seconds', 'one cadence, every surface reading this constant');
 });

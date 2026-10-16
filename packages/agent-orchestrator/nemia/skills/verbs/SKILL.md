@@ -59,10 +59,6 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                the run, and what each step was told
   nemia logs <runId> <step>
                                that step's session output
-  nemia feed [cursor]
-                               what the tick judged, a line each time it changed: a run's status, a
-                               step's word as nemia ls says it, and what a person's word changed — then
-                               cursor: <n>, to read on from with nemia feed <n>; from the start with none
   nemia stats [--from <day>] [--to <day>] [--by agent|step|factory|workflow|repo] [--agent|--step|--factory|--workflow|--repo <v>] [--line|--json]
                                what every run in the store adds up to, by UTC day: rounds to
                                acceptance of each loop: step, landings of the workspace: main step
@@ -130,11 +126,19 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                this nemia's release, an install's tag or a checkout, and its folder;
                                the release the store's releases/current names; and the release the
                                daemon runs, from its lease. --json: the whole answer
-  nemia watch [cursor] [--json] [--wake] [--wake-word <word>]...
-                               nemia feed's lines, followed as the tick writes them, until ^C, and a
+  nemia watch [cursor] [--once] [-l <selector>]... [--cursor-file <path>] [--json] [--wake] [--wake-word <word>]...
+                               the feed's lines, followed as the tick writes them, until ^C, and a
                                daemon down line when nothing ticks the store, daemon up when it does
-                               again. --json: one JSON object a line, a feed line with its cursor;
-                               --wake: only the lines that wait on a person; --wake-word: these words
+                               again: a run's status, a step's word as nemia ls says it, and what a
+                               person's word changed. --once: read from the cursor to the feed's end,
+                               print cursor: <n> and stop; from the start with no cursor. -l: the
+                               lines a selector takes, given again for another (key=v, key!=v, "key in
+                               (a,b)", "key notin (a,b)", key), over run, factory, workflow, step,
+                               agent, kind, reason, type, waits and source. --cursor-file: keep the
+                               cursor read to in a file, and start from it where it is there.
+                               --json: one JSON object a line, a feed line with its cursor, and a
+                               cursor of its own every 30 seconds while the feed is still; --wake:
+                               only the lines that wait on a person; --wake-word: these words
   nemia admit [--at-least <level>] [--auto <agent>]
                                a call's admission: the call a session is about to make, on stdin, answered
                                ask where it answers what waits on you;
@@ -233,7 +237,7 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                session works or a check or landing runs, Paused once none does.
                                nemia start still writes a run, and approvals, retries and answers are
                                kept, not acted on: the pass after nemia resume files what waits. nemia ls,
-                               nemia feed, nemia start and nemia up say it, and nemia ls names what finishes.
+                               nemia watch --once, nemia start and nemia up say it, and nemia ls names what finishes.
                                Refused while a pause stands.
                                --why: the reason, said wherever the pause is; --by: who pauses it
                                (default: your OS user)

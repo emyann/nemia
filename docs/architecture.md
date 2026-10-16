@@ -28,7 +28,7 @@ Each layer reaches exactly the one below it, and nothing reaches up or skips one
   `packages/agent-orchestrator/test/boundary.test.ts`), and its vocabulary through its pure door, `agent-runtime/vocabulary`, from
   any file.
 
-Spawning a package's `bin/` — `wf feed` in the web app's e2e test, say — is using its CLI, not importing it.
+Spawning a package's `bin/` — `nemia watch --once` in the web app's e2e test, say — is using its CLI, not importing it.
 
 ## Who owns what
 
@@ -173,7 +173,8 @@ saying how the one before it ended); each is the record,
 logs it at Info with its labels, its reason, its type and its word, and publishes it to the process's hub (`FeedHub`, a sliding `PubSub` its layer builds,
 `feedHubLayer`). A live reader in that process, `followFeed`, takes the hub's items and reads from the file what none brought — a line
 the hub dropped, or one another process wrote — on a beat that stats the file: the api's `GET /api/feed/stream`, on the hub its daemon
-publishes to. A reader in another process, `nemia watch`, watches the file (`watchFeed`), and reads the lease at a pace beside it,
+publishes to, which takes a repeated `?selector=` in the same grammar as `nemia watch`'s `-l` and selects at the source, and says where
+it has read to as a `bookmark` event carrying that cursor as its id. A reader in another process, `nemia watch`, watches the file (`watchFeed`), and reads the lease at a pace beside it,
 printing `daemon down` and `daemon up` as the store's liveness changes (`livenessLines`, `src/cli/main.ts`): its own output, never a
 line of the feed. `--json` prints each line whole with its cursor; `--wake` and `--wake-word` keep the lines a wake word finds.
 

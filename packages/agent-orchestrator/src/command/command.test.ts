@@ -415,10 +415,6 @@ test("the table's help is today's, word for word", () => {
       '                               the run, and what each step was told',
       '  nemia logs <runId> <step>',
       "                               that step's session output",
-      '  nemia feed [cursor]',
-      "                               what the tick judged, a line each time it changed: a run's status, a",
-      "                               step's word as nemia ls says it, and what a person's word changed — then",
-      '                               cursor: <n>, to read on from with nemia feed <n>; from the start with none',
       '  nemia stats [--from <day>] [--to <day>] [--by agent|step|factory|workflow|repo] [--agent|--step|--factory|--workflow|--repo <v>] [--line|--json]',
       '                               what every run in the store adds up to, by UTC day: rounds to',
       '                               acceptance of each loop: step, landings of the workspace: main step',
@@ -518,7 +514,7 @@ test("the table's help is today's, word for word", () => {
       '                               session works or a check or landing runs, Paused once none does.',
       '                               nemia start still writes a run, and approvals, retries and answers are',
       '                               kept, not acted on: the pass after nemia resume files what waits. nemia ls,',
-      '                               nemia feed, nemia start and nemia up say it, and nemia ls names what finishes.',
+      '                               nemia watch --once, nemia start and nemia up say it, and nemia ls names what finishes.',
       '                               Refused while a pause stands.',
       '                               --why: the reason, said wherever the pause is; --by: who pauses it',
       '                               (default: your OS user)',
@@ -629,11 +625,19 @@ test("the table's help is today's, word for word", () => {
       '                               nemia up --stats: what the last pass cost, phase by phase — read, not',
       '                               run, so it fits while a daemon holds the store; where none does,',
       '                               nemia tick --stats',
-      '  nemia watch [cursor] [--json] [--wake] [--wake-word <word>]...',
-      "                               nemia feed's lines, followed as the tick writes them, until ^C, and a",
+      '  nemia watch [cursor] [--once] [-l <selector>]... [--cursor-file <path>] [--json] [--wake] [--wake-word <word>]...',
+      "                               the feed's lines, followed as the tick writes them, until ^C, and a",
       '                               daemon down line when nothing ticks the store, daemon up when it does',
-      '                               again. --json: one JSON object a line, a feed line with its cursor;',
-      '                               --wake: only the lines that wait on a person; --wake-word: these words',
+      "                               again: a run's status, a step's word as nemia ls says it, and what a",
+      "                               person's word changed. --once: read from the cursor to the feed's end,",
+      '                               print cursor: <n> and stop; from the start with no cursor. -l: the',
+      '                               lines a selector takes, given again for another (key=v, key!=v, "key in',
+      '                               (a,b)", "key notin (a,b)", key), over run, factory, workflow, step,',
+      '                               agent, kind, reason, type, waits and source. --cursor-file: keep the',
+      '                               cursor read to in a file, and start from it where it is there.',
+      '                               --json: one JSON object a line, a feed line with its cursor, and a',
+      '                               cursor of its own every 30 seconds while the feed is still; --wake:',
+      '                               only the lines that wait on a person; --wake-word: these words',
       '  nemia admit [--at-least <level>] [--auto <agent>]',
       "                               a call's admission: the call a session is about to make, on stdin, answered",
       '                               ask where it answers what waits on you;',
@@ -834,10 +838,35 @@ test("REFUSED at shipped defaults: nemia tick's, nemia up's and nemia watch's ar
   );
   assert.equal(refusedBy(up, ['10', '20']), 'nemia up takes one pass interval at most, and was given 20 too: nemia up [ms].');
   assert.equal(refusedBy(up, ['10']), null);
-  const cursor =
-    'nemia watch takes one cursor at most, a whole number of bytes — 0, or the number a `cursor:` line printed: nemia watch [cursor] [--json] [--wake] [--wake-word <word>]...';
-  for (const argv of [['x'], ['1', '2'], ['--from']]) assert.equal(refusedBy(entry('watch'), argv), cursor, argv.join(' '));
+  const form = 'nemia watch [cursor] [--once] [-l <selector>]... [--cursor-file <path>] [--json] [--wake] [--wake-word <word>]...';
+  const cursor = `nemia watch takes one cursor at most, a whole number of bytes — 0, or the number a \`cursor:\` line printed: ${form}`;
+  assert.equal(refusedBy(entry('watch'), ['x']), cursor);
+  assert.equal(refusedBy(entry('watch'), ['1', '2']), `nemia watch does not take 2: ${form}`);
+  assert.equal(refusedBy(entry('watch'), ['--from']), `nemia watch does not take --from: ${form}`);
+  assert.equal(refusedBy(entry('watch'), ['-L']), `nemia watch does not take -L: ${form}`, "a typo'd short flag is no cursor");
   assert.equal(refusedBy(entry('watch'), ['12']), null);
+  assert.equal(refusedBy(entry('watch'), ['--once', '12', '-l', 'factory=nemia', '--json']), null);
+});
+
+test("REFUSED at shipped defaults: nemia watch's selectors, its cursor file, and a cursor given beside it", () => {
+  const watch = entry('watch');
+  assert.match(refusedBy(watch, ['-l', 'message=hi']) ?? '', /^"message" is no key of a feed line/);
+  assert.match(refusedBy(watch, ['-l', 'factory=nemia', '-l', '']) ?? '', /^"" is no selector: it holds no clause/);
+  assert.equal(
+    refusedBy(watch, ['-l', '--json']),
+    'nemia watch -l takes a selector of the feed\'s lines: -l <key>=<value>, -l <key>!=<value>, -l "<key> in (<a>,<b>)", ' +
+      '-l "<key> notin (<a>,<b>)" or -l <key> for a line that carries it; commas between clauses, which all must hold, and -l again ' +
+      'for another selector, of which one must. The keys: run, factory, workflow, step, agent, kind, reason, type, waits, source',
+    'a value given apart that is one of its own flags reads as the value left out',
+  );
+  assert.match(refusedBy(watch, ['--cursor-file']) ?? '', /^nemia watch --cursor-file takes the path this watch keeps/);
+  assert.equal(refusedBy(watch, ['--cursor-file', 'a', '--cursor-file', 'b']), 'nemia watch takes --cursor-file once.');
+  assert.equal(
+    refusedBy(watch, ['500', '--cursor-file', 'f']),
+    'nemia watch takes a cursor or --cursor-file, not both, and it was given 500 and a file: the file is where the watch keeps its ' +
+      'place, so drop the 500 — or drop --cursor-file and read from 500 this once (delete the file to start the watch over).',
+  );
+  assert.deepEqual(parseArgv(entry('watch').spec, ['-l', 'agent=ada', '-l', 'kind=Step']), { selector: ['agent=ada', 'kind=Step'] });
 });
 
 /** A spec that takes a card's `name`, and the words a person or the api alone gives. */

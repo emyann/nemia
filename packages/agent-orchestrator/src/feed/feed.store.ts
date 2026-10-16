@@ -111,10 +111,10 @@ function cursorRefusalAt(file: string, after: number): string | undefined {
     return `a feed cursor is a whole number of bytes — 0, or one a \`cursor:\` line printed — not ${after}`;
   const size = statOf(file)?.size ?? 0;
   if (after > size) {
-    return `cursor ${after} is past the end of the feed (${size} bytes, ${file}): the feed it came from was truncated or replaced since — read it again from the start: nemia feed 0`;
+    return `cursor ${after} is past the end of the feed (${size} bytes, ${file}): the feed it came from was truncated or replaced since — read it again from the start: nemia watch --once 0`;
   }
   if (after > 0 && byteAt(file, after - 1) !== 0x0a) {
-    return `cursor ${after} falls inside a line of the feed, not after one: a cursor is 0 or the number a \`cursor:\` line printed — nemia feed 0 reads from the start`;
+    return `cursor ${after} falls inside a line of the feed, not after one: a cursor is 0 or the number a \`cursor:\` line printed — nemia watch --once 0 reads from the start`;
   }
   return undefined;
 }

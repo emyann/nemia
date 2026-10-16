@@ -306,9 +306,14 @@ function oncePast(fold: FeedFold, run: string, offers: readonly Once[]): Once[] 
 const holdSince = (at: string): string => `since ${at}`;
 
 /**
- * The one-shots a run's hold owes the feed: the put, for the hold the pass read on the record (`held`, its `at`), and the lift — the
- * pass's own, where the pass lifted it (`lifted`), and one for each put the feed holds that is no longer the hold on the record. A lift
- * already written is no concern of this: it is an offer like any other, and `oncePast` holds it to one line. Pure.
+ * The one-shots a run's hold owes the feed: the put, for the hold the pass read on the record (`held`, its `at`) or lifted itself
+ * (`lifted`), and the lift — the pass's own, and one for each put the feed holds that is no longer the hold on the record. A put or a
+ * lift already written is no concern of this: each is an offer like any other, and `oncePast` holds it to one line. Pure.
+ *
+ * **The put is offered from the hold the pass lifted too.** `liftHold` takes the hold off the record before the pass is worded, so a pass
+ * that reads a hold and lifts it in one go — a parent that shipped before the daemon's next pass, or a daemon restarted after it — sees
+ * only `lifted`. Offering the put from `held ?? lifted` is what keeps the person's own `nemia hold` from losing its line there; on a pass
+ * that had already written the put, `oncePast` drops the second offer.
  *
  * **A fact a person deleted is answered by the pair, not by a key.** `nemia hold <run> --off` takes the hold's file away, so the next pass
  * reads only its absence; the feed holds the put, so the lift is due, and once written the pair is matched and no pass says it again. A
@@ -321,11 +326,12 @@ const holdSince = (at: string): string => `since ${at}`;
 function holdOnce(fold: FeedFold, run: string, held: string | undefined, lifted: string | undefined): Once[] {
   const involved = onceInvolved(run, undefined);
   const standing = held === undefined ? undefined : holdSince(held);
-  const out: Once[] = [
-    ...(standing !== undefined ? [{ word: SIGNAL_WORDS.HoldPut, note: standing }] : []),
-    ...(lifted !== undefined ? [{ word: SIGNAL_WORDS.HoldLifted, note: holdSince(lifted), source: 'tick' as const }] : []),
-  ];
   const lifting = lifted === undefined ? undefined : holdSince(lifted);
+  const since = standing ?? lifting;
+  const out: Once[] = [
+    ...(since !== undefined ? [{ word: SIGNAL_WORDS.HoldPut, note: since }] : []),
+    ...(lifting !== undefined ? [{ word: SIGNAL_WORDS.HoldLifted, note: lifting, source: 'tick' as const }] : []),
+  ];
   const puts = onceKey(involved, 'HoldPut', undefined, '');
   for (const key of fold.shots.keys()) {
     if (!key.startsWith(puts)) continue;

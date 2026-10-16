@@ -558,6 +558,21 @@ test("a hold the tick lifted itself is the tick's deed, not the person's — the
   );
 });
 
+test("a hold the pass lifted on the very pass that read it still says the person's put, not the lift alone", () => {
+  emptyStore();
+  const memo = freshFeedMemo();
+  const put = '2026-10-16T03:45:00.000Z';
+  for (let i = 0; i < 10; i++) recordFeed(new Map([['r-1', withOnce({ acts: [], lifted: put })]]), { at: AT, memo });
+  assert.deepEqual(
+    [...said('HoldPut'), ...said('HoldLifted')].map((l) => [l.word, l.note, l.source]),
+    [
+      ['hold put', `since ${put}`, 'person'],
+      ['hold lifted', `since ${put}`, 'tick'],
+    ],
+    "liftHold takes the hold off the record before the pass is worded, so a pass that reads one and lifts it sees only its lift: the person's own nemia hold must not lose its line there, and neither is said twice over ten passes",
+  );
+});
+
 test('each fault the runtime journalled is one line per occurrence, and neither waits on a person', () => {
   emptyStore();
   const memo = freshFeedMemo();

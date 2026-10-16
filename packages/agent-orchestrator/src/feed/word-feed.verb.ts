@@ -10,7 +10,7 @@ import { feedPhase, feedWords, SIGNAL_WORDS, type FeedDenial, type FeedWords, ty
 import { closeoutOf, saidCount, waitingOf } from '../views/views.verb.ts';
 import { engineWord } from '../views/views-words.ts';
 import { runStore } from '../record/files.store.ts';
-import { denialText } from '../runtime-client.ts';
+import { denialText, type TaskView } from '../runtime-client.ts';
 import { taskTryOf, type Run } from '../record/record.ts';
 import { holdsOf, type ParentRun, type Wait } from '../wait/wait.ts';
 import { runLabels, stepLabels } from '../telemetry/telemetry.ts';
@@ -100,8 +100,15 @@ function actsOf(run: Run): Once[] {
  * runtime's words** — nothing is passed through, and the words above it are the owner's (`SIGNAL_WORDS`).
  *
  * The rest of an attempt's ends are no news of their own: what they came to is the step's own word, which the feed already says.
+ *
+ * Keyed by the attempt's own `reason` as the client types it (`AttemptEnd`), never by `string`: a reason renamed in the runtime fails this
+ * typecheck here, as it does at the two sibling readers that compare the literal (`views/took.ts`, `status/status.ts`). Typed loosely, a
+ * rename would answer `undefined` for every attempt and both signals would vanish with a green suite, since a test plants the reason by
+ * hand rather than taking it from the runtime's type.
  */
-const FAULTS: Readonly<Record<string, string>> = {
+type AttemptEnd = NonNullable<TaskView['state']['attempts'][number]['reason']>;
+
+const FAULTS: Partial<Record<AttemptEnd, string>> = {
   unstartable: SIGNAL_WORDS.SpawnFailed,
   lost: SIGNAL_WORDS.SessionLost,
 };

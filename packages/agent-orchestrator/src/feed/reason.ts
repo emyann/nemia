@@ -188,8 +188,9 @@ const WAITING_NOTES: readonly string[] = ['waiting on you:', 'needs:'];
  * Whether a line of `reason`, with `note` beside it, waits on a person: the reason's own flag, or a note that leads with one of
  * `WAITING_NOTES`. Pure.
  *
- * This is the one guarantee a watcher has: exactly the lines a subscriber is woken by today (`DEFAULT_WAKE`, `sortLine`) wait, and
- * `reason.test.ts` holds the two to each other over every word the package writes — so the words can go and the answer stays.
+ * This is the one guarantee a watcher has: the lines that wait are exactly the lines the retired wake words woke a subscriber on, and
+ * exactly the lines the selectors they convert to take (`selectorsOfWake`); `reason.test.ts` holds the three to each other over every
+ * word the package writes — so the words could go and the answer stayed.
  */
 export const waitsOf = (reason: Reason, note?: string): boolean =>
   entryOf(reason).waits === true ||

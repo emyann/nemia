@@ -16,6 +16,8 @@ import { FeedLineSchema } from '../feed/feed.store.ts';
 import { lineAsRead } from '../feed/index.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 import type { KeptDelivery, Subscription } from './subscription.ts';
+import { selectorsOfWake } from './former-wake.ts';
+import { SELECTOR_FORM, selectorsRefusal } from '../watch/selector.ts';
 import { LEVELS } from '../level/level.ts';
 
 /** The store whose subscriptions these are, read once as the package loads, as `record.store.ts` reads its `HOME`. */
@@ -36,11 +38,19 @@ const STATE = '.state.json';
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
 const Bytes = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
 
-/** A subscription's file as `nemia subscribe` writes it. */
+/** A word of a subscription's file that is text and not empty: a selector as a person typed it, or a wake word a former nemia wrote. */
+const Word = Schema.String.check(Schema.isNonEmpty());
+
+/**
+ * A subscription's file as `nemia subscribe` writes it. `selectors` is optional on the file and never empty — a record holding none takes
+ * every line, where a subscription asked for with none holds `DEFAULT_SELECTORS` — and `wake` is the former key a store written before
+ * this slice holds, converted on read (`selectorsOfWake`) and never rewritten.
+ */
 const SubscriptionSchema = Schema.StructWithRest(
   Schema.Struct({
     task: Schema.String.check(Schema.isNonEmpty()),
-    wake: Schema.Array(Schema.String.check(Schema.isNonEmpty())),
+    selectors: Schema.optionalKey(Schema.Array(Word).check(Schema.isNonEmpty())),
+    wake: Schema.optionalKey(Schema.Array(Word)),
     digestEvery: Schema.Finite.check(Schema.isGreaterThan(0)),
     from: Bytes,
     scope: Schema.optionalKey(Schema.Struct({ atLeast: Schema.Literals(LEVELS) })),
@@ -112,9 +122,43 @@ function namesIn(): { subscriptions: string[]; deliveries: string[] } {
   };
 }
 
+/** How a person puts a subscription again once one of theirs was left out, and what a selector takes. */
+const retype = (name: string): string =>
+  `nemia unsubscribe ${name} removes it, and nemia subscribe ${name} <task> -l <selector> puts it again — ${SELECTOR_FORM}`;
+
+/**
+ * The selectors the record `read` is delivered by, or undefined where it is left out of the listing and said once (`said`): a record
+ * naming neither `selectors` nor the former `wake`, one whose `selectors` the grammar does not take, and one whose whole wake list
+ * converts to nothing. Never an empty list: that would take every line of the feed, where an empty wake list took none.
+ *
+ * A record holding `selectors` is taken as it is; one holding only `wake` is converted on every read (`selectorsOfWake`), its file left as
+ * it is, and each word of it that names no selector said once beside the subscription.
+ */
+function selectorsOf(name: string, read: { selectors?: readonly string[]; wake?: readonly string[] }, said: (line: string) => void) {
+  const left = (why: string): undefined => {
+    said(`nemia: the subscription ${subscriptionFile(name)} ${why}: it is not delivered (${retype(name)}).`);
+    return undefined;
+  };
+  if (read.selectors !== undefined) {
+    const refusal = selectorsRefusal(read.selectors);
+    return refusal === undefined ? [...read.selectors] : left(`holds a selector the feed does not take — ${refusal}`);
+  }
+  const wake = read.wake ?? [];
+  if (wake.length === 0) return left('names no selectors');
+  const { selectors, unconverted } = selectorsOfWake(wake);
+  if (selectors.length === 0)
+    return left(`was asked for with ${wake.map((w) => JSON.stringify(w)).join(', ')} alone, which names no selector of a feed line`);
+  if (unconverted.length > 0)
+    said(
+      `nemia: the subscription ${name} was asked for with the word ${unconverted.map((w) => JSON.stringify(w)).join(', ')}, which names ` +
+        `no selector of a feed line: it is delivered by ${selectors.join(' and ')} alone — ${retype(name)}.`,
+    );
+  return selectors;
+}
+
 /**
  * The store's subscriptions, by name. A file that does not read as one is left out and said once on stderr, naming the file and its first
- * wrong field, so one bad file stops no other subscription.
+ * wrong field, so one bad file stops no other subscription; so is one whose filter does not read (`selectorsOf`).
  */
 export function listSubscriptions(said: (line: string) => void = sayOnce): Array<{ name: string; subscription: Subscription }> {
   return namesIn().subscriptions.flatMap((name) => {
@@ -125,8 +169,10 @@ export function listSubscriptions(said: (line: string) => void = sayOnce): Array
       said(`nemia: the subscription ${subscriptionFile(name)} ${read.error}: it is not delivered (nemia unsubscribe ${name} removes it).`);
       return [];
     }
-    const { task, wake, digestEvery, from, scope } = read.value;
-    return [{ name, subscription: { task, wake: [...wake], digestEvery, from, ...(scope ? { scope: { atLeast: scope.atLeast } } : {}) } }];
+    const { task, digestEvery, from, scope } = read.value;
+    const selectors = selectorsOf(name, read.value, said);
+    if (selectors === undefined) return [];
+    return [{ name, subscription: { task, selectors, digestEvery, from, ...(scope ? { scope: { atLeast: scope.atLeast } } : {}) } }];
   });
 }
 

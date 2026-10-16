@@ -5,7 +5,7 @@
  * transcripts and the chat's files (`projectChat`).
  *
  * **Every read costs the whole projection, and that is accepted here.** A read is the task's view, every one of the task's attempts'
- * transcripts from the start, the chat's three files and the open runs for `waitsOnYou`; a followed chat pays it again on every beat, per
+ * transcripts from the start, the chat's four files and the open runs for `waitsOnYou`; a followed chat pays it again on every beat, per
  * reader. So one read costs what the task has said all its life, and a session that talks all day costs more each beat than it did an
  * hour before: the pace (`CHAT_BEAT_MS` at the api) and the readers open bound how often it is paid, not how much. It buys being
  * level-triggered: nothing is kept between reads, so a restart owes exactly what the files and the runtime say, and the cursor a reader
@@ -13,7 +13,7 @@
  * of the session to the SDK, where the projection reads the session's own events instead of a harness's transcript file; a cursor
  * carrying the runtime's transcript cursor, and the earlier attempts' events held between beats, belong with that move.
  *
- * A controller: it reaches the runtime through the client, and is the one writer of the outbox and of the read mark.
+ * A controller: it reaches the runtime through the client, and is the one writer of the outbox, of the read mark and of the stops.
  */
 import { randomBytes } from 'node:crypto';
 import { Effect } from 'effect';

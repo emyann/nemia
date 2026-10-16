@@ -2,7 +2,8 @@
  * A chat with a long-lived task, as the board draws it: one event shape for a turn (`ChatEvent`), its history projected from the task's
  * transcripts across its attempts and what was said to it (`projectChat`), a page of it (`chatPage`), the cursor a stream resumes from
  * (`chatCursor`, `readChatCursor`), and where the task is (`presenceOf`). Nothing of it is stored but the person's words, the marks of
- * their delivery and the person's read mark (`chat.store.ts`): the rest is what the runtime already holds, read again each time.
+ * their delivery, the person's read mark and the turns they asked to end (`chat.store.ts`): the rest is what the runtime already holds,
+ * read again each time.
  *
  * Pure. The files are `chat.store.ts`'s, the reads and the person's writes `chat.verb.ts`, and the delivery the keeper's
  * (`deliver.verb.ts`).

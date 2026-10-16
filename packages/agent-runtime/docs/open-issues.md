@@ -55,8 +55,8 @@ orchestrator's `chatStop`.
 
 **What the slice measured.** `Query.interrupt()` resolves, the turn ends with a `result` of subtype `error_during_execution` that keeps
 the partial text, and the session answers the next message pushed on its input under the same Claude Code session id — live on
-2026-10-16 (design's probe), and again in `test/attached-long-lived.boundary.test.ts`, where exactly one `interrupt` control request is
-sent and the same session answers after it. **She spoke again**: nothing of the interrupt ends the conversation.
+2026-10-16 (design's probe), and again in `test/attached.boundary.test.ts`, where exactly one `interrupt` control request is sent
+and the same session answers after it. **She spoke again**: nothing of the interrupt ends the conversation.
 
 **What is unrecorded.** The SDK's control response to `interrupt` carries a `still_queued` field — the stand-in answers `[]` — and no
 probe recorded what a live Claude Code lists there, nor whether the partial text of the cut turn is listed back anywhere but the

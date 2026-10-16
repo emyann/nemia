@@ -3,7 +3,7 @@ import path from 'node:path';
 import { photograph, recordedUsage, reloadForQuota, themeOf } from '../board.ts';
 import { expectClearOfEachOther } from '../canvas.ts';
 import { expectCount, expectTexts, expectVisible, Refused, settled } from '../checks.ts';
-import { timeOfDay } from '../../../src/lib/timeOfDay.ts';
+import { clockWord } from '../../../src/lib/quota.ts';
 import { QUOTA } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
@@ -12,8 +12,8 @@ export default {
   /**
    * The subscription's quota in the frame's bottom bar, and whole in the machine's gauges it opens, as the api asked the e2e's `claude` for
    * it (get_usage). The bar says each window's label and percentage on one line, the week marked past 80%; the gauges say each window's
-   * reset in the browser's own time, to the minute as `timeOfDay` writes it, with the weekday when it falls on another day than today
-   * (`clockWord`), never assumed:
+   * reset in the browser's own time, as `clockWord` writes it — to the minute, with the weekday when it falls on another day than
+   * today — the page deciding by that writer and never by a form of its own:
    * the week resets three days out and always reads with one, and the five-hour window's reset crosses midnight in the two hours before it.
    * Then three ways the harness cannot answer — no plan, a request it refuses, and a `claude` that ends before it answers — each asked
    * again on the reload, read in the state the change makes (`reloadForQuota`), and said in a sentence, with no number. The answer is put
@@ -54,20 +54,10 @@ export default {
       const { rate_limits: limits } = (
         JSON.parse(written) as { response: { response: { rate_limits: Record<'five_hour' | 'seven_day', { resets_at: string }> } } }
       ).response.response;
-      const clock = async (iso: string) => {
-        const { timeZone, weekday } = await page.evaluate((at) => {
-          const d = new Date(at);
-          const day = (on: Date) => new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(on);
-          return {
-            timeZone: new Intl.DateTimeFormat().resolvedOptions().timeZone,
-            weekday: day(d) === day(new Date()) ? null : new Intl.DateTimeFormat(undefined, { weekday: 'short' }).format(d),
-          };
-        }, iso);
-        const time = timeOfDay(new Date(iso), timeZone);
-        return weekday === null ? time : `${weekday} ${time}`;
-      };
-      const fiveResets = await clock(limits.five_hour.resets_at);
-      const weekResets = await clock(limits.seven_day.resets_at);
+      const timeZone: string = await page.evaluate(() => new Intl.DateTimeFormat().resolvedOptions().timeZone);
+      const clock = (iso: string) => clockWord(new Date(iso), new Date(), timeZone);
+      const fiveResets = clock(limits.five_hour.resets_at);
+      const weekResets = clock(limits.seven_day.resets_at);
       await expectTexts(
         line.locator('[data-quota-window="five_hour"]'),
         [`5-hour ${fiveUsed}% · resets ${fiveResets}`],

@@ -2,8 +2,10 @@
  * A time of day in words has one writer, `timeOfDay` (src/lib/timeOfDay.ts), on a 12-hour clock, and the board's source holds no
  * second one: no option that writes an hour (`hourCycle`, `hour12`, `hour:`, `timeStyle:`) outside the writer's file, and nothing
  * written as the browser's locale does (`toLocaleString(`, `toLocaleTimeString(`, `toLocaleDateString(`, whatever their arguments):
- * a whole instant is `instantWords`'s (src/lib/instant.ts). The calls that write a number in a locale are `NUMBERS`, by file and
- * count, each with its reason. The vendored kit (`src/components/ui/ds`) is another repository's and stays out.
+ * a whole instant is `instantWords`'s (src/lib/instant.ts). Every moment and date is written by date-fns, so no file of `src` builds
+ * a formatter of its own (`new Intl.DateTimeFormat`), the writer's file included: that family carries no exemption. The calls that
+ * write a number in a locale are `NUMBERS`, by file and count, each with its reason. The vendored kit (`src/components/ui/ds`) is
+ * another repository's and stays out.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -40,6 +42,11 @@ export const LOCALE: Record<string, RegExp> = {
   date: /\.toLocaleDateString\s*\(/g,
 };
 
+/** How the board no longer writes a date: a formatter of its own. Refused in every file of `src`, the writer's included. */
+export const FORMATTERS: Record<string, RegExp> = {
+  parts: /new\s+Intl\.DateTimeFormat\b/g,
+};
+
 /** What a pattern found in a text: the words written and where, as `line:column`. */
 export interface Found {
   words: string;
@@ -71,8 +78,8 @@ export const NUMBERS: Numbers[] = [
 
 /**
  * What is wrong in `files` (each a source text by its path from the board's root): an hour option outside `WRITER`, as
- * `file:line:column (words)`; a file with more calls that write in a locale than `numbers` gives it; and an entry of `numbers`
- * whose file holds fewer.
+ * `file:line:column (words)`; a formatter built by hand in any file, `WRITER` included; a file with more calls that write in a
+ * locale than `numbers` gives it; and an entry of `numbers` whose file holds fewer.
  */
 export function refusals(files: Record<string, string>, numbers: Numbers[] = NUMBERS): string[] {
   const options = Object.entries(files)
@@ -80,6 +87,11 @@ export function refusals(files: Record<string, string>, numbers: Numbers[] = NUM
     .flatMap(([file, text]) =>
       foundAt(text, OPTIONS).map(({ words, at }) => `${file}:${at} (${words}) writes an hour: take the time from timeOfDay (${WRITER})`),
     );
+  const formatters = Object.entries(files).flatMap(([file, text]) =>
+    foundAt(text, FORMATTERS).map(
+      ({ words, at }) => `${file}:${at} (${words}) writes a date: format it with date-fns (format, isSameDay, isSameYear)`,
+    ),
+  );
   const names = [...new Set([...Object.keys(files), ...numbers.map((n) => n.file)])].sort();
   const locale = names.flatMap((file) => {
     const found = foundAt(files[file] ?? '', LOCALE);
@@ -91,7 +103,7 @@ export function refusals(files: Record<string, string>, numbers: Numbers[] = NUM
     if (found.length < allowed) return [`${file} writes ${found.length} times in a locale, NUMBERS says ${allowed}: lower the list`];
     return [];
   });
-  return [...options, ...locale];
+  return [...options, ...formatters, ...locale];
 }
 
 /** Every `.ts` and `.tsx` of `root`'s `src` outside the kit, as its text by its path from `root`. */
@@ -139,12 +151,27 @@ test('REFUSED: a second writer of an hour, by each way one is written, and never
   assert.deepEqual(second("new Intl.DateTimeFormat(undefined, { hour: '2-digit', hourCycle: 'h23' }).format(at)"), [
     `src/lib/x.ts:1:38 (hour:) writes an hour: take the time from timeOfDay (${WRITER})`,
     `src/lib/x.ts:1:55 (hourCycle) writes an hour: take the time from timeOfDay (${WRITER})`,
+    'src/lib/x.ts:1:1 (newIntl.DateTimeFormat) writes a date: format it with date-fns (format, isSameDay, isSameYear)',
   ]);
   assert.equal(second('const o = {\n  hour12:\n    true };').length, 1, 'an option broken across lines');
   assert.match(second('const o = {\n  hour\n    : "numeric" };')[0] ?? '', /^src\/lib\/x\.ts:2:3 \(hour:\)/, 'named where it starts');
-  assert.equal(second("new Intl.DateTimeFormat('en', { timeStyle: 'short' })").length, 1, 'a time style');
+  assert.equal(second("new Intl.DateTimeFormat('en', { timeStyle: 'short' })").length, 2, 'a time style, and the formatter it sits in');
   assert.equal(second("of('hour'); const perHour = 3; rate.hour; type T = { hours: number }").length, 0, 'a word that only holds the name');
-  assert.equal(refusals({ [WRITER]: 'new Intl.DateTimeFormat("en-US", { hour: "numeric", hour12: true })' }, []).length, 0, 'the writer');
+  assert.equal(refusals({ [WRITER]: 'const o = { hour: "numeric", hour12: true };' }, []).length, 0, 'the writer may name an hour');
+});
+
+test("REFUSED: a date formatted outside date-fns, in the writers' files too", () => {
+  const built = (text: string) => refusals({ 'src/lib/x.ts': text }, []);
+  assert.deepEqual(built("new Intl.DateTimeFormat('en-US', { month: 'short' }).format(at)"), [
+    'src/lib/x.ts:1:1 (newIntl.DateTimeFormat) writes a date: format it with date-fns (format, isSameDay, isSameYear)',
+  ]);
+  assert.equal(built('const f = new\n  Intl.DateTimeFormat();').length, 1, 'broken across lines');
+  assert.deepEqual(
+    refusals({ [WRITER]: "new Intl.DateTimeFormat('en-US').format(at)" }, []),
+    [`${WRITER}:1:1 (newIntl.DateTimeFormat) writes a date: format it with date-fns (format, isSameDay, isSameYear)`],
+    'the family has no exemption: the one writer of an hour is refused like any other file',
+  );
+  assert.equal(built('const DateTimeFormatOf = 1; const n = new Intl.NumberFormat("en");').length, 0, 'a word that only holds the name');
 });
 
 test('REFUSED: anything written as the locale does, a date with a locale and no options too, and a number until the list names it', () => {
@@ -179,10 +206,8 @@ test('REFUSED: one more call in a locale than the list gives a file, and a list 
 test("the board's source has one writer of an hour, and writes nothing in a locale but the numbers the list names", () => {
   const files = sources(WEB);
   assert.ok(Object.keys(files).length > 100, `the source is read: ${Object.keys(files).length} files`);
-  assert.ok(
-    foundAt(files[WRITER] ?? '', OPTIONS).some((found) => found.words === 'hour12'),
-    `${WRITER} is read, and holds the option`,
-  );
+  assert.ok(files[WRITER]?.includes('export function timeOfDay('), `${WRITER} is read, and holds the one writer of an hour`);
+  assert.ok(files[WRITER]?.includes("from 'date-fns'"), `${WRITER} writes its hour with date-fns`);
   assert.ok(files[INSTANT]?.includes('export function instantWords('), `${INSTANT} is read, and holds the writer of an instant`);
   assert.equal(
     NUMBERS.every((n) => n.why.trim()),
@@ -197,4 +222,10 @@ test("the board's source has one writer of an hour, and writes nothing in a loca
   });
   assert.equal(back.length, 1, back.join('\n'));
   assert.match(back[0] ?? '', /^src\/components\/Facts\.tsx writes 1 times in a locale/, 'a toLocaleString() written back is refused');
+  const built = refusals({
+    ...files,
+    'src/components/Facts.tsx': `${files['src/components/Facts.tsx']}\nnew Intl.DateTimeFormat('en-US').format(d);\n`,
+  });
+  assert.equal(built.length, 1, built.join('\n'));
+  assert.match(built[0] ?? '', /^src\/components\/Facts\.tsx:\d+:1 \(newIntl\.DateTimeFormat\) writes a date/, 'a formatter written back');
 });

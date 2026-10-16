@@ -1099,6 +1099,52 @@ test('`nemia watch` survives a feed cut under it: truncated, deleted or replaced
 });
 
 test(
+  "a feed that goes between a watch's stat of it and the read after it is said as the cut it is, never as a cursor past its end",
+  WAITED,
+  async (t) => {
+    emptyStore();
+    const line = JSON.stringify({ at: '2026-09-22T10:00:00.000Z', run: 'r-a', word: 'running' });
+    fs.writeFileSync(FEED, `${line}\n${line}\n`);
+    const from = size();
+    const cuts: string[] = [];
+    const errors: string[] = [];
+    const said = bell();
+    const open = fs.openSync;
+    let opens = 0;
+    t.mock.method(fs, 'openSync', ((file: fs.PathLike, flags: string) => {
+      const fd = open(file, flags);
+      if (String(file) === FEED && ++opens === 2) fs.rmSync(FEED, { force: true });
+      return fd;
+    }) as typeof fs.openSync);
+    const watch = watchFeed({
+      from,
+      intervalMs: 20,
+      onLine: () => {},
+      onCut: (cut) => {
+        cuts.push(cut);
+        said.ring();
+      },
+      onError: (err) => {
+        errors.push((err as Error).message ?? String(err));
+        said.ring();
+      },
+    });
+    try {
+      await until(t, () => cuts.length + errors.length > 0, 'the feed gone under the beat said', { bell: said });
+    } finally {
+      watch.stop();
+    }
+    assert.deepEqual(errors, [], 'a watch already following never says the refusal a cursor given by hand gets');
+    assert.equal(cuts.length, 1, 'the cut is said once');
+    assert.match(
+      cuts[0],
+      /^the feed was deleted under this watch at cursor \d+/,
+      'there at the stat of the beat and gone at the read after it: the deletion, not a cursor past the end',
+    );
+  },
+);
+
+test(
   '`nemia watch` says it is watching only once it holds its cursor: a feed cut the moment the banner is read is said, not refused',
   WAITED,
   async (t) => {

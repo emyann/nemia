@@ -289,17 +289,94 @@ function recordFeedFile(
 /**
  * Whether the feed was cut under a reader at `cursor`, in words — or undefined, when the cursor is still one of this file's: it was
  * deleted, a file was put in its place (`ino`, the inode the cursor was read in), or it is shorter than the cursor or has no line boundary
- * there (`cursorRefusalAt`): truncated, and perhaps written again. A feed truncated and written past the cursor again, a line ending just
+ * there: truncated, and perhaps written again. A feed truncated and written past the cursor again, a line ending just
  * there, is not seen: nothing on disk tells it from the same feed grown.
+ *
+ * Judged of the one `stat` its beat took and of the byte before the cursor, never of a stat of its own: a feed that goes between two stats
+ * of one beat is seen by the later one alone, and the beat then says a cut the earlier one's size does not fit. The read of that byte
+ * throws where the file has just gone, and the beat takes itself again (`cutOrRead`).
  */
 function feedCut(file: string, cursor: number, ino: number | undefined, stat: fs.Stats | undefined): string | undefined {
   if (cursor === 0) return undefined;
   const from = `reading the feed there is now from its start — a line said before may be said again`;
   if (!stat) return `the feed was deleted under this watch at cursor ${cursor} (${file}): ${from}`;
   if (ino !== undefined && stat.ino !== ino) return `the feed was replaced under this watch at cursor ${cursor} (${file}): ${from}`;
-  if (cursorRefusalAt(file, cursor) !== undefined)
+  if (cursor > stat.size || byteAt(file, cursor - 1) !== 0x0a)
     return `the feed was truncated under this watch at cursor ${cursor}, and is ${stat.size} bytes now (${file}): ${from}`;
   return undefined;
+}
+
+/**
+ * What one beat of a watch found: the cut that happened under it, in words (`feedCut`), or the lines at its cursor, and the inode it read
+ * them in.
+ */
+type WatchBeat =
+  | { cut: string; ino: number | undefined }
+  | { cut?: undefined; ino: number | undefined; got: { lines: FeedLine[]; ends: number[]; cursor: number } };
+
+/**
+ * One beat of a watch at `cursor`: the cut that happened under it (`feedCut`), or the lines from `cursor` to the size that same stat said.
+ *
+ * Read by that stat's size, never through `readEnds`: `readEnds` stats again, and a feed that goes between the two refuses the cursor as
+ * one given by hand is refused (`cursorRefusalAt`) — `past the end`, where the truth is a feed deleted or truncated under the watch. A
+ * read that cannot open the file is a feed that went just then, and is taken again, up to `tries`, so the stat of the next try says which
+ * cut it was; a file that keeps failing for another reason throws its last failure, which the watch hands to `onError`.
+ */
+function cutOrRead(file: string, cursor: number, ino: number | undefined, tries = 3): WatchBeat {
+  let seen = ino;
+  for (let i = 1; ; i++) {
+    const stat = statOf(file);
+    try {
+      const cut = feedCut(file, cursor, seen, stat);
+      return cut !== undefined ? { cut, ino: stat?.ino } : { ino: stat?.ino, got: linesFrom(file, cursor, stat?.size ?? 0) };
+    } catch (e) {
+      if (i >= tries) throw e;
+      seen = stat?.ino;
+    }
+  }
+}
+
+/** Where a watch is: the cursor it has read to, the inode it read it in, and whether it has stopped (`stop()`). */
+type WatchAt = { cursor: number; ino: number | undefined; stopped: boolean };
+
+/** What a watch hands on, as `watchFeedFile` is given them. */
+type WatchHands = {
+  onLine: (line: FeedLine, cursor: number) => void | Promise<void>;
+  onError?: (e: unknown) => void;
+  onRead?: () => void | Promise<void>;
+  /** The feed was cut under the watch, in words (`feedCut`): the watch reads on from 0, the start of the feed there is now. */
+  onCut?: (said: string) => void | Promise<void>;
+};
+
+/**
+ * One pass of a watch at `at`: the cut under it said and its cursor moved to the start of the feed there is now (`cutOrRead`), or every
+ * line from its cursor handed on, its cursor moved with them. Whether there is more to read — false where the read found nothing new, and
+ * where the watch stopped during it.
+ *
+ * Given no `onCut`, it reads through `readEnds`, whose refusal of a cursor the feed no longer has (exit 2) is the caller's to take: the
+ * api's stream ends on it, and its reader opens the feed again. Given one, no read of a watch already following ever says that refusal.
+ */
+async function passOf(file: string, at: WatchAt, { onLine, onRead, onCut }: WatchHands): Promise<boolean> {
+  let got: { lines: FeedLine[]; ends: number[]; cursor: number };
+  if (onCut) {
+    const beat = cutOrRead(file, at.cursor, at.ino);
+    at.ino = beat.ino;
+    if (beat.cut !== undefined) {
+      at.cursor = 0;
+      await onCut(beat.cut);
+      return !at.stopped;
+    }
+    got = beat.got;
+  } else got = readEnds(file, at.cursor);
+  if (at.stopped) return false;
+  await onRead?.();
+  if (got.cursor === at.cursor) return false;
+  at.cursor = got.cursor;
+  for (const [i, line] of got.lines.entries()) {
+    if (at.stopped) return false;
+    await onLine(line, got.ends[i]);
+  }
+  return !at.stopped;
 }
 
 /**
@@ -330,33 +407,17 @@ function feedCut(file: string, cursor: number, ino: number | undefined, stat: fs
  */
 function watchFeedFile(
   file: string,
-  {
-    from = 0,
-    onLine,
-    intervalMs = 1_000,
-    onError,
-    onRead,
-    onCut,
-  }: {
-    from?: number;
-    onLine: (line: FeedLine, cursor: number) => void | Promise<void>;
-    intervalMs?: number;
-    onError?: (e: unknown) => void;
-    onRead?: () => void | Promise<void>;
-    /** The feed was cut under the watch, in words (`feedCut`): the watch reads on from 0, the start of the feed there is now. */
-    onCut?: (said: string) => void | Promise<void>;
-  },
+  { from = 0, intervalMs = 1_000, onLine, onError, onRead, onCut }: { from?: number; intervalMs?: number } & WatchHands,
 ): { stop(): void } {
   const refusal = cursorRefusalAt(file, from);
   if (refusal) throw refused(refusal);
-  let cursor = from;
-  let ino = statOf(file)?.ino;
-  let stopped = false;
+  const at: WatchAt = { cursor: from, ino: statOf(file)?.ino, stopped: false };
+  const hands: WatchHands = { onLine, onError, onRead, onCut };
   let draining = false;
   let again = false;
 
   const drain = async (): Promise<void> => {
-    if (stopped) return;
+    if (at.stopped) return;
     if (draining) {
       again = true;
       return;
@@ -365,29 +426,10 @@ function watchFeedFile(
     try {
       do {
         again = false;
-        for (;;) {
-          if (onCut) {
-            const stat = statOf(file);
-            const cut = feedCut(file, cursor, ino, stat);
-            ino = stat?.ino;
-            if (cut) {
-              cursor = 0;
-              await onCut(cut);
-              if (stopped) return;
-            }
-          }
-          const got = readEnds(file, cursor);
-          if (stopped) return;
-          await onRead?.();
-          if (got.cursor === cursor) break;
-          cursor = got.cursor;
-          for (const [i, line] of got.lines.entries()) {
-            if (stopped) return;
-            await onLine(line, got.ends[i]);
-          }
-        }
+        let more = true;
+        while (more) more = await passOf(file, at, hands);
         // oxlint-disable-next-line no-unmodified-loop-condition -- a drain called during an await sets `again`, and `stop()` sets `stopped`
-      } while (again && !stopped);
+      } while (again && !at.stopped);
     } catch (e) {
       onError?.(e);
     } finally {
@@ -408,7 +450,7 @@ function watchFeedFile(
   void drain();
   return {
     stop: () => {
-      stopped = true;
+      at.stopped = true;
       clearInterval(timer);
       watcher?.close();
     },

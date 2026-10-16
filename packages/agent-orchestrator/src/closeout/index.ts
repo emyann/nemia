@@ -2,6 +2,7 @@
 export {
   CLOSEOUT_SCHEMA,
   closeoutContract,
+  closeoutHashOf,
   closeoutSchemaOf,
   declaredOutput,
   isLoopTarget,

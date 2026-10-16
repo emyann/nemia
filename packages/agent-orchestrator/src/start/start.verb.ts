@@ -19,6 +19,7 @@ import { fansOut, isFolderTeam } from '../workflow/index.ts';
 import { formerModesWritten, loadWorkflows } from '../folder/folder.store.ts';
 import { isShippedPlace, skillsFor, type Places } from '../skills/read.store.ts';
 import { placesOf } from '../folder/lookup.store.ts';
+import { pinsOf } from '../revisions/pin.verb.ts';
 import { workRoot } from '../record/places.store.ts';
 import { gateRefusal } from '../ending/ending.ts';
 import { isRepositoryRun, type Mount, type Run } from '../record/record.ts';
@@ -572,6 +573,10 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const run = yield* folder ? folderRun(id, told, stepRecords) : repositoryRun(id, told, stepRecords, opts.repo, isolate);
   yield* tried(() => copyInputs(run, inputs));
   yield* tried(() => renderAgents(run, steps, opts.workflowDir, places));
+  yield* tried(() => {
+    const pinned = pinsOf(run, steps, run.createdAt);
+    if (pinned.length) run.pinned = pinned;
+  });
   yield* tried(() => runStore.runs.create(run));
   return run;
 });

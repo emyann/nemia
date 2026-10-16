@@ -489,3 +489,6 @@ export type { RestingMemo, RestingRead } from './rest/resting.verb.ts';
 export { judgedNow, runsSummarized } from './summary/summary.verb.ts';
 export type { RunSummary, SummaryHow } from './summary/summary.verb.ts';
 export type { FinishedPage, FinishedRun, ListedRun, OpenRuns, RunClock, RunOutcome, StepCost, WaitingRun } from './runlist/runlist.verb.ts';
+export { driftWords, kindsDrift, revisionNow, REVISION_KINDS, stepsDrift } from './revisions/revisions.ts';
+export type { Drift, KindName, Pin, Revision, RevisionKind } from './revisions/revisions.ts';
+export { ledgerOf, topsOf } from './revisions/revisions.store.ts';

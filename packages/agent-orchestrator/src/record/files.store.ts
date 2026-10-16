@@ -28,6 +28,9 @@ import {
   fileNames,
   heldIn,
   holdFile,
+  refreshFile,
+  removeRefresh,
+  writeRefresh,
   isDirectory,
   listRuns,
   lstatOf,
@@ -160,7 +163,7 @@ function consumeAllAsks(run: Run, asks: readonly RetryAsk[], rounds: readonly Ro
 /** Remove the run's record and a person's files beside it, and its own directory, answering each path removed from `WF_ROOT`. */
 function removeRunFiles(id: string): string[] {
   const removed: string[] = [];
-  for (const at of [runFile(id), cancelFile(id), pruneFile(id), holdFile(id), asksDir(id), path.join(runsDir(), id)]) {
+  for (const at of [runFile(id), cancelFile(id), pruneFile(id), holdFile(id), refreshFile(id), asksDir(id), path.join(runsDir(), id)]) {
     const st = lstatOf(at);
     if (!st) continue;
     fs.rmSync(at, { recursive: true, force: true });
@@ -424,6 +427,7 @@ export const filesStore: RunStore = {
   },
   asks: { read: readAllAsks, answers: readAnswers, consume: consumeAllAsks, write: writePersonAsk, where: askWhere },
   holds: { lift: removeHold, put: writeHold, stands: (id) => fs.existsSync(holdFile(id)) },
+  refresh: { lift: removeRefresh, put: writeRefresh, stands: (id) => fs.existsSync(refreshFile(id)) },
   forgetting: {
     write: writeForgetting,
     read: readForgetting,

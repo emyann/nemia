@@ -7,6 +7,7 @@
  * here reads a disk or calls the engine.
  */
 import { isObject, LOOP_REPLIES, outputFields, type Workflow } from '../step/step.ts';
+import { digestOf } from '../revisions/revisions.ts';
 import {
   artifactsOf,
   bodyOf,
@@ -63,6 +64,13 @@ export function closeoutSchemaOf(step: Workflow, steps: readonly Workflow[]): Cl
     required: [...CLOSEOUT_SCHEMA.required, ...Object.keys(properties), ...(replies ? [LOOP_REPLIES] : [])],
   };
 }
+
+/**
+ * The digest of the schema a step is filed with (`closeoutSchemaOf`), kept on the step's record: read by a later filing that would continue
+ * that session, which starts fresh instead where this has moved. A continued session is asked for its closeout by the tool it was given;
+ * asked in another shape it would pay for the whole conversation again for an answer in the wrong one.
+ */
+export const closeoutHashOf = (step: Workflow, steps: readonly Workflow[]): string => digestOf([closeoutSchemaOf(step, steps)]);
 
 /**
  * What a step says on its way out, as every reader reads it, whichever version it was given in (`parseCloseout`).

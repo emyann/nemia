@@ -8,7 +8,7 @@ effort: high
 context: 200k
 tools: Read, Grep, Glob, Bash, Skill, Agent, WebFetch, WebSearch
 permissionMode: dontAsk
-allowedTools: Agent
+allowedTools: WebSearch, WebFetch(domain:code.claude.com), WebFetch(domain:docs.claude.com), WebFetch(domain:platform.claude.com), WebFetch(domain:docs.anthropic.com), Agent
 disallowedTools: Bash(cd:*)
 output: intent.schema.json
 ---
@@ -30,3 +30,7 @@ only this round's.
 When the frontier is empty, ask one last round of one question: whether you share an understanding, with the intent you would write as
 your recommended answer. When the person confirms, sign off `done` with the intent, in the person's own terms. A decision the person has
 not made is an open question, never an answer you chose for them. If someone else answered for them, say who, beside each answer.
+
+Anthropic's Agent SDK is documented at https://code.claude.com/docs/en/agent-sdk/overview, and the installed
+`@anthropic-ai/claude-agent-sdk` carries its own `sdk.d.ts`, the version actually in use: when a fact you need is the SDK's, read
+both and cite them, never an interface from memory.

@@ -447,15 +447,16 @@ export type EngineShape = {
   /**
    * Make this process the holder of the Claude Code sessions the engine runs attached (`harness/claude/attached.ts`), for as long as the
    * scope it is taken in lasts: while held, a Claude Code task that runs to its end is spawned attached on the Agent SDK, and a session
-   * parked, or left by a holder that is gone, is resumed under its own id on the next look. As the scope closes it holds back new tool
-   * calls, waits with no bound for each call in flight to end, then stops each session and parks it for the next holder. An engine
-   * that never takes it runs such a task as a `claude -p` job.
+   * parked, or left by a holder that is gone, is resumed under its own id on the next look. As the scope closes it holds back the new
+   * tool calls of each session with none in flight, waits at most `LET_GO_MS` for each call in flight to end, then stops each session
+   * and parks it for the next holder, a call it cut at that bound kept on the session's run file and said on the log. An engine that
+   * never takes it runs such a task as a `claude -p` job.
    */
   readonly hold: () => Effect.Effect<void, never, Scope.Scope>;
   /**
    * Hold back the new tool calls of the attached sessions the process `holder` holds, each at its hook until the drain is lifted, or with
-   * `null` lift it. A call in flight runs on; another process's holder is not held. Refused — `DrainRefused` — for a holder that is
-   * neither a process id nor null.
+   * `null` lift it. A call in flight runs on, and so does a call that belongs to one, or the call in flight could never end; another
+   * process's holder is not held. Refused — `DrainRefused` — for a holder that is neither a process id nor null.
    */
   readonly drain: (holder: number | null) => Effect.Effect<void, DrainRefused>;
   /**

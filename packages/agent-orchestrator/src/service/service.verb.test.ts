@@ -25,6 +25,7 @@ process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
 const { installService, liveHost, uninstallService, serviceStatus, SERVICES } = await import('./service.verb.ts');
+const { LET_GO_MS } = await import('agent-runtime');
 const { restartService, RESTARTS } = await import('./restart.verb.ts');
 const { putPause, readPause, pauseFile, resumePause } = await import('../pause/pause.store.ts');
 const { EngineService, engineOf, runWith: runEngine } = await import('../runtime-client.ts');
@@ -94,6 +95,7 @@ type World = {
   onSignal?: () => void;
   onStart?: () => void;
   root?: string;
+  stopMs?: number;
   machine?: { platform: string; wsl: boolean; systemd: boolean };
 };
 
@@ -156,6 +158,7 @@ function hostOf(world: World): { host: ServiceHost; events: string[] } {
     say: (line) => events.push(`say ${line}`),
     pollMs: 1,
     waitMs: 200,
+    stopMs: world.stopMs ?? 300,
   };
   return { host, events };
 }
@@ -277,6 +280,59 @@ test('a take-over drains the daemon and waits for each call in flight, naming it
   assert.ok(!events.includes('drain null'), 'the drain names the daemon that is gone, and is left');
 });
 
+test('a take-over gives up on a call that never ends, says which, and goes on to stop the daemon', async () => {
+  const world: World = { lease: lease(OLD), unitPid: null, landings: [[]], calls: [[CALL]] };
+  world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
+  world.onStart = () => passing(world, NEW);
+  const { host, events } = hostOf(world);
+  assert.equal((await install({ takeOver: String(OLD) }, { ...host, waitMs: 30 })).did, 'taken');
+  const gave =
+    "say giving up on r2's implement: its call to Bash has not ended in 30 ms, and the daemon is stopped now; its holder cuts the " +
+    'call, and the next one resumes the session told the call did not finish';
+  assert.ok(events.includes(gave), events.join('\n'));
+  assert.ok(events.indexOf(`signal ${OLD}`) > events.indexOf(gave), 'it gives up, says so, and only then signals');
+});
+
+test('a take-over whose daemon takes its own let-go to stop is not refused: the stop has a bound of its own', async () => {
+  const world: World = { lease: lease(OLD), unitPid: null, landings: [[]], calls: [[CALL]], stopMs: 400 };
+  const slow = Array.from({ length: 60 }, () => lease(OLD));
+  world.onSignal = () => (world.later = [...slow, lease(OLD, 'stopped')]);
+  world.onStart = () => passing(world, NEW);
+  const { host, events } = hostOf(world);
+  const done = await install({ takeOver: String(OLD) }, { ...host, waitMs: 20 });
+  assert.equal(done.did, 'taken', 'the daemon let the store go on its own time and was never refused for it');
+  assert.ok(slow.length * host.pollMs > 20, 'and it waited past the bound it gives a call in flight, read by read');
+  assert.ok(
+    events.some((e) => e.startsWith("say giving up on r2's implement")),
+    'it gave up on the call that never ended first',
+  );
+  assert.ok(events.includes(`signal ${OLD}`), events.join('\n'));
+  assert.equal(readPause(), null, 'and the pause it put is lifted, since the take-over succeeded');
+});
+
+test(
+  'a take-over waits past its bound for a landing check that never ends: a check that did not finish is no refusal',
+  WAITED,
+  async (t) => {
+    const world: World = { lease: lease(OLD), unitPid: null, landings: [[LANDING]], calls: [[]] };
+    const { host, events } = hostOf(world);
+    const fiber = Effect.runFork(
+      installService({ takeOver: String(OLD) }, { ...host, waitMs: 1 }).pipe(
+        Effect.provide(EngineService.layer(engineOf(engine().layer))),
+        Effect.provide(stand().layer),
+      ),
+    );
+    await until(
+      t,
+      () => events.filter((e) => e === 'landings 1').length >= 5,
+      'the landing read five times, each long past the bound of one millisecond',
+      { everyMs: 5 },
+    );
+    await Effect.runPromise(Fiber.interrupt(fiber));
+    assert.ok(!events.some((e) => e.startsWith('drain') || e.startsWith('signal')), events.join('\n'));
+  },
+);
+
 test('a take-over interrupted while it waits on a call lifts its drain and its pause, and signals nothing', async () => {
   const world: World = { lease: lease(OLD), unitPid: null, landings: [[]], calls: [[CALL]] };
   const { host, events } = hostOf(world);
@@ -349,7 +405,7 @@ test('REFUSED when the stopped daemon still holds the store: Conflict naming ps 
   const world: World = { lease: lease(OLD), unitPid: null, landings: [[]] };
   const { host, events } = hostOf(world);
   await assert.rejects(
-    install({ takeOver: String(OLD) }, { ...host, waitMs: 30 }),
+    install({ takeOver: String(OLD) }, { ...host, stopMs: 30 }),
     refusedWith('Conflict', /still holds the store: check it with ps -p 4242/),
   );
   assert.ok(!events.includes('systemctl --user start nemia.service'), events.join('\n'));
@@ -357,14 +413,19 @@ test('REFUSED when the stopped daemon still holds the store: Conflict naming ps 
 });
 
 test(
-  'REFUSED at shipped defaults: a stopped daemon that still holds the store is waited for sixty seconds and no less, its lease read every two seconds',
+  'REFUSED at shipped defaults: a stopped daemon that still holds the store is waited for ninety seconds and no less, its lease read every two seconds',
   WAITED,
   async (t) => {
     const world: World = { lease: lease(OLD), unitPid: null, landings: [[]] };
     const { host } = hostOf(world);
     const live = liveHost();
     let reads = 0;
-    const shipped = { ...host, pollMs: live.pollMs, waitMs: live.waitMs, lease: () => (reads++, host.lease()) };
+    const shipped = { ...host, pollMs: live.pollMs, waitMs: live.waitMs, stopMs: live.stopMs, lease: () => (reads++, host.lease()) };
+    assert.ok(
+      live.stopMs > LET_GO_MS,
+      `the shipped stop wait is ${live.stopMs} ms and the runtime's let-go takes up to ${LET_GO_MS} ms: a daemon parking the ` +
+        'session whose call it cut would be refused as one that will not stop, so raise stopMs or lower LET_GO_MS',
+    );
     const clock = steeredClock();
     const fiber = Effect.runFork(
       installService({ takeOver: String(OLD) }, shipped).pipe(
@@ -377,14 +438,14 @@ test(
     const refused = Effect.runPromise(Fiber.join(fiber));
     refused.catch(() => undefined);
     await until(t, () => clock.asked.length === 2, 'the wait and its first rest asked', { bell: clock.bell });
-    assert.deepEqual(clock.asked, [2_000, 60_000], 'the shipped pace of its reads, and the shipped wait');
+    assert.deepEqual(clock.asked, [2_000, live.stopMs], 'the shipped pace of its reads, and the shipped wait for the stop');
     const read = reads;
     await clock.adjust(1_999);
     assert.deepEqual([clock.woken, reads], [[], read], 'a millisecond early, the lease is not read again');
     await clock.adjust(1);
     assert.deepEqual([clock.woken, reads], [[2_000], read + 1], 'at two seconds it is');
-    await clock.adjust(57_999);
-    assert.equal(fiber.pollUnsafe(), undefined, 'a millisecond before sixty seconds, the take-over still waits');
+    await clock.adjust(live.stopMs - 2_000 - 1);
+    assert.equal(fiber.pollUnsafe(), undefined, 'a millisecond before the shipped wait, the take-over still waits');
     await clock.adjust(1);
     await assert.rejects(refused, refusedWith('Conflict', /still holds the store: check it with ps -p 4242/));
   },

@@ -21,7 +21,7 @@ export function KindsBehind({ run }: { run: RunDetail }) {
     <section
       aria-label="The revisions this run is behind on"
       data-kinds-behind={kinds.length}
-      className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded bg-muted px-3 py-2 text-body-medium text-foreground"
+      className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded border border-outline px-3 py-2 text-body-medium text-foreground"
     >
       <p className="text-muted-foreground">
         What it resolved has moved since. {run.refresh && <span className="font-mono text-body-medium">{run.refresh}</span>} takes the new

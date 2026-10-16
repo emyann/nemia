@@ -340,3 +340,45 @@ export function fansOut(steps: readonly Workflow[]): boolean {
 export function terminalSteps(steps: readonly Workflow[]): Workflow[] {
   return steps.filter((s) => !steps.some((other) => other.after.includes(s.name)));
 }
+
+/**
+ * Why a folder's steps are no step set to run, with the fix, or undefined where they are one.
+ *
+ * Structural, and about the set alone, so it is pure and can be asked of a folder nobody is starting: a step named for another step's
+ * check (`<name>-check`) or try (`<name>-try<N>`, `<name>-try<N>-check`), whose tasks a run files under those names and would read one as
+ * the other; and, where the run's steps work in place (`isolate: false`), a team that says `place: folder`, which has no base branch to
+ * work on, one that can run two steps at once (`fansOut`), which would share a directory, and an ending (`workspace: main`), which would
+ * merge a result branch the run does not have.
+ *
+ * Asked twice, of the same set: of the folder `nemia start` is given, which it refuses (`stepsToStart`), and of the folder a run that has
+ * filed nothing takes again on a pass (`stepsNow`), which keeps the set it froze and says so. What is left to `nemia start` alone reads
+ * more than the set — the place a skill resolves to, the engine's remote agents, the store's path, a harness's config — and refuses the
+ * filing itself where a pass takes it.
+ */
+export function stepSetRefusal(steps: readonly Workflow[], isolate: boolean): string | undefined {
+  if (!isolate && isFolderTeam(steps))
+    return (
+      `--no-worktree: this workflow's steps say \`place: folder\`, so each works in a folder the run makes, with no git repository — there is no base branch for them to work on in place.\n` +
+      `Start it without --no-worktree.`
+    );
+  if (!isolate && fansOut(steps))
+    return (
+      'this workflow can run two steps at once, and --no-worktree would put them in the same directory.\n' +
+      'Either drop --no-worktree, or make the steps a chain.'
+    );
+  const ending = !isolate ? steps.find((s) => s.workspace === 'main') : undefined;
+  if (ending)
+    return (
+      `${ending.name}: \`workspace: main\` ends this workflow by merging the run's result branch onto the base branch, and --no-worktree gives the run no result branch — every step works on the base branch itself, where the work already is, so there would be nothing to merge.\n` +
+      `Either drop --no-worktree, or start a workflow whose last step is not an ending.`
+    );
+  const clash = steps.find((s) => s.check && steps.some((other) => other.name === `${s.name}-check`));
+  if (clash)
+    return `${clash.name}-check: a step may not be named for another step's check. ${clash.name} has a \`check:\`, and the run files it as ${clash.name}-check. Rename ${clash.name}-check.md.`;
+  const tryClash = steps
+    .map((s) => ({ s, of: /^(.+)-try\d+(?:-check)?$/.exec(s.name)?.[1] }))
+    .find(({ of }) => of && steps.some((other) => other.name === of));
+  if (tryClash)
+    return `${tryClash.s.name}: a step may not be named for another step's try. The run files ${tryClash.of} tried again as ${tryClash.of}-try2, its check as ${tryClash.of}-try2-check, and on. Rename ${tryClash.s.name}.md.`;
+  return undefined;
+}

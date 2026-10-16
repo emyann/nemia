@@ -11,6 +11,9 @@ export default {
    * denied, the Decide section read out of the run's real repository, what each session used and the mode it runs in, the timeline off
    * the engine's attempts and the filings on its feed, and the step inspector's Details, Activity and Output tabs. It ends with tokens'
    * Output open for the photograph, its image served as a PNG never cached and opened full-size in a tab of its own.
+   *
+   * The revisions band is photographed where it is read, before any sheet is open: the step sheet the page ends on covers the right third
+   * of the page, so the whole-page picture shows neither the band's last tag nor its step-level line.
    */
   name: 'run',
   route: `/runs/${FAKE.id}`,
@@ -21,6 +24,16 @@ export default {
       `the run's header names its workflow (${FAKE.workflow}), a folder the board pages on no address, linked to the Workflows page`,
     );
     await expectCount(page.locator('[data-from]'), 0, 'a run started with no card says it came from none');
+    const behind = page.locator('section[aria-label="The revisions this run is behind on"]');
+    await expectCount(
+      behind.locator('[data-kind-behind]'),
+      FAKE.behind.kinds,
+      `the run says the drift of every kind it resolved (${FAKE.behind.kinds})`,
+    );
+    for (const words of [FAKE.behind.agent, FAKE.behind.skill, FAKE.behind.ran])
+      await expectVisible(behind.locator('[data-kind-behind]', { hasText: words }), `the drift reads ${words}`);
+    await expectVisible(behind.getByText(`nemia refresh ${FAKE.id}`), 'it says the verb that takes the new revisions');
+    await photograph(behind, path.join(OUT, `run-kinds-${await themeOf(page)}.png`));
     const graph = page.locator(`section[aria-label="The run's steps as a graph"]`);
     await expectCount(
       graph.locator('.react-flow__node'),

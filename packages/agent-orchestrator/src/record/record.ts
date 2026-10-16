@@ -11,6 +11,7 @@ import type { EarlierTry, RetryAsk } from '../retry/index.ts';
 import type { MergeOf, RoundAsk } from '../status/status.ts';
 import type { QueueTry } from '../inbox/index.ts';
 import type { Pause } from '../pause/pause.ts';
+import type { Pin } from '../revisions/revisions.ts';
 
 /**
  * A folder a step may reach beyond its workspace, as the runtime takes it (`config.mounts`): an absolute path, and whether the step may
@@ -216,6 +217,13 @@ type RunBase = {
    */
   hold?: Hold;
   /**
+   * What this run resolved of each kind it reads — its workflow folder, each step's agent, each skill and its factory's rules — with the
+   * revision of each (`Pin`): written by the pass that resolves them, which is every pass while the run has filed nothing, and again by
+   * the pass that takes a person's refresh. Never re-read from the folder for a run that has filed: `stepsOf` reads the frozen workflow,
+   * and these say which revision that copy is. Absent on a record written before revisions, which pinned nothing.
+   */
+  pinned?: readonly Pin[];
+  /**
    * That a person paused the whole store (`nemia pause`), by whom and why — composed on read onto every run from the store's one file,
    * `$WF_ROOT/cordon`, and never written into a record. While it stands the run files nothing new, no step, try, round or check, and
    * what a person writes meanwhile waits on its own files for the lift (`assess`); what is in flight runs on. Absent while the store is not
@@ -403,6 +411,19 @@ export type StepRecord = {
    * `handedOff` is, and kept by a recheck, which is the same task.
    */
   filesRead?: FilesRead;
+  /**
+   * The agent and skill revisions the step's current try was filed on (`stepPins`): what a step that has shipped says it ran on, which the
+   * board reads beside the run's own pins once a refresh has moved those past it. Written at each filing, so a try filed again says the
+   * revisions that try took. Absent on a step nothing has filed, and on a record written before revisions.
+   */
+  pinned?: readonly Pin[];
+  /**
+   * The digest of the closeout schema the step's current try was filed with (`closeoutHashOf`): read when a later filing would continue
+   * that session, and the session started fresh instead where the schema has moved — a continued session is asked for its closeout in the
+   * schema it was given, and one asked in another would pay for the whole conversation again for an answer in the wrong shape. Absent on a
+   * record written before it, which resumes as it always did.
+   */
+  closeoutHash?: string;
 };
 
 /**
@@ -662,6 +683,16 @@ export type RunStore = {
      */
     readonly put: (id: string, until: readonly string[], said: Pick<Hold, 'why' | 'by'>) => Hold | null;
     /** Whether a hold's file is there, read as a hold or not: one that does not read still holds the run. */
+    readonly stands: (id: string) => boolean;
+  };
+  readonly refresh: {
+    /**
+     * Write down that a person asked the run to take the new revisions: the ask written, or null when one already stands, which is kept.
+     */
+    readonly put: (id: string) => { at: string } | null;
+    /** Lift the ask, once the pass has taken the revisions it asked for: whether there was one. */
+    readonly lift: (id: string) => boolean;
+    /** Whether an ask's file is there, read as one or not. */
     readonly stands: (id: string) => boolean;
   };
   readonly forgetting: {

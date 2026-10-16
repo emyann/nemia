@@ -61,6 +61,8 @@ import { VERSIONS } from '../release/version.verb.ts';
 import { ADMIT } from '../admission/admit.verb.ts';
 import { AUTO_ENTRIES } from '../auto/auto.verb.ts';
 import { writerText as textOf } from '../yours/yours.ts';
+import { refreshRun } from '../revisions/pin.verb.ts';
+import { driftWords, type Drift } from '../revisions/revisions.ts';
 
 /** The run's id and the step's name, as every route and command line names them. */
 const named = (args: Args): { runId: string; step: string } => ({ runId: textOf(args, 'runId') ?? '', step: textOf(args, 'step') ?? '' });
@@ -219,6 +221,44 @@ const ROUND: Command<{ step: string; round: number; file: string; budget?: numbe
       `   ${file}`,
     ];
   },
+};
+
+/**
+ * `nemia refresh`: a run asked to take the new revisions of the kinds it resolved, and the drift it was asked on.
+ *
+ * It takes, it does not reload: the next pass re-pins the run and renders its steps' agent files again, so every filing after it — a new
+ * step, a retry, a round — is filed on the revisions the world holds now. Nothing already filed is re-run.
+ */
+const REFRESH: Command<{ drift: readonly Drift[] }> = {
+  name: 'refresh',
+  usage: '<runId>',
+  help: [
+    'take the new revisions: a run keeps the workflow, agents, skills and',
+    'factory rules it resolved when it started, and this pins it to the',
+    'ones they hold now, so every filing after it — a new step, a retry,',
+    'a round — is filed on them. What has already been filed is not re-run,',
+    'and the steps the run has are neither added to nor removed. Refused of',
+    'a run that has filed nothing, which resolves afresh at its first filing',
+    'anyway, and of one already on the newest revision of every kind',
+  ],
+  spec: {
+    positionals: [{ key: 'runId', takes: 'required', kind: 'name' }],
+    flags: [],
+    unknown: (arg) => `nemia refresh takes one run's id: not ${arg}.`,
+    missing: 'nemia refresh takes the run to pin to the new revisions: nemia refresh <runId>.',
+  },
+  writes: true,
+  ticks: true,
+  nemia: 'hers',
+  route: { method: 'POST', path: '/api/runs/:runId/refresh', status: 202 },
+  apiKeys: ['drift'],
+  handler: Effect.fnUntraced(function* (args: Args) {
+    return { drift: yield* refreshRun(named(args).runId) };
+  }),
+  print: ({ drift }, args) => [
+    `${named(args).runId}  asked: the new revisions — the next tick takes them, and every filing after it is on them`,
+    ...drift.map((d) => `   ${driftWords(d)}`),
+  ],
 };
 
 /**
@@ -478,6 +518,7 @@ export const COMMANDS: readonly Command[] = [
   RETRY,
   APPROVE,
   ROUND,
+  REFRESH,
   ACCEPT,
   MERGE,
   SAY,

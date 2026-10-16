@@ -1,7 +1,8 @@
 /**
  * Lets a node test import the board's components. Node runs a test's TypeScript as it is, and not a component's JSX: the hooks here
  * hand it the app's `.tsx` compiled by `typescript`, the compiler the app is typechecked with, and resolve an import as vite does —
- * no extension, and `@/` for `src/`. A test imports this file first, and each component after it, by `await import(…)`.
+ * no extension, `@/` for `src/`, and a folder's `index` for the folder, so a component imported through a door (`@/components/look`)
+ * loads. A test imports this file first, and each component after it, by `await import(…)`.
  */
 import fs from 'node:fs';
 import { registerHooks } from 'node:module';
@@ -15,9 +16,9 @@ registerHooks({
   resolve(specifier, context, nextResolve) {
     const named = specifier.startsWith('@/') ? pathToFileURL(path.join(SRC, specifier.slice(2))).href : specifier;
     if ((named.startsWith('.') || named.startsWith('file:')) && !path.extname(named)) {
-      for (const extension of ['.ts', '.tsx']) {
+      for (const tail of ['.ts', '.tsx', '/index.ts', '/index.tsx']) {
         try {
-          return nextResolve(named + extension, context);
+          return nextResolve(named + tail, context);
         } catch {}
       }
     }

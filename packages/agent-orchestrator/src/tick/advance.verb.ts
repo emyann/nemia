@@ -21,6 +21,7 @@ import { holdsOpen } from '../gate/gate.ts';
 import { checkTaskId, isRepositoryRun, stepTaskId, tryOf, type CloseoutAsked, type Run, type TaskPhase } from '../record/record.ts';
 import { budgetOf, landsOnCheck, sentBack, stepStatus, type RoundAsk, type SpendOf } from '../status/status.ts';
 import { hasStarted, holdsOf, runReady, waitedOn, waitsOf, type ParentRun, type Wait } from '../wait/wait.ts';
+import { pinPass, pinsWritten } from '../revisions/pin.verb.ts';
 import { handOffDue } from '../workspace/workspace.ts';
 import { filesDue } from '../artifacts/artifacts.ts';
 import { inParts } from '../brief/index.ts';
@@ -342,6 +343,7 @@ export const advanceRun = Effect.fn('advance')(function* (run: Run, slot?: RunSl
 export const advancePass = Effect.fn('advancePass')(
   function* (e: Engine, run: Run, slot?: RunSlot, pass?: PassRead) {
     yield* Effect.annotateCurrentSpan({ run: run.id });
+    const took = pinPass(run, new Date().toISOString());
     const { reads, askNotes } = yield* readPass(e, run);
     const { steps, phaseOf, signedOff, asked, verdictOf, sessionBlocked, spendOf, asks, roundAsks } = reads;
     const adopted = yield* adoptAll(e, run, reads);
@@ -368,6 +370,7 @@ export const advancePass = Effect.fn('advancePass')(
     const feed = wordFeed(run, reads, assessed, admission, checkout);
 
     const notes: string[] = [...askNotes, ...handed.collected, ...lacking.notes, ...landing.notes, ...liftNotes, ...closeNotes];
+    notes.unshift(...took.notes);
     const f: Filing = { e: { ...e, file: (spec) => e.file(inParts(spec)) }, run, reads, closer, mayFile: mayFileOf(run), notes, heads };
     const { tried, rechecked } = yield* fileTries(f, assessed.retry);
     const looped = yield* fileRounds(f, assessed.round);
@@ -379,7 +382,7 @@ export const advancePass = Effect.fn('advancePass')(
       [filed, checked, tried, looped, adopted].some((names) => names.length > 0) ||
       Boolean(tips || heldFirst || handed.marked || lacking.read || landing.landed || marked.length || timed) ||
       Boolean(settled.marks.settlesCounted);
-    if (wrote) runStore.runs.rewrite(run);
+    pinsWritten(run, took, wrote);
     runStore.asks.consume(run, asks, roundAsks, pauseAsksVoid(steps, run, asks, phaseOf, spendOf));
 
     const facts = [...settled.facts, ...roundsGranted(run, steps, looped), ...marked, ...(timed ?? [])];

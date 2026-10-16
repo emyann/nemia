@@ -103,6 +103,16 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
   `needsOf` (`summary/judged.verb.ts`) and the web's `stepState` still compare `needs-human`. A new runtime phase is translated in `listing` and
   `phaseOfView`; put a new word beside a phase (`waitingOf`), never into it.
 - **A new step status is `working` on the board until `stepState` knows it**.
+- **A run's kinds are resolved from the world, never from a remembered transition** (`pinPass`, `src/revisions/pin.verb.ts`, at the head
+  of `advancePass`): while a run has filed nothing it takes the folder's steps and their revisions on every pass, and after that only on
+  a person's `nemia refresh`. The ledger is appended by hash (`appendRevision`), so two passes over one edit give it one number.
+- **A resolve on a pass stops its own run, never the pass** (`pinPass`): a kind that stops reading, a folder whose steps are a set
+  `nemia start` would refuse (`stepSetRefusal`, pure, asked of both), a ledger the store cannot write — the run keeps the revisions, the
+  step set and the prompts it had, and the pass says why. The record is changed after the render, which is the write that can throw.
+- **A revision answered for a kind nobody has resolved has no ledger entry**: compare against what a fresh resolve returns
+  (`refreshedNow`), never `topsOf` of what the record pins, or an edit reads as no drift.
+- **A refresh takes new content, never a new step set** (`refreshedNow` keeps a step the folder lost), and re-renders each step's prompt
+  (`renderAgain`): `closeoutSchemaOf` reads the frozen step, so a schema that moved starts a fresh session (`resumeOn`, `tick/file.verb.ts`).
 - **A word from outside is made one line before it is measured into a column** (`waitingWords`).
 - **A person's fact that stops a run's asks is read by `assess`**, not only by the verbs and the tick; a line that offers a verb says that
   verb's refusal itself (each producer reads `run.pruned`).

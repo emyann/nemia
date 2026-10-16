@@ -17,9 +17,10 @@ export const unprinted = (rel: string): boolean =>
 
 /**
  * What the api writes into its store as it serves the board, whatever a page does: the runner's sightings of a session's transcript
- * (`quiet/` under the engine's root), and the feed its passes write of the runs they judged (`feed.jsonl` beside `runs/`).
+ * (`quiet/` under the engine's root), the feed its passes write of the runs they judged (`feed.jsonl` beside `runs/`), and the revisions
+ * ledger a pass appends to for every kind a run of the seed resolves (`revisions/`, one file per kind and name).
  */
-const UNPRINTED: readonly RegExp[] = [/^engine\/quiet\//, /^feed\.jsonl$/];
+const UNPRINTED: readonly RegExp[] = [/^engine\/quiet\//, /^feed\.jsonl$/, /^revisions\//];
 
 /** Every file under `root` but those `skip` leaves out, by its path in `root`, with the digest of its bytes; a link by where it leads. */
 export function fingerprint(root: string, skip: (rel: string) => boolean = unprinted): Map<string, string> {

@@ -304,6 +304,14 @@ export type RunDetail = {
   /** The steps the run is gated at, in the order they run: those its workflow gates, and those it was started with. */
   gates: string[];
   warning: string | null;
+  /**
+   * The kinds the run is behind the revisions ledger on, as the api reads them: the kind (a workflow folder, an agent, a skill, a
+   * factory's rules), its name, the revision the run resolved and the one there is now — and, for a line about a step that has already
+   * been filed, that step's name. Absent on an answer from an api before revisions.
+   */
+  kinds?: Array<{ kind: string; name: string; pinned: number; now: number; step?: string }>;
+  /** The line the api says to type to take the new revisions, so the board spells no command. Absent on an answer from an api before it. */
+  refresh?: string;
   /** The steps as a graph, from the workflow the run froze: what the canvases draw, so none derives it from `after`. */
   graph: RunGraph;
   steps: Array<{
@@ -548,6 +556,20 @@ const RunDetailSchema = Schema.Struct({
   toDecide: Schema.NullOr(RunToDecideSchema),
   gates: StringsSchema,
   warning: Schema.NullOr(Schema.String),
+  kinds: Schema.optional(
+    Schema.mutable(
+      Schema.Array(
+        Schema.Struct({
+          kind: Schema.String,
+          name: Schema.String,
+          pinned: Schema.Number,
+          now: Schema.Number,
+          step: Schema.optional(Schema.String),
+        }),
+      ),
+    ),
+  ),
+  refresh: Schema.optional(Schema.String),
   graph: RunGraphSchema,
   steps: Schema.mutable(Schema.Array(DetailStepSchema)),
   timeline: Schema.Struct({ rounds: Schema.mutable(Schema.Array(TimelineTotalSchema)), run: TimelineTotalSchema }),

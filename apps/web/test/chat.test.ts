@@ -29,7 +29,7 @@ import {
 import { CHAT_OUTBOX_KEY, editKept, forgetKept, keepUnsent, parseKept, readKept, sendingOnce } from '../src/lib/chatOutbox.ts';
 import { composerButton, composerWords } from '../src/lib/nemia.ts';
 import { faceOf, UP, type Presence } from '../src/lib/presence.ts';
-import type { StreamLike } from '../src/lib/following.ts';
+import type { StreamLike } from '../src/lib/follow.ts';
 import type { ChatEvent, ChatPresence } from '../src/lib/api.ts';
 
 const at = (second: number): string => new Date(Date.UTC(2026, 9, 15, 17, 40, second)).toISOString();
@@ -220,10 +220,15 @@ test("her stream's frames reach the page: presence replaces where she is, a chat
   assert.equal((now().events[0] as ChatStep).state, 'done');
   assert.equal(now().cursor, '1.2.0.0.0');
   stream.send('unreadable', { error: 'Her chat is unreadable.', retrying: true });
-  assert.match(String(now().error), /^Her chat is unreadable\. Reading it again/);
-  assert.equal(now().live, true, 'a read it tries again keeps the stream');
+  assert.deepEqual(
+    [now().retrying, now().error, now().live],
+    ['Her chat is unreadable.', null, true],
+    "a read the api makes again is a notice apart from an end, in the api's own words, and keeps the stream",
+  );
   stream.fire('open');
-  assert.equal(now().error, null, 'and a connection made clears what the last one said');
+  assert.deepEqual([now().retrying, now().error], [null, null], 'and a connection made clears what the last one said');
+  stream.send('unreadable', { error: 'Her chat is gone.', retrying: false });
+  assert.deepEqual([now().error, now().retrying, now().live], ['Her chat is gone.', null, false], 'one it will not make again is the end');
   stop();
   assert.equal(stream.readyState, 2);
 });

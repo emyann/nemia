@@ -1,5 +1,5 @@
 import type { QueryKey } from '@tanstack/react-query';
-import { END_GRACE_MS, type Frames, type StreamLike } from './following.ts';
+import { END_GRACE_MS, type Frames, type StreamLike } from './follow.ts';
 
 /**
  * Whether the board follows the workflow feed: `connecting` until its stream first opens, `open` while it does, `down` while it cannot —

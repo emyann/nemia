@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { type FeedStatus, filterOf, followFeed, polled } from './feed.ts';
-import { animationFrames } from './following.ts';
+import { animationFrames } from './follow.ts';
 
 /** Where the workflow feed is followed; `?after=` a cursor it gave. */
 const FEED_STREAM = '/api/feed/stream';

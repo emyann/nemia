@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateA
 import { chatStreamPath, markChatRead, readChat, sendChat, stopChat, type ChatEvent, type ChatSent } from './api/chat.ts';
 import { changedChat, followChat, mergeChatEvents, unreadChat, type ChatFollowed } from './chatFollowing.ts';
 import { forgetKept, keepUnsent, readKept, sendingOnce, editKept as writeKept, type ChatKept } from './chatOutbox.ts';
-import { animationFrames } from './following.ts';
+import { animationFrames } from './follow.ts';
 
 /** How long the board waits before it reads her chat again, or tries a kept message again, after one that did not work. */
 export const CHAT_RETRY_MS = 3_000;

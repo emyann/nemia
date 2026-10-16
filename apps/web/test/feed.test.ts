@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { QueryClient, type QueryKey } from '@tanstack/react-query';
-import { END_GRACE_MS, type Frames, type StreamLike } from '../src/lib/following.ts';
+import { END_GRACE_MS, type Frames, type StreamLike } from '../src/lib/follow.ts';
 import { FALLBACK_MS, type FeedStatus, filterOf, followFeed, keysOf, pace, polled, REOPEN_MS } from '../src/lib/feed.ts';
 
 /** An EventSource as far as `followFeed` uses it: its state, its events, and `close`. */

@@ -228,6 +228,15 @@ What Claude Code does as the steps meet it. Where the orchestrator's code holds 
   folder** (2.1.291, 2026-10-06, allow and deny alike): `CLAUDE_UNRULED` holds the set, with `(`/`)` the runtime's `RULE` refuses;
   `\*` is read as an escape, unused yet.
 - **A project's allow rules are dropped in a directory Claude Code has not trusted**: measure a rule in a trusted checkout.
+- **Under a mode that refuses what no allow rule reaches — `default`, `manual`, `dontAsk` — only `Read`, `Grep`, `Glob` and `Skill`
+  run with no rule** (`CLAUDE_UNFENCED`, `CLAUDE_REFUSING_MODES`). `Read` was measured (2.1.289, the added-folder line above); the
+  other three are read off the shipped team, whose `dontAsk` steps grep the checkout and load their skills with no allow naming either,
+  while the only calls their feeds show refused are the ones no rule named. `Bash` is not among them: a built-in read-only set runs
+  unruled, which does not make the tool unruled — a `node -e` was refused.
+- **A checkout's own `.claude/settings.json` allow rules do reach a job's session in a worktree of it**: 89 `WebFetch` calls of
+  `dontAsk` steps succeeded here on the checkout's `WebFetch` allow since 2026-10-09, while the same agents were refused every fetch in
+  a repository whose settings allow none. So what a step may call depends on the repository the run lands in, not on the workflow folder
+  alone: `projectAllows` reads those rules (`src/harness/settings.ts`), and `unallowedRefusal` in the orchestrator counts them.
 - **`--bg` in a folder nobody opened is refused at spawn** ("Workspace not trusted. Run `claude` in <dir> once…", 2.1.289); trust is
   kept per path in `.claude.json` (`src/harness/claude/trust.ts`): read by `trustedFolder`, written by `trustFolder` alone, one key,
   under the main checkout's root the caller names, never by a session. A `--bg` permission prompt

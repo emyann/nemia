@@ -50,6 +50,12 @@
  * A dontAsk job given a skill whose SKILL.md grants tools is told to read that file with Read, since its fence refuses the Skill tool's
  * load (`grantingSkillsUnread`). Each call a shipped skill's rule says it breaks is one the stats count against it (`rulesOfTry`).
  *
+ * Every shipped step's `tools:` is callable under its own fence (`unallowedRefusal`), judged against this checkout's own allow rules:
+ * a step held to its rules and given a tool no rule names could never call it, and the refusals would read in the feed like a fence
+ * doing its job. The same steps with no project rule refuse, naming which agents the checkout's settings are covering
+ * (`COVERED_BY_SETTINGS`): what makes them pass here is the repository, not the folder, so a factory elsewhere must allow those calls
+ * itself.
+ *
  * A skill a shipped step names with its folder (`apps/web:ds-build`) is read where the line says: the folders those lines name
  * (`NESTED`) are among the folders of skills whose grants, files and rules are read (`SKILL_FOLDERS`, `skillFileOf`, `lineNameOf`).
  * The reader of the kit's `ds-spec` is a command design's and review's notes name (`reader` in `CHECKERS`), the one the trigger skill
@@ -60,11 +66,12 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadWorkflows } from '../src/folder/folder.store.ts';
+import type { Workflow } from '../src/step/step.ts';
 import { readSkillRules, RULES_FILE } from '../src/skills/read.store.ts';
 import { appliesMatch, appliesOf, type SkillRule } from '../src/skills/skills.ts';
 import { filedConfig, inputsMounts, readsMounts } from '../src/filed/filed.ts';
 import { handedMounts } from '../src/artifacts/artifacts.ts';
-import { isFolderTeam, sandboxed, upstreamOf } from '../src/workflow/index.ts';
+import { isFolderTeam, sandboxed, unallowedRefusal, upstreamOf } from '../src/workflow/index.ts';
 import { scratch } from './scratch.ts';
 import { declared } from '../place/git/declared.ts';
 import { levelFile, promptFile, readNemia, storeDenies, toldFile } from '../src/nemia/level.store.ts';
@@ -2300,4 +2307,39 @@ test("REFUSED: a confirm or a drop of the person's rules for auto is asked over 
   assert.equal(fs.existsSync(path.join(root, 'auto')), false, 'denied before the folder is there');
   for (const file of ['nemia.json', 'nemia.proposed.json'])
     assert.equal(editVerdictOf(herRules(root), path.join(root, 'auto', file)), 'deny', file);
+});
+
+/**
+ * The agent of each shipped or tests' step whose `tools:` only the checkout's own allow rules make callable, and the tool: the fence
+ * travels with the folder, and these calls do not. Each is a step that must allow them itself before its folder runs anywhere else.
+ */
+const COVERED_BY_SETTINGS: ReadonlyArray<readonly [string, string, string]> = [
+  ['design', 'seldon', 'Bash'],
+  ['intake', 'iris', 'Bash'],
+  ['review', 'reviewer', 'Bash'],
+];
+
+/** Every step of every shipped folder, and of the tests' team, with the folder it came from. */
+const allSteps = (): Array<{ dir: string; step: Workflow }> =>
+  [...FOLDERS, TEAM_DEV].flatMap((dir) => loadWorkflows(dir, placesOf(dir)).map((step) => ({ dir, step })));
+
+test('every shipped step can call each tool it is given, judged against this checkout\'s own allow rules', () => {
+  for (const { dir, step } of allSteps()) {
+    assert.equal(unallowedRefusal([step], SETTINGS_ALLOWS), undefined, `${path.basename(dir)}/${step.name}`);
+  }
+});
+
+test("the same steps with no project rule refuse, and only those the checkout's settings cover: what makes them pass here is the repository", () => {
+  const refused = allSteps().flatMap(({ step }) => {
+    const why = unallowedRefusal([step], []);
+    return why === undefined ? [] : [[step.name, step.agent?.name ?? step.name, /gives its session `([^`]+)`/.exec(why)![1]] as const];
+  });
+  assert.deepEqual(refused, COVERED_BY_SETTINGS);
+  for (const [name, agent, tool] of COVERED_BY_SETTINGS) {
+    const step = allSteps().find((s) => s.step.name === name && s.step.agent?.name === agent)!.step;
+    const why = unallowedRefusal([step], []);
+    assert.match(why ?? '', new RegExp(`^${name}: `), name);
+    assert.match(why ?? '', new RegExp(`agents/${agent}\\.md`), name);
+    assert.ok(why?.includes(`take \`${tool}\` off \`tools:\``), `${name}: the refusal names taking ${tool} off the line`);
+  }
 });

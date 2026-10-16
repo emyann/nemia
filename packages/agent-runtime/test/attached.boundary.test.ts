@@ -6,7 +6,8 @@
  * nested in one in flight nor a sub-agent's, a holder that cannot let go within its bound cuts the call and says which, the next
  * holder resumes a session told which call was cut, a stop and words from another engine reach the session, a call held at its hook as
  * the holder lets go is never written in flight, a holder whose pid another process has taken is gone, neither a drain nor a kill
- * reaches a process given a pid since, and a resumed session's cost leaves out what its parent spent.
+ * reaches a process given a pid since, a let-go whose sessions never end still returns with its waits inside one budget, and a
+ * resumed session's cost leaves out what its parent spent.
  */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -15,7 +16,7 @@ import path from 'node:path';
 import test, { type TestContext } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { Effect, Exit, Logger, Scope } from 'effect';
-import { attachedSessions } from '../src/harness/claude/attached.ts';
+import { attachedSessions, letGoOf } from '../src/harness/claude/attached.ts';
 import {
   alive,
   attachedDir,
@@ -28,6 +29,9 @@ import {
   writeRun,
 } from '../src/harness/claude/attached-file.ts';
 import { processStart } from '../src/harness/claude/inbox.ts';
+import { purseOf } from '../src/core/clock.ts';
+import { instantNow } from '../src/core/engine/now.ts';
+import type { Live } from '../src/harness/claude/attached-session.ts';
 import { claudeCodeOps } from '../src/harness/claude/code.ts';
 import { Engine } from '../src/index.ts';
 import type { SpawnRequest } from '../src/harness/seam.ts';
@@ -468,4 +472,60 @@ test("a session cut at its holder's bound is resumed told which call did not fin
   await until(t, () => lines(dir, 'said.jsonl').length, 'the resumed session told something', { everyMs: 50 });
   assert.deepEqual(lines(dir, 'said.jsonl'), [crashNote('Agent')]);
   assert.notDeepEqual(lines(dir, 'said.jsonl'), [CARRY_ON], 'a session whose call was cut is never told to carry on');
+});
+
+/**
+ * A session its holder can never wait out, as the let-go finds it in `live`: a call in flight that never ends, a `done` that never
+ * settles and a call held at a hook that never lets go, so each of the let-go's three waits runs to whatever it was given. `facts`
+ * are written on its run file. Nothing of the session's input is modelled: the let-go reads none of it.
+ */
+const stuck = (facts: Partial<Parameters<typeof writeRun>[1]> = {}): Live =>
+  ({
+    run: {
+      name: NAME,
+      state: 'working',
+      owner: process.pid,
+      startedAt: new Date().toISOString(),
+      sessionId: 'never-ends',
+      calling: { tool: 'Agent', since: new Date().toISOString() },
+      request: {},
+      ...facts,
+    },
+    abort: new AbortController(),
+    calls: new Map([['call-1', { tool: 'Agent', since: new Date().toISOString() }]]),
+    letGo: false,
+    waiting: 1,
+    done: new Promise<void>(() => undefined),
+  }) as unknown as Live;
+
+/** The let-go of `live` under a budget of `ms`, its lines dropped, and the purse its waits took from. */
+const letGone = async (root: string, live: Map<string, Live>, ms: number) => {
+  const purse = purseOf(ms, instantNow);
+  const quiet = Logger.make(() => undefined);
+  await Effect.runPromise(letGoOf(root, live, ms, purse).pipe(Effect.provide(Logger.layer([quiet]))));
+  return purse;
+};
+
+test('a let-go whose session never ends returns all the same, its three waits inside one budget', WAITED, async () => {
+  const { root } = place({});
+  const purse = await letGone(root, new Map([[NAME, stuck()]]), 1_000);
+  assert.equal(purse.given.length, 3, 'each of its three waits took from the one purse, so each of them is bounded');
+  assert.ok(
+    purse.given.reduce((a, b) => a + b, 0) <= 1_000,
+    `the waits of one let-go add up to no more than its budget, not ${purse.given.join(' + ')}`,
+  );
+  assert.ok(purse.given[0] > 0 && purse.given[1] > 0, 'and the waits before the last each had something to wait with');
+  assert.equal(run(root)?.state, 'parked', 'it parked the session it could not wait out');
+  assert.equal(run(root)?.calling?.tool, 'Agent', 'keeping the call it cut');
+});
+
+test("the park leaves alone a process that has taken the session's Claude Code's pid since", WAITED, async (t) => {
+  const { root } = place({});
+  const taken = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', detached: true });
+  t.after(() => void (taken.pid && alive(taken.pid) && process.kill(-taken.pid, 'SIGKILL')));
+  const facts = { childPid: taken.pid!, childStart: "when the session's Claude Code started, not this process" };
+  await letGone(root, new Map([[NAME, stuck(facts)]]), 1_000);
+  assert.equal(alive(taken.pid!), true, "the process that took the pid is not the session's, and the park left it alone");
+  assert.equal(run(root)?.state, 'parked');
+  assert.equal(run(root)?.childPid, undefined, 'and the parked file names no Claude Code of its own');
 });

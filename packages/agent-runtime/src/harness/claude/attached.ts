@@ -21,7 +21,7 @@
 import { Effect, Option, Schedule, type Scope } from 'effect';
 import fs from 'node:fs';
 import { instantNow } from '../../core/engine/now.ts';
-import { leftOf } from '../../core/clock.ts';
+import { purseOf, type Purse } from '../../core/clock.ts';
 import type { Sighting } from '../../core/index.ts';
 import { RunnerError } from '../error.ts';
 import type { Observation, RunnerOps, SpawnRequest } from '../seam.ts';
@@ -138,14 +138,16 @@ const toolOf = (l: Live): string => l.run.calling?.tool ?? 'a tool';
  * Each session of `live` at work written `parked`, aborted and its Claude Code's process group killed, its file its holder's last
  * word; the call it was cut in kept as `calling` where `cut`, which is what tells the next holder which call did not finish. The park
  * ends the session's Claude Code itself rather than leave it to the waits after it, which a spent budget can cut short: a parked
- * session never leaves a process behind. Uninterruptible as one: a second signal leaves no session neither parked nor running.
+ * session never leaves a process behind. The group it kills is the one `childOf` answers, so a pid another process has taken since
+ * is left alone. Uninterruptible as one: a second signal leaves no session neither parked nor running.
  */
 const parked = (root: string, live: Map<string, Live>, cut: boolean): Effect.Effect<void> =>
   Effect.sync(() => {
     for (const l of live.values()) {
       if (!l.abort || l.run.state !== 'working') continue;
       const kept = cut && l.calls?.size ? l.run.calling : undefined;
-      const { calling: _, childPid: group, childStart: ___, ...rest } = l.run;
+      const group = childOf(l.run);
+      const { calling: _, childPid: __, childStart: ___, ...rest } = l.run;
       l.run = { ...rest, state: 'parked', ...(kept ? { calling: kept } : {}) };
       writeRun(root, l.run);
       l.letGo = true;
@@ -157,30 +159,34 @@ const parked = (root: string, live: Map<string, Live>, cut: boolean): Effect.Eff
 /**
  * The holder's let-go of the sessions in `live`: it says what it is waiting for, waits for the calls in flight to end, says which
  * session it cut and in what call where they did not, then parks each session at work (`parked`) and waits for each to end and for
- * each call held at its hook to be let go. Its three waits share one budget of `letGoMs` (`leftOf`), the wait for the calls in flight
- * capped at `LET_GO_CALLS_SHARE` of it and the rest spent as they go, so the whole let-go ends within the budget rather than taking
- * their sum: it always returns, and within the bound, so a signal always ends the process and whatever waits for the process — a
- * service unit's stop timeout, a restart's wait for the lease — can be set above one number.
+ * each call held at its hook to be let go. Its three waits take from one `purse` of `letGoMs` (`purseOf`), the wait for the calls in
+ * flight capped at `LET_GO_CALLS_SHARE` of it and the rest spent as they go, so the whole let-go ends within the budget rather than
+ * taking their sum: it always returns, and within the bound, so a signal always ends the process and whatever waits for the process
+ * — a service unit's stop timeout, a restart's wait for the lease — can be set above one number. `purse` is the caller's so a test
+ * can read what each wait was given (`Purse.given`) and show they add up to no more than the budget.
  */
-const letGoOf = (root: string, live: Map<string, Live>, letGoMs: number): Effect.Effect<void> =>
+export const letGoOf = (
+  root: string,
+  live: Map<string, Live>,
+  letGoMs: number,
+  purse: Purse = purseOf(letGoMs, instantNow),
+): Effect.Effect<void> =>
   Effect.gen(function* () {
-    const began = instantNow();
-    const left = () => leftOf(began, letGoMs, instantNow());
     const waited = inCallOf(live);
     if (waited.length)
       yield* Effect.logInfo(
         `letting go of ${live.size} session(s): waiting at most ${letGoMs} ms for ${waited.length} call(s) in flight ` +
           `(${waited.map((l) => `${l.run.name} ${toolOf(l)}`).join(', ')})`,
       );
-    const quiet = yield* waitedOut(() => inCallOf(live).length === 0, Math.floor(letGoMs * LET_GO_CALLS_SHARE));
+    const quiet = yield* waitedOut(() => inCallOf(live).length === 0, purse.take(LET_GO_CALLS_SHARE));
     for (const l of quiet ? [] : inCallOf(live))
       yield* Effect.logWarning(
         `${l.run.name} is cut in its call to ${toolOf(l)}: it did not end within ${letGoMs} ms, and the next holder resumes the ` +
           'session told the call did not finish',
       );
     yield* parked(root, live, !quiet);
-    yield* Effect.promise(() => Promise.all([...live.values()].map((l) => l.done))).pipe(Effect.timeoutOption(left()));
-    yield* waitedOut(() => ![...live.values()].some((l) => l.waiting), left());
+    yield* Effect.promise(() => Promise.all([...live.values()].map((l) => l.done))).pipe(Effect.timeoutOption(purse.take()));
+    yield* waitedOut(() => ![...live.values()].some((l) => l.waiting), purse.take());
   });
 
 /**

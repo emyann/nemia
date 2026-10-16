@@ -26,3 +26,28 @@ export const elapsedMs = (from: Instant, to: Instant): number =>
  * each wait the whole bound and the sequence their sum.
  */
 export const leftOf = (from: Instant, ms: number, now: Instant): number => Math.max(0, ms - elapsedMs(from, now));
+
+/** One budget's hand to the waits that share it: `take` what is left, and `given`, what every take so far answered. */
+export type Purse = { readonly take: (share?: number) => number; readonly given: readonly number[] };
+
+/**
+ * One budget of `ms` milliseconds, taken at `now()` and shared by the waits of a sequence that must end within it: each `take`
+ * answers what the budget has left (`leftOf`), at most `share` of the whole, and `given` is what every take answered. So the waits of
+ * one sequence add up to no more than the budget, where a bound of `ms` on each would let the sequence take their sum; and a caller
+ * can show that they do, by what was given rather than by the clock.
+ *
+ * @param ms the whole budget
+ * @param now the clock it is spent on, read when the budget is taken and at each `take`
+ */
+export const purseOf = (ms: number, now: () => Instant): Purse => {
+  const from = now();
+  const given: number[] = [];
+  return {
+    take: (share = 1) => {
+      const left = Math.min(leftOf(from, ms, now()), Math.floor(ms * share));
+      given.push(left);
+      return left;
+    },
+    given,
+  };
+};

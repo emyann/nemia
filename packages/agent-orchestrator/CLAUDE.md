@@ -11,6 +11,8 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
 
 - **A file in `src/<feature>/` says its kind by its name**: `x.store.ts`, `x.verb.ts`, else pure; only a top-level file is listed in
   `boundary.test.ts`. A test beside its file reaches the helpers one folder further up (`../../test/scratch.ts`).
+- **A feature folder holds six source files at most** (`FOLDER_MAX`, `test/layout.test.ts`), tests not counted: a seventh belongs in a
+  folder of its own, named for its own feature, never in a ceiling raised there (`src/watch/` was cut from a full `src/feed/`).
 - **The place is a service with no default (`PlaceService`, `src/place/place.store.ts`)**: a controller asks it (`yield* PlaceService`),
   a store helper takes it as an argument, and whoever runs the program gives it by name — `gitPlaceLayer` at the daemon and the api,
   `runOver(runEngine, () => stand().layer)` at a test's head (`test/placed.ts`). A program given none does not compile. A test answers

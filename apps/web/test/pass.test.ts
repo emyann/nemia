@@ -49,13 +49,13 @@ test("the title is the breakdown: the pass, every phase in the package's order, 
   const lines = passTitle(PASS, now, 'UTC').split('\n');
   assert.equal(lines[0], "The daemon's last pass, at 10:00 AM: 212 ms, 12 run records read, 812.0 kB read, 1 process started.");
   assert.deepEqual(
-    lines.slice(1, 9).map((l) => l.split(':')[0]),
+    lines.slice(1, 10).map((l) => l.split(':')[0]),
     [...PASS_PHASES],
   );
   assert.equal(lines[1], 'records: 20.0 ms, 12 calls, 12.0 kB read, 0 processes started');
-  assert.equal(lines[4], 'observe: 120 ms, 1 call, 0 B read, 1 process started');
-  assert.equal(lines[9], 'Observed, by harness (at once, so their times overlap):');
-  assert.deepEqual(lines.slice(10, 12), [
+  assert.equal(lines[5], 'observe: 120 ms, 1 call, 0 B read, 1 process started');
+  assert.equal(lines[10], 'Observed, by harness (at once, so their times overlap):');
+  assert.deepEqual(lines.slice(11, 13), [
     'check: 1 observe, 2.00 ms, 40 sessions or run files listed, 0 processes started',
     'claude: 1 observe, 118 ms, 3 sessions or run files listed, 1 process started',
   ]);

@@ -73,6 +73,10 @@ export const stepsDrift = (
     }),
   );
 
-/** A drift in words, as `nemia refresh` prints it and the board draws it: `agent coder: rev 5, now 6`. */
+/**
+ * A drift in words, as `nemia refresh` prints it: `agent coder: rev 5, now 6`, the numbers of a resolve it has just made. Its one caller is
+ * the verb's own answer (`REFRESH.print`). The board words the same drift itself, off what the api serves, and says it as the ledger's,
+ * since a page's read makes no resolve: changing this line changes the CLI alone.
+ */
 export const driftWords = (d: Drift): string =>
   `${d.kind} ${d.name}: ${d.step ? `${d.step} ran on rev ${d.pinned}` : `rev ${d.pinned}`}, now ${d.now}`;

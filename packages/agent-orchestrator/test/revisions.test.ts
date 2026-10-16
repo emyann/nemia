@@ -25,7 +25,7 @@ process.env.WF_ROOT = ROOT;
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
 const stand = eachTest(testPlace);
-const { advanceRun, startRun, retryRun, runWith: runEngine } = await import('../src/runner.ts');
+const { addFactory, advanceRun, attachWorkflow, startRun, retryRun, runWith: runEngine } = await import('../src/runner.ts');
 const runWith = runOver(runEngine, () => stand().layer);
 const runPlaced = runGiven(() => stand().layer);
 const engine = eachTest(testEngine);
@@ -34,6 +34,7 @@ const { readRun } = await import('../src/record/record.store.ts');
 const { agentFilesDir } = await import('../src/agents/agents.store.ts');
 const { ledgerOf, topsOf } = await import('../src/revisions/revisions.store.ts');
 const { refreshRun } = await import('../src/revisions/pin.verb.ts');
+const { writeRules } = await import('../src/rules/rules.store.ts');
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 
@@ -82,7 +83,7 @@ const promptOf = (id: string, step: string): string => fs.readFileSync(path.join
 const pinOf = (pinned: readonly Pin[] | undefined, kind: Pin['kind'], name: string): Pin | undefined =>
   (pinned ?? []).find((p) => p.kind === kind && p.name === name);
 
-const started = (dir: string, repo: string, how: { after?: string[]; isolate?: boolean } = {}) =>
+const started = (dir: string, repo: string, how: { after?: string[]; isolate?: boolean; factory?: string } = {}) =>
   runPlaced(startRun({ brief: 'build a thing', repo, workflowDir: dir, isolate: false, ...how }));
 
 /** `branch` merged into `repo`'s checkout and committed, as a person ships a result by hand: what `--after` waits for. */
@@ -125,6 +126,40 @@ test('a run that has filed nothing resolves the folder afresh: an edit made whil
     ],
     "the step's own record says which revisions its try ran on",
   );
+});
+
+test("the factory's rules are a kind of their own: a run in a factory pins their revision, and an edit while it waits is numbered", async () => {
+  const t = team();
+  const repo = aRepo();
+  const factory = `factory-${t.name}`;
+  addFactory({ name: factory, repos: [repo] });
+  attachWorkflow({ factory, workflow: t.name });
+  writeRules({ name: factory }, 'Never push on a Friday.');
+  const parent = await started(team().dir, repo, { isolate: true });
+  const run = await started(t.dir, repo, { after: [parent.id], isolate: true, factory });
+
+  assert.equal(
+    pinOf(readRun(run.id).pinned, 'rules', factory)!.n,
+    1,
+    "the run records the revision of its factory's rules, beside the rest",
+  );
+  assert.equal(ledgerOf('rules', factory).length, 1, 'and the ledger of the kind holds the one content it was given');
+
+  writeRules({ name: factory }, 'Never push on a Friday, nor on a Monday.');
+  const b = board();
+  await runWith(b.e, advanceRun(readRun(run.id)));
+
+  assert.equal(
+    pinOf(readRun(run.id).pinned, 'rules', factory)!.n,
+    2,
+    'the rules edited while the run waits are pinned at their new revision',
+  );
+  assert.deepEqual(
+    ledgerOf('rules', factory).map((r) => r.n),
+    [1, 2],
+    'which the ledger numbered as it numbers any other kind',
+  );
+  assert.match(promptOf(run.id, 'build'), /nor on a Monday/, "and the new rules reach the prompt the step's session reads");
 });
 
 test('a run that has filed keeps its pins: the folder edited after its first filing reaches neither the record nor the prompt', async () => {

@@ -12,7 +12,7 @@ import { scratch } from './scratch.ts';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest } from './placed.ts';
-import type { FeedLine } from '../src/feed/index.ts';
+import type { RunLine } from '../src/feed/index.ts';
 import { heldUnasked } from './unasked.ts';
 
 const ROOT = scratch('wf-watch-selectors-');
@@ -29,7 +29,7 @@ heldUnasked(engine);
 const AT = '2026-10-16T12:00:00.000Z';
 
 /** A step's line of the feed, its labels built field by field, as the tick signs one. */
-const step = (run: string, name: string, agent: string, factory: string, word = 'running'): FeedLine =>
+const step = (run: string, name: string, agent: string, factory: string, word = 'running'): RunLine =>
   upgraded({
     at: AT,
     run,
@@ -37,16 +37,16 @@ const step = (run: string, name: string, agent: string, factory: string, word = 
     word,
     involved: { kind: 'Step', name: `${run}/${name}` },
     labels: { run, factory, workflow: 'build', step: name, agent },
-  });
+  }) as RunLine;
 
-const LINES: readonly FeedLine[] = [
+const LINES: readonly RunLine[] = [
   step('r-1', 'implement', 'ada', 'nemia'),
   step('r-2', 'review', 'agora', 'nemia'),
   step('r-3', 'implement', 'ada', 'pipao'),
 ];
 
 /** The feed written as `lines`, and its size in bytes. */
-function feedOf(lines: readonly FeedLine[]): number {
+function feedOf(lines: readonly RunLine[]): number {
   fs.writeFileSync(FEED, lines.map((l) => `${JSON.stringify(l)}\n`).join(''));
   return fs.statSync(FEED).size;
 }
@@ -82,7 +82,7 @@ test('nemia watch --once reads to the feed’s end, prints each line and the cur
   assert.equal(said.at(-1), `cursor: ${end}`);
   assert.deepEqual(
     said.slice(0, -1),
-    LINES.map((l) => `12:00:00  ${l.run}  ${(l as { step?: string }).step}  running`),
+    LINES.map((l) => `12:00:00  ${l.run}  ${l.step}  running`),
   );
   const head = Buffer.byteLength(`${JSON.stringify(LINES[0])}\n`);
   assert.deepEqual(await printed(t, ['watch', '--once', String(head)]), [

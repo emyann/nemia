@@ -1,7 +1,7 @@
 /**
- * The store's pause as the CLI says it (`pausedWords`): first on `nemia watch --once`, after how to start the run on `nemia start`, and on `nemia
- * up` once when it is put, again each time its words change — Pausing with fewer finishing, then Paused, then a landing held staged — and
- * `resumed` once when it is resumed (`pauseSaid`); none of them while no pause stands.
+ * The store's pause as the CLI says it (`pausedWords`): first on `nemia watch --once`, after how to start the run on `nemia start`, and
+ * on `nemia up` once when it is put, again each time its words change — Pausing with fewer finishing, then Paused, then a landing held
+ * staged — and `resumed` once when it is resumed (`pauseSaid`); none of them while no pause stands.
  *
  * `WF_ROOT` is set before the import, since the module reads it as it loads.
  */

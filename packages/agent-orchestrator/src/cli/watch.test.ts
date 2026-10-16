@@ -250,7 +250,11 @@ test('a watch that has fallen silent bookmarks its cursor at its cadence, and wr
     );
     await steered.adjust('1 millis');
     await until(t, () => out.some((l) => l.includes('"cursor"')), 'the bookmark printed', { bell: wrote });
-    assert.deepEqual(JSON.parse(out.find((l) => l.includes('"cursor"'))!), { cursor: end }, 'the cursor the watch read to, and nothing else');
+    assert.deepEqual(
+      JSON.parse(out.find((l) => l.includes('"cursor"'))!),
+      { cursor: end },
+      'the cursor the watch read to, and nothing else',
+    );
     assert.equal(kept(file), end, 'and written to its file');
   } finally {
     await Effect.runPromise(Fiber.interrupt(fiber));

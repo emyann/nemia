@@ -4,8 +4,9 @@
  * read of the feed are told in one message.
  *
  * Pure: what a line means for a subscriber (`sortLine`) and for `nemia watch` (`wakeOf`, `watchedLine`, `bookmarkLine` and the one
- * cadence a silent watch says where it is at, `BOOKMARK_EVERY`), what one read of the feed comes to (`readDelivered`), the words it is told (`messageOf`, `digestOf`), when a digest falls due (`digestDue`), and the refusals of a
- * subscription asked for (`subscribeRefusalOf`).
+ * cadence a silent watch says where it is at, `BOOKMARK_EVERY`), what one read of the feed comes to (`readDelivered`), the words it is
+ * told (`messageOf`, `digestOf`), when a digest falls due (`digestDue`), and the refusals of a subscription asked for
+ * (`subscribeRefusalOf`).
  * The person's file and the deliverer's are `subscription.store.ts`'s, the deliverer is `deliver.verb.ts`, and the commands are
  * `subscription.verb.ts`.
  */

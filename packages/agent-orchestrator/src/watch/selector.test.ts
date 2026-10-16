@@ -152,9 +152,24 @@ test('AND within one selector, OR across two', () => {
 
 test('the selections a person types, each failing when one clause of it is dropped', () => {
   const cases: Array<{ typed: string; selects: string[]; drop: string; then: string[] }> = [
-    { typed: 'factory=nemia', selects: ['r-1/implement', 'r-2/design', 'r-5/implement', 'r-7/review', 'r-1/—'], drop: 'factory=nemia', then: [] },
-    { typed: 'factory=nemia,workflow=build', selects: ['r-1/implement', 'r-7/review', 'r-1/—'], drop: 'factory=nemia', then: ['r-1/implement', 'r-3/implement', 'r-7/review', 'r-6/design', 'r-1/—'] },
-    { typed: 'workflow=build,step=implement', selects: ['r-1/implement', 'r-3/implement'], drop: 'workflow=build', then: ['r-1/implement', 'r-5/implement', 'r-3/implement'] },
+    {
+      typed: 'factory=nemia',
+      selects: ['r-1/implement', 'r-2/design', 'r-5/implement', 'r-7/review', 'r-1/—'],
+      drop: 'factory=nemia',
+      then: [],
+    },
+    {
+      typed: 'factory=nemia,workflow=build',
+      selects: ['r-1/implement', 'r-7/review', 'r-1/—'],
+      drop: 'factory=nemia',
+      then: ['r-1/implement', 'r-3/implement', 'r-7/review', 'r-6/design', 'r-1/—'],
+    },
+    {
+      typed: 'workflow=build,step=implement',
+      selects: ['r-1/implement', 'r-3/implement'],
+      drop: 'workflow=build',
+      then: ['r-1/implement', 'r-5/implement', 'r-3/implement'],
+    },
     { typed: 'agent=ada', selects: ['r-1/implement', 'r-2/design', 'r-5/implement'], drop: 'agent=ada', then: [] },
     { typed: 'agent=ada,step=design', selects: ['r-2/design'], drop: 'agent=ada', then: ['r-2/design', 'r-6/design'] },
     { typed: 'factory=pipao,agent=agora', selects: ['r-3/implement'], drop: 'factory=pipao', then: ['r-3/implement', 'r-7/review'] },

@@ -14,7 +14,6 @@ import {
   everyOf,
   feedCursorRefusal,
   feedHubLayer,
-  feedLineWords,
   readFeedEnds,
   cursorFileStart,
   cutCursorFile,

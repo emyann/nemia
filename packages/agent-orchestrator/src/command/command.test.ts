@@ -631,8 +631,8 @@ test("the table's help is today's, word for word", () => {
       "                               again: a run's status, a step's word as nemia ls says it, and what a",
       "                               person's word changed. --once: read from the cursor to the feed's end,",
       '                               print cursor: <n> and stop; from the start with no cursor. -l: the',
-      "                               lines a selector takes, given again for another (key=v, key!=v, \"key in",
-      '                               (a,b)\", \"key notin (a,b)\", key), over run, factory, workflow, step,',
+      '                               lines a selector takes, given again for another (key=v, key!=v, "key in',
+      '                               (a,b)", "key notin (a,b)", key), over run, factory, workflow, step,',
       '                               agent, kind, reason, type, waits and source. --cursor-file: keep the',
       '                               cursor read to in a file, and start from it where it is there.',
       '                               --json: one JSON object a line, a feed line with its cursor, and a',
@@ -854,7 +854,7 @@ test("REFUSED at shipped defaults: nemia watch's selectors, its cursor file, and
   assert.match(refusedBy(watch, ['-l', 'factory=nemia', '-l', '']) ?? '', /^"" is no selector: it holds no clause/);
   assert.equal(
     refusedBy(watch, ['-l', '--json']),
-    "nemia watch -l takes a selector of the feed's lines: -l <key>=<value>, -l <key>!=<value>, -l \"<key> in (<a>,<b>)\", " +
+    'nemia watch -l takes a selector of the feed\'s lines: -l <key>=<value>, -l <key>!=<value>, -l "<key> in (<a>,<b>)", ' +
       '-l "<key> notin (<a>,<b>)" or -l <key> for a line that carries it; commas between clauses, which all must hold, and -l again ' +
       'for another selector, of which one must. The keys: run, factory, workflow, step, agent, kind, reason, type, waits, source',
     'a value given apart that is one of its own flags reads as the value left out',

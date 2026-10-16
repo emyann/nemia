@@ -8,9 +8,13 @@ import { END_GRACE_MS, type Frames, type StreamLike } from './following.ts';
 export type FeedStatus = 'connecting' | 'open' | 'down';
 
 /**
- * What the feed's stream names each event, as the api's `feedEventOf` does: a step's word, a run gone from the store, or a run's own word.
+ * What the feed's stream names each event, as the api's `feedEventOf` does: a daemon that took the store, a step's word, a run gone from
+ * the store, or a run's own word.
  */
-export type FeedEvent = 'run' | 'step' | 'removed';
+export type FeedEvent = 'run' | 'step' | 'removed' | 'daemon';
+
+/** The events of the feed that are a run's, each line naming the run it is about; a daemon's names none. */
+export type RunEvent = Exclude<FeedEvent, 'daemon'>;
 
 /** How often what the feed answers for is read all the same while its stream is open: a slow fallback, in case an event is ever missed. */
 export const FALLBACK_MS = 60_000;
@@ -29,10 +33,15 @@ export const REOPEN_MS = 5_000;
  * that finds none is how a page open on the run learns it is gone (`runGone`).
  *
  * And every event reads again whether a daemon ticks the store (`daemonQuery`): a line on the feed is written by a tick, the
- * daemon's, so a daemon started while the board says none does is seen on its first line, not on the fallback a minute later.
+ * daemon's, so a daemon started while the board says none does is seen on its first line, not on the fallback a minute later. A
+ * daemon's own line is that first line, and reads the daemon's standing alone: it names no run, and moves no run's record.
  */
-export function keysOf(event: FeedEvent, run: string): QueryKey[] {
+export function keysOf(event: 'daemon'): QueryKey[];
+export function keysOf(event: RunEvent, run: string): QueryKey[];
+export function keysOf(event: FeedEvent, run?: string): QueryKey[] {
   switch (event) {
+    case 'daemon':
+      return [['daemon']];
     case 'step':
       return [['runs'], ['runs-open'], ['runs-finished'], ['runs', run], ['daemon']];
     case 'run':
@@ -84,6 +93,16 @@ export type Timers = {
 };
 
 const browserTimers: Timers = { set: (f, ms) => setTimeout(f, ms), clear: (t) => clearTimeout(t) };
+
+/**
+ * The queries a line of the feed moves, read off the event it arrived as and the line's own JSON: a daemon's line names no run and moves
+ * the daemon's standing alone; a run's event whose line names no run moves nothing, since every key of one is keyed by the run.
+ */
+const keysFor = (event: FeedEvent, data: string): QueryKey[] => {
+  const { run } = JSON.parse(data) as { run?: unknown };
+  if (event === 'daemon') return keysOf(event);
+  return typeof run === 'string' ? keysOf(event, run) : [];
+};
 
 /** `EventSource.CLOSED`, named here so a stream can be followed where there is no EventSource. */
 const CLOSED = 2;
@@ -143,12 +162,12 @@ export function followFeed(
     const read = (event: FeedEvent) => (message: MessageEvent) => {
       if (!current()) return;
       if (message.lastEventId) last = message.lastEventId;
-      const { run } = JSON.parse(message.data) as { run?: unknown };
-      if (typeof run !== 'string') return;
-      for (const key of keysOf(event, run)) arrived.set(JSON.stringify(key), key);
+      const keys = keysFor(event, message.data);
+      if (!keys.length) return;
+      for (const key of keys) arrived.set(JSON.stringify(key), key);
       frame ||= frames.request(flush);
     };
-    for (const event of ['run', 'step', 'removed'] as const) s.addEventListener(event, read(event));
+    for (const event of ['run', 'step', 'removed', 'daemon'] as const) s.addEventListener(event, read(event));
     s.addEventListener('open', () => {
       if (!current()) return;
       opened = true;

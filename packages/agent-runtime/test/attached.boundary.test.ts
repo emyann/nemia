@@ -509,24 +509,28 @@ test("an interrupt asked by another process is honoured on the holder's next loo
   assert.match(refused.message, /is idle, so it has no turn to end/, 'and an idle session has no turn to end');
 });
 
-test("REFUSED: an ask that reached the file after its turn ended is dropped on the holder's look, never kept for the next turn", WAITED, async (t) => {
-  const { root, dir, request } = kept({ hold: true, output: {} });
-  const h = await holder(root);
-  t.after(h.close);
-  await Effect.runPromise(h.attached.ops.spawn(request));
-  await until(t, () => run(root)?.sessionId, 'the session started its first turn', { everyMs: 50 });
-  fs.writeFileSync(path.join(dir, 'end'), '');
-  await idle(t, root, 'and ended it');
-  fs.writeFileSync(filesOf(root, NAME).interrupt, '4242');
-  await Effect.runPromise(h.attached.ops.observe);
-  assert.equal(fs.existsSync(filesOf(root, NAME).interrupt), false, 'the ask goes: there is no turn to end');
-  const taken = lines(dir, 'taken.jsonl') as { subtype: string | null }[];
-  assert.deepEqual(
-    taken.filter((r) => r.subtype === 'interrupt'),
-    [],
-    'and nothing was asked of the session, so its next turn runs to its own end',
-  );
-});
+test(
+  "REFUSED: an ask that reached the file after its turn ended is dropped on the holder's look, never kept for the next turn",
+  WAITED,
+  async (t) => {
+    const { root, dir, request } = kept({ hold: true, output: {} });
+    const h = await holder(root);
+    t.after(h.close);
+    await Effect.runPromise(h.attached.ops.spawn(request));
+    await until(t, () => run(root)?.sessionId, 'the session started its first turn', { everyMs: 50 });
+    fs.writeFileSync(path.join(dir, 'end'), '');
+    await idle(t, root, 'and ended it');
+    fs.writeFileSync(filesOf(root, NAME).interrupt, '4242');
+    await Effect.runPromise(h.attached.ops.observe);
+    assert.equal(fs.existsSync(filesOf(root, NAME).interrupt), false, 'the ask goes: there is no turn to end');
+    const taken = lines(dir, 'taken.jsonl') as { subtype: string | null }[];
+    assert.deepEqual(
+      taken.filter((r) => r.subtype === 'interrupt'),
+      [],
+      'and nothing was asked of the session, so its next turn runs to its own end',
+    );
+  },
+);
 
 test('a holder lets a long-lived session go between turns and the next resumes it under the same Claude Code id', WAITED, async (t) => {
   const { root, dir, request } = kept({ output: {} });

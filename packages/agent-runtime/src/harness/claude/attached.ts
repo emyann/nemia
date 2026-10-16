@@ -133,7 +133,10 @@ export const attachedSessions = (root: string, executable?: string): Attached =>
     if (!fs.existsSync(file)) return;
     const at = live.get(run.name);
     if (at === undefined) return;
-    if (run.state !== 'working') return void fs.rmSync(file, { force: true });
+    if (run.state !== 'working') {
+      fs.rmSync(file, { force: true });
+      return;
+    }
     void interruptTurn(at)
       .then((sent) => void (sent && fs.rmSync(file, { force: true })))
       .catch(() => undefined);

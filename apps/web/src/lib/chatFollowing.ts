@@ -230,6 +230,13 @@ export function foldChat(events: readonly ChatEvent[]): ChatItem[] {
 export const turnWords = (turn: Pick<ChatTurn, 'ms' | 'steps'>): string =>
   `Worked for ${duration(turn.ms)} · ${turn.steps.length === 1 ? '1 step' : `${turn.steps.length} steps`}`;
 
+/**
+ * How a message is drawn, by who it is from: the keeper's words as one quiet marker line, since the keeper frames what the person wrote
+ * and writes nothing of its own; the person's own words as their bubble; hers as hers. Only an outbox entry is drawn as the person's.
+ */
+export const drawnAs = (message: ChatMessage): 'marker' | 'person' | 'agent' =>
+  message.from === 'keeper' ? 'marker' : message.from === 'person' ? 'person' : 'agent';
+
 /** Whether an event is a message of hers, which is what goes unread. */
 const hers = (event: ChatEvent): event is ChatMessage => event.kind === 'message' && event.from === 'agent';
 

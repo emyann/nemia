@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { CutButton, CutTag, cutShape } from '@/components/look';
 import { container, ink } from '@/lib/meaning';
-import { linksOf, type ChatMessage as Message } from '@/lib/chatFollowing';
+import { drawnAs, linksOf, type ChatMessage as Message } from '@/lib/chatFollowing';
 import type { ChatKept } from '@/lib/chatOutbox';
 import { timeOfDay } from '@/lib/timeOfDay';
 import { Markdown } from '../Markdown';
@@ -75,10 +75,11 @@ function Yours({ message }: { message: Message }) {
   );
 }
 
-/** One message of her chat, drawn by who it is from. */
+/** One message of her chat, drawn as `drawnAs` says by who it is from. */
 export function ChatMessage({ message }: { message: Message }) {
-  if (message.from === 'keeper') return <ChatMarkerLine what="keeper">{message.text}</ChatMarkerLine>;
-  if (message.from === 'person') return <Yours message={message} />;
+  const drawn = drawnAs(message);
+  if (drawn === 'marker') return <ChatMarkerLine what="keeper">{message.text}</ChatMarkerLine>;
+  if (drawn === 'person') return <Yours message={message} />;
   return <Hers message={message} />;
 }
 

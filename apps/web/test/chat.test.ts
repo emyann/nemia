@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import {
   CHAT_DOWN,
   changedChat,
+  drawnAs,
   foldChat,
   followChat,
   jumpWords,
@@ -22,17 +23,19 @@ import {
   unreadChat,
   type ChatFollowed,
   type ChatItem,
+  type ChatMessage,
   type ChatStep,
 } from '../src/lib/chatFollowing.ts';
 import { CHAT_OUTBOX_KEY, editKept, forgetKept, keepUnsent, parseKept, readKept, sendingOnce } from '../src/lib/chatOutbox.ts';
-import { faceOf, type Presence } from '../src/lib/presence.ts';
+import { composerWords } from '../src/lib/nemia.ts';
+import { faceOf, UP, type Presence } from '../src/lib/presence.ts';
 import type { StreamLike } from '../src/lib/following.ts';
 import type { ChatEvent, ChatPresence } from '../src/lib/api.ts';
 
 const at = (second: number): string => new Date(Date.UTC(2026, 9, 15, 17, 40, second)).toISOString();
 
 /** A message of hers, the person's or the keeper's. */
-const message = (id: string, second: number, from: 'agent' | 'person' | 'keeper', text: string): ChatEvent => ({
+const message = (id: string, second: number, from: 'agent' | 'person' | 'keeper', text: string): ChatMessage => ({
   kind: 'message',
   id,
   at: at(second),
@@ -41,7 +44,7 @@ const message = (id: string, second: number, from: 'agent' | 'person' | 'keeper'
 });
 
 /** One step of hers. */
-const step = (id: string, second: number, state: ChatStep['state'], sentence = 'Read the inbox'): ChatEvent => ({
+const step = (id: string, second: number, state: ChatStep['state'], sentence = 'Read the inbox'): ChatStep => ({
   kind: 'step',
   id,
   at: at(second),
@@ -316,4 +319,23 @@ test('REFUSED: a send with no guard sends a kept message twice', async () => {
     return held;
   });
   assert.equal(calls, 1);
+});
+
+test("only an outbox entry is drawn as the person's bubble: the keeper's words are a quiet marker, and hers are hers", () => {
+  assert.equal(drawnAs(message('k:1:x', 1, 'keeper', 'The person writes from the board: hi')), 'marker');
+  assert.equal(drawnAs(message('p:1:y', 2, 'person', 'hi')), 'person');
+  assert.equal(drawnAs(message('m:1:z', 3, 'agent', 'Two gates.')), 'agent');
+  assert.notEqual(
+    drawnAs(message('k:1:x', 1, 'keeper', 'The person writes from the board: hi')),
+    'person',
+    "a keeper's words drawn as the person's would put the framing sentence in their mouth",
+  );
+});
+
+test('the composer invites what where she is asks for, and there is no stopping her until her session moves to the SDK', () => {
+  assert.equal(composerWords(UP), 'Tell Nemia what to do, or ask');
+  assert.equal(composerWords({ ...UP, answering: true }), 'She is answering. Write the next one');
+  assert.equal(composerWords({ ...UP, down: true }), 'Write now; she reads it when she is up');
+  assert.equal(composerWords({ ...UP, notSent: true }), 'Waiting for the daemon');
+  assert.equal(composerWords({ ...UP, notSent: true, down: true, answering: true }), 'Waiting for the daemon', 'nowhere to send it');
 });

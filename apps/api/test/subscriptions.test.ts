@@ -1,7 +1,8 @@
 /**
  * A subscription to the feed on the api, as `nemia subscribe` and `nemia unsubscribe` put and take it, through their entries of the
- * package's command table: `POST /api/subscriptions/:name` gives a long-lived task one, 201; a task never filed is the package's 404, one
- * not long-lived and minutes not above zero its 422, a name taken its 409; a body that is not one, and a name that names no file, 400,
+ * package's command table: `POST /api/subscriptions/:name` gives a long-lived task one, 201, with the level its runs' factories are at
+ * least at (`atLeast`) where one is asked for; a task never filed is the package's 404, one not long-lived, minutes not above zero and a
+ * floor that is no level its 422, a name taken its 409; a body that is not one, and a name that names no file, 400,
  * before anything is written; `DELETE /api/subscriptions/:name` takes it away, and a second is its 404; and a page on another site is
  * refused by the guard.
  *
@@ -46,7 +47,7 @@ async function asked(method: string, name: string, body?: unknown, headers: Reco
 }
 
 const file = (name: string): string => path.join(root, 'subscriptions', `${name}.json`);
-const SHAPE = '`{ "task": "<task>", "selectors"?: ["<selector>"], "digestEvery"?: <minutes> }`';
+const SHAPE = '`{ "task": "<task>", "selectors"?: ["<selector>"], "digestEvery"?: <minutes>, "atLeast"?: "<level>" }`';
 
 test('a long-lived task is given a subscription, 201, by its words or the defaults; a name taken is a 409; it is taken away, then a 404', async () => {
   const put = await asked('POST', 'watch', { task: 'nemia' });
@@ -128,4 +129,43 @@ test('REFUSED at shipped defaults: a page on another site gives no subscription,
   assert.equal(drop.status, 403);
   assert.equal(fs.existsSync(file('c')), true, 'the subscription kept');
   assert.equal((await asked('DELETE', 'c')).status, 200);
+});
+
+test("a subscription is stored with the floor its runs' factories must be at, and takes the level the package knows alone", async () => {
+  const put = await asked('POST', 'floored', { task: 'nemia', atLeast: 'auto' });
+  assert.equal(put.status, 201);
+  assert.deepEqual(
+    (put.body.subscription as { scope?: unknown }).scope,
+    { atLeast: 'auto' },
+    "the body carries the floor as the subscription's scope",
+  );
+  assert.deepEqual(
+    (JSON.parse(fs.readFileSync(file('floored'), 'utf8')) as { scope?: unknown }).scope,
+    { atLeast: 'auto' },
+    "the store's file holds it too",
+  );
+  assert.equal((await asked('DELETE', 'floored')).status, 200);
+
+  const none = await asked('POST', 'open', { task: 'nemia' });
+  assert.equal(none.status, 201);
+  assert.equal(
+    (none.body.subscription as { scope?: unknown }).scope,
+    undefined,
+    'a subscription asked for with no floor carries none, and every line is in its scope',
+  );
+  assert.equal((await asked('DELETE', 'open')).status, 200);
+});
+
+test("REFUSED: a floor that is no level is a 422 in the package's words, naming --at-least and the levels; one of the wrong type a 400 naming the shape", async () => {
+  const nonsense = await asked('POST', 'd', { task: 'nemia', atLeast: 'nonsense' });
+  assert.equal(nonsense.status, 422);
+  assert.match(String(nonsense.body.error), /^--at-least takes a level, one of .*, and "nonsense" is none/);
+  const numbered = await asked('POST', 'd', { task: 'nemia', atLeast: 7 });
+  assert.equal(numbered.status, 400);
+  assert.match(
+    String(numbered.body.error),
+    /^`atLeast` is the level a run's factory is at least at for its lines to be carried, as `nemia subscribe --at-least <level>` takes it/,
+  );
+  assert.match(String(numbered.body.error), /This request's was 7: .*"atLeast"\?: "<level>"/);
+  assert.equal(fs.existsSync(file('d')), false, 'nothing written');
 });

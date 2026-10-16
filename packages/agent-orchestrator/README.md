@@ -170,7 +170,12 @@ are printed whatever the selectors.
 
 The api streams the same feed at `GET /api/feed/stream`, one server-sent event a line — `run`,
 `step`, `removed` or `daemon`, by what the line is about — its id the cursor just after that line, so an
-EventSource that reconnects resumes after the last line it was sent.
+EventSource that reconnects resumes after the last line it was sent. It takes `?selector=`, given again
+for each further selector, in the same grammar as `-l`, and selects at the source: a line the selectors
+do not take never crosses the wire, while the cursor still advances past it. A selector the grammar
+refuses is a 422 before the stream opens. Every stream says where it has read to every
+`BOOKMARK_EVERY` as a `bookmark` event, carrying that cursor as its id and no data, so a reader of a
+silent feed knows where it is and can resume there.
 
 `wf` once had a `watch` verb that followed the engine, and gave it back: observing the engine is
 the engine's job. This one follows what only this package knows.

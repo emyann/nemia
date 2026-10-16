@@ -313,9 +313,11 @@ export const wordBreaks = (table: readonly Pick<CommandSpec, 'name' | 'route'>[]
  * - `DELETE /api/pause` — the store's pause lifted, as `nemia resume` lifts it (`resumePause`); it reads no body. None standing is a 404
  *   (`Missing`). Its 200 is `{ pause }`, the pause lifted.
  * - `POST /api/subscriptions/:name` — a long-lived task given a subscription to the feed, as `nemia subscribe <name> <task>` gives it
- *   (`subscribe`), its body `{ task, selectors?, digestEvery? }`, `selectors` a list as `-l` given many times: the daemon's deliverer says
- *   the feed to the task from the feed's end. A name that names no file is a 400 before the body is read; a task never filed on the store's
- *   engine is a 404 (`Missing`), one not long-lived, a selector the feed's grammar refuses or minutes not above zero a 422, and a name
+ *   (`subscribe`), its body `{ task, selectors?, digestEvery?, atLeast? }`, `selectors` a list as `-l` given many times, and `atLeast`
+ *   the level a run's factory is at least at for its lines to be carried, as `--at-least` takes it, stored as the subscription's `scope`:
+ *   the daemon's deliverer says the feed to the task from the feed's end. A name that names no file is a 400 before the body is read; a
+ *   task never filed on the store's engine is a 404 (`Missing`), one not long-lived, a selector the feed's grammar refuses, minutes not
+ *   above zero and an `atLeast` the package knows as no level a 422, in its own words naming `--at-least` and the levels, and a name
  *   taken a 409 (`Conflict`). Its 201 is `{ name, subscription }`, as written.
  * - `DELETE /api/subscriptions/:name` — a subscription taken away, as `nemia unsubscribe <name>` takes it (`dropSubscription`), and where
  *   its deliverer was with it; it reads no body. None by that name is a 404 (`Missing`). Its 200 is `{ name }`.

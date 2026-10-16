@@ -3246,7 +3246,9 @@ Every pass is measured as it runs, phase by phase (`src/meter/tally.store.ts` co
 written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on it; it is there to say where a pass's time goes.
 
 - **The phases** are `records` (the run records, with the files beside each), `asks` (a person's asks, approvals, acceptances and
-  answers), `journals` (the runtime's journals, read through the engine), `observe` (asking each harness what runs), `runtime` (the
+  answers), `journals` (the runtime's journals, read through the engine), `revisions` (the workflow folders,
+  agents, skills and factory rules a run's kinds are resolved from, and the ledger they are numbered in — one read of each folder a pass,
+  shared by every run on it), `observe` (asking each harness what runs), `runtime` (the
   runtime's own pass, less its observe), `place` (every question asked of the place, a call each: the git processes it starts and
   its time, whether it judged where a branch stands or acted — so it is a phase of its own rather than part of `act`), `assess` (the judgement — which queued tasks to admit among it — and any time counted as no other phase) and `act`
   (filing, admitting, stopping, collecting artifacts, and writing the record, the feed and the ceilings). A phase inside another counts as the inner one, so the phases add up to the pass's

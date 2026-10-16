@@ -599,6 +599,28 @@ test('a memo is keyed by what it reads: one folder read once, and again for anot
   );
 });
 
+test('a run with no repository is keyed apart, never as the ticking process\u2019s own directory', () => {
+  const t = team();
+  const folderRun = { workflowDir: t.dir, repo: undefined, factory: undefined };
+  const atCwd = { workflowDir: t.dir, repo: process.cwd(), factory: undefined };
+  const read = passRevisions();
+  assert.notEqual(
+    read.skills(folderRun),
+    read.skills(atCwd),
+    "a run on a folder place looks for its skills beside the store alone; a run whose repository is the daemon's own directory looks beside that repository too, and the two are not one read",
+  );
+  assert.notEqual(
+    read.steps(folderRun),
+    read.steps(atCwd),
+    'and the folder is loaded with the places each was given, never with the other\u2019s',
+  );
+  assert.equal(
+    read.skills(folderRun),
+    read.skills({ ...folderRun }),
+    'a second run with no repository shares the first\u2019s read, as two runs on one folder do',
+  );
+});
+
 test('a workflow folder that has stopped reading is read once a pass, and every run on it keeps what it froze', async () => {
   const { one, two, t } = await twoOnOneFolder();
   const read = passRevisions();

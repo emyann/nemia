@@ -148,7 +148,11 @@ export type PassRevisions = {
 
 /** A pass's one reader of what a resolve reads (`PassRevisions`), holding nothing yet. */
 export function passRevisions(): PassRevisions {
-  const where = (run: FolderRun): string[] => [path.resolve(run.workflowDir), path.resolve(run.repo ?? ''), run.factory ?? ''];
+  const where = (run: FolderRun): Array<string | null> => [
+    path.resolve(run.workflowDir),
+    run.repo === undefined ? null : path.resolve(run.repo),
+    run.factory ?? null,
+  ];
   const factory = once(factoryOf, (run) => String(run.factory ?? ''));
   const skills = once(
     (run: FolderRun) => skillsFor(run.workflowDir, placesOf(run.repo)),

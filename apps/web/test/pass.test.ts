@@ -30,7 +30,7 @@ const PASS: PassCost = {
     observe: phase(120, { spawned: 1 }),
     runtime: phase(8),
     place: phase(0, { calls: 0 }),
-    assess: phase(15, { calls: 0 }),
+    assess: phase(9, { calls: 0 }),
     act: phase(3),
   },
   harnesses: { claude: { calls: 1, ms: 118, listed: 3, spawned: 1 }, check: { calls: 1, ms: 2, listed: 40, spawned: 0 } },

@@ -47,7 +47,7 @@ export const ENVELOPE_SCHEMA = {
     outcome: { type: 'string', enum: ['done', 'blocked'] },
     summary: {
       type: 'string',
-      description: `One line of at most ${SUMMARY_MAX} characters; everything else goes in body. A longer one is cut where it is shown.`,
+      description: `One line of at most ${SUMMARY_MAX} characters; everything else goes in body. A longer one is cut, and the whole of it leads the body.`,
     },
     body: { type: ['string', 'null'], description: 'Markdown: what the summary has no room for. null when there is nothing more.' },
     artifacts: { type: 'array', items: { anyOf: [FILE_ARTIFACT, VALUE_ARTIFACT] } },

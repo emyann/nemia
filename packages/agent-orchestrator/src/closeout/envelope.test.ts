@@ -78,15 +78,23 @@ test('a v1 closeout is read by its own envelope: files and values apart, and a c
   });
 });
 
-test('REFUSED: `needs` on a done v1 closeout, and nothing else of its envelope, a 10,000-character summary included', () => {
+test("a v1 summary over 120 characters, or on two lines, is cut on read as a v0 first line is, never refused, so a step never spends a round on its summary: a `needs` on a done closeout is the envelope's one refusal", () => {
   const v1 = (outcome: string, needs: string | null, summary = 's') =>
     read({ apiVersion: 'nemia/v1', outcome, summary, body: null, artifacts: [], needs });
+  const long = 'y'.repeat(10_000);
+  const cut = v1('done', null, long);
+  assert.ok(cut.summary.endsWith('\u2026') && cut.summary.length <= SUMMARY_MAX, cut.summary);
+  assert.equal(cut.body, long, 'the whole of a cut summary leads the body');
+  assert.deepEqual(envelopeRefusals(cut), [], 'a summary is never refused for its length');
+  const twoLines = v1('done', null, 'One.\nTwo.');
+  assert.equal(twoLines.summary, 'One.');
+  assert.equal(twoLines.body, 'One.\nTwo.', 'the whole of a summary on two lines leads the body');
+  assert.deepEqual(envelopeRefusals(twoLines), [], 'a summary is never refused for being on two lines');
   assert.equal(envelopeRefusals(v1('done', 'x')).length, 1);
   assert.match(envelopeRefusals(v1('done', 'x'))[0], /sign off `blocked`/);
   assert.deepEqual(envelopeRefusals(v1('done', null)), []);
   assert.deepEqual(envelopeRefusals(v1('done', '')), []);
   assert.deepEqual(envelopeRefusals(v1('blocked', 'x')), []);
-  assert.deepEqual(envelopeRefusals(v1('done', null, 'y'.repeat(10_000))), []);
   assert.deepEqual(
     envelopeRefusals(read({ outcome: 'done', summary: 's', artifacts: [], needs: 'x' })),
     [],

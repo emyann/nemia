@@ -64,6 +64,9 @@ holds what every change needs.
   transition is wrong after a restart `(no test yet)`.
 - **Prose is not a constraint.** If the packages need an agent to do something, the machinery refuses the alternative
   `(no test yet)`.
+- **Errors say what to do next.** A message names the fix — the command to type, the field to set — and not only what went wrong
+  `(no test yet)`: what a refusal is thrown as and the exit code it carries are refused when they are wrong, its words are nobody's
+  to check.
 - **A state machine is drawn by its code.** A new machine prints its own Mermaid diagram, held between `diagram:<name>` markers in its
   package's docs whose begin line names the command; never a drawing `(no test yet)`. A diagram that has drifted from what its
   command prints is another matter, and refused.

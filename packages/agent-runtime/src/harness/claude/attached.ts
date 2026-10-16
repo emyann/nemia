@@ -49,12 +49,16 @@ import {
 import { gone, hear, interruptTurn, killGroup, startSession, type Held, type Live } from './attached-session.ts';
 import { pushesOf, type Pushes } from './attached-follow.ts';
 
-/** The attached sessions of one engine: the runner's verbs, and `hold`, which makes this process their holder for a scope. */
+/**
+ * The attached sessions of one engine: the runner's verbs, `hold`, which makes this process their holder for a scope, and
+ * `following`, how many follow the session `name` here now — what a test reads to see a follower that left free its place.
+ */
 export type Attached = {
   readonly ops: Pick<RunnerOps, 'spawn' | 'observe' | 'observeFor' | 'stop' | 'logs' | 'transcript' | 'say' | 'interrupt' | 'follow'>;
   readonly hold: Effect.Effect<void, never, Scope.Scope>;
   readonly holding: () => boolean;
   readonly has: (name: string) => boolean;
+  readonly following: (name: string) => number;
 };
 
 /**
@@ -296,6 +300,7 @@ export const attachedSessions = (root: string, executable?: string, options: { l
     ),
     holding: () => holding,
     has: (name) => fs.existsSync(filesOf(root, name).run),
+    following: pushes.following,
     ops: opsOf(root, live, start, runs, pushes),
   };
 };

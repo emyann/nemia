@@ -7,7 +7,7 @@ import type { Guarded } from '../guard.ts';
 import type { RouteWords } from './words.ts';
 
 /** The body `POST /api/subscriptions/:name` takes: `nemia subscribe`'s task and flags, as JSON. */
-const SUBSCRIBE_SHAPE = '`{ "task": "<task>", "wake"?: ["<word>"], "digestEvery"?: <minutes> }`';
+const SUBSCRIBE_SHAPE = '`{ "task": "<task>", "wake"?: ["<word>"], "digestEvery"?: <minutes>, "atLeast"?: "<level>" }`';
 
 /** What `issue` says of a key of `POST /api/subscriptions/:name`'s body sent wrong, `input` what the request sent. */
 const subscribeKeyWords = (key: unknown, input: unknown): string => {
@@ -18,6 +18,11 @@ const subscribeKeyWords = (key: unknown, input: unknown): string => {
     return `\`wake\` is the words that wake the task, as \`nemia subscribe --wake <word>\` takes each: a list of text, or left out for the feed's words for a wait on a person. ${was}`;
   if (key === 'digestEvery')
     return `\`digestEvery\` is the minutes a digest waits for a wake, as \`nemia subscribe --digest-every <minutes>\` takes it: a JSON number, or left out for 60. ${was}`;
+  if (key === 'atLeast')
+    return (
+      "`atLeast` is the level a run's factory is at least at for its lines to be carried, as " +
+      `\`nemia subscribe --at-least <level>\` takes it: a level by name, or left out for every line, whatever its factory is at. ${was}`
+    );
   return `POST /api/subscriptions/:name takes a JSON object: ${SUBSCRIBE_SHAPE}.`;
 };
 

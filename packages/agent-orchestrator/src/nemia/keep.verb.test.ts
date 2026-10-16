@@ -28,7 +28,7 @@ process.env.CLAUDE_CONFIG_DIR = CONFIG;
 const { keep, keepOnce } = await import('./keep.verb.ts');
 const { LEVEL } = await import('./level.verb.ts');
 const { MEMORY } = await import('./memory.verb.ts');
-const { appendOutbox, chatDir } = await import('../chat/chat.store.ts');
+const { appendOutbox, chatDir, stopsFile } = await import('../chat/chat.store.ts');
 const { framedForHer } = await import('../chat/chat.ts');
 const { levelFile, memoryDir, nemiaDir, ownBin, promptFile, readLevel, readNemia, toldFile } = await import('./level.store.ts');
 const { listSubscriptions } = await import('../subscription/subscription.store.ts');
@@ -210,6 +210,10 @@ test("at semi-auto the keeper files her task long-lived in auto, the daemon's bi
     [...settings.permissions.ask, ...denies].filter((rule) => rule.startsWith(`Edit(/${nemiaDir()}`)),
     [`Edit(/${levelFile()})`, `Edit(/${promptFile()})`, `Edit(/${toldFile()})`, `Edit(/${chatDir(nemiaDir())}/**)`],
     "her memory is denied and asked by no rule, and the person's chat files are denied",
+  );
+  assert.ok(
+    stopsFile(nemiaDir()).startsWith(`${chatDir(nemiaDir())}${path.sep}`),
+    'the stop marker her chat draws is one of those files: the record of a turn the person ended is theirs, never hers to write',
   );
   for (const rule of fence.allow) assert.ok((spec.config.allowedTools as string[]).includes(rule), `${rule} allowed`);
   assert.deepEqual(

@@ -155,8 +155,9 @@ const inCallOf = (live: Map<string, Live>): Live[] => [...live.values()].filter(
 const toolOf = (l: Live): string => l.run.calling?.tool ?? 'a tool';
 
 /**
- * Each session of `live` at work or idle between turns written `parked`, aborted and its Claude Code's process group killed, its file its holder's last
- * word; the call it was cut in kept as `calling` where `cut`, which is what tells the next holder which call did not finish. The park
+ * Each session of `live` at work, or idle between a long-lived session's turns, written `parked`, aborted and its Claude Code's
+ * process group killed, its file its holder's last word; the call it was cut in kept as `calling` where `cut`, which is what tells
+ * the next holder which call did not finish. The park
  * ends the session's Claude Code itself rather than leave it to the waits after it, which a spent budget can cut short: a parked
  * session never leaves a process behind. The group it kills is the one `childOf` answers, so a pid another process has taken since
  * is left alone. Uninterruptible as one: a second signal leaves no session neither parked nor running.

@@ -19,3 +19,10 @@ export type Instant = { at: number; mono?: Monotonic };
  */
 export const elapsedMs = (from: Instant, to: Instant): number =>
   from.mono && to.mono && from.mono.boot === to.mono.boot ? to.mono.ms - from.mono.ms : to.at - from.at;
+
+/**
+ * How much of a budget of `ms`, taken at `from`, is left at `now`: never below zero, so a budget already spent cuts at once rather
+ * than granting its length again. What shares one bound across the waits of a sequence that must end within it, instead of giving
+ * each wait the whole bound and the sequence their sum.
+ */
+export const leftOf = (from: Instant, ms: number, now: Instant): number => Math.max(0, ms - elapsedMs(from, now));

@@ -20,6 +20,8 @@
  */
 import { Effect, Option, Schedule, type Scope } from 'effect';
 import fs from 'node:fs';
+import { instantNow } from '../../core/engine/now.ts';
+import { leftOf } from '../../core/clock.ts';
 import type { Sighting } from '../../core/index.ts';
 import { RunnerError } from '../error.ts';
 import type { Observation, RunnerOps, SpawnRequest } from '../seam.ts';
@@ -52,11 +54,22 @@ export type Attached = {
   readonly has: (name: string) => boolean;
 };
 
-/** How long a holder waits for the calls in flight of its sessions before it cuts them, in milliseconds. */
+/**
+ * How long a holder's whole let-go takes at most, in milliseconds: the budget its three waits share, not the bound of each, so the
+ * process always ends within it. Whatever waits for a holder to stop — the systemd unit's `TimeoutStopSec`, the restart's wait for
+ * the lease — is set above it, and a test reads this number rather than repeat it.
+ */
 export const LET_GO_MS = 60_000;
 
 /** How often a let-go reads whether what it waits for is over, in milliseconds. */
 const LET_GO_EVERY_MS = 50;
+
+/**
+ * What share of a let-go's budget the wait for the calls in flight may take at most, the rest kept for the waits after the park:
+ * each session ending, and each call held at a hook being let go. A call that ends sooner leaves the whole remainder to them
+ * (`leftOf`), so the share is a ceiling on the one wait that can run long, never a floor on the short ones.
+ */
+const LET_GO_CALLS_SHARE = 0.8;
 
 /**
  * Waits until `over` answers true, read at once and every `LET_GO_EVERY_MS` after, at most `ms`.
@@ -122,46 +135,52 @@ const inCallOf = (live: Map<string, Live>): Live[] => [...live.values()].filter(
 const toolOf = (l: Live): string => l.run.calling?.tool ?? 'a tool';
 
 /**
- * Each session of `live` at work written `parked` and aborted, its file its holder's last word; the call it was cut in kept as
- * `calling` where `cut`, which is what tells the next holder which call did not finish. Uninterruptible as one: a second signal
- * leaves no session neither parked nor running.
+ * Each session of `live` at work written `parked`, aborted and its Claude Code's process group killed, its file its holder's last
+ * word; the call it was cut in kept as `calling` where `cut`, which is what tells the next holder which call did not finish. The park
+ * ends the session's Claude Code itself rather than leave it to the waits after it, which a spent budget can cut short: a parked
+ * session never leaves a process behind. Uninterruptible as one: a second signal leaves no session neither parked nor running.
  */
 const parked = (root: string, live: Map<string, Live>, cut: boolean): Effect.Effect<void> =>
   Effect.sync(() => {
     for (const l of live.values()) {
       if (!l.abort || l.run.state !== 'working') continue;
       const kept = cut && l.calls?.size ? l.run.calling : undefined;
-      const { calling: _, childPid: __, childStart: ___, ...rest } = l.run;
+      const { calling: _, childPid: group, childStart: ___, ...rest } = l.run;
       l.run = { ...rest, state: 'parked', ...(kept ? { calling: kept } : {}) };
       writeRun(root, l.run);
       l.letGo = true;
       l.abort.abort();
+      killGroup(group);
     }
   }).pipe(Effect.uninterruptible);
 
 /**
- * The holder's let-go of the sessions in `live`: it says what it is waiting for, waits at most `letGoMs` for the calls in flight to
- * end, says which session it cut and in what call where they did not, then parks each session at work (`parked`) and waits, bounded
- * the same way, for each to end and for each call held at its hook to be let go. It always returns, so a signal always ends the
- * process.
+ * The holder's let-go of the sessions in `live`: it says what it is waiting for, waits for the calls in flight to end, says which
+ * session it cut and in what call where they did not, then parks each session at work (`parked`) and waits for each to end and for
+ * each call held at its hook to be let go. Its three waits share one budget of `letGoMs` (`leftOf`), the wait for the calls in flight
+ * capped at `LET_GO_CALLS_SHARE` of it and the rest spent as they go, so the whole let-go ends within the budget rather than taking
+ * their sum: it always returns, and within the bound, so a signal always ends the process and whatever waits for the process — a
+ * service unit's stop timeout, a restart's wait for the lease — can be set above one number.
  */
 const letGoOf = (root: string, live: Map<string, Live>, letGoMs: number): Effect.Effect<void> =>
   Effect.gen(function* () {
+    const began = instantNow();
+    const left = () => leftOf(began, letGoMs, instantNow());
     const waited = inCallOf(live);
     if (waited.length)
       yield* Effect.logInfo(
         `letting go of ${live.size} session(s): waiting at most ${letGoMs} ms for ${waited.length} call(s) in flight ` +
           `(${waited.map((l) => `${l.run.name} ${toolOf(l)}`).join(', ')})`,
       );
-    const quiet = yield* waitedOut(() => inCallOf(live).length === 0, letGoMs);
+    const quiet = yield* waitedOut(() => inCallOf(live).length === 0, Math.floor(letGoMs * LET_GO_CALLS_SHARE));
     for (const l of quiet ? [] : inCallOf(live))
       yield* Effect.logWarning(
         `${l.run.name} is cut in its call to ${toolOf(l)}: it did not end within ${letGoMs} ms, and the next holder resumes the ` +
           'session told the call did not finish',
       );
     yield* parked(root, live, !quiet);
-    yield* Effect.promise(() => Promise.all([...live.values()].map((l) => l.done))).pipe(Effect.timeoutOption(letGoMs));
-    yield* waitedOut(() => ![...live.values()].some((l) => l.waiting), letGoMs);
+    yield* Effect.promise(() => Promise.all([...live.values()].map((l) => l.done))).pipe(Effect.timeoutOption(left()));
+    yield* waitedOut(() => ![...live.values()].some((l) => l.waiting), left());
   });
 
 /**

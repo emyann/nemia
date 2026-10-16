@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test, { type TestContext } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { Effect, Exit, Scope } from 'effect';
+import { Effect, Exit, Logger, Scope } from 'effect';
 import { attachedSessions } from '../src/harness/claude/attached.ts';
 import {
   alive,
@@ -63,12 +63,23 @@ const lines = (dir: string, file: string): unknown[] => {
     : [];
 };
 
-/** A holder of the sessions under `root`, for a scope the test closes, its let-go bound `letGoMs` where one is given. */
+/**
+ * A holder of the sessions under `root`, for a scope the test closes, its let-go bound `letGoMs` where one is given. `said` keeps every
+ * line its let-go logged, at its level, so what the holder says as it lets go is read rather than printed.
+ */
 const holder = async (root: string, letGoMs?: number) => {
   const attached = attachedSessions(root, STAND_IN, letGoMs === undefined ? {} : { letGoMs });
   const scope = Scope.makeUnsafe();
+  const said: string[] = [];
+  const keeper = Logger.make(
+    ({ message, logLevel }) => void said.push(`${logLevel} ${(Array.isArray(message) ? message : [message]).join(' ')}`),
+  );
   await Effect.runPromise(Scope.provide(attached.hold, scope));
-  return { attached, close: () => Effect.runPromise(Scope.close(scope, Exit.void)) };
+  return {
+    attached,
+    said,
+    close: () => Effect.runPromise(Scope.close(scope, Exit.void).pipe(Effect.provide(Logger.layer([keeper])))),
+  };
 };
 
 /** What the run file says of the session, read again. */
@@ -416,7 +427,7 @@ test("a drain answers a sub-agent's call, which belongs to a call it cannot see 
 
 test('a holder that cannot let go within its bound cuts the call, keeps it on the run file, and parks the session', WAITED, async (t) => {
   const { root, dir, request } = place({ call: 'Bash', output: {} });
-  const h = await holder(root, 200);
+  const h = await holder(root, 1_000);
   await Effect.runPromise(h.attached.ops.spawn(request));
   assert.equal((await inCall(t, root)).tool, 'Bash');
   await h.close();
@@ -427,7 +438,17 @@ test('a holder that cannot let go within its bound cuts the call, keeps it on th
     ['PreToolUse'],
     'the call never ended: its PostToolUse was never asked',
   );
-  assert.equal(alive(Number(fs.readFileSync(path.join(dir, 'pid'), 'utf8'))), false, "the session's Claude Code is gone");
+  const child = Number(fs.readFileSync(path.join(dir, 'pid'), 'utf8'));
+  await until(t, () => !alive(child), "the session's Claude Code gone: the park ended it", { everyMs: 20 });
+  assert.deepEqual(
+    h.said,
+    [
+      'Info letting go of 1 session(s): waiting at most 1000 ms for 1 call(s) in flight (ae/t1/1 Bash)',
+      'Warn ae/t1/1 is cut in its call to Bash: it did not end within 1000 ms, and the next holder resumes the session told the call ' +
+        'did not finish',
+    ],
+    'it says it is letting go and how many calls it waits for, then names each session it cut and the call it cut it in',
+  );
 });
 
 test("a session cut at its holder's bound is resumed told which call did not finish", WAITED, async (t) => {

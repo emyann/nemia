@@ -96,7 +96,13 @@ export const interruptVerbOf = (
       );
     }
     yield* go(end({ name, sessionId: sighting.sessionId })).pipe(
-      unsent((e) => `${name}'s turn was not ended (${wordsOf(e)}). Nothing was changed; ask again.`),
+      Effect.catchCause((cause: Cause.Cause<unknown>): Effect.Effect<never, InterruptRefused | InterruptUnsent> => {
+        const e = Cause.squash(cause) as { refused?: boolean };
+        if (e.refused === true) return Effect.fail(new InterruptRefused({ message: wordsOf(e) }));
+        return Effect.fail(
+          new InterruptUnsent({ message: `${name}'s turn was not ended (${wordsOf(e)}). Nothing was changed; ask again.`, cause: e }),
+        );
+      }),
     );
     return { at: new Date().toISOString(), attempt: last.n };
   });

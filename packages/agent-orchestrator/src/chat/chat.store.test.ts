@@ -9,21 +9,26 @@ import { scratch } from '../../test/scratch.ts';
 import {
   appendDelivered,
   appendOutbox,
+  appendStop,
   deliveredFile,
   outboxFile,
   readDelivered,
   readMarkFile,
   readOutbox,
   readReadMark,
+  readStops,
+  stopsFile,
   writeReadMark,
 } from './chat.store.ts';
 
 test('no file reads as empty, and what is appended reads back in order', () => {
   const dir = scratch('wf-chat-store-');
-  assert.deepEqual([readOutbox(dir), readDelivered(dir), readReadMark(dir)], [[], [], undefined]);
+  assert.deepEqual([readOutbox(dir), readDelivered(dir), readStops(dir), readReadMark(dir)], [[], [], [], undefined]);
   appendOutbox(dir, { id: 'o1', at: '2026-10-15T12:00:00.000Z', text: 'one' });
   appendOutbox(dir, { id: 'o2', at: '2026-10-15T12:00:01.000Z', text: 'two\nlines' });
   appendDelivered(dir, { id: 'o1', said: '2026-10-15T12:00:02.000Z', attempt: 1 });
+  appendStop(dir, { at: '2026-10-15T12:00:05.000Z', attempt: 1 });
+  appendStop(dir, { at: '2026-10-15T12:00:06.000Z', attempt: 2 });
   writeReadMark(dir, { through: 'm:1:a', at: '2026-10-15T12:00:03.000Z' });
   writeReadMark(dir, { through: 'm:1:b', at: '2026-10-15T12:00:04.000Z' });
   assert.deepEqual(
@@ -32,6 +37,20 @@ test('no file reads as empty, and what is appended reads back in order', () => {
   );
   assert.deepEqual(readDelivered(dir), [{ id: 'o1', said: '2026-10-15T12:00:02.000Z', attempt: 1 }]);
   assert.deepEqual(readReadMark(dir), { through: 'm:1:b', at: '2026-10-15T12:00:04.000Z' });
+  assert.deepEqual(readStops(dir), [
+    { at: '2026-10-15T12:00:05.000Z', attempt: 1 },
+    { at: '2026-10-15T12:00:06.000Z', attempt: 2 },
+  ]);
+});
+
+test("REFUSED: a stop line that does not decode, naming the file and the line — never read as saying nothing", () => {
+  const dir = scratch('wf-chat-store-');
+  appendStop(dir, { at: '2026-10-15T12:00:05.000Z', attempt: 1 });
+  fs.appendFileSync(stopsFile(dir), '{"at":"2026-10-15T12:00:07.000Z"}\n');
+  assert.throws(
+    () => readStops(dir),
+    (err: Error) => err.message.startsWith(`${stopsFile(dir)}:2 is not a line of the chat's record`),
+  );
 });
 
 test('a last line not yet ended is left out, as an append still being written', () => {

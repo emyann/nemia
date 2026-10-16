@@ -345,9 +345,10 @@ export type EngineShape = {
    * Refused — `InterruptRefused`, and nothing sent — in this order, what the record says before what the harness says: a task this
    * engine has no record of; a harness that cannot end a turn without ending its session (every harness but Claude Code attached on
    * the Agent SDK); a task that has settled, or has been asked to stop; one with no attempt in flight; then, off its harness, an
-   * attempt its harness does not list; a session its harness lists ended; and a long-lived session open and waiting for its next
-   * words, which has no turn in it (`idleOf`). A harness that could not be read, or that did not take the request, fails with
-   * `InterruptUnsent`, its `cause` what failed: ask again.
+   * attempt its harness does not list; a session its harness lists ended; a long-lived session open and waiting for its next
+   * words, which has no turn in it (`idleOf`); and a session whose own runner cannot end a turn, in that runner's words (Claude
+   * Code's `--bg` session and its job, under the one `claude` harness that offers the verb). A harness that could not be read, or
+   * that did not take the request, fails with `InterruptUnsent`, its `cause` what failed: ask again.
    */
   readonly interrupt: (taskId: string) => Effect.Effect<Interrupted, InterruptRefused | InterruptUnsent | JournalError>;
   /**

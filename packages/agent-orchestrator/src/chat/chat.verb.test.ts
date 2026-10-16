@@ -1,7 +1,8 @@
 /**
  * The chat's reads and the person's writes over the engine's stand-in and the test place: a history paged across two attempts with
  * the line between them, a stream's read resumed after its cursor, the person's words put in the outbox and refused when empty or too
- * long, and the read mark moved forward only, refused for an event the chat does not hold. A store of its own, since `WF_ROOT` is read
+ * long, the read mark moved forward only, refused for an event the chat does not hold, and the turn she is answering stopped, which
+ * leaves one quiet marker on her record. A store of its own, since `WF_ROOT` is read
  * as the module loads.
  */
 import { test } from 'node:test';
@@ -12,8 +13,8 @@ import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
 
 process.env.WF_ROOT = scratch('wf-chat-verb-');
-const { chatHistory, chatRead, chatSend, chatSince } = await import('./chat.verb.ts');
-const { readOutbox, readReadMark } = await import('./chat.store.ts');
+const { chatHistory, chatRead, chatSend, chatSince, chatStop } = await import('./chat.verb.ts');
+const { readOutbox, readReadMark, readStops } = await import('./chat.store.ts');
 const { engineOf, runWith: runEngine } = await import('../runtime-client.ts');
 
 const engine = eachTest(testEngine);
@@ -104,4 +105,31 @@ test('REFUSED: a read mark on an event the chat does not hold', async () => {
   const { e, place } = await twoAttempts();
   await assert.rejects(runWith(e, chatRead(place, 'm:9:z')), (err: Error) => err.message.startsWith('m:9:z is no event of this chat'));
   assert.equal(readReadMark(place.dir), undefined);
+});
+
+test("a stop ends her turn through the runtime and leaves one Stopped line on the record", async () => {
+  const { e, place } = await twoAttempts();
+  const stop = await runWith(e, chatStop(place));
+  assert.deepEqual(engine().interrupts, [place.task], 'the turn was ended through the runtime, and once');
+  assert.deepEqual(readStops(place.dir), [stop]);
+  assert.equal(stop.attempt, 2, 'the attempt that was answering');
+  const texts = (await runWith(e, chatHistory(place))).events.map((x) => (x.kind === 'message' ? `${x.from}:${x.text}` : x.kind));
+  assert.deepEqual(texts.filter((w) => w === 'keeper:Stopped'), ['keeper:Stopped']);
+});
+
+test('REFUSED: a stop with no session of hers filed, and one the runtime will not end, each leaves no line behind', async () => {
+  const e = engineOf(engine().layer);
+  const none = { task: undefined, dir: scratch('wf-chat-dir-') };
+  await assert.rejects(
+    runWith(e, chatStop(none)),
+    (err: Error) => err.message === 'No session of hers is filed, so there is no turn to stop.',
+  );
+  assert.deepEqual(engine().interrupts, [], 'the runtime was not asked');
+  const task = await runEngine(e, e.file({ id: 'her', brief: 'be there', cwd: '/r', restartPolicy: 'Always' }));
+  const unstarted = { task, dir: scratch('wf-chat-dir-') };
+  await assert.rejects(
+    runWith(e, chatStop(unstarted)),
+    (err: Error) => /has not started an attempt yet, so there is no turn to end/.test(err.message),
+  );
+  assert.deepEqual(readStops(unstarted.dir), [], 'a turn the runtime did not end is on no record');
 });

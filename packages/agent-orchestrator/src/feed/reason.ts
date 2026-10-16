@@ -58,9 +58,10 @@ export const DENIED = 'denied: ';
  * The word each of a person's acts and each of the two runtime faults says, the one place it is spelled: the owner named these six at this
  * slice's design gate, and `reason.test.ts` holds each literally beside the rule below that reads it back.
  *
- * **None of them may carry a wake word.** `DEFAULT_WAKE` finds its words anywhere inside a line's word, so `failed`, `blocked` or
- * `needs:` in one of these would wake every subscriber for a fact the owner said waits on nobody — which is why a refused spawn is
- * `nothing started` and not `spawn failed`. `reason.test.ts` holds `waitsOf` identical to what `--wake` takes, and breaks on it.
+ * **None of them may carry a word a subscriber was woken by.** The prose match is retired, but `reason.test.ts` still holds `waitsOf`
+ * identical to it over every word the package writes (`FORMER_DEFAULT_WAKE`, and the selectors `selectorsOfWake` converts it to): that
+ * match found its words anywhere inside a line's word, so `failed`, `blocked` or `needs:` in one of these would break the identity for a
+ * fact the owner said waits on nobody — which is why a refused spawn is `nothing started` and not `spawn failed`.
  */
 export const SIGNAL_WORDS = {
   Approved: 'approved',

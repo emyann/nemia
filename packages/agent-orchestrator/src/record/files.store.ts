@@ -436,21 +436,28 @@ function paused(run: Run, pause: Pause | null = readPause()): Run {
 }
 
 /**
- * The run `id` names, found among the ids the store lists (`runIds`), never read by a path made of the id, so no id — one climbing out
- * with `..`, an absolute one — can name a file outside `runs/`; with the store's pause composed onto it as `runs.read` composes it.
- * Undefined for an id the store does not list, for a record removed between the listing and the read, and for one that does not read as
- * a run (`UnreadableRecord`), which is said once on `said`, as `listRuns` says it: the run page answers that there is no such run where
+ * The run `id` names, read with `pause` composed onto it as `runs.read` composes the store's own — for an id the caller has already
+ * matched against the store's listing. Undefined for a record removed between the listing and the read, and for one that does not read
+ * as a run (`UnreadableRecord`), which is said on `said`, as `listRuns` says it: the run page answers that there is no such run where
  * it used to throw.
  */
-function findRun(id: string, said: (line: string) => void = sayOnce): Run | undefined {
-  if (!runIds().includes(id)) return undefined;
+function runListed(id: string, said: (line: string) => void, pause: Pause | null): Run | undefined {
   try {
-    return paused(readRun(id));
+    return paused(readRun(id), pause);
   } catch (err) {
     if (err instanceof UnreadableRecord) said(`left out: ${err.message}`);
     else if (fs.existsSync(runFile(id))) throw err;
     return undefined;
   }
+}
+
+/**
+ * The run `id` names, found among the ids the store lists (`runIds`), never read by a path made of the id, so no id — one climbing out
+ * with `..`, an absolute one — can name a file outside `runs/`; with the store's pause composed onto it as `runs.read` composes it, and
+ * undefined for an id the store does not list, or that does not read (`runListed`).
+ */
+function findRun(id: string, said: (line: string) => void = sayOnce): Run | undefined {
+  return runIds().includes(id) ? runListed(id, said, readPause()) : undefined;
 }
 
 /**
@@ -509,9 +516,16 @@ export const runStore: RunStore = filesStore;
 
 /**
  * Every run of the store as `project` reads it, off `memo` where one is handed in (`keptRecords`): the store stamped before any record
- * is read, each run whose stamp stands answered from memory, and each other found by id (`runs.find`). With no memo — the command
- * line's reads, and a test's cold read — every record is read, as `runs.list` reads them, and nothing is kept. `env` says whether each
- * kept projection is judged afresh too (`WF_VERIFY_REST`).
+ * is read, each run whose stamp stands answered from memory, and each other read by id. With no memo — the command line's reads, and a
+ * test's cold read — every record is read, and nothing is kept. `env` says whether each kept projection is judged afresh too
+ * (`WF_VERIFY_REST`).
+ *
+ * The store is listed once and its pause read once for the whole read, as `runs.list` lists and reads them once: `runs.find` does both
+ * for its one run, and a read that went through it per run would list the store once per run.
  */
-export const keptRuns = <P>(memo: RecordMemo<P> | undefined, project: (run: Run) => P, env: NodeJS.ProcessEnv = process.env): P[] =>
-  keptRecords(memo, { stamps: runStore.runs.stamps(), find: (id) => runStore.runs.find(id), verify: verifiesRest(env) }, project);
+export const keptRuns = <P>(memo: RecordMemo<P> | undefined, project: (run: Run) => P, env: NodeJS.ProcessEnv = process.env): P[] => {
+  const listed = new Set(runIds());
+  const pause = readPause();
+  const find = (id: string) => (listed.has(id) ? runListed(id, sayOnce, pause) : undefined);
+  return keptRecords(memo, { stamps: runStore.runs.stamps(), find, verify: verifiesRest(env) }, project);
+};

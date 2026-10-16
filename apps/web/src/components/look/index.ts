@@ -6,6 +6,7 @@ export { CopyId } from './CopyId';
 export { cutPoints, cutRing, cutShape, type CutSize } from './cut';
 export { CutButton, CutPress } from './CutButton';
 export { CutCue } from './CutCue';
+export { CutField } from './CutField';
 export { CutFrame, FRAMED_BOX, FRAMED_END, FRAMED_ROW, FRAMED_TABLE, type FrameHue } from './CutFrame';
 export { CutTag } from './CutTag';
 export { Pager } from './Pager';

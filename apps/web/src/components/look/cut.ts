@@ -3,8 +3,8 @@
  * of a ring beside it.
  */
 
-/** How long a cut is along each side, in pixels: a card's, a table's, a button's, a cue's. */
-export type CutSize = 28 | 24 | 12 | 9;
+/** How long a cut is along each side, in pixels: a card's, a table's, a button's, a field's, a cue's. */
+export type CutSize = 28 | 24 | 12 | 10 | 9;
 
 /** How much longer a cut is, for each pixel its shape is grown by on every side, so the grown cut runs beside the first: 2 − √2. */
 const GROWN = 2 - Math.SQRT2;

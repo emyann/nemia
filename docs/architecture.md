@@ -158,18 +158,21 @@ the hub dropped, or one another process wrote — on a beat that stats the file:
 publishes to, which takes a repeated `?selector=` in the same grammar as `nemia watch`'s `-l` and selects at the source, and says where
 it has read to as a `bookmark` event carrying that cursor as its id. A reader in another process, `nemia watch`, watches the file (`watchFeed`), and reads the lease at a pace beside it,
 printing `daemon down` and `daemon up` as the store's liveness changes (`livenessLines`, `src/cli/main.ts`): its own output, never a
-line of the feed. `--json` prints each line whole with its cursor; `--wake` and `--wake-word` keep the lines a wake word finds.
+line of the feed. `--json` prints each line whole with its cursor; `-l` keeps the lines a selector takes — `-l waits=person` the lines that wait on a
+person.
 
-**Subscriptions** are the feed said to a long-lived task: `nemia subscribe <name> <task>` (`src/subscription/subscription.verb.ts`, also
-`POST /api/subscriptions/:name`) puts a file under `$WF_ROOT/subscriptions/`, the person's, and the daemon's deliverer (`deliver` in
-`src/subscription/deliver.verb.ts`, forked by `up`) follows the feed for each, writing where it is beside it (`<name>.state.json`, its
-one writer, stamped with the subscription it is for). The lines holding a wake word that one read of the feed finds are said to the task
-at once, in one message through the runtime's `say`, the routine lines riding them as a digest; with no wake, the digest is said after
-`digestEvery` minutes. A read is what the feed's reader handed on since the deliverer last took, a pass's lines together, and no window
-waits for more. The cursor moves only once that `say` resolved, so a message is told at least once, to the harness's inbox, and said
-again whole by a deliverer stopped before its cursor was written: whether the session reads it is the runtime's
-(`agent-runtime/docs/open-issues.md`, #12, #14–#16). A subscription given a floor (`--at-least`, its `scope`) is told only of the runs
-whose factory is at it or above, read as each line comes.
+**Subscriptions** are the feed said to a long-lived task: `nemia subscribe <name> <task>` (`src/subscription/subscription.verb.ts`,
+also `POST /api/subscriptions/:name`) puts a file under `$WF_ROOT/subscriptions/`, the person's, and the daemon's deliverer (`deliver`
+in `src/subscription/deliver.verb.ts`, forked by `up`) follows the feed for each, writing where it is beside it (`<name>.state.json`,
+its one writer, stamped with the subscription it is for). A subscription's filter is a list of selectors in the same grammar `nemia
+watch -l` reads (`-l`, its `selectors`; the default `waits=person`), and the lines one of them takes in one read of the feed are said
+to the task at once, in one message through the runtime's `say`, the routine lines riding them as a digest; with no wake, the digest is
+said after `digestEvery` minutes. A record written before the selectors, which held a list of wake words, is converted to selectors on
+every read and never rewritten (`selectorsOfWake`, `src/subscription/former-wake.ts`). A read is what the feed's reader handed on since
+the deliverer last took, a pass's lines together, and no window waits for more. The cursor moves only once that `say` resolved, so a
+message is told at least once, to the harness's inbox, and said again whole by a deliverer stopped before its cursor was written:
+whether the session reads it is the runtime's (`agent-runtime/docs/open-issues.md`, #12, #14–#16). A subscription given a floor
+(`--at-least`, its `scope`) is told only of the runs whose factory is at it or above, read as each line comes.
 
 **Nemia**, the store's own agent, is the orchestrator's: a long-lived task the daemon's keeper (`keep` in `src/nemia/keep.verb.ts`,
 forked by `up`) files while any factory is above `manual` and stops once none is, level-triggered off the levels (`nemia level`) and

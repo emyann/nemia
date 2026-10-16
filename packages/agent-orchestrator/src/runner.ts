@@ -218,7 +218,7 @@ export type {
 export { feedLineWords, REMOVED } from './feed/index.ts';
 export type { FeedLine, FeedPublished } from './feed/index.ts';
 export type { FeedSaid, FeedWords } from './run.ts';
-export { BOOKMARK_EVERY, bookmarkLine, DEFAULT_WAKE, subscriptionNameRefusal, wakeOf, watchedLine } from './subscription/subscription.ts';
+export { BOOKMARK_EVERY, bookmarkLine, DEFAULT_SELECTORS, subscriptionNameRefusal, watchedLine } from './subscription/index.ts';
 export {
   LABEL_KEYS,
   labelKeysRefusal,
@@ -231,7 +231,7 @@ export {
   selects,
 } from './watch/selector.ts';
 export type { Clause, Selectors } from './watch/selector.ts';
-export type { Watched } from './subscription/subscription.ts';
+export type { Watched } from './subscription/index.ts';
 export {
   DAEMON_FILE,
   DEFAULT_EVERY_MS,

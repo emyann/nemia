@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Layer } from 'effect';
-import { DEFAULT_WAKE, engine } from 'agent-orchestrator';
+import { DEFAULT_SELECTORS, engine } from 'agent-orchestrator';
 import { appOf, liveOf } from '../src/app.ts';
 import { Engine } from '../src/store.ts';
 
@@ -47,17 +47,17 @@ async function asked(method: string, name: string, body?: unknown, headers: Reco
 }
 
 const file = (name: string): string => path.join(root, 'subscriptions', `${name}.json`);
-const SHAPE = '`{ "task": "<task>", "wake"?: ["<word>"], "digestEvery"?: <minutes>, "atLeast"?: "<level>" }`';
+const SHAPE = '`{ "task": "<task>", "selectors"?: ["<selector>"], "digestEvery"?: <minutes>, "atLeast"?: "<level>" }`';
 
 test('a long-lived task is given a subscription, 201, by its words or the defaults; a name taken is a 409; it is taken away, then a 404', async () => {
   const put = await asked('POST', 'watch', { task: 'nemia' });
   assert.equal(put.status, 201);
-  const subscription = { task: 'nemia', wake: [...DEFAULT_WAKE], digestEvery: 60, from: 0 };
+  const subscription = { task: 'nemia', selectors: [...DEFAULT_SELECTORS], digestEvery: 60, from: 0 };
   assert.deepEqual(put.body, { name: 'watch', subscription });
   assert.deepEqual(JSON.parse(fs.readFileSync(file('watch'), 'utf8')), subscription, "the store's file holds it");
-  const own = await asked('POST', 'own', { task: 'nemia', wake: ['verified', 'failed'], digestEvery: 15 });
+  const own = await asked('POST', 'own', { task: 'nemia', selectors: ['reason=CheckPassed', 'agent=ada'], digestEvery: 15 });
   assert.equal(own.status, 201);
-  assert.deepEqual(own.body.subscription, { task: 'nemia', wake: ['verified', 'failed'], digestEvery: 15, from: 0 });
+  assert.deepEqual(own.body.subscription, { task: 'nemia', selectors: ['reason=CheckPassed', 'agent=ada'], digestEvery: 15, from: 0 });
   const taken = await asked('POST', 'watch', { task: 'nemia' });
   assert.equal(taken.status, 409);
   assert.match(String(taken.body.error), /^a subscription is already named watch: nemia unsubscribe watch removes it first/);
@@ -69,7 +69,15 @@ test('a long-lived task is given a subscription, 201, by its words or the defaul
   assert.deepEqual((await asked('DELETE', 'own')).status, 200);
 });
 
-test('REFUSED: a task never filed is a 404, one not long-lived and minutes not above zero a 422, each before anything is written', async () => {
+test('a selectors list sent empty comes to the default: nothing is stored with a filter that takes every line', async () => {
+  const blank = await asked('POST', 'blank', { task: 'nemia', selectors: [] });
+  assert.equal(blank.status, 201);
+  assert.deepEqual((blank.body.subscription as { selectors: string[] }).selectors, [...DEFAULT_SELECTORS]);
+  assert.deepEqual(JSON.parse(fs.readFileSync(file('blank'), 'utf8')).selectors, [...DEFAULT_SELECTORS], "the store's file holds it");
+  assert.equal((await asked('DELETE', 'blank')).status, 200);
+});
+
+test('REFUSED: a task never filed is a 404, one not long-lived, a selector refused and minutes not above zero a 422, each before anything is written', async () => {
   const nowhere = await asked('POST', 'a', { task: 'nowhere' });
   assert.equal(nowhere.status, 404);
   assert.match(String(nowhere.body.error), /^no task nowhere is filed on the store's engine: file it long-lived/);
@@ -79,9 +87,9 @@ test('REFUSED: a task never filed is a 404, one not long-lived and minutes not a
   const zero = await asked('POST', 'a', { task: 'nemia', digestEvery: 0 });
   assert.equal(zero.status, 422);
   assert.match(String(zero.body.error), /^--digest-every takes the minutes a digest waits for a wake/);
-  const blank = await asked('POST', 'a', { task: 'nemia', wake: [' '] });
-  assert.equal(blank.status, 422);
-  assert.match(String(blank.body.error), /^--wake takes a word/);
+  const nokey = await asked('POST', 'a', { task: 'nemia', selectors: ['message=boom'] });
+  assert.equal(nokey.status, 422);
+  assert.match(String(nokey.body.error), /is no key of a feed line/);
   assert.equal(fs.existsSync(file('a')), false, 'nothing written');
 });
 
@@ -93,12 +101,12 @@ test('REFUSED: a body that is not a subscription, and a name that names no file,
   const noTask = await asked('POST', 'b', {});
   assert.equal(noTask.status, 400);
   assert.match(String(noTask.body.error), /^`task` names the engine's long-lived task the feed is said to.*This request's was left out/);
-  const oneWord = await asked('POST', 'b', { task: 'nemia', wake: 'blocked' });
+  const oneWord = await asked('POST', 'b', { task: 'nemia', selectors: 'waits=person' });
   assert.equal(oneWord.status, 400);
   assert.equal(
     oneWord.body.error,
-    "`wake` is the words that wake the task, as `nemia subscribe --wake <word>` takes each: a list of text, or left out for the feed's " +
-      `words for a wait on a person. This request's was "blocked": ${SHAPE}.`,
+    "`selectors` is what wakes the task, as `nemia subscribe -l <selector>` takes each: a list of text, one selector of the feed's " +
+      `lines each, or left out for waits=person, the lines that wait on a person. This request's was "waits=person": ${SHAPE}.`,
   );
   const soon = await asked('POST', 'b', { task: 'nemia', digestEvery: 'soon' });
   assert.equal(soon.status, 400);

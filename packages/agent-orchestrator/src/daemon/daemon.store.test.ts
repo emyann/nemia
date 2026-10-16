@@ -1138,7 +1138,7 @@ test('the daemon delivers the subscriptions: a wake line written to the feed is 
   const { Effect } = await import('effect');
   const { dropSubscription, putSubscription } = await import('../subscription/subscription.store.ts');
   const { feedFile, feedSize } = await import('../feed/feed.store.ts');
-  putSubscription('daemon', { task: 'nemia', wake: ['awaiting approval'], digestEvery: 60, from: feedSize() });
+  putSubscription('daemon', { task: 'nemia', selectors: ['reason=AwaitingApproval'], digestEvery: 60, from: feedSize() });
   fs.appendFileSync(feedFile(), `${JSON.stringify({ at: at(0), run: 'r-1', step: 'plan', word: 'awaiting approval' })}\n`);
   const told: string[] = [];
   const e = engineOf((n) => {

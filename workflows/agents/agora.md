@@ -6,9 +6,9 @@ harness: claude
 model: opus
 effort: high
 context: 200k
-tools: Read, Grep, Glob, Bash, Skill, Agent
+tools: Read, Grep, Glob, Bash, Skill, Agent, WebFetch, WebSearch
 permissionMode: dontAsk
-allowedTools: Agent, Bash(git log:*), Bash(git show:*), Bash(git diff:*), Bash(git merge-base:*), Bash(git rev-parse:*), Bash(git branch --contains:*), Bash(git status), mcp__playwright__browser_click, mcp__playwright__browser_close, mcp__playwright__browser_console_messages, mcp__playwright__browser_drag, mcp__playwright__browser_drop, mcp__playwright__browser_evaluate, mcp__playwright__browser_file_upload, mcp__playwright__browser_fill_form, mcp__playwright__browser_find, mcp__playwright__browser_handle_dialog, mcp__playwright__browser_hover, mcp__playwright__browser_navigate, mcp__playwright__browser_navigate_back, mcp__playwright__browser_network_request, mcp__playwright__browser_network_requests, mcp__playwright__browser_press_key, mcp__playwright__browser_resize, mcp__playwright__browser_select_option, mcp__playwright__browser_snapshot, mcp__playwright__browser_tabs, mcp__playwright__browser_take_screenshot, mcp__playwright__browser_type, mcp__playwright__browser_wait_for
+allowedTools: WebSearch, WebFetch(domain:code.claude.com), WebFetch(domain:docs.claude.com), WebFetch(domain:platform.claude.com), WebFetch(domain:docs.anthropic.com), Agent, Bash(git log:*), Bash(git show:*), Bash(git diff:*), Bash(git merge-base:*), Bash(git rev-parse:*), Bash(git branch --contains:*), Bash(git status), mcp__playwright__browser_click, mcp__playwright__browser_close, mcp__playwright__browser_console_messages, mcp__playwright__browser_drag, mcp__playwright__browser_drop, mcp__playwright__browser_evaluate, mcp__playwright__browser_file_upload, mcp__playwright__browser_fill_form, mcp__playwright__browser_find, mcp__playwright__browser_handle_dialog, mcp__playwright__browser_hover, mcp__playwright__browser_navigate, mcp__playwright__browser_navigate_back, mcp__playwright__browser_network_request, mcp__playwright__browser_network_requests, mcp__playwright__browser_press_key, mcp__playwright__browser_resize, mcp__playwright__browser_select_option, mcp__playwright__browser_snapshot, mcp__playwright__browser_tabs, mcp__playwright__browser_take_screenshot, mcp__playwright__browser_type, mcp__playwright__browser_wait_for
 disallowedTools: Bash(cd:*), mcp__playwright__browser_run_code_unsafe, mcp__playwright__browser_console_messages(filename:*), mcp__playwright__browser_evaluate(filename:*), mcp__playwright__browser_network_request(filename:*), mcp__playwright__browser_network_requests(filename:*), mcp__playwright__browser_snapshot(filename:*), mcp__playwright__browser_take_screenshot(filename:*)
 output: review.schema.json
 ---
@@ -18,3 +18,7 @@ against this repository's rules. You read and run; you never write into the work
 Load your skill `review-a-change` with the Skill tool and follow it. Sign off `done` with your findings, and with `again` true only
 when a finding is worth another round of work; false when the change is done as far as a review can tell. A person still decides what
 lands.
+
+Anthropic's Agent SDK is documented at https://code.claude.com/docs/en/agent-sdk/overview, and the installed
+`@anthropic-ai/claude-agent-sdk` carries its own `sdk.d.ts`, the version actually in use: when a change leans on the SDK, read
+both and cite them, never an interface from memory.

@@ -1,7 +1,7 @@
 /**
- * The site builds, so every check's `npm test` catches a broken page, a broken internal link or a diagram that does not draw: the
- * real site is built into a scratch folder, and its own configuration, pointed at scratch pages of which one links to nowhere, must fail.
- * After the builds, the dev server starts through `dev()` in a child (`test/dev.ts`) and must say no error of its prerender server.
+ * The build refuses what it must: its own configuration, pointed at scratch pages of which one links to nowhere, must fail. What the
+ * real site's build writes is asserted where the repository builds it, by `built.ts` on `npm run build`, never by a build made here.
+ * After it, the dev server starts through `dev()` in a child (`test/dev.ts`) and must say no error of its prerender server.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -29,39 +29,6 @@ const build = (root: string, outDir: string, config?: string): { status: number 
   );
   return { status: ran.status, said: `${ran.stdout}${ran.stderr}` };
 };
-
-/** The SVGs of a built page. */
-const svgsOf = (html: string): string[] => html.match(/<svg[\s\S]*?<\/svg>/g) ?? [];
-
-/** The site's pages, in the sidebar's order: each built as its own `index.html`. */
-const PAGES = ['', 'map', 'runtime', 'a2a', 'workflows', 'agents', 'factories', 'how-a-run-lives', 'nemia', 'glossary', 'getting-started'];
-
-test('the site builds, with its eleven pages, the lifecycle on the runtime page alone and Nemia’s machine on hers alone', () => {
-  const out = scratch('docs-build-');
-  const { status, said } = build(APP, out);
-  assert.equal(status, 0, said);
-  const built = PAGES.map((page) => path.join(out, page, 'index.html'));
-  assert.deepEqual(
-    built.filter((page) => !fs.existsSync(page)),
-    [],
-    'every page is built',
-  );
-  for (const page of built)
-    assert.doesNotMatch(fs.readFileSync(page, 'utf8'), /set:html/, `no figure of ${page} prints its style as an attribute`);
-  const figures = (page: string) => svgsOf(fs.readFileSync(path.join(out, page, 'index.html'), 'utf8'));
-  assert.ok(
-    figures('runtime').some((svg) => svg.includes('input-required')),
-    'the runtime page draws the lifecycle',
-  );
-  assert.ok(
-    figures('nemia').some((svg) => svg.includes('untrusted')),
-    "Nemia's page draws her machine",
-  );
-  assert.ok(figures('how-a-run-lives').length > 0, 'how a run lives draws its sequence');
-  const drawing = (word: string) => PAGES.filter((page) => figures(page).some((svg) => svg.includes(word)));
-  assert.deepEqual(drawing('input-required'), ['runtime'], 'the lifecycle has one home, the runtime page');
-  assert.deepEqual(drawing('untrusted'), ['nemia'], 'Nemia’s machine has one home, her page');
-});
 
 test('REFUSED: a page with a broken internal link fails the build', () => {
   const fixture = scratch('docs-broken-');

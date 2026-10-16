@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "ASTRO_TELEMETRY_DISABLED=1 astro dev",
-    "build": "ASTRO_TELEMETRY_DISABLED=1 astro build",
+    "build": "ASTRO_TELEMETRY_DISABLED=1 astro build && node built.ts",
     "preview": "ASTRO_TELEMETRY_DISABLED=1 astro preview",
     "typecheck": "tsc --noEmit",
     "test": "node --import=../../tools/test-costs/probe.ts --test --test-concurrency=2 --test-timeout=120000 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=../../tools/test-costs/reporter.ts --test-reporter-destination=stderr test/*.test.ts"

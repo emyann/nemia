@@ -3,63 +3,19 @@
  * file naming it: a page of her history with where she is, a send put in her outbox and refused when empty, a read mark moved and refused
  * for an event she does not hold, a stop refused where her session cannot have its turn ended and guarded as her other writes are,
  * and the stream: presence first, then her events with the cursor, resumed after Last-Event-ID with nothing
- * repeated, and a cursor no read gave refused before it opens.
+ * repeated, and a cursor no read gave refused before it opens. The stop a session takes is answered 200 in
+ * `nemia-chat-stop.boundary.test.ts`: no session the harness lists here can have its turn ended.
+ *
+ * Her record is planted by `her.ts`, the fixture both files share.
  */
-import { config, registry, root } from './harness.ts';
+import './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
-import { randomUUID } from 'node:crypto';
 import type { ChatEvent, ChatHistory } from 'agent-orchestrator';
+import { said, withHer } from './her.ts';
 import { app } from '../src/app.ts';
 
 const BOARD = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' };
-
-const T0 = Date.parse('2026-10-15T12:00:00.000Z');
-const at = (s: number) => new Date(T0 + s * 1000).toISOString();
-const jsonl = (lines: object[]) => lines.map((line) => `${JSON.stringify(line)}\n`).join('');
-
-/** One line of her session's transcript, as Claude Code writes it: her words `text`. */
-const herLine = (sessionId: string, uuid: string, s: number, text: string) => ({
-  sessionId,
-  isSidechain: false,
-  userType: 'external',
-  cwd: '/code/app',
-  version: '2.1.270',
-  type: 'assistant',
-  uuid,
-  timestamp: at(s),
-  message: { role: 'assistant', content: [{ type: 'text', text }] },
-});
-
-/** Her session's transcript, `words` appended to it. */
-const said = (sessionId: string, words: string[], from = 0) => {
-  const file = path.join(config, 'projects', '-code-app', `${sessionId}.jsonl`);
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.appendFileSync(file, jsonl(words.map((w, i) => herLine(sessionId, `e${from + i}`, from + i + 1, w))));
-};
-
-/**
- * Her task at work: journalled as filed long-lived and spawned, its session listed working by `claude agents`, its transcript `words`,
- * and her level file naming it; her chat's files none.
- */
-function withHer(words: string[]) {
-  const task = `nemia-${randomUUID().slice(0, 8)}`;
-  const sessionId = randomUUID();
-  const journal = path.join(root, 'engine', 'tasks', `${task}.jsonl`);
-  fs.mkdirSync(path.dirname(journal), { recursive: true });
-  const filed = { kind: 'filed', at: at(0), brief: 'Be there.', cwd: '/code/app', maxAttempts: 1, harness: 'claude' };
-  fs.writeFileSync(journal, jsonl([filed, { kind: 'starting', at: at(0), attempt: 1 }, { kind: 'spawned', at: at(0), attempt: 1 }]));
-  const rows = fs.existsSync(registry) ? (JSON.parse(fs.readFileSync(registry, 'utf8')) as object[]) : [];
-  rows.push({ name: `ae/${task}/1`, sessionId, kind: 'background', state: 'working', status: 'busy', startedAt: T0 });
-  fs.writeFileSync(registry, JSON.stringify(rows));
-  said(sessionId, words);
-  fs.mkdirSync(path.join(root, 'nemia'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'nemia', 'level.json'), JSON.stringify({ level: 'semi-auto', since: at(0), task }));
-  fs.rmSync(path.join(root, 'nemia', 'chat'), { recursive: true, force: true });
-  return { task, sessionId };
-}
 
 /** The api's answer to `method` on `url` with `body`, as the board sends it. */
 async function asked(method: string, url: string, body?: unknown) {

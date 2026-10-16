@@ -57,7 +57,8 @@ export function leftOver(before: ReadonlyMap<string, string>, after: ReadonlyMap
   return (
     `a page left a write in the store it did not take back, ${left[0]}${left.length > 1 ? ` and ${left.length - 1} more` : ''}, and ` +
     `the next page in its place would read it:\n    ${left.join('\n    ')}\n` +
-    `  One of ${pages.join(', ')} wrote it: a page takes back what it writes before it ends (apps/web/CLAUDE.md). Run them one at a ` +
+    `  One of ${pages.join(', ')} wrote it: a page takes back what it writes before it ends (the change-the-board skill, Writing an ` +
+    'e2e page). Run them one at a ' +
     'time (npm run e2e -- --pages <name>) to find which.'
   );
 }

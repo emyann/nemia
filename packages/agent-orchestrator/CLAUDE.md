@@ -127,6 +127,16 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
   decoded by `FrozenStepSchema` (`folder/folder.store.ts`), a field per `StepKey` (a key added without one fails the typecheck): the shape, not
   the words.
 
+## The feed
+
+- **A line is signed once, through one door**: `upgraded` (`src/feed/feed.ts`) fills in `apiVersion`, `involved`, `labels`, `reason`,
+  `type`, `waits`, `source` and `message` for a line with no version, and is what `feedChanges`, `startedLine` and `denialLines` stamp a
+  new line with; a line that already names an `apiVersion` is passed on as its writer judged it.
+- **The fold keys on `involved`, not on `run`/`step`**: a hand-built fixture that spreads a run's line and adds a `step` keeps the run's
+  `involved` and folds under the run (it cost a pass in `apps/api/src/factory/feed.test.ts`). Build a line's fields, never spread another's.
+- **A reason comes from the table alone** (`src/feed/reason.ts`): a status reworded in `list.ts`, `cap.ts`, `wait.ts`, `ending.ts` or
+  `assess.ts` falls to `Unknown`, and `src/feed/reason.test.ts` is the only thing that refuses it — add the word to its fixture.
+
 ## The tick
 
 - **A command that lives as long as its process is an Effect run by `runMain`** (`src/daemon/up.verb.ts`, run by `wf up` and the api's

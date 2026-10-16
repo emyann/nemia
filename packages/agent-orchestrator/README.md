@@ -66,7 +66,18 @@ wf watch             # the same from the start, then each line as the tick write
 20:59:02  the-gate-yd1g  plan  unverified · done
 ```
 
-It is `$WF_ROOT/feed.jsonl`, a line of JSON per change — `{at, run, step?, word, note?}` — for the
+It is `$WF_ROOT/feed.jsonl`, a line of JSON per change. Every line a `nemia` of this version writes is a
+typed, labelled signal, as a Kubernetes `Event` is: `apiVersion: "nemia/v1"`, `involved` what it is about
+(`{kind, name}`, kind `Run`, `Step` or `Daemon`, a step named `<run>/<step>`), `labels` the run, its factory,
+its workflow and, on a step's line, the step and its agent — the same `stepLabels` a filing gives its
+session — `reason` a stable code a machine selects on, from the closed table in `src/feed/reason.ts`,
+`type` `Normal` or `Warning`, `waits: "person"` where the line waits on somebody, `source` the `tick`,
+the `runtime`, a `person` or a `daemon`, and `message` the sentence a person reads. Beside them it keeps
+the four fields it has always had — `{at, run, step?, word, note?}` — for one release, since every reader
+still reads them; a line written before this version has none of the rest, and is **upgraded on read**
+(`upgraded`, `parseLine`): its run and step become its `involved`, its word its `reason`, its word and
+note its `message`. Nothing on disk is ever rewritten, so every cursor ever handed out still means
+what it meant. The word is the
 run's status (`assess`'s, as `wf tick` prints it, `(pruned)` beside it for a pruned run, and what
 waits on you as its note) and for each step's word and note as `wf ls` prints them. A run stopped on
 a person's word and not on anything that broke says what `wf decide` says of it rather than `failed`:
@@ -78,7 +89,7 @@ closeout's `needs`, made one line and clipped at 200 characters — as the first
 `needs: …`, so the question is on the watcher's screen and `wf decide` has it whole. **The daemon is its
 one writer**: its tick appends a line only where what it judged is not what the feed said last, and a run
 whose record is gone (`wf rm`) gets one `removed`. `up`, once it holds the store, appends one line of its
-own — `{at, daemon, word: "daemon started", note}`, its pid and how the daemon before it ended:
+own — its pid and `word: "daemon started"`, `reason: "DaemonStarted"`, and how the daemon before it ended:
 `first daemon on this store`, `last stopped at <time>`, or `last gone without a stop: took … over from pid …`
 — so a follower sees a restart, and a crash before it, in the feed it already reads. It is routine to a
 subscription, and no run's: the fold and a run's `removed` leave it out. **Nothing reads it to decide**: every pass still
@@ -94,8 +105,14 @@ cost is said, and no git standing is read (`wf ls`'s `→ to decide` for a finis
 ending step is not in the feed). A step's filing reaches it a pass late, as `pending`: the words
 are read before the pass files anything. A run the pass finds at rest (`atRest`) whose words are
 the feed's writes nothing when only a note is worded anew, so a new or reworded note does not say
-again every finished run; a run in flight writes every change of word or note, a live step's new
-`denied:` among them.
+again every finished run; a run in flight writes every change of word or note.
+
+**A call a step's session was denied is a signal of its own**, not a part of the step's note: one line per
+denial the runtime journalled, `reason: "ToolDenied"`, `source: "runtime"`, `type: "Warning"`, carrying the
+`call` as a permission rule names it (`Bash(git push)`) and the `try` it belongs to, from 1, as fields a
+selector matches — `denied: Bash(git push)  · try 2` on a screen. It waits on nobody, holds no place in the
+fold, and is written once however many passes read it: what says it has been written already is the feed's
+own lines with that step and that try, counted, so a restarted daemon writes it neither again nor never.
 
 **The cursor is the engine's**: a byte offset, 0 or the number a `cursor:` line printed, that never
 expires. A read stops at the last newline, so it never passes a line half written, and one after

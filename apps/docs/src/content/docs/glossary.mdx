@@ -48,7 +48,7 @@ Each term has one line and a link to the page that explains it.
 - **Session**: one agent's conversation on a harness: a job that runs to its end, or a long-lived session that runs until stopped. [A job and a long-lived session](/runtime/#a-job-and-a-long-lived-session)
 - **Skill**: a folder of instructions and files an agent is given for one kind of work. [Skills](/agents/#skills)
 - **Step**: one markdown file of a workflow: who does it, what it may do, and what must finish first. [A step](/workflows/#a-step)
-- **Subscription**: two things. In A2A, a client following one Task's events as they happen. [A subscription](/a2a/#a-subscription). Nemia's subscription, `nemia`, is the orchestrator's own: it wakes her on lines of the store's feed. [Her subscription](/nemia/#her-subscription)
+- **Subscription**: two things. In A2A, a client following one Task's events as they happen. [A subscription](/a2a/#a-subscription). Nemia's subscription, `nemia`, is the orchestrator's own: it wakes her on the lines of the store's feed its selectors take. [Her subscription](/nemia/#her-subscription)
 - **Task**: the runtime's unit of work: a brief filed to run on a harness, with its attempts. [A task](/runtime/#a-task)
 - **Tick**: one pass of the daemon: it reads the world, decides (`assess`), acts, and carries nothing to the next pass. [Two loops](/how-a-run-lives/#two-loops-both-level-triggered)
 - **Tools**: the only tools a step's session has (`tools`), beside its fence. [Tools and the fence](/agents/#tools-and-the-fence)

@@ -525,13 +525,14 @@ test("the table's help is today's, word for word", () => {
       '                               interrupt',
       '  nemia resume',
       '                               resume the store: the next pass files what waits',
-      '  nemia subscribe <name> <task> [--wake <word>]... [--digest-every <minutes>] [--at-least <level>]',
+      '  nemia subscribe <name> <task> [-l <selector>]... [--digest-every <minutes>] [--at-least <level>]',
       "                               give the engine's long-lived task <task> a subscription to the feed,",
-      '                               named <name>, from its end: a line holding a wake word is said to it at',
-      '                               once, and the rest folded into a digest said with the next wake, or',
-      '                               after --digest-every minutes (default 60) with none.',
-      "                               --wake: a word that wakes it, once for each (default: the feed's words",
-      '                               for a wait on a person). Refused for a task not long-lived.',
+      '                               named <name>, from its end: a line one of its selectors takes is said to',
+      '                               it at once, and the rest folded into a digest said with the next wake,',
+      '                               or after --digest-every minutes (default 60) with none.',
+      '                               -l: the lines a selector takes, given again for another (default:',
+      '                               waits=person, the lines that wait on a person). Refused for a task not',
+      '                               long-lived.',
       "                               --at-least: only the lines of runs whose factory's level is at least",
       '                               this (manual, semi-auto, auto), read as each line is delivered.',
       '  nemia unsubscribe <name>',
@@ -625,7 +626,7 @@ test("the table's help is today's, word for word", () => {
       '                               nemia up --stats: what the last pass cost, phase by phase — read, not',
       '                               run, so it fits while a daemon holds the store; where none does,',
       '                               nemia tick --stats',
-      '  nemia watch [cursor] [--once] [-l <selector>]... [--cursor-file <path>] [--json] [--wake] [--wake-word <word>]...',
+      '  nemia watch [cursor] [--once] [-l <selector>]... [--cursor-file <path>] [--json]',
       "                               the feed's lines, followed as the tick writes them, until ^C, and a",
       '                               daemon down line when nothing ticks the store, daemon up when it does',
       "                               again: a run's status, a step's word as nemia ls says it, and what a",
@@ -636,8 +637,8 @@ test("the table's help is today's, word for word", () => {
       '                               agent, kind, reason, type, waits and source. --cursor-file: keep the',
       '                               cursor read to in a file, and start from it where it is there.',
       '                               --json: one JSON object a line, a feed line with its cursor, and a',
-      '                               cursor of its own every 30 seconds while the feed is still; --wake:',
-      '                               only the lines that wait on a person; --wake-word: these words',
+      '                               cursor of its own every 30 seconds while the feed is still. With no -l,',
+      '                               every line; -l waits=person takes the lines that wait on a person.',
       '  nemia admit [--at-least <level>] [--auto <agent>]',
       "                               a call's admission: the call a session is about to make, on stdin, answered",
       '                               ask where it answers what waits on you;',
@@ -838,7 +839,7 @@ test("REFUSED at shipped defaults: nemia tick's, nemia up's and nemia watch's ar
   );
   assert.equal(refusedBy(up, ['10', '20']), 'nemia up takes one pass interval at most, and was given 20 too: nemia up [ms].');
   assert.equal(refusedBy(up, ['10']), null);
-  const form = 'nemia watch [cursor] [--once] [-l <selector>]... [--cursor-file <path>] [--json] [--wake] [--wake-word <word>]...';
+  const form = 'nemia watch [cursor] [--once] [-l <selector>]... [--cursor-file <path>] [--json]';
   const cursor = `nemia watch takes one cursor at most, a whole number of bytes — 0, or the number a \`cursor:\` line printed: ${form}`;
   assert.equal(refusedBy(entry('watch'), ['x']), cursor);
   assert.equal(refusedBy(entry('watch'), ['1', '2']), `nemia watch does not take 2: ${form}`);

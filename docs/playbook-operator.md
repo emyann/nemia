@@ -27,11 +27,14 @@ words the agent can act on. It files, chains and restarts. It does not decide wh
 
 ## The loop
 
-1. **Watch.** One `nemia watch` stream plus a daemon-liveness line, filtered at the source to what needs judgement: a gate, a round, a
-   failure, a landing, the daemon. Every line that reaches the operator wakes it, and each wake re-reads its whole context, which is the
-   real cost of watching; routine transitions (`checking`, `verified ✓`, a step `done`) wake nobody. Match the status words after the
-   run's id, never the whole line, or a run named "landings refused…" wakes you on every transition. Re-arm the watch every time it
-   expires (it lasts 30 minutes):
+1. **Watch.** One `nemia watch` stream plus a daemon-liveness line, cut down to what needs judgement: a gate, a round, a failure, a
+   landing, the daemon. Every line that reaches the operator wakes it, and each wake re-reads its whole context, which is the real cost
+   of watching; routine transitions (`checking`, `verified ✓`, a step `done`) wake nobody. Two nets, and they are not the same net.
+   `nemia watch -l` selects **at the source**, over the keys a line names and never its message — `-l waits=person` is every line the
+   tick says waits on a person, and `-l reason=ToolDenied` a call denied. What no key names is the operator's own net below: a landing's
+   note (`committed its merge`), a run that simply `succeeded`, and the watch's own liveness lines, which are printed whatever the
+   selectors. Match that net on the status words after the run's id, never on the whole line, or a run named "landings refused…" wakes
+   you on every transition. Re-arm the watch every time it expires (it lasts 30 minutes):
 
    ```sh
    cur=$(npx nemia watch --once | awk '/^cursor:/{print $2}' | tail -1)
@@ -41,7 +44,8 @@ words the agent can act on. It files, chains and restarts. It does not decide wh
        if (rest ~ /awaiting approval|BLOCKED|input-required|failed|refused|over budget|succeeded|committed its merge|aborted|cancelled|stalled|error/) { print; fflush() } }'
    ```
 
-   Filter with `awk` and `fflush()`, never `grep`: `grep` held each gate line in its buffer.
+   Filter with `awk` and `fflush()`, never `grep`: `grep` held each gate line in its buffer. Give `nemia watch` the `-l` for what a key
+   does name, and the stream costs less before the pipe ever sees it.
 2. **React** to each event. A gate (`awaiting approval`), a round (`input-required · BLOCKED`), a failed check, a landing, or a daemon
    line that is not ok needs action.
 3. **After any gap** (an expired watch, a long answer to the person), list what moved before re-arming

@@ -24,7 +24,7 @@ process.env.WF_ROOT = ROOT;
 const { DELIVER_DEFAULTS, SUBSCRIPTION_DIGEST_CHECKS, deliver, sayBackoff } = await import('./deliver.verb.ts');
 const { deliveryFile, dropSubscription, putSubscription, readDelivery, subscriptionFile, writeDelivery } =
   await import('./subscription.store.ts');
-const { DEFAULT_WAKE } = await import('./subscription.ts');
+const { DEFAULT_SELECTORS } = await import('./subscription.ts');
 const { feedFile, feedSize, readFeed } = await import('../feed/feed.store.ts');
 const { emitFeed, FEED_FOLLOW_LINES, FEED_FOLLOWERS, feedHubLayer } = await import('../feed/feed.verb.ts');
 const { engineOf, over } = await import('../runtime-client.ts');
@@ -88,10 +88,10 @@ const kept = (t: TestContext, name: string, subscription: Parameters<typeof putS
   });
 };
 
-/** A subscription of `task`'s for test `t`, by the default wake words, from the feed's end, which it answers (`kept`). */
+/** A subscription of `task`'s for test `t`, by the default selector, from the feed's end, which it answers (`kept`). */
 const subscribed = (t: TestContext, name: string, task: string): number => {
   const from = feedSize();
-  kept(t, name, { task, wake: [...DEFAULT_WAKE], digestEvery: 60, from });
+  kept(t, name, { task, selectors: [...DEFAULT_SELECTORS], digestEvery: 60, from });
   return from;
 };
 
@@ -445,8 +445,8 @@ test(
     writeRun('r-pipao', 'pipao');
     writeRun('r-hkb', 'hkb');
     const from = feedSize();
-    kept(t, 'floored', { task: 't-floored', wake: [...DEFAULT_WAKE], digestEvery: 60, from, scope: { atLeast: 'semi-auto' } });
-    kept(t, 'everything', { task: 't-everything', wake: [...DEFAULT_WAKE], digestEvery: 60, from });
+    kept(t, 'floored', { task: 't-floored', selectors: [...DEFAULT_SELECTORS], digestEvery: 60, from, scope: { atLeast: 'semi-auto' } });
+    kept(t, 'everything', { task: 't-everything', selectors: [...DEFAULT_SELECTORS], digestEvery: 60, from });
     const stop = running(t);
     appended(line('r-pipao', 'running'), line('r-pipao', 'awaiting approval'), line('r-gone', 'awaiting approval'));
     appended(line('r-hkb', 'awaiting approval'));
@@ -468,8 +468,8 @@ test(
   WAITED,
   async (t) => {
     const from = feedSize();
-    kept(t, 'scoped-d', { task: 't-scoped-d', wake: [...DEFAULT_WAKE], digestEvery: 60, from, scope: { atLeast: 'semi-auto' } });
-    kept(t, 'woken-d', { task: 't-woken-d', wake: ['daemon'], digestEvery: 60, from });
+    kept(t, 'scoped-d', { task: 't-scoped-d', selectors: [...DEFAULT_SELECTORS], digestEvery: 60, from, scope: { atLeast: 'semi-auto' } });
+    kept(t, 'woken-d', { task: 't-woken-d', selectors: ['kind=Daemon'], digestEvery: 60, from });
     const stop = running(t);
     const started: FeedLine = { at: new Date().toISOString(), daemon: 5151, word: DAEMON_STARTED, note: 'first daemon on this store' };
     appended(started);

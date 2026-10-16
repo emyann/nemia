@@ -1,6 +1,8 @@
 /**
- * What a line of the feed means for a subscriber, the words it is told, and when a digest falls due: pure, and pinned against the words the
- * feed writes (`feedWords`), so a word the feed changes is a default wake word that fails here rather than a wake that never comes.
+ * What a line of the feed means for a subscriber, the words it is told, and when a digest falls due: pure, and pinned against the lines the
+ * feed writes (`feedWords`), so a wait the feed stops stamping fails here rather than becoming a wake that never comes. Which lines wake is
+ * the feed's one selector grammar over the subscription's selectors (`selects`); the conversion of a stored wake list is
+ * `former-wake.test.ts`'s.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,14 +13,20 @@ import type { Instant } from '../daemon/daemon.ts';
 import {
   BOOKMARK_EVERY,
   bookmarkLine,
-  DEFAULT_WAKE,
+  DEFAULT_SELECTORS,
   digestDue,
   digestOf,
   messageOf,
   readDelivered,
-  sortLine,
   subscribeRefusalOf,
 } from './subscription.ts';
+import { parseSelectors, selects } from '../watch/selector.ts';
+
+/** The default filter parsed, as a subscription that named no selector of its own is delivered by. */
+const DEFAULT = parseSelectors(DEFAULT_SELECTORS);
+
+/** Whether the default filter takes `line`: `'wake'` where it does, `'routine'` where the line joins the digest instead. */
+const sorted = (line: FeedLine, selectors = DEFAULT): 'wake' | 'routine' => (selects(selectors, line) ? 'wake' : 'routine');
 
 const AT = '2026-10-05T12:00:00.000Z';
 
@@ -48,7 +56,7 @@ const linesOf = (
 
 const BLOCKED: Closeout = { outcome: 'blocked', summary: 's', artifacts: [], needs: 'a decision on the schema' };
 
-test('the default wake words wake on each line the feed writes for a wait on a person, pinned against feedWords', () => {
+test('the default selector takes each line the feed writes for a wait on a person, pinned against feedWords', () => {
   const waits: Array<[string, FeedLine[]]> = [
     ['a step at its gate', linesOf(listed('awaiting approval', { onYou: true }), { status: 'awaiting approval' })],
     ['a loop out of rounds', linesOf(listed('rounds exhausted', { onYou: true }), { status: 'running' })],
@@ -58,12 +66,12 @@ test('the default wake words wake on each line the feed writes for a wait on a p
   ];
   for (const [what, lines] of waits)
     assert.ok(
-      lines.some((l) => sortLine(l, DEFAULT_WAKE) === 'wake'),
+      lines.some((l) => sorted(l) === 'wake'),
       `${what} wakes: ${JSON.stringify(lines)}`,
     );
 });
 
-test('a tool denial is routine for the default wake words, as a step’s denied: note was before it became a signal of its own', () => {
+test('a tool denial is routine for the default selector, as it was for the wake words it replaces', () => {
   const shot = upgraded({
     at: AT,
     run: 'r-1',
@@ -74,49 +82,50 @@ test('a tool denial is routine for the default wake words, as a step’s denied:
     try: 2,
   });
   assert.equal(shot.reason, 'ToolDenied');
-  assert.equal(sortLine(shot, DEFAULT_WAKE), 'routine', 'nobody woken by the default words is woken by a denial, then or now');
+  assert.equal(sorted(shot), 'routine', 'nobody woken by the default selector is woken by a denial, then or now');
+  assert.equal(sorted(shot, parseSelectors(['reason=ToolDenied'])), 'wake', 'a subscription that names it is');
 });
 
 test("a run blocked, its note waiting on you: review, wakes on the run's own line, and a loop out of rounds on the step's", () => {
   const [run] = linesOf(listed('rounds exhausted', { onYou: true }), { status: 'blocked' });
   assert.deepEqual(run, upgraded({ at: AT, run: 'r-1', word: 'blocked', note: 'waiting on you: review' }));
   assert.deepEqual({ reason: run.reason, type: run.type, waits: run.waits }, { reason: 'Blocked', type: 'Warning', waits: 'person' });
-  assert.equal(sortLine(run, DEFAULT_WAKE), 'wake');
+  assert.equal(sorted(run), 'wake');
   assert.equal(
-    sortLine({ at: AT, run: 'r-1', word: 'running', note: 'waiting on you: review' }, DEFAULT_WAKE),
+    sorted(upgraded({ at: AT, run: 'r-1', word: 'running', note: 'waiting on you: review' })),
     'wake',
-    'by its note alone',
+    'by its note alone, which the tick reads into the line’s waits',
   );
   const [, step] = linesOf(listed('rounds exhausted', { onYou: true }), { status: 'running' });
   assert.equal(step.word, 'rounds exhausted');
-  assert.equal(sortLine(step, DEFAULT_WAKE), 'wake');
+  assert.equal(sorted(step), 'wake');
 });
 
 test("a blocked sign-off wakes by its note's needs: alone, whatever its word", () => {
   const [, step] = linesOf(listed('succeeded · BLOCKED'), { status: 'running' }, BLOCKED);
   assert.equal(step.note, 'needs: a decision on the schema');
-  assert.equal(sortLine({ ...step, word: 'succeeded' }, DEFAULT_WAKE), 'wake');
+  assert.equal(sorted(upgraded({ at: AT, run: 'r-1', step: 'review', word: 'succeeded', note: step.note })), 'wake');
 });
 
 test('routine words do not wake: a step at work, verified, waiting, a run running or succeeded, a hold', () => {
   for (const status of ['running', 'verified ✓', 'waiting', 'pending', 'succeeded · done'])
     for (const line of linesOf(listed(status), { status: 'running' }))
-      assert.equal(sortLine(line, DEFAULT_WAKE), 'routine', `${JSON.stringify(line)} is routine`);
-  assert.equal(sortLine({ at: AT, run: 'r-1', word: 'succeeded' }, DEFAULT_WAKE), 'routine');
-  assert.equal(sortLine({ at: AT, run: 'r-1', word: 'running', note: 'held until r-2 ships' }, DEFAULT_WAKE), 'routine');
+      assert.equal(sorted(line), 'routine', `${JSON.stringify(line)} is routine`);
+  assert.equal(sorted(upgraded({ at: AT, run: 'r-1', word: 'succeeded' })), 'routine');
+  assert.equal(sorted(upgraded({ at: AT, run: 'r-1', word: 'running', note: 'held until r-2 ships' })), 'routine');
   assert.equal(
-    sortLine({ at: AT, run: 'r-1', step: 'build', word: 'running', note: 'said to twice · the needs: of it' }, DEFAULT_WAKE),
+    sorted(upgraded({ at: AT, run: 'r-1', step: 'build', word: 'running', note: 'said to twice · the needs: of it' })),
     'routine',
-    'a wake word inside a part of the note, not leading it, is no wake',
+    'a wake word inside a part of the note, not leading it, is no wait the tick stamps',
   );
 });
 
-test("a subscriber's own wake words replace the default, matched on the word or the note's lead whatever their case", () => {
-  const line: FeedLine = { at: AT, run: 'r-1', step: 'plan', word: 'Verified ✓' };
-  assert.equal(sortLine(line, ['verified']), 'wake');
-  assert.equal(sortLine({ ...line, word: 'verified ✓' }, ['VERIFIED']), 'wake', 'the wake word folded too');
-  assert.equal(sortLine({ ...line, word: 'awaiting approval' }, ['verified']), 'routine');
-  assert.equal(sortLine({ ...line, word: 'running', note: 'Waiting On You: review it' }, DEFAULT_WAKE), 'wake', "the note's lead folded");
+test("a subscriber's own selectors replace the default, over the keys a line names and never its message", () => {
+  const line = linesOf(listed('verified ✓'), { status: 'running' })[1];
+  assert.equal(sorted(line, parseSelectors(['reason=CheckPassed'])), 'wake');
+  assert.equal(sorted(line, parseSelectors(['step=review'])), 'wake', 'a label of the line too');
+  assert.equal(sorted(line, parseSelectors(['reason=AwaitingApproval'])), 'routine');
+  assert.equal(sorted(line, parseSelectors(['reason=AwaitingApproval', 'type=Normal'])), 'wake', 'one selector of several must hold');
 });
 
 test('a wake is told its lines, then the digest riding it; a digest alone is told with its count', () => {
@@ -169,7 +178,7 @@ test('a read with a wake comes to one message: every wake line, then the digest 
   const folded: FeedLine = { at: '2026-10-05T11:50:00.000Z', run: 'r-2', step: 'build', word: 'running' };
   const before: FeedLine = { at: '2026-10-05T11:58:00.000Z', run: 'r-2', step: 'build', word: 'verified ✓' };
   const after: FeedLine = { at: '2026-10-05T12:01:00.000Z', run: 'r-3', step: 'build', word: 'running' };
-  const read = readDelivered({ cursor: 10, digest: [folded], since }, [before, ...GATE, after], DEFAULT_WAKE, 99, now);
+  const read = readDelivered({ cursor: 10, digest: [folded], since }, [before, ...GATE, after], DEFAULT, 99, now);
   assert.equal(read.message, messageOf(GATE, [folded, before, after]));
   assert.equal(read.wakes, 2);
   assert.deepEqual(read.next, { cursor: 99, digest: [] });
@@ -180,19 +189,24 @@ test('a read with no wake is told nothing: its routine lines folded, the digest 
   const since: Instant = { at: 1_000_000, mono: { boot: 'b', ms: 0 } };
   const r1: FeedLine = { at: AT, run: 'r-2', step: 'build', word: 'running' };
   const r2: FeedLine = { at: AT, run: 'r-2', step: 'build', word: 'verified ✓' };
-  assert.deepEqual(readDelivered({ cursor: 10, digest: [] }, [r1, r2], DEFAULT_WAKE, 50, now), {
+  assert.deepEqual(readDelivered({ cursor: 10, digest: [] }, [r1, r2], DEFAULT, 50, now), {
     wakes: 0,
     next: { cursor: 50, digest: [r1, r2], since: now },
   });
-  assert.deepEqual(readDelivered({ cursor: 10, digest: [r1], since }, [r2], DEFAULT_WAKE, 50, now), {
+  assert.deepEqual(readDelivered({ cursor: 10, digest: [r1], since }, [r2], DEFAULT, 50, now), {
     wakes: 0,
     next: { cursor: 50, digest: [r1, r2], since },
   });
-  assert.deepEqual(readDelivered({ cursor: 10, digest: [r1], since }, [], DEFAULT_WAKE, 50, now), {
+  assert.deepEqual(readDelivered({ cursor: 10, digest: [r1], since }, [], DEFAULT, 50, now), {
     wakes: 0,
     next: { cursor: 50, digest: [r1], since },
   });
-  assert.deepEqual(readDelivered({ cursor: 10, digest: [] }, [], DEFAULT_WAKE, 50, now), { wakes: 0, next: { cursor: 50, digest: [] } });
+  assert.deepEqual(readDelivered({ cursor: 10, digest: [] }, [], DEFAULT, 50, now), { wakes: 0, next: { cursor: 50, digest: [] } });
+  assert.deepEqual(
+    readDelivered({ cursor: 10, digest: [] }, [r1, r2], parseSelectors(['reason=ToolDenied']), 50, now),
+    { wakes: 0, next: { cursor: 50, digest: [r1, r2], since: now } },
+    'a read whose lines no selector takes says nothing and leaves the cursor past them: the bookmark with no say',
+  );
 });
 
 test('a digest is due once its minutes have passed since its first line, and never while it is empty', () => {
@@ -207,13 +221,18 @@ test('a digest is due once its minutes have passed since its first line, and nev
   assert.equal(digestDue(since, 1, otherBoot), true, 'across boots, the wall clock');
 });
 
-test('REFUSED: a subscription whose name is no file name, a wake word empty, or minutes not above zero', () => {
-  assert.equal(subscribeRefusalOf({ name: 'nemia', wake: [], digestEvery: 60 }), undefined);
+test("REFUSED: a subscription whose name is no file name, a selector the feed's grammar refuses, or minutes not above zero", () => {
+  assert.equal(subscribeRefusalOf({ name: 'nemia', selectors: [...DEFAULT_SELECTORS], digestEvery: 60 }), undefined);
   for (const name of ['', '../x', 'a b', 'x.state', '-x'])
-    assert.match(subscribeRefusalOf({ name, wake: [] }) ?? '', /is no subscription's name/, JSON.stringify(name));
-  assert.match(subscribeRefusalOf({ name: 'n', wake: ['failed', ' '] }) ?? '', /^--wake takes a word/);
+    assert.match(subscribeRefusalOf({ name, selectors: [] }) ?? '', /is no subscription's name/, JSON.stringify(name));
+  assert.match(subscribeRefusalOf({ name: 'n', selectors: ['waits=person', 'message=boom'] }) ?? '', /is no key of a feed line/);
+  assert.match(subscribeRefusalOf({ name: 'n', selectors: [' '] }) ?? '', /is no selector: it holds no clause/);
   for (const digestEvery of [0, -1, Number.NaN])
-    assert.match(subscribeRefusalOf({ name: 'n', wake: [], digestEvery }) ?? '', /^--digest-every takes the minutes/, String(digestEvery));
+    assert.match(
+      subscribeRefusalOf({ name: 'n', selectors: [...DEFAULT_SELECTORS], digestEvery }) ?? '',
+      /^--digest-every takes the minutes/,
+      String(digestEvery),
+    );
 });
 
 test('a silent watch bookmarks its cursor under --json and prints nothing of it in words', () => {
@@ -221,6 +240,5 @@ test('a silent watch bookmarks its cursor under --json and prints nothing of it 
   assert.deepEqual(JSON.parse(bookmarkLine(1834, { json: true })!), { cursor: 1834 });
   assert.equal(Object.hasOwn(JSON.parse(bookmarkLine(0, { json: true })!), 'word'), false, 'a reader that filters on the words skips it');
   assert.equal(bookmarkLine(1834, {}), undefined, 'in words, a person reading a still feed is told nothing');
-  assert.equal(bookmarkLine(1834, { wake: ['failed'] }), undefined, 'and the wake words do not make it one');
   assert.equal(BOOKMARK_EVERY, '30 seconds', 'one cadence, every surface reading this constant');
 });

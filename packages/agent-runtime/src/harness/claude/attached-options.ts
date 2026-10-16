@@ -25,6 +25,7 @@ export type AttachedOptions = Pick<
   | 'additionalDirectories'
   | 'permissionMode'
   | 'settingSources'
+  | 'systemPrompt'
   | 'model'
   | 'effort'
   | 'maxBudgetUsd'
@@ -92,7 +93,9 @@ const mcpFileOf = (r: SpawnRequest, file: string): string | undefined => {
  *
  * - the tools, denies and allows (`claudeDenies`, `claudeAllows`), the mounts as `additionalDirectories`;
  * - `config.claude` with the admission's hook (`admittedFlags`) on `extraArgs`, its plugin folders as `plugins`;
- * - the mode, `auto` unless the task names one; the servers, strict, no Chrome; `--setting-sources project`;
+ * - the mode, `auto` unless the task names one; the servers, strict, no Chrome; `--setting-sources project`; Claude Code's own
+ *   system prompt as the preset `claude_code`, which a `claude -p` job has by default and the SDK leaves empty when unasked, so the
+ *   agent's own prompt on `append-system-prompt-file` is appended to it and not to nothing;
  * - the model, the effort, the context window, the closing statement's schema (`outputFormat`, handed on as it was given, unread), the
  *   session to resume, the worktree, and the spend cap;
  * - the environment: the engine's own, its telemetry taken out (`withoutTelemetry`), with the task's `env`, `CLAUDE_JOB_ENV` and the
@@ -110,6 +113,7 @@ export const attachedOptions = (r: SpawnRequest, mcpFile: string): AttachedOptio
     ...(plugins.length ? { plugins: plugins.map((p) => ({ type: 'local' as const, path: path.resolve(r.cwd, p) })) } : {}),
     permissionMode: (c?.permissionMode ?? CLAUDE_DEFAULT_MODE) as Options['permissionMode'],
     settingSources: ['project'],
+    systemPrompt: { type: 'preset', preset: 'claude_code' },
     ...askedOf(r),
     extraArgs: {
       ...extra,

@@ -84,8 +84,9 @@ she waits `untrusted` until it does. Once `filed`, she is subscribed and `kept`.
 ## Her subscription
 
 Nemia is woken by the feed, the line of everything the daemon writes. Her subscription to it is named `nemia`
-(`NEMIA_SUBSCRIPTION`, in `packages/agent-orchestrator/src/nemia/nemia.ts`), and is hers alone. When a feed line matches its wake words,
-she is told, and looks.
+(`NEMIA_SUBSCRIPTION`, in `packages/agent-orchestrator/src/nemia/nemia.ts`), and is hers alone. Its filter is two selectors
+(`NEMIA_SELECTORS`): `waits=person`, the lines that wait on a person, and `reason=ToolDenied`, a step's calls denied. When a feed line one
+of them takes is written, she is told, and looks.
 
 This is the orchestrator's subscription to the store's feed. It is not A2A's subscription to a session's Task, which the board uses to
 follow a step live (see [A2A](/a2a/#a-subscription)).

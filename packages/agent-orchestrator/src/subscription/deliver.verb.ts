@@ -31,6 +31,7 @@ import { atLeast } from '../level/level.ts';
 import { levelOfFactory, runFactory } from '../level/levels.verb.ts';
 import { dropDelivery, listDeliveries, listSubscriptions, readDelivery, writeDelivery } from './subscription.store.ts';
 import { digestDue, digestOf, readDelivered, resumedAt, type Delivery, type Subscription } from './subscription.ts';
+import { parseSelectors, type Selectors } from '../watch/selector.ts';
 
 /** The wake lines said to subscribers. */
 export const SUBSCRIPTION_WAKES = Metric.counter('subscription.wakes', { description: 'the wake lines of the feed said to a subscriber' });
@@ -93,12 +94,13 @@ const told = (name: string, sub: Subscription, text: string, o: DeliverOptions):
   });
 
 /**
- * One subscription's delivery: where its deliverer is (`state`), written through after each change, its lock, one change at a time, and
- * the factory of each run it has read (`factories`), frozen on the run's record.
+ * One subscription's delivery: where its deliverer is (`state`), written through after each change, its lock, one change at a time, the
+ * selectors of its record parsed once (`selectors`), and the factory of each run it has read (`factories`), frozen on the run's record.
  */
 type Delivering = {
   name: string;
   sub: Subscription;
+  selectors: Selectors;
   o: DeliverOptions;
   state: Ref.Ref<Delivery>;
   lock: Semaphore.Semaphore;
@@ -130,7 +132,7 @@ const onLines = (d: Delivering, lines: readonly FeedLine[], cursor: number): Eff
   Effect.gen(function* () {
     const at = yield* Ref.get(d.state);
     const carried = yield* Effect.filter(lines, (line) => (isRunLine(line) ? carries(d, line.run) : Effect.succeed(true)));
-    const read = readDelivered(at, carried, d.sub.wake, cursor, instantNow());
+    const read = readDelivered(at, carried, d.selectors, cursor, instantNow());
     if (read.message !== undefined) {
       yield* told(d.name, d.sub, read.message, d.o);
       yield* Metric.update(SUBSCRIPTION_WAKES, read.wakes);
@@ -197,7 +199,15 @@ const reading = (d: Delivering): Effect.Effect<never, never, EngineService> =>
 const delivering = (name: string, sub: Subscription, o: DeliverOptions): Effect.Effect<never, never, EngineService> =>
   Effect.gen(function* () {
     const state = yield* Ref.make<Delivery>(resumedAt(readDelivery(name), sub));
-    const d: Delivering = { name, sub, o, state, lock: yield* Semaphore.make(1), factories: new Map() };
+    const d: Delivering = {
+      name,
+      sub,
+      selectors: parseSelectors(sub.selectors),
+      o,
+      state,
+      lock: yield* Semaphore.make(1),
+      factories: new Map(),
+    };
     const check = d.lock.withPermit(digestPass(d)).pipe(Effect.andThen(Metric.update(SUBSCRIPTION_DIGEST_CHECKS, 1)));
     yield* Effect.forkChild(Effect.forever(check.pipe(Effect.andThen(Effect.sleep(o.digestCheck)))));
     return yield* reading(d);

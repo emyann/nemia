@@ -3,24 +3,26 @@
  * and as one digest for routine news, said with the next wake or once `digestEvery` minutes have passed with none. The wake lines of one
  * read of the feed are told in one message.
  *
- * Pure: what a line means for a subscriber (`sortLine`) and for `nemia watch` (`wakeOf`, `watchedLine`, `bookmarkLine` and the one
- * cadence a silent watch says where it is at, `BOOKMARK_EVERY`), what one read of the feed comes to (`readDelivered`), the words it is
- * told (`messageOf`, `digestOf`), when a digest falls due (`digestDue`), and the refusals of a subscription asked for
- * (`subscribeRefusalOf`).
+ * Pure: how `nemia watch` prints a line (`watchedLine`, `bookmarkLine` and the one cadence a silent watch says where it is at,
+ * `BOOKMARK_EVERY`), what one read of the feed comes to (`readDelivered`), the words it is told (`messageOf`, `digestOf`), when a digest
+ * falls due (`digestDue`), and the refusals of a subscription asked for (`subscribeRefusalOf`). What a line means for a subscriber is the
+ * feed's one selector grammar (`selects`, `watch/selector.ts`), over the selectors its record holds; the conversion of a record that still
+ * holds the former `wake` key is `former-wake.ts`.
  * The person's file and the deliverer's are `subscription.store.ts`'s, the deliverer is `deliver.verb.ts`, and the commands are
  * `subscription.verb.ts`.
  */
-import type { Args } from '../command/command.ts';
 import { feedLineWords, type FeedLine } from '../feed/index.ts';
+import { selectorsRefusal, selects, type Selectors } from '../watch/selector.ts';
 import { elapsedMs, type Instant } from '../daemon/daemon.ts';
 import { LEVELS, type Level } from '../level/level.ts';
 
 /**
- * A subscription as a person asked for it: the task told (`task`), the words that wake it (`wake`), the minutes a digest waits for a wake
- * (`digestEvery`), the byte of the feed its news starts from (`from`), the feed's size when it was asked for, and its `scope`: the level
- * a run's factory is at least at for its lines to be carried, absent where every line is.
+ * A subscription as a person asked for it: the task told (`task`), the selectors that wake it (`selectors`, the text a person typed, one
+ * of which must take a line — never empty, which would take every line), the minutes a digest waits for a wake (`digestEvery`), the byte
+ * of the feed its news starts from (`from`), the feed's size when it was asked for, and its `scope`: the level a run's factory is at least
+ * at for its lines to be carried, absent where every line is.
  */
-export type Subscription = { task: string; wake: string[]; digestEvery: number; from: number; scope?: { atLeast: Level } };
+export type Subscription = { task: string; selectors: string[]; digestEvery: number; from: number; scope?: { atLeast: Level } };
 
 /**
  * Where the deliverer is with a subscription: the byte of the feed it has delivered or folded every line before (`cursor`), the routine
@@ -41,55 +43,24 @@ export const resumedAt = (kept: KeptDelivery | undefined, sub: Subscription): De
     : { cursor: sub.from, digest: [] };
 
 /**
- * The words that wake a subscriber when it names none: each word of the feed for a line that waits on a person. A step at its
- * gate (`awaiting approval`), a loop out of rounds (`rounds exhausted`), a session waiting on its harness's prompt (`needs-human`), a step
- * or run that signed off or stopped blocked (`blocked`) or failed (`failed`), and the notes of a run that waits on a person
- * (`waiting on you:`) and of a blocked sign-off (`needs:`).
+ * What wakes a subscriber that names no selector of its own: the lines that wait on a person. One selector, over the key the tick stamps
+ * off the feed's reason table (`waitsOf`), so the waking set is exactly the set the table says waits — the guarantee the seven wake words
+ * carried, now held by `src/feed/reason.test.ts` over the conversion of them.
  */
-export const DEFAULT_WAKE: readonly string[] = [
-  'awaiting approval',
-  'rounds exhausted',
-  'needs-human',
-  'blocked',
-  'failed',
-  'waiting on you:',
-  'needs:',
-];
+export const DEFAULT_SELECTORS: readonly string[] = ['waits=person'];
 
 /** The minutes a digest waits for a wake when the subscription names none. */
 export const DEFAULT_DIGEST_EVERY = 60;
 
-/**
- * Whether `line` wakes a subscriber woken by `wake`, or joins its digest: a wake word found in the line's word, or leading one of the parts
- * of its note (` · ` between them), whatever their case. Pure.
- */
-export function sortLine(line: FeedLine, wake: readonly string[]): 'wake' | 'routine' {
-  const word = line.word.toLowerCase();
-  const notes = (line.note ?? '').split(' · ').map((part) => part.trim().toLowerCase());
-  const woken = wake.map((w) => w.toLowerCase()).some((w) => word.includes(w) || notes.some((part) => part.startsWith(w)));
-  return woken ? 'wake' : 'routine';
-}
-
-/** How `nemia watch` prints the feed: as JSON (`--json`), and only the lines a wake word in `wake` finds (`--wake`, `--wake-word`). */
-export type Watched = { json?: boolean; wake?: readonly string[] };
-
-/**
- * The wake words of `nemia watch`'s arguments: `DEFAULT_WAKE` for `--wake`, and each `--wake-word` beside them — or undefined for
- * neither, where every line is printed.
- */
-export function wakeOf(args: Args): readonly string[] | undefined {
-  const words = [...(args.wake === true ? DEFAULT_WAKE : []), ...((args.wakeWord as readonly string[] | undefined) ?? [])];
-  return words.length > 0 ? words : undefined;
-}
+/** How `nemia watch` prints the feed: as JSON (`--json`), else in words. Which lines it prints is its selectors' (`selects`). */
+export type Watched = { json?: boolean };
 
 /**
  * A line of the feed as `nemia watch` prints it, `cursor` the byte just after it: in words (`feedLineWords`), or one JSON object, the line
- * whole with its cursor — or undefined where the watch keeps the wake lines and a wake word finds none in it (`sortLine`). Pure.
+ * whole with its cursor. Pure. Every line given is printed: a line its selectors do not take never reaches here.
  */
-export function watchedLine(line: FeedLine, cursor: number, how: Watched): string | undefined {
-  if (how.wake !== undefined && sortLine(line, how.wake) !== 'wake') return undefined;
-  return how.json === true ? JSON.stringify({ ...line, cursor }) : feedLineWords(line);
-}
+export const watchedLine = (line: FeedLine, cursor: number, how: Watched): string =>
+  how.json === true ? JSON.stringify({ ...line, cursor }) : feedLineWords(line);
 
 /**
  * How often a watch that has fallen silent says where it is: one cadence, read by every surface that follows the feed, so a watcher
@@ -128,18 +99,19 @@ export type ReadDelivered = { message?: string; wakes: number; next: Delivery };
 
 /**
  * What one read of the feed, ending at `cursor`, comes to for a subscriber at `at`, given the lines it carries of that read (`carried`), in
- * feed order. Where one wakes (`sortLine`), every wake line is said in one message, with the digest and every routine line of the read
- * riding it, and the digest is emptied; else each routine line is folded into the digest, begun at `now` where it was empty. Pure.
+ * feed order. Where one wakes — `selects`, over the subscription's parsed selectors — every wake line is said in one message, with the
+ * digest and every routine line of the read riding it, and the digest is emptied; else each routine line is folded into the digest, begun
+ * at `now` where it was empty. Pure.
  */
 export function readDelivered(
   at: Delivery,
   carried: readonly FeedLine[],
-  wake: readonly string[],
+  selectors: Selectors,
   cursor: number,
   now: Instant,
 ): ReadDelivered {
-  const wakes = carried.filter((l) => sortLine(l, wake) === 'wake');
-  const routine = carried.filter((l) => sortLine(l, wake) === 'routine');
+  const wakes = carried.filter((l) => selects(selectors, l));
+  const routine = carried.filter((l) => !selects(selectors, l));
   const digest = [...at.digest, ...routine];
   if (wakes.length) return { message: messageOf(wakes, digest), wakes: wakes.length, next: { cursor, digest: [] } };
   if (!routine.length) return { wakes: 0, next: { ...at, cursor } };
@@ -161,7 +133,7 @@ export const digestDue = (since: Instant | undefined, everyMinutes: number, now:
 const NAME = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 
 /** The usage the refusals of a subscription end on. */
-export const SUBSCRIBE_FORM = 'nemia subscribe <name> <task> [--wake <word>]... [--digest-every <minutes>] [--at-least <level>]';
+export const SUBSCRIBE_FORM = 'nemia subscribe <name> <task> [-l <selector>]... [--digest-every <minutes>] [--at-least <level>]';
 
 /** Why `name` is no subscription's name, or undefined where it is one. Pure. */
 export const subscriptionNameRefusal = (name: string): string | undefined =>
@@ -171,23 +143,24 @@ export const subscriptionNameRefusal = (name: string): string | undefined =>
       `${SUBSCRIBE_FORM}.`;
 
 /**
- * Why a subscription asked for is refused before anything is read: a name that is none (`subscriptionNameRefusal`), a wake word empty,
- * minutes not above zero, or a floor that is no level — or undefined. Pure.
+ * Why a subscription asked for is refused before anything is read: a name that is none (`subscriptionNameRefusal`), a selector the feed's
+ * grammar does not take (`selectorsRefusal`), minutes not above zero, or a floor that is no level — or undefined. Pure.
  */
 export function subscribeRefusalOf({
   name,
-  wake,
+  selectors,
   digestEvery,
   atLeast,
 }: {
   name: string;
-  wake: readonly string[];
+  selectors: readonly string[];
   digestEvery?: number;
   atLeast?: string;
 }): string | undefined {
   const named = subscriptionNameRefusal(name);
   if (named) return named;
-  if (wake.some((w) => !w.trim())) return `--wake takes a word that wakes the subscriber, and one given is empty: ${SUBSCRIBE_FORM}.`;
+  const selected = selectorsRefusal(selectors);
+  if (selected) return selected;
   if (digestEvery !== undefined && !(Number.isFinite(digestEvery) && digestEvery > 0))
     return `--digest-every takes the minutes a digest waits for a wake, above zero, and ${digestEvery} is not: ${SUBSCRIBE_FORM}.`;
   if (atLeast !== undefined && !(LEVELS as readonly string[]).includes(atLeast))

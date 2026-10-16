@@ -9,6 +9,8 @@ import fs from 'node:fs';
 import { query, type CanUseTool, type HookCallbackMatcher, type HookEvent, type SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 import { attachedOptions } from './attached-options.ts';
 import { alive, childFacts, filesOf, writeRun, type AttachedRun, type AttachedState } from './attached-file.ts';
+import { bridgeStateOf, enableBridge } from './attached-bridge.ts';
+import { bridgeAsked } from './vocabulary.ts';
 import { claudeStreamKept } from '../detached/output.ts';
 import type { SpawnRequest } from '../seam.ts';
 
@@ -49,7 +51,11 @@ const inputOf = () => {
   };
 };
 
-/** A session at work in this process, as its holder keeps it: what it runs, its calls in flight by id, and how it ends. */
+/**
+ * A session at work in this process, as its holder keeps it: what it runs, its calls in flight by id, and how it ends. `open` says the
+ * session outlives its turns (a long-lived request): its input stays open and a result writes `idle`. `q` is the SDK's query object,
+ * kept so the holder can end a turn through it (`interrupt`).
+ */
 export type Live = {
   run: AttachedRun;
   abort: AbortController;
@@ -57,7 +63,20 @@ export type Live = {
   calls: Map<string, { tool: string; since: string }>;
   letGo: boolean;
   waiting: number;
+  open: boolean;
+  q?: { interrupt?: () => Promise<void> };
   done: Promise<void>;
+};
+
+/**
+ * Ends the turn of the session `live` through the SDK's control request, which only a session on streaming input takes: it leaves the
+ * session answering under the same id, its turn ending with a result of its own. Answers whether the request was sent at all.
+ */
+export const interruptTurn = async (live: Live | undefined): Promise<boolean> => {
+  const ask = live?.q?.interrupt;
+  if (ask === undefined || live === undefined || live.letGo) return false;
+  await ask.call(live.q);
+  return true;
 };
 
 /** How long a call is held at its hook before Claude Code answers for it, in seconds: a day, longer than any drain. */
@@ -136,13 +155,22 @@ const callsEndedBy = (m: SDKMessage): string[] => {
   );
 };
 
-/** One message of the session, taken: captured, its session id and its end written, the calls it ends cleared. */
+/**
+ * One message of the session, taken: captured, its session id and its end written, the calls it ends cleared.
+ *
+ * A turn's end is not a session's end for a long-lived request (`live.open`): the calls clear, the run file is written `idle` with the
+ * session id, and the input stays open so the next words said are heard in the same session. An `is_error` result — an interrupted
+ * turn's `error_during_execution` among them — ends the turn and never fails the session.
+ */
 const took = (root: string, live: Live, m: SDKMessage): void => {
   if (m.type !== 'user' && m.type !== 'stream_event') capture(root, live.run.name, m);
   const over = callsEndedBy(m).filter((id) => live.calls.delete(id));
+  const bridged = bridgeStateOf(m);
   if (m.type === 'system' && m.subtype === 'init' && m.session_id !== live.run.sessionId) rewrite(root, live, { sessionId: m.session_id });
+  else if (bridged !== undefined) rewrite(root, live, { bridge: { ...live.run.bridge, state: bridged } });
   else if (m.type === 'result') {
     live.calls.clear();
+    if (live.open) return rewrite(root, live, { state: 'idle', sessionId: m.session_id });
     live.input.close();
     rewrite(root, live, { state: m.is_error ? 'failed' : 'completed', sessionId: m.session_id });
   } else if (over.length) rewrite(root, live);
@@ -199,7 +227,8 @@ export const startSession = (
   options: { held: Held; executable?: string; resume?: string },
 ): Live => {
   const abort = new AbortController();
-  const live: Live = { run, abort, input: inputOf(), calls: new Map(), letGo: false, waiting: 0, done: Promise.resolve() };
+  const open = r.restartPolicy === 'Always';
+  const live: Live = { run, abort, input: inputOf(), calls: new Map(), letGo: false, waiting: 0, open, done: Promise.resolve() };
   writeRun(root, run);
   live.input.push(first);
   const given = attachedOptions(r, filesOf(root, run.name).mcp);
@@ -220,16 +249,31 @@ export const startSession = (
       },
     },
   });
+  live.q = q as Live['q'];
   live.done = (async () => {
     let end: AttachedState = 'failed';
+    let turns = 0;
     try {
-      for await (const m of q) took(root, live, m);
+      for await (const m of q) {
+        took(root, live, m);
+        if (m.type === 'result' && ++turns === 1 && bridgeAsked(r)) await bridgeOn(root, live, q, run.name);
+      }
     } catch {
       end = abort.signal.aborted ? 'canceled' : 'failed';
     }
     killGroup(live.run.childPid);
     if (abort.signal.aborted) end = 'canceled';
-    if (!live.letGo && live.run.state === 'working') rewrite(root, live, { state: end });
+    if (!live.letGo && (live.run.state === 'working' || live.run.state === 'idle')) rewrite(root, live, { state: end });
   })();
   return live;
+};
+
+/**
+ * Opens the session's claude.ai bridge after its first turn, where its request asked for one, and writes what came of it on the run
+ * file — the bridge's facts, or why there is none (`attached-bridge.ts`). A resume re-attaches the claude.ai session its run file kept.
+ */
+const bridgeOn = async (root: string, live: Live, q: unknown, name: string): Promise<void> => {
+  if (live.letGo) return;
+  const bridge = await enableBridge(q, name, live.run.bridge?.bridgeSessionId);
+  rewrite(root, live, { bridge });
 };

@@ -33,17 +33,18 @@ import {
   everyRun,
   filesOf,
   holderGone,
+  isOpen,
   keptRequest,
   readRun,
   thisHolder,
   writeRun,
   type AttachedRun,
 } from './attached-file.ts';
-import { gone, hear, killGroup, startSession, type Live } from './attached-session.ts';
+import { gone, hear, interruptTurn, killGroup, startSession, type Live } from './attached-session.ts';
 
 /** The attached sessions of one engine: the runner's verbs, and `hold`, which makes this process their holder for a scope. */
 export type Attached = {
-  readonly ops: Pick<RunnerOps, 'spawn' | 'observe' | 'observeFor' | 'stop' | 'logs' | 'transcript' | 'say'>;
+  readonly ops: Pick<RunnerOps, 'spawn' | 'observe' | 'observeFor' | 'stop' | 'logs' | 'transcript' | 'say' | 'interrupt'>;
   readonly hold: Effect.Effect<void, never, Scope.Scope>;
   readonly holding: () => boolean;
   readonly has: (name: string) => boolean;
@@ -74,10 +75,26 @@ const carriedFrom = (root: string, resumeFrom: string): NonNullable<AttachedRun[
   return { ...(costUsd !== undefined ? { costUsd } : {}), ...(apiMs !== undefined ? { apiMs } : {}) };
 };
 
-/** A run file's sighting: its state, its call in flight, and what its capture says it stated, used and was denied. */
+/** The bridge a run file kept, as a sighting says it: the link where one was opened, else why there is none. */
+const bridgeOf = (run: AttachedRun): Pick<Sighting, 'bridge'> => {
+  const bridge = run.bridge;
+  if (bridge === undefined) return {};
+  if (bridge.url !== undefined) return { bridge: { url: bridge.url } };
+  return bridge.why === undefined ? {} : { bridge: { url: null, why: bridge.why } };
+};
+
+/**
+ * A run file's sighting: its state, whether a process still holds the session and which (`held`, `pid`), its bridge, its call in
+ * flight, and what its capture says it stated, used and was denied.
+ *
+ * A session a holder still runs (`isOpen`) says whether its process is there, which `decide` reads for a long-lived task alone: held,
+ * its idle session is open (`idleOf`); with its holder gone it is one the harness is taking up again (`respawning`), and is not
+ * restarted under its feet. A session that has ended says nothing of a process, as it did before.
+ */
 const sightingOf = (root: string, run: AttachedRun): Sighting => {
   const { denials, usage, ...said } = saidBy(root, run.name);
   const own = usage && run.carried ? lessCarried(usage, run.carried) : usage;
+  const held = isOpen(run.state) ? !holderGone(run) : undefined;
   return {
     sessionId: run.name,
     state: attachedStateOf(run),
@@ -85,12 +102,15 @@ const sightingOf = (root: string, run: AttachedRun): Sighting => {
     ...said,
     ...(own ? { usage: own } : {}),
     ...(denials?.length ? { denials } : {}),
+    ...(held === undefined ? {} : { held }),
+    ...(held === true ? { pid: run.owner } : {}),
+    ...bridgeOf(run),
     ...(run.calling && run.state === 'working' ? { calling: run.calling } : {}),
   };
 };
 
 /** Whether a holder takes `run` up: parked, or at work under a process that is gone, its pid taken by another since included. */
-const orphaned = (run: AttachedRun): boolean => run.state === 'parked' || (run.state === 'working' && holderGone(run));
+const orphaned = (run: AttachedRun): boolean => run.state === 'parked' || (isOpen(run.state) && holderGone(run));
 
 /** What a resumed session is told first: why it was stopped, by its run file. */
 const noteOf = (run: AttachedRun): string => (run.state !== 'parked' && run.calling ? crashNote(run.calling.tool) : CARRY_ON);
@@ -108,6 +128,21 @@ export const attachedSessions = (root: string, executable?: string): Attached =>
 
   const stopped = (run: AttachedRun) => fs.existsSync(filesOf(root, run.name).stop);
 
+  /**
+   * The turn of the session this process holds ended, where another process asked for it: read off the interrupt file on every look,
+   * never acted on as a transition, so a holder that restarted mid-ask honours it all the same; the file goes once the request was
+   * sent, and stays for the next look while no live turn takes it.
+   */
+  const interrupted = (run: AttachedRun) => {
+    const file = filesOf(root, run.name).interrupt;
+    if (!fs.existsSync(file)) return;
+    const at = live.get(run.name);
+    if (at === undefined || run.state !== 'working') return;
+    void interruptTurn(at)
+      .then((sent) => void (sent && fs.rmSync(file, { force: true })))
+      .catch(() => undefined);
+  };
+
   const adopt = async (run: AttachedRun): Promise<void> => {
     const child = childOf(run);
     killGroup(child);
@@ -121,7 +156,8 @@ export const attachedSessions = (root: string, executable?: string): Attached =>
   const looked = (run: AttachedRun): AttachedRun => {
     const at = live.get(run.name);
     if (!holding) return run;
-    if (at && stopped(run) && at.run.state === 'working') at.abort.abort();
+    if (at && stopped(run) && isOpen(at.run.state)) at.abort.abort();
+    interrupted(run);
     if (at?.input) hear(root, at);
     if (!at && orphaned(run)) {
       const placeholder = { run, letGo: true } as Live;
@@ -143,7 +179,7 @@ export const attachedSessions = (root: string, executable?: string): Attached =>
     draining = true;
     while ([...live.values()].some((l) => l.calls?.size)) await pause(100);
     for (const l of live.values()) {
-      if (!l.abort || l.run.state !== 'working') continue;
+      if (!l.abort || !isOpen(l.run.state)) continue;
       const { calling: _, childPid: __, childStart: ___, ...rest } = l.run;
       l.run = { ...rest, state: 'parked' };
       writeRun(root, l.run);
@@ -185,8 +221,8 @@ const opsOf = (
   spawn: (r) =>
     Effect.try({
       try: () => {
-        const { out, stop, say } = filesOf(root, r.name);
-        for (const f of [out, stop, say]) fs.rmSync(f, { force: true });
+        const { out, stop, interrupt, say } = filesOf(root, r.name);
+        for (const f of [out, stop, interrupt, say]) fs.rmSync(f, { force: true });
         const run: AttachedRun = {
           name: r.name,
           state: 'working',
@@ -225,12 +261,26 @@ const opsOf = (
       },
       catch: failed('transcript'),
     }),
+  interrupt: (session) =>
+    Effect.tryPromise({
+      try: async () => {
+        const { run: file, interrupt } = filesOf(root, session.name);
+        const run = readRun(file);
+        if (run?.state !== 'working')
+          throw new Error(
+            `\`${session.name}\` is ${run ? run.state : 'not an attached session'}, so it has no turn to end. Interrupt it while it answers.`,
+          );
+        fs.writeFileSync(interrupt, String(process.pid));
+        if (await interruptTurn(live.get(session.name))) fs.rmSync(interrupt, { force: true });
+      },
+      catch: failed('interrupt'),
+    }),
   say: (session, text) =>
     Effect.try({
       try: () => {
         const { run: file, say } = filesOf(root, session.name);
         const run = readRun(file);
-        if (run?.state !== 'working' && run?.state !== 'parked')
+        if (run === undefined || !isOpen(run.state))
           throw new Error(`\`${session.name}\` is ${run ? run.state : 'not an attached session'}, so nothing said to it would be heard.`);
         fs.appendFileSync(say, `${JSON.stringify({ text })}\n`);
         const at = live.get(session.name);

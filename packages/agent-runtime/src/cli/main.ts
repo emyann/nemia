@@ -298,6 +298,8 @@ const HELP = `ae — an engine for agent sessions
   ae stop <id>                 ask it to stop
   ae say <id> "<text>"         tell its running session something, and journal it: a job on
                                its stdin until its result, a background session in its inbox
+  ae interrupt <id>            end the turn its session is in, and leave the session open to
+                               hear the next words: only a session attached on the Agent SDK
   ae answer <id> "<text>" [--budget <usd>]
                                answer a task held open that waits (input-required): its
                                next turn resumes the session that signed, told the words
@@ -626,6 +628,12 @@ export async function main(argv: string[]): Promise<void> {
       if (!arg) return console.log(HELP);
       const said = await run('say', engine.say(arg, argv.slice(2).join(' ')));
       return console.log(entryLine(arg, { kind: 'said', ...said }));
+    }
+
+    case 'interrupt': {
+      if (!arg) return console.log(HELP);
+      const ended = await run('interrupt', engine.interrupt(arg));
+      return console.log(`${arg}  turn of attempt ${ended.attempt} asked to end at ${ended.at}`);
     }
 
     case 'answer': {

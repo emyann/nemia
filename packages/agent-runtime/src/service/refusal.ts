@@ -12,6 +12,7 @@ const REFUSALS = new Set([
   'OutputRefused',
   'FollowRefused',
   'SayRefused',
+  'InterruptRefused',
   'QuotaRefused',
   'EngineRefused',
   'BodyRefused',
@@ -22,8 +23,9 @@ const REFUSALS = new Set([
 ]);
 
 /**
- * What `verb` failed with, `e`, in words: a refusal as an `Error` whose `exitCode` is 2 and whose message is led by the verb, `SayUnsent`
- * as an `Error` led by the verb with its `cause` and no `exitCode`, and anything else — a `JournalError`, a `RunnerError` — as it is.
+ * What `verb` failed with, `e`, in words: a refusal as an `Error` whose `exitCode` is 2 and whose message is led by the verb, a reach
+ * that failed and may pass (`SayUnsent`, `InterruptUnsent`) as an `Error` led by the verb with its `cause` and no `exitCode`, and
+ * anything else — a `JournalError`, a `RunnerError` — as it is.
  */
 export const refusalWords =
   (verb: string) =>
@@ -31,6 +33,6 @@ export const refusalWords =
     const { _tag, message, cause } = (e ?? {}) as { _tag?: unknown; message?: unknown; cause?: unknown };
     if (typeof _tag !== 'string' || typeof message !== 'string') return e;
     if (REFUSALS.has(_tag)) return Object.assign(new Error(`${verb}: ${message}`), { exitCode: 2 });
-    if (_tag === 'SayUnsent') return new Error(`${verb}: ${message}`, cause === undefined ? undefined : { cause });
+    if (_tag === 'SayUnsent' || _tag === 'InterruptUnsent') return new Error(`${verb}: ${message}`, cause === undefined ? undefined : { cause });
     return e;
   };

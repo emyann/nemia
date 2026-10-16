@@ -67,6 +67,7 @@ import { keepingVerbsOf, type KeptRefused, type KeptReport } from './kept.ts';
 import type { CompactRefused, CompactReport } from './compact.ts';
 import { watchOf } from './watch.ts';
 import { sayVerbOf, type SayRefused, type SayUnsent } from './say.ts';
+import { interruptVerbOf, type Interrupted, type InterruptRefused, type InterruptUnsent } from './interrupt.ts';
 import {
   handleOf,
   isSpec,
@@ -332,6 +333,23 @@ export type EngineShape = {
    * result are taken and may never be read.
    */
   readonly say: (taskId: string, text: string) => Effect.Effect<Said, SayRefused | SayUnsent | JournalError>;
+  /**
+   * End the turn the task's session is in, and leave the session open — `kubectl exec` of an escape key, not a kill. The running turn
+   * stops where it is, its own result closes it keeping what it wrote, and the session answers the next words said to it under the
+   * same id. Answers when it was asked, and of which attempt (`Interrupted`).
+   *
+   * Journals nothing, and is no lifecycle verb: no entry of it is on the record, and the next pass reads the session's state as it
+   * reads any other, so an interrupt asked twice ends one turn and refuses the second. What the session makes of being cut is its own
+   * affair: nothing of ours is said to it.
+   *
+   * Refused — `InterruptRefused`, and nothing sent — in this order, what the record says before what the harness says: a task this
+   * engine has no record of; a harness that cannot end a turn without ending its session (every harness but Claude Code attached on
+   * the Agent SDK); a task that has settled, or has been asked to stop; one with no attempt in flight; then, off its harness, an
+   * attempt its harness does not list; a session its harness lists ended; and a long-lived session open and waiting for its next
+   * words, which has no turn in it (`idleOf`). A harness that could not be read, or that did not take the request, fails with
+   * `InterruptUnsent`, its `cause` what failed: ask again.
+   */
+  readonly interrupt: (taskId: string) => Effect.Effect<Interrupted, InterruptRefused | InterruptUnsent | JournalError>;
   /**
    * What a harness's subscription has left (`HarnessQuota`), asked of `harness`, or of the default harness when none is named: the
    * plan's limits, each with its use and its reset, or why there are none. Claude Code answers it, as `claude` and as `claude-bg`, by
@@ -774,6 +792,7 @@ const make = (options: EngineOptions) =>
       output: outputVerbOf(read, runners, harnessOf),
       follow: followVerbOf(read, runners, harnessOf),
       say: sayVerbOf(go, read, runners, harnesses, harnessOf),
+      interrupt: interruptVerbOf(go, read, runners, harnesses, harnessOf),
       quota: quotaVerbOf(runners, fallback),
       answer: answerVerb,
       close: (taskId) => go(close(taskId)),

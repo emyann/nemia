@@ -13,15 +13,34 @@ import { processStart } from './inbox.ts';
 import type { SpawnRequest } from '../seam.ts';
 
 /**
- * What a holder writes of a session: `working` while a holder runs it, `parked` once a holder let it go between two calls for the next
- * to resume, `completed`, `failed` or `canceled` once it ended.
+ * What a holder writes of a session: `working` while a holder runs it, `idle` once a long-lived session's turn ended and it waits with
+ * its input open for the next words, `parked` once a holder let it go between two calls for the next to resume, `completed`, `failed`
+ * or `canceled` once it ended.
  */
-export type AttachedState = 'working' | 'parked' | 'completed' | 'failed' | 'canceled';
+export type AttachedState = 'working' | 'idle' | 'parked' | 'completed' | 'failed' | 'canceled';
+
+/**
+ * What a session's claude.ai bridge came to, as the SDK's control request answered it (`attached-bridge.ts`): its link and the facts a
+ * resume re-attaches with, and `state` as the stream's `bridge_state` messages last said it. Or `why` alone, where the SDK this
+ * runtime runs on has no such control request: the session runs on with no bridge.
+ */
+const BridgeFactsSchema = Schema.Struct({
+  url: Schema.optional(Schema.String),
+  connectUrl: Schema.optional(Schema.String),
+  environmentId: Schema.optional(Schema.String),
+  epoch: Schema.optional(Schema.Finite),
+  bridgeSessionId: Schema.optional(Schema.String),
+  state: Schema.optional(Schema.String),
+  why: Schema.optional(Schema.String),
+});
+
+/** A session's bridge as its run file keeps it. */
+export type AttachedBridge = typeof BridgeFactsSchema.Type;
 
 const RunFileSchema = Schema.StructWithRest(
   Schema.Struct({
     name: Schema.String,
-    state: Schema.Literals(['working', 'parked', 'completed', 'failed', 'canceled']),
+    state: Schema.Literals(['working', 'idle', 'parked', 'completed', 'failed', 'canceled']),
     /** The pid of the process that holds the session, and so writes this file. */
     owner: Schema.Finite,
     /** When that process started (`processStart`), so a pid another process has taken since is not read as the holder. */
@@ -41,6 +60,8 @@ const RunFileSchema = Schema.StructWithRest(
     carried: Schema.optional(Schema.Struct({ costUsd: Schema.optional(Schema.Finite), apiMs: Schema.optional(Schema.Finite) })),
     /** How far into its say file the words were handed to the session, in bytes. */
     heard: Schema.optional(Schema.Finite),
+    /** What its claude.ai bridge came to, where one was asked for: its facts, or why there is none. */
+    bridge: Schema.optional(BridgeFactsSchema),
     /** The spawn, its brief left out: what a holder resumes the session with. */
     request: Schema.Record(Schema.String, Schema.Unknown),
   }),
@@ -58,10 +79,20 @@ export const attachedDir = (root: string): string => path.join(root, 'runs', 'at
 /** A session's name as a file name: the engine's `ae/<task>/<n>`, its slashes taken out. */
 const safe = (name: string): string => name.replace(/[^A-Za-z0-9._-]/g, '_');
 
-/** The files of the session under `name`: its run file, its stop, the words said to it, its capture, and its MCP config. */
+/**
+ * The files of the session under `name`: its run file, its stop, the interrupt another process asks its turn's end with, the words said
+ * to it, its capture, and its MCP config.
+ */
 export const filesOf = (root: string, name: string) => {
   const base = path.join(attachedDir(root), safe(name));
-  return { run: `${base}.json`, stop: `${base}.stop`, say: `${base}.say.jsonl`, out: `${base}.out.jsonl`, mcp: `${base}.mcp.json` };
+  return {
+    run: `${base}.json`,
+    stop: `${base}.stop`,
+    interrupt: `${base}.interrupt`,
+    say: `${base}.say.jsonl`,
+    out: `${base}.out.jsonl`,
+    mcp: `${base}.mcp.json`,
+  };
 };
 
 /** The run file at `file`, or undefined when there is none, or it is not one a holder writes (a holder caught mid-write is not). */
@@ -131,10 +162,19 @@ export const holderGone = (run: AttachedRun): boolean =>
 export const heldHere = (run: AttachedRun): boolean => run.owner === process.pid && !holderGone(run);
 
 /**
- * A run file's state as a sighting says it. A session nobody holds now, its holder gone or its holder let it go (`parked`), is
- * `working`: a holder resumes it on its next look.
+ * A run file's state as a sighting says it, the harness's word translated to A2A's at this edge. A session nobody holds now, its holder
+ * gone or its holder let it go (`parked`), is `working`: a holder resumes it on its next look. A long-lived session between two turns
+ * (`idle`) is `input-required`, the word a session waiting on a person already has, so `decide` reads it as idle (`idleOf`) with no
+ * branch of its own.
  */
-export const attachedStateOf = (run: AttachedRun): SessionState => (run.state === 'parked' ? 'working' : run.state);
+export const attachedStateOf = (run: AttachedRun): SessionState =>
+  run.state === 'parked' ? 'working' : run.state === 'idle' ? 'input-required' : run.state;
+
+/** The states a holder still runs a session in: one it works, one it waits in with its input open, and one it was let go in. */
+export const OPEN_STATES: readonly AttachedState[] = ['working', 'idle', 'parked'];
+
+/** Whether `state` is one a holder still runs the session in (`OPEN_STATES`). */
+export const isOpen = (state: AttachedState): boolean => OPEN_STATES.includes(state);
 
 /** The drain's file name, beside the run files. */
 const DRAIN = 'drain.json';

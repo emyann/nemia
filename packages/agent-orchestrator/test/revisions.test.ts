@@ -278,7 +278,8 @@ test('`nemia refresh` refuses a run that has filed nothing, one already on the n
 
 test("`nemia refresh` adds and removes no step, and a run that has filed nothing takes the folder's step set whole", async () => {
   const t = team();
-  const run = await started(t.dir, aRepo());
+  const repo = aRepo();
+  const run = await started(t.dir, repo);
   const b = board();
   await runWith(b.e, advanceRun(readRun(run.id)));
 
@@ -287,7 +288,9 @@ test("`nemia refresh` adds and removes no step, and a run that has filed nothing
   await runWith(b.e, advanceRun(readRun(run.id)));
   assert.deepEqual(Object.keys(readRun(run.id).steps), ['build'], 'the verb re-pins content, never a step set');
 
-  const waiting = await started(t.dir, aRepo());
+  const held = team();
+  const parent = await started(held.dir, repo, { isolate: true });
+  const waiting = await started(t.dir, repo, { after: [parent.id], isolate: true });
   await runWith(b.e, advanceRun(readRun(waiting.id)));
   assert.deepEqual(
     Object.keys(readRun(waiting.id).steps),
@@ -301,6 +304,98 @@ test("`nemia refresh` adds and removes no step, and a run that has filed nothing
     Object.keys(readRun(waiting.id).steps),
     ['build'],
     'and the step the folder has since dropped goes with it: the step set is the one the folder holds now',
+  );
+});
+
+/** What a loop's target owes from round 2 on: an answer to each finding it was handed. */
+const ANSWERED = [{ finding: 'build.md:1', answer: 'fixed', why: 'built it again' }];
+
+/** A closeout schema of one required field, as a step's `output:` names one beside the folder. */
+const schemaOf = (field: string): object => ({
+  type: 'object',
+  properties: { [field]: { type: 'string' } },
+  required: [field],
+  additionalProperties: false,
+});
+
+test("a step that continues another step's session is judged by its own closeout schema, never by the schema of the step it resumes", async () => {
+  const t = team();
+  fs.writeFileSync(
+    path.join(t.dir, 'write.md'),
+    `---\nplace: git\nafter: build\nresume: build\noutput: write.schema.json\n---\nWrite it up.\n`,
+  );
+  fs.writeFileSync(path.join(t.dir, 'write.schema.json'), JSON.stringify(schemaOf('wrote')));
+  const run = await started(t.dir, aRepo());
+  const b = board();
+  await runWith(b.e, advanceRun(readRun(run.id)));
+  b.settle(`${run.id}-build`, 'succeeded', { closeout: SIGNED });
+  await runWith(b.e, advanceRun(readRun(run.id)));
+
+  const filed = readRun(run.id);
+  assert.notEqual(
+    filed.steps.build?.closeoutHash,
+    filed.steps.write?.closeoutHash,
+    'build declares no closeout schema and write declares one, so their digests differ',
+  );
+  assert.equal(
+    b.tasks.get(`${run.id}-write`)!.spec.resumeFrom,
+    b.tasks.get(`${run.id}-build`)!.attempt?.nativeId,
+    "write continues build's session all the same: what is compared is the schema write itself was last filed with, and it has none yet",
+  );
+});
+
+test('a round files its target on the closeout schema the folder declares now: continued where it has not moved, fresh where it has', async () => {
+  const t = team();
+  fs.writeFileSync(t.stepFile, `---\nplace: git\nagent: ${t.agent}\noutput: build.schema.json\n---\nBuild it.\n`);
+  fs.writeFileSync(path.join(t.dir, 'build.schema.json'), JSON.stringify(schemaOf('built')));
+  fs.writeFileSync(
+    path.join(t.dir, 'review.md'),
+    `---\nplace: git\nafter: build\nloop: build\nrounds: 3\noutput: review.schema.json\n---\nReview it.\n`,
+  );
+  fs.writeFileSync(
+    path.join(t.dir, 'review.schema.json'),
+    JSON.stringify({ type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false }),
+  );
+  const run = await started(t.dir, aRepo());
+  const b = board();
+
+  const filed = async (step: string): Promise<string> => {
+    for (let passes = 0; passes < 6; passes += 1) {
+      const taskId = readRun(run.id).steps[step]?.taskId;
+      if (taskId) return taskId;
+      await runWith(b.e, advanceRun(readRun(run.id)));
+    }
+    throw new Error(`${step} was never filed: ${JSON.stringify(readRun(run.id).steps)}`);
+  };
+
+  const first = await filed('build');
+  b.settle(first, 'succeeded', { closeout: { ...SIGNED, built: 'once' } });
+  b.settle(await filed('review'), 'succeeded', { closeout: { ...SIGNED, again: true } });
+  await runWith(b.e, advanceRun(readRun(run.id)));
+
+  const second = await filed('build');
+  assert.notEqual(second, first, 'the round files build again, under its next try');
+  assert.equal(
+    b.tasks.get(second)!.spec.resumeFrom,
+    b.tasks.get(first)!.attempt?.nativeId,
+    'it continues the session it ran, its own closeout schema unmoved',
+  );
+
+  b.settle(second, 'succeeded', { closeout: { ...SIGNED, built: 'twice', replies: ANSWERED } });
+  const reviewing = await filed('review');
+  fs.writeFileSync(path.join(t.dir, 'build.schema.json'), JSON.stringify(schemaOf('builtAgain')));
+  const drift = await runPlaced(refreshRun(run.id));
+  assert.ok(drift.length, 'the schema beside the step moves the folder on, which the refresh takes');
+  await runWith(b.e, advanceRun(readRun(run.id)));
+  b.settle(reviewing, 'succeeded', { closeout: { ...SIGNED, again: true } });
+  await runWith(b.e, advanceRun(readRun(run.id)));
+
+  const third = await filed('build');
+  assert.notEqual(third, second, 'the second round files build again');
+  assert.equal(
+    b.tasks.get(third)!.spec.resumeFrom,
+    undefined,
+    'and asks a fresh session, since the schema it is now given is not the one its last try answered in',
   );
 });
 

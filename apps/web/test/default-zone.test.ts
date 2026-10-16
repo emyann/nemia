@@ -2,7 +2,9 @@
  * A writer handed no `timeZone` writes the moment where the person is: `zoneOf` gives date-fns no context at all, so date-fns falls
  * back to the machine's own zone, as `Intl.DateTimeFormat` did with `timeZone: undefined`. This file sets a zone that is not UTC
  * before it loads a writer, so a `zoneOf(undefined)` that handed date-fns a context of its own (`{ in: undefined }`, or UTC) would
- * be caught here and nowhere else: every other suite passes its writers an explicit zone, and would stay green.
+ * be caught here and nowhere else: every other suite passes its writers an explicit zone, and would stay green. A zone-carrying
+ * comparison no other suite pins whatever the machine is belongs here too, named with its zone: a machine that is already UTC makes
+ * a dropped zone a no-op everywhere else.
  */
 process.env.TZ = 'Asia/Tokyo';
 
@@ -49,4 +51,6 @@ test('the day and the year are decided in the machine’s zone too, never in UTC
   const newYear = [new Date('2025-12-31T16:00:00Z'), new Date('2026-10-12T15:00:00Z')] as const;
   assert.equal(whenWords(...newYear), '1 Jan 1:00 AM', '31 Dec 16:00 UTC is already 2026 in Tokyo, so the year is dropped');
   assert.equal(whenWords(...newYear, 'UTC'), '31 Dec 2025', 'and named UTC it is the year before, which drops the time instead');
+  assert.equal(whenColumn(...newYear), ' 1 Jan  1:00 AM', "a column keeps its date and drops the year the machine's zone shares");
+  assert.equal(whenColumn(...newYear, 'UTC'), '31 Dec 2025', 'and named UTC the column says the year instead of the time');
 });

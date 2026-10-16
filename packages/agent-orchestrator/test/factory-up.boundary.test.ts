@@ -11,7 +11,7 @@ import path from 'node:path';
 import { nodeChild } from './child.ts';
 import { scratch } from './scratch.ts';
 import { teamCopy } from './team.ts';
-import { WAITED } from './waits.ts';
+import { WAITED } from 'agent-runtime/testing';
 
 const PKG = path.join(import.meta.dirname, '..');
 const BIN = path.join(PKG, 'bin', 'nemia.ts');

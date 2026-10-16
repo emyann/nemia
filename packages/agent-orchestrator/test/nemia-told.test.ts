@@ -15,7 +15,7 @@ import { spawn } from 'node:child_process';
 import { Effect } from 'effect';
 import { nameFor } from 'agent-runtime';
 import { scratch } from './scratch.ts';
-import { until, WAITED } from './waits.ts';
+import { until, WAITED } from 'agent-runtime/testing';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runOver } from './placed.ts';
 

@@ -226,7 +226,7 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
   failed install is ended by a signal: only the attempt's exit code is a verdict (`attemptVerdict`), never what it printed.
 - **A test that spawns a `wf` child waits on it with `nodeChild`** (`test/child.ts`): for what it says or writes, or its exit, which fails
   the wait at once with its output — never under a deadline, which the CLI's import alone can pass on a loaded machine.
-- **A test waits in its process with `until` (`test/waits.ts`, the runtime's copy, held by `test/waits.test.ts`)**, asked on a `bell`
+- **A test waits in its process with `until` (the runtime's, taken from `agent-runtime/testing`)**, asked on a `bell`
   its event's source rings or at a pace for a state, its test given `WAITED`: the runner's timeout is its one bound, which the `test`
   script's `--test-timeout` gives a test given none. `DEADLINES` (`test/waits.test.ts`) refuses a hand-written deadline.
 - **A test that lets a deliverer's `say` through first waits until each line it expects gathered is handed on by the reader**

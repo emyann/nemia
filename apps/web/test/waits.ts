@@ -1,13 +1,12 @@
 /**
  * An in-process wait a test makes on the event it counts, never on a length of time (`until`), a bell its source rings (`bell`), and the
- * one bound such a test takes, the runner's (`WAITED`).
+ * one bound such a test takes, the runner's (`WAITED`). The one copy: a test of this package reads it through `src/waits/index.ts`, a
+ * test of a layer above through `agent-runtime/testing`, and the board, which imports no package, keeps a copy held to this file.
  *
  * A wait has no deadline of its own: a machine under load makes any picked length a guess. It asks again when its event's source rings,
  * or at a pace where the event is a state read off disk or a worker, and it ends when its test's signal aborts, as the runner aborts it
  * at the test's `timeout`, saying what never came beside the runner's `test timed out`.
  */
-import type { TestContext } from 'node:test';
-
 /** The timers as the module loaded, so a test that mocks the clock's timers still has its wait asked at its pace. */
 const later = globalThis.setTimeout;
 const unlater = globalThis.clearTimeout;
@@ -27,7 +26,7 @@ export type Truthy<T> = Exclude<T, false | 0 | 0n | '' | null | undefined>;
 export type Bell = { ring: () => void; hear: (look: () => void) => () => void };
 
 /** What `until` reads of a test: the signal the runner aborts at its timeout, and where it says what never came. */
-export type Waiter = Pick<TestContext, 'signal' | 'diagnostic'>;
+export type Waiter = { signal: AbortSignal; diagnostic: (message: string) => void };
 
 /**
  * A bell: each `ring` asks every wait that hears it again.

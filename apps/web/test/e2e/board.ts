@@ -4,7 +4,7 @@ import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from './checks.ts';
 import { instantWhole, instantWords } from '../../src/lib/instant.ts';
-import { DIAMOND } from './seed.ts';
+import { DIAMOND, REGISTRY } from './seed.ts';
 import { measure } from './contrast.ts';
 import { API, measuring, photographing, store } from './world.ts';
 
@@ -464,3 +464,141 @@ export async function photographBothWidths(page: Page, out: string, name: string
   await photograph(page, path.join(out, `${name}-${what}-phone-${theme}.png`), { fullPage: true });
   await page.setViewportSize(size);
 }
+
+/** Where Nemia's chat is served from: the folder of her own in the store, and the task her level file names. */
+const NEMIA_TASK = 'nemia-e2e-chat';
+
+/** Her session's id, and the folder its transcript is kept under, which Claude Code names after the session's `cwd`. */
+const NEMIA_SESSION = '7b1d0c3e-e2e0-4a1b-9c21-0d5f6a7b8c90';
+const NEMIA_CWD = '/code/nemia';
+const NEMIA_PROJECT = NEMIA_CWD.replaceAll('/', '-');
+
+/** One line of her session's transcript: her words, or one tool call, or its result. */
+export type HerLine = { text: string } | { tool: string; says: string; result?: string };
+
+/** What a page plants of her: her level, where her session is, her transcript, the read mark, and the person's outbox. */
+export type HerChat = {
+  level?: 'manual' | 'semi-auto' | 'auto';
+  /** Her session as `claude agents` lists it: answering a turn, up and waiting for words, or none filed at all. */
+  session?: 'answering' | 'up' | 'none';
+  /** Her transcript, oldest first: her words are `m:1:e<i>` in the chat, a tool call `t:1:e<i>`, by its line's place here. */
+  said?: readonly HerLine[];
+  /** The id the read mark names, which the chat gives each line of `said`. */
+  read?: string;
+  /** What the person wrote that the api took, each entry drawn as their own bubble. */
+  outbox?: readonly { id: string; at: string; text: string }[];
+};
+
+/** The id her chat gives the line at `i` of `said`: `m:1:e<i>` for her words, `t:1:e<i>` for a tool call. */
+export const herEvent = (said: readonly HerLine[], i: number): string => `${'text' in said[i] ? 'm' : 't'}:1:e${i}`;
+
+/** One line of her transcript as Claude Code writes it, `seconds` before now. */
+const herTranscriptLine = (line: HerLine, i: number, at: (seconds: number) => string): object[] => {
+  const head = {
+    sessionId: NEMIA_SESSION,
+    isSidechain: false,
+    userType: 'external',
+    cwd: NEMIA_CWD,
+    version: '2.1.270',
+    uuid: `e${i}`,
+    timestamp: at(i * 4),
+  };
+  if ('text' in line) return [{ ...head, type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: line.text }] } }];
+  const call = { ...head, type: 'assistant', message: { role: 'assistant', content: [{ type: 'tool_use', id: `e${i}`, name: line.tool, input: { description: line.says } }] } };
+  if (line.result === undefined) return [call];
+  const result = {
+    ...head,
+    uuid: `r${i}`,
+    timestamp: at(i * 4 + 2),
+    type: 'user',
+    message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: `e${i}`, content: line.result }] },
+  };
+  return [call, result];
+};
+
+/**
+ * Plants Nemia's chat in the store the worker serves: her level file naming her task, her task journalled filed and spawned, her
+ * session's row for the fake `claude agents` (`REGISTRY`), her session's transcript, the person's outbox and their read mark. Each file
+ * is written as the keeper, the api and the runtime write theirs — a key they leave out absent, never null.
+ *
+ * Answers what takes it back: every file it made removed, and the registry put back as the seed left it. A page calls it in a `try` and
+ * the take-back in its `finally`, so no page after it reads her.
+ */
+export function herChat(what: HerChat): () => void {
+  const root = store!;
+  const now = Date.now();
+  const at = (seconds: number) => new Date(now - 600_000 + seconds * 1000).toISOString();
+  const level = what.level ?? 'semi-auto';
+  const nemiaDir = path.join(root, 'nemia');
+  const journal = path.join(root, 'engine', 'tasks', `${NEMIA_TASK}.jsonl`);
+  const registry = path.join(root, REGISTRY);
+  const transcript = path.join(root, 'claude', 'projects', NEMIA_PROJECT, `${NEMIA_SESSION}.jsonl`);
+  const rows = JSON.parse(fs.readFileSync(registry, 'utf8')) as object[];
+  const lines = (entries: readonly object[]) => entries.map((entry) => `${JSON.stringify(entry)}\n`).join('');
+
+  fs.mkdirSync(nemiaDir, { recursive: true });
+  fs.writeFileSync(path.join(nemiaDir, 'level.json'), `${JSON.stringify({ level, since: at(0), task: NEMIA_TASK })}\n`);
+  fs.mkdirSync(path.dirname(journal), { recursive: true });
+  fs.writeFileSync(
+    journal,
+    lines([
+      {
+        kind: 'filed',
+        at: at(0),
+        brief: 'Keep the factories running.',
+        cwd: NEMIA_CWD,
+        maxAttempts: 1,
+        harness: 'claude',
+        /** Her session is long-lived, as the keeper files it: a session between turns reads idle only under this policy (`idleOf`). */
+        restartPolicy: 'Always',
+      },
+      { kind: 'starting', at: at(1), attempt: 1 },
+      { kind: 'spawned', at: at(1), attempt: 1 },
+    ]),
+  );
+  const session = what.session ?? 'answering';
+  if (session !== 'none') {
+    const row =
+      session === 'answering'
+        ? { state: 'working', status: 'busy' }
+        : /** A session Claude Code holds, its turn over: the engine reads it `input-required` with nothing waited for, so her phase is idle. */
+          { state: 'done', status: 'idle', pid: 424242 };
+    fs.writeFileSync(
+      registry,
+      JSON.stringify([...rows, { name: `ae/${NEMIA_TASK}/1`, sessionId: NEMIA_SESSION, kind: 'background', ...row, startedAt: now - 600_000 }]),
+    );
+  }
+  const said = what.said ?? [];
+  fs.mkdirSync(path.dirname(transcript), { recursive: true });
+  fs.writeFileSync(transcript, lines(said.flatMap((line, i) => herTranscriptLine(line, i, at))));
+  if (what.outbox?.length) {
+    fs.mkdirSync(path.join(nemiaDir, 'chat'), { recursive: true });
+    fs.writeFileSync(path.join(nemiaDir, 'chat', 'outbox.jsonl'), lines(what.outbox));
+  }
+  if (what.read !== undefined) {
+    fs.mkdirSync(path.join(nemiaDir, 'chat'), { recursive: true });
+    fs.writeFileSync(path.join(nemiaDir, 'chat', 'read.json'), `${JSON.stringify({ through: what.read, at: at(600) })}\n`);
+  }
+  return () => {
+    fs.rmSync(nemiaDir, { recursive: true, force: true });
+    fs.rmSync(journal, { force: true });
+    fs.rmSync(path.join(root, 'claude', 'projects', NEMIA_PROJECT), { recursive: true, force: true });
+    fs.writeFileSync(registry, JSON.stringify(rows));
+  };
+}
+
+/** Her docked face, the cue beside it, and the panel it opens. */
+export const dockOf = (page: Page): Locator => page.locator('[data-nemia-dock]');
+export const dockFaceOf = (page: Page): Locator => page.locator('[data-nemia-dock-face]');
+export const chatPanelOf = (page: Page): Locator => page.locator('[data-chat-panel]');
+
+/** Opens the panel from her docked face, and waits for it. */
+export async function openChat(page: Page): Promise<Locator> {
+  await dockFaceOf(page).click();
+  const panel = chatPanelOf(page);
+  await expectVisible(panel, "her docked face opens Nemia's chat");
+  return panel;
+}
+
+/** The composer's field in her chat. */
+export const chatFieldOf = (page: Page): Locator => page.locator('[data-chat-composer] textarea');

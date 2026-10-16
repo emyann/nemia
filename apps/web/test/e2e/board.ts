@@ -4,7 +4,7 @@ import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from './checks.ts';
 import { instantWhole, instantWords } from '../../src/lib/instant.ts';
-import { DIAMOND } from './seed.ts';
+import { DIAMOND, REGISTRY } from './seed.ts';
 import { measure } from './contrast.ts';
 import { API, measuring, photographing, store } from './world.ts';
 
@@ -20,7 +20,7 @@ export const pickedIn = (url: URL): string | null =>
   (LISTINGS.includes(url.pathname) ? url.searchParams.get('factory') || null : null);
 
 /** The rail's destinations, in its order, one column from the top. */
-export const RAIL_PLACES = ['Overview', 'Runs', 'Inbox', 'Factories', 'Agents', 'Workflows', 'Stats', 'Settings'];
+export const RAIL_PLACES = ['Overview', 'Runs', 'Inbox', 'Factories', 'Agents', 'Workflows', 'Stats', 'Nemia', 'Settings'];
 
 /** The frame's rail at the left of a wide window: the menu button and the FAB above the kit's navigation rail. */
 export const railColumnOf = (page: Page): Locator => page.locator('[data-frame-rail]');
@@ -474,3 +474,192 @@ export async function photographBothWidths(page: Page, out: string, name: string
   await photograph(page, path.join(out, `${name}-${what}-phone-${theme}.png`), { fullPage: true });
   await page.setViewportSize(size);
 }
+
+/** Where Nemia's chat is served from: the folder of her own in the store, and the task her level file names. */
+const NEMIA_TASK = 'nemia-e2e-chat';
+
+/** Her session's id, and the folder its transcript is kept under, which Claude Code names after the session's `cwd`. */
+const NEMIA_SESSION = '7b1d0c3e-e2e0-4a1b-9c21-0d5f6a7b8c90';
+const NEMIA_CWD = '/code/nemia';
+const NEMIA_PROJECT = NEMIA_CWD.replaceAll('/', '-');
+
+/** One line of her session's transcript: her words, or one tool call, or its result. */
+export type HerLine = { text: string } | { tool: string; says: string; result?: string };
+
+/** What a page plants of her: her level, where her session is, her transcript, the read mark, and the person's outbox. */
+export type HerChat = {
+  level?: 'manual' | 'semi-auto' | 'auto';
+  /** Her session as `claude agents` lists it: answering a turn, up and waiting for words, or none filed at all. */
+  session?: 'answering' | 'up' | 'none';
+  /** Her transcript, oldest first: her words are `m:1:e<i>` in the chat, a tool call `t:1:e<i>`, by its line's place here. */
+  said?: readonly HerLine[];
+  /** The id the read mark names, which the chat gives each line of `said`. */
+  read?: string;
+  /** What the person wrote that the api took, each entry drawn as their own bubble. */
+  outbox?: readonly { id: string; at: string; text: string }[];
+  /**
+   * What the keeper said to her session, journalled as the runtime journals a said: a quiet marker in the chat, unless `delivers` names
+   * an outbox entry it carried, which draws that entry as the person's own bubble.
+   */
+  told?: readonly { text: string; delivers?: string }[];
+};
+
+/**
+ * The id her chat gives the line at `i` of `said`: `m:1:e<i>:0` for her words, the `0` their place in the message's content, and
+ * `t:1:e<i>` for a tool call.
+ */
+export const herEvent = (said: readonly HerLine[], i: number): string => ('text' in said[i] ? `m:1:e${i}:0` : `t:1:e${i}`);
+
+/** Her session in a turn, as the fake `claude agents` lists it: the engine reads it running, and her phase answering. */
+const ANSWERING = { state: 'working', status: 'busy', pid: 424242 };
+
+/**
+ * Her session held by Claude Code, its turn over: the engine reads it `input-required` with nothing waited for, so her phase is idle,
+ * which `idleOf` grants a long-lived session alone.
+ */
+const WAITING = { state: 'done', status: 'idle', pid: 424242 };
+
+/** One line of her transcript as Claude Code writes it, `seconds` before now. */
+const herTranscriptLine = (line: HerLine, i: number, at: (seconds: number) => string): object[] => {
+  const head = {
+    sessionId: NEMIA_SESSION,
+    isSidechain: false,
+    userType: 'external',
+    cwd: NEMIA_CWD,
+    version: '2.1.270',
+    uuid: `e${i}`,
+    timestamp: at(i * 4),
+  };
+  if ('text' in line) return [{ ...head, type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: line.text }] } }];
+  const call = {
+    ...head,
+    type: 'assistant',
+    message: { role: 'assistant', content: [{ type: 'tool_use', id: `e${i}`, name: line.tool, input: { description: line.says } }] },
+  };
+  if (line.result === undefined) return [call];
+  const result = {
+    ...head,
+    uuid: `r${i}`,
+    timestamp: at(i * 4 + 2),
+    type: 'user',
+    message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: `e${i}`, content: line.result }] },
+  };
+  return [call, result];
+};
+
+/**
+ * Plants Nemia's chat in the store the worker serves: her level file naming her task, her task journalled filed and spawned, her
+ * session's row for the fake `claude agents` (`REGISTRY`), her session's transcript, the person's outbox and their read mark. Each file
+ * is written as the keeper, the api and the runtime write theirs — a key they leave out absent, never null.
+ *
+ * Answers what takes it back: every file it made removed, and the registry put back as the seed left it. A page calls it in a `try` and
+ * the take-back in its `finally`, so no page after it reads her.
+ */
+export function herChat(what: HerChat): () => void {
+  const root = store!;
+  const now = Date.now();
+  const at = (seconds: number) => new Date(now - 600_000 + seconds * 1000).toISOString();
+  const level = what.level ?? 'semi-auto';
+  const nemiaDir = path.join(root, 'nemia');
+  const journal = path.join(root, 'engine', 'tasks', `${NEMIA_TASK}.jsonl`);
+  const registry = path.join(root, REGISTRY);
+  const transcript = path.join(root, 'claude', 'projects', NEMIA_PROJECT, `${NEMIA_SESSION}.jsonl`);
+  const rows = JSON.parse(fs.readFileSync(registry, 'utf8')) as object[];
+  const lines = (entries: readonly object[]) => entries.map((entry) => `${JSON.stringify(entry)}\n`).join('');
+
+  fs.mkdirSync(nemiaDir, { recursive: true });
+  fs.writeFileSync(path.join(nemiaDir, 'level.json'), `${JSON.stringify({ level, since: at(0), task: NEMIA_TASK })}\n`);
+  fs.mkdirSync(path.dirname(journal), { recursive: true });
+  fs.writeFileSync(
+    journal,
+    lines([
+      {
+        kind: 'filed',
+        at: at(0),
+        brief: 'Keep the factories running.',
+        cwd: NEMIA_CWD,
+        maxAttempts: 1,
+        harness: 'claude',
+        /** Her session is long-lived, as the keeper files it: a session between turns reads idle only under this policy (`idleOf`). */
+        restartPolicy: 'Always',
+      },
+      { kind: 'starting', at: at(1), attempt: 1 },
+      { kind: 'spawned', at: at(1), attempt: 1 },
+      ...(what.told ?? []).map((told, i) => ({ kind: 'said', at: at(2 + i), attempt: 1, text: told.text })),
+    ]),
+  );
+  const session = what.session ?? 'answering';
+  if (session !== 'none') {
+    const row = session === 'answering' ? ANSWERING : WAITING;
+    fs.writeFileSync(
+      registry,
+      JSON.stringify([
+        ...rows,
+        { name: `ae/${NEMIA_TASK}/1`, sessionId: NEMIA_SESSION, kind: 'background', ...row, startedAt: now - 600_000 },
+      ]),
+    );
+  }
+  const said = what.said ?? [];
+  fs.mkdirSync(path.dirname(transcript), { recursive: true });
+  fs.writeFileSync(transcript, lines(said.flatMap((line, i) => herTranscriptLine(line, i, at))));
+  if (what.outbox?.length) {
+    fs.mkdirSync(path.join(nemiaDir, 'chat'), { recursive: true });
+    fs.writeFileSync(path.join(nemiaDir, 'chat', 'outbox.jsonl'), lines(what.outbox));
+  }
+  const delivered = (what.told ?? []).flatMap((told, i) =>
+    told.delivers === undefined ? [] : [{ id: told.delivers, said: at(2 + i), attempt: 1 }],
+  );
+  if (delivered.length > 0) {
+    fs.mkdirSync(path.join(nemiaDir, 'chat'), { recursive: true });
+    fs.writeFileSync(path.join(nemiaDir, 'chat', 'delivered.jsonl'), lines(delivered));
+  }
+  if (what.read !== undefined) {
+    fs.mkdirSync(path.join(nemiaDir, 'chat'), { recursive: true });
+    fs.writeFileSync(path.join(nemiaDir, 'chat', 'read.json'), `${JSON.stringify({ through: what.read, at: at(600) })}\n`);
+  }
+  return () => {
+    fs.rmSync(nemiaDir, { recursive: true, force: true });
+    fs.rmSync(journal, { force: true });
+    fs.rmSync(path.join(root, 'claude', 'projects', NEMIA_PROJECT), { recursive: true, force: true });
+    fs.writeFileSync(registry, JSON.stringify(rows));
+  };
+}
+
+/** Her docked face, the cue beside it, and the panel it opens. */
+export const dockOf = (page: Page): Locator => page.locator('[data-nemia-dock]');
+export const dockFaceOf = (page: Page): Locator => page.locator('[data-nemia-dock-face]');
+export const chatPanelOf = (page: Page): Locator => page.locator('[data-chat-panel]');
+
+/** Opens the panel from her docked face, and waits for it. */
+export async function openChat(page: Page): Promise<Locator> {
+  await dockFaceOf(page).click();
+  const panel = chatPanelOf(page);
+  await expectVisible(panel, "her docked face opens Nemia's chat");
+  return panel;
+}
+
+/**
+ * The panel stands wholly inside the window, and its composer wholly inside its frame: the header's three controls can be reached, the
+ * frame's cut corners are drawn, and nothing of the panel is laid over the page beneath it.
+ */
+export async function expectPanelHeld(page: Page): Promise<void> {
+  const room = page.viewportSize();
+  const panel = await chatPanelOf(page).boundingBox();
+  if (room === null || panel === null) throw new Refused('the panel has a size to measure');
+  const past = [
+    panel.y < -1 && `its top is at ${Math.round(panel.y)}`,
+    panel.x < -1 && `its left is at ${Math.round(panel.x)}`,
+    panel.x + panel.width > room.width + 1 && `its right is at ${Math.round(panel.x + panel.width)} of ${room.width}`,
+    panel.y + panel.height > room.height + 1 && `its foot is at ${Math.round(panel.y + panel.height)} of ${room.height}`,
+  ].filter((said) => said !== false);
+  if (past.length > 0) throw new Refused(`the panel stands inside the window — ${past.join(', ')}`);
+  const composer = await page.locator('[data-chat-composer]').boundingBox();
+  if (composer === null) throw new Refused('the composer has a size to measure');
+  if (composer.y + composer.height > panel.y + panel.height + 1)
+    throw new Refused(
+      `the composer stands inside the panel — it ends at ${Math.round(composer.y + composer.height)}, the panel at ${Math.round(panel.y + panel.height)}`,
+    );
+}
+
+/** The composer's field in her chat. */
+export const chatFieldOf = (page: Page): Locator => page.locator('[data-chat-composer] textarea');

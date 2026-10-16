@@ -7176,3 +7176,79 @@ test('the run page draws one tag per kind the run is behind on, and the verb to 
   assert.equal(renderToStaticMarkup(createElement(KindsBehind, { run: detailOf({ kinds: [] }) })), '', 'a run on the newest draws none');
   assert.equal(renderToStaticMarkup(createElement(KindsBehind, { run: unpinned() })), '', 'and so does one the api pinned nothing for');
 });
+
+const { ChatTurn } = await import('../src/components/chat/ChatTurn.tsx');
+const { ChatLostBand, ChatStoppedBand, ChatUnreadableBand } = await import('../src/components/chat/ChatBand.tsx');
+const { foldChat } = await import('../src/lib/chatFollowing.ts');
+const { dockWords } = await import('../src/lib/presence.ts');
+type ChatEvent = import('../src/lib/api.ts').ChatEvent;
+
+/** One step of hers. */
+const chatStep = (id: string, state: 'done' | 'running' | 'waits', second: number): Extract<ChatEvent, { kind: 'step' }> => ({
+  kind: 'step',
+  id,
+  at: new Date(Date.UTC(2026, 9, 15, 21, 40, second)).toISOString(),
+  tool: 'Read',
+  sentence: 'Read the inbox',
+  state,
+});
+
+test('a turn at work draws its steps, the one that waits on a person in yours; a finished turn folds and lays out nothing it holds', () => {
+  const turnOf = (steps: Extract<ChatEvent, { kind: 'step' }>[]) => {
+    const [item] = foldChat(steps);
+    if (item.kind !== 'turn') throw new Error('her consecutive steps fold into a turn');
+    return item;
+  };
+  const live = turnOf([chatStep('t:1', 'done', 0), chatStep('t:2', 'waits', 4)]);
+  const running = renderToStaticMarkup(createElement(ChatTurn, { turn: live }));
+  assert.match(running, /data-chat-turn="running"/);
+  assert.match(running, /data-status="yours"[^>]*data-chat-step="waits"/, 'a step that waits on a person is the look’s own state');
+  assert.match(running, /border-l-2 border-yours/);
+  const over = turnOf([chatStep('t:1', 'done', 0), chatStep('t:2', 'done', 134)]);
+  const folded = renderToStaticMarkup(createElement(ChatTurn, { turn: over }));
+  assert.match(folded, /data-chat-turn="folded"/);
+  assert.match(folded, /Worked for 2m 14s · 2 steps/);
+  assert.doesNotMatch(folded, /data-chat-step=/, 'a closed fold lays out none of its steps');
+});
+
+test("her session stopped is a status, the daemon lost an alert in the failure's colour, and neither is dimmed by an opacity", async () => {
+  const stopped = await routedWith(createElement(ChatStoppedBand, { words: 'Her session was stopped from outside.' }));
+  assert.match(stopped, /data-chat-band="stopped"[^>]*role="status"|role="status"[^>]*data-chat-band="stopped"/);
+  assert.match(stopped, /Her session stopped/);
+  assert.match(stopped, /What you write waits for her\./);
+  assert.match(stopped, /data-chat-start[^>]*href="\/settings"|href="\/settings"/, 'Start her session leads to her settings');
+  const lost = renderToStaticMarkup(
+    createElement(ChatLostBand, { since: '2026-10-15T21:57:00.000Z', now: new Date('2026-10-15T22:00:00.000Z') }),
+  );
+  assert.match(lost, /data-chat-band="lost"[^>]*role="alert"|role="alert"[^>]*data-chat-band="lost"/);
+  assert.match(lost, /No answer from the daemon/);
+  assert.match(lost, /bg-failure-container text-on-failure-container/);
+  assert.match(lost, /nothing you wrote is lost/);
+  for (const html of [stopped, lost]) assert.doesNotMatch(html, /\sopacity-\d/, 'a dimmed text falls under 4.5:1');
+});
+
+test("her docked face is called by the presence that gives it its expression, in the owner's order", () => {
+  assert.equal(dockWords(UP, false), "Open Nemia's chat. Her session is up.");
+  assert.equal(dockWords(UP, true), "Close Nemia's chat. Her session is up.");
+  assert.equal(dockWords({ ...UP, waitsOnYou: 2 }, false), "Open Nemia's chat. 2 wait on you.");
+  assert.equal(dockWords({ ...UP, waitsOnYou: 1 }, false), "Open Nemia's chat. 1 waits on you.");
+  assert.equal(dockWords({ ...UP, notSent: true }, false), "Open Nemia's chat. A message was not sent.");
+  assert.equal(dockWords({ ...UP, down: true }, false), "Open Nemia's chat. Her session is down.");
+  assert.equal(dockWords({ ...UP, answering: true }, false), "Open Nemia's chat. She is answering.");
+  assert.equal(dockWords({ ...UP, unread: 2 }, true), "Close Nemia's chat. 2 new answers.");
+  assert.equal(dockWords({ ...UP, unread: 1 }, false), "Open Nemia's chat. 1 new answer.");
+  assert.equal(
+    dockWords({ waitsOnYou: 2, notSent: true, down: true, answering: true, unread: 3 }, false),
+    "Open Nemia's chat. 2 wait on you.",
+    'what waits on a person comes first, as her face does',
+  );
+});
+
+test("a chat the board cannot read says so as an alarm, in the read's own words, and says the board reads again on its own", () => {
+  const html = renderToStaticMarkup(createElement(ChatUnreadableBand, { why: 'the api answered 503' }));
+  assert.match(html, /data-chat-band="unreadable"/);
+  assert.match(html, /role="alert"/);
+  assert.match(html, /The board cannot read her chat/);
+  assert.match(html, /the api answered 503\. It reads again every few seconds/);
+  assert.match(html, /what you write is kept here until the api takes it/);
+});

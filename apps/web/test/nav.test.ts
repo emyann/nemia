@@ -5,10 +5,10 @@ import { destinationHref, destinationOf, DESTINATIONS, pickedOf, pickTo, SETTING
 /** The name of the destination the page at `path` lights, none for none. */
 const lit = (path: string) => destinationOf(path)?.label;
 
-test("the rail's destinations are Overview, Runs, Inbox, Factories, Agents, Workflows, Stats and Settings, in that order", () => {
+test("the rail's destinations are Overview, Runs, Inbox, Factories, Agents, Workflows, Stats, Nemia and Settings, in that order", () => {
   assert.deepEqual(
     DESTINATIONS.map((item) => item.label),
-    ['Overview', 'Runs', 'Inbox', 'Factories', 'Agents', 'Workflows', 'Stats', 'Settings'],
+    ['Overview', 'Runs', 'Inbox', 'Factories', 'Agents', 'Workflows', 'Stats', 'Nemia', 'Settings'],
   );
 });
 
@@ -21,8 +21,9 @@ test("each page lights its destination — a run's steps Runs, a card's page the
   assert.equal(lit('/agents/skills/new'), 'Agents');
   assert.equal(lit('/workflows/repo/dev/review'), 'Workflows');
   assert.equal(lit('/stats'), 'Stats');
+  assert.equal(lit('/chat'), 'Nemia', 'her chat is a page of its own, and the rail lights her on it');
   for (const path of ['/settings', '/machines', '/capabilities']) assert.equal(lit(path), 'Settings', path);
-  for (const path of ['/nowhere', '/agentsx', '/machinesx', '/capabilitiesx', '/factoriesx', '/settingsx', '/statsx', '/runsx'])
+  for (const path of ['/nowhere', '/chatx', '/agentsx', '/machinesx', '/capabilitiesx', '/factoriesx', '/settingsx', '/statsx', '/runsx'])
     assert.equal(lit(path), undefined, `refused: ${path} is no destination's page`);
 });
 

@@ -16,6 +16,7 @@ import path from 'node:path';
 import { type TaskSpec, type TaskView, StopRefused, ForgetRefused } from 'agent-runtime';
 import type { Engine } from '../src/runtime-client.ts';
 import type { RepositoryRun, Run, TaskPhase } from '../src/run.ts';
+import type { StepRecord } from '../src/run.ts';
 import type { Effect as EffectOf } from 'effect/Effect';
 import type { ForgetHow, Forgot } from '../src/forget/forget.ts';
 import type { Refusal } from '../src/refusal/refusal.ts';
@@ -180,6 +181,15 @@ const engineWith = (phase: Record<string, TaskPhase>, hold?: Promise<void>, clos
     },
   });
   return { e, stopped };
+};
+
+/**
+ * A step's record without what every filing writes of the revisions it took — the agent and skill pins (`pinned`) and the digest of the
+ * closeout schema it was given (`closeoutHash`), whose subject is `revisions.test.ts`: what is left is what this file is about.
+ */
+const filedAs = (record: StepRecord | undefined): Partial<StepRecord> => {
+  const { pinned: _, closeoutHash: __, ...rest } = record ?? { taskId: null };
+  return rest;
 };
 
 test('a cancellation is not kept in the file the daemon rewrites', () => {
@@ -387,28 +397,28 @@ test("REFUSED at shipped defaults: a run is never started under an id the store 
   );
 });
 
-test('a run reads the workflow it froze at `nemia start` — the folder edited afterwards never reaches it', async () => {
+test('a run that has filed keeps the workflow it froze — the folder edited after its first filing never reaches it', async () => {
   const folder = fs.mkdtempSync(path.join(ROOT, 'frozen-'));
   fs.writeFileSync(path.join(folder, 'implement.md'), '---\nplace: git\n---\nimplement it as asked\n');
   fs.writeFileSync(path.join(folder, 'review.md'), '---\nafter: implement\nplace: git\n---\nreview it\n');
   const run = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: folder, isolate: false }));
 
-  fs.writeFileSync(path.join(folder, 'implement.md'), '---\nplace: git\n---\nsomething else entirely\n');
-  fs.rmSync(path.join(folder, 'review.md'));
-
-  const { e, filed } = recording();
+  const { e, tasks, filings, settle } = board();
   await runWith(e, advanceRun(readRun(run.id)));
-  assert.deepEqual(
-    filed.map((f) => f.id),
-    [`${run.id}-implement`],
-    'the folder the run was started from, rewritten since, never reaches it',
-  );
-  assert.match(filed[0].brief, /implement it as asked/);
-  assert.doesNotMatch(filed[0].brief, /something else/);
+  assert.deepEqual(filings, [`${run.id}-implement`], 'the first pass files the first step');
+
+  fs.writeFileSync(path.join(folder, 'implement.md'), '---\nplace: git\n---\nsomething else entirely\n');
+  fs.writeFileSync(path.join(folder, 'review.md'), '---\nafter: implement\nplace: git\n---\nsomething else entirely\n');
+
+  settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  await runWith(e, advanceRun(readRun(run.id)));
+  assert.deepEqual(filings, [`${run.id}-implement`, `${run.id}-review`], 'the step after it is filed from the freeze');
+  assert.match(tasks.get(`${run.id}-review`)!.spec.brief, /review it/);
+  assert.doesNotMatch(tasks.get(`${run.id}-review`)!.spec.brief, /something else/);
   assert.deepEqual(
     readRun(run.id).workflow?.map((s) => s.name),
     ['implement', 'review'],
-    "the deleted step is still the run's",
+    'the folder the run has filed from, rewritten since, never reaches it',
   );
 });
 
@@ -583,7 +593,7 @@ test("the run files a signed step's check itself: the frozen command, in its wor
   const id = `${run.id}-implement-check`;
   assert.deepEqual([pass.checked, pass.filed], [['implement'], []], 'the follower waits for the check, not for the agent');
   assert.deepEqual(
-    readRun(run.id).steps.implement,
+    filedAs(readRun(run.id).steps.implement),
     {
       taskId: `${run.id}-implement`,
       workspace: run.repo,
@@ -683,13 +693,13 @@ test('UNSIGNED at shipped defaults: a step that ends without the closeout the ru
   assert.deepEqual(filings, [`${run.id}-implement`]);
 });
 
-test('a `check:` planted in the folder after `nemia start` never reaches the check the run files', async () => {
+test('a `check:` planted in the folder after the run has filed never reaches the check the run files', async () => {
   const dir = folder('check: npm test');
   const run = await started(dir);
-  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\ncheck: true\n---\nimplement it\n');
 
   const { e, tasks, settle } = board();
   await runWith(e, advanceRun(readRun(run.id)));
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\ncheck: true\n---\nimplement it\n');
   settle(`${run.id}-implement`, 'succeeded', SIGNED);
   await runWith(e, advanceRun(readRun(run.id)));
   const spec = tasks.get(`${run.id}-implement-check`)!.spec;
@@ -990,23 +1000,23 @@ test("a step with `input:` is handed exactly the declared fields inline, as data
   );
 });
 
-test("the schema the run files is the one it froze at `nemia start`, not the folder's — and it is what the step is judged by", async () => {
+test("the schema the run files is the one it froze, not the folder's as it is rewritten after the run has filed — and it is what the step is judged by", async () => {
   const dir = reviewed('input: review\n');
   const run = await started(dir);
+
+  const { e, tasks, settle } = board();
+  await runWith(e, advanceRun(readRun(run.id)));
   fs.writeFileSync(
     path.join(dir, 'review.schema.json'),
     JSON.stringify({ type: 'object', properties: { verdict: { type: 'string' } }, required: ['verdict'], additionalProperties: false }),
   );
-
-  const { e, tasks, settle } = board();
-  await runWith(e, advanceRun(readRun(run.id)));
   settle(`${run.id}-implement`, 'succeeded', SIGNED);
   await runWith(e, advanceRun(readRun(run.id)));
   const filedWith = tasks.get(`${run.id}-review`)!.spec.closeoutSchema as { properties: Record<string, unknown>; required: string[] };
   assert.deepEqual(
     filedWith.properties.findings,
     FINDINGS.properties.findings,
-    'the schema rewritten in the folder after the start, to ask for something easier, never reaches the task',
+    'the schema rewritten in the folder after the first filing, to ask for something easier, never reaches the task',
   );
   assert.equal(filedWith.properties.verdict, undefined);
   assert.deepEqual(readRun(run.id).workflow?.find((s) => s.name === 'review')?.output, { file: 'review.schema.json', schema: FINDINGS });
@@ -1229,7 +1239,7 @@ test('`retries: 1` re-files a step its check refused, once, continuing its sessi
     { cwd: spec.cwd, resumeFrom: spec.resumeFrom, harness: spec.harness },
     { cwd: run.repo, resumeFrom: `native-${run.id}-implement`, harness: undefined },
   );
-  assert.deepEqual(readRun(run.id).steps.implement, {
+  assert.deepEqual(filedAs(readRun(run.id).steps.implement), {
     taskId: try2,
     workspace: run.repo,
     branch: run.branch,
@@ -1366,7 +1376,7 @@ test('a check that ended stopped spends no retry: the step waits on you, `nemia 
   assert.deepEqual([pass.tried, pass.checked, pass.filed], [['implement'], ['implement'], []]);
   assert.deepEqual(filings, [`${run.id}-implement`, check1, check2], 'a check, and no step');
   assert.equal(tasks.get(check2)!.spec.harness, 'check');
-  assert.deepEqual(readRun(run.id).steps.implement, {
+  assert.deepEqual(filedAs(readRun(run.id).steps.implement), {
     taskId: `${run.id}-implement`,
     workspace: run.repo,
     branch: run.branch,
@@ -1558,7 +1568,7 @@ test('implement ⇄ review: `again: true` files round 2 — implement continued 
     'needs',
     'replies',
   ]);
-  assert.deepEqual(readRun(run.id).steps, {
+  assert.deepEqual(Object.fromEntries(Object.entries(readRun(run.id).steps).map(([name, record]) => [name, filedAs(record)])), {
     implement: {
       taskId: try2,
       workspace: run.repo,

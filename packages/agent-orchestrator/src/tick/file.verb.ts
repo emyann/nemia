@@ -54,6 +54,7 @@ import type { BranchReader } from '../branches/branches.store.ts';
 import { roundBriefed, roundFiled, roundFiledNote } from '../round/round.ts';
 import { closeoutsAfterMerge } from '../merge/merge.verb.ts';
 import { filedConfig, tryModel } from '../filed/filed.ts';
+import { filedOn, resumeOn } from '../pinned/pinned.ts';
 import { closeoutSchemaOf, envelopeRefusals, parseCloseout, type Closeout } from '../closeout/index.ts';
 import { modeWord, nextTry, sessionModel, tryWord, type Retry, type RetryAsk } from '../retry/index.ts';
 import { artifactsDir, inputsDir } from '../record/record.store.ts';
@@ -205,7 +206,7 @@ const fileTry = Effect.fnUntraced(function* (f: Filing, r: Retry, out: Tried) {
   }
   out.tried.push(r.step);
   notes.push(said);
-  run.steps[r.step] = nextTry(record, r, taskId);
+  run.steps[r.step] = { ...nextTry(record, r, taskId), ...filedOn(f, step) };
   for (const b of r.back ?? []) run.steps[b] = sentBack(run.steps[b]);
 });
 
@@ -228,7 +229,7 @@ const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: Workflow
   const files = artifactsDir(run, r.step);
   fs.mkdirSync(files, { recursive: true });
   const remote = isRemoteHarness(step.harness);
-  const resumeFrom = r.mode === 'nudge' && !remote ? sessionIn(reads.views, record.taskId!) : undefined;
+  const resumeFrom = resumeOn(r.mode === 'nudge' && !remote ? sessionIn(reads.views, record.taskId!) : undefined, step, f, record);
   const refusal = record.check && step.check ? yield* refusalRead(step.check, record.check.taskId).pipe(over(asRead(f))) : undefined;
   const closeouts = yield* askingReads(f, r, resumeFrom);
   const checked = remote ? [] : yield* checksHandedRead(run, reads.steps, step).pipe(over(asRead(f)));
@@ -423,7 +424,7 @@ function roundSpec(
   const record = run.steps[r.target];
   const files = artifactsDir(run, r.target);
   fs.mkdirSync(files, { recursive: true });
-  const resumeFrom = record.taskId ? sessionIn(reads.views, record.taskId) : undefined;
+  const resumeFrom = resumeOn(record.taskId ? sessionIn(reads.views, record.taskId) : undefined, target, f, record);
   const told = toldOf(run, target);
   return {
     id: taskId,
@@ -555,7 +556,7 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, ready: rea
       say: landing.say,
     };
     const taskId = yield* asked('file', e.file(readySpec(f, step, place, files, told))).pipe(forStep(run, step));
-    run.steps[name] = { ...run.steps[name], taskId, workspace: place.workspace, branch: place.branch };
+    run.steps[name] = { ...run.steps[name], taskId, workspace: place.workspace, branch: place.branch, ...filedOn(f, step) };
     filed.push(name);
   }
   return filed;
@@ -628,7 +629,7 @@ function readySpec(
         own: told.own,
         landingDenied: () => said.words?.denied ?? [],
       }),
-      resumeFrom: step.resume ? sessionOf(f, step.resume) : undefined,
+      resumeFrom: step.resume ? resumeOn(sessionOf(f, step.resume), step, f, run.steps[step.name]) : undefined,
       ...(holdsOpenOn(step) ? { holdOpen: true as const } : {}),
       /**
        * The engine hands it to the harness and records the answer without reading it: what the fields mean is this package's (`Closeout`).

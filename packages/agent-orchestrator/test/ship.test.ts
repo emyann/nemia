@@ -18,6 +18,7 @@ import path from 'node:path';
 import type { TaskSpec } from 'agent-runtime';
 import type { Engine } from '../src/runtime-client.ts';
 import type { RepositoryRun, Run, TaskPhase } from '../src/run.ts';
+import type { StepRecord } from '../src/run.ts';
 import { scratch } from './scratch.ts';
 import { decideScreen } from './screens.ts';
 import { TEAM, TEAM_DEV } from './team.ts';
@@ -260,6 +261,15 @@ async function atTheGate(given: Given = {}) {
   const pass = await runWith(e, advanceRun(readRun(run.id)));
   return { repo, id: run.id, branch: work.branch!, e, tasks, filings, settle, pass, base: world().head(repo) };
 }
+
+/**
+ * A step's record without what every filing writes of the revisions it took — the agent and skill pins (`pinned`) and the digest of the
+ * closeout schema it was given (`closeoutHash`), whose subject is `revisions.test.ts`: what is left is what this file is about.
+ */
+const filedAs = (record: StepRecord | undefined): Partial<StepRecord> => {
+  const { pinned: _, closeoutHash: __, ...rest } = record ?? { taskId: null };
+  return rest;
+};
 
 test('`nemia start` on a folder with an ending says so: nothing of that step runs until a person approves it', async (t) => {
   const repo = aRepo();
@@ -1238,7 +1248,7 @@ test("an ending that stopped on the base branch sends the work back through the 
 
   const sent = await runWith(e, advanceRun(readRun(id)));
   assert.deepEqual([sent.tried, sent.filed], [['review'], []], 'the reviewer is filed again, and the ending is not');
-  assert.deepEqual(readRun(id).steps.ship, {
+  assert.deepEqual(filedAs(readRun(id).steps.ship), {
     taskId: null,
     workspace: repo,
     branch: 'main',

@@ -202,6 +202,23 @@ const ACCEPT: RouteWords = {
     `Could not accept ${step}'s loop as it stands: ${said}. \`nemia accept ${runId} ${step} --message "<why>"\` accepts the same way from the command line.`,
 };
 
+/** A run told to take the new revisions of the kinds it resolved, as the guard's refusals word it, its body and its failures. */
+const REFRESH: RouteWords = {
+  shape: '`{}`',
+  guard: ({ runId }) => ({
+    route: `POST /api/runs/${runId}/refresh`,
+    does: 'tells a run to take the new revisions of the kinds it resolved',
+    forAnother: 'refresh one',
+    why: "every filing after it — a new step, a retry, a round — is filed on the newest revision of the run's workflow, its agents, their skills and its factory's rules, which an agent acts on in this repository",
+    reach: `take them with \`nemia refresh ${runId}\``,
+    instead: `Take them with \`nemia refresh ${runId}\`: the run's page on the board shows the drift and prints that verb, and has no button for it`,
+    shape: '`{}`',
+  }),
+  issue: (at) => () => `POST /api/runs/${at.runId}/refresh takes no body.`,
+  failed: ({ runId }, said) =>
+    `Could not refresh ${runId}: ${said}. \`nemia refresh ${runId}\` takes the new revisions the same way from the command line.`,
+};
+
 /** Words for a step's running session, as the guard's refusals word them, and its body; words the harness did not take are its own. */
 const SAY: RouteWords = {
   shape: SAY_SHAPE,
@@ -607,6 +624,7 @@ const FACTORY_FIRE: RouteWords = {
 export const WORDS: Readonly<Record<string, RouteWords>> = {
   retry: RETRY,
   round: ROUND,
+  refresh: REFRESH,
   merge: MERGE,
   approve: APPROVE,
   accept: ACCEPT,

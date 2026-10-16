@@ -1,5 +1,20 @@
-/** A step's tries, earliest first, each with its attempts and how it signed off, as the run's record keeps them. */
-import { endWords, type RetryAsk, bare, type TaskView, type Views, wordOf } from 'agent-orchestrator';
+/**
+ * A step's tries, earliest first, each with its attempts and how it signed off, as the run's record keeps them — and, of the revisions a
+ * try ran on, the two drifts the run page shows: how the workflow folder has moved away from the steps the run started with (`driftOf`),
+ * a name-level difference said as a warning, and the kinds the run and its filed steps are behind the ledger on (`kindsOf`).
+ */
+import {
+  endWords,
+  kindsDrift,
+  type RetryAsk,
+  bare,
+  stepsDrift,
+  type TaskView,
+  topsOf,
+  type Drift,
+  type Views,
+  wordOf,
+} from 'agent-orchestrator';
 import {
   answerOf,
   type Asked,
@@ -249,4 +264,37 @@ export function attemptsIn(taskId: string | null, views: Views, turn?: number): 
     count: attempts.length,
     latest: state && latest ? { startedAt: latest.startedAt, ...endWords(state, latest), endedAt: latest.endedAt ?? null } : null,
   };
+}
+
+/** How the folder has moved away from the steps the run started with, or null if it has not. */
+export function driftOf(run: Run, workflows: readonly Workflow[]): string | null {
+  const inFolder = new Set(workflows.map((s) => s.name));
+  const removed = Object.keys(run.steps).filter((name) => !inFolder.has(name));
+  const added = workflows.map((s) => s.name).filter((name) => !Object.hasOwn(run.steps, name));
+  const shown = run.workflow ? 'shown as the run froze it' : 'shown from the run record without spec or prose';
+  const said = [
+    ...(removed.length ? [`it no longer has ${removed.join(', ')}, ${shown}`] : []),
+    ...(added.length
+      ? [`it has ${added.join(', ')}, which the run did not start with${run.workflow ? ' and will never file, so it is not shown' : ''}`]
+      : []),
+  ];
+  return said.length ? `The workflow folder ${run.workflowDir} has changed since this run started: ${said.join('; ')}.` : null;
+}
+
+/**
+ * The kinds the run is behind the ledger on (`kindsDrift`, `stepsDrift`): its own pins, and those a filed step ran on that the run has
+ * since moved past. The ledger is read once, for the kinds the run names and no others; a run that pinned nothing reads none, and nothing
+ * is read for it.
+ *
+ * The ledger, not a resolve: a number here is one the ledger holds for a content anything resolved, so a kind edited and then reverted to
+ * the content the run pins reads as behind the ledger's last number while `nemia refresh` answers that there is nothing to take — the verb
+ * resolves to answer (`refreshedNow`), and a page's read does not pay a resolve. The board says these numbers as the ledger's for that
+ * reason (`behindWords`).
+ */
+export function kindsOf(run: Run): readonly Drift[] {
+  const steps = Object.entries(run.steps).map(([name, record]) => [name, record.pinned] as const);
+  const named = [...(run.pinned ?? []), ...steps.flatMap(([, pins]) => pins ?? [])].map(({ kind, name }) => ({ kind, name }));
+  if (!named.length) return [];
+  const tops = topsOf(named);
+  return [...kindsDrift(run.pinned, tops), ...stepsDrift(steps, run.pinned, tops)];
 }

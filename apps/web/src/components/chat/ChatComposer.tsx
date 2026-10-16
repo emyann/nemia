@@ -8,13 +8,15 @@
 import { useRef, useState } from 'react';
 import { ArrowUpIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { cutShape } from '@/components/look';
+import { CutField, cutRing, cutShape } from '@/components/look';
 import { composerButton, composerWords } from '@/lib/nemia';
 import type { Presence } from '@/lib/presence';
-import { cn } from '@/lib/utils';
 
 /** How far the composer's two corners and its button are cut, in pixels. */
 const COMPOSER_CUT = 10;
+
+/** The room between the button and its focus ring, and the ring's width, in pixels: the look's cut button's own. */
+const [GAP, RING] = [2, 3];
 
 /** A key the hints name. */
 const Key = ({ children }: { children: string }) => (
@@ -42,42 +44,46 @@ export function ChatComposer({ presence, onSend, onStop }: { presence: Presence;
         setText('');
       }}
     >
-      <div
-        className={cn(
-          'flex min-h-13 items-end gap-2.5 py-1.5 pr-1.5 pl-3.5 ring-1 ring-outline-variant ring-inset focus-within:ring-2 focus-within:ring-alive',
-          off ? 'bg-surface-container' : 'bg-surface-container-high',
-        )}
-        style={{ clipPath: cutShape(COMPOSER_CUT) }}
-      >
-        <textarea
-          aria-label="Message to Nemia"
-          value={text}
-          disabled={off}
-          rows={1}
-          placeholder={composerWords(presence)}
-          onChange={(event) => setText(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
-              event.preventDefault();
-              form.current?.requestSubmit();
-            }
-          }}
-          className="field-sizing-content max-h-40 min-h-10 min-w-0 flex-1 resize-none bg-transparent py-2 text-body-medium text-on-surface outline-none placeholder:text-on-surface-variant disabled:cursor-not-allowed"
-        />
-        <Button
-          type={stops ? 'button' : 'submit'}
-          data-chat-button={stops ? 'stop' : 'send'}
-          aria-label={stops ? 'Stop her answer' : 'Send'}
-          size="icon"
-          variant="secondary"
-          isDisabled={stops ? false : !ready}
-          onPress={stops ? onStop : undefined}
-          className="rounded-none"
-          style={{ clipPath: cutShape(COMPOSER_CUT) }}
-        >
-          {stops ? <span aria-hidden="true" className="size-3 bg-current" /> : <ArrowUpIcon />}
-        </Button>
-      </div>
+      <CutField size={COMPOSER_CUT} ground={off ? 'bg-surface-container' : 'bg-surface-container-high'}>
+        <div className="flex min-h-13 items-end gap-2.5 py-1.5 pr-1.5 pl-3.5">
+          <textarea
+            aria-label="Message to Nemia"
+            value={text}
+            disabled={off}
+            rows={1}
+            placeholder={composerWords(presence)}
+            onChange={(event) => setText(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+                event.preventDefault();
+                form.current?.requestSubmit();
+              }
+            }}
+            className="field-sizing-content max-h-40 min-h-10 min-w-0 flex-1 resize-none bg-transparent py-2 text-body-medium text-on-surface outline-none placeholder:text-on-surface-variant disabled:cursor-not-allowed"
+          />
+          <span className="group/send relative inline-flex shrink-0">
+            <span
+              aria-hidden="true"
+              data-cut-ring
+              className="pointer-events-none absolute -inset-[5px] hidden bg-ring group-has-data-focus-visible/send:block"
+              style={{ clipPath: cutRing(COMPOSER_CUT, GAP, RING) }}
+            />
+            <Button
+              type={stops ? 'button' : 'submit'}
+              data-chat-button={stops ? 'stop' : 'send'}
+              aria-label={stops ? 'Stop her answer' : 'Send'}
+              size="icon"
+              variant="secondary"
+              isDisabled={stops ? false : !ready}
+              onPress={stops ? onStop : undefined}
+              className="relative rounded-none"
+              style={{ clipPath: cutShape(COMPOSER_CUT) }}
+            >
+              {stops ? <span aria-hidden="true" className="size-3 bg-current" /> : <ArrowUpIcon />}
+            </Button>
+          </span>
+        </div>
+      </CutField>
       <div className="flex items-center gap-2 text-body-small text-on-surface-variant">
         <Key>Enter</Key>
         <span>sends</span>

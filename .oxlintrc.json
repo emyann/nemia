@@ -343,7 +343,7 @@
     {
       "files": ["apps/api/src/detail/detail.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 91, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 86, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 22 }]
       }
     },

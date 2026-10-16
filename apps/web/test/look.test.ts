@@ -94,6 +94,49 @@ test('REFUSED: a part the door exports that the skill does not name', () => {
     assert.ok(door.includes(`from './${name.slice(0, -4)}'`), `${name}, a part of the folder, is exported by the door`);
 });
 
+/**
+ * Each focus ring written in `source`, the text of a file that draws a cut: a ring utility behind a focus state, and the kit's
+ * `focusRing`, which writes them. A clip to the cut shape takes such a ring off the two cut corners, so a box drawn in a cut lights
+ * its own edge in that shape instead (`CutField`, `CutFrame`), or draws a band beside it (`cutRing`). A ground named `bg-ring` is
+ * none, and the word in a doc comment is none: a ring is read behind its state alone.
+ */
+export const ringedCut = (source: string): string[] => [
+  ...(source.match(/(?<![\w-])(?:[\w/[\]-]+-)?focus(?:-visible|-within)?(?:\/[\w-]+)?:ring[\w[\]/.-]*/g) ?? []),
+  ...(source.match(/\bfocusRing\(/g) ?? []),
+];
+
+test('REFUSED: a focus ring in a file that draws a cut: a clip takes a rectangular ring off the two cut corners', () => {
+  assert.deepEqual(ringedCut("'ring-1 ring-outline-variant ring-inset focus-within:ring-2 focus-within:ring-alive'"), [
+    'focus-within:ring-2',
+    'focus-within:ring-alive',
+  ]);
+  assert.deepEqual(ringedCut("cn('inline-flex', focusRing())"), ['focusRing(']);
+  assert.deepEqual(
+    ringedCut("'absolute -inset-[5px] bg-ring group-data-focus-visible/cut:block' /* its focus ring */"),
+    [],
+    'neither a ground nor the word',
+  );
+  assert.deepEqual(ringedCut("'data-focus-visible:ring-3 group-focus-visible/send:ring-ring/50'"), [
+    'data-focus-visible:ring-3',
+    'group-focus-visible/send:ring-ring/50',
+  ]);
+  const drawing = filesUnder(SRC).filter(
+    (file) => /\.tsx?$/.test(file) && /\bcut(?:Shape|Ring)\(/.test(fs.readFileSync(path.join(SRC, file), 'utf8')),
+  );
+  assert.ok(drawing.includes('components/chat/ChatComposer.tsx'), `the files that draw a cut are read: ${drawing.join(', ')}`);
+  for (const file of drawing)
+    assert.deepEqual(ringedCut(fs.readFileSync(path.join(SRC, file), 'utf8')), [], `${file} draws a ring the cut would break`);
+});
+
+test("a field drawn in a cut takes the look's cut field, and the send beside it a band in the cut shape", () => {
+  const composer = fs.readFileSync(path.join(SRC, 'components', 'chat', 'ChatComposer.tsx'), 'utf8');
+  assert.match(composer, /import\s*\{[^}]*\bCutField\b[^}]*\}\s*from\s*'@\/components\/look'/, 'the field through the door');
+  assert.match(composer, /<CutField\s+size=\{COMPOSER_CUT\}/, 'its edge is drawn in its cut, never a ring a clip breaks');
+  assert.doesNotMatch(composer, /ring-outline-variant|ring-inset/, 'and no rectangular edge is left on it');
+  assert.match(composer, /clipPath:\s*cutRing\(COMPOSER_CUT, GAP, RING\)/, "the send's focus ring is a band in the send's cut");
+  assert.match(composer, /group-has-data-focus-visible\/send:block/, 'shown when the keyboard reaches the send');
+});
+
 /** The one file that writes a grain's tile, by its path from `src`. */
 const GRAIN = 'components/look/grain.css';
 

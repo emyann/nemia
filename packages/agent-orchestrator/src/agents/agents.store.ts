@@ -59,8 +59,9 @@ export const renderedIn = (dir: string, step: Workflow): boolean =>
 /**
  * Render every step of `steps` whose agent is rendered (`rendersAgent`) into its folder (`agentFilesDir`): its prompt, its skills copied
  * whole from where the load found them (`skills`), each under its bare name (`bareSkillOf`), as the prompt names it, and its style.
- * Written once, at `nemia start`, so an edit of an agent or a skill after it reaches no run already started, as an edit of its workflow
- * does not. A skill is copied as its files, never a link, and one holding
+ * Written at `nemia start`, and again whenever the run takes the revisions of its kinds (`renderAgain`): at its first filing while it
+ * has filed nothing, and on `nemia refresh`. So an edit of an agent or a skill after a run has filed reaches it no more than an edit of
+ * its workflow does. A skill is copied as its files, never a link, and one holding
  * a link that is not followed is refused (`copySkillFiles`): the folder is the step's own.
  */
 export function writeAgentFiles(run: Pick<Run, 'id'>, steps: readonly Workflow[], skills: SkillsFound): void {

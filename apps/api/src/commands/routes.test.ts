@@ -209,6 +209,7 @@ test('REFUSED at shipped defaults: every route that writes, asked by a page on a
       'retry POST',
       'approve POST',
       'round POST',
+      'refresh POST',
       'accept POST',
       'merge POST',
       'say POST',

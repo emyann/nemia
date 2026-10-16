@@ -47,6 +47,7 @@ import {
   type Spent,
   spentOf,
   type StepNeeds,
+  type Drift,
 } from 'agent-orchestrator';
 import {
   acceptanceOf,
@@ -70,11 +71,14 @@ import {
 import { loopSpan, remoteNameOf, type Workflow } from 'agent-orchestrator/workflow';
 import { folderFiles, type StepArtifact } from '../steps/artifacts.ts';
 import { type RunGraph, runGraph } from 'agent-orchestrator';
+
 import { checksOf, refusedStderr, type StepCheck } from '../steps/logs.ts';
 import { engineRead, type Engine, judgedOn, workFolderOf } from '../store.ts';
 import {
   attemptsIn,
   closeoutIn,
+  driftOf,
+  kindsOf,
   type StepAttempts,
   type StepCloseout,
   type StepTry,
@@ -83,7 +87,7 @@ import {
   unreadableIn,
 } from './tries.ts';
 import { type TaskPart, toldOf } from './told.ts';
-import { decideLine, stepCommands, type StepCommands } from './commands.ts';
+import { decideLine, refreshLine, stepCommands, type StepCommands } from './commands.ts';
 import type { Served } from '../layer.ts';
 import { readOf, type RunRead, type StepUsed, totalOf, usedOf } from './usage.ts';
 
@@ -292,6 +296,15 @@ export type RunDetail = {
   /** Set when the workflow folder cannot be read, or lacks steps the run started with. */
   warning: string | null;
   /**
+   * The kinds this run is behind the revisions ledger on, in `Drift`'s words: one entry per kind and name whose number the ledger has
+   * moved past since the run resolved it — without `step`, what a filing after this would take (`nemia refresh`); with `step`, what a step
+   * that has already been filed ran on, where the run's own pin has moved past it. `[]` for a run on the newest of every kind, and for a
+   * record written before revisions, which pinned nothing.
+   */
+  kinds: readonly Drift[];
+  /** The line to type to take the new revisions, built off the table (`refreshLine`): what the board shows beside the drift. */
+  refresh: string;
+  /**
    * The steps as a graph, from the workflow the run is judged by (`judgedSteps`), for every client to draw the same:
    * `runGraph`. A step the page shows and that workflow does not have waits on nothing, so it is a root.
    */
@@ -414,20 +427,24 @@ export type StepTimelineTotal = TimelineTotal & { cost: Spent | null };
  */
 export type StepTimelineTry = Omit<TimelineTry, 'used'> & { used: StepUsed | null };
 
-/** How the folder has moved away from the steps the run started with, or null if it has not. */
-function driftOf(run: Run, workflows: readonly Workflow[]): string | null {
-  const inFolder = new Set(workflows.map((s) => s.name));
-  const removed = Object.keys(run.steps).filter((name) => !inFolder.has(name));
-  const added = workflows.map((s) => s.name).filter((name) => !Object.hasOwn(run.steps, name));
-  const shown = run.workflow ? 'shown as the run froze it' : 'shown from the run record without spec or prose';
-  const said = [
-    ...(removed.length ? [`it no longer has ${removed.join(', ')}, ${shown}`] : []),
-    ...(added.length
-      ? [`it has ${added.join(', ')}, which the run did not start with${run.workflow ? ' and will never file, so it is not shown' : ''}`]
-      : []),
-  ];
-  return said.length ? `The workflow folder ${run.workflowDir} has changed since this run started: ${said.join('; ')}.` : null;
-}
+/**
+ * Where the run works, as a person reads it: its repository, the kind of place its steps work in, a folder run's work directory, the
+ * workflow folder it was started from, the agent a try started from an agent's page tried, and its base commit, branch and whether it cut
+ * worktrees.
+ */
+const whereOf = (
+  run: Run,
+  home: string,
+): Pick<RunDetail, 'repo' | 'place' | 'work' | 'workflowDir' | 'try' | 'baseRef' | 'branch' | 'isolate'> => ({
+  repo: run.repo ?? null,
+  place: placeOf(run),
+  work: isRepositoryRun(run) ? null : run.workspace,
+  workflowDir: run.workflowDir,
+  try: tryOf(run, home),
+  baseRef: run.baseRef ?? null,
+  branch: run.branch ?? null,
+  isolate: run.isolate ?? null,
+});
 
 /**
  * What a step's tries have cost, against its cap, and the raise of that cap the package takes (`Spent`, `StepBudget`, `StepRaise`) — off
@@ -641,14 +658,7 @@ export async function detail(run: Run, { e, placeService, home, memo }: Detailin
     id: run.id,
     brief: run.brief,
     decide: decideLine(run.id),
-    repo: run.repo ?? null,
-    place: placeOf(run),
-    work: isRepositoryRun(run) ? null : run.workspace,
-    workflowDir: run.workflowDir,
-    try: tryOf(run, home),
-    baseRef: run.baseRef ?? null,
-    branch: run.branch ?? null,
-    isolate: run.isolate ?? null,
+    ...whereOf(run, home),
     createdAt: run.createdAt,
     startedAt: runStartedAt(run, filed),
     cancelledAt: run.cancelledAt ?? null,
@@ -670,6 +680,8 @@ export async function detail(run: Run, { e, placeService, home, memo }: Detailin
     toDecide: judged.toDecide,
     gates: gatesOf(steps, run),
     warning: folder.steps ? driftOf(run, folder.steps) : folder.warning,
+    kinds: kindsOf(run),
+    refresh: refreshLine(run.id),
     graph: runGraph(steps, names),
     steps: await Promise.all(
       names.map(async (name) => {

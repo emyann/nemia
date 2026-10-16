@@ -2316,7 +2316,6 @@ test("REFUSED: a confirm or a drop of the person's rules for auto is asked over 
 const COVERED_BY_SETTINGS: ReadonlyArray<readonly [string, string, string]> = [
   ['design', 'seldon', 'Bash'],
   ['intake', 'iris', 'Bash'],
-  ['review', 'reviewer', 'Bash'],
 ];
 
 /** Every step of every shipped folder, and of the tests' team, with the folder it came from. */

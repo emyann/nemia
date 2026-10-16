@@ -69,6 +69,7 @@ const PINNED: Record<string, string[]> = {
     'folderTrust',
     'lifecycleGraph',
     'nameFor',
+    'projectAllows',
     'refusalWords',
     'refusedText',
     'remoteConfigRefusal',

@@ -10,6 +10,7 @@ import type { CancelPlan } from '../cancel/cancel.ts';
 import { everyOf } from '../daemon/daemon.ts';
 import { forgetLine, type Forgot } from '../forget/forget.ts';
 import { SELECTOR_FORM, selectorsRefusal } from '../watch/selector.ts';
+import { retiredWakeRefusal } from '../subscription/index.ts';
 import { forgetRun } from '../forget/forget.verb.ts';
 import type { EngineForgetting } from '../forgetting/forgetting.ts';
 import { pruneLines, type Pruning } from '../prune/prune.ts';
@@ -521,12 +522,8 @@ const UP: Ran = {
   only: { side: 'cli', why: 'nemia up holds the store as long as its process lives; the api holds none' },
 };
 
-/** The refusal of a `--wake-word` given no word. */
-const WAKE_WORD_TAKES =
-  "nemia watch --wake-word takes a word, found in a feed line's word or leading a part of its note: nemia watch --wake-word <word>";
-
 /** What `nemia watch` takes after its name: its usage in the help, and what every refusal of what was typed ends on. */
-const WATCH_USAGE = '[cursor] [--once] [-l <selector>]... [--cursor-file <path>] [--json] [--wake] [--wake-word <word>]...';
+const WATCH_USAGE = '[cursor] [--once] [-l <selector>]... [--cursor-file <path>] [--json]';
 
 /** The command line `nemia watch`'s refusals end on. */
 const WATCH_FORM = `nemia watch ${WATCH_USAGE}`;
@@ -546,7 +543,6 @@ const CURSOR_FILE_TAKES =
 const WATCH_TAKES: Readonly<Record<string, string>> = {
   '-l': SELECTOR_TAKES,
   '--cursor-file': CURSOR_FILE_TAKES,
-  '--wake-word': WAKE_WORD_TAKES,
 };
 
 /**
@@ -575,8 +571,9 @@ const WATCH: Ran = {
     'agent, kind, reason, type, waits and source. --cursor-file: keep the',
     'cursor read to in a file, and start from it where it is there.',
     '--json: one JSON object a line, a feed line with its cursor, and a',
-    'cursor of its own every 30 seconds while the feed is still; --wake:',
-    'only the lines that wait on a person; --wake-word: these words',
+    'cursor of its own every 30 seconds while the feed is still. With no -l,',
+    'every line; -l waits=person takes the lines that wait on a person. A',
+    'step with no agent carries agent: none, which -l agent!=none leaves out.',
   ],
   spec: {
     positionals: [{ key: 'cursor', takes: 'optional', kind: 'text' }],
@@ -585,10 +582,8 @@ const WATCH: Ran = {
       { flag: '-l', kind: 'text', key: 'selector', many: true, takes: SELECTOR_TAKES },
       { flag: '--cursor-file', kind: 'text', key: 'cursorFile', takes: CURSOR_FILE_TAKES, twice: 'nemia watch takes --cursor-file once.' },
       { flag: '--json', kind: 'switch', key: 'json' },
-      { flag: '--wake', kind: 'switch', key: 'wake' },
-      { flag: '--wake-word', kind: 'text', key: 'wakeWord', many: true, takes: WAKE_WORD_TAKES },
     ],
-    unknown: (arg) => `nemia watch does not take ${arg}: ${WATCH_FORM}`,
+    unknown: (arg) => retiredWakeRefusal('nemia watch', arg) ?? `nemia watch does not take ${arg}: ${WATCH_FORM}`,
     apart: (_value, flag) => WATCH_TAKES[flag] ?? cursorTakes,
   },
   check: (args) => {

@@ -230,7 +230,11 @@ test("at semi-auto the keeper files her task long-lived in auto, the daemon's bi
     listSubscriptions().map((s) => [s.name, s.subscription.task]),
     [['nemia', set.task]],
   );
-  assert.ok(listSubscriptions()[0].subscription.wake?.includes('denied:'), "a step's denied calls wake her");
+  assert.deepEqual(
+    listSubscriptions()[0].subscription.selectors,
+    ['waits=person', 'reason=ToolDenied'],
+    "the lines that wait on a person, and a step's denied calls",
+  );
   assert.deepEqual(listSubscriptions()[0].subscription.scope, { atLeast: 'semi-auto' }, 'told of no factory left alone');
   assert.deepEqual(await beat(), [], 'level-triggered: nothing filed again');
   assert.equal(b.filings.filter((id) => id === set.task).length, 1);

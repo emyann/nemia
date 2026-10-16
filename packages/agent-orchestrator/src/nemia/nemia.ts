@@ -1,14 +1,13 @@
 /**
  * Nemia, the store's own agent, kept on a long-lived session while a person has her on: the levels a person sets (`LEVELS`), the file
  * that says it (`LevelFile`), what the keeper owes on a beat (`nemiaDue`) off the state her session and her subscription are in
- * (`nemiaState`), the words that wake her (`NEMIA_WAKE`), the settings her session is filed with (`nemiaSettings`), and her machine as a
- * board draws it (`nemiaGraph`, `nemiaDiagram`).
+ * (`nemiaState`), the selectors of the feed that wake her (`NEMIA_SELECTORS`), the settings her session is filed with
+ * (`nemiaSettings`), and her machine as a board draws it (`nemiaGraph`, `nemiaDiagram`).
  *
  * Pure. The person's file and her folder are `level.store.ts`'s, the keeper is `keep.verb.ts`, and the commands are `level.verb.ts` and
  * `memory.verb.ts`.
  */
 import path from 'node:path';
-import { DEFAULT_WAKE } from '../subscription/subscription.ts';
 import { DEMAND_OFF } from '../demand/demand.ts';
 import { FACTORY_LEVEL_FORM, LEVELS, type Level } from '../level/level.ts';
 
@@ -27,8 +26,11 @@ export const NEMIA_FLOOR: Level = 'semi-auto';
 /** The name of her subscription to the feed, which the keeper alone puts and drops: refused to `nemia subscribe` and `unsubscribe`. */
 export const NEMIA_SUBSCRIPTION = 'nemia';
 
-/** The words of the feed that wake her: those that wait on a person (`DEFAULT_WAKE`), and a step's calls denied (`denied:`). */
-export const NEMIA_WAKE: readonly string[] = [...DEFAULT_WAKE, 'denied:'];
+/**
+ * The selectors of the feed that wake her, two lines a person reads in her record: the lines that wait on a person, and a step's calls
+ * denied. Hers, not the package's default, and said in the feed's one grammar (`watch/selector.ts`), over the keys the tick stamps.
+ */
+export const NEMIA_SELECTORS: readonly string[] = ['waits=person', 'reason=ToolDenied'];
 
 /**
  * The minutes a digest of the feed's routine lines waits for a wake: a day, so routine news reaches her mostly folded into a line that

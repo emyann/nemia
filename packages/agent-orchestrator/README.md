@@ -138,8 +138,7 @@ started again says the same. A program reads the watch with flags:
 ```bash
 nemia watch --json              # one JSON object a line: a feed line whole with "cursor", the byte after it,
                                 # or {"liveness": "down"|"up", "at", "note"}; the banner and a cut on stderr
-nemia watch --wake              # only the lines that wait on a person: the default wake words of a subscription
-nemia watch --wake-word landing # only the lines that word finds; repeatable, and beside --wake's
+nemia watch -l waits=person     # only the lines that wait on a person: a subscription's own default filter
 nemia watch -l factory=nemia    # only the lines a selector takes (below); given again, a line either takes
 nemia watch --cursor-file ~/.cache/nemia.cursor   # resume where the last watch read to, and keep its place
 ```
@@ -151,7 +150,9 @@ a line one of them takes is printed. The keys are the line's own: its labels —
 `step`, `agent` — and the five a signed line names of itself, `kind`, `reason`, `type`, `waits` and `source`.
 The message a person reads is no key of it: it is prose, reworded whenever a status is, so nothing selects on
 it, and `-l message=…` is refused with the keys there are. `=` and `in` never match a key the line does not
-carry, so `-l factory=nemia` passes over a daemon's line and `-l factory!=nemia` takes it.
+carry, so `-l factory=nemia` passes over a daemon's line and `-l factory!=nemia` takes it. A step with no
+agent carries `agent: none`, the word the one writer of a step's labels gives it (`stepKeys`, `src/meter/step.ts`),
+so the bare `-l agent` takes its line and `-l agent!=none` is how a person leaves agentless steps out.
 
 **`--cursor-file <path>` is where a watch keeps its place**: read when it starts, where the file is there,
 and written after every line it reads — selected or not, so a filtered watcher resumes at the feed's end and
@@ -166,8 +167,8 @@ surface reads): under `--json`, a line of its own carrying `cursor` and nothing 
 a reader tells it from a feed line — and nothing printed in words. So a watcher that crashes re-reads at most
 half a minute of a still feed.
 
-A wake word is found as a subscription finds it (`sortLine`): in the line's word, or leading a part of
-its note, whatever the case. The liveness lines are printed whatever the words.
+A selector reads what a subscription's does: the one grammar, over the keys a line names. The liveness lines
+are printed whatever the selectors.
 
 The api streams the same feed at `GET /api/feed/stream`, one server-sent event a line — `run`,
 `step`, `removed` or `daemon`, by what the line is about — its id the cursor just after that line, so an

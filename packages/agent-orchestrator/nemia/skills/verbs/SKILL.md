@@ -126,7 +126,7 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                this nemia's release, an install's tag or a checkout, and its folder;
                                the release the store's releases/current names; and the release the
                                daemon runs, from its lease. --json: the whole answer
-  nemia watch [cursor] [--once] [-l <selector>]... [--cursor-file <path>] [--json] [--wake] [--wake-word <word>]...
+  nemia watch [cursor] [--once] [-l <selector>]... [--cursor-file <path>] [--json]
                                the feed's lines, followed as the tick writes them, until ^C, and a
                                daemon down line when nothing ticks the store, daemon up when it does
                                again: a run's status, a step's word as nemia ls says it, and what a
@@ -137,8 +137,9 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                agent, kind, reason, type, waits and source. --cursor-file: keep the
                                cursor read to in a file, and start from it where it is there.
                                --json: one JSON object a line, a feed line with its cursor, and a
-                               cursor of its own every 30 seconds while the feed is still; --wake:
-                               only the lines that wait on a person; --wake-word: these words
+                               cursor of its own every 30 seconds while the feed is still. With no -l,
+                               every line; -l waits=person takes the lines that wait on a person. A
+                               step with no agent carries agent: none, which -l agent!=none leaves out.
   nemia admit [--at-least <level>] [--auto <agent>]
                                a call's admission: the call a session is about to make, on stdin, answered
                                ask where it answers what waits on you;
@@ -248,13 +249,14 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                interrupt
   nemia resume
                                resume the store: the next pass files what waits
-  nemia subscribe <name> <task> [--wake <word>]... [--digest-every <minutes>] [--at-least <level>]
+  nemia subscribe <name> <task> [-l <selector>]... [--digest-every <minutes>] [--at-least <level>]
                                give the engine's long-lived task <task> a subscription to the feed,
-                               named <name>, from its end: a line holding a wake word is said to it at
-                               once, and the rest folded into a digest said with the next wake, or
-                               after --digest-every minutes (default 60) with none.
-                               --wake: a word that wakes it, once for each (default: the feed's words
-                               for a wait on a person). Refused for a task not long-lived.
+                               named <name>, from its end: a line one of its selectors takes is said to
+                               it at once, and the rest folded into a digest said with the next wake,
+                               or after --digest-every minutes (default 60) with none.
+                               -l: the lines a selector takes, given again for another (default:
+                               waits=person, the lines that wait on a person). Refused for a task not
+                               long-lived.
                                --at-least: only the lines of runs whose factory's level is at least
                                this (manual, semi-auto, auto), read as each line is delivered.
   nemia unsubscribe <name>

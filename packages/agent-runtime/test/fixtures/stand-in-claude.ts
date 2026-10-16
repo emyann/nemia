@@ -2,9 +2,10 @@
  * A stand-in for Claude Code as the Agent SDK runs it (`pathToClaudeCodeExecutable`), speaking the SDK's stdio protocol as
  * `@anthropic-ai/claude-agent-sdk` 0.3.270 does: control requests both ways (`initialize`, `hook_callback`, `can_use_tool`,
  * `interrupt`, `remote_control`), and stream-json lines out. What it does is its plan, `STANDIN_PLAN` (`Plan`), and what it saw it
- * writes into `STANDIN_DIR`: `argv.jsonl` (each start's arguments), `said.jsonl` (each user message's text), `asked.jsonl` (each hook
- * it asked, as it asks), `answers.jsonl` (each answer to a control request it sent), `taken.jsonl` (each control request the SDK sent
- * it, by subtype, with what it carried) and `pid` (its own, on each start).
+ * writes into `STANDIN_DIR`: `argv.jsonl` (each start's arguments), `initialize.jsonl` (each `initialize` request's payload, the
+ * system prompt the SDK sends included), `said.jsonl` (each user message's text), `asked.jsonl` (each hook it asked, as it asks),
+ * `answers.jsonl` (each answer to a control request it sent), `taken.jsonl` (each control request the SDK sent it, by subtype, with
+ * what it carried) and `pid` (its own, on each start).
  *
  * Its session id is `stand-in-session`, or the one `--resume=<id>` names, as the SDK writes it.
  */
@@ -136,7 +137,10 @@ const bridged = (request: { enabled?: unknown; reattach_session_id?: unknown }):
 /** The answer to a control request the SDK sent, by its subtype: what the stand-in says back as its `response`. */
 const answered = (request: { subtype?: string; hooks?: typeof hooks } & Record<string, unknown>): object => {
   note('taken.jsonl', { subtype: request.subtype ?? null, ...request });
-  if (request.subtype === 'initialize') hooks = request.hooks ?? {};
+  if (request.subtype === 'initialize') {
+    hooks = request.hooks ?? {};
+    note('initialize.jsonl', request);
+  }
   if (request.subtype === 'interrupt') {
     interrupted = true;
     return { still_queued: [] };

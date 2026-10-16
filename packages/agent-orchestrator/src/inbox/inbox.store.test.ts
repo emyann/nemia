@@ -2,7 +2,8 @@
  * The inbox on disk: `$WF_ROOT/inbox/`, filed, listed and dropped through the verbs, as a person types them.
  *
  * What a card is and what the listing says are pure, and live in inbox.test.ts. This is the part that is not: the folder, the name a card
- * is filed under, and the run records a listing reads. `WF_ROOT` is set before the import, since the module reads it as it loads.
+ * is filed under, and the run records a listing reads. `WF_ROOT` is set before the import, since the module reads it as it loads, and
+ * `WF_VERIFY_REST=0` with it: nothing here ticks, and a warm read counted under `1` reads every record afresh to verify it.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,6 +21,7 @@ const INBOX = path.join(ROOT, 'inbox');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
 process.env.WF_ROOT = ROOT;
+process.env.WF_VERIFY_REST = '0';
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
 const { addToInbox, dropFromInbox, inboxDir, readInbox, startRun, startFromInbox } = await import('../runner.ts');

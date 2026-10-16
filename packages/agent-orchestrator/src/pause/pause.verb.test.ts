@@ -1,7 +1,8 @@
 /**
  * The store's pause at once on disk: `pauseNow` puts the pause, writes for each task at work but a landing the ask that names it, and
  * asks the engine to stop it only once that ask is on disk; it keeps a pause that stands as it was; a stop the engine refuses leaves the
- * ask; `nowRead` writes nothing. A store of its own, since `WF_ROOT` is read as the module loads; an engine of its own, which records.
+ * ask; `nowRead` writes nothing. A store of its own, since `WF_ROOT` is read as the module loads, with `WF_VERIFY_REST=0` beside it:
+ * nothing here ticks, and a warm read counted under `1` reads every record afresh to verify it. An engine of its own, which records.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,6 +17,7 @@ import { eachTest, runOver } from '../../test/placed.ts';
 
 const ROOT = scratch('wf-pause-now-');
 process.env.WF_ROOT = ROOT;
+process.env.WF_VERIFY_REST = '0';
 const { nowRead, pauseNow } = await import('./pause.verb.ts');
 const { askFile, asksDir } = await import('../record/record.store.ts');
 const { pauseFile, putPause, readPause, resumePause } = await import('./pause.store.ts');

@@ -273,6 +273,9 @@ export type InboxListing = {
  */
 export type QueueTry = { at: string; text: string; repo: string; why: string; refused: boolean };
 
+/** The memo a caller that polls the inbox keeps of what its listing reads of every run: the card it was started from, under its id. */
+export type InboxRuns = RecordMemo<Pick<Run, 'id' | 'from'>>;
+
 /**
  * The inbox as `nemia inbox` lists it, by file name: every entry of the folder — a folder inside it by its name and a trailing `/` — each
  * card with the runs its name is on (`startedAs`), and each entry that is not a card listed with why, never hidden. A hidden file and a
@@ -283,9 +286,6 @@ export type QueueTry = { at: string; text: string; repo: string; why: string; re
  * another reason is not queued. Each card says the repository its factory picks for it (`factoryRepo`), from the store's `factories` that
  * read, by name: with none handed, none picks one.
  */
-/** The memo a caller that polls the inbox keeps of what its listing reads of every run: the card it was started from, under its id. */
-export type InboxRuns = RecordMemo<Pick<Run, 'id' | 'from'>>;
-
 export function inboxListing(
   files: readonly PlanFile[],
   runs: readonly Pick<Run, 'id' | 'from'>[],

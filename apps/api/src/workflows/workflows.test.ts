@@ -12,7 +12,8 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
-import { app } from '../app.ts';
+import { app, runtime } from '../app.ts';
+import { ReadMemo } from '../layer.ts';
 import { workflowVersion as versionIn } from 'agent-orchestrator';
 import { runWith } from '../../test/placed.ts';
 import { listWorkflows } from './workflows.ts';
@@ -837,27 +838,36 @@ test("a step that names a server its agent does not is listed with its own line 
   assert.deepEqual([of('plain')?.spec.mcp, of('plain')?.mcp], [[], ['browser']], "the agent's alone is no line of the step");
 });
 
-test("a step's page read twice reads no record of a run that has not moved, and says the same: its recent runs are read off the app's memo", async () => {
+test("a step's page reads its recent runs off the app's memo: a run whose record has not moved is answered from it, and one written since is on the page", async () => {
   const runs = path.join(root, 'runs');
   fs.mkdirSync(runs, { recursive: true });
-  const record = (id: string) => ({
+  const record = (id: string, at: string, dir = good) => ({
     id,
     workspace: root,
     brief: `the brief of ${id}`,
-    workflowDir: good,
+    workflowDir: dir,
     place: { kind: 'folder' },
     steps: { review: { taskId: `${id}-review` } },
-    createdAt: '2099-10-16T00:00:00.000Z',
+    createdAt: at,
   });
-  fs.writeFileSync(path.join(runs, 'r-of-good.json'), JSON.stringify(record('r-of-good')));
+  const put = (id: string, at: string, dir?: string) =>
+    fs.writeFileSync(path.join(runs, `${id}.json`), JSON.stringify(record(id, at, dir)));
+  put('r-of-good', '2099-10-16T00:00:00.000Z');
 
+  const { records } = await runtime.runPromise(ReadMemo.useSync((memo) => memo));
   const cold = (await (await stepPage('repo', 'good', 'review')).json()) as WorkflowStepPage;
   assert.ok(
     cold.recentRuns.some((r) => r.id === 'r-of-good'),
     `the fixture run is on the page: ${cold.recentRuns.map((r) => r.id).join(', ')}`,
   );
-  for (let n = 0; n < 50; n++)
-    fs.writeFileSync(path.join(runs, `other-${n}.json`), JSON.stringify({ ...record(`other-${n}`), workflowDir: mine }));
+  assert.ok(records.step.runs.has('r-of-good'), "the page's read went through the app's memo, which now holds the run");
+
+  put('r-since', '2099-10-16T01:00:00.000Z');
   const warm = (await (await stepPage('repo', 'good', 'review')).json()) as WorkflowStepPage;
-  assert.deepEqual(warm, cold, "the warm answer is the cold read's own: nothing the board shows changes");
+  assert.deepEqual(
+    warm.recentRuns.map((r) => r.id).slice(0, 2),
+    ['r-since', 'r-of-good'],
+    'a run written since the last read is on the page, and the one before it is answered from the memo',
+  );
+  assert.deepEqual({ ...warm, recentRuns: cold.recentRuns }, cold, 'and nothing else the page shows changed');
 });

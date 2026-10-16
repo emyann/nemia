@@ -14,11 +14,21 @@ import readline from 'node:readline';
 /**
  * What the stand-in does after the first user message, in order: `deny`, print a `permission_denied` line for that tool; `ask`, send
  * a `can_use_tool` request for that tool; `call`, run that tool, its `PreToolUse` hooks asked first, held until the file `release`
- * appears in its folder; `nested`, once the file `nest` appears, ask the `PreToolUse` hooks of a second call of that tool, carrying
- * `agent_id` as a sub-agent's call does, while `call`'s is still in flight and before its release; `hold`, wait until the file `end`
- * appears; then its result, `output` as its `structured_output` and `cost` as its `total_cost_usd` (0.01 when absent).
+ * appears in its folder; `nested`, once the file `nest` appears, ask the `PreToolUse` hooks of a second call of that tool, while
+ * `call`'s is still in flight and before its release, carrying `agent_id` as a sub-agent's call does where `fromSubAgent`; `hold`,
+ * wait until the file `end` appears; then its result, `output` as its `structured_output` and `cost` as its `total_cost_usd` (0.01
+ * when absent).
  */
-type Plan = { deny?: string; ask?: string; call?: string; nested?: string; hold?: boolean; output?: unknown; cost?: number };
+type Plan = {
+  deny?: string;
+  ask?: string;
+  call?: string;
+  nested?: string;
+  fromSubAgent?: boolean;
+  hold?: boolean;
+  output?: unknown;
+  cost?: number;
+};
 
 const dir = process.env.STANDIN_DIR!;
 const plan = JSON.parse(process.env.STANDIN_PLAN ?? '{}') as Plan;
@@ -75,7 +85,7 @@ const work = async () => {
   }
   if (plan.nested) {
     await appears('nest');
-    await hooked('PreToolUse', plan.nested, 'call-2', { agent_id: 'stand-in-sub-agent' });
+    await hooked('PreToolUse', plan.nested, 'call-2', plan.fromSubAgent ? { agent_id: 'stand-in-sub-agent' } : {});
   }
   if (plan.call) {
     await appears('release');

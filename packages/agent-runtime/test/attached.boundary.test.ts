@@ -399,7 +399,7 @@ test('a drain answers a call nested in one in flight, so the call in flight can 
 });
 
 test("a drain answers a sub-agent's call, which belongs to a call it cannot see in flight", WAITED, async (t) => {
-  const { root, dir, request } = place({ nested: 'Grep', output: {} });
+  const { root, dir, request } = place({ nested: 'Grep', fromSubAgent: true, output: {} });
   fs.writeFileSync(path.join(dir, 'nest'), '');
   putDrain(root, process.pid);
   const h = await holder(root);

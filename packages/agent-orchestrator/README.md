@@ -1909,8 +1909,8 @@ kept nowhere:
   heading with `none` under it means nothing on the list changed, not that nobody looked.
 - **lesson** says whether the run changed a file where the next agent reads — `CLAUDE.md`,
   `AGENTS.md`, the root's `docs/` or a workspace package's own — or that it wrote nothing there. Not any
-  `docs/`: an app's `src/routes/docs/` is product code, and counting it would report a lesson nobody wrote. CLAUDE.md's *When you miss* is a rule, and
-  this line holds a person to it.
+  `docs/`: an app's `src/routes/docs/` is product code, and counting it would report a lesson nobody wrote. Writing down what a run
+  learned is the factory's rule, and this line holds a person to it.
 - **not known**: where the place refused the report or was not heard — git not there, a repository gone, a branch it has not — each
   line says `what this run changed is not known: <what the place said>`, and the lesson that it could not be read, never that the
   branch changed nothing. A declared file the workspace no longer has is looked for on the step's branch the same way, and said to

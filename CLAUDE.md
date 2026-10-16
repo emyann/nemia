@@ -5,13 +5,9 @@ that runs to its end, and a long-lived session that runs until stopped (`restart
 `src/core/domain.ts` is the whole judgement. `packages/agent-orchestrator` owns workflows and the runs of their steps — a folder of
 markdown is a workflow (the `wf` CLI). `apps/api` puts the workflows behind HTTP; `apps/web`, the board, shows them to a person.
 
-Each layer reaches exactly the one below it, and nothing reaches up or skips one: the web reaches the api over HTTP alone
-(`apps/web/test/structure.test.ts`); the api reaches the orchestrator's public entries alone (the entries:
-`packages/agent-orchestrator/test/contract.test.ts`; that its source imports no runtime: its lint block, which
-`packages/agent-orchestrator/test/imports.boundary.test.ts` proves); the orchestrator reaches the runtime's behaviour through its one client,
-`src/runtime-client.ts` (`CLIENT` in `packages/agent-orchestrator/test/boundary.test.ts`), and its vocabulary through its pure door,
-`agent-runtime/vocabulary`, from any file. Read `README.md` and each package's
-README for the model before changing behaviour. `wf` becomes `nemia` (the Nemia intent); `ae` stays the runtime's CLI. The stores
+Each layer reaches exactly the one below it, and nothing reaches up or skips one. Which layer owns what, the public contract of each and
+the four rules and the tests that hold them are in `docs/architecture.md`: read it before you place a change. Read `README.md` and each
+package's README for the model before changing behaviour. `wf` becomes `nemia` (the Nemia intent); `ae` stays the runtime's CLI. The stores
 `~/.agent-workflows` (`WF_ROOT`) and `~/.agent-engine` (`AE_ROOT`) keep their names on purpose: a new default would orphan every
 record there.
 
@@ -52,103 +48,22 @@ holds what every change needs.
   touching one.
 - A run's check leaves what its tests cost in `WF_ARTIFACTS`, a `test-costs-<package>-<stamp>.json` per package and try; `node
   tools/test-costs/report.ts <dir>...` ranks them. A package's peak is its largest process, not the sum of the files running at once.
-
-## How to test
-
-- **A guard is proven by a test that makes it refuse**, at shipped defaults. A test that asks whether it allows proves nothing; guards
-  tested that way have been silently inert.
-- **A rule about order or names is proven by a fixture that breaks it.** Give the fixture the opposite order or another name, and check
-  the test fails without the rule.
-- **A time measured on a machine is a floor, never a ceiling.** Assert identities (the parts add up to no more than the whole), not
-  wall-clock bounds, and wait for the event you count, never for a length of time.
-- **A test that fails only under load is a race until shown otherwise.** Make it happen on demand first — a throwaway `--import` hook
-  through `NODE_OPTIONS`, a process frozen with `SIGSTOP` (wait for `ps -o stat=` to say so before `SIGCONT`) — then fix it.
-- **Temporary folders come from `scratch(prefix)`**, never `os.tmpdir()`; `scratch.test.ts` refuses the call. Bound every background
-  process a test starts, and every loop you run in the background yourself (`timeout 120 bash -c '…'`).
-- **A test that depends on the environment sets it.** A run's checks inherit the daemon's environment (`WF_MAX_CONCURRENT=50` on the
-  owner's machine), so a test that relies on a default passes there and fails by hand. All of it but the telemetry: the runtime takes
-  it out of every child that is no session (`withoutTelemetry`; `agent-orchestrator/test/check-export.boundary.test.ts`), and the three
-  seats drop the collector's address (`test/ambient.ts`, the api's `test/harness.ts`, the e2e's `apiEnvOf`): a test that exports sets a
-  collector it made.
-- **Assert on `err.message`,** never `assert.throws(fn, /^…/)`: that matches `String(err)`, which starts with `Error: `.
-- **A test that reads source text ends a slice on a name that must exist,** and matches across line breaks (`\s*`): a formatter moves
-  them, and a pattern that no longer matches makes an assertion of absence pass for nothing.
-- **A type-aware lint fix trusts the type; a guard exists because a caller does not.** A value from a page, a journal, a harness or JSON
-  arrives as it is: read every line a `--fix` changes in `src` before keeping it.
-- **A file written through a tool can turn an escape into the character it names**: a raw NUL, DEL or byte order mark. Build such a
-  character with `String.fromCharCode`, and after writing an escape of one, look for the raw bytes (`grep -rl $'\xEF\xBB\xBF'`): the
-  apps' `source.test.ts` refuses a raw control character, and no test refuses a BOM.
-- **A field moved to another key still passes the typecheck where it is read through a cast, a `Record` or JSON**: grep the tests for
-  the old key, read the passing ones too, and check a comparison still fails with a mutant. A wrong type passed on purpose to prove a
-  refusal says so with `as never` where it does.
-- **An optional field added to a returned type is dropped by every caller that rebuilds the answer field by field.** Grep for each
-  place that spreads or rebuilds the type, and give the new fact one writer.
-- **A test is given a stand-in, and the real thing is asked by name.** A new test file writes `const stand = eachTest(testPlace);`
-  (`packages/agent-orchestrator/test/placed.ts`), and for an engine `const engine = eachTest(testEngine);` (`testEngine` from
-  `agent-runtime/testing`, held to the real engine by `packages/agent-runtime/test/engine-walks.ts`). A file whose whole subject is git, a process, the real place or the real engine, or
-  that needs what the stand-in does not model, is named `<what>.boundary.test.ts` (the suffix; `test/boundary.test.ts`, the layer
-  kinds, is another word). `packages/agent-orchestrator/test/stand-ins.test.ts` refuses the rest in the runtime, the orchestrator and
-  the api, against `test/stand-ins.baseline.ts`, which only shrinks, and refuses a stand-in whose contract no boundary test walks.
+- **A run's checks inherit the daemon's environment** (`WF_MAX_CONCURRENT=50` on the owner's machine): a test that relies on a default
+  passes there and fails by hand. All of it but the telemetry, which the runtime takes out of every child that is no session and the
+  three test seats drop.
+- **No test refuses a byte order mark.** A file written through a tool can turn an escape into the character it names, so after writing
+  an escape of a NUL, DEL or byte order mark, look for the raw bytes (`grep -rl $'\xEF\xBB\xBF'`).
 
 ## Rules the code keeps
 
-- **The runtime owns how a session runs; the layers above own what it means.** `decide` (`agent-runtime/src/core/domain.ts`) is pure
-  (`agent-runtime/test/engine.test.ts` refuses a carried field read in it) and stays a screen long `(no test yet)`; `agent-runtime`
-  (`src/index.ts`) and `agent-runtime/vocabulary` (`src/vocabulary.ts`) are the export lists, and neither exports `decide`
-  (`agent-runtime/test/contract.test.ts`). A knob on a workload is a field carried on the task and read by a runner, never a callback
-  into `decide`, and no `if` in `engine.ts` belongs in `decide` `(no test yet)`. What sits in which layer today, and what is a
-  candidate to move, is in `docs/architecture.md`, *Who owns what*.
-- **Four rules hold the layers, each a test** (`docs/architecture.md`):
-  - *Between packages, only the public contract*: `agent-runtime`, `agent-runtime/vocabulary` and, for a test file alone,
-    `agent-runtime/testing` (the engine's stand-in; `packages/agent-runtime/test/contract.test.ts` refuses it in a `src`); `agent-orchestrator`,
-    `agent-orchestrator/run` and `agent-orchestrator/workflow` — never a subpath outside `exports`, a relative path,
-    `import.meta.resolve` or a path into `src/` (the two `contract.test.ts`). The packages' entries are Effect, and the api is the
-    system's public interface.
-  - *Inside the orchestrator, every file is pure, store, controller or the client* (`PURE`, `STORE`, `CONTROLLER`, `CLIENT` in
-    `packages/agent-orchestrator/test/boundary.test.ts`); a new file joins one kind, or the suite fails.
-  - *The runtime is reached through one client*, `src/runtime-client.ts` (`CLIENT` in the same test): its behaviour through the client,
-    its vocabulary through its pure door, `agent-runtime/vocabulary`, which any file may import (`VOCABULARY` in the same test;
-    `packages/agent-runtime/test/vocabulary-door.test.ts` holds it pure).
-  - *Each layer says its own words*: no harness word outside the runtime, no workflow word in it, no team name in a package's `src`
-    (`HARNESS_WORDS`, `WORKFLOW_WORDS`, `TEAM_NAMES` in `packages/agent-orchestrator/test/words.test.ts`, which only shrink).
-- **A spec here reads `docs/architecture.md` first.** A change's `where` names its layer (`agent-runtime`, `agent-orchestrator`,
-  `apps/api`, `apps/web`), and in the orchestrator its feature folder and kind (pure, store, controller, client), in the api its folder;
-  its `why`, and a placement finding's `rule`, cite the rule above or the *Who owns what* line, with the test that holds it.
+- **The runtime owns how a session runs; the layers above own what it means.** `decide` (`agent-runtime/src/core/domain.ts`) is pure and
+  stays a screen long `(no test yet)`. A knob on a workload is a field carried on the task and read by a runner, never a callback into
+  `decide`, and no `if` in `engine.ts` belongs in `decide` `(no test yet)`. What sits in which layer today, and what is a candidate to
+  move, is in `docs/architecture.md`, *Who owns what*.
 - **Level-triggered.** A tick reads the world, decides, acts, and carries nothing between passes. A guard that only fires on a
   transition is wrong after a restart `(no test yet)`.
-- **One writer per file.** The tick writes the run record; a person's facts (`.cancelled`, an ask) get their own files, composed on read
-  (`packages/agent-orchestrator/test/run-store.test.ts` holds the run record's).
-- **A check that did not finish is not a refusal.** Only a numeric exit is a verdict on the work (`refusedCheck`); `wf retry <run> <step>
-  --recheck` runs it again — never a hand edit of a journal or a record (`agent-orchestrator/test/run.test.ts`, *a check that did not
-  finish is no refusal*).
-- **No command from a checkout.** A `check:` comes from the workflow folder frozen on the run record, never from the workspace a step
-  works in: resolved at `wf start`, afresh at the run's first filing while it has filed nothing, and on `nemia refresh`
-  (`agent-orchestrator/test/store.test.ts`, *the frozen command*; `test/revisions.test.ts`).
 - **Prose is not a constraint.** If the packages need an agent to do something, the machinery refuses the alternative
   `(no test yet)`.
-- **Errors say what to do next.** Throw `Error` with `.exitCode = 2` and a message naming the fix; in the orchestrator, a refusal by
-  kind (`Missing`, `Conflict`, `Invalid`), and `agent-orchestrator/test/refusal.test.ts` refuses an `exitCode: 2` set by hand.
-- **Code reads by itself.** No `//` or `/* */` comment in code but a lint or TypeScript directive with its `-- reason`; a JSDoc sits on
-  a file's head or a declaration and says what it is, takes, returns and refuses — never its history, a workaround, a run, a date or a
-  card: history lives in git, CLAUDE.md and the tests. A comment is never evidence that a problem is settled: read the code and its test.
-  - The guards: the oxlint plugin `lint/comments.ts`, oxlint's `no-warning-comments` and `no-inline-comments`, in one override block per
-    package in `.oxlintrc.json`, and a test that a name a comment quotes in backticks is one the code has
-    (`packages/agent-orchestrator/test/comments.test.ts`, with its short list of other programs' words).
-  - Every package's guards are on: no block has an `excludeFiles` (`comments.test.ts`, *no guard block has an excludeFiles*). The
-    linter skips the vendored design system kit and its skills, and no folder of ours (`VENDORED`, same test). A new
-    package gets a block of its own, and the runtime's block also covers `lint/**`, the guards' own plugin; no other block lists it
-    (`comments.test.ts`, *one guard block per workspace package*).
-  - A JSDoc on a parameter, a union member or a local is refused: say it as an `@param` line or in the declaration's JSDoc.
-    The lint refuses a comment line over 140 columns, since `oxfmt` rewraps none; a `(` `)` it drops once a comment inside
-    them goes is its own.
-- **A limit is met by cutting the function** (500 code lines a file, 80 a function, cyclomatic 20, cognitive 15), never by raising a
-  ceiling in `.oxlintrc.json`. The commit that shrinks a baselined file lowers its ceiling there and its count in
-  `packages/agent-orchestrator/test/limits.test.ts`, which refuses one left loose; a move renames both.
-- **A state machine is drawn by its code.** A new machine prints its own Mermaid diagram, held between `diagram:<name>` markers in its
-  package's docs whose begin line names the command; never a drawing. `agent-orchestrator/test/diagrams.test.ts` refuses a drift.
-- **A state machine declares the verbs written from outside it**: each with the states it is taken from, the state the next pass reads
-  and its guard, which the verb's refusal asks first; its diagram draws them. The lifecycle's are `VERBS`, held to their refusals by
-  `agent-runtime/src/core/verbs.test.ts`; `LifecycleGraph.verbs` is required of every machine the board serves, `[]` when it has none.
 - **The Kubernetes test for a new field on the runtime's task: does the Pod spec (`core/v1`) have one?** A container's command, args,
   env, volumes, restart policy, resources and priority are the runtime's; what a workflow means — a step, a gate, a check's verdict, a
   budget across tries — is not `(no test yet)`.
@@ -170,33 +85,8 @@ holds what every change needs.
 What the `create-an-agent` skill, being generic, does not say here:
 
 - Read `packages/agent-orchestrator/README.md`, *An agent is a node's attachment*, for the format and the five layers.
-- A test that loads a shipped folder passes its place (`placesOf` in `packages/agent-orchestrator/test/team.ts`), or the repository's
-  `.claude/skills/` is not found.
-- An agent's file and its own skills name nothing of this repository (`packages/agent-orchestrator/test/team-portable.test.ts`): what
-  is ours is said by the step (`build-told.test.ts`), by `.claude/settings.json`, by a `CLAUDE.md` or by the factory's rules.
-- A checking step, its agent given `Bash`, denies `Bash(npm run build)` and `Bash(npm run e2e)`, which `.claude/settings.json` allows
-  other roles, on its own `disallowedTools:`, beside each deny of its agent's; the checks it runs are allowed by exact name in
-  `.claude/settings.json` (`npm run lint`, `npx turbo run typecheck --force`) and named in its note, where `CHECKERS` reads them in
-  `packages/agent-orchestrator/test/agent-fences.test.ts`, which holds every shipped step's fence. The reader of the kit's `ds-spec` is
-  allowed by its script's path, `node apps/web/.claude/skills/ds-spec/md3.mjs`, and named in design's and review's notes, where the same
-  `CHECKERS` reads it (`reader`): the workspace's script, never the copy a run froze for the step.
-- A checking step given the browser (design, review) serves the change with `npm run board:serve` and ends it with `npm run board:stop`,
-  each allowed by exact name and named in its note (`BOARD_CHECKS`); its agent allows the browser's tools by name, never the server
-  whole, and the step denies the live board's ports by address on its own `disallowedTools:` (`LIVE_BOARD`, same test). Agent and
-  step both deny a `filename` to each browser tool that takes one (`NAMED_FILES`): a relative one is written into the workspace.
-- A step that runs what no deny names (implement, land) denies the live collector's ports by address, `Bash(*:4318*)` and
-  `Bash(*:4317*)`, on its own `disallowedTools:`, beside each deny of its agent's (`LIVE_COLLECTOR`, same test): a typed command only,
-  a commit message or a search that spells the port included, never an address inside a script.
 - An agent's questions are an output field `{ "x-shape": "questions" }`, expanded by `packages/agent-orchestrator/src/question/question.ts`.
 - Its checks are *Check your work*, forced for `workflows/`; a new agent is named in *Where things are*.
-
-## When you miss
-
-- A trap that cost you time is a lesson: better as a test that refuses the mistake, else three lines at most in the `CLAUDE.md` of the
-  package it concerns — the rule and the file that embodies it, no story. The `CLAUDE.md` files are merged by union (`.gitattributes`):
-  whoever merges reads the file and tidies it.
-- If a step fails its check twice, the fix is content — the brief, the workflow folder, a `CLAUDE.md`, a test — not a hand edit nobody
-  records.
 
 ## Where things are
 

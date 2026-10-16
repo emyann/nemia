@@ -27,7 +27,18 @@ description: "Review a change in this repository as a second engineer would: aga
    kind `placement` that cites the rule.
 5. **Look for what the author could not see**: a rule claimed with no test that makes it refuse; a test that passes for nothing; a
    caller that rebuilds a returned type field by field and drops the new one; a limit raised; a behaviour change the spec did not ask
-   for.
+   for. You read a diff and cannot run the author's experiment, so look for the shapes that pass for nothing:
+   - A guard tested by asking whether it allows, never by making it refuse, and never at shipped defaults: it proves nothing, and
+     guards tested that way have been silently inert.
+   - A fixture that does not break the rule the test claims to hold — the same order, the same name — so the test would pass with the
+     rule gone.
+   - A wall-clock bound, or a wait for a length of time rather than for the event being counted: it passes on the author's machine and
+     fails under load.
+   - A test that reads source text with a slice that can silently match nothing, so an assertion of absence passes for nothing.
+   - An assertion on the error's whole string where it belongs on its `message`; a test that relies on an environment or a clock it
+     does not set; a temporary folder taken from the operating system rather than the repository's own helper.
+   - A type-aware lint fix kept unread where the guard it touched exists because a caller does not keep the type.
+   - A limit's ceiling raised, or a baseline or a count that only shrinks loosened, in place of the function being cut.
 6. **Write each finding so the engineer can act on it alone**: the file, the line, the input or case, and the wrong result; its `kind`,
    and the `rule` it cites, by the file that states or holds it and its words. No finding invented to look thorough, none about taste.
 7. **Decide the round**: `again` true only when a finding is worth another round of work. From the second round, read the engineer's

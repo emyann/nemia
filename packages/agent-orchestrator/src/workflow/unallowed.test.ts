@@ -91,6 +91,18 @@ test('a step that works in a folder the run makes counts no rule of the reposito
 test('the tools the harness runs with no rule need none: the three that read and a skill load pass with no rule anywhere', () => {
   assert.equal(unallowedRefusal(stepsOf({ agent: 'seldon' }, { ...HELD, tools: 'Read, Grep, Glob, Skill' }), []), undefined);
   assert.match(unallowedRefusal(stepsOf({ agent: 'seldon' }, { ...HELD, tools: 'Read, Grep, Glob, Skill, Bash' }), []) ?? '', /`Bash`/);
+  const edits = unallowedRefusal(stepsOf({ agent: 'seldon' }, { ...HELD, tools: 'Read, Skill, Edit' }), []);
+  assert.match(edits ?? '', /gives its session `Edit`/, 'a word that asks before a write grants no write of its own');
+});
+
+test('a word that writes unasked is judged too, and grants the Edit family alone: a write needs no rule there, a fetch and a command do', () => {
+  const writes = { ...HELD, permissionMode: 'acceptEdits', tools: 'Read, Edit, Write' };
+  assert.equal(unallowedRefusal(stepsOf({ agent: 'seldon' }, writes), []), undefined, 'the word itself approves a write in its directory');
+  const fetches = { ...writes, tools: 'Read, Edit, WebFetch' };
+  assert.match(unallowedRefusal(stepsOf({ agent: 'seldon' }, fetches), NO_WEB) ?? '', /gives its session `WebFetch`/);
+  const commands = { ...writes, tools: 'Read, Edit, Bash, Skill' };
+  assert.match(unallowedRefusal(stepsOf({ agent: 'seldon' }, commands), []) ?? '', /gives its session `Bash`/);
+  assert.match(unallowedRefusal(stepsOf({ agent: 'seldon' }, commands), []) ?? '', /runs in `acceptEdits`/);
 });
 
 test('a fence word that asks about a call no rule reaches refuses nothing, named or left to the default', () => {

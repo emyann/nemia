@@ -32,8 +32,9 @@ function refusingWord(step: Workflow, reach: FenceReach): string | undefined {
  * The first tool of step `step`'s `tools:` that nothing its session gets allows, with what it was judged against: the step's resolved
  * `allowedTools:` — its agent's, where the step writes none of its own — and `allows`, the rules the repository's own settings grant,
  * unless the step says `place: folder`, whose session works in a folder the run makes and gets none of them. A tool the harness runs
- * with no rule at all (`FenceReach.unfenced`) is allowed. `undefined` for a step with no `tools:` line, which is given every tool, for
- * one whose fence word asks rather than refuses, and for one on a remote agent, whose operator holds its fence.
+ * with no rule at all (`FenceReach.unfenced`), and one the step's own fence word grants with none (`FenceReach.granted`, the Edit
+ * family under a word that writes unasked), each needs no rule. `undefined` for a step with no `tools:` line, which is given every tool,
+ * for one whose fence word asks rather than refuses, and for one on a remote agent, whose operator holds its fence.
  */
 function unallowedIn(step: Workflow, allows: readonly string[]): Unallowed | undefined {
   const harness = step.harness ?? DEFAULT_HARNESS;
@@ -43,7 +44,8 @@ function unallowedIn(step: Workflow, allows: readonly string[]): Unallowed | und
   const checkout = step.place !== 'folder';
   const rules = [...(step.allowedTools ?? []), ...(checkout ? allows : [])];
   const named = new Set(rules.map((rule) => toolOf(rule.trim())));
-  const tool = step.tools.find((given) => !reach.unfenced.includes(given) && !named.has(given));
+  const unruled = [...reach.unfenced, ...(reach.granted[word] ?? [])];
+  const tool = step.tools.find((given) => !unruled.includes(given) && !named.has(given));
   return tool === undefined ? undefined : { tool, tools: step.tools, word, checkout };
 }
 

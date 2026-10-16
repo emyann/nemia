@@ -93,14 +93,16 @@ test('a harness whose fence takes no rule naming a path answers nothing, whateve
   for (const harness of ['codex', 'command', 'a2a:x', 'nobody']) assert.equal(unruledIn(harness, '/srv/wf*(x)'), undefined, harness);
 });
 
-test('the modes that refuse what no allow rule reaches are the modes of one rank, and no wider one, on either of its harnesses', () => {
+test('the modes that refuse what no allow rule reaches are those that decide by rule alone: above none, and never plan', () => {
   for (const harness of CLAUDES) {
-    const { rank, refusing } = fenceReach(harness)!;
-    assert.deepEqual([...refusing].sort(), ['default', 'dontAsk', 'manual'], harness);
-    const ranks = new Set(refusing.map((mode) => rank[mode]));
-    assert.equal(ranks.size, 1, `${harness}: the refusing modes are of one rank`);
-    for (const mode of CLAUDE_PERMISSION_MODES.filter((m) => !refusing.includes(m))) {
-      assert.notEqual(rank[mode], [...ranks][0], `${harness}: ${mode} is not of the refusing rank`);
+    const { rank, refusing, writes } = fenceReach(harness)!;
+    assert.deepEqual(
+      [...refusing].sort(),
+      CLAUDE_PERMISSION_MODES.filter((mode) => rank[mode] > rank.plan && rank[mode] <= writes).sort(),
+      `${harness}: every mode from the narrowest that runs anything up to the widest that writes unasked, and no other`,
+    );
+    for (const mode of ['auto', 'bypassPermissions', 'plan']) {
+      assert.ok(!refusing.includes(mode), `${harness}: ${mode} does not refuse by its rules alone`);
     }
   }
 });
@@ -112,7 +114,23 @@ test('the tools a session calls with no allow rule are the three that read and a
   }
 });
 
-test("codex's sandbox takes no allow rule, so it refuses in no word and leaves no tool unruled", () => {
+test('the one mode that grants a tool of its own is the one that writes unasked, and it grants the Edit family and nothing else', () => {
+  for (const harness of CLAUDES) {
+    const { granted, rank, refusing, writes } = fenceReach(harness)!;
+    assert.deepEqual(
+      Object.keys(granted).sort(),
+      refusing.filter((mode) => rank[mode] >= writes).sort(),
+      `${harness}: a word grants of its own only where it writes unasked`,
+    );
+    for (const [mode, tools] of Object.entries(granted)) {
+      assert.deepEqual([...tools].sort(), ['Edit', 'MultiEdit', 'NotebookEdit', 'Write'], `${harness}: ${mode}`);
+      assert.ok(!tools.includes('Bash'), `${harness}: ${mode} asks about a command, so Bash takes a rule`);
+    }
+  }
+});
+
+test("codex's sandbox takes no allow rule, so it refuses in no word and leaves no tool unruled or granted", () => {
   assert.deepEqual(fenceReach('codex')!.refusing, []);
   assert.deepEqual(fenceReach('codex')!.unfenced, []);
+  assert.deepEqual(fenceReach('codex')!.granted, {});
 });

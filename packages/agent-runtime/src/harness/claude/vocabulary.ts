@@ -40,19 +40,30 @@ export const CLAUDE_MODE_RANK: Readonly<Record<string, number>> = {
 };
 
 /**
- * The permission modes a job runs what its allow rules reach in and refuses every other call in, rather than stopping to ask: `default`,
- * `manual` and `dontAsk`, the modes of one rank in `CLAUDE_MODE_RANK`, since a job denies whatever a mode would ask. Under one of them a
- * tool a session is given and no rule names can never be called. `plan` refuses by its own kind, and the wider modes let a classifier or
- * the mode itself allow what no rule names, so neither is here.
+ * The permission modes a job runs what its allow rules reach in, and refuses every other call in rather than stopping to ask: every mode
+ * from the narrowest that runs anything up to the widest that still decides by rule alone — the one that writes in its directory
+ * unasked — since a job denies whatever a mode would ask. Under one of them a tool a session is given that neither a rule names nor the
+ * mode itself grants (`CLAUDE_UNFENCED`, `CLAUDE_GRANTED`) can never be called. Above them a classifier (`auto`) or the mode itself
+ * (`bypassPermissions`) allows what no rule names, which no list can model; `plan` refuses by its own kind, and what it does with a tool
+ * that neither reads nor writes is unmeasured, so neither is here.
  */
-export const CLAUDE_REFUSING_MODES: readonly string[] = ['default', 'dontAsk', 'manual'];
+export const CLAUDE_REFUSING_MODES: readonly string[] = ['default', 'dontAsk', 'manual', 'acceptEdits'];
 
 /**
  * The tools a session calls inside its own directory with no allow rule naming them, in every permission mode: the three that only read,
- * and the load of a skill. Every other tool is refused under a mode of `CLAUDE_REFUSING_MODES` until a rule allows it — `Bash` among
- * them, whose built-in read-only commands run with no rule without making the tool itself unruled.
+ * and the load of a skill. Every other tool is refused under a mode of `CLAUDE_REFUSING_MODES` until a rule allows it or the mode grants
+ * it (`CLAUDE_GRANTED`) — `Bash` among them, whose built-in read-only commands run with no rule without making the tool itself unruled.
  */
 export const CLAUDE_UNFENCED: readonly string[] = ['Read', 'Grep', 'Glob', 'Skill'];
+
+/**
+ * The tools a mode grants with no allow rule naming them, beyond `CLAUDE_UNFENCED`, by the mode that grants them; a mode that grants
+ * none is absent. `acceptEdits` approves a write in the session's directory itself, so the Edit tool's family needs no rule there — and
+ * nothing else does: a command it would ask about is still denied a job.
+ */
+export const CLAUDE_GRANTED: Readonly<Record<string, readonly string[]>> = {
+  acceptEdits: ['Edit', 'Write', 'MultiEdit', 'NotebookEdit'],
+};
 
 /** The permission mode a Claude Code session runs in when its task names none: `--permission-mode` is always given. */
 export const CLAUDE_DEFAULT_MODE = 'auto';

@@ -228,11 +228,18 @@ What Claude Code does as the steps meet it. Where the orchestrator's code holds 
   folder** (2.1.291, 2026-10-06, allow and deny alike): `CLAUDE_UNRULED` holds the set, with `(`/`)` the runtime's `RULE` refuses;
   `\*` is read as an escape, unused yet.
 - **A project's allow rules are dropped in a directory Claude Code has not trusted**: measure a rule in a trusted checkout.
-- **Under a mode that refuses what no allow rule reaches — `default`, `manual`, `dontAsk` — only `Read`, `Grep`, `Glob` and `Skill`
-  run with no rule** (`CLAUDE_UNFENCED`, `CLAUDE_REFUSING_MODES`). `Read` was measured (2.1.289, the added-folder line above); the
-  other three are read off the shipped team, whose `dontAsk` steps grep the checkout and load their skills with no allow naming either,
-  while the only calls their feeds show refused are the ones no rule named. `Bash` is not among them: a built-in read-only set runs
-  unruled, which does not make the tool unruled — a `node -e` was refused.
+- **Under a mode that refuses what no allow rule reaches — `default`, `manual`, `dontAsk`, `acceptEdits` — only `Read`, `Grep`, `Glob`
+  and `Skill` run with no rule** (`CLAUDE_UNFENCED`, `CLAUDE_REFUSING_MODES`). `Read` was measured (2.1.289, the added-folder line
+  above); the other three are read off the shipped team, whose `dontAsk` steps grep the checkout and load their skills with no allow
+  naming either, while the only calls their feeds show refused are the ones no rule named. `Bash` is not among them: a built-in
+  read-only set runs unruled, which does not make the tool unruled — a `node -e` was refused.
+- **`acceptEdits` refuses by its rules too, granting only a write in the session's directory** (`CLAUDE_GRANTED`): a job waits on
+  nobody in any mode, so a call it would ask about is denied, and `acceptEdits` approves file edits and `mkdir`/`mv`/`cp` but not
+  `npm test` (`agent-orchestrator/README.md`, *Permission modes, the hard-won part*). The write was measured: a job given
+  `--permission-mode acceptEdits` wrote a file with no allow rule, where the same job in `dontAsk` was denied it
+  (`docs/spike-2026-09-25-agents-skills.md`, F10, rows m2 and m3). `Write` is what was measured; the rest of the Edit tool's family
+  rides on it, since a write is matched against `Edit` rules alone. So a step in `acceptEdits` given `Bash` or `WebFetch` and no rule
+  for it is as broken as one in `dontAsk`, and is refused the same way (`unallowedRefusal`).
 - **A checkout's own `.claude/settings.json` allow rules do reach a job's session in a worktree of it**: 89 `WebFetch` calls of
   `dontAsk` steps succeeded here on the checkout's `WebFetch` allow since 2026-10-09, while the same agents were refused every fetch in
   a repository whose settings allow none. So what a step may call depends on the repository the run lands in, not on the workflow folder

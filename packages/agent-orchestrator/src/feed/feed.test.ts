@@ -20,15 +20,19 @@ import {
   feedChanges,
   feedPhase,
   feedWords,
+  FEED_VERSION,
   foldFeed,
   freshFold,
   isRunLine,
   publishedOf,
+  REMOVED,
   upgraded,
   type FeedLine,
   type FeedWords,
   type RunLine,
 } from './feed.ts';
+import { DEFAULT_FACTORY } from '../factory/factory.ts';
+import { runLabels, stepLabels } from '../telemetry/telemetry.ts';
 import { nodeChild } from '../../test/child.ts';
 import { scratch } from '../../test/scratch.ts';
 import { promised } from '../../test/promised.ts';
@@ -61,7 +65,7 @@ const runPlaced = runGiven(gitPlaceLayer);
 const store = await import('./feed.store.ts');
 /** The lines the feed's writer wrote (`recordFeed`), as a pass hands it what it judged. */
 const recordFeed = (...args: Parameters<typeof store.recordFeed>) => store.recordFeed(...args).lines;
-const { readRun, rewriteRun } = await import('../record/record.store.ts');
+const { readRun, rewriteRun, stepsOf } = await import('../record/record.store.ts');
 const { freshRestMemo } = await import('../tick/tick.verb.ts');
 const { main, watchPrinted, watching } = await import('../cli/main.ts');
 
@@ -419,6 +423,35 @@ test('a step denied a call writes a one-shot of the runtime and leaves the step�
     [],
     'and no step’s note says a word of it: the denial is a signal of its own',
   );
+});
+
+test('a line’s labels are the ones stepLabels and runLabels give, so no second writer decides what a label is', async () => {
+  emptyStore();
+  const b = board();
+  const run = await started('the labels');
+  await runWith(b.e, tickRun());
+  b.deny(`${run.id}-plan`, [{ tool: 'Bash', what: 'git push' }]);
+  b.set(`${run.id}-plan`, 'running (working)');
+  await runWith(b.e, tickRun());
+
+  const record = readRun(run.id);
+  const plan = stepsOf(record).find((s) => s.name === 'plan')!;
+  assert.deepEqual(
+    stepLabels(record, plan),
+    { run: run.id, factory: DEFAULT_FACTORY, workflow: path.basename(record.workflowDir), step: 'plan', agent: 'none' },
+    'the one source of a label gives the five of a step',
+  );
+  const ofPlan = lines().filter((l) => l.run === run.id && l.step === 'plan');
+  assert.ok(ofPlan.length >= 2, 'the step said a word of its own');
+  assert.ok(
+    ofPlan.some((l) => l.reason === 'ToolDenied'),
+    'and carries a one-shot, whose labels are filled where it is written',
+  );
+  for (const l of ofPlan) assert.deepEqual(l.labels, stepLabels(record, plan), `${l.word} carries the labels of the step’s filing, whole`);
+
+  const ofRun = lines().filter((l) => l.run === run.id && l.step === undefined);
+  assert.ok(ofRun.length > 0, 'the run said a word of its own');
+  for (const l of ofRun) assert.deepEqual(l.labels, runLabels(record), `${l.word} carries the labels the run is known by, whole`);
 });
 
 /** A workflow of `plan → implement`, with no gate: a run on it finishes once both steps sign off. */
@@ -1396,6 +1429,124 @@ test('the fold keeps the last word of each run and step, forgets a removed run, 
       { at, run: 'r-1', word: 'removed' },
       { at, run: 'r-3', word: 'removed' },
     ].map(upgraded),
+  );
+});
+
+test('a feed written before the signature and one written after fold to the same state, and a removal of either shape forgets the run', () => {
+  const at = '2026-10-16T04:00:00.000Z';
+  const v0: FeedLine[] = [
+    { at, run: 'r-1', word: 'running' },
+    { at, run: 'r-1', step: 'plan', word: 'pending' },
+    { at, run: 'r-1', step: 'plan', word: 'running', note: 'waiting on you: approve the plan' },
+    { at, run: 'r-2', word: 'succeeded' },
+    { at, run: 'r-2', step: 'plan', word: 'unverified · done' },
+  ];
+  const v1: FeedLine[] = [
+    {
+      at,
+      run: 'r-1',
+      word: 'running',
+      apiVersion: FEED_VERSION,
+      involved: { kind: 'Run', name: 'r-1' },
+      labels: { run: 'r-1', factory: 'nemia', workflow: 'build' },
+      reason: 'Running',
+      type: 'Normal',
+      source: 'tick',
+      message: 'running',
+    },
+    {
+      at,
+      run: 'r-1',
+      step: 'plan',
+      word: 'pending',
+      apiVersion: FEED_VERSION,
+      involved: { kind: 'Step', name: 'r-1/plan' },
+      labels: { run: 'r-1', factory: 'nemia', workflow: 'build', step: 'plan', agent: 'ada' },
+      reason: 'Pending',
+      type: 'Normal',
+      source: 'tick',
+      message: 'pending',
+    },
+    {
+      at,
+      run: 'r-1',
+      step: 'plan',
+      word: 'running',
+      note: 'waiting on you: approve the plan',
+      apiVersion: FEED_VERSION,
+      involved: { kind: 'Step', name: 'r-1/plan' },
+      labels: { run: 'r-1', factory: 'nemia', workflow: 'build', step: 'plan', agent: 'ada' },
+      reason: 'Running',
+      type: 'Normal',
+      waits: 'person',
+      source: 'tick',
+      message: 'running · waiting on you: approve the plan',
+    },
+    {
+      at,
+      run: 'r-2',
+      word: 'succeeded',
+      apiVersion: FEED_VERSION,
+      involved: { kind: 'Run', name: 'r-2' },
+      labels: { run: 'r-2', factory: 'nemia', workflow: 'build' },
+      reason: 'Succeeded',
+      type: 'Normal',
+      source: 'tick',
+      message: 'succeeded',
+    },
+    {
+      at,
+      run: 'r-2',
+      step: 'plan',
+      word: 'unverified · done',
+      apiVersion: FEED_VERSION,
+      involved: { kind: 'Step', name: 'r-2/plan' },
+      labels: { run: 'r-2', factory: 'nemia', workflow: 'build', step: 'plan', agent: 'ada' },
+      reason: 'Succeeded',
+      type: 'Normal',
+      source: 'tick',
+      message: 'unverified · done',
+    },
+  ];
+
+  assert.deepEqual(
+    [...foldFeed(freshFold(), v0).said.keys()],
+    ['Run/r-1', 'Step/r-1/plan', 'Run/r-2', 'Step/r-2/plan'],
+    'a line of a step keys on the step, never on the run it belongs to',
+  );
+  assert.deepEqual(
+    foldFeed(freshFold(), v0),
+    foldFeed(freshFold(), v1),
+    'the same events in the two shapes fold to the same state: what each is about is derived the one way',
+  );
+
+  const fromSigned = foldFeed(freshFold(), v1);
+  foldFeed(fromSigned, [{ at, run: 'r-1', word: REMOVED }]);
+  assert.deepEqual(
+    [...fromSigned.said.keys()],
+    ['Run/r-2', 'Step/r-2/plan'],
+    'a removal written before the signature forgets a run folded from signed lines, and its steps with it',
+  );
+
+  const fromUnsigned = foldFeed(freshFold(), v0);
+  foldFeed(fromUnsigned, [
+    {
+      at,
+      run: 'r-2',
+      word: REMOVED,
+      apiVersion: FEED_VERSION,
+      involved: { kind: 'Run', name: 'r-2' },
+      labels: { run: 'r-2', factory: 'nemia', workflow: 'build' },
+      reason: 'Removed',
+      type: 'Normal',
+      source: 'person',
+      message: 'removed',
+    },
+  ]);
+  assert.deepEqual(
+    [...fromUnsigned.said.keys()],
+    ['Run/r-1', 'Step/r-1/plan'],
+    'and a signed removal forgets a run folded from lines written before the signature',
   );
 });
 

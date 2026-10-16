@@ -355,7 +355,7 @@ export const advancePass = Effect.fn('advancePass')(
       ? { read: pass, slot }
       : { standing: standingNow(runStore.runs.list()).pipe(Effect.provideService(PlaceService, place)) };
     const checkout = yield* checkoutHold(e, run, steps, from, process.env, memo);
-    const liftNotes = yield* liftHold(e, run, parents);
+    const lift = yield* liftHold(e, run, parents);
     const assessed = assess(steps, run, phaseOf, signedOff, asked, verdictOf, asks, roundAsks, sessionBlocked, spendOf, [], checkout);
     const settled = settledOf(run, reads);
     const marked = markedOnce(run, reads);
@@ -363,9 +363,9 @@ export const advancePass = Effect.fn('advancePass')(
     const closer = closerOf(e, reads.views);
     const closeNotes = yield* closeHeldOpen(run, reads, closer);
     const admission = yield* admit(e, run, slot, reads, assessed, parents);
-    const feed = wordFeed(run, reads, assessed, admission, checkout);
+    const feed = wordFeed(run, reads, assessed, admission, checkout, lift.lifted);
 
-    const notes: string[] = [...askNotes, ...handed.collected, ...lacking.notes, ...landing.notes, ...liftNotes, ...closeNotes];
+    const notes: string[] = [...askNotes, ...handed.collected, ...lacking.notes, ...landing.notes, ...lift.notes, ...closeNotes];
     notes.unshift(...took.notes);
     const f: Filing = { e: { ...e, file: (spec) => e.file(inParts(spec)) }, run, reads, closer, mayFile: mayFileOf(run), notes, heads };
     const { tried, rechecked } = yield* fileTries(f, assessed.retry);
@@ -543,18 +543,23 @@ const handedOffBy = Effect.fnUntraced(function* (place: Place, workspace: string
 
 /**
  * Lift a person's hold once every run it names has shipped, each read through `parents`, and only the hold this pass read (`removeHold`):
- * answers with its note.
+ * answers with its note, and with the moment the hold it lifted was put (`lifted`), which the feed writes as this pass's own deed and not
+ * a person's (`holdOnce`) — by the time it is worded the hold is off the record, and nothing but this knows who took it off.
  */
 const liftHold = Effect.fnUntraced(function* (e: Engine, run: Run, parents: Parents) {
-  if (!run.hold || run.cancelledAt || !run.hold.until.length) return [];
+  const nothing: { notes: string[]; lifted?: string } = { notes: [] };
+  if (!run.hold || run.cancelledAt || !run.hold.until.length) return nothing;
   let shipped = true;
   for (const id of run.hold.until) if (!(shipped = (yield* keptParent(id, parents.git, parents.read).pipe(over(e))).shipped)) break;
-  if (!shipped || !runStore.holds.lift(run.id, run.hold.at)) return [];
-  const { until } = run.hold;
+  if (!shipped || !runStore.holds.lift(run.id, run.hold.at)) return nothing;
+  const { until, at } = run.hold;
   delete run.hold;
-  return [
-    `the hold is lifted: ${until.length > 1 ? `${until.slice(0, -1).join(', ')} and ${until.at(-1)} have` : `${until[0]} has`} shipped`,
-  ];
+  return {
+    notes: [
+      `the hold is lifted: ${until.length > 1 ? `${until.slice(0, -1).join(', ')} and ${until.at(-1)} have` : `${until[0]} has`} shipped`,
+    ],
+    lifted: at,
+  };
 });
 
 /** The pass's closer (`Closer`), with the tasks waiting for a word as the pass read them (`waits`) and those it closed (`closed`). */

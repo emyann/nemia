@@ -6,11 +6,11 @@
  * what the pass already read — the engine's views, the run's record, the person's answers — and asks the runtime nothing of its own.
  */
 import { listing } from '../list/list.ts';
-import { feedPhase, feedWords, type FeedDenial, type FeedWords } from './index.ts';
+import { feedPhase, feedWords, SIGNAL_WORDS, type FeedDenial, type FeedWords, type Once } from './index.ts';
 import { closeoutOf, saidCount, waitingOf } from '../views/views.verb.ts';
 import { engineWord } from '../views/views-words.ts';
 import { runStore } from '../record/files.store.ts';
-import { denialText } from '../runtime-client.ts';
+import { denialText, type TaskView } from '../runtime-client.ts';
 import { taskTryOf, type Run } from '../record/record.ts';
 import { holdsOf, type ParentRun, type Wait } from '../wait/wait.ts';
 import { runLabels, stepLabels } from '../telemetry/telemetry.ts';
@@ -23,7 +23,14 @@ import type { PassReads } from '../tick/file.verb.ts';
 type Admitted = { waiting: Wait[]; held: RunSlot | undefined; parent: (id: string) => ParentRun };
 
 /** The feed's words for the run and each step (`feedWords`), off what the pass read before it filed anything. */
-export function wordFeed(run: Run, r: PassReads, assessed: Assessment, admission: Admitted, checkout: CheckoutHold | undefined): FeedWords {
+export function wordFeed(
+  run: Run,
+  r: PassReads,
+  assessed: Assessment,
+  admission: Admitted,
+  checkout: CheckoutHold | undefined,
+  lifted?: string,
+): FeedWords {
   const { views, steps } = r;
   return feedWords(
     listing({
@@ -55,8 +62,76 @@ export function wordFeed(run: Run, r: PassReads, assessed: Assessment, admission
         return step ? stepLabels(run, step) : { run: run.id, step: name };
       },
       denials: denialsOf(run, r),
+      acts: actsOf(run),
+      faults: faultsOf(run, r),
+      ...(run.hold ? { held: run.hold.at } : {}),
+      ...(lifted !== undefined ? { lifted } : {}),
     },
   );
+}
+
+/**
+ * Every act a person took on `run`, as the pass reads it off the record: each approval at a gate (`nemia approve`), keyed by the step and
+ * the try it opens, and the call-off (`nemia cancel`), keyed by the moment it was asked. Each carries the person's own moment in its note,
+ * which is what tells one occurrence from another — the line's own `at` is the pass's, as a denial's is.
+ *
+ * Each fact is already on the record as the pass read it, composed on read from the person's own file and never written into the record
+ * (`readRun`): so the feed keeps its one writer, the daemon, and no verb is touched. The hold is not here — it is answered by its put and
+ * its lift together (`holdOnce`), off `FeedWords.held`, since `nemia hold --off` leaves only an absence to read.
+ *
+ * It is the whole of what a person has done, not what is new: the feed's own lines say which have been written already (`oncePast`), so
+ * the pass carries nothing between passes and a restarted daemon writes an act neither again nor never.
+ */
+function actsOf(run: Run): Once[] {
+  return [
+    ...(run.approvals ?? []).map((a): Once => ({
+      step: a.step,
+      word: SIGNAL_WORDS.Approved,
+      note: `try ${a.try} · at ${a.at}`,
+      try: a.try,
+    })),
+    ...(run.cancelledAt !== undefined ? [{ word: SIGNAL_WORDS.CancelAsked, note: `at ${run.cancelledAt}` }] : []),
+  ];
+}
+
+/**
+ * The two ends of the runtime's that are the workflow layer's news, in the workflow layer's own words: a spawn its harness refused, so
+ * nothing started, and a session the runtime lost. **This table is the only place in the package's feed code that names either of the
+ * runtime's words** — nothing is passed through, and the words above it are the owner's (`SIGNAL_WORDS`).
+ *
+ * The rest of an attempt's ends are no news of their own: what they came to is the step's own word, which the feed already says.
+ *
+ * Keyed by the attempt's own `reason` as the client types it (`AttemptEnd`), never by `string`: a reason renamed in the runtime fails this
+ * typecheck here, as it does at the two sibling readers that compare the literal (`views/took.ts`, `status/status.ts`). Typed loosely, a
+ * rename would answer `undefined` for every attempt and both signals would vanish with a green suite, since a test plants the reason by
+ * hand rather than taking it from the runtime's type.
+ */
+type AttemptEnd = NonNullable<TaskView['state']['attempts'][number]['reason']>;
+
+const FAULTS: Partial<Record<AttemptEnd, string>> = {
+  unstartable: SIGNAL_WORDS.SpawnFailed,
+  lost: SIGNAL_WORDS.SessionLost,
+};
+
+/**
+ * Every fault the runtime journalled of `run`'s steps, as the pass read their views: one per attempt that ended for a reason `FAULTS`
+ * translates, of the step and the try its task was filed for (`taskTryOf`, from 1), in the order the runtime journalled them — each
+ * attempt of the step's task in order, and nothing of an attempt still running.
+ *
+ * Two attempts of one try lost are two occurrences, told apart by being two and counted off the feed's own lines (`oncePast`), as a call
+ * denied twice in one try is. Neither waits on a person, by the table (`REASONS`): the step's own status is what wakes you.
+ */
+function faultsOf(run: Run, r: PassReads): Once[] {
+  const out: Once[] = [];
+  for (const step of r.steps) {
+    const view = r.views.get(run.steps[step.name]?.taskId ?? '');
+    const tried = taskTryOf(run, step.name);
+    for (const attempt of view?.state.attempts ?? []) {
+      const word = attempt.reason == null ? undefined : FAULTS[attempt.reason];
+      if (word !== undefined) out.push({ step: step.name, word, note: `try ${tried}`, try: tried });
+    }
+  }
+  return out;
 }
 
 /**

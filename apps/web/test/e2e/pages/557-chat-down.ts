@@ -40,7 +40,7 @@ export default {
       await expectVisible(dockOf(page).locator('[data-cue]', { hasText: 'Down' }), 'a Down cue stands beside her face');
       await expectDown(page, 'Filed: her session is starting.');
       await settled(page);
-      await photograph(page, path.join(OUT, `chat-down-${await themeOf(page)}.png`), { fullPage: true });
+      await photograph(page, path.join(OUT, `chat-down-filed-${await themeOf(page)}.png`), { fullPage: true });
 
       const field = chatFieldOf(page);
       await field.fill('Start the kit cards when you are back.');

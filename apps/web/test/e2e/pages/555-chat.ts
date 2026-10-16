@@ -102,7 +102,15 @@ export default {
       if ((await field.inputValue()) !== '') throw new Refused('the field is emptied once the words are sent');
 
       await panel.getByRole('button', { name: 'Grow to the whole space' }).click();
-      await expectVisible(chatPanelOf(page).and(page.locator('[data-chat-panel="grown"]')), 'the panel grows to the whole space');
+      const grown = chatPanelOf(page).and(page.locator('[data-chat-panel="grown"]'));
+      await expectVisible(grown, 'the panel grows to the whole space');
+      const room = page.viewportSize();
+      const box = await grown.boundingBox();
+      if (room === null || box === null) throw new Refused('the grown panel has a size to measure');
+      if (box.width < room.width * 0.7 || box.height < room.height * 0.7)
+        throw new Refused(
+          `grown, it takes the whole space — it is ${Math.round(box.width)}×${Math.round(box.height)} of ${room.width}×${room.height}`,
+        );
       await settled(page);
       await photograph(page, path.join(OUT, `chat-grown-${await themeOf(page)}.png`), { fullPage: true });
 

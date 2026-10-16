@@ -40,7 +40,13 @@ export function NemiaDock() {
       className="pointer-events-none fixed inset-0 z-30 flex flex-col items-end justify-end gap-3 p-7"
     >
       {mode !== null && (
-        <div className={mode === 'grown' ? 'pointer-events-auto flex min-h-0 w-full flex-1' : 'pointer-events-auto w-[430px] max-w-full'}>
+        <div
+          className={
+            mode === 'grown'
+              ? 'pointer-events-auto flex min-h-0 w-full flex-1'
+              : 'pointer-events-auto flex max-h-full min-h-0 w-[430px] max-w-full'
+          }
+        >
           <ChatPanel
             chat={chat}
             nemia={nemia}

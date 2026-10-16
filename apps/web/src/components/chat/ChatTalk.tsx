@@ -4,13 +4,13 @@
  * which is when the read mark is posted (`onRead`), and when the jump pill goes.
  *
  * It scrolls on its own, its bar drawn by `markScrolls`, and follows her latest while the person is at its foot: read back, it stays
- * where they left it.
+ * where they left it. It takes the room the panel gives it and no more — the panel is bounded by the window — so a long talk scrolls
+ * inside it rather than growing the panel past the screen, and on her own page it fills the frame down to the composer.
  */
 import { useEffect, useRef, useState } from 'react';
 import { foldChat, newFrom, newWords, readableFrom, type ChatItem } from '@/lib/chatFollowing';
 import type { ChatEvent } from '@/lib/api';
 import { markScrolls } from '@/lib/useScrollMark';
-import { cn } from '@/lib/utils';
 import { ChatJump } from './ChatJump';
 import { ChatMarkerLine, ChatMessage } from './ChatMessage';
 import { ChatTurn } from './ChatTurn';
@@ -25,17 +25,7 @@ function Block({ item }: { item: ChatItem }) {
 }
 
 /** The talk: what `events` holds, folded, with the new line, the jump pill and the read mark's sentinel. */
-export function ChatTalk({
-  events,
-  unread,
-  onRead,
-  grown,
-}: {
-  events: readonly ChatEvent[];
-  unread: number;
-  onRead: (through: string) => void;
-  grown: boolean;
-}) {
+export function ChatTalk({ events, unread, onRead }: { events: readonly ChatEvent[]; unread: number; onRead: (through: string) => void }) {
   const box = useRef<HTMLDivElement>(null);
   const end = useRef<HTMLDivElement>(null);
   const [atEnd, setAtEnd] = useState(true);
@@ -63,7 +53,7 @@ export function ChatTalk({
   }, [atEnd, events.length]);
 
   return (
-    <div className="flex min-h-0 flex-col gap-2">
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
       <div
         ref={box}
         data-chat-talk={atEnd ? 'latest' : 'back'}
@@ -71,7 +61,7 @@ export function ChatTalk({
         aria-label={atEnd ? "Nemia's talk" : 'Earlier messages'}
         // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a box that scrolls is reached by the keyboard
         tabIndex={0}
-        className={cn('flex min-h-0 flex-col gap-4 overflow-y-auto', grown ? 'flex-1' : 'max-h-130')}
+        className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto"
       >
         {items.map((item) => (
           <div key={item.kind === 'turn' ? item.id : item.event.id} className="contents">

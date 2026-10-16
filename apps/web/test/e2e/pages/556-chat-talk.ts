@@ -7,12 +7,26 @@ import { OUT } from '../world.ts';
 
 /** Her session's transcript: her words, her tool calls, and a last call with no result, which is the one at work. */
 const SAID: readonly HerLine[] = [
-  { text: 'I am keeping the two kit cards moving.' },
+  {
+    text:
+      'I am keeping the two kit cards moving. The first is at its design gate and the second waits on it, so I am holding the second ' +
+      'until the first lands; neither has cost more than a dollar so far, and nothing of theirs waits on you yet.',
+  },
   { tool: 'Read', says: 'docs/architecture.md', result: 'read 420 lines' },
   { tool: 'Bash', says: 'npx turbo run test --force', result: 'all green' },
-  { text: 'Both checks are green. The runs are on [the runs page](/runs), and the factory is [Nemia](/factories).' },
+  {
+    text:
+      'Both checks are green, and both runs are back at work after their merges. The runs are on [the runs page](/runs), and the ' +
+      'factory is [Nemia](/factories).',
+  },
   { tool: 'Grep', says: 'waitsOnYou', result: '6 matches' },
-  { text: 'Six runs wait on you. The oldest is the kit card.' },
+  {
+    text:
+      'Six runs wait on you. The oldest is the kit card, which has waited since this morning; the other five are gates I may not ' +
+      'answer for you. I will keep the two kit cards moving while you read them, and say so here when either moves.',
+  },
+  { tool: 'Read', says: 'packages/agent-orchestrator/docs/features.md', result: 'read 180 lines' },
+  { tool: 'Bash', says: 'nemia runs --json', result: '6 waiting' },
   { tool: 'Task', says: 'watch the two runs to their gates' },
 ];
 

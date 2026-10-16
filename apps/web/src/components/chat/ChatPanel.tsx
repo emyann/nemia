@@ -2,6 +2,8 @@
  * Nemia's chat, as the canvas draws it: the look's cut frame — alive while her session is up, a quiet outline while she is down — her
  * header, the band that says why she stopped or that the board lost the daemon, her talk, the message this browser kept, and the
  * composer. Floating over the page, grown to the whole frame, or the page of its own at `/chat`, which is the same panel full-bleed.
+ * Grown it takes the whole of the room it is given; floating it grows with her talk no further than that room, so its header, and the
+ * three controls on it, are never pushed off the top of the window.
  *
  * Escape closes it while it floats, as the frame's own bar closes on Escape; the page closes on nothing, being a page.
  */
@@ -48,11 +50,16 @@ export function ChatPanel({ chat, nemia, presence, atWork, now, mode, onGrow, on
   }, [mode, onClose]);
 
   return (
-    <CutFrame hue={presence.down ? 'none' : 'alive'} size={PANEL_CUT} className={cn('flex min-h-0 flex-col', grown && 'h-full')}>
+    <CutFrame
+      hue={presence.down ? 'none' : 'alive'}
+      size={PANEL_CUT}
+      fill
+      className={cn('flex min-h-0 flex-col', grown ? 'h-full w-full' : 'max-h-full')}
+    >
       <section
         aria-label="Nemia's chat"
         data-chat-panel={mode}
-        className={cn('flex min-h-0 flex-col gap-3.5 px-4.5 pt-4 pb-4.5', grown && 'h-full')}
+        className={cn('flex min-h-0 flex-col gap-3.5 px-4.5 pt-4 pb-4.5', grown ? 'h-full' : 'max-h-full')}
       >
         <ChatHeader nemia={nemia} presence={presence} now={now} mode={mode} onGrow={onGrow} onClose={onClose} />
         <hr className="shrink-0 border-outline-variant" />
@@ -60,7 +67,7 @@ export function ChatPanel({ chat, nemia, presence, atWork, now, mode, onGrow, on
         {state.events.length === 0 ? (
           <ChatEmpty nemia={nemia} presence={presence} atWork={atWork} onSend={chat.send} />
         ) : (
-          <ChatTalk events={state.events} unread={state.presence.unread} onRead={chat.markRead} grown={grown} />
+          <ChatTalk events={state.events} unread={state.presence.unread} onRead={chat.markRead} />
         )}
         {kept !== null && (
           <>

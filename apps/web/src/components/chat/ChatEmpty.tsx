@@ -55,7 +55,7 @@ export function ChatEmpty({
         <span className="text-label-small text-on-surface-variant uppercase">Start with</span>
         <div className="flex flex-wrap gap-2">
           {CHAT_STARTERS.map((words) => (
-            <Button key={words} variant="outline" size="sm" data-chat-chip onPress={() => onSend(words)}>
+            <Button key={words} variant="outline" size="sm" data-chat-chip isDisabled={presence.notSent} onPress={() => onSend(words)}>
               {words}
             </Button>
           ))}

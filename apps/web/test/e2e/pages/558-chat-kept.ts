@@ -30,6 +30,12 @@ async function expectKept(panel: ReturnType<typeof chatPanelOf>, words: string):
     throw new Refused(`and that the board keeps trying — it says ${JSON.stringify(said)}`);
 }
 
+/** The panel's top edge is on the screen, so the header's Close, Grow and Open as a page can be reached. */
+async function expectHeld(panel: ReturnType<typeof chatPanelOf>): Promise<void> {
+  const box = await panel.boundingBox();
+  if (box === null || box.y < 0) throw new Refused(`the panel stands inside the window — its top is at ${box?.y ?? 'nowhere'}`);
+}
+
 /** The composer, and a message Enter sends: answers the panel it was written in. */
 async function wrote(page: Page, words: string): Promise<ReturnType<typeof chatPanelOf>> {
   const panel = await openChat(page);
@@ -68,8 +74,12 @@ export default {
       await expectKept(panel, WROTE);
       await expectCount(panel.locator('[data-chat-bubble="person"]'), 0, 'and no bubble of theirs stands for a message nobody has');
       await expectVisible(dockOf(down).locator('[data-cue]', { hasText: 'Not sent' }), 'a cue beside her face says one was not sent');
+      await expectHeld(panel);
+      for (const chip of await panel.locator('[data-chat-chip]').all())
+        if (!(await chip.isDisabled()))
+          throw new Refused('a chip is off while a message is kept: pressing one would take the place of the words nobody has yet');
       await settled(down);
-      await photograph(down, path.join(OUT, `chat-kept-${await themeOf(down)}.png`), { fullPage: true });
+      await photograph(down, path.join(OUT, `chat-kept-notsent-${await themeOf(down)}.png`), { fullPage: true });
 
       await panel.locator('[data-chat-kept]').getByRole('button', { name: 'Send again' }).click();
       await expectKept(panel, WROTE);

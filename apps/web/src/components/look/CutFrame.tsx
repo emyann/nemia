@@ -26,16 +26,19 @@ const GLOW: Record<FrameHue, string | undefined> = {
  * The look's cut-corner frame: a shape of its own under what it holds, its top-right and bottom-left corners cut, an edge in `hue`
  * around the card's ground, which wears the surface's grain inside the cut, and for what waits on a person a glow the shape casts.
  * Outside the cut nothing is painted: the page's ground shows. Nothing of the frame cuts what it holds off: a focused child's ring is
- * drawn whole, over a cut corner too. `size` is its cut.
+ * drawn whole, over a cut corner too. `size` is its cut. `fill` is for a frame given a height — a panel that grows to the room it is
+ * in — where what it holds is laid out down the whole of it, and scrolls inside rather than past it.
  */
 export function CutFrame({
   hue = 'none',
   size = 28,
+  fill = false,
   className,
   children,
 }: {
   hue?: FrameHue;
   size?: CutSize;
+  fill?: boolean;
   className?: string;
   children: ReactNode;
 }) {
@@ -50,7 +53,7 @@ export function CutFrame({
           style={{ clipPath: `polygon(${cutPoints(size, 1)})` }}
         />
       </span>
-      <div className="relative">{children}</div>
+      <div className={cn('relative', fill && 'flex h-full min-h-0 flex-col')}>{children}</div>
     </div>
   );
 }

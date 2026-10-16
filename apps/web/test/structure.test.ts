@@ -21,7 +21,7 @@ import path from 'node:path';
 const WEB = path.join(import.meta.dirname, '..');
 
 /** The two files that open a stream from the api, and only they. */
-const STREAMS = ['src/lib/useFeed.ts', 'src/lib/useStepTranscript.ts'];
+const STREAMS = ['src/lib/useFeed.ts', 'src/lib/useStepTranscript.ts', 'src/lib/useNemiaChat.ts'];
 
 /** The one file that renders markdown: every surface that shows a text written in markdown draws it through its `Markdown`. */
 const RENDERER = 'src/components/Markdown.tsx';
@@ -110,7 +110,10 @@ function importBreaks(texts: ReadonlyMap<string, string>): string[] {
   return out;
 }
 
-/** Each file outside `STREAMS` that names an `EventSource` in its code: the api's streams are opened in those two files alone. */
+/**
+ * Each file outside `STREAMS` that names an `EventSource` in its code: the api's streams — the workflow feed's, a step's transcript and
+ * Nemia's chat — are opened in those files alone.
+ */
 const eventSourceBreaks = (texts: ReadonlyMap<string, string>): string[] =>
   [...texts]
     .filter(([file, text]) => !STREAMS.includes(file) && /\bEventSource\b/.test(withoutComments(text)))
@@ -352,7 +355,7 @@ test(`only ${STREAMS.join(' and ')} open an EventSource`, () => {
 test('REFUSED: an EventSource opened in another file; one named in a JSDoc is let through', () => {
   const planted = (text: string): string[] => eventSourceBreaks(new Map([...sourceTexts(), ['src/lib/x.ts', text]]));
   assert.deepEqual(planted("const s = new EventSource('/api/feed/stream');\n"), [
-    "src/lib/x.ts opens an EventSource: the api's streams are opened in src/lib/useFeed.ts and src/lib/useStepTranscript.ts alone",
+    `src/lib/x.ts opens an EventSource: the api's streams are opened in ${STREAMS.join(' and ')} alone`,
   ]);
   assert.deepEqual(planted('/** Follows an EventSource, or anything that dispatches its events. */\nexport const x = 1;\n'), []);
 });

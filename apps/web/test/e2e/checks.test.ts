@@ -10,6 +10,7 @@ import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { chromium, type Browser, type Page } from 'playwright';
 import {
+  CHAT_STREAM,
   expectApart,
   expectBeneath,
   expectBetween,
@@ -526,10 +527,11 @@ test(
   },
 );
 
-test("the watch lets the feed's stream be aborted by a navigation of the page committed after it opened, and counts every other failure", () => {
+test('the watch lets a page stream be aborted once the page it opened on is left — by a navigation committed after it, or by the router moving to another address — and counts every other failure', () => {
   const main = {};
   const emitter = new EventEmitter();
-  const page = Object.assign(emitter, { mainFrame: () => main }) as unknown as Page;
+  let address = 'http://e2e.test/';
+  const page = Object.assign(emitter, { mainFrame: () => main, url: () => address }) as unknown as Page;
   const request = (pathname: string, { navigation = false, error = 'net::ERR_ABORTED' } = {}) => ({
     url: () => `http://e2e.test${pathname}`,
     method: () => 'GET',
@@ -603,6 +605,17 @@ test("the watch lets the feed's stream be aborted by a navigation of the page co
   emitter.emit('framenavigated', main);
   emitter.emit('requestfailed', pushed);
   assert.equal(seen(), 6, "a same-document navigation (pushState) asks for nothing and leaves nothing: the stream's abort is counted");
+
+  const moved = request(CHAT_STREAM);
+  emitter.emit('request', moved);
+  address = 'http://e2e.test/chat';
+  emitter.emit('requestfailed', moved);
+  assert.equal(seen(), 6, 'a page stream the router left behind by moving to another address is let abort: nothing reads it there');
+
+  const standing = request(CHAT_STREAM);
+  emitter.emit('request', standing);
+  emitter.emit('requestfailed', standing);
+  assert.deepEqual(problems().slice(6), [failed(CHAT_STREAM)], 'and one the board closes while that address stands is counted');
 });
 
 test('idle lets go of the requests a page left behind when it reloaded or navigated, those its old document asked for on the way included, of which Playwright says nothing more — and of none on a pushState', async () => {

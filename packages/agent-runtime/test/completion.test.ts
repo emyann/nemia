@@ -1021,7 +1021,7 @@ test('claude.remoteControl reaches Claude Code as --remote-control, and a flag f
   const args = await argvOf({ config: { claude: { remoteControl: true }, tools: ['Read'], disallowedTools: ['SendMessage'] } });
   const i = args.indexOf('--remote-control');
   assert.notEqual(i, -1, args.join(' '));
-  assert.equal(args[i + 1], '--permission-mode', 'a flag, not a value, comes next');
+  assert.equal(args[i + 1], '--settings', 'a flag, not a value, comes next');
   assert.equal(
     args.filter((a) => a === '--remote-control').length,
     1,
@@ -1082,7 +1082,7 @@ if (args[0] === '--bg') {
     assert.equal(of('bridged').length, 1, 'its attempt');
     for (const args of of('bridged')) assert.ok(args.includes('--remote-control'), args.join(' '));
     assert.equal(of('bridged before').length, 1, 'its attempt');
-    for (const args of of('bridged before')) assert.equal(args[args.indexOf('--remote-control') + 1], '--permission-mode', args.join(' '));
+    for (const args of of('bridged before')) assert.equal(args[args.indexOf('--remote-control') + 1], '--settings', args.join(' '));
     assert.equal(of('plain').length, 1);
     for (const args of of('plain')) assert.equal(args.includes('--remote-control'), false, args.join(' '));
   } finally {
@@ -1105,7 +1105,7 @@ test('tools reach Claude Code as --tools, and a flag ends the list before the pr
   const i = args.indexOf('--tools');
   assert.notEqual(i, -1);
   assert.equal(args[i + 1], 'Read,Grep,Glob');
-  assert.equal(args[i + 2], '--permission-mode', '`--tools <tools...>` is variadic: before the prompt it would take the prompt as a tool');
+  assert.equal(args[i + 2], '--settings', '`--tools <tools...>` is variadic: before the prompt it would take the prompt as a tool');
   assert.equal(args.at(-1), 'the prompt');
 });
 
@@ -1121,7 +1121,7 @@ test('disallowedTools reach Claude Code as --disallowedTools, the rules in one a
   const i = args.indexOf('--disallowedTools');
   assert.notEqual(i, -1, args.join(' '));
   assert.equal(args[i + 1], 'Bash(npm run build),Bash(npm run e2e),SendMessage', 'a space inside a rule stays inside it');
-  assert.equal(args[i + 2], '--permission-mode', 'variadic: before the prompt it would take the prompt as a rule to deny');
+  assert.equal(args[i + 2], '--settings', 'variadic: before the prompt it would take the prompt as a rule to deny');
   assert.equal(args[args.indexOf('--tools') + 1], 'Read,Bash', 'beside the tool list, not in its place');
   assert.equal(args.at(-1), 'the prompt');
   assert.equal(
@@ -1138,7 +1138,7 @@ test('allowedTools reach Claude Code as --allowedTools, the rules in one argumen
   const i = args.indexOf('--allowedTools');
   assert.notEqual(i, -1, args.join(' '));
   assert.equal(args[i + 1], 'Write(**),Bash(npm test)', 'a space inside a rule stays inside it');
-  assert.equal(args[i + 2], '--permission-mode', 'variadic: before the prompt it would take the prompt as a rule to allow');
+  assert.equal(args[i + 2], '--settings', 'variadic: before the prompt it would take the prompt as a rule to allow');
   assert.equal(args[args.indexOf('--disallowedTools') + 1], 'SendMessage', 'beside the deny list, not in its place');
   assert.equal(args[args.indexOf('--tools') + 1], 'Read,Write');
   assert.equal(args.at(-1), 'the prompt');
@@ -1293,6 +1293,8 @@ test('with every option set, Claude Code is given each flag in its one order, th
       '--allowedTools',
       'Edit(**)',
       '--remote-control',
+      '--settings',
+      '{"autoMemoryEnabled":false}',
       '--permission-mode',
       'dontAsk',
       '--mcp-config',
@@ -1326,6 +1328,8 @@ test('at shipped defaults Claude Code is given its name, the permission mode aut
     '--bg',
     '--name',
     'ae/t/1',
+    '--settings',
+    '{"autoMemoryEnabled":false}',
     '--permission-mode',
     'auto',
     '--strict-mcp-config',

@@ -96,9 +96,10 @@ test("a background session is handed its telemetry in its --settings' env, over 
     return at < 0 ? undefined : JSON.parse(argv[at + 1]);
   };
   const given = { ...told, config: { claude: { settings: JSON.stringify({ env: { PATH: '/x', TRACEPARENT: 'mine' }, model: 'm' }) } } };
-  assert.deepEqual(settingsOf(given), { env: { PATH: '/x', ...claudeTelemetryEnv(told) }, model: 'm' });
-  assert.deepEqual(settingsOf({ ...given, telemetry: undefined }), { env: { PATH: '/x', TRACEPARENT: 'mine' }, model: 'm' });
-  assert.equal(settingsOf({ ...told, telemetry: undefined }), undefined, 'no settings given, none made');
+  const off = { autoMemoryEnabled: false };
+  assert.deepEqual(settingsOf(given), { env: { PATH: '/x', ...claudeTelemetryEnv(told) }, model: 'm', ...off });
+  assert.deepEqual(settingsOf({ ...given, telemetry: undefined }), { env: { PATH: '/x', TRACEPARENT: 'mine' }, model: 'm', ...off });
+  assert.deepEqual(settingsOf({ ...told, telemetry: undefined }), off, "no settings given: the session's auto-memory off alone");
   assert.deepEqual(telemeteredFlags({ settings: '/a/settings.json' }, told), { settings: '/a/settings.json' }, 'a file is not rewritten');
 });
 
@@ -117,6 +118,7 @@ test("a background session told to say its tools' details is handed OTEL_LOG_TOO
   assert.deepEqual(JSON.parse(argv[argv.indexOf('--settings') + 1]), {
     env: { PATH: '/x', ...claudeTelemetryEnv(told), OTEL_LOG_TOOL_DETAILS: '1' },
     model: 'm',
+    autoMemoryEnabled: false,
   });
   assert.deepEqual(
     telemeteredFlags({ settings: '/a/settings.json' }, detailed),

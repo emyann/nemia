@@ -395,50 +395,73 @@ test("a conversation the engine cannot read is a 502 that says how to read the s
 });
 
 /**
- * An app over the api's own engine but for `follow`, refused as a harness that does not stream its sessions refuses it. Its runtime is
- * let go once the test `t` ends.
+ * An app over the api's own engine but for `follow`, refused as a harness that does not stream its sessions refuses it, until `streams`
+ * says yes — a harness that starts pushing its sessions under a reader. Its runtime is let go once the test `t` ends.
  */
-function unstreamedApp(t: TestContext) {
+function unstreamedApp(t: TestContext, streams: { yes: boolean } = { yes: false }) {
+  const real = engine();
   const unstreamed = {
-    ...engine(),
-    follow: () => Effect.fail({ _tag: 'FollowRefused', message: 'the `x` harness does not stream its sessions' }),
+    ...real,
+    follow: (taskId: string) =>
+      streams.yes ? real.follow(taskId) : Effect.fail({ _tag: 'FollowRefused', message: 'the `x` harness does not stream its sessions' }),
   } as unknown as ReturnType<typeof engine>;
   const own = appOf(Layer.merge(liveOf(), Layer.succeed(Engine)(unstreamed)));
   t.after(() => own.runtime.dispose());
   return own.app;
 }
 
+const UNPUSHED =
+  "Step 'unpushed' of run 'r-talk' runs a session its harness does not push as it is written: what it said so far is sent, and it is read again every few seconds.";
+
 test(
-  'the stream of a live step whose session is not pushed sends `following` false and what it has said, then `unreadable`, never read again: it names the read that gives what is new, and closes',
-  { timeout: 30_000 },
+  'the stream of a live step whose session is not pushed sends `following` false and what it has said, then `unreadable` retrying: it stays open, reads the conversation again on a beat, and takes to the live relay once the harness starts pushing it',
+  { timeout: 60_000 },
   async (t) => {
-    const app = unstreamedApp(t);
+    const streams = { yes: false };
+    const app = unstreamedApp(t, streams);
     const sessionId = runningTask('t-unpushed');
     const lines = conversation(sessionId);
     writeTranscript(sessionId, lines.slice(0, 4));
     const res = await app.request(streamUrl('unpushed'));
-    const said = await readUntil(res.body!.getReader(), { value: '' }, () => false);
+    const reader = res.body!.getReader();
+    const text = { value: '' };
+    const said = await readUntil(reader, text, (got) => got.some((b) => b.event === 'unreadable'));
     assert.deepEqual(said[0], { event: 'following', data: JSON.stringify({ streamed: false }) }, 'not pushed');
     assert.deepEqual(eventsIn(said), (await Effect.runPromise(engine().transcript('t-unpushed'))).events, 'what it has said, once each');
-    const last = said.at(-1)!;
-    assert.equal(last.event, 'unreadable', 'the read resolves only once the api closes the stream: one read again would time the test out');
-    const { error, retrying } = JSON.parse(last.data!) as { error: string; retrying: boolean };
-    assert.equal(retrying, false);
-    assert.equal(
-      error,
-      "Step 'unpushed' of run 'r-talk' runs a session that is not pushed as it is written: what it said so far is sent. GET /api/runs/r-talk/steps/unpushed/transcript?after=<the last id> gives what it says next.",
+    assert.deepEqual(
+      JSON.parse(said.at(-1)!.data!),
+      { error: UNPUSHED, retrying: true },
+      'it says why it cannot be streamed, and that it reads it again',
     );
-    assert.ok(!said.some((b) => b.event === 'settled'));
+    assert.ok(!said.some((b) => b.event === 'settled'), 'and the stream is not ended');
 
     writeTranscript(sessionId, lines.slice(4));
-    const after = said.filter((b) => b.id !== undefined).at(-1)!.id!;
-    const next = (await (await app.request(url('unpushed', `?after=${encodeURIComponent(after)}`))).json()) as StepTranscript;
+    const whole = (await Effect.runPromise(engine().transcript('t-unpushed'))).events;
+    const after = await readUntil(reader, text, (got) => eventsIn(got).length >= whole.length);
     assert.deepEqual(
-      next.events.map((e) => e.id),
-      (await Effect.runPromise(engine().transcript('t-unpushed', after))).events.map((e) => e.id),
-      'the read it names gives what is new, from the id of the last event sent',
+      eventsIn(after).map((e) => e.id),
+      whole.map((e) => e.id),
+      'what the session said after the give-up used to be arrives on the same stream, one beat later',
     );
-    assert.ok(next.events.length > 0);
+    assert.equal(after.filter((b) => b.event === 'unreadable').length, 1, 'said once, not once a beat');
+
+    streams.yes = true;
+    const live = await readUntil(reader, text, (got) => got.some((b) => b.event === 'readable'));
+    assert.deepEqual(
+      live.filter((b) => b.event === 'following').at(-1),
+      { event: 'following', data: JSON.stringify({ streamed: true }) },
+      'a harness that starts pushing its session is followed live on the next beat',
+    );
+
+    journal('t-unpushed', ending('t-unpushed', sessionId));
+    listed('t-unpushed', { state: 'done', status: 'idle' });
+    await Effect.runPromise(
+      emitFeed(new Map([[RUN, { run: { word: 'running' }, steps: [{ name: 'unpushed', word: 'succeeded' }] }]])).pipe(
+        Effect.provide(Logger.layer([])),
+      ),
+    );
+    const over = await readUntil(reader, text, () => false);
+    assert.equal(over.at(-1)?.event, 'settled', 'and the beat does not hold the stream open past the task settling');
   },
 );
 

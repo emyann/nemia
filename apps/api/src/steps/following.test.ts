@@ -311,7 +311,7 @@ test(
 );
 
 test(
-  'a step moved to a try whose session is not pushed is sent what the try has said from its start, not the task it was opened on, then `unreadable`: nothing is read again',
+  'a step moved to a try whose session is not pushed is sent what the try has said from its start, not the task it was opened on, then `unreadable` retrying: the stream stays open and reads the try again on a beat',
   WAITED,
   async (t) => {
     const first = working([said('a-1')]);
@@ -331,18 +331,17 @@ test(
     first.settled = 'failed';
     writeRun({ tried: 't-tried-try2' });
     await line(own, 'tried', 'running');
-    const sent = await f.ended();
-    assert.deepEqual(kinds(sent).slice(0, -1), [
-      'following {"streamed":true}',
-      'transcript a-1',
-      'moved {"taskId":"t-tried-try2"}',
-      'following {"streamed":false}',
-      'transcript b-1',
-    ]);
-    assert.equal(sent.at(-1)?.event, 'unreadable', 'the stream ends of itself, the try still live: one read again would time the test out');
-    assert.deepEqual(JSON.parse(sent.at(-1)!.data!), {
-      error: `Step 'tried' of run '${RUN}' runs a session that is not pushed as it is written: what it said so far is sent. GET /api/runs/${RUN}/steps/tried/transcript?after=<the last id> gives what it says next.`,
-      retrying: false,
+    await f.wait((s) => kinds(s).includes('transcript b-1'), "the try's own history, read from its start");
+    const sent = f.said();
+    assert.deepEqual(
+      kinds(sent).filter((k) => !k.startsWith('unreadable ')),
+      ['following {"streamed":true}', 'transcript a-1', 'moved {"taskId":"t-tried-try2"}', 'following {"streamed":false}', 'transcript b-1'],
+    );
+    assert.deepEqual(JSON.parse(sent.find((b) => b.event === 'unreadable')!.data!), {
+      error: `Step 'tried' of run '${RUN}' runs a session its harness does not push as it is written: what it said so far is sent, and it is read again every few seconds.`,
+      retrying: true,
     });
+    assert.equal(sent.filter((b) => b.event === 'settled').length, 0, 'the try is still live, and the stream is not ended');
+    await f.leave();
   },
 );

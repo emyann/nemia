@@ -490,7 +490,7 @@ test('a round files its target on the closeout schema the folder declares now: c
   );
 });
 
-test('the pure parts: a revision already given keeps its number, and the drift reads per kind and per step', () => {
+test('the pure parts: a revision already given keeps its number, a gap gives no number twice, and the drift reads per kind and per step', () => {
   const entries = [
     { n: 1, hash: 'a', at: 'then' },
     { n: 2, hash: 'b', at: 'later' },
@@ -498,6 +498,18 @@ test('the pure parts: a revision already given keeps its number, and the drift r
   assert.deepEqual(revisionNow(entries, 'a', 'now'), { n: 1, hash: 'a', at: 'then' }, 'a content the ledger holds keeps its number');
   assert.deepEqual(revisionNow(entries, 'c', 'now'), { n: 3, hash: 'c', at: 'now' }, 'a new content takes one past the highest');
   assert.deepEqual(revisionNow([], 'a', 'now'), { n: 1, hash: 'a', at: 'now' }, 'an empty ledger gives revision 1');
+  assert.deepEqual(
+    revisionNow(
+      [
+        { n: 1, hash: 'a', at: 'then' },
+        { n: 3, hash: 'c', at: 'later' },
+      ],
+      'd',
+      'now',
+    ),
+    { n: 4, hash: 'd', at: 'now' },
+    'a ledger with a gap in it — an entry that did not decode, or a hand edit — gives one past its highest, never its count, which would give a number twice',
+  );
 
   const pinned: Pin[] = [{ kind: 'agent', name: 'coder', n: 5, hash: 'e' }];
   const tops: Pin[] = [{ kind: 'agent', name: 'coder', n: 6, hash: 'f' }];

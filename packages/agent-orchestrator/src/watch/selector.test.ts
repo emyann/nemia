@@ -5,7 +5,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { startedLine, upgraded, type FeedLine } from '../feed/index.ts';
+import { startedLine, upgraded, type FeedLabels, type FeedLine } from '../feed/index.ts';
 import {
   labelKeysRefusal,
   LABEL_KEYS,
@@ -75,8 +75,25 @@ test('a selector names one of the ten keys of a feed line, and the message is no
   assert.equal(selectableOf(ADA_IMPLEMENT).message, undefined, 'and no selector reads it');
 });
 
+test('every label a line can carry is a key a selector may name', () => {
+  const every: Required<FeedLabels> = { run: 'r-1', factory: 'nemia', workflow: 'build', step: 'implement', agent: 'ada' };
+  assert.deepEqual([...LABEL_KEYS], Object.keys(every), 'a label the list forgets is no key of a selector, and selects nothing live');
+  const carries = upgraded({
+    at: AT,
+    run: 'r-1',
+    step: 'implement',
+    word: 'running',
+    involved: { kind: 'Step', name: 'r-1/implement' },
+    labels: every,
+  });
+  const on = selectableOf(carries);
+  for (const key of Object.keys(every)) assert.equal(on[key], every[key as keyof FeedLabels], key);
+  for (const key of Object.keys(every)) assert.equal(selectorsRefusal([`${key}=${every[key as keyof FeedLabels]}`]), undefined, key);
+});
+
 test('a label may not take a reserved name of a line, and the refusal names it', () => {
   assert.equal(labelKeysRefusal(LABEL_KEYS), undefined, 'the labels the feed ships with take none');
+  assert.equal(LABEL_KEYS.length, 5, 'and the list it is asked of is every label there is, held above');
   assert.equal(
     labelKeysRefusal(['run', 'reason', 'agent']),
     'reason is a reserved key of a feed line (kind, reason, type, waits, source) and cannot be a label: name the label something else',

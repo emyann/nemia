@@ -14,8 +14,15 @@
  */
 import { involvedOf, upgraded, type FeedLabels, type FeedLine } from '../feed/index.ts';
 
-/** The label keys a selector may name: every key of `FeedLabels`, which the typecheck holds this list to. */
-export const LABEL_KEYS: readonly (keyof FeedLabels)[] = ['run', 'factory', 'workflow', 'step', 'agent'];
+/**
+ * Every label key of a feed line, each named once. A `Record` of `keyof FeedLabels`, whose keys are required however optional the
+ * labels themselves are, so a label added to `FeedLabels` fails the typecheck here until it is named — and a selector reaches it the
+ * day it exists, rather than being refused as no key of a line.
+ */
+const EVERY_LABEL: Record<keyof FeedLabels, true> = { run: true, factory: true, workflow: true, step: true, agent: true };
+
+/** The label keys a selector may name, in the order `FeedLabels` declares them: every one of them (`EVERY_LABEL`). */
+export const LABEL_KEYS: readonly (keyof FeedLabels)[] = Object.keys(EVERY_LABEL) as (keyof FeedLabels)[];
 
 /** The keys a signed line names of itself, which a selector reads beside the labels: what it is about, and how its writer judged it. */
 export const RESERVED_KEYS: readonly string[] = ['kind', 'reason', 'type', 'waits', 'source'];

@@ -81,17 +81,28 @@ export type NemiaState = 'off' | 'due' | 'untrusted' | 'filed' | 'kept' | 'stopp
 
 /**
  * What the keeper does on a beat: file her task, subscribe it, stop it, drop her subscription, tell her open task her custom words,
- * deliver the person's chat words to her session.
+ * deliver the person's chat words to her session, write down the questions of hers that wait on the person (`record`), and carry
+ * their answers to them (`answer`).
  */
-export type NemiaAct = 'file' | 'subscribe' | 'stop' | 'drop' | 'tell' | 'deliver';
+export type NemiaAct = 'file' | 'subscribe' | 'stop' | 'drop' | 'tell' | 'deliver' | 'record' | 'answer';
 
 /**
  * What the keeper reads of the levels and her folder: whether any factory, the default one included, is above `manual` now; her task's
  * id; whether her harness trusts her folder (`trusted`, absent for a harness that keeps no trust, which is read as trusted); and whether
  * the person's custom words are not those she was last filed or told with (`stale`), read only while she is kept; whether her session is
- * live (`up`); and whether the person's chat holds words not yet delivered to her (`owed`).
+ * live (`up`); whether the person's chat holds words not yet delivered to her (`owed`); whether her session holds a question open on
+ * the person (`asking`, off her task's view); and whether the chat holds an answer of theirs not yet carried to her (`answered`).
  */
-export type Keeping = { above: boolean; task?: string; trusted?: boolean; stale?: boolean; up?: boolean; owed?: boolean };
+export type Keeping = {
+  above: boolean;
+  task?: string;
+  trusted?: boolean;
+  stale?: boolean;
+  up?: boolean;
+  owed?: boolean;
+  asking?: boolean;
+  answered?: boolean;
+};
 
 /** What the keeper reads of her subscription: the task it tells, and whether it carries her floor (`NEMIA_FLOOR`). */
 export type HerSubscription = { task: string; scoped: boolean };
@@ -113,7 +124,9 @@ export function nemiaState(keeping: Keeping, task: HerTask | undefined, subscrib
 /**
  * What the keeper owes on a beat, in order: at `due`, file; at `filed`, subscribe, dropping first a subscription left for another task or
  * without her floor; at `kept`, tell her the person's custom words where they are not those her task was filed with (`stale`), then
- * deliver the person's chat words where some are owed and her session is live (`owed`, `up`); at `leaving`, stop the open task and drop
+ * deliver the person's chat words where some are owed and her session is live (`owed`, `up`), write down the questions her live session
+ * holds open (`record`, where her task's view says one waits: `asking`), and carry the person's answers where one is
+ * owed (`answered`); at `leaving`, stop the open task and drop
  * the subscription; at `stopped`, drop a subscription left; else nothing, at `untrusted` too: a session filed in a folder her harness does
  * not trust would be refused at its start. A task settled from outside is never filed again: the person said so by stopping it. Pure.
  */
@@ -128,6 +141,8 @@ export function nemiaDue(keeping: Keeping, task: HerTask | undefined, subscribed
   return [
     ...(keeping.stale === true ? (['tell'] as const) : []),
     ...(keeping.owed === true && keeping.up === true ? (['deliver'] as const) : []),
+    ...(keeping.asking === true && keeping.up === true ? (['record'] as const) : []),
+    ...(keeping.answered === true && keeping.up === true ? (['answer'] as const) : []),
   ];
 }
 

@@ -109,6 +109,7 @@ const PINNED: Record<string, string[]> = {
     'ceilingLines',
     'ceilings',
     'changesOf',
+    'chatAnswer',
     'chatHistory',
     'chatRead',
     'chatSend',

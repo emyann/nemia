@@ -506,7 +506,8 @@ export type { FinishedPage, FinishedRun, ListedRun, OpenRuns, RunClock, RunOutco
 export { driftWords, kindsDrift, revisionNow, REVISION_KINDS, stepsDrift } from './revisions/revisions.ts';
 export type { Drift, KindName, Pin, Revision, RevisionKind } from './revisions/revisions.ts';
 export { ledgerOf, topsOf } from './revisions/revisions.store.ts';
-export { chatHistory, chatRead, chatSend, chatSince, chatStop } from './chat/chat.verb.ts';
+export { chatAnswer, chatHistory, chatRead, chatSend, chatSince, chatStop } from './chat/chat.verb.ts';
 export type { ChatChanges, ChatHistory, ChatPlace, ChatReads } from './chat/chat.verb.ts';
 export type { ChatEvent, ChatFrom, Presence, StepState } from './chat/chat.ts';
+export type { Ask, AskAnswer, AskEvent, AskOption, AskPick, AskQuestion } from './chat/chat.ts';
 export { nemiaChatPlace } from './nemia/level.store.ts';

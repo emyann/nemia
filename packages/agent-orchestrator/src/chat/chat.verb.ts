@@ -25,8 +25,20 @@ import { restingMemo, type RestingMemo } from '../rest/resting.verb.ts';
 import { kindOf } from '../runlist/runlist.ts';
 import type { Filings } from '../summary/reads.verb.ts';
 import { runsSummarized, type RunSummary } from '../summary/summary.verb.ts';
-import { appendOutbox, appendStop, readDelivered, readOutbox, readReadMark, readStops, writeReadMark } from './chat.store.ts';
 import {
+  appendAnswer,
+  appendOutbox,
+  appendStop,
+  readAnswers,
+  readAsks,
+  readDelivered,
+  readOutbox,
+  readReadMark,
+  readStops,
+  writeReadMark,
+} from './chat.store.ts';
+import {
+  answerFor,
   CHAT_TEXT_MAX,
   changedSince,
   chatCursor,
@@ -39,6 +51,8 @@ import {
   type ChatEvent,
   type ChatSession,
   type ChatSources,
+  type AskAnswer,
+  type AskPick,
   type OutboxEntry,
   type Presence,
   type ReadMark,
@@ -86,6 +100,8 @@ const sourcesOf = (place: ChatPlace) =>
       outbox: readOutbox(place.dir),
       delivered: readDelivered(place.dir),
       stops: readStops(place.dir),
+      asks: readAsks(place.dir),
+      answers: readAnswers(place.dir),
     }));
     const view = place.task === undefined ? undefined : yield* asked('view', e.view(place.task));
     if (place.task === undefined || view === undefined || !view.state.filedAt)
@@ -160,6 +176,32 @@ export const chatSend = Effect.fn('chatSend')(function* (place: ChatPlace, text:
   const entry: OutboxEntry = { id: entryId(), at: new Date().toISOString(), text };
   yield* tried(() => appendOutbox(place.dir, entry));
   return entry;
+});
+
+/**
+ * The person's answer to the ask `id` of the chat at `place` recorded, and the answer as its record keeps it: a file of their own, which
+ * the keeper carries to her — back through the call she holds open, or said to her as words where no call of it is waiting any more
+ * (`answersDue`). The keeper carries it, never this verb: an answer whose delivery depended on a live holder would be lost where the
+ * holder is busy, and a restart owes exactly what the files say.
+ *
+ * Refused (`Missing`) for an ask the chat does not hold, (`Conflict`) for one already answered, and (`Invalid`) as `answerFor` refuses
+ * the picks — a question left out, a label that is no choice of it, blank words, several labels for a question that takes one.
+ */
+export const chatAnswer = Effect.fn('chatAnswer')(function* (place: ChatPlace, given: { id: string; picks: readonly AskPick[] }) {
+  const asks = yield* tried(() => readAsks(place.dir));
+  const ask = asks.find((one) => one.id === given.id);
+  if (ask === undefined)
+    return yield* Effect.fail(new Missing({ message: `${given.id} is no question of this chat: answer one its history gave.` }));
+  const answered = yield* tried(() => readAnswers(place.dir));
+  const already = answered.find((one) => one.id === given.id);
+  if (already !== undefined)
+    return yield* Effect.fail(
+      new Conflict({ message: `${given.id} was answered at ${already.at}: read her chat again, which draws the answer.` }),
+    );
+  const answers = yield* tried(() => answerFor(ask, given.picks));
+  const answer: AskAnswer = { id: given.id, at: new Date().toISOString(), answers };
+  yield* tried(() => appendAnswer(place.dir, answer));
+  return answer;
 });
 
 /**

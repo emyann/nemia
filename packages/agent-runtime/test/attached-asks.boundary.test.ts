@@ -6,17 +6,20 @@
  * `answer` verb and the held call let through with it, asserted key by key as the SDK's page documents the flow — `behavior: 'allow'`,
  * the input's own questions, and `answers` keyed by each question's text and valued by the chosen label; the ask closed `taken`
  * afterwards; a multi-select's labels joined with `", "` and own words carried as the answer's value rather than the word 'Other';
+ * a question whose holder died is closed as cut when the next holder adopts the session, so nothing waits on a person twice;
  * and the guard made to refuse — a session whose task does not say a person can be asked (`config.mayAsk`) denies the same call with
  * `DENIED_HERE` and writes no ask, and every other tool is denied in a session that does.
  */
 import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import test, { type TestContext } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { Effect, Exit, Scope } from 'effect';
 import { attachedSessions } from '../src/harness/claude/attached.ts';
-import { filesOf, openAsks, readRun } from '../src/harness/claude/attached-file.ts';
+import { alive, appendAsk, crashNote, filesOf, openAsks, readRun, writeRun } from '../src/harness/claude/attached-file.ts';
+import { processStart } from '../src/harness/claude/inbox.ts';
 import { ASK_ANSWERED, ASK_CUT, askHookOutput, DENIED_HERE } from '../src/harness/claude/attached-session.ts';
 import type { AskQuestion } from '../src/core/index.ts';
 import type { SpawnRequest } from '../src/harness/seam.ts';
@@ -182,6 +185,41 @@ test('an ask whose holder let the session go is closed as cut, so its answer is 
   assert.equal(ask.questions.length, 1);
   assert.deepEqual(openAsks(root, NAME), [], 'and a holder that takes the session up again finds none waiting');
   fs.rmSync(path.join(dir, 'nothing'), { force: true });
+});
+
+test('a question whose holder died is closed as cut when the next holder adopts the session', WAITED, async (t) => {
+  const { root, dir, request } = place({ output: { done: 1 } }, { mayAsk: true });
+  const dead = spawn(process.execPath, ['-e', ''], { stdio: 'ignore' });
+  await new Promise((r) => dead.once('exit', r));
+  const left = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', detached: true });
+  t.after(() => void (left.pid && alive(left.pid) && process.kill(-left.pid, 'SIGKILL')));
+  writeRun(root, {
+    name: NAME,
+    state: 'working',
+    owner: dead.pid!,
+    startedAt: new Date().toISOString(),
+    sessionId: 'crashed-asker',
+    childPid: left.pid!,
+    childStart: processStart(left.pid!),
+    calling: { tool: 'AskUserQuestion', since: new Date().toISOString() },
+    request: { ...request, brief: undefined },
+  });
+  appendAsk(root, NAME, { id: 'asked-1', at: new Date().toISOString(), questions: [ONE] });
+  assert.deepEqual(
+    openAsks(root, NAME).map((ask) => ask.id),
+    ['asked-1'],
+    'the ask the dead holder wrote waits on a person',
+  );
+  const h = await holder(root);
+  t.after(h.close);
+  await Effect.runPromise(h.attached.ops.observe);
+  await until(t, () => lines(dir, 'said.jsonl').length, 'the adopted session told something', { everyMs: 50 });
+  assert.equal(alive(left.pid!), false, "the dead holder's Claude Code is killed before the resume");
+  assert.deepEqual(lines(dir, 'said.jsonl'), [crashNote('AskUserQuestion')]);
+  assert.deepEqual(openAsks(root, NAME), [], 'the adopt closes the ask: no call of it is waiting on a person any more');
+  const seen = (await Effect.runPromise(h.attached.ops.observe)).get(NAME)!;
+  assert.deepEqual(seen.asks, [], 'the sighting says nothing waits');
+  assert.equal(seen.asksTaken, undefined, 'and no call of it took an answer: it is owed as words');
 });
 
 test('a question whose answer never came is denied at its hook, told the answer comes as words', () => {

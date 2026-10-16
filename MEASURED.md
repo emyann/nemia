@@ -32,6 +32,10 @@ Every read lists every record on every poll.
 | step page | 152 ms / 806 records | **5 ms / 0 records** |
 | run page | **1 ms / 1 record** | **1 ms / 1 record** |
 
+Measured again on the tree with the base merged in (`eb71f6f9`), the record counts are the same and the times within this machine's
+spread: cold 232 / 134 / 152 / 180 ms and 5 ms for the run page, warm 4 / 3 / 3 / 5 ms and 0 ms, each warm read still 0 records and
+the run page still 1.
+
 The run page needs no memo: `runs.find` reads the one record the id names, found among the ids the store lists.
 
 The cold read answers exactly what it answered before, at the same cost: the memo is a cache of a pure function, and a fresh process

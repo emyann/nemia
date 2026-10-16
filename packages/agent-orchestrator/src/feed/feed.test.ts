@@ -1789,6 +1789,49 @@ test('the fold keeps the last word of each run and step, forgets a removed run, 
   );
 });
 
+test("a removed run's one-shots go with it: a run back under an id it had says its acts again, and never reads them as already written", () => {
+  const at = '2026-09-22T10:00:00.000Z';
+  const put = '2026-09-22T09:00:00.000Z';
+  /** Every one-shot the two runs hold: the run's own acts, and its steps'. */
+  const of = (run: string): FeedLine[] => [
+    { at, run, word: 'cancel asked', note: `at ${put}` },
+    { at, run, word: 'hold put', note: `since ${put}` },
+    { at, run, step: 'plan', word: 'approved', note: `try 1 · at ${put}`, try: 1 },
+    { at, run, step: 'plan', word: 'denied: Bash(git push)', note: 'try 1', call: 'Bash(git push)', try: 1 },
+  ];
+  const fold = foldFeed(freshFold(), [...of('r-1'), ...of('r-1x'), { at, run: 'r-1', word: 'running' }]);
+  assert.equal([...fold.shots.keys()].length, 8, 'the fixture holds four one-shots of each run, of its own kind and of its step');
+
+  foldFeed(fold, [{ at, run: 'r-1', word: 'removed' }]);
+  assert.deepEqual(
+    [...fold.shots.keys()].map((key) => key.slice(key.indexOf(' ') + 1).split('#')[0]).sort(),
+    ['Run/r-1x', 'Run/r-1x', 'Step/r-1x/plan', 'Step/r-1x/plan'],
+    "a removal takes the run's one-shots with it, its own and its steps' — and leaves every other run's, an id this one is a prefix of included",
+  );
+  assert.deepEqual([...fold.said.keys()], [], 'as it takes its words');
+
+  const words: FeedWords = {
+    run: { word: 'running' },
+    steps: [{ name: 'plan', word: 'running' }],
+    acts: [
+      { word: 'cancel asked', note: `at ${put}` },
+      { step: 'plan', word: 'approved', note: `try 1 · at ${put}`, try: 1 },
+    ],
+    held: put,
+  };
+  assert.deepEqual(
+    feedChanges(fold, new Map([['r-1', words]]), at)
+      .filter((l) => l.reason !== 'Running')
+      .map((l) => [l.reason, l.note]),
+    [
+      ['CancelAsked', `at ${put}`],
+      ['Approved', `try 1 · at ${put}`],
+      ['HoldPut', `since ${put}`],
+    ],
+    'so a run back under an id it had says each of its acts again: a count left behind would make the new run’s acts read as already written, and none would ever be said',
+  );
+});
+
 test('a feed written before the signature and one written after fold to the same state, and a removal of either shape forgets the run', () => {
   const at = '2026-10-16T04:00:00.000Z';
   const v0: FeedLine[] = [

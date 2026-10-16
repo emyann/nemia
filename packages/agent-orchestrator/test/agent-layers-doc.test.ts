@@ -15,20 +15,23 @@ import { REPO } from './team.ts';
 /** The five layers in precedence order, as each numbered list names them: the higher number wins. */
 const IN_ORDER = ['Instructions', 'Custom instructions', "The folder's files", "The factory's rules", "The step's policy"];
 
-/** A layer's name as prose cites it, the leading `The` dropped and a line break allowed between its words. */
-const cited = (name: string): RegExp =>
-  new RegExp(
-    name
-      .replace(/^The\s+/, '')
-      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-      .replace(/\s+/g, '\\s+'),
-    'i',
-  );
+/**
+ * A layer's name as a routing question cites its owner: the leading `The` dropped, a line break allowed between its words, and
+ * `Instructions` only where `custom` does not precede them, so the first layer's question is not answered by the second's.
+ */
+const cited = (name: string): RegExp => {
+  const words = name
+    .replace(/^The\s+/, '')
+    .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    .replace(/\s+/g, '\\s+');
+  return new RegExp(name === 'Instructions' ? `(?<!custom\\s{1,4})${words}` : words, 'i');
+};
 
 const ESCAPE_HATCH = /escape\s+hatch/i;
 const LATER_WINS = /\bthe\s+later\s+(?:one|layer)?\s*wins\b/i;
 const HIGHER_NUMBER = /\bthe\s+higher\s+number\s+wins\b/i;
 const ROUTING = /\*\*Where a new instruction goes\.?\*\*|^#+ Where a new instruction goes/m;
+const ROUTING_END = /^A procedure is none of them/m;
 const NOT_BUILT = /\bcoming,\s*not\s+built\b|\bis\s+not\s+built\s+yet\b/i;
 
 /** Every numbered item of a passage's layer list, by its `1. **Name**` line, whitespace in a name collapsed to one space. */
@@ -63,13 +66,24 @@ function precedenceRefusal(passage: string): string | undefined {
   return undefined;
 }
 
-/** Why a passage carries no routing rule — the block is missing, or it does not name all five layers — or undefined. */
+/**
+ * Why a passage carries no routing rule — the block is missing, it does not end on the line that sends a procedure elsewhere, or its
+ * questions are not one for each layer in precedence order, each naming its own layer's owner — or undefined. The block ends on that
+ * line, so the prose after it cannot supply a name a question dropped.
+ */
 function routingRefusal(passage: string): string | undefined {
   const at = passage.search(ROUTING);
   if (at < 0) return 'it has no **Where a new instruction goes** block, which says which layer owns a new instruction';
-  const block = passage.slice(at);
-  const missing = IN_ORDER.filter((name) => !cited(name).test(block));
-  if (missing.length > 0) return `its routing rule names no owner for ${missing.join(', ')}`;
+  const rest = passage.slice(at);
+  const ends = rest.search(ROUTING_END);
+  if (ends < 0) return 'its routing rule does not end on `A procedure is none of them`, which sends a procedure to a skill instead';
+  const asked = [...rest.slice(0, ends).matchAll(/^(\d+)\.[^\n]*$/gm)];
+  if (asked.length !== IN_ORDER.length) return `its routing rule asks ${asked.length} questions, not one for each of the five layers`;
+  for (const [i, want] of IN_ORDER.entries()) {
+    const question = asked[i][0];
+    if (Number(asked[i][1]) !== i + 1) return `its question ${i + 1} is numbered ${asked[i][1]}, and the five are asked in order`;
+    if (!cited(want).test(question)) return `its question ${i + 1} names no owner for **${want}**`;
+  }
   return undefined;
 }
 
@@ -132,18 +146,32 @@ test('REFUSED: a precedence paragraph that says the later layer wins, or never s
   assert.match(precedenceRefusal('The words reach the agent in that order, then the task.') ?? '', /does not say the higher number wins/);
 });
 
-test('REFUSED: a passage with no routing rule, or one whose routing rule leaves a layer without an owner', () => {
-  const block = (names: readonly string[]): string =>
-    `**Where a new instruction goes.** Ask these in order and stop at the first yes:\n${names
-      .map((name, i) => `${i + 1}. Does it hold so? Then its **${name.replace(/^The\s+/, '')}**.`)
-      .join('\n')}`;
+/** A routing block of one question per owner named, each numbered in turn, ended by the line a real one ends on. */
+const block = (owners: readonly string[], numbers?: readonly number[]): string =>
+  `**Where a new instruction goes.** Ask these in order and stop at the first yes:\n${owners
+    .map((owner, i) => `${numbers?.[i] ?? i + 1}. Does it hold so? Then its **${owner.replace(/^The\s+/, '')}**.`)
+    .join('\n')}\n\nA procedure is none of them: it belongs in a skill.`;
+
+test('REFUSED: a passage with no routing rule, or one whose questions are not one per layer in precedence order', () => {
   assert.equal(routingRefusal(block(IN_ORDER)), undefined);
   assert.match(routingRefusal(listOf(IN_ORDER)) ?? '', /no \*\*Where a new instruction goes\*\* block/);
-  assert.match(routingRefusal(block(IN_ORDER.slice(0, 4))) ?? '', /names no owner for The step's policy/);
+  assert.match(routingRefusal(block(IN_ORDER).replace(/\n\nA procedure[^]*$/, '')) ?? '', /does not end on/);
+  assert.match(routingRefusal(block(IN_ORDER.slice(0, 4))) ?? '', /asks 4 questions, not one for each/);
+  assert.match(routingRefusal(block(IN_ORDER, [1, 2, 3, 3, 4])) ?? '', /question 4 is numbered 3/);
+  assert.match(routingRefusal(block(IN_ORDER.slice(1))) ?? '', /asks 4 questions, not one for each/);
   assert.match(
-    routingRefusal(`${listOf(IN_ORDER)}\n\n${block(IN_ORDER.slice(0, 3))}`) ?? '',
-    /names no owner for The factory's rules, The step's policy/,
-    'the block is read from its own heading, not from the list above it',
+    routingRefusal(block(['Custom instructions', ...IN_ORDER.slice(1)])) ?? '',
+    /question 1 names no owner for \*\*Instructions\*\*/,
+    "the first layer's question is not answered by naming custom instructions",
+  );
+  assert.match(
+    routingRefusal(block([IN_ORDER[0], IN_ORDER[1], IN_ORDER[2], IN_ORDER[3], "The step's note"])) ?? '',
+    /question 5 names no owner for \*\*The step's policy\*\*/,
+  );
+  assert.match(
+    routingRefusal(`${block(IN_ORDER.slice(0, 4))}\n\nThe run page shows the step's policy and the task after it.`) ?? '',
+    /asks 4 questions, not one for each/,
+    'the prose after the block cannot supply an owner a question dropped',
   );
 });
 

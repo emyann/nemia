@@ -269,3 +269,33 @@ test('REFUSED: a file under src that calls `passStanding`, imported or named off
   assert.deepEqual(planted('export const pass = (o: typeof import("agent-orchestrator")) => o.passStanding([]);\n'), ['src/x/x.ts']);
   assert.deepEqual(planted('/** Never calls `passStanding`: the tick does. */\nexport const x = 1;\n'), [], 'a JSDoc that names it');
 });
+
+/** The one file that provides the process's telemetry: the app's layer, which the handlers and the tick's program alike run over. */
+const TELEMETRY = 'src/app.ts';
+
+/**
+ * The files of `texts` that name the process's telemetry (`telemetryLayer`) outside their comment lines, the app's own layer aside: none,
+ * since the app's layer provides it once (`liveOf` in src/app.ts) and a second provider in the process exports every metric twice —
+ * Effect's metric registry is a reference whose default map every context that does not override it shares.
+ */
+const telemetryProvidersIn = (texts: ReadonlyMap<string, string>): string[] =>
+  [...texts].filter(([file, text]) => file !== TELEMETRY && /\btelemetryLayer\b/.test(withoutComments(text))).map(([file]) => file);
+
+test('the api provides its telemetry once, in app.ts: no other file under src names `telemetryLayer`', () => {
+  const texts = sourceTexts();
+  assert.deepEqual(telemetryProvidersIn(texts), []);
+  assert.ok(/\btelemetryLayer\b/.test(withoutComments(texts.get(TELEMETRY) ?? '')), `${TELEMETRY} provides it`);
+});
+
+test('REFUSED: a second file under src that names `telemetryLayer`, main.ts among them, imported or off the package', () => {
+  const planted = (file: string, text: string): string[] => telemetryProvidersIn(new Map([...sourceTexts(), [file, text]]));
+  assert.deepEqual(planted('src/main.ts', "import { telemetryLayer } from 'agent-orchestrator';\n"), ['src/main.ts']);
+  assert.deepEqual(planted('src/x/x.ts', 'export const t = (o: typeof import("agent-orchestrator")) => o.telemetryLayer({});\n'), [
+    'src/x/x.ts',
+  ]);
+  assert.deepEqual(
+    planted('src/x/x.ts', '/** Never provides `telemetryLayer`: app.ts does. */\nexport const x = 1;\n'),
+    [],
+    'a JSDoc that names it',
+  );
+});

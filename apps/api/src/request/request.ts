@@ -86,12 +86,14 @@ const streamed = (c: Context<ApiEnv>): boolean => c.res.headers.get('content-typ
 /**
  * `body`, the streamed answer's own, relayed through a response of the same status and headers, which says the closing line with how long
  * it was open once the relay is over, however it ended: the writer closed, or the reader gone, which cancels `body` and so reaches the
- * stream's `onAbort` as the reader's own cancel did before.
+ * stream's `onAbort` as the reader's own cancel did before. A line the runtime can no longer say is dropped: the api's own shutdown
+ * disposes the runtime as its program ends, and a relay that settles after it would reject with nothing left to say it to.
  */
 const piped = (c: Context<ApiEnv>, body: ReadableStream<Uint8Array>, attributes: RequestAttributes, began: number): Response => {
   const relay = new TransformStream<Uint8Array, Uint8Array>();
   const closed = (): void => {
-    void c.var.runtime.runPromise(line(attributes, `${tookOf(performance.now() - began)} stream closed`));
+    const said = line(attributes, `${tookOf(performance.now() - began)} stream closed`);
+    void c.var.runtime.runPromise(said).catch(() => undefined);
   };
   void body.pipeTo(relay.writable).then(closed, closed);
   return new Response(relay.readable, { status: c.res.status, headers: c.res.headers });

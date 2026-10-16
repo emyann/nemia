@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Layer, Logger, References } from 'effect';
+import { Effect, Layer, Logger, References } from 'effect';
 import { appOf, liveOf } from '../src/app.ts';
 import { tookOf } from '../src/request/request.ts';
 import { until, WAITED, type Waiter } from './waits.ts';
@@ -16,8 +16,8 @@ import { until, WAITED, type Waiter } from './waits.ts';
 /** A line the app said: its level, its message, and the annotations the fiber carried when it was said. */
 type Said = { level: string; text: string; annotations: Record<string, unknown> };
 
-/** An app over the live layer whose lines are kept in `said` rather than printed, and the lines it has said so far. */
-function appSaying(): { app: ReturnType<typeof appOf>['app']; said: Said[] } {
+/** An app over the live layer whose lines are kept in `said` rather than printed, its runtime, and the lines it has said so far. */
+function appSaying(): { app: ReturnType<typeof appOf>['app']; runtime: ReturnType<typeof appOf>['runtime']; said: Said[] } {
   const said: Said[] = [];
   const keeper = Logger.make<unknown, void>(({ message, logLevel, fiber }) =>
     said.push({
@@ -26,8 +26,13 @@ function appSaying(): { app: ReturnType<typeof appOf>['app']; said: Said[] } {
       annotations: { ...fiber.getRef(References.CurrentLogAnnotations) },
     }),
   );
-  return { app: appOf(Layer.merge(liveOf(), Logger.layer([keeper]))).app, said };
+  return { ...appOf(Layer.merge(liveOf(), Logger.layer([keeper]))), said };
 }
+
+/** The event loop's pending turns drained, so a rejection Node has not yet reported as unhandled has been. */
+const drained = async (): Promise<void> => {
+  for (let turn = 0; turn < 3; turn++) await new Promise((done) => setImmediate(done));
+};
 
 /** The one line `path` was answered with, the test failing where it said none or more than one. */
 async function oneLine(path: string): Promise<Said> {
@@ -95,4 +100,20 @@ test('a stream says two lines: one when it opens, and one when it is closed, wit
 test('how long a request took is said in whole milliseconds under a second, and in seconds to one decimal above it', () => {
   assert.deepEqual([tookOf(0), tookOf(3.4), tookOf(999)], ['0ms', '3ms', '999ms']);
   assert.deepEqual([tookOf(1_000), tookOf(1_240), tookOf(61_000)], ['1.0s', '1.2s', '61.0s']);
+});
+
+test("a stream whose relay settles once the runtime is disposed drops its closing line: the api's own shutdown disposes it, and a rejection nobody handles ends the process", async (t) => {
+  const { app, runtime, said } = appSaying();
+  const res = await app.request('/api/feed/stream');
+  assert.equal(said.length, 1, `the opening line: ${JSON.stringify(said)}`);
+  const unhandled: unknown[] = [];
+  const caught = (err: unknown): void => void unhandled.push(err);
+  process.on('unhandledRejection', caught);
+  t.after(() => process.off('unhandledRejection', caught));
+  await runtime.dispose();
+  await assert.rejects(() => runtime.runPromise(Effect.void), 'a disposed runtime says nothing more');
+  await res.body!.cancel();
+  await drained();
+  assert.deepEqual(unhandled, [], 'nothing was left for Node to end the process on');
+  assert.equal(said.length, 1, 'and the closing line is dropped rather than said by a runtime that is gone');
 });

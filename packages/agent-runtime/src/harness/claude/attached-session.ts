@@ -177,16 +177,6 @@ const callsEndedBy = (m: SDKMessage): string[] => {
 };
 
 /**
- * One message of the session, taken: captured, its session id and its end written, the calls it ends cleared.
- *
- * A turn's end is not a session's end for a long-lived request (`live.open`): the calls clear, the run file is written `idle` with the
- * session id, and the input stays open so the next words said are heard in the same session. An `is_error` result — an interrupted
- * turn's `error_during_execution` among them — ends the turn and never fails the session.
- *
- * It is `idle` only once every word pushed on its input has been answered (`answered`): words pushed while a turn runs are sometimes
- * worked as a turn of their own and sometimes folded into the one running, so a result is read for the messages it names, never counted.
- */
-/**
  * Takes off `live.unanswered` the words the result `m` says it consumed: `user_message_uuids`, which lists the message the turn took and
  * every one folded into it as it ran; the single `user_message_uuid` where a producer lists only that; and all of them where it names
  * none, so a producer that says nothing leaves no session answering for words no result will ever name.
@@ -205,6 +195,16 @@ const answered = (live: Live, m: SDKMessage): void => {
   for (const id of named) if (typeof id === 'string') live.unanswered.delete(id);
 };
 
+/**
+ * One message of the session, taken: captured, its session id and its end written, the calls it ends cleared.
+ *
+ * A turn's end is not a session's end for a long-lived request (`live.open`): the calls clear, the run file is written `idle` with the
+ * session id, and the input stays open so the next words said are heard in the same session. An `is_error` result — an interrupted
+ * turn's `error_during_execution` among them — ends the turn and never fails the session.
+ *
+ * It is `idle` only once every word pushed on its input has been answered (`answered`): words pushed while a turn runs are sometimes
+ * worked as a turn of their own and sometimes folded into the one running, so a result is read for the messages it names, never counted.
+ */
 const took = (root: string, live: Live, m: SDKMessage): void => {
   if (m.type !== 'user' && m.type !== 'stream_event') capture(root, live.run.name, m);
   const over = callsEndedBy(m).filter((id) => live.calls.delete(id));

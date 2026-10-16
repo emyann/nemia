@@ -12,6 +12,7 @@ import {
   barValue,
   barWidth,
   escapeDoes,
+  focusGoesBack,
   inspects,
   nextBar,
   parseWidth,
@@ -259,6 +260,14 @@ test('Escape closes the bar, unless something else took it, it ends a compositio
   assert.equal(escapeDoes({ ...key, fieldText: 'a brief' }), 'leave');
   assert.equal(escapeDoes({ ...key, defaultPrevented: true }), 'ignore', 'a menu or a modal closed on it');
   assert.equal(escapeDoes({ ...key, isComposing: true, fieldText: 'a' }), 'ignore');
+});
+
+test("REFUSED: the bar's close gives the focus back only while it still holds it, never once the focus left it for the page", () => {
+  assert.equal(focusGoesBack({ left: false, now: 'in' }), true, 'Escape or Close pressed in the bar');
+  assert.equal(focusGoesBack({ left: false, now: 'nothing' }), true, 'what held the focus inside the bar went with it');
+  assert.equal(focusGoesBack({ left: true, now: 'nothing' }), false, 'a press on the empty drawing took the focus off');
+  assert.equal(focusGoesBack({ left: false, now: 'out' }), false, 'something on the page took the focus');
+  assert.equal(focusGoesBack({ left: true, now: 'out' }), false);
 });
 
 test('the bar covers the part of a frame right of its left edge, and none with no bar, past the frame, or on a narrow screen', () => {

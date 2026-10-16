@@ -3,8 +3,9 @@
  * The date is `dateParts`'s and the hour the one writer's (`timeOfDay`, `timeToTheSecond`); a comma stands after a year alone, and
  * every space is a plain one. Pure: the instant, now and the time zone are handed in.
  */
+import { isSameDay, isSameYear } from 'date-fns';
 import { dateParts } from './runWords.ts';
-import { timeOfDay, timeToTheSecond, unreadable, UNREADABLE } from './timeOfDay.ts';
+import { timeOfDay, timeToTheSecond, unreadable, UNREADABLE, zoneOf } from './timeOfDay.ts';
 
 /**
  * An instant as a page says it where the person is, in `timeZone`, theirs by default, to the minute: the time alone on the day of
@@ -13,10 +14,11 @@ import { timeOfDay, timeToTheSecond, unreadable, UNREADABLE } from './timeOfDay.
  */
 export function instantWords(at: Date, now: Date, timeZone?: string): string {
   if (unreadable(at, now)) return UNREADABLE;
-  const [then, today] = [dateParts(at, timeZone), dateParts(now, timeZone)];
+  const zone = zoneOf(timeZone);
+  const then = dateParts(at, timeZone);
   const time = timeOfDay(at, timeZone);
-  if (then.year !== today.year) return `${then.day} ${then.month} ${then.year}, ${time}`;
-  return then.day === today.day && then.month === today.month ? time : `${then.day} ${then.month} ${time}`;
+  if (!isSameYear(at, now, zone)) return `${then.day} ${then.month} ${then.year}, ${time}`;
+  return isSameDay(at, now, zone) ? time : `${then.day} ${then.month} ${time}`;
 }
 
 /**

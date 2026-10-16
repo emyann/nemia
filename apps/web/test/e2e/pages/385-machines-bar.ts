@@ -1,7 +1,7 @@
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { photograph, themeOf } from '../board.ts';
-import { expectCount, expectInside, expectLeftOf, expectUncut, expectVisible, Refused, settled } from '../checks.ts';
+import { expectCount, expectInside, expectLeftOf, expectNone, expectUncut, expectVisible, Refused, settled } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
 
@@ -41,6 +41,22 @@ async function expectState(page: Page, state: string, assertion: string): Promis
   return bar;
 }
 
+/** What the focus stands on: a state's name where it is on a node of the drawing, the tag's name elsewhere, and null for nothing. */
+const focusedOn = (page: Page): Promise<string | null> =>
+  page.evaluate(() => {
+    const now = document.activeElement;
+    if (now === null || now === document.body) return null;
+    return now.classList.contains('react-flow__node') ? now.getAttribute('data-id') : now.tagName.toLowerCase();
+  });
+
+/** Refuses unless the focus stands on `what` — a state's name, or null for nothing — within the wait. */
+async function expectFocus(page: Page, what: string | null, assertion: string): Promise<void> {
+  await expectNone(async () => {
+    const now = await focusedOn(page);
+    return now === what ? null : `the focus is on ${now ?? 'nothing'}`;
+  }, assertion);
+}
+
 /** Clicks a point of the lifecycle's drawing with nothing drawn on it, where the click lands on the empty pane. */
 async function clickPane(page: Page): Promise<void> {
   const spot = await frameOf(page).evaluate((frame) => {
@@ -78,8 +94,8 @@ async function shows(page: Page): Promise<void> {
 }
 
 /**
- * Again closes it; another state switches it; Enter shows one; the empty canvas closes it; Escape closes it; a double click stays on the
- * page, showing the state its first click showed.
+ * Again closes it; another state switches it; the empty canvas closes it and gives the focus back to no node, so Enter on the state
+ * focused next shows that one; Escape closes it; a double click stays on the page, showing the state its first click showed.
  */
 async function presses(page: Page): Promise<void> {
   await nodeOf(page, ASKS).click();
@@ -94,8 +110,10 @@ async function presses(page: Page): Promise<void> {
   await settled(page);
   await clickPane(page);
   await expectNoBar(page, 'a click on the empty drawing closes the bar');
+  await expectFocus(page, null, 'and leaves the focus where the press put it, on nothing: no node is given it back');
 
   await nodeOf(page, WORKS).focus();
+  await expectFocus(page, WORKS, `the focus moves to ${WORKS}'s node, and nothing takes it back`);
   await page.keyboard.press('Enter');
   await expectState(page, WORKS, `Enter on ${WORKS}'s node shows it in the bar`);
   await page.keyboard.press('Escape');

@@ -2,19 +2,19 @@
  * The words of the quota over the Factory's floor (`QuotaLine`), from what the api judged (`Quota`). Pure: the time and the time zone are
  * handed in, the browser's own on the page.
  */
+import { format, isSameDay } from 'date-fns';
 import type { Quota, QuotaWindow } from './api';
-import { timeOfDay, unreadable, UNREADABLE } from './timeOfDay.ts';
+import { timeOfDay, unreadable, UNREADABLE, zoneOf } from './timeOfDay.ts';
 
 /**
- * A time as a person reads it where they are, as `timeOfDay` writes it: `4:40 PM` on the day of `now`, `Tue 9:00 AM` on another;
- * `UNREADABLE` where `at` or `now` does not parse.
+ * A time as a person reads it where they are, as `timeOfDay` writes it: `4:40 PM` on the day of `now`, `Tue 9:00 AM` on another, its
+ * weekday in date-fns's English, wherever the browser is. `UNREADABLE` where `at` or `now` does not parse.
  */
 export function clockWord(at: Date, now: Date, timeZone?: string): string {
   if (unreadable(at, now)) return UNREADABLE;
+  const zone = zoneOf(timeZone);
   const time = timeOfDay(at, timeZone);
-  const day = (d: Date) => new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone }).format(d);
-  if (day(at) === day(now)) return time;
-  return `${new Intl.DateTimeFormat(undefined, { weekday: 'short', timeZone }).format(at)} ${time}`;
+  return isSameDay(at, now, zone) ? time : `${format(at, 'EEE', zone)} ${time}`;
 }
 
 /** How long ago a reading was made: `just now`, `4 min ago`, `2 h 5 min ago`, `3 d ago`. */

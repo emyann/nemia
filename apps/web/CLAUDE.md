@@ -83,13 +83,21 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
 - The copy control's glyph is the look's own, 12 pixels whatever size the kit hands it, and its button is pulled in around it
   (`look/CopyId.tsx`): its target reaches what stands 4 pixels over it, so a card's title is raised (`relative z-10`) to keep its box
   (`titleKeepsItsBox`, same page), and a row in flight keeps 16 pixels between its title and its id.
-- A time of day in words has one writer, `timeOfDay` (`lib/timeOfDay.ts`): 12-hour (`1:11 PM`), built from `formatToParts` and joined
-  with plain spaces. `clockWord`, `whenWords`, `whenColumn` and `fireWord` each decide their day and take the time from it, and
-  `test/time-of-day.test.ts` refuses a second writer of an hour in `src`.
+- A time of day in words has one writer, `timeOfDay` (`lib/timeOfDay.ts`): 12-hour (`1:11 PM`), date-fns's `h:mm a` under `zoneOf`,
+  which is the one place a zone becomes date-fns's context and gives none where there is none, the browser's own. Every date word is
+  date-fns's default English, wherever the browser is. `clockWord`, `whenWords`, `whenColumn` and `fireWord` each decide their day
+  (`isSameDay`, `isSameYear`) and take the time from it, and `test/time-of-day.test.ts` refuses a second writer of an hour in `src`.
+- A writer handed no `timeZone` is proven only by a file that sets a zone that is not UTC before it loads one
+  (`test/default-zone.test.ts`): every other suite names its zone, so a `zoneOf` that defaulted to UTC would leave them all green.
+  A zone-carrying comparison is pinned there with its zone named too, or a machine already in UTC makes dropping it a no-op.
 - A whole instant has one writer, `lib/instant.ts`: text on a page is `instantWords` (`7:08 PM` today, `9 Oct 5:30 PM`, `31 Dec 2025,
   4:10 PM`: a comma after a year alone), a `title` is `instantWhole` (`12 Oct 2026, 7:08:53 PM`), the Timeline's cell is
   `timeToTheSecond`; a component draws one with `Instant` (`components/Instant.tsx`). The same guard refuses any `toLocaleString(`,
-  `toLocaleTimeString(` or `toLocaleDateString(` in `src`, a number's too until its file and count are named in `NUMBERS`.
+  `toLocaleTimeString(` or `toLocaleDateString(` in `src`, a number's too until its file and count are named in `NUMBERS`, and an
+  `Intl.DateTimeFormat` — with `new` or without, both legal — in every file of `src`, the one writer's included, with no exemption.
+  What holds the one-writer rule now is the library itself: date-fns is imported only in the four files that write a moment
+  (`WRITERS`: `lib/timeOfDay.ts`, `lib/instant.ts`, `lib/runWords.ts`, `lib/quota.ts`), since `format(at, 'h:mm a')` is a second
+  writer that no Intl family can see. A fifth file that needs it joins the list with its reason.
 - A time on the runs page is `whenWords`, or `whenColumn` in a table (`lib/runWords.ts`); its date is `dateParts`. A schedule's
   far fire is `instantWords` (`14 Oct 12:00 PM`, `1 Jan 2027, 4:00 AM`); `whenWords` keeps dropping the time in another year.
   `expectTexts` trims, so a padded time is compared trimmed or by its `textContent`.

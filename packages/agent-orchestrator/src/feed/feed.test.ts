@@ -159,7 +159,6 @@ const board = () => {
   });
   const set = (id: string, phase: string, closeout?: unknown) => Object.assign(tasks.get(id)!, { phase, closeout });
   const deny = (id: string, denials: object[], live = false) => Object.assign(tasks.get(id)!, { denials, live });
-  /** The attempts of `id` before its current one, each ended for the reason named: what the runtime journalled of a restarted session. */
   const ends = (id: string, reasons: readonly string[]) => Object.assign(tasks.get(id)!, { ends: reasons });
   return { e, set, deny, ends, views: () => views };
 };
@@ -593,7 +592,6 @@ test("a person's verbs and the runtime's two faults are read off the store the p
   const other = await inRepo('the run it waits on', true);
   const run = await inRepo('the acts', false);
   await runWith(b.e, tickRun());
-  /** Every line of one reason this run's, with the fields the walk reads: the other run's lines are no part of it. */
   const mine = (reason: Reason) => said(reason).filter((l) => l.run === run.id);
 
   b.set(`${run.id}-plan`, 'running');
@@ -611,7 +609,7 @@ test("a person's verbs and the runtime's two faults are read off the store the p
 
   await runWith(b.e, hold(run.id, [other.id], { why: 'it waits on the other run', by: 'operator' }));
   for (let i = 0; i < 3; i++) await runWith(b.e, tickRun());
-  const held = readRun(run.id)!.hold!;
+  const held = readRun(run.id).hold!;
   assert.deepEqual(
     mine('HoldPut').map((l) => [l.word, l.note, l.source]),
     [['hold put', `since ${held.at}`, 'person']],
@@ -630,7 +628,7 @@ test("a person's verbs and the runtime's two faults are read off the store the p
   for (let i = 0; i < 3; i++) await runWith(b.e, tickRun());
   await runWith(b.e, approveRun(run.id, 'plan'));
   for (let i = 0; i < 3; i++) await runWith(b.e, tickRun());
-  const approval = readRun(run.id)!.approvals![0];
+  const approval = readRun(run.id).approvals![0];
   assert.deepEqual(
     mine('Approved').map((l) => [l.step, l.word, l.note, l.try, l.source]),
     [['plan', 'approved', `try ${approval.try} · at ${approval.at}`, approval.try, 'person']],
@@ -641,7 +639,7 @@ test("a person's verbs and the runtime's two faults are read off the store the p
   for (let i = 0; i < 3; i++) await runWith(b.e, tickRun());
   assert.deepEqual(
     mine('CancelAsked').map((l) => [l.word, l.note, l.source]),
-    [['cancel asked', `at ${readRun(run.id)!.cancelledAt}`, 'person']],
+    [['cancel asked', `at ${readRun(run.id).cancelledAt}`, 'person']],
     'and so is the call-off',
   );
 

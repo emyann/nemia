@@ -8,6 +8,9 @@ import { OUT } from '../world.ts';
 /** Where the person's words are sent, which this page refuses for as long as the daemon is to read as unreachable. */
 const SEND = '/api/nemia/chat/send';
 
+/** The line Chromium writes to the console for a resource it could not reach at all, which names no address. */
+const REFUSED_LINE = 'console error: Failed to load resource: net::ERR_CONNECTION_REFUSED';
+
 /** What the person writes, and what they change it to before the api is back. */
 const WROTE = 'Start the two kit cards as one batch.';
 const CHANGED = 'Start the two kit cards as one batch, and tell me when their checks are green.';
@@ -99,8 +102,6 @@ export default {
       await settled(down);
       await photograph(down, path.join(OUT, `chat-kept-taken-${await themeOf(down)}.png`), { fullPage: true });
 
-      /** The line Chromium writes to the console for a resource it could not reach at all, naming no address. */
-      const REFUSED_LINE = 'console error: Failed to load resource: net::ERR_CONNECTION_REFUSED';
       const unexpected = problems().filter((problem) => !problem.includes(SEND) && problem !== REFUSED_LINE);
       if (unexpected.length > 0)
         throw new Refused(`the only failures are the sends this page refused — it also saw:\n${unexpected.join('\n')}`);

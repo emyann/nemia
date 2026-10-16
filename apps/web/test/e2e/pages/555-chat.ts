@@ -43,7 +43,8 @@ async function expectEmpty(panel: ReturnType<typeof chatPanelOf>): Promise<void>
   await expectVisible(empty.getByText('ask before what is yours to decide', { exact: false }), 'what she is for');
   await expectVisible(empty.locator('[data-chat-tag]', { hasText: 'Semi-auto' }), 'her level');
   const tags = await empty.locator('[data-chat-tag]').allTextContents();
-  if (!tags.some((tag) => /^\d+ (?:factory|factories)$/.test(tag))) throw new Refused(`the tags say how many factories — ${tags.join(', ')}`);
+  if (!tags.some((tag) => /^\d+ (?:factory|factories)$/.test(tag)))
+    throw new Refused(`the tags say how many factories — ${tags.join(', ')}`);
   if (!tags.some((tag) => /^\d+ runs? at work$/.test(tag))) throw new Refused(`and how many runs are at work — ${tags.join(', ')}`);
   await expectVisible(empty.getByText('Start with', { exact: true }), 'the things to start with');
   for (const words of STARTERS) await expectVisible(empty.locator('[data-chat-chip]', { hasText: words }), `the chip ${words}`);
@@ -89,8 +90,12 @@ export default {
         }),
         field.press('Enter'),
       ]);
-      if (sent.status() !== 201) throw new Refused(`Enter sends what was written — the api answered ${sent.status()}: ${await sent.text()}`);
-      await expectVisible(panel.locator('[data-chat-bubble="person"]', { hasText: draft.split('\n')[0] }), "the words are the person's bubble");
+      if (sent.status() !== 201)
+        throw new Refused(`Enter sends what was written — the api answered ${sent.status()}: ${await sent.text()}`);
+      await expectVisible(
+        panel.locator('[data-chat-bubble="person"]', { hasText: draft.split('\n')[0] }),
+        "the words are the person's bubble",
+      );
       if ((await field.inputValue()) !== '') throw new Refused('the field is emptied once the words are sent');
 
       await panel.getByRole('button', { name: 'Grow to the whole space' }).click();
@@ -111,6 +116,9 @@ export default {
     }
     await page.goto(new URL('/', page.url()).href, { waitUntil: 'load' });
     await idle(page);
-    await expectVisible(dockOf(page).locator('[data-cue]', { hasText: 'Down' }), 'taken back, she has no session, and a Down cue stands beside her face');
+    await expectVisible(
+      dockOf(page).locator('[data-cue]', { hasText: 'Down' }),
+      'taken back, she has no session, and a Down cue stands beside her face',
+    );
   },
 } satisfies PageSpec;

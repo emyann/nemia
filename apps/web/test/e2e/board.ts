@@ -500,6 +500,15 @@ export type HerChat = {
  */
 export const herEvent = (said: readonly HerLine[], i: number): string => ('text' in said[i] ? `m:1:e${i}:0` : `t:1:e${i}`);
 
+/** Her session in a turn, as the fake `claude agents` lists it: the engine reads it running, and her phase answering. */
+const ANSWERING = { state: 'working', status: 'busy', pid: 424242 };
+
+/**
+ * Her session held by Claude Code, its turn over: the engine reads it `input-required` with nothing waited for, so her phase is idle,
+ * which `idleOf` grants a long-lived session alone.
+ */
+const WAITING = { state: 'done', status: 'idle', pid: 424242 };
+
 /** One line of her transcript as Claude Code writes it, `seconds` before now. */
 const herTranscriptLine = (line: HerLine, i: number, at: (seconds: number) => string): object[] => {
   const head = {
@@ -571,12 +580,7 @@ export function herChat(what: HerChat): () => void {
   );
   const session = what.session ?? 'answering';
   if (session !== 'none') {
-    const row =
-      session === 'answering'
-        ? /** A session in a turn: the engine reads it running, and her phase answering. */
-          { state: 'working', status: 'busy', pid: 424242 }
-        : /** A session Claude Code holds, its turn over: the engine reads it `input-required` with nothing waited for, so her phase is idle. */
-          { state: 'done', status: 'idle', pid: 424242 };
+    const row = session === 'answering' ? ANSWERING : WAITING;
     fs.writeFileSync(
       registry,
       JSON.stringify([

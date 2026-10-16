@@ -1,4 +1,4 @@
-import { Bot, ChartColumn, Factory, House, Inbox, List, type LucideIcon, Settings, Waypoints } from 'lucide-react';
+import { Bot, ChartColumn, Factory, House, Inbox, List, type LucideIcon, MessageCircle, Settings, Waypoints } from 'lucide-react';
 import { factorySearch } from '../lib/factories.ts';
 
 /** Whether `path` is `to` or a page under it: `/agents/new` is under `/agents`, `/agentsx` is not. */
@@ -46,7 +46,8 @@ export type Destination = { id: string; label: string; icon: LucideIcon; lights:
 
 /**
  * The rail's destinations, in their order: Overview, the factories' canvas at `/`; Runs, the Inbox, Factories (a factory's floor and its
- * settings), Agents and Workflows, each lit on its page and under it; Stats; and Settings, lit on each of its tabs (`SETTINGS_TABS`).
+ * settings), Agents and Workflows, each lit on its page and under it; Stats; Nemia, her chat as a page of its own, which her docked face
+ * also opens; and Settings, lit on each of its tabs (`SETTINGS_TABS`).
  */
 export const DESTINATIONS: readonly Destination[] = [
   { id: 'overview', label: 'Overview', icon: House, lights: (path) => path === '/' },
@@ -56,6 +57,7 @@ export const DESTINATIONS: readonly Destination[] = [
   { id: 'agents', label: 'Agents', icon: Bot, lights: under('/agents') },
   { id: 'workflows', label: 'Workflows', icon: Waypoints, lights: under('/workflows') },
   { id: 'stats', label: 'Stats', icon: ChartColumn, lights: under('/stats') },
+  { id: 'nemia', label: 'Nemia', icon: MessageCircle, lights: under('/chat') },
   { id: 'settings', label: 'Settings', icon: Settings, lights: (path) => SETTINGS_TABS.some((tab) => under(tab.to)(path)) },
 ];
 

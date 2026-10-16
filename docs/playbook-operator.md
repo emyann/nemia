@@ -29,8 +29,9 @@ words the agent can act on. It files, chains and restarts. It does not decide wh
 
 1. **Watch.** One `nemia watch` stream plus a daemon-liveness line, filtered at the source to what needs judgement: a gate, a round, a
    failure, a landing, the daemon. Every line that reaches the operator wakes it, and each wake re-reads its whole context, which is the
-   real cost of watching; routine transitions (`checking`, `verified ✓`, a step `done`) wake nobody. Match the status words after the
-   run's id, never the whole line, or a run named "landings refused…" wakes you on every transition. Re-arm the watch every time it
+   real cost of watching; routine transitions (`checking`, `verified ✓`, a step `done`) wake nobody. Filter with `nemia watch -l
+   waits=person`, over the keys a line names, never on the prose of its message, or a run named "landings refused…" wakes you on every
+   transition. Re-arm the watch every time it
    expires (it lasts 30 minutes):
 
    ```sh

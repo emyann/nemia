@@ -11,8 +11,8 @@ import path from 'node:path';
 import { Effect, Fiber, Stream } from 'effect';
 import { livenessWords, type DaemonFile, type DaemonStanding } from '../daemon/daemon.ts';
 import { startedLine, upgraded, type FeedLine } from '../feed/index.ts';
-import { wakeOf, watchedLine, type Watched } from '../subscription/subscription.ts';
-import { parseSelectors } from '../watch/selector.ts';
+import { watchedLine, type Watched } from '../subscription/index.ts';
+import { parseSelectors, selects } from '../watch/selector.ts';
 import { steeredClock } from '../../test/steered.ts';
 import { scratch } from '../../test/scratch.ts';
 import { bell, until, WAITED } from '../../test/waits.ts';
@@ -21,6 +21,8 @@ const ROOT = scratch('wf-watch-');
 process.env.WF_ROOT = ROOT;
 const FEED = path.join(ROOT, 'feed.jsonl');
 const { livenessLines, watching, watchPrinted } = await import('./main.ts');
+const { RAN } = await import('../command/runs.verb.ts');
+const { parseArgv } = await import('../command/command.ts');
 
 const NOW = Date.parse('2026-10-07T12:00:00.000Z');
 const AT = new Date(NOW).toISOString();
@@ -104,20 +106,39 @@ const ROUTINE: FeedLine[] = [
   line('denied: Bash(git push)', 'try 1'),
 ];
 
-test('`--wake` keeps the lines that wait on a person, each default word among them, and none of the routine', () => {
-  const kept = (wake: readonly string[] | undefined) => [...WAKES, ...ROUTINE].filter((l) => watchedLine(l, 0, { wake }) !== undefined);
-  assert.deepEqual(kept(wakeOf({ wake: true })), WAKES);
-  assert.deepEqual(kept(wakeOf({ wakeWord: ['landing'] })), [ROUTINE[2]], '--wake-word names the words instead');
-  assert.deepEqual(kept(wakeOf({ wake: true, wakeWord: ['daemon started'] })), [...WAKES, ROUTINE[3]], 'or beside the default');
-  assert.equal(watchedLine(ROUTINE[4], 0, { wake: wakeOf({ wake: true }) }), undefined, 'a tool denial is routine, as it is today');
-  assert.equal(wakeOf({}), undefined);
-  assert.deepEqual(kept(undefined), [...WAKES, ...ROUTINE], 'with neither, every line');
+/** `nemia watch`'s spec, where the retired flags are refused by name. */
+const WATCH = RAN.find((r) => r.name === 'watch')!;
+
+test('`-l waits=person` keeps the lines that wait on a person, and none of the routine; with no -l, every line', () => {
+  const kept = (selectors: readonly string[]) => [...WAKES, ...ROUTINE].filter((l) => selects(parseSelectors(selectors), l));
+  assert.deepEqual(kept(['waits=person']), WAKES);
+  assert.deepEqual(kept(['kind=Daemon']), [ROUTINE[3]], 'another selector names other lines');
+  assert.deepEqual(kept(['waits=person', 'kind=Daemon']), [...WAKES, ROUTINE[3]], 'or beside it, as -l given again');
+  assert.equal(selects(parseSelectors(['waits=person']), ROUTINE[4]), false, 'a tool denial waits on nobody, as it is today');
+  assert.deepEqual(kept([]), [...WAKES, ...ROUTINE], 'with none, every line');
+});
+
+test('REFUSED: each flag retired with the wake words, by name, naming the selector to type', () => {
+  for (const argv of [['--wake'], ['--wake-word', 'failed'], ['--wake=1'], ['--wake-word=failed']]) {
+    const said = (() => {
+      try {
+        parseArgv(WATCH.spec, argv);
+      } catch (err) {
+        assert.equal((err as { exitCode?: number }).exitCode, 2, String(err));
+        return (err as Error).message;
+      }
+      return assert.fail(`${argv.join(' ')} was not refused`);
+    })();
+    assert.match(said, /^nemia watch no longer takes --wake/, argv.join(' '));
+    assert.match(said, /-l waits=person/);
+  }
+  assert.ok(parseArgv(WATCH.spec, ['-l', 'waits=person']), 'and the selector it names reads');
 });
 
 test('`--json` prints a line of the feed whole, with the cursor just after it; without, in words', () => {
   const daemon = ROUTINE[3];
-  assert.deepEqual(JSON.parse(watchedLine(daemon, 412, { json: true })!), { ...daemon, cursor: 412 });
-  assert.deepEqual(JSON.parse(watchedLine(WAKES[0], 90, { json: true })!), { ...WAKES[0], cursor: 90 });
+  assert.deepEqual(JSON.parse(watchedLine(daemon, 412, { json: true })), { ...daemon, cursor: 412 });
+  assert.deepEqual(JSON.parse(watchedLine(WAKES[0], 90, { json: true })), { ...WAKES[0], cursor: 90 });
   assert.equal(watchedLine(WAKES[0], 90, {}), '12:00:00  r-1  build  awaiting approval', 'and the words a person reads do not move');
   assert.equal(WAKES[0].reason, 'AwaitingApproval', 'the line printed whole is a signed one');
 });
@@ -135,7 +156,7 @@ test(
       printed.ring();
     });
     t.mock.method(console, 'error', (...a: unknown[]) => err.push(a.join(' ')));
-    const watch = watchPrinted(0, { json: true, wake: wakeOf({ wake: true }) });
+    const watch = watchPrinted(0, { json: true }, { selectors: parseSelectors(['waits=person']) });
     try {
       assert.deepEqual(err, ['watching from 0, ^C to stop']);
       const text = [ROUTINE[0], WAKES[0]].map((l) => `${JSON.stringify(l)}\n`).join('');
@@ -152,7 +173,7 @@ test(
 );
 
 test(
-  '`nemia watch` says the store’s liveness beside the feed, whatever its wake words: down after its banner, as JSON with --json',
+  '`nemia watch` says the store’s liveness beside the feed, whatever its selectors: down after its banner, as JSON with --json (its selectors no matter)',
   WAITED,
   async (t) => {
     fs.writeFileSync(FEED, '');
@@ -178,7 +199,7 @@ test(
       }
       return { out: [...out], err: [...err] };
     };
-    const words = await lines({ wake: ['failed'] });
+    const words = await lines({});
     assert.equal(words.out[0], 'watching from 0, ^C to stop');
     assert.match(words.out[1] ?? '', /^\d\d:\d\d:\d\d {2}daemon down {2}· daemon: none has held this store/);
     const json = await lines({ json: true });
@@ -238,7 +259,9 @@ test('a watch that has fallen silent bookmarks its cursor at its cadence, and wr
   t.mock.method(console, 'error', () => {});
   const steered = steeredClock();
   const fiber = Effect.runFork(
-    watching(0, { json: true, wake: ['failed'] }, () => ({ kind: 'none' }), { cursorFile: file }).pipe(Effect.provide(steered.layer)),
+    watching(0, { json: true }, () => ({ kind: 'none' }), { selectors: parseSelectors(['reason=Failed']), cursorFile: file }).pipe(
+      Effect.provide(steered.layer),
+    ),
   );
   try {
     await until(t, () => steered.asked.includes(30_000), 'the bookmark’s rest asked', { bell: steered.bell });

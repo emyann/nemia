@@ -1,6 +1,6 @@
 /**
  * The feed's reason table (`reason.ts`): every word the package writes maps to a reason, the lines that wait on a person are exactly the
- * lines a subscriber is woken by today, and every entry of the table is one some word reaches.
+ * lines a subscriber was woken by before the selectors and is woken by after them, and every entry of the table is one some word reaches.
  *
  * The fixtures are built from the code's own constants and word-builders wherever there is one — `SLOT_WAIT`, `slotWord`, `PAUSE_WAIT`,
  * `checkoutWord`, `waitWord`, `holdWord`, `waitingWords`, `REMOVED`, `DENIED` — and the statuses are keyed by their unions
@@ -10,11 +10,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DENIED, kindsOf, messageOf, reasonOf, REASON_CODES, typeOf, waitsOf, REMOVED, type InvolvedKind, type Reason } from './reason.ts';
+import { upgraded, type FeedLine } from './feed.ts';
 import { SLOT_WAIT, slotWord } from '../cap/cap.ts';
 import { PAUSE_WAIT, waitingWords } from '../list/list.ts';
 import { checkoutWord } from '../ending/ending.ts';
 import { holdWord, waitWord } from '../wait/wait.ts';
-import { DEFAULT_WAKE, sortLine } from '../subscription/subscription.ts';
+import { FORMER_DEFAULT_WAKE, FORMER_NEMIA_WAKE, selectorsOfWake } from '../subscription/index.ts';
+import { parseSelectors, selects } from '../watch/selector.ts';
 import type { Assessment } from '../tick/assess.ts';
 import type { StepStatus } from '../record/record.ts';
 
@@ -141,21 +143,73 @@ test('every entry of the table is one some word reaches', () => {
   );
 });
 
-test('the waiting set is the one a subscriber is woken by today', () => {
+/**
+ * The retired prose rule, kept here as this file's yardstick: whether `line` held a word of `wake` in its word, or leading a part of its
+ * note, whatever the case — the five lines `sortLine` was before this slice retired it. It is what the conversion of a stored wake list
+ * (`selectorsOfWake`) is held equal to below; deleted as dead code, the old-versus-new equivalence goes with it and nothing refuses a
+ * wrong table entry in `former-wake.ts`.
+ */
+function wokenByFormerWake(line: FeedLine, wake: readonly string[]): boolean {
+  const word = line.word.toLowerCase();
+  const notes = (line.note ?? '').split(' · ').map((part) => part.trim().toLowerCase());
+  return wake.map((w) => w.toLowerCase()).some((w) => word.includes(w) || notes.some((part) => part.startsWith(w)));
+}
+
+/** One fixture as the tick writes it to the feed: a signed line of its run, or of its step. */
+const lineOf = (c: Case): FeedLine =>
+  upgraded({
+    at: '2026-10-16T04:00:00.000Z',
+    run: 'r-1',
+    ...(c.kind === 'Step' ? { step: 'plan' } : {}),
+    word: c.word,
+    ...(c.note !== undefined ? { note: c.note } : {}),
+  });
+
+/** Whether the selectors a stored wake list converts to take `line`. */
+const takenByConverted = (wake: readonly string[], line: FeedLine): boolean =>
+  selects(parseSelectors(selectorsOfWake(wake).selectors), line);
+
+test('the waiting set is the one the retired wake words woke on, and the one the selectors they convert to take', () => {
   for (const c of CASES) {
-    const line = {
-      at: '2026-10-16T04:00:00.000Z',
-      run: 'r-1',
-      ...(c.kind === 'Step' ? { step: 'plan' } : {}),
-      word: c.word,
-      ...(c.note !== undefined ? { note: c.note } : {}),
-    };
-    assert.equal(
-      waitsOf(c.reason, c.note),
-      sortLine(line, DEFAULT_WAKE) === 'wake',
-      `${c.reason}: ${JSON.stringify(c.word)} ${JSON.stringify(c.note ?? '')} must wait exactly when --wake takes it`,
-    );
+    const line = lineOf(c);
+    const waits = waitsOf(c.reason, c.note);
+    const said = `${c.reason}: ${JSON.stringify(c.word)} ${JSON.stringify(c.note ?? '')}`;
+    assert.equal(waits, wokenByFormerWake(line, FORMER_DEFAULT_WAKE), `${said} must wait exactly when the former wake words took it`);
+    assert.equal(waits, takenByConverted(FORMER_DEFAULT_WAKE, line), `${said} must be taken exactly by the selectors they convert to`);
   }
+});
+
+test("Nemia's former wake list converts to selectors that take the waiting lines and a tool denial, and no other line", () => {
+  for (const c of CASES) {
+    const line = lineOf(c);
+    const hers = waitsOf(c.reason, c.note) || c.reason === 'ToolDenied';
+    assert.equal(takenByConverted(FORMER_NEMIA_WAKE, line), hers, `${c.reason}: ${JSON.stringify(c.word)}`);
+    assert.equal(wokenByFormerWake(line, FORMER_NEMIA_WAKE), hers, 'which is what her eight words woke on');
+  }
+  assert.ok(
+    CASES.some((c) => c.reason === 'ToolDenied'),
+    'a denial is among the fixtures, or the line above proves nothing',
+  );
+});
+
+test('every one of the 256 stored wake lists converts to selectors that take every line it woke on, and the two note words more', () => {
+  const lines = CASES.map(lineOf);
+  const subsets = Array.from({ length: 1 << FORMER_NEMIA_WAKE.length }, (_, mask) =>
+    FORMER_NEMIA_WAKE.filter((_word, i) => (mask & (1 << i)) !== 0),
+  );
+  assert.equal(subsets.length, 256);
+  let wider = 0;
+  for (const wake of subsets)
+    for (const [i, line] of lines.entries()) {
+      const woken = wokenByFormerWake(line, wake);
+      const taken = takenByConverted(wake, line);
+      if (woken) assert.ok(taken, `${JSON.stringify(wake)} woke on ${JSON.stringify(CASES[i].word)} and its selectors do not take it`);
+      if (taken && !woken) wider++;
+    }
+  assert.ok(
+    wider > 0,
+    'waiting on you: and needs: read a note that no selector reads, so they convert to waits=person: a strict superset, never a narrower one',
+  );
 });
 
 test('a type is the table its reason comes from, and a message is the word and its note', () => {

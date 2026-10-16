@@ -7,15 +7,15 @@ import type { Guarded } from '../guard.ts';
 import type { RouteWords } from './words.ts';
 
 /** The body `POST /api/subscriptions/:name` takes: `nemia subscribe`'s task and flags, as JSON. */
-const SUBSCRIBE_SHAPE = '`{ "task": "<task>", "wake"?: ["<word>"], "digestEvery"?: <minutes> }`';
+const SUBSCRIBE_SHAPE = '`{ "task": "<task>", "selectors"?: ["<selector>"], "digestEvery"?: <minutes> }`';
 
 /** What `issue` says of a key of `POST /api/subscriptions/:name`'s body sent wrong, `input` what the request sent. */
 const subscribeKeyWords = (key: unknown, input: unknown): string => {
   const was = `This request's was ${JSON.stringify(input) ?? 'left out'}: ${SUBSCRIBE_SHAPE}.`;
   if (key === 'task')
     return `\`task\` names the engine's long-lived task the feed is said to, as \`nemia subscribe <name> <task>\` takes it. ${was}`;
-  if (key === 'wake')
-    return `\`wake\` is the words that wake the task, as \`nemia subscribe --wake <word>\` takes each: a list of text, or left out for the feed's words for a wait on a person. ${was}`;
+  if (key === 'selectors')
+    return `\`selectors\` is what wakes the task, as \`nemia subscribe -l <selector>\` takes each: a list of text, one selector of the feed's lines each, or left out for waits=person, the lines that wait on a person. ${was}`;
   if (key === 'digestEvery')
     return `\`digestEvery\` is the minutes a digest waits for a wake, as \`nemia subscribe --digest-every <minutes>\` takes it: a JSON number, or left out for 60. ${was}`;
   return `POST /api/subscriptions/:name takes a JSON object: ${SUBSCRIBE_SHAPE}.`;

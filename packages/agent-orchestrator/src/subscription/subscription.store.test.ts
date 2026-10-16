@@ -1,13 +1,14 @@
 /**
  * The store's subscriptions on disk: the person's file put once and removed with the deliverer's, the deliverer's written whole and read
- * back, a scope's floor kept, and a file that does not read left out and said, never a stop. `WF_ROOT` is read as the module loads, so it
- * is set before the import.
+ * back, a scope's floor kept, a stored wake list converted on read (`selectorsOfWake`), and a file that does not read — or whose filter
+ * does not — left out and said, never a stop. `WF_ROOT` is read as the module loads, so it is set before the import.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { scratch } from '../../test/scratch.ts';
 import { upgraded } from '../feed/index.ts';
+import { FORMER_NEMIA_WAKE } from './former-wake.ts';
 
 process.env.WF_ROOT = scratch('wf-subscription-store-');
 const store = await import('./subscription.store.ts');
@@ -22,7 +23,7 @@ const {
   writeDelivery,
 } = store;
 
-const SUB = { task: 'nemia-1', wake: ['blocked'], digestEvery: 60, from: 120 };
+const SUB = { task: 'nemia-1', selectors: ['reason=Blocked'], digestEvery: 60, from: 120 };
 
 /** Every line said, for a test to read. */
 const saying = (): { said: string[]; say: (line: string) => void } => {
@@ -165,4 +166,49 @@ test('REFUSED: a scope whose floor is no level leaves the subscription out, said
   );
   fs.rmSync(subscriptionFile('unfloored'));
   dropSubscription('floored');
+});
+
+test('a record that holds the former wake key is converted on read, its file left as it is', () => {
+  const file = subscriptionFile('former');
+  fs.mkdirSync(store.subscriptionsDir(), { recursive: true });
+  const stored = { task: 'nemia-1', wake: [...FORMER_NEMIA_WAKE], digestEvery: 1440, from: 0 };
+  fs.writeFileSync(file, JSON.stringify(stored));
+  assert.deepEqual(listSubscriptions(), [
+    { name: 'former', subscription: { task: 'nemia-1', selectors: ['waits=person', 'reason=ToolDenied'], digestEvery: 1440, from: 0 } },
+  ]);
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), stored, 'the file is never rewritten: nothing of where its deliverer is moves');
+  fs.rmSync(file);
+});
+
+test('a wake word the table does not know is said once and the rest of its list still delivers', () => {
+  fs.writeFileSync(subscriptionFile('partly'), JSON.stringify({ ...SUB, selectors: undefined, wake: ['blocked', 'verified'] }));
+  const { said, say } = saying();
+  assert.deepEqual(listSubscriptions(say).map((s) => s.subscription.selectors), [['reason=Blocked']]);
+  assert.equal(said.length, 1);
+  assert.match(said[0], /the subscription partly was asked for with the word "verified", which names no selector of a feed line/);
+  assert.match(said[0], /it is delivered by reason=Blocked alone/);
+  fs.rmSync(subscriptionFile('partly'));
+});
+
+test('REFUSED: a record with no selector at all is left out and said, never delivered against an empty filter that takes every line', () => {
+  const fixtures: Array<[string, object, RegExp]> = [
+    ['empty', { ...SUB, selectors: [] }, /its selectors /],
+    ['neither', { task: 'nemia-1', digestEvery: 60, from: 0 }, /names no selectors/],
+    ['nokey', { ...SUB, selectors: ['message=boom'] }, /holds a selector the feed does not take — "message" is no key of a feed line/],
+    ['nowords', { task: 'nemia-1', digestEvery: 60, from: 0, wake: ['verified'] }, /with "verified" alone, which names no selector/],
+  ];
+  for (const [name, record] of fixtures) fs.writeFileSync(subscriptionFile(name), JSON.stringify(record));
+  const { said, say } = saying();
+  assert.deepEqual(listSubscriptions(say), [], 'not one of them is delivered');
+  for (const [name, , why] of fixtures) {
+    const line = said.find((l) => l.includes(subscriptionFile(name)));
+    assert.ok(line, `${name} said: ${said.join('\n')}`);
+    assert.match(line, why);
+    assert.ok(line.includes(`nemia unsubscribe ${name} removes it`), line);
+  }
+  assert.ok(
+    said.every((l) => l.includes('nemia subscribe') || l.includes('its selectors ')),
+    'each names how a person puts it again',
+  );
+  for (const [name] of fixtures) fs.rmSync(subscriptionFile(name));
 });

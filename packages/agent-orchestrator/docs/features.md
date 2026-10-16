@@ -2315,7 +2315,7 @@ goes).
 A long-lived task can be given a subscription to the feed, and the daemon says the feed to it: a line that needs its judgement at once,
 the rest folded into a digest.
 
-- **`nemia subscribe <name> <task> [--wake <word>]… [--digest-every <minutes>]`** and **`nemia unsubscribe <name>`**, in the command
+- **`nemia subscribe <name> <task> [-l <selector>]… [--digest-every <minutes>]`** and **`nemia unsubscribe <name>`**, in the command
   table (`src/subscription/subscription.verb.ts`), and on the api as `POST` and `DELETE /api/subscriptions/:name`. The task is read off
   the engine first: one never filed is refused (`Missing`), one not long-lived (`restartPolicy: Always`) is refused (`Invalid`), since its
   session ends with its turn, and one settled (`Conflict`). The subscription's news starts at the feed's end (`from`). Nemia's own is put
@@ -2326,10 +2326,11 @@ the rest folded into a digest.
   line and removed once the person's file is gone. `of` stamps it with the subscription's `task` and `from` (`resumedAt`): a name put
   again starts from its own `from`, whatever file the last one's deliverer left. `nemia unsubscribe` removes the person's file; a file
   that does not read is left out and said, never a stop.
-- **A line sorted** (`sortLine`, `src/subscription/subscription.ts`): a wake where its word holds a wake word, or a part of its note
-  (between ` · `) starts with one, case aside; else routine. The default wake words (`DEFAULT_WAKE`) are the feed's words for a wait on a person — `awaiting approval`,
-  `rounds exhausted`, `needs-human`, `blocked` (a run blocked carries the note `waiting on you: …`), `failed`, `waiting on you:` and
-  `needs:` — pinned against `feedWords` by a test.
+- **A line sorted** by the subscription's selectors (`selects`, `src/watch/selector.ts`, the one grammar `nemia watch -l` reads): a wake
+  where one of them takes it, else routine. The default filter (`DEFAULT_SELECTORS`) is `waits=person`, the key the tick stamps off the
+  feed's reason table — pinned against `feedWords` by a test. A record written before this, which held a list of wake words, is converted
+  on every read and never rewritten (`selectorsOfWake`, `src/subscription/former-wake.ts`); the seven words of the former default come to
+  exactly `waits=person`, and a word the table does not know converts to nothing and is said once on stderr.
 - **The deliverer** (`deliver`, `src/subscription/deliver.verb.ts`), forked by `up` beside the tick: a fiber a subscription in a
   `FiberMap`, the subscriptions read again every 5 s (one gone stopped and its state dropped, one changed stopped before it is started
   again, one new started). Each follows the feed from its cursor (`followFeed`). A wake line is said through the runtime's `say` at
@@ -2373,7 +2374,7 @@ and every write she proposes is asked of the person at a prompt, over Remote Con
   but hers; card A replaced both (*at Semi-auto, only what waits on the person prompts*, below): her fence is derived from the command
   classes (`nemiaFence`), the store outside her folder is denied her edits (`storeDenies`), and `readNemia` refuses an askTools: line.
   Her settings put the daemon's own `nemia` first on her `PATH` (`ownBin`).
-- **Her subscription is `nemia`**, with the default wake words and `denied:`, and a digest once a day; `nemia subscribe nemia` and `nemia
+- **Her subscription is `nemia`**, its filter `-l waits=person -l reason=ToolDenied` (`NEMIA_SELECTORS`), and a digest once a day; `nemia subscribe nemia` and `nemia
   unsubscribe nemia` are refused, pointing to `nemia level` (`Conflict`).
 - **`nemia memory [<fact>]`** (`src/nemia/memory.verb.ts`, also `GET /api/nemia/memory[/:fact]`) lists the facts she keeps in
   `$WF_ROOT/nemia/memory/`, or prints one; read-only, so she stays its one writer.
@@ -2420,7 +2421,7 @@ stateDiagram-v2
   (`denialLines`, `src/feed/feed.ts`), written once for each denial its task's attempts journalled, as the runtime journals it
   (`denied`), and never a part of the step's own note. It carries the call in the runtime's words (`denialText`) and the try its task was
   filed for (`taskTryOf`), the two the tick counts by, off the feed's own lines: a restarted daemon writes a denial neither again nor
-  never, and a recheck of the step says none of them again. `denied:` is one of her wake words, and her `grant-access` skill proposes the
+  never, and a recheck of the step says none of them again. `reason=ToolDenied` is one of her two selectors, and her `grant-access` skill proposes the
   narrowest allow that would have let the call through, or says the deny stands. The denials `nemia stats` counts are its own read of the
   same views, each ended attempt's calls one by one (`deniedCallsOf` in `src/stats/discipline.ts`, read by `src/stats/stats.verb.ts`).
 - **Her quota and her spend**: her task is allowed `curl -s <url>/api/quota` unasked, the address read off `daemon.json` at filing
@@ -5964,8 +5965,8 @@ cares about: it read them all and matched the prose a person reads. One watcher 
   reads (`src/subscription/subscription.ts`, beside `watchedLine`). Under `--json` it is a line carrying `cursor` and nothing else, no
   `word`, which is how a reader tells it from a feed line; in words nothing is printed.
 - **`nemia feed` is retired**: its entry and its generated api command, the CLI's help, the READMEs, `docs/`, and Nemia's `recap` skill,
-  which now keeps its `feed-cursor` fact off `nemia watch --once <cursor>`. `--wake` and `--wake-word` stay until the subscriptions
-  retire them.
+  which now keeps its `feed-cursor` fact off `nemia watch --once <cursor>`. `--wake` and `--wake-word` were retired with the wake words
+  themselves, by the slice below.
 
 Where it departs from the spec, and why:
 
@@ -5980,3 +5981,38 @@ refused), `src/subscription/subscription.test.ts` (the bookmark's line and its c
 help word for word, and every refusal of what was typed), `src/cli/watch.test.ts` (a filtered watch's cursor file at the feed's end, the
 bookmark under `--json`, and a cut) and `test/watch-selectors.test.ts` (the verb typed whole: `--once` stops at the end and prints the
 cursor, a selector takes the lines it names, and a watch resumes from its cursor file).
+
+## Shipped: subscriptions take selectors, and prose matching retires (signals slice S3, 2026-10-16)
+
+A subscription's filter is a list of selectors in its record, read by the deliverer through the feed's one grammar; a line's prose is
+matched nowhere any more.
+
+- **`selectors` on the record** (`Subscription`, `src/subscription/subscription.ts`), the text a person typed and never empty, taken by
+  `nemia subscribe -l <selector>` as often as it is given and on the api as the body key `selectors`; `DEFAULT_SELECTORS` is
+  `['waits=person']`, and `--at-least` stays the level floor it is. The deliverer parses them once a subscription (`parseSelectors` in
+  `delivering`) and sorts each line with `selects`; its cursor advances on a read whose lines nothing takes, as it did before.
+- **A stored wake list is converted on every read** (`selectorsOfWake`, `src/subscription/former-wake.ts`, read by `listSubscriptions`),
+  never rewritten: the file is left as it is, as the package leaves a v0 feed line (`upgraded`) and a renamed step key (`FORMER_KEYS`).
+  `FORMER_WAKE` names the eight words ever shipped and what each was selecting, typed by `Reason`; the seven of the former default come
+  to exactly `waits=person`, and Nemia's eight to exactly her two selectors.
+- **A record with no selector at all is left out of the listing and said once** on stderr naming `nemia unsubscribe <name>`: one naming
+  neither key, one whose `selectors` the grammar refuses, one whose `selectors` are empty (the schema's `isNonEmpty`), and one whose whole
+  wake list converts to nothing. An empty filter would take every line, where an empty wake list took none. A word the table does not know
+  beside words that do is said once and the rest still delivers (the owner's decision at this slice's gate).
+- **`--wake` and `--wake-word` are retired** from `nemia watch` and from `nemia subscribe`, with `sortLine`, `DEFAULT_WAKE`, `wakeOf` and
+  `Watched.wake`; each flag is refused by name wherever it was typed (`retiredWakeRefusal`), naming `-l waits=person` and the keys a
+  selector takes. `DEFAULT_WAKE`'s guarantee — the waking set is exactly what the tick writes a `waits: 'person'` line for — is held by
+  `src/feed/reason.test.ts` over the conversion, for the two shipped lists and for every one of the 256 subsets of the eight words (⊇).
+- **Her record is converted on read, her file untouched** (the owner's decision): rewriting it on a beat would reset `from` to the feed's
+  end and lose the wake lines between her cursor and now.
+
+Residual risk, recorded rather than guarded in this slice (the owner's decision at its gate): a subscription whose cursor predates a
+store's first v1 pass folds every historic `ToolDenied` line into one digest message — 815 of them across 316 runs for this store, written
+at 3:33 AM on 2026-10-16. The conversion wakes nobody newly on them: only a wake list already holding `denied:` becomes
+`reason=ToolDenied`, and such a list already woke on those lines under prose matching. No follow-up card was filed.
+
+Tested in `src/subscription/former-wake.test.ts` (the per-word table, the subsumption, the two shipped lists, an unknown word, and each
+retired flag's refusal), `src/feed/reason.test.ts` (the equivalence over every word the package writes, and the ⊇ over all 256 subsets),
+`src/subscription/subscription.store.test.ts` (a stored wake record read back as selectors with its file untouched, and the four records
+left out), `src/subscription/subscription.verb.test.ts`, `src/cli/watch.test.ts` (the refusals by name), and
+`src/subscription/deliver.verb.test.ts`.

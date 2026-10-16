@@ -35,11 +35,12 @@ test('each shipped word converts to what it was selecting, and a word with no re
     ['reason in (Failed,CheckFailed)'],
     'one word was a substring of two words of the feed, and a reason that waits survives while waits=person is not there',
   );
-  assert.deepEqual(selectorsOfWake(['DENIED:', ' blocked ']).selectors, ['reason=Blocked'], 'a word is keyed as sortLine folded it');
+  assert.deepEqual(selectorsOfWake([' BLOCKED ']).selectors, ['reason=Blocked'], 'a word is keyed as sortLine folded its case and spaces');
+  assert.deepEqual(selectorsOfWake(['Needs:']).selectors, ['waits=person'], 'the note words too');
   assert.deepEqual(
     selectorsOfWake(['denied:', 'blocked']).selectors,
-    ['reason=Blocked'],
-    'and the reasons of one list are one selector, in the table’s order',
+    ['reason in (Blocked,ToolDenied)'],
+    'and the reasons of one list are one selector, in the table’s order whatever the order they were typed in',
   );
 });
 
@@ -59,7 +60,12 @@ test('every subset of the eight words converts to text the grammar takes, and ev
   for (const subset of SUBSETS) {
     const { selectors } = selectorsOfWake(subset);
     assert.equal(selectorsRefusal(selectors), undefined, JSON.stringify(subset));
-    for (const named of selectors.flatMap((s) => (s.startsWith('reason') ? s.replace(/^reason\s*(=|in)\s*\(?|\)$/, '').split(',') : [])))
+    for (const named of selectors.flatMap((one) => {
+      const listed = /^reason in \(([^()]*)\)$/.exec(one);
+      if (listed) return listed[1].split(',');
+      const one0 = /^reason=(.*)$/.exec(one);
+      return one0 ? [one0[1]] : [];
+    }))
       assert.ok((REASON_CODES as readonly string[]).includes(named), `${named} is no reason of the feed`);
   }
   assert.equal(SUBSETS.length, 256, 'the eight words the package ever shipped');

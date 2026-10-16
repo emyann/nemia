@@ -4,11 +4,12 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_WAKE, sortLine } from '../subscription/subscription.ts';
+import { DEFAULT_SELECTORS } from '../subscription/index.ts';
+import { parseSelectors, selects } from '../watch/selector.ts';
 import { DEMAND_OFF } from '../demand/demand.ts';
 import { DENIED, upgraded } from '../feed/index.ts';
 import {
-  NEMIA_WAKE,
+  NEMIA_SELECTORS,
   customChanged,
   levelRefusal,
   nemiaDiagram,
@@ -148,7 +149,7 @@ test('her diagram draws every edge and each verb from every state it is taken fr
   );
 });
 
-test("REFUSED: a step's denied call wakes her, and only her — the one-shot's word leads with `denied: `, as NEMIA_WAKE finds it", () => {
+test("REFUSED: a step's denied call wakes her, and only her — her selectors name reason=ToolDenied, which the default does not", () => {
   const shot = upgraded({
     at: '2026-10-05T16:00:00.000Z',
     run: 'r-1',
@@ -161,9 +162,10 @@ test("REFUSED: a step's denied call wakes her, and only her — the one-shot's w
     try: 2,
   });
   assert.equal(shot.reason, 'ToolDenied', 'a denial is a signal of its own');
-  assert.equal(sortLine(shot, NEMIA_WAKE), 'wake', 'she sees every denial between this slice and the selectors that replace sortLine');
-  assert.equal(sortLine(shot, DEFAULT_WAKE), 'routine', 'and nobody else is woken, as nobody is today');
-  assert.ok(shot.word.startsWith(DENIED), `the one-shot's word leads with ${JSON.stringify(DENIED)}, which is what she matches on`);
+  assert.equal(selects(parseSelectors([...NEMIA_SELECTORS]), shot), true, 'she is told of every denial at once');
+  assert.equal(selects(parseSelectors([...DEFAULT_SELECTORS]), shot), false, 'and nobody else is woken, as nobody is today');
+  assert.ok(shot.word.startsWith(DENIED), `the one-shot's word leads with ${JSON.stringify(DENIED)}, and her selector reads its reason`);
+  assert.deepEqual([...NEMIA_SELECTORS], ['waits=person', 'reason=ToolDenied'], 'two lines a person reads in her record');
   assert.equal(shot.waits, undefined, 'a denial waits on nobody: the step runs on');
 });
 

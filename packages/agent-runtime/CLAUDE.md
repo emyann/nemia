@@ -132,6 +132,9 @@ down is in `docs/architecture.md`, *Who owns what*.
 - **The Agent SDK (0.3.270) speaks to its CLI in control requests both ways, and writes a resume as one argument, `--resume=<id>`**: the
   stand-in CLI (`test/fixtures/stand-in-claude.ts`) answers `initialize` and asks `hook_callback` and `can_use_tool` as it does, and
   `test/attached.boundary.test.ts` pins it; an SDK update that moves the protocol fails there first.
+- **The SDK sends an empty system prompt when `systemPrompt` is unasked**, so an agent's own prompt on `append-system-prompt-file` is
+  appended to nothing: `attachedOptions` asks for the preset `claude_code`, which a `claude -p` job has by default (measured 0.3.270:
+  the `initialize` request carried `[""]` without it, and none with it).
 
 ## A2A and remote agents
 

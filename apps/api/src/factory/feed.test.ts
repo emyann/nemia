@@ -729,8 +729,8 @@ test(
       assert.match(error, pattern, query);
       assert.match(
         error,
-        /A selector reaches this stream as `selector`, given again for another selector, of which one must hold; pass none to follow every line\.$/,
-        query,
+        /\. A selector reaches this stream as `selector`, given again for another selector, of which one must hold; pass none to follow every line\.$/,
+        `${query}: the package's words, which end on its key list, closed by a full stop before the api's own sentence`,
       );
     }
     assert.equal(followers(), 0, 'no reader was started for a selector the grammar refuses: it is answered before the stream opens');
@@ -750,4 +750,21 @@ test('the stream says where it has read to at the one cadence every surface read
     'and the api spells no cadence of its own, which would be a second cadence to drift',
   );
   assert.equal(typeof BOOKMARK_EVERY, 'string', 'the constant the package owns');
+});
+
+test("the tick's first beat is dropped: no bookmark comes among the lines the feed already holds when the stream opens", async () => {
+  const pass = emptyFeed();
+  await pass({ 'r-a': planAt('running') });
+  const every = everySent();
+  assert.equal(every.length, 2, 'two lines are written before the stream is subscribed, and one read hands both on');
+  const got = await untilBookmark(0, [], '200 millis');
+  assert.deepEqual(
+    got.map((m) => [m.event, m.id]),
+    [
+      ['run', every[0].sent.id],
+      ['step', every[1].sent.id],
+      ['bookmark', every[1].sent.id],
+    ],
+    'both lines, then the beat: a first beat not dropped comes at subscription, and lands between the two lines the first read hands on',
+  );
 });

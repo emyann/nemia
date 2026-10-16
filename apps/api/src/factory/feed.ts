@@ -40,8 +40,9 @@ function feedCursorOf(raw: string | undefined): number | { error: string } {
 }
 
 /**
- * How a selector reaches this stream, said after the package's refusal of one, whose words are the grammar's and spell it as `nemia
- * watch` takes it: the query key, that it is given again for another selector, and that none follows every line.
+ * How a selector reaches this stream, said after the package's refusal of one and a full stop, since the package's words end on its
+ * key list: the query key, that it is given again for another selector, and that none follows every line. The package's words are the
+ * grammar's and spell it as `nemia watch` takes it; this says how a reader of this surface spells the same thing.
  */
 const SELECTOR_ASKED =
   'A selector reaches this stream as `selector`, given again for another selector, of which one must hold; pass none to follow every line.';
@@ -141,7 +142,7 @@ export const feed = new Hono<ApiEnv>().get('/api/feed/stream', (c) => {
   if (typeof from !== 'number') return c.json({ error: from.error }, 400);
   const asked = c.req.queries('selector') ?? [];
   const refused = selectorsRefusal(asked);
-  if (refused) throw new Invalid({ message: `${refused} ${SELECTOR_ASKED}` });
+  if (refused) throw new Invalid({ message: `${refused}. ${SELECTOR_ASKED}` });
   const selectors = parseSelectors(asked);
   return streamSSE(c, async (stream) => {
     const gone = new AbortController();

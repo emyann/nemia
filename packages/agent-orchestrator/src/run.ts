@@ -186,8 +186,8 @@ export { choicesOf, costLine, decision, runCostLines } from './decide/decide.ts'
 export type { DecideCommand, Decision, Offer, Shipped } from './decide/decide.ts';
 export { answerIn, deniedWords, harnessWaitLine, listing, onYouWords, shownNote, shownStatus, waitingWords } from './list/list.ts';
 export type { Listing } from './list/list.ts';
-export { feedPhase, feedWords } from './feed/feed.ts';
-export type { FeedSaid, FeedWords } from './feed/feed.ts';
+export { feedPhase, feedWords } from './feed/index.ts';
+export type { FeedSaid, FeedWords } from './feed/index.ts';
 export {
   acceptedLines,
   briefParts,

@@ -112,7 +112,7 @@ function modulesLoaded(entry: string, more: readonly string[] = []): string[] {
  * pinned `effect`.
  */
 const PINNED_MODULES: Record<string, { all: number; effect: number }> = {
-  'agent-orchestrator/run': { all: 91, effect: 15 },
+  'agent-orchestrator/run': { all: 93, effect: 15 },
   'agent-orchestrator/workflow': { all: 48, effect: 15 },
 };
 

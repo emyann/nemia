@@ -13,7 +13,7 @@ import { wfRoot } from '../config/config.store.ts';
 import { firstRefusal } from '../record/record.store.ts';
 import { countRead } from '../meter/tally.store.ts';
 import { FeedLineSchema } from '../feed/feed.store.ts';
-import { lineAsRead } from '../feed/feed.ts';
+import { lineAsRead } from '../feed/index.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 import type { KeptDelivery, Subscription } from './subscription.ts';
 import { LEVELS } from '../level/level.ts';

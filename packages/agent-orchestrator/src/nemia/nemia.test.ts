@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_WAKE, sortLine } from '../subscription/subscription.ts';
 import { DEMAND_OFF } from '../demand/demand.ts';
+import { DENIED, upgraded } from '../feed/index.ts';
 import {
   NEMIA_WAKE,
   customChanged,
@@ -147,10 +148,23 @@ test('her diagram draws every edge and each verb from every state it is taken fr
   );
 });
 
-test("a step's denied calls wake her, and only her: the default wake words leave them to the digest", () => {
-  const line = { at: '2026-10-05T16:00:00.000Z', run: 'r-1', step: 'build', word: 'running', note: 'denied: Bash(git push) ×1 · try 2' };
-  assert.equal(sortLine(line, NEMIA_WAKE), 'wake');
-  assert.equal(sortLine(line, DEFAULT_WAKE), 'routine');
+test("REFUSED: a step's denied call wakes her, and only her — the one-shot's word leads with `denied: `, as NEMIA_WAKE finds it", () => {
+  const shot = upgraded({
+    at: '2026-10-05T16:00:00.000Z',
+    run: 'r-1',
+    step: 'build',
+    word: 'denied: Bash(git push)',
+    note: 'try 2',
+    involved: { kind: 'Step', name: 'r-1/build' },
+    labels: { run: 'r-1', factory: 'nemia', workflow: 'build', step: 'build', agent: 'ada' },
+    call: 'Bash(git push)',
+    try: 2,
+  });
+  assert.equal(shot.reason, 'ToolDenied', 'a denial is a signal of its own');
+  assert.equal(sortLine(shot, NEMIA_WAKE), 'wake', 'she sees every denial between this slice and the selectors that replace sortLine');
+  assert.equal(sortLine(shot, DEFAULT_WAKE), 'routine', 'and nobody else is woken, as nobody is today');
+  assert.ok(shot.word.startsWith(DENIED), `the one-shot's word leads with ${JSON.stringify(DENIED)}, which is what she matches on`);
+  assert.equal(shot.waits, undefined, 'a denial waits on nobody: the step runs on');
 });
 
 test('a nemia she types starts no daemon beside the one that keeps her, with a bin of its own or none', () => {

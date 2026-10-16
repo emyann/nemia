@@ -17,7 +17,7 @@ import { scratch } from '../../test/scratch.ts';
 import { testEngine } from 'agent-runtime/testing';
 import { bell, until, WAITED } from '../../test/waits.ts';
 import { steeredClock } from '../../test/steered.ts';
-import { isRunLine } from '../feed/feed.ts';
+import { DAEMON_STARTED, isRunLine, upgraded, type FeedLine } from '../feed/index.ts';
 
 const ROOT = scratch('wf-deliver-');
 process.env.WF_ROOT = ROOT;
@@ -471,7 +471,7 @@ test(
     kept(t, 'scoped-d', { task: 't-scoped-d', wake: [...DEFAULT_WAKE], digestEvery: 60, from, scope: { atLeast: 'semi-auto' } });
     kept(t, 'woken-d', { task: 't-woken-d', wake: ['daemon'], digestEvery: 60, from });
     const stop = running(t);
-    const started = { at: new Date().toISOString(), daemon: 5151, word: 'daemon started', note: 'first daemon on this store' };
+    const started: FeedLine = { at: new Date().toISOString(), daemon: 5151, word: DAEMON_STARTED, note: 'first daemon on this store' };
     appended(started);
     await held(t, () => toldTo('t-woken-d').length === 1, 'the subscriber that names daemon woken');
     assert.match(
@@ -479,7 +479,11 @@ test(
       /^The feed needs your judgement:\n {2}\S+ {2}pid 5151 {2}daemon started {2}· first daemon on this store$/,
     );
     await held(t, () => readDelivery('scoped-d')?.cursor === feedSize(), "the scoped one's cursor past the line");
-    assert.deepEqual(readDelivery('scoped-d')?.digest, [started], 'folded into its digest, and read back off its file');
+    assert.deepEqual(
+      readDelivery('scoped-d')?.digest,
+      [upgraded(started)],
+      'folded into its digest, and read back off its file, upgraded as the feed reads it',
+    );
     assert.equal(toldTo('t-scoped-d').length, 0, 'routine by the default words');
     await stop();
   },

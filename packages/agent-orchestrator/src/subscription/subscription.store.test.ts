@@ -7,6 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { scratch } from '../../test/scratch.ts';
+import { upgraded } from '../feed/index.ts';
 
 process.env.WF_ROOT = scratch('wf-subscription-store-');
 const store = await import('./subscription.store.ts');
@@ -46,14 +47,36 @@ test('a subscription put is listed by its name, and its name taken again is refu
 
 test("the deliverer's file is written whole and read back, the deliverer's own files listed apart from the subscriptions", () => {
   putSubscription('round', SUB);
+  const at = '2026-10-05T12:00:00.000Z';
+  const signed = upgraded({ at, run: 'r-1', step: 'plan', word: 'running' });
+  const shot = upgraded({
+    at,
+    run: 'r-1',
+    step: 'plan',
+    word: 'denied: Bash(git push)',
+    note: 'try 2',
+    involved: { kind: 'Step', name: 'r-1/plan' },
+    labels: { run: 'r-1', factory: 'nemia', workflow: 'build', step: 'plan', agent: 'ada' },
+    call: 'Bash(git push)',
+    try: 2,
+  });
   const delivery = {
     of: { task: SUB.task, from: SUB.from },
     cursor: 300,
-    digest: [{ at: '2026-10-05T12:00:00.000Z', run: 'r-1', step: 'plan', word: 'running' }],
+    digest: [signed, shot],
     since: { at: 1_000, mono: { boot: 'b', ms: 5 } },
   };
   writeDelivery('round', delivery);
-  assert.deepEqual(readDelivery('round'), delivery);
+  assert.deepEqual(readDelivery('round'), delivery, 'every field of a signed line survives the round trip, a one-shot’s call and try included');
+
+  const newer = { at, run: 'r-1', word: 'running', apiVersion: 'nemia/v9', aKeyThisNemiaDoesNotName: 'kept' };
+  const v0 = { at, run: 'r-1', step: 'plan', word: 'awaiting approval' };
+  writeDelivery('round', { ...delivery, digest: [newer, v0] as typeof delivery.digest });
+  assert.deepEqual(
+    readDelivery('round')?.digest,
+    [newer, upgraded(v0)],
+    'a key a newer nemia wrote is kept, and a line written before the feed was signed reads back upgraded',
+  );
   assert.deepEqual(listDeliveries(), ['round']);
   assert.deepEqual(
     listSubscriptions().map((s) => s.name),

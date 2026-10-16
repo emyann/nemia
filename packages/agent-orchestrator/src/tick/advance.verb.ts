@@ -25,7 +25,7 @@ import { handOffDue } from '../workspace/workspace.ts';
 import { filesDue } from '../artifacts/artifacts.ts';
 import { inParts } from '../brief/index.ts';
 import { assess, type Assessment } from './assess.ts';
-import { feedPhase, feedWords, type FeedDenial, type FeedWords } from '../feed/feed.ts';
+import { feedPhase, feedWords, type FeedDenial, type FeedWords } from '../feed/index.ts';
 import { listing } from '../list/list.ts';
 import { roundFiled, roundsDue } from '../round/round.ts';
 import type { Closeout } from '../closeout/index.ts';

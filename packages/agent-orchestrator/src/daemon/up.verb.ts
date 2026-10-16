@@ -17,7 +17,7 @@ import { refusalLines, tickRun, type Pass } from '../tick/tick.verb.ts';
 import { beat, heldUrl, passed, releaseStore, stillHeld, takeStore, type TakenStore } from './daemon.store.ts';
 import { takenFromLine, type HolderKind } from './daemon.ts';
 import { deliver } from '../subscription/deliver.verb.ts';
-import { DAEMON_STARTED, startedLine } from '../feed/feed.ts';
+import { DAEMON_STARTED, startedLine } from '../feed/index.ts';
 import { emitDaemonStarted, FEED_FOLLOW_BEATS, FEED_FOLLOW_LINES, FEED_FOLLOW_READS } from '../feed/feed.verb.ts';
 import { keep } from '../nemia/keep.verb.ts';
 import { reconcile } from '../applied/applied.verb.ts';

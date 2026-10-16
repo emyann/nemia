@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Fiber, Stream } from 'effect';
 import { livenessWords, type DaemonFile, type DaemonStanding } from '../daemon/daemon.ts';
-import { startedLine, type FeedLine } from '../feed/feed.ts';
+import { startedLine, upgraded, type FeedLine } from '../feed/index.ts';
 import { wakeOf, watchedLine, type Watched } from '../subscription/subscription.ts';
 import { scratch } from '../../test/scratch.ts';
 import { bell, until, WAITED } from '../../test/waits.ts';
@@ -81,8 +81,9 @@ test('a watch started while the store is down says so at once', async () => {
   assert.match(none[0].text, /^daemon: none has held this store — nothing ticks it/);
 });
 
-/** A run's line of the feed, its word and note as given. */
-const line = (word: string, note?: string): FeedLine => ({ at: AT, run: 'r-1', step: 'build', word, ...(note ? { note } : {}) });
+/** A run's line of the feed, signed as the tick signs one (`upgraded`), its word and note as given. */
+const line = (word: string, note?: string): FeedLine =>
+  upgraded({ at: AT, run: 'r-1', step: 'build', word, ...(note ? { note } : {}) });
 
 const WAKES: FeedLine[] = [
   line('awaiting approval'),
@@ -98,6 +99,7 @@ const ROUTINE: FeedLine[] = [
   line('done', 'landed on main'),
   line('running', 'cost $1.20 · landing'),
   startedLine(5151, { kind: 'none' }, AT, NOW),
+  line('denied: Bash(git push)', 'try 1'),
 ];
 
 test('`--wake` keeps the lines that wait on a person, each default word among them, and none of the routine', () => {
@@ -105,6 +107,7 @@ test('`--wake` keeps the lines that wait on a person, each default word among th
   assert.deepEqual(kept(wakeOf({ wake: true })), WAKES);
   assert.deepEqual(kept(wakeOf({ wakeWord: ['landing'] })), [ROUTINE[2]], '--wake-word names the words instead');
   assert.deepEqual(kept(wakeOf({ wake: true, wakeWord: ['daemon started'] })), [...WAKES, ROUTINE[3]], 'or beside the default');
+  assert.equal(watchedLine(ROUTINE[4], 0, { wake: wakeOf({ wake: true }) }), undefined, 'a tool denial is routine, as it is today');
   assert.equal(wakeOf({}), undefined);
   assert.deepEqual(kept(undefined), [...WAKES, ...ROUTINE], 'with neither, every line');
 });
@@ -113,7 +116,8 @@ test('`--json` prints a line of the feed whole, with the cursor just after it; w
   const daemon = ROUTINE[3];
   assert.deepEqual(JSON.parse(watchedLine(daemon, 412, { json: true })!), { ...daemon, cursor: 412 });
   assert.deepEqual(JSON.parse(watchedLine(WAKES[0], 90, { json: true })!), { ...WAKES[0], cursor: 90 });
-  assert.equal(watchedLine(WAKES[0], 90, {}), '12:00:00  r-1  build  awaiting approval');
+  assert.equal(watchedLine(WAKES[0], 90, {}), '12:00:00  r-1  build  awaiting approval', 'and the words a person reads do not move');
+  assert.equal(WAKES[0].reason, 'AwaitingApproval', 'the line printed whole is a signed one');
 });
 
 test(

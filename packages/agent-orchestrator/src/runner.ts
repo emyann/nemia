@@ -263,7 +263,7 @@ export {
   runId,
   stepsOf,
 } from './record/record.store.ts';
-export { inboxDir, runStore } from './record/files.store.ts';
+export { inboxDir, keptRuns, runStore } from './record/files.store.ts';
 export type { RunStore } from './record/record.ts';
 export {
   alive,
@@ -500,6 +500,11 @@ export { holdingOf, judge, needsOf, runWaitingOf, spentOf, standingsOf, wordOf }
 export type { GitAsked, JudgeHow, RunHolding, RunStatus, RunToDecide, RunWaiting, Spent, StepNeeds } from './summary/judged.verb.ts';
 export { restingMemo, restingRead } from './rest/resting.verb.ts';
 export type { RestingMemo, RestingRead } from './rest/resting.verb.ts';
+export { recordMemo } from './rest/kept.ts';
+export type { RecordMemo } from './rest/kept.ts';
+export type { ScheduleRuns } from './factory/factory.verb.ts';
+export type { PauseRuns } from './pause/pause.verb.ts';
+export type { InboxRuns } from './inbox/inbox.store.ts';
 export { judgedNow, runsSummarized } from './summary/summary.verb.ts';
 export type { RunSummary, SummaryHow } from './summary/summary.verb.ts';
 export type { FinishedPage, FinishedRun, ListedRun, OpenRuns, RunClock, RunOutcome, StepCost, WaitingRun } from './runlist/runlist.verb.ts';

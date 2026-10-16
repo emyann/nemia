@@ -15,6 +15,7 @@ import type { RetryAsk } from '../retry/index.ts';
 import type { RoundAsk } from '../status/status.ts';
 import {
   HOME,
+  UnreadableRecord,
   acceptFile,
   acceptanceIn,
   approvalFile,
@@ -42,6 +43,7 @@ import {
   restStamps,
   rewriteRun,
   roundAskFile,
+  sayOnce,
   roundAskIn,
   runFile,
   runsDir,
@@ -51,6 +53,8 @@ import {
   When,
 } from './record.store.ts';
 import { mergeSpent } from '../merge/merge.ts';
+import { keptRecords, type RecordMemo } from '../rest/kept.ts';
+import { verifiesRest } from '../config/config.store.ts';
 
 /** Each kind of ask: the file it is written at, by run, step and number, and its reader, as the tick reads it. */
 const ASKS: Record<
@@ -432,12 +436,31 @@ function paused(run: Run, pause: Pause | null = readPause()): Run {
 }
 
 /**
+ * The run `id` names, found among the ids the store lists (`runIds`), never read by a path made of the id, so no id — one climbing out
+ * with `..`, an absolute one — can name a file outside `runs/`; with the store's pause composed onto it as `runs.read` composes it.
+ * Undefined for an id the store does not list, for a record removed between the listing and the read, and for one that does not read as
+ * a run (`UnreadableRecord`), which is said once on `said`, as `listRuns` says it: the run page answers that there is no such run where
+ * it used to throw.
+ */
+function findRun(id: string, said: (line: string) => void = sayOnce): Run | undefined {
+  if (!runIds().includes(id)) return undefined;
+  try {
+    return paused(readRun(id));
+  } catch (err) {
+    if (err instanceof UnreadableRecord) said(`left out: ${err.message}`);
+    else if (fs.existsSync(runFile(id))) throw err;
+    return undefined;
+  }
+}
+
+/**
  * A run's record and a person's files beside it, each a file of its own under `runs/`, with the store's pause composed onto each run read
  * (`paused`); the markers of the runs `nemia rm` forgets, under `forgetting/`; the inbox's cards and the tick's tries.
  */
 export const filesStore: RunStore = {
   runs: {
     read: (id) => paused(readRun(id)),
+    find: findRun,
     list: (said, kept) => {
       const pause = readPause();
       return listRuns(said, kept).map((run) => paused(run, pause));
@@ -483,3 +506,12 @@ export const filesStore: RunStore = {
 
 /** The run store every controller reads and writes through. */
 export const runStore: RunStore = filesStore;
+
+/**
+ * Every run of the store as `project` reads it, off `memo` where one is handed in (`keptRecords`): the store stamped before any record
+ * is read, each run whose stamp stands answered from memory, and each other found by id (`runs.find`). With no memo — the command
+ * line's reads, and a test's cold read — every record is read, as `runs.list` reads them, and nothing is kept. `env` says whether each
+ * kept projection is judged afresh too (`WF_VERIFY_REST`).
+ */
+export const keptRuns = <P>(memo: RecordMemo<P> | undefined, project: (run: Run) => P, env: NodeJS.ProcessEnv = process.env): P[] =>
+  keptRecords(memo, { stamps: runStore.runs.stamps(), find: (id) => runStore.runs.find(id), verify: verifiesRest(env) }, project);

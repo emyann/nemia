@@ -25,9 +25,11 @@ import { FACTORY_RULES } from '../rules/rules.verb.ts';
 import { FACTORY_APPLY } from '../applied/applied.verb.ts';
 import { FACTORY_PLAN, FACTORY_RESOLVE, FACTORY_UPGRADE } from '../upgrade/upgrade.verb.ts';
 import { FACTORY_SCHEDULE, FACTORY_UNSCHEDULE } from '../schedule/schedule.verb.ts';
-import { schedulesListed } from '../schedule/listed.store.ts';
+import { schedulesListed, type ScheduleRun } from '../schedule/listed.store.ts';
 import type { ScheduleListed } from '../schedule/schedule.ts';
-import { runStore } from '../record/files.store.ts';
+import { keptRuns } from '../record/files.store.ts';
+import type { RecordMemo } from '../rest/kept.ts';
+import type { Run } from '../record/record.ts';
 import { trustedLines, type PlaceTrust, type Untrusted } from '../trust/trust.ts';
 import { FACTORY_TRUST, NO_TRUST, trustPlaces, untrustedPlaces } from '../trust/trust.verb.ts';
 
@@ -155,9 +157,27 @@ const textOf = (args: Args, key: string): string => {
  */
 type Listed = { factories: FactoryListing[]; schedules: ScheduleListed[]; untrusted: Untrusted[] };
 
-/** The store's factories, their schedules with the runs they started, and their places not trusted, each read now. */
-const listedNow = Effect.fn('listedNow')(function* () {
-  const { factories, schedules } = yield* tried(() => ({ factories: readFactories(), schedules: schedulesListed(runStore.runs.list()) }));
+/** What a schedule's listing reads of a run, and the memo a caller that polls the factories keeps of it between its reads. */
+export type ScheduleRuns = RecordMemo<ScheduleRun>;
+
+/** A run as a schedule's listing reads it: which fire of which schedule started it, and when the run was created. */
+const scheduleRun = (run: Run): ScheduleRun => ({
+  id: run.id,
+  createdAt: run.createdAt,
+  ...(run.scheduled === undefined ? {} : { scheduled: run.scheduled }),
+});
+
+/**
+ * The store's factories, their schedules with the runs they started, and their places not trusted, each read now. A schedule reads of a
+ * run only which fire started it and when (`scheduleRun`), so the records are read through `memo` where a caller that polls hands one
+ * (`keptRuns`): a warm read of the board's factories reads no finished run's record. With none — the command line's — every record is
+ * read, and the answer is the same.
+ */
+const listedNow = Effect.fn('listedNow')(function* (memo?: ScheduleRuns) {
+  const { factories, schedules } = yield* tried(() => ({
+    factories: readFactories(),
+    schedules: schedulesListed(keptRuns(memo, scheduleRun)),
+  }));
   return { factories, schedules, untrusted: yield* untrustedPlaces(factories) } satisfies Listed;
 });
 
@@ -186,7 +206,7 @@ export const FACTORY: Command<Listed> = {
   nemia: 'read',
   route: { method: 'GET', path: '/api/factories', status: 200 },
   manual: FACTORY_HELP,
-  handler: () => listedNow(),
+  handler: (_args, _env, _home, kept) => listedNow(kept?.records?.factories),
   print: listed,
 };
 
@@ -203,7 +223,7 @@ const FACTORY_LS: Command<Listed> = {
   writes: false,
   nemia: 'read',
   only: { side: 'cli', why: "the api lists the factories on nemia factory's route: ls is the command line's second name for it" },
-  handler: () => listedNow(),
+  handler: (_args, _env, _home, kept) => listedNow(kept?.records?.factories),
   print: listed,
 };
 

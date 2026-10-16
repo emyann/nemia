@@ -8,6 +8,9 @@ import type { Factory, Schedule } from '../factory/factory.ts';
 import { firesOf, readScheduleTry } from './schedule.store.ts';
 import { scheduleDue, settledFire, type ScheduleListed, type ScheduleTry } from './schedule.ts';
 
+/** What a schedule reads of a run: which fire of which schedule started it, and the run itself, for its last run's line. */
+export type ScheduleRun = Pick<Run, 'id' | 'createdAt' | 'scheduled'>;
+
 /** A schedule as a pass reads it: its factory and workflow, what the factory's file says, its fires around now, and the tick's kept try. */
 export type Read = {
   factory: Factory;
@@ -15,17 +18,17 @@ export type Read = {
   schedule: Schedule;
   fires: { latest: number; next: number } | { error: string };
   kept: ScheduleTry | undefined;
-  last: Run | undefined;
+  last: ScheduleRun | undefined;
 };
 
 /** The newest run `runs` holds that the schedule of `workflow` in `factory` started, by the fire it was started for. */
-const lastRun = (runs: readonly Run[], factory: string, workflow: string): Run | undefined =>
+const lastRun = (runs: readonly ScheduleRun[], factory: string, workflow: string): ScheduleRun | undefined =>
   runs
     .filter((r) => r.scheduled?.factory === factory && r.scheduled.workflow === workflow)
     .sort((a, b) => Date.parse(b.scheduled!.due) - Date.parse(a.scheduled!.due))[0];
 
 /** Every schedule of every factory that reads, factories by name, then workflows by name, each read at `now`. */
-export function schedulesRead(runs: readonly Run[], now: number): Read[] {
+export function schedulesRead(runs: readonly ScheduleRun[], now: number): Read[] {
   return readFactories()
     .filter((f): f is Factory & { file: string } => !('error' in f))
     .sort((a, b) => a.name.localeCompare(b.name))
@@ -69,7 +72,7 @@ function refusedOf(r: Read): string | null {
 }
 
 /** Every factory's schedules as `nemia ls` and the api list them (`ScheduleListed`), at `now`. */
-export function schedulesListed(runs: readonly Run[], now: number = Date.now()): ScheduleListed[] {
+export function schedulesListed(runs: readonly ScheduleRun[], now: number = Date.now()): ScheduleListed[] {
   return schedulesRead(runs, now).map((r) => ({
     factory: r.factory.name,
     workflow: r.workflow,

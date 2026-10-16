@@ -8,6 +8,9 @@ import type { EngineService } from '../runtime-client.ts';
 import type { Conflict, Missing, Refusal } from '../refusal/refusal.ts';
 import type { StatsMemo } from '../stats/stats.verb.ts';
 import type { RestingMemo } from '../rest/resting.verb.ts';
+import type { ScheduleRuns } from '../factory/factory.verb.ts';
+import type { PauseRuns } from '../pause/pause.verb.ts';
+import type { InboxRuns } from '../inbox/inbox.store.ts';
 import type { SeriesMemo } from '../series/series.ts';
 import type { Filings } from '../summary/reads.verb.ts';
 import type { RunSummary } from '../summary/summary.verb.ts';
@@ -15,13 +18,25 @@ import type { Args, CommandSpec } from './command.ts';
 
 /**
  * What a caller that lives long keeps between its calls of the table's handlers: the stats' memo of each run's facts (`stats`), the list's
- * memo of runs at rest (`runs`), the feed's filing times (`filings`), and the series' days read (`series`).
+ * memo of runs at rest (`runs`), the feed's filing times (`filings`), the series' days read (`series`), and `records`, a memo per read
+ * that wants a little of every run (`keptRecords`), each keyed by the run's stamp alone.
  */
 export type Kept = {
   readonly stats?: StatsMemo;
   readonly series?: SeriesMemo;
   readonly runs?: RestingMemo<Omit<RunSummary, 'startedAt'>>;
   readonly filings?: Filings;
+  readonly records?: KeptRecords;
+};
+
+/**
+ * A memo of a projection of every run's record, one per read that polls (`keptRecords`): the inbox's listing, the factories' schedules
+ * and the pause's current tasks. A read handed none reads every record, as the command line does.
+ */
+export type KeptRecords = {
+  readonly inbox?: InboxRuns;
+  readonly factories?: ScheduleRuns;
+  readonly pause?: PauseRuns;
 };
 
 /**

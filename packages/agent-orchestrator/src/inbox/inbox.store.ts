@@ -29,7 +29,9 @@ import { loadWorkflows, workflowFolder } from '../folder/folder.store.ts';
 import { defaultStartsAllowed, factoryNames, readFactories, treeOf } from '../factory/factory.store.ts';
 import type { Factory } from '../factory/factory.ts';
 import { HOME, isDirectory, runId, runsDir } from '../record/record.store.ts';
-import { runStore } from '../record/files.store.ts';
+import { keptRuns, runStore } from '../record/files.store.ts';
+import type { RecordMemo } from '../rest/kept.ts';
+import type { Run } from '../record/record.ts';
 
 /** The names of the inbox's cards, as `nemia inbox` lists them. */
 export const inboxCards = (): string[] =>
@@ -42,9 +44,22 @@ export const inboxCards = (): string[] =>
  * does not read as a card, with why. The run records are read for their `from`, so a card whose removal failed after its start is listed as
  * started; the tick's tries, so a queued card whose start was refused, or failed, says why; and the factories that read, so a card says the
  * repository its factory picks for it (`factoryRepo`).
+ *
+ * All a run says here is its id and the card it was started from, so the records are read through `memo` where a caller that polls hands
+ * one (`keptRuns`): a warm read of the board's inbox reads no finished run's record. With none — the command line's — every record is
+ * read, and the answer is the same.
  */
-export const readInbox = (): InboxListing[] =>
-  inboxListing(runStore.inbox.entries(), runStore.runs.list(), isDirectory, runStore.inbox.tries(), readableFactories());
+export const readInbox = (memo?: InboxRuns): InboxListing[] =>
+  inboxListing(
+    runStore.inbox.entries(),
+    keptRuns(memo, (run) => ({ id: run.id, ...(run.from === undefined ? {} : { from: run.from }) })),
+    isDirectory,
+    runStore.inbox.tries(),
+    readableFactories(),
+  );
+
+/** What the inbox's listing reads of a run: the card it was started from, under the run's id. */
+export type InboxRuns = RecordMemo<Pick<Run, 'id' | 'from'>>;
 
 /** The store's factories that read, by name: what a queued card's repository is chosen from (`queueRepo`). One not read is none. */
 export const readableFactories = (): Map<string, Factory> =>

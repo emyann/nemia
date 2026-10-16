@@ -7,18 +7,40 @@
 import { Effect } from 'effect';
 import { EngineService, asked } from '../runtime-client.ts';
 import { tryOf, type Run } from '../record/record.ts';
-import { runStore } from '../record/files.store.ts';
+import { keptRuns, runStore } from '../record/files.store.ts';
+import type { RecordMemo } from '../rest/kept.ts';
 import { stepsOf } from '../record/record.store.ts';
 import { stopAsked } from '../tick/held.verb.ts';
 import { putPause, readPause } from './pause.store.ts';
-import { currentTasks, interruptsAmong, type Interrupt, type PausedNow } from './pause.ts';
+import { currentTasks, interruptsAmong, liveAmong, type Interrupt, type PausedNow, type RunTasks } from './pause.ts';
 
-/** The runs a pause at once may stop the tasks of, by id, and those tasks (`interruptsAmong`), off one read of the engine. */
-const interruptsRead = Effect.fnUntraced(function* () {
+/** What a pause at once reads of every run before it reads a record, and the memo a caller that polls keeps of it between its reads. */
+export type PauseRuns = RecordMemo<RunTasks>;
+
+/** A run as a pause at once first reads it: whether a person called it off, and every current task of its steps. */
+const runTasks = (run: Run): RunTasks => ({
+  id: run.id,
+  ...(run.cancelledAt === undefined ? {} : { cancelledAt: run.cancelledAt }),
+  tasks: currentTasks(run),
+});
+
+/**
+ * The runs a pause at once may stop the tasks of, by id, and those tasks (`interruptsAmong`), off one read of the engine.
+ *
+ * In two phases: every run projected to its current tasks (`runTasks`), through `memo` where a caller that polls hands one, so a warm
+ * read reads no finished run's record; then one `e.list` of those tasks; then the record of each run one of whose tasks is at work
+ * (`liveAmong`), and of no other — a handful, where the store has hundreds. With no memo the first phase reads every record, and the
+ * answer is the same.
+ */
+const interruptsRead = Effect.fnUntraced(function* (memo?: PauseRuns) {
   const e = yield* EngineService;
-  const runs = runStore.runs.list().filter((run) => !run.cancelledAt);
-  const ids = [...new Set(runs.flatMap(currentTasks))];
+  const seen = keptRuns(memo, runTasks);
+  const ids = [...new Set(seen.filter((run) => !run.cancelledAt).flatMap((run) => run.tasks))];
   const views = new Map((ids.length ? (yield* asked('list', e.list(ids))).views : []).map((v) => [v.id, v]));
+  const runs = liveAmong(seen, (id) => views.get(id)).flatMap((id) => {
+    const run = runStore.runs.find(id);
+    return run ? [run] : [];
+  });
   return {
     runs: new Map<string, Run>(runs.map((r) => [r.id, r])),
     interrupts: interruptsAmong(runs, (id) => views.get(id), stepsOf) satisfies Interrupt[],
@@ -26,8 +48,8 @@ const interruptsRead = Effect.fnUntraced(function* () {
 });
 
 /** Each task a pause at once would stop now, of every run not called off: what `nemia pause --now` and the board's confirm show. */
-export const nowRead = Effect.fn('nowRead')(function* () {
-  return (yield* interruptsRead()).interrupts;
+export const nowRead = Effect.fn('nowRead')(function* (memo?: PauseRuns) {
+  return (yield* interruptsRead(memo)).interrupts;
 });
 
 /**

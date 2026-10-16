@@ -100,7 +100,8 @@ const STORE_BOTTOM = ['src/record/places.store.ts', 'src/skills/read.store.ts', 
  * on both (`folder.store.ts`), a run's steps on the folders and the configuration (`steps.store.ts`), the run store on them and the
  * store's pause on the bottom,
  * the schedules' cron and tries on the run store, a templated factory's tree, base and status on it (`applied.store.ts`), the factories on
- * the run store and both, and the run store's files on them (`runStore`), what a place is and how its processes are stopped, on no store
+ * the run store and both, and the run store's files on them and on the configuration (`runStore`, whose `keptRuns` reads
+ * `WF_VERIFY_REST`), what a place is and how its processes are stopped, on no store
  * file (`place.store.ts`), then a step's workspace, cut by the place, a workflow folder written on the run store, the two reads and the
  * factories, and where a run looks and a place's workflow folders (`lookup.store.ts`) on the run store and the skills read; what a branch
  * changed, as the place says, on the place (`changes.store.ts`), and where the branches stood on the run store and the place
@@ -129,7 +130,7 @@ const STORE_SHARED: Record<string, readonly string[]> = {
   'src/schedule/schedule.store.ts': ['src/record/record.store.ts'],
   'src/applied/applied.store.ts': ['src/record/record.store.ts'],
   'src/factory/factory.store.ts': ['src/record/record.store.ts', 'src/schedule/schedule.store.ts', 'src/applied/applied.store.ts'],
-  'src/record/files.store.ts': ['src/record/record.store.ts', 'src/pause/pause.store.ts'],
+  'src/record/files.store.ts': ['src/record/record.store.ts', 'src/pause/pause.store.ts', 'src/config/config.store.ts'],
   'src/place/place.store.ts': [],
   'src/workspace/worktree.store.ts': [
     'src/record/record.store.ts',

@@ -17,7 +17,13 @@ const IN_ORDER = ['Instructions', 'Custom instructions', "The folder's files", "
 
 /** A layer's name as prose cites it, the leading `The` dropped and a line break allowed between its words. */
 const cited = (name: string): RegExp =>
-  new RegExp(name.replace(/^The\s+/, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+'), 'i');
+  new RegExp(
+    name
+      .replace(/^The\s+/, '')
+      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      .replace(/\s+/g, '\\s+'),
+    'i',
+  );
 
 const ESCAPE_HATCH = /escape\s+hatch/i;
 const LATER_WINS = /\bthe\s+later\s+(?:one|layer)?\s*wins\b/i;
@@ -44,8 +50,7 @@ function layersRefusal(passage: string): string | undefined {
   for (const [i, want] of IN_ORDER.entries()) {
     const got = items[i];
     if (got.number !== i + 1) return `its layer ${i + 1} is numbered ${got.number}, and the five are numbered in order`;
-    if (got.name.toLowerCase() !== want.toLowerCase())
-      return `its layer ${i + 1} is **${got.name}**, and by precedence it is **${want}**`;
+    if (got.name.toLowerCase() !== want.toLowerCase()) return `its layer ${i + 1} is **${got.name}**, and by precedence it is **${want}**`;
   }
   if (ESCAPE_HATCH.test(passage)) return 'it calls a layer an escape hatch';
   return undefined;
@@ -68,7 +73,10 @@ function routingRefusal(passage: string): string | undefined {
   return undefined;
 }
 
-/** Why a shipped passage promises what is not built — it states the precedence with no caveat that a session is not told it — or undefined. */
+/**
+ * Why a shipped passage promises what is not built — it states the precedence with no caveat that a session is not told it yet — or
+ * undefined.
+ */
 function caveatRefusal(passage: string): string | undefined {
   if (!NOT_BUILT.test(passage)) return 'it states the precedence with no caveat that telling a session so is not built';
   return undefined;
@@ -88,8 +96,7 @@ function slice(file: string, from: string, to: RegExp): string {
 const README = (): string =>
   slice('packages/agent-orchestrator/README.md', "### An agent is a node's attachment", /^#### What an agent says it can do/m);
 const SKILL = (): string => slice('.claude/skills/create-an-agent/SKILL.md', '## The five layers', /^## /m);
-const PAGE = (): string =>
-  slice('apps/docs/src/content/docs/agents.mdx', '## What an agent is told: five layers', /^## Sources/m);
+const PAGE = (): string => slice('apps/docs/src/content/docs/agents.mdx', '## What an agent is told: five layers', /^## Sources/m);
 
 /** A numbered list of the layers, each item `n. **Name** — words`, built from the names and numbers given. */
 const listOf = (names: readonly string[], numbers?: readonly number[]): string =>
@@ -105,7 +112,10 @@ test('REFUSED: a numbered list that is not the five layers in precedence order, 
     'a line break inside a name still names it',
   );
   const OLD_ORDER = ['Instructions', 'Custom instructions', "The factory's rules", "The step's policy", "The folder's files"];
-  assert.match(layersRefusal(listOf(OLD_ORDER)) ?? '', /layer 3 is \*\*The factory's rules\*\*, and by precedence it is \*\*The folder's files\*\*/);
+  assert.match(
+    layersRefusal(listOf(OLD_ORDER)) ?? '',
+    /layer 3 is \*\*The factory's rules\*\*, and by precedence it is \*\*The folder's files\*\*/,
+  );
   assert.match(layersRefusal(listOf(IN_ORDER.slice(0, 4))) ?? '', /numbers 4 layers, not the five/);
   assert.match(layersRefusal(listOf(IN_ORDER, [1, 2, 3, 3, 4])) ?? '', /layer 4 is numbered 3/);
   assert.match(

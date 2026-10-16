@@ -159,6 +159,19 @@ test('every event reads again whether a daemon ticks, exactly: a line on the fee
   f.stop();
 });
 
+test("a daemon's line names no run and reads the daemon's standing alone: nothing of a run's record, the cap or the inbox", () => {
+  assert.deepEqual(keysOf('daemon'), [['daemon']]);
+});
+
+test("a daemon's start line is seen on the feed, not on the fallback a minute later", () => {
+  const f = followed();
+  f.stream().opens();
+  f.stream().send('daemon', { at: '2026-09-22T21:00:00.000Z', daemon: 4242, word: 'daemon started' }, '10');
+  f.frame();
+  assert.deepEqual(f.invalidated, [[['daemon']]], "the daemon's standing is read again on the line itself, and no key of a run is");
+  f.stop();
+});
+
 test('the polled queries are the runs, a run, the cap, and whether a daemon ticks — never a decision, the inbox, or anything else', () => {
   for (const key of [['runs'], ['runs', 'r-1'], ['ceilings'], ['daemon']]) assert.equal(polled(key), true, JSON.stringify(key));
   for (const key of [

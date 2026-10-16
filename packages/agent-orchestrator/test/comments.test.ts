@@ -8,8 +8,8 @@
  * here. The last part is what a lint rule cannot see across files: a name a comment quotes in backticks is one the code has, in each
  * file a guard block covers.
  *
- * No line that holds a comment, in any source file under packages/, apps/, lint/ and tools/, is wider than 140 columns: oxfmt wraps code
- * at that width and rewraps no comment.
+ * No line that holds a comment is wider than oxfmt's print width, which wraps code but rewraps no comment: the plugin's rule refuses
+ * one, and a scan of every source file under packages/, apps/, lint/ and tools/ is the floor under it.
  *
  * The design system kit the shadcn CLI writes into the board, and its skills beside it, are another repository's code, fetched again
  * at each update: the linter skips them (`"ignorePatterns"`) and so do the scans here, and no other folder may join them.
@@ -23,7 +23,7 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import ts from 'typescript';
-import plugin from '../../../lint/comments.ts';
+import plugin, { COMMENT_WIDTH } from '../../../lint/comments.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = path.join(import.meta.dirname, '..', '..', '..');
@@ -228,6 +228,32 @@ const INLINE = [
   '',
 ].join('\n');
 
+/** A line `width` code points wide: `head`, then as many `x` as it takes, then `tail`. */
+const widened = (head: string, tail: string, width: number): string => `${head}${'x'.repeat(width - head.length - tail.length)}${tail}`;
+
+const WIDTH = [
+  widened('/** a one-line JSDoc ', ' */', COMMENT_WIDTH + 1),
+  'export const a = 1;',
+  widened('/** a JSDoc at the width ', ' */', COMMENT_WIDTH),
+  'export const b = 1;',
+  '/**',
+  widened(' * the middle line of a JSDoc ', '', COMMENT_WIDTH + 1),
+  ' */',
+  'export const c = 1;',
+  widened('// oxlint-disable-next-line no-debugger -- a directive ', '', COMMENT_WIDTH + 1),
+  'debugger;',
+  widened('export const d = 1; // a comment after code ', '', COMMENT_WIDTH + 1),
+  widened("export const e = 'a string with no comment ", "';", COMMENT_WIDTH + 10),
+  '/** A view: documented. */',
+  'export function View() {',
+  widened('  return <div>{/* a comment in JSX ', ' */}</div>;', COMMENT_WIDTH + 1),
+  '}',
+  '',
+].join('\n');
+
+/** The needle of each line of `WIDTH` that is over the width and holds a comment, in order; the wide line of code is not among them. */
+const WIDE_LINES = ['a one-line JSDoc', 'the middle line of a JSDoc', 'a directive', 'a comment after code', 'a comment in JSX'];
+
 const FIXTURES: Record<string, string> = {
   'code.ts': CODE,
   'jsx.tsx': JSX,
@@ -235,6 +261,7 @@ const FIXTURES: Record<string, string> = {
   'deferral.ts': DEFERRAL,
   'warning.ts': WARNING,
   'inline.ts': INLINE,
+  'width.tsx': WIDTH,
 };
 
 let linted: Diagnostic[] | undefined;
@@ -323,6 +350,22 @@ test('REFUSED: no-warning-comments refuses a warning word anywhere in a JSDoc', 
 
 test('REFUSED: no-inline-comments refuses a comment after code, and lets a directive follow it', () => {
   assert.deepEqual(refusals('inline.ts'), { 'no-inline-comments': [lineOf(INLINE, 'refused: after code')] });
+});
+
+test('REFUSED: comments/no-wide-comment-lines refuses a wide comment line in each shape, and lets a wide line of code pass', () => {
+  const afterCode = lineOf(WIDTH, 'a comment after code');
+  const inJSX = lineOf(WIDTH, 'a comment in JSX');
+  assert.deepEqual(refusals('width.tsx'), {
+    'comments/no-wide-comment-lines': WIDE_LINES.map((needle) => lineOf(WIDTH, needle)),
+    'comments/no-code-comments': [afterCode, inJSX],
+    'no-inline-comments': [afterCode, inJSX],
+  });
+});
+
+test("the plugin's width is oxfmt's print width", () => {
+  const oxfmt = ts.parseConfigFileTextToJson('.oxfmtrc.json', fs.readFileSync(path.join(ROOT, '.oxfmtrc.json'), 'utf8'));
+  assert.equal(oxfmt.error, undefined);
+  assert.equal(COMMENT_WIDTH, (oxfmt.config as { printWidth: number }).printWidth);
 });
 
 /** Where the guard blocks do not cover the folders beside the packages in one block, after its package's glob, as the fix to make. */
@@ -433,12 +476,6 @@ function commentsOf(file: string, text: string): Found[] {
 }
 
 /**
- * The widest a line that holds any part of a comment may be, in code points: oxfmt's print width (`.oxfmtrc.json`), which rewraps no
- * comment.
- */
-const COMMENT_WIDTH = 140;
-
-/**
  * Each line of `text` that holds any part of a comment and is wider than 140 columns, measured whole in code points, indentation and code
  * before the comment included: `<file>:<line> is <n> columns`, each line once, in order.
  */
@@ -453,38 +490,9 @@ function wideCommentLines(file: string, text: string): string[] {
     });
 }
 
-/** A line `width` code points wide: `head`, then as many `x` as it takes, then `tail`. */
-const widened = (head: string, tail: string, width: number): string => `${head}${'x'.repeat(width - head.length - tail.length)}${tail}`;
-
 test('REFUSED: a line over 140 columns that holds a comment is found, in a JSDoc, a //, after code and in JSX; a wide code line is not', () => {
-  const over = COMMENT_WIDTH + 1;
-  const fixture = [
-    widened('/** a one-line JSDoc ', ' */', over),
-    'export const a = 1;',
-    widened('/** a JSDoc at the width ', ' */', COMMENT_WIDTH),
-    'export const b = 1;',
-    '/**',
-    widened(' * the middle line of a JSDoc ', '', over),
-    ' */',
-    'export const c = 1;',
-    widened('// oxlint-disable-next-line no-debugger -- a directive ', '', over),
-    'debugger;',
-    widened('export const d = 1; // a comment after code ', '', over),
-    widened("export const e = 'a string with no comment ", "';", COMMENT_WIDTH + 10),
-    '/** A view: documented. */',
-    'export function View() {',
-    widened('  return <div>{/* a comment in JSX ', ' */}</div>;', over),
-    '}',
-    '',
-  ].join('\n');
-  const at = (needle: string) => `fixture.tsx:${lineOf(fixture, needle)} is ${over} columns`;
-  assert.deepEqual(wideCommentLines('fixture.tsx', fixture), [
-    at('a one-line JSDoc'),
-    at('the middle line of a JSDoc'),
-    at('a directive'),
-    at('a comment after code'),
-    at('a comment in JSX'),
-  ]);
+  const at = (needle: string) => `width.tsx:${lineOf(WIDTH, needle)} is ${COMMENT_WIDTH + 1} columns`;
+  assert.deepEqual(wideCommentLines('width.tsx', WIDTH), WIDE_LINES.map(at));
 });
 
 test('no line that holds a comment, under packages/, apps/, lint/ and tools/, is over 140 columns', () => {

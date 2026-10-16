@@ -140,6 +140,16 @@ export function fed(run: string, ...said: [string] | [string, string]): void {
   fs.appendFileSync(path.join(store!, 'feed.jsonl'), `${JSON.stringify(line)}\n`);
 }
 
+/**
+ * One daemon's line appended to the workflow feed, in the shape the package writes it once a daemon has taken the store (`DaemonLine`:
+ * `{ at, daemon, word }`, the pid and `daemon started`): for a page that writes a `daemon.json` by hand, where no daemon runs to say so,
+ * and a board that must see it on the feed rather than on the fallback a minute later. A report and never an input, as `fed`'s lines are.
+ */
+export function fedDaemon(pid: number = process.pid): void {
+  const line = { at: new Date().toISOString(), daemon: pid, word: 'daemon started' };
+  fs.appendFileSync(path.join(store!, 'feed.jsonl'), `${JSON.stringify(line)}\n`);
+}
+
 /** When the run DIAMOND calls off was cancelled, as `wf cancel` wrote it beside its record. */
 export const cancelledAt = (): string => fs.readFileSync(path.join(store!, 'runs', `${DIAMOND.cancelled.id}.cancelled`), 'utf8').trim();
 

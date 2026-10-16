@@ -143,6 +143,7 @@
         "comments/no-code-comments": "error",
         "comments/no-history-in-comments": "error",
         "comments/no-deferral-in-comments": "error",
+        "comments/no-wide-comment-lines": "error",
         "no-warning-comments": [
           "error",
           { "terms": ["todo", "fixme", "xxx", "hack", "workaround", "work around", "stopgap", "learned by"], "location": "anywhere" }
@@ -156,6 +157,7 @@
         "comments/no-code-comments": "error",
         "comments/no-history-in-comments": "error",
         "comments/no-deferral-in-comments": "error",
+        "comments/no-wide-comment-lines": "error",
         "no-warning-comments": [
           "error",
           { "terms": ["todo", "fixme", "xxx", "hack", "workaround", "work around", "stopgap", "learned by"], "location": "anywhere" }
@@ -169,6 +171,7 @@
         "comments/no-code-comments": "error",
         "comments/no-history-in-comments": "error",
         "comments/no-deferral-in-comments": "error",
+        "comments/no-wide-comment-lines": "error",
         "no-warning-comments": [
           "error",
           { "terms": ["todo", "fixme", "xxx", "hack", "workaround", "work around", "stopgap", "learned by"], "location": "anywhere" }
@@ -182,6 +185,7 @@
         "comments/no-code-comments": "error",
         "comments/no-history-in-comments": "error",
         "comments/no-deferral-in-comments": "error",
+        "comments/no-wide-comment-lines": "error",
         "no-warning-comments": [
           "error",
           { "terms": ["todo", "fixme", "xxx", "hack", "workaround", "work around", "stopgap", "learned by"], "location": "anywhere" }
@@ -195,6 +199,7 @@
         "comments/no-code-comments": "error",
         "comments/no-history-in-comments": "error",
         "comments/no-deferral-in-comments": "error",
+        "comments/no-wide-comment-lines": "error",
         "no-warning-comments": [
           "error",
           { "terms": ["todo", "fixme", "xxx", "hack", "workaround", "work around", "stopgap", "learned by"], "location": "anywhere" }

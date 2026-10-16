@@ -1,6 +1,10 @@
 /**
  * The store `npm run e2e` serves: six fake runs and the diamond's, written the way `wf` and the engine write theirs.
  *
+ * Written by hand, all of it: nothing here ticks, so a run's record, a step's pins and a kind's revisions ledger are planted in the
+ * shapes the store holds, never by a filing. What those shapes are is held where they are written — the orchestrator's
+ * `test/revisions.test.ts` and the api's `drift.test.ts` for the pins and the ledger. Here the pages are the subject.
+ *
  * FAKE has five steps in two lanes, frozen on the record as `wf start` freezes them, with the folder beside
  * it. `implement` signed off blocked, with its session's conversation on disk for the engine to read (SESSION),
  * `review` was filed and the engine has no record of its task
@@ -63,9 +67,9 @@ export const FAKE = {
    * an older revision of the agent than the run is pinned to. The board draws one line per kind, the step's saying it already ran.
    */
   behind: {
-    agent: 'agent coder: rev 5, now 6',
-    skill: 'skill look: rev 1, now 2',
-    ran: 'agent coder: tokens ran on rev 4, now 6',
+    agent: 'agent coder: rev 5, ledger at 6',
+    skill: 'skill look: rev 1, ledger at 2',
+    ran: 'agent coder: tokens ran on rev 4, ledger at 6',
     kinds: 3,
   },
   /** `tokens`' lane, which `theme` worked in too: the run's result branch, committed in its repository. */

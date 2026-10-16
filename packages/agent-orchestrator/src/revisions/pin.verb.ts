@@ -264,7 +264,7 @@ export const refreshRun = Effect.fn('refresh')(function* (id: string) {
   if (!drift.length)
     return yield* Effect.fail(
       new Conflict({
-        message: `run ${id} is already on the newest revision of every kind it resolved: there is nothing to take. Edit a workflow, an agent, a skill or the factory's rules, and nemia refresh ${id} again. Nothing was written.`,
+        message: `run ${id} is already on the newest revision of every kind it resolved: there is nothing to take, whatever the board's band says — it reads the ledger, which holds a number for every content anything resolved, this run's included. Edit a workflow, an agent, a skill or the factory's rules, and nemia refresh ${id} again. Nothing was written.`,
       }),
     );
   if (!runStore.refresh.put(id))

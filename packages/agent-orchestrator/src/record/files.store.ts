@@ -193,7 +193,6 @@ function runIds(): string[] {
   }
 }
 
-/** The run's files directory, `runs/<id>/artifacts`. */
 /**
  * That a person asked the run to take the new revisions (`nemia refresh`): `{ at }`, a person's fact in a file of its own for the reason
  * `cancelFile` is. Written by `refresh` alone, exclusively; removed by the pass that takes the revisions it asked for (`removeRefresh`).
@@ -228,6 +227,7 @@ const removeRefresh = (id: string): boolean => {
   }
 };
 
+/** The run's files directory, `runs/<id>/artifacts`. */
 const filesDir = (id: string): string => path.join(runsDir(), id, 'artifacts');
 
 /** The run's files directory while it is a directory and no link; else undefined. */

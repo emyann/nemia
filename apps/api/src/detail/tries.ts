@@ -285,6 +285,11 @@ export function driftOf(run: Run, workflows: readonly Workflow[]): string | null
  * The kinds the run is behind the ledger on (`kindsDrift`, `stepsDrift`): its own pins, and those a filed step ran on that the run has
  * since moved past. The ledger is read once, for the kinds the run names and no others; a run that pinned nothing reads none, and nothing
  * is read for it.
+ *
+ * The ledger, not a resolve: a number here is one the ledger holds for a content anything resolved, so a kind edited and then reverted to
+ * the content the run pins reads as behind the ledger's last number while `nemia refresh` answers that there is nothing to take — the verb
+ * resolves to answer (`refreshedNow`), and a page's read does not pay a resolve. The board says these numbers as the ledger's for that
+ * reason (`behindWords`).
  */
 export function kindsOf(run: Run): readonly Drift[] {
   const steps = Object.entries(run.steps).map(([name, record]) => [name, record.pinned] as const);

@@ -335,7 +335,13 @@ test(
     const sent = f.said();
     assert.deepEqual(
       kinds(sent).filter((k) => !k.startsWith('unreadable ')),
-      ['following {"streamed":true}', 'transcript a-1', 'moved {"taskId":"t-tried-try2"}', 'following {"streamed":false}', 'transcript b-1'],
+      [
+        'following {"streamed":true}',
+        'transcript a-1',
+        'moved {"taskId":"t-tried-try2"}',
+        'following {"streamed":false}',
+        'transcript b-1',
+      ],
     );
     assert.deepEqual(JSON.parse(sent.find((b) => b.event === 'unreadable')!.data!), {
       error: `Step 'tried' of run '${RUN}' runs a session its harness does not push as it is written: what it said so far is sent, and it is read again every few seconds.`,

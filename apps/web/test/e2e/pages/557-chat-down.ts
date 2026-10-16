@@ -10,7 +10,7 @@ const WAITING = 'Write now; she reads it when she is up';
 /** Her session down: why she stopped, where it is started, and that what the person writes waits for her in the outbox. */
 async function expectDown(page: Parameters<PageSpec['expect']>[0], words: string): Promise<void> {
   const panel = await openChat(page);
-  const band = panel.locator('[data-chat-band="stopped"]');
+  const band = panel.locator('[data-band="stopped"]');
   await expectVisible(band, 'the panel says her session stopped');
   if ((await band.getAttribute('role')) !== 'status') throw new Refused('and says it as a state, not an alarm: nothing failed');
   const said = (await band.textContent()) ?? '';

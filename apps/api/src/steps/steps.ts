@@ -189,7 +189,9 @@ function messagesOf(m: Relayed, sent: Set<string>, at: { cursor: string }): SSEM
   return fresh.map((ev, i) => ({ event: 'transcript', data: JSON.stringify(ev), ...(i === fresh.length - 1 ? { id: m.cursor } : {}) }));
 }
 
-/** What a step's stream follows and reads with: the app's runtime and its registry of followings, the engine and its place, and the step. */
+/**
+ * What a step's stream follows and reads with: the app's runtime and its registry of followings, the engine and its place, and the step.
+ */
 type Reading = {
   runtime: ApiRuntime;
   followings: Followings['Service'];

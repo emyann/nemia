@@ -84,7 +84,7 @@ export const followedFrom = (first: { live: boolean; cursor: string | null }, wa
  */
 const stepFollower = (): Follower<Following, Change> => {
   const closed = new Set<string>();
-  const one = <T,>(got: T | null | undefined, of: (said: T) => Change): Change[] => (got ? [of(got)] : []);
+  const one = <T>(got: T | null | undefined, of: (said: T) => Change): Change[] => (got ? [of(got)] : []);
   return {
     reads: {
       transcript: (m) => one(streamDataOf('transcript', m.data), (event) => ({ kind: 'events', events: [event] })),

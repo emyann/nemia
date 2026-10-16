@@ -78,7 +78,7 @@ test("a step's own words reach the page through the follower: the api's retrying
 
   const lost = followed();
   lost.stream.send('unreadable', { retrying: false });
-  assert.equal(lost.now().error, 'The conversation could not be read.', 'and a read the api named nothing of says the step\'s own words');
+  assert.equal(lost.now().error, 'The conversation could not be read.', "and a read the api named nothing of says the step's own words");
 });
 
 test('the message being written is dropped when the following ends, whatever ends it', () => {

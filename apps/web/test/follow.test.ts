@@ -162,7 +162,11 @@ test('REFUSED: a stream that said it is over is closed once the api has ended it
 
   const over = followed();
   over.stream.send('done');
-  assert.deepEqual([over.now().live, over.now().ended, over.stream.readyState], [false, true, 1], 'not closed while its response may arrive');
+  assert.deepEqual(
+    [over.now().live, over.now().ended, over.stream.readyState],
+    [false, true, 1],
+    'not closed while its response may arrive',
+  );
   endsResponse(over.stream);
   assert.deepEqual([over.stream.readyState, over.now().error], [2, null], 'closed then, and nothing said of a refusal');
   let closes = 0;

@@ -11,6 +11,9 @@ below its layer is in `docs/architecture.md`, *Who owns what*.
   hand (`node --import ./test/harness.ts --test <file>` from `apps/api`). `harness.test.ts` refuses a script or a file without it. It deletes
   `OTEL_EXPORTER_OTLP_ENDPOINT` too: the api is the daemon, and a test that exports sets the address of a collector it made.
   It sets `WF_MAX_RUNS` and `WF_MAX_CONCURRENT` to a value the package refuses: a test that reads a ceiling sets or deletes it itself.
+- **`npm run dev` watches the sources alone**, a `--watch-path` for each (`apps/api/src` and the packages' sources it loads), never
+  `node_modules`, whose files a run's worktree hardlinks: a worktree made or freed changes their ctime and restarted the viewer
+  (`test/dev-watch.test.ts`).
 - **A body read off a response is `unknown`**: name the api's own answer type (`(await res.json()) as RunDetail`).
 - **An encoded `..` never reaches a route in a test**: `app.request` resolves `%2E%2E` before the router sees it. Send `..%2F…` to reach
   a name refusal.

@@ -44,7 +44,13 @@
     },
     "api#test": {
       "dependsOn": ["^transit"],
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/tools/**"]
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/tools/**",
+        "$TURBO_ROOT$/packages/*/src/**",
+        "$TURBO_ROOT$/packages/*/place/**",
+        "$TURBO_ROOT$/packages/*/package.json"
+      ]
     },
     "web#test": {
       "dependsOn": ["^transit"],

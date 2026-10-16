@@ -307,8 +307,8 @@ const holdSince = (at: string): string => `since ${at}`;
 
 /**
  * The one-shots a run's hold owes the feed: the put, for the hold the pass read on the record (`held`, its `at`), and the lift — the
- * pass's own, where the pass lifted it (`lifted`), and one for each put the feed holds that it holds no lift against and that is no longer
- * the hold on the record. Pure.
+ * pass's own, where the pass lifted it (`lifted`), and one for each put the feed holds that is no longer the hold on the record. A lift
+ * already written is no concern of this: it is an offer like any other, and `oncePast` holds it to one line. Pure.
  *
  * **A fact a person deleted is answered by the pair, not by a key.** `nemia hold <run> --off` takes the hold's file away, so the next pass
  * reads only its absence; the feed holds the put, so the lift is due, and once written the pair is matched and no pass says it again. A
@@ -331,7 +331,6 @@ function holdOnce(fold: FeedFold, run: string, held: string | undefined, lifted:
     if (!key.startsWith(puts)) continue;
     const note = key.slice(puts.length);
     if (note === standing || note === lifting) continue;
-    if (fold.shots.has(onceKey(involved, 'HoldLifted', undefined, note))) continue;
     out.push({ word: SIGNAL_WORDS.HoldLifted, note });
   }
   return out;

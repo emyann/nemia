@@ -653,22 +653,26 @@ test("a person's verbs and the runtime's two faults are read off the store the p
     );
 });
 
-test("REFUSED: no runtime word crosses into a signal — the feed says the workflow layer's own words for the runtime's two ends", () => {
+test("REFUSED: no runtime word crosses into a signal — the workflow layer says its own words for the runtime's two ends", async () => {
   emptyStore();
-  const memo = freshFeedMemo();
-  const faults = [
-    { run: 'r-1', step: 'plan', word: 'nothing started', note: 'try 1', try: 1 },
-    { run: 'r-1', step: 'plan', word: 'session lost', note: 'try 1', try: 1 },
-  ];
-  for (let i = 0; i < 3; i++) recordFeed(new Map([['r-1', withOnce({ acts: [], faults })]]), { at: AT, memo });
-  assert.equal(said('SpawnFailed').length + said('SessionLost').length, 2, 'the fixture wrote the two lines the refusal is about');
+  const b = board();
+  const run = await started('the faults');
+  await runWith(b.e, tickRun());
+  b.set(`${run.id}-plan`, 'running');
+  b.ends(`${run.id}-plan`, ['unstartable', 'lost']);
+  for (let i = 0; i < 3; i++) await runWith(b.e, tickRun());
+  assert.deepEqual(
+    [...said('SpawnFailed'), ...said('SessionLost')].map((l) => l.word),
+    ['nothing started', 'session lost'],
+    "the fixture journalled the two ends the refusal is about, and each reads as the workflow layer's own word",
+  );
   for (const line of lines())
     assert.equal(
       JSON.stringify(line).includes('unstartable'),
       false,
       `a runtime end reason reached a line of the feed: ${JSON.stringify(line)}`,
     );
-  const here = path.join(import.meta.dirname);
+  const here = import.meta.dirname;
   const names = fs
     .readdirSync(here)
     .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
@@ -676,7 +680,7 @@ test("REFUSED: no runtime word crosses into a signal — the feed says the workf
   assert.deepEqual(
     names,
     ['word-feed.verb.ts'],
-    "one site in the feed's code names the runtime's word, and it is the one that translates it",
+    "one site in the feed's code names the runtime's word, and it is the one table that translates it",
   );
 });
 

@@ -69,7 +69,7 @@ export function ChatTalk({
         data-chat-talk={atEnd ? 'latest' : 'back'}
         role="log"
         aria-label={atEnd ? "Nemia's talk" : 'Earlier messages'}
-        // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a region that scrolls is reached by the keyboard, as the canvas's own talk is
+        // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a box that scrolls is reached by the keyboard
         tabIndex={0}
         className={cn('flex min-h-0 flex-col gap-4 overflow-y-auto', grown ? 'flex-1' : 'max-h-130')}
       >

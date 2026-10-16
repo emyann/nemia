@@ -266,7 +266,8 @@ test('a pass resolves one workflow folder once, however many runs wait on it', a
   const { tallies: before } = await onePass(b);
   assert.ok(before.kinds.revisions.calls > 0, 'the pass resolved the kinds of the runs that have filed nothing');
   const was = unfiled();
-  for (let i = 0; i < 6; i++) await runPlaced(startRun({ brief: `on the one folder ${i}`, repo, workflowDir: oneStep, after: [waiting.id] }));
+  for (let i = 0; i < 6; i++)
+    await runPlaced(startRun({ brief: `on the one folder ${i}`, repo, workflowDir: oneStep, after: [waiting.id] }));
   assert.equal(unfiled() - was, 6, 'six more runs wait on the one folder, each having filed nothing');
   const { tallies: after } = await onePass(b);
   assert.equal(

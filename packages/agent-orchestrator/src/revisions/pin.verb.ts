@@ -170,12 +170,7 @@ export function passRevisions(): PassRevisions {
  * The pins of `steps` as the world holds them now, each given its number in the ledger (`appendRevision`), which appends only where the
  * digest has moved. A kind that is not there is left out: a pin says what was resolved, and nothing was.
  */
-export function pinsOf(
-  run: FolderRun,
-  steps: readonly Workflow[],
-  at: string,
-  read: PassRevisions = passRevisions(),
-): Pin[] {
+export function pinsOf(run: FolderRun, steps: readonly Workflow[], at: string, read: PassRevisions = passRevisions()): Pin[] {
   return kindsIn(run, steps).flatMap((of) => {
     const hash = read.digest(of, run);
     if (hash === null) return [];

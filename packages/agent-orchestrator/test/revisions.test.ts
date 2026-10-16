@@ -599,7 +599,7 @@ test('a memo is keyed by what it reads: one folder read once, and again for anot
   );
 });
 
-test("a workflow folder that has stopped reading is read once a pass, and every run on it keeps what it froze", async () => {
+test('a workflow folder that has stopped reading is read once a pass, and every run on it keeps what it froze', async () => {
   const { one, two, t } = await twoOnOneFolder();
   const read = passRevisions();
   const alone = await resolveCalls(() => resolvedNow(one, AT, read));
@@ -630,8 +630,8 @@ test('each run on one folder is handed its own steps, so a write onto one run’
   assert.notEqual(first.steps, second.steps, 'not the one array');
   assert.notEqual(first.steps[0], second.steps[0], 'nor the one step object');
   assert.deepEqual(first.steps, second.steps, 'the same steps all the same');
-  first.steps[0]!.after = ['nothing of the other run'];
-  assert.deepEqual(second.steps[0]!.after, [], "a write onto one run's steps leaves the other's as the folder holds them");
+  first.steps[0].after = ['nothing of the other run'];
+  assert.deepEqual(second.steps[0].after, [], "a write onto one run's steps leaves the other's as the folder holds them");
 });
 
 test('the pure parts: a revision already given keeps its number, a gap gives no number twice, and the drift reads per kind and per step', () => {

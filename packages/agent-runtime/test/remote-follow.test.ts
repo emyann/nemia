@@ -15,7 +15,7 @@ import type { Followed, RunnerError } from '../src/harness/seam.ts';
 import { bearer, remoteServer, type Binding, type RemoteServer, type ServerOptions } from './remote-server.ts';
 import { scratch } from './scratch.ts';
 import { builtEngine } from './engine.ts';
-import { bell, until, WAITED } from './waits.ts';
+import { bell, until, WAITED } from '../src/waits/index.ts';
 import { elapsedMs } from '../src/core/clock.ts';
 import { instantNow } from '../src/core/engine/now.ts';
 

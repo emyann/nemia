@@ -23,7 +23,7 @@ import { apiKey, bearer, mtls, remoteServer, type Binding, type RemoteServer, ty
 import { scratch } from './scratch.ts';
 import { stepClock } from './clock.ts';
 import { builtEngine } from './engine.ts';
-import { until as untilEvent, WAITED } from './waits.ts';
+import { until as untilEvent, WAITED } from '../src/waits/index.ts';
 
 const servers: RemoteServer[] = [];
 afterEach(async () => {

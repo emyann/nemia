@@ -13,7 +13,7 @@ import { Engine, type EngineShape } from '../src/index.ts';
 import { machineTempDir, scratch } from './scratch.ts';
 import { asyncOps, type AsyncRunner } from './promise-runner.ts';
 import { builtEngine } from './engine.ts';
-import { until, WAITED } from './waits.ts';
+import { until, WAITED } from '../src/waits/index.ts';
 
 const bin = scratch('ae-quota-bin-');
 /** Every ask the fake took: its arguments, then what it ran in, then that it ended, each with its pid. */

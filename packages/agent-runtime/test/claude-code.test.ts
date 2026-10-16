@@ -17,7 +17,7 @@ import { parentFileOf, type ParentCall } from '../src/harness/claude/parent.ts';
 import type { Statement } from '../src/harness/claude/bg.ts';
 import type { SpawnRequest } from '../src/harness/seam.ts';
 import { stepClock } from './clock.ts';
-import { until, WAITED, type Waiter } from './waits.ts';
+import { until, WAITED, type Waiter } from '../src/waits/index.ts';
 import { refusedOsError, TRANSIENT_ERRNOS } from '../src/harness/error.ts';
 
 const tmp = (label: string) => scratch(`ae-claude-code-${label}-`);

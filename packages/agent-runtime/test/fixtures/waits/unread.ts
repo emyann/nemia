@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { until, type Waiter } from '../../waits.ts';
+import { until, type Waiter } from '../../../src/waits/index.ts';
 
 /** A waiter whose signal throws when read, as a function handed in its place does. */
 const unread: Waiter = {

@@ -1,6 +1,6 @@
 /**
  * The workflow layer's feed: one line for each change in what the tick judged of a run or of a step, and one from each daemon once it
- * has taken the store (`startedLine`), appended to `$WF_ROOT/feed.jsonl`.
+ * has taken the store (`startedLine`), appended to `$WF_ROOT/feed.jsonl`, and read by `nemia watch`.
  *
  * The engine keeps a feed of what happened to its tasks (`engine/feed.jsonl`: filed, started, ended, settled). What the workflow layer
  * decides on top of it — a step at its gate, one that signed off blocked, a loop out of rounds, a run waiting on another, a person's
@@ -332,7 +332,7 @@ export const feedSaidWords = (l: FeedLine): string =>
   `${isRunLine(l) ? `${l.run}  ${l.step ?? '—'}` : `pid ${l.daemon}`}  ${l.word}${l.note ? `  · ${l.note}` : ''}`;
 
 /**
- * One line of the feed, for a person: `10:02:13  r-1  plan  awaiting approval  · approve it: …`. Shared by `nemia feed` and `nemia watch`.
+ * One line of the feed, for a person: `10:02:13  r-1  plan  awaiting approval  · approve it: …`: what `nemia watch` prints of it.
  */
 export const feedLineWords = (l: FeedLine): string => `${l.at.slice(11, 19)}  ${feedSaidWords(l)}`;
 
@@ -468,7 +468,3 @@ const needsNote = (c: Closeout | { error: string } | undefined): string => {
   const needs = c && !('error' in c) && c.outcome === 'blocked' && typeof c.needs === 'string' ? oneLine(c.needs, NEEDS_CAP) : '';
   return needs ? `needs: ${needs}` : '';
 };
-
-/** The refusal of a cursor `nemia feed` or `nemia watch` does not take: a second, or anything but a whole number of bytes. */
-export const cursorTakes = (verb: 'feed' | 'watch'): string =>
-  `nemia ${verb} takes one cursor at most, a whole number of bytes — 0, or the number a \`cursor:\` line printed: nemia ${verb} [cursor]${verb === 'watch' ? ' [--json] [--wake] [--wake-word <word>]...' : ''}`;

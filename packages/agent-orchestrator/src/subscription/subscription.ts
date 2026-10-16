@@ -3,9 +3,10 @@
  * and as one digest for routine news, said with the next wake or once `digestEvery` minutes have passed with none. The wake lines of one
  * read of the feed are told in one message.
  *
- * Pure: what a line means for a subscriber (`sortLine`) and for `nemia watch` (`wakeOf`, `watchedLine`), what one read of the feed comes
- * to (`readDelivered`), the words it is told (`messageOf`, `digestOf`), when a digest falls due (`digestDue`), and the refusals of a
- * subscription asked for (`subscribeRefusalOf`).
+ * Pure: what a line means for a subscriber (`sortLine`) and for `nemia watch` (`wakeOf`, `watchedLine`, `bookmarkLine` and the one
+ * cadence a silent watch says where it is at, `BOOKMARK_EVERY`), what one read of the feed comes to (`readDelivered`), the words it is
+ * told (`messageOf`, `digestOf`), when a digest falls due (`digestDue`), and the refusals of a subscription asked for
+ * (`subscribeRefusalOf`).
  * The person's file and the deliverer's are `subscription.store.ts`'s, the deliverer is `deliver.verb.ts`, and the commands are
  * `subscription.verb.ts`.
  */
@@ -89,6 +90,21 @@ export function watchedLine(line: FeedLine, cursor: number, how: Watched): strin
   if (how.wake !== undefined && sortLine(line, how.wake) !== 'wake') return undefined;
   return how.json === true ? JSON.stringify({ ...line, cursor }) : feedLineWords(line);
 }
+
+/**
+ * How often a watch that has fallen silent says where it is: one cadence, read by every surface that follows the feed, so a watcher
+ * resumes within this much of the feed wherever it watched from. Thirty seconds — a `--json` log gains two lines a minute while nothing
+ * happens, and a watcher re-reads at most that much of a silent feed after a crash.
+ */
+export const BOOKMARK_EVERY = '30 seconds';
+
+/**
+ * The bookmark a silent watch prints at `cursor`: under `--json`, a line of its own carrying the cursor and nothing else — no `word`, so
+ * a reader that filters the feed's words skips it; in words, nothing at all, since a person reading a still feed is told nothing by a
+ * number. Pure.
+ */
+export const bookmarkLine = (cursor: number, how: Watched): string | undefined =>
+  how.json === true ? JSON.stringify({ cursor }) : undefined;
 
 /** The routine lines said under a heading, one a line with its time, and how many there are. */
 const digestLines = (lines: readonly FeedLine[]): string[] => [

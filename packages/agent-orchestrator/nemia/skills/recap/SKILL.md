@@ -9,8 +9,9 @@ what you remember of it.
 
 ## Since when
 
-Your memory keeps one fact named `feed-cursor`: where in the feed your last recap ended. `nemia feed <cursor>` prints what came after it,
-and the cursor to keep next. With no such fact, read `nemia feed` from its start and say the recap covers everything the feed holds.
+Your memory keeps one fact named `feed-cursor`: where in the feed your last recap ended. `nemia watch --once <cursor>` prints what came
+after it, and the cursor to keep next. With no such fact, read `nemia watch --once` from the feed's start and say the recap covers
+everything the feed holds.
 Write the new cursor to `feed-cursor` once the recap is given.
 
 ## What it says

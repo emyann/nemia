@@ -28,7 +28,7 @@ Each layer reaches exactly the one below it, and nothing reaches up or skips one
   `packages/agent-orchestrator/test/boundary.test.ts`), and its vocabulary through its pure door, `agent-runtime/vocabulary`, from
   any file.
 
-Spawning a package's `bin/` — `wf feed` in the web app's e2e test, say — is using its CLI, not importing it.
+Spawning a package's `bin/` — `nemia watch --once` in the web app's e2e test, say — is using its CLI, not importing it.
 
 ## Who owns what
 

@@ -34,7 +34,7 @@ words the agent can act on. It files, chains and restarts. It does not decide wh
    expires (it lasts 30 minutes):
 
    ```sh
-   cur=$(npx nemia feed | awk '/^cursor:/{print $2}' | tail -1)
+   cur=$(npx nemia watch --once | awk '/^cursor:/{print $2}' | tail -1)
    ( … the lease-liveness loop, printing only when it changes … ) &
    npx nemia watch "$cur" 2>&1 | awk '/^[[:space:]]*$/ || /watching from/ || /is now nemia/ {next}
      { rest=$0; sub(/^[^ ]+ +[^ ]+ +/, "", rest)

@@ -245,6 +245,9 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
 - Both conversations follow their stream through the one `follow` of `lib/follow.ts`, each handing it a `Follower`: a step's is
   `lib/following.ts`, her chat's `lib/chatFollowing.ts`, and `test/follow.test.ts` refuses a second `unreadable` listener in `lib`
   (`lib/feed.ts` exempt by name). A read the api says it is making again fills `retrying`, a notice at rest; `error` is the end.
+- A step's conversation is followed only while its task is open, never once it has settled (`followedFrom`, `test/following.test.ts`): a
+  settled task says nothing again, and a stream the page closes before the api has answered it is a failed request the e2e's watch counts,
+  only the frame's own streams being let go.
 - Send what the current choice takes, not what hidden state holds (`afterFor`).
 - A form keyed on an agent's version is thrown away with its draft when a write beside the agent moves the version (`keptAfterCopy`,
   `formKeyOf` in `lib/agents.ts`).

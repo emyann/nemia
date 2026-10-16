@@ -50,17 +50,25 @@ const servedAs = (type: string) => ({
 /** One of the engine's events in a session's conversation, as `transcript` gives it (`TranscriptEvent` in agent-runtime). */
 export type TranscriptEvent = Effect.Success<ReturnType<Engine['Service']['transcript']>>['events'][number];
 
-/** A read of a step's conversation: the engine's events from the cursor asked with, where to ask again, and whether more may come. */
+/**
+ * A read of a step's conversation: the engine's events from the cursor asked with, where to ask again, whether something of the task runs
+ * or is to (`live`), and whether it may yet say more (`open`).
+ */
 export type StepTranscript = {
   events: TranscriptEvent[];
   /** The engine's cursor, to pass as `after` on the next read. Null for a step with no task to read. */
   cursor: string | null;
-  /** Whether the step's task is not settled yet. */
+  /** Whether something of the step's task runs or is to, so the conversation is being written while it is read. */
   live: boolean;
+  /**
+   * Whether the task has not settled — one held open on a person's word among them — so it may yet say more. A settled task says
+   * nothing ever again, and the stream of one is a request nobody is served by: a reader follows an open task alone.
+   */
+  open: boolean;
 };
 
-/** A read as the stream takes it: a cursor always, and whether the task has not settled, held open on a person's word among it (`open`). */
-type Read = StepTranscript & { cursor: string; open: boolean };
+/** A read as the stream takes it: a cursor always. */
+type Read = StepTranscript & { cursor: string };
 
 /** Why a step's conversation was not read, with the status that says whose it is to fix. */
 class Unread extends Error {
@@ -315,8 +323,9 @@ async function readAgain(
  *   the step's, and it may write in it again. 400 for a name that is not one; 404 for a step that works on a branch, or a file the folder
  *   does not have.
  * - `GET /api/runs/:id/steps/:step/transcript` — the step's conversation read once from the cursor `after` (an empty one is none, read
- *   from the start): the engine's events for the step's current task, and whether it is live, read through `step transcript`. A step
- *   not filed yet has nothing to read, and nothing of it moves until a tick files it. Refusals are `readTranscript`'s.
+ *   from the start): the engine's events for the step's current task, whether it is live and whether it may yet say more (`open`), read
+ *   through `step transcript`. A step not filed yet has nothing to read, is neither live nor open, and nothing of it moves until a tick
+ *   files it. Refusals are `readTranscript`'s.
  * - `GET /api/runs/:id/steps/:step/transcript/stream` — the same conversation followed, as server-sent events. It starts after the
  *   Last-Event-ID an EventSource sends when it reconnects, else after `after`. The first read is made before the stream opens, so a refused
  *   cursor or a lost task is an answer with a status (`readTranscript`'s), not an event; a step not filed yet is 404.
@@ -452,9 +461,9 @@ export const steps = new Hono<ApiEnv>()
       const step = c.req.param('step');
       const found = taskOfStep(id, step, home);
       if ('error' in found) return c.json({ error: found.error }, 404);
-      if (!found.taskId) return c.json({ events: [], cursor: null, live: false } satisfies StepTranscript);
+      if (!found.taskId) return c.json({ events: [], cursor: null, live: false, open: false } satisfies StepTranscript);
       try {
-        const { open: _open, ...read } = await readTranscript(e, placeService, id, step, found.taskId, c.req.query('after') || undefined);
+        const read = await readTranscript(e, placeService, id, step, found.taskId, c.req.query('after') || undefined);
         return c.json(read satisfies StepTranscript);
       } catch (err) {
         if (err instanceof Unread) return c.json({ error: err.message }, err.status);

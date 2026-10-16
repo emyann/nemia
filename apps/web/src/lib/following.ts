@@ -72,10 +72,14 @@ export function changed(s: Following, c: Change, closed: Set<string>): Following
 
 /**
  * The cursor a step's conversation is followed from after its first read (`first`), or null where it is read that once: a task that is
- * not live, unless the step waits on a person (`waiting`) and its next turn is to come; and a read that gave no cursor.
+ * not live, unless the step waits on a person (`waiting`) and its task is open, its next turn to come; and a read that gave no cursor.
+ *
+ * A task that has settled is never followed, whatever the step waits on: it says nothing ever again, so the api would answer `settled`
+ * and end the stream, and a page that stops reading before that answer arrives aborts a request nobody was served by — which the e2e's
+ * watch counts as a failed request, since only the frame's own streams are let go (`watch` in `test/e2e/checks.ts`).
  */
-export const followedFrom = (first: { live: boolean; cursor: string | null }, waiting: boolean): string | null =>
-  first.live || waiting ? first.cursor : null;
+export const followedFrom = (first: { live: boolean; cursor: string | null; open: boolean }, waiting: boolean): string | null =>
+  first.live || (waiting && first.open) ? first.cursor : null;
 
 /**
  * What a step's stream means, for `follow`: its events decoded by their schemas (`streamDataOf`), each change taken as `changed` says

@@ -194,8 +194,21 @@ test('REFUSED: an event whose data is not of its shape is ignored — a piece wi
 });
 
 test('a step is followed from its first read while its task is live, and while it waits on a person; else, or with no cursor, read once', () => {
-  assert.equal(followedFrom({ live: true, cursor: '3' }, false), '3', 'a live task is followed');
-  assert.equal(followedFrom({ live: false, cursor: '3' }, true), '3', 'a step held on a person is followed, its next turn to come');
-  assert.equal(followedFrom({ live: false, cursor: '3' }, false), null, 'a finished step is read once');
-  assert.equal(followedFrom({ live: true, cursor: null }, true), null, 'a read with no cursor gives nothing to follow from');
+  assert.equal(followedFrom({ live: true, cursor: '3', open: true }, false), '3', 'a live task is followed');
+  assert.equal(
+    followedFrom({ live: false, cursor: '3', open: true }, true),
+    '3',
+    'a step held on a person is followed, its next turn to come',
+  );
+  assert.equal(followedFrom({ live: false, cursor: '3', open: true }, false), null, 'a finished step is read once');
+  assert.equal(followedFrom({ live: true, cursor: null, open: true }, true), null, 'a read with no cursor gives nothing to follow from');
+});
+
+test('a step whose task has settled is read once, whatever it waits on: a settled task says nothing again, and its stream serves nobody', () => {
+  assert.equal(
+    followedFrom({ live: false, cursor: '3', open: false }, true),
+    null,
+    'a step that asks a person, on a task the engine settled, is not followed',
+  );
+  assert.equal(followedFrom({ live: false, cursor: '3', open: false }, false), null, 'nor is one that waits on nobody');
 });

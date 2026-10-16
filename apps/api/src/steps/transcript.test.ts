@@ -176,12 +176,12 @@ const blocks = (text: string): Block[] =>
     );
 const eventsIn = (said: Block[]) => said.filter((b) => b.event === 'transcript').map((b) => JSON.parse(b.data!));
 
-test("a step's transcript is the engine's read of its task's session — its events and cursor — and not live once the task settled", async () => {
+test("a step's transcript is the engine's read of its task's session — its events and cursor — neither live nor open once the task settled", async () => {
   const res = await app.request(url('implement'));
   assert.equal(res.status, 200);
   const body = await res.json();
   const engines = await Effect.runPromise(engine().transcript('t-implement'));
-  assert.deepEqual(body, { ...engines, live: false });
+  assert.deepEqual(body, { ...engines, live: false, open: false }, 'a settled task is read whole, and says it will say nothing more');
   assert.deepEqual(
     body.events.map((e: { kind: string }) => e.kind),
     ['text', 'thinking', 'text', 'tool_use', 'tool_result', 'tool_use', 'tool_result', 'system'],
@@ -190,10 +190,14 @@ test("a step's transcript is the engine's read of its task's session — its eve
 
   const again = await app.request(url('implement', `?after=${encodeURIComponent(body.cursor)}`));
   assert.equal(again.status, 200);
-  assert.deepEqual(await again.json(), { events: [], cursor: body.cursor, live: false }, 'read again from the cursor it gave: nothing new');
+  assert.deepEqual(
+    await again.json(),
+    { events: [], cursor: body.cursor, live: false, open: false },
+    'read again from the cursor it gave: nothing new',
+  );
 });
 
-test('a held step that signed waits on a person, and nothing of it runs: its conversation is read, and not live — and its stream, followed for its next turn, sends it and stays open', async () => {
+test('a held step that signed waits on a person, and nothing of it runs: its conversation is read, not live but open — and its stream, followed for its next turn, sends it and stays open', async () => {
   assert.equal((await Effect.runPromise(engine().view('t-held'))).phase, 'input-required', "the seed is the engine's held task, waiting");
   assert.equal(
     (await Effect.runPromise(engine().view('t-closed'))).phase,
@@ -203,7 +207,7 @@ test('a held step that signed waits on a person, and nothing of it runs: its con
   for (const step of ['held', 'closed']) {
     const engines = await Effect.runPromise(engine().transcript(`t-${step}`));
     assert.equal(engines.events.length, 8, step);
-    assert.deepEqual(await (await app.request(url(step))).json(), { ...engines, live: false }, step);
+    assert.deepEqual(await (await app.request(url(step))).json(), { ...engines, live: false, open: true }, step);
     const reader = (await app.request(streamUrl(step))).body!.getReader();
     const said = await readUntil(reader, { value: '' }, (got) => eventsIn(got).length >= engines.events.length);
     assert.deepEqual(said[0], { event: 'following', data: JSON.stringify({ streamed: true }) }, `${step}: its harness streams a turn`);
@@ -261,10 +265,10 @@ test('a run or a step that does not exist is a 404, worded as the log route word
   }
 });
 
-test('a step not filed yet has no conversation and nothing live to follow', async () => {
+test('a step not filed yet has no conversation and nothing to follow: neither live nor open', async () => {
   const res = await app.request(url('review'));
   assert.equal(res.status, 200);
-  assert.deepEqual(await res.json(), { events: [], cursor: null, live: false });
+  assert.deepEqual(await res.json(), { events: [], cursor: null, live: false, open: false });
   const stream = await app.request(streamUrl('review'));
   assert.equal(stream.status, 404);
   assert.match(

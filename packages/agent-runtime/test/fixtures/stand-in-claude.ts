@@ -19,9 +19,20 @@ import readline from 'node:readline';
  * its `structured_output` and `cost` as its `total_cost_usd` (0.01 when absent).
  *
  * `turns` says what it does after its first result: `one`, close its stdin as a job does, and `many`, keep it open and work each
- * further user message as another turn, as a session on streaming input does.
+ * further user message as another turn, as a session on streaming input does. `fold` works a message that came while a turn ran into
+ * that turn instead, as Claude Code does for words pushed while a tool call runs: one result, listing every message it consumed on
+ * `user_message_uuids`, and no turn of its own.
  */
-type Plan = { deny?: string; ask?: string; call?: string; hold?: boolean; output?: unknown; cost?: number; turns?: 'one' | 'many' };
+type Plan = {
+  deny?: string;
+  ask?: string;
+  call?: string;
+  hold?: boolean;
+  fold?: boolean;
+  output?: unknown;
+  cost?: number;
+  turns?: 'one' | 'many';
+};
 
 const dir = process.env.STANDIN_DIR!;
 const plan = JSON.parse(process.env.STANDIN_PLAN ?? '{}') as Plan;
@@ -47,10 +58,14 @@ const ask = (request: object): Promise<unknown> => {
 /** Whether the turn in flight was interrupted, set by the SDK's `interrupt` control request and read by the turn. */
 let interrupted = false;
 
-/** Waits until `file` appears in the stand-in's folder, or the turn is interrupted. */
+/** Waits until `file` appears in the stand-in's folder, and takes it so the next turn waits for its own; nothing once interrupted. */
 const appears = async (file: string) => {
   for (;;) {
-    if (interrupted || fs.existsSync(path.join(dir, file))) return;
+    if (interrupted) return;
+    if (fs.existsSync(path.join(dir, file))) {
+      fs.rmSync(path.join(dir, file), { force: true });
+      return;
+    }
     await new Promise((r) => setTimeout(r, 50));
   }
 };
@@ -66,6 +81,9 @@ const hooked = async (event: string, tool: string, id: string) => {
       });
     }
 };
+
+/** The uuids of the user messages the turn in flight consumed: the one it took, and any it folded in as it ended. */
+let mine: string[] = [];
 
 /** One turn's work, once a user message came. */
 const work = async () => {
@@ -83,8 +101,10 @@ const work = async () => {
   if (plan.hold) await appears('end');
   const cut = interrupted;
   interrupted = false;
+  if (plan.fold) mine = [...mine, ...queued.splice(0).map((q) => q.uuid)];
   print({
     type: 'result',
+    user_message_uuids: mine,
     subtype: cut ? 'error_during_execution' : 'success',
     is_error: cut,
     ...(cut ? { errors: ['Interrupted by user'] } : {}),
@@ -127,7 +147,7 @@ const answered = (request: { subtype?: string; hooks?: typeof hooks } & Record<s
 
 let working = false;
 let everStarted = false;
-const queued: string[] = [];
+const queued: { text: string; uuid: string }[] = [];
 
 /**
  * Works the next queued user message, one turn at a time, so a second message waits for the turn in flight. A plan whose session is
@@ -135,7 +155,7 @@ const queued: string[] = [];
  */
 const next = () => {
   if (working || queued.length === 0 || (everStarted && plan.turns !== 'many')) return;
-  queued.shift();
+  mine = [queued.shift()!.uuid];
   working = true;
   everStarted = true;
   void work().then(() => {
@@ -145,13 +165,13 @@ const next = () => {
 };
 
 readline.createInterface({ input: process.stdin }).on('line', (text) => {
-  const line = JSON.parse(text) as { type: string; request_id?: string; request?: { subtype: string; hooks?: typeof hooks }; response?: { request_id: string; response?: unknown }; message?: { content: unknown } };
+  const line = JSON.parse(text) as { type: string; uuid?: string; request_id?: string; request?: { subtype: string; hooks?: typeof hooks }; response?: { request_id: string; response?: unknown }; message?: { content: unknown } };
   if (line.type === 'control_request')
     print({ type: 'control_response', response: { subtype: 'success', request_id: line.request_id, response: answered(line.request ?? {}) } });
   else if (line.type === 'control_response') pending.get(line.response!.request_id)?.(line.response!.response);
   else if (line.type === 'user') {
     note('said.jsonl', line.message?.content);
-    queued.push(String(line.message?.content ?? ''));
+    queued.push({ text: String(line.message?.content ?? ''), uuid: String(line.uuid ?? '') });
     next();
   }
 }).on('close', () => process.exit(0));

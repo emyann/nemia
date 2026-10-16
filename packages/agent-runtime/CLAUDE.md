@@ -133,7 +133,10 @@ down is in `docs/architecture.md`, *Who owns what*.
   file is rewritten `idle`, the input stays open, and an `is_error` result fails nothing. The SDK reads `errors` off a result whose
   subtype is not `success`, so a stand-in's interrupted result carries one or `readMessages` throws. Words pushed on its input begin
   the next turn, so `hear` writes `working` with them: a session heard and left `idle` is read as waiting on a person while it answers,
-  and no turn of it can be ended.
+  and no turn of it can be ended. It is `idle` again only once a result has named every word pushed, by `user_message_uuids` on the
+  result (`answered`), never by counting: words pushed while the model writes run as a turn of their own, and words pushed while a tool
+  call runs are folded into the turn in flight and answered by its one result (measured live 2026-10-16, SDK 0.3.270, CLI 2.1.301;
+  `queued_turn_count` was 0 on a result a second turn followed, so nothing reads it).
 - **An attached sighting says `held` and the holder's `pid` while its state is open** (`sightingOf`, `harness/claude/attached.ts`), and
   a holder gone says `held: false`, which `decide` restarts the task under: `interrupted` reads the interrupt file on every look, never
   as a transition, so another process's ask survives a restart of the holder, and an ask that landed after its turn ended is dropped

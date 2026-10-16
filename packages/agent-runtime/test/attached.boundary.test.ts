@@ -509,6 +509,46 @@ test("an interrupt asked by another process is honoured on the holder's next loo
   assert.match(refused.message, /is idle, so it has no turn to end/, 'and an idle session has no turn to end');
 });
 
+test('words said while a turn runs leave the session answering until the turn that answered them ends', WAITED, async (t) => {
+  const { root, dir, request } = kept({ hold: true, output: {} });
+  const h = await holder(root);
+  t.after(() => {
+    fs.writeFileSync(path.join(dir, 'end'), '');
+    return h.close();
+  });
+  await Effect.runPromise(h.attached.ops.spawn(request));
+  await until(t, () => run(root)?.sessionId, 'the session started its first turn', { everyMs: 50 });
+  await Effect.runPromise(h.attached.ops.say!({ name: NAME, sessionId: NAME }, 'and this too'));
+  fs.writeFileSync(path.join(dir, 'end'), '');
+  await until(t, () => (lines(dir, 'said.jsonl') as string[]).length === 2, 'the words it heard are worked as a turn of their own', {
+    everyMs: 50,
+  });
+  assert.equal(run(root)?.state, 'working', 'the first turn ended, and the words it did not answer leave the session answering');
+  assert.equal(
+    (await Effect.runPromise(h.attached.ops.observe)).get(NAME)?.state,
+    'working',
+    'so its sighting says a turn of it can still be ended, never that it waits on a person',
+  );
+  fs.writeFileSync(path.join(dir, 'end'), '');
+  await idle(t, root, 'and it is idle once the turn that answered them ends');
+});
+
+test('words folded into the turn in flight are answered by its one result, which leaves the session idle', WAITED, async (t) => {
+  const { root, dir, request } = kept({ hold: true, fold: true, output: {} });
+  const h = await holder(root);
+  t.after(h.close);
+  await Effect.runPromise(h.attached.ops.spawn(request));
+  await until(t, () => run(root)?.sessionId, 'the session started its first turn', { everyMs: 50 });
+  await Effect.runPromise(h.attached.ops.say!({ name: NAME, sessionId: NAME }, 'and this too'));
+  assert.equal(run(root)?.state, 'working', 'the words it heard are a turn of its own until a result says otherwise');
+  fs.writeFileSync(path.join(dir, 'end'), '');
+  await until(t, () => fs.readFileSync(filesOf(root, NAME).out, 'utf8').includes('"result"'), 'the turn ended, with one result', {
+    everyMs: 50,
+  });
+  assert.equal(run(root)?.state, 'idle', 'one result named both messages, so nothing of it is left unanswered');
+  assert.deepEqual(lines(dir, 'said.jsonl'), ['do the work', 'and this too'], 'both were said, in one turn');
+});
+
 test(
   "REFUSED: an ask that reached the file after its turn ended is dropped on the holder's look, never kept for the next turn",
   WAITED,

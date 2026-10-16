@@ -58,6 +58,16 @@ the partial text, and the session answers the next message pushed on its input u
 2026-10-16 (design's probe), and again in `test/attached.boundary.test.ts`, where exactly one `interrupt` control request is sent
 and the same session answers after it. **She spoke again**: nothing of the interrupt ends the conversation.
 
+**What words pushed mid-turn do.** Measured live on 2026-10-16 (SDK 0.3.270, Claude Code 2.1.301, streaming input, each pushed message
+stamped with a `uuid` of its own): words pushed while the model writes its final text run as a second turn (result #1, then
+`system`/`status: requesting`, then result #2); words pushed while a tool call runs are folded into the turn in flight (the transcript
+enqueues and removes a `queue-operation`, and the words arrive as a `queued_command` attachment after the next tool result), answered by
+that turn's one result. `user_message_uuids` on the result is exact in both — case 2's one result listed both uuids — and
+`queued_turn_count` is not: it was 0 on a result a second turn followed. So the run file is `idle` only once a result has named every
+word pushed (`answered`, `attached-session.ts`), never once a count of them reaches zero, which case 2 would hold at `working` for good.
+**Unmeasured**: whether the result of an interrupted turn names the words it was cut off from answering, and what a live
+`still_queued` lists — a word named by neither would leave the session reading `working` until its next result.
+
 **What is unrecorded.** The SDK's control response to `interrupt` carries a `still_queued` field — the stand-in answers `[]` — and no
 probe recorded what a live Claude Code lists there, nor whether the partial text of the cut turn is listed back anywhere but the
 `result`. The engine's verb reads none of it: it answers `{ at, attempt }`, and the board draws the person's own `Stopped` marker from

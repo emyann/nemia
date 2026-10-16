@@ -1447,7 +1447,7 @@ test('effort reaches codex as a config override before `resume`, and claude-deta
   }).args;
   assert.equal(d[d.indexOf('--effort') + 1], 'max');
   assert.equal(d[d.indexOf('--tools') + 1], 'Read,Grep');
-  assert.equal(d[d.indexOf('--tools') + 2], '--permission-mode', 'a flag ends the variadic list');
+  assert.equal(d[d.indexOf('--tools') + 2], '--settings', 'a flag ends the variadic list');
 });
 
 test('an effort a harness does not have is refused by that harness, in its own words', async () => {
@@ -2199,7 +2199,7 @@ test(
       const a = argv.indexOf('--allowedTools');
       assert.notEqual(a, -1, argv.join(' '));
       assert.equal(argv[a + 1], 'Write(**)');
-      assert.equal(argv[a + 2], '--permission-mode', 'a flag ends this variadic list too');
+      assert.equal(argv[a + 2], '--settings', 'a flag ends this variadic list too');
     } finally {
       process.env.PATH = prev;
     }

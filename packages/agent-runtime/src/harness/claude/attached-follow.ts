@@ -11,7 +11,9 @@
  *   `readTranscript` takes back.
  * - **When it ends.** A wake is a push or one second, and each reads the run file: the follow ends once the session is no longer one
  *   this process runs — ended, held by another process, or parked with no session of that name left in this process's hands (a
- *   let-go). A session parked and taken up again here keeps its followers, the fan-out being made per name rather than per `query()`.
+ *   let-go). The fan-out is made per name rather than per `query()`, so a session this process takes up again — a new `query()` under
+ *   the same name — is said from the same place, to a follower that joins once it is taken up; a follower whose wake falls in the
+ *   park a take-up passes through is ended by the clause above, and reads on by following again.
  * - **What it does not do.** Nothing reaches another process: a follower of a session this holder let go of ends, and a second
  *   process reads the session through `transcript`.
  */

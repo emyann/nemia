@@ -3,7 +3,8 @@
  * as it would Claude Code: its state, the pieces of the text it writes as it writes them — the SDK asked for them with
  * `includePartialMessages`, which the stand-in only streams for when it sees the argument on its argv — the whole events of its
  * transcript with the cursor `transcript` takes back, a follower that joins late, one that leaves, a session taken up again here,
- * one this process has let go of, and a turn cut mid-text.
+ * one this process has let go of, a turn cut mid-text, and the same session followed through the harness's own door, where a name
+ * goes to the runner whose run file it has.
  *
  * Where Claude Code keeps its transcripts is read when `claude/transcript.ts` is loaded, so `CLAUDE_CONFIG_DIR` is set before `src`
  * is imported, and the helpers that import it are imported the same way. The stand-in is started for it by the holder the helpers
@@ -23,6 +24,7 @@ process.env.CLAUDE_CONFIG_DIR = scratch('ae-attached-follow-config-');
 const { holder, kept, lines, NAME, run } = await import('./attached-held.ts');
 const { filesOf, writeRun } = await import('../src/harness/claude/attached-file.ts');
 const { isTranscriptCursor } = await import('../src/harness/transcript.ts');
+const { claudeCodeOps } = await import('../src/harness/claude/code.ts');
 
 /** The pieces the stand-in writes, and the whole its transcript keeps (`fixtures/stand-in-claude.ts`). */
 const SAID = ['Half ', 'a thought'];
@@ -72,7 +74,7 @@ const followable = async (id: string, plan: object = {}) => {
   const { root, dir, request } = kept({ id, stream: true, transcript: true, hold: true, ...plan });
   const h = await holder(root);
   await Effect.runPromise(h.attached.ops.spawn(request));
-  return { root, dir, h };
+  return { root, dir, h: { ...h, root } };
 };
 
 test(
@@ -195,7 +197,7 @@ test('a follower that leaves frees its place, and the next is said everything al
 });
 
 test(
-  'a session this process takes up again is followed: the fan-out is made where the session is, adoption included',
+  'a session this process takes up again is followed by a follower that joins once it is taken up: the fan-out is per name',
   WAITED,
   async (t) => {
     const { root, dir, request } = kept({ id: 'sid-follow-5', stream: true, transcript: true, hold: true });
@@ -248,5 +250,27 @@ test('a turn cut mid-text closes the block it left open', WAITED, async (t) => {
   );
   assert.equal(run(root)?.state, 'idle', 'the cut turn ended the turn, never the session');
   await Effect.runPromise(Fiber.interrupt(fiber));
+  await h.close();
+});
+
+test('a held session is followed through the harness its name is under, from the fan-out and not the job runner', WAITED, async () => {
+  const { dir, h } = await followable('sid-follow-8');
+  const got: Followed[] = [];
+  const exit = await Effect.runPromiseExit(
+    Stream.runForEach(Stream.take(claudeCodeOps({ root: h.root }, h.attached).follow!(NAME), 2), (m) =>
+      Effect.sync(() => void got.push(m)),
+    ),
+  );
+  assert.ok(Exit.isSuccess(exit), `the follow of a held session is served by the attached ops: ${JSON.stringify(exit)}`);
+  assert.deepEqual(
+    got,
+    [
+      { kind: 'state', state: 'working' },
+      { kind: 'partial', key: 'msg_sid-follow-8:0', text: SAID[0], append: false, last: false },
+    ],
+    'the harness sends an attached name to the attached ops, whose follow says the session’s state and its text as it is written',
+  );
+  fs.writeFileSync(path.join(dir, 'more'), '');
+  fs.writeFileSync(path.join(dir, 'end'), '');
   await h.close();
 });

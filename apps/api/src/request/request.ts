@@ -27,9 +27,9 @@ const WILDCARD = '/*';
 
 /**
  * The route the router matched the request to, as its pattern (`/api/runs/:id`), or undefined where nothing but the middleware's own
- * wildcard matched, which is what OTel asks of a request that reached no route. The last of the matched routes, not `routePath(c)`, which
- * reads the one at `c.req.routeIndex`: the dispatcher moves that index as it runs each handler, so what it names depends on when it is
- * read, and the last line matched is the route whichever handler is running.
+ * wildcard matched, which is what OTel asks of a request that reached no route. The last of the matched routes, not Hono's own helper for
+ * the request's route, which reads the one at the index the dispatcher moves as it runs each handler: what that index names depends on
+ * when it is read, while the last line matched is the route whichever handler is running.
  */
 const routeOf = (c: Context<ApiEnv>): string | undefined => {
   const path = matchedRoutes(c).at(-1)?.path;

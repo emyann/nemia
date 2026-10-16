@@ -53,4 +53,6 @@ test('the day and the year are decided in the machine’s zone too, never in UTC
   assert.equal(whenWords(...newYear, 'UTC'), '31 Dec 2025', 'and named UTC it is the year before, which drops the time instead');
   assert.equal(whenColumn(...newYear), ' 1 Jan  1:00 AM', "a column keeps its date and drops the year the machine's zone shares");
   assert.equal(whenColumn(...newYear, 'UTC'), '31 Dec 2025', 'and named UTC the column says the year instead of the time');
+  assert.equal(instantWords(...newYear), '1 Jan 1:00 AM', 'the page keeps its time and drops the year the zone shares');
+  assert.equal(instantWords(...newYear, 'UTC'), '31 Dec 2025, 4:00 PM', 'and named UTC it says the year, then a comma, then the time');
 });

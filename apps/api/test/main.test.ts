@@ -292,8 +292,9 @@ test('an api started --no-tick exports a server span per request, with the HTTP 
       }[];
     }[];
   };
-  const request = span.resourceSpans.flatMap((r) => r.scopeSpans.flatMap((s) => s.spans)).find((one) => one.name === 'GET /api/version');
-  assert.ok(request, `a span named GET /api/version: ${spans}`);
+  const asked = span.resourceSpans.flatMap((r) => r.scopeSpans.flatMap((s) => s.spans)).filter((one) => one.name === 'GET /api/version');
+  assert.equal(asked.length, 1, `one span for the one request asked for: ${spans}`);
+  const request = asked[0];
   assert.equal(request.kind, 2, 'of kind server');
   assert.deepEqual(Object.fromEntries(request.attributes.map((a) => [a.key, a.value.stringValue ?? a.value.intValue])), {
     'http.request.method': 'GET',

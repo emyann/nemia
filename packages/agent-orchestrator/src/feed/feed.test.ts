@@ -888,7 +888,11 @@ test('a v1 line only half signed is read all the same, and every key it lacks is
   assert.equal(read[2].reason, 'ReasonANewerNemiaNamed', 'a line a newer nemia signed is passed on as its writer judged it');
   const fold = foldFeed(freshFold(), read);
   assert.deepEqual([...fold.said.keys()], ['Step/r-a/plan', 'Run/r-a'], 'and the fold reads each by what it is about');
-  assert.deepEqual([...fold.shots.entries()], [['r-a/plan#0', 1]], 'the one-shot with no try is counted under none');
+  assert.deepEqual(
+    [...fold.shots.entries()],
+    [['ToolDenied Step/r-a/plan#0#try 1', 1]],
+    'the one-shot is counted under its reason, what it is about, the try it lacks and the note that tells it from another',
+  );
 });
 
 test('a line a writer died in the middle of is ended by the next pass, and costs that line alone', async () => {

@@ -9,7 +9,20 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DENIED, kindsOf, messageOf, reasonOf, REASON_CODES, typeOf, waitsOf, REMOVED, type InvolvedKind, type Reason } from './reason.ts';
+import {
+  DENIED,
+  kindsOf,
+  messageOf,
+  reasonOf,
+  REASON_CODES,
+  sourceOf,
+  typeOf,
+  waitsOf,
+  REMOVED,
+  type InvolvedKind,
+  type Reason,
+  type SignalSource,
+} from './reason.ts';
 import { SLOT_WAIT, slotWord } from '../cap/cap.ts';
 import { PAUSE_WAIT, waitingWords } from '../list/list.ts';
 import { checkoutWord } from '../ending/ending.ts';
@@ -99,6 +112,20 @@ const RUN_LINES: readonly Case[] = [
   { kind: 'Run', word: 'awaiting approval', note: 'waiting on you: approve plan', reason: 'AwaitingApproval' },
 ];
 
+/**
+ * The six words the owner named at this slice's design gate, spelled here by hand and not read off `SIGNAL_WORDS`: this file is what holds
+ * the code to the words, so a word reworded in the table and not here is a case that fails, which is the point. Each of the two runtime
+ * faults is a word of the workflow layer's own — `nothing started`, not `unstartable`; `session lost`, not `lost`.
+ */
+const ACT_WORDS: readonly Case[] = [
+  { kind: 'Step', word: 'approved', note: 'try 2 · at 2026-10-16T04:00:00.000Z', reason: 'Approved' },
+  { kind: 'Run', word: 'cancel asked', note: 'at 2026-10-16T04:00:00.000Z', reason: 'CancelAsked' },
+  { kind: 'Run', word: 'hold put', note: 'since 2026-10-16T04:00:00.000Z', reason: 'HoldPut' },
+  { kind: 'Run', word: 'hold lifted', note: 'since 2026-10-16T04:00:00.000Z', reason: 'HoldLifted' },
+  { kind: 'Step', word: 'nothing started', note: 'try 1', reason: 'SpawnFailed' },
+  { kind: 'Step', word: 'session lost', note: 'try 3', reason: 'SessionLost' },
+];
+
 /** The one-shot a tool denial writes, and the one line a daemon writes. */
 const ONE_SHOTS: readonly Case[] = [
   { kind: 'Step', word: `${DENIED}Bash(grep)`, note: 'try 2', reason: 'ToolDenied' },
@@ -114,6 +141,7 @@ const CASES: readonly Case[] = [
   ...SAID_WORDS,
   ...WAIT_WORDS,
   ...ONE_SHOTS,
+  ...ACT_WORDS,
 ];
 
 test('every word the package writes maps to a reason', () => {
@@ -132,8 +160,8 @@ test('every entry of the table is one some word reaches', () => {
     CASES.map((c) => `${reasonOf({ word: c.word, ...(c.note !== undefined ? { note: c.note } : {}) }, c.kind)}/${c.kind}`),
   );
   const entries = REASON_CODES.flatMap((reason) => kindsOf(reason).map((kind) => `${reason}/${kind}`));
-  assert.equal(entries.length, 32, 'the table the owner named has 32 entries');
-  assert.equal(REASON_CODES.length, 27, 'of 27 distinct codes');
+  assert.equal(entries.length, 38, 'the table the owner named has 38 entries');
+  assert.equal(REASON_CODES.length, 33, 'of 33 distinct codes');
   assert.deepEqual(
     entries.filter((entry) => !reached.has(entry)),
     [],
@@ -168,4 +196,36 @@ test('a type is the table its reason comes from, and a message is the word and i
   assert.equal(messageOf({ word: 'running' }), 'running', 'a word with no note is the message whole');
   assert.equal(messageOf({ word: 'running', note: '' }), 'running', 'and so is an empty note');
   assert.equal(messageOf({ word: `${DENIED}Bash(grep)`, note: 'try 2' }), 'denied: Bash(grep) · try 2', "the owner's wording for a denial");
+});
+
+/** Every source a line may be the deed of: what a selector on `source` may match, and what the table may answer. */
+const SOURCES: readonly SignalSource[] = ['tick', 'runtime', 'person', 'daemon'];
+
+test("a line's source is the table's, and every source is one some word reaches", () => {
+  for (const reason of REASON_CODES)
+    assert.ok(SOURCES.includes(sourceOf(reason)), `${reason}: ${sourceOf(reason)} is no source a line may carry`);
+  const reached = new Set(CASES.map((c) => sourceOf(reasonOf({ word: c.word, note: c.note }, c.kind))));
+  assert.deepEqual(
+    SOURCES.filter((source) => !reached.has(source)),
+    [],
+    'a source no fixture reaches is one nothing writes',
+  );
+});
+
+test("a person's act is the person's deed and a runtime fault the runtime's — never the tick's", () => {
+  assert.deepEqual(
+    ACT_WORDS.map((c) => sourceOf(c.reason)),
+    ['person', 'person', 'person', 'person', 'runtime', 'runtime'],
+    "the owner's four verbs are a person's deed and the two faults the runtime's",
+  );
+  assert.equal(sourceOf('ToolDenied'), 'runtime', 'a call the harness denied is the runtime telling us');
+  assert.equal(sourceOf('DaemonStarted'), 'daemon');
+  assert.equal(sourceOf('Running'), 'tick', "a word the tick judged is the tick's, which is what a reason naming no source is");
+});
+
+test('neither runtime fault waits on a person, as the owner said, and neither is Normal', () => {
+  for (const reason of ['SpawnFailed', 'SessionLost'] as const) {
+    assert.equal(waitsOf(reason), false, `${reason} must wake nobody on its own`);
+    assert.equal(typeOf(reason), 'Warning', `${reason} is something gone wrong`);
+  }
 });

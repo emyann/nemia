@@ -34,18 +34,22 @@ import { takeoverLine, type DaemonStanding } from '../daemon/daemon.ts';
 import {
   DAEMON_STARTED,
   DENIED,
+  isOnce,
   messageOf,
   reasonOf,
   REMOVED,
+  SIGNAL_WORDS,
+  sourceOf,
   typeOf,
   waitsOf,
   type InvolvedKind,
   type Reason,
+  type SignalSource,
   type SignalType,
 } from './reason.ts';
 
-export { DAEMON_STARTED, REMOVED };
-export type { InvolvedKind, Reason, SignalType };
+export { DAEMON_STARTED, REMOVED, SIGNAL_WORDS };
+export type { InvolvedKind, Reason, SignalSource, SignalType };
 
 /** The version every line this `nemia` writes is stamped with; a line with none is upgraded on read (`upgraded`). */
 export const FEED_VERSION = 'nemia/v1';
@@ -58,9 +62,6 @@ export type Involved = { kind: InvolvedKind; name: string };
  * its agent. A daemon's line is of no run and carries none.
  */
 export type FeedLabels = { run?: string; factory?: string; workflow?: string; step?: string; agent?: string };
-
-/** Who wrote a line: the tick's judgement, the runtime's journal, a person's verb, or a daemon that took the store. */
-export type SignalSource = 'tick' | 'runtime' | 'person' | 'daemon';
 
 /**
  * What a v1 line says besides the four fields it keeps for one release: its version, what it is about (`involved`), its labels, the
@@ -121,8 +122,10 @@ const labelsOf = (line: FeedLine): FeedLabels =>
  * reason, its type, whether it waits, its source and its message filled in from the word and the note it was written with. Pure, and
  * nothing on disk is rewritten — this is read, never written back.
  *
- * It is also the one stamp a new line gets: `feedChanges`, `startedLine` and `denialLines` build the fields a line is written with and
- * hand them here, so a line written and a line upgraded say the same reason, type, wait and message.
+ * It is also the one stamp a new line gets: `feedChanges`, `startedLine` and `onceLines` build the fields a line is written with and
+ * hand them here, so a line written and a line upgraded say the same reason, type, wait and message. A line's `source` is the reason's by
+ * the table (`sourceOf`), unless the offer named one of its own: a hold the tick lifted is the tick's deed under a reason a person's verb
+ * usually writes, and nothing but the pass that lifted it can know that.
  *
  * A line that carries an `apiVersion` is trusted as written, whatever version it names. A `nemia` newer than this one may name a reason
  * this table does not have, or mark as waiting a reason this one does not: re-deriving either would answer for its writer, and a line is
@@ -141,7 +144,7 @@ export function upgraded(line: FeedLine): FeedLine {
     reason,
     type: typeOf(reason),
     ...(waitsOf(reason, line.note) ? { waits: 'person' as const } : {}),
-    source: involved.kind === 'Daemon' ? 'daemon' : reason === 'ToolDenied' ? 'runtime' : 'tick',
+    source: line.source ?? sourceOf(reason),
     message: messageOf(line),
   };
 }
@@ -197,8 +200,20 @@ export const freshMemo = (): FeedMemo => ({ cursor: 0, fold: freshFold() });
 /** Where the fold keeps what a line is about, derived the same from a v0 line and a v1 one. */
 const foldKey = (involved: Involved): string => `${involved.kind}/${involved.name}`;
 
-/** Where the fold counts a step's one-shots: what the line is about, and the try it belongs to. */
-const shotKey = (involved: Involved, tried: number | undefined): string => `${involved.name}#${tried ?? 0}`;
+/**
+ * Where the fold counts one occurrence of a one-shot: the reason its word names, what the line is about (`foldKey`'s shape, so `forget`
+ * reads the run off it), the try it belongs to, and the note that tells one occurrence from another — the note last, so `holdOnce` reads
+ * it back off the key. A run id and a step name are slugs and carry no `#`, so the note is what follows the second one.
+ */
+const onceKey = (involved: Involved, reason: Reason, tried: number | undefined, note: string | undefined): string =>
+  `${reason} ${involved.kind}/${involved.name}#${tried ?? 0}#${note ?? ''}`;
+
+/** What a one-shot of `run`, of its step `step` where it is of one, is about: the same `Involved` a line of it carries. */
+const onceInvolved = (run: string, step: string | undefined): Involved =>
+  step === undefined ? { kind: 'Run', name: run } : { kind: 'Step', name: `${run}/${step}` };
+
+/** What a one-shot's key says the line is about, as `onceKey` joined it after the reason. */
+const onceAbout = (key: string): string => key.slice(key.indexOf(' ') + 1);
 
 /** The reason `line` names, its own where it has one, else the word's by the table. */
 const reasonOfLine = (line: FeedLine, involved: Involved): Reason => line.reason ?? reasonOf(line, involved.kind);
@@ -207,7 +222,8 @@ const reasonOfLine = (line: FeedLine, involved: Involved): Reason => line.reason
 function forget(fold: FeedFold, run: string): void {
   fold.said.delete(foldKey({ kind: 'Run', name: run }));
   for (const key of fold.said.keys()) if (key.startsWith(`Step/${run}/`)) fold.said.delete(key);
-  for (const key of fold.shots.keys()) if (key.startsWith(`${run}/`)) fold.shots.delete(key);
+  for (const key of fold.shots.keys())
+    if (onceAbout(key).startsWith(`Run/${run}#`) || onceAbout(key).startsWith(`Step/${run}/`)) fold.shots.delete(key);
 }
 
 /**
@@ -219,8 +235,8 @@ export function foldFeed(fold: FeedFold, lines: readonly FeedLine[]): FeedFold {
   for (const l of lines.filter(isRunLine)) {
     const involved = involvedOf(l);
     const reason = reasonOfLine(l, involved);
-    if (reason === 'ToolDenied') {
-      const key = shotKey(involved, l.try);
+    if (isOnce(reason)) {
+      const key = onceKey(involved, reason, l.try, l.note);
       fold.shots.set(key, (fold.shots.get(key) ?? 0) + 1);
       continue;
     }
@@ -247,43 +263,117 @@ const saidKeys = (said: FeedSaid): { word: string; note?: string } => ({
 });
 
 /**
- * The one-shots a pass owes the feed for what `words` says the run's steps were denied: one line for each denial the feed does not hold
- * already, with the `call` denied and the `try` it belongs to as fields of its own. Pure.
+ * A one-shot the pass offers the feed: a fact written exactly once per occurrence rather than a word that stands until it changes — a call
+ * a harness denied, a person's act, a spawn refused, a session lost. The word and the note it says, the step it is of where it is of one,
+ * the `call` a denial names and the `try` it belongs to where it has them, and a `source` over the reason's own where the deed is not the
+ * one the reason implies (`upgraded`).
  *
- * **The count is read off the feed, not remembered.** A denial has no stamp of its own in the runtime's journal, so what identifies one
- * is the step, its try, and its place among that try's denials; the fold counts the lines already written under that step and that try
- * (`shots`), and this writes the rest, in the order the runtime journalled them. So a pass writes a denial once however many passes read
- * it, and a restarted daemon, which reads the whole feed, writes it neither again nor never.
+ * **The reason is the word's, through the one classifier** (`reasonOf`): an offer carries no reason of its own, so the key an offer is
+ * counted under and the key the line read back is counted under cannot drift apart and write the fact on every pass.
+ *
+ * What identifies one occurrence is its reason, what it is of, its try and its note (`onceKey`) — and, where several share all four, its
+ * place among them: nothing in the runtime's journal stamps a denial, and two attempts of one try lost are told apart only by being two.
  */
-function denialLines(fold: FeedFold, at: string, run: string, words: FeedWords): RunLine[] {
-  const out: RunLine[] = [];
+export type Once = { step?: string; word: string; note?: string; call?: string; try?: number; source?: SignalSource };
+
+/**
+ * The one-shots of `offers` the feed does not hold already, in the order they were offered. Pure.
+ *
+ * **The count is read off the feed, not remembered.** The fold counts the lines written under each occurrence's key (`shots`), and this
+ * takes the rest. Two offers that come to one key are one occurrence apiece, counted by their place among them, so a second denial of the
+ * same call in the same try, or a second attempt of it lost, gets its own line and a repeat of the first gets none. So a pass writes a
+ * fact once however many passes read it, and a restarted daemon, which reads the whole feed, writes it neither again nor never — and two
+ * offers of one occurrence on one pass, as a hold the tick lifted is both the tick's offer and a hold merely gone, are one line.
+ */
+function oncePast(fold: FeedFold, run: string, offers: readonly Once[]): Once[] {
   const walked = new Map<string, number>();
-  for (const d of words.denials ?? []) {
-    const involved: Involved = { kind: 'Step', name: `${run}/${d.step}` };
-    const key = shotKey(involved, d.try);
+  const out: Once[] = [];
+  for (const o of offers) {
+    const involved = onceInvolved(run, o.step);
+    const key = onceKey(involved, reasonOf(o, involved.kind), o.try, o.note);
     const nth = walked.get(key) ?? 0;
     walked.set(key, nth + 1);
     if (nth < (fold.shots.get(key) ?? 0)) continue;
-    out.push(
-      upgraded({
-        at,
-        run,
-        step: d.step,
-        word: `${DENIED}${d.call}`,
-        note: `try ${d.try}`,
-        involved,
-        labels: words.steps.find((s) => s.name === d.step)?.labels ?? { run, step: d.step },
-        call: d.call,
-        try: d.try,
-      }) as RunLine,
-    );
+    out.push(o);
   }
   return out;
 }
 
+/** The note a hold's put and its lift both carry: the moment the hold was put, which is what tells one hold of a run from the next. */
+const holdSince = (at: string): string => `since ${at}`;
+
+/**
+ * The one-shots a run's hold owes the feed: the put, for the hold the pass read on the record (`held`, its `at`), and the lift — the
+ * pass's own, where the pass lifted it (`lifted`), and one for each put the feed holds that it holds no lift against and that is no longer
+ * the hold on the record. Pure.
+ *
+ * **A fact a person deleted is answered by the pair, not by a key.** `nemia hold <run> --off` takes the hold's file away, so the next pass
+ * reads only its absence; the feed holds the put, so the lift is due, and once written the pair is matched and no pass says it again. A
+ * hold put, lifted and put again is two puts and two lifts, each told apart by the moment its hold was put (`holdSince`).
+ *
+ * The tick lifts a hold itself once every run it names has shipped (`liftHold`), and by then the hold is already off the record: so the
+ * pass that lifted it offers its own lift first, sourced `tick`, and the absence rule's offer of the same occurrence is the same line
+ * (`oncePast`) — which is what keeps the tick's own deed from being read as a person's.
+ */
+function holdOnce(fold: FeedFold, run: string, held: string | undefined, lifted: string | undefined): Once[] {
+  const involved = onceInvolved(run, undefined);
+  const standing = held === undefined ? undefined : holdSince(held);
+  const out: Once[] = [
+    ...(standing !== undefined ? [{ word: SIGNAL_WORDS.HoldPut, note: standing }] : []),
+    ...(lifted !== undefined ? [{ word: SIGNAL_WORDS.HoldLifted, note: holdSince(lifted), source: 'tick' as const }] : []),
+  ];
+  const puts = onceKey(involved, 'HoldPut', undefined, '');
+  for (const key of fold.shots.keys()) {
+    if (!key.startsWith(puts)) continue;
+    const note = key.slice(puts.length);
+    if (note === standing || fold.shots.has(onceKey(involved, 'HoldLifted', undefined, note))) continue;
+    out.push({ word: SIGNAL_WORDS.HoldLifted, note });
+  }
+  return out;
+}
+
+/** One call a step's sessions were denied, as the one-shot the feed writes of it: the call in its word and as a field of its own. */
+const denialOnce = (d: FeedDenial): Once => ({
+  step: d.step,
+  word: `${DENIED}${d.call}`,
+  note: `try ${d.try}`,
+  call: d.call,
+  try: d.try,
+});
+
+/**
+ * The lines a pass owes the feed for the one-shots `words` carries: each call its steps were denied, each act a person took on the run
+ * (`acts`), its hold's put and lift (`holdOnce`) and each fault the runtime journalled (`faults`) — each written once per occurrence
+ * (`oncePast`), stamped through the one door (`upgraded`). Pure.
+ */
+function onceLines(fold: FeedFold, at: string, run: string, words: FeedWords): RunLine[] {
+  const runLabels = words.labels ?? { run };
+  const offers = [
+    ...(words.denials ?? []).map(denialOnce),
+    ...(words.acts ?? []),
+    ...holdOnce(fold, run, words.held, words.lifted),
+    ...(words.faults ?? []),
+  ];
+  return oncePast(fold, run, offers).map(
+    (o) =>
+      upgraded({
+        at,
+        run,
+        ...(o.step !== undefined ? { step: o.step } : {}),
+        word: o.word,
+        ...(o.note !== undefined ? { note: o.note } : {}),
+        involved: onceInvolved(run, o.step),
+        labels: o.step === undefined ? runLabels : (words.steps.find((s) => s.name === o.step)?.labels ?? { ...runLabels, step: o.step }),
+        ...(o.call !== undefined ? { call: o.call } : {}),
+        ...(o.try !== undefined ? { try: o.try } : {}),
+        ...(o.source !== undefined ? { source: o.source } : {}),
+      }) as RunLine,
+  );
+}
+
 /**
  * The lines a pass owes the feed: one for each run and each step whose word or note is not what the feed said of it last — a run the feed
- * has never named says each of its words once — one one-shot for each denial the feed does not hold yet (`denialLines`), and one `removed`
+ * has never named says each of its words once — one line for each one-shot the feed does not hold yet (`onceLines`), and one `removed`
  * for each run the feed still names that the store no longer has. Pure.
  *
  * A run the pass found at rest (`FeedWords.atRest`) owes a line only where a word moved: a note that moved alone, as a new wording of
@@ -315,7 +405,7 @@ export function feedChanges(
     for (const s of words.steps)
       if (!same(fold.said.get(`Step/${id}/${s.name}`), s, atRest))
         out.push(line(id, s.name, s, s.labels ?? { ...runLabels, step: s.name }));
-    out.push(...denialLines(fold, at, id, words));
+    out.push(...onceLines(fold, at, id, words));
   }
   for (const key of fold.said.keys()) {
     const id = key.startsWith('Run/') ? key.slice('Run/'.length) : undefined;
@@ -371,6 +461,11 @@ export type FeedSaid = { word: string; note?: string };
 /**
  * What a pass judged of one run, in the words the feed keeps (`feedWords`): the run's, and each step's in the order they run; and
  * `atRest` when the pass found the run at rest (`atRest` in rest.ts), whose notes moving alone owe the feed no line (`feedChanges`).
+ *
+ * Beside the words, the one-shots the pass read of the run, each written once per occurrence and no part of any word: the calls its
+ * steps were denied (`denials`), the acts a person took on it (`acts`, from `actsOf`), the faults the runtime journalled (`faults`, from
+ * `faultsOf`), the moment the hold on its record was put (`held`) and the moment of the hold this pass lifted itself (`lifted`), which
+ * `holdOnce` pairs into a put and a lift.
  */
 export type FeedWords = {
   run: FeedSaid;
@@ -378,6 +473,10 @@ export type FeedWords = {
   atRest?: true;
   labels?: FeedLabels;
   denials?: readonly FeedDenial[];
+  acts?: readonly Once[];
+  faults?: readonly Once[];
+  held?: string;
+  lifted?: string;
 };
 
 /**
@@ -419,19 +518,33 @@ export const feedPhase = (word: string): string =>
  * @param closeoutOf How each step signed off, as `listing` was handed it: a step that signed off blocked says what it needs beside its
  *   word.
  * @param labelled The labels of the run and of each of its steps, from the one source a filing's labels come from (`stepLabels`), and the
- *   calls its steps were denied so far. The labels have one writer, the pass that files the steps: nothing here decides what a label is.
+ *   one-shots the pass read of the run beside them — the calls its steps were denied, a person's acts, the runtime's faults, and the two
+ *   moments a hold is paired by (`FeedWords`). The labels have one writer, the pass that files the steps: nothing here decides what a
+ *   label is.
  */
 export function feedWords(
   l: Listing,
   run: Pick<Run, 'pruned' | 'hold'>,
   { status }: Pick<Assessment, 'status'>,
   closeoutOf: (step: string) => Closeout | { error: string } | undefined = () => undefined,
-  labelled: { run?: FeedLabels; step?: (step: string) => FeedLabels; denials?: readonly FeedDenial[] } = {},
+  labelled: {
+    run?: FeedLabels;
+    step?: (step: string) => FeedLabels;
+    denials?: readonly FeedDenial[];
+    acts?: readonly Once[];
+    faults?: readonly Once[];
+    held?: string;
+    lifted?: string;
+  } = {},
 ): FeedWords {
   const onYou = onYouWords(l);
   return {
     ...(labelled.run ? { labels: labelled.run } : {}),
     ...(labelled.denials?.length ? { denials: labelled.denials } : {}),
+    ...(labelled.acts?.length ? { acts: labelled.acts } : {}),
+    ...(labelled.faults?.length ? { faults: labelled.faults } : {}),
+    ...(labelled.held !== undefined ? { held: labelled.held } : {}),
+    ...(labelled.lifted !== undefined ? { lifted: labelled.lifted } : {}),
     run: {
       word: `${status}${run.pruned ? ' (pruned)' : ''}`,
       ...(run.hold && status !== 'cancelled'

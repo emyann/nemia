@@ -138,6 +138,11 @@ test('a run that has filed keeps its pins: the folder edited after its first fil
 
   assert.deepEqual(readRun(run.id).pinned, pinned, 'the pins are the ones it filed on');
   assert.doesNotMatch(promptOf(run.id, 'build'), /Something else/, 'and the prompt is the one it was rendered with');
+  assert.deepEqual(
+    ledgerOf('agent', t.agent).map((r) => r.n),
+    [1, 2],
+    'and the edit is numbered all the same, so the board can say what the run is behind on',
+  );
 });
 
 test('the ledger appends only where the digest moved, and a content it already holds keeps the number it was given', async () => {

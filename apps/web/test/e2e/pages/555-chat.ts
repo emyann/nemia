@@ -53,6 +53,16 @@ async function expectEmpty(panel: ReturnType<typeof chatPanelOf>): Promise<void>
   for (const words of STARTERS) await expectVisible(empty.locator('[data-chat-chip]', { hasText: words }), `the chip ${words}`);
 }
 
+/** The composer's edge, its colour and the shape it is clipped to: the layer the look's cut field draws round the whole box. */
+async function edgeOf(page: Parameters<PageSpec['expect']>[0]): Promise<{ colour: string; clip: string }> {
+  const edge = page.locator('[data-chat-composer] [data-cut-edge]');
+  await expectVisible(edge, "the composer's edge is a layer of its own");
+  return await edge.evaluate((layer) => {
+    const style = getComputedStyle(layer);
+    return { colour: style.backgroundColor, clip: style.clipPath };
+  });
+}
+
 export default {
   /**
    * Her face docked and closed on a page of the board (state 1), the panel it opens with nothing said yet (state 2) — her greeting, her
@@ -79,8 +89,25 @@ export default {
       await settled(page);
       await photograph(page, path.join(OUT, `chat-empty-${await themeOf(page)}.png`), { fullPage: true });
 
+      const quiet = await edgeOf(page);
+      if (!quiet.clip.startsWith('polygon(')) throw new Refused(`the edge is drawn in the cut shape — it is clipped to ${quiet.clip}`);
+
       const field = chatFieldOf(page);
       await field.fill('Start the two kit cards as one batch');
+      const lit = await edgeOf(page);
+      if (lit.colour === quiet.colour)
+        throw new Refused(`with the focus in the field the whole edge takes the focus ink — it stays ${quiet.colour}`);
+      if (lit.clip !== quiet.clip)
+        throw new Refused(`and keeps the cut shape it had, round both cut corners — it is clipped to ${lit.clip}`);
+
+      await field.press('Tab');
+      const ring = page.locator('[data-chat-composer] [data-cut-ring]');
+      await expectVisible(ring, 'the keyboard on the send draws its focus ring');
+      const band = await ring.evaluate((layer) => getComputedStyle(layer).clipPath);
+      if (!band.startsWith('polygon(evenodd'))
+        throw new Refused(`the send's ring is a band in its cut shape, as the look's cut button's is — it is clipped to ${band}`);
+      await settled(page);
+      await photograph(page, path.join(OUT, `chat-send-ring-${await themeOf(page)}.png`), { fullPage: true });
       await field.press('Shift+Enter');
       await field.type('and tell me when its check is green');
       const draft = await field.inputValue();

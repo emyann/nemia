@@ -3,8 +3,8 @@
  * package's tests (`DEADLINES`).
  *
  * `src/waits/waits.ts` is the one copy: a test of a layer above takes it from `agent-runtime/testing`, and the board, which imports no
- * package, keeps a copy this file holds to it byte for byte, since the board's own test builds no path into a package. A wait asks at once, on each ring and
- * at its pace, and ends at its test's timeout saying what never came: that is read off a nested `node --test` of
+ * package, keeps a copy this file holds to it byte for byte, since the board's own test builds no path into a package. A wait asks at
+ * once, on each ring and at its pace, and ends at its test's timeout saying what never came: that is read off a nested `node --test` of
  * `test/fixtures/waits/never.ts`, since a test's timeout is reported only outside it. `DEADLINES` counts, file by file, each `now()` of
  * `Date` or `performance` a number is added to, or a start taken from and held under a bound, in the package's tests: each left is a
  * mocked clock, a timestamp, a reaper's bound, a synchronous hold or an assertion, never a wait, and a count only shrinks

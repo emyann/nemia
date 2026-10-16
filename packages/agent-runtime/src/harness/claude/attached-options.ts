@@ -34,6 +34,7 @@ export type AttachedOptions = Pick<
   | 'plugins'
   | 'extraArgs'
   | 'env'
+  | 'includePartialMessages'
 >;
 
 /** One flag's value as `extraArgs` takes it: a string, or null for a switch; refused where it repeats the flag. */
@@ -93,6 +94,9 @@ const mcpFileOf = (r: SpawnRequest, file: string): string | undefined => {
  *
  * - the tools, denies and allows (`claudeDenies`, `claudeAllows`), the mounts as `additionalDirectories`;
  * - `config.claude` with the admission's hook (`admittedFlags`) on `extraArgs`, its plugin folders as `plugins`;
+ * - the partial messages, always asked for: the SDK emits a `stream_event` for each piece of a block only when
+ *   `includePartialMessages` is set (`sdk.d.ts:1736`, `--include-partial-messages` to its CLI), and a follow of the session reads
+ *   their `text_delta`s and nothing else (`attached-follow.ts`); the capture goes on dropping them;
  * - the mode, `auto` unless the task names one; the servers, strict, no Chrome; `--setting-sources project`; Claude Code's own
  *   system prompt as the preset `claude_code`, which a `claude -p` job has by default and the SDK leaves empty when unasked, so the
  *   agent's own prompt on `append-system-prompt-file` is appended to it and not to nothing;
@@ -111,6 +115,7 @@ export const attachedOptions = (r: SpawnRequest, mcpFile: string): AttachedOptio
     cwd: r.cwd,
     ...fenceOf(c),
     ...(plugins.length ? { plugins: plugins.map((p) => ({ type: 'local' as const, path: path.resolve(r.cwd, p) })) } : {}),
+    includePartialMessages: true,
     permissionMode: (c?.permissionMode ?? CLAUDE_DEFAULT_MODE) as Options['permissionMode'],
     settingSources: ['project'],
     systemPrompt: { type: 'preset', preset: 'claude_code' },

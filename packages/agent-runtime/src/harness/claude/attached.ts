@@ -128,11 +128,6 @@ export const attachedSessions = (root: string, executable?: string): Attached =>
 
   const stopped = (run: AttachedRun) => fs.existsSync(filesOf(root, run.name).stop);
 
-  /**
-   * The turn of the session this process holds ended, where another process asked for it: read off the interrupt file on every look,
-   * never acted on as a transition, so a holder that restarted mid-ask honours it all the same; the file goes once the request was
-   * sent, and stays for the next look while no live turn takes it.
-   */
   const interrupted = (run: AttachedRun) => {
     const file = filesOf(root, run.name).interrupt;
     if (!fs.existsSync(file)) return;

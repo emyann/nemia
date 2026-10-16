@@ -1,7 +1,8 @@
 /**
  * A chat with a long-lived task, read and written as the board asks: its history a page at a time with where the task is
  * (`chatHistory`), what changed since a stream's cursor (`chatSince`), the person's words put in the outbox (`chatSend`), their read
- * mark moved (`chatRead`) and the turn it is answering stopped (`chatStop`). Every read projects again from the task's record, its transcripts and the chat's files (`projectChat`).
+ * mark moved (`chatRead`) and the turn it is answering stopped (`chatStop`). Every read projects again from the task's record, its
+ * transcripts and the chat's files (`projectChat`).
  *
  * **Every read costs the whole projection, and that is accepted here.** A read is the task's view, every one of the task's attempts'
  * transcripts from the start, the chat's three files and the open runs for `waitsOnYou`; a followed chat pays it again on every beat, per
@@ -173,14 +174,12 @@ export const chatStop = Effect.fn('chatStop')(function* (place: ChatPlace) {
   const e = yield* EngineService;
   if (place.task === undefined)
     return yield* Effect.fail(new Conflict({ message: 'No session of hers is filed, so there is no turn to stop.' }));
-  const ended = yield* e
-    .interrupt(place.task)
-    .pipe(
-      Effect.catchTags({
-        InterruptRefused: (refused) => Effect.fail(new Conflict({ message: refused.message })),
-        InterruptUnsent: (unsent) => Effect.fail(new Conflict({ message: unsent.message })),
-      }),
-    );
+  const ended = yield* e.interrupt(place.task).pipe(
+    Effect.catchTags({
+      InterruptRefused: (refused) => Effect.fail(new Conflict({ message: refused.message })),
+      InterruptUnsent: (unsent) => Effect.fail(new Conflict({ message: unsent.message })),
+    }),
+  );
   const stop: SourceStop = { at: ended.at, attempt: ended.attempt };
   yield* tried(() => appendStop(place.dir, stop));
   return stop;

@@ -77,7 +77,9 @@ export const interruptVerbOf = (
         return Effect.fail(new InterruptUnsent({ message: message(e), cause: e }));
       });
     const observed = yield* go(runner.observe).pipe(
-      unsent((e) => `the \`${harness}\` harness could not be read (${wordsOf(e)}), so ${name} could not be found. Nothing was sent; ask again.`),
+      unsent(
+        (e) => `the \`${harness}\` harness could not be read (${wordsOf(e)}), so ${name} could not be found. Nothing was sent; ask again.`,
+      ),
     );
     const sighting = observed.get(name);
     if (!sighting) {

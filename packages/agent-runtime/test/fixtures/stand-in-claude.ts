@@ -49,7 +49,10 @@ let interrupted = false;
 
 /** Waits until `file` appears in the stand-in's folder, or the turn is interrupted. */
 const appears = async (file: string) => {
-  while (!fs.existsSync(path.join(dir, file)) && !interrupted) await new Promise((r) => setTimeout(r, 50));
+  for (;;) {
+    if (interrupted || fs.existsSync(path.join(dir, file))) return;
+    await new Promise((r) => setTimeout(r, 50));
+  }
 };
 
 /** Asks each hook of `event` for the call `id` of `tool`, in turn. */

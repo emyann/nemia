@@ -490,7 +490,11 @@ export const composite = (harnesses: Record<string, RunnerOps>, fallback: string
       return ops.interrupt
         ? ops.interrupt(session)
         : Effect.fail(
-            new RunnerError({ verb: 'interrupt', message: `the \`${session.sessionId}\` session's harness cannot end a turn.`, refused: true }),
+            new RunnerError({
+              verb: 'interrupt',
+              message: `the \`${session.sessionId}\` session's harness cannot end a turn.`,
+              refused: true,
+            }),
           );
     },
 

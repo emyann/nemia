@@ -27,7 +27,7 @@ import {
   type ChatStep,
 } from '../src/lib/chatFollowing.ts';
 import { CHAT_OUTBOX_KEY, editKept, forgetKept, keepUnsent, parseKept, readKept, sendingOnce } from '../src/lib/chatOutbox.ts';
-import { composerWords } from '../src/lib/nemia.ts';
+import { composerButton, composerWords } from '../src/lib/nemia.ts';
 import { faceOf, UP, type Presence } from '../src/lib/presence.ts';
 import type { StreamLike } from '../src/lib/following.ts';
 import type { ChatEvent, ChatPresence } from '../src/lib/api.ts';
@@ -332,10 +332,22 @@ test("only an outbox entry is drawn as the person's bubble: the keeper's words a
   );
 });
 
-test('the composer invites what where she is asks for, and there is no stopping her until her session moves to the SDK', () => {
+test('the composer invites what where she is asks for, and offers the stop while she answers', () => {
   assert.equal(composerWords(UP), 'Tell Nemia what to do, or ask');
-  assert.equal(composerWords({ ...UP, answering: true }), 'She is answering. Write the next one');
+  assert.equal(composerWords({ ...UP, answering: true }), 'She is answering. Write the next one, or stop her');
   assert.equal(composerWords({ ...UP, down: true }), 'Write now; she reads it when she is up');
   assert.equal(composerWords({ ...UP, notSent: true }), 'Waiting for the daemon');
   assert.equal(composerWords({ ...UP, notSent: true, down: true, answering: true }), 'Waiting for the daemon', 'nowhere to send it');
+});
+
+test("the composer's button is the stop while she answers, and the send every other time", () => {
+  assert.equal(composerButton({ ...UP, answering: true }), 'stop');
+  assert.equal(composerButton(UP), 'send', 'no turn of hers to end');
+  assert.equal(composerButton({ ...UP, down: true }), 'send');
+  assert.equal(composerButton({ ...UP, unread: 2 }), 'send');
+  assert.equal(
+    composerButton({ ...UP, answering: true, notSent: true }),
+    'send',
+    'a message this browser kept means the api is not there to be asked for a stop either',
+  );
 });

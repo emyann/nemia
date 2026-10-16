@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import { chatStreamPath, markChatRead, readChat, sendChat, type ChatEvent, type ChatSent } from './api/chat.ts';
+import { chatStreamPath, markChatRead, readChat, sendChat, stopChat, type ChatEvent, type ChatSent } from './api/chat.ts';
 import { changedChat, followChat, mergeChatEvents, unreadChat, type ChatFollowed } from './chatFollowing.ts';
 import { forgetKept, keepUnsent, readKept, sendingOnce, editKept as writeKept, type ChatKept } from './chatOutbox.ts';
 import { animationFrames } from './following.ts';
@@ -26,12 +26,14 @@ const personEvent = (entry: ChatSent): ChatEvent => ({
 
 /**
  * Her chat as a page holds it: what was read and followed (`state`), the message this browser kept because the api would not take it
- * (`kept`), and what the panel does — send words, try a kept message again, change it, throw it away, and mark what was read.
+ * (`kept`), and what the panel does — send words, end the turn she is answering, try a kept message again, change it, throw it away,
+ * and mark what was read.
  */
 export type NemiaChat = {
   state: ChatFollowed;
   kept: ChatKept | null;
   send: (text: string) => void;
+  stop: () => void;
   sendKept: () => void;
   editKept: (text: string) => void;
   discardKept: () => void;
@@ -96,6 +98,10 @@ function reading({ setState, tryAgain, follow }: Reader): () => void {
  *
  * The read mark is posted for the event the panel says is on screen (`markRead`), once for each: the api never moves it back, and a
  * refusal lets the panel ask again.
+ *
+ * `stop` ends the turn she is answering (`stopChat`) and leaves her session open. Nothing is drawn from its answer: the stop is written
+ * on her chat as the keeper's quiet marker, which the stream brings down with the rest, and a refusal — her turn over by the time it
+ * reached the api — is what her presence says a beat later.
  */
 export function useNemiaChat(follow = true): NemiaChat {
   const [state, setState] = useState<ChatFollowed>(() => unreadChat(true));
@@ -138,6 +144,10 @@ export function useNemiaChat(follow = true): NemiaChat {
     [took],
   );
 
+  const stop = useCallback(() => {
+    stopChat().catch(() => undefined);
+  }, []);
+
   const sendKept = useCallback(() => {
     if (kept !== null) tryKept(kept.text).catch(() => undefined);
   }, [kept, tryKept]);
@@ -165,5 +175,5 @@ export function useNemiaChat(follow = true): NemiaChat {
     );
   }, []);
 
-  return { state, kept, send, sendKept, editKept: edit, discardKept: discard, markRead };
+  return { state, kept, send, stop, sendKept, editKept: edit, discardKept: discard, markRead };
 }

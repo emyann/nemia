@@ -510,6 +510,31 @@ const compactCaptures = async (engine: EngineShape, rest: readonly string[]): Pr
   for (const line of compactLines(await run('compact', engine.compact({ yes })))) console.log(line);
 };
 
+/**
+ * The verbs written to the session of a task in flight, each given the task's id and the words after it: `ae say <id> <words>`, the
+ * words put to its session and printed as the entry they were journalled as, and `ae interrupt <id>`, the turn it is in asked to end,
+ * its session left open to hear the next words.
+ */
+const WRITING: Readonly<Record<string, (engine: EngineShape, id: string, words: readonly string[]) => Promise<void>>> = {
+  say: async (engine, id, words) => console.log(entryLine(id, { kind: 'said', ...(await run('say', engine.say(id, words.join(' ')))) })),
+  interrupt: async (engine, id) => {
+    const ended = await run('interrupt', engine.interrupt(id));
+    console.log(`${id}  turn of attempt ${ended.attempt} asked to end at ${ended.at}`);
+  },
+};
+
+/**
+ * The first word of `argv` handled as a verb written to a session (`WRITING`): false where it names none, so the caller goes on to the
+ * rest; true once it was handled, the help printed where it named no task.
+ */
+const wroteToSession = async (engine: EngineShape, argv: readonly string[]): Promise<boolean> => {
+  const [verb, id, ...words] = argv;
+  if (verb === undefined || !Object.hasOwn(WRITING, verb)) return false;
+  if (!id) console.log(HELP);
+  else await WRITING[verb](engine, id, words);
+  return true;
+};
+
 /** The verbs over what the store keeps, each given the arguments after it: `sweep`, `forget` and `compact`. */
 const KEEPING: Readonly<Record<string, (engine: EngineShape, rest: readonly string[]) => Promise<void>>> = {
   sweep: sweepBodies,
@@ -592,6 +617,7 @@ export async function main(argv: string[]): Promise<void> {
   if (engineless(argv)) return;
   const root = process.env.AE_ROOT ?? path.join(os.homedir(), '.agent-engine');
   const engine = await engineAt({ root });
+  if (await wroteToSession(engine, argv)) return;
 
   switch (verb) {
     case 'start': {
@@ -623,18 +649,6 @@ export async function main(argv: string[]): Promise<void> {
       if (!arg) return console.log(HELP);
       await run('stop', engine.stop(arg));
       return console.log(`${arg}  stop requested`);
-
-    case 'say': {
-      if (!arg) return console.log(HELP);
-      const said = await run('say', engine.say(arg, argv.slice(2).join(' ')));
-      return console.log(entryLine(arg, { kind: 'said', ...said }));
-    }
-
-    case 'interrupt': {
-      if (!arg) return console.log(HELP);
-      const ended = await run('interrupt', engine.interrupt(arg));
-      return console.log(`${arg}  turn of attempt ${ended.attempt} asked to end at ${ended.at}`);
-    }
 
     case 'answer': {
       if (!arg) return console.log(HELP);

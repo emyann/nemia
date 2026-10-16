@@ -43,7 +43,7 @@ test('no file reads as empty, and what is appended reads back in order', () => {
   ]);
 });
 
-test("REFUSED: a stop line that does not decode, naming the file and the line — never read as saying nothing", () => {
+test('REFUSED: a stop line that does not decode, naming the file and the line — never read as saying nothing', () => {
   const dir = scratch('wf-chat-store-');
   appendStop(dir, { at: '2026-10-15T12:00:05.000Z', attempt: 1 });
   fs.appendFileSync(stopsFile(dir), '{"at":"2026-10-15T12:00:07.000Z"}\n');

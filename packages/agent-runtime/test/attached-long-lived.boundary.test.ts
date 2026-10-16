@@ -88,10 +88,7 @@ test("attachedStateOf translates the harness's words: idle is input-required, pa
     attachedStateOf({ name: NAME, state, owner: 1, startedAt: '2026-01-01T00:00:00.000Z', request: {} });
   assert.equal(of('idle'), 'input-required', 'a long-lived session between turns waits on a person');
   assert.equal(of('parked'), 'working', 'a session let go is taken up on the next look');
-  assert.deepEqual(
-    (['working', 'completed', 'failed', 'canceled'] as const).map(of),
-    ['working', 'completed', 'failed', 'canceled'],
-  );
+  assert.deepEqual((['working', 'completed', 'failed', 'canceled'] as const).map(of), ['working', 'completed', 'failed', 'canceled']);
 });
 
 test('a turn of a long-lived attached session ends without ending it: it is idle, held, and hears the next words', WAITED, async (t) => {
@@ -181,21 +178,25 @@ test('a holder lets a long-lived session go between turns and the next resumes i
   assert.equal(after.carried?.costUsd ?? null, null, 'and a session resumed by its own holder carries nothing of a parent');
 });
 
-test("a long-lived session whose holder is gone says its process is not held, so decide reads it as one being taken up", WAITED, async () => {
-  const { root, request } = place({ output: {} });
-  writeRun(root, {
-    name: NAME,
-    state: 'idle',
-    owner: 2_147_483_600,
-    ownerStart: 'a holder long gone',
-    startedAt: new Date().toISOString(),
-    sessionId: 'left-idle',
-    request: { ...request, brief: undefined },
-  });
-  const seen = (await Effect.runPromise(attachedSessions(root, STAND_IN).ops.observe)).get(NAME)!;
-  assert.deepEqual([seen.state, seen.held, seen.pid], ['input-required', false, undefined]);
-  assert.deepEqual(read(seen), { idle: false, respawning: true }, 'never idle, so no end of it is recorded under its feet');
-});
+test(
+  'a long-lived session whose holder is gone says its process is not held, so decide reads it as one being taken up',
+  WAITED,
+  async () => {
+    const { root, request } = place({ output: {} });
+    writeRun(root, {
+      name: NAME,
+      state: 'idle',
+      owner: 2_147_483_600,
+      ownerStart: 'a holder long gone',
+      startedAt: new Date().toISOString(),
+      sessionId: 'left-idle',
+      request: { ...request, brief: undefined },
+    });
+    const seen = (await Effect.runPromise(attachedSessions(root, STAND_IN).ops.observe)).get(NAME)!;
+    assert.deepEqual([seen.state, seen.held, seen.pid], ['input-required', false, undefined]);
+    assert.deepEqual(read(seen), { idle: false, respawning: true }, 'never idle, so no end of it is recorded under its feet');
+  },
+);
 
 test('the claude.ai bridge is opened after the first turn where the request asked for one, and its state kept', WAITED, async (t) => {
   const { root, dir, request } = place({ output: {} }, { claude: { remoteControl: true } });
@@ -228,7 +229,7 @@ test('a long-lived request that asks for no bridge never sends the bridge contro
   assert.equal(run(root)?.bridge, undefined, 'and its run file says nothing of a bridge');
 });
 
-test("a resumed session re-attaches the claude.ai session its run file kept", WAITED, async (t) => {
+test('a resumed session re-attaches the claude.ai session its run file kept', WAITED, async (t) => {
   const { root, dir, request } = place({ output: {} }, { claude: { remoteControl: true } });
   writeRun(root, {
     name: NAME,

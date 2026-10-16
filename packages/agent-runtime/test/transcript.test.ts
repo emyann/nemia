@@ -1614,10 +1614,7 @@ test("a `user` line's own origin is carried: words a person wrote into the sessi
     'a line with no origin says none: the host that pushed the words knows it did',
   );
   assert.deepEqual(
-    claudeTranscriptEvents(
-      { ...line({ kind: 'human' }), message: { role: 'user', content: [{ type: 'text', text: 'and this?' }] } },
-      0,
-    ),
+    claudeTranscriptEvents({ ...line({ kind: 'human' }), message: { role: 'user', content: [{ type: 'text', text: 'and this?' }] } }, 0),
     [{ id: 'said:0', at: at(0), role: 'user', kind: 'text', text: 'and this?', origin: { kind: 'human' } }],
     'and a line written in blocks carries it onto each',
   );

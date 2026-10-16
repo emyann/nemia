@@ -107,14 +107,17 @@ test('REFUSED: a read mark on an event the chat does not hold', async () => {
   assert.equal(readReadMark(place.dir), undefined);
 });
 
-test("a stop ends her turn through the runtime and leaves one Stopped line on the record", async () => {
+test('a stop ends her turn through the runtime and leaves one Stopped line on the record', async () => {
   const { e, place } = await twoAttempts();
   const stop = await runWith(e, chatStop(place));
   assert.deepEqual(engine().interrupts, [place.task], 'the turn was ended through the runtime, and once');
   assert.deepEqual(readStops(place.dir), [stop]);
   assert.equal(stop.attempt, 2, 'the attempt that was answering');
   const texts = (await runWith(e, chatHistory(place))).events.map((x) => (x.kind === 'message' ? `${x.from}:${x.text}` : x.kind));
-  assert.deepEqual(texts.filter((w) => w === 'keeper:Stopped'), ['keeper:Stopped']);
+  assert.deepEqual(
+    texts.filter((w) => w === 'keeper:Stopped'),
+    ['keeper:Stopped'],
+  );
 });
 
 test('REFUSED: a stop with no session of hers filed, and one the runtime will not end, each leaves no line behind', async () => {
@@ -127,9 +130,8 @@ test('REFUSED: a stop with no session of hers filed, and one the runtime will no
   assert.deepEqual(engine().interrupts, [], 'the runtime was not asked');
   const task = await runEngine(e, e.file({ id: 'her', brief: 'be there', cwd: '/r', restartPolicy: 'Always' }));
   const unstarted = { task, dir: scratch('wf-chat-dir-') };
-  await assert.rejects(
-    runWith(e, chatStop(unstarted)),
-    (err: Error) => /has not started an attempt yet, so there is no turn to end/.test(err.message),
+  await assert.rejects(runWith(e, chatStop(unstarted)), (err: Error) =>
+    /has not started an attempt yet, so there is no turn to end/.test(err.message),
   );
   assert.deepEqual(readStops(unstarted.dir), [], 'a turn the runtime did not end is on no record');
 });

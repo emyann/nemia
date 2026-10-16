@@ -644,6 +644,15 @@ const countedInto =
  *
  * Fails with `EngineRefused` for what `optionsRefusalOf` refuses.
  */
+/**
+ * The verbs a person writes to the session of a task in flight, over the journal and the harnesses: `say` and `interrupt`, which both
+ * take what `sayVerbOf` takes.
+ */
+const writtenVerbsOf = (...given: Parameters<typeof sayVerbOf>) => ({
+  say: sayVerbOf(...given),
+  interrupt: interruptVerbOf(...given),
+});
+
 const make = (options: EngineOptions) =>
   Effect.gen(function* () {
     const refused = optionsRefusalOf(options);
@@ -792,8 +801,7 @@ const make = (options: EngineOptions) =>
       transcript: transcriptVerb,
       output: outputVerbOf(read, runners, harnessOf),
       follow: followVerbOf(read, runners, harnessOf),
-      say: sayVerbOf(go, read, runners, harnesses, harnessOf),
-      interrupt: interruptVerbOf(go, read, runners, harnesses, harnessOf),
+      ...writtenVerbsOf(go, read, runners, harnesses, harnessOf),
       quota: quotaVerbOf(runners, fallback),
       answer: answerVerb,
       close: (taskId) => go(close(taskId)),

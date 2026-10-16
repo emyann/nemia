@@ -33,6 +33,7 @@ export const refusalWords =
     const { _tag, message, cause } = (e ?? {}) as { _tag?: unknown; message?: unknown; cause?: unknown };
     if (typeof _tag !== 'string' || typeof message !== 'string') return e;
     if (REFUSALS.has(_tag)) return Object.assign(new Error(`${verb}: ${message}`), { exitCode: 2 });
-    if (_tag === 'SayUnsent' || _tag === 'InterruptUnsent') return new Error(`${verb}: ${message}`, cause === undefined ? undefined : { cause });
+    if (_tag === 'SayUnsent' || _tag === 'InterruptUnsent')
+      return new Error(`${verb}: ${message}`, cause === undefined ? undefined : { cause });
     return e;
   };

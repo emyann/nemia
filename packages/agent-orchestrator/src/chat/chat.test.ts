@@ -198,7 +198,7 @@ test('a cursor of five counts, which a tab open across the deploy still carries,
   assert.deepEqual(readChatCursor('2.1.0.1.0'), { attempts: 2, events: 1, said: 0, outbox: 1, delivered: 0, stops: 0 });
 });
 
-test('a turn the person stopped is the keeper\'s quiet marker, in its place in time, and no new kind of event', () => {
+test("a turn the person stopped is the keeper's quiet marker, in its place in time, and no new kind of event", () => {
   const stopped = twoSessions({ stops: [{ at: at(3), attempt: 1 }] });
   assert.deepEqual(shape(projectChat(stopped)), [
     'agent:Hello.',
@@ -219,7 +219,7 @@ test('a turn the person stopped is the keeper\'s quiet marker, in its place in t
   assert.deepEqual(shape(projectChat(later)).at(-1), 'keeper:Stopped', "a stop after a session's last event stands at its end");
 });
 
-test("a reader at a cursor taken before a stop is sent the Stopped line once, and not again", () => {
+test('a reader at a cursor taken before a stop is sent the Stopped line once, and not again', () => {
   const now = twoSessions({ stops: [{ at: at(3), attempt: 1 }] });
   const before = chatCursor({ ...cursorOf(now), stops: 0 });
   const changed = changedSince(projectChat(sourcesAt(now, readChatCursor(before), before)), projectChat(now));
@@ -228,17 +228,17 @@ test("a reader at a cursor taken before a stop is sent the Stopped line once, an
   assert.deepEqual(changedSince(projectChat(sourcesAt(now, readChatCursor(after), after)), projectChat(now)), []);
 });
 
-test("words a person wrote into her own face are drawn as theirs; words the host pushed on her input are not drawn twice", () => {
+test('words a person wrote into her own face are drawn as theirs; words the host pushed on her input are not drawn twice', () => {
   const face = twoSessions();
   const [first, second] = face.sessions;
   face.sessions = [
-    first!,
-    { ...second!, events: [{ ...text('p1', 12, 'from my phone', 'user'), origin: { kind: 'human' } }, ...(second?.events ?? [])] },
+    first,
+    { ...second, events: [{ ...text('p1', 12, 'from my phone', 'user'), origin: { kind: 'human' } }, ...second.events] },
   ];
   assert.ok(shape(projectChat(face)).includes('person:from my phone'), 'the board reads as one conversation');
   const pushed = twoSessions({ outbox: [{ id: 'o1', at: at(11), text: 'Hi' }] });
   const [one, two] = pushed.sessions;
-  pushed.sessions = [one!, { ...two!, events: [...(two?.events ?? []), text('p2', 12, 'Hi', 'user')] }];
+  pushed.sessions = [one, { ...two, events: [...two.events, text('p2', 12, 'Hi', 'user')] }];
   assert.deepEqual(
     shape(projectChat(pushed)).filter((w) => w === 'person:Hi'),
     ['person:Hi'],

@@ -625,6 +625,27 @@ export function herChat(what: HerChat): () => void {
   };
 }
 
+/**
+ * Her turn over, as Claude Code lists it once a turn of a session it holds has ended: her row rewritten to the one the engine reads
+ * `input-required` (`WAITING`), so her presence says she is no longer answering. Taken back with the rest by `herChat`'s take-back,
+ * which writes the registry as the seed left it.
+ */
+export function herTurnOver(): void {
+  const registry = path.join(store!, REGISTRY);
+  const rows = JSON.parse(fs.readFileSync(registry, 'utf8')) as { name?: string }[];
+  fs.writeFileSync(registry, JSON.stringify(rows.map((row) => (row.name === `ae/${NEMIA_TASK}/1` ? { ...row, ...WAITING } : row))));
+}
+
+/**
+ * The stop the api writes when the turn she was answering is ended, on her chat's own file as `chatStop` appends it: one line, so a
+ * second visit of a page reads the one stop it made. Her chat draws it as the keeper's quiet marker.
+ */
+export function herStopped(at: string): void {
+  const dir = path.join(store!, 'nemia', 'chat');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'stops.jsonl'), `${JSON.stringify({ at, attempt: 1 })}\n`);
+}
+
 /** Her docked face, the cue beside it, and the panel it opens. */
 export const dockOf = (page: Page): Locator => page.locator('[data-nemia-dock]');
 export const dockFaceOf = (page: Page): Locator => page.locator('[data-nemia-dock-face]');

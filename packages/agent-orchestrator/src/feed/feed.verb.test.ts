@@ -276,7 +276,7 @@ test('REFUSED: the lines of one emission reach a reader as one chunk, a run and 
   assert.equal(step.kind === 'line' && step.cursor, feedSize());
 });
 
-test('each line emitFeed writes is logged at Info, annotated with its run, its step where it names one, and its word', async () => {
+test('each line emitFeed writes is logged at Info, annotated with its labels, its reason, how serious it is, and its word', async () => {
   const logs: { level: string; text: string; annotations: Record<string, unknown> }[] = [];
   const keeper = Logger.make(({ message, logLevel, fiber }) => {
     logs.push({
@@ -288,7 +288,11 @@ test('each line emitFeed writes is logged at Info, annotated with its run, its s
   const lines = await Effect.runPromise(emitFeed(judged('running', 'plan')).pipe(Effect.provide(Logger.layer([keeper]))));
   assert.equal(lines.length, 2);
   assert.deepEqual(logs, [
-    { level: 'Info', text: 'r-1  —  running', annotations: { run: 'r-1', word: 'running' } },
-    { level: 'Info', text: 'r-1  plan  running', annotations: { run: 'r-1', step: 'plan', word: 'running' } },
+    { level: 'Info', text: 'r-1  —  running', annotations: { run: 'r-1', reason: 'Running', type: 'Normal', word: 'running' } },
+    {
+      level: 'Info',
+      text: 'r-1  plan  running',
+      annotations: { run: 'r-1', step: 'plan', reason: 'Running', type: 'Normal', word: 'running' },
+    },
   ]);
 });

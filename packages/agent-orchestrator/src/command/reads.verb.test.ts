@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
-import { cursorTakes, feedLineWords, type FeedLine } from '../feed/feed.ts';
+import { cursorTakes, feedLineWords, upgraded, type FeedLine } from '../feed/index.ts';
 import { pausedWords } from '../pause/pause.ts';
 
 /** The store's pause as read while none stands. */
@@ -103,15 +103,20 @@ test('nemia stats prints JSON with --json, one line with --line, and its tiles a
 });
 
 test("nemia feed reads the store's feed from a cursor, and prints the pause first while one stands, then the lines and the cursor", async () => {
-  const first: FeedLine = { at: '2026-10-04T12:00:00.000Z', run: 'r-1', word: 'running' };
-  const second: FeedLine = { at: '2026-10-04T12:01:00.000Z', run: 'r-1', step: 'implement', word: 'succeeded' };
+  const first: FeedLine = upgraded({ at: '2026-10-04T12:00:00.000Z', run: 'r-1', word: 'running' });
+  const v0: FeedLine = { at: '2026-10-04T12:01:00.000Z', run: 'r-1', step: 'implement', word: 'succeeded' };
+  const second = upgraded(v0);
   const head = `${JSON.stringify(first)}\n`;
-  const whole = `${head}${JSON.stringify(second)}\n`;
+  const whole = `${head}${JSON.stringify(v0)}\n`;
   fs.writeFileSync(path.join(ROOT, 'feed.jsonl'), whole);
   const end = Buffer.byteLength(whole);
   const e = engineOf(engine().layer);
 
-  assert.deepEqual(await runWith(e, FEED.handler({})), { lines: [first, second], cursor: end, pause: NONE });
+  assert.deepEqual(
+    await runWith(e, FEED.handler({})),
+    { lines: [first, second], cursor: end, pause: NONE },
+    'a line signed as it was written reads back as it lies, and one written before is upgraded on read',
+  );
   const after = await runWith(e, FEED.handler({ cursor: String(Buffer.byteLength(head)) }));
   assert.deepEqual(after, { lines: [second], cursor: end, pause: NONE });
   assert.deepEqual(FEED.print(after, {}), [feedLineWords(second), `cursor: ${end}`]);

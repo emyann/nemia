@@ -152,7 +152,7 @@ throwaway collector by name (`tools/observe/README.md`, *Point the daemon at it*
 **The feed** is the orchestrator's, written once, by the daemon alone: `emitFeed` (`src/feed/feed.verb.ts`) appends a run's line to
 `feed.jsonl`, and `up`, once it holds the store, a daemon's (`emitDaemonStarted`: `{at, daemon, word: 'daemon started', note}`, the note
 saying how the one before it ended); each is the record,
-logs it at Info with its run, step and word, and publishes it to the process's hub (`FeedHub`, a sliding `PubSub` its layer builds,
+logs it at Info with its labels, its reason, its type and its word, and publishes it to the process's hub (`FeedHub`, a sliding `PubSub` its layer builds,
 `feedHubLayer`). A live reader in that process, `followFeed`, takes the hub's items and reads from the file what none brought — a line
 the hub dropped, or one another process wrote — on a beat that stats the file: the api's `GET /api/feed/stream`, on the hub its daemon
 publishes to. A reader in another process, `nemia watch`, watches the file (`watchFeed`), and reads the lease at a pace beside it,

@@ -24,7 +24,7 @@
 import { Cause, Effect, FiberMap, Metric, Ref, Schedule, Semaphore, Stream, type Duration } from 'effect';
 import type { NonEmptyReadonlyArray } from 'effect/Array';
 import { instantNow } from '../daemon/daemon.store.ts';
-import { isRunLine, type FeedLine } from '../feed/feed.ts';
+import { isRunLine, type FeedLine } from '../feed/index.ts';
 import { followFeed, type Followed } from '../feed/feed.verb.ts';
 import { EngineService } from '../runtime-client.ts';
 import { atLeast } from '../level/level.ts';

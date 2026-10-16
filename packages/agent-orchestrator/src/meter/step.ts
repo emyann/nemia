@@ -58,7 +58,7 @@ export function boundedAttributes(attributes: Readonly<Record<string, string>>):
 export type StepKeys = { factory: string; workflow: string; step: string; agent: string };
 
 /** The two labels a run is known by, whatever the step: its factory or the default, and its workflow's folder. */
-const runKeys = (run: Pick<Run, 'factory' | 'workflowDir'>): Pick<StepKeys, 'factory' | 'workflow'> => ({
+export const runKeys = (run: Pick<Run, 'factory' | 'workflowDir'>): Pick<StepKeys, 'factory' | 'workflow'> => ({
   factory: run.factory ?? DEFAULT_FACTORY,
   workflow: path.basename(run.workflowDir),
 });

@@ -215,8 +215,8 @@ export type {
   Schedule,
   TemplateStatus,
 } from './factory/factory.ts';
-export { cursorTakes, feedLineWords, REMOVED } from './feed/feed.ts';
-export type { FeedLine, FeedPublished } from './feed/feed.ts';
+export { cursorTakes, feedLineWords, REMOVED } from './feed/index.ts';
+export type { FeedLine, FeedPublished } from './feed/index.ts';
 export type { FeedSaid, FeedWords } from './run.ts';
 export { DEFAULT_WAKE, subscriptionNameRefusal, wakeOf, watchedLine } from './subscription/subscription.ts';
 export type { Watched } from './subscription/subscription.ts';

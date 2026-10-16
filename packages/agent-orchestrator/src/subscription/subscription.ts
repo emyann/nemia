@@ -10,7 +10,7 @@
  * `subscription.verb.ts`.
  */
 import type { Args } from '../command/command.ts';
-import { feedLineWords, type FeedLine } from '../feed/feed.ts';
+import { feedLineWords, type FeedLine } from '../feed/index.ts';
 import { elapsedMs, type Instant } from '../daemon/daemon.ts';
 import { LEVELS, type Level } from '../level/level.ts';
 

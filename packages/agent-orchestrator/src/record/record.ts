@@ -363,6 +363,18 @@ export const SETTLED: ReadonlySet<TaskPhase> = new Set(['succeeded', 'failed', '
 export const tryOf = (run: Run, step: string): number => (run.steps[step]?.tries?.length ?? 0) + 1;
 
 /**
+ * The try the task a step is on was first filed for, from 1: the try it is on, unless a later try kept the same task — a recheck, which
+ * replaces the check alone, or one answered into the session the task holds open — in which case the try that filed it. What a fact read
+ * off the task's own journal belongs to, since the journal does not move when the try does. Pure.
+ */
+export const taskTryOf = (run: Run, step: string): number => {
+  const record = run.steps[step];
+  const tries = record?.tries ?? [];
+  const first = tries.findIndex((t) => t.taskId === record?.taskId);
+  return first === -1 ? tries.length + 1 : first + 1;
+};
+
+/**
  * The id of a step's check task. Derived, never generated: a pass that files the check and dies
  * before writing the run down finds it under this id on the next pass, and adopts it rather than
  * filing a second — the engine's own rule for a session, one layer up.

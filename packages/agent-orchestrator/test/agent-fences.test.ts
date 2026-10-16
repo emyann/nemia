@@ -2323,7 +2323,7 @@ const COVERED_BY_SETTINGS: ReadonlyArray<readonly [string, string, string]> = [
 const allSteps = (): Array<{ dir: string; step: Workflow }> =>
   [...FOLDERS, TEAM_DEV].flatMap((dir) => loadWorkflows(dir, placesOf(dir)).map((step) => ({ dir, step })));
 
-test('every shipped step can call each tool it is given, judged against this checkout\'s own allow rules', () => {
+test("every shipped step can call each tool it is given, judged against this checkout's own allow rules", () => {
   for (const { dir, step } of allSteps()) {
     assert.equal(unallowedRefusal([step], SETTINGS_ALLOWS), undefined, `${path.basename(dir)}/${step.name}`);
   }

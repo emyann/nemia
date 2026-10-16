@@ -48,8 +48,7 @@ function unallowedIn(step: Workflow, allows: readonly string[]): Unallowed | und
 }
 
 /** Where step `step`'s fence is written: its agent's file, or `undefined` for a step that is its own fence. */
-const fenceFile = (step: Workflow): string | undefined =>
-  step.agent === undefined ? undefined : `${AGENTS_FOLDER}/${step.agent.name}.md`;
+const fenceFile = (step: Workflow): string | undefined => (step.agent === undefined ? undefined : `${AGENTS_FOLDER}/${step.agent.name}.md`);
 
 /** The allow lists the refusal says held no rule for the tool, in the order a session gets them. */
 function lists(step: Workflow, found: Unallowed): string {

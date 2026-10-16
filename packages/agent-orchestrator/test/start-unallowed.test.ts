@@ -78,7 +78,7 @@ test('REFUSED at `nemia start`: a step given a tool no rule of its session names
   assert.deepEqual(runsWritten(), before, 'nothing was written');
 });
 
-test("the same folder starts in a repository whose own settings allow the call, scoped or bare: what the session gets is read at the start", () => {
+test('the same folder starts in a repository whose own settings allow the call, scoped or bare: what the session gets is read at the start', () => {
   assert.match(started(HELD, aRepo(['WebFetch'])), /./);
   assert.match(started(HELD, aRepo(['WebFetch(domain:example.com)', 'Bash(npm test)'])), /./);
 });

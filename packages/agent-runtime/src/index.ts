@@ -138,5 +138,8 @@ export { CONFIG_FOLDERS, configFolderIn } from './harness/config-folders.ts';
  * (`folderTrust`), and the act of giving it (`trustFolder`); each `undefined` for a harness that keeps none.
  */
 export { folderTrust, trustFolder, trustedFolder, type FolderTrust, type FolderTrusted } from './harness/trust.ts';
-/** The allow rules a harness's own project configuration in a directory grants a session started there; `undefined` for a harness that reads none. */
+/**
+ * The allow rules a harness's own project configuration in a directory grants a session started there; `undefined` for a harness that
+ * reads none.
+ */
 export { projectAllows } from './harness/settings.ts';

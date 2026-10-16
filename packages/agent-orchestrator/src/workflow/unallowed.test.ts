@@ -69,7 +69,10 @@ test('the repository allowing the tool is what makes the step pass, bare or scop
 });
 
 test("the agent's own allow passes it, whatever the repository says, and so does a step that is its own fence", () => {
-  assert.equal(unallowedRefusal(stepsOf({ agent: 'seldon' }, { ...HELD, allowedTools: 'WebFetch(domain:example.com), Bash' }), []), undefined);
+  assert.equal(
+    unallowedRefusal(stepsOf({ agent: 'seldon' }, { ...HELD, allowedTools: 'WebFetch(domain:example.com), Bash' }), []),
+    undefined,
+  );
   const own = { ...HELD, allowedTools: 'WebFetch(domain:example.com), Bash(npm test)' };
   assert.equal(unallowedRefusal(stepsOf(own), []), undefined);
   const refused = unallowedRefusal(stepsOf({ ...HELD, allowedTools: 'Bash(npm test)' }), []);

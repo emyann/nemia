@@ -27,8 +27,13 @@ export type CueHue = 'yours' | 'alive' | 'failure' | 'none';
 /** A cue: its hue and its words. */
 export type Cue = { hue: CueHue; words: string };
 
-/** A presence that may hold: whether it holds, the face it gives, and its cue. */
-type Fact = { holds: (presence: Presence) => boolean; face: FaceExpression; cue: (presence: Presence) => Cue };
+/** A presence that may hold: whether it holds, the face it gives, its cue, and the sentence her docked face says it in. */
+type Fact = {
+  holds: (presence: Presence) => boolean;
+  face: FaceExpression;
+  cue: (presence: Presence) => Cue;
+  says: (presence: Presence) => string;
+};
 
 /**
  * The presences in the owner's order, the first that holds wins the face: waits on you, then a message not sent, then down, then
@@ -39,11 +44,27 @@ export const FACE_ORDER: readonly Fact[] = [
     holds: (p) => p.waitsOnYou > 0,
     face: 'surprised',
     cue: (p) => ({ hue: 'yours', words: p.waitsOnYou === 1 ? '1 waits on you' : `${p.waitsOnYou} wait on you` }),
+    says: (p) => (p.waitsOnYou === 1 ? '1 waits on you.' : `${p.waitsOnYou} wait on you.`),
   },
-  { holds: (p) => p.notSent, face: 'unsure', cue: () => ({ hue: 'failure', words: 'Not sent' }) },
-  { holds: (p) => p.down, face: 'sleepy', cue: () => ({ hue: 'none', words: 'Down' }) },
-  { holds: (p) => p.answering, face: 'thinking', cue: () => ({ hue: 'alive', words: 'Answering' }) },
-  { holds: (p) => p.unread > 0, face: 'happy', cue: (p) => ({ hue: 'alive', words: `${p.unread} new` }) },
+  {
+    holds: (p) => p.notSent,
+    face: 'unsure',
+    cue: () => ({ hue: 'failure', words: 'Not sent' }),
+    says: () => 'A message was not sent.',
+  },
+  { holds: (p) => p.down, face: 'sleepy', cue: () => ({ hue: 'none', words: 'Down' }), says: () => 'Her session is down.' },
+  {
+    holds: (p) => p.answering,
+    face: 'thinking',
+    cue: () => ({ hue: 'alive', words: 'Answering' }),
+    says: () => 'She is answering.',
+  },
+  {
+    holds: (p) => p.unread > 0,
+    face: 'happy',
+    cue: (p) => ({ hue: 'alive', words: `${p.unread} new` }),
+    says: (p) => (p.unread === 1 ? '1 new answer.' : `${p.unread} new answers.`),
+  },
 ];
 
 /** The expression her face wears for `presence`: the first in the owner's order that holds, else idle. */
@@ -51,3 +72,10 @@ export const faceOf = (presence: Presence): FaceExpression => FACE_ORDER.find((f
 
 /** The cue of every presence that holds, in the owner's order; none when she is only up. */
 export const cuesOf = (presence: Presence): Cue[] => FACE_ORDER.filter((fact) => fact.holds(presence)).map((fact) => fact.cue(presence));
+
+/**
+ * What her docked face is called, by the presence that gives it its expression — the first in the owner's order that holds, her session
+ * being up where none does — and by whether the panel it opens is already open: `Open Nemia's chat. 2 wait on you.`
+ */
+export const dockWords = (presence: Presence, open: boolean): string =>
+  `${open ? 'Close' : 'Open'} Nemia's chat. ${FACE_ORDER.find((fact) => fact.holds(presence))?.says(presence) ?? 'Her session is up.'}`;

@@ -48,4 +48,5 @@ export * from './api/machines.ts';
 export * from './api/factories.ts';
 export * from './api/pause.ts';
 export * from './api/nemia.ts';
+export * from './api/chat.ts';
 export * from './api/auto.ts';

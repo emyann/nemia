@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AgentsRouteImport } from './routes/agents'
 import { Route as CapabilitiesRouteImport } from './routes/capabilities'
+import { Route as ChatRouteImport } from './routes/chat'
 import { Route as InboxRouteImport } from './routes/inbox'
 import { Route as MachinesRouteImport } from './routes/machines'
 import { Route as SettingsRouteImport } from './routes/settings'
@@ -43,6 +44,11 @@ const AgentsRoute = AgentsRouteImport.update({
 const CapabilitiesRoute = CapabilitiesRouteImport.update({
   id: '/capabilities',
   path: '/capabilities',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChatRoute = ChatRouteImport.update({
+  id: '/chat',
+  path: '/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InboxRoute = InboxRouteImport.update({
@@ -137,6 +143,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/agents': typeof AgentsRoute
   '/capabilities': typeof CapabilitiesRoute
+  '/chat': typeof ChatRoute
   '/inbox': typeof InboxRoute
   '/machines': typeof MachinesRoute
   '/settings': typeof SettingsRoute
@@ -159,6 +166,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/agents': typeof AgentsRoute
   '/capabilities': typeof CapabilitiesRoute
+  '/chat': typeof ChatRoute
   '/inbox': typeof InboxRoute
   '/machines': typeof MachinesRoute
   '/settings': typeof SettingsRoute
@@ -182,6 +190,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/agents': typeof AgentsRoute
   '/capabilities': typeof CapabilitiesRoute
+  '/chat': typeof ChatRoute
   '/inbox': typeof InboxRoute
   '/machines': typeof MachinesRoute
   '/settings': typeof SettingsRoute
@@ -206,6 +215,7 @@ export interface FileRouteTypes {
     | '/'
     | '/agents'
     | '/capabilities'
+    | '/chat'
     | '/inbox'
     | '/machines'
     | '/settings'
@@ -228,6 +238,7 @@ export interface FileRouteTypes {
     | '/'
     | '/agents'
     | '/capabilities'
+    | '/chat'
     | '/inbox'
     | '/machines'
     | '/settings'
@@ -250,6 +261,7 @@ export interface FileRouteTypes {
     | '/'
     | '/agents'
     | '/capabilities'
+    | '/chat'
     | '/inbox'
     | '/machines'
     | '/settings'
@@ -273,6 +285,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AgentsRoute: typeof AgentsRoute
   CapabilitiesRoute: typeof CapabilitiesRoute
+  ChatRoute: typeof ChatRoute
   InboxRoute: typeof InboxRoute
   MachinesRoute: typeof MachinesRoute
   SettingsRoute: typeof SettingsRoute
@@ -313,6 +326,13 @@ declare module '@tanstack/react-router' {
       path: '/capabilities'
       fullPath: '/capabilities'
       preLoaderRoute: typeof CapabilitiesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/chat': {
+      id: '/chat'
+      path: '/chat'
+      fullPath: '/chat'
+      preLoaderRoute: typeof ChatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/inbox': {
@@ -441,6 +461,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AgentsRoute: AgentsRoute,
   CapabilitiesRoute: CapabilitiesRoute,
+  ChatRoute: ChatRoute,
   InboxRoute: InboxRoute,
   MachinesRoute: MachinesRoute,
   SettingsRoute: SettingsRoute,

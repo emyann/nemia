@@ -4,8 +4,8 @@
  * whose holder died mid-call is told which call did not finish, a non-holder neither adopts nor spawns attached, a denial is journalled
  * while the attempt is at work, a call that would ask is denied in the holder, a drain holds new calls, a stop and words from another
  * engine reach the session, a call held at its hook as the holder lets go is never written in flight, a holder whose pid another
- * process has taken is gone, neither a drain nor a kill reaches a process given a pid since, and a resumed session's cost leaves out
- * what its parent spent.
+ * process has taken is gone, neither a drain nor a kill reaches a process given a pid since, a resumed session's cost leaves out
+ * what its parent spent, and a session is started on Claude Code's own system prompt with the agent's appended to it.
  */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -36,8 +36,8 @@ import { until, WAITED } from './waits.ts';
 const STAND_IN = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'stand-in-claude.ts');
 const NAME = 'ae/t1/1';
 
-/** A store and the stand-in's folder, and a spawn of `plan` whose session works there. */
-const place = (plan: object) => {
+/** A store and the stand-in's folder, and a spawn of `plan` whose session works there, `config` laid over the stand-in's own. */
+const place = (plan: object, config: SpawnRequest['config'] = {}) => {
   const root = scratch('ae-attached-');
   const dir = path.join(root, 'stand-in');
   fs.mkdirSync(dir, { recursive: true });
@@ -45,7 +45,7 @@ const place = (plan: object) => {
     name: NAME,
     brief: 'do the work',
     cwd: dir,
-    config: { env: { STANDIN_DIR: dir, STANDIN_PLAN: JSON.stringify(plan) } },
+    config: { ...config, env: { STANDIN_DIR: dir, STANDIN_PLAN: JSON.stringify(plan) } },
   };
   return { root, dir, request };
 };
@@ -376,4 +376,25 @@ test("adopting a session leaves alone a process that has taken its Claude Code's
   await until(t, () => run(root)?.state === 'completed', 'the session resumed and completed', { everyMs: 50 });
   assert.deepEqual(lines(dir, 'said.jsonl'), [CARRY_ON]);
   assert.equal(alive(taken.pid!), true, 'the process that took the pid is not killed');
+});
+
+test("a session is started on Claude Code's own system prompt, the agent's appended to it", WAITED, async (t) => {
+  const prompt = path.join(scratch('ae-attached-prompt-'), 'agent.md');
+  fs.writeFileSync(prompt, 'you are the agent');
+  const { root, dir, request } = place({ output: {} }, { claude: { appendSystemPromptFile: prompt } });
+  const h = await holder(root);
+  t.after(h.close);
+  await Effect.runPromise(h.attached.ops.spawn(request));
+  await until(t, () => run(root)?.state === 'completed', 'the session completed', { everyMs: 50 });
+  const [init] = lines(dir, 'initialize.jsonl') as { systemPrompt?: unknown }[];
+  assert.ok(init, 'the SDK sent an initialize request');
+  assert.equal(
+    init.systemPrompt,
+    undefined,
+    `the preset sends no prompt of ours, so Claude Code renders its own; it sent ${JSON.stringify(init.systemPrompt)}`,
+  );
+  const [argv] = lines(dir, 'argv.jsonl') as string[][];
+  const at = argv.indexOf('--append-system-prompt-file');
+  assert.deepEqual(argv.slice(at, at + 2), ['--append-system-prompt-file', prompt], "the agent's own prompt is still appended");
+  assert.ok(!argv.includes('--system-prompt'), "no prompt of ours is spawned: the preset is Claude Code's own");
 });

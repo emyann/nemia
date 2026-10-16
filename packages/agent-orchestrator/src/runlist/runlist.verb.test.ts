@@ -1,7 +1,8 @@
 /**
  * The runs in two reads (`runsOpen`, `runsFinished`), through their entries of the command table (`RUNS_OPEN`, `RUNS_FINISHED`), on a
  * store of runs started and advanced over the stand-ins: together they say what the whole list says (`RUNS`), each run once; the finished
- * runs page by when their work stopped; the light answer does not grow with the finished runs; and a page asked wrongly is refused.
+ * runs page by when their work stopped; the light answer does not grow with the finished runs, and read warm costs no record of one;
+ * and a page asked wrongly is refused.
  *
  * `WF_ROOT` is set before the package is imported, since the store reads it as it loads; each test empties the store's runs first, and
  * a test that compares two answers, or orders runs by time, seeds `Date`.
@@ -27,6 +28,8 @@ const { advanceRun, approveRun, startRun, runWith: runEngine } = await import('.
 const { Invalid } = await import('../refusal/refusal.ts');
 const { readRun } = await import('../record/record.store.ts');
 const { engineOf } = await import('../runtime-client.ts');
+const { metered } = await import('../meter/tally.store.ts');
+const { restingMemo } = await import('../rest/resting.verb.ts');
 type FinishedPage = import('./runlist.verb.ts').FinishedPage;
 type OpenRuns = import('./runlist.verb.ts').OpenRuns;
 type RunSummary = import('../summary/summary.verb.ts').RunSummary;
@@ -349,6 +352,38 @@ test('the light answer does not grow with the finished runs: the same answer, bu
   assert.equal(after.counts.finished, 200);
   assert.deepEqual({ ...after, counts: { ...after.counts, finished: 0 } }, before);
   assert.equal((await finishedPage({ page: '23' })).runs.length, 2, 'two hundred finished runs, nine a page: two on the last');
+});
+
+/** `n` more finished runs in the store, each a copy of the record `text` under an id of its own. */
+const copies = (text: string, n: number): void => {
+  for (let i = 0; i < n; i++) {
+    const id = `cp-${String(i).padStart(3, '0')}`;
+    fs.writeFileSync(path.join(RUNS_DIR, `${id}.json`), `${JSON.stringify({ ...JSON.parse(text), id })}\n`);
+  }
+};
+
+test('a warm read of the open runs costs the records of the open runs alone: as many with two hundred finished runs as with one', async (t) => {
+  seeded(t);
+  const model = await aFinished();
+  await aWaiting();
+  await anInFlight();
+  const kept = { runs: restingMemo<Omit<RunSummary, 'startedAt'>>(), filings: { filed: new Map(), cursor: 0 } };
+  const unverified = { ...process.env, WF_VERIFY_REST: '0' };
+  const warm = async (): Promise<number | undefined> => {
+    await runWith(e(), RUNS_OPEN.handler({}, unverified, ROOT, kept));
+    return (await metered(() => runWith(e(), RUNS_OPEN.handler({}, unverified, ROOT, kept)))).tallies?.records;
+  };
+
+  const few = await warm();
+  copies(fs.readFileSync(path.join(RUNS_DIR, `${model}.json`), 'utf8'), 200);
+  const many = await warm();
+  assert.equal(few, 2, 'the waiting run and the run in flight, and no record more');
+  assert.equal(many, few, "a warm read reads no finished run's record, however many there are");
+
+  const warmed = await runWith(e(), RUNS_OPEN.handler({}, unverified, ROOT, kept));
+  const cold = await open();
+  assert.equal(cold.counts.finished, 201, 'the fixture holds two hundred and one finished runs');
+  assert.deepEqual(warmed, cold, "the warm answer is a cold read's own: nothing the board shows changes");
 });
 
 test('REFUSED by kind: a page that is no whole number from 1, and a size that is none from 1 to 100', async () => {

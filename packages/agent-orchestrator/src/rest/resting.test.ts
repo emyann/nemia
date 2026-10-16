@@ -1,7 +1,8 @@
 /**
  * The list's memo of runs at rest (`restingRead`, resting.verb.ts): an answer kept for a run is given back while its files in the store,
- * its record and the engine's feed for its tasks stand, and a read that judges it afresh (`WF_VERIFY_REST`) refuses an answer the memo
- * gave otherwise. Each guard is made to refuse on a store of scratch files and a feed held in memory.
+ * its record and the engine's feed for its tasks stand; the run it judged is handed to the store in place of a read of its record
+ * (`given`), and a read that judges it afresh (`WF_VERIFY_REST`) is handed nothing and refuses an answer the memo gave otherwise. Each
+ * guard is made to refuse on a store of scratch files and a feed held in memory.
  *
  * A file of its own, since the store's stamps read every run under `WF_ROOT`, read as the store loads, so it is set before the import.
  */
@@ -82,7 +83,29 @@ test('REFUSED: a line of its task on the feed, its file in the store rewritten, 
 
   const read = stored('read');
   const readMemo = await memoOf(read, 'done');
-  assert.equal((await runWith(e, restingRead(e, readMemo, false, git))).kept({ ...read, brief: 'Do it again.' }), undefined, 'its record');
+  const other = await runWith(e, restingRead<{ said: string }>(e, readMemo, false, git));
+  assert.equal(other.kept({ ...read, brief: 'Do it again.' }), undefined, 'a run that is not the one it kept');
+
+  fs.writeFileSync(path.join(ROOT, 'runs', 'read.json'), JSON.stringify({ ...read, brief: 'Do it again.' }));
+  const rewritten = await runWith(e, restingRead<{ said: string }>(e, readMemo, false, git));
+  assert.equal(rewritten.given('read'), undefined, 'its record rewritten: the store is handed nothing and reads it');
+  assert.equal(rewritten.kept(read), undefined, 'and the run the memo kept is answered no more');
+});
+
+test('a run at rest is handed to the store as the very run the memo kept, in place of a read of its record', async () => {
+  const run = stored('handed');
+  const read = await runWith(e, restingRead<{ said: string }>(e, await memoOf(run, 'done'), false, git));
+  assert.equal(read.given('handed'), run, 'the object kept, which `kept` then knows by identity');
+  assert.deepEqual(read.kept(run), { said: 'done' });
+  assert.equal(read.given('never-kept'), undefined, 'a run the memo holds nothing for');
+});
+
+test('REFUSED: a verified read is handed nothing from memory, and answers no record that reads otherwise than the run kept', async () => {
+  const run = stored('afresh');
+  const read = await runWith(e, restingRead<{ said: string }>(e, await memoOf(run, 'done'), true, git));
+  assert.equal(read.given('afresh'), undefined, 'the store reads every record afresh, so the fresh read can be compared');
+  assert.deepEqual(read.kept({ ...run }), { said: 'done' }, 'the record read afresh reads as the run kept');
+  assert.equal(read.kept({ ...run, brief: 'Do it again.' }), undefined, 'a record that reads otherwise');
 });
 
 test('REFUSED: a read whose feed another read went past keeps nothing, and a feed that does not read empties the memo', async () => {

@@ -14,7 +14,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { Cause, Effect, Exit, Fiber } from 'effect';
 import type { Engine } from '../runtime-client.ts';
-import type { Run } from '../record/record.ts';
+import { tryOf, type Run } from '../record/record.ts';
 import { listing } from '../list/list.ts';
 import {
   feedChanges,
@@ -452,6 +452,33 @@ test('a line’s labels are the ones stepLabels and runLabels give, so no second
   const ofRun = lines().filter((l) => l.run === run.id && l.step === undefined);
   assert.ok(ofRun.length > 0, 'the run said a word of its own');
   for (const l of ofRun) assert.deepEqual(l.labels, runLabels(record), `${l.word} carries the labels the run is known by, whole`);
+});
+
+test('REFUSED: a recheck says a step’s denials again — a one-shot is counted by the try its task was filed for, not the try the step has reached', async () => {
+  emptyStore();
+  const b = board();
+  const run = await started('the recheck');
+  await runWith(b.e, tickRun());
+  b.deny(`${run.id}-plan`, [{ tool: 'Bash', what: 'git push' }]);
+  b.set(`${run.id}-plan`, 'running (working)');
+  await runWith(b.e, tickRun());
+  const shots = () => lines().filter((l) => l.run === run.id && l.reason === 'ToolDenied');
+  assert.deepEqual(
+    shots().map((l) => [l.try, l.note]),
+    [[1, 'try 1']],
+    'the denial was written once, on the try its task was filed for',
+  );
+
+  const before = readRun(run.id);
+  const plan = before.steps.plan;
+  rewriteRun({ ...before, steps: { ...before.steps, plan: { ...plan, tries: [{ taskId: plan.taskId!, then: 'recheck' }] } } });
+  assert.equal(tryOf(readRun(run.id), 'plan'), 2, 'the step is on a second try, on the task it was already on');
+  for (let i = 0; i < 3; i++) await runWith(b.e, tickRun());
+  assert.deepEqual(
+    shots().map((l) => [l.try, l.note]),
+    [[1, 'try 1']],
+    'and the recheck says it neither again nor under a try the runtime never journalled it on',
+  );
 });
 
 /** A workflow of `plan → implement`, with no gate: a run on it finishes once both steps sign off. */

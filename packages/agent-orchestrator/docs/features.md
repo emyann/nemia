@@ -2415,11 +2415,13 @@ stateDiagram-v2
 ```
 <!-- diagram:nemia:end -->
 
-- **A step denied a call says so on its feed line**: a note part `denied: <call> ×<n>, …` (`deniedNote`, `src/feed/feed.ts`), off the
-  denials its task's attempts journalled (`deniedSoFarOf`): a running attempt's each distinct call once, by its name alone, as the
-  runtime journals it (`denied`), and each call counted when its attempt ends, at most five named. `denied:` is one of
-  her wake words, and her `grant-access` skill proposes the narrowest allow that would have let the call through, or says the deny
-  stands.
+- **A step denied a call says so in a signal of its own**: a one-shot line of the feed, `reason: ToolDenied`, `source: runtime`
+  (`denialLines`, `src/feed/feed.ts`), written once for each denial its task's attempts journalled, as the runtime journals it
+  (`denied`), and never a part of the step's own note. It carries the call in the runtime's words (`denialText`) and the try its task was
+  filed for (`taskTryOf`), the two the tick counts by, off the feed's own lines: a restarted daemon writes a denial neither again nor
+  never, and a recheck of the step says none of them again. `denied:` is one of her wake words, and her `grant-access` skill proposes the
+  narrowest allow that would have let the call through, or says the deny stands. The denials the stats count are their own read
+  (`deniedSoFarOf`, `src/stats/discipline.ts`).
 - **Her quota and her spend**: her task is allowed `curl -s <url>/api/quota` unasked, the address read off `daemon.json` at filing
   (`quotaUrl` in `keep.verb.ts`), and told it in her first message; none where the daemon serves no board. `nemia level` says what her ended sessions
   cost (`spend`), counted as a step's are (`taskSpend`).
@@ -2436,7 +2438,8 @@ instruction` is not on her allow list, since its write flags share its prefix.
 
 Tested in `src/nemia/nemia.test.ts` (what the keeper owes; a task stopped from outside never filed again; the levels; the diagram;
 `denied:` waking her alone), `src/nemia/keep.verb.test.ts` (the untrusted wait, the filing and its fields, the quota allow, her spend,
-a stop from outside, manual, memory), `src/feed/feed.test.ts` (the `denied:` note, a tick that says it once, and a running step's calls said as they come),
+a stop from outside, manual, memory), `src/feed/feed.test.ts` (the one-shot: one line for a denial over ten passes, a restart and a recheck that say it neither again nor
+never, and the step's own note left alone),
 `src/stats/discipline.test.ts` (the calls so far beside the ended ones the stats count),
 `src/subscription/subscription.verb.test.ts` (the name `nemia` refused), `test/agent-fences.test.ts` (her deny list, and a mode but
 `default` refused) and `test/nemia-shipped.test.ts` (no team name ships; each skill named ships).

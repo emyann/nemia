@@ -11,7 +11,7 @@ import { closeoutOf, saidCount, waitingOf } from '../views/views.verb.ts';
 import { engineWord } from '../views/views-words.ts';
 import { runStore } from '../record/files.store.ts';
 import { denialText } from '../runtime-client.ts';
-import { tryOf, type Run } from '../record/record.ts';
+import { taskTryOf, type Run } from '../record/record.ts';
 import { holdsOf, type ParentRun, type Wait } from '../wait/wait.ts';
 import { runLabels, stepLabels } from '../telemetry/telemetry.ts';
 import type { Assessment } from '../tick/assess.ts';
@@ -60,19 +60,20 @@ export function wordFeed(run: Run, r: PassReads, assessed: Assessment, admission
 }
 
 /**
- * Every call the sessions of `run`'s steps have been denied, as the pass read their views: the step, its current try (`tryOf`, from 1)
- * and the call in the runtime's words (`denialText`), in the order the runtime journalled them — each attempt of the step's task in
- * order, ended or not, and each denial of it.
+ * Every call the sessions of `run`'s steps have been denied, as the pass read their views: the step, the try its task was filed for
+ * (`taskTryOf`, from 1) and the call in the runtime's words (`denialText`), in the order the runtime journalled them — each attempt of
+ * the step's task in order, ended or not, and each denial of it.
  *
- * It is the whole of what the step's current try was denied, not what is new: the feed's own lines say which have been written already
+ * It is the whole of what the step's task was denied, not what is new: the feed's own lines say which have been written already
  * (`denialLines`), so the pass carries nothing between passes and a restarted daemon writes a denial neither again nor never. An earlier
- * try's denials were said on the passes it was the current one, and the try is part of what counts them.
+ * task's denials were said on the passes it was the current one, and the try that filed the task is part of what counts them — the try
+ * the task was filed for, never the try the step has since reached, or a recheck would say every denial of that task again.
  */
 function denialsOf(run: Run, r: PassReads): FeedDenial[] {
   const out: FeedDenial[] = [];
   for (const step of r.steps) {
     const view = r.views.get(run.steps[step.name]?.taskId ?? '');
-    const tried = tryOf(run, step.name);
+    const tried = taskTryOf(run, step.name);
     for (const attempt of view?.state.attempts ?? [])
       for (const denial of attempt.denials ?? []) out.push({ step: step.name, try: tried, call: denialText(denial) });
   }

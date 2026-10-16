@@ -3,7 +3,19 @@
  * `--import` before every test file, under `test/` or beside the code in `src/`, every test file imports it first too, and the `claude` the
  * api's engine runs is the harness's.
  */
-import { askEnded, bin, calls, observations, registry, root, scriptUnharnessed, unharnessed } from './harness.ts';
+import {
+  askEnded,
+  asks,
+  bin,
+  calls,
+  observations,
+  recorded,
+  registry,
+  root,
+  scriptUnharnessed,
+  unharnessed,
+  usageAnswer,
+} from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
@@ -246,24 +258,78 @@ test("the `claude` the api's engine runs is the harness's: it resolves there, an
   assert.match(fs.readFileSync(calls, 'utf8'), /^agents --all --json$/m);
 });
 
-test("the harness's `claude` answers a get_usage request with the request's own id, and ends only once its stdin is closed", async () => {
-  const child = spawn('claude', ['-p', '--input-format', 'stream-json'], { stdio: ['pipe', 'pipe', 'ignore'] });
+/** The flags the Agent SDK starts Claude Code with for an ask of the usage, read off one (0.3.270): no `-p` among them. */
+const SDK_FLAGS = ['--output-format', 'stream-json', '--verbose', '--input-format', 'stream-json', '--setting-sources='];
+
+/** A control response as the fake prints one, and the SDK reads it; `answered` below reads the next line the fake printed as one. */
+type Answered = { type: string; response: { request_id: string; subtype: string; response?: unknown } };
+
+/** A control request line as the SDK writes one. */
+const requested = (id: string, request: object): string => `${JSON.stringify({ type: 'control_request', request_id: id, request })}\n`;
+
+test("the harness's `claude` answers the SDK's control requests under each request's own id, and ends only once its stdin is closed", async () => {
+  const child = spawn('claude', SDK_FLAGS, { stdio: ['pipe', 'pipe', 'ignore'] });
+  const lines: string[] = [];
   let out = '';
-  const line = new Promise<string>((resolve) =>
-    child.stdout.on('data', (d: Buffer) => {
-      out += d;
-      if (out.includes('\n')) resolve(out.slice(0, out.indexOf('\n')));
-    }),
+  const waiting: (() => void)[] = [];
+  child.stdout.on('data', (d: Buffer) => {
+    out += d;
+    while (out.includes('\n')) {
+      lines.push(out.slice(0, out.indexOf('\n')));
+      out = out.slice(out.indexOf('\n') + 1);
+    }
+    waiting.splice(0).forEach((go) => go());
+  });
+  const answered = async (): Promise<Answered> => {
+    while (lines.length === 0) await new Promise<void>((go) => waiting.push(go));
+    return JSON.parse(lines.shift()!) as Answered;
+  };
+
+  child.stdin.write(requested('init-1', { subtype: 'initialize', hooks: {} }));
+  const opened = await answered();
+  assert.deepEqual(
+    [opened.type, opened.response.request_id, opened.response.subtype],
+    ['control_response', 'init-1', 'success'],
+    'the SDK opens every query with an initialize control request, and Claude Code answers it with a success',
   );
-  child.stdin.write(
-    `${JSON.stringify({ type: 'control_request', request_id: 'mine-7', request: { subtype: 'get_usage', skip_behaviors: true } })}\n`,
+
+  child.stdin.write(requested('mine-7', { subtype: 'get_usage', skip_behaviors: true }));
+  const usage = await answered();
+  assert.deepEqual(
+    [usage.type, usage.response.request_id, usage.response.subtype],
+    ['control_response', 'mine-7', 'success'],
+    "the recorded answer comes back under the request's own id, and not the `usage-1` the fixture was recorded with",
   );
-  const answered = JSON.parse(await line) as { type: string; response: { request_id: string; subtype: string } };
-  assert.deepEqual([answered.type, answered.response.request_id, answered.response.subtype], ['control_response', 'mine-7', 'success']);
+  assert.equal(
+    (usage.response.response as { subscription_type?: string }).subscription_type,
+    'max',
+    "and carries the recorded usage, which the runtime's `quotaOfUsage` reads",
+  );
+
   await new Promise((r) => setTimeout(r, 100));
   assert.equal(child.exitCode, null, 'it waits on its stdin, as Claude Code does');
   assert.equal(askEnded(child.pid!), false);
   child.stdin.end();
   await new Promise((r) => child.once('exit', r));
   assert.equal(askEnded(child.pid!), true);
+});
+
+test("REFUSED: in `exit` mode the harness's `claude` ends 3 with its sentence, before it reads a request", async () => {
+  usageAnswer('', 'exit');
+  try {
+    const child = spawn('claude', SDK_FLAGS, { stdio: ['pipe', 'pipe', 'pipe'] });
+    let said = '';
+    child.stderr.on('data', (d: Buffer) => {
+      said += d;
+    });
+    const before = asks();
+    child.stdin.on('error', () => {});
+    child.stdin.write(requested('mine-8', { subtype: 'get_usage', skip_behaviors: true }));
+    const code = await new Promise<number | null>((r) => child.once('exit', (c) => r(c)));
+    assert.equal(code, 3);
+    assert.equal(said.trim(), 'claude: the harness was told to fail');
+    assert.equal(asks(), before, 'it answered nothing: it exited before it read the request written to its stdin');
+  } finally {
+    usageAnswer(recorded('plan'));
+  }
 });

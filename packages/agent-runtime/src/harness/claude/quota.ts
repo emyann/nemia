@@ -43,20 +43,28 @@ export function usageEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEn
 }
 
 /**
+ * Which Claude Code an ask drives when none is named: `claude` from PATH, the one the harness spawns its sessions with
+ * (`src/harness/claude/code.ts`). A bare name, so the SDK's spawn resolves it on PATH and its absence arrives as
+ * `executable_not_found`, which `quotaOfRefusal` reads as `missing`. Were the option left off, the SDK would drive its own bundled
+ * native CLI instead, and the quota would report on a Claude Code the sessions never run.
+ */
+export const QUOTA_COMMAND = 'claude';
+
+/**
  * The SDK options an ask opens its query with. No prompt is sent, so what is asked for is what a usage question needs and nothing a
  * session needs: the system's temporary directory to run in; this process's environment without a session's keys (`usageEnv`) or its
  * telemetry (`withoutTelemetry`), given whole since `env` replaces the child's environment rather than adding to it; no session written,
  * should a version write one for a session that never had a turn; no MCP server but one named here (none); and none of the user's
- * settings, which load plugins and their hooks and sync skills to disk on each start. `command` is the Claude Code to ask, the SDK's own
- * entrypoint when it is not given.
+ * settings, which load plugins and their hooks and sync skills to disk on each start. `command` is the Claude Code to ask,
+ * `QUOTA_COMMAND` when it is not given — never the SDK's own bundled CLI.
  */
-export const usageOptions = (command?: string): Options => ({
+export const usageOptions = (command: string = QUOTA_COMMAND): Options => ({
   cwd: os.tmpdir(),
   env: withoutTelemetry(usageEnv(process.env)),
   persistSession: false,
   strictMcpConfig: true,
   settingSources: [],
-  ...(command === undefined ? {} : { pathToClaudeCodeExecutable: command }),
+  pathToClaudeCodeExecutable: command,
 });
 
 /**
@@ -68,7 +76,7 @@ export type UsageAsk = {
   readonly close: () => Promise<void>;
 };
 
-/** How an ask is opened: over the Claude Code named, the SDK's own entrypoint when none is. */
+/** How an ask is opened: over the Claude Code named, `QUOTA_COMMAND` when none is. */
 export type OpenUsage = (command?: string) => UsageAsk;
 
 /**
@@ -133,20 +141,41 @@ export function quotaOfUsage(usage: unknown): HarnessQuota {
   return { kind: 'windows', limits: limitsOf(usage.rate_limits), subscription: subscriptionOf(usage) };
 }
 
-/** What an error the SDK throws carries of how it went: the class it names it, and a child's exit code where there was one. */
-type SdkError = { errorClass?: unknown; exitCode?: unknown; message?: unknown };
+/**
+ * What an error the SDK throws carries of how it went: the class it names it, and a child's exit code or the signal that killed it,
+ * each where there was one.
+ */
+type SdkError = { errorClass?: unknown; exitCode?: unknown; signal?: unknown; message?: unknown };
+
+/** How the SDK joins a child's stderr to the message of a process that exited badly (`formatStderrTail`, 0.3.270). */
+const STDERR_TAIL = '. stderr: ';
+
+/**
+ * What Claude Code itself said, read off an SDK message: the last line of the stderr tail the SDK appends (`STDERR_TAIL`), or of the
+ * message where it appended none — a control request Claude Code refused says its own words there, with no child to have failed.
+ */
+const saidIn = (message: string): string => {
+  const at = message.indexOf(STDERR_TAIL);
+  const tail = at < 0 ? message : message.slice(at + STDERR_TAIL.length);
+  return tail.trim().split('\n').pop()?.trim() ?? '';
+};
 
 /**
  * Why an ask that threw has no answer. Claude Code refusing the question — a version whose control request this is not — is `unknown`,
- * in its own words; no Claude Code to ask is `missing`; anything else is `failed`, with the exit code the SDK read where it read one.
- * The signal is the SDK's message, not a field of its own, so a `failed` of a killed child says `null` there and names it in `said`.
+ * in its own words; no Claude Code to ask is `missing`; anything else is `failed`, with the exit code or the signal the SDK read where
+ * it read one, and what the child said on its stderr (`saidIn`).
  */
 export function quotaOfRefusal(error: unknown): HarnessQuota {
-  const { errorClass, exitCode, message } = (isObject(error) ? error : {}) as SdkError;
-  const said = (typeof message === 'string' ? message : String(error)).trim().split('\n').pop()?.trim() ?? '';
+  const { errorClass, exitCode, signal, message } = (isObject(error) ? error : {}) as SdkError;
+  const said = saidIn(typeof message === 'string' ? message : String(error));
   if (errorClass === 'executable_not_found') return { kind: 'missing' };
   if (errorClass === 'control_request_failed') return { kind: 'unknown', what: `it refused the request (${said || 'no error given'})` };
-  return { kind: 'failed', code: typeof exitCode === 'number' ? exitCode : null, signal: null, said };
+  return {
+    kind: 'failed',
+    code: typeof exitCode === 'number' ? exitCode : null,
+    signal: typeof signal === 'string' ? signal : null,
+    said,
+  };
 }
 
 /**

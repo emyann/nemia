@@ -8,7 +8,15 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Exit, Tracer } from 'effect';
-import { claudeQuota, type OpenUsage, quotaOfRefusal, quotaOfUsage, usageEnv, usageOptions } from '../src/harness/claude/index.ts';
+import {
+  claudeQuota,
+  type OpenUsage,
+  QUOTA_COMMAND,
+  quotaOfRefusal,
+  quotaOfUsage,
+  usageEnv,
+  usageOptions,
+} from '../src/harness/claude/index.ts';
 import { Engine, type EngineShape } from '../src/index.ts';
 import { machineTempDir, scratch } from './scratch.ts';
 import { asyncOps, type AsyncRunner } from './promise-runner.ts';
@@ -25,8 +33,12 @@ const recorded = (name: 'plan' | 'no-plan' | 'unsupported' | 'unanswered'): { re
 /** The usage of a recorded answer, as the SDK resolves it and `quotaOfUsage` is handed it. */
 const usageOf = (name: 'plan' | 'no-plan' | 'unanswered'): unknown => recorded(name).response;
 
-/** An error the SDK throws, as it carries how it went: the class it names it, and a child's exit code where it read one. */
-const thrown = (message: string, more: { errorClass?: string; exitCode?: number } = {}): Error => Object.assign(new Error(message), more);
+/**
+ * An error the SDK throws, as it carries how it went: the class it names it, and a child's exit code or the signal that ended it
+ * where it read one.
+ */
+const thrown = (message: string, more: { errorClass?: string; exitCode?: number; signal?: string } = {}): Error =>
+  Object.assign(new Error(message), more);
 
 /** A stand-in for the SDK's usage call: what `answer` says, what it was asked, and that the ask closed its query. */
 const standIn = (answer: () => Promise<unknown>) => {
@@ -107,12 +119,23 @@ test('REFUSED: a refusal reads by what the SDK named it: the question refused, n
   });
   assert.deepEqual(
     quotaOfRefusal(
-      thrown('Claude Code process exited with code 3\nclaude: the harness was told to fail', {
+      thrown('Claude Code process exited with code 3. stderr: claude: the harness was told to fail', {
         errorClass: 'process_exited_nonzero',
         exitCode: 3,
       }),
     ),
     { kind: 'failed', code: 3, signal: null, said: 'claude: the harness was told to fail' },
+    "what the child said is the stderr tail the SDK joins to its message, not the SDK's own sentence about the exit",
+  );
+  assert.deepEqual(
+    quotaOfRefusal(
+      thrown('Claude Code process terminated by signal SIGKILL. stderr: out of memory', {
+        errorClass: 'process_killed_by_signal',
+        signal: 'SIGKILL',
+      }),
+    ),
+    { kind: 'failed', code: null, signal: 'SIGKILL', said: 'out of memory' },
+    "the signal is a field of the SDK's error, read as one",
   );
   assert.deepEqual(quotaOfRefusal('nope'), { kind: 'failed', code: null, signal: null, said: 'nope' });
 });
@@ -147,9 +170,10 @@ test("REFUSED: an ask's query is opened for the question alone: in the temporary
   assert.equal(given.cwd, machineTempDir(), 'an ask runs its claude in the temp directory');
   assert.deepEqual(
     [given.persistSession, given.strictMcpConfig, given.settingSources, given.pathToClaudeCodeExecutable],
-    [false, true, [], undefined],
-    "no session written, no MCP server but one named here, none of the user's settings, and the SDK's own entrypoint",
+    [false, true, [], 'claude'],
+    "no session written, no MCP server but one named here, none of the user's settings, and the `claude` the sessions run on — never the SDK's own bundled CLI, which an ask that named none would drive",
   );
+  assert.equal(QUOTA_COMMAND, 'claude', 'the Claude Code an ask drives when none is named is a bare name, resolved on PATH');
   assert.equal(usageOptions('/bin/claude').pathToClaudeCodeExecutable, '/bin/claude', 'the Claude Code named is the one asked');
 });
 

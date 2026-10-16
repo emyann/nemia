@@ -1,7 +1,8 @@
 /**
  * A stand-in for Claude Code as the Agent SDK runs it (`pathToClaudeCodeExecutable`), speaking the SDK's stdio protocol as
  * `@anthropic-ai/claude-agent-sdk` 0.3.270 does: control requests both ways (`initialize`, `hook_callback`, `can_use_tool`,
- * `interrupt`, `remote_control`), and stream-json lines out. What it does is its plan, `STANDIN_PLAN` (`Plan`), and what it saw it
+ * `interrupt`, `remote_control`, `get_usage` — that one answered with the usage of the recorded answer `STANDIN_USAGE` names), and
+ * stream-json lines out. What it does is its plan, `STANDIN_PLAN` (`Plan`), and what it saw it
  * writes into `STANDIN_DIR`: `argv.jsonl` (each start's arguments), `initialize.jsonl` (each `initialize` request's payload, the
  * system prompt the SDK sends included), `said.jsonl` (each user message's text), `asked.jsonl` (each hook it asked, as it asks),
  * `answers.jsonl` (each answer to a control request it sent), `taken.jsonl` (each control request the SDK sent it, by subtype, with
@@ -156,6 +157,8 @@ const answered = (request: { subtype?: string; hooks?: typeof hooks } & Record<s
     hooks = request.hooks ?? {};
     note('initialize.jsonl', request);
   }
+  if (request.subtype === 'get_usage')
+    return (JSON.parse(fs.readFileSync(process.env.STANDIN_USAGE!, 'utf8')) as { response: { response: object } }).response.response;
   if (request.subtype === 'interrupt') {
     interrupted = true;
     return { still_queued: [] };

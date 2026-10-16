@@ -215,7 +215,7 @@ export type {
   Schedule,
   TemplateStatus,
 } from './factory/factory.ts';
-export { cursorTakes, feedLineWords, REMOVED } from './feed/index.ts';
+export { feedLineWords, REMOVED } from './feed/index.ts';
 export type { FeedLine, FeedPublished } from './feed/index.ts';
 export type { FeedSaid, FeedWords } from './run.ts';
 export {
@@ -309,7 +309,7 @@ export type {
   PhaseCost,
   RecentPass,
 } from './meter/index.ts';
-export { feedCursorRefusal, feedFile, freshFeedMemo, readFeed, watchFeed } from './feed/feed.store.ts';
+export { feedCursorRefusal, feedFile, freshFeedMemo, readFeed, readFeedEnds, watchFeed } from './feed/feed.store.ts';
 export { cursorFileStart, cutCursorFile, keepCursor } from './watch/cursor.store.ts';
 export { emitFeed, FEED_FOLLOW_BEATS, FEED_FOLLOW_READS, FEED_FOLLOWERS, FeedHub, feedHubLayer, followFeed } from './feed/feed.verb.ts';
 export { followStep } from './following/following.verb.ts';

@@ -138,7 +138,6 @@ const PINNED: Record<string, string[]> = {
     'costLine',
     'countsLine',
     'currentRelease',
-    'cursorTakes',
     'customInstructionsFile',
     'customInstructionsFor',
     'daemonFile',

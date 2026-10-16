@@ -87,9 +87,9 @@ The `nemia` command reads the store from disk (`WF_ROOT`), so it cannot drive a 
 - **The feed**: `$WF_ROOT/feed.jsonl`, one JSON line per change of a run's or a step's word, written by the daemon alone
   (`src/feed/feed.verb.ts`, `emitFeed`), published to the process's hub (`FeedHub`, a sliding `PubSub`). Its cursor is a byte offset
   that never expires; a cursor inside a line is refused by name (`feedCursorRefusal`).
-- **A read that ends**: `nemia feed [cursor]`, CLI-only.
-- **A read that never ends**: `nemia watch` (`src/cli/main.ts`, `watching`, over `watchFeed`), with `--json`, `--wake`,
-  `--wake-word`, and the store's liveness beside it (`livenessLines`, read every 2 s). It is a subscribe, not an await.
+- **A read that ends**: `nemia watch --once [cursor]`, CLI-only.
+- **A read that never ends**: `nemia watch` (`src/cli/main.ts`, `watching`, over `watchFeed`), with `-l`, `--cursor-file`, `--json`,
+  `--wake`, `--wake-word`, and the store's liveness beside it (`livenessLines`, read every 2 s). It is a subscribe, not an await.
 - **The api's stream**: `GET /api/feed/stream` (`apps/api/src/factory/feed.ts`), server-sent events over the live reader
   `followFeed` (hub items, and the file for what the hub dropped), each event's id the cursor after its line, so an EventSource
   resumes with `Last-Event-ID`.

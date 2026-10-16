@@ -41,8 +41,10 @@ export const labelKeysRefusal = (keys: readonly string[]): string | undefined =>
 
 /** One clause of a selector, parsed: a key compared with one value, with a list, or named alone for a line that carries it. */
 export type Clause =
-  | { readonly key: string; readonly op: '=' | '!='; readonly value: string }
-  | { readonly key: string; readonly op: 'in' | 'notin'; readonly values: readonly string[] }
+  | { readonly key: string; readonly op: '='; readonly value: string }
+  | { readonly key: string; readonly op: '!='; readonly value: string }
+  | { readonly key: string; readonly op: 'in'; readonly values: readonly string[] }
+  | { readonly key: string; readonly op: 'notin'; readonly values: readonly string[] }
   | { readonly key: string; readonly op: 'exists' };
 
 /** Every selector given, parsed: the clauses of one all hold, and one selector of them does (AND within, OR across). */
@@ -145,9 +147,15 @@ export function selectorsRefusal(values: readonly string[]): string | undefined 
 function clauseOf(text: string): Clause {
   const t = text.trim();
   const listed = LISTED.exec(t);
-  if (listed) return { key: listed[1], op: listed[2] as 'in' | 'notin', values: listed[3].split(',').map((v) => v.trim()) };
+  if (listed) {
+    const values = listed[3].split(',').map((v) => v.trim());
+    return listed[2] === 'notin' ? { key: listed[1], op: 'notin', values } : { key: listed[1], op: 'in', values };
+  }
   const compared = COMPARED.exec(t);
-  if (compared) return { key: compared[1], op: compared[2] as '=' | '!=', value: compared[3].trim() };
+  if (compared) {
+    const value = compared[3].trim();
+    return compared[2] === '!=' ? { key: compared[1], op: '!=', value } : { key: compared[1], op: '=', value };
+  }
   return { key: t, op: 'exists' };
 }
 
@@ -187,8 +195,8 @@ function holds(clause: Clause, value: string | undefined): boolean {
   if (clause.op === 'exists') return value !== undefined;
   if (clause.op === '=') return value === clause.value;
   if (clause.op === '!=') return value !== clause.value;
-  if (clause.op === 'in') return value !== undefined && clause.values.includes(value);
-  return value === undefined || !clause.values.includes(value);
+  const listed = value !== undefined && clause.values.includes(value);
+  return clause.op === 'in' ? listed : !listed;
 }
 
 /**

@@ -1,7 +1,8 @@
 /**
  * `nemia watch`'s own lines: the store's liveness said once as it falls and once as it comes back (`livenessLines`), read off a lease
- * the test scripts; the lines kept by `--wake` and `--wake-word` (`wakeOf`, `watchedLine`); and `--json`, the feed's lines with their
- * cursor on stdout and the watch's own words on stderr (`watchPrinted`).
+ * the test scripts; the lines kept by `--wake` and `--wake-word` (`wakeOf`, `watchedLine`); `--json`, the feed's lines with their
+ * cursor on stdout and the watch's own words on stderr (`watchPrinted`); the lines a `-l` selector takes, with the cursor file that
+ * reaches the feed's end whatever it drops; and the bookmark a silent watch says at its cadence, the clock steered.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,6 +12,8 @@ import { Effect, Fiber, Stream } from 'effect';
 import { livenessWords, type DaemonFile, type DaemonStanding } from '../daemon/daemon.ts';
 import { startedLine, upgraded, type FeedLine } from '../feed/index.ts';
 import { wakeOf, watchedLine, type Watched } from '../subscription/subscription.ts';
+import { parseSelectors } from '../watch/selector.ts';
+import { steeredClock } from '../../test/steered.ts';
 import { scratch } from '../../test/scratch.ts';
 import { bell, until, WAITED } from '../../test/waits.ts';
 
@@ -184,3 +187,72 @@ test(
     assert.equal(JSON.parse(json.out[0]).liveness, 'down');
   },
 );
+
+/** The cursor a watch's file holds, or undefined while it has written none. */
+const kept = (file: string): number | undefined => (fs.existsSync(file) ? Number(fs.readFileSync(file, 'utf8').trim()) : undefined);
+
+test(
+  'a filtered watch prints the lines its selector takes alone, and its cursor file reaches the feed’s end all the same',
+  WAITED,
+  async (t) => {
+    fs.writeFileSync(FEED, '');
+    const file = path.join(ROOT, 'filtered.cursor');
+    fs.rmSync(file, { force: true });
+    const out: string[] = [];
+    const wrote = bell();
+    t.mock.method(console, 'log', (...a: unknown[]) => {
+      out.push(a.join(' '));
+      wrote.ring();
+    });
+    t.mock.method(console, 'error', () => {});
+    const ada = upgraded({ at: AT, run: 'r-1', step: 'implement', word: 'running', labels: { run: 'r-1', agent: 'ada' } });
+    const agora = upgraded({ at: AT, run: 'r-2', step: 'review', word: 'running', labels: { run: 'r-2', agent: 'agora' } });
+    const watch = watchPrinted(0, {}, { selectors: parseSelectors(['agent=ada']), cursorFile: file });
+    try {
+      const text = [agora, ada, agora].map((l) => `${JSON.stringify(l)}\n`).join('');
+      fs.appendFileSync(FEED, text);
+      const end = Buffer.byteLength(text);
+      await until(t, () => kept(file) === end, 'the cursor file at the feed’s end', { bell: wrote, everyMs: 20 });
+      assert.deepEqual(out.slice(1), ['12:00:00  r-1  implement  running'], 'the lines its selector takes alone, after the banner');
+      assert.equal(watch.at(), end, 'and the watch holds the feed’s end, not the last line it printed');
+      fs.writeFileSync(FEED, '');
+      await until(t, () => kept(file) === 0, 'the cursor file rewritten on the cut', { bell: wrote, everyMs: 20 });
+    } finally {
+      watch.stop();
+    }
+  },
+);
+
+test('a watch that has fallen silent bookmarks its cursor at its cadence, and writes it', WAITED, async (t) => {
+  const text = `${JSON.stringify(upgraded({ at: AT, run: 'r-9', word: 'running' }))}\n`;
+  fs.writeFileSync(FEED, text);
+  const end = Buffer.byteLength(text);
+  const file = path.join(ROOT, 'bookmark.cursor');
+  fs.rmSync(file, { force: true });
+  const out: string[] = [];
+  const wrote = bell();
+  t.mock.method(console, 'log', (...a: unknown[]) => {
+    out.push(a.join(' '));
+    wrote.ring();
+  });
+  t.mock.method(console, 'error', () => {});
+  const steered = steeredClock();
+  const fiber = Effect.runFork(
+    watching(0, { json: true, wake: ['failed'] }, () => ({ kind: 'none' }), { cursorFile: file }).pipe(Effect.provide(steered.layer)),
+  );
+  try {
+    await until(t, () => steered.asked.includes(30_000), 'the bookmark’s rest asked', { bell: steered.bell });
+    await steered.adjust('29999 millis');
+    assert.equal(
+      out.some((l) => l.includes('"cursor"')),
+      false,
+      'a millisecond before its cadence, no bookmark',
+    );
+    await steered.adjust('1 millis');
+    await until(t, () => out.some((l) => l.includes('"cursor"')), 'the bookmark printed', { bell: wrote });
+    assert.deepEqual(JSON.parse(out.find((l) => l.includes('"cursor"'))!), { cursor: end }, 'the cursor the watch read to, and nothing else');
+    assert.equal(kept(file), end, 'and written to its file');
+  } finally {
+    await Effect.runPromise(Fiber.interrupt(fiber));
+  }
+});

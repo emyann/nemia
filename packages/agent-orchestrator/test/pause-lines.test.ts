@@ -1,5 +1,5 @@
 /**
- * The store's pause as the CLI says it (`pausedWords`): first on `nemia feed`, after how to start the run on `nemia start`, and on `nemia
+ * The store's pause as the CLI says it (`pausedWords`): first on `nemia watch --once`, after how to start the run on `nemia start`, and on `nemia
  * up` once when it is put, again each time its words change — Pausing with fewer finishing, then Paused, then a landing held staged — and
  * `resumed` once when it is resumed (`pauseSaid`); none of them while no pause stands.
  *
@@ -61,16 +61,16 @@ const aStart = (): string[] => {
   return ['start', 'a paused start', '--workflows', dir, '--repo', repo, '--factory', factory, '--no-worktree'];
 };
 
-test('nemia feed opens with the pause while one stands, Paused with nothing at work, and says none once it is resumed', async (t) => {
+test('nemia watch --once opens with the pause while one stands, Paused with nothing at work, and says none once it is resumed', async (t) => {
   const pause = putPause({ why: 'merging by hand', by: 'ann' });
   try {
-    const feed = await printed(t, () => main(['feed'], engineOf(engine().layer), undefined, stand().place));
+    const feed = await printed(t, () => main(['watch', '--once'], engineOf(engine().layer), undefined, stand().place));
     assert.equal(feed[0], pausedWords({ pause, finishing: [], staged: [], held: [] }), feed.join('\n'));
     assert.match(feed[0], /^Paused since /);
   } finally {
     resumePause();
   }
-  const lifted = await printed(t, () => main(['feed'], engineOf(engine().layer), undefined, stand().place));
+  const lifted = await printed(t, () => main(['watch', '--once'], engineOf(engine().layer), undefined, stand().place));
   assert.equal(
     lifted.some((l) => l.startsWith('Paus')),
     false,

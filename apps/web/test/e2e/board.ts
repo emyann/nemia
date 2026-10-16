@@ -487,10 +487,18 @@ export type HerChat = {
   read?: string;
   /** What the person wrote that the api took, each entry drawn as their own bubble. */
   outbox?: readonly { id: string; at: string; text: string }[];
+  /**
+   * What the keeper said to her session, journalled as the runtime journals a said: a quiet marker in the chat, unless `delivers` names
+   * an outbox entry it carried, which draws that entry as the person's own bubble.
+   */
+  told?: readonly { text: string; delivers?: string }[];
 };
 
-/** The id her chat gives the line at `i` of `said`: `m:1:e<i>` for her words, `t:1:e<i>` for a tool call. */
-export const herEvent = (said: readonly HerLine[], i: number): string => `${'text' in said[i] ? 'm' : 't'}:1:e${i}`;
+/**
+ * The id her chat gives the line at `i` of `said`: `m:1:e<i>:0` for her words, the `0` their place in the message's content, and
+ * `t:1:e<i>` for a tool call.
+ */
+export const herEvent = (said: readonly HerLine[], i: number): string => ('text' in said[i] ? `m:1:e${i}:0` : `t:1:e${i}`);
 
 /** One line of her transcript as Claude Code writes it, `seconds` before now. */
 const herTranscriptLine = (line: HerLine, i: number, at: (seconds: number) => string): object[] => {
@@ -504,7 +512,11 @@ const herTranscriptLine = (line: HerLine, i: number, at: (seconds: number) => st
     timestamp: at(i * 4),
   };
   if ('text' in line) return [{ ...head, type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: line.text }] } }];
-  const call = { ...head, type: 'assistant', message: { role: 'assistant', content: [{ type: 'tool_use', id: `e${i}`, name: line.tool, input: { description: line.says } }] } };
+  const call = {
+    ...head,
+    type: 'assistant',
+    message: { role: 'assistant', content: [{ type: 'tool_use', id: `e${i}`, name: line.tool, input: { description: line.says } }] },
+  };
   if (line.result === undefined) return [call];
   const result = {
     ...head,
@@ -554,18 +566,23 @@ export function herChat(what: HerChat): () => void {
       },
       { kind: 'starting', at: at(1), attempt: 1 },
       { kind: 'spawned', at: at(1), attempt: 1 },
+      ...(what.told ?? []).map((told, i) => ({ kind: 'said', at: at(2 + i), attempt: 1, text: told.text })),
     ]),
   );
   const session = what.session ?? 'answering';
   if (session !== 'none') {
     const row =
       session === 'answering'
-        ? { state: 'working', status: 'busy' }
+        ? /** A session in a turn: the engine reads it running, and her phase answering. */
+          { state: 'working', status: 'busy', pid: 424242 }
         : /** A session Claude Code holds, its turn over: the engine reads it `input-required` with nothing waited for, so her phase is idle. */
           { state: 'done', status: 'idle', pid: 424242 };
     fs.writeFileSync(
       registry,
-      JSON.stringify([...rows, { name: `ae/${NEMIA_TASK}/1`, sessionId: NEMIA_SESSION, kind: 'background', ...row, startedAt: now - 600_000 }]),
+      JSON.stringify([
+        ...rows,
+        { name: `ae/${NEMIA_TASK}/1`, sessionId: NEMIA_SESSION, kind: 'background', ...row, startedAt: now - 600_000 },
+      ]),
     );
   }
   const said = what.said ?? [];
@@ -574,6 +591,13 @@ export function herChat(what: HerChat): () => void {
   if (what.outbox?.length) {
     fs.mkdirSync(path.join(nemiaDir, 'chat'), { recursive: true });
     fs.writeFileSync(path.join(nemiaDir, 'chat', 'outbox.jsonl'), lines(what.outbox));
+  }
+  const delivered = (what.told ?? []).flatMap((told, i) =>
+    told.delivers === undefined ? [] : [{ id: told.delivers, said: at(2 + i), attempt: 1 }],
+  );
+  if (delivered.length > 0) {
+    fs.mkdirSync(path.join(nemiaDir, 'chat'), { recursive: true });
+    fs.writeFileSync(path.join(nemiaDir, 'chat', 'delivered.jsonl'), lines(delivered));
   }
   if (what.read !== undefined) {
     fs.mkdirSync(path.join(nemiaDir, 'chat'), { recursive: true });

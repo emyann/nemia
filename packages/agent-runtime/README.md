@@ -2226,6 +2226,7 @@ of pure code sits beside it.
 | `src/harness/claude/bridge.ts` | a `--bg` session's Remote Control link, off its registration's `bridgeSessionId` (`claudeBridge`), or why there is none |
 | `src/harness/claude/transcript.ts` | a Claude Code session's transcript: where it is, its closeout, its lines as events, and its usage and cost |
 | `src/harness/claude/admission.ts` | admission as Claude Code runs it: a `PreToolUse` hook merged into `--settings` (`admittedFlags`), and the adapter `ae admission` runs (`admitCall`, `admissionHook`), which `bin/ae.ts` loads alone, before any engine |
+| `src/harness/claude/memory.ts` | auto-memory off in every session the runtime starts: the setting (`AUTO_MEMORY_OFF`) merged into the settings a task gives, for the SDK (`memorylessSettings`) and in a job's or a background session's flags (`memorylessFlags`) |
 | `src/harness/claude/telemetry.ts` | a session's telemetry as Claude Code reads it: its variables, its tools' details only when asked, in a job's environment (`claudeTelemetryEnv`) and in a background session's `--settings` (`telemeteredFlags`) |
 | `src/harness/claude/vocabulary.ts` | Claude Code's modes, their ranks, efforts and context windows, the models it drops `auto` on, and what it refuses to be asked for |
 | `src/harness/claude/index.ts` | the face of `harness/claude/`, as the face takes it |

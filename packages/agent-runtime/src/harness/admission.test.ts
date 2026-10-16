@@ -105,12 +105,16 @@ test("admission is a PreToolUse hook merged into the caller's --settings, matche
     );
   }
   for (const [what, settings] of settingsGiven({ callAdmission: ADMISSION })) {
-    assert.deepEqual(Object.keys(settings), ['hooks'], `${what}: no settings of the caller's, the hook alone`);
+    assert.deepEqual(
+      Object.keys(settings),
+      ['hooks', 'autoMemoryEnabled'],
+      `${what}: no settings of the caller's, the hook and the session's auto-memory off`,
+    );
   }
   assert.deepEqual(
     claudeJob.command({ name: 'ae/t/1', brief: 'b', cwd: '/r', config: { claude } }).args.filter((a) => a.includes('PreToolUse')),
-    [claude.settings],
-    'no admission, the settings as given',
+    [JSON.stringify({ ...(JSON.parse(claude.settings) as object), autoMemoryEnabled: false })],
+    "no admission: the settings as given, the session's auto-memory off beside them",
   );
 });
 

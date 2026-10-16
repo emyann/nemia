@@ -6012,10 +6012,12 @@ Where it departs from the spec, and why:
   default ends the merged stream only when both sides end, and the tick never ends: a feed that *ended* would leave a stream alive on
   bookmarks alone. A feed that *fails* ends the stream either way, which is why no test can make the default refuse — the live reader
   never ends of itself today. `'left'` is the setting the end case needs, and is named here rather than left to be rediscovered.
-- **`Stream.drop(1)` on the tick is named by no mutant.** `Stream.tick` emits once at subscription, and the drop is why no bookmark
-  precedes the first line — but on this pin `Stream.merge` takes the left side first, so the feed's lines win that race anyway, and no
-  test can be made to refuse `Stream.drop(0)`. The drop makes the order a property of the stream rather than of a race, and it is the
-  shape `nemia watch` already has, which is why it stays.
+- **Where the tick's dropped first beat shows.** `Stream.tick` emits once at subscription (measured: one beat at 0 ms, two at 503 ms
+  for a 500 ms interval), so `Stream.drop(1)` is why no bookmark precedes the first line. It does not show where one would guess:
+  `Stream.merge` on this pin pulls the left side first, so with `Stream.drop(0)` the bookmark does not come *before* the lines — it
+  lands *between* them, after the first element of the chunk that one read of the feed hands on. Measured on a two-line feed:
+  `[run, step, bookmark]` with the drop, `[run, bookmark, step]` without it. That order is the test, and it is what names the mutant; a
+  test asserting only the stream's first event passes either way, which is why the first try had none.
 - **No test asserts a bookmark's bytes on the wire.** The cadence is `BOOKMARK_EVERY`, 30 seconds, and the route takes no cadence of its
   own — rightly, since a reader must not set the daemon's beat. The bookmark's event name, id and empty data are proven against
   `feedEvents` with a cadence of the test's own, and its id is then taken back over HTTP as `Last-Event-ID`, which is the card's resume
@@ -6027,9 +6029,9 @@ Tested in `apps/api/src/factory/feed.test.ts` (a selector sends only the lines i
 unselected lines written between them as the fixture; AND within one selector and OR across two, each with the line that must be absent;
 a bookmark's id is the feed's whole length, past a line the selector dropped, with an empty data field; its id taken back as
 `Last-Event-ID` resumes and resends nothing; a bare key opens the stream; five malformed selectors each a 422 naming it and the query
-key, with no follower started; and the shipped cadence read off the file's own text, which refuses a length spelled in the api) and
-`apps/api/test/main.test.ts` (the stream's first bytes are its comment then the daemon's line, which is what refuses a bookmark before
-the first line). `atLeast` is tested in `apps/api/test/subscriptions.test.ts` (stored as `scope`, absent where none was asked for, a
+key, with no follower started, each closing the package's words with a full stop before the api's own sentence; the shipped cadence read
+off the file's own text, which refuses a length spelled in the api; and the order of the first three events of a two-line feed, which
+refuses a first beat left in). `atLeast` is tested in `apps/api/test/subscriptions.test.ts` (stored as `scope`, absent where none was asked for, a
 level that is none a 422 naming `--at-least`, and one of the wrong type a 400 naming the shape).
 
 What it leaves: nothing of the slice. A reader that needs the daemon to do less work for a narrow selector — a dropped line still costs

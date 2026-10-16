@@ -132,8 +132,8 @@ function stepOf(attempt: number, use: SourceEvent, result: SourceEvent | undefin
 /**
  * The chat events one transcript event is: the agent's text a message, a tool call a step, words a person wrote into the session's own
  * face (`origin: { kind: 'human' }`, the other face her session gives a person) a message of theirs, so the board reads as one
- * conversation whichever face it was written from; everything else none. Words the host pushed on her input carry no origin and are drawn from the outbox, where
- * they were written, so one sent message is one bubble.
+ * conversation whichever face it was written from; everything else none. Words the host pushed on her input carry no origin and are
+ * drawn from the outbox, where they were written, so one sent message is one bubble.
  */
 function eventsOf(attempt: number, e: SourceEvent, results: ReadonlyMap<string, SourceEvent>, open: StepState): ChatEvent[] {
   if (e.role === 'assistant' && e.kind === 'text' && (e.text ?? '').trim() !== '')

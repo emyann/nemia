@@ -9,6 +9,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
+import { scratch } from './scratch.ts';
 
 const APP = path.join(import.meta.dirname, '..');
 const ROOT = path.join(APP, '..', '..');
@@ -85,25 +86,31 @@ const namesOf = (source: ts.SourceFile, into: Set<string>): Set<string> => {
   return into;
 };
 
+/** Every name the TypeScript of `files`, by path from `root`, has: the docs' own tests left out, whose fixtures cite stale names. */
+const namesIn = (root: string, files: string[]): Set<string> =>
+  files
+    .filter((f) => /\.tsx?$/.test(f) && !f.startsWith('apps/docs/test/') && fs.existsSync(path.join(root, f)))
+    .reduce(
+      (names, f) =>
+        namesOf(
+          ts.createSourceFile(f, fs.readFileSync(path.join(root, f), 'utf8'), ts.ScriptTarget.Latest, true, f.endsWith('x') ? 4 : 3),
+          names,
+        ),
+      new Set<string>(),
+    );
+
 let known: Known | undefined;
-/** The names the repository's code has, from its sources but the docs' tests, whose fixtures cite stale names, and its entries. */
+/** The names the repository's code has, read from the files git knows of under its four source tops, and its entries. */
 const knownOfRepo = (): Known =>
   (known ??= {
-    names: execFileSync('git', ['ls-files', '-co', '--exclude-standard', 'packages', 'apps', 'lint', 'tools'], {
-      cwd: ROOT,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-    })
-      .split('\n')
-      .filter((f) => /\.tsx?$/.test(f) && !f.startsWith('apps/docs/test/') && fs.existsSync(path.join(ROOT, f)))
-      .reduce(
-        (names, f) =>
-          namesOf(
-            ts.createSourceFile(f, fs.readFileSync(path.join(ROOT, f), 'utf8'), ts.ScriptTarget.Latest, true, f.endsWith('x') ? 4 : 3),
-            names,
-          ),
-        new Set<string>(),
-      ),
+    names: namesIn(
+      ROOT,
+      execFileSync('git', ['ls-files', '-co', '--exclude-standard', 'packages', 'apps', 'lint', 'tools'], {
+        cwd: ROOT,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }).split('\n'),
+    ),
     entries: entries(),
     exists: (file) => fs.existsSync(path.join(ROOT, file)),
   });
@@ -132,14 +139,22 @@ test('REFUSED: a page citing a path that does not exist, or a name the code does
 });
 
 test('the code’s names are read: an identifier, a string’s word and a hyphened state, and no stale name of the fixture', () => {
-  const { names } = knownOfRepo();
-  for (const name of ['readRun', 'decide', 'input-required', 'restartPolicy']) assert.ok(names.has(name), name);
+  const root = scratch('docs-names-');
+  const write = (file: string, text: string) => {
+    fs.mkdirSync(path.join(root, path.dirname(file)), { recursive: true });
+    fs.writeFileSync(path.join(root, file), text);
+  };
+  write('packages/agent-runtime/src/core/domain.ts', 'export const decide = (restartPolicy: string) => restartPolicy;\n');
+  write('packages/agent-orchestrator/src/run/tick.ts', "export const t = () => readRun('a task waits in input-required');\n");
+  write('apps/web/src/routes/runs.tsx', 'export const Runs = () => <p>a run</p>;\n');
+  write('apps/docs/test/names.test.ts', 'const page = `the tick calls noSuchFunctionAnywhere`;\n');
+  write('apps/docs/src/mermaid.ts', "export const read = () => 'ignoredByNothing';\n");
+  write('packages/agent-runtime/README.md', 'The name `notTypeScript` is in no source.\n');
+  const files = (fs.readdirSync(root, { recursive: true }) as string[]).map((f) => f.split(path.sep).join('/'));
+  const names = namesIn(root, files);
+  for (const name of ['decide', 'restartPolicy', 'readRun', 'input-required', 'Runs', 'read']) assert.ok(names.has(name), name);
   assert.equal(names.has('noSuchFunctionAnywhere'), false, 'the docs’ tests are left out of the scan');
-  assert.deepEqual(
-    [...ELSEWHERE].filter((word) => names.has(word)),
-    [],
-    'the code has these names: take them off ELSEWHERE',
-  );
+  assert.equal(names.has('notTypeScript'), false, 'only TypeScript is read');
 });
 
 /** The pages the scan reads: every `.mdx` or `.md` file under the site's content, sorted. */
@@ -170,6 +185,11 @@ test('the scan reads all eleven pages, and the many spans they cite', () => {
 
 test('every page cites only paths that exist and names the code has', () => {
   const repo = knownOfRepo();
+  assert.deepEqual(
+    [...ELSEWHERE].filter((word) => repo.names.has(word)),
+    [],
+    'the code has these names: take them off ELSEWHERE',
+  );
   assert.deepEqual(
     scanned().flatMap((p) => staleCitations(path.join('src/content/docs', p), fs.readFileSync(path.join(PAGES, p), 'utf8'), repo)),
     [],

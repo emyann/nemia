@@ -182,7 +182,7 @@ export type Printed<K extends PrintedKind> = (typeof PRINTED)[K]['Type'];
  * the text block at its index, a block written whole. Read off the event's own fields, so the same reading serves a line decoded
  * from a kept stdout (`claudePartials`) and an event handed by the Agent SDK as it comes (`attached-follow.ts`).
  *
- * @returns nothing for anything else — a tool's `input_json_delta` among them, so a partial never carries a call's unvalidated input
+ * @returns nothing for anything else — a piece of a tool call's input among them, so a partial never carries unvalidated input
  */
 export const partialMarksOf = (event: unknown): PartialMark[] => {
   const e = (event ?? {}) as { type?: unknown; index?: unknown; message?: { id?: unknown }; delta?: { type?: unknown; text?: unknown } };

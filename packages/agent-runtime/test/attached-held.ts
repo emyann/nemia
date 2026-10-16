@@ -2,7 +2,7 @@
  * The holder a boundary test of the attached sessions works with: the stand-in Claude Code the SDK is given, a store and a spawn
  * whose session works in a folder of its own, a long-lived request, the lines the stand-in wrote, a holder for a scope the test
  * closes, and the run file read again. Here rather than in one test file because a test that must set `CLAUDE_CONFIG_DIR` before it
- * imports `src` imports these the same way (`attached-follow.boundary.test.ts`), and there is one copy of them.
+ * imports `src` imports these the same way (`attached-follow.test.ts`), and there is one copy of them.
  */
 import fs from 'node:fs';
 import path from 'node:path';

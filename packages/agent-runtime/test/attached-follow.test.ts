@@ -6,7 +6,8 @@
  * one this process has let go of, and a turn cut mid-text.
  *
  * Where Claude Code keeps its transcripts is read when `claude/transcript.ts` is loaded, so `CLAUDE_CONFIG_DIR` is set before `src`
- * is imported, and the helpers that import it are imported the same way.
+ * is imported, and the helpers that import it are imported the same way. The stand-in is started for it by the holder the helpers
+ * make (`attached-held.ts`), so this file names nothing that starts a process and takes no boundary name.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

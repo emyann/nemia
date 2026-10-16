@@ -701,7 +701,7 @@ test("Claude Code's own flags (`config.claude`) are handed over as written, afte
     '--plugin-dir',
     '/a/nemia-y',
     '--settings',
-    '{"outputStyle":"nemia-x:no-coding"}',
+    '{"outputStyle":"nemia-x:no-coding","autoMemoryEnabled":false}',
     '--bare',
   ];
   const { claudeDetached } = await import('../src/harness/claude/code.ts');
@@ -956,7 +956,14 @@ test('a bridge asked in `config.claude` reaches a background session as --remote
     f.restore();
   }
   const at = bg.indexOf('--remote-control');
-  assert.deepEqual(bg.slice(at, at + 4), ['--remote-control', '--append-system-prompt-file', '/a/p.md', '--permission-mode']);
+  assert.deepEqual(bg.slice(at, at + 6), [
+    '--remote-control',
+    '--append-system-prompt-file',
+    '/a/p.md',
+    '--settings',
+    '{"autoMemoryEnabled":false}',
+    '--permission-mode',
+  ]);
   assert.equal(bg.filter((a) => a === '--remote-control').length, 1, 'once: the runtime gives it no other way');
 });
 
@@ -1004,8 +1011,9 @@ test('REFUSED at shipped defaults: a flag the runtime gives Claude Code itself, 
     ['claude-detached', claudeDetached.command(request, io).args],
     ['a background session', bg],
   ] as const) {
-    const stray = flagsIn(args).filter((flag) => !CLAUDE_OWNED_FLAGS.includes(flag));
+    const stray = flagsIn(args).filter((flag) => !CLAUDE_OWNED_FLAGS.includes(flag) && flag !== 'settings');
     assert.deepEqual(stray, [], `${what} gives flags the list does not name`);
+    assert.equal(args.filter((a) => a === '--settings').length, 1, `${what}: the session's auto-memory is merged into one --settings`);
   }
   for (const owned of CLAUDE_OWNED_FLAGS) {
     for (const refuses of [claudeRefuses, claudeCodeRefuses]) {
@@ -1669,6 +1677,8 @@ const PINNED_ARGV: Record<string, string[]> = {
     'SendMessage',
     '--allowedTools',
     'Edit(**)',
+    '--settings',
+    '{"autoMemoryEnabled":false}',
     '--permission-mode',
     'dontAsk',
     '--strict-mcp-config',
@@ -1693,6 +1703,8 @@ const PINNED_ARGV: Record<string, string[]> = {
     'SendMessage',
     '--allowedTools',
     'Edit(**)',
+    '--settings',
+    '{"autoMemoryEnabled":false}',
     '--permission-mode',
     'dontAsk',
     '--strict-mcp-config',
@@ -1713,6 +1725,8 @@ const PINNED_ARGV: Record<string, string[]> = {
     'SendMessage',
     '--allowedTools',
     'Edit(**)',
+    '--settings',
+    '{"autoMemoryEnabled":false}',
     '--permission-mode',
     'dontAsk',
     '--strict-mcp-config',

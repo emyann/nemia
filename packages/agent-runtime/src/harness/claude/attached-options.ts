@@ -10,6 +10,7 @@ import type { Options } from '@anthropic-ai/claude-agent-sdk';
 import type { SpawnRequest } from '../seam.ts';
 import { CLAUDE_DEFAULT_MODE, claudeAllows, claudeDenies, claudeFlagName, worktreeName, type ClaudeFlags } from './vocabulary.ts';
 import { admittedFlags } from './admission.ts';
+import { memorylessSettings } from './memory.ts';
 import { claudeTelemetryEnv } from './telemetry.ts';
 import { CLAUDE_JOB_ENV } from './job-env.ts';
 import { checkoutMcpConfig, sessionMcp, writeMcpConfig } from '../mcp.ts';
@@ -25,6 +26,7 @@ export type AttachedOptions = Pick<
   | 'additionalDirectories'
   | 'permissionMode'
   | 'settingSources'
+  | 'settings'
   | 'systemPrompt'
   | 'model'
   | 'effort'
@@ -47,13 +49,20 @@ const extraValueOf = (key: string, value: string | number | true | string[]): st
   );
 };
 
-/** `config.claude` as `extraArgs` takes it, each flag by its name without `--`, and its plugin folders apart. */
-const extraOf = (flags: ClaudeFlags | undefined): { extra: Record<string, string | null>; plugins: string[] } => {
-  const { pluginDir, ...rest } = flags ?? {};
+/**
+ * `config.claude` as `extraArgs` takes it, each flag by its name without `--`, with its plugin folders apart, and its settings apart
+ * with the session's auto-memory off in them (`memorylessSettings`), as the SDK's own `settings` option takes them: an object, or a
+ * file's path as given, which the runtime does not rewrite.
+ */
+const extraOf = (
+  flags: ClaudeFlags | undefined,
+): { extra: Record<string, string | null>; plugins: string[]; settings: Options['settings'] } => {
+  const { pluginDir, settings, ...rest } = flags ?? {};
   const given = Object.entries(rest).filter((e): e is [string, string | number | true | string[]] => e[1] !== undefined);
   return {
     extra: Object.fromEntries(given.map(([key, value]) => [claudeFlagName(key).slice(2), extraValueOf(key, value)])),
     plugins: pluginDir ?? [],
+    settings: memorylessSettings(settings) ?? settings,
   };
 };
 
@@ -93,7 +102,8 @@ const mcpFileOf = (r: SpawnRequest, file: string): string | undefined => {
  * `r` as the SDK takes it, its servers written to `mcpFile`. In `claudePrintFlags`' order:
  *
  * - the tools, denies and allows (`claudeDenies`, `claudeAllows`), the mounts as `additionalDirectories`;
- * - `config.claude` with the admission's hook (`admittedFlags`) on `extraArgs`, its plugin folders as `plugins`;
+ * - `config.claude` with the admission's hook (`admittedFlags`) on `extraArgs`, its plugin folders as `plugins`, and its settings on
+ *   the SDK's own `settings`, the session's auto-memory off in them (`memorylessSettings`);
  * - the partial messages, always asked for: the SDK emits a `stream_event` for each piece of a block only when
  *   `includePartialMessages` is set (`sdk.d.ts:1736`, `--include-partial-messages` to its CLI), and a follow of the session reads
  *   their `text_delta`s and nothing else (`attached-follow.ts`); the capture goes on dropping them;
@@ -109,7 +119,7 @@ const mcpFileOf = (r: SpawnRequest, file: string): string | undefined => {
  */
 export const attachedOptions = (r: SpawnRequest, mcpFile: string): AttachedOptions => {
   const c = r.config;
-  const { extra, plugins } = extraOf(admittedFlags(c));
+  const { extra, plugins, settings } = extraOf(admittedFlags(c));
   const mcp = mcpFileOf(r, mcpFile);
   return {
     cwd: r.cwd,
@@ -118,6 +128,7 @@ export const attachedOptions = (r: SpawnRequest, mcpFile: string): AttachedOptio
     includePartialMessages: true,
     permissionMode: (c?.permissionMode ?? CLAUDE_DEFAULT_MODE) as Options['permissionMode'],
     settingSources: ['project'],
+    settings,
     systemPrompt: { type: 'preset', preset: 'claude_code' },
     ...askedOf(r),
     extraArgs: {

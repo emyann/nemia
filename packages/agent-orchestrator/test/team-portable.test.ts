@@ -3,7 +3,8 @@
  * schemas beside them, and the skills that are their own (`OWN_SKILLS`, each `SKILL.md` and its `rules.json`) say no word of this
  * repository (`REPOSITORY_WORDS`): no path of it, no command or tool of its check, no file of its lint, no step of its workflows, none of
  * its owner's settings. What is this repository's is told by the layer that owns it: a step of its workflows, its `.claude/settings.json`,
- * its `CLAUDE.md` files, its factory's rules. An agent's `skills:` names only its own skills, the place's and the vendored interview
+ * its `CLAUDE.md` files, its factory's rules. A link to Anthropic's own documentation is not a path of this repository, and no word is
+ * read inside one (`DOCUMENTATION`). An agent's `skills:` names only its own skills, the place's and the vendored interview
  * (`ROLE_SKILLS`): a skill about this repository is added by the step that needs it.
  *
  * Each word is first refused in planted text (`PLANTED`), and each file is read for a name it must hold, so a file moved or emptied
@@ -52,9 +53,17 @@ const wholeWord = (word: string): RegExp =>
     'i',
   );
 
-/** Where `files` say one of `words`: a line each, `<file>: <word>`. */
+/**
+ * A link to Anthropic's own documentation, on a host of theirs: its path is that site's, never a path of this repository, so the words
+ * are not read inside one. A link to anywhere else is read whole.
+ */
+const DOCUMENTATION = /https:\/\/(?:(?:code|docs|platform)\.claude\.com|docs\.anthropic\.com)\/\S*/g;
+
+/** Where `files` say one of `words`, each link to Anthropic's documentation (`DOCUMENTATION`) left out: a line each, `<file>: <word>`. */
 const oursIn = (files: Map<string, string>, words: readonly string[] = REPOSITORY_WORDS): string[] =>
-  [...files].flatMap(([file, text]) => words.filter((word) => wholeWord(word).test(text)).map((word) => `${file}: ${word}`));
+  [...files].flatMap(([file, text]) =>
+    words.filter((word) => wholeWord(word).test(text.replace(DOCUMENTATION, ''))).map((word) => `${file}: ${word}`),
+  );
 
 /** The skills that are the team's own, written for its roles. */
 const OWN_SKILLS = ['write-a-spec', 'implement-a-change', 'review-a-change', 'land-a-branch', 'read-the-stats'];
@@ -113,6 +122,15 @@ test("REFUSED: each of this repository's words, planted in an agent's body, in i
     );
   }
   assert.ok(REPOSITORY_WORDS.length >= 22, 'the list only grows');
+});
+
+test("REFUSED: a word of this repository beside a link to Anthropic's documentation, and inside a link to anywhere else", () => {
+  const link = 'https://code.claude.com/docs/en/agent-sdk/overview';
+  const beside = new Map([['a.md', `Read ${link}, then docs/architecture.md.`]]);
+  assert.deepEqual(oursIn(beside, ['docs/']), ['a.md: docs/'], 'the link is left out, the path beside it is not');
+  const elsewhere = new Map([['b.md', 'Read https://example.test/docs/architecture.md.']]);
+  assert.deepEqual(oursIn(elsewhere, ['docs/']), ['b.md: docs/'], 'a link to another site is read whole');
+  assert.deepEqual(oursIn(new Map([['c.md', `Read ${link}.`]]), ['docs/']), []);
 });
 
 test('the matcher takes a word whole, and lets through what any factory says', () => {

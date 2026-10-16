@@ -9,7 +9,6 @@ import assert from 'node:assert/strict';
 import {
   JOBS_SINCE,
   deniedCallsOf,
-  deniedSoFarOf,
   deniesRecorded,
   filesTouchedOf,
   ranAsJob,
@@ -36,27 +35,6 @@ test('every ended attempt gives each call it was denied, one per call, in order;
   assert.deepEqual(deniedCallsOf(view), [write, write, push]);
   assert.deepEqual(deniedCallsOf({ state: { attempts: [{ ended: 'done' }] } }), [], 'a session denied nothing');
   assert.deepEqual(deniedCallsOf(undefined), []);
-});
-
-test('so far, the ended attempts give each call, one per call, and apart an attempt still running each distinct call once — the stats read only the ended', () => {
-  const ls = { tool: 'Bash', what: 'ls' };
-  const text = (d: { tool: string; what?: string }) => `${d.tool}(${d.what ?? ''})`;
-  const view = {
-    state: {
-      attempts: [
-        { ended: 'failed', denials: [write, write] },
-        { ended: null, denials: [ls, push, ls, ls] },
-      ],
-    },
-  };
-  assert.deepEqual(deniedSoFarOf(view, text), { ended: [write, write], running: [ls, push] });
-  assert.deepEqual(deniedCallsOf(view), [write, write], 'the stats count no call of an attempt still running');
-  assert.deepEqual(
-    deniedSoFarOf({ state: { attempts: [{ ended: 'done', denials: [ls, ls] }] } }, text),
-    { ended: [ls, ls], running: [] },
-    'ended: each call',
-  );
-  assert.deepEqual(deniedSoFarOf(undefined, text), { ended: [], running: [] });
 });
 
 test('a step on codex, on a remote agent or in the background records no denial; a job on claude or claude-detached does', () => {

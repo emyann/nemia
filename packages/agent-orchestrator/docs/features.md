@@ -6012,6 +6012,10 @@ Where it departs from the spec, and why:
   default ends the merged stream only when both sides end, and the tick never ends: a feed that *ended* would leave a stream alive on
   bookmarks alone. A feed that *fails* ends the stream either way, which is why no test can make the default refuse — the live reader
   never ends of itself today. `'left'` is the setting the end case needs, and is named here rather than left to be rediscovered.
+- **`Stream.drop(1)` on the tick is named by no mutant.** `Stream.tick` emits once at subscription, and the drop is why no bookmark
+  precedes the first line — but on this pin `Stream.merge` takes the left side first, so the feed's lines win that race anyway, and no
+  test can be made to refuse `Stream.drop(0)`. The drop makes the order a property of the stream rather than of a race, and it is the
+  shape `nemia watch` already has, which is why it stays.
 - **No test asserts a bookmark's bytes on the wire.** The cadence is `BOOKMARK_EVERY`, 30 seconds, and the route takes no cadence of its
   own — rightly, since a reader must not set the daemon's beat. The bookmark's event name, id and empty data are proven against
   `feedEvents` with a cadence of the test's own, and its id is then taken back over HTTP as `Last-Event-ID`, which is the card's resume

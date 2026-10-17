@@ -1,7 +1,8 @@
 /**
  * The store's pause at once on disk: `pauseNow` puts the pause, writes for each task at work but a landing the ask that names it, and
  * asks the engine to stop it only once that ask is on disk; it keeps a pause that stands as it was; a stop the engine refuses leaves the
- * ask; `nowRead` writes nothing. A store of its own, since `WF_ROOT` is read as the module loads; an engine of its own, which records.
+ * ask; `nowRead` writes nothing. A store of its own, since `WF_ROOT` is read as the module loads, with `WF_VERIFY_REST=0` beside it:
+ * nothing here ticks, and a warm read counted under `1` reads every record afresh to verify it. An engine of its own, which records.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -9,17 +10,20 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import type { Workflow } from '../step/step.ts';
-import type { FinishingView } from './pause.ts';
+import type { FinishingView, RunTasks } from './pause.ts';
 import { promised } from '../../test/promised.ts';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
 
 const ROOT = scratch('wf-pause-now-');
 process.env.WF_ROOT = ROOT;
+process.env.WF_VERIFY_REST = '0';
 const { nowRead, pauseNow } = await import('./pause.verb.ts');
 const { askFile, asksDir } = await import('../record/record.store.ts');
 const { pauseFile, putPause, readPause, resumePause } = await import('./pause.store.ts');
 const { runWith: runEngine } = await import('../runtime-client.ts');
+const { recordMemo } = await import('../rest/index.ts');
+const { metered } = await import('../meter/tally.store.ts');
 const stand = eachTest(testPlace);
 const runWith = runOver(runEngine, () => stand().layer);
 
@@ -195,4 +199,21 @@ test('nemia pause --now says what it would stop and writes nothing; --yes acts; 
   assert.deepEqual(stops, [{ taskId: 't1', askOnDisk: true }]);
   fs.rmSync(asksDir('r-a'), { recursive: true });
   resumePause();
+});
+
+test("a warm read of what a pause at once would stop reads the live runs' records alone, and answers a cold read's own", async () => {
+  writeRun('r-live', { implement: { taskId: 'live-1' } });
+  for (let n = 0; n < 200; n++) writeRun(`fin-${String(n).padStart(3, '0')}`, { implement: { taskId: `fin-${n}` } });
+  const { e } = engineOf(['live-1']);
+  const memo = recordMemo<RunTasks>();
+  const warm = async () => {
+    await runWith(e, nowRead(memo));
+    return (await metered(async () => await runWith(e, nowRead(memo)))).tallies?.records;
+  };
+
+  const records = await warm();
+  assert.equal(records, 1, "the one run whose task is at work, and no finished run's record");
+  const warmed = await runWith(e, nowRead(memo));
+  assert.deepEqual(warmed, [{ run: 'r-live', step: 'implement', kind: 'session', taskId: 'live-1' }]);
+  assert.deepEqual(warmed, await runWith(e, nowRead()), "the warm answer is a cold read's own: nothing the board shows changes");
 });

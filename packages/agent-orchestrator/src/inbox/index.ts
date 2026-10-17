@@ -12,5 +12,5 @@ export {
   queueOrder,
   workflowAt,
 } from './inbox.ts';
-export type { InboxCard, InboxListing, QueueStarted, QueueTry } from './inbox.ts';
+export type { InboxCard, InboxListing, InboxRuns, QueueStarted, QueueTry } from './inbox.ts';
 export { queueFactoryRefusal } from './queue-factory.ts';

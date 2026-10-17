@@ -449,8 +449,8 @@ export const PAUSE_NOW: Command<{ interrupts: Interrupt[]; cost: string }> = {
   nemia: 'read',
   route: { method: 'GET', path: '/api/pause/now', status: 200 },
   only: { side: 'api', why: 'the board confirms a pause at once with it; at the command line, nemia pause --now says it' },
-  handler: Effect.fnUntraced(function* () {
-    return { interrupts: yield* nowRead(), cost: NOW_COST };
+  handler: Effect.fnUntraced(function* (_args, _env, _home, kept) {
+    return { interrupts: yield* nowRead(kept?.records?.pause), cost: NOW_COST };
   }),
   print: () => [],
 };

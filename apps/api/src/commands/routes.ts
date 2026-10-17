@@ -202,8 +202,10 @@ const namedBy = (c: Context<ApiEnv>): Named => ({
 
 /**
  * A routed command's handler: the guard where it writes, a name its path names (400), its arguments, its check (422), and its handler's
- * data at its route's status — or, where the command throws a refusal in place of data that did nothing (`apiRefusal`), that refusal,
- * answered by `app.onError`; or 502 in its words, where it has words for a failure (`RouteWords.failed`).
+ * data at its route's status, the app's memos of the runs each read projects handed with them (`ReadMemo.records`), so a read that polls
+ * — the factories' listing — answers a run whose record has not moved from memory — or, where the command throws a refusal in place
+ * of data that did nothing (`apiRefusal`), that refusal, answered by `app.onError`; or 502 in its words, where it has words for a
+ * failure (`RouteWords.failed`).
  */
 const route = (command: Command, at: Route) => (c: Context<ApiEnv>) =>
   served(c, async (s) => {
@@ -222,7 +224,7 @@ const route = (command: Command, at: Route) => (c: Context<ApiEnv>) =>
     if (wrong) return c.json({ error: wrong }, 422);
     try {
       const args = servedRepo(command, read.args, s);
-      const data = await runPlaced(s.placeService, s.e, command.handler(args, s.env, s.home));
+      const data = await runPlaced(s.placeService, s.e, command.handler(args, s.env, s.home, { records: s.memo.records }));
       const refusal = command.apiRefusal?.(data, args);
       if (refusal) throw refusal;
       return c.json(answerOf(command, data), at.status);

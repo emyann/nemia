@@ -625,6 +625,13 @@ export type RunStore = {
      * answers for an id is listed as given, its record not read.
      */
     readonly list: (said?: (line: string) => void, kept?: (id: string) => Run | undefined) => Run[];
+    /**
+     * One run by id, found among the ids the store lists, never read by a path made of the id, with the person's files composed onto it
+     * as `read` composes them. Undefined for an id the store does not list — one climbing out of the store's own directory among them —
+     * for a record removed since the listing, and for one that does not read as a run, which is said once on `said`, stderr unless given,
+     * as `list` says it.
+     */
+    readonly find: (id: string, said?: (line: string) => void) => Run | undefined;
     /** Make a new run's record: `nemia start`'s, the one writer that makes one. */
     readonly create: (run: Run) => void;
     /**

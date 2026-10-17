@@ -155,7 +155,7 @@ export class UnreadableRecord extends Invalid {
 
 /** Each unreadable record said once a process: a daemon lists the runs every pass. */
 const saidAlready = new Set<string>();
-const sayOnce = (line: string): void => {
+export const sayOnce = (line: string): void => {
   if (!saidAlready.has(line) && saidAlready.add(line)) process.stderr.write(`${line}\n`);
 };
 

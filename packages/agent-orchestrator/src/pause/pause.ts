@@ -6,6 +6,7 @@
  * it are `assess` and the tick's `pass`.
  */
 import type { Run } from '../record/record.ts';
+import type { RecordMemo } from '../rest/index.ts';
 import type { RetryAsk } from '../retry/index.ts';
 import type { Workflow } from '../step/step.ts';
 import { landsOnCheck } from '../status/status.ts';
@@ -140,11 +141,8 @@ export function interruptsAmong(
 }
 
 /** Whether one of `run`'s current tasks or checks is at work. */
-const live = (run: Run, viewOf: (taskId: string) => FinishingView | undefined): boolean =>
-  currentTasks(run).some((taskId) => {
-    const view = viewOf(taskId);
-    return view !== undefined && atWork(view);
-  });
+const live = (run: Pick<Run, 'steps'>, viewOf: (taskId: string) => FinishingView | undefined): boolean =>
+  currentTasks(run).some((taskId) => atWorkNow(taskId, viewOf));
 
 /**
  * Each task still finishing under the pause among `runs` (`finishingOf`), each run's steps read (`stepsOf`) and its waiting asks
@@ -160,8 +158,33 @@ export function finishingAmong(
 }
 
 /** Every step's current task and its check's, of `run`: what may still be at work. */
-export const currentTasks = (run: Run): string[] =>
+export const currentTasks = (run: Pick<Run, 'steps'>): string[] =>
   Object.values(run.steps).flatMap((s) => [s.taskId, s.check?.taskId].filter((id): id is string => Boolean(id)));
+
+/**
+ * A run as a pause at once first reads it, before any record is: its id, whether a person called it off, and its steps' current tasks
+ * (`currentTasks`). What a reader that polls keeps between its reads, so that the records it then reads are the live runs' alone.
+ */
+export type RunTasks = Pick<Run, 'id' | 'cancelledAt'> & { tasks: readonly string[] };
+
+/** The memo a caller that polls what a pause at once would stop keeps of what it reads of every run (`RunTasks`). */
+export type PauseRuns = RecordMemo<RunTasks>;
+
+/**
+ * The ids among `runs` one of whose current tasks is at work: the runs whose records a pause at once then reads, and no other. A run a
+ * person called off is none, as `interruptsRead` leaves one out.
+ */
+export const liveAmong = (runs: readonly RunTasks[], viewOf: (taskId: string) => FinishingView | undefined): string[] =>
+  runs
+    .filter((run) => !run.cancelledAt)
+    .filter((run) => run.tasks.some((taskId) => atWorkNow(taskId, viewOf)))
+    .map((run) => run.id);
+
+/** Whether the task `taskId` is at work, as `viewOf` sees it: nothing for one with no view. */
+const atWorkNow = (taskId: string, viewOf: (taskId: string) => FinishingView | undefined): boolean => {
+  const view = viewOf(taskId);
+  return view !== undefined && atWork(view);
+};
 
 /** Whether a task's view is at work: pending or running, neither queued for a slot nor waiting on a person. */
 const atWork = (view: FinishingView): boolean => {

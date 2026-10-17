@@ -2,7 +2,8 @@
  * The inbox on disk: `$WF_ROOT/inbox/`, filed, listed and dropped through the verbs, as a person types them.
  *
  * What a card is and what the listing says are pure, and live in inbox.test.ts. This is the part that is not: the folder, the name a card
- * is filed under, and the run records a listing reads. `WF_ROOT` is set before the import, since the module reads it as it loads.
+ * is filed under, and the run records a listing reads. `WF_ROOT` is set before the import, since the module reads it as it loads, and
+ * `WF_VERIFY_REST=0` with it: nothing here ticks, and a warm read counted under `1` reads every record afresh to verify it.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,6 +21,7 @@ const INBOX = path.join(ROOT, 'inbox');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
 process.env.WF_ROOT = ROOT;
+process.env.WF_VERIFY_REST = '0';
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
 const { addToInbox, dropFromInbox, inboxDir, readInbox, startRun, startFromInbox } = await import('../runner.ts');
@@ -27,6 +29,8 @@ const stand = eachTest(testPlace);
 const runPlaced = runGiven(() => stand().layer);
 const { readRun } = await import('../record/record.store.ts');
 const { runStore } = await import('../record/files.store.ts');
+const { recordMemo } = await import('../rest/index.ts');
+const { metered } = await import('../meter/tally.store.ts');
 const { main: cli } = await import('../cli/main.ts');
 /** `nemia`, as a person types it, its commands given this test's place. */
 const main = (argv: string[], e?: Parameters<typeof cli>[1]) => cli(argv, e, undefined, stand().place);
@@ -722,4 +726,24 @@ test('a card gone between its start and its removal — removed by someone else 
   assert.equal(started.removed, true, 'a card already gone is not a removal that failed');
   assert.deepEqual(readRun(started.run.id).from, { inbox: card.name });
   assert.deepEqual(readInbox(), []);
+});
+
+test("a warm read of the inbox reads no finished run's record, however many there are, and answers a cold read's own", async () => {
+  emptyInbox();
+  for (const file of fs.readdirSync(path.join(ROOT, 'runs'))) fs.rmSync(path.join(ROOT, 'runs', file), { recursive: true });
+  const { card } = addToInbox({ text: 'Cache the inbox' });
+  writeRecord('r-started', { inbox: card.name });
+  const memo = recordMemo<Pick<Run, 'id' | 'from'>>();
+  const warm = async () => {
+    readInbox(memo);
+    return (await metered(async () => readInbox(memo))).tallies?.records;
+  };
+
+  const few = await warm();
+  for (let n = 0; n < 200; n++) writeRecord(`fin-${String(n).padStart(3, '0')}`);
+  const many = await warm();
+  assert.equal(few, 0, 'nothing moved since the last read, so no record is read');
+  assert.equal(many, few, "a warm read reads no finished run's record, however many there are");
+  assert.deepEqual(readInbox(memo), readInbox(), "the warm answer is a cold read's own: nothing the board shows changes");
+  assert.deepEqual(readInbox(memo).find((l) => l.name === card.name)?.startedAs, ['r-started'], 'and it still says what started the card');
 });

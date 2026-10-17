@@ -28,6 +28,7 @@ import {
 } from './chat.store.ts';
 import {
   answeredBefore,
+  sameWords,
   askDue,
   askOf,
   askWords,
@@ -91,10 +92,12 @@ export const outboxOwed = (dir: string): boolean => {
  * Each ask the task `taskId` says its session holds open, copied into the chat kept in `dir` once, by its id: the ids copied now.
  * The board reads the chat's own folder, so an ask survives the session that asked it; an ask already there is left as it was.
  *
- * An ask asking the same questions as one the person answered already (`answeredBefore`) is copied into no second ask and put to
- * nobody: the answer on record is written back through the call she holds open now, so a question a restart cut between the ask and
- * the answer — asked afresh under a new call id — is answered from what the person said the first time. Level-triggered: nothing is
- * marked for it, and the next beat finds the call gone from `asks` once it has taken the answer.
+ * An ask asking the same questions as one the chat holds already (`sameWords`) is copied into no second ask: a restart cuts her call
+ * and she asks the same question afresh under a new id, and the person is asked it once. Where the record answers it
+ * (`answeredBefore`) that answer is written back through the call she holds open now, so a question cut between the ask and the
+ * answer is answered from what the person said the first time; where it does not, the one copy goes on waiting on them, and their
+ * answer reaches her by the road `answersDue` finds for it. Level-triggered: nothing is marked for either, and the next beat finds
+ * the call gone from `asks` once it has taken the answer.
  */
 export const recordAsks = Effect.fn('recordAsks')(function* (taskId: string, dir: string) {
   const e = yield* EngineService;
@@ -106,13 +109,13 @@ export const recordAsks = Effect.fn('recordAsks')(function* (taskId: string, dir
   for (const raw of view.asks ?? []) {
     if (known.has(raw.id)) continue;
     const ask = askOf(raw);
-    const before = answeredBefore(asks, answers, ask);
-    if (before === undefined) {
+    if (sameWords(asks, ask) === undefined) {
       appendAsk(dir, ask);
       copied.push(ask.id);
       continue;
     }
-    yield* carry(e, taskId, 'return', ask, { ...before, id: ask.id });
+    const before = answeredBefore(asks, answers, ask);
+    if (before !== undefined) yield* carry(e, taskId, 'return', ask, { ...before, id: ask.id });
   }
   return copied;
 });

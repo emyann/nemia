@@ -309,6 +309,12 @@ export const askOf = (raw: {
 /** The questions of an ask as one key: each question's own words, in order, so two asks of the same words key the same. Pure. */
 export const askKey = (ask: Pick<Ask, 'questions'>): string => JSON.stringify(ask.questions.map((q) => q.question));
 
+/** The id of the ask among `asks` asking the same questions as `ask` under another id, where there is one. Pure. */
+export const sameWords = (asks: readonly Ask[], ask: Pick<Ask, 'id' | 'questions'>): string | undefined => {
+  const key = askKey(ask);
+  return asks.find((one) => one.id !== ask.id && askKey(one) === key)?.id;
+};
+
 /**
  * The answer already recorded for an ask of the same questions as `ask` under another id, the latest where there are several: what a
  * question she asks again — a restart cut her session between the ask and the answer, so she asks it afresh under a new call — is

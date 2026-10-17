@@ -185,6 +185,16 @@ test('the same question asked again after a restart is answered from the record,
   assert.deepEqual(engine().said, [], 'nothing of it was said as words: her new call carried it');
 });
 
+test('the same question open under a second call of hers is written down once: the person is asked it no twice', async () => {
+  const { e, id, dir } = await filed();
+  engine().plantAsk(id, RAW);
+  assert.deepEqual(await runWith(e, recordAsks(id, dir)), ['call-1']);
+  engine().plantAsk(id, { ...RAW, id: 'call-2' });
+  assert.deepEqual(await runWith(e, recordAsks(id, dir)), [], 'her second call of the same words is no second ask');
+  assert.deepEqual(readAsks(dir), [kept], 'the chat draws the question once, and counts it once as waiting on them');
+  assert.deepEqual(engine().answered, [], 'and nothing was answered from a record that holds no answer to it');
+});
+
 test('REFUSED: an ask of other words is no answer of the record, and waits on the person itself', async () => {
   const { e, id, dir } = await filed();
   const words = RAW.questions[0].question;

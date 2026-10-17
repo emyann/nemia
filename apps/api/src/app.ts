@@ -196,7 +196,9 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     )
     .get('/api/metrics', async (c) => c.json(metricsOf(await runtime.runPromise(Metric.snapshot))))
     .get('/api/pause', (c) => served(c, async ({ e, placeService }) => c.json(await pauseOf(e, placeService))))
-    .get('/api/pause/now', (c) => served(c, async ({ e, placeService }) => c.json(await pauseNowOf(e, placeService))))
+    .get('/api/pause/now', (c) =>
+      served(c, async ({ e, placeService, memo }) => c.json(await pauseNowOf(e, placeService, memo.records.pause))),
+    )
     .get('/api/daemon', (c) => c.json(readDaemon()))
     .get('/api/quota', (c) =>
       served(c, async ({ e, env, quota }) => c.json(await quota({ env, ask: () => engineRead('quota', e.quota('claude')) }))),

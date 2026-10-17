@@ -16,8 +16,8 @@ import { scratch } from '../../test/scratch.ts';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
-import { steeredClock } from '../../test/steered.ts';
-import { until, WAITED } from '../../test/waits.ts';
+import { steeredClock, type Steered } from '../../test/steered.ts';
+import { until, WAITED, type Waiter } from '../../test/waits.ts';
 
 const ROOT = scratch('wf-service-');
 process.env.WF_ROOT = ROOT;
@@ -165,6 +165,37 @@ function hostOf(world: World): { host: ServiceHost; events: string[] } {
 
 const install = (args: Args, host: ServiceHost) => runWith(engineOf(engine().layer), installService(args, host));
 
+/**
+ * A take-over of the old pid on `host`, forked over the engine and the place of the test running now, on the clock `clock` steers where
+ * one is given and on the real clock where none is.
+ */
+const taking = (host: ServiceHost, clock?: Steered) => {
+  const program = installService({ takeOver: String(OLD) }, host).pipe(
+    Effect.provide(EngineService.layer(engineOf(engine().layer))),
+    Effect.provide(stand().layer),
+  );
+  return Effect.runFork(clock ? program.pipe(Effect.provide(clock.layer)) : program);
+};
+
+/** A rest of `by` that `clock` was asked and has not woken: the pass of `fiber`'s program that waits for the clock to move. */
+const resting = (clock: Steered, by: number): boolean =>
+  clock.asked.filter((ms) => ms === by).length > clock.woken.filter((ms) => ms === by).length;
+
+/**
+ * Moves `clock` by `by` for each rest of `by` `fiber`'s program is waiting on, waiting for the rest and never for a length of time,
+ * until the program ends. Every rest a take-over asks but its bounds is its host's poll, so the clock moves by one poll a pass and a
+ * program driven this way reaches none of those bounds: no length of real time decides what it does.
+ */
+const stepped = async (t: Waiter, clock: Steered, fiber: { pollUnsafe: () => unknown }, by: number): Promise<void> => {
+  while (fiber.pollUnsafe() === undefined) {
+    await until(t, () => resting(clock, by) || fiber.pollUnsafe() !== undefined, `a rest of ${by} ms outstanding, or the program ended`, {
+      bell: clock.bell,
+    });
+    if (fiber.pollUnsafe() !== undefined) return;
+    await clock.adjust(by);
+  }
+};
+
 beforeEach(() => {
   fs.rmSync(path.join(HOME, '.config'), { recursive: true, force: true });
   fs.rmSync(pauseFile(), { force: true });
@@ -262,12 +293,18 @@ test('a take-over pauses, waits out the landing check, stops the confirmed pid, 
   );
 });
 
-test('a take-over drains the daemon and waits for each call in flight, naming it once, before it signals', async () => {
+test('a take-over drains the daemon and waits for each call in flight, naming it once, before it signals', WAITED, async (t) => {
   const world: World = { lease: lease(OLD), unitPid: null, landings: [[]], calls: [[CALL], [CALL], []] };
   world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
   world.onStart = () => passing(world, NEW);
   const { host, events } = hostOf(world);
-  assert.equal((await install({ takeOver: String(OLD) }, host)).did, 'taken');
+  const clock = steeredClock();
+  const fiber = taking(host, clock);
+  t.after(() => Effect.runPromise(Fiber.interrupt(fiber)));
+  await until(t, () => clock.asked.length >= 2, 'the call read, its rest and the bound of the wait asked', { bell: clock.bell });
+  assert.deepEqual(clock.asked.slice(0, 2), [host.pollMs, host.waitMs], 'it rests at the host’s pace, under the host’s bound');
+  await stepped(t, clock, fiber, host.pollMs);
+  assert.equal((await Effect.runPromise(Fiber.join(fiber))).did, 'taken');
   const from = events.indexOf(`drain ${OLD}`);
   assert.deepEqual(events.slice(from, from + 6), [
     `drain ${OLD}`,
@@ -280,32 +317,46 @@ test('a take-over drains the daemon and waits for each call in flight, naming it
   assert.ok(!events.includes('drain null'), 'the drain names the daemon that is gone, and is left');
 });
 
-test('a take-over gives up on a call that never ends, says which, and goes on to stop the daemon', async () => {
+test('a take-over gives up on a call that never ends, says which, and goes on to stop the daemon', WAITED, async (t) => {
   const world: World = { lease: lease(OLD), unitPid: null, landings: [[]], calls: [[CALL]] };
   world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
   world.onStart = () => passing(world, NEW);
   const { host, events } = hostOf(world);
-  assert.equal((await install({ takeOver: String(OLD) }, { ...host, waitMs: 30 })).did, 'taken');
+  const bound = { ...host, waitMs: 30 };
+  const clock = steeredClock();
+  const fiber = taking(bound, clock);
+  t.after(() => Effect.runPromise(Fiber.interrupt(fiber)));
   const gave =
     "say giving up on r2's implement: its call to Bash has not ended in 30 ms, and the daemon is stopped now; its holder cuts the " +
     'call, and the next one resumes the session told the call did not finish';
-  assert.ok(events.includes(gave), events.join('\n'));
+  await until(t, () => clock.asked.length >= 2, 'the call read, its rest and the bound of the wait asked', { bell: clock.bell });
+  assert.ok(!events.includes(gave), 'a clock nothing moved is a bound nothing reached: it waits');
+  await clock.adjust(bound.waitMs);
+  await until(t, () => events.includes(gave), 'the call it gave up on named', { bell: clock.bell });
+  await stepped(t, clock, fiber, host.pollMs);
+  assert.equal((await Effect.runPromise(Fiber.join(fiber))).did, 'taken');
   assert.ok(events.indexOf(`signal ${OLD}`) > events.indexOf(gave), 'it gives up, says so, and only then signals');
 });
 
-test('a take-over whose daemon takes its own let-go to stop is not refused: the stop has a bound of its own', async () => {
+test('a take-over whose daemon takes its own let-go to stop is not refused: the stop has a bound of its own', WAITED, async (t) => {
   const world: World = { lease: lease(OLD), unitPid: null, landings: [[]], calls: [[CALL]], stopMs: 400 };
   const slow = Array.from({ length: 60 }, () => lease(OLD));
   world.onSignal = () => (world.later = [...slow, lease(OLD, 'stopped')]);
   world.onStart = () => passing(world, NEW);
   const { host, events } = hostOf(world);
-  const done = await install({ takeOver: String(OLD) }, { ...host, waitMs: 20 });
+  const clock = steeredClock();
+  const bound = { ...host, waitMs: 20 };
+  const fiber = taking(bound, clock);
+  t.after(() => Effect.runPromise(Fiber.interrupt(fiber)));
+  await until(t, () => clock.asked.length >= 2, 'the call read, its rest and the bound of the wait asked', { bell: clock.bell });
+  await clock.adjust(bound.waitMs);
+  await until(t, () => events.some((e) => e.startsWith("say giving up on r2's implement")), 'the call it gave up on named first', {
+    bell: clock.bell,
+  });
+  await stepped(t, clock, fiber, bound.pollMs);
+  const done = await Effect.runPromise(Fiber.join(fiber));
   assert.equal(done.did, 'taken', 'the daemon let the store go on its own time and was never refused for it');
-  assert.ok(slow.length * host.pollMs > 20, 'and it waited past the bound it gives a call in flight, read by read');
-  assert.ok(
-    events.some((e) => e.startsWith("say giving up on r2's implement")),
-    'it gave up on the call that never ended first',
-  );
+  assert.ok(slow.length * bound.pollMs > bound.waitMs, 'and it waited past the bound it gives a call in flight, read by read');
   assert.ok(events.includes(`signal ${OLD}`), events.join('\n'));
   assert.equal(readPause(), null, 'and the pause it put is lifted, since the take-over succeeded');
 });
@@ -316,12 +367,7 @@ test(
   async (t) => {
     const world: World = { lease: lease(OLD), unitPid: null, landings: [[LANDING]], calls: [[]] };
     const { host, events } = hostOf(world);
-    const fiber = Effect.runFork(
-      installService({ takeOver: String(OLD) }, { ...host, waitMs: 1 }).pipe(
-        Effect.provide(EngineService.layer(engineOf(engine().layer))),
-        Effect.provide(stand().layer),
-      ),
-    );
+    const fiber = taking({ ...host, waitMs: 1 });
     await until(
       t,
       () => events.filter((e) => e === 'landings 1').length >= 5,
@@ -338,12 +384,7 @@ test('a take-over interrupted while it waits on a call lifts its drain and its p
   const { host, events } = hostOf(world);
   let said: () => void = () => undefined;
   const waiting = new Promise<void>((resolve) => (said = resolve));
-  const fiber = Effect.runFork(
-    installService({ takeOver: String(OLD) }, { ...host, say: (l) => (events.push(`say ${l}`), said()) }).pipe(
-      Effect.provide(EngineService.layer(engineOf(engine().layer))),
-      Effect.provide(stand().layer),
-    ),
-  );
+  const fiber = taking({ ...host, say: (l) => (events.push(`say ${l}`), said()) }, steeredClock());
   await waiting;
   await Effect.runPromise(Fiber.interrupt(fiber));
   assert.ok(!events.some((e) => e.startsWith('signal')), events.join('\n'));
@@ -375,12 +416,7 @@ test('a take-over interrupted while it waits on a landing lifts its own pause an
   const { host, events } = hostOf(world);
   let said: () => void = () => undefined;
   const waiting = new Promise<void>((resolve) => (said = resolve));
-  const fiber = Effect.runFork(
-    installService({ takeOver: String(OLD) }, { ...host, say: (l) => (events.push(`say ${l}`), said()) }).pipe(
-      Effect.provide(EngineService.layer(engineOf(engine().layer))),
-      Effect.provide(stand().layer),
-    ),
-  );
+  const fiber = taking({ ...host, say: (l) => (events.push(`say ${l}`), said()) }, steeredClock());
   await waiting;
   assert.ok(readPause() !== null, 'the take-over paused the store');
   await Effect.runPromise(Fiber.interrupt(fiber));
@@ -427,13 +463,7 @@ test(
         'session whose call it cut would be refused as one that will not stop, so raise stopMs or lower LET_GO_MS',
     );
     const clock = steeredClock();
-    const fiber = Effect.runFork(
-      installService({ takeOver: String(OLD) }, shipped).pipe(
-        Effect.provide(EngineService.layer(engineOf(engine().layer))),
-        Effect.provide(stand().layer),
-        Effect.provide(clock.layer),
-      ),
-    );
+    const fiber = taking(shipped, clock);
     t.after(() => Effect.runPromise(Fiber.interrupt(fiber)));
     const refused = Effect.runPromise(Fiber.join(fiber));
     refused.catch(() => undefined);

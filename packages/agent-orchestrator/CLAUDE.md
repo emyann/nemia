@@ -188,6 +188,9 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
 - **A controller's rest or deadline is steered with `steeredClock()` (`test/steered.ts`), at its shipped duration written as a literal**:
   wait for the rest asked (`asked`, on `bell`) before `adjust`, a millisecond short, then the millisecond. A wall decision keeps its
   `now` on `Date`; `test/steered.test.ts` refuses `effect/testing` in a file of `src`, `bin` or `place` that is no test.
+- **A bound a fake host gives is steered as a shipped one is**: a wait with a deadline over a poll (the take-over's for a call in flight)
+  gives up under load where real time decides it, so the test of its waiting moves the clock a poll a pass (`stepped` in
+  `src/service/service.verb.test.ts`) and the test of its giving up is its own case, adjusted by the bound.
 - **A pass on a copy of the store acts on the real repositories** its records name: measure with a fixture store of scratch repositories,
   or a fake runtime whose tasks are all `pending`.
 - **Git refuses a whole `for-each-ref` for one base it cannot read**: the place's `standing` lists again without it (pinned in

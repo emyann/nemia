@@ -306,6 +306,24 @@ export const askOf = (raw: {
   })),
 });
 
+/** The questions of an ask as one key: each question's own words, in order, so two asks of the same words key the same. Pure. */
+export const askKey = (ask: Pick<Ask, 'questions'>): string => JSON.stringify(ask.questions.map((q) => q.question));
+
+/**
+ * The answer already recorded for an ask of the same questions as `ask` under another id, the latest where there are several: what a
+ * question she asks again — a restart cut her session between the ask and the answer, so she asks it afresh under a new call — is
+ * answered from, rather than put to the person a second time. `undefined` where no earlier ask of those words was answered. Pure.
+ */
+export const answeredBefore = (
+  asks: readonly Ask[],
+  answers: readonly AskAnswer[],
+  ask: Pick<Ask, 'id' | 'questions'>,
+): AskAnswer | undefined => {
+  const key = askKey(ask);
+  const same = new Set(asks.filter((one) => one.id !== ask.id && askKey(one) === key).map((one) => one.id));
+  return answers.filter((answer) => same.has(answer.id)).at(-1);
+};
+
 /** How the board draws an ask. */
 export type AskDrawn = 'actions' | 'form' | 'many';
 

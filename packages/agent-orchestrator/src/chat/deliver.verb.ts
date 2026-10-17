@@ -26,7 +26,17 @@ import {
   readDelivered,
   readOutbox,
 } from './chat.store.ts';
-import { askDue, askOf, askWords, framedForHer, type AnswerOwed, type Ask, type AskAnswer, type SourceSaid } from './chat.ts';
+import {
+  answeredBefore,
+  askDue,
+  askOf,
+  askWords,
+  framedForHer,
+  type AnswerOwed,
+  type Ask,
+  type AskAnswer,
+  type SourceSaid,
+} from './chat.ts';
 
 /**
  * What one delivery did: the entries found said already and marked without saying again (`marked`), those it said, and those left for
@@ -80,16 +90,29 @@ export const outboxOwed = (dir: string): boolean => {
 /**
  * Each ask the task `taskId` says its session holds open, copied into the chat kept in `dir` once, by its id: the ids copied now.
  * The board reads the chat's own folder, so an ask survives the session that asked it; an ask already there is left as it was.
+ *
+ * An ask asking the same questions as one the person answered already (`answeredBefore`) is copied into no second ask and put to
+ * nobody: the answer on record is written back through the call she holds open now, so a question a restart cut between the ask and
+ * the answer — asked afresh under a new call id — is answered from what the person said the first time. Level-triggered: nothing is
+ * marked for it, and the next beat finds the call gone from `asks` once it has taken the answer.
  */
 export const recordAsks = Effect.fn('recordAsks')(function* (taskId: string, dir: string) {
   const e = yield* EngineService;
   const view = yield* asked('view', e.view(taskId));
-  const known = new Set(readAsks(dir).map((ask) => ask.id));
+  const asks = readAsks(dir);
+  const answers = readAnswers(dir);
+  const known = new Set(asks.map((ask) => ask.id));
   const copied: string[] = [];
   for (const raw of view.asks ?? []) {
     if (known.has(raw.id)) continue;
-    appendAsk(dir, askOf(raw));
-    copied.push(raw.id);
+    const ask = askOf(raw);
+    const before = answeredBefore(asks, answers, ask);
+    if (before === undefined) {
+      appendAsk(dir, ask);
+      copied.push(ask.id);
+      continue;
+    }
+    yield* carry(e, taskId, 'return', ask, { ...before, id: ask.id });
   }
   return copied;
 });

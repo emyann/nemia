@@ -10,8 +10,9 @@ import { testEngine } from 'agent-runtime/testing';
 import { scratch } from '../../test/scratch.ts';
 import { eachTest } from '../../test/placed.ts';
 import { engineOf, runWith } from '../runtime-client.ts';
-import { appendAnswer, appendAsk, readAnswersDone, readAsks } from './chat.store.ts';
+import { appendAnswer, appendAsk, readAnswers, readAnswersDone, readAsks } from './chat.store.ts';
 import {
+  answeredBefore,
   answerFor,
   askDue,
   askEvent,
@@ -162,6 +163,39 @@ test('the keeper copies each ask her session holds open into the chat once, and 
   assert.deepEqual(readAsks(dir), [kept], 'the chat keeps the ask as the board draws it, not as the call spelled its labels');
   assert.deepEqual(await runWith(e, recordAsks(id, dir)), [], 'an ask already written down is left as it was');
   assert.deepEqual(readAsks(dir), [kept]);
+});
+
+test('the same question asked again after a restart is answered from the record, and put to the person no second time', async () => {
+  const { e, id, dir } = await filed();
+  const words = RAW.questions[0].question;
+  engine().plantAsk(id, RAW);
+  await runWith(e, recordAsks(id, dir));
+  appendAnswer(dir, { id: 'call-1', at: new Date().toISOString(), answers: { [words]: 'Cut it on read' } });
+  await runWith(e, answersDue(id, dir));
+  await runWith(e, answersDue(id, dir));
+  engine().plantAsk(id, { ...RAW, id: 'call-2' });
+  assert.deepEqual(await runWith(e, recordAsks(id, dir)), [], 'the same words asked afresh are written down as no second ask');
+  assert.deepEqual(readAsks(dir), [kept], 'the chat keeps the one ask, so nothing new waits on the person');
+  assert.deepEqual(
+    engine().answered.map((one) => one.id),
+    ['call-1', 'call-2'],
+    'and the answer on record is written back through the call she holds open now',
+  );
+  assert.deepEqual(engine().answered.at(-1)?.answers, { [words]: 'Cut it on read' });
+  assert.deepEqual(engine().said, [], 'nothing of it was said as words: her new call carried it');
+});
+
+test('REFUSED: an ask of other words is no answer of the record, and waits on the person itself', async () => {
+  const { e, id, dir } = await filed();
+  const words = RAW.questions[0].question;
+  appendAsk(dir, kept);
+  appendAnswer(dir, { id: 'call-1', at: new Date().toISOString(), answers: { [words]: 'Cut it on read' } });
+  const other = { ...RAW, id: 'call-2', questions: [{ ...RAW.questions[0], question: 'And the values?' }] };
+  assert.equal(answeredBefore([kept], readAnswers(dir), askOf(other)), undefined);
+  assert.deepEqual(answeredBefore([kept], readAnswers(dir), askOf({ ...RAW, id: 'call-2' }))?.answers, { [words]: 'Cut it on read' });
+  engine().plantAsk(id, other);
+  assert.deepEqual(await runWith(e, recordAsks(id, dir)), ['call-2'], 'a question of other words is written down and asked');
+  assert.deepEqual(engine().answered, [], 'and no answer of the record was written into its call');
 });
 
 test('an answer to a call she still holds open goes back through it, and is marked only once the call has taken it', async () => {

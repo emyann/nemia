@@ -36,6 +36,7 @@ import path from 'node:path';
 import { bodyOf, frontmatterKeys, type PlanFile } from '../plan/plan.ts';
 import { factoryNameRefusal, type Factory } from '../factory/factory.ts';
 import type { Run } from '../record/record.ts';
+import type { RecordMemo } from '../rest/index.ts';
 import { isReadme, splitFrontmatter, WorkflowError } from '../step/step.ts';
 
 export type InboxCard = {
@@ -271,6 +272,9 @@ export type InboxListing = {
  * pass.
  */
 export type QueueTry = { at: string; text: string; repo: string; why: string; refused: boolean };
+
+/** The memo a caller that polls the inbox keeps of what its listing reads of every run: the card it was started from, under its id. */
+export type InboxRuns = RecordMemo<Pick<Run, 'id' | 'from'>>;
 
 /**
  * The inbox as `nemia inbox` lists it, by file name: every entry of the folder — a folder inside it by its name and a trailing `/` — each

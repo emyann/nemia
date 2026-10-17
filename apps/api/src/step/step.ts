@@ -14,9 +14,9 @@ import {
   DEFAULT_FACTORY,
   fillsOf,
   hireRefusalOf,
+  keptRuns,
   Missing,
   readFactories,
-  runStore,
   skillsFor,
   unattachedRefusal,
 } from 'agent-orchestrator';
@@ -112,11 +112,25 @@ export function workflowPageOf(
   return repo === path.resolve(served) ? { from: 'repo', workflow, factory: null, repo: null } : null;
 }
 
+/** What a step's page reads of a run: its folder and factory, the steps it has, and what its row says. */
+export type StepRun = Pick<Run, 'id' | 'brief' | 'createdAt' | 'workflowDir' | 'workflow' | 'factory' | 'steps'>;
+
+/** A run as a step's page reads it (`StepRun`): the fields `recentRunsOf` reads, and no part of a frozen step's body. */
+export const stepRun = (run: Run): StepRun => ({
+  id: run.id,
+  brief: run.brief,
+  createdAt: run.createdAt,
+  workflowDir: run.workflowDir,
+  steps: run.steps,
+  ...(run.workflow === undefined ? {} : { workflow: run.workflow }),
+  ...(run.factory === undefined ? {} : { factory: run.factory }),
+});
+
 /**
  * The newest runs of the workflow folder `dir` that hold the step `step`, at most `RECENT_RUNS`, newest first: of every factory, or only
  * those of `factory` when one is named.
  */
-export function recentRunsOf(runs: readonly Run[], dir: string, step: string, factory: string | null): RecentRun[] {
+export function recentRunsOf(runs: readonly StepRun[], dir: string, step: string, factory: string | null): RecentRun[] {
   const folder = path.resolve(dir);
   return runs
     .filter((run) => path.resolve(run.workflowDir) === folder)
@@ -217,7 +231,7 @@ const AGENTS = COMMANDS.find((c) => c.name === 'agents')!;
  *   into it, with those it can (`hiring`).
  */
 export const step = new Hono<ApiEnv>().get('/api/workflows/:from/:name/:step', (c) =>
-  served(c, async ({ e, placeService, env, repo, home, factory }) => {
+  served(c, async ({ e, placeService, env, repo, home, factory, memo }) => {
     const { from, name, step: asked } = c.req.param();
     if (from !== 'repo' && from !== 'yours') {
       return c.json(
@@ -258,7 +272,7 @@ export const step = new Hono<ApiEnv>().get('/api/workflows/:from/:name/:step', (
       hiredIn: factory ? [] : hiredInOf(readFactories(), name, found.name, from, repo),
       hiring: await hiringOf(factory, name, found, hired, from, agents),
       skillsFrom: skillsFromOf(layers, skillsFor(folder.dir, places), repo, home),
-      recentRuns: recentRunsOf(runStore.runs.list(), folder.dir, found.name, factory?.name ?? null),
+      recentRuns: recentRunsOf(keptRuns(memo.records.step, stepRun), folder.dir, found.name, factory?.name ?? null),
     } satisfies WorkflowStepPage);
   }),
 );

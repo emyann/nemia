@@ -103,7 +103,8 @@ export function chatHeaderLine(nemia: NemiaLevel | undefined, presence: Presence
 
 /**
  * What her chat's composer invites, by where she is: the daemon waited on while this browser keeps a message it would not take, her
- * reading it later while she is down, their own words while a question of hers waits on them (`asking`, the canvas's board 7), the
+ * reading it later while she is down, their own words while one question of hers waits on them,
+ * drawn as the form and answered by what they write (`asking`, `askInWords`, the canvas's board 7), the
  * next one or her turn stopped while she answers, else what she is for.
  */
 export function composerWords(presence: Presence, asking = false): string {

@@ -8,6 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   askAnswered,
+  askInWords,
   askLeft,
   asksOpen,
   CHAT_DOWN,
@@ -26,6 +27,8 @@ import {
   traceStatusOf,
   turnWords,
   unreadChat,
+  wordsAnswer,
+  type ChatAsk,
   type ChatFollowed,
   type ChatItem,
   type ChatMessage,
@@ -355,7 +358,7 @@ const EXPLAINED: AskQuestion = {
 const PLAIN: AskQuestion = { ...EXPLAINED, options: EXPLAINED.options.map((option) => ({ ...option, description: '  ' })) };
 
 /** An ask of hers in her chat, waiting on the person. */
-const asked = (kind: 'question' | 'proposal', questions: readonly AskQuestion[], chose?: Record<string, string>): ChatEvent => ({
+const asked = (kind: 'question' | 'proposal', questions: readonly AskQuestion[], chose?: Record<string, string>): ChatAsk => ({
   kind,
   id: `q:${kind}`,
   at: at(2),
@@ -394,6 +397,19 @@ test('the asks waiting on the person are those with no choice on them: one answe
     ['q:question'],
   );
   assert.deepEqual(asksOpen([done]), [], 'answered: the composer asks for nothing');
+});
+
+test('the composer\u2019s own words answer one question drawn as the form, and no proposal, no flow and no two at once', () => {
+  const form = asked('question', [EXPLAINED]);
+  const proposal = asked('proposal', [PLAIN]);
+  const many = { ...asked('question', [EXPLAINED, EXPLAINED]), id: 'q:many', call: 'many' };
+  assert.equal(askInWords([message('m:1', 1, 'agent', 'One.'), form])?.call, 'question');
+  assert.equal(askInWords([proposal]), undefined, 'a proposal\u2019s buttons say its choices whole: they take no words of theirs');
+  assert.equal(askInWords([many]), undefined, 'several questions are answered in the flow, which has a row for their words');
+  assert.equal(askInWords([form, proposal]), undefined, 'two asks at once: their words would name no question');
+  assert.equal(askInWords([asked('question', [EXPLAINED], { [EXPLAINED.question]: 'Cut it on read' })]), undefined, 'answered already');
+  assert.equal(askInWords([]), undefined);
+  assert.deepEqual(wordsAnswer(form, 'Neither: cut it on write'), [{ question: EXPLAINED.question, words: 'Neither: cut it on write' }]);
 });
 
 test("an ask her stream sends is read whole — its questions, the choices and the person's answer on it", () => {

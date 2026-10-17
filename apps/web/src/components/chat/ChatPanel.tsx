@@ -9,11 +9,15 @@
  * A chat the board cannot read at all says so, and draws no greeting: a level, a count of factories and runs at work read from nothing
  * would be facts the board does not have.
  *
+ * While exactly one question of hers waits on the person, drawn as the form (`askInWords`), the composer invites their own words and
+ * what they write answers that question (`wordsAnswer`) rather than being said to her as the next message; for a proposal, for
+ * several questions and for none, it sends as it always does.
+ *
  * Escape closes it while it floats, as the frame's own bar closes on Escape; the page closes on nothing, being a page.
  */
 import { useEffect } from 'react';
 import { CutFrame } from '@/components/look';
-import { asksOpen } from '@/lib/chatFollowing';
+import { askInWords, wordsAnswer } from '@/lib/chatFollowing';
 import { sessionOf } from '@/lib/nemia';
 import type { NemiaLevel } from '@/lib/api';
 import type { Presence } from '@/lib/presence';
@@ -45,6 +49,7 @@ export function ChatPanel({ chat, nemia, presence, atWork, now, mode, onGrow, on
   const { state, kept } = chat;
   const grown = mode !== 'float';
   const unreadable = state.error !== null;
+  const inWords = askInWords(state.events);
 
   useEffect(() => {
     if (mode === 'page') return;
@@ -88,7 +93,12 @@ export function ChatPanel({ chat, nemia, presence, atWork, now, mode, onGrow, on
           </div>
         )}
         <div className="shrink-0">
-          <ChatComposer presence={presence} asking={asksOpen(state.events).length > 0} onSend={chat.send} onStop={chat.stop} />
+          <ChatComposer
+            presence={presence}
+            asking={inWords !== undefined}
+            onSend={(text) => (inWords === undefined ? chat.send(text) : chat.answer(inWords.call, wordsAnswer(inWords, text)))}
+            onStop={chat.stop}
+          />
         </div>
       </section>
     </CutFrame>

@@ -4,7 +4,8 @@
  * (`changedChat`, `followChat`), the one translation of the api's presence and her level into the board's (`presenceOf`), the map from
  * her step's state to a trace line's (`traceStatusOf`), her consecutive steps folded into a turn (`foldChat`), the links read out of
  * her words (`linksOf`), how an ask of hers is drawn (`drawnAsk`) and what is left to answer of one of several questions
- * (`askLeft`, `askAnswered`, `asksOpen`), and the words the read-back controls say.
+ * (`askLeft`, `askAnswered`, `asksOpen`), which of them the composer's own words answer (`askInWords`, `wordsAnswer`), and
+ * the words the read-back controls say.
  *
  * Beside the effect in `lib/useNemiaChat.ts`, as `lib/following.ts` sits beside `lib/useStepTranscript.ts`.
  */
@@ -47,6 +48,21 @@ export const askLeft = (open: number): string => (open > 0 ? `${open} not answer
 /** The asks of `events` the person has not answered: what the composer's words and the panel's cue are about. */
 export const asksOpen = (events: readonly ChatEvent[]): ChatAsk[] =>
   events.filter((event): event is ChatAsk => (event.kind === 'question' || event.kind === 'proposal') && event.chose === undefined);
+
+/**
+ * The ask of hers the composer's own words answer, where there is one: exactly one ask waits on the person and it is drawn as the form
+ * (board 7), one question whose choices explain themselves. A proposal's choices are said whole by its own buttons and take no words
+ * of the person's, and several questions are answered in their own flow, each with a row for their words; so for either, and for two
+ * asks at once — where the words would name no question — the composer is what it always is, and this is `undefined`. Pure.
+ */
+export const askInWords = (events: readonly ChatEvent[]): ChatAsk | undefined => {
+  const open = asksOpen(events);
+  const one = open.length === 1 ? open[0] : undefined;
+  return one !== undefined && drawnAsk(one.questions) === 'form' ? one : undefined;
+};
+
+/** The person's own words from the composer as the answer to the one question `ask` waits on: the pick its held call takes. Pure. */
+export const wordsAnswer = (ask: ChatAsk, text: string): AskPick[] => [{ question: ask.questions[0]?.question ?? '', words: text }];
 
 /** `EventSource.CLOSED`, named here so a stream is followed where there is no EventSource. */
 const CLOSED = 2;

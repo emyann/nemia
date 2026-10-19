@@ -1463,3 +1463,13 @@ asking for a version the card does not declare is served all the same. And a vie
 (`src/a2a/holder-follow.ts`): a reader asks again from the cursor it holds, where a remote agent's follow resubscribes
 (`remote-follow.ts`). Neither is wrong today — the port is reached over loopback by a process the layer above handed the token to — and
 both wait for the slice that needs them.
+
+## `file()` refuses a long-lived Claude Code task's `env`, though an attached session would take it
+
+A task filed on the `claude` harness with `restartPolicy: 'Always'` and `config.background: true` is refused its `config.env`, in
+words saying the session "runs in a pre-spawned process and ignores its asker's environment" (`fileRefusal`). True of a `--bg`
+session, and not of the same task while a holder holds: it runs attached on the Agent SDK, which lays the env in the child it
+spawns (`attachedLongLived`, `harness/claude/code.ts`). The refusal is read at filing, where nothing knows whether a holder will
+be there when the pass spawns it — so it refuses the wider case. Met while writing `test/holder-follow.boundary.test.ts`, which
+files its session as a job instead, which runs attached just the same. Nothing is wrong on the record: no caller is given a session
+without the env it asked for.

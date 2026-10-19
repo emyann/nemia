@@ -110,12 +110,16 @@ The tests need no live harness, and nothing a clean `ubuntu-latest` lacks: the a
 `AE_LIVE=1`, which CI never sets.
 
 **Prose is not what holds the workflow to the repository.** `packages/agent-orchestrator/test/ci-workflow.test.ts` refuses, each by its
-own sentence naming the fix: a workspace with a suite and no leg, a node floor adrift from `engines.node`, a node version left unquoted
-(YAML reads `22.18` as a number and setup-node installs another release), a timezone the leg does not run its suite under and a run of it
-that drops `--force`, a `cancel-in-progress` that would cancel a run of `main`, a job outside the gate's `needs`, a gate without
-`always()`, an action that is not GitHub's own by major tag, and the trigger that would run a fork's code against a writable token. The
-shard list adrift from `NAMES` is card 2's clause, written with the shards themselves — there is no shard list to drift from until then.
-So the file cannot quietly test less than it claims.
+own sentence naming the fix: a workspace with a suite and no leg, a leg that does not filter to its own workspace, a node floor adrift
+from `engines.node`, a node version left unquoted (YAML reads `22.18` as a number and setup-node installs another release), a timezone
+the leg does not run its suite under and a run of it that drops `--force`, a `cancel-in-progress` that would cancel a run of `main`, a
+job outside the gate's `needs`, a gate without `always()`, a gate step not given the results through its environment or interpolating an
+expression into its shell, an action that is not GitHub's own by major tag, and the trigger that would run a fork's code against a
+writable token. What the gate's script decides is not read but run, in `packages/agent-orchestrator/test/ci-gate.boundary.test.ts`:
+against every result GitHub can hand it and three it cannot, because a list of the words that mean failure and a check that every result
+means success read alike to a pattern and differ exactly on the result nobody foresaw. The shard list adrift from `NAMES` is card 2's
+clause, written with the shards themselves — there is no shard list to drift from until then. So the file cannot quietly test less than
+it claims.
 
 **The owner pushes `main` by hand after each landing**, and reads the verdict off GitHub's own notification or the Actions tab. Nothing in
 Nemia reads CI today, and `push: main` fires after the landing has already committed: CI reports on a landing and never gates one, so a

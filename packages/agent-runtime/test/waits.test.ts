@@ -2,8 +2,9 @@
  * The wait a test makes on its event (`until`, `bell`, `src/waits/`), and the guard that keeps a hand-written deadline out of the
  * package's tests (`DEADLINES`).
  *
- * `src/waits/waits.ts` is the one copy: a test of a layer above takes it from `agent-runtime/testing`, and the board, which imports no
- * package, keeps a copy this file holds to it byte for byte, since the board's own test builds no path into a package. A wait asks at
+ * `src/waits/waits.ts` is the one copy: a test of a layer above takes it from `agent-runtime/testing`, and the board and the
+ * documentation site, which import no package, each keep a copy this file holds to it byte for byte, since a test of theirs builds no
+ * path into a package's `src`. A wait asks at
  * once, on each ring and at its pace, and ends at its test's timeout saying what never came: that is read off a nested `node --test` of
  * `test/fixtures/waits/never.ts`, since a test's timeout is reported only outside it. `DEADLINES` counts, file by file, each `now()` of
  * `Date` or `performance` a number is added to, or a start taken from and held under a bound, in the package's tests: each left is a
@@ -180,12 +181,19 @@ test('REFUSED: a wait that cannot read its test fails at once, and its process e
   assert.match(ran.stdout, /^# pass 1$/m, ran.stdout);
 });
 
-test("the board's copy of the helper is this package's, byte for byte", () => {
+test("the copies of the helper outside the packages are this package's, byte for byte", () => {
+  const one = fs.readFileSync(path.join(PACKAGE, 'src', 'waits', 'waits.ts'), 'utf8');
   assert.equal(
     fs.readFileSync(path.join(ROOT, 'apps', 'web', 'test', 'waits.ts'), 'utf8'),
-    fs.readFileSync(path.join(PACKAGE, 'src', 'waits', 'waits.ts'), 'utf8'),
+    one,
     'copy packages/agent-runtime/src/waits/waits.ts over apps/web/test/waits.ts: a change to the wait is made here, and the board, ' +
-      'which imports no package, keeps the one copy of it',
+      'which imports no package, keeps a copy of it',
+  );
+  assert.equal(
+    fs.readFileSync(path.join(ROOT, 'apps', 'docs', 'test', 'waits.ts'), 'utf8'),
+    one,
+    'copy packages/agent-runtime/src/waits/waits.ts over apps/docs/test/waits.ts: a change to the wait is made here, and the ' +
+      'documentation site, which imports no package, keeps a copy of it',
   );
 });
 

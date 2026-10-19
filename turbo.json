@@ -24,6 +24,8 @@
         "$TURBO_ROOT$/apps/*/package.json",
         "$TURBO_ROOT$/apps/*/CLAUDE.md",
         "$TURBO_ROOT$/CLAUDE.md",
+        "$TURBO_ROOT$/README.md",
+        "$TURBO_ROOT$/LICENSE",
         "$TURBO_ROOT$/workflows/agents/**",
         "$TURBO_ROOT$/packages/agent-runtime/**",
         "!$TURBO_ROOT$/packages/agent-runtime/.turbo/**"

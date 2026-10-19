@@ -66,7 +66,8 @@ const inputOf = () => {
  * A session at work in this process, as its holder keeps it: what it runs, its calls in flight by id, and how it ends. `open` says the
  * session outlives its turns (a long-lived request): its input stays open and a result that leaves `unanswered` empty writes `idle`.
  * `unanswered` is the words pushed on its input that no result has named yet. `q` is the SDK's query object, kept so the holder can end
- * a turn through it (`interrupt`).
+ * a turn through it (`interrupt`). `pushed` is given every message the session gives, in order, for whoever follows it live
+ * (`attached-follow.ts`).
  */
 export type Live = {
   run: AttachedRun;
@@ -79,6 +80,7 @@ export type Live = {
   unanswered: Set<string>;
   q?: { interrupt?: () => Promise<void> };
   done: Promise<void>;
+  pushed?: (m: SDKMessage) => void;
 };
 
 /**
@@ -204,8 +206,12 @@ const answered = (live: Live, m: SDKMessage): void => {
  *
  * It is `idle` only once every word pushed on its input has been answered (`answered`): words pushed while a turn runs are sometimes
  * worked as a turn of their own and sometimes folded into the one running, so a result is read for the messages it names, never counted.
+ *
+ * `live.pushed` is called first, with every message and before the capture's guard, so whoever follows the session live is given its
+ * `stream_event` lines too — the pieces of the text it is writing — which the capture goes on dropping.
  */
 const took = (root: string, live: Live, m: SDKMessage): void => {
+  live.pushed?.(m);
   if (m.type !== 'user' && m.type !== 'stream_event') capture(root, live.run.name, m);
   const over = callsEndedBy(m).filter((id) => live.calls.delete(id));
   const bridged = bridgeStateOf(m);
@@ -263,15 +269,16 @@ export const killGroup = (pid: number | undefined): void => {
 
 /**
  * Starts the session `run` and answers it at once: `r` its spawn, `first` the first words on its input, `resume` the Claude Code session
- * it continues. `executable` is the Claude Code it runs, the SDK's own when absent. It ends `completed` or `failed` by its result,
- * `canceled` when aborted, `failed` when its messages end with none; a session let go (`letGo`) is left as its holder wrote it.
+ * it continues. `executable` is the Claude Code it runs, the SDK's own when absent, and `pushed` is given every message it gives. It
+ * ends `completed` or `failed` by its result, `canceled` when aborted, `failed` when its messages end with none; a session let go
+ * (`letGo`) is left as its holder wrote it.
  */
 export const startSession = (
   root: string,
   r: SpawnRequest,
   run: AttachedRun,
   first: string,
-  options: { held: Held; executable?: string; resume?: string },
+  options: { held: Held; executable?: string; resume?: string; pushed?: (m: SDKMessage) => void },
 ): Live => {
   const abort = new AbortController();
   const open = r.restartPolicy === 'Always';
@@ -285,6 +292,7 @@ export const startSession = (
     open,
     unanswered: new Set(),
     done: Promise.resolve(),
+    ...(options.pushed ? { pushed: options.pushed } : {}),
   };
   writeRun(root, run);
   live.unanswered.add(live.input.push(first));

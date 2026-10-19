@@ -1,10 +1,12 @@
 /**
  * The harness every api test runs against, and never this machine's: a fake `claude` first on PATH that lists the sessions in `registry`
  * and notes every call, and a scratch directory where Claude Code keeps its sessions and transcripts (`CLAUDE_CONFIG_DIR`). The api reads
- * through the package's `engine()`, whose `claude` harness is the engine's own — a job (`claude -p`), or a background session (`claude
- * --bg`) — and that harness runs `claude` from PATH: the harness a test hands the api is that `claude`, as the engine's own tests hand
- * theirs. So the runner itself — the registry it observes, the transcripts it reads, the flags it spawns with — is what the api's tests
- * exercise, and not a stand-in for it. It sets `WF_VERIFY_REST=1`: every answer the list's memo of runs at rest gives (`RestingMemo`) is
+ * through the package's `engine()`, whose `claude` harness is the engine's own — a job (`claude -p`), a background session (`claude
+ * --bg`), or the Agent SDK's query the quota is asked through — and that harness runs `claude` from PATH: the harness a test hands
+ * the api is that `claude`, as the engine's own tests hand theirs. What it is called with as a flag it hands to
+ * `fixtures/stand-in-claude.ts`, which answers the Agent SDK as Claude Code does. So the runner itself — the registry it observes,
+ * the transcripts it reads, the flags it spawns with — is what the api's tests exercise, and not a stand-in for it. It sets
+ * `WF_VERIFY_REST=1`: every answer the list's memo of runs at rest gives (`RestingMemo`) is
  * judged afresh too, and a difference fails the request. And the store is a scratch folder too (`root`, `WF_ROOT`), never this machine's.
  * It sets the daemon's two ceilings, `WF_MAX_RUNS` and `WF_MAX_CONCURRENT`, to `set-it-in-the-test`, which the package refuses by name: a
  * run's check inherits the daemon's environment, so a test that reads a ceiling sets or deletes it itself. It sets
@@ -30,15 +32,17 @@ export const bin = scratch('nemia-api-harness-');
 /** What `claude agents` lists: a JSON array of sessions, as Claude Code's registry lists them. None until a test writes some. */
 export const registry = path.join(bin, 'registry.json');
 /**
- * Every call the fake answered, a line each: its arguments. An ask for the quota adds a line when it ended, with its pid.
+ * Every call the fake answered, a line each: its arguments. An ask for the quota adds a line for each usage request it answered, with
+ * the request's id, and one when it ended, with its pid.
  */
 export const calls = path.join(bin, 'calls');
 /**
- * What the fake prints to a `get_usage` request (`claude -p`, as the engine's `quota` asks it): lines of stream-json, `@ID@` in them
- * replaced by the request's own id. Claude Code 2.1.278's answer as recorded until a test writes another (`usageAnswer`).
+ * What the fake answers a usage control request with (`get_usage`, as the engine's `quota` asks it through the Agent SDK): the whole
+ * control response, `@ID@` in it replaced by the request's own id. Claude Code 2.1.278's answer as recorded until a test writes
+ * another (`usageAnswer`).
  */
 export const answer = path.join(bin, 'usage-answer');
-/** How the fake takes a `get_usage` request: `answer` (the default), or `exit`, 3 before it reads it. */
+/** How the fake takes a usage control request: `answer` (the default), or `exit`, 3 before it reads anything. */
 const mode = path.join(bin, 'usage-mode');
 
 /** Claude Code 2.1.278's answers to `get_usage`, recorded by hand (`fixtures/get-usage-*.json`), their request id made `@ID@`. */
@@ -58,22 +62,23 @@ fs.writeFileSync(registry, '[]');
 fs.writeFileSync(calls, '');
 fs.writeFileSync(answer, recorded('plan'));
 fs.writeFileSync(mode, 'answer');
+/**
+ * The fake `claude`: it notes its arguments, answers `claude agents` from the registry, and hands anything whose first argument is a
+ * flag or nothing at all to the stand-in Claude Code, which speaks the Agent SDK's protocol. The SDK's own argv for an ask begins with
+ * a flag and is the SDK's to change, so nothing here matches one; another of Claude Code's verbs (`claude stop`) is a bare word, and
+ * ends well having said nothing, as the fake has always answered one.
+ */
+const standIn = path.join(import.meta.dirname, 'fixtures', 'stand-in-claude.ts');
 fs.writeFileSync(
   path.join(bin, 'claude'),
   [
     '#!/bin/sh',
     `echo "$*" >> '${calls}'`,
-    `if [ "$1" = agents ]; then cat '${registry}'; fi`,
-    'if [ "$1" = -p ]; then',
-    `  case "$(cat '${mode}')" in`,
-    "    exit) echo 'claude: the harness was told to fail' >&2; exit 3 ;;",
-    '  esac',
-    '  read -r line',
-    `  id=$(printf '%s' "$line" | sed -n 's/.*"request_id":"\\([^"]*\\)".*/\\1/p')`,
-    `  sed "s/@ID@/$id/g" '${answer}'`,
-    '  cat > /dev/null',
-    `  echo "usage-ended pid=$$" >> '${calls}'`,
-    'fi',
+    'case "$1" in',
+    `  agents) cat '${registry}'; exit 0 ;;`,
+    `  -*|'') STANDIN_ANSWER='${answer}' STANDIN_MODE='${mode}' STANDIN_CALLS='${calls}' exec node '${standIn}' "$@" ;;`,
+    'esac',
+    'exit 0',
     '',
   ].join('\n'),
   { mode: 0o755 },
@@ -99,8 +104,11 @@ export const observations = (): number => callsOf('agents');
 /** How many times `claude stop` has run: a session stopped, which is the tick's to do, and never the api's. */
 export const stops = (): number => callsOf('stop');
 
-/** How many times the quota has been asked of the fake: a `claude -p` each. */
-export const asks = (): number => callsOf('-p');
+/**
+ * How many times the quota has been asked of the fake: one usage control request the stand-in answered each, never a shape of the
+ * SDK's argv, which is the SDK's and changes with it.
+ */
+export const asks = (): number => callsOf('usage');
 
 /**
  * Whether the ask whose process is `pid` ended once its stdin was closed. By pid, not by a count: an ask an earlier test started may end
@@ -108,7 +116,7 @@ export const asks = (): number => callsOf('-p');
  */
 export const askEnded = (pid: number): boolean => fs.readFileSync(calls, 'utf8').split('\n').includes(`usage-ended pid=${pid}`);
 
-/** What the fake prints to the next `get_usage` requests, and how it takes them. */
+/** What the fake answers the next usage control requests with, and how it takes them. */
 export function usageAnswer(text: string, how: 'answer' | 'exit' = 'answer'): void {
   fs.writeFileSync(answer, text);
   fs.writeFileSync(mode, how);

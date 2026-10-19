@@ -15,7 +15,7 @@ import { filedConfig } from '../filed/filed.ts';
 import { budgetUsdFor } from '../status/status.ts';
 import { renderedFlags } from '../agents/agents.ts';
 import { ownOf } from '../tick/told.verb.ts';
-import { isFolderTeam, stepSetRefusal } from '../workflow/index.ts';
+import { isFolderTeam, stepSetRefusal, unallowedRefusal } from '../workflow/index.ts';
 import { formerModesWritten, loadWorkflows } from '../folder/folder.store.ts';
 import { isShippedPlace, skillsFor, type Places } from '../skills/read.store.ts';
 import { placesOf } from '../folder/lookup.store.ts';
@@ -34,6 +34,7 @@ import { PlaceService, openPlace } from '../place/place.store.ts';
 import { parentRecord } from '../branches/branches.store.ts';
 import { standingLiveOf } from '../standing/standing.verb.ts';
 import { Invalid } from '../refusal/refusal.ts';
+import { NO_ALLOWS, repoAllows, type Allows } from '../trust/allows.verb.ts';
 import {
   DEFAULT_FACTORY,
   factoryMountRefusal,
@@ -90,7 +91,9 @@ function stepsIn(workflowDir: string, places: Places, factory: Factory | undefin
  *   before the runtime's, which would speak of a rule or a folder the person never wrote; the run's inputs folder among them when
  *   `given`, for a run `nemia start --input` gives files;
  * - a step whose first filing's config its harness refuses (`refused`, `configRefused` unless a caller gives another), the run started at
- *   `gates` beside the workflow's own: a word, a window, a cap or a bridge (`remote: true`) its harness does not take.
+ *   `gates` beside the workflow's own: a word, a window, a cap or a bridge (`remote: true`) its harness does not take;
+ * - a step whose `tools:` names a tool nothing its session would be allowed (`unallowedRefusal`, pure, asked of a folder a waiting run
+ *   takes again too), judged against `allows`, the allow rules the run's own repository grants a session started in it (`repoAllows`).
  */
 export function stepsToStart(
   workflowDir: string,
@@ -101,10 +104,13 @@ export function stepsToStart(
   gates: readonly string[] = [],
   refused: ConfigRefused = configRefused,
   given = false,
+  allows: Allows = NO_ALLOWS,
 ): Workflow[] {
   const steps = stepsIn(workflowDir, places, factory);
   const set = stepSetRefusal(steps, isolate);
   if (set) throw new Invalid({ message: set });
+  const unallowed = unallowedRefusal(steps, allows.rules, allows.untrusted);
+  if (unallowed) throw new Invalid({ message: unallowed });
   const placeSkill = placeSkillRefusal(steps, workflowDir, places);
   if (placeSkill) throw new Invalid({ message: placeSkill });
   const undeclared = undeclaredRefusal(steps);
@@ -516,7 +522,17 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const { declared } = yield* PlaceService;
   const denied = declared.denyWhileLanding;
   const steps = yield* tried(() =>
-    stepsToStart(opts.workflowDir, isolate, places, denied, factory, opts.gates, refused, Boolean(opts.inputs?.length)),
+    stepsToStart(
+      opts.workflowDir,
+      isolate,
+      places,
+      denied,
+      factory,
+      opts.gates,
+      refused,
+      Boolean(opts.inputs?.length),
+      repoAllows(opts.repo, opts.factory),
+    ),
   );
   const folder = isFolderTeam(steps);
   if (folder && opts.repoNamed) return yield* Effect.fail(new Invalid({ message: repoNamedRefusal(opts.repo) }));

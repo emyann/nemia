@@ -1,6 +1,6 @@
 /**
  * `nemia` run as a process exits with a refusal's code, and 1 on anything else. The package refuses with `exitCode` 2 and a sentence saying
- * what to do next (CLAUDE.md, *Errors say what to do next*); a bin that exits 1 on every error leaves a script unable to tell a
+ * what to do next; a bin that exits 1 on every error leaves a script unable to tell a
  * refusal from a crash. The verbs' own tests read `exitCode` off what `main` throws; only a process shows what `nemia` exits with.
  * A fake `claude` and `codex` first on PATH, so nothing real is asked.
  */

@@ -133,7 +133,7 @@
         "typescript/restrict-template-expressions": "off"
       }
     },
-    // The comment guards (lint/comments.ts, CLAUDE.md "Code reads by itself"), one block per package, the same rules in each, none with
+    // The comment guards (lint/comments.ts), one block per package, the same rules in each, none with
     // an `excludeFiles`. The runtime's block also covers the folders beside the packages: lint/**, the guards' own plugin, and tools/**,
     // the repository's test tooling.
     // packages/agent-orchestrator/test/comments.test.ts reads these blocks.

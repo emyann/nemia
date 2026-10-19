@@ -1,13 +1,14 @@
 /**
  * A stand-in for Claude Code as the Agent SDK runs it (`pathToClaudeCodeExecutable`), speaking the SDK's stdio protocol as
  * `@anthropic-ai/claude-agent-sdk` 0.3.270 does: control requests both ways (`initialize`, `hook_callback`, `can_use_tool`,
- * `interrupt`, `remote_control`), and stream-json lines out. What it does is its plan, `STANDIN_PLAN` (`Plan`), and what it saw it
+ * `interrupt`, `remote_control`, `get_usage` — that one answered by `usageAnswer` from the recorded answer `STANDIN_USAGE` names,
+ * after `STANDIN_USAGE_MS`), and stream-json lines out. What it does is its plan, `STANDIN_PLAN` (`Plan`), and what it saw it
  * writes into `STANDIN_DIR`: `argv.jsonl` (each start's arguments), `initialize.jsonl` (each `initialize` request's payload, the
  * system prompt the SDK sends included), `said.jsonl` (each user message's text), `asked.jsonl` (each hook it asked, as it asks),
  * `answers.jsonl` (each answer to a control request it sent), `taken.jsonl` (each control request the SDK sent it, by subtype, with
  * what it carried) and `pid` (its own, on each start).
  *
- * Its session id is `stand-in-session`, or the one `--resume=<id>` names, as the SDK writes it.
+ * Its session id is `stand-in-session`, its plan's `id` where it gives one, or the one `--resume=<id>` names, as the SDK writes it.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -21,12 +22,22 @@ import readline from 'node:readline';
  * wait until the file `end` appears, or until an `interrupt` request comes; then its result, `output` as its `structured_output` and
  * `cost` as its `total_cost_usd` (0.01 when absent).
  *
+ * `stream` makes it print, before its result and only when its argv carries `--include-partial-messages` — the argument the SDK
+ * passes for `includePartialMessages` — a message begun, a text block opened, one piece of text, then, once the file `more` appears
+ * in its folder, a second piece and the block written whole; interrupted at `more`, it prints neither, so its open block is left for
+ * the result to close. `transcript` has it write what it said as a line of Claude Code's own transcript, under
+ * `$CLAUDE_CONFIG_DIR/projects/stand-in/<sessionId>.jsonl`, before the result. `id` is the session id it answers under, so two
+ * sessions of one test process keep their transcripts apart.
+ *
  * `turns` says what it does after its first result: `one`, close its stdin as a job does, and `many`, keep it open and work each
  * further user message as another turn, as a session on streaming input does. `fold` works a message that came while a turn ran into
  * that turn instead, as Claude Code does for words pushed while a tool call runs: one result, listing every message it consumed on
  * `user_message_uuids`, and no turn of its own.
  */
 type Plan = {
+  id?: string;
+  stream?: boolean;
+  transcript?: boolean;
   deny?: string;
   ask?: string;
   call?: string;
@@ -43,7 +54,7 @@ const dir = process.env.STANDIN_DIR!;
 const plan = JSON.parse(process.env.STANDIN_PLAN ?? '{}') as Plan;
 const argv = process.argv.slice(2);
 const resumed = argv.find((a) => a.startsWith('--resume='))?.slice('--resume='.length);
-const sessionId = resumed ?? 'stand-in-session';
+const sessionId = resumed ?? plan.id ?? 'stand-in-session';
 const note = (file: string, value: unknown) => fs.appendFileSync(path.join(dir, file), `${JSON.stringify(value)}\n`);
 note('argv.jsonl', argv);
 fs.writeFileSync(path.join(dir, 'pid'), String(process.pid));
@@ -114,6 +125,8 @@ const work = async () => {
     await hooked('PostToolUse', plan.call, 'call-1');
     print({ type: 'user', session_id: sessionId, message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'call-1', content: 'ok' }] } });
   }
+  if (plan.stream && argv.includes('--include-partial-messages')) await streamed();
+  if (plan.transcript) wrote();
   if (plan.hold) await appears('end');
   const cut = interrupted;
   interrupted = false;
@@ -130,6 +143,42 @@ const work = async () => {
     usage: { input_tokens: 1, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 1 },
     ...(plan.output !== undefined ? { structured_output: plan.output } : {}),
   });
+};
+
+/** The two pieces of text the stand-in writes, and the whole its transcript keeps. */
+const SAID = ['Half ', 'a thought'];
+
+/** One `stream_event` line, as `claude -p --include-partial-messages` prints it. */
+const streamEvent = (event: object) =>
+  print({ type: 'stream_event', uuid: `stream-${sessionId}`, session_id: sessionId, parent_tool_use_id: null, event });
+
+/**
+ * The text written as it is written: a message begun, a block opened, the first piece, then — unless the turn was interrupted while
+ * it waited for `more` — the second piece and the block written whole.
+ */
+const streamed = async () => {
+  streamEvent({ type: 'message_start', message: { id: `msg_${sessionId}` } });
+  streamEvent({ type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } });
+  streamEvent({ type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: SAID[0] } });
+  await appears('more');
+  if (interrupted) return;
+  streamEvent({ type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: SAID[1] } });
+  streamEvent({ type: 'content_block_stop', index: 0 });
+};
+
+/** What it said, written as a line of Claude Code's own transcript, where a follow and `transcript` read it. */
+const wrote = () => {
+  const at = path.join(process.env.CLAUDE_CONFIG_DIR ?? '', 'projects', 'stand-in');
+  fs.mkdirSync(at, { recursive: true });
+  fs.appendFileSync(
+    path.join(at, `${sessionId}.jsonl`),
+    `${JSON.stringify({
+      type: 'assistant',
+      uuid: `said-${sessionId}-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      message: { id: `msg_${sessionId}`, role: 'assistant', content: [{ type: 'text', text: SAID.join('') }] },
+    })}\n`,
+  );
 };
 
 /** The bridge's facts a `remote_control` request is answered with, and the `bridge_state` messages it drives onto the stream. */
@@ -183,9 +232,22 @@ const next = () => {
   });
 };
 
+/**
+ * The usage of the recorded answer `STANDIN_USAGE` names, as Claude Code answers a `get_usage` control request, under the request's
+ * own id and after the wait `STANDIN_USAGE_MS` asks for (none by default): a wait longer than the asker's own makes a stand-in that
+ * is started and never answers, which the asker must still let go of.
+ */
+const usageAnswer = async (id: string | undefined): Promise<void> => {
+  const waitMs = Number(process.env.STANDIN_USAGE_MS ?? 0);
+  if (waitMs > 0) await new Promise((r) => setTimeout(r, waitMs));
+  const recorded = JSON.parse(fs.readFileSync(process.env.STANDIN_USAGE!, 'utf8')) as { response: { response: object } };
+  print({ type: 'control_response', response: { subtype: 'success', request_id: id, response: recorded.response.response } });
+};
+
 readline.createInterface({ input: process.stdin }).on('line', (text) => {
   const line = JSON.parse(text) as { type: string; uuid?: string; request_id?: string; request?: { subtype: string; hooks?: typeof hooks }; response?: { request_id: string; response?: unknown }; message?: { content: unknown } };
-  if (line.type === 'control_request')
+  if (line.type === 'control_request' && line.request?.subtype === 'get_usage') void usageAnswer(line.request_id);
+  else if (line.type === 'control_request')
     print({ type: 'control_response', response: { subtype: 'success', request_id: line.request_id, response: answered(line.request ?? {}) } });
   else if (line.type === 'control_response') pending.get(line.response!.request_id)?.(line.response!.response);
   else if (line.type === 'user') {

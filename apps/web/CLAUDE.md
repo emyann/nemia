@@ -205,6 +205,10 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
   milliseconds apart from `browser_evaluate`.
 - React Flow sets `pointer-events: none` on a node neither draggable nor selectable, and a click on it lands on the pane: a node that is
   pressed gives them back in its `style` (`nodesOf` in `FactoriesCanvas.tsx`).
+- React Flow draws a node whose size it has not measured `visibility: hidden`, and it forgets what it measured every time the nodes are
+  built again — a new node object, as a press or the bar's close makes: a node invisible for a frame takes no press and no focus, so a
+  `focus()` then lands on nothing. A node whose size its layout knows carries it as the node's own `width` and `height`, never in its
+  `style` alone (`flowOf` in `MachineCanvas.tsx`, `nodesOf` in `FactoriesCanvas.tsx`).
 - React Flow's `nodeTypes` and `edgeTypes` are module constants, and each `ReactFlow` has an `id` of its own, which scopes its marker
   ids; `defaultMarkerColor={null}` lets the stylesheet colour a marker.
 - Chromium writes a console error, `Failed to load resource`, for every 4xx: a page expecting one refusal allows that line too.

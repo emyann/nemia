@@ -97,9 +97,9 @@ and 3, and the gate's `needs` clause is what refuses adding a job and forgetting
   twice, under `TZ=UTC` and `TZ=America/New_York`. Both runs pass `--force`: `turbo.json` hashes no environment, so without it the second
   run replays the first from the cache and the second timezone is never tested.
 - **`npm run lint` and `npm run typecheck`**, whole, on the floor.
-- **The 120-page e2e in four shards** (card 2) off `apps/web/test/e2e/pages/NAMES`, with a gate summing their page time against
-  `PAGES_BOUND_MS`, Playwright's browsers cached, and a failing page's pictures uploaded. npm itself is never cached: the lockfile's own
-  install is part of what is tested.
+- **The whole e2e in four shards** (card 2), every page named in `apps/web/test/e2e/pages/NAMES`, with a gate summing their page
+  time against `PAGES_BOUND_MS`, Playwright's browsers cached, and a failing page's pictures uploaded. npm itself is never cached:
+  the lockfile's own install is part of what is tested.
 - **A build job** (card 2) that refuses a stale generated file by name, `git diff --exit-code` over `apps/web/src/routeTree.gen.ts` and
   `apps/web/theme/`.
 - **gitleaks** (card 3) over the incoming commits, as a pinned binary with a two-line allowlist, and `CODEOWNERS` over what a branch
@@ -136,7 +136,7 @@ through a place's `checks` verb, with `checks:` and several named checks as its 
   ship reading the PR's status on each tick; the plan for that step chooses.
 - **Round checks.** Settled by the CI intent, not here: they stay local, and narrow to what the change touched. A round proves the
   bound, the pictures, the probes, the mutants, the types and the lint whole, and the tests of the packages whose turbo inputs cover the
-  diff; the whole forced suite and the whole 120-page e2e become CI's, and the laptop stops paying for them.
+  diff; the whole forced suite and the whole e2e become CI's, and the laptop stops paying for them.
 - **What goes away.** The shipper's trial merge and hand-run check, the chasing of main, and the tick's clean-up of a merge left
   on main.
 

@@ -56,6 +56,11 @@ is written, the commands, and what its own code promises — and this section ho
 - Adding a component of `apps/web/src/components/ui` or `apps/web/src/components/ai-elements` again overwrites the edits that put it on
   React Aria (the sidebar's `ul` menu, `showCloseButton={false}`, shiki's fine-grained build), and brings back comments the guards refuse.
 - The kit has no adapter for TanStack Router: an `href` on one of its buttons, chips or menu items loads the page whole.
+- `npx shadcn@latest add <component>` installs no `react-aria-components`: the board already depends on it, and a registry whose
+  components sit on it says so in no install the CLI runs, so a fresh dependency of a component you add is yours to add.
+- A weight the board wants on a role's text sits on the element that carries the role, never on a parent, which the role overrides. The
+  guard that refuses a weight written beside a role reads one quoted class string at a time (`dressed`, `apps/web/test/type.test.ts`),
+  so a `font-bold` on a parent of a `text-label-large` is refused by nothing and loses its weight all the same.
 - A colour means one of five things on the board (`yours`, `alive`, `money`, `rest`, `failure`): a use that means none of them is rest; a
   caution is failure for a write refused, yours drawn light for what a person weighs, rest for a note.
 - Classes merge through `cn`, built from the kit's `twMergeConfig`: a `leading-*` written before a role in one merge is dropped, so write

@@ -314,8 +314,6 @@ test('REFUSED: a workspace with no leg, a leg with no workspace, a node floor ad
       `engines.node in package.json reads ${unreadable}, which names no floor to test: write it >=<major>.<minor>.<patch>, so the matrix can be held to the version the package claims to run on`,
     ]);
 
-  // Both sentences at once, and this one is handed the repository's real floor, not a fixture's: the second quotes whatever
-  // engines.node claims today, so it moves when the floor moves.
   const unquoted = structuredClone(shipped);
   matrixOf(unquoted).node = [22.18, '24'];
   assert.deepEqual(nodeDrift(unquoted, engine), [

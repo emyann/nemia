@@ -93,6 +93,8 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
 - A write that changes a run calls `runsMoved` (`lib/runWrites.ts`), never `['runs']` by hand; a key that stands for every key under it
   is said by `filterOf` (`lib/feed.ts`), which the feed invalidates through. `['runs-finished']` stands for every page of the finished
   runs, each factory's (`filterOf`, `polled`, `runsMoved`).
+- Both conversations follow their stream through the one `follow` of `lib/follow.ts`, each handing it a `Follower`: a step's is
+  `lib/following.ts`, her chat's `lib/chatFollowing.ts`.
 - A value two files under `lib/api/` need sits in a sibling that imports no sibling: the builder's saves decode a `WorkflowListing`, so
   they sit in `workflows.ts` beside its schema.
 
@@ -110,12 +112,6 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
 - `refetchInterval` is read again only when the query changes: `useFeed` reads the active polled queries once whenever the feed's stream
   opens or goes down (`pace` in `lib/feed.ts`), which is also what a stream from the feed's end does not carry.
 - An `EventSource` is closed on the `error` fired as the response ends, or after a grace (`follow`), never on the last event.
-- Both conversations follow their stream through the one `follow` of `lib/follow.ts`, each handing it a `Follower`: a step's is
-  `lib/following.ts`, her chat's `lib/chatFollowing.ts`, and `test/follow.test.ts` refuses a second `unreadable` listener in `lib`
-  (`lib/feed.ts` exempt by name). A read the api says it is making again fills `retrying`, a notice at rest; `error` is the end.
-- A step's conversation is followed only while its task is open, never once it has settled (`followedFrom`, `test/following.test.ts`): a
-  settled task says nothing again, and a stream the page closes before the api has answered it is a failed request the e2e's watch counts,
-  only the frame's own streams being let go.
 - Send what the current choice takes, not what hidden state holds (`afterFor`).
 - A form keyed on an agent's version is thrown away with its draft when a write beside the agent moves the version (`keptAfterCopy`,
   `formKeyOf` in `lib/agents.ts`).
@@ -136,11 +132,3 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
 
 - `assert.deepEqual(x, [])` from `node:assert/strict` narrows `x` to `never[]` after it: assert on its length, or compare a copy.
 - No directory import in a module a test reads (`./api` is a folder Node refuses): a helper a test reads uses file imports only.
-- A test waits in its process with `until` (`test/waits.ts`, the runtime's copy, held to `packages/agent-runtime/src/waits/waits.ts`
-  by the fence in that package's `test/waits.test.ts`), on a `bell` its event's
-  source rings or at a pace, given `WAITED`; `DEADLINES` refuses a hand-written deadline.
-- A component that draws a `routeLink` renders under `RouterContextProvider` over a memory-history router (`components.test.ts`); the
-  markup spells React's props (`readOnly=""`). In a browser its Enter navigates only under React Aria's `RouterProvider`, the root's.
-- A node test that renders a component imports `./tsx.ts` first, then the component by `await import(…)`.
-- A package program the e2e runs from a string (`PASS` in `test/e2e/world.ts`) is read by no typecheck: after changing what a package's
-  program requires, run `npm run e2e -- --pages runs`, which seeds through it.

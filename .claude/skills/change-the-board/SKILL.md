@@ -133,6 +133,8 @@ is written, the commands, and what its own code promises — and this section ho
 - Name a page's own pictures `<name>-<what>-<theme>.png`; `<name>-<theme>.png` is the runner's: a run that pictures the page overwrites
   it, and a run that does not leaves an earlier run's where it is.
 - The watch counts every 4xx against a page: a refusal made on purpose gets a page of its own whose watch expects exactly it.
+- A stream the page closes before the api has answered it is a failed request the watch counts too, only the frame's own streams being
+  let go: a page that leaves a conversation's stream open on its way out is counted against, not the frame's feed.
 - A run added to the seed shifts every count asserted about the store (the Factory's tally, the Runs rows and headings): run the e2e to
   its end. A test about the pages reads the pages that exist, never a hard-coded last page.
 - An expectation about a time of day decides as `clockWord` does (same calendar day or not) and writes its time with `timeOfDay`

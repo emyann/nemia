@@ -94,10 +94,22 @@ jobs:
         # controls must not reach a command line.
         env:
           RESULTS: ${{ toJSON(needs) }}
+        # A whitelist, never a list of the words that mean failure: every result must read success. A job that ends in a state nobody
+        # here foresaw, and a RESULTS that arrives empty or in another shape, are failures too — they are the cases a list of known
+        # bad words would wave through, green, on a landing nothing tested.
         run: |
           echo "$RESULTS"
-          if printf '%s' "$RESULTS" | grep -q '"result": *"\(failure\|cancelled\|skipped\)"'; then
-            echo "ci: a job above did not succeed. Open this run's summary, read the failing job's log, and fix what it names;" >&2
-            echo "ci: a cancelled or skipped job is a failure too - re-run the workflow once its cause is gone." >&2
+          results=$(printf '%s' "$RESULTS" | grep -o '"result": *"[^"]*"' | sed 's/^"result": *"//; s/"$//')
+          if [ -z "$results" ]; then
+            echo "ci: read no job result out of needs, so nothing here was checked. Give this step env RESULTS: the toJSON of needs," >&2
+            echo "ci: and list every job in the ci job's needs, in .github/workflows/ci.yml." >&2
             exit 1
           fi
+          for result in $results; do
+            if [ "$result" != success ]; then
+              echo "ci: a job above ended $result, not success. Open this run's summary, read that job's log, and fix what it names;" >&2
+              echo "ci: a cancelled or skipped job is a failure too - re-run the workflow once its cause is gone." >&2
+              exit 1
+            fi
+          done
+          echo "ci: every job above succeeded."

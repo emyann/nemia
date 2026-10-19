@@ -5293,6 +5293,21 @@ test("a machine's states take a press, the focus and a name only when the canvas
   );
 });
 
+test("a machine's states carry the size their layout gave them, so React Flow draws none invisible while it measures one", async () => {
+  const { flowOf } = await import('../src/components/MachineCanvas.tsx');
+  const { drawMachine } = await import('../src/lib/machine.ts');
+  const drawing = drawMachine({ initial: 'a', states: ['a', 'b'], final: ['b'], edges: [], verbs: [] });
+  const sizes = drawing.states.map((box) => [box.id, box.width, box.height]);
+  for (const pressed of [false, true]) {
+    const { nodes } = flowOf(drawing, undefined, [], pressed, null);
+    assert.deepEqual(
+      nodes.map((node) => [node.id, node.width, node.height]),
+      sizes,
+      `each state is as wide and tall as its box on the node itself, where React Flow reads a size it measures nothing for; pressed: ${pressed}`,
+    );
+  }
+});
+
 /** The bar's body for the state `state` of `graph`, as the bar for a machine's state draws it. */
 async function stateBodyMarkup(graph: import('../src/lib/api.ts').MachineGraph, state: string): Promise<string> {
   const { StateBody } = await import('../src/components/StateBar.tsx');

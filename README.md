@@ -123,3 +123,6 @@ git log -- packages/agent-runtime packages/agent-engine # renamed on 2026-09-23
 
 After pulling the rename, run `npm install` at the root (the workspace links are renamed) and restart a
 running daemon: a daemon started before it spawns its sessions from a worker path that is gone.
+
+Nemia is MIT-licensed (`LICENSE`); the vendored skills and the design system kit keep their own licences, reproduced in
+`THIRD_PARTY_NOTICES.md`.

@@ -2,6 +2,7 @@
   "name": "docs",
   "private": true,
   "type": "module",
+  "license": "MIT",
   "scripts": {
     "dev": "ASTRO_TELEMETRY_DISABLED=1 astro dev",
     "build": "ASTRO_TELEMETRY_DISABLED=1 astro build && node built.ts",

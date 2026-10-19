@@ -159,25 +159,33 @@ export function seedStore(root: string): void {
 
 /**
  * First on the api's PATH is a `claude` that lists the store's sessions (REGISTRY), HELD's blocked: the engine observes claude agents on
- * every list, and the pages are about the store, not about the sessions on this machine. It answers the api's get_usage request too
- * (quota.ts), with the store's answer (QUOTA.file) under the request's id, and waits on its stdin as Claude Code does; with no answer in
- * the store, it ends as a claude that cannot answer would. Returns the directory it is in.
+ * every list, and the pages are about the store, not about the sessions on this machine. It answers the api's usage control request too
+ * (quota.ts), which the runtime asks through the Agent SDK: anything whose first argument is a flag — the SDK's argv, never matched
+ * here, since it is the SDK's to change — it hands to the api's own stand-in Claude Code, which answers the SDK as Claude Code does
+ * from the store's answer (QUOTA.file) under the request's own id, and waits on its stdin as Claude Code does. With no answer in the
+ * store it ends as a claude that cannot answer would, before the stand-in is reached. Another of Claude Code's verbs is a bare word,
+ * and ends well having said nothing. Returns the directory it is in.
  */
 export function fakeClaude(root: string): string {
   const bin = path.join(root, 'bin');
   fs.mkdirSync(bin);
   const answer = path.join(root, QUOTA.file);
+  const mode = path.join(bin, 'usage-mode');
+  const calls = path.join(bin, 'calls');
+  fs.writeFileSync(mode, 'answer');
+  fs.writeFileSync(calls, '');
+  const standIn = path.join(API, 'test', 'fixtures', 'stand-in-claude.ts');
   fs.writeFileSync(
     path.join(bin, 'claude'),
     [
       '#!/bin/sh',
-      `if [ "$1" = agents ]; then cat "${path.join(root, REGISTRY)}"; exit 0; fi`,
-      'if [ "$1" != -p ]; then echo \'[]\'; exit 0; fi',
-      'read -r line',
-      `if [ ! -f "${answer}" ]; then echo 'claude: not signed in, the e2e took its answer away' >&2; exit 1; fi`,
-      `id=$(printf '%s' "$line" | sed -n 's/.*"request_id":"\\([^"]*\\)".*/\\1/p')`,
-      `sed "s/@ID@/$id/g" "${answer}"`,
-      'cat > /dev/null',
+      'case "$1" in',
+      `  agents) cat "${path.join(root, REGISTRY)}"; exit 0 ;;`,
+      "  -*|'')",
+      `    if [ ! -f "${answer}" ]; then echo 'claude: not signed in, the e2e took its answer away' >&2; exit 1; fi`,
+      `    STANDIN_ANSWER="${answer}" STANDIN_MODE="${mode}" STANDIN_CALLS="${calls}" exec node "${standIn}" "$@" ;;`,
+      'esac',
+      'exit 0',
       '',
     ].join('\n'),
     { mode: 0o755 },

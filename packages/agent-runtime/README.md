@@ -1804,11 +1804,13 @@ const q = yield* engine.quota('claude')
 if (q.kind === 'windows') for (const l of q.limits) console.log(l.key, l.usedPercentage, l.resetsAt)
 ```
 
-Claude Code answers it, as `claude` and as `claude-bg`: the `claude` on PATH, sent its `get_usage` control request with no prompt
-(`claudeQuota`, `harness/claude/quota.ts`), so no model is called and no token spent. Each call is one ask, one process: `claudeQuota`
-lets it go before it returns, whatever ended it — an answer, the timeout, an interruption. Through the engine the ask runs behind the
-A2A seam, which an interruption does not cross: a caller that interrupts `quota()` gets control back at once, and the process ends by
-the ask's own timeout, within `QUOTA_TIMEOUT_MS` (15 s) and 2 s more. Nothing is journalled and nothing kept, so a caller that reads
+Claude Code answers it, as `claude` and as `claude-bg`: the ask is the Agent SDK's own usage question, put to the `claude` on PATH —
+the Claude Code the sessions run on, named as `QUOTA_COMMAND` — with no prompt (`claudeQuota`, `harness/claude/quota.ts`), so no model
+is called and no token spent. Each call is one ask, one query of its own, and the SDK owns the process: `claudeQuota` closes that query
+before it returns, whatever ended it — an answer, the timeout, an interruption — and no `claude` is left behind by the time it does
+(`test/quota.boundary.test.ts`). Through the engine the ask runs behind the A2A seam, which an interruption does not cross: a caller
+that interrupts `quota()` gets control back at once, and the ask it left ends at its own timeout at the latest (`QUOTA_TIMEOUT_MS`,
+15 s), its process with it. Nothing is journalled and nothing kept, so a caller that reads
 often keeps the answer itself. A
 harness with no quota — Codex, a remote agent, a brought `RunnerOps` — is refused in words (`QuotaRefused`, worded with exit code 2 by `refusalWords`, as `ae` does),
 naming the harnesses that have one; so is a harness the engine does not have, and any argument but one name.
@@ -2197,11 +2199,12 @@ of pure code sits beside it.
 | `src/harness/forget.ts` | what every harness's `forget` and `kept` share (`forgetFiles`, `keptOf`): the files it keeps of a session, removed or, dry, listed, what it leaves that is not its own, and the same files named for a measure |
 | `src/harness/error.ts` | `RunnerError`, beneath the seam and Claude Code's `--bg` runner: `Runner.claude` needs `claudeOps` as a value, and `claudeOps` builds `RunnerError`, so neither file imports the other for it |
 | `src/harness/args.ts` | a task's harness arguments, `HarnessArgs`: the adapter's configuration, carried as one `config`, and the checks every harness shares of it (`argsRefusalOf`), asked through every `Runner` |
-| `src/harness/reach.ts` | what a harness's fence words reach, `fenceReach`: each word's rank, the one a task naming none runs in, the held and unasking modes, and the modes Claude Code drops on a model; and `unruledIn`, the first character of a path its permission rules cannot carry |
+| `src/harness/reach.ts` | what a harness's fence words reach, `fenceReach`: each word's rank, the one a task naming none runs in, the held and unasking modes, the modes Claude Code drops on a model, the words that refuse what no allow rule reaches and the tools that need none; and `unruledIn`, the first character of a path its permission rules cannot carry |
 | `src/harness/choices.ts` | the words each default harness takes per key of a task's config, `HARNESS_CHOICES`: its efforts, its permission modes or its sandboxes, the lists `configRefusal` judges by |
 | `src/harness/config-folders.ts` | the folders a harness reads as its own configuration inside a folder it is given to read, `CONFIG_FOLDERS`, and the first a path passes through, `configFolderIn`: pure, for a caller that puts files into a mounted folder |
 | `src/harness/mounts.ts` | a task's mounts, `Mount`: the folders beyond its `cwd` a session may reach, each read-only or writable, and the check of their shape every harness shares (`mountsRefusalOf`) |
 | `src/harness/admission.ts` | a task's admission, `Admission`: the command run before each call to the tools it names, the call it reads and the answer it gives (`AdmissionCall`, `AdmissionAnswer`), and the check of its shape every harness shares (`admissionRefusalOf`) |
+| `src/harness/settings.ts` | a harness's own project configuration in a directory, as a session started there gets it: `projectAllows`, the allow rules it grants, `[]` where the file is absent or names none and `undefined` for a harness that reads none |
 | `src/harness/trust.ts` | a harness's trust of a folder, off the harness's own file: whether it is given (`trustedFolder`), what it is in a person's words (`folderTrust`) and the act of giving it (`trustFolder`), each `undefined` for a harness that keeps no trust |
 | `src/harness/telemetry.ts` | where an engine's sessions export (`Telemetry`), the runner that tells each spawn (`telemetered`), the trace context of the span that filed a task (`traceparentOf`), and the variables no child inherits from the engine's process (`withoutTelemetry`) |
 | `src/harness/mcp.ts` | a task's MCP servers: what is refused, the configs written, and Claude Code's flags for them; for Codex, the server names its config already has and a task's servers as its `mcp_servers` table |
@@ -2220,7 +2223,7 @@ of pure code sits beside it.
 | `src/harness/claude/attached-session.ts` | one attached session over `query()`: its input, its hooks for the call in flight and the drain, `canUseTool`, its capture |
 | `src/harness/claude/attached-file.ts` | an attached session's run file, its stop, the drain, and the two notes a resumed session is told |
 | `src/harness/claude/attached-options.ts` | a task as the SDK's `Options` (`attachedOptions`): the job's fence, folders, servers, model, budget and schema |
-| `src/harness/claude/quota.ts` | Claude Code's quota (`claudeQuota`): the `claude` on PATH asked `get_usage` with no prompt, and its answer read (`quotaOfResponse`) |
+| `src/harness/claude/quota.ts` | Claude Code's quota (`claudeQuota`): the Agent SDK's usage question put to the `claude` on PATH with no prompt, and its answer read (`quotaOfUsage`) or its refusal (`quotaOfRefusal`) |
 | `src/harness/claude/registry.ts` | the rows `claude agents --all --json` prints, decoded: which are ours, and why a listing is refused; a row's state in A2A's names (`claudeStateOf`) |
 | `src/harness/claude/lines.ts` | the transcript lines the runtime reads (`LINES`), each decoded where it is read, and why a line is refused |
 | `src/harness/claude/print.ts` | the lines of `claude -p`'s output the runtime reads (`PRINTED`), decoded, and why an output is refused |

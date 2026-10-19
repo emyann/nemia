@@ -252,6 +252,13 @@ function modeGrants(mode: string | undefined, rule: string): boolean {
   return tool === 'Edit' && inner !== undefined && editsUnasked(mode) && pathCovers('**', inner);
 }
 
+/**
+ * The tool permission rule `rule` names, whether the rule is the bare tool or names what it reaches in parentheses: `Bash(git log:*)`
+ * names `Bash`. Over `ruleParts`, so one parser reads a rule for what covers what (`covers`) and for whether any rule names a tool at
+ * all (`unallowedRefusal`).
+ */
+export const toolOf = (rule: string): string => ruleParts(rule).tool;
+
 /** A permission rule's tool and what it names in its parentheses, `undefined` for a bare tool. */
 function ruleParts(rule: string): { tool: string; inner?: string } {
   const open = rule.indexOf('(');

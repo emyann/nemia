@@ -1,5 +1,5 @@
 /**
- * The comment guards: a comment is a JSDoc contract, or a lint directive with its reason (CLAUDE.md, "Code reads by itself").
+ * The comment guards: a comment is a JSDoc contract, or a lint directive with its reason.
  *
  * `lint/comments.ts` is the oxlint plugin; `.oxlintrc.json` runs the guards in one override block per package, none with an
  * `"excludeFiles"`, and one block also covers the folders beside the packages: `lint/**`, the plugin itself, and `tools/**`, the

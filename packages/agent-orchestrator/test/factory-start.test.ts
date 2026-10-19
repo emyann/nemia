@@ -132,7 +132,10 @@ test('once a factory hires into each step, a start in it runs each as its hire, 
   hireAgent({ factory: 'pipao', agent: 'shipper', step: 'build/implement' });
   const steps = Object.fromEntries((run.workflow ?? []).map((s) => [s.name, s]));
   assert.equal(steps.implement.agent?.name, 'implementer');
-  assert.match(steps.implement.body, /^Make the change you were asked for, in this repository\.[\s\S]*\n\nBuild what was asked\.$/);
+  assert.match(
+    steps.implement.body,
+    /^## 1\. [^\n]+\n\nMake the change you were asked for, in this repository\.[\s\S]*\n## 5\. [^\n]+\n\nBuild what was asked\.$/,
+  );
   assert.equal(steps.implement.model, 'opus', "the hire's keys are the step's");
   assert.equal(steps.review.agent?.name, 'reviewer');
   assert.equal(steps.named.agent?.name, 'reviewer', 'a step that names its own agent is filled in any factory');

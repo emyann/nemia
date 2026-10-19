@@ -5885,6 +5885,7 @@ const LAYERS: StepLayers = {
   policy: 'Write the note.',
   addedSkills: ['gamma'],
   fence: [],
+  folderFiles: true,
   task: '## What was asked for\n\nA note.',
   via: 'prompt',
 };
@@ -5930,7 +5931,7 @@ test("the factory's rules are a layer of their own, between your custom instruct
     'custom, factory, policy',
   );
   const layer = html.slice(order[1], order[2]);
-  assert.match(layer, /<h4[^>]*>The factory&#x27;s rules<\/h4>/);
+  assert.match(layer, /<h4[^>]*>4\. The factory&#x27;s rules<\/h4>/);
   assert.match(layer, /Never push on a <strong>Friday<\/strong>\./, 'its words, as the markdown they are');
   assert.equal(html.split('Friday').length - 1, 1, 'drawn once');
   assert.match(html, /The agent&#x27;s instructions, yours and the factory&#x27;s rules were\s+frozen at the start of the run/);
@@ -5938,6 +5939,35 @@ test("the factory's rules are a layer of their own, between your custom instruct
   const none = toldMarkup({ told: null, layers: LAYERS, filed: true });
   assert.doesNotMatch(none, /data-layer="factory"|factory&#x27;s rules/, 'a run that froze none draws no layer for them, nor names them');
   assert.match(none, /The agent&#x27;s instructions and yours were\s+frozen at the start of the run/);
+});
+
+test("the folder's files are a layer of their own, third, numbered as the session is told them, and drawn only where the step reads a folder", () => {
+  const html = toldMarkup({ told: null, layers: { ...LAYERS, factory: 'Never push on a Friday.' }, filed: true });
+  const at = (needle: string): number => {
+    const i = html.indexOf(needle);
+    assert.ok(i >= 0, `${needle} in ${html}`);
+    return i;
+  };
+  const order = ['instructions', 'custom', 'folder', 'factory', 'policy', 'task'].map((name) => at(`data-layer="${name}"`));
+  assert.deepEqual(
+    [...order].sort((a, b) => a - b),
+    order,
+    'instructions, custom, folder, factory, policy, task',
+  );
+  const layer = html.slice(order[2], order[3]);
+  assert.match(layer, /<h4[^>]*>3\. The folder&#x27;s files<\/h4>/);
+  assert.match(layer, /The session reads them itself/, 'the layer says the session reads them, the board having none to draw');
+  assert.doesNotMatch(layer, /data-markdown/, 'nothing of them is frozen on the run, so none is drawn as words');
+  const heads = [
+    /<h4[^>]*>1\. Instructions — writer&#x27;s<\/h4>/,
+    /<h4[^>]*>2\. Your custom instructions<\/h4>/,
+    /<h4[^>]*>5\. The step&#x27;s policy<\/h4>/,
+  ];
+  for (const head of heads) assert.match(html, head);
+  assert.match(html, /the higher number wins, and the task is above them all\./, 'the fold says what the numbers mean');
+
+  const elsewhere = toldMarkup({ told: null, layers: { ...LAYERS, folderFiles: false }, filed: true });
+  assert.doesNotMatch(elsewhere, /data-layer="folder"/, 'a step that reads no folder here is told of none');
 });
 
 test('the task is drawn in its parts: its text, and each run it was handed a block headed by how, linked to the run — a run handed neither way a plain block', async () => {
@@ -5971,7 +6001,11 @@ test("a layer the run froze none of says so; a step with no agent draws no agent
     filed: true,
   });
   assert.doesNotMatch(agentless, /data-layer="instructions"|data-layer="custom"/);
-  assert.match(agentless, /No agent: its own words are all it was told, before the task\.[^]*data-layer="policy"/);
+  assert.match(
+    agentless,
+    /No agent: of the words Nemia composes, its own are all it was told\. Where two of them say different things, the higher number wins, and the task is above them all\.[^]*data-layer="folder"[^]*data-layer="policy"/,
+    "a step with no agent is still told the folder's files, and which number wins",
+  );
 
   const whole = toldMarkup({ told: 'Write the note.\n\n## What was asked for', layers: null, filed: false });
   assert.match(whole, /What it would be told now/);
@@ -6547,6 +6581,7 @@ test("a workflow's steps, a row each: an agent's step by its policy, its agent l
     policy: 'Keep the **diff** small.',
     addedSkills: ['look'],
     fence: [],
+    folderFiles: true,
     task: null,
     via: 'prompt' as const,
   };

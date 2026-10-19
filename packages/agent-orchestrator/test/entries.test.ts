@@ -491,6 +491,7 @@ const PINNED: Record<string, string[]> = {
     'GIVEN',
     'HANDED_CLOSEOUT',
     'MOMENTUM',
+    'PRECEDENCE',
     'SIGNOFF',
     'WHY_CAP',
     'acceptAsk',

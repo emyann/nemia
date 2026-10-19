@@ -12,6 +12,7 @@ import path from 'node:path';
 import type { RunDetail } from '../src/detail/detail.ts';
 import { app } from '../src/app.ts';
 import { addFactory, attachWorkflow, startRun, engine } from 'agent-orchestrator';
+import { PRECEDENCE } from 'agent-orchestrator/run';
 import { runWith } from './placed.ts';
 import { scratch } from './scratch.ts';
 
@@ -57,13 +58,14 @@ test('each layer is answered as the run froze it: an edit of the agent, its cust
     policy: 'Write the note.',
     addedSkills: ['gamma'],
     fence: [{ key: 'disallowedTools', value: 'WebFetch' }],
+    folderFiles: true,
     task: undefined,
     via: 'prompt',
   });
-  assert.ok(write.told?.startsWith('Write the note.\n\n## What was asked for'), write.told ?? 'null');
+  assert.ok(write.told?.startsWith(`${PRECEDENCE}\n\nWrite the note.\n\n## What was asked for`), write.told ?? 'null');
   assert.equal(
     write.layers?.task,
-    write.told?.slice('Write the note.\n\n'.length),
+    write.told?.slice(`${PRECEDENCE}\n\nWrite the note.\n\n`.length),
     "a step not filed: the task is its preview's, after the note",
   );
 });

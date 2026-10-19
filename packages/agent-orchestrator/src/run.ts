@@ -195,6 +195,7 @@ export {
   gateLines,
   handedParts,
   loopSection,
+  PRECEDENCE,
   remoteBrief,
   retrySection,
   roundSection,

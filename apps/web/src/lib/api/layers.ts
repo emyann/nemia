@@ -9,7 +9,8 @@ import { Schema } from 'effect';
  * instructions and own skills, the person's custom instructions for it, the rules of the factory its run was started in (`factory`, null
  * where the factory keeps none or the step is told none), the step's own note, the skills its line adds and the fence lines it tightens
  * the agent's with, and the task, its brief after them. `via` says where the agent's words, the person's and the factory's went: the
- * session's system prompt (`prompt`), or the head of its brief (`brief`).
+ * session's system prompt (`prompt`), or the head of its brief (`brief`). `folderFiles` says whether the session reads the files of the
+ * folder it works in, the third layer, which Nemia composes nothing of.
  */
 export type StepLayers = {
   agent: string | null;
@@ -20,6 +21,7 @@ export type StepLayers = {
   policy: string;
   addedSkills: string[];
   fence: Array<{ key: string; value: string }>;
+  folderFiles: boolean;
   task: string | null;
   via: 'prompt' | 'brief';
 };
@@ -34,6 +36,7 @@ export const StepLayersSchema = Schema.Struct({
   policy: Schema.String,
   addedSkills: Schema.mutable(Schema.Array(Schema.String)),
   fence: Schema.mutable(Schema.Array(Schema.Struct({ key: Schema.String, value: Schema.String }))),
+  folderFiles: Schema.Boolean,
   task: Schema.NullOr(Schema.String),
   via: Schema.Literals(['prompt', 'brief']),
 }) satisfies Schema.Schema<StepLayers>;

@@ -23,8 +23,9 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   adapter or preset): run it from `apps/web`, read `git diff`, regenerate the theme, and run the check again until nothing is left.
   Since 0.4.0 the CLI writes nothing into `src/styles.css`, and the board imports no `bridge-shadcn.css`: it names shadcn's roles
   itself. The message it prints, to import the kit's default theme, is not for us.
-- `theme/` is generated, never edited: change `DESIGN.md`, then `npx tsx src/components/ui/ds/tokens/generate-theme.mjs DESIGN.md --out
-  theme` from `apps/web`, and read the warnings in `theme/DESIGN.resolved.md`. A face the `DESIGN.md` names is loaded by
+- `theme/` is generated, never edited: change `DESIGN.md`, then `npm run theme:generate` from `apps/web` (the kit's generator, `npx tsx
+  src/components/ui/ds/tokens/generate-theme.mjs DESIGN.md --out theme`), and read the warnings in `theme/DESIGN.resolved.md`. CI's build
+  job runs it and `npm run build`, and refuses a `theme/` or a `src/routeTree.gen.ts` whose committed bytes are not what they write. A face the `DESIGN.md` names is loaded by
   `src/styles.css` from its npm package, under the exact family the package registers (`Michroma`, `Chakra Petch`, `Share Tech Mono`),
   and given to the theme's hook (`--font-michroma`); the label face (`Archivo Variable`, `--font-label`) is the board's own.
 - The kit's corners (`rounded-shape-*`) follow `DESIGN.md`; shadcn's (`--radius`) are the board's own.
@@ -40,6 +41,11 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   never the whole suite in a session but to measure it. A whole run whose pages cost more than `PAGES_BOUND_MS` summed fails, naming
   its slowest pages; its own time past `E2E_BOUND_MS` is said, never refused: it is the machine's, by the workers it gave (`overBound`,
   `pastTool`, `e2e/timing.ts`).
+- `npm run e2e -- --shard <i> --of <n>` visits shard `i` of `n`, dealt from the pages that exist round-robin in their order (`shardOf`,
+  `e2e/pages.ts`): a run of some pages like `--pages`, so no whole run and held to no bound itself. It writes its page times to
+  `pages-<i>-of-<n>.json` where the pictures go (`$WF_ARTIFACTS`, else `.e2e/`), and `node test/e2e/pages-bound.ts <dir>…` sums every
+  shard's together against `PAGES_BOUND_MS` — the bound being the whole run's and additive — refusing a shard that is missing, doubled or
+  of another run. CI runs the e2e in four shards and that command over them (`.github/workflows/ci.yml`).
 - `npm run e2e -- --photos --contrast` writes each picture's text pairs beside it (`e2e/contrast.ts`); `node test/e2e/contrast-report.ts
   <dir>` makes `contrast.md` and `look.html` there and exits 1 on a pair under 4.5:1. A measure, never a check of every run.
 - `npm run e2e` hands its pages to workers one at a time (`queueOf`, `e2e/workers.ts`), each a process with its own seeded store, api,

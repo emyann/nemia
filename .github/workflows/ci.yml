@@ -82,12 +82,120 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
 
+  e2e:
+    name: e2e shard ${{ matrix.shard }}
+    runs-on: ubuntu-latest
+    strategy:
+      # Every shard runs: one shard's failing page says nothing about the other three, and the bound below needs every shard's times.
+      fail-fast: false
+      matrix:
+        # 1 to 4, contiguous: the run takes its count off strategy.job-total, so the count is written here and nowhere else, and the
+        # runner refuses a shard outside 1..n. ci-workflow.test.ts refuses a list that is not 1..n in order.
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        # No cache: npm, as the legs above.
+        with:
+          node-version: '22.18.0'
+      - run: npm ci
+      - name: Cache Playwright's browsers
+        # Keyed on the lockfile, which pins playwright: a dependency change downloads Chromium again, which is minutes and not
+        # correctness. The restore-key gives a near miss the last build rather than none.
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: playwright-${{ runner.os }}-
+      - name: Install Chromium
+        # From the checkout's own playwright, never an npx download, as apps/web/CLAUDE.md says: an install from elsewhere deletes the
+        # builds of every Playwright it does not see. --with-deps runs apt even on a cache hit, which is minutes and not correctness.
+        run: npx playwright install --with-deps chromium
+        working-directory: apps/web
+      - name: Visit this shard's pages
+        # The shard is the leg's own and the count is read back off the matrix: a literal here would leave a shard's pages unvisited the
+        # day the matrix changes. A shard is a run of some pages, so it is held to no bound itself; the bound is the e2e-bound job's.
+        run: npm run e2e -- --shard ${{ matrix.shard }} --of ${{ strategy.job-total }}
+        env:
+          # The e2e writes its pictures and this shard's page times here (OUT, apps/web/test/e2e/world.ts).
+          WF_ARTIFACTS: ${{ github.workspace }}/.e2e
+      - name: Upload this shard's page times
+        # On a pass alone: run.ts writes the file after the pages passed, so a failing shard has none to upload — and the bound job
+        # below then names that shard and the command to run again, rather than summing less than the whole silently. if-no-files-found:
+        # error — a shard that passed and wrote no times is a broken runner, not a quiet success.
+        if: success()
+        uses: actions/upload-artifact@v7
+        with:
+          name: pages-${{ matrix.shard }}-of-${{ strategy.job-total }}
+          path: .e2e/pages-*.json
+          if-no-files-found: error
+      - name: Upload the failing pages' pictures
+        # Only a failure's: a passing run with no --photos takes no picture but a failing page's, and there is nothing to keep.
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-failure-shard-${{ matrix.shard }}
+          path: .e2e/*.png
+          if-no-files-found: ignore
+
+  e2e-bound:
+    # The whole e2e's page time, summed across the shards and held to PAGES_BOUND_MS — the bound that is additive and that a shard, like
+    # --pages, silences inside a run. Its one writer is apps/web/test/e2e/timing.ts: no copy of the number belongs in this file.
+    needs: [e2e]
+    runs-on: ubuntu-latest
+    # Whatever the shards did: a shard that failed still uploaded its times, and this job names a shard that wrote none rather than
+    # summing less than the whole.
+    if: always()
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.18.0'
+      - name: Download every shard's page times
+        uses: actions/download-artifact@v8
+        with:
+          pattern: pages-*-of-*
+          merge-multiple: true
+          path: .e2e
+      - name: Sum the shards' page time against the whole run's bound
+        # No npm ci: the command imports node and the e2e's own files, nothing installed.
+        run: node apps/web/test/e2e/pages-bound.ts .e2e
+
+  build:
+    # The board builds, and the two paths a generator writes are the bytes that are committed. A stale one is green here without this
+    # job and red on the next person's typecheck.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.18.0'
+      - run: npm ci
+      # Writes apps/web/src/routeTree.gen.ts, which a new route file needs before typecheck passes.
+      - run: npm run build
+      # Writes apps/web/theme/, which is generated from DESIGN.md and never edited (the kit's generator, recorded in apps/web/package.json).
+      - run: npm run theme:generate --workspace web
+      - name: Refuse a stale generated file
+        # Run, not read: ci-build.boundary.test.ts runs this very script in a scratch repository, since a git diff that forgets to fail
+        # reads like one that does and differs exactly where a stale file would report green. The paths are GENERATED in ci-workflow.ts.
+        run: |
+          stale=$(git -c core.quotePath=false diff --name-only -- apps/web/src/routeTree.gen.ts apps/web/theme/)
+          if [ -n "$stale" ]; then
+            echo "ci: these generated files are not the bytes their generator writes:" >&2
+            echo "$stale" | sed 's/^/ci:   /' >&2
+            echo "ci: apps/web/src/routeTree.gen.ts is written by \`npm run build\`, and apps/web/theme/ by" >&2
+            echo "ci: \`npm run theme:generate --workspace web\` (never edited by hand: it is generated from apps/web/DESIGN.md)." >&2
+            echo "ci: Run the one that writes each, from the repository root, and commit what it changed." >&2
+            exit 1
+          fi
+          echo "ci: the generated files are the bytes their generators write."
+
   # The one context branch protection requires. It needs every other job, so protection is configured once and never touched as the job
   # list changes, and always() makes it run even when one of them fails, is skipped or is cancelled — each of which it reads as a failure.
   ci:
     runs-on: ubuntu-latest
     if: always()
-    needs: [test, lint, typecheck]
+    needs: [test, lint, typecheck, e2e, e2e-bound, build]
     steps:
       - name: Every job succeeded
         # toJSON(needs) goes through env, never interpolated into the shell: on a pull request from a fork, an expression the branch

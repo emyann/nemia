@@ -302,7 +302,7 @@ export type {
   PhaseCost,
   RecentPass,
 } from './meter/index.ts';
-export { feedCursorRefusal, feedFile, freshFeedMemo, readFeed, readFeedEnds, watchFeed } from './feed/feed.store.ts';
+export { feedCursorRefusal, feedFile, feedSize, freshFeedMemo, readFeed, readFeedEnds, watchFeed } from './feed/feed.store.ts';
 export { cursorFileStart, cutCursorFile, keepCursor } from './watch/cursor.store.ts';
 export { emitFeed, FEED_FOLLOW_BEATS, FEED_FOLLOW_READS, FEED_FOLLOWERS, FeedHub, feedHubLayer, followFeed } from './feed/feed.verb.ts';
 export { followStep } from './following/following.verb.ts';

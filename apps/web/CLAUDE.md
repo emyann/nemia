@@ -109,6 +109,11 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
 - A query keyed by the state it answers for is not invalidated by a write: a write invalidates the run's record alone (`exact: true`).
 - `refetchInterval` is read again only when the query changes: `useFeed` marks the polled queries stale when the stream opens and reads
   them when it goes down (`pace` in `lib/feed.ts`).
+- The frame, whatever the root route mounts, reads the light answer (`openRunsQuery`), never `runsQuery`: `wholeListBreaks`
+  (`test/structure.test.ts`) follows the root's imports. A write that changes a run calls `runsMoved` (`lib/runWrites.ts`), never
+  `['runs']` by hand; a key that stands for every key under it is said by `filterOf` (`lib/feed.ts`), which the feed invalidates through.
+- `refetchInterval` is read again only when the query changes: `useFeed` reads the active polled queries once whenever the feed's stream
+  opens or goes down (`pace` in `lib/feed.ts`), which is also what a stream from the feed's end does not carry.
 - An `EventSource` is closed on the `error` fired as the response ends, or after a grace (`follow`), never on the last event.
 - Send what the current choice takes, not what hidden state holds (`afterFor`).
 - A form keyed on an agent's version is thrown away with its draft when a write beside the agent moves the version (`keptAfterCopy`,

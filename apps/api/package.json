@@ -2,6 +2,7 @@
   "name": "api",
   "private": true,
   "type": "module",
+  "license": "MIT",
   "scripts": {
     "dev": "node --watch --watch-path=src --watch-path=../../packages/agent-orchestrator/src --watch-path=../../packages/agent-orchestrator/place/git --watch-path=../../packages/agent-runtime/src src/main.ts --no-tick",
     "start": "node src/main.ts",

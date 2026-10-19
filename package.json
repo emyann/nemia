@@ -2,6 +2,11 @@
   "name": "nemia",
   "private": true,
   "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/emyann/nemia.git"
+  },
   "packageManager": "npm@11.19.0",
   "workspaces": [
     "packages/*",

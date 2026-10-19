@@ -21,7 +21,6 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import test, { type TestContext } from 'node:test';
-import { fileURLToPath } from 'node:url';
 import { Effect, Exit, Logger, Scope } from 'effect';
 import { attachedSessions, letGoOf } from '../src/harness/claude/attached.ts';
 import {
@@ -32,7 +31,6 @@ import {
   CARRY_ON,
   filesOf,
   putDrain,
-  readRun,
   thisHolder,
   writeRun,
   type AttachedRun,
@@ -45,74 +43,9 @@ import { instantNow } from '../src/core/engine/now.ts';
 import type { Live } from '../src/harness/claude/attached-session.ts';
 import { claudeCodeOps } from '../src/harness/claude/code.ts';
 import { Engine } from '../src/index.ts';
-import type { SpawnRequest } from '../src/harness/seam.ts';
 import { scratch } from './scratch.ts';
 import { until, WAITED } from '../src/waits/index.ts';
-
-const STAND_IN = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'stand-in-claude.ts');
-const NAME = 'ae/t1/1';
-
-/** A store and the stand-in's folder, and a spawn of `plan` whose session works there, `config` laid over the stand-in's own. */
-const place = (plan: object, config: SpawnRequest['config'] = {}) => {
-  const root = scratch('ae-attached-');
-  const dir = path.join(root, 'stand-in');
-  fs.mkdirSync(dir, { recursive: true });
-  const request: SpawnRequest = {
-    name: NAME,
-    brief: 'do the work',
-    cwd: dir,
-    config: { ...config, env: { STANDIN_DIR: dir, STANDIN_PLAN: JSON.stringify(plan) } },
-  };
-  return { root, dir, request };
-};
-
-/**
- * The same, long-lived: the request carries `restartPolicy: 'Always'` with `background: true`, which is what makes it run attached, and
- * its stand-in works every turn its input brings (`turns: 'many'`). `config` is laid over the request's own.
- */
-const kept = (plan: object, config: Record<string, unknown> = {}) => {
-  const { root, dir, request } = place({ turns: 'many', ...plan });
-  return {
-    root,
-    dir,
-    request: {
-      ...request,
-      restartPolicy: 'Always' as const,
-      config: { background: true, ...config, ...request.config },
-    } satisfies SpawnRequest,
-  };
-};
-
-/** The lines of the stand-in's `file`, each parsed. */
-const lines = (dir: string, file: string): unknown[] => {
-  const at = path.join(dir, file);
-  return fs.existsSync(at)
-    ? fs
-        .readFileSync(at, 'utf8')
-        .split('\n')
-        .filter(Boolean)
-        .map((l) => JSON.parse(l) as unknown)
-    : [];
-};
-
-/**
- * A holder of the sessions under `root`, for a scope the test closes, its let-go bound `letGoMs` where one is given. `said` keeps every
- * line its let-go logged, at its level, so what the holder says as it lets go is read rather than printed.
- */
-const holder = async (root: string, letGoMs?: number) => {
-  const attached = attachedSessions(root, STAND_IN, letGoMs === undefined ? {} : { letGoMs });
-  const scope = Scope.makeUnsafe();
-  const said: string[] = [];
-  const keeper = Logger.make(
-    ({ message, logLevel }) => void said.push(`${logLevel} ${(Array.isArray(message) ? message : [message]).join(' ')}`),
-  );
-  await Effect.runPromise(Scope.provide(attached.hold, scope));
-  return {
-    attached,
-    said,
-    close: () => Effect.runPromise(Scope.close(scope, Exit.void).pipe(Effect.provide(Logger.layer([keeper])))),
-  };
-};
+import { holder, inCall, kept, lines, NAME, place, run, STAND_IN } from './attached-held.ts';
 
 /**
  * How many results the session's capture holds, as its holder wrote them: each is written in the same take as the run file it leaves
@@ -127,12 +60,6 @@ const resultsOf = (root: string): number => {
     .filter(Boolean)
     .filter((l) => (JSON.parse(l) as { type?: string }).type === 'result').length;
 };
-
-/** What the run file says of the session, read again. */
-const run = (root: string) => readRun(filesOf(root, NAME).run);
-
-/** Waits until the stand-in is in its call, held at `release`. */
-const inCall = (t: TestContext, root: string) => until(t, () => run(root)?.calling, 'the session in its call', { everyMs: 50 });
 
 test('a holder let go waits for the call in flight, then parks the session, its Claude Code gone', WAITED, async (t) => {
   const { root, dir, request } = place({ call: 'Bash', hold: true, output: { ok: true } });

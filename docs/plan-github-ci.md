@@ -93,9 +93,16 @@ What it runs, all of it reporting **one required context, `ci`**, from a single 
 branch protection is configured once and never touched as the job list grows. The first three are built; the last two come with cards 2
 and 3, and the gate's `needs` clause is what refuses adding a job and forgetting to wire it in:
 
-- **Ten test legs**: one per workspace, on node 22.18.0 — the floor `engines.node` claims — and 24, each leg running its package's suite
+- **Ten test legs**: one per workspace, on node 24.16.0 — the floor `engines.node` claims — and 24, each leg running its package's suite
   twice, under `TZ=UTC` and `TZ=America/New_York`. Both runs pass `--force`: `turbo.json` hashes no environment, so without it the second
   run replays the first from the cache and the second timezone is never tested.
+
+  The floor was 22.18.0, where type stripping became unflagged, and rose to 24.16.0 when CI first ran the suite on it. Two things it
+  cannot do: libuv 1.51.0 truncates a millisecond time set through `utimes` — 496 of 1,000 such times read back changed, which the
+  runtime's capture cache and its quiescence compare with `===` — and Node's test runner takes `--test-isolation` only from 24.13.1,
+  which `workflows/build/mutants.ts` passes. The first is what sets the floor: libuv 1.52.1 keeps the millisecond, no Node 22 release
+  ships it (22.23.3, the line's latest, carries 1.51.0), and 24.16.0 is the first 24.x that does — 24.15.0 still carries 1.51.0. So the
+  floor is the first release the suite passes on, not a round number.
 - **`npm run lint` and `npm run typecheck`**, whole, on the floor.
 - **The whole e2e in four shards** (card 2), every page named in `apps/web/test/e2e/pages/NAMES`, with a gate summing their page
   time against `PAGES_BOUND_MS`, Playwright's browsers cached, and a failing page's pictures uploaded. npm itself is never cached:
@@ -111,7 +118,7 @@ The tests need no live harness, and nothing a clean `ubuntu-latest` lacks: the a
 
 **Prose is not what holds the workflow to the repository.** `packages/agent-orchestrator/test/ci-workflow.test.ts` refuses, each by its
 own sentence naming the fix: a workspace with a suite and no leg, a leg that does not filter to its own workspace, a node floor adrift
-from `engines.node`, a node version left unquoted (YAML reads `22.18` as a number and setup-node installs another release), a timezone
+from `engines.node`, a node version left unquoted (YAML reads `24.16` as a number and setup-node installs another release), a timezone
 the leg does not run its suite under and a run of it that drops `--force`, a `cancel-in-progress` that would cancel a run of `main`, a
 job outside the gate's `needs`, a gate without `always()`, a gate step not given the results through its environment or interpolating an
 expression into its shell, an action that is not GitHub's own by major tag, and the trigger that would run a fork's code against a

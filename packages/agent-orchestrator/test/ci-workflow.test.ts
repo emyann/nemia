@@ -314,11 +314,13 @@ test('REFUSED: a workspace with no leg, a leg with no workspace, a node floor ad
       `engines.node in package.json reads ${unreadable}, which names no floor to test: write it >=<major>.<minor>.<patch>, so the matrix can be held to the version the package claims to run on`,
     ]);
 
+  // Both sentences at once, and this one is handed the repository's real floor, not a fixture's: the second quotes whatever
+  // engines.node claims today, so it moves when the floor moves.
   const unquoted = structuredClone(shipped);
   matrixOf(unquoted).node = [22.18, '24'];
   assert.deepEqual(nodeDrift(unquoted, engine), [
     "the test job's matrix.node in .github/workflows/ci.yml holds 22.18 unquoted: YAML reads it as a number and setup-node then installs another version, so write it '22.18'",
-    "the test job's matrix.node in .github/workflows/ci.yml does not test 22.18.0, the floor engines.node claims in package.json: add '22.18.0' to the matrix, or lower engines.node to a version the matrix tests",
+    "the test job's matrix.node in .github/workflows/ci.yml does not test 24.16.0, the floor engines.node claims in package.json: add '24.16.0' to the matrix, or lower engines.node to a version the matrix tests",
   ]);
 
   const unneeded = structuredClone(shipped);

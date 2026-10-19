@@ -256,7 +256,7 @@ the inside seat's tool; the port is the agent's surface.
    the server for outside seats as the hook enforces it inside; a login for the board; MCP's OAuth. That is the hosted product's wall.
 3. **Context** (section 8).
 
-Beside the three, for the VPS by hand, no code: provision (Node 22.18+, git, `gh`, `claude` signed in under its own
+Beside the three, for the VPS by hand, no code: provision (Node 22.18+ when this was written, 24.16+ since the floor rose, git, `gh`, `claude` signed in under its own
 `CLAUDE_CONFIG_DIR`; memory sized for runs, each package's suite near 2 GB, `WF_MAX_CONCURRENT` and `WF_MAX_RUNS` low); install as a
 service (`nemia service install --env`, systemd user units with linger or launchd, `src/service/`; releases and `nemia upgrade`);
 clone each repository there and `nemia factory add`; reach it through an SSH tunnel or Tailscale (8787 and the board's preview

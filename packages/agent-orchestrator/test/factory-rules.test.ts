@@ -1,5 +1,5 @@
 /**
- * A factory's rules, the third of an agent's five layers: what a factory tells every agent hired into it, one file kept with the factory
+ * A factory's rules, the fourth of an agent's five layers: what a factory tells every agent hired into it, one file kept with the factory
  * in the store (`<WF_ROOT>/factories/<name>/RULES.md`). Held here: the order a step is told its layers in — the agent's instructions, the
  * person's custom instructions, the factory's rules, the step's own note — proven with layers that say different things, in Claude Code's
  * prompt and in a brief; the freeze at `nemia start` on every step, proven with an edit after it; a factory with no rules, and the

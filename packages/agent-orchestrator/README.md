@@ -465,7 +465,12 @@ What an agent is told comes in five layers, each written by whoever owns it:
    mode or skills — a frontmatter block written by hand, or a link, stops a start of every step naming the agent, naming the file.
    `wf start` reads them once and freezes them with the step (`StepAgent.customInstructions`): a run started before an edit or a
    `--clear` keeps the words it froze, and only runs started after it get the new ones.
-3. **The factory's rules** — the rules and policies of one factory, told to every agent hired into it, whichever agent and whichever
+3. **The folder's files** — the files the harness reads from the folder the agent works in (today `CLAUDE.md`, `AGENTS.md`): what holds
+   there for every agent at work in it. Nemia composes nothing of them; the harness reads them as it would for a person. They rank
+   above the agent's own instructions and below the factory's rules and the step's policy: a place's facts beat a role's generic
+   defaults, and the factory knows its work and the step knows its process better than a folder knows either. This holds although a
+   harness presents a folder's files as overriding everything it is told — that framing is the harness's, not Nemia's.
+4. **The factory's rules** — the rules and policies of one factory, told to every agent hired into it, whichever agent and whichever
    step: one file a factory, `$WF_ROOT/factories/<name>/RULES.md`, kept in the store and never in a repository (a factory made from a
    template keeps it in its tree, `$WF_ROOT/factories/<name>/tree/RULES.md`, where a template carries it and an upgrade merges it as
    text). `nemia factory rules <name> --file <path>` writes them (`--file -` reads stdin), `nemia factory rules <name>` prints them,
@@ -475,16 +480,27 @@ What an agent is told comes in five layers, each written by whoever owns it:
    with every step of the run (`StepAgent.factoryRules`): a run started before an edit or a `--clear` keeps the words it froze. A
    factory with none tells nothing, the default factory keeps none, and a step on a remote agent is told none: it runs as its operator
    configured it. `NEMIA.md` is another file, Nemia's: no step is told it (*A factory's instruction*, below).
-4. **The step's policy** — the step's own words and keys: what this node of this process asks of whoever does its work — a role's
+5. **The step's policy** — the step's own words and keys: what this node of this process asks of whoever does its work — a role's
    policies, *in this team, also check …*, or a `ship` step telling its shipper why a build and an e2e matter on a merged tree. It is a
    normal layer, the place a process says what it expects of a role. A step's `skills:` adds skills to its agent's, and takes none away
    (below).
-5. **The folder's files** — the files the harness reads from the folder the agent works in (today `CLAUDE.md`, `AGENTS.md`): what holds
-   there for every agent at work in it. Nemia composes nothing of them; the harness reads them as it would for a person.
 
-The words reach the agent in that order — instructions, then custom instructions, then the factory's rules, then the step's policy,
-then the task — and where two say different things, the later one wins: the factory knows its work better than a person's words for
-an agent anywhere, the step knows the process, and the task knows the case. Telling the agent so is coming, not built.
+The number is precedence, not arrival: where two layers say different things, the higher number wins — the folder's facts over the
+role's generic words, the factory over the folder, the step's process over the factory — and the task is above them all. The order the
+words arrive in is Nemia's own and unchanged: the instructions, then the custom instructions, then the factory's rules, then the step's
+policy, then the task, with the folder's files read by the harness itself wherever the agent works. Telling the agent so is coming, not
+built.
+
+**Where a new instruction goes.** Given something you want an agent to be told, ask these in order and stop at the first yes:
+
+1. Does it hold for this role everywhere, whatever the work and whoever hires it? Then the agent's **instructions**.
+2. Is it yours alone — how you want this role to work for you, in every factory? Then your **custom instructions**.
+3. Does it hold for anyone working in this folder, agent or person, whatever they are doing? Then the **folder's files**.
+4. Does it hold for every agent in this body of work, whichever step they do? Then the **factory's rules**.
+5. Does it hold for this one position of this one process alone? Then the **step's policy**.
+
+A procedure is none of them: it belongs in a skill the agent or the step is given. Nor is a rule the machinery can refuse: that belongs
+in a fence, a gate or a test, which holds whether or not the words were read.
 
 The run page shows a step's layers apart, as the run froze them at `wf start` (`toldLayers`), never as the files read now: the agent's
 instructions and its own skills, your custom instructions, the factory's rules where the run froze some, the step's policy and the

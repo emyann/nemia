@@ -102,7 +102,7 @@ What the `create-an-agent` skill, being generic, does not say here:
 - `packages/agent-runtime/docs/open-issues.md` — what is still wrong or half-verified.
 - `.claude/skills/` — the repository's skills. Ours: `look`, `see-a-dashboard` (a dashboard of the side Grafana, rendered and read),
   `effect` (how we write Effect 4), `create-an-agent` (how an agent is made here) and `change-the-board` (the trigger of shadcn and of the
-  kit's skills, for a change under apps/web). Vendored unchanged, pinned in `skills-lock.json`
+  kit's skills, and the board's own traps, for a change under apps/web). Vendored unchanged, pinned in `skills-lock.json`
   and credited in `THIRD_PARTY_NOTICES.md`: `shadcn` (it is loaded, and its CLI runs, from `apps/web`, where `components.json` is:
   loaded from the root it refuses with `monorepo_root`), `grilling` and `grill-me` (Iris's interview), and `react-aria` (Adobe's
   documentation of React Aria, for the board's own parts: taken from the root by `npx skills add https://react-aria.adobe.com -a

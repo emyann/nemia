@@ -1233,21 +1233,20 @@ test("nemia ls, nemia decide and the feed say a hold's why and who put it beside
   assert.equal((await runWith(b.e, advanceRun(readRun(olderQuiet.id)))).feed.run.note, `held until ${target.id} ships`);
 });
 
-test("`nemia hold`'s and `--off`'s programs say in their type what they need and what they refuse", () => {
-  const held: EffectOf<Holding, Refusal, EngineService | PlaceService> = hold('x', []);
+/**
+ * `nemia hold`'s and `--off`'s programs say in their type what they need and what they refuse. Nothing calls this: the typecheck reads
+ * its lines, and an `@ts-expect-error` over code that stops erring is the failure.
+ */
+function _holdProgramTypes() {
+  void (hold('x', []) satisfies EffectOf<Holding, Refusal, EngineService | PlaceService>);
   // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
-  const heldInfallible: EffectOf<Holding, never, EngineService> = hold('x', []);
-  const lifted: EffectOf<Holding, Refusal> = unhold('x');
+  void (hold('x', []) satisfies EffectOf<Holding, never, EngineService>);
+  void (unhold('x') satisfies EffectOf<Holding, Refusal>);
   // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
-  const liftedInfallible: EffectOf<Holding> = unhold('x');
-  const unprovided = () =>
-    // @ts-expect-error -- hold requires EngineService, and runPromise takes no requirement
-    Effect.runPromise(hold('x', []));
-  assert.deepEqual(
-    [typeof held, typeof heldInfallible, typeof lifted, typeof liftedInfallible, typeof unprovided],
-    ['object', 'object', 'object', 'object', 'function'],
-  );
-});
+  void (unhold('x') satisfies EffectOf<Holding>);
+  // @ts-expect-error -- hold requires EngineService, and runPromise takes no requirement
+  void Effect.runPromise(hold('x', []));
+}
 
 test("REFUSED as a typed failure: each refusal of `hold` and `unhold` is its program's failure, recovered by its tag in the words `runWith` rejects with", async (t) => {
   const b = board();

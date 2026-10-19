@@ -26,7 +26,7 @@ import { Journal } from '../src/core/engine/journal.ts';
 import { Runner } from '../src/harness/seam.ts';
 import { scratch } from './scratch.ts';
 import { builtEngine } from './engine.ts';
-import { until, WAITED } from './waits.ts';
+import { until, WAITED } from '../src/waits/index.ts';
 
 const tmp = (label: string) => scratch(`ae-budget-${label}-`);
 

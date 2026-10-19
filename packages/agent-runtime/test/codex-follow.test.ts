@@ -13,7 +13,7 @@ import { codex } from '../src/harness/codex/codex.ts';
 import { codexRolloutEvents } from '../src/harness/codex/transcript.ts';
 import type { Followed } from '../src/harness/seam.ts';
 import { scratch } from './scratch.ts';
-import { bell, until, WAITED } from './waits.ts';
+import { bell, until, WAITED } from '../src/waits/index.ts';
 
 const THREAD = '01a09996-d343-7932-8971-b2f209ba315b';
 const line = (o: object) => `${JSON.stringify(o)}\n`;

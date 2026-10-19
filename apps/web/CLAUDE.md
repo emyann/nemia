@@ -278,7 +278,8 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
 
 - `assert.deepEqual(x, [])` from `node:assert/strict` narrows `x` to `never[]` after it: assert on its length, or compare a copy.
 - No directory import in a module a test reads (`./api` is a folder Node refuses): a helper a test reads uses file imports only.
-- A test waits in its process with `until` (`test/waits.ts`, the runtime's copy, held by `test/waits.test.ts`), on a `bell` its event's
+- A test waits in its process with `until` (`test/waits.ts`, the runtime's copy, held to `packages/agent-runtime/src/waits/waits.ts`
+  by the fence in that package's `test/waits.test.ts`), on a `bell` its event's
   source rings or at a pace, given `WAITED`; `DEADLINES` refuses a hand-written deadline.
 - A component that draws a `routeLink` renders under `RouterContextProvider` over a memory-history router (`components.test.ts`); the
   markup spells React's props (`readOnly=""`). In a browser its Enter navigates only under React Aria's `RouterProvider`, the root's.

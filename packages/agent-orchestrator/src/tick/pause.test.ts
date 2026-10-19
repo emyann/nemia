@@ -19,7 +19,7 @@ import { Engine } from 'agent-runtime';
 import type { Run } from '../run.ts';
 import type { Finishing } from '../pause/pause.ts';
 import { scratch } from '../../test/scratch.ts';
-import { until, WAITED } from '../../test/waits.ts';
+import { until, WAITED } from 'agent-runtime/testing';
 import { Effect } from 'effect';
 import { testPlace } from '../../place/memory/index.ts';
 import { runGiven, runOver } from '../../test/placed.ts';

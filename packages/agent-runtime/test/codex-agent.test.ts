@@ -43,7 +43,7 @@ import { detachedOps } from '../src/harness/detached/detached.ts';
 import type { SpawnRequest } from '../src/harness/seam.ts';
 import { scratch } from './scratch.ts';
 import { builtEngine } from './engine.ts';
-import { until, WAITED, type Waiter } from './waits.ts';
+import { until, WAITED, type Waiter } from '../src/waits/index.ts';
 
 /** A task's events, read as the engine reads them: decoded and upgraded (`Journal.layer`). */
 const readJournal = (taskId: string) =>

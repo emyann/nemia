@@ -21,7 +21,7 @@ import { randomUUID } from 'node:crypto';
 import type { TranscriptEvent } from '../src/harness/seam.ts';
 import { scratch } from './scratch.ts';
 import { warned } from './warned.ts';
-import { until, WAITED, type Waiter } from './waits.ts';
+import { until, WAITED, type Waiter } from '../src/waits/index.ts';
 import type { AsyncRunner } from './promise-runner.ts';
 
 const tmp = (label: string) => scratch(`ae-transcript-${label}-`);

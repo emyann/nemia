@@ -65,7 +65,8 @@ template keeps it in its tree, where a template carries it and an upgrade merges
 - `nemia factory rules <name> --file <path>` writes them, `nemia factory rules <name>` prints them, and `--clear` removes them. The
   board's page of the factory's settings reads, writes and clears them too.
 - Every step of every run started in the factory is told them, after the agent's custom instructions and before the step's own policy:
-  the third of an agent's [instruction layers](/agents/#what-an-agent-is-told-five-layers). A step on a remote agent is told none.
+  the fourth of an agent's [instruction layers](/agents/#what-an-agent-is-told-five-layers), which the step's own policy outranks. A
+  step on a remote agent is told none.
 - A run reads them once, when it starts, and freezes them (`StepAgent.factoryRules`): an edit reaches only the runs started after it.
 - They only add words. A frontmatter block is refused (`factoryRulesRefusal`): they set no key, give no tool and widen no fence.
 - A factory with none tells nothing, and the default factory keeps none.
@@ -79,7 +80,7 @@ or keep the words in your store instead, for a repository you would rather not w
 - [Nemia](/nemia/) reads it before she acts in the factory.
 - The board shows it on the factory's settings page, and the api serves it (`packages/agent-orchestrator/src/factory/instruction.store.ts`).
 - It is not told to a step. What every agent hired into the factory must know belongs in [its rules](#its-rules), and what holds in
-  one repository in the files the harness reads there, `CLAUDE.md` or `AGENTS.md`: the third and the fifth of an agent's
+  one repository in the files the harness reads there, `CLAUDE.md` or `AGENTS.md`: the fourth and the third of an agent's
   [instruction layers](/agents/#what-an-agent-is-told-five-layers).
 
 ## Sources

@@ -208,7 +208,10 @@ const KIT_STEPS = [
 /** The kit's skills as the three steps' lines write them, in the lines' order. */
 const KIT_GIVEN = ['apps/web:ds-build', 'apps/web:ds-theme', 'apps/web:ds-spec'];
 
-/** A repository the stand-in knows, holding a copy of the checkout's own skills and of the board's nested ones, each link followed. */
+/**
+ * A repository the stand-in knows, holding a copy of the checkout's own skills and of the board's nested ones, each link followed, and
+ * of the checkout's own settings, which grant a step's session the calls the shipped agents are given (`unallowedRefusal`).
+ */
 function checkoutCopy(): string {
   const repo = fs.mkdtempSync(path.join(ROOT, 'checkout-'));
   for (const folder of ['.', 'apps/web'])
@@ -216,6 +219,7 @@ function checkoutCopy(): string {
       recursive: true,
       dereference: true,
     });
+  fs.cpSync(path.join(REPO, '.claude', 'settings.json'), path.join(repo, '.claude', 'settings.json'));
   stand().world.repository(repo, {});
   return repo;
 }

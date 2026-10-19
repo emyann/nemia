@@ -91,6 +91,25 @@ holds what every change needs.
 What the `create-an-agent` skill, being generic, does not say here:
 
 - Read `packages/agent-orchestrator/README.md`, *An agent is a node's attachment*, for the format and the five layers.
+- Read `packages/agent-orchestrator/README.md`, *An agent is a node's attachment*, for the format, the five layers numbered by
+  precedence, and the routing rule that says which layer owns a new instruction (*Where a new instruction goes*).
+- A test that loads a shipped folder passes its place (`placesOf` in `packages/agent-orchestrator/test/team.ts`), or the repository's
+  `.claude/skills/` is not found.
+- An agent's file and its own skills name nothing of this repository (`packages/agent-orchestrator/test/team-portable.test.ts`): what
+  is ours is said by the step (`build-told.test.ts`), by `.claude/settings.json`, by a `CLAUDE.md` or by the factory's rules.
+- A checking step, its agent given `Bash`, denies `Bash(npm run build)` and `Bash(npm run e2e)`, which `.claude/settings.json` allows
+  other roles, on its own `disallowedTools:`, beside each deny of its agent's; the checks it runs are allowed by exact name in
+  `.claude/settings.json` (`npm run lint`, `npx turbo run typecheck --force`) and named in its note, where `CHECKERS` reads them in
+  `packages/agent-orchestrator/test/agent-fences.test.ts`, which holds every shipped step's fence. The reader of the kit's `ds-spec` is
+  allowed by its script's path, `node apps/web/.claude/skills/ds-spec/md3.mjs`, and named in design's and review's notes, where the same
+  `CHECKERS` reads it (`reader`): the workspace's script, never the copy a run froze for the step.
+- A checking step given the browser (design, review) serves the change with `npm run board:serve` and ends it with `npm run board:stop`,
+  each allowed by exact name and named in its note (`BOARD_CHECKS`); its agent allows the browser's tools by name, never the server
+  whole, and the step denies the live board's ports by address on its own `disallowedTools:` (`LIVE_BOARD`, same test). Agent and
+  step both deny a `filename` to each browser tool that takes one (`NAMED_FILES`): a relative one is written into the workspace.
+- A step that runs what no deny names (implement, land) denies the live collector's ports by address, `Bash(*:4318*)` and
+  `Bash(*:4317*)`, on its own `disallowedTools:`, beside each deny of its agent's (`LIVE_COLLECTOR`, same test): a typed command only,
+  a commit message or a search that spells the port included, never an address inside a script.
 - An agent's questions are an output field `{ "x-shape": "questions" }`, expanded by `packages/agent-orchestrator/src/question/question.ts`.
 - Its checks are *Check your work*, forced for `workflows/`; a new agent is named in *Where things are*.
 

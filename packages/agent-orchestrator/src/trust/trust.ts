@@ -68,3 +68,20 @@ export const untrustedLines = (factory: string, untrusted: readonly Untrusted[],
       (one) =>
         `${' '.repeat(width)}  not trusted for ${one.harness}: ${one.place} — withheld: ${one.withheld}. ${one.never ?? `Trust it: ${trustCommandOf(factory)}`}`,
     );
+
+/** A trust of one folder as a harness reads it now, as much of it as a sentence about a withheld grant needs. */
+type TrustRead = { readonly harness: string; readonly folder: string; readonly grants: string; readonly trusted: boolean };
+
+/**
+ * The second thing to check, said after a refusal that counted a repository's own allow rules: that the harness has no trust of the
+ * folder the rules are in, and withholds them until it does. `undefined` where the trust is given, and where the harness keeps none
+ * (`trust` undefined), so a refusal says it only where it is true. `factory` names the factory whose verb asks the trust again, left
+ * out for a run started in none, whose person trusts the folder by running the harness there.
+ */
+export const untrustedNote = (trust: TrustRead | undefined, factory?: string): string | undefined =>
+  trust === undefined || trust.trusted
+    ? undefined
+    : `Check too that ${trust.harness} trusts ${trust.folder}: it does not, and until it does it withholds ${trust.grants}, ` +
+      `so the rules counted above may not reach the session at all. ${
+        factory === undefined ? `Run ${trust.harness} in ${trust.folder} once and accept its prompt` : trustCommandOf(factory)
+      } gives it.`;

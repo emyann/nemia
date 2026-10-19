@@ -1,7 +1,7 @@
 /**
  * The package's entries are Effect: no function an entry exports hands back a Promise, or an object whose methods do — the shapes of a
- * plain face that runs a program for its caller, and of a Promise engine — but one named in `PROMISED`, where only the testing door's
- * wait is. A pure function
+ * plain face that runs a program for its caller, and of a Promise engine — but one named in `PROMISED`, by its entry and its name,
+ * where only the testing door's wait is. A pure function
  * answers a plain value, as it may; a verb is an Effect of the engine. Read by the TypeScript checker, over the entries `package.json`
  * names, and proven on `fixtures/promise-face.ts`, which exports both shapes.
  */
@@ -22,12 +22,13 @@ const ENTRIES = Object.values(
   .map((f) => path.normalize(f));
 
 /**
- * The functions an entry may export that answer a Promise, or methods that do: `until` alone, the wait a test makes on its event
- * (`src/waits/`), which `agent-runtime/testing` gives a test of a layer above. A test awaits it in its own process, with the runner's
- * signal as its one bound; it is composed into no program, and the door that gives it is for tests alone (`test/contract.test.ts`).
- * Nothing of `agent-runtime` or `agent-runtime/vocabulary` is here: a verb is an Effect of the engine.
+ * What an entry may export that answers a Promise, or methods that do, each by the entry that exports it and its name, as
+ * `promisedExports` answers them: the testing door's `until` alone, the wait a test makes on its event (`src/waits/`), which
+ * `agent-runtime/testing` gives a test of a layer above. A test awaits it in its own process, with the runner's signal as its one
+ * bound; it is composed into no program, and the door that gives it is for tests alone (`test/contract.test.ts`). The entry is part of
+ * the name, so the same `until` on `src/index.ts` or `src/vocabulary.ts` is refused: a verb is an Effect of the engine.
  */
-const PROMISED = new Set<string>(['until']);
+const PROMISED = new Set<string>(['src/testing.ts: until']);
 
 /** The names of the functions each entry in `files` exports whose call answers a Promise, or methods that do, as `entry: name`. */
 const promisedExports = (files: string[]): string[] => {
@@ -59,12 +60,11 @@ test('the entries read are the ones package.json exports', () => {
   assert.deepEqual(ENTRIES, ['src/index.ts', 'src/vocabulary.ts', 'src/testing.ts']);
 });
 
+/** Of `answers`, each `<entry>: <name>` that `PROMISED` does not name whole: a plain face no entry may export. */
+const unexempted = (answers: readonly string[]): string[] => answers.filter((p) => !PROMISED.has(p));
+
 test('no function an entry exports answers a Promise, or methods that do, but the ones PROMISED names', () => {
-  assert.deepEqual(
-    promisedExports(ENTRIES).filter((p) => !PROMISED.has(p.slice(p.indexOf(': ') + 2))),
-    [],
-    "an entry exports a plain face: make it an Effect, as the engine's verbs are",
-  );
+  assert.deepEqual(unexempted(promisedExports(ENTRIES)), [], "an entry exports a plain face: make it an Effect, as the engine's verbs are");
 });
 
 test('REFUSED: a function that answers a Promise, and one that answers an object of Promise methods, each named', () => {
@@ -72,4 +72,9 @@ test('REFUSED: a function that answers a Promise, and one that answers an object
     'test/fixtures/promise-face.ts: promiseFace',
     'test/fixtures/promise-face.ts: promiseEngine',
   ]);
+  assert.deepEqual(
+    unexempted(['src/index.ts: until', 'src/vocabulary.ts: until', 'src/testing.ts: until', 'src/testing.ts: promiseFace']),
+    ['src/index.ts: until', 'src/vocabulary.ts: until', 'src/testing.ts: promiseFace'],
+    "REFUSED: the wait's name on another entry, and another name on the testing door: `PROMISED` exempts the one it names, whole",
+  );
 });

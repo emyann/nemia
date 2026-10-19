@@ -14,7 +14,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { Effect } from 'effect';
 import { tried } from '../runtime-client.ts';
 import { AGENTS_FOLDER, type Workflow } from '../step/step.ts';
-import { stepSetRefusal } from '../workflow/index.ts';
+import { stepSetRefusal, unallowedRefusal } from '../workflow/index.ts';
 import { loadWorkflows } from '../folder/folder.store.ts';
 import { lookupRoots, skillsFor, skillVersion, type Places } from '../skills/read.store.ts';
 import { placesOf } from '../folder/lookup.store.ts';
@@ -31,6 +31,7 @@ import { hasStarted } from '../wait/wait.ts';
 import { Conflict } from '../refusal/refusal.ts';
 import type { SkillsFound } from '../agents/agents.ts';
 import type { Run } from '../record/record.ts';
+import { repoAllows, type Allows } from '../trust/allows.verb.ts';
 import { appendRevision } from './revisions.store.ts';
 import { kindsDrift, type KindName, type Pin, type Revision, type RevisionKind } from './revisions.ts';
 
@@ -127,7 +128,8 @@ function once<A extends unknown[], T>(f: (...args: A) => T, key: (...args: A) =>
 
 /**
  * What one pass reads once for every run whose kinds it resolves: the factory a run is in, its workflow folder loaded, the skills found
- * beside that folder, the digest of one kind and name, and a kind's entry in the ledger. Ten runs waiting on one folder read and digest
+ * beside that folder, the allow rules that folder's repository grants a session, the digest of one kind and name, and a kind's entry in
+ * the ledger. Ten runs waiting on one folder read and digest
  * that folder once a pass between them, not ten times, and the reads are charged to the `revisions` phase.
  *
  * It shares a read of the world, never a judgement: what stays per run is judged per run — `stepSetRefusal` on the run's own `isolate`,
@@ -142,6 +144,7 @@ export type PassRevisions = {
   readonly factory: (run: Pick<Run, 'factory'>) => Factory | undefined;
   readonly skills: (run: FolderRun) => SkillsFound;
   readonly steps: (run: FolderRun) => Workflow[];
+  readonly allows: (run: FolderRun) => Allows;
   readonly digest: (of: KindName, run: FolderRun) => string | null;
   readonly revision: (kind: RevisionKind, name: string, hash: string, at: string) => Revision;
 };
@@ -162,12 +165,16 @@ export function passRevisions(): PassRevisions {
     (run: FolderRun) => stepsNow(run, placesOf(run.repo), factory(run)),
     (run) => JSON.stringify(where(run)),
   );
+  const allows = once(
+    (run: FolderRun) => repoAllows(run.repo, run.factory),
+    (run) => JSON.stringify(where(run).slice(1)),
+  );
   const digest = once(
     (of: KindName, run: FolderRun) => digestFor(of, run, placesOf(run.repo), factory(run), skills(run)),
     (of, run) => JSON.stringify([of.kind, of.name, ...where(run)]),
   );
   const revision = once(appendRevision, (kind, name, hash) => JSON.stringify([kind, name, hash]));
-  return { factory, skills, steps, digest, revision };
+  return { factory, skills, steps, allows, digest, revision };
 }
 
 /**
@@ -202,7 +209,10 @@ function folderNow(run: FolderRun, read: PassRevisions): Workflow[] | undefined 
  *
  * Undefined where the folder does not load. `kept`, with the reason's first line, where the folder loads but its steps are no set a run
  * may take (`stepSetRefusal`): `nemia start` refuses that folder, and a run taking it afresh keeps the set it froze rather than file a
- * step whose task id another step's check is read under. Judged on the run's own `isolate`, as `nemia start` judged it.
+ * step whose task id another step's check is read under. Judged on the run's own `isolate`, as `nemia start` judged it. `kept` too where
+ * a step's `tools:` names a tool nothing its session would be allowed (`unallowedRefusal`), which `nemia start` refuses as well, judged
+ * against the allow rules of the run's own repository, read once a pass for every run on it: a session that could never call what it is
+ * given is not filed by an edit made while the run waited.
  */
 export function resolvedNow(
   run: Pick<Run, 'workflowDir' | 'repo' | 'factory' | 'isolate'>,
@@ -211,7 +221,8 @@ export function resolvedNow(
 ): Resolved | Kept | undefined {
   const steps = folderNow(run, read);
   if (!steps) return undefined;
-  const refused = stepSetRefusal(steps, run.isolate ?? true);
+  const allows = read.allows(run);
+  const refused = stepSetRefusal(steps, run.isolate ?? true) ?? unallowedRefusal(steps, allows.rules, allows.untrusted);
   return refused ? { kept: firstLine(refused) } : { steps, pins: pinsOf(run, steps, at, read) };
 }
 

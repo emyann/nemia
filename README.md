@@ -52,20 +52,21 @@ or TanStack Start server.
 
 The Factory's header shows how much of the subscription's five-hour window and week is used, each with its
 reset in your own time zone, and how old the reading is. Nothing to install: `GET /api/quota` asks the runtime's `claude` harness for its
-`quota`, which asks Claude Code itself with its `get_usage` control request, and serves the answer. It asks the `claude` on the api's PATH, at
+`quota`, which asks Claude Code itself its usage question through the Agent SDK, and serves the answer. It asks the `claude` on the api's PATH, at
 most once every 10 minutes, one ask at a time, and only while a board asks (`HKB_QUOTA_KEEP_MS` sets the keep; `0`
 asks on every read). A read is never answered by an ask that began more than the keep before it (with `0`, only by one that began after
 it), and a reading's age counts from when its ask began. A read waits 2 s for its ask before it says it is asking (`HKB_QUOTA_WAIT_MS`):
 with a keep shorter than an ask lasts, set a wait longer than one, or every read starts an ask it does not wait out.
-An ask is a short `claude -p` that makes no model turn and spends nothing:
+An ask is one short query of the Agent SDK that makes no model turn and spends nothing:
 
-```bash
-claude -p --input-format stream-json --output-format stream-json --verbose \
-  --no-session-persistence --strict-mcp-config --setting-sources ''
+```ts
+query({ prompt, options: { pathToClaudeCodeExecutable: 'claude', cwd: os.tmpdir(), persistSession: false, settingSources: [] } })
+  .usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET({ skipBehaviors: true })
 ```
 
-with one `{"type":"control_request","request_id":…,"request":{"subtype":"get_usage"}}` on stdin. It writes no
-transcript, starts no MCP server and loads no settings, so no hook runs; it runs from the temp directory with
+The SDK starts that `claude` with arguments of its own choosing and sends it the `get_usage` control request; which
+Claude Code it starts is the one thing the runtime names, so the quota is read by the Claude Code the sessions run
+on. It writes no transcript, starts no MCP server and loads no settings, so no hook runs; it runs from the temp directory with
 the variables a Claude Code session hands its children taken out, should the api run inside one; how it signs in
 (`CLAUDE_CONFIG_DIR`, `CLAUDE_CODE_OAUTH_TOKEN`, a provider's switch) is kept, as the engine's workers keep it. That claude must be
 signed in to the subscription under the api's `CLAUDE_CONFIG_DIR` (`claude`, then `/login`): an API key, Bedrock

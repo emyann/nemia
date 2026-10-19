@@ -2125,7 +2125,9 @@ clean — so `decide` does not make it yet.
 
 A third way to run a Claude Code task to its end, beside the job and `--bg`: `query()` in the process that holds the engine's
 attached sessions (`harness/claude/attached.ts`). The process takes `hold()` in a scope; while it holds, a `claude` task that is
-no `background` session spawns attached, and any other engine, or the same one before `hold`, runs it as a `claude -p` job.
+no `background` session spawns attached, and any other engine, or the same one before `hold`, runs it as a `claude -p` job. The
+Claude Code it drives is the Agent SDK's own bundled CLI, or the command `EngineOptions.claudeExecutable` names — the attached
+road alone reads it, as a job and a `--bg` session run the `claude` on the PATH.
 
 - **Who holds them.** One process: the one whose engine took `hold()`. It spawns, adopts and resumes; another engine reads the
   run files under `<root>/runs/attached/` and writes a stop (`<name>.stop`) or words to say (`<name>.say.jsonl`) beside one, which
@@ -2137,14 +2139,15 @@ no `background` session spawns attached, and any other engine, or the same one b
   same file, with the cursor `transcript` takes back, beside its state and the pieces of the text it is writing
   (`follow`, `attached-follow.ts`): a follower in the holder's own process, from the moment it joins, or one in another process,
   over the port the hold serves.
-- **What the hold serves.** `hold()` answers an address and a bearer token — or `null`, where the engine runs no attached harness,
-  as every engine but a holder does. While it holds, a `node:http` server is bound on `127.0.0.1` at a port the machine chooses,
-  speaking A2A's JSON-RPC over a reading surface alone — the card, `GetTask` and `SubscribeToTask` — for each harness the engine
-  runs itself, a remote agent's excluded; every other method of A2A is refused in the SDK's own error (`a2a/listener.ts`,
-  `a2a/served.ts`). One token is minted per hold, kept `0600` under `<root>/a2a/holder-token`, never printed, and checked on every
+- **What the hold serves.** `hold()` answers an address and a bearer token — or `null`, where the engine has no harness configured
+  as the literal `'claude'`, as every engine but a holder has not. While it holds, a `node:http` server is bound on `127.0.0.1` at a
+  port the machine chooses, speaking A2A's JSON-RPC over a reading surface alone — the card, `GetTask` and `SubscribeToTask` — for
+  each such harness and no other: those sessions are the ones this process holds attached, and the only ones a second engine cannot
+  read live for itself. Every other method of A2A is refused in the SDK's own error (`a2a/listener.ts`, `a2a/served.ts`). One token is minted per hold, kept `0600` under `<root>/a2a/holder-token`, never printed, and checked on every
   request, the card's read included: without it, or with a wrong one, the answer is HTTP 401. Whoever took the hold hands the
   address, the token and a harness's card to whoever should read it — the runtime writes no file of another layer's. An engine
-  given that card inline (`holder: { <harness>: { card } }`) and a `credentials` answer follows a session of the holder's through
+  given that card inline (`holder: { <harness>: { card } }`, refused for a harness it does not run as `'claude'`) and a
+  `credentials` answer follows a session of the holder's through
   the port, and spawns, says, stops and reads every transcript from the files itself, so a viewer still reads the conversation with
   the holder gone (`a2a/holder-follow.ts`). The port goes with the scope: the server stops, every open socket is destroyed, and the
   token's file is forgotten.
@@ -2294,7 +2297,8 @@ of pure code sits beside it.
 | `src/service/transcript-end.ts` | `transcriptEndOf`: the last event of a session's transcript as a `TranscriptMark`, or null when there is none to read; never fails |
 | `src/service/follow.ts` | the engine's `follow` verb, `followVerbOf`, and `FollowRefused`: the session of a task's latest attempt, followed live by its harness |
 | `src/service/output.ts` | the engine's `output` verb, `outputVerbOf`, and `OutputRefused`: one stream of a task's latest attempt, kept whole by its harness |
-| `src/service/harnesses.ts` | `DEFAULT_HARNESSES`, the harnesses an engine runs when its options name none, and `configRefusal`, what they refuse of a task's configuration, exported for the layers above to ask before they file |
+| `src/service/default-harnesses.ts` | `DEFAULT_HARNESSES`, the harnesses an engine runs when its options name none, where the options and the engine both read them |
+| `src/service/harnesses.ts` | `configRefusal`, what the default harnesses refuse of a task's configuration, exported for the layers above to ask before they file |
 | `src/service/refusal.ts` | `refusalWords`: a verb's refusal in words — an `Error` led by the verb whose `exitCode` is 2 — for a caller that answers with a sentence and an exit code: `ae` and the orchestrator |
 | `src/service/index.ts` | the face of `service/`, as the face takes it |
 | `src/cli/main.ts` | the verbs, and the brief: parse (closed keys), call, print |

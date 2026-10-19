@@ -9,6 +9,7 @@ import { Admission, type IoCounts, type ObserveCount, type RefusedMove, type Sto
 
 export type { ObserveCount } from '../core/engine/index.ts';
 import { claudeOps, claudeCodeOps, type Attached } from '../harness/claude/index.ts';
+import { DEFAULT_HARNESSES } from './default-harnesses.ts';
 import { detachedOps, type HarnessSpec } from '../harness/detached/detached.ts';
 import { telemetered, telemetryRefusalOf, type Telemetry } from '../harness/telemetry.ts';
 import {
@@ -82,12 +83,19 @@ export type EngineOptions = {
    */
   telemetry?: Telemetry;
   /**
+   * The Claude Code the attached sessions are run with (`pathToClaudeCodeExecutable`), where it is not the Agent SDK's own bundled
+   * CLI: a command of this runtime's own, as a container's is. Read by the attached road alone, while this engine holds (`hold`) —
+   * a job and a `--bg` session run the `claude` on the PATH, whatever this says. Absent: the SDK's own.
+   */
+  claudeExecutable?: string;
+  /**
    * The engines that hold the sessions this one only reads, by the harness each holds: the card that engine served on its own port
    * (`Served.cards`), as the JSON it answered. Given one, this engine's `follow` of that harness's sessions is dialled on that port
    * (`holderSeamOf`) and nothing else is: a spawn, a stop, words said, a view, a transcript, logs and output are read here, off the
    * files both engines share, so this engine still answers with the holder down — just not live. The token is not here: `credentials`
    * gives it for the card's `bearer` scheme, and a `holder` with no `credentials` that answers is refused at the first follow, in
-   * words naming the fix.
+   * words naming the fix. Named for a harness this engine does not run as Claude Code attached (`'claude'`) it is refused before
+   * the engine builds: no other harness's sessions are held by a process of ours.
    */
   holder?: Record<string, HolderAgent>;
 };
@@ -252,13 +260,17 @@ const runnerOf = (
           ? remoteOps(name, h, root, credentials, undefined, { missingCredential })
           : h;
 
-/** Why one of `options.holder`'s entries cannot be taken, or `undefined`: the first `holderRefusal` refuses, in the options' order. */
+/**
+ * Why one of `options.holder`'s entries cannot be taken, or `undefined`: the first `holderRefusal` refuses, in the options' order.
+ * The harnesses it is read against are the ones the engine will run — `DEFAULT_HARNESSES` where the options name none, as `make`
+ * reads them — so a holder of the `claude` harness is taken by an engine that was given no `harnesses` at all.
+ */
 const holdersRefusalOf = (options: EngineOptions): string | undefined => {
-  const harnesses = options.harnesses ?? {};
+  const harnesses = options.harnesses ?? DEFAULT_HARNESSES;
   const names = Object.keys(harnesses);
   for (const [name, agent] of Object.entries(options.holder ?? {})) {
     const h = Object.hasOwn(harnesses, name) ? harnesses[name] : undefined;
-    const refused = holderRefusal(name, agent, { harnesses: names, remote: h !== undefined && isRemote(h) });
+    const refused = holderRefusal(name, agent, { harnesses: names, claude: h === 'claude' });
     if (refused) return refused;
   }
   return undefined;

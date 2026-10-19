@@ -1,8 +1,9 @@
 /**
  * What a holder serves (`src/a2a/served.ts`): the card it declares, read as a viewer's client reads it (`cardOfJson`,
  * `authOf`), and the reading surface over a driver a test moves by hand — the three methods served, and every other refused.
- * And the viewer's side as the options take it: the seam that dials the follow alone (`holderSeamOf`), and what
- * `Engine.layer` refuses of a `holder` entry, in the order it refuses it (`optionsRefusalOf`).
+ * And the viewer's side as the options take it: the seam that dials the follow alone (`holderSeamOf`), the engine that takes a
+ * holder of the harnesses it runs by default, and what `Engine.layer` refuses of a `holder` entry, in the order it refuses it
+ * (`optionsRefusalOf`).
  *
  * Each refusal is made to refuse, at shipped defaults, and each fact about the card is made to fail with the fixture that
  * breaks it: a card whose scheme is taken off makes `authOf` send no header, which is why the scheme is on it.
@@ -19,6 +20,9 @@ import { authOf } from '../src/a2a/remote-client.ts';
 import { BEARER, cardJsonOf, REFUSED, servedCardOf, ServedHandler } from '../src/a2a/served.ts';
 import { holderRefusal, holderSeamOf } from '../src/a2a/holder-follow.ts';
 import { optionsRefusalOf } from '../src/service/options.ts';
+import { Engine } from '../src/index.ts';
+import { builtEngine } from './engine.ts';
+import { scratch } from './scratch.ts';
 import type { SeamOps } from '../src/a2a/client.ts';
 import type { Followed, RunnerOps } from '../src/harness/seam.ts';
 import type { Sighting } from '../src/core/domain.ts';
@@ -110,7 +114,7 @@ test('the served card is read back by a viewer as the card of an agent given inl
     authOf(read.card, URL_AT, 'claude', () => 'tok-1'),
     { headers: { authorization: 'Bearer tok-1' } },
   );
-  assert.equal(holderRefusal('claude', { card: json }, { harnesses: ['claude'], remote: false }), undefined);
+  assert.equal(holderRefusal('claude', { card: json }, { harnesses: ['claude'], claude: true }), undefined);
 });
 
 test('REFUSED, at shipped defaults: every method the port does not serve, each naming itself and what the port is for', async () => {
@@ -173,14 +177,20 @@ test('the viewer dials its `follow` and nothing else: every other verb is the va
   );
 });
 
-test('REFUSED: a holder named for a harness the engine does not run, for a remote agent, and with a card that does not read', () => {
+test('REFUSED: a holder for a harness the engine does not run, one it does not run attached, and a card that does not read', () => {
   const card = cardJsonOf(servedCardOf('claude', handOps(), URL_AT));
-  const place = { harnesses: ['claude', 'reviewer'], remote: false };
+  const place = { harnesses: ['claude', 'reviewer', 'stand'], claude: true };
   assert.match(
     holderRefusal('codex', { card }, place)!,
-    /`holder` names the `codex` harness, which this engine does not run: it runs `claude`, `reviewer`\./,
+    /`holder` names the `codex` harness, which this engine does not run: it runs `claude`, `reviewer`, `stand`\./,
   );
-  assert.match(holderRefusal('reviewer', { card }, { ...place, remote: true })!, /is a remote A2A agent/);
+  for (const other of ['reviewer', 'stand']) {
+    assert.match(
+      holderRefusal(other, { card }, { ...place, claude: false })!,
+      /which this engine does not run as Claude Code attached/,
+      `${other}: a harness whose sessions no process of ours holds — a remote agent's, a detached one's — is no holder`,
+    );
+  }
   assert.match(holderRefusal('claude', { url: 'http://a.example' }, place)!, /takes `card` and nothing else, and was given `url`/);
   assert.match(holderRefusal('claude', 'a-card', place)!, /takes `card` and nothing else, and was given a string/);
   assert.match(
@@ -204,7 +214,17 @@ test('REFUSED by the options, in their fixed order: a ceiling and a harness spea
   );
   assert.match(
     optionsRefusalOf({ harnesses: { claude: 'claude', reviewer: { url: 'https://a.example' } }, holder: { reviewer: { card } } })!,
-    /`holder` names the `reviewer` harness, which is a remote A2A agent/,
+    /`holder` names the `reviewer` harness, which this engine does not run as Claude Code attached/,
+  );
+  assert.match(
+    optionsRefusalOf({ harnesses: { claude: 'claude', stand: handOps() }, holder: { stand: { card } } })!,
+    /`holder` names the `stand` harness, which this engine does not run as Claude Code attached/,
+    'a local harness that is not Claude Code attached is no holder either: its sessions are read off the store',
+  );
+  assert.equal(
+    optionsRefusalOf({ holder: { claude: { card } } }),
+    undefined,
+    'and an engine given no `harnesses` at all is read against the ones it will run, which have `claude` among them',
   );
   assert.match(optionsRefusalOf({ harnesses, holder: { claude: { card: { name: 'claude' } } } })!, /has no card this runtime reads/);
   assert.match(
@@ -222,4 +242,12 @@ test('REFUSED by the options, in their fixed order: a ceiling and a harness spea
     /`holder` names the `codex` harness/,
     'then the holders, before `unschedulable`, `credentials`, `missingCredential` and the telemetry',
   );
+});
+
+test('an engine given no `harnesses` builds with a holder of the `claude` harness it runs by default', () => {
+  const card = cardJsonOf(servedCardOf('claude', handOps(), URL_AT));
+  const engine = builtEngine(
+    Engine.layer({ root: scratch('ae-holder-default-'), holder: { claude: { card } }, credentials: () => 'tok-1' }),
+  );
+  assert.equal(typeof engine.follow, 'function', 'the engine built: a holder is read against the harnesses it will run, not against none');
 });

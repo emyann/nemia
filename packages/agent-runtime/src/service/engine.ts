@@ -59,7 +59,7 @@ import {
 } from '../core/engine/index.ts';
 import { OutputRefused, outputVerbOf } from './output.ts';
 import { followVerbOf, type FollowRefused } from './follow.ts';
-import { DEFAULT_HARNESSES } from './harnesses.ts';
+import { DEFAULT_HARNESSES } from './default-harnesses.ts';
 import { a2aOps, holderSeamOf, servedOf, type Served, type SeamOps } from '../a2a/index.ts';
 import { bodyVerbsOf } from './bodies.ts';
 import type { ForgetFailure, ForgetReport } from './forget.ts';
@@ -472,10 +472,11 @@ export type EngineShape = {
    * never takes it runs such a task as a `claude -p` job.
    *
    * Answers what the hold serves (`Served`): a loopback port of its own, speaking A2A as a reading surface alone — the card,
-   * `GetTask` and `SubscribeToTask` — behind one bearer token, for the sessions of every harness this engine runs itself; a remote
-   * agent's are not its own, and are read at its own address. The address, the token and each harness's card are for whoever started
-   * the engine to pass on to a viewer (`EngineOptions.holder`); the port and the token last exactly as long as the scope. `null` for
-   * an engine that holds no attached session — no harness of it is spelt `'claude'` — which serves nothing.
+   * `GetTask` and `SubscribeToTask` — behind one bearer token, for the sessions of each harness configured as the literal
+   * `'claude'`, and no other: those are the ones this process holds attached, and the only ones another process cannot read live
+   * for itself. The address, the token and each harness's card are for whoever started the engine to pass on to a viewer
+   * (`EngineOptions.holder`); the port and the token last exactly as long as the scope. `null` for an engine with no such
+   * harness, which holds nothing and serves nothing.
    */
   readonly hold: () => Effect.Effect<Served | null, never, Scope.Scope>;
   /**
@@ -674,7 +675,7 @@ const make = (options: EngineOptions) =>
     const observed: Record<string, ObserveCount> = {};
     const counted = countedInto(observed);
     const observedNow = () => copyOf(observed);
-    const attached = attachedSessions(root);
+    const attached = attachedSessions(root, options.claudeExecutable);
     const { credentials, missingCredential, telemetry } = options;
     const made = runnersOf(harnesses, root, credentials, missingCredential, telemetry, attached);
     const runners = Object.fromEntries(Object.entries(made).map(seamOf(harnesses, events, counted, options)));
@@ -844,14 +845,13 @@ const seamOf =
   ];
 
 /**
- * What a holder serves while it holds: the ops of every harness the engine runs itself, by name — a remote agent's sessions are the
- * other party's, read at its own address — and whether this engine holds attached sessions at all, which is what makes it a holder
- * (a harness spelt `'claude'`). An engine that holds none serves nothing.
+ * What a holder serves while it holds: the ops of each harness configured as the literal `'claude'`, by name, and no other — those
+ * are the sessions one process holds attached, and the only ones another process cannot read live for itself. An engine with no such
+ * harness serves nothing, and its `hold()` answers `null`.
  */
 const servingOf = (harnesses: Record<string, HarnessConfig>, made: Record<string, RunnerOps>, events: Parameters<typeof a2aOps>[2]) => ({
-  ops: Object.fromEntries(Object.entries(made).filter(([name]) => !isRemote(harnesses[name]))),
+  ops: Object.fromEntries(Object.entries(made).filter(([name]) => harnesses[name] === 'claude')),
   events,
-  holds: Object.values(harnesses).some((h) => h === 'claude'),
 });
 
 /**
@@ -861,7 +861,7 @@ const servingOf = (harnesses: Record<string, HarnessConfig>, made: Record<string
 const attachVerbsOf = (attached: Attached, root: string, serving: ReturnType<typeof servingOf>): Pick<EngineShape, 'hold' | 'drain'> => ({
   hold: () =>
     Effect.flatMap(attached.hold, () =>
-      serving.holds ? servedOf({ root, ops: serving.ops, events: serving.events }) : Effect.succeed(null),
+      Object.keys(serving.ops).length > 0 ? servedOf({ root, ops: serving.ops, events: serving.events }) : Effect.succeed(null),
     ),
   drain: Effect.fn('Engine.drain')(function* (holder: number | null) {
     const refused = drainRefusalOf(holder);

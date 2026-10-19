@@ -149,7 +149,11 @@ down is in `docs/architecture.md`, *Who owns what*.
   kind off the status, and a refusal inside a 200 reaches a viewer as an unsupported operation, naming the wrong fix.
 - **A follow of a session this process runs is answered here**, off the files and the holder's own fan-out (`heldHere`,
   `harness/claude/attached-follow.ts`): a test of a holder and a viewer is two processes, or the viewer dials nothing
-  (`test/holder-follow.boundary.test.ts`).
+  (`test/holder-follow.boundary.test.ts`, whose holder runs the attached road against the stand-in CLI through
+  `EngineOptions.claudeExecutable`, and whose viewer is given the same `CLAUDE_CONFIG_DIR` so it reads the same transcript).
+- **A holder's port serves the harnesses configured as the literal `'claude'` and no others** (`servingOf`, `service/engine.ts`):
+  those sessions are the ones one process holds attached, and a `holder` named for any other harness — a remote agent's, a
+  detached one's — is refused before the engine builds (`holderRefusal`), since its sessions are read off the store both share.
 - **`Stream.retry` starts its schedule again at the attempt's first output**, an empty array included: a bound on failures in a row
   is counted by hand (`drops` in `followTask`).
 

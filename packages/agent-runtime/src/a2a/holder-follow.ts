@@ -80,22 +80,23 @@ export const holderSeamOf = (
 /**
  * Why the holder given for the harness `harness` cannot be taken, or `undefined`. Asked by `Engine.layer`, in the order
  * below, so a holder that could never be dialled is refused before any task is filed: a harness this engine does not run
- * (`place.harnesses`, the ones it does); a harness that is a remote A2A agent (`place.remote`), whose sessions are the other
- * party's and are followed on its own address; an entry with a key that is not `card`; and a card that does not decode,
+ * (`place.harnesses`, the ones it does); a harness it does not run as Claude Code attached (`place.claude`), since no other
+ * harness's sessions are held by one process — a remote agent's are the other party's, followed at its own address, and every
+ * other harness's are read off the store both engines share; an entry with a key that is not `card`; and a card that does not decode,
  * worded by `cardOfJson` as a configured agent's is. A `credentials` that answers for no scheme is not refused here: only
  * `authOf` knows whether it answers for this scheme and this agent, and it refuses the first follow in words naming the fix.
  */
 export const holderRefusal = (
   harness: string,
   agent: unknown,
-  place: { harnesses: readonly string[]; remote: boolean },
+  place: { harnesses: readonly string[]; claude: boolean },
 ): string | undefined => {
   if (!place.harnesses.includes(harness)) {
     const runs = place.harnesses.length ? place.harnesses.map((n) => `\`${n}\``).join(', ') : 'none';
     return `\`holder\` names the \`${harness}\` harness, which this engine does not run: it runs ${runs}. Name a harness of \`harnesses\`, whose sessions the holder runs.`;
   }
-  if (place.remote) {
-    return `\`holder\` names the \`${harness}\` harness, which is a remote A2A agent: its sessions are the other party's, followed at its own address, and no holder of ours serves them. Take the entry off.`;
+  if (!place.claude) {
+    return `\`holder\` names the \`${harness}\` harness, which this engine does not run as Claude Code attached (\`'claude'\`): a port serves the sessions one process holds attached, and no other harness has any — a remote agent's are the other party's, followed at its own address, and every other harness's are read off the store both engines share. Follow this harness's sessions here, and take the entry off.`;
   }
   if (typeof agent !== 'object' || agent === null || Object.keys(agent).some((k) => k !== 'card')) {
     const given =

@@ -1,8 +1,8 @@
 /**
  * What a person and a step read in the git place's own words: the whole screens of `nemia ls` and `nemia decide`, with the branch the
  * repository each test makes is on (`master`, named by the fixture, never git's own default) and the commands it offers, a line of
- * `nemia ls` laid out after that branch, and the sentence a fan-in is told of the paths its merge left in conflict. The test place says each in words of its own, so these keep the git place;
- * what the screens say of a run is walked in store.test.ts.
+ * `nemia ls` laid out after that branch, and the sentence a fan-in is told of the paths its merge left in conflict. The test place says
+ * each in words of its own, so these keep the git place; what the screens say of a run is walked in store.test.ts.
  *
  * `WF_ROOT` is set before the runner is imported, since it is read as the module loads.
  */

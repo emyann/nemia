@@ -1,7 +1,7 @@
 /**
- * What a person and a step read in the git place's own words: the whole screens of `nemia ls` and `nemia decide`, with the branch git
- * names a new repository's first and the commands it offers, a line of `nemia ls` laid out after that branch, and the sentence a
- * fan-in is told of the paths its merge left in conflict. The test place says each in words of its own, so these keep the git place;
+ * What a person and a step read in the git place's own words: the whole screens of `nemia ls` and `nemia decide`, with the branch the
+ * repository each test makes is on (`master`, named by the fixture, never git's own default) and the commands it offers, a line of
+ * `nemia ls` laid out after that branch, and the sentence a fan-in is told of the paths its merge left in conflict. The test place says each in words of its own, so these keep the git place;
  * what the screens say of a run is walked in store.test.ts.
  *
  * `WF_ROOT` is set before the runner is imported, since it is read as the module loads.
@@ -36,12 +36,16 @@ const runWith = runOver(runEngine, gitPlaceLayer);
 const runPlaced = runGiven(gitPlaceLayer);
 const { readRun } = await import('../src/record/record.store.ts');
 
-/** A repository with one commit, so `nemia start` has a base to record. */
+/**
+ * A repository with one commit, so `nemia start` has a base to record. It names its own branch `master`, rather than take git's
+ * `init.defaultBranch`: the screens below quote that branch by name, and the default is a machine's, unset here and `main` on a
+ * runner.
+ */
 const aRepo = (): string => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const git = (...args: string[]) =>
     execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: 'ignore' });
-  git('init', '-q');
+  git('init', '-q', '-b', 'master');
   git('commit', '-q', '--allow-empty', '-m', 'base');
   return repo;
 };

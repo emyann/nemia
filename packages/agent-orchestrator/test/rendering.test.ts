@@ -100,10 +100,10 @@ const team = (agent: string, files: Record<string, string>, step = "---\nagent: 
  * whose words follow. Written out here, not read from the code, so a heading reworded fails the assertions that quote it.
  */
 const HEAD = {
-  instructions: "## 1. Instructions \u2014 your role's own words",
-  custom: '## 2. Custom instructions \u2014 the person who hired you',
-  factory: "## 4. The factory's rules \u2014 every step of this factory",
-  policy: "## 5. The step's policy \u2014 this step of this process",
+  instructions: "## 1. Instructions — your role's own words",
+  custom: '## 2. Custom instructions — the person who hired you',
+  factory: "## 4. The factory's rules — every step of this factory",
+  policy: "## 5. The step's policy — this step of this process",
 } as const;
 
 test("an agent gives skills by name and says what becomes of Claude Code's prompt, each its own line, read and written back", () => {

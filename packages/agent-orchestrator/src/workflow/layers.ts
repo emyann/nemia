@@ -9,10 +9,10 @@
  * the folder's files being 3 and read by the harness itself wherever the session works.
  */
 export const LAYER_HEADINGS = {
-  instructions: "## 1. Instructions \u2014 your role's own words",
-  custom: '## 2. Custom instructions \u2014 the person who hired you',
-  factory: "## 4. The factory's rules \u2014 every step of this factory",
-  policy: "## 5. The step's policy \u2014 this step of this process",
+  instructions: "## 1. Instructions — your role's own words",
+  custom: '## 2. Custom instructions — the person who hired you',
+  factory: "## 4. The factory's rules — every step of this factory",
+  policy: "## 5. The step's policy — this step of this process",
 } as const;
 
 /** A layer of what a session is told that Nemia composes as text, by the key its heading is written under (`LAYER_HEADINGS`). */

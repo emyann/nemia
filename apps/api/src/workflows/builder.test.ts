@@ -321,7 +321,7 @@ test('a step with an agent is listed resolved, with what its file sets itself (`
   assert.deepEqual(build, {
     name: 'build',
     spec: spec({ agent: 'coder', harness: 'claude', model: 'opus', effort: 'high', check: 'npm test' }),
-    body: "## 1. Instructions \u2014 your role's own words\n\nYou write code.\n\n## 5. The step's policy \u2014 this step of this process\n\nAnd mind the cache.",
+    body: "## 1. Instructions — your role's own words\n\nYou write code.\n\n## 5. The step's policy — this step of this process\n\nAnd mind the cache.",
     own: { keys: ['place', 'check'], body: 'And mind the cache.' },
     hired: null,
     layers: {
@@ -366,7 +366,7 @@ test('a step with an agent is listed resolved, with what its file sets itself (`
     [
       'opus',
       'low',
-      "## 1. Instructions \u2014 your role's own words\n\nYou write code.\n\n## 5. The step's policy \u2014 this step of this process\n\nAnd mind the index.",
+      "## 1. Instructions — your role's own words\n\nYou write code.\n\n## 5. The step's policy — this step of this process\n\nAnd mind the index.",
     ],
   );
 

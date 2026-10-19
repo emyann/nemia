@@ -130,11 +130,12 @@ export async function loadPages(dir = PAGES_DIR): Promise<PageSpec[]> {
  * a check makes, which is held to the e2e's bound (`overBound`, timing.ts). With no flag, every page in the dark theme, pictured by none:
  * the assertions alone. `--photos` visits light, then dark, and pictures each page visited; `--pages <name,…>` visits only the pages
  * named, in the order of the pages, and with `--photos` pictures them; `--contrast`, with `--photos`, has each picture's text pairs
- * `measured` beside it (contrast.ts), and is refused without it; `--workers <n>` sets how many workers visit them; `--shard <i> --of <n>` visits shard `i` of `n`,
- * dealt from the pages that exist (`shardOf`), and is no whole run either, so a shard's pages are never summed against their bound — a
- * reporter sums every shard's instead (pages-bound.ts). Refuses a flag it
- * does not know, a name that is no page (listing the pages there are), `--pages` with no name after it, and `--workers` with no whole
- * number of one or more.
+ * `measured` beside it (contrast.ts), and is refused without it; `--workers <n>` sets how many workers visit them; and
+ * `--shard <i> --of <n>` visits shard `i` of `n`, dealt from the pages that exist (`shardOf`). A shard is no whole run either, so its
+ * pages are never summed against their bound: a reporter sums every shard's instead (pages-bound.ts). Refuses a flag it does not know, a
+ * name that is no page (listing the pages there are), `--pages` with no name after it, `--workers` with no whole number of one or more,
+ * one of `--shard` and `--of` without the other, `--shard` with `--pages`, a shard past the shards there are, and an `--of` past the
+ * pages there are.
  */
 export function planOf<P extends { name: string }>(
   argv: readonly string[],
@@ -186,7 +187,15 @@ export function planOf<P extends { name: string }>(
   const themes: Theme[] = photos ? ['light', 'dark'] : ['dark'];
   if (shard !== undefined && of !== undefined) {
     if (named) throw new Error('--shard deals the pages itself and --pages names them: give one of the two, not both (--shard 1 --of 4)');
-    return { visit: shardOf(pages, shard, of), themes, pictured: (name) => photos && name !== '', measured, workers, shard: { i: shard, of }, whole: false };
+    return {
+      visit: shardOf(pages, shard, of),
+      themes,
+      pictured: (name) => photos && name !== '',
+      measured,
+      workers,
+      shard: { i: shard, of },
+      whole: false,
+    };
   }
   if (!named) return { visit: [...pages], themes, pictured: () => photos, measured, workers, whole: !photos };
   const all = pages.map((p) => p.name);
@@ -215,7 +224,8 @@ function workersAfter(arg: string | undefined): number {
 /** The whole number of one or more a flag is given; refuses anything else, and a flag in its place. `what` names what the number is. */
 function wholeAfter(flag: string, what: string, arg: string | undefined): number {
   const n = Number(arg);
-  if (!arg || !/^\d+$/.test(arg) || n < 1) throw new Error(`${flag} takes ${what}, one or more (--shard 1 --of 4), not ${arg ?? 'nothing'}`);
+  if (!arg || !/^\d+$/.test(arg) || n < 1)
+    throw new Error(`${flag} takes ${what}, one or more (--shard 1 --of 4), not ${arg ?? 'nothing'}`);
   return n;
 }
 

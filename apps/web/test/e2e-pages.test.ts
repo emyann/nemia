@@ -325,7 +325,8 @@ test('REFUSED: --pages with no page after it', () => {
 test('REFUSED: a flag the e2e does not know', () => {
   assert.throws(
     () => planOf(['--colour'], ABC),
-    (e: Error) => /^the e2e takes --photos, --contrast, --pages <name,…>, --workers <n> and --shard <i> --of <n>, not --colour\b/.test(e.message),
+    (e: Error) =>
+      /^the e2e takes --photos, --contrast, --pages <name,…>, --workers <n> and --shard <i> --of <n>, not --colour\b/.test(e.message),
   );
   assert.throws(
     () => planOf(['b'], ABC),
@@ -333,10 +334,6 @@ test('REFUSED: a flag the e2e does not know', () => {
   );
 });
 
-/**
- * The deal, over the pages that exist: `shardOf` cuts them into `of` shards, round-robin in the pages' own order, so the slow pages
- * spread rather than piling into one shard. Read against `loadPages()`, never a hard-coded list, as the board's traps ask.
- */
 test('the shards deal every page into exactly one of them, in the pages’ order, within one page of each other', async () => {
   const pages = await loadPages();
   const all = pages.map((p) => p.name);
@@ -345,9 +342,17 @@ test('the shards deal every page into exactly one of them, in the pages’ order
     const dealt = shards.flat();
     assert.equal(dealt.length, all.length, `of ${n}: every page is dealt once, and ${dealt.length} were dealt of ${all.length}`);
     assert.deepEqual(orderOf(dealt), orderOf(all), `of ${n}: the shards together are the pages, each once`);
-    for (const shard of shards) assert.deepEqual(shard, all.filter((name) => shard.includes(name)), `of ${n}: a shard keeps the pages’ order`);
+    for (const shard of shards)
+      assert.deepEqual(
+        shard,
+        all.filter((name) => shard.includes(name)),
+        `of ${n}: a shard keeps the pages’ order`,
+      );
     const sizes = shards.map((shard) => shard.length);
-    assert.ok(Math.max(...sizes) - Math.min(...sizes) <= 1, `of ${n}: the shares are within one page of each other, and were ${sizes.join(', ')}`);
+    assert.ok(
+      Math.max(...sizes) - Math.min(...sizes) <= 1,
+      `of ${n}: the shares are within one page of each other, and were ${sizes.join(', ')}`,
+    );
   }
 });
 
@@ -358,10 +363,22 @@ test('--shard <i> --of <n> visits that shard and is no whole run, so the bound i
     plan.visit.map((p) => p.name),
     shardOf(pages, 2, 4).map((p) => p.name),
   );
-  assert.equal(plan.whole, false, 'a shard is a run of some pages: its pages are not the whole e2e’s, and summing them would refuse nothing');
-  assert.deepEqual(plan.shard, { i: 2, of: 4 }, 'the plan says which shard it is, so the run can write its page times down under that name');
+  assert.equal(
+    plan.whole,
+    false,
+    'a shard is a run of some pages: its pages are not the whole e2e’s, and summing them would refuse nothing',
+  );
+  assert.deepEqual(
+    plan.shard,
+    { i: 2, of: 4 },
+    'the plan says which shard it is, so the run can write its page times down under that name',
+  );
   assert.deepEqual(plan.themes, ['dark'], 'a shard runs the assertions, in the dark theme, as a whole run does');
-  assert.equal(plan.visit.some((p) => plan.pictured(p.name)), false, 'a shard pictures nothing without --photos');
+  assert.equal(
+    plan.visit.some((p) => plan.pictured(p.name)),
+    false,
+    'a shard pictures nothing without --photos',
+  );
   assert.equal(planOf([], pages).shard, undefined, 'a run that is no shard says so by having none');
   assert.equal(planOf(['--shard', '1', '--of', '1'], pages).visit.length, pages.length, 'one shard of one visits every page');
   assert.equal(planOf(['--shard', '1', '--of', '1'], pages).whole, false, 'and is still no whole run: --shard says a subset was asked for');
@@ -370,11 +387,13 @@ test('--shard <i> --of <n> visits that shard and is no whole run, so the bound i
 test('REFUSED: --shard without --of, and --of without --shard', () => {
   assert.throws(
     () => planOf(['--shard', '2'], ABC),
-    (e: Error) => e.message === '--shard 2 says which shard to visit, and --of says how many shards there are: give both (--shard 2 --of 4)',
+    (e: Error) =>
+      e.message === '--shard 2 says which shard to visit, and --of says how many shards there are: give both (--shard 2 --of 4)',
   );
   assert.throws(
     () => planOf(['--of', '4'], ABC),
-    (e: Error) => e.message === '--of 4 says how many shards there are, and --shard says which of them to visit: give both (--shard 1 --of 4)',
+    (e: Error) =>
+      e.message === '--of 4 says how many shards there are, and --shard says which of them to visit: give both (--shard 1 --of 4)',
   );
 });
 
@@ -386,7 +405,8 @@ test('REFUSED: a shard past the shards there are, and an --of past the pages the
   assert.throws(
     () => planOf(['--shard', '1', '--of', '200'], ABC),
     (e: Error) =>
-      e.message === '--of 200 asks for more shards than the e2e has pages (3), and a shard of them would visit nothing: give --of 3 at most',
+      e.message ===
+      '--of 200 asks for more shards than the e2e has pages (3), and a shard of them would visit nothing: give --of 3 at most',
   );
 });
 

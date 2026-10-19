@@ -17,8 +17,14 @@ import {
   PHASES,
   rankLines,
   slowest,
+  shardPages,
+  shardsMissing,
   type PageTiming,
+  type ShardPages,
 } from './e2e/timing.ts';
+
+/** The names of `pages`, sorted, for a comparison that does not care which shard dealt which. */
+const orderOfNames = (pages: readonly PageTiming[]): string[] => pages.map((p) => p.name).sort();
 
 /** A page's timing whose phases are its whole time, split evenly. */
 const timed = (name: string, ms: number, worker = 0): PageTiming => ({
@@ -134,4 +140,68 @@ test('the slowest pages are ranked slowest first, the list given left as it was'
   assert.deepEqual(rankLines([timed('runs', 6_000)], 1), [
     'runs (dark, worker 0): 6.0 s (load 1.0 s, idle 1.0 s, expect 1.0 s, quiet 1.0 s, settle 1.0 s, picture 1.0 s)',
   ]);
+});
+
+/**
+ * The shards' reading: four shard files are a whole run between them, and their pages are summed as one run's — the bound is additive,
+ * and a shard of its own is not held to it (`planOf`, pages.ts). What is missing, doubled, out of range or of another run is refused by
+ * a sentence naming the fix, since each of those silently holds the e2e to less than the whole.
+ */
+const shardsOf = (of: number, pages: readonly PageTiming[]): ShardPages[] =>
+  Array.from({ length: of }, (_, i) => ({ shard: i + 1, of, pages: pages.filter((_p, at) => at % of === i) }));
+
+test('the shards sum to the sum of their pages, however they were dealt', () => {
+  for (const n of [1, 2, 4, 7]) {
+    const shards = shardsOf(n, SEVEN);
+    assert.equal(shardsMissing(shards), null, `of ${n}: every shard is there`);
+    assert.deepEqual(orderOfNames(shardPages(shards)), orderOfNames(SEVEN), `of ${n}: the shards together are the run's pages, each once`);
+    assert.equal(pagesLine(shardPages(shards)), pagesLine(SEVEN), `of ${n}: the sum is the same whichever shard a page was dealt to`);
+  }
+});
+
+test('the shards together are held to the bound a whole run is, naming the slowest pages past it', () => {
+  const under = shardsOf(4, [timed('a', PAGES_BOUND_MS / 2), timed('b', PAGES_BOUND_MS / 2)]);
+  assert.equal(overBound(shardPages(under), true), null, 'the shards at the bound pass, as a whole run at it does');
+  const over = shardsOf(4, [timed('a', PAGES_BOUND_MS / 2), timed('b', PAGES_BOUND_MS / 2), timed('slowest', 1)]);
+  const late = overBound(shardPages(over), true);
+  assert.match(String(late), /^the pages of the whole e2e cost .* over their bound of /);
+  assert.match(String(late), /slowest \(dark, worker 0\)/, 'the refusal names the slowest page of every shard together');
+  assert.equal(overBound(shardsOf(4, SEVEN)[0].pages, true), null, 'and one shard alone is far under it: a shard is never the whole');
+});
+
+test('REFUSED: a shard that did not write its page times, by name and by the command that writes it', () => {
+  const three = shardsOf(4, SEVEN).filter((shard) => shard.shard !== 3);
+  assert.equal(
+    shardsMissing(three),
+    'shard 3 of 4 wrote no page times here, so the pages it visited are in no sum and the e2e is held to less than the whole: ' +
+      'run `npm run e2e -- --shard 3 --of 4` and put pages-3-of-4.json here',
+  );
+  assert.match(
+    String(shardsMissing(shardsOf(4, SEVEN).filter((shard) => shard.shard > 2))),
+    /^shards 1 and 2 of 4 wrote no page times here/,
+    'two missing shards are both named',
+  );
+});
+
+test('REFUSED: no shard file at all, a shard written twice, a shard out of range, and two runs’ files together', () => {
+  assert.match(
+    String(shardsMissing([])),
+    /^no shard of the e2e wrote its page times here: run `npm run e2e -- --shard <i> --of <n>` for every shard of n/,
+  );
+  const [one, two] = shardsOf(4, SEVEN);
+  assert.equal(
+    shardsMissing([one, two, two, ...shardsOf(4, SEVEN).slice(2)]),
+    'shard 2 of 4 wrote its page times twice, and its pages would be counted twice in the sum: ' +
+      'give this one run’s shards alone, since a shard of a run is run once',
+  );
+  assert.equal(
+    shardsMissing([{ shard: 5, of: 4, pages: [] }, ...shardsOf(4, SEVEN)]),
+    'shard 5 is no shard of 4, so the run it belongs to is not the one these files are of: ' +
+      'give this one run’s shards alone (pages-<i>-of-4.json, i from 1 to 4)',
+  );
+  assert.equal(
+    shardsMissing([...shardsOf(4, SEVEN), { shard: 1, of: 5, pages: [] }]),
+    'the shard files here disagree about how many shards there are (4 and 5), so they are of two different runs ' +
+      'and their pages are no one run’s: delete the ones left over, and give this one run’s shards alone',
+  );
 });

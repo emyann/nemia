@@ -36,7 +36,7 @@ export default {
         await expectCount(panel.locator('[data-chat-empty]'), 0, 'nor her greeting, which stands only where there is nothing to say');
         await expectVisible(panel.getByText(SAID[0].text, { exact: false }), 'and what she said stays on the page');
         await settled(page);
-        await photograph(page, path.join(OUT, `chat-retrying-${await themeOf(page)}.png`), { fullPage: true });
+        await photograph(page, path.join(OUT, `chat-retrying-band-${await themeOf(page)}.png`), { fullPage: true });
       } finally {
         broken();
       }

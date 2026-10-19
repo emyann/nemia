@@ -979,22 +979,27 @@ test('an intent whose sending process lives is left to it: read submitted in ano
   }
 });
 
-test('a send under way is not read in doubt when the wall clock steps forward past its bound: the lease is measured on the monotonic clock', async (t: TestContext) => {
-  const g = gate();
-  const s = await serve({ script: () => [{ until: g.shut, data: { ok: 'held' }, state: 'completed' }] });
-  const root = scratch('ae-remote-');
-  const sendMs = 60_000;
-  const ops = remoteOps('remote', { url: s.url }, root, undefined, REQUEST_MS, { sendMs, spawnWaitMs: 50 });
-  try {
-    await Effect.runPromise(ops.spawn({ name: 'ae/held/1', brief: 'b', cwd: '/w' }));
-    stepClock(t, sendMs + 60_000);
-    assert.equal((await Effect.runPromise(ops.observe)).get('ae/held/1')?.state, 'submitted', 'still being sent: a Task submitted');
-    await Effect.runPromise(ops.spawn({ name: 'ae/held/1', brief: 'b', cwd: '/w' }));
-    assert.equal(s.counts.sendMessage, 1, 'left to the send under way, never sent again nor read in doubt');
-  } finally {
-    g.open();
-  }
-});
+test(
+  'a send under way is not read in doubt when the wall clock steps forward past its bound: the lease is measured on the monotonic clock',
+  WAITED,
+  async (t: TestContext) => {
+    const g = gate();
+    const s = await serve({ script: () => [{ until: g.shut, data: { ok: 'held' }, state: 'completed' }] });
+    const root = scratch('ae-remote-');
+    const sendMs = 60_000;
+    const ops = remoteOps('remote', { url: s.url }, root, undefined, REQUEST_MS, { sendMs, spawnWaitMs: 50 });
+    try {
+      await Effect.runPromise(ops.spawn({ name: 'ae/held/1', brief: 'b', cwd: '/w' }));
+      await untilEvent(t, () => s.counts.sendMessage === 1, 'the send under way reached the other party', { everyMs: 5 });
+      stepClock(t, sendMs + 60_000);
+      assert.equal((await Effect.runPromise(ops.observe)).get('ae/held/1')?.state, 'submitted', 'still being sent: a Task submitted');
+      await Effect.runPromise(ops.spawn({ name: 'ae/held/1', brief: 'b', cwd: '/w' }));
+      assert.equal(s.counts.sendMessage, 1, 'left to the send under way, never sent again nor read in doubt');
+    } finally {
+      g.open();
+    }
+  },
+);
 
 test('a spawn writes its send lease on both clocks: `until` on the wall clock, and `mono` on the monotonic clock of this boot', async () => {
   const g = gate();

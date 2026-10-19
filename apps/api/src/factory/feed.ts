@@ -6,6 +6,7 @@ import {
   BOOKMARK_EVERY,
   feedCursorRefusal,
   type FeedLine,
+  feedSize,
   followFeed,
   type Followed,
   Invalid,
@@ -37,6 +38,26 @@ function feedCursorOf(raw: string | undefined): number | { error: string } {
   if (!/^\d+$/.test(raw)) return { error: `\`${raw}\` is not a cursor this feed gave: a feed cursor is a whole number of bytes. ${how}` };
   const refusal = feedCursorRefusal(Number(raw));
   return refusal ? { error: `\`${raw}\` is not a cursor this feed gave: ${refusal}. ${how}` } : Number(raw);
+}
+
+/** The one value `from` takes: the feed's end, where a reader that wants no history of it starts. */
+const END = 'end';
+
+/**
+ * Where a reader that gave no cursor starts: the feed's end on `from=end`, its start on no `from`, or why `from` cannot be read. A
+ * cursor — a Last-Event-ID or an `after` — wins over `from`, so an EventSource's reconnect resumes where it was, and a `from` of any
+ * other value is refused all the same, before the stream opens.
+ *
+ * @param raw the `from` asked for, none for the feed's start
+ * @returns the byte of the feed to read from, or why `from` cannot be read
+ */
+function feedStartOf(raw: string | undefined): number | { error: string } {
+  if (raw === undefined) return 0;
+  if (raw !== END)
+    return {
+      error: `\`${raw}\` is not a start this feed takes: \`from=${END}\` starts at the feed's end, which is the one value \`from\` takes; pass none to read the feed from the start, or a cursor this stream gave as \`after\`.`,
+    };
+  return feedSize();
 }
 
 /**
@@ -126,6 +147,11 @@ export const feedEvents = (from: number, selectors: Selectors = [], bookmarkEver
  * as a `bookmark` event carrying that cursor as its id and an empty data field, so a reader of a silent feed knows where it is and can
  * resume there; the first beat is dropped, so no bookmark precedes the first line.
  *
+ * `from=end` starts the stream at the feed's end as it opens (`feedSize`), so a reader that holds no history of the feed — the board,
+ * whose every query is read fresh — is sent no line that was written before it asked. A cursor wins over it, so an EventSource's
+ * reconnect resumes where it was, and `from` of any other value is refused before the stream opens, saying `end` is the one it takes.
+ * None given reads the feed from the start, as `nemia watch` and `ae watch` do.
+ *
  * A cursor the feed never gave is refused with 400 before the stream opens, an answer with a status, not an event. A selector the grammar
  * refuses is the package's `Invalid` with `SELECTOR_ASKED` after it, 422 before the stream opens, and no reader is started for it. On the
  * stream, a refusal (exit 2) — the feed truncated or replaced under the cursor, including between the check and the reader's first
@@ -138,7 +164,10 @@ export const feedEvents = (from: number, selectors: Selectors = [], bookmarkEver
  * one path, its subscription with it, and no longer counted among the feed's followers (`FEED_FOLLOWERS`).
  */
 export const feed = new Hono<ApiEnv>().get('/api/feed/stream', (c) => {
-  const from = feedCursorOf(c.req.header('Last-Event-ID') || c.req.query('after') || undefined);
+  const start = feedStartOf(c.req.query('from'));
+  if (typeof start !== 'number') return c.json({ error: start.error }, 400);
+  const cursor = c.req.header('Last-Event-ID') || c.req.query('after') || undefined;
+  const from = cursor === undefined ? start : feedCursorOf(cursor);
   if (typeof from !== 'number') return c.json({ error: from.error }, 400);
   const asked = c.req.queries('selector') ?? [];
   const refused = selectorsRefusal(asked);

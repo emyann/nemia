@@ -478,10 +478,11 @@ test('words said while a turn runs leave the session answering until the turn th
   await Effect.runPromise(h.attached.ops.spawn(request));
   await until(t, () => run(root)?.sessionId, 'the session started its first turn', { everyMs: 50 });
   await Effect.runPromise(h.attached.ops.say!({ name: NAME, sessionId: NAME }, 'and this too'));
-  fs.writeFileSync(path.join(dir, 'end'), '');
   await until(t, () => (lines(dir, 'said.jsonl') as string[]).length === 2, 'the words it heard are worked as a turn of their own', {
     everyMs: 50,
   });
+  fs.writeFileSync(path.join(dir, 'end'), '');
+  await until(t, () => resultsOf(root) === 1, 'the first turn ended, with a result that did not name the words', { everyMs: 50 });
   assert.equal(run(root)?.state, 'working', 'the first turn ended, and the words it did not answer leave the session answering');
   assert.equal(
     (await Effect.runPromise(h.attached.ops.observe)).get(NAME)?.state,

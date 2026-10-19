@@ -60,7 +60,7 @@ import {
 import { OutputRefused, outputVerbOf } from './output.ts';
 import { followVerbOf, type FollowRefused } from './follow.ts';
 import { DEFAULT_HARNESSES } from './harnesses.ts';
-import { a2aOps, type SeamOps } from '../a2a/index.ts';
+import { a2aOps, holderSeamOf, servedOf, type Served, type SeamOps } from '../a2a/index.ts';
 import { bodyVerbsOf } from './bodies.ts';
 import type { ForgetFailure, ForgetReport } from './forget.ts';
 import { keepingVerbsOf, type KeptRefused, type KeptReport } from './kept.ts';
@@ -470,8 +470,14 @@ export type EngineShape = {
    * tool calls of each session with none in flight, waits at most `LET_GO_MS` for each call in flight to end, then stops each session
    * and parks it for the next holder, a call it cut at that bound kept on the session's run file and said on the log. An engine that
    * never takes it runs such a task as a `claude -p` job.
+   *
+   * Answers what the hold serves (`Served`): a loopback port of its own, speaking A2A as a reading surface alone — the card,
+   * `GetTask` and `SubscribeToTask` — behind one bearer token, for the sessions of every harness this engine runs itself; a remote
+   * agent's are not its own, and are read at its own address. The address, the token and each harness's card are for whoever started
+   * the engine to pass on to a viewer (`EngineOptions.holder`); the port and the token last exactly as long as the scope. `null` for
+   * an engine that holds no attached session — no harness of it is spelt `'claude'` — which serves nothing.
    */
-  readonly hold: () => Effect.Effect<void, never, Scope.Scope>;
+  readonly hold: () => Effect.Effect<Served | null, never, Scope.Scope>;
   /**
    * Hold back the new tool calls of the attached sessions the process `holder` holds, each at its hook until the drain is lifted, or with
    * `null` lift it. A call in flight runs on, and so does a call that belongs to one, or the call in flight could never end; another
@@ -671,7 +677,7 @@ const make = (options: EngineOptions) =>
     const attached = attachedSessions(root);
     const { credentials, missingCredential, telemetry } = options;
     const made = runnersOf(harnesses, root, credentials, missingCredential, telemetry, attached);
-    const runners = Object.fromEntries(Object.entries(made).map(seamOf(harnesses, events, counted)));
+    const runners = Object.fromEntries(Object.entries(made).map(seamOf(harnesses, events, counted, options)));
     const layer = Layer.mergeAll(journal, Runner.layer(composite(runners, fallback)), tickMemoLayer(), admissionOf(options, harnesses));
     const go = <A, E>(e: Effect.Effect<A, E, Journal | Runner>): Effect.Effect<A, E> => e.pipe(Effect.provide(layer));
     const read = (taskId: string) => go(Effect.flatMap(Journal, (j) => j.read(taskId)));
@@ -812,21 +818,56 @@ const make = (options: EngineOptions) =>
       watch: watchOf(feedVerb, journalOps.subscribe),
       ...ioVerbsOf(observedNow),
       start: startOf(tickVerb),
-      ...attachVerbsOf(attached, root),
+      ...attachVerbsOf(attached, root, servingOf(harnesses, made, events)),
     });
   });
 
-/** A harness's runner as the engine runs it: through its A2A agent unless it is a remote one already, its observes counted. */
+/**
+ * A harness's runner as the engine runs it: through its A2A agent unless it is a remote one already, its observes counted, and its
+ * `follow` alone dialled on the engine that holds its sessions where `options.holder` names one (`holderSeamOf`).
+ */
 const seamOf =
-  (harnesses: Record<string, HarnessConfig>, events: Parameters<typeof a2aOps>[2], counted: ReturnType<typeof countedInto>) =>
+  (
+    harnesses: Record<string, HarnessConfig>,
+    events: Parameters<typeof a2aOps>[2],
+    counted: ReturnType<typeof countedInto>,
+    options: EngineOptions,
+  ) =>
   ([name, ops]: [string, RunnerOps]): [string, SeamOps] => [
     name,
-    counted(name, isRemote(harnesses[name]) ? ops : a2aOps(name, ops, events)),
+    holderSeamOf(
+      options.holder && Object.hasOwn(options.holder, name) ? options.holder[name] : undefined,
+      name,
+      options.credentials,
+      counted(name, isRemote(harnesses[name]) ? ops : a2aOps(name, ops, events)),
+    ),
   ];
 
-/** The verbs of the sessions run attached: `hold`, and `drain`, which writes the drain's file or removes it. */
-const attachVerbsOf = (attached: Attached, root: string): Pick<EngineShape, 'hold' | 'drain'> => ({
-  hold: () => attached.hold,
+/**
+ * What a holder serves while it holds: the ops of every harness the engine runs itself, by name — a remote agent's sessions are the
+ * other party's, read at its own address — and whether this engine holds attached sessions at all, which is what makes it a holder
+ * (a harness spelt `'claude'`). An engine that holds none serves nothing.
+ */
+const servingOf = (
+  harnesses: Record<string, HarnessConfig>,
+  made: Record<string, RunnerOps>,
+  events: Parameters<typeof a2aOps>[2],
+) => ({
+  ops: Object.fromEntries(Object.entries(made).filter(([name]) => !isRemote(harnesses[name]))),
+  events,
+  holds: Object.values(harnesses).some((h) => h === 'claude'),
+});
+
+/** The verbs of the sessions run attached: `hold`, with the port it serves (`servedOf`), and `drain`, which writes the drain's file or removes it. */
+const attachVerbsOf = (
+  attached: Attached,
+  root: string,
+  serving: ReturnType<typeof servingOf>,
+): Pick<EngineShape, 'hold' | 'drain'> => ({
+  hold: () =>
+    Effect.flatMap(attached.hold, () =>
+      serving.holds ? servedOf({ root, ops: serving.ops, events: serving.events }) : Effect.succeed(null),
+    ),
   drain: Effect.fn('Engine.drain')(function* (holder: number | null) {
     const refused = drainRefusalOf(holder);
     if (refused) return yield* Effect.fail(new DrainRefused({ message: refused }));

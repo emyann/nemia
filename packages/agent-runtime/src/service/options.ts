@@ -11,7 +11,15 @@ export type { ObserveCount } from '../core/engine/index.ts';
 import { claudeOps, claudeCodeOps, type Attached } from '../harness/claude/index.ts';
 import { detachedOps, type HarnessSpec } from '../harness/detached/detached.ts';
 import { telemetered, telemetryRefusalOf, type Telemetry } from '../harness/telemetry.ts';
-import { remoteConfigRefusal, remoteOps, type Credentials, type MissingCredential, type RemoteAgent } from '../a2a/index.ts';
+import {
+  holderRefusal,
+  remoteConfigRefusal,
+  remoteOps,
+  type Credentials,
+  type HolderAgent,
+  type MissingCredential,
+  type RemoteAgent,
+} from '../a2a/index.ts';
 
 /**
  * A harness, as one of five things:
@@ -73,6 +81,15 @@ export type EngineOptions = {
    * exports says it in its own variables; one that does not ignores it. Absent: no session exports, whatever the process's environment.
    */
   telemetry?: Telemetry;
+  /**
+   * The engines that hold the sessions this one only reads, by the harness each holds: the card that engine served on its own port
+   * (`Served.cards`), as the JSON it answered. Given one, this engine's `follow` of that harness's sessions is dialled on that port
+   * (`holderSeamOf`) and nothing else is: a spawn, a stop, words said, a view, a transcript, logs and output are read here, off the
+   * files both engines share, so this engine still answers with the holder down — just not live. The token is not here: `credentials`
+   * gives it for the card's `bearer` scheme, and a `holder` with no `credentials` that answers is refused at the first follow, in
+   * words naming the fix.
+   */
+  holder?: Record<string, HolderAgent>;
 };
 
 /** A task to file (`Engine.file`). */
@@ -254,14 +271,21 @@ const harnessConfigRefusalOf = (name: string, h: HarnessConfig): string | undefi
 /**
  * Why an engine cannot be built from these options, in a sentence that says what to do instead — or `undefined`. Asked of the
  * options as handed in, untyped, and refuses, in this order: a `maxConcurrent` that is not a whole number from 1; a harness
- * brought as an object whose `pool` is not a name; a remote agent's entry `remoteConfigRefusal` refuses, its `pool` aside; an
- * `unschedulable`, a `credentials` or a `missingCredential` that is not a function; and a `telemetry` that names no collector.
+ * brought as an object whose `pool` is not a name; a remote agent's entry `remoteConfigRefusal` refuses, its `pool` aside; a `holder`
+ * entry `holderRefusal` refuses; an `unschedulable`, a `credentials` or a `missingCredential` that is not a function; and a
+ * `telemetry` that names no collector.
  */
 export const optionsRefusalOf = (options: EngineOptions): string | undefined => {
   const ceiling = ceilingRefusalOf(options.maxConcurrent);
   if (ceiling) return ceiling;
   for (const [name, h] of Object.entries(options.harnesses ?? {})) {
     const refused = harnessConfigRefusalOf(name, h);
+    if (refused) return refused;
+  }
+  const harnesses = options.harnesses ?? {};
+  for (const [name, agent] of Object.entries(options.holder ?? {})) {
+    const h = Object.hasOwn(harnesses, name) ? harnesses[name] : undefined;
+    const refused = holderRefusal(name, agent, { harnesses: Object.keys(harnesses), remote: h !== undefined && isRemote(h) });
     if (refused) return refused;
   }
   if (options.unschedulable !== undefined && typeof options.unschedulable !== 'function') {

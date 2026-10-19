@@ -68,7 +68,9 @@ async function sent(stream: SSEStreamingApi, read: ChatChanges, shown: string): 
  * - `GET /api/nemia/chat/stream` — the same followed, as server-sent events read again every `CHAT_BEAT_MS`: `presence` first and
  *   once it changes, then `chat`, each event new or changed (an event is replaced by its id), the cursor the id of each read's last.
  *   It resumes after the Last-Event-ID an EventSource sends when it reconnects, else after `after`, else sends the history whole; a
- *   cursor no read gave is a 422 before the stream opens.
+ *   cursor no read gave is a 422 before the stream opens. A read that fails once the stream is open is an `unreadable` event with
+ *   `retrying: true` — the next beat reads again, and gives up on nothing — and the first beat that works after one says `readable`,
+ *   which takes the notice off the page.
  * - `POST /api/nemia/chat/send` — `{ text }` put in her outbox, which the keeper says to her once she is up: 201 with the entry
  *   `{ id, at, text }`. 400 for a body that is not one, 422 for text that is empty or too long.
  * - `POST /api/nemia/chat/read` — `{ through }`, the last event the person saw: 200 with the mark `{ through, at }`, never moved back.
@@ -94,14 +96,20 @@ export const nemiaChat = new Hono<ApiEnv>()
       return streamSSE(c, async (stream) => {
         let read = first;
         let shown = '';
+        let unread = false;
         while (!stream.aborted) {
           shown = await sent(stream, read, shown);
           await stream.sleep(CHAT_BEAT_MS);
           if (stream.aborted) break;
           try {
             read = await runPlaced(s.placeService, s.e, chatSince(nemiaChatPlace(), read.cursor, readsOf(s)));
+            if (unread) {
+              unread = false;
+              await stream.writeSSE({ event: 'readable', data: '{}' });
+            }
           } catch (err) {
             const error = err instanceof Error ? err.message : String(err);
+            unread = true;
             await stream.writeSSE({ event: 'unreadable', data: JSON.stringify({ error, retrying: true }) });
             read = { ...read, events: [] };
           }

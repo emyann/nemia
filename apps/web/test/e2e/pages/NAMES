@@ -119,3 +119,4 @@ chat-down
 chat-kept
 chat-stop
 unstreamed-session
+chat-retrying

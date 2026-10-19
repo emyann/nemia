@@ -267,7 +267,9 @@ export const STEP_BEAT_MS = 5_000;
  * be had, said as `unreadable` with `retrying: true` and again only when those words change; then, each beat, the conversation read
  * afresh from the cursor, its events as `transcript`, `settled` once the task has settled, and the following asked for again, so a
  * harness that starts pushing its session resumes the live relay with `following` true and `readable` clears what was said. A read
- * that fails is the next beat's words. Ends on a settled task or a reader that has gone, and on nothing else: no road here gives up.
+ * that fails is the next beat's words. A pass that moved to another task is read from that task's start, and every beat after it from
+ * the cursor it reached: the cursor is dropped at the move alone, never again. Ends on a settled task or a reader that has gone, and on
+ * nothing else: no road here gives up.
  */
 async function readAgain(
   stream: SSEStreamingApi,
@@ -301,8 +303,8 @@ async function readAgain(
     await send(stream, read);
     const again = await followed(stream, r, task, read, () => say(null));
     if (again === null) return;
+    if (again.taskId !== task) after = undefined;
     task = again.taskId;
-    if (task !== from.task) after = undefined;
     words = again.error ?? unpushedWords(r.id, r.step);
     await stream.sleep(STEP_BEAT_MS);
   }

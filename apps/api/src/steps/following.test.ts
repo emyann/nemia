@@ -21,7 +21,7 @@ import { bell, until, WAITED } from '../../test/waits.ts';
 type Followed = Stream.Success<NonNullable<Effect.Success<ReturnType<Engine['Service']['follow']>>>>;
 
 const RUN = 'r-follow';
-const STEPS = ['implement', 'review', 'late', 'held', 'opened', 'tried'];
+const STEPS = ['implement', 'review', 'late', 'held', 'opened', 'tried', 'drifted'];
 
 /** The run's record, each step of `STEPS` on the task `t-<step>`, but those `moved` names on another. */
 function writeRun(moved: Record<string, string> = {}): void {
@@ -348,6 +348,41 @@ test(
       retrying: true,
     });
     assert.equal(sent.filter((b) => b.event === 'settled').length, 0, 'the try is still live, and the stream is not ended');
+    await f.leave();
+  },
+);
+
+test(
+  'a beat that moves to another try reads that try from its start once, and from its cursor on every beat after: nothing is sent twice',
+  { timeout: 60_000 },
+  async (t) => {
+    const first: Task = { ...working([said('a-1')]), unstreamed: true };
+    const tried: Task = { ...working([said('c-1')]), unstreamed: true };
+    const { e } = engineOver(
+      new Map([
+        ['t-drifted', first],
+        ['t-drifted-try2', tried],
+      ]),
+    );
+    const own = appOver(t, e);
+    t.after(() => writeRun());
+    const f = await follower(t, own.app, 'drifted');
+    await f.wait((s) => s.some((b) => b.event === 'unreadable'), 'not pushed: read again on a beat');
+    delete first.unstreamed;
+    await f.wait((s) => s.some((b) => b.event === 'readable'), 'a harness that starts pushing is relayed live on the next beat');
+    Queue.endUnsafe(first.attempts[0]);
+    first.ended = 1;
+    first.settled = 'failed';
+    writeRun({ drifted: 't-drifted-try2' });
+    await line(own, 'drifted', 'running');
+    await f.wait((s) => kinds(s).includes('transcript c-1'), "the try's own history, read from its start");
+    tried.history.push(said('c-2'));
+    await f.wait((s) => kinds(s).includes('transcript c-2'), 'what the try says next, on the beat after');
+    assert.equal(
+      kinds(f.said()).filter((k) => k === 'transcript c-1').length,
+      1,
+      "the try's history is read from its start at the move alone: the beats after it read from the cursor",
+    );
     await f.leave();
   },
 );

@@ -1454,3 +1454,12 @@ settle; it found a third: an attempt cut at its budget and listed `done` (or qui
 and settled `succeeded`. None of the 507 ends on the record is `budget`, so it was not seen live; it is `failed` now.
 Each of the three fails the contract test when reverted. agent-orchestrator reads a check ended `deadline` or `operator` as
 `unfinished` whatever exit code its end carries, as it read one left open.
+
+## A holder's served port carries no retry and refuses no protocol version
+
+The port a holder serves (`src/a2a/listener.ts`) answers an `A2A-Version` header it does not read: `validateVersion` is exported by
+`@a2a-js/sdk/server` and never called on the JSON-RPC road, and `ServerCallContext.requestedVersion` defaults to `'0.3'`, so a client
+asking for a version the card does not declare is served all the same. And a viewer's dropped follow ends rather than subscribing again
+(`src/a2a/holder-follow.ts`): a reader asks again from the cursor it holds, where a remote agent's follow resubscribes
+(`remote-follow.ts`). Neither is wrong today — the port is reached over loopback by a process the layer above handed the token to — and
+both wait for the slice that needs them.

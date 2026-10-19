@@ -1,6 +1,8 @@
 /**
  * What a holder serves (`src/a2a/served.ts`): the card it declares, read as a viewer's client reads it (`cardOfJson`,
  * `authOf`), and the reading surface over a driver a test moves by hand — the three methods served, and every other refused.
+ * And the viewer's side as the options take it: the seam that dials the follow alone (`holderSeamOf`), and what
+ * `Engine.layer` refuses of a `holder` entry, in the order it refuses it (`optionsRefusalOf`).
  *
  * Each refusal is made to refuse, at shipped defaults, and each fact about the card is made to fail with the fixture that
  * breaks it: a card whose scheme is taken off makes `authOf` send no header, which is why the scheme is on it.
@@ -16,6 +18,7 @@ import { cardOfJson } from '../src/a2a/card.ts';
 import { authOf } from '../src/a2a/remote-client.ts';
 import { BEARER, cardJsonOf, REFUSED, servedCardOf, ServedHandler } from '../src/a2a/served.ts';
 import { holderRefusal, holderSeamOf } from '../src/a2a/holder-follow.ts';
+import { optionsRefusalOf } from '../src/service/options.ts';
 import type { SeamOps } from '../src/a2a/client.ts';
 import type { Followed, RunnerOps } from '../src/harness/seam.ts';
 import type { Sighting } from '../src/core/domain.ts';
@@ -168,4 +171,31 @@ test('REFUSED: a holder named for a harness the engine does not run, for a remot
     /has no card this runtime reads: its `supportedInterfaces` /,
   );
   assert.equal(holderRefusal('claude', { card }, place), undefined, 'and the card a holder served is taken');
+});
+
+test('REFUSED by the options, in their fixed order: a ceiling and a harness speak before a holder, and a holder before the rest', () => {
+  const card = cardJsonOf(servedCardOf('claude', handOps(), URL_AT));
+  const harnesses = { claude: 'claude' } as const;
+  assert.equal(optionsRefusalOf({ harnesses, holder: { claude: { card } } }), undefined, 'a holder of a harness it runs, with the card it served');
+  assert.match(optionsRefusalOf({ harnesses, holder: { codex: { card } } })!, /`holder` names the `codex` harness, which this engine does not run/);
+  assert.match(
+    optionsRefusalOf({ harnesses: { claude: 'claude', reviewer: { url: 'https://a.example' } }, holder: { reviewer: { card } } })!,
+    /`holder` names the `reviewer` harness, which is a remote A2A agent/,
+  );
+  assert.match(optionsRefusalOf({ harnesses, holder: { claude: { card: { name: 'claude' } } } })!, /has no card this runtime reads/);
+  assert.match(
+    optionsRefusalOf({ maxConcurrent: 0, harnesses, holder: { codex: { card } } })!,
+    /is not a ceiling/,
+    'the ceiling speaks first, before any harness or holder',
+  );
+  assert.match(
+    optionsRefusalOf({ harnesses: { claude: 'claude', other: { ...handOps(), pool: '' } }, holder: { codex: { card } } })!,
+    /names the `pool`/,
+    'then the harnesses, before any holder',
+  );
+  assert.match(
+    optionsRefusalOf({ harnesses, holder: { codex: { card } }, unschedulable: 'yes' as never })!,
+    /`holder` names the `codex` harness/,
+    'then the holders, before `unschedulable`, `credentials`, `missingCredential` and the telemetry',
+  );
 });

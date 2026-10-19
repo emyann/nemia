@@ -140,6 +140,13 @@ down is in `docs/architecture.md`, *Who owns what*.
   subscription is aborted first (`abortedOnReturn`, `a2a/remote-follow.ts`), or its interruption never ends.
 - **A test that shortens a remote harness's `requestMs` hands the agent its card (`opsOn`, `test/remote-follow.test.ts`) and waits for the
   send's answer**, or every request it does not test (the card read again after a failure, a subscription's headers) is held to it.
+- **A card a holder serves carries its security scheme, or a client finds no requirement and sends no header** (`authOf`): a port that
+  then refuses every request looks like a wrong token (`servedCardOf`, `a2a/served.ts`).
+- **A holder's port refuses a token in HTTP 401, never a JSON-RPC error inside a 200** (`a2a/listener.ts`): `clientFetchOf` reads the
+  kind off the status, and a refusal inside a 200 reaches a viewer as an unsupported operation, naming the wrong fix.
+- **A follow of a session this process runs is answered here**, off the files and the holder's own fan-out (`heldHere`,
+  `harness/claude/attached-follow.ts`): a test of a holder and a viewer is two processes, or the viewer dials nothing
+  (`test/holder-follow.boundary.test.ts`).
 - **`Stream.retry` starts its schedule again at the attempt's first output**, an empty array included: a bound on failures in a row
   is counted by hand (`drops` in `followTask`).
 

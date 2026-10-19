@@ -18,7 +18,7 @@ import { Engine } from '../src/index.ts';
 import { HARNESS, standSpec } from './holder-stand.ts';
 import { builtEngine } from './engine.ts';
 import { scratch } from './scratch.ts';
-import { bell, until, WAITED } from './waits.ts';
+import { bell, until, WAITED } from '../src/waits/index.ts';
 
 const VIEWER = path.join(import.meta.dirname, 'fixtures', 'viewer-engine.ts');
 

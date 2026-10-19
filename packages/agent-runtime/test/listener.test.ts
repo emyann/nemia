@@ -15,7 +15,7 @@ import { tokenFileOf, tokenFolderOf } from '../src/a2a/holder-token.ts';
 import type { Followed, RunnerOps } from '../src/harness/seam.ts';
 import type { Sighting } from '../src/core/domain.ts';
 import { scratch } from './scratch.ts';
-import { WAITED } from './waits.ts';
+import { WAITED } from '../src/waits/index.ts';
 
 const NAME = 'ae/t1/1';
 

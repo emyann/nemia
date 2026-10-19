@@ -13,6 +13,7 @@ import { Result, Schema } from 'effect';
 import { parseAgent, parseWorkflow, type Agents, type Workflow } from '../src/workflow.ts';
 import { briefBody, renderedFlags, renderedPrompt, rendersAgent, unrendered } from '../src/agents/agents.ts';
 import { FrozenStepSchema, loadWorkflows } from '../src/folder/folder.store.ts';
+import { headedLayers } from '../src/workflow/index.ts';
 import { scratch } from './scratch.ts';
 import { teamCopy } from './team.ts';
 import { testPlace } from '../place/memory/index.ts';
@@ -94,7 +95,7 @@ test('an agent told nothing in its file but given custom instructions is rendere
   const step = parseWorkflow('build', '---\nplace: git\nagent: quiet\n---\nReply in Spanish.\n', undefined, agents);
   assert.equal(rendersAgent(step), true);
   assert.deepEqual(renderedFlags(step, '/r'), { appendSystemPromptFile: '/r/prompt.md' });
-  assert.equal(renderedPrompt(step, []), 'Reply in French.\n');
+  assert.equal(renderedPrompt(step, []), `${headedLayers([['custom', 'Reply in French.']])}\n`);
   const gone = unrendered(step);
   assert.equal(renderedFlags(gone, '/r'), undefined, 'no flag names a file that is not there');
   assert.equal(gone.agent?.customInstructions, undefined);

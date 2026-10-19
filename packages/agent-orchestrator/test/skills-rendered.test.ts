@@ -17,6 +17,7 @@ import { appliesOf } from '../src/skills/skills.ts';
 import { briefBody, pluginOf, unrendered } from '../src/agents/agents.ts';
 import { scratch } from './scratch.ts';
 import { placesOf, SHIPPED_HOLDERS, TEAM, TEAM_DEV } from './team.ts';
+import { headedLayers } from '../src/workflow/index.ts';
 
 const ROOT = scratch('wf-skills-rendered-');
 process.env.WF_ROOT = ROOT;
@@ -86,7 +87,10 @@ test("an agent renders as `nemia start` renders it: skills to load named in its 
     const prompt = fs.readFileSync(path.join(at, 'prompt.md'), 'utf8');
     const agent = step.agent!;
     const plugin = pluginOf(agent.name);
-    assert.ok(prompt.startsWith(agent.instructions!.trimEnd()), `${folder}/${name}: the agent's instructions first`);
+    assert.ok(
+      prompt.startsWith(headedLayers([['instructions', agent.instructions!]])),
+      `${folder}/${name}: the agent's instructions first, under the heading of their layer`,
+    );
     const loaded = agent.skills!.filter((s) => !PRELOADED.includes(s));
     if (loaded.length)
       assert.ok(
@@ -115,7 +119,10 @@ test("a step whose rendered folder is gone is told every skill whole in its brie
   const dir = TEAM_DEV;
   for (const step of loadWorkflows(dir).filter((s) => s.agent?.skills?.length)) {
     const brief = briefBody(unrendered(step, skillsAgain(step, skillsFor(dir))));
-    assert.ok(brief.startsWith(step.agent!.instructions!.trimEnd()), `${step.name}: the instructions first`);
+    assert.ok(
+      brief.startsWith(headedLayers([['instructions', step.agent!.instructions!]])),
+      `${step.name}: the instructions first, under the heading of their layer`,
+    );
     for (const skill of step.agent!.skills!) {
       const file = path.join(TEAM, 'skills', skill, 'SKILL.md');
       assert.ok(

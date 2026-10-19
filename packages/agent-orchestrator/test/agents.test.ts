@@ -21,6 +21,7 @@ import {
 } from '../src/workflow.ts';
 import { loadWorkflows, workflowFolder, workflowsIn } from '../src/folder/folder.store.ts';
 import { loadAgents } from '../src/agents/read.store.ts';
+import { headedLayers } from '../src/workflow/index.ts';
 import { scratch } from './scratch.ts';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runGiven } from './placed.ts';
@@ -247,7 +248,7 @@ test("a step that names an agent runs with the agent's role keys, its own keys w
   assert.deepEqual(build.disallowedTools, ['SendMessage']);
   assert.deepEqual(build.after, ['plan']);
   assert.equal(build.check, 'npm test');
-  assert.equal(build.body, 'Implement what you are asked.\n\nBuild the parser first.');
+  assert.equal(build.body, headedLayers([['instructions', 'Implement what you are asked.'], ['policy', 'Build the parser first.']]));
   assert.deepEqual(
     build.agent,
     {
@@ -262,12 +263,12 @@ test("a step that names an agent runs with the agent's role keys, its own keys w
   );
 
   const bare = parseWorkflow('build', '---\nplace: git\nagent: implementer\n---\n', undefined, agents);
-  assert.equal(bare.body, 'Implement what you are asked.', "no note of its own: the agent's words alone");
+  assert.equal(bare.body, headedLayers([['instructions', 'Implement what you are asked.']]), "no note of its own: the agent's words alone");
   assert.equal(bare.model, 'opus');
 
   const same = parseWorkflow(
     'build',
-    '---\nplace: git\nharness: claude\nmodel: opus\neffort: high\ncontext: 200k\ndisallowedTools: SendMessage\n---\nImplement what you are asked.\n',
+    `---\nplace: git\nharness: claude\nmodel: opus\neffort: high\ncontext: 200k\ndisallowedTools: SendMessage\n---\n${headedLayers([['instructions', 'Implement what you are asked.']])}\n`,
   );
   const { agent: _agent, ...resolved } = bare;
   assert.deepEqual(resolved, same, 'resolved, it is the step written out whole');
@@ -304,9 +305,13 @@ test('a step whose file names no agent, hired one, is resolved exactly as if its
   );
   assert.deepEqual(hired, written);
   assert.equal(hired.agent?.name, 'implementer');
-  assert.equal(hired.body, 'Implement what you are asked.\n\nBuild the parser first.');
+  assert.equal(hired.body, headedLayers([['instructions', 'Implement what you are asked.'], ['policy', 'Build the parser first.']]));
   const bare = parseWorkflow('implement', '---\nafter: plan\nplace: git\n---\n', undefined, agents, undefined, hire('implementer'));
-  assert.equal(bare.body, 'Implement what you are asked.', "a step with no note of its own is told its hire's words");
+  assert.equal(
+    bare.body,
+    headedLayers([['instructions', 'Implement what you are asked.']]),
+    "a step with no note of its own is told its hire's words",
+  );
   assert.equal(parseWorkflow('implement', text, undefined, agents).agent, undefined, 'unhired, it names no agent');
 });
 
@@ -634,7 +639,7 @@ test('nemia start freezes the resolved steps on the run: an agent edited after t
   assert.ok(run.workflow, 'the workflow is frozen on the record at start');
   const [build] = run.workflow;
   assert.equal(build.model, 'opus');
-  assert.equal(build.body, 'Implement what you are asked.\n\nBuild it.');
+  assert.equal(build.body, headedLayers([['instructions', 'Implement what you are asked.'], ['policy', 'Build it.']]));
   assert.deepEqual(build.agent, {
     name: 'implementer',
     keys: ['place'],
@@ -645,7 +650,7 @@ test('nemia start freezes the resolved steps on the run: an agent edited after t
   });
   assert.equal(
     fs.readFileSync(path.join(agentFilesDir(run, 'build'), 'prompt.md'), 'utf8'),
-    'Implement what you are asked.\n',
+    `${headedLayers([['instructions', 'Implement what you are asked.']])}\n`,
     'the agent as the run renders it for Claude Code is frozen with the workflow: the edit reaches neither',
   );
 });

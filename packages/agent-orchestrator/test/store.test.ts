@@ -42,6 +42,7 @@ import { testPlace } from '../place/memory/index.ts';
 import type { PlaceService } from '../src/place/place.store.ts';
 import type { PlaceOutcome } from '../src/place/place.ts';
 import { placeOver, unreadBy } from './place-over.ts';
+import { PRECEDENCE } from '../src/brief/index.ts';
 
 const ROOT = scratch('wf-store-');
 const WORKFLOW = path.join(ROOT, 'workflow');
@@ -1590,7 +1591,7 @@ test('implement ⇄ review: `again: true` files round 2 — implement continued 
   await toReview(b, run.id, 2, false);
   const review2 = b.tasks.get(`${run.id}-review-try2`)!.spec;
   assert.equal(review2.resumeFrom, undefined, 'the reviewer is a new session each round');
-  assert.match(review2.brief, /^review it\n\n## What was asked for\n\nadd a flag/);
+  assert.ok(review2.brief.startsWith(`${PRECEDENCE}\n\nreview it\n\n## What was asked for\n\nadd a flag`), review2.brief);
   assert.deepEqual(dataUnder(review2.brief, '## Replies from implement'), { replies: REPLIES });
   assert.doesNotMatch(review2.brief, /IMPLEMENTER-SUMMARY|REVIEWER-SUMMARY/);
 

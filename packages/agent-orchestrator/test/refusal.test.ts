@@ -112,8 +112,8 @@ function modulesLoaded(entry: string, more: readonly string[] = []): string[] {
  * pinned `effect`.
  */
 const PINNED_MODULES: Record<string, { all: number; effect: number }> = {
-  'agent-orchestrator/run': { all: 96, effect: 15 },
-  'agent-orchestrator/workflow': { all: 50, effect: 15 },
+  'agent-orchestrator/run': { all: 97, effect: 15 },
+  'agent-orchestrator/workflow': { all: 51, effect: 15 },
 };
 
 const isEffectModule = (url: string): boolean => url.includes('/node_modules/effect/');

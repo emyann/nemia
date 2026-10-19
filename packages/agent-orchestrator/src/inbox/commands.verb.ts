@@ -84,7 +84,7 @@ export const INBOX: Command<{ cards: InboxListing[] }> = {
   nemia: 'read',
   route: { method: 'GET', path: '/api/inbox', status: 200 },
   manual: INBOX_HELP,
-  handler: () => tried(() => ({ cards: readInbox() })),
+  handler: (_args, _env, _home, kept) => tried(() => ({ cards: readInbox(kept?.records?.inbox) })),
   print: ({ cards }) =>
     cards.length
       ? [

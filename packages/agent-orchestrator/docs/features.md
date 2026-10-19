@@ -4538,12 +4538,13 @@ P0.7 of `docs/pivot-2026-09-18.md`, then its source changed: the quota comes fro
 runtime: the api reads the engine's `quota` for the `claude` harness through `engine()`, and starts no process; the keep and the
 backoff stay in the api.
 
-- **The ask** (`claudeQuota` in `packages/agent-runtime/src/harness/claude/quota.ts`, the engine's `quota`). The runtime starts the `claude` on its PATH as `claude -p --input-format stream-json
-  --output-format stream-json --verbose --no-session-persistence --strict-mcp-config --setting-sources ''`, writes one
-  `control_request` with subtype `get_usage`, reads stdout for the `control_response` whose `request_id` is its own, and closes stdin,
-  which ends the process. No model turn, nothing spent. It runs from `os.tmpdir()`, with the variables a Claude Code session around
-  the engine hands its children dropped by name (`SESSION_KEYS`) and its sign-in and provider kept, and is killed at 15 s (SIGTERM,
-  SIGKILL 2 s later).
+- **The ask** (`claudeQuota` in `packages/agent-runtime/src/harness/claude/quota.ts`, the engine's `quota`). The runtime opens one
+  Agent SDK query over the `claude` on its PATH (`pathToClaudeCodeExecutable: QUOTA_COMMAND`, the Claude Code the sessions run on)
+  and puts the SDK's usage question (`usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET`, `skipBehaviors: true`): the SDK
+  chooses the arguments, writes the `get_usage` control request and matches its answer. No model turn, nothing spent. It runs from
+  `os.tmpdir()`, with the variables a Claude Code session around the engine hands its children dropped by name (`SESSION_KEYS`) and
+  its sign-in and provider kept. The query is closed at 15 s, or sooner on an answer or an interruption, and its process is gone by
+  the time the ask returns (`packages/agent-runtime/test/quota.boundary.test.ts`).
 - **The keep** (`readQuota`). The api holds one answer in memory for `QUOTA_KEEP_MS`, 10 min (`HKB_QUOTA_KEEP_MS`; the e2e sets 0),
   with at most one ask in flight, which concurrent reads join. Nothing asks unless a board reads: the web polls every 60 s, every
   2 s while the state is `asking`. It was 3 min until 2026-09-19; 10 because the windows are five hours and a week long, and twenty
@@ -4558,7 +4559,7 @@ backoff stay in the api.
   (`rate_limits_available: false`: an API key, Bedrock, Vertex, or not signed in), `unanswered` (`rate_limits_available: true` and
   `rate_limits: null`: signed in, and Anthropic's usage service gave Claude Code nothing — seen by the owner on 2026-09-19, hours
   after the quota began to come from `get_usage`, with `Usage fetch returned a fieldless or non-object body (in-band error)` in
-  2.1.278's `--debug` log; said as possibly the service limiting how often it is asked, never as a fact), `no-claude` (the spawn's ENOENT), `timeout`,
+  2.1.278's `--debug` log; said as possibly the service limiting how often it is asked, never as a fact), `no-claude` (the SDK's `executable_not_found`), `timeout`,
   `failed` (exit code or signal, and stderr's last line; or an ask the engine rejected, in its words), `unknown` (an error answer, or a shape not read, named). A window is `marked`
   at `QUOTA_MARK_PERCENT`, 80, and `reset` when its `resets_at` has passed since the answer. Only the known windows are shown —
   `five_hour`, `seven_day`, `seven_day_sonnet`, `seven_day_opus` — since the answer carries others under codenames, at 0% with no

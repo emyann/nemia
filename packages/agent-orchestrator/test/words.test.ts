@@ -166,7 +166,7 @@ const HARNESS_WORDS: Baseline = {
   'packages/agent-orchestrator/src/agents/read.store.ts': { count: 1, ...MOVES.checkout },
   'packages/agent-orchestrator/src/artifacts/artifacts.store.ts': { count: 2, card: 'slice-2' },
   'packages/agent-orchestrator/src/artifacts/artifacts.ts': { count: 3, card: 'slice-2' },
-  'packages/agent-orchestrator/src/branches/branches.ts': { count: 5, ...MOVES.checkout },
+  'packages/agent-orchestrator/src/branches/branches.ts': { count: 4, ...MOVES.checkout },
   'packages/agent-orchestrator/src/cap/cap.ts': { count: 6, card: 'slice-3' },
   'packages/agent-orchestrator/src/cli/flags.ts': { count: 9, card: 'slice-4' },
   'packages/agent-orchestrator/src/closeout/closeout.ts': { count: 5, ...MOVES.render },

@@ -11,6 +11,7 @@
  */
 import { Result, Schema } from 'effect';
 import { firstRefusal } from '../../core/index.ts';
+import type { PartialMark } from '../detached/follow.ts';
 
 const Count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
 
@@ -175,3 +176,19 @@ export const printedLinesOf = (output: string, kinds: readonly PrintedKind[]): {
 
 /** A line of `kind`, as its schema in `PRINTED` decodes it. */
 export type Printed<K extends PrintedKind> = (typeof PRINTED)[K]['Type'];
+
+/**
+ * What one `stream_event`'s event says of the text being written, as a follow reads it (`PartialMark`): a message begun, a piece of
+ * the text block at its index, a block written whole. Read off the event's own fields, so the same reading serves a line decoded
+ * from a kept stdout (`claudePartials`) and an event handed by the Agent SDK as it comes (`attached-follow.ts`).
+ *
+ * @returns nothing for anything else — a piece of a tool call's input among them, so a partial never carries unvalidated input
+ */
+export const partialMarksOf = (event: unknown): PartialMark[] => {
+  const e = (event ?? {}) as { type?: unknown; index?: unknown; message?: { id?: unknown }; delta?: { type?: unknown; text?: unknown } };
+  if (e.type === 'message_start' && typeof e.message?.id === 'string') return [{ begun: e.message.id }];
+  if (e.type === 'content_block_stop' && typeof e.index === 'number') return [{ stopped: e.index }];
+  if (e.type === 'content_block_delta' && typeof e.index === 'number' && e.delta?.type === 'text_delta' && typeof e.delta.text === 'string')
+    return [{ index: e.index, text: e.delta.text }];
+  return [];
+};

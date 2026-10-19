@@ -13,6 +13,10 @@
  * a name holding it: the files quote the short of a long name. The patterns match across line breaks, since a citation wraps.
  *
  * The test reads files outside this package: after a change to a `CLAUDE.md` or to a test's name, `npx turbo run test --force`.
+ *
+ * How many citations the files hold is no measure of this guard: the files are being cut down to what no test can refuse, so the corpus
+ * shrinks on purpose and a floor near its size would refuse a cut rather than a broken citation. The floor below only says the walk
+ * read the files at all; that a citation is read, and a name with it, is proven by the `REFUSED:` fixture.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -155,11 +159,7 @@ test('every test file each CLAUDE.md cites is there, and every test name it quot
   assert.ok(files.length > 200, `the walk found ${files.length} test files, far fewer than the repository has`);
   const docs = claudeFiles(ROOT);
   const cited = docs.flatMap((doc) => citesOf(fs.readFileSync(path.join(ROOT, doc), 'utf8')));
-  assert.ok(cited.length > 100, `the files cite ${cited.length} tests, far fewer than they do`);
-  assert.ok(
-    cited.filter((cite) => cite.name !== undefined).length > 0,
-    'no citation was read as quoting a test name: the name pattern matches nothing the files write',
-  );
+  assert.ok(cited.length > 20, `the files cite ${cited.length} tests, far fewer than they do`);
   const broken = docs.flatMap((doc) => brokenCites(ROOT, doc, files));
   assert.deepEqual(broken, [], 'correct the citation to the test that holds the rule, or delete the line with its test');
 });

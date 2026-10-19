@@ -155,7 +155,7 @@ export const CHECK_AFFECTING: readonly string[] = [
 ];
 
 /**
- * Where the next agent reads what this one learned (CLAUDE.md's "When you miss"): these, and the `docs/` of
+ * Where the next agent reads what this one learned: these, and the `docs/` of
  * each workspace package (`lessonGlobs`). Not any `docs/`: an app's `src/routes/docs/` is product code, and a
  * lesson line that counts it says a lesson was written when none was — the one wrong answer the line is for.
  */

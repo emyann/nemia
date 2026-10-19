@@ -326,6 +326,56 @@ test('REFUSED: a cursor the feed never gave is a 400 that names it and says what
   await taken.reader.cancel();
 });
 
+test('`from=end` starts the stream at the feed as it stands: none of the lines it holds, and the next one written', WAITED, async (t) => {
+  const pass = emptyFeed();
+  await pass({ 'r-1': planAt('running') });
+  const { reader, text } = await open('?from=end');
+  try {
+    const [gate] = await pass({ 'r-1': planAt('awaiting approval', 'approve it: nemia approve r-1 plan') });
+    const said = await readUntil(t, reader, text, (s) => s.length >= 1);
+    assert.deepEqual(
+      said,
+      [{ event: 'step', data: JSON.stringify(gate), id: String(end()) }],
+      'the line written after it opened, and nothing of the feed it opened on',
+    );
+  } finally {
+    await reader.cancel();
+  }
+});
+
+test('a cursor wins over `from=end`: a Last-Event-ID resumes where its reader was, and the lines after it are sent', WAITED, async (t) => {
+  const pass = emptyFeed();
+  await pass({ 'r-1': planAt('running') });
+  const size = end();
+  const { reader, text } = await open('?from=end', { 'Last-Event-ID': '0' });
+  try {
+    const said = await readUntil(t, reader, text, (s) => s.at(-1)?.id === String(size));
+    assert.ok(said.length >= 1, 'the feed from the cursor, not from its end: an EventSource reconnecting misses nothing');
+    assert.equal(said.at(-1)!.id, String(size), 'read to the end of the feed it opened on');
+  } finally {
+    await reader.cancel();
+  }
+});
+
+test('REFUSED: a `from` that is not `end` is a 400 before the stream opens, saying `end` is the one value it takes', async () => {
+  const pass = emptyFeed();
+  await pass({ 'r-1': planAt('running') });
+  for (const raw of ['start', '0', 'END', '']) {
+    const res = await app.request(`${STREAM}?from=${raw}`);
+    const where = `?from=${raw}`;
+    assert.equal(res.status, 400, where);
+    assert.match(res.headers.get('content-type') ?? '', /^application\/json/, `${where}: an answer, not a stream`);
+    const { error } = (await res.json()) as { error: string };
+    assert.equal(
+      error,
+      `\`${raw}\` is not a start this feed takes: \`from=end\` starts at the feed's end, which is the one value \`from\` takes; pass none to read the feed from the start, or a cursor this stream gave as \`after\`.`,
+      where,
+    );
+  }
+  const taken = await open('?from=end');
+  await taken.reader.cancel();
+});
+
 test('a feed truncated under the stream ends it: `unreadable`, not tried again, and the response closes', WAITED, async (t) => {
   const pass = emptyFeed();
   await pass({ 'r-1': planAt('running') });

@@ -25,7 +25,7 @@ async function expectKept(panel: ReturnType<typeof chatPanelOf>, words: string):
   await expectTexts(kept.locator('[data-chat-bubble="kept"]'), [words], 'drawn as the person’s own words, failing');
   await expectTexts(kept.locator('[data-chat-tag="kept"]'), ['Not sent'], 'tagged as not sent');
   await expectTexts(kept.getByRole('button'), ['Send again', 'Edit', 'Discard'], 'send it again, change it, or throw it away');
-  const band = panel.locator('[data-chat-band="lost"]');
+  const band = panel.locator('[data-band="lost"]');
   await expectVisible(band, 'and a line says the daemon does not answer');
   if ((await band.getAttribute('role')) !== 'alert') throw new Refused('said as an alarm: the board has lost the daemon');
   const said = (await band.textContent()) ?? '';
@@ -69,7 +69,7 @@ export default {
       await down.goto(page.url(), { waitUntil: 'load' });
 
       const unread = await openChat(down);
-      const band = unread.locator('[data-chat-band="unreadable"]');
+      const band = unread.locator('[data-band="unreadable"]');
       await expectVisible(band, 'the api refusing the read, the panel says the board cannot read her chat');
       if ((await band.getAttribute('role')) !== 'alert') throw new Refused('said as an alarm: the board has what it cannot read');
       await expectCount(
@@ -121,7 +121,7 @@ export default {
         chatPanelOf(down).locator('[data-chat-bubble="person"]', { hasText: CHANGED }),
         'and it stands as the person’s own words, the api holding it',
       );
-      await expectCount(chatPanelOf(down).locator('[data-chat-band="lost"]'), 0, 'the daemon answering, nothing is lost any more');
+      await expectCount(chatPanelOf(down).locator('[data-band="lost"]'), 0, 'the daemon answering, nothing is lost any more');
       if (took !== 1) throw new Refused(`the api takes it once and no more — it took it ${took} times`);
       await settled(down);
       await photograph(down, path.join(OUT, `chat-kept-taken-${await themeOf(down)}.png`), { fullPage: true });

@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
 import { scratch } from './scratch.ts';
-import { until, WAITED } from './waits.ts';
+import { until, WAITED } from 'agent-runtime/testing';
 import { boundOf, HOLD_DEFAULT, heldLines, heldName } from '../../../tools/observe/render/hold.ts';
 import { dropStale, locked, lockFile, release, take, type Lock } from '../../../tools/observe/render/lock.ts';
 import { addressOf, heightOf, written, type Seen } from '../../../tools/observe/render/panels.ts';

@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
+import { RefreshCwIcon } from 'lucide-react';
 import { Conversation } from '@/components/conversation/Conversation';
+import { ConversationBand } from '@/components/conversation/ConversationBand';
 import { DebugPanel } from '@/components/DebugPanel';
 import { PromptBox } from '@/components/conversation/PromptBox';
 import { RunGone } from '@/components/RunGone';
@@ -119,6 +121,11 @@ function Session({ run, step }: { run: RunDetail; step: Step }) {
           )}
         </div>
         <StepNote note={step.note} />
+        {following.retrying !== null && (
+          <ConversationBand role="status" what="retrying" icon={<RefreshCwIcon />} title="Reading the session again">
+            {`${following.retrying} Nothing is lost; what it says next arrives a moment later.`}
+          </ConversationBand>
+        )}
         {following.error && <p className="text-body-medium text-failure">{following.error}</p>}
       </header>
       <DebugPanel run={run} step={step} />

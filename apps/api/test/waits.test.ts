@@ -1,6 +1,6 @@
 /**
- * The wait a test makes on its event (`until`, `bell`, `test/waits.ts`), a copy of the runtime's held here byte for byte, and the guard
- * that keeps a hand-written deadline out of the package's tests (`DEADLINES`). The helper's own tests are the runtime's.
+ * The wait a test makes on its event (`until`, `bell`), taken from the runtime through `agent-runtime/testing`, and the guard that
+ * keeps a hand-written deadline out of the package's tests (`DEADLINES`). The helper's own tests are the runtime's.
  *
  * `DEADLINES` counts, file by file, each `now()` of `Date` or `performance` a number is added to, or a start taken from and held under a
  * bound, in the package's tests: each left is a mocked clock, a timestamp or a spin, never a wait, and a count only shrinks
@@ -11,21 +11,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { WAITED } from './waits.ts';
+import { WAITED } from 'agent-runtime/testing';
 
 const TEST = import.meta.dirname;
 const PACKAGE = path.join(TEST, '..');
-/** The one copy the others are held to. */
-const RUNTIME = path.join(TEST, '..', '..', '..', 'packages', 'agent-runtime', 'test', 'waits.ts');
-
-test("the helper is the runtime's, byte for byte", () => {
-  assert.equal(
-    fs.readFileSync(path.join(TEST, 'waits.ts'), 'utf8'),
-    fs.readFileSync(RUNTIME, 'utf8'),
-    'copy packages/agent-runtime/test/waits.ts over this one: a change to it is made there and copied to every package',
-  );
-});
-
 /** The default timeout a `test` script gives every test (`--test-timeout=<ms>`, one word), or null for none. */
 const defaultTimeout = (script: string): number | null => {
   const word = script.split(/\s+/).find((w) => /^--test-timeout=[1-9]\d*$/.test(w));
@@ -93,7 +82,9 @@ const testFiles = (): string[] =>
 const deadlineBreaks = (counts: ReadonlyMap<string, number>, allowed: Readonly<Record<string, Allowance>>): string[] => [
   ...[...counts].flatMap(([file, n]) =>
     n > (allowed[file]?.count ?? 0)
-      ? [`${file} has ${n} hand-written deadlines, ${allowed[file]?.count ?? 0} allowed: wait with \`until\` (test/waits.ts) instead`]
+      ? [
+          `${file} has ${n} hand-written deadlines, ${allowed[file]?.count ?? 0} allowed: wait with \`until\` (agent-runtime/testing) instead`,
+        ]
       : [],
   ),
   ...Object.entries(allowed).flatMap(([file, { count }]) =>
@@ -120,7 +111,7 @@ test('REFUSED: a deadline written into a test is over its allowance, and an allo
   for (const deadline of [planted, compared]) {
     counts.set('src/factory/feed.test.ts', (counts.get('src/factory/feed.test.ts') ?? 0) + deadlinesIn(deadline));
     assert.deepEqual(deadlineBreaks(counts, DEADLINES), [
-      'src/factory/feed.test.ts has 1 hand-written deadlines, 0 allowed: wait with `until` (test/waits.ts) instead',
+      'src/factory/feed.test.ts has 1 hand-written deadlines, 0 allowed: wait with `until` (agent-runtime/testing) instead',
     ]);
     counts.set('src/factory/feed.test.ts', 0);
   }

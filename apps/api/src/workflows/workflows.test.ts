@@ -295,6 +295,7 @@ test("GET /api/workflows/:from/:name/:step is a step's page: which workflow and 
         policy: 'Review it.',
         addedSkills: [],
         fence: [],
+        folderFiles: true,
         task: null,
         via: 'brief',
       },

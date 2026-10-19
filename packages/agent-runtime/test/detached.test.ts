@@ -53,7 +53,7 @@ import { FILES_STREAM, resultLine, SESSION, SKILLS_STREAM, stream } from './read
 import { ioCounts } from '../src/core/engine/tally.ts';
 import { monoNow } from '../src/core/engine/now.ts';
 import { builtEngine } from './engine.ts';
-import { until, WAITED, type Waiter } from './waits.ts';
+import { until, WAITED, type Waiter } from '../src/waits/index.ts';
 
 const root = () => scratch('ae-detached-');
 const sh = (script: string): HarnessSpec => ({ name: 'sh', command: () => ({ cmd: 'sh', args: ['-c', script] }) });

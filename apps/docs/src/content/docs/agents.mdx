@@ -92,8 +92,13 @@ What reaches an agent comes in five layers, each written by whoever owns it:
 The number is precedence, not arrival. Where two layers say different things, the higher number wins — the folder's facts over the
 role's generic words, the factory over the folder, the step's process over the factory — and the task is above them all. The order the
 words arrive in is a separate thing: the instructions, then the custom instructions, then the factory's rules, then the step's policy,
-then the task, with the folder's files read by the harness itself wherever the agent works. No session is told this precedence yet: it
-is coming, not built, and until it is, an agent resolves a conflict as its harness and its own reading lead it to.
+then the task, with the folder's files read by the harness itself wherever the agent works.
+
+A session is told this precedence. Every layer Nemia composes is headed by its number and its owner — `## 1. Instructions — your
+role's own words`, `## 4. The factory's rules — every step of this factory` — in the prompt a step's agent is rendered into, or at the
+head of its brief on a harness that takes no prompt of ours. And every brief opens on one sentence that names each layer by number and
+says the higher number wins, the task above them all. It is the last thing Nemia says, after the harness's own statement that the files
+of the folder the session works in override everything, so a session reads it as an instruction rather than as a note.
 
 **Where a new instruction goes.** Given something you want an agent to be told, ask these in order and stop at the first yes:
 

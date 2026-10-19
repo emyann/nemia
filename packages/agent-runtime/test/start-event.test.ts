@@ -22,7 +22,7 @@ import { Engine } from '../src/index.ts';
 import { scratch } from './scratch.ts';
 import { warned } from './warned.ts';
 import { builtEngine } from './engine.ts';
-import { until, WAITED, type Waiter } from './waits.ts';
+import { until, WAITED, type Waiter } from '../src/waits/index.ts';
 import { resultLine, SESSION, stream } from './reader-streams.ts';
 
 const THREAD = '01a09996-d343-7932-8971-b2f209ba315b';

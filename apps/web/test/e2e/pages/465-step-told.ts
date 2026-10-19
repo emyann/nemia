@@ -17,7 +17,7 @@ const RECENT = { id: 'reviews-in-a-factory-e2e47', title: 'Reviews in a factory'
 const PHONE = { width: 390, height: 844 };
 
 /** The layers a step with an agent is told, read in a factory, in the order the page draws them. */
-const LAYERS = ['instructions', 'custom', 'factory', 'policy', 'task'];
+const LAYERS = ['instructions', 'custom', 'folder', 'factory', 'policy', 'task'];
 
 /** What the rules' layer says of a step told none, read in a factory. */
 const NONE_TOLD = 'This step is told none: the factory keeps none that can be told, or the step is on a remote agent';
@@ -156,7 +156,7 @@ export default {
       await expectHref(page, '[data-home="custom"] a', `/agents/repo/${REVIEWER}#custom-instructions`, 'your custom instructions too');
       const rules = told.locator('[data-layer="factory"]');
       await expectVisible(
-        rules.getByRole('heading', { name: "The factory's rules", exact: true }),
+        rules.getByRole('heading', { name: "4. The factory's rules", exact: true }),
         'read in a factory, its rules are a layer of their own',
       );
       await expectVisible(rules.getByText(NONE_TOLD, { exact: true }), 'which says the step is told none');

@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseAgent, parseWorkflow, type Agents, type Workflow } from '../src/workflow.ts';
 import { briefBody, renderedFlags, renderedPrompt, rendersAgent, unrendered } from '../src/agents/agents.ts';
+import { headedLayers } from '../src/workflow/index.ts';
 import { scratch } from './scratch.ts';
 import { teamCopy } from './team.ts';
 import { testEngine } from 'agent-runtime/testing';
@@ -159,7 +160,7 @@ test('an agent told nothing in its file, in a factory with rules, is rendered, i
   const step = parseWorkflow('build', text, undefined, agents, undefined, undefined, RULES);
   assert.equal(rendersAgent(step), true);
   assert.deepEqual(renderedFlags(step, '/r'), { appendSystemPromptFile: '/r/prompt.md' });
-  assert.equal(renderedPrompt(step, []), 'Reply in German.\n');
+  assert.equal(renderedPrompt(step, []), `${headedLayers([['factory', 'Reply in German.']])}\n`);
   assert.equal(briefBody(step), 'Reply in Spanish.', 'its brief is its own note alone');
   assert.equal(rendersAgent(parseWorkflow('build', text, undefined, agents)), false, 'told nothing, it is not rendered');
   const gone = unrendered(step);
@@ -211,7 +212,11 @@ test('a run in a factory with no rules, and a run in the default factory, are to
   }
   assert.equal(promptOf(none, 'implement'), promptOf(inDefault, 'implement'));
   assert.notEqual(promptOf(told, 'implement'), promptOf(none, 'implement'));
-  assert.equal(promptOf(told, 'implement').replace(`\n\n${RULES}`, ''), promptOf(none, 'implement'), 'the rules are all that was added');
+  assert.equal(
+    promptOf(told, 'implement').replace(`\n\n${headedLayers([['factory', RULES]])}`, ''),
+    promptOf(none, 'implement'),
+    'the rules are all that was added',
+  );
   assert.deepEqual(
     frozen(told.id).map(({ body: _b, agent, ...keys }) => ({ ...keys, agent: { ...agent, factoryRules: undefined } })),
     frozen(none.id).map(({ body: _b, agent, ...keys }) => ({ ...keys, agent: { ...agent, factoryRules: undefined } })),

@@ -20,12 +20,13 @@ import {
   type RoundBriefing,
 } from './brief-sections.ts';
 import { landsOnCheck, merged, owesReplies } from '../status/status.ts';
+import { isRemoteHarness } from '../harness/harness.ts';
 import { mergeReviewSection, mergeSection } from '../merge/merge.ts';
 import { checkContract, checkHandedSection, landingContract, type CheckHanded, type LandingWords } from '../check/check.ts';
 import { artifactsContract } from '../artifacts/artifacts.ts';
 import { briefBody, rendersAgent, skillLayers } from '../agents/agents.ts';
 import { ownNote } from '../ending/ending.ts';
-import { FENCE_KEYS } from '../workflow/index.ts';
+import { FENCE_KEYS, headedLayers, type ComposedLayer } from '../workflow/index.ts';
 import { INPUTS_HEADING, inputsLine, mountsLine } from '../start/index.ts';
 import { resultSteps, workChecks } from '../branches/index.ts';
 import { costsSection, type WorkflowCosts } from '../costs/index.ts';
@@ -59,6 +60,19 @@ const conflictLines = (merge: { readonly conflicts: readonly string[]; readonly 
         ...(merge.say ? ['', merge.say] : []),
       ]
     : [];
+
+/**
+ * What a brief opens with, before anything else of Nemia's: which layer of what the session is told is which, and which wins where two
+ * differ. It is the last thing Nemia says before the harness's own words about the folder it works in, and the only thing of ours that
+ * lands after them, so it is where the precedence can be said as an instruction the session reads. Written once, read by `composeBrief`,
+ * which opens every brief with it, and by `toldLayers`, which cuts a brief back on it.
+ */
+export const PRECEDENCE =
+  "Of what you are told, your instructions are layer 1, the custom instructions 2, the files of the folder you work in 3, this factory's rules 4 and this step's policy 5: where two of them say different things, the higher number wins, and what is asked of you below is above them all.";
+
+/** What the brief opens with: the precedence (`PRECEDENCE`), then the layers the step is told in its brief (`briefBody`), where it has
+ * any. */
+const opened = (step: Workflow): string => [PRECEDENCE, briefBody(step)].filter(Boolean).join('\n\n');
 
 /**
  * What a step is told. THE decision about what one step knows of another.
@@ -164,7 +178,7 @@ export function composeBrief(
 
   if (step.resume && !retry && !round)
     return (
-      briefBody(step) + handed.decided.join('') + (tree.length ? ['', '## Where to look', '', ...tree].join('\n') : '') + given + contracts
+      opened(step) + handed.decided.join('') + (tree.length ? ['', '## Where to look', '', ...tree].join('\n') : '') + given + contracts
     );
 
   const earlier = step.after.length
@@ -173,7 +187,7 @@ export function composeBrief(
 
   const inputs = inputsLine(inputsDir, run.inputs, inFolder, folders);
   const request = [run.brief, ...mountsLine(step, run, folders), ...(inputs ? ['', INPUTS_HEADING, '', inputs] : [])];
-  const opening = briefBody(step) ? [briefBody(step), ''] : [];
+  const opening = [opened(step), ''];
   const parts = [...opening, '## What was asked for', '', ...request, ...handed.parents, ...handed.decided];
 
   if (step.after.length > 1 && step.workspace !== 'main' && !inFolder) {
@@ -407,7 +421,8 @@ function remoteTrySection(step: Workflow, r: RetryBriefing): string {
  * skills; the rules of the factory its run was started in (`factory`), as the run froze them; the step's policy, its own note, the skills
  * its line adds (`skillLayers`) and the fence lines it tightens its agent's with (`fenceLines`); and the task, what its brief told it
  * after them. Null where the step has none. `via` says where the agent's words, the person's and the factory's went: the session's prompt
- * (`prompt`), or the head of its brief (`brief`).
+ * (`prompt`), or the head of its brief (`brief`). `folderFiles` says whether the session reads the files of the folder it works in, the
+ * third layer, which Nemia composes nothing of: false for a step on a remote agent, which works wherever its operator put it.
  */
 export type ToldLayers = {
   agent: string | null;
@@ -418,6 +433,7 @@ export type ToldLayers = {
   policy: string;
   addedSkills: string[];
   fence: Array<{ key: string; value: string }>;
+  folderFiles: boolean;
   task: string | null;
   via: 'prompt' | 'brief';
 };
@@ -436,12 +452,12 @@ function fenceLines(step: Workflow): ToldLayers['fence'] {
 }
 
 /**
- * What the frozen `step` was told, by layer (`ToldLayers`), its task cut from `brief`, the brief it was filed with or would be: after its
- * own note where its agent is rendered (`rendersAgent`), after its instructions, custom instructions, factory's rules and note where they
- * head the brief —
- * a step on another harness or on `resume:`, or one filed with its rendered folder gone. A brief that opens with neither, then a blank
- * line — a resumed try's, or one of a record frozen without its instructions — is the task whole, never cut at a guess; a null brief is
- * no task.
+ * What the frozen `step` was told, by layer (`ToldLayers`), its task cut from `brief`, the brief it was filed with or would be: after the
+ * precedence (`PRECEDENCE`) and its own note where its agent is rendered (`rendersAgent`), after the precedence and its instructions,
+ * custom instructions, factory's rules and note, each under its heading (`headedLayers`), where they head the brief — a step on another
+ * harness or on `resume:`, or one filed with its rendered folder gone. A brief filed before either the precedence or the headings was
+ * written opens with the same layers plainly joined, and cuts on them too. A brief that opens with none of them, then a blank line — a
+ * resumed try's, or one of a record frozen without its instructions — is the task whole, never cut at a guess; a null brief is no task.
  */
 export function toldLayers(step: Workflow, brief: string | null): ToldLayers {
   const agent = step.agent;
@@ -450,12 +466,7 @@ export function toldLayers(step: Workflow, brief: string | null): ToldLayers {
   const custom = agent?.customInstructions ?? null;
   const factory = agent?.factoryRules ?? null;
   const skills = skillLayers(step);
-  const layered = [instructions, custom, factory, policy].filter(Boolean).join('\n\n');
-  const openings: Array<{ via: ToldLayers['via']; opening: string }> = [
-    ...(rendersAgent(step) ? [{ via: 'prompt' as const, opening: policy }] : []),
-    { via: 'brief', opening: layered },
-  ];
-  const opened = brief === null ? undefined : openings.find(({ opening }) => opening && brief.startsWith(`${opening}\n\n`));
+  const opened = brief === null ? undefined : openingOf(step, policy, brief);
   return {
     agent: agent?.name ?? null,
     instructions,
@@ -465,7 +476,42 @@ export function toldLayers(step: Workflow, brief: string | null): ToldLayers {
     policy,
     addedSkills: skills.added,
     fence: fenceLines(step),
-    task: brief === null || !opened ? brief : brief.slice(opened.opening.length + 2),
+    folderFiles: !isRemoteHarness(step.harness),
+    task: brief === null || !opened ? brief : brief.slice(opened.head.length),
     via: opened?.via ?? (rendersAgent(step) ? 'prompt' : 'brief'),
   };
+}
+
+/**
+ * The head of `brief` the task starts after, and where the layers above it went (`ToldLayers.via`), or undefined where the brief opens
+ * with none of the heads a brief of `step` has ever opened with. Every candidate is tried, the longest first — the precedence
+ * (`PRECEDENCE`) above each of them, as every brief composed since it was written opens; then each of them alone, as a brief filed before
+ * it does — so a head that is another's prefix never cuts a brief short.
+ *
+ * @param policy The step's own note (`ownNote`), the opening of a rendered step's brief, whose layers above went into its prompt.
+ */
+function openingOf(step: Workflow, policy: string, brief: string): { via: ToldLayers['via']; head: string } | undefined {
+  const agent = step.agent;
+  const layers: ReadonlyArray<readonly [ComposedLayer, string | undefined]> = [
+    ['instructions', agent?.instructions],
+    ['custom', agent?.customInstructions],
+    ['factory', agent?.factoryRules],
+    ['policy', policy],
+  ];
+  const bodies: Array<{ via: ToldLayers['via']; opening: string }> = [
+    ...(rendersAgent(step) ? [{ via: 'prompt' as const, opening: policy }] : []),
+    ...(agent ? [{ via: 'brief' as const, opening: headedLayers(layers) }] : []),
+    {
+      via: 'brief',
+      opening: layers
+        .map(([, words]) => words)
+        .filter(Boolean)
+        .join('\n\n'),
+    },
+  ];
+  const heads = [
+    ...bodies.map(({ via, opening }) => ({ via, head: `${PRECEDENCE}\n\n${opening ? `${opening}\n\n` : ''}` })),
+    ...bodies.filter(({ opening }) => opening).map(({ via, opening }) => ({ via, head: `${opening}\n\n` })),
+  ];
+  return heads.find(({ head }) => brief.startsWith(head));
 }

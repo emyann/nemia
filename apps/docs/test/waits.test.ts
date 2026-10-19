@@ -1,7 +1,9 @@
 /**
- * The wait a test makes on its event (`until`, `bell`, `test/waits.ts`), a copy of the runtime's held here byte for byte, the default
- * timeout the package's `test` script gives a test that waits, and the guard that keeps a hand-written bound out of a child this
- * package's tests start (`boundsIn`). The helper's own tests are the runtime's.
+ * The wait a test makes on its event (`until`, `bell`, `test/waits.ts`), a copy of the runtime's `src/waits/waits.ts`, since this
+ * package imports none, the default timeout the package's `test` script gives a test that waits, and the guard that keeps a
+ * hand-written bound out of a child this package's tests start (`boundsIn`). The helper's own tests are the runtime's, and so is the
+ * fence that holds this copy to it byte for byte (`packages/agent-runtime/test/waits.test.ts`): a test here builds no path into a
+ * package's `src` (`contract.test.ts` there).
  *
  * A bound handed to a spawn is a ceiling on a machine, and a time measured on a machine is a floor: the dev child of
  * `build.test.ts` was killed at 100 s inside the runner's 120 s. So no spawn in `test/` takes one, and the runner's
@@ -13,18 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { WAITED } from './waits.ts';
 
-const TEST = import.meta.dirname;
-const PACKAGE = path.join(TEST, '..');
-/** The one copy the others are held to. */
-const RUNTIME = path.join(TEST, '..', '..', '..', 'packages', 'agent-runtime', 'test', 'waits.ts');
-
-test("the helper is the runtime's, byte for byte", () => {
-  assert.equal(
-    fs.readFileSync(path.join(TEST, 'waits.ts'), 'utf8'),
-    fs.readFileSync(RUNTIME, 'utf8'),
-    'copy packages/agent-runtime/test/waits.ts over this one: a change to it is made there and copied to every package',
-  );
-});
+const PACKAGE = path.join(import.meta.dirname, '..');
 
 /** The default timeout a `test` script gives every test (`--test-timeout=<ms>`, one word), or null for none. */
 const defaultTimeout = (script: string): number | null => {

@@ -12,7 +12,7 @@ import path from 'node:path';
 import { Effect, Exit, Layer, Logger, ManagedRuntime, References, Stream } from 'effect';
 import { a2aServer } from './a2a-server.ts';
 import { scratch } from './scratch.ts';
-import { bell, until, WAITED } from './waits.ts';
+import { bell, until, WAITED } from 'agent-runtime/testing';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest } from './placed.ts';
 

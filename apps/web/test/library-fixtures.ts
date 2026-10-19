@@ -195,6 +195,7 @@ export const stepPage = (extra: Partial<WorkflowStepPage> = {}): WorkflowStepPag
     policy: 'Land it.',
     addedSkills: [],
     fence: [],
+    folderFiles: true,
     task: null,
     via: 'brief',
   },

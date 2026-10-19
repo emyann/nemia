@@ -1,8 +1,9 @@
 /**
  * Every temporary root a test makes comes from `scratch`, which takes it away with whatever runs in it (`scratch.ts`):
- * a call of `os.tmpdir` anywhere else under `test/`, or in a test beside the code under `src/`, is refused, and each
- * package's copy of the helper is this one. A test of where the code under test runs a process names the temp directory with
- * `machineTempDir()`, which the scan refuses only on a line that makes a root with `mkdtempSync`. A Claude Code runner a test
+ * a call of `os.tmpdir` anywhere else under `test/`, or in a test beside the code under `src/`, is refused. `test/scratch.ts` here is
+ * the one copy, and each other package's is held to it by that package's own `scratch.test.ts`. A test of where the code under test
+ * runs a process names the temp directory with `machineTempDir()`, which the scan refuses only on a line that makes a root with
+ * `mkdtempSync`. A Claude Code runner a test
  * makes is given its `root`, which it writes to as it looks (`harness/claude/quiet.ts`): a call with none is refused, since
  * the default is the person's own store.
  */
@@ -13,8 +14,6 @@ import path from 'node:path';
 
 const TEST = import.meta.dirname;
 const SRC = path.join(TEST, '..', 'src');
-/** The one copy the others are held to. */
-const RUNTIME = path.join(TEST, '..', '..', '..', 'packages', 'agent-runtime', 'test', 'scratch.ts');
 /** The files under `test/` that may make a root by hand: the helper, and the fixture that shows the guard a leak. */
 const ALLOWED = ['scratch.ts', 'fixtures/leak-unguarded.ts'];
 
@@ -62,14 +61,6 @@ test('no test makes a root but through scratch', () => {
     .filter((f) => !ALLOWED.includes(f.split(path.sep).join('/')))
     .flatMap((f) => tmpdirCalls(fs.readFileSync(path.join(TEST, f), 'utf8')).map((l) => `${f}:${l}`));
   assert.deepEqual(refused, [], 'make the root with scratch(prefix) from test/scratch.ts, which takes it away with what runs in it');
-});
-
-test("the helper is the runtime's, byte for byte", () => {
-  assert.equal(
-    fs.readFileSync(path.join(TEST, 'scratch.ts'), 'utf8'),
-    fs.readFileSync(RUNTIME, 'utf8'),
-    'copy packages/agent-runtime/test/scratch.ts over this one: a change to it is made there and copied to every package',
-  );
 });
 
 /** The makers of a Claude Code runner, whose `root` defaults to the person's own store. */

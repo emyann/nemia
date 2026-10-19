@@ -8,7 +8,8 @@
  * Under `runs/<id>/agents/<step>/`, frozen with the run as its workflow is:
  *
  * - `prompt.md`, the agent's instructions, then the person's custom instructions for it (`customInstructions`), then the rules of the
- *   factory the run was started in (`factoryRules`), then a line naming each skill it is given, then the whole text of each skill that
+ *   factory the run was started in (`factoryRules`), each under the heading of its layer's number and owner (`headedLayers`), then a
+ *   line naming each skill it is given, then the whole text of each skill that
  *   asks to be told whole (`preload: true`): appended to Claude Code's own prompt, which is kept (`--append-system-prompt-file`), or put
  *   in its place for `harnessPrompt: replace` (`--system-prompt-file`);
  * - `nemia-<agent>/`, a plugin of the step's own (`--plugin-dir`): its `skills/<name>/`, each copied whole from where the load found it,
@@ -44,7 +45,7 @@ import {
   harnessPromptNamed,
   readKeys,
 } from '../former/former.ts';
-import { stepFrom } from '../workflow/index.ts';
+import { headedLayers, stepFrom } from '../workflow/index.ts';
 import type { AgentSkill } from '../skills/skills.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 
@@ -614,7 +615,8 @@ export const unrendered = (step: Workflow, skills: readonly SkillAgain[] = []): 
 export type RenderedSkill = { name: string; whole?: string };
 
 /**
- * The text of `prompt.md`: the agent's instructions, then the person's custom instructions for it, then its factory's rules, then each
+ * The text of `prompt.md`: the agent's instructions, then the person's custom instructions for it, then its factory's rules, each under
+ * the heading of its layer's number and owner (`headedLayers`), then each
  * skill it is given by its
  * namespaced name, the session to load it with the Skill tool when the instructions say it is needed, then each skill told whole, under a
  * heading of its name. Claude Code lists a plugin's skills to the session by name and description all the same; naming them here says they
@@ -626,11 +628,14 @@ export function renderedPrompt(step: Workflow, skills: readonly RenderedSkill[])
   const plugin = pluginOf(agent.name);
   const named = skills.filter((s) => s.whole === undefined);
   const whole = skills.filter((s) => s.whole !== undefined);
+  const headed = headedLayers([
+    ['instructions', agent.instructions],
+    ['custom', agent.customInstructions],
+    ['factory', agent.factoryRules],
+  ]);
   return (
     [
-      ...(agent.instructions ? [agent.instructions.trimEnd()] : []),
-      ...(agent.customInstructions ? [agent.customInstructions.trimEnd()] : []),
-      ...(agent.factoryRules ? [agent.factoryRules.trimEnd()] : []),
+      ...(headed ? [headed] : []),
       ...(named.length
         ? [
             `Your skills, each loaded with the Skill tool by its name when you need it: ${named.map((s) => `\`${plugin}:${s.name}\``).join(', ')}.`,

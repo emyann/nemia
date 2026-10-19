@@ -7,7 +7,18 @@
 import type { ReactNode } from 'react';
 import type { StepLayers } from '../lib/api';
 import { AgentLink } from './AgentParts';
-import { Layer, Skills, toldBefore, Words } from './Told';
+import {
+  CUSTOM_INSTRUCTIONS,
+  FACTORY_RULES,
+  FOLDER_FILES,
+  FOLDER_FILES_SAID,
+  INSTRUCTIONS,
+  Layer,
+  Skills,
+  STEP_POLICY,
+  toldBefore,
+  Words,
+} from './Told';
 
 const LINE = 'text-body-small leading-snug text-muted-foreground';
 
@@ -25,7 +36,7 @@ export function AgentLayers({ agent, layers }: { agent: string; layers: StepLaye
     );
   return (
     <>
-      <Layer name="instructions" title={`Instructions — ${agent}'s`}>
+      <Layer name="instructions" title={INSTRUCTIONS(agent)}>
         <details className="text-body-small">
           <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Read them</summary>
           <Words text={layers.instructions} none={`None: agents/${agent}.md says nothing`} />
@@ -36,7 +47,7 @@ export function AgentLayers({ agent, layers }: { agent: string; layers: StepLaye
           's file, <span className="font-mono">agents/{agent}.md</span>.
         </p>
       </Layer>
-      <Layer name="custom" title="Your custom instructions">
+      <Layer name="custom" title={CUSTOM_INSTRUCTIONS}>
         {layers.custom === null ? (
           <p className={LINE}>
             None. Write them on <AgentLink from="yours" name={agent} />
@@ -46,8 +57,13 @@ export function AgentLayers({ agent, layers }: { agent: string; layers: StepLaye
           <Words text={layers.custom} />
         )}
       </Layer>
+      {layers.folderFiles && (
+        <Layer name="folder" title={FOLDER_FILES}>
+          <p className={LINE}>{FOLDER_FILES_SAID}</p>
+        </Layer>
+      )}
       {layers.factory !== null && (
-        <Layer name="factory" title="The factory's rules">
+        <Layer name="factory" title={FACTORY_RULES}>
           <Words text={layers.factory} />
           <p className={LINE}>Written on the factory's Settings: every agent hired into it is told them.</p>
         </Layer>
@@ -75,7 +91,7 @@ export function PolicyLayer({
   const before =
     layers?.agent !== agent ? `${agent}'s instructions, and any custom instructions you wrote for it` : toldBefore(agent, layers);
   return (
-    <Layer name="policy" title="The step's policy">
+    <Layer name="policy" title={STEP_POLICY}>
       <div className="space-y-3">
         <div className="space-y-1">
           {note}

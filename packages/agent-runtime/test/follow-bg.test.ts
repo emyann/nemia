@@ -18,7 +18,7 @@ import { Cause, Effect, Exit, Stream } from 'effect';
 import { TestClock } from 'effect/testing';
 import type { Followed, RunnerError, RunnerOps, TranscriptEvent } from '../src/harness/seam.ts';
 import { scratch } from './scratch.ts';
-import { bell, until, WAITED } from './waits.ts';
+import { bell, until, WAITED } from '../src/waits/index.ts';
 
 const config = scratch('ae-follow-bg-config-');
 process.env.CLAUDE_CONFIG_DIR = config;

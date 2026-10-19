@@ -2171,7 +2171,9 @@ of pure code sits beside it.
 | file | what |
 |---|---|
 | `src/vocabulary.ts` | the vocabulary door's export list, pure: what `agent-runtime/vocabulary` gives |
-| `src/testing.ts` | the testing entry's export list: what `agent-runtime/testing` gives a test of a layer above, the engine's stand-in |
+| `src/testing.ts` | the testing entry's export list: what `agent-runtime/testing` gives a test of a layer above, the engine's stand-in and the wait |
+| `src/waits/index.ts` | the wait's face: `until`, `bell` and `WAITED`, as a test of this package and the testing entry read them |
+| `src/waits/waits.ts` | the one copy of the wait a test makes on the event it counts, never on a length of time (`until`), the bell its source rings (`bell`) and the bound a waiting test takes (`WAITED`) |
 | `src/index.ts` | the export list of `agent-runtime`, by name, all Effect — the boundary; `decide` is not on it |
 | `src/core/session.ts` | a session's state in A2A's names, the end each records and the word a person reads (`endOf`, `phaseWordOf`): read by both `domain.ts` and `lifecycle.ts`, so neither imports the other's values |
 | `src/core/domain.ts` | events, `fold`, **`decide`** and what it reads — `lifecycleOf`, `observe` — pure, no I/O, the whole judgement, and the session name read back (`nameParts`) |

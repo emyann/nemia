@@ -32,7 +32,7 @@ Each term has one line and a link to the page that explains it.
 - **Harness**: the program a session runs in: Claude Code, Codex, a plain command, or a remote A2A agent. [A harness](/runtime/#a-harness)
 - **Hire**: a factory's choice of the agent that does one step of a workflow. [Hires](/factories/#hires)
 - **Inbox**: where cards wait before they are started. [From a card to a landing](/how-a-run-lives/#from-a-card-to-a-landing)
-- **Instruction layers**: the five layers of what an agent is told, numbered by precedence: its instructions, a person's custom instructions, the folder's files, the factory's rules, and the step's policy. Where two say different things the higher number wins, and the task is above them all — telling a session so is coming, not built. [Five layers](/agents/#what-an-agent-is-told-five-layers)
+- **Instruction layers**: the five layers of what an agent is told, numbered by precedence: its instructions, a person's custom instructions, the folder's files, the factory's rules, and the step's policy. Where two say different things the higher number wins, and the task is above them all, and a session is told so: each layer Nemia composes is headed by its number and its owner, and every brief opens on the precedence in words. [Five layers](/agents/#what-an-agent-is-told-five-layers)
 - **Intent**: a confirmed idea, cut into cards; it is a word of this repository's own team (`workflows/`), not something Nemia ships. [What Nemia is](/)
 - **Journal**: the runtime's durable record of a task, an event a line, which every pass reads again. [The engine](/runtime/#the-engine)
 - **Keeper**: the daemon's part that files Nemia's session while any factory is above `manual`, and stops it once none is. [The keeper](/nemia/#the-keeper)

@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Fiber } from 'effect';
 import { steeredClock } from './steered.ts';
-import { until, WAITED } from './waits.ts';
+import { until, WAITED } from 'agent-runtime/testing';
 
 const PKG = path.join(import.meta.dirname, '..');
 const FROM_ROOT = 'packages/agent-orchestrator';

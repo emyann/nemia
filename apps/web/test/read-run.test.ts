@@ -86,6 +86,7 @@ const LAYERS = {
   policy: 'Keep the diff small.',
   addedSkills: [],
   fence: [],
+  folderFiles: true,
   task: 'A note.',
   via: 'prompt' as const,
 };

@@ -37,14 +37,18 @@ const runPlaced = runGiven(gitPlaceLayer);
 const { readRun } = await import('../src/record/record.store.ts');
 
 /**
- * A repository with one commit, so `nemia start` has a base to record. It names its own branch `master`, rather than take git's
- * `init.defaultBranch`: the screens below quote that branch by name, and the default is a machine's, unset here and `main` on a
- * runner.
+ * A repository with one commit, so `nemia start` has a base to record. The screens below quote its branch by name, so the fixture
+ * names it — `-b master` — rather than take git's `init.defaultBranch`, which is a machine's and not this test's: unset on the
+ * owner's machine, `main` on a runner. It inits under a default of `main` on purpose, so the branch can only come from the `-b`:
+ * drop it and the file fails wherever it runs, rather than only where the machine disagrees.
  */
 const aRepo = (): string => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const git = (...args: string[]) =>
-    execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: 'ignore' });
+    execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'init.defaultBranch=main', ...args], {
+      cwd: repo,
+      stdio: 'ignore',
+    });
   git('init', '-q', '-b', 'master');
   git('commit', '-q', '--allow-empty', '-m', 'base');
   return repo;

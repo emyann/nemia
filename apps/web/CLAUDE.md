@@ -239,8 +239,8 @@ and `theme/` is what the kit's generator makes of it; `src/styles.css` imports t
 - The frame, whatever the root route mounts, reads the light answer (`openRunsQuery`), never `runsQuery`: `wholeListBreaks`
   (`test/structure.test.ts`) follows the root's imports. A write that changes a run calls `runsMoved` (`lib/runWrites.ts`), never
   `['runs']` by hand; a key that stands for every key under it is said by `filterOf` (`lib/feed.ts`), which the feed invalidates through.
-- `refetchInterval` is read again only when the query changes: `useFeed` marks the polled queries stale when the stream opens and reads
-  them when it goes down (`pace` in `lib/feed.ts`).
+- `refetchInterval` is read again only when the query changes: `useFeed` reads the active polled queries once whenever the feed's stream
+  opens or goes down (`pace` in `lib/feed.ts`), which is also what a stream from the feed's end does not carry.
 - An `EventSource` is closed on the `error` fired as the response ends, or after a grace (`follow`), never on the last event.
 - Both conversations follow their stream through the one `follow` of `lib/follow.ts`, each handing it a `Follower`: a step's is
   `lib/following.ts`, her chat's `lib/chatFollowing.ts`, and `test/follow.test.ts` refuses a second `unreadable` listener in `lib`

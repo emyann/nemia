@@ -6,7 +6,18 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { QueryClient, type QueryKey } from '@tanstack/react-query';
 import { END_GRACE_MS, type Frames, type StreamLike } from '../src/lib/follow.ts';
-import { FALLBACK_MS, type FeedStatus, filterOf, followFeed, keysOf, pace, polled, REOPEN_MS } from '../src/lib/feed.ts';
+import {
+  FALLBACK_MS,
+  type FeedStart,
+  type FeedStatus,
+  filterOf,
+  FLUSH_MS,
+  followFeed,
+  keysOf,
+  pace,
+  polled,
+  REOPEN_MS,
+} from '../src/lib/feed.ts';
 
 /** An EventSource as far as `followFeed` uses it: its state, its events, and `close`. */
 class Stream implements StreamLike {
@@ -21,9 +32,9 @@ class Stream implements StreamLike {
   dispatchEvent(event: Event): void {
     this.#target.dispatchEvent(event);
   }
-  readonly after: string | undefined;
-  constructor(after: string | undefined) {
-    this.after = after;
+  readonly start: FeedStart;
+  constructor(start: FeedStart) {
+    this.start = start;
   }
   close() {
     this.readyState = 2;
@@ -58,8 +69,8 @@ function followed() {
   const timers = new Map<number, { at: number; f: () => void }>();
   let next = 0;
   const stop = followFeed(
-    (after) => {
-      const stream = new Stream(after);
+    (start) => {
+      const stream = new Stream(start);
       streams.push(stream);
       return stream;
     },
@@ -151,10 +162,13 @@ test('every event reads again whether a daemon ticks, exactly: a line on the fee
     );
     f.stream().send(event, line('r-1', event === 'step' ? 'plan' : undefined), id);
     f.frame();
+    const read = f.invalidated.length;
     assert.ok(
       f.invalidated.at(-1)!.some((k) => JSON.stringify(k) === JSON.stringify(['daemon'])),
       `a ${event} event alone reads the daemon again`,
     );
+    f.pass(FLUSH_MS);
+    assert.equal(f.invalidated.length, read, 'and nothing more once the gathering second is up with no line in it');
   }
   f.stop();
 });
@@ -261,6 +275,38 @@ test('the events that arrive together are read again once a frame, each key once
   f.stop();
 });
 
+test('a burst is read once a second: a hundred lines, one a frame, are read once when the second is up, and a line after a quiet second on the next frame', () => {
+  const f = followed();
+  f.stream().opens();
+  f.stream().send('step', line('r-0', 'plan'), '1');
+  f.frame();
+  assert.equal(f.invalidated.length, 1, 'the first line, after a quiet second, is read on the next frame');
+
+  for (let i = 1; i <= 100; i += 1) {
+    f.stream().send('step', line(`r-${i}`, 'plan'), String(i + 1));
+    f.frame();
+  }
+  assert.equal(f.invalidated.length, 1, 'a hundred lines inside the second read nothing more, however many frames came');
+  f.pass(FLUSH_MS - 1);
+  assert.equal(f.invalidated.length, 1, 'not before the second is up');
+  f.pass(1);
+  assert.equal(f.invalidated.length, 2, 'gathered and read once, when it is up');
+  assert.equal(
+    f.invalidated[1].filter((key) => key.length === 2 && key[0] === 'runs').length,
+    100,
+    'every run the burst named has its record read, in that one read',
+  );
+
+  f.pass(FLUSH_MS);
+  assert.equal(f.invalidated.length, 2, 'a quiet second reads nothing and sets no timer');
+  assert.equal(f.timersSet(), 0);
+  f.stream().send('step', line('r-late', 'plan'), '200');
+  f.frame();
+  assert.equal(f.invalidated.length, 3, 'a line after a quiet second is read on the next frame');
+  f.stop();
+  assert.equal(f.timersSet(), 0, 'and the gathering second is cancelled by the stop');
+});
+
 test('the polls slow while the stream is open, and come back to their pace while it is not', () => {
   const f = followed();
   assert.equal(pace(5_000), 5_000, 'connecting: polled at its own pace');
@@ -284,7 +330,7 @@ test('the polls slow while the stream is open, and come back to their pace while
   assert.equal(pace(5_000), 5_000, 'stopped: nothing follows');
 });
 
-test('a feed cut under the cursor is closed on the `error` fired as the api ends the response — not on the event — and opened again from the start', () => {
+test('a feed cut under the cursor is closed on the `error` fired as the api ends the response — not on the event — and opened again from the end', () => {
   const f = followed();
   f.stream().opens();
   f.stream().send('step', line('r-1', 'plan'), '10');
@@ -295,14 +341,14 @@ test('a feed cut under the cursor is closed on the `error` fired as the api ends
   cut.drops();
   assert.equal(cut.readyState, 2, 'closed once the api has ended the response, before the EventSource reconnects');
   assert.equal(f.streams.length, 2, 'and opened again');
-  assert.equal(f.stream().after, undefined, 'from the start: the cursor is what the api cannot read from');
+  assert.equal(f.stream().start, 'end', 'from the feed’s end: the cursor is what the api cannot read from');
   f.stream().opens();
   assert.equal(f.statuses.at(-1), 'open');
   assert.equal(f.timersSet(), 0, 'no grace left running');
   f.stop();
 });
 
-test('a cut feed whose response never ends is closed after the grace, and opened again from the start', () => {
+test('a cut feed whose response never ends is closed after the grace, and opened again from the end', () => {
   const f = followed();
   f.stream().opens();
   f.stream().send('step', line('r-1', 'plan'), '10');
@@ -313,13 +359,13 @@ test('a cut feed whose response never ends is closed after the grace, and opened
   f.pass(1);
   assert.equal(cut.readyState, 2);
   assert.deepEqual(
-    f.streams.map((s) => s.after),
-    [undefined, undefined],
+    f.streams.map((s) => s.start),
+    ['end', 'end'],
   );
   f.stop();
 });
 
-test('a stream the api refused is opened again after a while from the last event read, and from the start if that is refused before it opens', () => {
+test('a stream the api refused is opened again after a while from the last event read, and from the end if that is refused before it opens', () => {
   const f = followed();
   f.stream().opens();
   f.stream().send('run', line('r-1'), '10');
@@ -331,24 +377,24 @@ test('a stream the api refused is opened again after a while from the last event
   assert.equal(f.streams.length, 1, 'not at once');
   f.pass(1);
   assert.deepEqual(
-    f.streams.map((s) => s.after),
-    [undefined, '42'],
+    f.streams.map((s) => s.start),
+    ['end', { after: '42' }],
     'from the last event read',
   );
 
   f.stream().refused();
   f.pass(REOPEN_MS);
   assert.deepEqual(
-    f.streams.map((s) => s.after),
-    [undefined, '42', undefined],
-    "refused again before it opened, the cursor may be what is refused (a 400 reads as a proxy's 5xx does): the next goes from the start",
+    f.streams.map((s) => s.start),
+    ['end', { after: '42' }, 'end'],
+    "refused again before it opened, the cursor may be what is refused (a 400 reads as a proxy's 5xx does): the next goes from the end",
   );
   f.stream().refused();
   f.pass(REOPEN_MS);
   assert.deepEqual(
-    f.streams.map((s) => s.after),
-    [undefined, '42', undefined, undefined],
-    'one from the start refused too, while the api is not there yet, is tried again from the start',
+    f.streams.map((s) => s.start),
+    ['end', { after: '42' }, 'end', 'end'],
+    'one from the end refused too, while the api is not there yet, is tried again from the end',
   );
   f.stream().opens();
   assert.equal(f.statuses.at(-1), 'open');

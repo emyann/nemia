@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { type FeedStatus, filterOf, followFeed, polled } from './feed.ts';
 import { animationFrames } from './follow.ts';
 
-/** Where the workflow feed is followed; `?after=` a cursor it gave. */
+/** Where the workflow feed is followed; `?after=` a cursor it gave, `?from=end` at the feed's end. */
 const FEED_STREAM = '/api/feed/stream';
 
 /**
@@ -11,9 +11,13 @@ const FEED_STREAM = '/api/feed/stream';
  * queries it can change (`keysOf`, each as `filterOf` says), and those the board polls slow to `FALLBACK_MS` while the stream is open
  * (`pace`).
  *
- * When it opens or goes down, the polled queries are told at once: react-query reads a query's `refetchInterval` again only when the query
- * changes, so one read at 5 s would otherwise wait out its old timer. Open, they are marked stale, which reads nothing; down, they are read
- * again, which reads what the stream may have missed and puts them back at their own pace.
+ * Every stream opens at the feed's end (`?from=end`) unless it resumes a cursor the api gave: the board holds no history of the feed, and
+ * a replay of the whole of it would read every query it holds once a line.
+ *
+ * When it opens or goes down, the polled queries that are active are read once: react-query reads a query's `refetchInterval` again only
+ * when the query changes, so one read at 5 s would otherwise wait out its old timer, and a read hands it the change. Open, the read is
+ * also what the stream will not carry — what moved between the page's first reads and the end the stream starts at; down, it is what the
+ * stream may have missed.
  */
 export function useFeed(): FeedStatus {
   const queryClient = useQueryClient();
@@ -22,7 +26,7 @@ export function useFeed(): FeedStatus {
   useEffect(
     () =>
       followFeed(
-        (after) => new EventSource(after === undefined ? FEED_STREAM : `${FEED_STREAM}?after=${encodeURIComponent(after)}`),
+        (start) => new EventSource(start === 'end' ? `${FEED_STREAM}?from=end` : `${FEED_STREAM}?after=${encodeURIComponent(start.after)}`),
         {
           invalidate: (keys) => {
             for (const queryKey of keys) void queryClient.invalidateQueries(filterOf(queryKey));
@@ -30,8 +34,7 @@ export function useFeed(): FeedStatus {
           status: (next) => {
             setStatus(next);
             const predicate = (query: { queryKey: readonly unknown[] }) => polled(query.queryKey);
-            if (next === 'open') void queryClient.invalidateQueries({ predicate, refetchType: 'none' });
-            else if (next === 'down') void queryClient.refetchQueries({ predicate, type: 'active' });
+            if (next !== 'connecting') void queryClient.refetchQueries({ predicate, type: 'active' });
           },
         },
         animationFrames,

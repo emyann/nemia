@@ -23,6 +23,12 @@ export const FALLBACK_MS = 60_000;
 export const REOPEN_MS = 5_000;
 
 /**
+ * How often a burst of lines is read at most: the lines that arrive within this of the last read are gathered and read once, when it is
+ * up. A line after a quiet `FLUSH_MS` is read on the next frame.
+ */
+export const FLUSH_MS = 1_000;
+
+/**
  * The queries an event of the feed can change, each to be invalidated as `filterOf` says: exactly, never by prefix, but the light answer's
  * — `['runs', id, 'decision', stamp]` is keyed by the state it answers for, and read again under a key of its own when the run's record
  * moves (`decisionQuery`).
@@ -83,6 +89,16 @@ let live = false;
 /** How often a polled query is read: `fast` while the feed is not followed, and `FALLBACK_MS` while it is. A query's `refetchInterval`. */
 export const pace = (fast: number): number => (live ? FALLBACK_MS : fast);
 
+/**
+ * Where a stream of the feed opens: after an event this page was already sent, or at the feed's end. The board holds no history of the
+ * feed — every query it reads is read fresh, and a line only says which to read again — so a stream that resumes nothing starts at the
+ * end rather than replay the whole of it.
+ */
+export type FeedStart = 'end' | { after: string };
+
+/** Where a stream opens for a page that was last sent the event `after`, or none: a cursor resumes, and nothing to resume is the end. */
+const startAt = (after: string | undefined): FeedStart => (after === undefined ? 'end' : { after });
+
 /** What `followFeed` tells the page: the queries to read again, and whether it follows. */
 export type FeedSink = { invalidate: (keys: QueryKey[]) => void; status: (status: FeedStatus) => void };
 
@@ -108,23 +124,63 @@ const keysFor = (event: FeedEvent, data: string): QueryKey[] => {
 const CLOSED = 2;
 
 /**
+ * How the keys the lines of the feed move are read again: the keys that arrive together once, on a frame, and a burst no more than once
+ * every `FLUSH_MS` — the lines that come within that of a read are gathered and read together, once, when it is up, so a page whose
+ * reads are heavy reads once a second however fast the lines come.
+ *
+ * @param sink what the keys are handed to
+ * @param frames the frames a read waits for
+ * @param timers the timers the gathering second is kept by
+ * @returns `arrive`, given a line's keys, and `stop`, which cancels the frame and the second still pending
+ */
+const gathered = (sink: FeedSink, frames: Frames, timers: Timers) => {
+  const arrived = new Map<string, QueryKey>();
+  let frame = 0;
+  let gathering: ReturnType<typeof setTimeout> | undefined;
+  const flush = () => {
+    frame = 0;
+    const keys = [...arrived.values()];
+    arrived.clear();
+    if (!keys.length) return;
+    sink.invalidate(keys);
+    gathering = timers.set(() => {
+      gathering = undefined;
+      flush();
+    }, FLUSH_MS);
+  };
+  return {
+    arrive: (keys: QueryKey[]) => {
+      for (const key of keys) arrived.set(JSON.stringify(key), key);
+      if (gathering === undefined) frame ||= frames.request(flush);
+    },
+    stop: () => {
+      if (frame) frames.cancel(frame);
+      if (gathering !== undefined) timers.clear(gathering);
+    },
+  };
+};
+
+/**
  * The workflow feed followed (`GET /api/feed/stream`), apart from React, so it is tested without a browser: `useFeed` opens the stream and
- * hands its invalidations to the query client. `open(after)` opens one, from the cursor after the event `after` names, or from the start.
- * The keys of the events that arrive together are invalidated once, on a frame: a stream opened with no cursor replays the whole feed.
+ * hands its invalidations to the query client. `open(start)` opens one, from the cursor after an event it was sent, or at the feed's end
+ * (`startAt`): every stream that resumes nothing starts at the end, since the board holds no history of the feed.
+ * The keys of the events that arrive together are invalidated once, on a frame, and a burst no more than once every `FLUSH_MS`: the lines
+ * that arrive within that of the last read are gathered and read together, once, when it is up, so a page whose reads are heavy reads
+ * once a second however fast the lines come.
  *
  * A dropped connection is the EventSource's own to resume: it reconnects with the id of the last event it was sent, and misses nothing.
  * One the api refused — or a proxy's 5xx while the api restarts — is closed for good by the EventSource, and opened again here after
- * `REOPEN_MS` from the last event's id; if that is refused too, before it ever opened, from the start, since a cursor the api refuses (a
+ * `REOPEN_MS` from the last event's id; if that is refused too, before it ever opened, from the end, since a cursor the api refuses (a
  * 400) cannot be told apart from an api that is not there. A read the api failed and tries again every second (`unreadable`, `retrying`) is
  * said `down` and still followed, and `open` again once the api says `readable`. A feed cut under the stream's cursor is said once
  * (`unreadable`, not `retrying`) and the api ends the response: closed then, on the `error` fired as the response ends, or after
- * `END_GRACE_MS` — never on the event itself, which aborts a request answered in full (`follow`) — and opened again from the start.
+ * `END_GRACE_MS` — never on the event itself, which aborts a request answered in full (`follow`) — and opened again from the end.
  * A listener of a stream closed and replaced does nothing with what that stream still dispatches.
  *
  * Returns what stops following.
  */
 export function followFeed(
-  open: (after?: string) => StreamLike,
+  open: (start: FeedStart) => StreamLike,
   sink: FeedSink,
   frames: Frames,
   timers: Timers = browserTimers,
@@ -143,29 +199,20 @@ export function followFeed(
     status = next;
   };
 
-  const arrived = new Map<string, QueryKey>();
-  let frame = 0;
-  const flush = () => {
-    frame = 0;
-    const keys = [...arrived.values()];
-    arrived.clear();
-    if (keys.length) sink.invalidate(keys);
-  };
+  const reads = gathered(sink, frames, timers);
 
   const connect = (after: string | undefined) => {
     opened = false;
     fromCursor = after !== undefined;
     grace = undefined;
-    const s = open(after);
+    const s = open(startAt(after));
     stream = s;
     const current = () => !stopped && stream === s;
     const read = (event: FeedEvent) => (message: MessageEvent) => {
       if (!current()) return;
       if (message.lastEventId) last = message.lastEventId;
       const keys = keysFor(event, message.data);
-      if (!keys.length) return;
-      for (const key of keys) arrived.set(JSON.stringify(key), key);
-      frame ||= frames.request(flush);
+      if (keys.length) reads.arrive(keys);
     };
     for (const event of ['run', 'step', 'removed', 'daemon'] as const) s.addEventListener(event, read(event));
     s.addEventListener('open', () => {
@@ -211,7 +258,7 @@ export function followFeed(
     stopped = true;
     if (grace !== undefined) timers.clear(grace);
     if (reopening !== undefined) timers.clear(reopening);
-    if (frame) frames.cancel(frame);
+    reads.stop();
     stream.close();
     live = false;
   };

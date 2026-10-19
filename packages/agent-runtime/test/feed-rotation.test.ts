@@ -17,7 +17,7 @@ import { instantNow } from '../src/core/engine/now.ts';
 import { elapsedMs } from '../src/core/clock.ts';
 import { ioCounts } from '../src/core/engine/tally.ts';
 import { scratch } from './scratch.ts';
-import { until, WAITED, type Waiter } from './waits.ts';
+import { until, WAITED, type Waiter } from '../src/waits/index.ts';
 
 const PACKAGE = path.join(import.meta.dirname, '..');
 

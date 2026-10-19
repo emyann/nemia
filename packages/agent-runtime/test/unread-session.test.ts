@@ -22,7 +22,7 @@ import { Engine, type TaskView } from '../src/index.ts';
 import { scratch } from './scratch.ts';
 import { warned } from './warned.ts';
 import { builtEngine } from './engine.ts';
-import { until, WAITED, type Waiter } from './waits.ts';
+import { until, WAITED, type Waiter } from '../src/waits/index.ts';
 
 const CODEX_USED = { input_tokens: 1200, cached_input_tokens: 1000, cache_write_input_tokens: 0, output_tokens: 80 };
 const USED = { toolCalls: 0, inputTokens: 1200, uncachedTokens: 200, cacheWriteTokens: 0, cacheReadTokens: 1000, outputTokens: 80 };

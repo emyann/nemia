@@ -37,7 +37,7 @@ import { HARNESSES } from '../runtime-client.ts';
 import { scratch } from '../../test/scratch.ts';
 import { Effect } from 'effect';
 import { plainEngine } from '../../test/promised.ts';
-import { until, WAITED, type Waiter } from '../../test/waits.ts';
+import { until, WAITED, type Waiter } from 'agent-runtime/testing';
 
 const ENV: CheckEnv = {
   WF_RUN: 'r-1',

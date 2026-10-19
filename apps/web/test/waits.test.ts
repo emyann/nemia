@@ -1,6 +1,8 @@
 /**
- * The wait a test makes on its event (`until`, `bell`, `test/waits.ts`), a copy of the runtime's held here byte for byte, and the guard
- * that keeps a hand-written deadline out of the board's tests and e2e pages (`DEADLINES`). The helper's own tests are the runtime's.
+ * The wait a test makes on its event (`until`, `bell`, `test/waits.ts`), a copy of the runtime's `src/waits/waits.ts`, since the board
+ * imports no package, and the guard that keeps a hand-written deadline out of the board's tests and e2e pages (`DEADLINES`). The
+ * helper's own tests are the runtime's, and so is the fence that holds this copy to it byte for byte
+ * (`packages/agent-runtime/test/waits.test.ts`): the board's own test builds no path into another package (`contract.test.ts` there).
  *
  * `DEADLINES` counts, file by file, each `now()` of `Date` or `performance` a number is added to, or a start taken from and held under a
  * bound, under `test/`: each left is the reaper's bound or an e2e assertion's timeout, never a test's wait, and a count only shrinks
@@ -14,16 +16,6 @@ import { WAITED } from './waits.ts';
 
 const TEST = import.meta.dirname;
 const PACKAGE = path.join(TEST, '..');
-/** The one copy the others are held to. */
-const RUNTIME = path.join(TEST, '..', '..', '..', 'packages', 'agent-runtime', 'test', 'waits.ts');
-
-test("the helper is the runtime's, byte for byte", () => {
-  assert.equal(
-    fs.readFileSync(path.join(TEST, 'waits.ts'), 'utf8'),
-    fs.readFileSync(RUNTIME, 'utf8'),
-    'copy packages/agent-runtime/test/waits.ts over this one: a change to it is made there and copied to every package',
-  );
-});
 
 /** The default timeout a script gives every test (`--test-timeout=<ms>`, one word), or null for none. */
 const defaultTimeout = (script: string): number | null => {

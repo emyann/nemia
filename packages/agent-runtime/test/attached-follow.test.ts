@@ -18,7 +18,7 @@ import { Effect, Exit, Fiber, Stream } from 'effect';
 import type { Attached } from '../src/harness/claude/attached.ts';
 import type { Followed } from '../src/harness/seam.ts';
 import { scratch } from './scratch.ts';
-import { bell, until, WAITED, type Waiter } from './waits.ts';
+import { bell, until, WAITED, type Waiter } from '../src/waits/index.ts';
 
 process.env.CLAUDE_CONFIG_DIR = scratch('ae-attached-follow-config-');
 const { holder, kept, lines, NAME, run } = await import('./attached-held.ts');

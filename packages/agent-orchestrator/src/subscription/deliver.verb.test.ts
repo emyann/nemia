@@ -14,8 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Duration, Effect, Fiber, Layer, Logger, ManagedRuntime, Metric, Schedule } from 'effect';
 import { scratch } from '../../test/scratch.ts';
-import { testEngine } from 'agent-runtime/testing';
-import { bell, until, WAITED } from '../../test/waits.ts';
+import { testEngine, bell, until, WAITED } from 'agent-runtime/testing';
 import { steeredClock } from '../../test/steered.ts';
 import { DAEMON_STARTED, isRunLine, upgraded, type FeedLine } from '../feed/index.ts';
 

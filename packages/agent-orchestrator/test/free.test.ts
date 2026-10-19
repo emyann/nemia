@@ -20,7 +20,7 @@ import { asyncOps, asyncStore, plainEngine, type AsyncJournal, type AsyncRunner 
 import { scratch } from './scratch.ts';
 import { runGiven } from './placed.ts';
 import { testPlace } from '../place/memory/index.ts';
-import { until, WAITED } from './waits.ts';
+import { until, WAITED } from 'agent-runtime/testing';
 import { steeredClock } from './steered.ts';
 import type { PlaceRequests, PlaceVerb } from '../src/place/place.ts';
 

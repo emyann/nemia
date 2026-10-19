@@ -38,7 +38,7 @@ import { loadWorkflows } from '../src/folder/folder.store.ts';
 import { scratch } from './scratch.ts';
 import { placesOf, shippedFolders } from './team.ts';
 import { plainEngine } from './promised.ts';
-import { until, WAITED } from './waits.ts';
+import { until, WAITED } from 'agent-runtime/testing';
 
 const REPO = path.resolve(import.meta.dirname, '..', '..', '..');
 const read = (file: string) => JSON.parse(fs.readFileSync(path.join(REPO, file), 'utf8'));

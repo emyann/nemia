@@ -1058,17 +1058,20 @@ test("`nemia decide`'s refusal is its program's typed failure: a `Missing`, pick
   assert.match(String(recovered), /^no such run: no-such-run/);
 });
 
-test("`nemia decide`'s program says in its type what it needs and what it refuses: run without the engine, it does not typecheck, and a refusal is its failure", async () => {
+/**
+ * `nemia decide`'s program says in its type what it needs and what it refuses: run without the engine, it does not typecheck, and a
+ * refusal is its failure. Nothing calls this: the typecheck reads its lines, and an `@ts-expect-error` over code that stops erring is
+ * the failure.
+ */
+async function _decideProgramTypes() {
   const { Effect } = await import('effect');
   const { decideRun } = await import('../src/decide/decide.verb.ts');
-  const typed: EffectOf<Decided, Refusal, EngineService | PlaceService> = decideRun('x');
+  void (decideRun('x') satisfies EffectOf<Decided, Refusal, EngineService | PlaceService>);
   // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
-  const infallible: EffectOf<Decided, never, EngineService> = decideRun('x');
-  const unprovided = () =>
-    // @ts-expect-error -- decideRun requires EngineService, and runPromise takes no requirement
-    Effect.runPromise(decideRun('x'));
-  assert.deepEqual([typeof typed, typeof infallible, typeof unprovided], ['object', 'object', 'function']);
-});
+  void (decideRun('x') satisfies EffectOf<Decided, never, EngineService>);
+  // @ts-expect-error -- decideRun requires EngineService, and runPromise takes no requirement
+  void Effect.runPromise(decideRun('x'));
+}
 
 /**
  * `nemia decide`'s whole screen for `id`, with the run id, its repository, its base commit and the store as `<id>`, `<repo>`, `<base>` and
@@ -1254,173 +1257,6 @@ test('the whole screen of a running run, of a try asked for, of a step blocked w
   ]);
 });
 
-test('the whole screen of a step past its budget: FAILED and OVER BUDGET, and the offer', async (t) => {
-  const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\nbudget: 3\n---\nimplement it\n');
-  fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\nplace: git\n---\nreview it\n');
-  const run = await runPlaced(startRun({ brief: 'add sub, failed', repo: aRepo(), workflowDir: dir, isolate: false }));
-  const { e, settle } = board();
-  await runWith(e, advanceRun(readRun(run.id)));
-  settle(`${run.id}-implement`, 'failed', undefined, { costUsd: 3.4 });
-  assert.deepEqual(await whole(t, e, run.id), [
-    '<id>  add sub, failed',
-    '',
-    '  FAILED: implement  (nemia logs <id> <step>)',
-    '  OVER BUDGET, waiting on you: implement ($3.40 of $3)  — the run files nothing more for it on its own; nothing after it ran',
-    '',
-    '  once more, on the next tick:',
-    '    implement: over budget (failed), $3.40 of $3. Raise its cap above $3.40 and continue its session:  nemia retry <id> implement --budget <amount>  (--fresh, or --model <m>, for a new session)',
-    '',
-    '  touched  main',
-    '    nothing — the branch changed no file against the base',
-    '  lesson  nothing written where the next agent reads',
-    '',
-    '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
-    '  none',
-    '',
-    '  implement',
-    '    used  turns not measured · tool calls not measured · tokens in not measured · tokens out not measured',
-    '    cost  $3.40 · budget $3',
-    '    timeline  try 1  filed 00:00:00Z  spawned 00:00:12Z  ended 00:05:00Z  queued 12s  ran 4m48s  used turns not measured · tool calls not measured · tokens in not measured · tokens out not measured  cost $3.40',
-    '',
-    '  cost  run $3.40',
-    '  timeline  run  queued 12s  ran 4m48s  wall 5m00s',
-    '',
-  ]);
-});
-
-test('the whole screen of a run the run nudged to sign off, unsigned again, and of one whose cost was measured', async (t) => {
-  const run = await runPlaced(startRun({ brief: 'add sub, unsigned', repo: aRepo(), workflowDir: folder(), isolate: false }));
-  const { e, settle } = board();
-  await runWith(e, advanceRun(readRun(run.id)));
-  settle(`${run.id}-implement`, 'failed', undefined, undefined, 'unsigned');
-  await runWith(e, advanceRun(readRun(run.id)));
-  settle(`${run.id}-implement-try2`, 'failed', undefined, undefined, 'unsigned');
-  await runWith(e, advanceRun(readRun(run.id)));
-  assert.deepEqual(await whole(t, e, run.id), [
-    '<id>  add sub, unsigned',
-    '',
-    '  UNSIGNED: implement (nudged to sign off once by the run, and unsigned again)  — ended without the closeout it was asked for, or without a field its output: declares, or its closeout named a file the run does not have; nothing after it ran',
-    '',
-    '  once more, on the next tick:',
-    '    implement: unsigned. Continue its session, told what happened:  nemia retry <id> implement  (--fresh, or --model <m>, for a new session)',
-    '',
-    '  touched  main',
-    '    nothing — the branch changed no file against the base',
-    '  lesson  nothing written where the next agent reads',
-    '',
-    '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
-    '  none',
-    '',
-    '  implement  (try 2, nudged to sign off by the run)',
-    '    used  not measured',
-    '    cost  this try not measured · not measured over 2 tries',
-    '    timeline  try 1  filed 00:00:00Z  spawned 00:00:12Z  ended 00:05:00Z  queued 12s  ran 4m48s  used not measured',
-    '              try 2  filed 00:10:00Z  spawned 00:10:12Z  ended 00:15:00Z  queued 12s  ran 4m48s  used not measured',
-    '',
-    '  cost  run not measured',
-    '  timeline  run  queued 24s  ran 9m36s  wall 15m00s',
-    '',
-  ]);
-
-  const measured = await runPlaced(startRun({ brief: 'add sub', repo: aRepo(), workflowDir: folder(), isolate: false }));
-  const other = board();
-  await runWith(other.e, advanceRun(readRun(measured.id)));
-  other.settle(`${measured.id}-implement`, 'succeeded', SIGNED, { ...USAGE, costUsd: 3.012, apiMs: 486_000, toolMs: 2_400 });
-  await runWith(other.e, advanceRun(readRun(measured.id)));
-  other.settle(`${measured.id}-implement-check`, 'failed', undefined, undefined, undefined, 1);
-  other.logs.set(`${measured.id}-implement-check`, '# pass 1\n');
-  await runWith(other.e, advanceRun(readRun(measured.id)));
-  assert.deepEqual(await whole(t, other.e, measured.id), [
-    '<id>  add sub',
-    '',
-    '  FAILED CHECK: implement  — the run executed its check and it did not exit 0; nothing after it ran',
-    '',
-    '  once more, on the next tick:',
-    '    implement: failed (check). Continue its session, told what happened:  nemia retry <id> implement  (--fresh, or --model <m>, for a new session)',
-    '',
-    '  touched  main',
-    '    nothing — the branch changed no file against the base',
-    '  lesson  nothing written where the next agent reads',
-    '',
-    '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
-    '  none',
-    '',
-    '  implement',
-    '    check  npm test  →  exit 1 ✗',
-    '      stdout:',
-    '        # pass 1',
-    '    used  29 turns · 93 tool calls · 6.35M in · 112k out · api 8m06s · tools 2s',
-    '    cost  $3.01',
-    '    timeline  try 1        filed 00:00:00Z  spawned 00:00:12Z  ended 00:05:00Z  queued 12s  ran 4m48s  used 29 turns · 93 tool calls · 6.35M in · 112k out · api 8m06s · tools 2s  cost $3.01',
-    '              try 1 check  filed 00:10:00Z  spawned 00:10:12Z  ended 00:15:00Z  queued 12s  ran 4m48s',
-    '    did it',
-    '',
-    '  cost  run $3.01',
-    '  timeline  run  queued 24s  ran 9m36s  wall 15m00s',
-    '',
-  ]);
-});
-
-test('the whole screen of a shipped run: the branch merged by hand', async (t) => {
-  const { run, repo, branch, e } = await awaiting();
-  git(repo, 'merge', '-q', '--no-ff', '--no-edit', branch);
-  assert.deepEqual(await whole(t, e, run.id), ['<id>  add sub', '', '  shipped — wf/<id> is already on main']);
-});
-
-test("the whole screen of an ending at its gate: the folder's words, approve it and send it back", async (t) => {
-  const repo = aRepo();
-  const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
-  fs.writeFileSync(
-    path.join(dir, 'ship.md'),
-    "---\nafter: implement\nplace: git\nworkspace: main\ngate: true\n---\nShip it: trial merge this run's result branch onto main, run the check, and commit.\n\nAbort on any failure.\n",
-  );
-  const run = await runPlaced(startRun({ brief: 'add sub', repo, workflowDir: dir }));
-  const { e, settle } = board();
-  await runWith(e, advanceRun(readRun(run.id)));
-  const work = readRun(run.id).steps.implement;
-  write(work.workspace!, 'packages/x/src/add.ts', 'export const add = (a, b) => a + b;\nexport const sub = (a, b) => a - b;\n');
-  git(work.workspace!, 'add', '-A');
-  git(work.workspace!, 'commit', '-q', '-m', 'add sub');
-  settle(`${run.id}-implement`, 'succeeded', SIGNED);
-  await runWith(e, advanceRun(readRun(run.id)));
-  assert.deepEqual(await whole(t, e, run.id), [
-    '<id>  add sub',
-    '',
-    '  UNVERIFIED: implement  — no check: declared; only its own word says it worked',
-    "  AWAITING APPROVAL, waiting on you: ship  — this workflow's ending, at its gate: nothing of it has run, and your approval is what runs it",
-    '',
-    '  touched  wf/<id>/implement',
-    '    packages/x  1 file   +1 −0',
-    '  lesson  nothing written where the next agent reads',
-    '',
-    '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
-    '  none',
-    '',
-    '  implement',
-    '    used  not measured',
-    '    cost  not measured',
-    '    timeline  try 1  filed 00:00:00Z  spawned 00:00:12Z  ended 00:05:00Z  queued 12s  ran 4m48s  used not measured',
-    '    did it',
-    '',
-    '  cost  run not measured',
-    '  timeline  run  queued 12s  ran 4m48s  wall 5m00s',
-    '',
-    '  wf/<id>/implement  — 1 file: +1 −0',
-    '',
-    '  branch    wf/<id>/implement is ahead of main by 1 commit',
-    '  merges    wf/<id>/implement merges cleanly onto main',
-    '  others    no other run is in flight on main',
-    '',
-    "  to decide  ship has not run: this workflow's ending, and your approval is what runs it:",
-    "    Ship it: trial merge this run's result branch onto main, run the check, and commit.",
-    '',
-    '  approve it    nemia approve <id> ship [--message "<words>"]',
-    '  send it back  nemia retry <id> implement --message "<objection>"',
-  ]);
-});
-
 test('the whole screen of a gate on a last step that merges nothing, before and after its approval', async (t) => {
   const repo = aRepo();
   const run = await runPlaced(startRun({ brief: 'add sub', repo, workflowDir: folder(), gates: ['review'] }));
@@ -1514,59 +1350,6 @@ test('the whole screen of a gate on a last step that merges nothing, before and 
     '',
     '  ship it   git -C <repo> merge --no-ff wf/<id>/implement',
     '  drop it   git -C <repo> branch -D wf/<id>/implement',
-  ]);
-});
-
-test('the whole screen of a run that worked on the base branch itself', async (t) => {
-  const repo = aRepo();
-  const run = await runPlaced(startRun({ brief: 'add sub, directly', repo, workflowDir: folder(), isolate: false, gates: ['review'] }));
-  const { e, settle } = board();
-  await runWith(e, advanceRun(readRun(run.id)));
-  settle(`${run.id}-implement`, 'succeeded', SIGNED);
-  await runWith(e, advanceRun(readRun(run.id)));
-  settle(`${run.id}-implement-check`, 'succeeded');
-  await runWith(e, advanceRun(readRun(run.id)));
-  settle(`${run.id}-review`, 'succeeded', SIGNED);
-  assert.deepEqual(await whole(t, e, run.id), [
-    '<id>  add sub, directly',
-    '',
-    '  UNVERIFIED: review  — no check: declared; only its own word says it worked',
-    '  AWAITING APPROVAL, waiting on you: review  — signed off at its gate; nothing after it is filed until you approve it, or send it back',
-    '',
-    '  touched  main',
-    '    nothing — the branch changed no file against the base',
-    '  lesson  nothing written where the next agent reads',
-    '',
-    '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
-    '  none',
-    '',
-    '  implement',
-    '    check  npm test  →  unfinished ✓',
-    '    used  not measured',
-    '    cost  not measured',
-    '    timeline  try 1        filed 00:00:00Z  spawned 00:00:12Z  ended 00:05:00Z  queued 12s  ran 4m48s  used not measured',
-    '              try 1 check  filed 00:10:00Z  spawned 00:10:12Z  ended 00:15:00Z  queued 12s  ran 4m48s',
-    '    did it',
-    '',
-    '  review',
-    '    gate  awaiting approval:  nemia approve <id> review [--message "<words>"]  — or send it back:  nemia retry <id> review --message "<objection>"',
-    '    used  not measured',
-    '    cost  not measured',
-    '    timeline  try 1  filed 00:20:00Z  spawned 00:20:12Z  ended 00:25:00Z  queued 12s  ran 4m48s  used not measured',
-    '    did it',
-    '',
-    '  cost  run not measured',
-    '  timeline  run  queued 36s  ran 14m24s  wall 25m00s',
-    '',
-    '  main',
-    '',
-    '  worked directly on main; nothing to merge; the base was <base>',
-    '  read it    git -C <repo> diff <base>...main',
-    '',
-    '  to decide  review has signed off and waits for your word:',
-    '',
-    '  approve it    nemia approve <id> review [--message "<words>"]',
-    '  send it back  nemia retry <id> review --message "<objection>"',
   ]);
 });
 

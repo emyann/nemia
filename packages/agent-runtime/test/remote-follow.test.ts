@@ -7,6 +7,8 @@
  */
 import { afterEach, test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import { Cause, Effect, Exit, Stream } from 'effect';
 import { Engine as EngineService, type EngineShape, type TaskSpec } from '../src/index.ts';
 import { remoteOps, SEND_MS, type RemoteOptions } from '../src/a2a/remote.ts';
@@ -241,13 +243,29 @@ const subscribes = ([input, init]: unknown[]): boolean => {
  */
 const opsOn = async (s: RemoteServer, name: string, o: RemoteOptions = {}, requestMs?: number) => {
   const card = (await (await fetch(`${s.url}/.well-known/agent-card.json`)).json()) as Record<string, unknown>;
-  const ops = remoteOps('remote', { card }, scratch('ae-remote-follow-'), undefined, requestMs, {
+  const root = scratch('ae-remote-follow-');
+  const ops = remoteOps('remote', { card }, root, undefined, requestMs, {
     resubscribeMs: 1,
     spawnWaitMs: SEND_MS,
     ...o,
   });
   await Effect.runPromise(ops.spawn({ name, brief: 'paint the fence', cwd: '/w' }));
-  return ops;
+  return { ...ops, root };
+};
+
+/** The registry file of the session `name` under `root`, as the driver names it. */
+const entryFile = (root: string, name: string) => path.join(root, 'remote', `${encodeURIComponent(name)}.json`);
+
+/**
+ * The send lease of the session `name` placed past its bound, by the entry on disk and not by waiting: `sentAt` long ago and the
+ * monotonic stamp taken off, so `sendHeld` judges it on the wall clock and finds it lapsed.
+ */
+const lapseSend = (root: string, name: string): void => {
+  const file = entryFile(root, name);
+  const entry = JSON.parse(fs.readFileSync(file, 'utf8')) as { sentAt: string; sending: { mono?: unknown } };
+  const sending = { ...entry.sending };
+  delete sending.mono;
+  fs.writeFileSync(file, JSON.stringify({ ...entry, sentAt: new Date(Date.now() - 86_400_000).toISOString(), sending }));
 };
 
 test(
@@ -416,11 +434,14 @@ test(
   'REFUSED: a session still being sent whose send falls into doubt is `submitted`, then refused: there is no Task to follow',
   WAITED,
   async (t) => {
-    const s = await serve({ slowMs: 300 });
-    const ops = await opsOn(s, 'ae/doubt/1', { spawnWaitMs: 10, sendMs: 50 });
+    const s = await serve();
+    s.hanging.a2a = true;
+    const { follow, root } = await opsOn(s, 'ae/doubt/1', { spawnWaitMs: 10, sendMs: 60_000 });
     const got: Followed[] = [];
-    const ended = drained(ops.follow!('ae/doubt/1'), got);
+    const ended = drained(follow!('ae/doubt/1'), got);
     await holds(t, got, 1);
+    assert.deepEqual(shown(got), ['state submitted'], 'still being sent: a Task submitted');
+    lapseSend(root, 'ae/doubt/1');
     const err = failure(await ended);
     assert.equal(err.refused, true);
     assert.equal(

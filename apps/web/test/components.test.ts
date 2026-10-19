@@ -6001,7 +6001,11 @@ test("a layer the run froze none of says so; a step with no agent draws no agent
     filed: true,
   });
   assert.doesNotMatch(agentless, /data-layer="instructions"|data-layer="custom"/);
-  assert.match(agentless, /No agent: its own words are all it was told, before the task\.[^]*data-layer="policy"/);
+  assert.match(
+    agentless,
+    /No agent: of the words Nemia composes, its own are all it was told\. Where two of them say different things, the higher number wins, and the task is above them all\.[^]*data-layer="folder"[^]*data-layer="policy"/,
+    "a step with no agent is still told the folder's files, and which number wins",
+  );
 
   const whole = toldMarkup({ told: 'Write the note.\n\n## What was asked for', layers: null, filed: false });
   assert.match(whole, /What it would be told now/);

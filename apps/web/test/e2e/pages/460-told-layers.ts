@@ -196,11 +196,8 @@ async function expectRules(page: Page): Promise<void> {
   ]);
   const review = sectionOf(page, 'review').locator('details[data-told]');
   await review.locator('summary').click();
-  await expectCount(
-    review.locator('[data-layer="factory"], [data-layer="folder"]'),
-    0,
-    'a step with no agent has no layer of its own above its note',
-  );
+  await expectCount(review.locator('[data-layer="factory"]'), 0, 'a step with no agent froze no rules of its own');
+  await expectCount(review.locator('[data-layer="folder"]'), 1, "and is told the folder's files all the same");
   await settled(page);
   await photograph(write, path.join(OUT, `told-layers-rules-${await themeOf(page)}.png`));
 }
@@ -213,7 +210,8 @@ export default {
    * says the first two went into the session's system prompt and that the higher number wins — five layers, and none for a factory's
    * rules, the run having frozen none;
    * a run started in a factory that kept rules draws them as a sixth, between the folder's files and the policy (`expectRules`);
-   * `review`, with no agent, says its own words are all it was told. Each
+   * `review`, with no agent, says the words Nemia composes are its own alone, and is told the folder's files all the same
+   * (`told-layers-agentless-<theme>.png`). Each
    * section, fold and all, says each layer's words once: no body above the fold says them again. A run that froze no layers still draws
    * its step's body above the fold, which is all it has of the step's words. The page writes its runs and takes them back, so each visit
    * reads the store as seeded.
@@ -282,15 +280,20 @@ export default {
 
       const review = sectionOf(page, 'review').locator('details[data-told]');
       await review.locator('summary').click();
-      await expectVisible(review.getByText('No agent: its own words are all it was told', { exact: false }), 'review has no agent');
+      await expectVisible(
+        review.getByText('No agent: of the words Nemia composes, its own are all it was told', { exact: false }),
+        'review has no agent',
+      );
+      await expectCount(review.locator('[data-layer="instructions"], [data-layer="custom"]'), 0, "and so no agent's layer");
       await expectCount(
-        review.locator('[data-layer="instructions"], [data-layer="custom"], [data-layer="folder"]'),
-        0,
-        "and so no agent's layer",
+        review.locator('[data-layer="folder"]'),
+        1,
+        "but the folder's files, which the session reads itself, are told whether a step has an agent or not",
       );
       await expectOnce(sectionOf(page, 'review'), [["review's own words", LAYERED.review]]);
       await settled(page);
       await photograph(write, path.join(OUT, `told-layers-open-${await themeOf(page)}.png`));
+      await photograph(sectionOf(page, 'review'), path.join(OUT, `told-layers-agentless-${await themeOf(page)}.png`));
       await onPhone(page, write);
       await expectRules(page);
 

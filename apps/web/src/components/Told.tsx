@@ -42,6 +42,10 @@ export const STEP_POLICY = "5. The step's policy";
 /** What the fold says of the numbers it heads its layers with. */
 export const PRECEDENCE_NOTE = 'Where two of them say different things, the higher number wins, and the task is above them all.';
 
+/** What the fold says of a step with no agent: Nemia composed no layer above its own words, which are its policy. */
+const noAgent = (will: boolean): string =>
+  `No agent: of the words Nemia composes, its own are all it ${will ? 'will be' : 'was'} told. ${PRECEDENCE_NOTE}`;
+
 /** What the layer of the folder's files says: the session reads them where it works, and the board has none of them to draw. */
 export const FOLDER_FILES_SAID =
   'The files of the folder this step works in. The session reads them itself, wherever it works, and Nemia composes none of them.';
@@ -104,7 +108,7 @@ function Layers({ layers, parts }: { layers: StepLayers; parts: TaskPart[] | nul
   return (
     <div className="mt-2 flex flex-col gap-3">
       {layers.agent === null ? (
-        <p className="text-body-small text-muted-foreground">No agent: its own words are all it was told, before the task.</p>
+        <p className="text-body-small text-muted-foreground">{noAgent(false)}</p>
       ) : (
         <>
           <p className="text-body-small text-muted-foreground">
@@ -119,17 +123,17 @@ function Layers({ layers, parts }: { layers: StepLayers; parts: TaskPart[] | nul
           <Layer name="custom" title={CUSTOM_INSTRUCTIONS}>
             <Words text={layers.custom} />
           </Layer>
-          {layers.folderFiles && (
-            <Layer name="folder" title={FOLDER_FILES}>
-              <p className="text-body-small text-muted-foreground">{FOLDER_FILES_SAID}</p>
-            </Layer>
-          )}
-          {layers.factory !== null && (
-            <Layer name="factory" title={FACTORY_RULES}>
-              <Words text={layers.factory} />
-            </Layer>
-          )}
         </>
+      )}
+      {layers.folderFiles && (
+        <Layer name="folder" title={FOLDER_FILES}>
+          <p className="text-body-small text-muted-foreground">{FOLDER_FILES_SAID}</p>
+        </Layer>
+      )}
+      {layers.factory !== null && (
+        <Layer name="factory" title={FACTORY_RULES}>
+          <Words text={layers.factory} />
+        </Layer>
       )}
       <Layer name="policy" title={STEP_POLICY}>
         <Words text={layers.policy || null} />
@@ -160,7 +164,7 @@ function WillBeTold({ layers, homes }: { layers: StepLayers; homes: LayerHomes }
             : `, ${layers.factory === null ? "the agent's words and yours" : "the agent's words, yours and the factory's rules"} ${layers.via === 'prompt' ? 'in its system prompt' : 'at the head of its brief'}. ${PRECEDENCE_NOTE}`}
         </p>
         {layers.agent === null ? (
-          <p className="text-body-small text-muted-foreground">No agent: its own words are all it will be told, before the task.</p>
+          <p className="text-body-small text-muted-foreground">{noAgent(true)}</p>
         ) : (
           <>
             <Layer name="instructions" title={INSTRUCTIONS(layers.agent)} home={homes.instructions}>
@@ -173,17 +177,17 @@ function WillBeTold({ layers, homes }: { layers: StepLayers; homes: LayerHomes }
             <Layer name="custom" title={CUSTOM_INSTRUCTIONS} home={homes.custom}>
               <Words text={layers.custom} none="None written" />
             </Layer>
-            {layers.folderFiles && (
-              <Layer name="folder" title={FOLDER_FILES}>
-                <p className="text-body-small text-muted-foreground">{FOLDER_FILES_SAID}</p>
-              </Layer>
-            )}
-            {(layers.factory !== null || homes.factory) && (
-              <Layer name="factory" title={FACTORY_RULES} home={homes.factory ?? undefined}>
-                <Words text={layers.factory} none={NO_RULES_TOLD} />
-              </Layer>
-            )}
           </>
+        )}
+        {layers.folderFiles && (
+          <Layer name="folder" title={FOLDER_FILES}>
+            <p className="text-body-small text-muted-foreground">{FOLDER_FILES_SAID}</p>
+          </Layer>
+        )}
+        {(layers.factory !== null || homes.factory) && (
+          <Layer name="factory" title={FACTORY_RULES} home={homes.factory ?? undefined}>
+            <Words text={layers.factory} none={NO_RULES_TOLD} />
+          </Layer>
         )}
         <Layer name="policy" title={STEP_POLICY} home={homes.words}>
           <Words text={layers.policy || null} none="No words of its own" />

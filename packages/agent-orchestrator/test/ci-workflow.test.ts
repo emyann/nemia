@@ -10,27 +10,19 @@
  * Branch protection requires one context, `ci`, from the gate job, and never names another: that is why the gate must need every job of
  * the file and carry `always()`, and why a job added by a later card without a line in `needs` is refused here.
  *
+ * What the gate's script actually decides is run rather than read, next door in `ci-gate.boundary.test.ts`: matching its text would
+ * prove nothing about its verdict.
+ *
  * The test reads files outside this package, the workflow and the root's `package.json`: `turbo.json` lists `.github/` among this
  * package's test inputs (`turbo-inputs.test.ts`), or turbo replays a pass from its cache after an edit to the workflow.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import yaml from 'js-yaml';
-import { scratch } from './scratch.ts';
+import { FILE, GATE, gateSteps, LEGS, readWorkflow, type Step, type Workflow, workflowText } from './ci-workflow.ts';
 
 const ROOT = path.join(import.meta.dirname, '..', '..', '..');
-
-/** The workflow, as every sentence below names it to the person who must fix it. */
-const FILE = '.github/workflows/ci.yml';
-
-/** The job that reports the one context branch protection requires. */
-const GATE = 'ci';
-
-/** The job whose matrix holds the legs: one workspace on one node version. */
-const LEGS = 'test';
 
 /** What `cancel-in-progress` must read, as the sentence that refuses another value spells it out. */
 const SPARED = "${{ github.ref != 'refs/heads/main' }}";
@@ -41,29 +33,8 @@ const FILTERED = '--filter=${{ matrix.workspace }}';
 /** What the gate's step must be given, the needed jobs' results as JSON, through the environment and not the command line. */
 const RESULTS = '${{ toJSON(needs) }}';
 
-type Step = { uses?: string; with?: Record<string, unknown>; run?: string; env?: Record<string, string> };
-
-type Job = {
-  if?: string;
-  needs?: string[];
-  strategy?: { 'fail-fast'?: boolean; matrix?: Record<string, unknown[]> };
-  steps?: Step[];
-};
-
-type Workflow = {
-  name?: string;
-  on?: Record<string, { branches?: string[] } | null>;
-  permissions?: Record<string, string>;
-  concurrency?: { group?: string; 'cancel-in-progress'?: unknown };
-  jobs: Record<string, Job>;
-};
-
 /** A workspace of this repository, by the name a turbo filter gives it, and whether it has a suite to run. */
 type Workspace = { name: string; suite: boolean };
-
-const workflowText = (): string => fs.readFileSync(path.join(ROOT, FILE), 'utf8');
-
-const readWorkflow = (text = workflowText()): Workflow => yaml.load(text) as Workflow;
 
 /** Every workspace the root `package.json` claims, expanded from its globs: the folders under them that hold a `package.json`. */
 function readWorkspaces(): Workspace[] {
@@ -213,9 +184,6 @@ function filterDrift(workflow: Workflow): string[] {
     );
 }
 
-/** The gate's steps that run a command: the one that turns the needed jobs' results into the `ci` context. */
-const gateSteps = (workflow: Workflow): Step[] => (workflow.jobs[GATE]?.steps ?? []).filter((step) => step.run !== undefined);
-
 /**
  * A gate whose verdict is not one step reading `toJSON(needs)` out of the environment. The results are a fork's to shape on a pull
  * request, so they must reach the step's shell through `env` and never be interpolated into its command line.
@@ -308,51 +276,6 @@ test('the shipped CI workflow runs on the three events, reads alone, and caches 
     (job.steps ?? []).filter((step) => step.uses?.startsWith('actions/setup-node') && 'cache' in (step.with ?? {})).map(() => name),
   );
   assert.deepEqual(cached, [], 'setup-node caches no install here: the lockfile install is part of what is tested');
-});
-
-/**
- * The gate's script, run as GitHub runs it: `bash -e` over a file, with the results in the environment and nothing else of the run's.
- * Matching its text would prove nothing about its verdict — a list of the words that mean failure and a check that every word means
- * success read the same to a pattern, and differ exactly on the result nobody foresaw.
- */
-function verdictOf(run: string, results: string): { status: number; said: string } {
-  const file = path.join(scratch('ci-gate-'), 'gate.sh');
-  fs.writeFileSync(file, run);
-  const ran = spawnSync('bash', ['-e', file], {
-    env: { PATH: process.env.PATH, RESULTS: results },
-    encoding: 'utf8',
-    timeout: 30_000,
-  });
-  return { status: ran.status ?? -1, said: `${ran.stdout}${ran.stderr}` };
-}
-
-/** The results GitHub hands the gate, as `toJSON(needs)` writes them: a result per needed job. */
-const resultsOf = (results: Record<string, string>): string =>
-  JSON.stringify(Object.fromEntries(Object.entries(results).map(([job, result]) => [job, { result, outputs: {} }])), undefined, 2);
-
-test('the gate reports the ci context green only when every job it needs read success', () => {
-  const steps = gateSteps(readWorkflow());
-  assert.equal(steps.length, 1, 'the gate has one step that runs a command today');
-  const run = steps[0].run ?? '';
-
-  const green = verdictOf(run, resultsOf({ test: 'success', lint: 'success', typecheck: 'success' }));
-  assert.equal(green.status, 0, `every job succeeded, so the gate passes: ${green.said}`);
-
-  for (const result of ['failure', 'cancelled', 'skipped', 'neutral', 'timed_out']) {
-    const red = verdictOf(run, resultsOf({ test: 'success', lint: result, typecheck: 'success' }));
-    assert.equal(red.status, 1, `a job that read ${result} is not a success: ${red.said}`);
-    assert.match(red.said, /read that job's log/, `the gate says what to do next about ${result}: ${red.said}`);
-  }
-
-  for (const [why, results] of [
-    ['empty', ''],
-    ['no job at all', '{}'],
-    ['another shape', '[{"state":"ok"}]'],
-  ] as const) {
-    const red = verdictOf(run, results);
-    assert.equal(red.status, 1, `results that are ${why} say nothing was checked, which is a failure: ${red.said}`);
-    assert.match(red.said, /read no job result out of needs/, `the gate says what to set when the results are ${why}: ${red.said}`);
-  }
 });
 
 test('REFUSED: a workspace with no leg, a leg with no workspace, a node floor adrift, an unquoted node, a job outside the gate, a third party, a timezone untested, a run unforced, a landing cancelled, a fork with a writable token', () => {

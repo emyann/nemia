@@ -21,7 +21,7 @@ import type { Engine } from '../runtime-client.ts';
 import { nodeChild } from '../../test/child.ts';
 import { scratch } from '../../test/scratch.ts';
 import { promised } from '../../test/promised.ts';
-import { until, WAITED } from '../../test/waits.ts';
+import { until, WAITED } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven } from '../../test/placed.ts';
 import { collector, seriesOf } from '../../test/collector.ts';

@@ -27,7 +27,7 @@ import { TEAM, TEAM_DEV } from './team.ts';
 import { columnsListed, plantedGit } from './planted-git.ts';
 import { runGiven, runOver } from './placed.ts';
 import { steeredClock } from './steered.ts';
-import { until, WAITED } from './waits.ts';
+import { until, WAITED } from 'agent-runtime/testing';
 import { placeOver, placeSplit, unreadBy } from './place-over.ts';
 import { gitPlace } from '../place/git/place.ts';
 

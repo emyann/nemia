@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { a2aServer, type Answer } from './a2a-server.ts';
 import { scratch } from './scratch.ts';
-import { until, WAITED, type Waiter } from './waits.ts';
+import { until, WAITED, type Waiter } from 'agent-runtime/testing';
 import { Effect } from 'effect';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runOver } from './placed.ts';

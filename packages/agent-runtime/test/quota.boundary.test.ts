@@ -15,7 +15,7 @@ import { Engine } from '../src/index.ts';
 import { scratch } from './scratch.ts';
 import { asyncOps, type AsyncRunner } from './promise-runner.ts';
 import { builtEngine } from './engine.ts';
-import { until } from './waits.ts';
+import { until } from '../src/waits/index.ts';
 
 /** A harness in Promises, which the engine spawns nothing on: this test is about the quota alone. */
 const idle: AsyncRunner = {

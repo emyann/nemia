@@ -14,7 +14,7 @@ import { directoryFence } from '../src/workflow/fence.ts';
 import { scratch } from './scratch.ts';
 import { Effect } from 'effect';
 import { plainEngine } from './promised.ts';
-import { until, WAITED } from './waits.ts';
+import { until, WAITED } from 'agent-runtime/testing';
 
 const ROOT = scratch('wf-fence-');
 process.env.WF_ROOT = ROOT;

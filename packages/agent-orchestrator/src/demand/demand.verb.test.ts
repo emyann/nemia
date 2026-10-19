@@ -10,7 +10,7 @@ import path from 'node:path';
 import { Effect } from 'effect';
 import { scratch } from '../../test/scratch.ts';
 import { steeredClock } from '../../test/steered.ts';
-import { until, WAITED } from '../../test/waits.ts';
+import { until, WAITED } from 'agent-runtime/testing';
 
 const ROOT = scratch('wf-demand-');
 process.env.WF_ROOT = ROOT;

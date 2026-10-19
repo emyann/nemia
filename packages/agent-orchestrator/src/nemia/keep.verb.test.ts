@@ -15,11 +15,10 @@ import { Effect, Fiber } from 'effect';
 import type { TaskView } from 'agent-runtime';
 import { CONFIG_FOLDERS } from 'agent-runtime/vocabulary';
 import { scratch } from '../../test/scratch.ts';
-import { testEngine } from 'agent-runtime/testing';
+import { testEngine, until, WAITED } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
 import { steeredClock } from '../../test/steered.ts';
-import { until, WAITED } from '../../test/waits.ts';
 
 const ROOT = scratch('wf-nemia-');
 process.env.WF_ROOT = ROOT;

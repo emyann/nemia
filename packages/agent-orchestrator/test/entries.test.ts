@@ -194,6 +194,7 @@ const PINNED: Record<string, string[]> = {
     'followStep',
     'feedFile',
     'feedLineWords',
+    'feedSize',
     'filesPrunedWords',
     'fillsOf',
     'findAgent',

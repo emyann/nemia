@@ -482,7 +482,7 @@
     {
       "files": ["apps/web/src/lib/feed.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 90, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 81, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {

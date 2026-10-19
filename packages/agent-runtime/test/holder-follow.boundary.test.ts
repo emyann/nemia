@@ -22,6 +22,12 @@ import { bell, until, WAITED } from './waits.ts';
 
 const VIEWER = path.join(import.meta.dirname, 'fixtures', 'viewer-engine.ts');
 
+/** Every file under `dir`, by its path from it: the store whole, journals, feed, run files, captures and the transcript. */
+const filesUnder = (dir: string, at = ''): string[] =>
+  fs
+    .readdirSync(path.join(dir, at), { withFileTypes: true })
+    .flatMap((e) => (e.isDirectory() ? filesUnder(dir, path.join(at, e.name)) : [path.join(at, e.name)]));
+
 /** A holder: an engine that runs Claude Code attached — which is what makes it one — beside the harness the test drives. */
 const holder = async () => {
   const root = scratch('ae-holder-');
@@ -106,6 +112,14 @@ test(
       [{ scheme: 'bearer', agentUrl: `${served.url}/${HARNESS}`, harness: HARNESS }],
       'the secret was asked for once, for the one request the follow made: the follow is the only thing dialled',
     );
+
+    const holds = filesUnder(root).filter((f) => fs.readFileSync(path.join(root, f), 'latin1').includes(served.token));
+    assert.deepEqual(
+      holds,
+      [path.join('a2a', 'holder-token')],
+      'the token is in the one file that keeps it and nowhere else under the store: no log, no journal, no feed line, no capture',
+    );
+    assert.ok(filesUnder(root).length > 5, `and the store was read whole: ${filesUnder(root).join(', ')}`);
 
     await held.close();
     const read = viewer({ root, taskId, card: served.cards[HARNESS], what: 'read' }, served.token, rung);

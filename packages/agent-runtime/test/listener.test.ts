@@ -49,6 +49,15 @@ const handOps = (held: Promise<void>): RunnerOps => {
   };
 };
 
+/**
+ * The same driver with nothing left to follow: its `follow` says a terminal state first, which is what `subscription` refuses
+ * before it has yielded anything (`a2a/follow.ts`). What makes the first answer of a stream fail.
+ */
+const endedOps = (): RunnerOps => ({
+  ...handOps(Promise.resolve()),
+  follow: () => Stream.succeed<Followed>({ kind: 'state', state: 'completed' }),
+});
+
 /** A holder listening for the length of the test, its scope closed by hand. */
 const holding = async (ops: RunnerOps) => {
   const root = scratch('ae-listener-');
@@ -227,5 +236,24 @@ test('a second hold answers a token of its own', async () => {
     assert.notEqual(second.served.url, first.served.url, 'and a port of its own');
   } finally {
     await second.close();
+  }
+});
+
+test('a subscription that fails before its first answer is a JSON-RPC error in a 200, never an event stream that says nothing', async () => {
+  const { served, close } = await holding(endedOps());
+  try {
+    const answered = await call(served, rpc('SubscribeToTask', { tenant: '', id: NAME }), `Bearer ${served.token}`);
+    assert.equal(answered.status, 200);
+    assert.match(
+      answered.headers.get('content-type')!,
+      /^application\/json/,
+      'an event stream here would leave a viewer waiting for ever on a session that has nothing to say',
+    );
+    const body = (await answered.json()) as { id?: number; error?: { message: string } };
+    assert.equal(body.id, 7, JSON.stringify(body));
+    assert.match(body.error!.message, /has ended \(done\)/, `the refusal says why, and what to read instead: ${JSON.stringify(body)}`);
+    assert.match(body.error!.message, /sessionTranscript/);
+  } finally {
+    await close();
   }
 });

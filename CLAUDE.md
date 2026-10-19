@@ -169,7 +169,8 @@ holds what every change needs.
 
 What the `create-an-agent` skill, being generic, does not say here:
 
-- Read `packages/agent-orchestrator/README.md`, *An agent is a node's attachment*, for the format and the five layers.
+- Read `packages/agent-orchestrator/README.md`, *An agent is a node's attachment*, for the format, the five layers numbered by
+  precedence, and the routing rule that says which layer owns a new instruction (*Where a new instruction goes*).
 - A test that loads a shipped folder passes its place (`placesOf` in `packages/agent-orchestrator/test/team.ts`), or the repository's
   `.claude/skills/` is not found.
 - An agent's file and its own skills name nothing of this repository (`packages/agent-orchestrator/test/team-portable.test.ts`): what

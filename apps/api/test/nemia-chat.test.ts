@@ -117,7 +117,7 @@ test('the stream sends presence first, then her events with the cursor, and resu
 });
 
 test('a read that fails under an open stream is `unreadable` with retrying, and the first beat that works after it says `readable`', async () => {
-  withHer(['One.']);
+  const { sessionId } = withHer(['One.']);
   const outbox = path.join(root, 'nemia', 'chat', 'outbox.jsonl');
   fs.mkdirSync(path.dirname(outbox), { recursive: true });
   const mended = fs.rmSync.bind(null, outbox, { force: true });
@@ -130,14 +130,19 @@ test('a read that fails under an open stream is `unreadable` with retrying, and 
     } else if (broken && !whole && got.some((b) => b.event === 'unreadable')) {
       whole = true;
       mended();
+      said(sessionId, ['Two.'], 1);
     }
-    return got.some((b) => b.event === 'readable');
+    return textsOf(got).includes('Two.');
   });
   mended();
-  const said = JSON.parse(beats.find((b) => b.event === 'unreadable')!.data!) as { error: string; retrying: boolean };
-  assert.equal(said.retrying, true, 'a read that failed is a notice: the next beat reads again');
-  assert.match(said.error, /is not a line of the chat's record/, "and it says what the api could not read, in the store's own words");
-  assert.equal(beats.at(-1)?.event, 'readable', 'the beat that works again says so, and the page takes the notice off');
+  const notice = JSON.parse(beats.find((b) => b.event === 'unreadable')!.data!) as { error: string; retrying: boolean };
+  assert.equal(notice.retrying, true, 'a read that failed is a notice: the next beat reads again');
+  assert.match(notice.error, /is not a line of the chat's record/, "and it says what the api could not read, in the store's own words");
+  assert.equal(
+    beats.findIndex((b) => b.event === 'readable') > beats.findIndex((b) => b.event === 'unreadable'),
+    true,
+    'the beat that reads again says `readable`, which takes the notice off the page, before what it read',
+  );
 });
 
 test('REFUSED: a stream from a cursor no read gave is a 422 before it opens', async () => {

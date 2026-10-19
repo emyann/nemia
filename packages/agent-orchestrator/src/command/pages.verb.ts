@@ -39,8 +39,8 @@ const stepSpec = (more: readonly Positional[], keys: readonly string[]): Spec =>
 /** The file's name, as the api's path names it. */
 const NAME: readonly Positional[] = [{ key: 'name', takes: 'required', kind: 'name' }];
 
-/** The run `id` names, among the runs the store lists; undefined for one it does not have. */
-const runOf = (args: Args): Run | undefined => runStore.runs.list().find((r) => r.id === textOf(args, 'id'));
+/** The run `id` names, found among the ids the store lists (`runs.find`); undefined for one it does not have. */
+const runOf = (args: Args): Run | undefined => runStore.runs.find(textOf(args, 'id') ?? '');
 
 /** The run `id`, found among the runs the store lists, never read by a path made of the id; null for one the store does not have. */
 export const RUN: Command<{ run: Run | null }> = {

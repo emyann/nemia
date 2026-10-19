@@ -263,7 +263,7 @@ export {
   runId,
   stepsOf,
 } from './record/record.store.ts';
-export { inboxDir, runStore } from './record/files.store.ts';
+export { inboxDir, keptRuns, runStore } from './record/files.store.ts';
 export type { RunStore } from './record/record.ts';
 export {
   alive,
@@ -315,7 +315,7 @@ export { lackedOf } from './record/record.ts';
 export { branchStandings, parentRecord, resultBranches, type BranchReader } from './branches/branches.store.ts';
 export { passStanding, standingLive, standingLiveOf, standingReader, standingSnapshot, standingWhen } from './standing/standing.verb.ts';
 export { changesOf, type BranchChanges, type Note } from './branches/changes.store.ts';
-export { evictedBy } from './rest/rest.ts';
+export { evictedBy } from './rest/index.ts';
 export { removeAgent, writeAgent } from './agents/agents.store.ts';
 export { copySkill, givenSkills, skillDirIn, skillFolders, skillRead, skillText, writeSkill } from './skills/skills.store.ts';
 export { PlaceService, type Place } from './place/place.store.ts';
@@ -500,6 +500,11 @@ export { holdingOf, judge, needsOf, runWaitingOf, spentOf, standingsOf, wordOf }
 export type { GitAsked, JudgeHow, RunHolding, RunStatus, RunToDecide, RunWaiting, Spent, StepNeeds } from './summary/judged.verb.ts';
 export { restingMemo, restingRead } from './rest/resting.verb.ts';
 export type { RestingMemo, RestingRead } from './rest/resting.verb.ts';
+export { recordMemo } from './rest/index.ts';
+export type { RecordMemo } from './rest/index.ts';
+export type { ScheduleRuns } from './schedule/listed.store.ts';
+export type { PauseRuns } from './pause/pause.ts';
+export type { InboxRuns } from './inbox/index.ts';
 export { judgedNow, runsSummarized } from './summary/summary.verb.ts';
 export type { RunSummary, SummaryHow } from './summary/summary.verb.ts';
 export type { FinishedPage, FinishedRun, ListedRun, OpenRuns, RunClock, RunOutcome, StepCost, WaitingRun } from './runlist/runlist.verb.ts';

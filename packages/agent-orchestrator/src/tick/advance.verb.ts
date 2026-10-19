@@ -42,7 +42,7 @@ import {
   standingReader,
   type PassStanding,
 } from '../standing/standing.verb.ts';
-import { restBlockers, type RestFacts } from '../rest/rest.ts';
+import { restBlockers, type RestFacts } from '../rest/index.ts';
 import {
   answersIn,
   closeoutAsked,

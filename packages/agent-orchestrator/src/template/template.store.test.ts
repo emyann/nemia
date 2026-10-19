@@ -79,7 +79,11 @@ test("the tests' team exports into a folder that passes its check, each part sai
     model: 'opus',
     effort: 'high',
     context: '200k',
-    fence: { permissionMode: 'dontAsk', tools: ['Read', 'Grep', 'Glob', 'Bash', 'Skill'] },
+    fence: {
+      permissionMode: 'dontAsk',
+      tools: ['Read', 'Grep', 'Glob', 'Bash', 'Skill'],
+      allowedTools: ['Bash(git diff:*)', 'Bash(git log:*)', 'Bash(git show:*)', 'Bash(git status)'],
+    },
   });
   assert.deepEqual(agent.output, { path: 'agents/reviewer/output.schema.json' });
   assert.equal(

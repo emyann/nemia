@@ -48,19 +48,22 @@ The instructions are one of five layers that shape an agent apart from its task,
 2. **Custom instructions** — what a person adds to an agent they use without rewriting it, kept in their store, one file per agent name
    (`wf agents custom <name>`), never in the agent's folder. Words only: they set no key, so they never widen the fence or give a tool.
    A run freezes them when it starts, so an edit reaches only the runs after it.
-3. **The factory's rules** — the rules and policies of one factory, told to every agent hired into it: one file a factory, kept in the
+3. **The folder's files** — the files the harness reads from the folder the agent works in (today `CLAUDE.md`, `AGENTS.md`): what holds
+   there for every agent at work in it. Nemia composes nothing of them. They rank above the agent's own instructions and below the
+   factory's rules and the step's policy, although a harness presents them as overriding everything: that framing is the harness's.
+4. **The factory's rules** — the rules and policies of one factory, told to every agent hired into it: one file a factory, kept in the
    store (`nemia factory rules <name>`), never in a repository. Words only, and frozen by a run when it starts, as custom instructions
    are. A step on a remote agent is told none.
-4. **The step's policy** — the step's own words and keys: what this position of this process asks of a role. A normal layer, not a
+5. **The step's policy** — the step's own words and keys: what this position of this process asks of a role. A normal layer, not a
    workaround: say there what one workflow expects, and keep it out of the instructions. A step may add skills, never take one away.
-5. **The folder's files** — the files the harness reads from the folder the agent works in (today `CLAUDE.md`, `AGENTS.md`): what holds
-   there for every agent at work in it. Nemia composes nothing of them.
 
-They reach the agent in that order — instructions, custom instructions, the factory's rules, the step's policy, then the task — and
-where two conflict, the later wins. Fences only tighten: a step may narrow its agent's fence and never widen it — the loader refuses a step's `tools:`,
-`allowedTools:`, `disallowedTools:`, `permissionMode:` or `sandbox:` that would give the agent what its file does not, and a step's
-`background: true` over an agent in any mode but `bypassPermissions`. So the instructions
-say what holds for the role everywhere, and nothing about one workflow or one workspace.
+The number is precedence: where two layers say different things, the higher number wins, and the task is above them all. The order the
+words arrive in is a separate thing — instructions, custom instructions, the factory's rules, the step's policy, then the task, with
+the folder's files read by the harness wherever the agent works. Which layer owns a new instruction is Nemia's own routing rule, *Where
+a new instruction goes*, said once in the shipped *Five layers* passage: ask it rather than guess. Fences only tighten: a step may narrow its agent's fence and
+never widen it — the loader refuses a step's `tools:`, `allowedTools:`, `disallowedTools:`, `permissionMode:` or `sandbox:` that would
+give the agent what its file does not, and a step's `background: true` over an agent in any mode but `bypassPermissions`. So the
+instructions say what holds for the role everywhere, and nothing about one workflow or one workspace.
 
 ## Its closeout
 

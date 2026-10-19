@@ -8,6 +8,7 @@ effort: high
 context: 200k
 tools: Read, Grep, Glob, Bash, Skill
 permissionMode: dontAsk
+allowedTools: Bash(git diff:*), Bash(git log:*), Bash(git show:*), Bash(git status)
 output: review.schema.json
 ---
 Review the change in this workspace. Write nothing into it.

@@ -70,8 +70,12 @@ export const holderFollowOf =
  * `ops` with its `follow` alone dialled on `agent` (`holderFollowOf`), and every other verb left as it is — the same function
  * values, so nothing else can reach the holder. `ops` unchanged where no holder is given for this harness.
  */
-export const holderSeamOf = (agent: HolderAgent | undefined, harness: string, credentials: Credentials | undefined, ops: SeamOps): SeamOps =>
-  agent === undefined ? ops : { ...ops, follow: holderFollowOf(agent, harness, credentials) };
+export const holderSeamOf = (
+  agent: HolderAgent | undefined,
+  harness: string,
+  credentials: Credentials | undefined,
+  ops: SeamOps,
+): SeamOps => (agent === undefined ? ops : { ...ops, follow: holderFollowOf(agent, harness, credentials) });
 
 /**
  * Why the holder given for the harness `harness` cannot be taken, or `undefined`. Asked by `Engine.layer`, in the order
@@ -94,7 +98,12 @@ export const holderRefusal = (
     return `\`holder\` names the \`${harness}\` harness, which is a remote A2A agent: its sessions are the other party's, followed at its own address, and no holder of ours serves them. Take the entry off.`;
   }
   if (typeof agent !== 'object' || agent === null || Object.keys(agent).some((k) => k !== 'card')) {
-    const given = typeof agent === 'object' && agent !== null ? Object.keys(agent).map((k) => `\`${k}\``).join(', ') : `a ${typeof agent}`;
+    const given =
+      typeof agent === 'object' && agent !== null
+        ? Object.keys(agent)
+            .map((k) => `\`${k}\``)
+            .join(', ')
+        : `a ${typeof agent}`;
     return `the holder of the \`${harness}\` harness takes \`card\` and nothing else, and was given ${given}. Give the card that engine's \`hold()\` answered for this harness, and its token through \`credentials\`.`;
   }
   const read = cardOfJson((agent as { card: unknown }).card);

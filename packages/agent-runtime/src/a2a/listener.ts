@@ -118,15 +118,11 @@ const answerStream = async (
     'x-accel-buffering': 'no',
   });
   res.flushHeaders();
-  let gone = false;
-  res.on('close', () => {
-    gone = true;
-    void it.return?.(undefined);
-  });
-  for (let step = first; !step.done && !gone; step = await it.next()) {
+  res.on('close', () => void it.return?.(undefined));
+  for (let step = first; !step.done && !res.closed; step = await it.next()) {
     res.write(`data: ${JSON.stringify(step.value)}\n\n`);
   }
-  if (!gone) res.end();
+  if (!res.closed) res.end();
 };
 
 /** The harness a request's path names, and whether it asks for that harness's card; `undefined` for a path this port has none for. */
@@ -155,7 +151,7 @@ const answerOf = async (req: http.IncomingMessage, res: http.ServerResponse, por
   if (body === undefined) return answerPlain(res, 413, `a request of this port holds at most ${MOST_BYTES} bytes.\n`);
   const context = new ServerCallContext({ state: new Map<string, unknown>([[STATE_HEADERS_KEY, req.headers]]) });
   const answer = await port.transport.handle(body, context);
-  if (Symbol.asyncIterator in answer) return answerStream(res, idOf(body), answer as AsyncGenerator<unknown, void, undefined>);
+  if (Symbol.asyncIterator in answer) return answerStream(res, idOf(body), answer);
   return answerJson(res, 200, answer);
 };
 
@@ -213,7 +209,10 @@ export const servedOf = (served: {
         const card = servedCardOf(harness, ops, `${url}/${harness}`);
         const json = cardJsonOf(card);
         cards[harness] = json;
-        ports.set(harness, { transport: new JsonRpcTransportHandler(new ServedHandler(new HarnessHandler(harness, ops, served.events), card)), card: json });
+        ports.set(harness, {
+          transport: new JsonRpcTransportHandler(new ServedHandler(new HarnessHandler(harness, ops, served.events), card)),
+          card: json,
+        });
       }
       writeToken(served.root, token);
       return { answer: { url, token, cards }, server, sockets };

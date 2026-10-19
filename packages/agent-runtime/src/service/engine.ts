@@ -848,22 +848,17 @@ const seamOf =
  * other party's, read at its own address — and whether this engine holds attached sessions at all, which is what makes it a holder
  * (a harness spelt `'claude'`). An engine that holds none serves nothing.
  */
-const servingOf = (
-  harnesses: Record<string, HarnessConfig>,
-  made: Record<string, RunnerOps>,
-  events: Parameters<typeof a2aOps>[2],
-) => ({
+const servingOf = (harnesses: Record<string, HarnessConfig>, made: Record<string, RunnerOps>, events: Parameters<typeof a2aOps>[2]) => ({
   ops: Object.fromEntries(Object.entries(made).filter(([name]) => !isRemote(harnesses[name]))),
   events,
   holds: Object.values(harnesses).some((h) => h === 'claude'),
 });
 
-/** The verbs of the sessions run attached: `hold`, with the port it serves (`servedOf`), and `drain`, which writes the drain's file or removes it. */
-const attachVerbsOf = (
-  attached: Attached,
-  root: string,
-  serving: ReturnType<typeof servingOf>,
-): Pick<EngineShape, 'hold' | 'drain'> => ({
+/**
+ * The verbs of the sessions run attached: `hold`, with the port it serves while it holds (`servedOf`), and `drain`, which writes the
+ * drain's file or removes it.
+ */
+const attachVerbsOf = (attached: Attached, root: string, serving: ReturnType<typeof servingOf>): Pick<EngineShape, 'hold' | 'drain'> => ({
   hold: () =>
     Effect.flatMap(attached.hold, () =>
       serving.holds ? servedOf({ root, ops: serving.ops, events: serving.events }) : Effect.succeed(null),

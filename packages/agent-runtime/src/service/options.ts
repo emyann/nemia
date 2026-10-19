@@ -252,6 +252,18 @@ const runnerOf = (
           ? remoteOps(name, h, root, credentials, undefined, { missingCredential })
           : h;
 
+/** Why one of `options.holder`'s entries cannot be taken, or `undefined`: the first `holderRefusal` refuses, in the options' order. */
+const holdersRefusalOf = (options: EngineOptions): string | undefined => {
+  const harnesses = options.harnesses ?? {};
+  const names = Object.keys(harnesses);
+  for (const [name, agent] of Object.entries(options.holder ?? {})) {
+    const h = Object.hasOwn(harnesses, name) ? harnesses[name] : undefined;
+    const refused = holderRefusal(name, agent, { harnesses: names, remote: h !== undefined && isRemote(h) });
+    if (refused) return refused;
+  }
+  return undefined;
+};
+
 /** Why `maxConcurrent` is not a ceiling, or `undefined`: anything but a whole number from 1. */
 const ceilingRefusalOf = (maxConcurrent: unknown): string | undefined =>
   maxConcurrent === undefined || (Number.isInteger(maxConcurrent) && (maxConcurrent as number) >= 1)
@@ -282,12 +294,8 @@ export const optionsRefusalOf = (options: EngineOptions): string | undefined => 
     const refused = harnessConfigRefusalOf(name, h);
     if (refused) return refused;
   }
-  const harnesses = options.harnesses ?? {};
-  for (const [name, agent] of Object.entries(options.holder ?? {})) {
-    const h = Object.hasOwn(harnesses, name) ? harnesses[name] : undefined;
-    const refused = holderRefusal(name, agent, { harnesses: Object.keys(harnesses), remote: h !== undefined && isRemote(h) });
-    if (refused) return refused;
-  }
+  const holders = holdersRefusalOf(options);
+  if (holders) return holders;
   if (options.unschedulable !== undefined && typeof options.unschedulable !== 'function') {
     return '`unschedulable` is a function, `() => boolean`, asked on every pass: give one, or leave it out.';
   }

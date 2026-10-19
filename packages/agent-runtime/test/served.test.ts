@@ -73,7 +73,11 @@ test('the served card carries the bearer scheme and the requirement that names i
 test('REFUSED: the same card with its schemes taken off asks for nothing, and a client sends no header', () => {
   const { card } = servedOn();
   const bare: AgentCard = { ...card, securitySchemes: {}, securityRequirements: [] };
-  assert.deepEqual(authOf(bare, URL_AT, 'claude', () => 'tok-1'), { headers: {} }, 'no requirement, no header: the port would refuse it');
+  assert.deepEqual(
+    authOf(bare, URL_AT, 'claude', () => 'tok-1'),
+    { headers: {} },
+    'no requirement, no header: the port would refuse it',
+  );
 });
 
 test('REFUSED: a viewer whose `credentials` answers nothing is refused in words naming the scheme and what to give', () => {
@@ -89,7 +93,10 @@ test('the served card lists no method of the runtime extension and no `say`, whe
   const ops = handOps();
   const { card } = servedOn(ops);
   const paramsOf = (c: AgentCard) => c.capabilities?.extensions?.[0]?.params as { methods: string[]; say: boolean };
-  assert.ok(paramsOf(cardOf('claude', ops)).methods.includes('sessionTranscript'), 'the driver has a transcript, so the in-process card offers it');
+  assert.ok(
+    paramsOf(cardOf('claude', ops)).methods.includes('sessionTranscript'),
+    'the driver has a transcript, so the in-process card offers it',
+  );
   assert.deepEqual(paramsOf(card), { methods: [], say: false }, 'the port answers no method of ours, and takes no words');
 });
 
@@ -99,7 +106,10 @@ test('the served card is read back by a viewer as the card of an agent given inl
   const read = cardOfJson(json);
   assert.ok('card' in read, `the card a holder serves decodes: ${JSON.stringify(read)}`);
   assert.deepEqual(read.card.supportedInterfaces, card.supportedInterfaces);
-  assert.deepEqual(authOf(read.card, URL_AT, 'claude', () => 'tok-1'), { headers: { authorization: 'Bearer tok-1' } });
+  assert.deepEqual(
+    authOf(read.card, URL_AT, 'claude', () => 'tok-1'),
+    { headers: { authorization: 'Bearer tok-1' } },
+  );
   assert.equal(holderRefusal('claude', { card: json }, { harnesses: ['claude'], remote: false }), undefined);
 });
 
@@ -130,7 +140,10 @@ test('REFUSED, at shipped defaults: every method the port does not serve, each n
 test('the three served methods are the handler the runtime already had: its card, its Task and its stream', async () => {
   const { card, inner, handler } = servedOn();
   assert.deepEqual(await handler.getAgentCard(), card, 'the card is the served one, never the in-process one');
-  assert.deepEqual(await handler.getTask({ tenant: '', id: NAME, historyLength: undefined }, ctx), await inner.getTask({ tenant: '', id: NAME, historyLength: undefined }, ctx));
+  assert.deepEqual(
+    await handler.getTask({ tenant: '', id: NAME, historyLength: undefined }, ctx),
+    await inner.getTask({ tenant: '', id: NAME, historyLength: undefined }, ctx),
+  );
   const read = async (gen: AsyncGenerator<unknown, void, undefined>) => {
     const got: unknown[] = [];
     for await (const answer of gen) got.push(answer);
@@ -153,7 +166,11 @@ test('the viewer dials its `follow` and nothing else: every other verb is the va
     [],
     'and every other verb is the same function value, so nothing else can reach the holder',
   );
-  assert.equal(holderSeamOf(undefined, 'claude', () => 'tok-1', ops), ops, 'a harness with no holder is left as it is');
+  assert.equal(
+    holderSeamOf(undefined, 'claude', () => 'tok-1', ops),
+    ops,
+    'a harness with no holder is left as it is',
+  );
 });
 
 test('REFUSED: a holder named for a harness the engine does not run, for a remote agent, and with a card that does not read', () => {
@@ -176,8 +193,15 @@ test('REFUSED: a holder named for a harness the engine does not run, for a remot
 test('REFUSED by the options, in their fixed order: a ceiling and a harness speak before a holder, and a holder before the rest', () => {
   const card = cardJsonOf(servedCardOf('claude', handOps(), URL_AT));
   const harnesses = { claude: 'claude' } as const;
-  assert.equal(optionsRefusalOf({ harnesses, holder: { claude: { card } } }), undefined, 'a holder of a harness it runs, with the card it served');
-  assert.match(optionsRefusalOf({ harnesses, holder: { codex: { card } } })!, /`holder` names the `codex` harness, which this engine does not run/);
+  assert.equal(
+    optionsRefusalOf({ harnesses, holder: { claude: { card } } }),
+    undefined,
+    'a holder of a harness it runs, with the card it served',
+  );
+  assert.match(
+    optionsRefusalOf({ harnesses, holder: { codex: { card } } })!,
+    /`holder` names the `codex` harness, which this engine does not run/,
+  );
   assert.match(
     optionsRefusalOf({ harnesses: { claude: 'claude', reviewer: { url: 'https://a.example' } }, holder: { reviewer: { card } } })!,
     /`holder` names the `reviewer` harness, which is a remote A2A agent/,

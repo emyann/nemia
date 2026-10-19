@@ -21,7 +21,7 @@ const told = await new Promise<Told>((resolve, reject) => {
     try {
       resolve(JSON.parse(text) as Told);
     } catch (cause) {
-      reject(cause as Error);
+      reject(cause);
     }
   });
 });

@@ -74,7 +74,9 @@ test('the port binds a port of its own on loopback, and answers the card it decl
     assert.ok(Number(url.port) > 0, `the port is one the machine chose: ${url.port}`);
     const iface = (served.cards.claude.supportedInterfaces as Array<{ url: string }>)[0];
     assert.equal(iface.url, `${served.url}/claude`, 'the card names the address it is served at');
-    const answered = await fetch(`${served.url}/claude/.well-known/agent-card.json`, { headers: { authorization: `Bearer ${served.token}` } });
+    const answered = await fetch(`${served.url}/claude/.well-known/agent-card.json`, {
+      headers: { authorization: `Bearer ${served.token}` },
+    });
     assert.equal(answered.status, 200);
     assert.deepEqual(await answered.json(), served.cards.claude, 'the card served is the card answered up');
   } finally {
@@ -199,7 +201,10 @@ test('the token is kept 0600 in a 0700 folder, is what the hold answered, and go
   await close();
   held.open();
   assert.equal(fs.existsSync(file), false, 'the token is forgotten as the hold ends');
-  await assert.rejects(call(served, rpc('GetTask', { tenant: '', id: NAME }), `Bearer ${served.token}`), 'and the port takes no connection');
+  await assert.rejects(
+    call(served, rpc('GetTask', { tenant: '', id: NAME }), `Bearer ${served.token}`),
+    'and the port takes no connection',
+  );
   await assert.rejects(
     (async () => {
       for (let step = await reader.read(); !step.done; step = await reader.read());

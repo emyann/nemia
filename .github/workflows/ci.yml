@@ -1,0 +1,103 @@
+# Nemia's own check, on clean runners off the owner's machine (docs/plan-github-ci.md, "5. CI").
+#
+# A reader of CI has no test to ask, so the reasons are beside the lines. What this file must agree with in the repository — a workspace
+# with no leg, a node floor adrift from engines.node, a job outside the gate's needs, an action that is not GitHub's own by major tag —
+# is refused by packages/agent-orchestrator/test/ci-workflow.test.ts, not by this comment.
+name: ci
+
+# A pull request is tested by pull_request, which runs the fork's code against a token that can only read. The sibling trigger that
+# would run it against a writable token is named nowhere in this file, and ci-workflow.test.ts refuses the word anywhere in its text.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Nothing here writes to the repository: the token reads the code and no more.
+permissions:
+  contents: read
+
+# A superseded run of a branch is cancelled, but every push to main keeps its run to its end: the gate below reads a cancelled job as a
+# failure, so cancelling main's run would leave a landed commit red without having been tested.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  test:
+    name: test ${{ matrix.workspace }} on node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    strategy:
+      # Every leg runs: one package's failure on one node says nothing about the other nine.
+      fail-fast: false
+      matrix:
+        workspace: [agent-runtime, agent-orchestrator, api, web, docs]
+        # Quoted, both of them: YAML reads 22.18 as a number and setup-node then installs the wrong Node. 22.18.0 is the floor
+        # engines.node claims; 24 is the release after it.
+        node: ['22.18.0', '24']
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        # No cache: npm — the lockfile's own install is part of what is under test, and a cache keyed across legs hides a broken one.
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Give the runner a git identity
+        # A runner has none, and its git init would default to master. Much of the suite makes scratch repositories; the ones that pass
+        # -c user.email and -b main themselves do not need this, and the ones that do not need the runner to resemble a person's machine.
+        run: |
+          git config --global user.name 'nemia ci'
+          git config --global user.email 'ci@nemia.invalid'
+          git config --global init.defaultBranch main
+      - run: npm ci
+      # Both runs pass --force: turbo.json hashes no environment (envMode loose passes it through without hashing it), so without it the
+      # second run replays the first from the cache and the second timezone is never tested.
+      - name: test under TZ=UTC
+        run: npx turbo run test --force --filter=${{ matrix.workspace }}
+        env:
+          TZ: UTC
+      - name: test under TZ=America/New_York
+        run: npx turbo run test --force --filter=${{ matrix.workspace }}
+        env:
+          TZ: America/New_York
+
+  lint:
+    # Whole, and on the floor engines.node claims: the linter's verdict does not differ by node, so one leg is enough.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.18.0'
+      - run: npm ci
+      - run: npm run lint
+
+  typecheck:
+    # Whole, on the same floor: tsc reads the repository's own TypeScript, not the runtime's.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.18.0'
+      - run: npm ci
+      - run: npm run typecheck
+
+  # The one context branch protection requires. It needs every other job, so protection is configured once and never touched as the job
+  # list changes, and always() makes it run even when one of them fails, is skipped or is cancelled — each of which it reads as a failure.
+  ci:
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [test, lint, typecheck]
+    steps:
+      - name: Every job succeeded
+        # toJSON(needs) goes through env, never interpolated into the shell: on a pull request from a fork, an expression the branch
+        # controls must not reach a command line.
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "$RESULTS"
+          if printf '%s' "$RESULTS" | grep -q '"result": *"\(failure\|cancelled\|skipped\)"'; then
+            echo "ci: a job above did not succeed. Open this run's summary, read the failing job's log, and fix what it names;" >&2
+            echo "ci: a cancelled or skipped job is a failure too - re-run the workflow once its cause is gone." >&2
+            exit 1
+          fi

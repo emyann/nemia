@@ -10,6 +10,7 @@
  * `tools/test-costs/`, so each package's test lists `tools/` too. The docs' tests read the packages' docs for the diagrams they draw,
  * every source for the names their pages cite, and the paths those pages cite, at the root and under `docs/` and `workflows/`.
  * The api's test of what `npm run dev` watches reads every workspace package's `package.json` and sources (`dev-watch.test.ts`).
+ * The CI guard here reads the repository's Actions workflow (`ci-workflow.test.ts`), so this package's test lists `.github/` too.
  * `INPUTS` names, for each such task, the globs it must list beside its own files; `missingInputs` refuses a task or a glob left out.
  */
 import { test } from 'node:test';
@@ -26,6 +27,7 @@ const INPUTS: Record<string, readonly string[]> = {
   'agent-orchestrator#test': [
     '$TURBO_DEFAULT$',
     '$TURBO_ROOT$/.oxlintrc.json',
+    '$TURBO_ROOT$/.github/**',
     '$TURBO_ROOT$/lint/**',
     '$TURBO_ROOT$/tools/**',
     ...APPS,
@@ -98,6 +100,9 @@ test("REFUSED: a task that drops the apps' tests or root files, the team, the te
   ]);
   assert.deepEqual(missingInputs(dropping('agent-orchestrator#test', '$TURBO_ROOT$/packages/agent-runtime/**')), [
     'agent-orchestrator#test does not list $TURBO_ROOT$/packages/agent-runtime/** among its inputs in turbo.json: add it, or turbo replays it from its cache',
+  ]);
+  assert.deepEqual(missingInputs(dropping('agent-orchestrator#test', '$TURBO_ROOT$/.github/**')), [
+    'agent-orchestrator#test does not list $TURBO_ROOT$/.github/** among its inputs in turbo.json: add it, or turbo replays it from its cache',
   ]);
   assert.deepEqual(missingInputs(dropping('agent-orchestrator#test', '$TURBO_ROOT$/workflows/agents/**')), [
     'agent-orchestrator#test does not list $TURBO_ROOT$/workflows/agents/** among its inputs in turbo.json: add it, or turbo replays it from its cache',

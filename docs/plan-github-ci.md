@@ -1,6 +1,8 @@
 # Moving to GitHub, with CI
 
-2026-09-25. A plan under way: the name is chosen (Nemia, 2026-09-29) and the project renamed in the repository; step 3 is next.
+2026-09-25, and still the one document to open to learn where the GitHub move stands. Steps 1 to 3 are done; step 5, CI, is being
+built now under the intent `the-ci-is-the-check-nemia-s-j94s` (signed 2026-10-19, twenty-six decisions, six cards), which also decided
+what of Nemia's own checks CI takes over. Step 6 is a named follow-on intent, not this one.
 
 ## Why now
 
@@ -28,10 +30,10 @@ on top of main and the changes ahead of it, then merges. Nothing chases main.
    do the machinery's names (a step's plugin, the api's MCP client, the board's storage keys); the names test refuses the old
    name outside history and paths. What people type and what is on disk kept its name, as with the package rename: the `wf`
    and `ae` commands, `~/.agent-workflows` and `~/.agent-engine`, and the checkout's folder. Dated writing keeps its words.
-3. **Settle what the history exposes** (below), before anything is pushed.
+3. ~~**Settle what the history exposes**~~ (below). Done: audited over all 1,333 commits, and the three decisions on it taken.
 4. **Put it on GitHub** by renaming the existing repository and replacing its code, keeping the old code reachable.
-5. **CI**: an Actions workflow, branch protection and a merge queue.
-6. **The factory ships through pull requests.** `ship` becomes "open the PR and let the queue merge it".
+5. **CI**: an Actions workflow and branch protection. Under way; the merge queue moved to step 6 with the pull-request landing.
+6. **The factory ships through pull requests**, with the merge queue. A named follow-on intent's, not this one's.
 7. **Other repositories** (`docs/plan-multi-repo.md`) follow mostly as configuration once 4 to 6 hold.
 
 ## 3. What the history exposes
@@ -81,20 +83,42 @@ the old URL and remote keep redirecting to the new name unless a new repository 
 Being public, standard Actions runners cost nothing (a private repository would get 2,000 minutes a month, which about twenty
 runs a day at several checks each would exhaust).
 
-One workflow, on `pull_request` and `merge_group`:
+One workflow, `.github/workflows/ci.yml`, on three events: `push` to `main`, `pull_request`, and `workflow_dispatch` so the owner can
+fire it by hand. Never the trigger that runs a fork's code against a writable token; `permissions: contents: read`; `concurrency` per
+ref, cancelling a superseded run of a branch but never one of `main`, since a cancelled job is read as a failure and a landing's verdict
+must be its own. GitHub's own actions by major tag, and a third party's taken as a pinned download in a `run` step instead. No tag
+trigger: `nemia upgrade`'s own trial build is a release's gate.
 
-- `npm ci`, `npm test`, `npm run typecheck`, `npm run build`, then `npx playwright install --with-deps chromium` (cached) and
-  `npm run e2e`, uploading `.e2e/*.png` as an artifact so a reviewer can read the pictures.
-- The tests need no live harness: the api's tests put a fake `claude` first on `PATH` (`apps/api/test/harness.ts`), and the live
-  tests run only under `AE_LIVE=1`, which CI never sets.
-- A secret scan (gitleaks) on every push.
-- `concurrency` per pull request, cancelling a superseded run.
+What it runs, all of it reporting **one required context, `ci`**, from a single gate job that `needs` every other job with `always()`, so
+branch protection is configured once and never touched as the job list grows:
 
-About 6 to 8 minutes on a standard runner, off the laptop, one per PR plus one in the queue.
+- **Ten test legs**: one per workspace, on node 22.18.0 — the floor `engines.node` claims — and 24, each leg running its package's suite
+  twice, under `TZ=UTC` and `TZ=America/New_York`. Both runs pass `--force`: `turbo.json` hashes no environment, so without it the second
+  run replays the first from the cache and the second timezone is never tested.
+- **`npm run lint` and `npm run typecheck`**, whole, on the floor.
+- **The 120-page e2e in four shards** off `apps/web/test/e2e/pages/NAMES`, with a gate summing their page time against `PAGES_BOUND_MS`,
+  Playwright's browsers cached, and a failing page's pictures uploaded. npm itself is not cached: the lockfile's own install is part of
+  what is tested.
+- **A build job** that refuses a stale generated file by name, `git diff --exit-code` over `apps/web/src/routeTree.gen.ts` and
+  `apps/web/theme/`.
+- **gitleaks** over the incoming commits, as a pinned binary with a two-line allowlist, and `CODEOWNERS` over what a branch could edit to
+  weaken its own check.
+
+The tests need no live harness, and nothing a clean `ubuntu-latest` lacks: the api's tests put a fake `claude` first on `PATH`
+(`apps/api/test/harness.ts`), the one docker-shaped test stubs `docker`, every `fetch` is loopback, and the live tests run only under
+`AE_LIVE=1`, which CI never sets. A workspace with no leg, a node floor adrift from `engines.node`, a shard list adrift from `NAMES`, a
+job outside the gate's `needs` and an action that is not GitHub's own are each refused by name in
+`packages/agent-orchestrator/test/ci-workflow.test.ts`, so the file cannot quietly test less than it claims.
+
+**The owner pushes `main` by hand after each landing**, and reads the verdict off GitHub's own notification or the Actions tab. Nothing in
+Nemia reads CI today, and `push: main` fires after the landing has already committed: CI reports on a landing and never gates one, so a
+red `main` is a normal state to be fixed, not a blocked one. One push after each landing is also what makes one CI run name one landing,
+and the verdict attributable.
 
 ## 6. The factory ships through pull requests
 
-What changes:
+A named follow-on intent's work, not this one's: the pull-request landing, the merge queue, `merge_group`, and Nemia reading CI's verdict
+through a place's `checks` verb, with `checks:` and several named checks as its first card. What changes there:
 
 - **Pushing.** A run pushes its own result branch (`wf/<run>/…`), never main. CLAUDE.md's "Never push" becomes "push only your
   run's branch"; branch protection, not `settings.json`, is what refuses a push to main.
@@ -103,8 +127,9 @@ What changes:
 - **The run reads CI.** A ship's step waits on the PR's checks and the queue's result, read with `gh`, level-triggered like
   everything else: merged, failed with the failing job's log, or still waiting. A runtime harness that "runs" a CI check, or the
   ship reading the PR's status on each tick; the plan for that step chooses.
-- **Round checks.** Stay local and fast (tests, typecheck, build, no e2e, since 2026-09-25), or move to CI on each push of the
-  run's branch. The second takes the load off the laptop entirely, at the cost of a push per round.
+- **Round checks.** Settled by the CI intent, not here: they stay local, and narrow to what the change touched. A round proves the
+  bound, the pictures, the probes, the mutants, the types and the lint whole, and the tests of the packages whose turbo inputs cover the
+  diff; the whole forced suite and the whole 120-page e2e become CI's, and the laptop stops paying for them.
 - **What goes away.** The shipper's trial merge and hand-run check, the chasing of main, and the tick's clean-up of a merge left
   on main.
 
@@ -116,14 +141,18 @@ checkout" as CODEOWNERS), and every lesson about the ship's check.
 1. ~~The project's new name~~ — decided 2026-09-29: Nemia.
 2. ~~The 11 commits with the personal email~~ — decided: left as they are, no history rewrite.
 3. ~~The Jev experiments' recorded run data~~ — decided: moved out of the tree, history kept.
-4. Round checks: local (as now) or in CI on each push.
+4. ~~Round checks: local (as now) or in CI on each push~~ — decided 2026-10-19 with the CI intent: **local, and narrowed to what the
+   change touched**. The whole forced suite and the whole e2e are CI's; a round keeps only what a clean runner cannot do sooner, and the
+   landing proves the merge's own diff on the merged tree.
 
 ## Cards, once the name is chosen
 
 1. ~~Rename the project in the repository (the name, the README, the root package, the board's title, the docs), with the names
    test taught the old project name the way it knows the old package names.~~ Done, 2026-09-29.
 2. ~~Generalise local paths in the files that name them (the experiments' data is already out).~~ Done, 2026-09-29.
-3. The owner, by hand: tag and branch the old main, rename the repository, push, protect main, CODEOWNERS.
-4. The Actions workflow with the e2e and the secret scan, proven on a first PR.
-5. The ship through a pull request and the merge queue, with the run reading CI's result.
-6. Round checks in CI, if so decided.
+3. The owner, by hand: tag and branch the old main, rename the repository, push, protect main, enforce CODEOWNERS.
+4. Steps 5 and 6 above are now the intent `the-ci-is-the-check-nemia-s-j94s` and its follow-on, cut into six cards: the workflow file
+   with its guard test, this document and the README badge; the e2e shards with the build job and the generated-file guard; gitleaks,
+   `CODEOWNERS` and the two `private` lines; then the three that narrow Nemia's own checks — the diff-to-packages mapping, the round's
+   narrowing, and the landing's narrowing with its inside-or-outside label. The ship through a pull request and the merge queue are the
+   follow-on's.

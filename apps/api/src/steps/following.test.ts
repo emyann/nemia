@@ -21,7 +21,7 @@ import { bell, until, WAITED } from '../../test/waits.ts';
 type Followed = Stream.Success<NonNullable<Effect.Success<ReturnType<Engine['Service']['follow']>>>>;
 
 const RUN = 'r-follow';
-const STEPS = ['implement', 'review', 'late', 'held', 'opened', 'tried', 'drifted'];
+const STEPS = ['implement', 'review', 'late', 'held', 'opened', 'tried', 'drifted', 'lost'];
 
 /** The run's record, each step of `STEPS` on the task `t-<step>`, but those `moved` names on another. */
 function writeRun(moved: Record<string, string> = {}): void {
@@ -49,7 +49,8 @@ const said = (id: string, text = id): TranscriptEvent => ({ id, at: '2026-10-07T
 
 /**
  * A task on the test's engine: its attempts' live moments, each a queue the test offers to, how many of them have ended, whether it
- * settled, its conversation, and whether its harness streams.
+ * settled, its conversation, whether its harness streams, and the words a stream it had fails with (`lost`), an error as the runtime
+ * fails with one: no refusal to stream, but a stream that broke under the follower.
  */
 type Task = {
   attempts: Queue.Queue<Followed, Cause.Done>[];
@@ -57,6 +58,7 @@ type Task = {
   settled: string | null;
   history: TranscriptEvent[];
   unstreamed?: true;
+  lost?: string;
 };
 
 /**
@@ -87,6 +89,7 @@ function engineOver(tasks: Map<string, Task>) {
         : Effect.sync(() => {
             follows.push(id);
             const t = tasks.get(id)!;
+            if (t.lost !== undefined) return Stream.fail(Object.assign(new Error(t.lost), { _tag: 'RunnerError', refused: false }));
             if (t.attempts.length === 0) return undefined;
             if (t.ended === t.attempts.length) return Stream.fail({ _tag: 'RunnerError', refused: true, message: 'the attempt has ended' });
             return Stream.fromQueue(t.attempts.at(-1)!).pipe(Stream.ensuring(Effect.sync(() => closed.push(id))));
@@ -384,5 +387,31 @@ test(
       "the try's history is read from its start at the move alone: the beats after it read from the cursor",
     );
     await f.leave();
+  },
+);
+
+test(
+  'a step whose live stream fails is given up on no more than one its harness never pushed: the stream says why, retrying, and the beat reads the conversation again',
+  { timeout: 60_000 },
+  async (t) => {
+    const lost: Task = { ...working([said('a-1')]), lost: 'the runner lost the session' };
+    const { e } = engineOver(new Map([['t-lost', lost]]));
+    const own = appOver(t, e);
+    const f = await follower(t, own.app, 'lost');
+    let reading = true;
+    const over = f.ended().then((s) => {
+      if (reading) assert.fail(`the stream ended on the failed upstream instead of saying why: ${JSON.stringify(kinds(s))}`);
+    });
+    await Promise.race([f.wait((s) => s.some((b) => b.event === 'unreadable'), 'the upstream failed, and the stream says so'), over]);
+    reading = false;
+    const notice = JSON.parse(f.said().find((b) => b.event === 'unreadable')!.data!) as { error: string; retrying: boolean };
+    assert.match(notice.error, /the runner lost the session/, "the upstream's own words say why no live stream can be had");
+    assert.equal(notice.retrying, true, 'and they are a notice, not an end: the api goes on reading');
+    assert.equal(f.said().filter((b) => b.event === 'settled').length, 0, 'nothing settled it: the stream stays open');
+    assert.ok(kinds(f.said()).includes('transcript a-1'), 'what the session said before the stream broke is sent all the same');
+    lost.history.push(said('a-2'));
+    await f.wait((s) => kinds(s).includes('transcript a-2'), 'and what it says after it arrives on the beat that follows');
+    await f.leave();
+    await over;
   },
 );

@@ -57,6 +57,33 @@ async function expectFocus(page: Page, what: string | null, assertion: string): 
   }, assertion);
 }
 
+/** What the page keeps for `watchDrawn`: the name of every state the drawing has drawn invisible since it began to watch. */
+type Watched = { e2eHiddenStates?: string[] };
+
+/**
+ * Watches every state of the drawing from here on for one drawn invisible, keeping its name for `expectEverDrawn`: React Flow draws a
+ * node whose size it has yet to measure `visibility: hidden`, and a state invisible for a frame takes neither a press nor the focus.
+ */
+const watchDrawn = (page: Page): Promise<void> =>
+  page.evaluate(() => {
+    const hidden: string[] = [];
+    (window as unknown as Watched).e2eHiddenStates = hidden;
+    new MutationObserver((records) => {
+      for (const { target } of records) {
+        const node = target as HTMLElement;
+        const state = node.dataset.id;
+        if (node.classList.contains('react-flow__node') && node.style.visibility === 'hidden' && state && !hidden.includes(state))
+          hidden.push(state);
+      }
+    }).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['style'] });
+  });
+
+/** Refuses when the drawing has drawn any state invisible since `watchDrawn`, naming each. */
+async function expectEverDrawn(page: Page, assertion: string): Promise<void> {
+  const hidden = await page.evaluate(() => (window as unknown as Watched).e2eHiddenStates ?? ['nothing was watched']);
+  if (hidden.length > 0) throw new Refused(`${assertion}: it drew ${hidden.join(', ')} invisible`);
+}
+
 /** Clicks a point of the lifecycle's drawing with nothing drawn on it, where the click lands on the empty pane. */
 async function clickPane(page: Page): Promise<void> {
   const spot = await frameOf(page).evaluate((frame) => {
@@ -95,9 +122,11 @@ async function shows(page: Page): Promise<void> {
 
 /**
  * Again closes it; another state switches it; the empty canvas closes it and gives the focus back to no node, so Enter on the state
- * focused next shows that one; Escape closes it; a double click stays on the page, showing the state its first click showed.
+ * focused next shows that one; Escape closes it; a double click stays on the page, showing the state its first click showed. Through all
+ * of it no state is drawn invisible (`watchDrawn`), which is what would take the focus from the node pressed or focused next.
  */
 async function presses(page: Page): Promise<void> {
+  await watchDrawn(page);
   await nodeOf(page, ASKS).click();
   await expectNoBar(page, `a click on ${ASKS}'s node again closes the bar`);
   await settled(page);
@@ -125,6 +154,10 @@ async function presses(page: Page): Promise<void> {
   if (new URL(page.url()).pathname !== '/machines') throw new Refused(`and stays on the Machines page — it is ${page.url()}`);
   await page.keyboard.press('Escape');
   await expectNoBar(page, 'Escape closes it again');
+  await expectEverDrawn(
+    page,
+    'no press, switch or close left a state of the drawing unfocusable, drawn invisible while React Flow measured it',
+  );
 }
 
 export default {

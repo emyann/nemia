@@ -19,6 +19,11 @@ export type MachinePress = Omit<ReturnType<typeof useCanvasPress>, 'shown'>;
 /**
  * The drawing's states and routes as React Flow's nodes and edges, `lit`, `inspected` and `taken` marked on them; each state given back
  * its pointer events, a name and no outline of the browser's when it can be `pressed`.
+ *
+ * A state carries the size its layout gave it as the node's own `width` and `height`, never in its `style` alone: React Flow draws a node
+ * whose size it does not know `visibility: hidden` until it has measured the box, and it forgets what it measured every time these nodes
+ * are built again — on a press, on the bar switching or closing. A state invisible for a frame takes no focus, so the focus a person gives
+ * it right then would land on nothing.
  */
 export function flowOf(drawing: Drawing, lit: string | undefined, taken: readonly string[], pressed: boolean, inspected: string | null) {
   const nodes: MachineFlowNode[] = drawing.states.map((box) => ({
@@ -26,8 +31,9 @@ export function flowOf(drawing: Drawing, lit: string | undefined, taken: readonl
     type: 'state',
     position: { x: box.x, y: box.y },
     data: { ...box, lit: box.id === lit, pressable: pressed, inspected: box.id === inspected },
-    style: { width: box.width, height: box.height, ...(pressed && { pointerEvents: 'all' as const }) },
-    ...(pressed && { ariaLabel: `State ${box.id}`, className: 'outline-none' }),
+    width: box.width,
+    height: box.height,
+    ...(pressed && { style: { pointerEvents: 'all' as const }, ariaLabel: `State ${box.id}`, className: 'outline-none' }),
     draggable: false,
     selectable: false,
   }));

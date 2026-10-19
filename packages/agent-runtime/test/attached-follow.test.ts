@@ -69,6 +69,15 @@ const resulted = (root: string): boolean => {
   }
 };
 
+/** The kind of each line the session's capture holds, in order: its `type`, with its `subtype` where it has one. */
+const capturedKinds = (root: string): string[] => {
+  const { out } = filesOf(root, NAME);
+  return lines(path.dirname(out), path.basename(out)).map((l) => {
+    const { type, subtype } = l as { type: string; subtype?: string };
+    return subtype === undefined ? type : `${type} ${subtype}`;
+  });
+};
+
 /** A long-lived session of the stand-in that streams its text, writes a transcript and holds its turn, spawned and held. */
 const followable = async (id: string, plan: object = {}) => {
   const { root, dir, request } = kept({ id, stream: true, transcript: true, hold: true, ...plan });
@@ -111,6 +120,11 @@ test(
     assert.ok(texts(got).includes(SAID.join('')), 'the event carries the text the pieces spelled');
     fs.writeFileSync(path.join(dir, 'end'), '');
     await until(t, () => got.some((m) => m.kind === 'state' && m.state === 'input-required'), 'the turn’s end', { bell: rung });
+    assert.deepEqual(
+      capturedKinds(root),
+      ['system init', 'result success'],
+      'the capture keeps only the kinds its readers read: not one line of the text in progress the follower was handed above',
+    );
     await Effect.runPromise(Fiber.interrupt(fiber));
     await h.close();
   },

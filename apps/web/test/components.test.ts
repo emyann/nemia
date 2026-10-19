@@ -7213,7 +7213,7 @@ test('the run page draws one tag per kind the run is behind on, and the verb to 
 });
 
 const { ChatTurn } = await import('../src/components/chat/ChatTurn.tsx');
-const { ChatLostBand, ChatStoppedBand, ChatUnreadableBand } = await import('../src/components/chat/ChatBand.tsx');
+const { ChatLostBand, ChatRetryingBand, ChatStoppedBand, ChatUnreadableBand } = await import('../src/components/chat/ChatBand.tsx');
 const { foldChat } = await import('../src/lib/chatFollowing.ts');
 const { dockWords } = await import('../src/lib/presence.ts');
 type ChatEvent = import('../src/lib/api.ts').ChatEvent;
@@ -7248,14 +7248,14 @@ test('a turn at work draws its steps, the one that waits on a person in yours; a
 
 test("her session stopped is a status, the daemon lost an alert in the failure's colour, and neither is dimmed by an opacity", async () => {
   const stopped = await routedWith(createElement(ChatStoppedBand, { words: 'Her session was stopped from outside.' }));
-  assert.match(stopped, /data-chat-band="stopped"[^>]*role="status"|role="status"[^>]*data-chat-band="stopped"/);
+  assert.match(stopped, /data-band="stopped"[^>]*role="status"|role="status"[^>]*data-band="stopped"/);
   assert.match(stopped, /Her session stopped/);
   assert.match(stopped, /What you write waits for her\./);
   assert.match(stopped, /data-chat-start[^>]*href="\/settings"|href="\/settings"/, 'Start her session leads to her settings');
   const lost = renderToStaticMarkup(
     createElement(ChatLostBand, { since: '2026-10-15T21:57:00.000Z', now: new Date('2026-10-15T22:00:00.000Z') }),
   );
-  assert.match(lost, /data-chat-band="lost"[^>]*role="alert"|role="alert"[^>]*data-chat-band="lost"/);
+  assert.match(lost, /data-band="lost"[^>]*role="alert"|role="alert"[^>]*data-band="lost"/);
   assert.match(lost, /No answer from the daemon/);
   assert.match(lost, /bg-failure-container text-on-failure-container/);
   assert.match(lost, /nothing you wrote is lost/);
@@ -7281,9 +7281,18 @@ test("her docked face is called by the presence that gives it its expression, in
 
 test("a chat the board cannot read says so as an alarm, in the read's own words, and says the board reads again on its own", () => {
   const html = renderToStaticMarkup(createElement(ChatUnreadableBand, { why: 'the api answered 503' }));
-  assert.match(html, /data-chat-band="unreadable"/);
+  assert.match(html, /data-band="unreadable"/);
   assert.match(html, /role="alert"/);
   assert.match(html, /The board cannot read her chat/);
   assert.match(html, /the api answered 503\. It reads again every few seconds/);
   assert.match(html, /what you write is kept here until the api takes it/);
+});
+
+test('a chat the api cannot stream and reads again on a beat is a quiet note at rest, never the failure that ends a page', () => {
+  const html = renderToStaticMarkup(createElement(ChatRetryingBand, { why: 'Her session is not pushed as it is written.' }));
+  assert.match(html, /data-band="retrying"[^>]*role="status"|role="status"[^>]*data-band="retrying"/);
+  assert.match(html, /Reading her chat again/);
+  assert.match(html, /Her session is not pushed as it is written\. Nothing is lost/);
+  assert.match(html, /border-rest/, 'a note the board makes of itself is rest, not a write refused');
+  assert.doesNotMatch(html, /failure/, 'the colour that says a write was refused says nothing here');
 });

@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { QueryClient, type QueryKey } from '@tanstack/react-query';
-import { END_GRACE_MS, type Frames, type StreamLike } from '../src/lib/following.ts';
+import { END_GRACE_MS, type Frames, type StreamLike } from '../src/lib/follow.ts';
 import {
   FALLBACK_MS,
   type FeedStart,

@@ -5,12 +5,13 @@
  * her step's state to a trace line's (`traceStatusOf`), her consecutive steps folded into a turn (`foldChat`), the links read out of
  * her words (`linksOf`), and the words the read-back controls say.
  *
- * Beside the effect in `lib/useNemiaChat.ts`, as `lib/following.ts` sits beside `lib/useStepTranscript.ts`.
+ * Beside the effect in `lib/useNemiaChat.ts`, as `lib/following.ts` sits beside `lib/useStepTranscript.ts`. The transport under
+ * `followChat` is the one follower both conversations run on, `lib/follow.ts`.
  */
 import type { ChatEvent, ChatPresence } from './api/chat.ts';
 import { chatDataOf } from './api/chat.ts';
 import { duration } from './canvas.ts';
-import { END_GRACE_MS, type Frames, type StreamLike } from './following.ts';
+import { follow, type Followed, type Follower, type Frames, type StreamLike } from './follow.ts';
 import type { Presence } from './presence.ts';
 import type { Level } from './api/nemia.ts';
 import type { TraceStatus } from '@/components/ui/trace';
@@ -20,9 +21,6 @@ export type ChatStep = Extract<ChatEvent, { kind: 'step' }>;
 
 /** Her message, the person's, or the keeper's marker. */
 export type ChatMessage = Extract<ChatEvent, { kind: 'message' }>;
-
-/** `EventSource.CLOSED`, named here so a stream is followed where there is no EventSource. */
-const CLOSED = 2;
 
 /** A trace line's state for each state one of her steps can be in: done draws plain, so it takes none. */
 const TRACE_STATUS: Record<ChatStep['state'], TraceStatus | undefined> = {
@@ -41,16 +39,14 @@ export const CHAT_DOWN: ChatPresence = { up: false, answering: false, waitsOnYou
 
 /**
  * Her chat as the panel holds it: the events it knows, oldest first; where she is, as the api last said; the `cursor` a stream resumes
- * from, null before the first read; whether the stream is still open (`live`); whether the first read is in flight (`loading`); and why
- * the chat could not be read, if it could not.
+ * from, null before the first read; whether the stream is still open (`live`); whether the first read is in flight (`loading`); why the
+ * chat could not be read at all, if it could not; and why the api is reading it again, if it is (`retrying`).
  */
-export type ChatFollowed = {
+export type ChatFollowed = Followed & {
   events: ChatEvent[];
   presence: ChatPresence;
   cursor: string | null;
-  live: boolean;
   loading: boolean;
-  error: string | null;
 };
 
 /** What the panel holds before its first read: nothing, being read when there is one (`loading`). */
@@ -61,6 +57,7 @@ export const unreadChat = (loading: boolean): ChatFollowed => ({
   live: false,
   loading,
   error: null,
+  retrying: null,
 });
 
 /**
@@ -97,75 +94,50 @@ export function changedChat(s: ChatFollowed, c: ChatChange): ChatFollowed {
   return { ...s, cursor: c.cursor };
 }
 
+/** The arrivals one of her stream's events brings: what it decoded, and the cursor its id is, each only where there is one. */
+const brought = (event: ChatChange | null, id: string): ChatChange[] => [
+  ...(event ? [event] : []),
+  ...(id ? [{ kind: 'cursor' as const, cursor: id }] : []),
+];
+
 /**
- * What each event of her chat's stream does to what the panel holds (`update`), apart from React, so it is tested without a browser:
- * `useNemiaChat` opens the stream and hands it here. Each event's data is decoded by its schema (`chatDataOf`), and one that does not
- * decode is ignored; `presence` replaces where she is, `chat` merges one event by its id, and the frames that arrive together are
- * merged once an animation frame, as a stream opened on a long chat sends hundreds at once. A read the api could not make and will try
- * again is said and keeps the stream; one it will not is the end. A dropped connection is the EventSource's to resume — it reconnects
- * with the id of the last event it was sent, which is the cursor — and one it closes, because the api refused it, ends the following.
- * Returns what stops following.
+ * What her chat's stream means, for `follow`: `presence` replaces where she is, `chat` merges one event by its id, and either moves the
+ * cursor to the id it came with; each event's data is decoded by its schema (`chatDataOf`), and one that does not decode is ignored.
+ * Her chat has no event that ends it: the api follows it for as long as the panel is open.
  */
-export function followChat(stream: StreamLike, update: (change: (s: ChatFollowed) => ChatFollowed) => void, frames: Frames): () => void {
-  let arrived: ChatChange[] = [];
-  let frame = 0;
-  let grace: ReturnType<typeof setTimeout> | undefined;
-  const close = () => {
-    if (grace !== undefined) clearTimeout(grace);
-    stream.close();
-  };
-  const flush = () => {
-    frame = 0;
-    const changes = arrived;
-    arrived = [];
-    update((s) => changes.reduce(changedChat, s));
-  };
-  const arrive = (c: ChatChange) => {
-    const last = arrived.at(-1);
-    if (c.kind === 'events' && last?.kind === 'events') last.events.push(...c.events);
-    else arrived.push(c);
-    frame ||= frames.request(flush);
-  };
-  const end = (error: string | null) => {
-    grace ??= setTimeout(close, END_GRACE_MS);
-    if (frame) {
-      frames.cancel(frame);
-      flush();
-    }
-    update((s) => ({ ...s, live: false, error }));
-  };
-  stream.addEventListener('presence', (message) => {
-    const presence = chatDataOf('presence', message.data);
-    if (presence) arrive({ kind: 'presence', presence });
-    if (message.lastEventId) arrive({ kind: 'cursor', cursor: message.lastEventId });
-  });
-  stream.addEventListener('chat', (message) => {
-    const event = chatDataOf('chat', message.data);
-    if (event) arrive({ kind: 'events', events: [event] });
-    if (message.lastEventId) arrive({ kind: 'cursor', cursor: message.lastEventId });
-  });
-  stream.addEventListener('unreadable', (message) => {
-    const said = chatDataOf('unreadable', message.data);
-    const error = said?.error ?? 'Her chat could not be read.';
-    if (said?.retrying) update((s) => ({ ...s, error: `${error} Reading it again every few seconds.` }));
-    else end(error);
-  });
-  stream.addEventListener('open', () => update((s) => ({ ...s, live: true, error: null })));
-  stream.addEventListener('error', () => {
-    if (grace !== undefined) {
-      close();
-      return;
-    }
-    if (stream.readyState === CLOSED) {
-      end('The api refused to follow her chat any further. Reload the page to read it again.');
-      close();
-    }
-  });
-  return () => {
-    close();
-    if (frame) frames.cancel(frame);
-  };
-}
+const chatFollower: Follower<ChatFollowed, ChatChange> = {
+  reads: {
+    presence: (m) => {
+      const presence = chatDataOf('presence', m.data);
+      return brought(presence ? { kind: 'presence', presence } : null, m.lastEventId);
+    },
+    chat: (m) => {
+      const event = chatDataOf('chat', m.data);
+      return brought(event ? { kind: 'events', events: [event] } : null, m.lastEventId);
+    },
+  },
+  over: [],
+  fold: changedChat,
+  joined: (last, next) => {
+    if (last.kind !== 'events' || next.kind !== 'events') return false;
+    last.events.push(...next.events);
+    return true;
+  },
+  ending: (s) => s,
+  opened: (s) => (s.live ? s : { ...s, live: true }),
+  unreadable: (m) => chatDataOf('unreadable', m.data) ?? null,
+  words: {
+    unread: 'Her chat could not be read.',
+    refused: 'The api refused to follow her chat any further. Reload the page to read it again.',
+  },
+};
+
+/**
+ * Her chat followed on `stream`, each change written through `update` (`follow`, `chatFollower`), apart from React so a node test
+ * proves it without a browser: `useNemiaChat` opens the stream and hands it here. Returns what stops following.
+ */
+export const followChat = (stream: StreamLike, update: (change: (s: ChatFollowed) => ChatFollowed) => void, frames: Frames): (() => void) =>
+  follow(stream, chatFollower, update, frames);
 
 /**
  * Where she is as her face and its cues read it (`lib/presence.ts`), the one writer of it: the api's presence `api`, her `level`, and

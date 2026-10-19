@@ -1,46 +1,15 @@
 /**
- * The two lines inside Nemia's chat that are about the chat itself, neither of them a part of the look (`change-the-board` names none,
- * and `test/look.test.ts` refuses one it does not): her session stopped, with a way to start it, the board having lost the daemon, and
- * her chat the board cannot read at all.
+ * The lines inside Nemia's chat that are about the chat itself, each the shared band both conversations draw
+ * (`conversation/ConversationBand.tsx`): her session stopped, with a way to start it, the board having lost the daemon, her chat the
+ * board cannot read at all, and her chat the api is reading again on a beat.
  */
-import type { ReactNode } from 'react';
-import { CircleXIcon, PauseIcon } from 'lucide-react';
+import { CircleXIcon, PauseIcon, RefreshCwIcon } from 'lucide-react';
+import { ConversationBand } from '@/components/conversation/ConversationBand';
 import { LinkButton } from '@/components/ui/button';
-import { container } from '@/lib/meaning';
 import { clockWord } from '@/lib/quota';
 import { routeLink } from '../routeLink';
 
 const RouterLinkButton = routeLink(LinkButton);
-
-/** A band: its icon, its heading and its sentence, over an accent at its left, or in the failure's container whole. */
-function Band({
-  role,
-  what,
-  icon,
-  title,
-  children,
-}: {
-  role: 'status' | 'alert';
-  what: string;
-  icon: ReactNode;
-  title: string;
-  children: ReactNode;
-}) {
-  const failed = role === 'alert';
-  return (
-    <div data-chat-band={what} role={role} className={failed ? container.failure : 'border-l-4 border-rest bg-surface-container-highest'}>
-      <div className="flex items-start gap-2.5 px-3.5 py-3">
-        <span aria-hidden="true" className="mt-0.5 shrink-0 [&_svg]:size-4">
-          {icon}
-        </span>
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <span className="text-title-small">{title}</span>
-          <span className={failed ? 'text-body-small' : 'text-body-small text-on-surface-variant'}>{children}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 /**
  * Why her session stopped, and what to do: Start her session leads to her settings, where a level above Manual files her one, and Why
@@ -49,9 +18,9 @@ function Band({
 export function ChatStoppedBand({ words }: { words: string }) {
   return (
     <>
-      <Band role="status" what="stopped" icon={<PauseIcon />} title="Her session stopped">
+      <ConversationBand role="status" what="stopped" icon={<PauseIcon />} title="Her session stopped">
         {`${words} Your factories still tick; gates still come to you. What you write waits for her.`}
-      </Band>
+      </ConversationBand>
       <div className="flex flex-wrap gap-2">
         <RouterLinkButton to="/settings" variant="secondary" size="sm" data-chat-start>
           Start her session
@@ -70,9 +39,9 @@ export function ChatStoppedBand({ words }: { words: string }) {
  */
 export function ChatLostBand({ since, now }: { since: string; now: Date }) {
   return (
-    <Band role="alert" what="lost" icon={<CircleXIcon />} title="No answer from the daemon">
+    <ConversationBand role="alert" what="lost" icon={<CircleXIcon />} title="No answer from the daemon">
       {`Since ${clockWord(new Date(since), now)}. The board tries again every few seconds; nothing you wrote is lost.`}
-    </Band>
+    </ConversationBand>
   );
 }
 
@@ -83,8 +52,20 @@ export function ChatLostBand({ since, now }: { since: string; now: Date }) {
  */
 export function ChatUnreadableBand({ why }: { why: string }) {
   return (
-    <Band role="alert" what="unreadable" icon={<CircleXIcon />} title="The board cannot read her chat">
+    <ConversationBand role="alert" what="unreadable" icon={<CircleXIcon />} title="The board cannot read her chat">
       {`${why}. It reads again every few seconds; what you write is kept here until the api takes it.`}
-    </Band>
+    </ConversationBand>
+  );
+}
+
+/**
+ * Her chat the api cannot stream and is reading again on a beat, `why` in the api's own words: a quiet note, not a failure, since
+ * nothing is lost and what she says arrives a beat later. It goes of itself once a live stream can be had again.
+ */
+export function ChatRetryingBand({ why }: { why: string }) {
+  return (
+    <ConversationBand role="status" what="retrying" icon={<RefreshCwIcon />} title="Reading her chat again">
+      {`${why} Nothing is lost; what she says arrives a moment later.`}
+    </ConversationBand>
   );
 }

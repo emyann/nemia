@@ -35,14 +35,19 @@ export type FollowSource = {
   };
 };
 
+/**
+ * Where the partial protocol is for one session: the message whose blocks are being written (`message`), and the text block open in
+ * it, by the `key` its pieces are said under and the text said so far. The one bookkeeping `marked` advances, for a detached follow
+ * and for an attached one alike.
+ */
+export type PartialAt = { message?: string; open?: { key: string; text: string } };
+
 /** Where a follower is: the state it last said, the transcript's cursor, the stdout read so far, and the text block open there. */
-type At = {
+type At = PartialAt & {
   state?: SessionState;
   cursor?: TranscriptCursor;
   bytes: number;
   lines: number;
-  message?: string;
-  open?: { key: string; text: string };
 };
 
 /** The whole lines of `file` past `from` bytes, and how many bytes they are: none when there is no file or no whole line yet. */
@@ -65,8 +70,11 @@ const wholeLinesOf = (file: string, from: number): { text: string; bytes: number
   }
 };
 
-/** `marks` taken from `at`: where it is after them, and the pieces said, each a `partial` moment. */
-const marked = (at: At, marks: readonly PartialMark[]): [At, Followed[]] => {
+/**
+ * `marks` taken from `at`: where it is after them, and the pieces said, each a `partial` moment. A piece is said under the key of
+ * its message and block, added to what came before under that key (`append`), and a block written whole ends with a `last` piece.
+ */
+export const marked = <A extends PartialAt>(at: A, marks: readonly PartialMark[]): [A, Followed[]] => {
   let { message, open } = at;
   const said: Followed[] = [];
   for (const mark of marks) {

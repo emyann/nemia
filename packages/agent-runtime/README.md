@@ -2133,7 +2133,9 @@ no `background` session spawns attached, and any other engine, or the same one b
   A holder is its pid and its start time (`ownerStart`): a pid another process has taken since is a holder gone.
 - **What it keeps.** Its run file (state, Claude Code's session id, the process group, the call in flight) and a capture of the
   messages a reader reads, appended as they come: a denial reaches the attempt while it works, and the statement and the usage
-  at the result, less what the session it resumed had spent (`carried`, as the job's `resumeCostCarried`). The conversation is Claude Code's own transcript (`transcript`); an attached session is not followed live.
+  at the result, less what the session it resumed had spent (`carried`, as the job's `resumeCostCarried`). The conversation is Claude Code's own transcript (`transcript`), and a follow of the session reads its whole events from that
+  same file, with the cursor `transcript` takes back, beside its state and the pieces of the text it is writing
+  (`follow`, `attached-follow.ts`): a follower in the holder's own process, from the moment it joins.
 - **The fence.** The job's, fact for fact (`attachedOptions`, held to `claudePrintFlags` by its test). A call that would ask a
   person is answered in the holder (`canUseTool`): denied, and written as a denial.
 - **Let go.** As the holder's scope closes, new calls wait at their `PreToolUse` hook, it waits with no bound for each call in
@@ -2219,6 +2221,7 @@ of pure code sits beside it.
 | `src/harness/claude/attached.ts` | Claude Code attached on the Agent SDK (`attachedSessions`): the holder's `hold`, adoption and resume, and the runner's verbs over the run files |
 | `src/harness/claude/attached-bridge.ts` | the claude.ai bridge of an attached session, behind one door: the SDK's undeclared `enableRemoteControl` read off the `query()` object, its answer decoded, and refused in words where it is absent |
 | `src/harness/claude/attached-session.ts` | one attached session over `query()`: its input, its hooks for the call in flight and the drain, `canUseTool`, its capture |
+| `src/harness/claude/attached-follow.ts` | an attached session followed live (`pushesOf`): the fan-out its message loop feeds, what each follower is said — its state, its text as it is written, its transcript's events with their cursor — and when a follow ends |
 | `src/harness/claude/attached-file.ts` | an attached session's run file, its stop, the drain, and the two notes a resumed session is told |
 | `src/harness/claude/attached-options.ts` | a task as the SDK's `Options` (`attachedOptions`): the job's fence, folders, servers, model, budget and schema |
 | `src/harness/claude/quota.ts` | Claude Code's quota (`claudeQuota`): the Agent SDK's usage question put to the `claude` on PATH with no prompt, and its answer read (`quotaOfUsage`) or its refusal (`quotaOfRefusal`) |

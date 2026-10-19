@@ -384,14 +384,6 @@ const interruptThrough = (ops: RunnerOps, session: { name: string; sessionId: st
 export const attachedLongLived = (r: Pick<SpawnRequest, 'restartPolicy'>, attached?: Pick<Attached, 'holding'>): boolean =>
   r.restartPolicy === 'Always' && attached?.holding() === true;
 
-/** Why an attached session is not followed live: its conversation is read again through `transcript`. */
-const attachedUnfollowed = (name: string) =>
-  new RunnerError({
-    verb: 'follow',
-    message: `\`${name}\` runs attached, and is not followed live: read its conversation with \`transcript\`, again from its cursor.`,
-    refused: true,
-  });
-
 /**
  * The jobs' runner `job`, with the sessions `attached` runs beside them, both named by the engine (`ae/<task>/<n>`): a spawn runs
  * attached while this process holds them, a job otherwise; each verb given a name goes to the one whose run file it has, so a job
@@ -420,6 +412,6 @@ const withAttached = (job: RunnerOps, attached: Attached): RunnerOps => {
     interrupt: (session) => interruptThrough(to(session.name), session),
     transcript: (name, after) => to(name).transcript!(name, after),
     say: (session, text) => to(session.name).say!(session, text),
-    follow: (name) => (attached.has(name) ? Stream.fail(attachedUnfollowed(name)) : job.follow!(name)),
+    follow: (name) => to(name).follow!(name),
   };
 };

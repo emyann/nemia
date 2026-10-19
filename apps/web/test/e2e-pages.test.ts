@@ -397,6 +397,19 @@ test('REFUSED: --shard without --of, and --of without --shard', () => {
   );
 });
 
+test('REFUSED: --shard with --pages, since a shard deals its own pages and the two would name different ones', () => {
+  for (const argv of [
+    ['--pages', 'b', '--shard', '1', '--of', '2'],
+    ['--shard', '1', '--of', '2', '--pages', 'b'],
+    ['--photos', '--pages', 'a,c', '--shard', '2', '--of', '2'],
+  ])
+    assert.throws(
+      () => planOf(argv, ABC),
+      (e: Error) => e.message === '--shard deals the pages itself and --pages names them: give one of the two, not both (--shard 1 --of 4)',
+      argv.join(' '),
+    );
+});
+
 test('REFUSED: a shard past the shards there are, and an --of past the pages there are', () => {
   assert.throws(
     () => planOf(['--shard', '5', '--of', '4'], ABC),

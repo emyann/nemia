@@ -73,6 +73,13 @@ export { trustedFolder } from 'agent-runtime';
 export { folderTrust, trustFolder, type FolderTrust, type FolderTrusted } from 'agent-runtime';
 
 /**
+ * The allow rules the repository's own harness configuration grants a session started in it, as the harness reads them
+ * (`projectAllows`): what a step's session gets beyond its own rules, for the judgement that a tool it is given can be called
+ * (`unallowedRefusal`). `undefined` for a harness that reads no such configuration.
+ */
+export { projectAllows } from 'agent-runtime';
+
+/**
  * Why one task's journal does not read, in the runtime's words, when `err` is what a read of it rejected with — the runtime's
  * `JournalError`, which names the task — or undefined for any other failure, and for one of the whole store (named `*`), which the caller
  * rethrows.

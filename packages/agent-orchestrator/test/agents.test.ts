@@ -248,7 +248,13 @@ test("a step that names an agent runs with the agent's role keys, its own keys w
   assert.deepEqual(build.disallowedTools, ['SendMessage']);
   assert.deepEqual(build.after, ['plan']);
   assert.equal(build.check, 'npm test');
-  assert.equal(build.body, headedLayers([['instructions', 'Implement what you are asked.'], ['policy', 'Build the parser first.']]));
+  assert.equal(
+    build.body,
+    headedLayers([
+      ['instructions', 'Implement what you are asked.'],
+      ['policy', 'Build the parser first.'],
+    ]),
+  );
   assert.deepEqual(
     build.agent,
     {
@@ -305,7 +311,13 @@ test('a step whose file names no agent, hired one, is resolved exactly as if its
   );
   assert.deepEqual(hired, written);
   assert.equal(hired.agent?.name, 'implementer');
-  assert.equal(hired.body, headedLayers([['instructions', 'Implement what you are asked.'], ['policy', 'Build the parser first.']]));
+  assert.equal(
+    hired.body,
+    headedLayers([
+      ['instructions', 'Implement what you are asked.'],
+      ['policy', 'Build the parser first.'],
+    ]),
+  );
   const bare = parseWorkflow('implement', '---\nafter: plan\nplace: git\n---\n', undefined, agents, undefined, hire('implementer'));
   assert.equal(
     bare.body,
@@ -639,7 +651,13 @@ test('nemia start freezes the resolved steps on the run: an agent edited after t
   assert.ok(run.workflow, 'the workflow is frozen on the record at start');
   const [build] = run.workflow;
   assert.equal(build.model, 'opus');
-  assert.equal(build.body, headedLayers([['instructions', 'Implement what you are asked.'], ['policy', 'Build it.']]));
+  assert.equal(
+    build.body,
+    headedLayers([
+      ['instructions', 'Implement what you are asked.'],
+      ['policy', 'Build it.'],
+    ]),
+  );
   assert.deepEqual(build.agent, {
     name: 'implementer',
     keys: ['place'],

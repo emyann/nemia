@@ -3,8 +3,8 @@
  * `create-an-agent` skill (*The five layers*) and the documentation site's *What an agent is told: five layers* describe them: each
  * numbers them by precedence — the agent's instructions, the person's custom instructions, the folder's files, the factory's rules,
  * the step's policy — says the higher number wins, and calls none of them an escape hatch; the README and the page carry the routing
- * rule that says which layer owns a new instruction, and say that telling a session so is not built yet; the README names the agent's
- * `harnessPrompt:`. Each refusal is first made of planted text.
+ * rule that says which layer owns a new instruction, and each says that a session is told the precedence, which it now is; the README
+ * names the agent's `harnessPrompt:`. The glossary's one-line entry says the same. Each refusal is first made of planted text.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -87,12 +87,16 @@ function routingRefusal(passage: string): string | undefined {
   return undefined;
 }
 
+/** That a session is told the precedence, as a passage says it. */
+const IS_TOLD = /\ba\s+session\s+is\s+told\s+(?:this|so|it|the\s+precedence)\b/i;
+
 /**
- * Why a shipped passage promises what is not built — it states the precedence with no caveat that a session is not told it yet — or
- * undefined.
+ * Why a shipped passage is wrong about what a session is told — it still says telling one is coming, or it never says a session is
+ * told the precedence — or undefined. A session is told it, so the caveat S1 shipped is now the mistake.
  */
-function caveatRefusal(passage: string): string | undefined {
-  if (!NOT_BUILT.test(passage)) return 'it states the precedence with no caveat that telling a session so is not built';
+function toldRefusal(passage: string): string | undefined {
+  if (NOT_BUILT.test(passage)) return 'it says telling a session the precedence is not built, and a session is told it';
+  if (!IS_TOLD.test(passage)) return 'it does not say that a session is told the precedence';
   return undefined;
 }
 
@@ -111,6 +115,7 @@ const README = (): string =>
   slice('packages/agent-orchestrator/README.md', "### An agent is a node's attachment", /^#### What an agent says it can do/m);
 const SKILL = (): string => slice('.claude/skills/create-an-agent/SKILL.md', '## The five layers', /^## /m);
 const PAGE = (): string => slice('apps/docs/src/content/docs/agents.mdx', '## What an agent is told: five layers', /^## Sources/m);
+const GLOSSARY = (): string => slice('apps/docs/src/content/docs/glossary.mdx', '- **Instruction layers**', /^- \*\*Intent\*\*/m);
 
 /** A numbered list of the layers, each item `n. **Name** — words`, built from the names and numbers given. */
 const listOf = (names: readonly string[], numbers?: readonly number[]): string =>
@@ -175,10 +180,15 @@ test('REFUSED: a passage with no routing rule, or one whose questions are not on
   );
 });
 
-test('REFUSED: a shipped passage that states the precedence with no caveat that a session is not told it', () => {
-  assert.equal(caveatRefusal('The higher number wins. Telling the agent so is coming, not built.'), undefined);
-  assert.equal(caveatRefusal('The higher number wins. A session is not built yet to be told so.'), undefined);
-  assert.match(caveatRefusal('The higher number wins, and the task is above them all.') ?? '', /no caveat/);
+test('REFUSED: a shipped passage that says telling a session the precedence is not built, or never says a session is told it', () => {
+  assert.equal(toldRefusal('The higher number wins. A session is told this, in every brief.'), undefined);
+  assert.match(
+    toldRefusal('The higher number wins. A session is told this. Telling the agent so is coming, not built.') ?? '',
+    /is not built, and a session is told it/,
+    'the caveat is refused even beside the sentence that replaces it',
+  );
+  assert.match(toldRefusal('The higher number wins. A session is not built yet to be told so.') ?? '', /is not built/);
+  assert.match(toldRefusal('The higher number wins, and the task is above them all.') ?? '', /does not say that a session is told/);
 });
 
 test("the README's *An agent is a node's attachment* numbers the layers by precedence, routes a new instruction, and gives `harnessPrompt:`", () => {
@@ -186,16 +196,16 @@ test("the README's *An agent is a node's attachment* numbers the layers by prece
   assert.equal(layersRefusal(passage), undefined);
   assert.equal(precedenceRefusal(passage), undefined);
   assert.equal(routingRefusal(passage), undefined);
-  assert.equal(caveatRefusal(passage), undefined);
+  assert.equal(toldRefusal(passage), undefined);
   assert.match(passage, /harnessPrompt:/);
 });
 
-test("the documentation site's *What an agent is told: five layers* says the same, and promises no behaviour that is not built", () => {
+test("the documentation site's *What an agent is told: five layers* says the same, and what a session is told of it", () => {
   const passage = PAGE();
   assert.equal(layersRefusal(passage), undefined);
   assert.equal(precedenceRefusal(passage), undefined);
   assert.equal(routingRefusal(passage), undefined);
-  assert.equal(caveatRefusal(passage), undefined);
+  assert.equal(toldRefusal(passage), undefined);
 });
 
 test("create-an-agent's *The five layers* numbers them by precedence, as no escape hatch", () => {
@@ -225,4 +235,11 @@ test('REFUSED: a second layer that says custom instructions are coming, or names
 test('the README and create-an-agent each say custom instructions are built, and the command that sets them', () => {
   assert.equal(customLayerRefusal(README()), undefined, 'README');
   assert.equal(customLayerRefusal(SKILL()), undefined, 'create-an-agent');
+});
+
+test("the glossary's *Instruction layers* entry says the precedence, and that a session is told it", () => {
+  const entry = GLOSSARY();
+  assert.equal(precedenceRefusal(entry), undefined);
+  assert.equal(toldRefusal(entry), undefined);
+  assert.match(entry, /five layers/i, 'and that there are five of them');
 });

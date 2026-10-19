@@ -29,8 +29,22 @@ export type LayerHomes = {
   skill: (name: string) => ReactNode;
 };
 
-/** What the board calls the layer of a factory's rules. */
-const FACTORY_RULES = "The factory's rules";
+/**
+ * What the board calls each layer of what a step is told, with its number in the precedence order: where two of them say different
+ * things, the higher number wins (`PRECEDENCE_NOTE`). The agent's own words are headed by whose they are.
+ */
+export const INSTRUCTIONS = (agent: string): string => `1. Instructions — ${agent}'s`;
+export const CUSTOM_INSTRUCTIONS = '2. Your custom instructions';
+export const FOLDER_FILES = "3. The folder's files";
+export const FACTORY_RULES = "4. The factory's rules";
+export const STEP_POLICY = "5. The step's policy";
+
+/** What the fold says of the numbers it heads its layers with. */
+export const PRECEDENCE_NOTE = 'Where two of them say different things, the higher number wins, and the task is above them all.';
+
+/** What the layer of the folder's files says: the session reads them where it works, and the board has none of them to draw. */
+export const FOLDER_FILES_SAID =
+  'The files of the folder this step works in. The session reads them itself, wherever it works, and Nemia composes none of them.';
 
 /**
  * What the rules' layer says of a step told none on a page read in a factory: what is true of the step. Its listing leaves the rules out
@@ -96,15 +110,20 @@ function Layers({ layers, parts }: { layers: StepLayers; parts: TaskPart[] | nul
           <p className="text-body-small text-muted-foreground">
             {layers.factory === null ? "The agent's instructions and yours" : "The agent's instructions, yours and the factory's rules"}{' '}
             were frozen at the start of the run and given{' '}
-            {layers.via === 'prompt' ? "in the session's system prompt" : 'at the head of its brief'}.
+            {layers.via === 'prompt' ? "in the session's system prompt" : 'at the head of its brief'}. {PRECEDENCE_NOTE}
           </p>
-          <Layer name="instructions" title={`Instructions — ${layers.agent}'s`}>
+          <Layer name="instructions" title={INSTRUCTIONS(layers.agent)}>
             <Words text={layers.instructions} />
             <Skills word="Its skills:" skills={layers.agentSkills} />
           </Layer>
-          <Layer name="custom" title="Your custom instructions">
+          <Layer name="custom" title={CUSTOM_INSTRUCTIONS}>
             <Words text={layers.custom} />
           </Layer>
+          {layers.folderFiles && (
+            <Layer name="folder" title={FOLDER_FILES}>
+              <p className="text-body-small text-muted-foreground">{FOLDER_FILES_SAID}</p>
+            </Layer>
+          )}
           {layers.factory !== null && (
             <Layer name="factory" title={FACTORY_RULES}>
               <Words text={layers.factory} />
@@ -112,7 +131,7 @@ function Layers({ layers, parts }: { layers: StepLayers; parts: TaskPart[] | nul
           )}
         </>
       )}
-      <Layer name="policy" title="The step's policy">
+      <Layer name="policy" title={STEP_POLICY}>
         <Words text={layers.policy || null} />
         <Skills word="Adds the skills:" skills={layers.addedSkills} />
         <Fence agent={layers.agent} fence={layers.fence} />
@@ -138,22 +157,27 @@ function WillBeTold({ layers, homes }: { layers: StepLayers; homes: LayerHomes }
           Read now from the files, and frozen when a run starts: a run is told what they say then
           {layers.agent === null
             ? '.'
-            : `, ${layers.factory === null ? "the agent's words and yours" : "the agent's words, yours and the factory's rules"} ${layers.via === 'prompt' ? 'in its system prompt' : 'at the head of its brief'}.`}
+            : `, ${layers.factory === null ? "the agent's words and yours" : "the agent's words, yours and the factory's rules"} ${layers.via === 'prompt' ? 'in its system prompt' : 'at the head of its brief'}. ${PRECEDENCE_NOTE}`}
         </p>
         {layers.agent === null ? (
           <p className="text-body-small text-muted-foreground">No agent: its own words are all it will be told, before the task.</p>
         ) : (
           <>
-            <Layer name="instructions" title={`Instructions — ${layers.agent}'s`} home={homes.instructions}>
+            <Layer name="instructions" title={INSTRUCTIONS(layers.agent)} home={homes.instructions}>
               <details data-instructions-fold>
                 <summary className="cursor-pointer text-body-small text-muted-foreground hover:text-foreground">Read them</summary>
                 <Words text={layers.instructions} none="Its file gives no instructions" />
               </details>
               <Skills word="Its skills:" skills={layers.agentSkills} link={homes.skill} />
             </Layer>
-            <Layer name="custom" title="Your custom instructions" home={homes.custom}>
+            <Layer name="custom" title={CUSTOM_INSTRUCTIONS} home={homes.custom}>
               <Words text={layers.custom} none="None written" />
             </Layer>
+            {layers.folderFiles && (
+              <Layer name="folder" title={FOLDER_FILES}>
+                <p className="text-body-small text-muted-foreground">{FOLDER_FILES_SAID}</p>
+              </Layer>
+            )}
             {(layers.factory !== null || homes.factory) && (
               <Layer name="factory" title={FACTORY_RULES} home={homes.factory ?? undefined}>
                 <Words text={layers.factory} none={NO_RULES_TOLD} />
@@ -161,7 +185,7 @@ function WillBeTold({ layers, homes }: { layers: StepLayers; homes: LayerHomes }
             )}
           </>
         )}
-        <Layer name="policy" title="The step's policy" home={homes.words}>
+        <Layer name="policy" title={STEP_POLICY} home={homes.words}>
           <Words text={layers.policy || null} none="No words of its own" />
           <Skills word="Adds the skills:" skills={layers.addedSkills} link={homes.skill} />
           <Fence agent={layers.agent} fence={layers.fence} />
@@ -194,7 +218,7 @@ export function StepPolicy({ layers }: { layers: StepLayers | null }) {
   if (layers === null || agent === null) return null;
   return (
     <div data-gate-policy className="flex flex-col gap-2 rounded border border-outline-variant p-3">
-      <Layer name="policy" title="The step's policy">
+      <Layer name="policy" title={STEP_POLICY}>
         <Words text={layers.policy || null} none={`No words of its own: ${agent}'s instructions are all it was told`} />
         <Skills word="Adds the skills:" skills={layers.addedSkills} />
         <Fence agent={agent} fence={layers.fence} />

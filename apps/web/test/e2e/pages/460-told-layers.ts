@@ -30,6 +30,15 @@ const LAYERED = {
   unfrozen: 'told-unfrozen-e2e46',
   /** What the folder's `write` step says, its body on a record that froze no layers. */
   folderSays: 'Write a short note on what was asked.',
+  /** What the layer of the folder's files says, which the run froze none of: the session reads them where it works. */
+  folderSaid: 'The session reads them itself, wherever it works',
+  /** The clause the fold's note carries, which is what the numbers on the headings mean. */
+  wins: 'the higher number wins, and the task is above them all',
+  /** Each layer the board numbers, by the heading a person reads over it. */
+  heads: [
+    ['custom', '2. Your custom instructions'],
+    ['policy', "5. The step's policy"],
+  ] as ReadonlyArray<readonly [string, string]>,
   brief: `Told by layer\n\nA run written by the told-layers page: a step whose agent, person and policy each told it something.\n\n\`\`\`\nconst line = '${'a line that is longer than any panel, '.repeat(8)}';\n\`\`\``,
 } as const;
 
@@ -168,12 +177,12 @@ async function expectRules(page: Page): Promise<void> {
   const write = sectionOf(page, 'write');
   const fold = write.locator('details[data-told]');
   await fold.locator('summary').click();
-  const layers = ['instructions', 'custom', 'factory', 'policy', 'task'];
-  await expectCount(fold.locator('[data-layer]'), layers.length, 'five layers, in a factory that kept rules');
+  const layers = ['instructions', 'custom', 'folder', 'factory', 'policy', 'task'];
+  await expectCount(fold.locator('[data-layer]'), layers.length, 'six layers, in a factory that kept rules');
   const drawn = await fold.locator('[data-layer]').evaluateAll((all) => all.map((el) => el.getAttribute('data-layer')));
   if (drawn.join() !== layers.join()) throw new Refused(`the layers are drawn ${layers.join(', ')} — they are ${drawn.join(', ')}`);
   const rules = fold.locator('[data-layer="factory"]');
-  await expectVisible(rules.locator('h4', { hasText: "The factory's rules" }), 'the layer is named');
+  await expectVisible(rules.locator('h4', { hasText: "4. The factory's rules" }), 'the layer is named, by its number');
   await expectVisible(rules.locator('[data-markdown]', { hasText: LAYERED.rulesSay }), 'and says the rules the run froze');
   await expectVisible(rules.locator('strong', { hasText: 'Friday' }), 'as the markdown they are');
   await expectVisible(
@@ -187,7 +196,11 @@ async function expectRules(page: Page): Promise<void> {
   ]);
   const review = sectionOf(page, 'review').locator('details[data-told]');
   await review.locator('summary').click();
-  await expectCount(review.locator('[data-layer="factory"]'), 0, 'a step with no agent is told no rules');
+  await expectCount(
+    review.locator('[data-layer="factory"], [data-layer="folder"]'),
+    0,
+    'a step with no agent has no layer of its own above its note',
+  );
   await settled(page);
   await photograph(write, path.join(OUT, `told-layers-rules-${await themeOf(page)}.png`));
 }
@@ -195,9 +208,11 @@ async function expectRules(page: Page): Promise<void> {
 export default {
   /**
    * What a step was told, by layer, from what its run froze. `write`'s fold, opened, draws the agent's instructions with its skill, the
-   * person's custom instructions, the step's policy with the skill and the deny its line adds, and the task, in that order, each once, and
-   * says the first two went into the session's system prompt — four layers, and none for a factory's rules, the run having frozen none;
-   * a run started in a factory that kept rules draws them as a fifth, between the custom instructions and the policy (`expectRules`);
+   * person's custom instructions, the folder's files the session reads itself, the step's policy with the skill and the deny its line
+   * adds, and the task, in that order, each once, each headed by its number, and
+   * says the first two went into the session's system prompt and that the higher number wins — five layers, and none for a factory's
+   * rules, the run having frozen none;
+   * a run started in a factory that kept rules draws them as a sixth, between the folder's files and the policy (`expectRules`);
    * `review`, with no agent, says its own words are all it was told. Each
    * section, fold and all, says each layer's words once: no body above the fold says them again. A run that froze no layers still draws
    * its step's body above the fold, which is all it has of the step's words. The page writes its runs and takes them back, so each visit
@@ -218,8 +233,8 @@ export default {
       await settled(page);
       await photograph(write, path.join(OUT, `told-layers-closed-${await themeOf(page)}.png`));
       await fold.locator('summary').click();
-      const layers = ['instructions', 'custom', 'policy', 'task'];
-      await expectCount(fold.locator('[data-layer]'), layers.length, "four layers: the run froze no factory's rules, and none is drawn");
+      const layers = ['instructions', 'custom', 'folder', 'policy', 'task'];
+      await expectCount(fold.locator('[data-layer]'), layers.length, "five layers: the run froze no factory's rules, and none is drawn");
       const drawn = await fold.locator('[data-layer]').evaluateAll((all) => all.map((el) => el.getAttribute('data-layer')));
       if (drawn.join() !== layers.join()) throw new Refused(`the layers are drawn ${layers.join(', ')} — they are ${drawn.join(', ')}`);
       const words: Array<[string, string]> = [
@@ -234,7 +249,17 @@ export default {
           `the ${layer} layer says ${JSON.stringify(said)}`,
         );
       await expectMarkdown(page, fold);
-      await expectVisible(fold.locator('[data-layer="instructions"] h4', { hasText: `Instructions — ${LAYERED.agent}'s` }), 'whose words');
+      await expectVisible(
+        fold.locator('[data-layer="instructions"] h4', { hasText: `1. Instructions — ${LAYERED.agent}'s` }),
+        'whose words, and which layer they are',
+      );
+      const folder = fold.locator('[data-layer="folder"]');
+      await expectVisible(folder.locator('h4', { hasText: "3. The folder's files" }), "the folder's files are the third layer");
+      await expectVisible(folder.getByText(LAYERED.folderSaid, { exact: false }), 'and the session reads them itself');
+      await expectCount(folder.locator('[data-markdown]'), 0, 'the run froze none of them, so none is drawn as words');
+      for (const [layer, head] of LAYERED.heads)
+        await expectVisible(fold.locator(`[data-layer="${layer}"] h4`, { hasText: head }), `the ${layer} layer is headed ${head}`);
+      await expectVisible(fold.getByText(LAYERED.wins, { exact: false }), 'the fold says the higher number wins');
       await expectVisible(
         fold.locator(`[data-layer="instructions"] [data-skill="${LAYERED.agentSkill}"]`),
         "the agent's skill under its instructions",
@@ -258,7 +283,11 @@ export default {
       const review = sectionOf(page, 'review').locator('details[data-told]');
       await review.locator('summary').click();
       await expectVisible(review.getByText('No agent: its own words are all it was told', { exact: false }), 'review has no agent');
-      await expectCount(review.locator('[data-layer="instructions"], [data-layer="custom"]'), 0, "and so no agent's layer");
+      await expectCount(
+        review.locator('[data-layer="instructions"], [data-layer="custom"], [data-layer="folder"]'),
+        0,
+        "and so no agent's layer",
+      );
       await expectOnce(sectionOf(page, 'review'), [["review's own words", LAYERED.review]]);
       await settled(page);
       await photograph(write, path.join(OUT, `told-layers-open-${await themeOf(page)}.png`));

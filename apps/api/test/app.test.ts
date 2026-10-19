@@ -23,6 +23,7 @@ import { runWith } from './placed.ts';
 import { claudeDetached, claudeOps } from 'agent-runtime';
 import { Effect } from 'effect';
 import { DEFAULT_ROUNDS } from 'agent-orchestrator/workflow';
+import { PRECEDENCE } from 'agent-orchestrator/run';
 /** A folder nothing is made in: a path under it names a workflow folder that is not there. */
 const NOWHERE = scratch('nemia-api-nowhere-');
 
@@ -575,7 +576,10 @@ test("a run in full: the brief, each step's spec and prose, what it was told, an
     },
   );
   assert.ok(review.told, 'not filed, so told what it would be given now: implement has run in this workspace, so look there');
-  assert.ok(review.told.startsWith('Review what implement did.\n\n## What was asked for\n\nAdd a cache\n\nKeep it small.'), review.told);
+  assert.ok(
+    review.told.startsWith(`${PRECEDENCE}\n\nReview what implement did.\n\n## What was asked for\n\nAdd a cache\n\nKeep it small.`),
+    review.told,
+  );
   assert.match(review.told, /already been worked in by: implement/);
   assert.match(review.told, /git diff def456/);
 });
@@ -846,7 +850,7 @@ test('a run that froze its workflow draws from it when its folder does not read:
   );
   assert.deepEqual((await listed('r-40')).graph, frozenGraph, "the list draws the card's flow off the same graph, with no read of the run");
   assert.ok(
-    run.steps[0].told?.startsWith('Implement it, as frozen.\n\n## What was asked for'),
+    run.steps[0].told?.startsWith(`${PRECEDENCE}\n\nImplement it, as frozen.\n\n## What was asked for`),
     `not filed: told what the tick would file it with, composed from the frozen workflow, not ${String(run.steps[0].told)}`,
   );
 
@@ -924,7 +928,7 @@ test('a run that froze its workflow is drawn from it, not from a folder that rea
     frozenGraph,
     "and so is its card: not the edited folder's graph, which has no edge at all",
   );
-  assert.ok(run.steps[1].told?.startsWith('Review it, as frozen.'), String(run.steps[1].told));
+  assert.ok(run.steps[1].told?.startsWith(`${PRECEDENCE}\n\nReview it, as frozen.`), String(run.steps[1].told));
 });
 
 test('a run that froze its workflow shows only its steps: one its folder gained since is named in the warning, and neither listed nor drawn', async () => {

@@ -53,7 +53,7 @@ async function addStep(builder: Locator, name: string, body: string): Promise<vo
  * custom instructions (none), then the step's policy holding its words and the fence key its file sets, and its other keys after.
  */
 async function expectLayers(keys: Locator, agent: string): Promise<void> {
-  const layers = ['instructions', 'custom', 'policy'];
+  const layers = ['instructions', 'custom', 'folder', 'policy'];
   const drawn = await keys.locator('[data-layer]').evaluateAll((all) => all.map((el) => el.getAttribute('data-layer')));
   if (drawn.join() !== layers.join()) throw new Refused(`the layers are drawn ${layers.join(', ')} — they are ${drawn.join(', ')}`);
   const instructions = keys.locator('[data-layer="instructions"]');

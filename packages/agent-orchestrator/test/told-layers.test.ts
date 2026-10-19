@@ -6,8 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseAgent, parseWorkflow, type Agents, type Workflow } from '../src/workflow.ts';
-import { composeBrief, toldLayers, type RepositoryRun } from '../src/run.ts';
-import { PRECEDENCE } from '../src/brief/index.ts';
+import { composeBrief, PRECEDENCE, toldLayers, type RepositoryRun } from '../src/run.ts';
 import { briefBody, skillLayers, unrendered } from '../src/agents/agents.ts';
 import { headedLayers } from '../src/workflow/index.ts';
 
@@ -178,7 +177,10 @@ test("the brief opens with the precedence, in the person's words, then the layer
   const rendered = stepOf('agent: ada');
   assert.ok(briefOf(rendered).startsWith(`${PRECEDENCE}\n\nBuild it.\n\n`), 'a rendered step: the precedence, then its own note');
   const bare = parseWorkflow('build', '---\nplace: git\nagent: ada\n---\n', undefined, AGENTS);
-  assert.ok(briefOf(bare).startsWith(`${PRECEDENCE}\n\n## What was asked for`), 'a rendered step with no note of its own: the precedence alone');
+  assert.ok(
+    briefOf(bare).startsWith(`${PRECEDENCE}\n\n## What was asked for`),
+    'a rendered step with no note of its own: the precedence alone',
+  );
 });
 
 test('a brief composed with the precedence cuts back to the identical task, and so does one filed before it was written', () => {

@@ -488,8 +488,13 @@ What an agent is told comes in five layers, each written by whoever owns it:
 The number is precedence, not arrival: where two layers say different things, the higher number wins — the folder's facts over the
 role's generic words, the factory over the folder, the step's process over the factory — and the task is above them all. The order the
 words arrive in is Nemia's own and unchanged: the instructions, then the custom instructions, then the factory's rules, then the step's
-policy, then the task, with the folder's files read by the harness itself wherever the agent works. Telling the agent so is coming, not
-built.
+policy, then the task, with the folder's files read by the harness itself wherever the agent works.
+
+A session is told this. Each layer Nemia composes carries a heading naming its number and its owner (`headedLayers`), in the step's
+rendered prompt and in the body a step on another harness is told in its brief; and every brief opens on the precedence itself
+(`PRECEDENCE`), which names each layer by number and says the higher number wins — the one thing of Nemia's that lands after the
+harness has told the session that the files of the folder it works in override everything, so it is read as the instruction it is. The
+run page shows the same numbers (`toldLayers`, `folderFiles`).
 
 **Where a new instruction goes.** Given something you want an agent to be told, ask these in order and stop at the first yes:
 

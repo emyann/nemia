@@ -189,9 +189,13 @@ test('a subscription is an event stream, framed and flushed, whose first answer 
   }
 });
 
-test('the token is kept 0600 in a 0700 folder, is what the hold answered, and goes with the scope', async () => {
+test('the token is kept 0600 in a 0700 folder, is what the hold answered, and goes with the scope', async (t) => {
   const held = gate();
   const { root, served, close } = await holding(handOps(held.opened));
+  t.after(async () => {
+    held.open();
+    await close();
+  });
   const file = tokenFileOf(root);
   assert.equal(fs.readFileSync(file, 'utf8'), served.token, 'the file holds what the hold answered');
   assert.equal(fs.statSync(file).mode & 0o777, 0o600);

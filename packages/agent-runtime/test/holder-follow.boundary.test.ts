@@ -70,6 +70,10 @@ test(
     const rung = bell();
     const held = await holder();
     const { root, cwd, engine, served } = held;
+    t.after(() => {
+      fs.writeFileSync(path.join(root, 'go'), '');
+      return held.close();
+    });
     assert.ok(served, 'an engine that runs Claude Code attached serves its own sessions while it holds');
     assert.deepEqual(Object.keys(served.cards).sort(), ['claude', HARNESS].sort(), 'it serves every harness it runs itself');
 
@@ -77,20 +81,14 @@ test(
     await Effect.runPromise(engine.tick());
     const live = viewer({ root, taskId, card: served.cards[HARNESS], what: 'follow' }, served.token, rung);
     t.after(() => live.stop());
-    try {
-      await until(
-        t,
-        () => live.said.some((l) => l.includes('Rivers')),
-        () => `the text so far: ${live.said.join(' | ')}${live.stderr.join('')}`,
-        {
-          bell: rung,
-        },
-      );
-      fs.writeFileSync(path.join(root, 'go'), '');
-      assert.equal(await live.ended, 0, `the viewer ended well: ${live.said.join(' | ')}${live.stderr.join('')}`);
-    } finally {
-      if (!fs.existsSync(path.join(root, 'go'))) fs.writeFileSync(path.join(root, 'go'), '');
-    }
+    await until(
+      t,
+      () => live.said.some((l) => l.includes('Rivers')),
+      () => `the text so far: ${live.said.join(' | ')}${live.stderr.join('')}`,
+      { bell: rung },
+    );
+    fs.writeFileSync(path.join(root, 'go'), '');
+    assert.equal(await live.ended, 0, `the viewer ended well: ${live.said.join(' | ')}${live.stderr.join('')}`);
     const moments = live.said
       .filter((l) => l.startsWith('moment '))
       .map((l) => JSON.parse(l.slice('moment '.length)) as { kind: string; text?: string; state?: string });

@@ -48,12 +48,6 @@ below its layer is in `docs/architecture.md`, *Who owns what*.
   `factory/quota.ts`, `makeMcpAsker` in `capabilities/capabilities.ts`) is never interrupted by one request's going.
 - **A handle count is waited for, never read once after a close** (`followers` in `src/factory/feed.test.ts`, waited for with the `until`
   of `test/waits.ts`): a stream's reader is counted a few microtasks after its response, so a test waits for it before it breaks the feed.
-- **A test waits in its process with `until` (the runtime's, taken from `agent-runtime/testing`; a test beside the code, under `src/`,
-  reads it through `test/waits.ts`, which re-exports it, since the layer's lint block refuses `agent-runtime` under `src/`)**, asked on a `bell`
-  its event's source rings or at a pace for a state, its test given `WAITED`: the runner's timeout is its one bound, which the `test`
-  script's `--test-timeout` gives a test given none. `DEADLINES` (`test/waits.test.ts`) refuses a hand-written deadline.
-- **A run's record, asks and stamps, and the inbox's cards, are read through `runStore`** (`agent-orchestrator`): the root exports no
-  store function of a run (`packages/agent-orchestrator/test/entries.test.ts`).
 - **A package program that asks the place is run with `runPlaced(placeService, e, program)`** (`src/store.ts`), the place the app's layer
   holds (`PlaceService` in `Services`, `gitPlaceLayer` in `liveOf`, `Served.placeService`); a test replaces it with
   `Layer.merge(liveOf(), PlaceService.layer(…))`, and runs a package program itself with the `runWith` of `test/placed.ts`.

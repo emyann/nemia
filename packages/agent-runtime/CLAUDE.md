@@ -29,14 +29,6 @@ down is in `docs/architecture.md`, *Who owns what*.
   deadline. A duration a test measures is read with `performance.now()`. A runner that cannot be handed another attempt's statement
   (the detached spawn clears the last one's), or that tells it from its parent's (`--bg`: the parent's last call id,
   `harness/claude/parent.ts`), reports it with no time, and its test steps the clock (`stepClock`, `test/clock.ts`).
-- **A new test file that runs git or imports what starts a process (`node:child_process`, a worker, a cluster) is named
-  `<what>.boundary.test.ts`**, its `test/` helpers followed: held from `packages/agent-orchestrator/test/stand-ins.test.ts`, today's
-  files on its baseline (`test/stand-ins.baseline.ts` there), which only shrinks.
-- **A test waits in its process with `until` (`src/waits/`, read through `src/waits/index.ts` here and given to a test of a layer above
-  by `agent-runtime/testing`; the board keeps a copy its own `waits.test.ts` holds to it)**, asked on a `bell`
-  its event's source rings or at a pace for a state, the engine's tick inside its condition, its test given `WAITED`: the runner's
-  timeout is its one bound, which the `test` script's `--test-timeout` gives a test given none. `DEADLINES` (`test/waits.test.ts`)
-  refuses a hand-written deadline.
 - **A duration the runtime decides on is `elapsedMs` over `Instant`s from `instantNow()`** (`core/clock.ts`, `core/engine/now.ts`), never
   two `Date.now()` readings: monotonic within a boot, the wall clock across one. `stepClock` leaves `process.hrtime` alone. A test's
   floor on such a bound reads `elapsedMs` over `instantNow()` taken around the call (`test/feed-rotation.test.ts`), never

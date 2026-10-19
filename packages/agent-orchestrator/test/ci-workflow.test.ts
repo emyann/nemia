@@ -30,6 +30,9 @@ const GATE = 'ci';
 /** The job whose matrix holds the legs: one workspace on one node version. */
 const LEGS = 'test';
 
+/** What `cancel-in-progress` must read, as the sentence that refuses another value spells it out. */
+const SPARED = "${{ github.ref != 'refs/heads/main' }}";
+
 type Step = { uses?: string; with?: Record<string, unknown>; run?: string; env?: Record<string, string> };
 
 type Job = {
@@ -160,6 +163,48 @@ function actionDrift(workflow: Workflow): string[] {
   );
 }
 
+/** The timezones every leg runs its suite under: the two the card names, in no particular order. */
+const ZONES = ['UTC', 'America/New_York'];
+
+/** Each run of the suite in the leg, by the timezone it sets and whether it passes `--force`. */
+const suiteRuns = (workflow: Workflow): { zone: string | undefined; forced: boolean }[] =>
+  (workflow.jobs[LEGS]?.steps ?? [])
+    .filter((step) => step.run?.includes('turbo run test') === true)
+    .map((step) => ({ zone: step.env?.TZ, forced: step.run?.includes('--force') === true }));
+
+/**
+ * A timezone the leg does not run its suite under, and a run that does not pass `--force`. The second is the invisible one: `turbo.json`
+ * hashes no environment, so a run without it replays the run before it from the cache and that timezone is never tested at all.
+ */
+function zoneDrift(workflow: Workflow): string[] {
+  const runs = suiteRuns(workflow);
+  return [
+    ...ZONES.filter((zone) => !runs.some((run) => run.zone === zone)).map(
+      (zone) =>
+        `the ${LEGS} job in ${FILE} does not run its suite under TZ=${zone}: give it a run step of the suite with env TZ: ${zone}, or a test whose verdict turns on the timezone passes CI and fails on a machine in the other`,
+    ),
+    ...runs
+      .filter((run) => !run.forced)
+      .map(
+        (run) =>
+          `the ${LEGS} job's suite run under TZ=${String(run.zone)} in ${FILE} does not pass --force: turbo hashes no environment, so it replays the run before it from the cache and that timezone is never tested`,
+      ),
+  ];
+}
+
+/** The one expression that cancels a branch's superseded run and spares every run of main, as the owner chose at the gate. */
+const SPARES_MAIN = /^\$\{\{\s*github\.ref\s*!=\s*'refs\/heads\/main'\s*\}\}$/;
+
+/** A `cancel-in-progress` that does not spare main: `true` cancels a landing's run, and anything else cancels nothing or is unreadable. */
+function cancelDrift(workflow: Workflow): string[] {
+  const value = workflow.concurrency?.['cancel-in-progress'];
+  return SPARES_MAIN.test(String(value))
+    ? []
+    : [
+        `concurrency.cancel-in-progress in ${FILE} reads ${String(value)}: write it ${SPARED} so a branch's superseded run is cancelled and every push to main keeps its own run, since the ${GATE} gate reads a cancelled job as a failure and a landing that was never tested would report red`,
+      ];
+}
+
 /** The trigger that would run a fork's code with a token that can write, read from the file's own text. */
 function targetDrift(text: string): string[] {
   const trigger = ['pull', 'request', 'target'].join('_');
@@ -176,6 +221,8 @@ const drift = (workflow: Workflow, workspaces: Workspace[], engine: string, text
   ...nodeDrift(workflow, engine),
   ...gateDrift(workflow),
   ...actionDrift(workflow),
+  ...zoneDrift(workflow),
+  ...cancelDrift(workflow),
   ...targetDrift(text),
 ];
 
@@ -214,7 +261,7 @@ test('the shipped CI workflow runs on the three events, reads alone, and caches 
   assert.deepEqual(cached, [], 'setup-node caches no install here: the lockfile install is part of what is tested');
 });
 
-test('REFUSED: a workspace with no leg, a leg with no workspace, a node floor adrift, an unquoted node, a job outside the gate, a third party, a fork with a writable token', () => {
+test('REFUSED: a workspace with no leg, a leg with no workspace, a node floor adrift, an unquoted node, a job outside the gate, a third party, a timezone untested, a run unforced, a landing cancelled, a fork with a writable token', () => {
   const workspaces = readWorkspaces();
   const engine = readEngine();
   const text = workflowText();
@@ -287,6 +334,32 @@ test('REFUSED: a workspace with no leg, a leg with no workspace, a node floor ad
     "the test job in .github/workflows/ci.yml takes actions/checkout@v7.0.1: this workflow takes GitHub's own actions by major tag alone, so write it actions/<name>@v<major>, and take a third party's code as a pinned download in a run step instead",
     "the test job in .github/workflows/ci.yml takes a-third-party/setup@v1: this workflow takes GitHub's own actions by major tag alone, so write it actions/<name>@v<major>, and take a third party's code as a pinned download in a run step instead",
   ]);
+
+  const onezone = structuredClone(shipped);
+  const legSteps = onezone.jobs[LEGS]?.steps;
+  assert.ok(legSteps !== undefined, `the ${LEGS} job has steps today`);
+  onezone.jobs[LEGS].steps = legSteps.filter((step) => step.env?.TZ !== 'America/New_York');
+  assert.equal(suiteRuns(onezone).length, 1, 'the leg runs its suite twice today');
+  assert.deepEqual(zoneDrift(onezone), [
+    'the test job in .github/workflows/ci.yml does not run its suite under TZ=America/New_York: give it a run step of the suite with env TZ: America/New_York, or a test whose verdict turns on the timezone passes CI and fails on a machine in the other',
+  ]);
+
+  const unforced = structuredClone(shipped);
+  const twice = unforced.jobs[LEGS]?.steps?.filter((step) => step.run?.includes('turbo run test') === true) ?? [];
+  assert.equal(twice.length, 2, 'the leg runs its suite twice today');
+  twice[1].run = twice[1].run?.replace(' --force', '');
+  assert.deepEqual(zoneDrift(unforced), [
+    "the test job's suite run under TZ=America/New_York in .github/workflows/ci.yml does not pass --force: turbo hashes no environment, so it replays the run before it from the cache and that timezone is never tested",
+  ]);
+
+  for (const value of [true, false, undefined, "${{ github.ref != 'refs/heads/next' }}"]) {
+    const cancelled = structuredClone(shipped);
+    assert.ok(cancelled.concurrency !== undefined, 'the workflow sets concurrency today');
+    cancelled.concurrency['cancel-in-progress'] = value;
+    assert.deepEqual(cancelDrift(cancelled), [
+      `concurrency.cancel-in-progress in .github/workflows/ci.yml reads ${String(value)}: write it ${SPARED} so a branch's superseded run is cancelled and every push to main keeps its own run, since the ci gate reads a cancelled job as a failure and a landing that was never tested would report red`,
+    ]);
+  }
 
   const target = ['pull', 'request', 'target'].join('_');
   assert.deepEqual(targetDrift(text.replace('pull_request:', `${target}:`)), [

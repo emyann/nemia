@@ -90,25 +90,32 @@ must be its own. GitHub's own actions by major tag, and a third party's taken as
 trigger: `nemia upgrade`'s own trial build is a release's gate.
 
 What it runs, all of it reporting **one required context, `ci`**, from a single gate job that `needs` every other job with `always()`, so
-branch protection is configured once and never touched as the job list grows:
+branch protection is configured once and never touched as the job list grows. The first three are built; the last two come with cards 2
+and 3, and the gate's `needs` clause is what refuses adding a job and forgetting to wire it in:
 
 - **Ten test legs**: one per workspace, on node 22.18.0 — the floor `engines.node` claims — and 24, each leg running its package's suite
   twice, under `TZ=UTC` and `TZ=America/New_York`. Both runs pass `--force`: `turbo.json` hashes no environment, so without it the second
   run replays the first from the cache and the second timezone is never tested.
 - **`npm run lint` and `npm run typecheck`**, whole, on the floor.
-- **The 120-page e2e in four shards** off `apps/web/test/e2e/pages/NAMES`, with a gate summing their page time against `PAGES_BOUND_MS`,
-  Playwright's browsers cached, and a failing page's pictures uploaded. npm itself is not cached: the lockfile's own install is part of
-  what is tested.
-- **A build job** that refuses a stale generated file by name, `git diff --exit-code` over `apps/web/src/routeTree.gen.ts` and
+- **The 120-page e2e in four shards** (card 2) off `apps/web/test/e2e/pages/NAMES`, with a gate summing their page time against
+  `PAGES_BOUND_MS`, Playwright's browsers cached, and a failing page's pictures uploaded. npm itself is never cached: the lockfile's own
+  install is part of what is tested.
+- **A build job** (card 2) that refuses a stale generated file by name, `git diff --exit-code` over `apps/web/src/routeTree.gen.ts` and
   `apps/web/theme/`.
-- **gitleaks** over the incoming commits, as a pinned binary with a two-line allowlist, and `CODEOWNERS` over what a branch could edit to
-  weaken its own check.
+- **gitleaks** (card 3) over the incoming commits, as a pinned binary with a two-line allowlist, and `CODEOWNERS` over what a branch
+  could edit to weaken its own check.
 
 The tests need no live harness, and nothing a clean `ubuntu-latest` lacks: the api's tests put a fake `claude` first on `PATH`
 (`apps/api/test/harness.ts`), the one docker-shaped test stubs `docker`, every `fetch` is loopback, and the live tests run only under
-`AE_LIVE=1`, which CI never sets. A workspace with no leg, a node floor adrift from `engines.node`, a shard list adrift from `NAMES`, a
-job outside the gate's `needs` and an action that is not GitHub's own are each refused by name in
-`packages/agent-orchestrator/test/ci-workflow.test.ts`, so the file cannot quietly test less than it claims.
+`AE_LIVE=1`, which CI never sets.
+
+**Prose is not what holds the workflow to the repository.** `packages/agent-orchestrator/test/ci-workflow.test.ts` refuses, each by its
+own sentence naming the fix: a workspace with a suite and no leg, a node floor adrift from `engines.node`, a node version left unquoted
+(YAML reads `22.18` as a number and setup-node installs another release), a timezone the leg does not run its suite under and a run of it
+that drops `--force`, a `cancel-in-progress` that would cancel a run of `main`, a job outside the gate's `needs`, a gate without
+`always()`, an action that is not GitHub's own by major tag, and the trigger that would run a fork's code against a writable token. The
+shard list adrift from `NAMES` is card 2's clause, written with the shards themselves — there is no shard list to drift from until then.
+So the file cannot quietly test less than it claims.
 
 **The owner pushes `main` by hand after each landing**, and reads the verdict off GitHub's own notification or the Actions tab. Nothing in
 Nemia reads CI today, and `push: main` fires after the landing has already committed: CI reports on a landing and never gates one, so a

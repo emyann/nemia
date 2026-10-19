@@ -248,7 +248,7 @@ export const isClaudeJob = (sessionId: string) => nameParts(sessionId) !== undef
  *   from its transcript and `claude agents`, at message level (`bgFollowOf`).
  * - `say` sends a job's words to its inbox, which its worker writes on to its stdin, and a background session's to Claude
  *   Code's inbox.
- * - `quota` asks the `claude` on PATH for the plan's usage (`claudeQuota`), whichever mode the sessions run in.
+ * - `quota` asks Claude Code for the plan's usage through the Agent SDK (`claudeQuota`), whichever mode the sessions run in.
  * - `forget` removes what either mode keeps under the session's name, since a name the engine gave does not say which mode
  *   ran it, and names the transcript once.
  * - `kept` names what either mode keeps under each session's name, joined the same way, a path named once.

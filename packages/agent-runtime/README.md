@@ -1804,11 +1804,13 @@ const q = yield* engine.quota('claude')
 if (q.kind === 'windows') for (const l of q.limits) console.log(l.key, l.usedPercentage, l.resetsAt)
 ```
 
-Claude Code answers it, as `claude` and as `claude-bg`: the `claude` on PATH, sent its `get_usage` control request with no prompt
-(`claudeQuota`, `harness/claude/quota.ts`), so no model is called and no token spent. Each call is one ask, one process: `claudeQuota`
-lets it go before it returns, whatever ended it — an answer, the timeout, an interruption. Through the engine the ask runs behind the
-A2A seam, which an interruption does not cross: a caller that interrupts `quota()` gets control back at once, and the process ends by
-the ask's own timeout, within `QUOTA_TIMEOUT_MS` (15 s) and 2 s more. Nothing is journalled and nothing kept, so a caller that reads
+Claude Code answers it, as `claude` and as `claude-bg`: the ask is the Agent SDK's own usage question, put to the `claude` on PATH —
+the Claude Code the sessions run on, named as `QUOTA_COMMAND` — with no prompt (`claudeQuota`, `harness/claude/quota.ts`), so no model
+is called and no token spent. Each call is one ask, one query of its own, and the SDK owns the process: `claudeQuota` closes that query
+before it returns, whatever ended it — an answer, the timeout, an interruption — and no `claude` is left behind by the time it does
+(`test/quota.boundary.test.ts`). Through the engine the ask runs behind the A2A seam, which an interruption does not cross: a caller
+that interrupts `quota()` gets control back at once, and the ask it left ends at its own timeout at the latest (`QUOTA_TIMEOUT_MS`,
+15 s), its process with it. Nothing is journalled and nothing kept, so a caller that reads
 often keeps the answer itself. A
 harness with no quota — Codex, a remote agent, a brought `RunnerOps` — is refused in words (`QuotaRefused`, worded with exit code 2 by `refusalWords`, as `ae` does),
 naming the harnesses that have one; so is a harness the engine does not have, and any argument but one name.
@@ -2219,7 +2221,7 @@ of pure code sits beside it.
 | `src/harness/claude/attached-session.ts` | one attached session over `query()`: its input, its hooks for the call in flight and the drain, `canUseTool`, its capture |
 | `src/harness/claude/attached-file.ts` | an attached session's run file, its stop, the drain, and the two notes a resumed session is told |
 | `src/harness/claude/attached-options.ts` | a task as the SDK's `Options` (`attachedOptions`): the job's fence, folders, servers, model, budget and schema |
-| `src/harness/claude/quota.ts` | Claude Code's quota (`claudeQuota`): the `claude` on PATH asked `get_usage` with no prompt, and its answer read (`quotaOfResponse`) |
+| `src/harness/claude/quota.ts` | Claude Code's quota (`claudeQuota`): the Agent SDK's usage question put to the `claude` on PATH with no prompt, and its answer read (`quotaOfUsage`) or its refusal (`quotaOfRefusal`) |
 | `src/harness/claude/registry.ts` | the rows `claude agents --all --json` prints, decoded: which are ours, and why a listing is refused; a row's state in A2A's names (`claudeStateOf`) |
 | `src/harness/claude/lines.ts` | the transcript lines the runtime reads (`LINES`), each decoded where it is read, and why a line is refused |
 | `src/harness/claude/print.ts` | the lines of `claude -p`'s output the runtime reads (`PRINTED`), decoded, and why an output is refused |

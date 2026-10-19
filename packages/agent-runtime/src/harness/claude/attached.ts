@@ -16,7 +16,8 @@
  * - **The drain.** A file naming the holder's pid and when it started (`putDrain`): while it names this process, the new calls of each
  *   session with none in flight wait at their hook, so a restart can wait for the calls in flight before it signals.
  * - **What it keeps.** Its run file, and a capture of the messages a reader reads (denials as they come, the result's statement and
- *   usage); the conversation is Claude Code's own transcript.
+ *   usage); the conversation is Claude Code's own transcript, which is also where a follow's whole events and its cursor come from
+ *   (`attached-follow.ts`), the same file `transcript` reads.
  */
 import { Effect, Option, Schedule, type Scope } from 'effect';
 import fs from 'node:fs';
@@ -46,13 +47,18 @@ import {
   type AttachedRun,
 } from './attached-file.ts';
 import { gone, hear, interruptTurn, killGroup, startSession, type Held, type Live } from './attached-session.ts';
+import { pushesOf, type Pushes } from './attached-follow.ts';
 
-/** The attached sessions of one engine: the runner's verbs, and `hold`, which makes this process their holder for a scope. */
+/**
+ * The attached sessions of one engine: the runner's verbs, `hold`, which makes this process their holder for a scope, and
+ * `following`, how many follow the session `name` here now — what a test reads to see a follower that left free its place.
+ */
 export type Attached = {
-  readonly ops: Pick<RunnerOps, 'spawn' | 'observe' | 'observeFor' | 'stop' | 'logs' | 'transcript' | 'say' | 'interrupt'>;
+  readonly ops: Pick<RunnerOps, 'spawn' | 'observe' | 'observeFor' | 'stop' | 'logs' | 'transcript' | 'say' | 'interrupt' | 'follow'>;
   readonly hold: Effect.Effect<void, never, Scope.Scope>;
   readonly holding: () => boolean;
   readonly has: (name: string) => boolean;
+  readonly following: (name: string) => number;
 };
 
 /**
@@ -219,8 +225,17 @@ export const attachedSessions = (root: string, executable?: string, options: { l
   let holding = false;
   let draining = false;
   const held: Held = (l) => (draining || drainsThis(root)) && l.calls.size === 0;
+  const pushes = pushesOf({ root, holds: (name) => live.has(name) });
   const start = (r: SpawnRequest, run: AttachedRun, first: string, resume?: string) =>
-    live.set(run.name, startSession(root, r, run, first, { held, ...(executable ? { executable } : {}), ...(resume ? { resume } : {}) }));
+    live.set(
+      run.name,
+      startSession(root, r, run, first, {
+        held,
+        pushed: (m) => pushes.push(run.name, m),
+        ...(executable ? { executable } : {}),
+        ...(resume ? { resume } : {}),
+      }),
+    );
 
   const stopped = (run: AttachedRun) => fs.existsSync(filesOf(root, run.name).stop);
 
@@ -285,7 +300,8 @@ export const attachedSessions = (root: string, executable?: string, options: { l
     ),
     holding: () => holding,
     has: (name) => fs.existsSync(filesOf(root, name).run),
-    ops: opsOf(root, live, start, runs),
+    following: pushes.following,
+    ops: opsOf(root, live, start, runs, pushes),
   };
 };
 
@@ -296,12 +312,15 @@ const failed = (verb: string) => (cause: unknown) =>
 /**
  * The runner's verbs over the sessions under `root`: `live`, those at work in this process, and `start`, how one is started. A name is
  * the engine's (`ae/<task>/<n>`), and every verb reads the session's run file, so another process reads and stops what the holder runs.
+ * `follow` is answered from `pushes`, the fan-out the holder's own message loop feeds: a session this process does not hold is
+ * followed by no one here, and is read through `transcript`.
  */
 const opsOf = (
   root: string,
   live: Map<string, Live>,
   start: (r: SpawnRequest, run: AttachedRun, first: string, resume?: string) => void,
   runs: (names?: readonly string[]) => Map<string, Sighting>,
+  pushes: Pushes,
 ): Attached['ops'] => ({
   spawn: (r) =>
     Effect.try({
@@ -360,6 +379,7 @@ const opsOf = (
       },
       catch: failed('interrupt'),
     }),
+  follow: (name) => pushes.follow(name),
   say: (session, text) =>
     Effect.try({
       try: () => {

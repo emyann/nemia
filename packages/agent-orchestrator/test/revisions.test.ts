@@ -701,3 +701,34 @@ test('the ledger reads as empty where its file does not read, and the tops of a 
   fs.writeFileSync(file, 'not json');
   assert.deepEqual(ledgerOf('workflow', 'broken'), [], 'a file a hand edit broke leaves every other kind readable');
 });
+
+test('a folder edited while a run waits to give a step a tool nothing allows keeps the set it froze, says why, and stops no other run', async () => {
+  const { one, two, t } = await twoOnOneFolder();
+  const read = passRevisions();
+  const before = resolvedNow(one, AT, read);
+  assert.ok(before && 'pins' in before, 'the folder resolves while its agent can call what it is given');
+
+  fs.writeFileSync(t.agentFile, `---\nskills: ${t.skill}\npermissionMode: dontAsk\ntools: Read, Grep, Skill, WebFetch\n---\nYou build.\n`);
+  const after = passRevisions();
+  const kept = resolvedNow(one, AT, after);
+  assert.ok(kept && 'kept' in kept, 'the run keeps the step set it froze');
+  assert.match(kept.kept, /^build: /);
+  assert.match(kept.kept, /gives its session `WebFetch`/);
+  assert.equal(kept.kept.includes('\n'), false, 'the note is the refusal’s first line');
+  const other = resolvedNow(two, AT, after);
+  assert.ok(other && 'kept' in other, 'the other run on the folder is judged too, and kept for the same reason');
+
+  const allowed = passRevisions();
+  fs.mkdirSync(path.join(one.repo!, '.claude'), { recursive: true });
+  fs.writeFileSync(path.join(one.repo!, '.claude', 'settings.json'), JSON.stringify({ permissions: { allow: ['WebFetch'] } }));
+  const now = resolvedNow(one, AT, allowed);
+  assert.ok(now && 'pins' in now, "the repository's own rule makes the call reachable, and the run takes the folder again");
+});
+
+test("the allow rules of a run's repository are read once a pass for every run on it, as the folder and its digests are", async () => {
+  const { one, two } = await twoOnOneFolder();
+  const read = passRevisions();
+  assert.equal(read.allows(one), read.allows(one), 'one repository read once, and the one read answered again');
+  assert.equal(read.allows(one), read.allows(two), 'and shared between two runs on it');
+  assert.notEqual(read.allows(one), read.allows({ ...one, repo: aRepo() }), 'the repository is the key: its own settings are what is read');
+});

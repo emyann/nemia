@@ -16,7 +16,8 @@
  * <json>\n\n`, the headers flushed before the first answer (`flushHeaders`) and `X-Accel-Buffering: no`, so a follower is
  * handed each moment as it comes rather than a buffer at the end. A subscription that throws before its first answer — a
  * Task that is gone, a session that has ended — is answered as a JSON-RPC error in a 200, never as an empty stream a
- * follower would wait on for ever.
+ * follower would wait on for ever. A follower that goes away ends the follow it was reading, however silent the session is,
+ * rather than leaving the holder at work for a reader that is gone (`answerStream`).
  *
  * **The scope owns the socket.** The port lives inside the hold's scope: as it closes, the server stops listening, every open
  * socket is destroyed — so a subscription cannot hold the hold open — and the token file is forgotten.
@@ -27,6 +28,7 @@ import { Effect, type Scope } from 'effect';
 import { JsonRpcTransportHandler, ServerCallContext, STATE_HEADERS_KEY } from '@a2a-js/sdk/server';
 import type { Event } from '../core/index.ts';
 import type { RunnerOps } from '../harness/index.ts';
+import { STATE_GONE_KEY } from './follow.ts';
 import { HarnessHandler } from './handler.ts';
 import { bearerOf, forgetToken, tokenHolds, tokenOf, writeToken } from './holder-token.ts';
 import { cardJsonOf, servedCardOf, ServedHandler } from './served.ts';
@@ -96,15 +98,25 @@ const idOf = (body: string): string | number | null => {
 
 /**
  * `answers` written as an event stream: the first answer is awaited before any header, so a subscription that fails at once is
- * answered as a JSON-RPC error in a 200 and not as a stream that says nothing. The generator is returned once the answers run
- * out or the follower goes away.
+ * answered as a JSON-RPC error in a 200 and not as a stream that says nothing.
+ *
+ * A follower that goes away aborts `gone` before the generator is asked to return, as the client half does on its own
+ * subscriptions (`abortedOnReturn`): a `return` waits behind the `next` already pending, and a session that says nothing never
+ * settles one, so without the abort the holder would follow it for its whole life with nobody reading. The handler ends the
+ * follow on that signal (`goneOf`, `a2a/follow.ts`), which settles the pending `next` and lets the return through. It is heard
+ * before the first answer is awaited, since a follower may go away before any comes.
  */
 const answerStream = async (
   res: http.ServerResponse,
   id: string | number | null,
   answers: AsyncGenerator<unknown, void, undefined>,
+  gone: AbortController,
 ): Promise<void> => {
   const it = answers[Symbol.asyncIterator]();
+  res.on('close', () => {
+    gone.abort();
+    void it.return?.(undefined);
+  });
   let first: IteratorResult<unknown, void>;
   try {
     first = await it.next();
@@ -118,7 +130,6 @@ const answerStream = async (
     'x-accel-buffering': 'no',
   });
   res.flushHeaders();
-  res.on('close', () => void it.return?.(undefined));
   for (let frame = first; !frame.done && !res.closed; frame = await it.next()) {
     res.write(`data: ${JSON.stringify(frame.value)}\n\n`);
   }
@@ -149,9 +160,15 @@ const answerOf = async (req: http.IncomingMessage, res: http.ServerResponse, por
   if (req.method !== 'POST') return answerPlain(res, 405, 'a JSON-RPC call is sent with POST.\n');
   const body = await bodyOf(req);
   if (body === undefined) return answerPlain(res, 413, `a request of this port holds at most ${MOST_BYTES} bytes.\n`);
-  const context = new ServerCallContext({ state: new Map<string, unknown>([[STATE_HEADERS_KEY, req.headers]]) });
+  const gone = new AbortController();
+  const context = new ServerCallContext({
+    state: new Map<string, unknown>([
+      [STATE_HEADERS_KEY, req.headers],
+      [STATE_GONE_KEY, gone.signal],
+    ]),
+  });
   const answer = await port.transport.handle(body, context);
-  if (Symbol.asyncIterator in answer) return answerStream(res, idOf(body), answer);
+  if (Symbol.asyncIterator in answer) return answerStream(res, idOf(body), answer, gone);
   return answerJson(res, 200, answer);
 };
 

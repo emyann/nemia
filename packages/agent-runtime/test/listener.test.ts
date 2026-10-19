@@ -1,7 +1,7 @@
 /**
  * The port a holder listens on (`src/a2a/listener.ts`), over a real socket and real HTTP: the token checked before anything,
- * the refusals of the methods the surface does not serve, the two reads it does, the event stream framed by hand, and the
- * token's file and its going with the scope.
+ * the refusals of the methods the surface does not serve, the two reads it does, the event stream framed by hand, what a
+ * follower that goes away lets go of, and the token's file and its going with the scope.
  *
  * It binds a socket of its own and speaks HTTP to it, and reaches nothing outside this process: no git, no process started, no
  * real place and no real engine, so it is no boundary test.
@@ -15,7 +15,7 @@ import { tokenFileOf, tokenFolderOf } from '../src/a2a/holder-token.ts';
 import type { Followed, RunnerOps } from '../src/harness/seam.ts';
 import type { Sighting } from '../src/core/domain.ts';
 import { scratch } from './scratch.ts';
-import { WAITED } from '../src/waits/index.ts';
+import { until, WAITED } from '../src/waits/index.ts';
 
 const NAME = 'ae/t1/1';
 
@@ -56,6 +56,22 @@ const handOps = (held: Promise<void>): RunnerOps => {
 const endedOps = (): RunnerOps => ({
   ...handOps(Promise.resolve()),
   follow: () => Stream.succeed<Followed>({ kind: 'state', state: 'completed' }),
+});
+
+/**
+ * The same driver following a session that says nothing: its state, then silence, as an attached follow is while its session is
+ * quiet — its `next` pending, so nothing asking this generator to return can reach it. `letGo` is set as the stream is let go of.
+ */
+const silentOps = (letGo: { done: boolean }): RunnerOps => ({
+  ...handOps(Promise.resolve()),
+  follow: () =>
+    Stream.concat(Stream.succeed<Followed>({ kind: 'state', state: 'working' }), Stream.never).pipe(
+      Stream.onExit(() =>
+        Effect.sync(() => {
+          letGo.done = true;
+        }),
+      ),
+    ),
 });
 
 /** A holder listening for the length of the test, its scope closed by hand. */
@@ -256,4 +272,19 @@ test('a subscription that fails before its first answer is a JSON-RPC error in a
   } finally {
     await close();
   }
+});
+
+test('a follower that goes away lets the holder’s follow go, though its session says nothing', WAITED, async (t) => {
+  const letGo = { done: false };
+  const { served, close } = await holding(silentOps(letGo));
+  t.after(close);
+  const answered = await call(served, rpc('SubscribeToTask', { tenant: '', id: NAME }), `Bearer ${served.token}`);
+  assert.equal(answered.status, 200);
+  const reader = answered.body!.getReader();
+  await reader.read();
+  assert.equal(letGo.done, false, 'the follow runs while its follower reads');
+  await reader.cancel();
+  await until(t, () => letGo.done, 'the follow let go once its follower went away, rather than running on for the session’s life', {
+    everyMs: 20,
+  });
 });

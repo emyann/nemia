@@ -2135,7 +2135,19 @@ no `background` session spawns attached, and any other engine, or the same one b
   messages a reader reads, appended as they come: a denial reaches the attempt while it works, and the statement and the usage
   at the result, less what the session it resumed had spent (`carried`, as the job's `resumeCostCarried`). The conversation is Claude Code's own transcript (`transcript`), and a follow of the session reads its whole events from that
   same file, with the cursor `transcript` takes back, beside its state and the pieces of the text it is writing
-  (`follow`, `attached-follow.ts`): a follower in the holder's own process, from the moment it joins.
+  (`follow`, `attached-follow.ts`): a follower in the holder's own process, from the moment it joins, or one in another process,
+  over the port the hold serves.
+- **What the hold serves.** `hold()` answers an address and a bearer token — or `null`, where the engine runs no attached harness,
+  as every engine but a holder does. While it holds, a `node:http` server is bound on `127.0.0.1` at a port the machine chooses,
+  speaking A2A's JSON-RPC over a reading surface alone — the card, `GetTask` and `SubscribeToTask` — for each harness the engine
+  runs itself, a remote agent's excluded; every other method of A2A is refused in the SDK's own error (`a2a/listener.ts`,
+  `a2a/served.ts`). One token is minted per hold, kept `0600` under `<root>/a2a/holder-token`, never printed, and checked on every
+  request, the card's read included: without it, or with a wrong one, the answer is HTTP 401. Whoever took the hold hands the
+  address, the token and a harness's card to whoever should read it — the runtime writes no file of another layer's. An engine
+  given that card inline (`holder: { <harness>: { card } }`) and a `credentials` answer follows a session of the holder's through
+  the port, and spawns, says, stops and reads every transcript from the files itself, so a viewer still reads the conversation with
+  the holder gone (`a2a/holder-follow.ts`). The port goes with the scope: the server stops, every open socket is destroyed, and the
+  token's file is forgotten.
 - **The fence.** The job's, fact for fact (`attachedOptions`, held to `claudePrintFlags` by its test). A call that would ask a
   person is answered in the holder (`canUseTool`): denied, and written as a denial.
 - **Let go.** As the holder's scope closes, new calls wait at their `PreToolUse` hook, it waits with no bound for each call in

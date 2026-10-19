@@ -137,7 +137,10 @@ down is in `docs/architecture.md`, *Who owns what*.
   `wordsOf` leaves whole (`a2a/said.ts`); anything else is cut at 200.
 - **A paged read is served from the listing its token names** (`OPEN_LISTINGS`), never the latest.
 - **An async generator's `return` waits behind its pending `next`**: `Stream.fromAsyncIterable` calls it on interruption, so a silent
-  subscription is aborted first (`abortedOnReturn`, `a2a/remote-follow.ts`), or its interruption never ends.
+  subscription is aborted first (`abortedOnReturn`, `a2a/remote-follow.ts`), or its interruption never ends. The serving half has the
+  same trap: a holder's port leaves the signal of a follower that went away on the call's state (`STATE_GONE_KEY`), and the
+  subscription interrupts the driver's follow on it (`goneOf`, `a2a/follow.ts`), or a follower that dropped leaves the holder
+  following a silent session for its whole life.
 - **A test that shortens a remote harness's `requestMs` hands the agent its card (`opsOn`, `test/remote-follow.test.ts`) and waits for the
   send's answer**, or every request it does not test (the card read again after a failure, a subscription's headers) is held to it.
 - **A card a holder serves carries its security scheme, or a client finds no requirement and sends no header** (`authOf`): a port that

@@ -1,5 +1,7 @@
 # Nemia
 
+[![ci](https://github.com/emyann/nemia/actions/workflows/ci.yml/badge.svg)](https://github.com/emyann/nemia/actions/workflows/ci.yml)
+
 **Nemia — Recruit intelligence.** Said NEH-mee-ah.
 
 Nemia runs teams of agents. A runtime keeps each agent session alive to completion; an orchestrator sequences steps from folders of

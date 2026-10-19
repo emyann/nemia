@@ -3,7 +3,7 @@
  * board's bottom bar says (`GET /api/pause`, app.ts); and what a pause at once would stop, with what it costs: what the board's confirm
  * says (`GET /api/pause/now`).
  */
-import { COMMANDS, type Interrupt, type Paused } from 'agent-orchestrator';
+import { COMMANDS, type Interrupt, type Paused, type PauseRuns } from 'agent-orchestrator';
 import type { Engine } from '../store.ts';
 import { runPlaced } from '../store.ts';
 import type { PlaceService } from 'agent-orchestrator';
@@ -26,6 +26,9 @@ export type PauseNowRead = { interrupts: Interrupt[]; cost: string };
 export const pauseOf = async (e: Engine['Service'], placeService: PlaceService['Service']): Promise<Paused> =>
   (await runPlaced(placeService, e, PAUSED.handler({}))) as Paused;
 
-/** Each task a pause at once would stop now, read through `e` and never stored, and what an interrupted step costs. */
-export const pauseNowOf = async (e: Engine['Service'], placeService: PlaceService['Service']): Promise<PauseNowRead> =>
-  (await runPlaced(placeService, e, PAUSE_NOW.handler({}))) as PauseNowRead;
+/**
+ * Each task a pause at once would stop now, read through `e` and never stored, and what an interrupted step costs. `memo` is the app's
+ * memo of what the pause reads of every run (`ReadMemo.records.pause`): with it, the confirm reads no finished run's record.
+ */
+export const pauseNowOf = async (e: Engine['Service'], placeService: PlaceService['Service'], memo?: PauseRuns): Promise<PauseNowRead> =>
+  (await runPlaced(placeService, e, PAUSE_NOW.handler({}, undefined, undefined, { records: { pause: memo } }))) as PauseNowRead;

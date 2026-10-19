@@ -4,7 +4,8 @@
 export { claudeOps } from './bg.ts';
 export { claudeCodeOps, claudeDetached, isClaudeJob } from './code.ts';
 export { claudeSayRefuses } from './inbox.ts';
-export { claudeQuota, quotaOfResponse, QUOTA_TIMEOUT_MS, USAGE_ARGS, usageEnv } from './quota.ts';
+export { claudeQuota, QUOTA_COMMAND, quotaOfRefusal, quotaOfUsage, QUOTA_TIMEOUT_MS, usageEnv, usageOptions } from './quota.ts';
+export type { OpenUsage, UsageAsk } from './quota.ts';
 export {
   CLAUDE_AUTO_DROPPED,
   CLAUDE_CONTEXT_TOKENS,

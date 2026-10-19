@@ -7,6 +7,7 @@ import { workflowFolder } from '../folder/folder.store.ts';
 import { type Card, type Planned } from './plan.ts';
 import { readPlan } from './plan.store.ts';
 import { startRun, stepsToStart } from '../start/start.verb.ts';
+import { repoAllows } from '../trust/allows.verb.ts';
 import { PlaceService, openPlace } from '../place/place.store.ts';
 import { isFolderTeam } from '../workflow/index.ts';
 import { placesOf } from '../folder/lookup.store.ts';
@@ -48,7 +49,17 @@ export const startPlan = Effect.fn('startPlan')(function* (opts: { dir: string; 
   for (const card of cards) {
     try {
       const folder = workflowFolder(card.workflow, opts.dir, opts.repo, factory?.tree);
-      const steps = stepsToStart(folder, true, placesOf(opts.repo), place.declared.denyWhileLanding, factory);
+      const steps = stepsToStart(
+        folder,
+        true,
+        placesOf(opts.repo),
+        place.declared.denyWhileLanding,
+        factory,
+        [],
+        undefined,
+        false,
+        repoAllows(opts.repo, opts.factory),
+      );
       onRepo = onRepo || !isFolderTeam(steps);
       folders.set(card.name, folder);
     } catch (err) {

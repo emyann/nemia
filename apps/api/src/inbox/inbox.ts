@@ -276,8 +276,12 @@ function filingOf(body: typeof FILE_BODY.Type, repo: string, home: string): Fili
  */
 export const inbox = new Hono<ApiEnv>()
   .get('/api/inbox', (c) =>
-    served(c, async ({ e, placeService }) => {
-      const { cards } = await runPlaced(placeService, e, INBOX.handler({}));
+    served(c, async ({ e, placeService, memo }) => {
+      const { cards } = await runPlaced(
+        placeService,
+        e,
+        INBOX.handler({}, undefined, undefined, { records: { inbox: memo.records.inbox } }),
+      );
       return c.json(listInbox(cards));
     }),
   )

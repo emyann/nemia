@@ -7,7 +7,7 @@
  */
 import path from 'node:path';
 import type { Denial, Usage } from '../../core/index.ts';
-import { printedKindOf, printedLinesOf, type PrintedKind, type PrintedLine, type Printed } from '../claude/print.ts';
+import { partialMarksOf, printedKindOf, printedLinesOf, type PrintedKind, type PrintedLine, type Printed } from '../claude/print.ts';
 import type { HarnessOutput } from './detached.ts';
 import type { PartialMark } from './follow.ts';
 
@@ -304,14 +304,5 @@ const lineKept = (text: string, denied: ReadonlySet<string>): string | undefined
 export const claudePartials = (output: string, before: number): { marks: PartialMark[] } | { wrong: string } => {
   const read = printedLinesOf('\n'.repeat(before) + output, ['stream_event']);
   if ('wrong' in read) return read;
-  return {
-    marks: read.lines.flatMap(({ line }): PartialMark[] => {
-      const { event } = line as Printed<'stream_event'>;
-      if (event.type === 'message_start' && 'message' in event) return [{ begun: event.message.id }];
-      if (event.type === 'content_block_stop' && 'index' in event) return [{ stopped: event.index }];
-      if (event.type === 'content_block_delta' && 'delta' in event && event.delta.type === 'text_delta' && 'text' in event.delta)
-        return [{ index: event.index, text: event.delta.text }];
-      return [];
-    }),
-  };
+  return { marks: read.lines.flatMap(({ line }) => partialMarksOf((line as Printed<'stream_event'>).event)) };
 };

@@ -18,6 +18,11 @@ import {
   type Filings,
   type RestingMemo,
   restingMemo,
+  recordMemo,
+  type InboxRuns,
+  type PauseRuns,
+  type RecordMemo,
+  type ScheduleRuns,
   type RunSummary,
   PlaceService,
 } from 'agent-orchestrator';
@@ -27,6 +32,7 @@ import { placeFor } from './factories/place.ts';
 import { QuotaAsker } from './factory/quota.ts';
 import { Followings } from './steps/following.ts';
 import { Engine, StoreRoot } from './store.ts';
+import type { StepRun } from './step/step.ts';
 
 /**
  * The environment the api reads its settings from, on each request, as it read `process.env` before: `HKB_REPO` (`repoOf`), `WF_MAX_RUNS`
@@ -44,9 +50,10 @@ export class ApiConfig extends Context.Service<ApiConfig, { readonly env: NodeJS
 /**
  * What an app's reads keep between requests, each read through its engine: the list's memo of runs at rest (`resting`, the package's
  * `RestingMemo`), the stats' memo of each run's facts (`stats`, the package's `StatsMemo`), the feed's filing times (`filings`,
- * `filedTimes`), where each blocked session's conversation was last read (`said`), and the series' days read (`series`, the
- * package's `SeriesMemo`). One for an app, built with its runtime (`live`),
- * so an app over another engine starts with none. A cache: nothing is decided by it.
+ * `filedTimes`), where each blocked session's conversation was last read (`said`), the series' days read (`series`, the
+ * package's `SeriesMemo`), and `records`, one memo per read that wants a little of every run (the package's `RecordMemo`, keyed by the
+ * run's stamp alone): the inbox's listing, the factories' schedules, the pause's current tasks and a step's recent runs. One for an app,
+ * built with its runtime (`live`), so an app over another engine starts with none. A cache: nothing is decided by it.
  */
 export class ReadMemo extends Context.Service<
   ReadMemo,
@@ -56,6 +63,12 @@ export class ReadMemo extends Context.Service<
     readonly filings: Filings;
     readonly said: LastSaid;
     readonly series: SeriesMemo;
+    readonly records: {
+      readonly inbox: InboxRuns;
+      readonly factories: ScheduleRuns;
+      readonly pause: PauseRuns;
+      readonly step: RecordMemo<StepRun>;
+    };
   }
 >()('api/ReadMemo') {
   static readonly live: Layer.Layer<ReadMemo> = Layer.sync(ReadMemo)(() => ({
@@ -64,6 +77,7 @@ export class ReadMemo extends Context.Service<
     filings: { filed: new Map(), cursor: 0 },
     said: new Map(),
     series: seriesMemo(),
+    records: { inbox: recordMemo(), factories: recordMemo(), pause: recordMemo(), step: recordMemo() },
   }));
 }
 

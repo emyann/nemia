@@ -80,8 +80,8 @@ export async function everyView(e: Reader): Promise<{ views: Views; unreadable: 
  */
 export const workFolderOf = (run: Run, step: string): string | null => (isRepositoryRun(run) ? null : (run.steps[step]?.workspace ?? null));
 
-/** Found among the runs the store has, not read by path, so no id can name a file outside it. */
-export const findRun = (id: string): Run | undefined => runStore.runs.list().find((r) => r.id === id);
+/** Found among the ids the store lists (`runs.find`), not read by path, so no id can name a file outside it. */
+export const findRun = (id: string): Run | undefined => runStore.runs.find(id);
 
 export const noSuchRun = (id: string) =>
   `No run '${id}' in this store. GET /api/runs (or \`nemia ls\`) lists the runs it has; check WF_ROOT if you expected it here.`;

@@ -119,8 +119,8 @@ const answerStream = async (
   });
   res.flushHeaders();
   res.on('close', () => void it.return?.(undefined));
-  for (let step = first; !step.done && !res.closed; step = await it.next()) {
-    res.write(`data: ${JSON.stringify(step.value)}\n\n`);
+  for (let frame = first; !frame.done && !res.closed; frame = await it.next()) {
+    res.write(`data: ${JSON.stringify(frame.value)}\n\n`);
   }
   if (!res.closed) res.end();
 };

@@ -3,7 +3,8 @@
  * the refusals of the methods the surface does not serve, the two reads it does, the event stream framed by hand, and the
  * token's file and its going with the scope.
  *
- * A boundary test: it binds a socket and speaks HTTP, which no stand-in models.
+ * It binds a socket of its own and speaks HTTP to it, and reaches nothing outside this process: no git, no process started, no
+ * real place and no real engine, so it is no boundary test.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

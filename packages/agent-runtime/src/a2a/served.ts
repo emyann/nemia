@@ -40,7 +40,7 @@ import { cardOf, type RuntimeExtensionParams } from './handler.ts';
 /** The name the served card gives its bearer scheme, and the name `credentials` is asked for. */
 export const BEARER = 'bearer';
 
-/** The protocol binding and version the served interface declares: what `spokenOf` reads, and `validateVersion` would. */
+/** The protocol binding and version the served interface declares: what a client's `spokenOf` reads to choose it. */
 const BINDING = 'JSONRPC';
 const VERSION = '1.0';
 

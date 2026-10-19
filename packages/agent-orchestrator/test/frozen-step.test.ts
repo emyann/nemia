@@ -200,12 +200,13 @@ test('the decoded step, read under the names its keys have now, is a `Workflow`,
   assert.deepEqual(toWorkflow(fromWorkflow(step)), step);
 });
 
-test('a field map without a field for a key of `STEP_KEYS` does not typecheck', () => {
-  const short = (fields: FrozenStepFields): FrozenStepFields => {
-    const { rounds: _, ...rest } = fields;
-    // @ts-expect-error -- a field map missing `rounds` is no `FrozenStepFields`, as one missing any key of `STEP_KEYS` is not
-    const missing: FrozenStepFields = rest;
-    return missing;
-  };
-  assert.equal(typeof short, 'function');
-});
+/**
+ * A field map without a field for a key of `STEP_KEYS` does not typecheck. Nothing calls this: the typecheck reads its lines, and an
+ * `@ts-expect-error` over code that stops erring is the failure.
+ */
+function _shortFieldMap(fields: FrozenStepFields): FrozenStepFields {
+  const { rounds: _, ...rest } = fields;
+  // @ts-expect-error -- a field map missing `rounds` is no `FrozenStepFields`, as one missing any key of `STEP_KEYS` is not
+  const missing: FrozenStepFields = rest;
+  return missing;
+}

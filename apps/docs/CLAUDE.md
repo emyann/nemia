@@ -29,6 +29,9 @@ its root. A page holds landed material only; a term designed and not built sits 
 - That build writes this folder's `.astro/`, ignored: a test build and a `npm run dev` at once overwrite each other's types. A test
   holds no fact of `.astro/dev.json` but the pid it names: a person's `npm run dev` owns that file, and an equality on it read before
   and after a test made their write the test's failure.
+- **A test here waits with `until`** (`test/waits.ts`, the runtime's copy, held to `packages/agent-runtime/src/waits/waits.ts` by the
+  fence in that package's `test/waits.test.ts`), its test given `WAITED`, and no spawn under `test/` takes a `timeout:` or a
+  `killSignal:`: the runner's `--test-timeout` is the one bound.
 - **The prerender environment inlines its dependencies on `astro build` alone** (`prerenderInlinedOnBuild` in `astro.config.mjs`): the build
   needs it for `cookie`, and in dev it makes Vite's runner evaluate CommonJS `picomatch` with no `require`. `test/build.test.ts` starts
   dev through `dev()` in a child (`test/dev.ts`), which writes no `.astro/dev.json`, and fails on the prerender server's error.

@@ -4,6 +4,8 @@
  */
 export { autoDropped, parseWorkflow, renderStep, skillAt, stepFrom } from './step-file.ts';
 export { directoryFence, FENCE_KEYS, POLICY_KEYS, sandboxed, toolOf } from './fence.ts';
+export { headedLayers, LAYER_HEADINGS } from './layers.ts';
+export type { ComposedLayer } from './layers.ts';
 export { unallowedRefusal } from './unallowed.ts';
 export type { Hire } from './step-file.ts';
 export type { StepDraft } from './step-file.ts';

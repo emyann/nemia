@@ -338,6 +338,7 @@ export const transcript = (extra: Partial<StepTranscript> = {}): StepTranscript 
   ],
   cursor: 'c-3',
   live: true,
+  open: true,
   ...extra,
 });
 

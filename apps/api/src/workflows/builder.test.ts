@@ -321,7 +321,7 @@ test('a step with an agent is listed resolved, with what its file sets itself (`
   assert.deepEqual(build, {
     name: 'build',
     spec: spec({ agent: 'coder', harness: 'claude', model: 'opus', effort: 'high', check: 'npm test' }),
-    body: 'You write code.\n\nAnd mind the cache.',
+    body: "## 1. Instructions — your role's own words\n\nYou write code.\n\n## 5. The step's policy — this step of this process\n\nAnd mind the cache.",
     own: { keys: ['place', 'check'], body: 'And mind the cache.' },
     hired: null,
     layers: {
@@ -333,6 +333,7 @@ test('a step with an agent is listed resolved, with what its file sets itself (`
       policy: 'And mind the cache.',
       addedSkills: [],
       fence: [],
+      folderFiles: true,
       task: null,
       via: 'prompt',
     },
@@ -360,7 +361,14 @@ test('a step with an agent is listed resolved, with what its file sets itself (`
     "a key changed, which the board makes the node's own, and the note are written, and nothing else of the agent's",
   );
   const [read] = await listedSteps('with-agent');
-  assert.deepEqual([read.spec.model, read.spec.effort, read.body], ['opus', 'low', 'You write code.\n\nAnd mind the index.']);
+  assert.deepEqual(
+    [read.spec.model, read.spec.effort, read.body],
+    [
+      'opus',
+      'low',
+      "## 1. Instructions — your role's own words\n\nYou write code.\n\n## 5. The step's policy — this step of this process\n\nAnd mind the index.",
+    ],
+  );
 
   res = await put('with-agent', {
     steps: [{ name: 'build', spec: { place: 'git', agent: 'coder', check: 'npm test' }, body: 'Mind nothing.' }],
@@ -413,6 +421,7 @@ test("a step with an agent is listed with its layers — the agent's instruction
       policy: 'Note the decisions.',
       addedSkills: [],
       fence: [{ key: 'disallowedTools', value: 'Bash(rm:*)' }],
+      folderFiles: true,
       task: null,
       via: 'prompt',
     });

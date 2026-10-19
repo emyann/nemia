@@ -8,9 +8,11 @@
  *
  * Her record is planted by `her.ts`, the fixture both files share.
  */
-import './harness.ts';
+import { root } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import type { ChatEvent, ChatHistory } from 'agent-orchestrator';
 import { said, withHer } from './her.ts';
 import { app } from '../src/app.ts';
@@ -112,6 +114,35 @@ test('the stream sends presence first, then her events with the cursor, and resu
   );
   assert.deepEqual(textsOf(resumed), ['Three.']);
   assert.equal(resumed.filter((b) => b.id !== undefined).at(-1)?.id, '1.3.0.0.0.0');
+});
+
+test('a read that fails under an open stream is `unreadable` with retrying, and the first beat that works after it says `readable`', async () => {
+  const { sessionId } = withHer(['One.']);
+  const outbox = path.join(root, 'nemia', 'chat', 'outbox.jsonl');
+  fs.mkdirSync(path.dirname(outbox), { recursive: true });
+  const mended = fs.rmSync.bind(null, outbox, { force: true });
+  let broken = false;
+  let whole = false;
+  const beats = await streamed(await app.request('/api/nemia/chat/stream'), (got) => {
+    if (!broken && textsOf(got).length >= 1) {
+      broken = true;
+      fs.writeFileSync(outbox, '{"id":"half-written"}\n');
+    } else if (broken && !whole && got.some((b) => b.event === 'unreadable')) {
+      whole = true;
+      mended();
+      said(sessionId, ['Two.'], 1);
+    }
+    return textsOf(got).includes('Two.');
+  });
+  mended();
+  const notice = JSON.parse(beats.find((b) => b.event === 'unreadable')!.data!) as { error: string; retrying: boolean };
+  assert.equal(notice.retrying, true, 'a read that failed is a notice: the next beat reads again');
+  assert.match(notice.error, /is not a line of the chat's record/, "and it says what the api could not read, in the store's own words");
+  assert.equal(
+    beats.findIndex((b) => b.event === 'readable') > beats.findIndex((b) => b.event === 'unreadable'),
+    true,
+    'the beat that reads again says `readable`, which takes the notice off the page, before what it read',
+  );
 });
 
 test('REFUSED: a stream from a cursor no read gave is a 422 before it opens', async () => {

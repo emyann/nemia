@@ -33,16 +33,18 @@ const TranscriptEventSchema = Schema.Struct({
 }) satisfies Schema.Schema<TranscriptEvent>;
 
 /**
- * Mirrors `StepTranscript` in apps/api/src/steps/steps.ts: the events from a cursor, the cursor to ask again from, and whether more may
- * come.
+ * Mirrors `StepTranscript` in apps/api/src/steps/steps.ts: the events from a cursor, the cursor to ask again from, whether something of
+ * the task runs or is to (`live`), and whether it may yet say more — a task that has not settled, one held on a person's word among them
+ * (`open`).
  */
-export type StepTranscript = { events: TranscriptEvent[]; cursor: string | null; live: boolean };
+export type StepTranscript = { events: TranscriptEvent[]; cursor: string | null; live: boolean; open: boolean };
 
 /** Decodes a `StepTranscript`. */
 const StepTranscriptSchema = Schema.Struct({
   events: Schema.mutable(Schema.Array(TranscriptEventSchema)),
   cursor: Schema.NullOr(Schema.String),
   live: Schema.Boolean,
+  open: Schema.Boolean,
 }) satisfies Schema.Schema<StepTranscript>;
 
 /** A piece of the message being written: its text block's `key`, the text added (`delta`), and whether the block is now whole (`last`). */

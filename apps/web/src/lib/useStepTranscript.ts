@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { readTranscript, transcriptPath } from './api';
-import { animationFrames, follow, followedFrom, unread, type Following } from './following.ts';
+import { animationFrames } from './follow.ts';
+import { followedFrom, followStep, unread, type Following } from './following.ts';
 import { mergeEvents } from './transcript';
 
 export type { Following } from './following.ts';
@@ -42,7 +43,7 @@ export function useStepTranscript(runId: string, step: string, taskId: string | 
         const after = followedFrom(first, waiting);
         if (after === null) return;
         const stream = new EventSource(`${transcriptPath(runId, step)}/stream?after=${encodeURIComponent(after)}`);
-        stop = follow(stream, setState, animationFrames);
+        stop = followStep(stream, setState, animationFrames);
       },
       (err: unknown) => {
         if (!reading.signal.aborted) setState({ ...unread(false), error: err instanceof Error ? err.message : String(err) });

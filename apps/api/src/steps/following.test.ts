@@ -21,7 +21,7 @@ import { bell, until, WAITED } from '../../test/waits.ts';
 type Followed = Stream.Success<NonNullable<Effect.Success<ReturnType<Engine['Service']['follow']>>>>;
 
 const RUN = 'r-follow';
-const STEPS = ['implement', 'review', 'late', 'held', 'opened', 'tried'];
+const STEPS = ['implement', 'review', 'late', 'held', 'opened', 'tried', 'drifted', 'lost'];
 
 /** The run's record, each step of `STEPS` on the task `t-<step>`, but those `moved` names on another. */
 function writeRun(moved: Record<string, string> = {}): void {
@@ -49,7 +49,8 @@ const said = (id: string, text = id): TranscriptEvent => ({ id, at: '2026-10-07T
 
 /**
  * A task on the test's engine: its attempts' live moments, each a queue the test offers to, how many of them have ended, whether it
- * settled, its conversation, and whether its harness streams.
+ * settled, its conversation, whether its harness streams, and the words a stream it had fails with (`lost`), an error as the runtime
+ * fails with one: no refusal to stream, but a stream that broke under the follower.
  */
 type Task = {
   attempts: Queue.Queue<Followed, Cause.Done>[];
@@ -57,6 +58,7 @@ type Task = {
   settled: string | null;
   history: TranscriptEvent[];
   unstreamed?: true;
+  lost?: string;
 };
 
 /**
@@ -87,6 +89,7 @@ function engineOver(tasks: Map<string, Task>) {
         : Effect.sync(() => {
             follows.push(id);
             const t = tasks.get(id)!;
+            if (t.lost !== undefined) return Stream.fail(Object.assign(new Error(t.lost), { _tag: 'RunnerError', refused: false }));
             if (t.attempts.length === 0) return undefined;
             if (t.ended === t.attempts.length) return Stream.fail({ _tag: 'RunnerError', refused: true, message: 'the attempt has ended' });
             return Stream.fromQueue(t.attempts.at(-1)!).pipe(Stream.ensuring(Effect.sync(() => closed.push(id))));
@@ -311,7 +314,7 @@ test(
 );
 
 test(
-  'a step moved to a try whose session is not pushed is sent what the try has said from its start, not the task it was opened on, then `unreadable`: nothing is read again',
+  'a step moved to a try whose session is not pushed is sent what the try has said from its start, not the task it was opened on, then `unreadable` retrying: the stream stays open and reads the try again on a beat',
   WAITED,
   async (t) => {
     const first = working([said('a-1')]);
@@ -331,18 +334,84 @@ test(
     first.settled = 'failed';
     writeRun({ tried: 't-tried-try2' });
     await line(own, 'tried', 'running');
-    const sent = await f.ended();
-    assert.deepEqual(kinds(sent).slice(0, -1), [
-      'following {"streamed":true}',
-      'transcript a-1',
-      'moved {"taskId":"t-tried-try2"}',
-      'following {"streamed":false}',
-      'transcript b-1',
-    ]);
-    assert.equal(sent.at(-1)?.event, 'unreadable', 'the stream ends of itself, the try still live: one read again would time the test out');
-    assert.deepEqual(JSON.parse(sent.at(-1)!.data!), {
-      error: `Step 'tried' of run '${RUN}' runs a session that is not pushed as it is written: what it said so far is sent. GET /api/runs/${RUN}/steps/tried/transcript?after=<the last id> gives what it says next.`,
-      retrying: false,
+    await f.wait((s) => kinds(s).includes('transcript b-1'), "the try's own history, read from its start");
+    const sent = f.said();
+    assert.deepEqual(
+      kinds(sent).filter((k) => !k.startsWith('unreadable ')),
+      [
+        'following {"streamed":true}',
+        'transcript a-1',
+        'moved {"taskId":"t-tried-try2"}',
+        'following {"streamed":false}',
+        'transcript b-1',
+      ],
+    );
+    assert.deepEqual(JSON.parse(sent.find((b) => b.event === 'unreadable')!.data!), {
+      error: `Step 'tried' of run '${RUN}' runs a session its harness does not push as it is written: what it said so far is sent, and it is read again every few seconds.`,
+      retrying: true,
     });
+    assert.equal(sent.filter((b) => b.event === 'settled').length, 0, 'the try is still live, and the stream is not ended');
+    await f.leave();
+  },
+);
+
+test(
+  'a beat that moves to another try reads that try from its start once, and from its cursor on every beat after: nothing is sent twice',
+  { timeout: 60_000 },
+  async (t) => {
+    const first: Task = { ...working([said('a-1')]), unstreamed: true };
+    const tried: Task = { ...working([said('c-1')]), unstreamed: true };
+    const { e } = engineOver(
+      new Map([
+        ['t-drifted', first],
+        ['t-drifted-try2', tried],
+      ]),
+    );
+    const own = appOver(t, e);
+    t.after(() => writeRun());
+    const f = await follower(t, own.app, 'drifted');
+    await f.wait((s) => s.some((b) => b.event === 'unreadable'), 'not pushed: read again on a beat');
+    delete first.unstreamed;
+    await f.wait((s) => s.some((b) => b.event === 'readable'), 'a harness that starts pushing is relayed live on the next beat');
+    Queue.endUnsafe(first.attempts[0]);
+    first.ended = 1;
+    first.settled = 'failed';
+    writeRun({ drifted: 't-drifted-try2' });
+    await line(own, 'drifted', 'running');
+    await f.wait((s) => kinds(s).includes('transcript c-1'), "the try's own history, read from its start");
+    tried.history.push(said('c-2'));
+    await f.wait((s) => kinds(s).includes('transcript c-2'), 'what the try says next, on the beat after');
+    assert.equal(
+      kinds(f.said()).filter((k) => k === 'transcript c-1').length,
+      1,
+      "the try's history is read from its start at the move alone: the beats after it read from the cursor",
+    );
+    await f.leave();
+  },
+);
+
+test(
+  'a step whose live stream fails is given up on no more than one its harness never pushed: the stream says why, retrying, and the beat reads the conversation again',
+  { timeout: 60_000 },
+  async (t) => {
+    const lost: Task = { ...working([said('a-1')]), lost: 'the runner lost the session' };
+    const { e } = engineOver(new Map([['t-lost', lost]]));
+    const own = appOver(t, e);
+    const f = await follower(t, own.app, 'lost');
+    let reading = true;
+    const over = f.ended().then((s) => {
+      if (reading) assert.fail(`the stream ended on the failed upstream instead of saying why: ${JSON.stringify(kinds(s))}`);
+    });
+    await Promise.race([f.wait((s) => s.some((b) => b.event === 'unreadable'), 'the upstream failed, and the stream says so'), over]);
+    reading = false;
+    const notice = JSON.parse(f.said().find((b) => b.event === 'unreadable')!.data!) as { error: string; retrying: boolean };
+    assert.match(notice.error, /the runner lost the session/, "the upstream's own words say why no live stream can be had");
+    assert.equal(notice.retrying, true, 'and they are a notice, not an end: the api goes on reading');
+    assert.equal(f.said().filter((b) => b.event === 'settled').length, 0, 'nothing settled it: the stream stays open');
+    assert.ok(kinds(f.said()).includes('transcript a-1'), 'what the session said before the stream broke is sent all the same');
+    lost.history.push(said('a-2'));
+    await f.wait((s) => kinds(s).includes('transcript a-2'), 'and what it says after it arrives on the beat that follows');
+    await f.leave();
+    await over;
   },
 );

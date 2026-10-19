@@ -94,7 +94,9 @@ sequenceDiagram
    (`apps/web/src/lib/useStepTranscript.ts`).
 2. The api serves that route, `/api/runs/:id/steps/:step/transcript/stream` (`apps/api/src/steps/steps.ts`), with one upstream per
    step, whoever follows it, and relays what the runtime streams. A dropped connection resumes after the last event it was sent.
-3. A step whose harness does not stream is sent what it has said so far, and told that nothing more will come on the stream.
+3. Where no live stream of a step can be had — its harness does not stream the session, or the stream it had failed — the stream says
+   why, quietly, and reads the conversation again every few seconds (`STEP_BEAT_MS`) from where it left off, asking each time whether
+   it can be followed live again. It gives up on no step: it ends when the step's task settles, or when nobody is reading.
 
 The board follows the store as a whole the same way: the feed, the line of everything the daemon writes, is relayed as server-sent
 events on `/api/feed/stream` (`apps/api/src/factory/feed.ts`, read by `apps/web/src/lib/useFeed.ts`).

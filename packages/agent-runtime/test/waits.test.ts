@@ -1,9 +1,11 @@
 /**
- * The wait a test makes on its event (`until`, `bell`, `test/waits.ts`), the copy every package keeps of it, and the guard that keeps a
- * hand-written deadline out of the package's tests (`DEADLINES`).
+ * The wait a test makes on its event (`until`, `bell`, `src/waits/`), and the guard that keeps a hand-written deadline out of the
+ * package's tests (`DEADLINES`).
  *
- * `test/waits.ts` here is the one copy the others are held to, byte for byte, as `scratch.ts` is. A wait asks at once, on each ring and
- * at its pace, and ends at its test's timeout saying what never came: that is read off a nested `node --test` of
+ * `src/waits/waits.ts` is the one copy: a test of a layer above takes it from `agent-runtime/testing`, and the board and the
+ * documentation site, which import no package, each keep a copy this file holds to it byte for byte, since a test of theirs builds no
+ * path into a package's `src`. A wait asks at
+ * once, on each ring and at its pace, and ends at its test's timeout saying what never came: that is read off a nested `node --test` of
  * `test/fixtures/waits/never.ts`, since a test's timeout is reported only outside it. `DEADLINES` counts, file by file, each `now()` of
  * `Date` or `performance` a number is added to, or a start taken from and held under a bound, in the package's tests: each left is a
  * mocked clock, a timestamp, a reaper's bound, a synchronous hold or an assertion, never a wait, and a count only shrinks
@@ -14,12 +16,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { bell, until, WAITED, type Waiter } from './waits.ts';
+import { bell, until, WAITED, type Waiter } from '../src/waits/index.ts';
 
 const TEST = import.meta.dirname;
 const PACKAGE = path.join(TEST, '..');
-/** The one copy the others are held to. */
-const RUNTIME = path.join(TEST, '..', '..', '..', 'packages', 'agent-runtime', 'test', 'waits.ts');
+const ROOT = path.join(PACKAGE, '..', '..');
 
 /**
  * A test's signal and diagnostics, as `until` reads them, with what it said kept and its abort in the test's hands: aborted once the test
@@ -180,11 +181,19 @@ test('REFUSED: a wait that cannot read its test fails at once, and its process e
   assert.match(ran.stdout, /^# pass 1$/m, ran.stdout);
 });
 
-test("the helper is the runtime's, byte for byte", () => {
+test("the copies of the helper outside the packages are this package's, byte for byte", () => {
+  const one = fs.readFileSync(path.join(PACKAGE, 'src', 'waits', 'waits.ts'), 'utf8');
   assert.equal(
-    fs.readFileSync(path.join(TEST, 'waits.ts'), 'utf8'),
-    fs.readFileSync(RUNTIME, 'utf8'),
-    'copy packages/agent-runtime/test/waits.ts over this one: a change to it is made there and copied to every package',
+    fs.readFileSync(path.join(ROOT, 'apps', 'web', 'test', 'waits.ts'), 'utf8'),
+    one,
+    'copy packages/agent-runtime/src/waits/waits.ts over apps/web/test/waits.ts: a change to the wait is made here, and the board, ' +
+      'which imports no package, keeps a copy of it',
+  );
+  assert.equal(
+    fs.readFileSync(path.join(ROOT, 'apps', 'docs', 'test', 'waits.ts'), 'utf8'),
+    one,
+    'copy packages/agent-runtime/src/waits/waits.ts over apps/docs/test/waits.ts: a change to the wait is made here, and the ' +
+      'documentation site, which imports no package, keeps a copy of it',
   );
 });
 
@@ -263,7 +272,7 @@ const testFiles = (): string[] =>
 const deadlineBreaks = (counts: ReadonlyMap<string, number>, allowed: Readonly<Record<string, Allowance>>): string[] => [
   ...[...counts].flatMap(([file, n]) =>
     n > (allowed[file]?.count ?? 0)
-      ? [`${file} has ${n} hand-written deadlines, ${allowed[file]?.count ?? 0} allowed: wait with \`until\` (test/waits.ts) instead`]
+      ? [`${file} has ${n} hand-written deadlines, ${allowed[file]?.count ?? 0} allowed: wait with \`until\` (src/waits/index.ts) instead`]
       : [],
   ),
   ...Object.entries(allowed).flatMap(([file, { count }]) =>
@@ -290,7 +299,7 @@ test('REFUSED: a deadline written into a test is over its allowance, and an allo
   for (const deadline of [planted, compared]) {
     counts.set('src/core/clock.test.ts', (counts.get('src/core/clock.test.ts') ?? 0) + deadlinesIn(deadline));
     assert.deepEqual(deadlineBreaks(counts, DEADLINES), [
-      'src/core/clock.test.ts has 1 hand-written deadlines, 0 allowed: wait with `until` (test/waits.ts) instead',
+      'src/core/clock.test.ts has 1 hand-written deadlines, 0 allowed: wait with `until` (src/waits/index.ts) instead',
     ]);
     counts.set('src/core/clock.test.ts', 0);
   }

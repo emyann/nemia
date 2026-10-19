@@ -11,7 +11,7 @@ import path from 'node:path';
 import { Effect, Layer, Logger, References } from 'effect';
 import { appOf, liveOf } from '../src/app.ts';
 import { tookOf } from '../src/request/request.ts';
-import { until, WAITED, type Waiter } from './waits.ts';
+import { until, WAITED, type Waiter } from 'agent-runtime/testing';
 
 /** A line the app said: its level, its message, and the annotations the fiber carried when it was said. */
 type Said = { level: string; text: string; annotations: Record<string, unknown> };

@@ -41,8 +41,8 @@ it holds today that is a candidate for the runtime is in `docs/architecture.md`,
   tests' team (`test/fixtures/team/`); a sentence a step is told is read with `toldIn`.
 - **A Claude Code step's instructions are in `runs/<id>/agents/<step>/prompt.md`** and its brief is its own note (`briefBody`); a step
   whose rendered folder is gone is told its skills whole in the brief (`unrendered`, `skillsAgain`).
-- **A step's `body` opens with its agent's instructions** ("You are …"): a screen that quotes the step reads its own words, `ownNote`
-  (`ending/ending.ts`), as `toDecide` and `wf decide` do.
+- **A step's `body` opens with the heading of its agent's instructions** (`LAYER_HEADINGS`, one per layer `headedLayers` composes): a
+  screen that quotes the step reads its own words, `ownNote` (`ending/ending.ts`), as `toDecide` and `wf decide` do.
 - **The board's listing of a step is resolved; its file is not**: write a step's own keys (`ListedStep.own`). A key the parser converts
   is written back in the form the file has (`contextText`). Code outside the package reads a step's frontmatter by calling the
   package's reader (`splitFrontmatter`, from `agent-orchestrator/workflow`), never a parser of its own `(no test yet)`.

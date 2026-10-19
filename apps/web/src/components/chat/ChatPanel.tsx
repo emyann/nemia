@@ -7,7 +7,8 @@
  * her talk, her greeting — scrolls inside the panel; the kept message, its band and the composer keep their room.
  *
  * A chat the board cannot read at all says so, and draws no greeting: a level, a count of factories and runs at work read from nothing
- * would be facts the board does not have.
+ * would be facts the board does not have. A chat the api cannot stream and is reading again on a beat says so quietly, apart from that
+ * failure, and draws no greeting either, for the same reason (`ChatRetryingBand`).
  *
  * Escape closes it while it floats, as the frame's own bar closes on Escape; the page closes on nothing, being a page.
  */
@@ -18,7 +19,7 @@ import type { NemiaLevel } from '@/lib/api';
 import type { Presence } from '@/lib/presence';
 import type { NemiaChat } from '@/lib/useNemiaChat';
 import { cn } from '@/lib/utils';
-import { ChatLostBand, ChatStoppedBand, ChatUnreadableBand } from './ChatBand';
+import { ChatLostBand, ChatRetryingBand, ChatStoppedBand, ChatUnreadableBand } from './ChatBand';
 import { ChatComposer } from './ChatComposer';
 import { ChatEmpty } from './ChatEmpty';
 import { ChatHeader, type ChatMode } from './ChatHeader';
@@ -44,6 +45,7 @@ export function ChatPanel({ chat, nemia, presence, atWork, now, mode, onGrow, on
   const { state, kept } = chat;
   const grown = mode !== 'float';
   const unreadable = state.error !== null;
+  const retrying = state.retrying;
 
   useEffect(() => {
     if (mode === 'page') return;
@@ -69,12 +71,14 @@ export function ChatPanel({ chat, nemia, presence, atWork, now, mode, onGrow, on
         <ChatHeader nemia={nemia} presence={presence} now={now} mode={mode} onGrow={onGrow} onClose={onClose} />
         <hr className="shrink-0 border-outline-variant" />
         {presence.down && nemia !== undefined && !unreadable && <ChatStoppedBand words={sessionOf(nemia).words} />}
+        {retrying !== null && <ChatRetryingBand why={retrying} />}
         {unreadable && <ChatUnreadableBand why={state.error ?? ''} />}
         {state.events.length > 0 ? (
           <ChatTalk events={state.events} unread={state.presence.unread} onRead={chat.markRead} />
         ) : (
           !state.loading &&
-          !unreadable && (
+          !unreadable &&
+          retrying === null && (
             <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
               <ChatEmpty nemia={nemia} presence={presence} atWork={atWork} onSend={chat.send} />
             </div>

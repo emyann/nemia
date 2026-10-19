@@ -16,6 +16,7 @@ import { agentsFor, agentVersion } from '../src/agents/read.store.ts';
 import { PLACE_SKILLS, isShippedPlace, lookupRoots, skillsFor } from '../src/skills/read.store.ts';
 import { SHIPPED_PLACE } from '../src/place/shipped.store.ts';
 import { briefBody, noCodingStyle, pluginOf, renderedFlags, renderedPrompt, rendersAgent, unrendered } from '../src/agents/agents.ts';
+import { PRECEDENCE } from '../src/brief/index.ts';
 import { scratch } from './scratch.ts';
 import { promised } from './promised.ts';
 import { testPlace } from '../place/memory/index.ts';
@@ -93,6 +94,17 @@ const team = (agent: string, files: Record<string, string>, step = "---\nagent: 
     'workflows',
     'team',
   );
+
+/**
+ * The heading each layer Nemia composes is told under, as a session reads it: its number in the doctrine's precedence order and the owner
+ * whose words follow. Written out here, not read from the code, so a heading reworded fails the assertions that quote it.
+ */
+const HEAD = {
+  instructions: "## 1. Instructions — your role's own words",
+  custom: '## 2. Custom instructions — the person who hired you',
+  factory: "## 4. The factory's rules — every step of this factory",
+  policy: "## 5. The step's policy — this step of this process",
+} as const;
 
 test("an agent gives skills by name and says what becomes of Claude Code's prompt, each its own line, read and written back", () => {
   const a = parseAgent(
@@ -270,7 +282,7 @@ test('REFUSED at shipped defaults: a codex agent with skills or a harness prompt
     false,
     'a codex agent that says only `keep`, or nothing, is not rendered: its instructions are in the brief',
   );
-  assert.match(briefBody(codex), /^You build\./);
+  assert.ok(briefBody(codex).startsWith(`${HEAD.instructions}\n\nYou build.`), briefBody(codex));
 });
 
 test('REFUSED at shipped defaults: skills or a harness prompt on a step that continues another session, which keeps its own (F13)', () => {
@@ -291,7 +303,7 @@ test('REFUSED at shipped defaults: skills or a harness prompt on a step that con
     ),
   ).find((s) => s.name === 'build')!;
   assert.equal(rendersAgent(told), false, 'instructions alone are told in the brief of a step that resumes');
-  assert.match(briefBody(told), /^You build\.[\s\S]*And go on\./);
+  assert.equal(briefBody(told), `${HEAD.instructions}\n\nYou build.\n\n${HEAD.policy}\n\nAnd go on.`);
 });
 
 test("REFUSED at shipped defaults: `auto` on a model Claude Code drops it on (F21) — the runtime's default mode or written — and let through where it is kept", () => {
@@ -505,9 +517,26 @@ test('the prompt is the instructions, then each skill by its namespaced name, th
   });
   assert.equal(
     renderedPrompt(step, [{ name: 'write-a-note' }, { name: 'review-a-change', whole: 'Read the diff.\n' }]),
-    'You build.\n\nYour skills, each loaded with the Skill tool by its name when you need it: `nemia-builder:write-a-note`.\n\n## Skill `nemia-builder:review-a-change`\n\nRead the diff.\n',
+    `${HEAD.instructions}\n\nYou build.\n\nYour skills, each loaded with the Skill tool by its name when you need it: \`nemia-builder:write-a-note\`.\n\n## Skill \`nemia-builder:review-a-change\`\n\nRead the diff.\n`,
   );
   assert.match(noCodingStyle('builder'), /^---\nname: no-coding\n[\s\S]*keep-coding-instructions: false\n---\n/);
+});
+
+test("the prompt heads each layer it composes with that layer's number and its owner, and the step's policy is none of them", () => {
+  const step = resolved('---\n---\nYou build.\n');
+  const told = { ...step, agent: { ...step.agent!, customInstructions: 'Be terse.', factoryRules: 'Never push on a Friday.' } };
+  assert.equal(
+    renderedPrompt(told, []),
+    `${HEAD.instructions}\n\nYou build.\n\n${HEAD.custom}\n\nBe terse.\n\n${HEAD.factory}\n\nNever push on a Friday.\n`,
+    'each layer under its own heading, in the order the session reads them',
+  );
+  const { factoryRules: _r, ...noRules } = told.agent;
+  assert.equal(
+    renderedPrompt({ ...told, agent: noRules }, []),
+    `${HEAD.instructions}\n\nYou build.\n\n${HEAD.custom}\n\nBe terse.\n`,
+    'a layer the run froze none of is left out, heading and all',
+  );
+  assert.ok(!renderedPrompt(told, []).includes(HEAD.policy), "the step's policy heads its brief, and is never in the prompt");
 });
 
 test("the flags: the prompt appended by default and for no-coding, in place of Claude Code's for own; the plugin for skills or a style; the style by its namespaced name; each named skill's bare copy off", () => {
@@ -559,7 +588,7 @@ test('a rendered step is briefed with its own note alone, and one whose folder i
   assert.equal(briefBody(step).trim(), "The step's own note.");
   const before = unrendered(step);
   assert.equal(rendersAgent(before), false);
-  assert.match(briefBody(before), /^You build\.\n[\s\S]*The step's own note\./);
+  assert.equal(briefBody(before), `${HEAD.instructions}\n\nYou build.\n\n${HEAD.policy}\n\nThe step's own note.`);
   assert.equal(renderedFlags(before, '/x'), undefined);
 });
 
@@ -593,7 +622,7 @@ test("nemia start renders each Claude Code step's agent under runs/<id>/agents/<
   const at = agentFilesDir(run, 'write');
   assert.equal(
     fs.readFileSync(path.join(at, 'prompt.md'), 'utf8'),
-    'You write notes.\n\nYour skills, each loaded with the Skill tool by its name when you need it: `nemia-scribe:write-a-note`.\n\n## Skill `nemia-scribe:mind-the-tone`\n\nHow to mind the tone.\n',
+    `${HEAD.instructions}\n\nYou write notes.\n\nYour skills, each loaded with the Skill tool by its name when you need it: \`nemia-scribe:write-a-note\`.\n\n## Skill \`nemia-scribe:mind-the-tone\`\n\nHow to mind the tone.\n`,
   );
   assert.equal(
     fs.readFileSync(path.join(at, 'nemia-scribe', 'skills', 'write-a-note', 'SKILL.md'), 'utf8'),
@@ -625,7 +654,10 @@ test("nemia start renders each Claude Code step's agent under runs/<id>/agents/<
     pluginDir: [path.join(at, 'nemia-scribe')],
     settings: JSON.stringify({ outputStyle: 'nemia-scribe:no-coding', skillOverrides: { 'write-a-note': 'off', 'mind-the-tone': 'off' } }),
   });
-  assert.match(write.brief, /^Write about tides\.\n/, "the step's own note first");
+  assert.ok(
+    write.brief.startsWith(`${PRECEDENCE}\n\nWrite about tides.\n`),
+    "the precedence, then the step's own note: the layers above it are in Claude Code's prompt",
+  );
   assert.doesNotMatch(write.brief, /You write notes/, "the instructions are in Claude Code's prompt, not the brief");
 });
 
@@ -636,7 +668,7 @@ test('a codex step is filed as before: its instructions in its brief, and no Cla
   await runWith(e, advanceRun(readRun(run.id)));
   const code = filed.get(`${run.id}-code`)!;
   assert.equal(code.config?.claude, undefined);
-  assert.match(code.brief, /^You write code\.\n\nCode it\./);
+  assert.ok(code.brief.startsWith(`${PRECEDENCE}\n\n${HEAD.instructions}\n\nYou write code.\n\n${HEAD.policy}\n\nCode it.`), code.brief);
 });
 
 test('a rendered step whose folder is gone is filed as before 2026-09-25 — the instructions in its brief, no flag naming a file that is not there — and told its skills whole', async () => {
@@ -647,7 +679,10 @@ test('a rendered step whose folder is gone is filed as before 2026-09-25 — the
   await runWith(e, advanceRun(readRun(run.id)));
   const write = filed.get(`${run.id}-write`)!;
   assert.equal(write.config?.claude, undefined);
-  assert.match(write.brief, /^You write notes\.\n\nWrite about tides\./);
+  assert.ok(
+    write.brief.startsWith(`${PRECEDENCE}\n\n${HEAD.instructions}\n\nYou write notes.\n\n${HEAD.policy}\n\nWrite about tides.`),
+    write.brief,
+  );
   assert.match(
     write.brief,
     /Write about tides\.\n\nNo skill is loaded with the Skill tool for this step[^\n]*\n\n## Skill `write-a-note`\n\nHow to write a note\./,
@@ -680,7 +715,10 @@ test('a rendered step whose plugin is under another name, as a start before the 
   await runWith(e, advanceRun(readRun(run.id)));
   const write = filed.get(`${run.id}-write`)!;
   assert.equal(write.config?.claude, undefined, 'no flag naming a plugin that is not there');
-  assert.match(write.brief, /^You write notes\.\n\nWrite about tides\./);
+  assert.ok(
+    write.brief.startsWith(`${PRECEDENCE}\n\n${HEAD.instructions}\n\nYou write notes.\n\n${HEAD.policy}\n\nWrite about tides.`),
+    write.brief,
+  );
   assert.match(write.brief, /\n## Skill `write-a-note`\n\nHow to write a note\./, 'and its skills told whole');
   const plain = filed.get(`${run.id}-plain`)!;
   assert.deepEqual(plain.config?.claude, { appendSystemPromptFile: path.join(agentFilesDir(run, 'plain'), 'prompt.md') });

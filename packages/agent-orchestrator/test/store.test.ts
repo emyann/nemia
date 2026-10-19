@@ -42,6 +42,7 @@ import { testPlace } from '../place/memory/index.ts';
 import type { PlaceService } from '../src/place/place.store.ts';
 import type { PlaceOutcome } from '../src/place/place.ts';
 import { placeOver, unreadBy } from './place-over.ts';
+import { PRECEDENCE } from '../src/brief/index.ts';
 
 const ROOT = scratch('wf-store-');
 const WORKFLOW = path.join(ROOT, 'workflow');
@@ -1590,7 +1591,7 @@ test('implement ⇄ review: `again: true` files round 2 — implement continued 
   await toReview(b, run.id, 2, false);
   const review2 = b.tasks.get(`${run.id}-review-try2`)!.spec;
   assert.equal(review2.resumeFrom, undefined, 'the reviewer is a new session each round');
-  assert.match(review2.brief, /^review it\n\n## What was asked for\n\nadd a flag/);
+  assert.ok(review2.brief.startsWith(`${PRECEDENCE}\n\nreview it\n\n## What was asked for\n\nadd a flag`), review2.brief);
   assert.deepEqual(dataUnder(review2.brief, '## Replies from implement'), { replies: REPLIES });
   assert.doesNotMatch(review2.brief, /IMPLEMENTER-SUMMARY|REVIEWER-SUMMARY/);
 
@@ -5561,17 +5562,19 @@ test("`nemia rm`'s refusal is its program's typed failure; anything else is a de
   assert.ok(under('runs', `${run.id}.json`), 'nothing removed');
 });
 
-test("`nemia rm`'s program says in its type what it needs and what it refuses: the engine, and a refusal", async () => {
+/**
+ * `nemia rm`'s program says in its type what it needs and what it refuses: the engine, and a refusal. Nothing calls this: the
+ * typecheck reads its lines, and an `@ts-expect-error` over code that stops erring is the failure.
+ */
+async function _rmProgramTypes() {
   const { Effect } = await import('effect');
   const { forgetRun } = await import('../src/forget/forget.verb.ts');
-  const typed: EffectOf<Forgot, Refusal, EngineService | PlaceService> = forgetRun('x', {});
+  void (forgetRun('x', {}) satisfies EffectOf<Forgot, Refusal, EngineService | PlaceService>);
   // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
-  const infallible: EffectOf<Forgot, never, EngineService> = forgetRun('x', {});
-  const unprovided = () =>
-    // @ts-expect-error -- forgetRun requires EngineService, and runPromise takes no requirement
-    Effect.runPromise(forgetRun('x', {}));
-  assert.deepEqual([typeof typed, typeof infallible, typeof unprovided], ['object', 'object', 'function']);
-});
+  void (forgetRun('x', {}) satisfies EffectOf<Forgot, never, EngineService>);
+  // @ts-expect-error -- forgetRun requires EngineService, and runPromise takes no requirement
+  void Effect.runPromise(forgetRun('x', {}));
+}
 
 /**
  * The programs of what a person asks of a run, and a runner of one over `e` as its plain face runs it: given the engine as a service.
@@ -5810,17 +5813,21 @@ test('`nemia cancel` asks the engine to stop before it marks the run: a stop the
   assert.ok((await runWith(b.e, cancelRun(run.id))).run.cancelledAt, 'asked again, it stops and marks');
 });
 
-test('the programs of what a person asks of a run say in their types what they need and what they refuse: the engine, the place where they ask it, and a refusal', async () => {
+/**
+ * The programs of what a person asks of a run say in their types what they need and what they refuse: the engine, the place where they
+ * ask it, and a refusal. Nothing calls this: the typecheck reads its lines.
+ */
+async function _verbProgramTypes() {
   const v = await verbPrograms();
-  const typed: Array<EffectOf<unknown, Refusal, EngineService | PlaceService>> = [
+  void ([
     v.roundRun('x') satisfies EffectOf<RoundAsked, Refusal, EngineService>,
     v.acceptRun('x') satisfies EffectOf<Accepted, Refusal, EngineService>,
     v.retryRun('x', 'y', { mode: 'fresh' }) satisfies EffectOf<Asked, Refusal, EngineService | PlaceService>,
     v.approveRun('x', 'y') satisfies EffectOf<Approved, Refusal, EngineService | PlaceService>,
     v.sayRun('x', 'y', 'z') satisfies EffectOf<Told, Refusal, EngineService>,
     v.cancelRun('x') satisfies EffectOf<Cancelled, Refusal, EngineService>,
-  ];
-  const infallible = [
+  ] satisfies Array<EffectOf<unknown, Refusal, EngineService | PlaceService>>);
+  void [
     // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
     v.roundRun('x') satisfies EffectOf<RoundAsked, never, EngineService>,
     // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
@@ -5834,7 +5841,7 @@ test('the programs of what a person asks of a run say in their types what they n
     // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
     v.cancelRun('x') satisfies EffectOf<Cancelled, never, EngineService>,
   ];
-  const unprovided = () => [
+  void [
     // @ts-expect-error -- roundRun requires EngineService, and runPromise takes no requirement
     v.Effect.runPromise(v.roundRun('x')),
     // @ts-expect-error -- acceptRun requires EngineService, and runPromise takes no requirement
@@ -5848,8 +5855,7 @@ test('the programs of what a person asks of a run say in their types what they n
     // @ts-expect-error -- cancelRun requires EngineService, and runPromise takes no requirement
     v.Effect.runPromise(v.cancelRun('x')),
   ];
-  assert.deepEqual([typed.length, infallible.length, typeof unprovided], [6, 6, 'function']);
-});
+}
 
 /**
  * The views' programs, a runner of one over `e` as its plain face runs it, and an engine over `e` whose feed says `entries`. Imported at
@@ -6018,11 +6024,15 @@ test('a parent whose frozen steps cannot be read has not shipped: its views prog
   assert.deepEqual(asked, [], 'no branch of it asked');
 });
 
-test("the views' programs say in their types what they need and what they refuse: the engine, and a refusal", async () => {
+/**
+ * The views' programs say in their types what they need and what they refuse: the engine, and a refusal. Nothing calls this: the
+ * typecheck reads its lines.
+ */
+async function _viewProgramTypes() {
   const v = await viewPrograms();
   const run = aRun('x', {});
   const failed = (): TaskPhase => 'failed';
-  const typed: Array<EffectOf<unknown, Refusal, EngineService>> = [
+  void ([
     v.taskPhasesRead(run) satisfies EffectOf<
       { views: Map<string, TaskView>; phaseOf: (taskId: string) => TaskPhase },
       Refusal,
@@ -6033,16 +6043,16 @@ test("the views' programs say in their types what they need and what they refuse
     v.parentRead('x', v.nothingRead()) satisfies EffectOf<ParentRun, Refusal, EngineService>,
     v.parentsRead(run, v.nothingRead()) satisfies EffectOf<(id: string) => ParentRun, Refusal, EngineService>,
     v.filingsRead() satisfies EffectOf<{ filed: Map<string, string>; cursor: number }, Refusal, EngineService>,
-  ];
-  const infallible = [
+  ] satisfies Array<EffectOf<unknown, Refusal, EngineService>>);
+  void [
     // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
     v.parentRead('x', v.nothingRead()) satisfies EffectOf<ParentRun, never, EngineService>,
   ];
-  const cannotFail = [
+  void [
     v.taskPhasesRead(run) satisfies EffectOf<unknown, never, EngineService>,
     v.filingsRead() satisfies EffectOf<unknown, never, EngineService>,
   ];
-  const unprovided = () => [
+  void [
     // @ts-expect-error -- taskPhasesRead requires EngineService, and runPromise takes no requirement
     v.Effect.runPromise(v.taskPhasesRead(run)),
     // @ts-expect-error -- parentRead requires EngineService, and runPromise takes no requirement
@@ -6050,8 +6060,7 @@ test("the views' programs say in their types what they need and what they refuse
     // @ts-expect-error -- filingsRead requires EngineService, and runPromise takes no requirement
     v.Effect.runPromise(v.filingsRead()),
   ];
-  assert.deepEqual([typed.length, infallible.length, cannotFail.length, typeof unprovided], [6, 1, 2, 'function']);
-});
+}
 
 /** The start program, its face, and what a test of either reads. Imported at the call, as `WF_ROOT` is read when the store loads. */
 const startProgram = async () => {
@@ -6211,15 +6220,17 @@ test(
   },
 );
 
-test('the start program says in its type that it refuses and asks the place: a run, a refusal, and no run without a place given', async () => {
+/**
+ * The start program says in its type that it refuses and asks the place: a run, a refusal, and no run without a place given. The
+ * typecheck reads its lines, and nothing calls this.
+ */
+async function _startProgramTypes() {
   const s = await startProgram();
   const opts = { brief: 'x', repo: ROOT, workflowDir: WORKFLOW };
-  const typed = s.startRun(opts) satisfies EffectOf<Run, Refusal, PlaceService>;
+  void (s.startRun(opts) satisfies EffectOf<Run, Refusal, PlaceService>);
   // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
-  const infallible = s.startRun(opts) satisfies EffectOf<Run, never, PlaceService>;
-  const unplaced = () =>
-    // @ts-expect-error -- a program that asks the place is given none, and runSync takes no requirement
-    s.Effect.runSync(s.startRun(opts));
-  const provided = () => s.Effect.runSync(placed(s.startRun(opts))) satisfies Run;
-  assert.deepEqual([typeof typed, typeof infallible, typeof unplaced, typeof provided], ['object', 'object', 'function', 'function']);
-});
+  void (s.startRun(opts) satisfies EffectOf<Run, never, PlaceService>);
+  // @ts-expect-error -- a program that asks the place is given none, and runSync takes no requirement
+  void s.Effect.runSync(s.startRun(opts));
+  void (s.Effect.runSync(placed(s.startRun(opts))) satisfies Run);
+}

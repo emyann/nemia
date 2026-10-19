@@ -1,8 +1,12 @@
 /**
- * A step's conversation is read once a request on the api, never again on a timer: a session is pushed by the runtime as it is
- * written, or the stream says it is not and ends. `rereads` names what in a source of `src/steps/` reads again — a timer (a sleep,
- * `setInterval`, `setTimeout`, an Effect `Schedule`), or a loop whose body calls `readTranscript` — and these tests hold the folder's
- * sources to none, and refuse the stream's old beat as it was written.
+ * A step's conversation is read again on the api in one place and for one reason: where no live stream of it can be had — its harness
+ * does not push the session, or the upstream failed — the stream's `readAgain` reads it from the cursor every `STEP_BEAT_MS` for as long
+ * as a reader is there. Everywhere else it is read once a request: a session the runtime pushes is relayed as it is written, and is never
+ * put on a timer.
+ *
+ * `timers` names what in a source of `src/steps/` reads again on its own — a sleep, `setInterval`, `setTimeout`, an Effect `Schedule` —
+ * and `loopsAround` counts the loops whose body calls a function. These tests hold the folder to the one beat and no other, and refuse a
+ * second one.
  */
 import '../../test/harness.ts';
 import { test } from 'node:test';
@@ -35,51 +39,56 @@ const loopBodies = (text: string): string[] =>
     return text[start] === '{' ? text.slice(start, closing(text, start, '{', '}')) : text.slice(start, text.indexOf(';', start) + 1);
   });
 
-/** What in the source `text` reads a step's conversation again: each timer it starts, and each loop around `readTranscript`. */
-const rereads = (text: string): string[] => [
-  ...TIMERS.filter(([pattern]) => pattern.test(text)).map(([, what]) => what),
-  ...loopBodies(text)
-    .filter((body) => /\breadTranscript\s*\(/.test(body))
-    .map(() => 'a loop around readTranscript'),
-];
+/** What in the source `text` reads again on its own: each timer it starts, named. */
+const timers = (text: string): string[] => TIMERS.filter(([pattern]) => pattern.test(text)).map(([, what]) => what);
+
+/** How many loops of `text` call `name` in their body. */
+const loopsAround = (text: string, name: string): number =>
+  loopBodies(text).filter((body) => new RegExp(`\\b${name}\\s*\\(`).test(body)).length;
+
+/** The body of the function `name` declared in `text`: from its head to the bracket that closes it. */
+const bodyOf = (text: string, name: string): string => {
+  const at = text.indexOf(`function ${name}(`);
+  assert.notEqual(at, -1, `${name}: the function this guard is about`);
+  const block = text.indexOf('{', closing(text, text.indexOf('(', at), '(', ')'));
+  return text.slice(block, closing(text, block, '{', '}'));
+};
 
 const STEPS = import.meta.dirname;
 const sources = fs.readdirSync(STEPS).filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'));
+const routes = fs.readFileSync(path.join(STEPS, 'steps.ts'), 'utf8');
 
-test("the api's step routes read a step's conversation once a request: no timer, and no loop around `readTranscript`", () => {
-  const routes = fs.readFileSync(path.join(STEPS, 'steps.ts'), 'utf8');
+test("a step's conversation is read again in one place alone: `readAgain`, the beat the stream falls back to", () => {
   assert.match(routes, /async function readTranscript\s*\(/, 'the one read of a conversation this guard is about');
   assert.ok(sources.includes('steps.ts') && sources.length > 1);
-  for (const file of sources) assert.deepEqual(rereads(fs.readFileSync(path.join(STEPS, file), 'utf8')), [], file);
-});
-
-test('REFUSED: the old beat, a loop that sleeps and reads the conversation again, by its sleep and its loop', () => {
-  const beat = `async function beat(stream, e, id, step, taskId, from) {
-  let read = from;
-  await send(stream, read);
-  while (read.live) {
-    await stream.sleep(STREAM_EVERY_MS);
-    if (stream.aborted) return;
-    try {
-      read = await readTranscript(e, id, step, taskId, read.cursor);
-    } catch (err) {
-      continue;
-    }
-    await send(stream, read);
+  assert.equal(loopsAround(routes, 'readTranscript'), 1, 'one loop around the read, and no second beat beside it');
+  assert.equal(loopsAround(bodyOf(routes, 'readAgain'), 'readTranscript'), 1, 'and that loop is the beat');
+  for (const file of sources.filter((f) => f !== 'steps.ts')) {
+    assert.equal(loopsAround(fs.readFileSync(path.join(STEPS, file), 'utf8'), 'readTranscript'), 0, file);
   }
-}`;
-  assert.deepEqual(rereads(beat), ['a sleep', 'a loop around readTranscript']);
 });
 
-test('REFUSED: a loop around `readTranscript` with no timer, a timer of any kind, and a loop of one statement', () => {
-  assert.deepEqual(rereads('for (;;) {\n  read = await readTranscript(e, id, step, taskId, read.cursor);\n}'), [
-    'a loop around readTranscript',
-  ]);
-  assert.deepEqual(rereads('while (live) read = await readTranscript(e, id, step, taskId, read.cursor);'), [
-    'a loop around readTranscript',
-  ]);
-  assert.deepEqual(rereads('const t = setInterval(() => readTranscript(e, id, step, taskId), 1_000);'), ['setInterval']);
-  assert.deepEqual(rereads('setTimeout(again, 1_000);'), ['setTimeout']);
-  assert.deepEqual(rereads('Effect.repeat(read, Schedule.spaced("1 second"))'), ['an Effect Schedule']);
-  assert.deepEqual(rereads('for (const event of read.events) await stream.writeSSE(event);'), [], 'a loop that reads nothing again');
+test('the beat is the folder’s one timer, and it waits `STEP_BEAT_MS`', () => {
+  assert.match(routes, /export const STEP_BEAT_MS = /, 'the beat is a constant of its own, read by the test that crosses it');
+  for (const file of sources) {
+    const text = fs.readFileSync(path.join(STEPS, file), 'utf8');
+    assert.deepEqual(timers(text), file === 'steps.ts' ? ['a sleep'] : [], `${file}: no timer but the beat's own sleep`);
+  }
+  const sleeps = [...routes.matchAll(/\.sleep\s*\(([^)]*)\)/g)].map((m) => m[1]);
+  assert.deepEqual(sleeps, ['STEP_BEAT_MS', 'STEP_BEAT_MS'], 'each wait of the beat is that long, and nothing waits for another reason');
+});
+
+test('REFUSED: a second beat — a loop around `readTranscript` beside the one — and a timer of any kind', () => {
+  const twice = `${bodyOf(routes, 'readAgain')}\nwhile (live) read = await readTranscript(e, place, id, step, taskId, read.cursor);`;
+  assert.equal(loopsAround(twice, 'readTranscript'), 2, 'a second loop around the read is seen, wherever it is written');
+  assert.equal(loopsAround('for (;;) {\n  read = await readTranscript(e, id, step, taskId, read.cursor);\n}', 'readTranscript'), 1);
+  assert.equal(
+    loopsAround('for (const event of read.events) await stream.writeSSE(event);', 'readTranscript'),
+    0,
+    'a loop that reads nothing again',
+  );
+  assert.deepEqual(timers('const t = setInterval(() => readTranscript(e, id, step, taskId), 1_000);'), ['setInterval']);
+  assert.deepEqual(timers('setTimeout(again, 1_000);'), ['setTimeout']);
+  assert.deepEqual(timers('Effect.repeat(read, Schedule.spaced("1 second"))'), ['an Effect Schedule']);
+  assert.deepEqual(timers('await stream.sleep(STEP_BEAT_MS);'), ['a sleep']);
 });

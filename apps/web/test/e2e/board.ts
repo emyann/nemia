@@ -645,6 +645,25 @@ export function herChat(what: HerChat): () => void {
 }
 
 /**
+ * Her chat made unreadable where it stands: a line the chat's record does not decode, written on the person's outbox, which every read
+ * of her chat refuses (`decoded` in the orchestrator's `chat/chat.store.ts`) while it is there. The api's chat stream then says
+ * `unreadable` with `retrying` on its next beat (`CHAT_BEAT_MS`) and goes on reading, which is what her panel draws as a quiet band.
+ *
+ * Answers what puts it back — the file as it was, or gone where there was none — so the read works on the beat after and the band goes.
+ * Called between `herChat` and its take-back, whose removal of her folder would take the file too.
+ */
+export function herChatUnreadable(): () => void {
+  const file = path.join(store!, 'nemia', 'chat', 'outbox.jsonl');
+  const held = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : undefined;
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, `${held ?? ''}{"id":"half-written"}\n`);
+  return () => {
+    if (held === undefined) fs.rmSync(file, { force: true });
+    else fs.writeFileSync(file, held);
+  };
+}
+
+/**
  * Her turn over, as Claude Code lists it once a turn of a session it holds has ended: her row rewritten to the one the engine reads
  * `input-required` (`WAITING`), so her presence says she is no longer answering. Taken back with the rest by `herChat`'s take-back,
  * which writes the registry as the seed left it.

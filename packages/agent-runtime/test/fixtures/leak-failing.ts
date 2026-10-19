@@ -10,7 +10,7 @@ import path from 'node:path';
 import { Effect } from 'effect';
 import { detachedOps, type HarnessSpec } from '../../src/harness/detached/detached.ts';
 import { scratch } from '../scratch.ts';
-import { until, WAITED, type Waiter } from '../waits.ts';
+import { until, WAITED, type Waiter } from '../../src/waits/index.ts';
 
 const started = (t: Waiter, file: string) => until(t, () => fs.existsSync(file), `started: ${file}`, { everyMs: 25 });
 

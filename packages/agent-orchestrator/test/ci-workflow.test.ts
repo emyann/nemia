@@ -954,8 +954,6 @@ test('REFUSED: no scan job, a download unpinned or unchecked, a scan without its
       `nothing else is. It is the only thing that proves what ${SCAN_CONFIG} allows, since a configuration's meaning is not in its text`,
   ]);
 
-  // The form the quick run's draft of this card shipped, verbatim: the operator's run of 2026-10-19 measured it allowing every finding
-  // in that file, the two planted GitHub tokens included, where the scoped form leaves the planted ones and allows the stubs alone.
   const global = [
     '[extend]',
     'useDefault = true',
@@ -966,11 +964,16 @@ test('REFUSED: no scan job, a download unpinned or unchecked, a scan without its
     "regexes = ['^tok-[0-9a-f]{4}-SECRET-[0-9a-f]{4}$', '^key-[0-9a-f]{4}-SECRET$']",
     '',
   ].join('\n');
-  assert.deepEqual(allowDrift(global, stubs), [
-    `${SCAN_CONFIG} holds a top-level [[allowlists]]: a global allowlist's paths entry skips the whole file whatever its condition, so ` +
-      `every secret in ${STUBS} is allowed and a real one pasted in beside the stubs goes through. Nest it instead as ` +
-      '[[rules.allowlists]] under a [[rules]] block carrying id = "generic-api-key", which scopes it to that one rule',
-  ]);
+  assert.deepEqual(
+    allowDrift(global, stubs),
+    [
+      `${SCAN_CONFIG} holds a top-level [[allowlists]]: a global allowlist's paths entry skips the whole file whatever its condition, so ` +
+        `every secret in ${STUBS} is allowed and a real one pasted in beside the stubs goes through. Nest it instead as ` +
+        '[[rules.allowlists]] under a [[rules]] block carrying id = "generic-api-key", which scopes it to that one rule',
+    ],
+    'the form the quick run’s draft of this card shipped, verbatim: the operator’s own run of it measured every finding in that file ' +
+      'allowed, the two planted GitHub tokens included, where the scoped form leaves the planted ones and allows the stubs alone',
+  );
 
   const unnested = config.replace('[[rules]]\nid = "generic-api-key"\n\n', '');
   assert.notEqual(unnested, config, 'the allowlist is nested under its rule today');
@@ -979,9 +982,13 @@ test('REFUSED: no scan job, a download unpinned or unchecked, a scan without its
       'way, or the allowlist is global and skips every secret in the file its paths names rather than the two shapes it lists',
   ]);
 
-  // The key goes on the rule block itself, not into the comment above it, which names the form in prose.
   const replaced = config.replace('\nid = "generic-api-key"\n', '\nid = "generic-api-key"\nregex = \'(?i)api[_-]?key\'\n');
-  assert.notEqual(replaced, config, 'the rule block carries its id and nothing else today');
+  assert.notEqual(
+    replaced,
+    config,
+    'the rule block carries its id and nothing else today, and the key goes on the block itself rather than into the comment above it, ' +
+      'which names the form in prose',
+  );
   assert.deepEqual(allowDrift(replaced, stubs), [
     `${SCAN_CONFIG}'s [[rules]] block carries regex beside its id: gitleaks appends an allowlist array but replaces every other ` +
       'attribute of a rule, so the default generic-api-key rule becomes one that detects nothing and the scan goes blind to every ' +

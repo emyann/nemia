@@ -111,10 +111,14 @@ test('REFUSED: a path with no owner, a manifest line anchored to the root, a pat
     );
   }
 
-  // The form the person rejected: it owns the root's manifest alone, and leaves every workspace's unowned. A clause that stripped the
-  // leading `/` before comparing — as the first draft of this file did — reads it as the chosen line and passes it.
   const anchored = text.replace('\npackage.json @emyann', '\n/package.json @emyann');
-  assert.notEqual(anchored, text, 'the shipped manifest line carries no leading slash today');
+  assert.notEqual(
+    anchored,
+    text,
+    'the shipped manifest line carries no leading slash today, and the anchored form below is the one the person rejected: it owns the ' +
+      'root’s manifest alone and leaves every workspace’s unowned, which a clause that stripped the leading `/` before comparing — as ' +
+      'the first draft of this file did — reads as the chosen line and passes',
+  );
   assert.deepEqual(ownerDrift(anchored), [
     `${OWNERS} owns no package.json: write the line \`package.json ${OWNER}\`, with no leading \`/\` so it reaches every workspace's own and not the root's alone, or a pull request that edits it weakens the check that reads it without the owner's review`,
   ]);

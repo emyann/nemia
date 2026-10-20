@@ -14,7 +14,8 @@
  * (`apps/web/test/look.test.ts`), and its test of a merge reads the root's `CLAUDE.md` and `.gitattributes`
  * (`apps/web/test/e2e-merge.test.ts`), so the web's test lists all three.
  * The CI guard here reads the repository's Actions workflow and the secret scan's allowlist (`ci-workflow.test.ts`), so this package's
- * test lists `.github/` and `.gitleaks.toml` too; `CODEOWNERS` is under `.github/` (`repo-guards.test.ts`).
+ * test lists `.github/` and `.gitleaks.toml` too. `repo-guards.test.ts` reads `CODEOWNERS`, which is under `.github/`, and the two
+ * packages' manifests, which `$TURBO_ROOT$/packages/agent-runtime/**` and this package's own files already cover.
  * `INPUTS` names, for each such task, the globs it must list beside its own files; `missingInputs` refuses a task or a glob left out.
  */
 import { test } from 'node:test';

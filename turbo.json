@@ -17,6 +17,7 @@
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/.oxlintrc.json",
         "$TURBO_ROOT$/.github/**",
+        "$TURBO_ROOT$/.gitleaks.toml",
         "$TURBO_ROOT$/lint/**",
         "$TURBO_ROOT$/tools/**",
         "$TURBO_ROOT$/apps/*/src/**",

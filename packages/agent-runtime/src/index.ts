@@ -103,6 +103,11 @@ export type { HarnessSpec } from './harness/detached/detached.ts';
 export { remoteOps } from './a2a/index.ts';
 export type { Credentials, MissingCredential, RemoteAgent } from './a2a/index.ts';
 /**
+ * What a holder serves on its own port, as `hold()` answers it (`Served`), and the holder a viewer's engine is given by its
+ * served card (`HolderAgent`, `EngineOptions.holder`).
+ */
+export type { Served, HolderAgent } from './a2a/index.ts';
+/**
  * Why a remote agent's entry is not one the runtime can reach, or `undefined`: what `Engine.layer` refuses, for a caller that reads entries
  * from a file of its own and words the refusal there.
  */

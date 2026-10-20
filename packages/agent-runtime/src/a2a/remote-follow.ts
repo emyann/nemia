@@ -77,7 +77,7 @@ const inDoubt = (d: FollowDeps, name: string) =>
  * `answers` whose `return` aborts `stop` before it asks the stream to end: an async generator's `return` waits behind the `next`
  * still pending, which a silent subscription never settles until its request is aborted.
  */
-const abortedOnReturn = (answers: AsyncIterable<StreamResponse>, stop: AbortController): AsyncIterable<StreamResponse> => ({
+export const abortedOnReturn = (answers: AsyncIterable<StreamResponse>, stop: AbortController): AsyncIterable<StreamResponse> => ({
   [Symbol.asyncIterator]: () => {
     const it = answers[Symbol.asyncIterator]();
     return {

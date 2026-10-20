@@ -7,8 +7,9 @@
  * `artifactUpdate` of an artifact of its own, named `partial`, under the block's key: its text a text part, `append` and
  * `lastChunk` as the piece says.
  */
-import { Stream } from 'effect';
+import { Effect, Stream } from 'effect';
 import type { Part, StreamResponse, SubscribeToTaskRequest } from '@a2a-js/sdk';
+import type { ServerCallContext } from '@a2a-js/sdk/server';
 import { UnsupportedOperationError } from '@a2a-js/sdk/errors';
 import { isLive, phaseWordOf, type SessionState } from '../core/index.ts';
 import { RunnerError, type Followed, type RunnerOps } from '../harness/index.ts';
@@ -16,6 +17,29 @@ import { nameOf, sightingOf, stateOf, taskOfSighting } from './map.ts';
 
 const TRANSCRIPT = 'transcript';
 const PARTIAL = 'partial';
+
+/**
+ * The key a transport leaves the signal of a follower that went away under, on the call's own state
+ * (`ServerCallContext.state`, where the SDK's own `STATE_HEADERS_KEY` sits): a holder's port aborts it as its socket closes
+ * (`a2a/listener.ts`).
+ */
+export const STATE_GONE_KEY = 'ae/follower-gone';
+
+/** The signal of a follower that went away, where the call carries one; none on the in-process road, which has no socket. */
+export const goneOf = (context: ServerCallContext): AbortSignal | undefined => {
+  const gone = context.state.get(STATE_GONE_KEY);
+  return gone instanceof AbortSignal ? gone : undefined;
+};
+
+/** `gone` as the effect that completes once it aborts: what a follow of a silent session is interrupted on. */
+const aborted = (gone: AbortSignal): Effect.Effect<void> =>
+  Effect.promise(
+    () =>
+      new Promise<void>((resolve) => {
+        if (gone.aborted) return resolve();
+        gone.addEventListener('abort', () => resolve(), { once: true });
+      }),
+  );
 
 /** An update of the artifact `artifactId`, named `name`, of the Task `taskId`: its one part, and whether it adds to the last. */
 const artifactUpdate = (
@@ -86,15 +110,21 @@ export const followedOf = (r: StreamResponse): Followed[] => {
  * the session is over. Refused (`UnsupportedOperationError`) where the driver does not follow sessions and on a Task in a terminal
  * state, which has nothing more to say: its transcript is read instead (`sessionTranscript`). The driver's own failure is thrown as
  * it failed, a `RunnerError`, for the handler to word.
+ *
+ * `gone`, where the call carries one, ends the follow as the follower goes away: the stream is interrupted, so a session that says
+ * nothing lets go at once. Asking this generator to return cannot do it — a `return` waits behind the `next` already pending, and a
+ * silent follow never settles one — so the driver's work would run on for the session's life with nobody reading it.
  */
 export async function* subscription(
   harness: string,
   ops: RunnerOps,
   params: SubscribeToTaskRequest,
+  gone?: AbortSignal,
 ): AsyncGenerator<StreamResponse, void, undefined> {
   if (!ops.follow) throw new UnsupportedOperationError('this agent does not stream: poll getTask.');
+  const followed = gone === undefined ? ops.follow(params.id) : ops.follow(params.id).pipe(Stream.interruptWhen(aborted(gone)));
   let first = true;
-  for await (const m of Stream.toAsyncIterable(ops.follow(params.id))) {
+  for await (const m of Stream.toAsyncIterable(followed)) {
     if (!first) {
       yield responseOf(params.id, m);
       continue;

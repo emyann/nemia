@@ -1,18 +1,7 @@
-/** The harnesses an engine runs when its options name none, and what they refuse of a task's configuration. */
-import { claudeDetached } from '../harness/claude/index.ts';
-import { codex } from '../harness/codex/codex.ts';
-import { commandHarness } from '../harness/command/command.ts';
+/** What the harnesses an engine runs when its options name none (`default-harnesses.ts`) refuse of a task's configuration. */
 import { argsRefusalOf, type HarnessArgs } from '../harness/args.ts';
 import { harnessRefusalOf } from './harness-refusal.ts';
-import type { HarnessConfig } from './options.ts';
-
-/** The harnesses of an engine given none: Claude Code, Codex, `claude -p` on the detached worker, and a process. */
-export const DEFAULT_HARNESSES: Record<string, HarnessConfig> = {
-  claude: 'claude',
-  codex,
-  'claude-detached': claudeDetached,
-  command: commandHarness,
-};
+import { DEFAULT_HARNESSES } from './default-harnesses.ts';
 
 /**
  * Why a task filed on `harness` with `config` would be refused, in the runtime's words, or `undefined`: what `file()` of an engine given

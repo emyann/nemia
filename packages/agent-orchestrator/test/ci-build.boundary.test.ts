@@ -7,6 +7,10 @@
  * committed. Matching the step's text would prove nothing about its verdict: a `git diff --exit-code` and a `git diff --name-only` that
  * forgets to fail read alike to a pattern, and differ exactly where it matters — a stale file reported green on a landing nobody checked.
  *
+ * A generator writes a file as readily as it rewrites one, so the step is held over both: a tracked file whose bytes changed, and a file
+ * under a generated path that nobody has committed — which `git diff` alone does not see at all, and which is the shape a kit update
+ * takes.
+ *
  * Where the step is, and which paths it guards, is `ci-workflow.ts` (`staleStep`, `GENERATED`); the file's agreement with the repository
  * is held in `ci-workflow.test.ts`, which refuses a step that forgets one of those paths and a path this repository does not have.
  */
@@ -75,6 +79,13 @@ test('the build job refuses a generated file whose committed bytes are not its g
     assert.match(red.said, new RegExp(file.replaceAll('.', '\\.')), `the step names ${file}: ${red.said}`);
     assert.match(red.said, new RegExp(command.replaceAll(' ', '\\s')), `the step says to run \`${command}\`: ${red.said}`);
   }
+
+  const created = checkout();
+  fs.writeFileSync(path.join(created, 'apps/web/theme/theme-extra.css'), 'a file the generator writes and nobody committed\n');
+  const uncommitted = verdictOf(run, created);
+  assert.equal(uncommitted.status, 1, `a generated file nobody committed is as stale as one whose bytes changed: ${uncommitted.said}`);
+  assert.match(uncommitted.said, /theme-extra\.css/, `the step names the file the generator wrote: ${uncommitted.said}`);
+  assert.match(uncommitted.said, /npm\srun\stheme:generate/, `and the command that writes it: ${uncommitted.said}`);
 
   const both = checkout();
   dirty(both, ROUTE_TREE);

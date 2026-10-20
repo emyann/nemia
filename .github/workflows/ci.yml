@@ -178,7 +178,13 @@ jobs:
       - name: Refuse a stale generated file
         # Run, not read: ci-build.boundary.test.ts runs this very script in a scratch repository, since a git diff that forgets to fail
         # reads like one that does and differs exactly where a stale file would report green. The paths are GENERATED in ci-workflow.ts.
+        #
+        # add -N first: a generator writes a file as readily as it rewrites one, and git diff reports tracked paths alone, so a new
+        # apps/web/theme/*.css that nobody committed would be invisible to the diff and the step would pass over a path missing a file
+        # its generator writes. Intent-to-add puts such a file in the diff under its own name, which is what the message below prints,
+        # and it respects .gitignore, so nothing ignored can be mistaken for a stale file.
         run: |
+          git add -N -- apps/web/src/routeTree.gen.ts apps/web/theme/
           stale=$(git -c core.quotePath=false diff --name-only -- apps/web/src/routeTree.gen.ts apps/web/theme/)
           if [ -n "$stale" ]; then
             echo "ci: these generated files are not the bytes their generator writes:" >&2

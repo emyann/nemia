@@ -1,8 +1,8 @@
 /**
- * What a person and a step read in the git place's own words: the whole screens of `nemia ls` and `nemia decide`, with the branch git
- * names a new repository's first and the commands it offers, a line of `nemia ls` laid out after that branch, and the sentence a
- * fan-in is told of the paths its merge left in conflict. The test place says each in words of its own, so these keep the git place;
- * what the screens say of a run is walked in store.test.ts.
+ * What a person and a step read in the git place's own words: the whole screens of `nemia ls` and `nemia decide`, with the branch the
+ * repository each test makes is on (`master`, named by the fixture, never git's own default) and the commands it offers, a line of
+ * `nemia ls` laid out after that branch, and the sentence a fan-in is told of the paths its merge left in conflict. The test place says
+ * each in words of its own, so these keep the git place; what the screens say of a run is walked in store.test.ts.
  *
  * `WF_ROOT` is set before the runner is imported, since it is read as the module loads.
  */
@@ -36,12 +36,20 @@ const runWith = runOver(runEngine, gitPlaceLayer);
 const runPlaced = runGiven(gitPlaceLayer);
 const { readRun } = await import('../src/record/record.store.ts');
 
-/** A repository with one commit, so `nemia start` has a base to record. */
+/**
+ * A repository with one commit, so `nemia start` has a base to record. The screens below quote its branch by name, so the fixture
+ * names it — `-b master` — rather than take git's `init.defaultBranch`, which is a machine's and not this test's: unset on the
+ * owner's machine, `main` on a runner. It inits under a default of `main` on purpose, so the branch can only come from the `-b`:
+ * drop it and the file fails wherever it runs, rather than only where the machine disagrees.
+ */
 const aRepo = (): string => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const git = (...args: string[]) =>
-    execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: 'ignore' });
-  git('init', '-q');
+    execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'init.defaultBranch=main', ...args], {
+      cwd: repo,
+      stdio: 'ignore',
+    });
+  git('init', '-q', '-b', 'master');
   git('commit', '-q', '--allow-empty', '-m', 'base');
   return repo;
 };

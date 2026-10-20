@@ -325,6 +325,7 @@ test("REFUSED at shipped defaults: implement's check, as frozen, refuses a page 
     'workflows/build/pictures.ts': fs.readFileSync(SCRIPT, 'utf8'),
     'workflows/build/probe.ts': fs.readFileSync(path.join(BUILD, 'probe.ts'), 'utf8'),
     'workflows/build/pull-request.ts': fs.readFileSync(path.join(BUILD, 'pull-request.ts'), 'utf8'),
+    'workflows/build/landing.ts': fs.readFileSync(path.join(BUILD, 'landing.ts'), 'utf8'),
   };
   const { repo, base } = workOn(PAGE, scripts);
   const files = scratch('wf-pictures-files-');

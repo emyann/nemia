@@ -59,12 +59,14 @@ const RESULTS = '${{ toJSON(needs) }}';
 /** The action every job installs its node with, by the prefix that matches it at any major tag. */
 const SETUP_NODE = 'actions/setup-node';
 
-/**
- * The jobs this repository's CI plan runs whole on the floor `engines.node` claims, each pinning its node by hand rather than off the
- * legs' matrix (`docs/plan-github-ci.md`: "`npm run lint` and `npm run typecheck`, whole, on the floor"). A job added later that runs
- * on another node — an e2e shard, a build — is none of these and claims no floor.
- */
-const PINNED = ['lint', 'typecheck'];
+/** The action that keeps a job's files, by the prefix that matches it at any major tag. */
+const UPLOAD = 'actions/upload-artifact';
+
+/** A path whose first segment is dotted, which `upload-artifact` skips unless it is told to take hidden files. */
+const HIDDEN = /(^|\/)\.[^/]/;
+
+/** A `node-version` that is an expression, the legs' `${{ matrix.node }}`: held by `nodeDrift` off the matrix, not by its pin. */
+const OFF_MATRIX = /\$\{\{/;
 
 /** A workspace of this repository, by the name a turbo filter gives it, and whether it has a suite to run. */
 type Workspace = { name: string; suite: boolean };
@@ -138,35 +140,55 @@ function nodeDrift(workflow: Workflow, engine: string): string[] {
 }
 
 /**
- * A job that runs whole on the floor and is pinned off it. `nodeDrift` holds the legs' matrix; nothing held these, so the file could
- * claim `>=24.16.0` in `engines.node` and still lint on 22.18.0, where `npm ci` refuses the job with `EBADENGINE`.
+ * A job that pins its node by hand and pins it off the floor. Every job of this workflow but the legs runs the repository's own code on
+ * the one version it claims to run on — `docs/plan-github-ci.md` says lint and typecheck run "whole, on the floor", and the e2e shards,
+ * their bound and the build run it no less — so a pin that is not the floor is refused wherever it is, and a job a later card adds is
+ * held the day it is written. The legs' own `${{ matrix.node }}` is `nodeDrift`'s, and skipped here.
+ *
+ * Unheld, the file could claim `>=24.16.0` in `engines.node` and still run five jobs on 22.18.0, where `npm ci` refuses them with
+ * `EBADENGINE` — which is what CI did on run 39349841691.
  */
 function pinDrift(workflow: Workflow, engine: string): string[] {
   const floor = /^>=(\d+\.\d+\.\d+)$/.exec(engine)?.[1];
   if (floor === undefined) return [];
-  return PINNED.flatMap((name) => {
-    const job = workflow.jobs[name];
-    if (job === undefined)
-      return [
-        `${FILE} has no ${name} job, which this repository's CI plan runs whole on the floor engines.node claims: add the job back, or take ${name} off PINNED in this test and say in docs/plan-github-ci.md what runs on the floor instead`,
-      ];
-    const pins = (job.steps ?? [])
+  return Object.entries(workflow.jobs).flatMap(([name, job]) =>
+    (job.steps ?? [])
       .filter((step) => step.uses?.startsWith(SETUP_NODE))
       .flatMap((step) => {
         const pin = (step.with ?? {})['node-version'];
-        return pin === undefined ? [] : [pin];
-      });
-    if (pins.length === 0)
-      return [
-        `the ${name} job in ${FILE} pins no node-version, so it runs on whatever the runner happens to ship: it runs whole on the floor, so give its setup-node step node-version: '${floor}'`,
-      ];
-    return pins
-      .filter((pin) => pin !== floor)
-      .map(
-        (pin) =>
-          `the ${name} job in ${FILE} runs on node ${String(pin)}, not ${floor}, the floor engines.node claims in package.json: it runs whole on the floor, so write node-version: '${floor}', or npm ci refuses the job with EBADENGINE`,
-      );
-  });
+        if (pin === undefined)
+          return [
+            `the ${name} job in ${FILE} pins no node-version, so it runs on whatever node the runner happens to ship: give its ${SETUP_NODE} step node-version: '${floor}', the floor engines.node claims in package.json`,
+          ];
+        if (typeof pin === 'string' && OFF_MATRIX.test(pin)) return [];
+        return pin === floor
+          ? []
+          : [
+              `the ${name} job in ${FILE} runs on node ${String(pin)}, not ${floor}, the floor engines.node claims in package.json: every job but the legs runs this repository's code on its floor, so write node-version: '${floor}', or npm ci refuses the job with EBADENGINE`,
+            ];
+      }),
+  );
+}
+
+/**
+ * An upload of a hidden path that does not take hidden files. `actions/upload-artifact` skips a dotted path by default, so an upload of
+ * the e2e's `.e2e/` found nothing: with `if-no-files-found: error` that failed every shard whose pages had all passed, and with
+ * `ignore` it would have dropped a failing page's pictures without a word. CI run 39349841691 is both.
+ */
+function hiddenDrift(workflow: Workflow): string[] {
+  return Object.entries(workflow.jobs).flatMap(([name, job]) =>
+    (job.steps ?? [])
+      .filter((step) => step.uses?.startsWith(UPLOAD))
+      .flatMap((step) => {
+        const kept = (step.with ?? {})['path'];
+        if (typeof kept !== 'string' || !kept.split('\n').some((line) => HIDDEN.test(line.trim()))) return [];
+        return (step.with ?? {})['include-hidden-files'] === true
+          ? []
+          : [
+              `the ${name} job in ${FILE} uploads ${kept}, a hidden path, without include-hidden-files: ${UPLOAD} skips a dotted path by default, so write include-hidden-files: true beside the path, or the upload keeps nothing`,
+            ];
+      }),
+  );
 }
 
 /** A gate that does not run whatever happens, or that does not need every other job of the file. */
@@ -430,6 +452,7 @@ const drift = (workflow: Workflow, workspaces: Workspace[], engine: string, text
   ...legDrift(workflow, workspaces),
   ...nodeDrift(workflow, engine),
   ...pinDrift(workflow, engine),
+  ...hiddenDrift(workflow),
   ...gateDrift(workflow),
   ...actionDrift(workflow),
   ...zoneDrift(workflow),
@@ -479,7 +502,7 @@ test('the shipped CI workflow runs on the three events, reads alone, and caches 
   assert.deepEqual(cached, [], 'setup-node caches no install here: the lockfile install is part of what is tested');
 });
 
-test('REFUSED: a workspace with no leg, a leg with no workspace, a node floor adrift, an unquoted node, a floor-running job pinned off the floor, unpinned and gone, a job outside the gate, a third party, a timezone untested, a run unforced, a landing cancelled, a fork with a writable token', () => {
+test('REFUSED: a workspace with no leg, a leg with no workspace, a node floor adrift, an unquoted node, a job pinned off the floor and one unpinned, a hidden path uploaded as if it were not, a job outside the gate, a third party, a timezone untested, a run unforced, a landing cancelled, a fork with a writable token', () => {
   const workspaces = readWorkspaces();
   const engine = readEngine();
   const text = workflowText();
@@ -531,19 +554,28 @@ test('REFUSED: a workspace with no leg, a leg with no workspace, a node floor ad
   const lowered = structuredClone(shipped);
   setupOf(lowered, 'lint').with!['node-version'] = '22.18.0';
   assert.deepEqual(pinDrift(lowered, '>=24.16.0'), [
-    "the lint job in .github/workflows/ci.yml runs on node 22.18.0, not 24.16.0, the floor engines.node claims in package.json: it runs whole on the floor, so write node-version: '24.16.0', or npm ci refuses the job with EBADENGINE",
+    "the lint job in .github/workflows/ci.yml runs on node 22.18.0, not 24.16.0, the floor engines.node claims in package.json: every job but the legs runs this repository's code on its floor, so write node-version: '24.16.0', or npm ci refuses the job with EBADENGINE",
   ]);
 
   const unpinned = structuredClone(shipped);
-  delete setupOf(unpinned, 'typecheck').with!['node-version'];
+  delete setupOf(unpinned, BUILD).with!['node-version'];
   assert.deepEqual(pinDrift(unpinned, '>=24.16.0'), [
-    "the typecheck job in .github/workflows/ci.yml pins no node-version, so it runs on whatever the runner happens to ship: it runs whole on the floor, so give its setup-node step node-version: '24.16.0'",
+    "the build job in .github/workflows/ci.yml pins no node-version, so it runs on whatever node the runner happens to ship: give its actions/setup-node step node-version: '24.16.0', the floor engines.node claims in package.json",
   ]);
 
-  const renamed = structuredClone(shipped);
-  delete renamed.jobs['lint'];
-  assert.deepEqual(pinDrift(renamed, '>=24.16.0'), [
-    '.github/workflows/ci.yml has no lint job, which this repository\'s CI plan runs whole on the floor engines.node claims: add the job back, or take lint off PINNED in this test and say in docs/plan-github-ci.md what runs on the floor instead',
+  assert.deepEqual(
+    pinDrift(shipped, '>=24.16.0'),
+    [],
+    "the legs' node-version is an expression off the matrix, which pinDrift leaves to nodeDrift rather than reading as a pin",
+  );
+
+  const shown = structuredClone(shipped);
+  const uploads = (shown.jobs[E2E]?.steps ?? []).filter((step) => step.uses?.startsWith(UPLOAD));
+  assert.equal(uploads.length, 2, 'the e2e job uploads its page times and its failing pages today');
+  for (const upload of uploads) delete upload.with!['include-hidden-files'];
+  assert.deepEqual(hiddenDrift(shown), [
+    'the e2e job in .github/workflows/ci.yml uploads .e2e/pages-*.json, a hidden path, without include-hidden-files: actions/upload-artifact skips a dotted path by default, so write include-hidden-files: true beside the path, or the upload keeps nothing',
+    'the e2e job in .github/workflows/ci.yml uploads .e2e/*.png, a hidden path, without include-hidden-files: actions/upload-artifact skips a dotted path by default, so write include-hidden-files: true beside the path, or the upload keeps nothing',
   ]);
 
   const unneeded = structuredClone(shipped);

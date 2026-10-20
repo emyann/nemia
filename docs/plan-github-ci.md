@@ -103,7 +103,9 @@ gate's `needs` clause is what refuses adding a job and forgetting to wire it in:
   which `workflows/build/mutants.ts` passes. The first is what sets the floor: libuv 1.52.1 keeps the millisecond, no Node 22 release
   ships it (22.23.3, the line's latest, carries 1.51.0), and 24.16.0 is the first 24.x that does — 24.15.0 still carries 1.51.0. So the
   floor is the first release the suite passes on, not a round number.
-- **`npm run lint` and `npm run typecheck`**, whole, on the floor.
+- **`npm run lint` and `npm run typecheck`**, whole, on the floor. So are the e2e shards, their bound and the build: every job but the
+  legs runs this repository's code on the one version it claims to run on, and `pinDrift` refuses a pin that is not the floor wherever
+  it is, so a job a later card adds is held the day it is written.
 - **The whole e2e in four shards**, each leg running `npm run e2e -- --shard ${{ matrix.shard }} --of ${{ strategy.job-total }}`: the
   runner deals the pages itself from the pages that exist (`shardOf`, `apps/web/test/e2e/pages.ts`), so the shard count is written once,
   in the matrix, and a new e2e page is still its file and its line in `apps/web/test/e2e/pages/NAMES` and nothing else. Each shard
@@ -123,8 +125,9 @@ The tests need no live harness, and nothing a clean `ubuntu-latest` lacks: the a
 
 **Prose is not what holds the workflow to the repository.** `packages/agent-orchestrator/test/ci-workflow.test.ts` refuses, each by its
 own sentence naming the fix: a workspace with a suite and no leg, a leg that does not filter to its own workspace, a node floor adrift
-from `engines.node`, one of the two jobs that run whole on the floor pinned off it — or unpinned, or gone — a node version left
-unquoted (YAML reads `24.16` as a number and setup-node installs another release), a timezone
+from `engines.node`, a job that pins its node by hand and pins it off that floor — or pins none at all — a hidden path uploaded
+without `include-hidden-files`, a node version left unquoted (YAML reads `24.16` as a number and setup-node installs another
+release), a timezone
 the leg does not run its suite under and a run of it that drops `--force`, a `cancel-in-progress` that would cancel a run of `main`, a
 job outside the gate's `needs`, a gate without `always()`, a gate step not given the results through its environment or interpolating an
 expression into its shell, an action that is not GitHub's own by major tag, and the trigger that would run a fork's code against a

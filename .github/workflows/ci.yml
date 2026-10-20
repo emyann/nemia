@@ -311,7 +311,9 @@ jobs:
             echo "ci: with .gitleaks.toml, $kept_others of the $bare_others controls at the allowed path are still found: the allowlist" >&2
             echo "ci: is allowing more of that file than the stub shapes, and a real secret pasted in beside them would pass. Write it as" >&2
             echo "ci: a [[rules]] block with id = \"generic-api-key\" carrying one [[rules.allowlists]], never a top-level [[allowlists]]:" >&2
-            echo "ci: a global allowlist's paths entry skips the whole file whatever its condition." >&2
+            echo "ci: a global allowlist's paths entry skips the whole file whatever its condition. And check that block carries" >&2
+            echo "ci: condition = \"AND\": without it a rule allowlist joins its criteria with OR, so paths alone allows every finding" >&2
+            echo "ci: in that file and regexes alone allows a stub's shape anywhere." >&2
             exit 1
           fi
           if [ "$kept_stubs" -ne 0 ]; then

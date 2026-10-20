@@ -496,11 +496,15 @@ const blocks = (text: string): { header: string; lines: string[] }[] => {
 };
 
 /**
- * How the one allowlist is nested, which is the one thing about this file no reading of it can tell and the one thing that went wrong:
- * a top-level `[[allowlists]]` is global, and a global allowlist's `paths` entry skips the whole file whatever its `condition`, so the
- * file allows every secret in `STUBS` while its own comment says it allows two shapes. Nested under a `[[rules]]` block naming the
- * rule it is scoped to that rule alone — and because gitleaks appends an allowlist array and replaces every other attribute, the block
- * must carry its `id` and nothing else, or the default rule is replaced by one that detects nothing.
+ * How the one allowlist is nested and joined, which is what no reading of this file can tell and what went wrong: a top-level
+ * `[[allowlists]]` is global, and a global allowlist's `paths` entry skips the whole file whatever its `condition`, so the file allows
+ * every secret in `STUBS` while its own comment says it allows two shapes. Nested under a `[[rules]]` block naming the rule it is
+ * scoped to that rule alone — and because gitleaks appends an allowlist array and replaces every other attribute, the block must carry
+ * its `id` and nothing else, or the default rule is replaced by one that detects nothing.
+ *
+ * `condition` is the same failure one key lower, and the default is the wrong one: without `condition = "AND"` a rule allowlist joins
+ * its criteria with OR, so `paths` alone allows a finding and `regexes` alone does too — the whole file allowed for that rule, and a
+ * stub's shape allowed anywhere in the repository. The file would read exactly as it does now.
  */
 function formDrift(text: string): string[] {
   const found = blocks(text);
@@ -513,6 +517,10 @@ function formDrift(text: string): string[] {
   if (rules.length !== 1 || rule === undefined || found.filter((block) => block.header === 'rules.allowlists').length !== 1)
     return [
       `${SCAN_CONFIG} does not nest one [[rules.allowlists]] under one [[rules]] block carrying id = "${RULE}": write it that way, or the allowlist is global and skips every secret in the file its paths names rather than the two shapes it lists`,
+    ];
+  if (found.find((block) => block.header === 'rules.allowlists')?.lines.includes('condition = "AND"') !== true)
+    return [
+      `${SCAN_CONFIG}'s [[rules.allowlists]] does not carry condition = "AND": a rule allowlist joins its criteria with OR by default, so paths alone allows a finding and regexes alone allows one too — every generic key in ${STUBS} allowed, and a stub's shape allowed anywhere in the repository. Write condition = "AND", which allows a finding only where its path and its shape both match`,
     ];
   return rule.lines
     .map((line) => /^([\w-]+)\s*=/.exec(line)?.[1])
@@ -1079,6 +1087,14 @@ test('REFUSED: no scan job, a download unpinned or unchecked, a scan without its
   assert.deepEqual(allowDrift(unnested, stubs), [
     `${SCAN_CONFIG} does not nest one [[rules.allowlists]] under one [[rules]] block carrying id = "generic-api-key": write it that ` +
       'way, or the allowlist is global and skips every secret in the file its paths names rather than the two shapes it lists',
+  ]);
+
+  const joined = config.replace('\ncondition = "AND"\n', '\n');
+  assert.notEqual(joined, config, 'the allowlist joins its path and its shape with AND today');
+  assert.deepEqual(allowDrift(joined, stubs), [
+    `${SCAN_CONFIG}'s [[rules.allowlists]] does not carry condition = "AND": a rule allowlist joins its criteria with OR by default, ` +
+      `so paths alone allows a finding and regexes alone allows one too — every generic key in ${STUBS} allowed, and a stub's shape ` +
+      'allowed anywhere in the repository. Write condition = "AND", which allows a finding only where its path and its shape both match',
   ]);
 
   const replaced = config.replace('\nid = "generic-api-key"\n', '\nid = "generic-api-key"\nregex = \'(?i)api[_-]?key\'\n');

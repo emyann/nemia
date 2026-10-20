@@ -67,6 +67,17 @@ export type DaemonFile = {
   stoppedAt?: string;
   /** The code it runs, written as it takes the store (`leaseRelease`); absent from a daemon started before releases. */
   release?: LeaseRelease;
+  /**
+   * What the engine of the process that holds the lease serves on its own port, by the harness each card is for: written beside its
+   * `url` right after it took the lease and held its engine (`heldHolder`), by that process alone, and read by any other process
+   * on this store that wants to follow one of those sessions live rather than off the files (`holderOnStore`).
+   *
+   * The cards are opaque here: this layer neither reads nor judges them — the runtime does, at the follow it configures with
+   * them. Nothing secret is on them, and nothing secret is on this file: the token a viewer needs to dial that port is kept by the
+   * holder's own engine, 0600 in its store, and is asked for there. Absent from a daemon that holds no such session, and from one
+   * started before this.
+   */
+  holder?: Record<string, Record<string, unknown>>;
 };
 
 /** The code a daemon runs, as its lease records it: a checkout or an install, its folder, and an install's tag and commit. */

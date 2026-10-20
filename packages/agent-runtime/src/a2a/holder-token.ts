@@ -33,6 +33,19 @@ export const writeToken = (root: string, token: string): void => {
   fs.chmodSync(file, 0o600);
 };
 
+/**
+ * The token a holder under `root` minted, trimmed, or `undefined` where there is no file — what a viewer's `credentials`
+ * answers for the served card's `bearer` scheme. It reads alone: no folder is made, no file written, and an absent store is
+ * no error. The path is the runtime's own, so no layer above joins it for itself.
+ */
+export const holderTokenOf = (root: string): string | undefined => {
+  try {
+    return fs.readFileSync(tokenFileOf(root), 'utf8').trim() || undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 /** The token under `root` forgotten; an absence is no error. */
 export const forgetToken = (root: string): void => fs.rmSync(tokenFileOf(root), { force: true });
 

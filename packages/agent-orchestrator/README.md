@@ -3193,6 +3193,18 @@ not read, a holder that `stopped`, one whose process is `gone` (`kill(pid, 0)` f
 (`stalled`), or one `ticking`. The interval is a whole number of milliseconds from 1 to 2147483647 and anything else is refused, exit 2,
 before the store is taken: `wf up -5` would write an interval the file does not read back, and a holder that does not read holds nothing.
 
+The lease also names what the daemon's own engine holds, `holder`: the cards it serves on its port, by the harness each is for, written
+right after it took the lease and held its engine (`heldHolder`), by that process, which is the one writer of the file — the api's url and
+the holder's cards are both facts of the process that holds it. Another process on this store reads them (`holderOnStore`) to follow one
+of those sessions live over that port rather than off the files, and reads them afresh at every follow: a holder's port is ephemeral, and
+a process that read it once would dial a dead port after any restart. Nothing is answered for a lease that stopped, whose process is gone
+or that has gone silent — there is no port to dial — nor for a lease the asking process itself holds, which would be a viewer dialling
+itself.
+
+Nothing secret is on the lease. The bearer token that port asks for is the holder engine's own, kept 0600 in the runtime's store, and a
+viewer asks the runtime for it at the moment it dials (`holderTokenOf`); it is on no line of a log, in no answer of the api, and on no
+screen of the board.
+
 - **A second daemon is refused by name, exit 2, while the store is ticked**, both ways round — an api while a `wf up` ticks, a `wf up`
   while an api does, and either while one of its own kind does — naming the pid, where and since when it ticks, its last pass,
   and how to stop it: `kill <pid>`, that pid, which is the node process and not an `npm exec` wrapper around it (killing the wrapper can
@@ -3882,7 +3894,7 @@ for the same reason, and so does the `wf` command.
 | `inbox/` | cards before they are started, one `<name>.md` each (`wf inbox`); a card started leaves it |
 | `queue/` | a queued card's last start that did not happen, `<name>.json`, the tick's to write: the card's text, the repository tried, why, and whether it was a refusal |
 | `factories/` | a factory each, `<name>.json` holding `{ "repos": [...], "workflows": [...], "hires": {...} }`, `wf factory add`, `attach`, `detach`, `hire` and `fire`'s to write and `wf factory rm`'s to remove; the default factory is no file |
-| `daemon.json` | the store taken by one `wf up`, its to write alone: pid, start, cwd, interval, last completed pass, and `stoppedAt` once it stopped (`src/daemon/daemon.ts`) |
+| `daemon.json` | the store taken by one `wf up`, its to write alone: pid, start, cwd, interval, last completed pass, `stoppedAt` once it stopped, and what its engine holds and serves (`holder`, never a secret) (`src/daemon/daemon.ts`) |
 | `tick.json` | the ceilings the last pass ran with, the tick's to write: what `wf ls` and `wf decide` judge the cap on runs in flight by |
 | `standing.json` | where the result branches stood on the last pass, the tick's to write (`src/standing/standing.store.ts`): for each repository, place and base branch, the place's `standing` answer or the words it was not read with, and when |
 | `feed.jsonl` | what the tick judged of each run and each step, a line each time it changed, and a line each time a daemon takes the store, the daemon's to append (`src/feed/feed.ts`, `src/feed/feed.store.ts`): what `nemia watch` reads and follows, and nothing decides on |

@@ -18,8 +18,8 @@ import { cardOf, HarnessHandler } from '../src/a2a/handler.ts';
 import { cardOfJson } from '../src/a2a/card.ts';
 import { authOf } from '../src/a2a/remote-client.ts';
 import { BEARER, cardJsonOf, REFUSED, servedCardOf, ServedHandler } from '../src/a2a/served.ts';
-import { holderRefusal, holderSeamOf } from '../src/a2a/holder-follow.ts';
-import { optionsRefusalOf } from '../src/service/options.ts';
+import { holderAgentRefusal, holderRefusal, holderSeamOf } from '../src/a2a/holder-follow.ts';
+import { heldHarnessesOf, optionsRefusalOf } from '../src/service/options.ts';
 import { Engine } from '../src/index.ts';
 import { builtEngine } from './engine.ts';
 import { scratch } from './scratch.ts';
@@ -114,7 +114,8 @@ test('the served card is read back by a viewer as the card of an agent given inl
     authOf(read.card, URL_AT, 'claude', () => 'tok-1'),
     { headers: { authorization: 'Bearer tok-1' } },
   );
-  assert.equal(holderRefusal('claude', { card: json }, { harnesses: ['claude'], claude: true }), undefined);
+  assert.equal(holderRefusal('claude', { harnesses: ['claude'], claude: true }), undefined);
+  assert.equal(holderAgentRefusal('claude', { card: json }), undefined);
 });
 
 test('REFUSED, at shipped defaults: every method the port does not serve, each naming itself and what the port is for', async () => {
@@ -162,7 +163,8 @@ test('the three served methods are the handler the runtime already had: its card
 
 test('the viewer dials its `follow` and nothing else: every other verb is the value it was', () => {
   const ops = handOps() as SeamOps;
-  const dialled = holderSeamOf({ card: cardJsonOf(servedCardOf('claude', ops, URL_AT)) }, 'claude', () => 'tok-1', ops);
+  const card = cardJsonOf(servedCardOf('claude', ops, URL_AT));
+  const dialled = holderSeamOf(() => ({ card }), 'claude', () => 'tok-1', ops);
   assert.notEqual(dialled.follow, ops.follow, 'the follow is the holder’s');
   const kept = Object.keys(ops).filter((k) => k !== 'follow');
   assert.deepEqual(
@@ -173,72 +175,127 @@ test('the viewer dials its `follow` and nothing else: every other verb is the va
   assert.equal(
     holderSeamOf(undefined, 'claude', () => 'tok-1', ops),
     ops,
-    'a harness with no holder is left as it is',
+    'a harness with no holder function is left as it is',
   );
 });
 
-test('REFUSED: a holder for a harness the engine does not run, one it does not run attached, and a card that does not read', () => {
+test('a holder function answering nothing reads the session here: the follow is the ops’ own, and nothing is dialled', async () => {
+  const ops = handOps() as SeamOps;
+  const seam = holderSeamOf(() => undefined, 'claude', () => 'tok-1', ops);
+  assert.deepEqual(await Effect.runPromise(Stream.runCollect(seam.follow!(NAME))), MOMENTS, 'the moments are the ones the ops give');
+});
+
+test('the holder is asked at each follow, not at the build: nothing first, a card second, on one seam', async () => {
+  const ops = handOps() as SeamOps;
+  const card = cardJsonOf(servedCardOf('claude', ops, URL_AT));
+  let holding = false;
+  const asked: string[] = [];
+  const seam = holderSeamOf(
+    () => (holding ? { card } : undefined),
+    'claude',
+    (scheme) => {
+      asked.push(scheme);
+      return 'tok-1';
+    },
+    ops,
+  );
+  assert.deepEqual(
+    await Effect.runPromise(Stream.runCollect(seam.follow!(NAME))),
+    MOMENTS,
+    'with no holder up, the follow reads here',
+  );
+  assert.deepEqual(asked, [], 'and nothing was dialled for it');
+  holding = true;
+  const dialled = await Effect.runPromise(Effect.exit(Stream.runCollect(seam.follow!(NAME))));
+  assert.equal(dialled._tag, 'Failure', `the port no one serves in this test is dialled, and the dial fails: ${String(dialled)}`);
+  assert.deepEqual(asked, [BEARER], 'the holder that came up is dialled, with no engine rebuilt and nothing restarted');
+});
+
+test('REFUSED at the follow: an entry with a key other than `card`, and a card that does not decode — and nothing is dialled', async () => {
+  const ops = handOps() as SeamOps;
+  const card = cardJsonOf(servedCardOf('claude', ops, URL_AT));
+  const asked: string[] = [];
+  const credentials = (scheme: string) => {
+    asked.push(scheme);
+    return 'tok-1';
+  };
+  const failed = async (agent: unknown) => {
+    const seam = holderSeamOf(() => agent as never, 'claude', credentials, ops);
+    const exit = await Effect.runPromise(Effect.exit(Stream.runCollect(seam.follow!(NAME))));
+    assert.equal(exit._tag, 'Failure', `the follow fails: ${JSON.stringify(exit)}`);
+    return String(exit);
+  };
+  assert.match(await failed({ url: 'http://a.example' }), /takes `card` and nothing else, and was given `url`/);
+  assert.match(await failed({ card: { ...card, supportedInterfaces: [] } }), /has no card this runtime reads: its `supportedInterfaces` /);
+  assert.deepEqual(asked, [], 'and nothing was dialled: no credential was ever asked for');
+});
+
+test('REFUSED before the engine builds: a holder named for a harness it does not run, and one it does not run attached', () => {
   const card = cardJsonOf(servedCardOf('claude', handOps(), URL_AT));
   const place = { harnesses: ['claude', 'reviewer', 'stand'], claude: true };
   assert.match(
-    holderRefusal('codex', { card }, place)!,
+    holderRefusal('codex', place)!,
     /`holder` names the `codex` harness, which this engine does not run: it runs `claude`, `reviewer`, `stand`\./,
   );
   for (const other of ['reviewer', 'stand']) {
     assert.match(
-      holderRefusal(other, { card }, { ...place, claude: false })!,
+      holderRefusal(other, { ...place, claude: false })!,
       /which this engine does not run as Claude Code attached/,
       `${other}: a harness whose sessions no process of ours holds — a remote agent's, a detached one's — is no holder`,
     );
   }
-  assert.match(holderRefusal('claude', { url: 'http://a.example' }, place)!, /takes `card` and nothing else, and was given `url`/);
-  assert.match(holderRefusal('claude', 'a-card', place)!, /takes `card` and nothing else, and was given a string/);
+  assert.equal(holderRefusal('claude', place), undefined, 'and the name of a harness it runs attached is taken');
+  assert.equal(holderAgentRefusal('claude', { card }), undefined, 'as is the card a holder served');
+});
+
+test('REFUSED at the follow: what a holder function answers that this runtime cannot dial', () => {
+  const card = cardJsonOf(servedCardOf('claude', handOps(), URL_AT));
+  assert.match(holderAgentRefusal('claude', { url: 'http://a.example' })!, /takes `card` and nothing else, and was given `url`/);
+  assert.match(holderAgentRefusal('claude', 'a-card')!, /takes `card` and nothing else, and was given a string/);
   assert.match(
-    holderRefusal('claude', { card: { ...card, supportedInterfaces: [] } }, place)!,
+    holderAgentRefusal('claude', { card: { ...card, supportedInterfaces: [] } })!,
     /has no card this runtime reads: its `supportedInterfaces` /,
   );
-  assert.equal(holderRefusal('claude', { card }, place), undefined, 'and the card a holder served is taken');
 });
 
 test('REFUSED by the options, in their fixed order: a ceiling and a harness speak before a holder, and a holder before the rest', () => {
   const card = cardJsonOf(servedCardOf('claude', handOps(), URL_AT));
   const harnesses = { claude: 'claude' } as const;
   assert.equal(
-    optionsRefusalOf({ harnesses, holder: { claude: { card } } }),
+    optionsRefusalOf({ harnesses, holder: { claude: () => ({ card }) } }),
     undefined,
     'a holder of a harness it runs, with the card it served',
   );
   assert.match(
-    optionsRefusalOf({ harnesses, holder: { codex: { card } } })!,
+    optionsRefusalOf({ harnesses, holder: { codex: () => ({ card }) } })!,
     /`holder` names the `codex` harness, which this engine does not run/,
   );
   assert.match(
-    optionsRefusalOf({ harnesses: { claude: 'claude', reviewer: { url: 'https://a.example' } }, holder: { reviewer: { card } } })!,
+    optionsRefusalOf({ harnesses: { claude: 'claude', reviewer: { url: 'https://a.example' } }, holder: { reviewer: () => ({ card }) } })!,
     /`holder` names the `reviewer` harness, which this engine does not run as Claude Code attached/,
   );
   assert.match(
-    optionsRefusalOf({ harnesses: { claude: 'claude', stand: handOps() }, holder: { stand: { card } } })!,
+    optionsRefusalOf({ harnesses: { claude: 'claude', stand: handOps() }, holder: { stand: () => ({ card }) } })!,
     /`holder` names the `stand` harness, which this engine does not run as Claude Code attached/,
     'a local harness that is not Claude Code attached is no holder either: its sessions are read off the store',
   );
   assert.equal(
-    optionsRefusalOf({ holder: { claude: { card } } }),
+    optionsRefusalOf({ holder: { claude: () => ({ card }) } }),
     undefined,
     'and an engine given no `harnesses` at all is read against the ones it will run, which have `claude` among them',
   );
-  assert.match(optionsRefusalOf({ harnesses, holder: { claude: { card: { name: 'claude' } } } })!, /has no card this runtime reads/);
   assert.match(
-    optionsRefusalOf({ maxConcurrent: 0, harnesses, holder: { codex: { card } } })!,
+    optionsRefusalOf({ maxConcurrent: 0, harnesses, holder: { codex: () => ({ card }) } })!,
     /is not a ceiling/,
     'the ceiling speaks first, before any harness or holder',
   );
   assert.match(
-    optionsRefusalOf({ harnesses: { claude: 'claude', other: { ...handOps(), pool: '' } }, holder: { codex: { card } } })!,
+    optionsRefusalOf({ harnesses: { claude: 'claude', other: { ...handOps(), pool: '' } }, holder: { codex: () => ({ card }) } })!,
     /names the `pool`/,
     'then the harnesses, before any holder',
   );
   assert.match(
-    optionsRefusalOf({ harnesses, holder: { codex: { card } }, unschedulable: 'yes' as never })!,
+    optionsRefusalOf({ harnesses, holder: { codex: () => ({ card }) }, unschedulable: 'yes' as never })!,
     /`holder` names the `codex` harness/,
     'then the holders, before `unschedulable`, `credentials`, `missingCredential` and the telemetry',
   );
@@ -247,7 +304,29 @@ test('REFUSED by the options, in their fixed order: a ceiling and a harness spea
 test('an engine given no `harnesses` builds with a holder of the `claude` harness it runs by default', () => {
   const card = cardJsonOf(servedCardOf('claude', handOps(), URL_AT));
   const engine = builtEngine(
-    Engine.layer({ root: scratch('ae-holder-default-'), holder: { claude: { card } }, credentials: () => 'tok-1' }),
+    Engine.layer({ root: scratch('ae-holder-default-'), holder: { claude: () => ({ card }) }, credentials: () => 'tok-1' }),
   );
   assert.equal(typeof engine.follow, 'function', 'the engine built: a holder is read against the harnesses it will run, not against none');
+});
+
+test('heldHarnessesOf: the harnesses configured as the literal `claude` and no other', () => {
+  assert.deepEqual(
+    heldHarnessesOf({
+      claude: 'claude',
+      second: 'claude',
+      bg: 'claude-bg',
+      reviewer: { url: 'https://a.example' },
+      made: { name: 'made', command: () => ({ cmd: 'echo', args: [] }) },
+      stand: handOps(),
+    }),
+    ['claude', 'second'],
+    'a `claude-bg`, a remote agent’s, a detached one’s and a runner brought as its own are none of them held',
+  );
+  assert.deepEqual(heldHarnessesOf({}), [], 'and a configuration with none holds none');
+});
+
+test('an engine with no `claude` harness serves nothing: its `hold()` answers null', async () => {
+  const engine = builtEngine(Engine.layer({ root: scratch('ae-holds-none-'), harnesses: { bg: 'claude-bg', stand: handOps() } }));
+  const held = await Effect.runPromise(Effect.scoped(engine.hold()));
+  assert.equal(held, null, 'there is nothing one process holds attached, so there is no port to serve');
 });

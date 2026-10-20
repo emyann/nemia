@@ -108,6 +108,13 @@ export type { Credentials, MissingCredential, RemoteAgent } from './a2a/index.ts
  */
 export type { Served, HolderAgent } from './a2a/index.ts';
 /**
+ * The name the served card gives its bearer scheme, and the name a viewer's `credentials` is asked for (`BEARER`); the token that
+ * holder minted, read off its own store (`holderTokenOf`), which is where it is written and the only place it is; and which of a
+ * configuration's harnesses a holder holds (`heldHarnessesOf`) — the rule a layer above reads rather than copying the literal.
+ */
+export { BEARER, holderTokenOf } from './a2a/index.ts';
+export { heldHarnessesOf } from './service/options.ts';
+/**
  * Why a remote agent's entry is not one the runtime can reach, or `undefined`: what `Engine.layer` refuses, for a caller that reads entries
  * from a file of its own and words the refusal there.
  */

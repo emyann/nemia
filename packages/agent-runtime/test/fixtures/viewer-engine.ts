@@ -39,7 +39,7 @@ const engine = builtEngine(
   Engine.layer({
     root: told.root,
     harnesses: { claude: 'claude' },
-    holder: { claude: { card: told.card } },
+    holder: { claude: () => ({ card: told.card }) },
     credentials: (scheme, agentUrl, harness) => {
       asked.push({ scheme, agentUrl, harness });
       return token;

@@ -76,6 +76,7 @@ import {
   runnersOf,
   optionsRefusalOf,
   admissionOf,
+  heldHarnessesOf,
   type EngineIo,
   type EngineOptions,
   type HarnessConfig,
@@ -825,7 +826,7 @@ const make = (options: EngineOptions) =>
 
 /**
  * A harness's runner as the engine runs it: through its A2A agent unless it is a remote one already, its observes counted, and its
- * `follow` alone dialled on the engine that holds its sessions where `options.holder` names one (`holderSeamOf`).
+ * `follow` alone asking, at each call, the engine that holds its sessions where `options.holder` names one (`holderSeamOf`).
  */
 const seamOf =
   (
@@ -849,10 +850,11 @@ const seamOf =
  * are the sessions one process holds attached, and the only ones another process cannot read live for itself. An engine with no such
  * harness serves nothing, and its `hold()` answers `null`.
  */
-const servingOf = (harnesses: Record<string, HarnessConfig>, made: Record<string, RunnerOps>, events: Parameters<typeof a2aOps>[2]) => ({
-  ops: Object.fromEntries(Object.entries(made).filter(([name]) => harnesses[name] === 'claude')),
-  events,
-});
+const servingOf = (harnesses: Record<string, HarnessConfig>, made: Record<string, RunnerOps>, events: Parameters<typeof a2aOps>[2]) => {
+  const held = heldHarnessesOf(harnesses);
+  return { ops: Object.fromEntries(Object.entries(made).filter(([name]) => held.includes(name))), events };
+};
+
 
 /**
  * The verbs of the sessions run attached: `hold`, with the port it serves while it holds (`servedOf`), and `drain`, which writes the

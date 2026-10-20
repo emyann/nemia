@@ -1300,8 +1300,9 @@ test("quick's land is build's land but its after: main has one guard, whatever t
 
 test("REFUSED: a quick land whose check, workspace, gate, fence or budget is no more build's is unequal to it", () => {
   const edits: [string, (text: string) => string][] = [
-    ['check', (text) => text.replace('npx turbo run test --force --continue && ', '')],
-    ['check', (text) => text.replace('else npm run e2e; fi', 'else true; fi')],
+    ['check', (text) => text.replace('receipt --run "$WF_RUN"', 'receipt --run "$WF_STEP"')],
+    ['check', (text) => text.replace('git show "HEAD:workflows/build/landing.ts"', 'cat workflows/build/landing.ts')],
+    ['note', (text) => text.replace('It deletes no branch and stages no merge here.', '')],
     ['workspace and gate', (text) => text.replace('workspace: main\n', '').replace('gate: true\n', '')],
     ['fence', (text) => text.replace(', Bash(*:4317*)', '')],
     ['budget', (text) => text.replace('budget: 10', 'budget: 11')],

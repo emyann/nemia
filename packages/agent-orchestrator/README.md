@@ -2007,12 +2007,14 @@ dropped. **Nothing in the packages knows what shipping means.**
   such a folder started `--no-worktree` is refused too: it has no result branch to merge.
   Its brief carries one way of handing a file over rather than the usual two: what it leaves in that checkout is collected by nobody, so
   it is told the run's artifacts directory, and that the checkout is to be left as it was found.
-- **The run checks the merge and lands it, not the ending's session.** A gated `workspace: main` step with a `check:`
-  stages the merge (`git merge --no-ff --no-commit`) and signs off with the commit message as its closeout's `message`
+- **The run checks the landing and records it, not the ending's session.** A gated `workspace: main` step with a `check:`
+  lands the run's result the way its own step says — staging the merge (`git merge --no-ff --no-commit`) where that is
+  the way its factory lands — and signs off with the message that records what landed as its closeout's `message`
   (`shipper.schema.json`): a subject of what shipped, the run's own title, and a short body read off `git log` and
   `git diff --stat` — never git's `Merge branch '…'`. Its brief says so under *The run checks and lands your merge*
-  (`landingContract`). The tick then files the step's check as it files any — the `check` harness in the checkout,
-  `LANDING_CHECK_DEADLINE_SECONDS` (measured on its own: the whole suite and the e2e on the merged tree, and no mutant), `nice`d, its streams kept as a check's are, no `WF_BASE_REF`: mid-merge,
+  (`landingContract`), which is shape-neutral: the packages know nothing of what shipping means, so the recipe is the
+  step's own note and the staging command its place's (`landingWords`). The tick then files the step's check as it files any — the `check` harness in the checkout,
+  `LANDING_CHECK_DEADLINE_SECONDS` (measured on its own: the whole suite and the e2e on the merged tree where a factory runs them there, and no mutant), `nice`d, its streams kept as a check's are, no `WF_BASE_REF`: mid-merge,
   `HEAD...MERGE_HEAD` is what the merge brings — and, on the pass that reads the check settled (`landingDue`, pure;
   `landEnding` in `ending/ending.verb.ts` acts through the place's `land`), commits the merge with the message on exit 0 or
   aborts it on anything else: a refusal, a check that did not finish, a message left blank, a merge that

@@ -29,8 +29,9 @@ holds what every change needs.
   test setup), the packages it touched: `npx turbo run test --force --continue --filter=<package>`, the package by its `name`
   (`agent-orchestrator`, `agent-runtime`, `api`, `web`). Typecheck and lint run whole: they are cheap. Implement's round check runs the
   declarations, the typecheck and the lint, and pushes the round's commit and waits on GitHub's `ci` context, which runs the whole
-  suite on it (`workflows/build/implement.md`); the landing's runs the whole suite forced again on the merged tree; a session runs it
-  only to measure it, as the e2e's rule says. A failing test it did not run is the check's refusal, answered in the next try. Outside a
+  suite on it (`workflows/build/implement.md`); the landing's check runs no suite at all — it is the receipt that the pull request `ci`
+  judged was merged (`workflows/build/landing.ts`) — so the commit `ci` passed on is the last thing any suite reads; a session runs the
+  whole suite only to measure it, as the e2e's rule says. A failing test it did not run is the check's refusal, answered in the next try. Outside a
   run no check follows you: run the whole suite before you commit.
 - `npm run typecheck` — `tsc --noEmit` per package, over its `src` and its `test/` (the web's `test/e2e/` under its own tsconfig);
   `agent-orchestrator/test/suite.test.ts` refuses a test file no typecheck reads.
@@ -38,8 +39,8 @@ holds what every change needs.
   `check:` runs it after the types. A rule turned off, or a line allowed with `oxlint-disable-next-line`, says why beside it.
 - `npm run build`, then `npm run e2e -- --pages <the pages the change touches>` (and `--photos` when pictures are due), when you touch
   `apps/web`: its assertions, in the dark theme, by workers in parallel, each with its own store, api and app (`apps/web/CLAUDE.md`).
-  A session never runs it whole but to measure it: `ci`'s `e2e` job runs every page on the commit implement's round check pushed, and
-  the landing's check runs them again on the merged tree.
+  A session never runs it whole but to measure it: `ci`'s `e2e` job runs every page on the commit implement's round check pushed, which
+  is the commit the landing merges; the landing's check runs no page.
 - `node tools/observe/render/render.ts --out <dir>` when you touch `tools/observe`: it renders the checkout's dashboards on a throwaway
   stack with fake data, never the live one, and a step hands over the `dashboard-<name>.png` and `.txt` it writes (`see-a-dashboard`).
   It needs `docker`, takes a minute and a half, and is never run by the suite.
@@ -83,9 +84,13 @@ holds what every change needs.
 - **A workflow step never pushes, never merges into the base branch, never force-deletes a branch**, and its agent's `disallowedTools:`
   refuses the push and the delete (a `dontAsk` agent's: no allow reaches them; `packages/agent-orchestrator/test/agent-fences.test.ts`).
   `.claude/settings.json` denies none of it: pushing and opening a pull request are the person's, or done by their session when they ask.
-  A person merges after a trial merge. The one exception is a run's ending step (a workflow's last step, `workspace: main`), filed only
-  once a person approves it: it stages the merge of the run's own result branch, and the run executes the ship's `check:` on the merged
-  tree and commits on exit 0 or aborts the merge (`landingDue`).
+  What a step may not type, the run does in its place, as two frozen scripts read out of git and run with `node`, never as a tool a fence
+  could not tell apart: `workflows/build/pull-request.ts` pushes a run's own branch and opens or updates its pull request, and
+  `workflows/build/landing.ts` merges that pull request and fast-forwards the checkout. The one exception to the rule is a run's ending
+  step (a workflow's last step, `workspace: main`), filed only once a person approves it: it runs `landing.ts merge`, which refuses
+  anything but this run's own green pull request — `mergeable`, `ci` green at the head the review read, no result branch left out — then
+  merges it with a merge commit whose message the step wrote and fast-forwards the base branch here; the run then executes the step's
+  `check:`, which is `landing.ts receipt`, and records the commit that landed on its exit 0 (`landingDue`).
 - If you are a workflow step, commit as you go: the run commits only what you leave uncommitted, in one commit under your step's name.
 
 ## Agents in this repository

@@ -182,23 +182,30 @@ export const checkContract = (command: string): string =>
   ].join('\n');
 
 /**
- * The check, told to an ending that lands on it (`landsOnCheck` in `status/status.ts`) in place of `checkContract`: the step stages the
- * merge, and the run judges and lands it. Appended to its brief, so the shipper's recipe and the run's mechanism cannot say two things: the
- * run executes the command on the merged tree once the step signs off, commits the merge with the closeout's `message` when it exits 0, and
- * aborts it otherwise — a check that did not finish included, which is no verdict. What a session would do instead — run the suite in a
- * turn it cannot hold open, commit on what it read of it — is what the run refuses here by doing it itself. How to stage it, and what the
- * session is denied, are its place's words (`words`, `landingWords`); with none, it is sent to its place's skill.
+ * The check, told to an ending that lands on it (`landsOnCheck` in `status/status.ts`) in place of `checkContract`: the step lands the
+ * run's result the way its own step says, and the run judges it and records what landed. Appended to its brief, so the shipper's recipe
+ * and the run's mechanism cannot say two things: the run executes the command in the checkout once the step signs off, and on its exit 0
+ * records
+ * the landing — committing the merge with the closeout's `message` where the step staged one — and otherwise lands nothing, a check that
+ * did not finish included, which is no verdict. What a session would do instead — run the suite in a turn it cannot hold open, commit on
+ * what it read of it — is what the run refuses here by doing it itself. Shape-neutral on purpose: a factory that lands by merging its own
+ * pull request on GitHub and a factory that stages a local merge are both told this, and the recipe of either is its step's own note.
+ * How to stage a merge, and what the session is denied, are its place's words (`words`, `landingWords`); with none, it is sent to its
+ * place's skill (*Stage a landing*).
  */
 export const landingContract = (command: string, words?: LandingWords): string =>
   [
     '',
     '## The run checks and lands your merge',
     '',
-    `Once you sign off, the run executes ${codeSpan(command)} in this checkout, on the merge you left staged, as it executes any step's check.`,
-    "When it exits 0 the run commits the merge onto the base branch, with the `message` your closeout gives, as the commit's message;",
-    'anything else — a refusal, or a check that did not finish — and the run aborts the merge, and nothing lands.',
+    `Once you sign off, the run executes ${codeSpan(command)} in this checkout, as it executes any step's check.`,
+    'When it exits 0 the run records what landed, and where you left a merge staged it commits that merge onto the base branch, with',
+    "the `message` your closeout gives as the commit's message; anything else — a refusal, or a check that did not finish — and nothing",
+    'lands, a merge you staged being taken back.',
     '',
-    `So stage the merge and sign off: stage every result branch in one merge that commits nothing, ${words ? codeSpan(words.stage) : "as your place's skill says (*Stage a landing*)"}, leave it staged, and do not run`,
+    "How this factory lands is your step's to say, and the landing is yours to make before you sign off, with the `message` that",
+    'records what landed. Where your step stages a merge: stage every result branch in one merge that commits nothing,',
+    `${words ? codeSpan(words.stage) : "as your place's skill says (*Stage a landing*)"}, leave it staged, and do not run`,
     'the check, commit, or abort a clean merge yourself. Where it does not merge cleanly, abort it and sign off `blocked`, saying why.',
     `${words?.denied.length ? `Your fence denies ${words.denied.map(codeSpan).join(' and ')}` : 'Committing it is denied you'} for that reason; a merge that commits as it merges would land it all the same, unchecked.`,
     "A try that follows a refusal is handed what the check said: the work is the run's result and not yours to change here.",

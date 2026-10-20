@@ -131,7 +131,7 @@ function closeoutFile(more: Record<string, unknown>): string {
 const SCRIPTS = {
   'workflows/quick/change.ts': TEXT,
   ...Object.fromEntries(
-    ['mutants.ts', 'pictures.ts', 'probe.ts', 'pull-request.ts'].map((name) => [
+    ['landing.ts', 'mutants.ts', 'pictures.ts', 'probe.ts', 'pull-request.ts'].map((name) => [
       `workflows/build/${name}`,
       fs.readFileSync(path.join(REPO, 'workflows', 'build', name), 'utf8'),
     ]),

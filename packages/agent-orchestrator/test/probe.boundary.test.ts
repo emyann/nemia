@@ -259,7 +259,7 @@ function based(files: Record<string, string>): { repo: string; base: string } {
 
 test("REFUSED at shipped defaults: implement's check, as frozen, refuses a live probe of its run and passes once it is stopped", () => {
   const scripts = Object.fromEntries(
-    ['mutants.ts', 'pictures.ts', 'probe.ts', 'pull-request.ts'].map((name) => [
+    ['landing.ts', 'mutants.ts', 'pictures.ts', 'probe.ts', 'pull-request.ts'].map((name) => [
       `workflows/build/${name}`,
       fs.readFileSync(path.join(BUILD, name), 'utf8'),
     ]),

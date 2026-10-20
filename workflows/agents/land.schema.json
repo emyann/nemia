@@ -1,7 +1,7 @@
 {
   "type": "object",
   "properties": {
-    "message": { "type": "string", "description": "The commit message the run commits your staged merge with once its check passes: a subject line, a blank line, then a body saying what changed and why. No trailers. Empty when you sign off blocked: a done sign-off with an empty message has the run abort the merge." }
+    "message": { "type": "string", "description": "The message that records what landed: a subject line, a blank line, then a body saying what changed and why. No trailers. Where your step stages a merge, the run commits it with this message once its check passes; where it lands another way, this is the message you made the landing with, repeated here for the record. Empty when you sign off blocked: a done sign-off with an empty message has the run take back a merge it would have committed." }
   },
   "required": ["message"],
   "additionalProperties": false

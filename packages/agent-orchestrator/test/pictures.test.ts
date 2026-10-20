@@ -4,7 +4,8 @@
  * `tools/observe` that a dashboard reads whose `artifacts` names no `dashboard-<name>.png` and `dashboard-<name>.txt` of it. Driven as
  * the check drives
  * it, `node pictures.ts <closeout>` in a committed scratch repository whose base is `WF_BASE_REF`, a bounded subprocess; and the shipped
- * check of `workflows/build/implement.md` is run whole, as frozen, with `npm` stubbed, so the clause is proven wired and not only written.
+ * check of `workflows/build/implement.md` is run whole, as frozen, with `npm` stubbed and the pull request's world stood up
+ * (`test/origin.ts`), so the clause is proven wired and not only written.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,6 +16,7 @@ import { loadWorkflows } from '../src/folder/folder.store.ts';
 import { checkArgv } from '../src/check/check.ts';
 import { REPO, placesOf } from './team.ts';
 import { scratch } from './scratch.ts';
+import { bareOrigin, ghIn, passing } from './origin.ts';
 
 const BUILD = path.join(REPO, 'workflows', 'build');
 
@@ -35,6 +37,9 @@ const write = (dir: string, files: Record<string, string>): void => {
   }
 };
 
+/** The branch a run's work is on, which the pull-request script the shipped check runs requires (`wf/<run>/<step>`). */
+const BRANCH = 'wf/r-1/implement';
+
 /** A scratch repository whose base commit holds `base` and whose HEAD, one commit on, adds `work`; with the base's commit. */
 function workOn(work: Record<string, string>, base: Record<string, string> = {}): { repo: string; base: string } {
   const repo = scratch('wf-pictures-repo-');
@@ -43,10 +48,11 @@ function workOn(work: Record<string, string>, base: Record<string, string> = {})
   git(repo, 'add', '-A');
   git(repo, 'commit', '-qm', 'base');
   const at = git(repo, 'rev-parse', 'HEAD').trim();
-  git(repo, 'checkout', '-q', '-b', 'work');
+  git(repo, 'checkout', '-q', '-b', BRANCH);
   write(repo, work);
   git(repo, 'add', '-A');
   git(repo, 'commit', '-qm', 'work');
+  bareOrigin(repo);
   return { repo, base: at };
 }
 
@@ -149,7 +155,7 @@ function mergedMain(
   write(at.repo, theirs);
   git(at.repo, 'add', '-A');
   git(at.repo, 'commit', '-qm', 'main moves on');
-  git(at.repo, 'checkout', '-q', 'work');
+  git(at.repo, 'checkout', '-q', BRANCH);
   git(at.repo, 'merge', '-q', '--no-commit', '--no-ff', 'main');
   write(at.repo, resolved);
   git(at.repo, 'add', '-A');
@@ -294,6 +300,7 @@ function shipped(repo: string, env: Record<string, string>): { status: number | 
   const bin = scratch('wf-pictures-bin-');
   fs.writeFileSync(path.join(bin, 'npm'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
   fs.writeFileSync(path.join(bin, 'claude'), '#!/bin/sh\necho "[]"\n', { mode: 0o755 });
+  const gh = ghIn(bin, passing(repo));
   const [cmd, ...args] = checkArgv(implementCheck());
   const r = spawnSync(cmd, args, {
     cwd: repo,
@@ -302,6 +309,7 @@ function shipped(repo: string, env: Record<string, string>): { status: number | 
       HOME: repo,
       TMPDIR: scratch('wf-pictures-tmp-'),
       WF_RUN: 'r-1',
+      ...gh.env(),
       ...env,
     },
     encoding: 'utf8',
@@ -316,6 +324,7 @@ test("REFUSED at shipped defaults: implement's check, as frozen, refuses a page 
     'workflows/build/mutants.ts': fs.readFileSync(path.join(BUILD, 'mutants.ts'), 'utf8'),
     'workflows/build/pictures.ts': fs.readFileSync(SCRIPT, 'utf8'),
     'workflows/build/probe.ts': fs.readFileSync(path.join(BUILD, 'probe.ts'), 'utf8'),
+    'workflows/build/pull-request.ts': fs.readFileSync(path.join(BUILD, 'pull-request.ts'), 'utf8'),
   };
   const { repo, base } = workOn(PAGE, scripts);
   const files = scratch('wf-pictures-files-');

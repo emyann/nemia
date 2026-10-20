@@ -25,7 +25,8 @@ step's note, which `packages/agent-orchestrator/test/quick-check.boundary.test.t
 
 ## Implement's check
 
-The check is the cheap set: it runs `change.ts size`, `pictures.ts`, `probe.ts` and `mutants.ts`, in that order, and nothing else.
+The check is the cheap set, and CI: it runs `change.ts size`, `pictures.ts`, `probe.ts`, `mutants.ts`, `pull-request.ts push` and
+`pull-request.ts wait`, in that order, and nothing else.
 Each script is read from the run's base (`git show "$WF_BASE_REF:…"`), never from the tree it judges:
 
 1. `change.ts size`, first: the net change from the base the branch holds to `HEAD` (`git diff --numstat -M`, so a line added then
@@ -35,11 +36,15 @@ Each script is read from the run's base (`git show "$WF_BASE_REF:…"`), never f
 2. `build`'s `pictures.ts`, `probe.ts` and `mutants.ts`, where they are in `workflows/build/`: a change under `apps/web/src` owes a
    picture, no probe is left live, and a rule the change adds is proven by a mutant (a removal names none, and says why in
    `noMutants`).
+3. `build`'s `pull-request.ts`, where it is in `workflows/build/`: `push` pushes the branch and refuses unless the one open, non-draft
+   pull request of it is at the commit the check judges; `wait` polls the `ci` context of that head and refuses a red, cancelled or
+   missing one with the Actions URL, the failing jobs and a tail of their log.
 
-No typecheck, no lint, no test of a package and no e2e page: nothing runs Ada's tests for her before the gate. Her session runs the
-tests of what she changed, the types, the lint and the e2e pages a change to the board touches, as `CLAUDE.md`, *Check your work*,
-says of a step's session. Land's check then runs the whole suite, the types, the lint and the whole e2e on the merged tree, whatever
-was touched, and is `build`'s land check to the letter (`agent-fences.test.ts` holds the two steps equal but their `after:`). Main
+No typecheck, no lint, no test of a package and no e2e page on this machine: nothing here runs Ada's tests for her before the gate. Her
+session runs the tests of what she changed, the types, the lint and the e2e pages a change to the board touches, as `CLAUDE.md`,
+*Check your work*, says of a step's session; CI's `ci` context runs the suite, the types, the lint and the whole e2e on the commit the
+check pushed, and the check waits on it. Land's check then runs the whole suite, the types, the lint and the whole e2e on the merged
+tree, whatever was touched, and is `build`'s land check to the letter (`agent-fences.test.ts` holds the two steps equal but their `after:`). Main
 has one guard, whatever the workflow.
 
 **A landing whose check refuses**: the merge is aborted and nothing landed. The work goes back to implement at once, with what the

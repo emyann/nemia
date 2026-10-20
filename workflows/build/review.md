@@ -30,11 +30,18 @@ When the change touches `tools/observe`, read each dashboard's picture and text 
 `dashboard-<name>.png` and `dashboard-<name>.txt`, with the `see-a-dashboard` skill: the text first. A dashboard the change touches
 with no picture and text of it is a finding. You do not render one yourself: your fence refuses the command and Docker.
 
-Implement's check ran the whole test suite on this round's tree, forced, and your brief hands you its exit and the end of its output
-under `## What implement's check said`. That run is the floor, and a run of yours on the same tree would only say it again, and your
-fence refuses the whole suite; a check that did not pass is a finding. Run the typecheck and the lint yourself, each bare and one
-command per call: `npx turbo run typecheck --force`, `npm run lint`. Run a package's tests,
-`npx turbo run test --force --continue --filter=<package>`, only where a finding needs a run to stand on.
+Implement's check ran the declarations, the typecheck and the lint on this round's tree, and waited on CI: GitHub's `ci` context judged
+the suite, the types, the lint, the whole e2e and the build on the commit implement pushed, and the check proved that commit is the one
+it judged. Your brief hands you its exit and the end of its output under `## What implement's check said`, that verdict in it; a check
+that did not pass is a finding, and so is a round whose suite nothing ran.
+
+**Read the pull request and its checks**, read-only, by the address implement named in its `artifacts` as a value: `gh pr view 7` and
+`gh pr checks 7`, the number that address ends on. A red, cancelled or absent `ci` is a finding, as is a pull request whose head is not
+the commit you are reviewing. You open, edit, merge and close none: those are refused you, and a person's.
+
+Run the typecheck and the lint yourself, each bare and one command per call: `npx turbo run typecheck --force`,
+`npm run lint`. Run a package's tests, `npx turbo run test --force --continue --filter=<package>`, only where a finding needs a run to
+stand on.
 
 **Judge the mutants, do not run them**: implement's check applied each mutant the engineer's closeout names and refused the step if
 one survived; your brief hands you what it said under `## What implement's check said`, each `wf mutants:` line whole in `reported`.
@@ -42,7 +49,7 @@ Judge whether the list covers every rule the change adds, and whether each mutan
 rule with no mutant, or a mutant that only stops the file loading, is a finding. Quote each `wf mutants:` line you judged in your
 closeout's `mutants`.
 
-Never build or run the e2e: implement's check ran it on this round's tree, and its log is in the check you are handed.
+Never build or run the e2e: CI ran every page on the commit implement pushed, and its verdict is in the check you are handed.
 
 **Say whether the branch holds the base** as it is when you review. The base is the branch the repository's own checkout is on, and
 from your workspace git names its tip `main-worktree/HEAD`, whatever that branch is called:

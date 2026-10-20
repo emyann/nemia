@@ -4,7 +4,8 @@
  * only when it asks for an answer, and is refused by implement's check while it is live. Driven as a step and the check drive it, in a
  * scratch repository on a run's branch, with a stub `claude` first on the PATH that records each call and lists the rows it is given,
  * a scratch `HOME` and `WF_ROOT`, each a bounded subprocess; and the shipped check of `workflows/build/implement.md` is run whole, as
- * frozen, with `npm` stubbed, so the clause is proven wired and not only written.
+ * frozen, with `npm` stubbed and the pull request's world stood up (`test/origin.ts`), so the clause is proven wired and not only
+ * written.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,6 +16,7 @@ import { loadWorkflows } from '../src/folder/folder.store.ts';
 import { checkArgv } from '../src/check/check.ts';
 import { REPO, placesOf } from './team.ts';
 import { scratch } from './scratch.ts';
+import { bareOrigin, ghIn, passing } from './origin.ts';
 
 const BUILD = path.join(REPO, 'workflows', 'build');
 
@@ -242,7 +244,7 @@ const implementCheck = (): string => {
 /** A scratch repository whose base commit holds `files`, one commit on: the repository and the base's commit. */
 function based(files: Record<string, string>): { repo: string; base: string } {
   const repo = scratch('wf-probe-check-');
-  git(repo, 'init', '-q', '-b', 'main');
+  git(repo, 'init', '-q', '-b', 'wf/r-1/implement');
   for (const [name, text] of Object.entries({ 'README.md': 'base\n', ...files })) {
     fs.mkdirSync(path.dirname(path.join(repo, name)), { recursive: true });
     fs.writeFileSync(path.join(repo, name), text);
@@ -251,21 +253,26 @@ function based(files: Record<string, string>): { repo: string; base: string } {
   git(repo, 'commit', '-qm', 'base');
   const base = git(repo, 'rev-parse', 'HEAD').trim();
   git(repo, 'commit', '-q', '--allow-empty', '-m', 'work');
+  bareOrigin(repo);
   return { repo, base };
 }
 
 test("REFUSED at shipped defaults: implement's check, as frozen, refuses a live probe of its run and passes once it is stopped", () => {
   const scripts = Object.fromEntries(
-    ['mutants.ts', 'pictures.ts', 'probe.ts'].map((name) => [`workflows/build/${name}`, fs.readFileSync(path.join(BUILD, name), 'utf8')]),
+    ['mutants.ts', 'pictures.ts', 'probe.ts', 'pull-request.ts'].map((name) => [
+      `workflows/build/${name}`,
+      fs.readFileSync(path.join(BUILD, name), 'utf8'),
+    ]),
   );
   const { repo, base } = based(scripts);
   const closeout = path.join(scratch('wf-probe-closeout-'), 'closeout.json');
   fs.writeFileSync(closeout, JSON.stringify({ outcome: 'done', summary: 's', artifacts: [], mutants: [], noMutants: 'a fixture' }));
   const at = placed({ rows: [row('r-1-probe-a', 'blocked')] });
   fs.writeFileSync(path.join(at.bin, 'npm'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+  const gh = ghIn(at.bin, passing(repo));
   const run = (more: Record<string, string>) => {
     const [cmd, ...args] = checkArgv(implementCheck());
-    const env = { ...envAt(at), TMPDIR: scratch('wf-probe-tmp-'), WF_RUN: 'r-1', WF_CLOSEOUT: closeout, ...more };
+    const env = { ...envAt(at), ...gh.env(), TMPDIR: scratch('wf-probe-tmp-'), WF_RUN: 'r-1', WF_CLOSEOUT: closeout, ...more };
     const r = spawnSync(cmd, args, { cwd: repo, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 120_000 });
     return { status: r.status, out: `${r.stdout}${r.stderr}` };
   };
@@ -281,7 +288,7 @@ test("REFUSED at shipped defaults: implement's check, as frozen, refuses a live 
   });
   const r = spawnSync(checkArgv(implementCheck())[0], checkArgv(implementCheck()).slice(1), {
     cwd: old.repo,
-    env: { ...envAt(at), TMPDIR: scratch('wf-probe-tmp-'), WF_RUN: 'r-1', WF_CLOSEOUT: closeout, WF_BASE_REF: old.base },
+    env: { ...envAt(at), ...gh.env(), TMPDIR: scratch('wf-probe-tmp-'), WF_RUN: 'r-1', WF_CLOSEOUT: closeout, WF_BASE_REF: old.base },
     encoding: 'utf8',
     timeout: 120_000,
   });

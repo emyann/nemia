@@ -28,9 +28,10 @@ holds what every change needs.
   `packages/agent-runtime` and `apps/web`. Where a file alone does not say enough (a shared helper, a type many files read, a package's
   test setup), the packages it touched: `npx turbo run test --force --continue --filter=<package>`, the package by its `name`
   (`agent-orchestrator`, `agent-runtime`, `api`, `web`). Typecheck and lint run whole: they are cheap. Implement's round check runs the
-  whole suite forced (`workflows/build/implement.md`), and the landing's again on the merged tree; a session runs it only to measure
-  it, as the e2e's rule says. A failing test it did not run is the check's refusal, answered in the next try. Outside a run no check
-  follows you: run the whole suite before you commit.
+  declarations, the typecheck and the lint, and pushes the round's commit and waits on GitHub's `ci` context, which runs the whole
+  suite on it (`workflows/build/implement.md`); the landing's runs the whole suite forced again on the merged tree; a session runs it
+  only to measure it, as the e2e's rule says. A failing test it did not run is the check's refusal, answered in the next try. Outside a
+  run no check follows you: run the whole suite before you commit.
 - `npm run typecheck` — `tsc --noEmit` per package, over its `src` and its `test/` (the web's `test/e2e/` under its own tsconfig);
   `agent-orchestrator/test/suite.test.ts` refuses a test file no typecheck reads.
 - `npm run lint` — oxlint (`.oxlintrc.json`) and `oxfmt --check` (`.oxfmtrc.json`); `npm run format` writes the layout. Every shipped

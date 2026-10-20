@@ -1,0 +1,32 @@
+# What the secret scan allows, and nothing more (the gitleaks job in .github/workflows/ci.yml).
+#
+# gitleaks' own rules are what scan; this file adds one allowlist, for the stub secrets a test of the runtime writes on purpose — a
+# token and two keys it sends to a loopback server to prove the secret reaches the harness and is written nowhere else. They are
+# generic-api-key findings by entropy, and they are in the only file that may hold one.
+#
+# The nesting is load-bearing, and is the one thing a reader cannot check by reading. A top-level `[[allowlists]]` is global, and a
+# global allowlist's `paths` skips the whole file whatever its `condition`: every secret in that file is then allowed, a real token
+# somebody pastes in beside the stubs included. Under `[[rules]]` with `id = "generic-api-key"` it is scoped to that one rule instead,
+# and because gitleaks appends allowlist arrays, the block extends the default rule rather than replacing it — which any other key on
+# the block would do, leaving a rule that detects nothing at all.
+#
+# `condition = "AND"` is the same trap one key lower, and the default is the wrong one: a rule allowlist joins its criteria with OR
+# unless told otherwise, so without that line `paths` alone allows every finding in that file and `regexes` alone allows a stub's shape
+# anywhere in the repository. The file would read exactly as it does now.
+#
+# Scoped by path AND by shape: a secret of another shape in that file is a finding, and a string of these shapes anywhere else is a
+# finding too. That is not this comment's word: the `gitleaks` job proves it on every run, scanning a fixture it writes with the pinned
+# binary and refusing unless the counts come out (the step named by `ALLOWLIST_STEP` in packages/agent-orchestrator/test/ci-workflow.ts).
+# packages/agent-orchestrator/test/ci-workflow.test.ts refuses this file's form, a regex here that matches none of that file's stub
+# secrets, and one that matches a line of any other file.
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+
+[[rules.allowlists]]
+description = "the runtime's deliberate stub secrets, in the one test that writes them"
+condition = "AND"
+paths = ['packages/agent-runtime/test/remote-agent\.test\.ts$']
+regexes = ['^tok-[0-9a-f]{4}-SECRET-[0-9a-f]{4}$', '^key-[0-9a-f]{4}-SECRET$']

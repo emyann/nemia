@@ -201,12 +201,175 @@ jobs:
           fi
           echo "ci: the generated files are the bytes their generators write."
 
+  gitleaks:
+    # The push's or the pull request's new commits, scanned for a secret. The history's own 4,021 commits were audited by hand on
+    # 2026-10-19 with this very version and held no secret (docs/plan-github-ci.md, "3. What the history exposes"), so what is left to
+    # watch is what arrives — and a range keeps the scan a second long instead of minutes of false positives from the history.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The whole history: the range below names a commit before this push, which the shallow default has not, and git refuses a
+          # range whose first end it cannot resolve.
+          fetch-depth: 0
+      - name: Download gitleaks and check it against its release's sha256
+        # A pinned download in a run step, never a third party's action: nothing of theirs runs with this token, and the version and
+        # the bytes are both this file's. v8.30.1 is the version the owner's audit used. To move it, change both lines below together:
+        # take the new hash from gitleaks_<version>_checksums.txt of that release. A release that detects the stub shapes differently
+        # is refused by the next step, which is the third place the version is felt - loudly, which is the point.
+        env:
+          VERSION: 8.30.1
+          SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        run: |
+          curl -fsSL -o gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz"
+          echo "${SHA256}  gitleaks.tar.gz" | sha256sum --check --strict -
+          tar -xzf gitleaks.tar.gz gitleaks
+          ./gitleaks version
+      - name: Prove the allowlist allows the stubs and nothing wider
+        # The one thing .gitleaks.toml's own text cannot say. A top-level [[allowlists]] with a paths entry skips the whole file
+        # whatever its condition, so the file's comment can claim a scope the file does not have - which is how the first draft of this
+        # card shipped an allowlist that allowed every secret in remote-agent.test.ts, planted tokens included. Only the binary knows,
+        # so the binary is asked here on every run, over a fixture of the repository's own shape: the two stub shapes at the allowed
+        # path, two controls of other shapes beside them, and a stub shape at a second path. Scanned twice, with the config and
+        # without it, and every difference between the two runs is named below.
+        #
+        # The controls are generated here, not written down, so this file holds no string any gitleaks rule matches. What the step
+        # refuses is run rather than read, in packages/agent-orchestrator/test/ci-scan.boundary.test.ts.
+        run: |
+          fixture=$(mktemp -d)
+          # The reports go outside the fixture: a report holds the secrets it found, so one written beside the fixture's files would be
+          # scanned by the next run and counted as a finding of its own.
+          reports=$(mktemp -d)
+          mkdir -p "$fixture/packages/agent-runtime/test"
+          # The stub shapes are read out of the file the allowlist is for, never written here: this file then holds no string any
+          # gitleaks rule matches, and the fixture is about the strings that test writes today rather than a copy of them that drifts.
+          stubs="$fixture/stubs"
+          grep -ohE "(tok|key)-[0-9a-f]{4}-SECRET(-[0-9a-f]{4})?" \
+            "$GITHUB_WORKSPACE/packages/agent-runtime/test/remote-agent.test.ts" | sort -u > "$stubs"
+          want=$(wc -l < "$stubs")
+          if [ "$want" -lt 2 ]; then
+            echo "ci: packages/agent-runtime/test/remote-agent.test.ts writes $want stub secrets of the shape this allowlist is for, so" >&2
+            echo "ci: there is nothing left to allow. Take the [[rules.allowlists]] block out of .gitleaks.toml, and this step with it." >&2
+            exit 1
+          fi
+          allowed="$fixture/packages/agent-runtime/test/remote-agent.test.ts"
+          : > "$allowed"
+          while read -r stub; do echo "const token = '$stub';" >> "$allowed"; done < "$stubs"
+          # Two controls of other shapes beside them, generated here: one of another rule, one of this rule and another shape. Neither
+          # may be allowed by an allowlist scoped to the stubs, and both are what the draft's global [[allowlists]] silently allowed.
+          echo "const pat = 'ghp_$(openssl rand -hex 18)';" >> "$allowed"
+          echo "const apiKey = '$(openssl rand -hex 32)';" >> "$allowed"
+          head -1 "$stubs" | while read -r stub; do echo "const token = '$stub';"; done \
+            > "$fixture/packages/agent-runtime/test/elsewhere.test.ts"
+
+          # Each scan writes a JSON report whatever it finds. --exit-code is not asked for here: a found secret is what this step wants,
+          # so the status says nothing, and a missing report is the only way to tell a scan that failed from one that found nothing.
+          scan() {
+            report="$reports/$1.json"
+            shift
+            rm -f "$report"
+            (cd "$fixture" && "$GITHUB_WORKSPACE/gitleaks" dir --no-banner --report-format json --report-path "$report" "$@" .) || true
+            if [ ! -f "$report" ]; then
+              echo "ci: gitleaks wrote no report over the allowlist self-check's fixture, so the scan itself failed and the allowlist" >&2
+              echo "ci: was never tested. Read the lines above: the binary is the one downloaded in the step before this." >&2
+              exit 1
+            fi
+          }
+          scan bare
+          scan configured --config "$GITHUB_WORKSPACE/.gitleaks.toml"
+
+          STUBS='^(tok-[0-9a-f]{4}-SECRET-[0-9a-f]{4}|key-[0-9a-f]{4}-SECRET)$'
+          ALLOWED='remote-agent\.test\.ts$'
+          OTHER='elsewhere\.test\.ts$'
+          # The findings in one file, either of the stub shapes or of any other: the allowlist's two scopes, counted apart.
+          found() {
+            jq --arg file "$2" --arg stubs "$STUBS" --argjson stub "$3" \
+              '[.[] | select(.File | test($file)) | select((.Secret | test($stubs)) == $stub)] | length' "$reports/$1.json"
+          }
+          rules() { jq -r --arg file "$2" '[.[] | select(.File | test($file)) | .RuleID] | unique | join(" ")' "$reports/$1.json"; }
+
+          bare_stubs=$(found bare "$ALLOWED" true)
+          bare_others=$(found bare "$ALLOWED" false)
+          bare_elsewhere=$(found bare "$OTHER" true)
+          kept_stubs=$(found configured "$ALLOWED" true)
+          kept_others=$(found configured "$ALLOWED" false)
+          kept_elsewhere=$(found configured "$OTHER" true)
+          echo "ci: unconfigured $bare_stubs stub(s) and $bare_others control(s) at the allowed path, $bare_elsewhere elsewhere" \
+            "[$(rules bare "$ALLOWED")]; configured $kept_stubs, $kept_others and $kept_elsewhere [$(rules configured "$ALLOWED")]"
+
+          # The fixture writes every stub shape that file holds at the allowed path and two controls beside them, so these are the
+          # fixture's own numbers and not gitleaks': what moves them is the release, which is why the sentence sends you to the release.
+          if [ "$bare_stubs" -lt "$want" ] || [ "$bare_others" -lt 2 ] || [ "$bare_elsewhere" -lt 1 ]; then
+            echo "ci: with no config, gitleaks found $bare_stubs of the $want stub shapes and $bare_others of the 2 controls at the allowed" >&2
+            echo "ci: path, and $bare_elsewhere of the 1 stub shape elsewhere. It no longer detects what .gitleaks.toml exists to allow," >&2
+            echo "ci: so that allowlist may be dead weight hiding a real secret of the same shape. Re-check the shapes against this" >&2
+            echo "ci: release's rules, and narrow or drop the allowlist to what is still detected." >&2
+            exit 1
+          fi
+          if [ "$kept_others" -lt "$bare_others" ]; then
+            echo "ci: with .gitleaks.toml, $kept_others of the $bare_others controls at the allowed path are still found: the allowlist" >&2
+            echo "ci: is allowing more of that file than the stub shapes, and a real secret pasted in beside them would pass. Write it as" >&2
+            echo "ci: a [[rules]] block with id = \"generic-api-key\" carrying one [[rules.allowlists]], never a top-level [[allowlists]]:" >&2
+            echo "ci: a global allowlist's paths entry skips the whole file whatever its condition. And check that block carries" >&2
+            echo "ci: condition = \"AND\": without it a rule allowlist joins its criteria with OR, so paths alone allows every finding" >&2
+            echo "ci: in that file and regexes alone allows a stub's shape anywhere." >&2
+            exit 1
+          fi
+          if [ "$kept_stubs" -ne 0 ]; then
+            echo "ci: with .gitleaks.toml, $kept_stubs of the $want stub shapes at the allowed path are still found, so a push that touches" >&2
+            echo "ci: packages/agent-runtime/test/remote-agent.test.ts is refused over a secret nobody can use. A regexes entry there no" >&2
+            echo "ci: longer matches what the test writes: read the strings it writes and re-anchor the shape, ^...\$, to the bytes" >&2
+            echo "ci: gitleaks captures." >&2
+            exit 1
+          fi
+          if [ "$kept_elsewhere" -ne "$bare_elsewhere" ]; then
+            echo "ci: with .gitleaks.toml, $kept_elsewhere of the $bare_elsewhere stub shapes outside the allowed path are still found:" >&2
+            echo "ci: the allowlist's paths scope reaches past the one file that may hold a stub, so a secret of that shape anywhere in" >&2
+            echo "ci: the repository is allowed. Scope paths to the one file, anchored with \$, and nothing wider." >&2
+            exit 1
+          fi
+          echo "ci: the allowlist allows the stub shapes in their one file, and nothing wider."
+      - name: Scan this push's new commits
+        # The shas come through env and are never interpolated into the command line: on a pull request they are a fork's to name.
+        # --redact, because this repository is public and a finding's log is too: the scan says which commit and line, never the secret.
+        # --exit-code 2, because gitleaks exits 1 both for a leak and for a failure to scan, and a job that calls a range it could not
+        # resolve a found secret says the wrong thing to whoever reads it.
+        env:
+          BEFORE: ${{ github.event.before }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ -n "$BASE" ]; then
+            range="$BASE..$HEAD_SHA"
+          elif [ -n "$BEFORE" ] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ]; then
+            range="$BEFORE..$GITHUB_SHA"
+          else
+            # workflow_dispatch, and a branch's first push, which has no commit before it: the tip's own commit.
+            range="$GITHUB_SHA~1..$GITHUB_SHA"
+          fi
+          echo "ci: scanning $range"
+          found=0
+          ./gitleaks git --config .gitleaks.toml --log-opts "$range" --redact --no-banner --exit-code 2 . || found=$?
+          if [ "$found" -eq 2 ]; then
+            echo "ci: gitleaks found a secret in a commit of this push, listed above by file and line (the value itself is redacted)." >&2
+            echo "ci: Take it out of the code, rotate it, and rewrite the commit that holds it - a secret pushed once is spent." >&2
+            echo "ci: If it is a stub nobody can use, allow its shape and its one file in .gitleaks.toml, and nothing wider." >&2
+            exit 1
+          fi
+          if [ "$found" -ne 0 ]; then
+            echo "ci: gitleaks could not scan $range (exit $found), so this push's commits were not read for a secret - and no secret" >&2
+            echo "ci: was found. Check that the range's first end resolves in this checkout: a force-push leaves a before that is gone," >&2
+            echo "ci: a root commit has no ~1, and the checkout above must keep fetch-depth: 0." >&2
+            exit 1
+          fi
+
   # The one context branch protection requires. It needs every other job, so protection is configured once and never touched as the job
   # list changes, and always() makes it run even when one of them fails, is skipped or is cancelled — each of which it reads as a failure.
   ci:
     runs-on: ubuntu-latest
     if: always()
-    needs: [test, lint, typecheck, e2e, e2e-bound, build]
+    needs: [test, lint, typecheck, e2e, e2e-bound, build, gitleaks]
     steps:
       - name: Every job succeeded
         # toJSON(needs) goes through env, never interpolated into the shell: on a pull request from a fork, an expression the branch

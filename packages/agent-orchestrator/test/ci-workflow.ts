@@ -1,8 +1,10 @@
 /**
  * Where the repository's Actions workflow is, how it parses, and which of its steps is the gate's.
  *
- * Read by the guard that holds the file to the repository (`ci-workflow.test.ts`) and by the test that runs the gate's own script
- * (`ci-gate.boundary.test.ts`): one writer for the path and for what the gate's step is, so the two cannot drift apart.
+ * Read by the guard that holds the file to the repository (`ci-workflow.test.ts`) and by the tests that run a step's own script
+ * (`ci-gate.boundary.test.ts`, `ci-build.boundary.test.ts`, `ci-scan.boundary.test.ts`): one writer for the path and for what each of
+ * those steps is, so the two cannot drift apart. What is about the repository and not about this workflow is not here: the owned paths
+ * and the private packages are written where their one reader is (`repo-guards.test.ts`).
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -78,3 +80,23 @@ export const staleStep = (workflow: Workflow): Step | undefined => runSteps(work
 
 /** The gate's steps that run a command: the one that turns the needed jobs' results into the `ci` context. */
 export const gateSteps = (workflow: Workflow): Step[] => runSteps(workflow, GATE);
+
+/** The job that scans the push's or the pull request's new commits for a secret. */
+export const SCAN = 'gitleaks';
+
+/** What the scan is configured by, and the one file that says what it allows, as the sentences that refuse a wider scan name it. */
+export const SCAN_CONFIG = '.gitleaks.toml';
+
+/**
+ * What the scan job's step that proves its own allowlist is called, so the guard and the boundary test find the same step. What it
+ * decides is run rather than matched (`ci-scan.boundary.test.ts`): the config's meaning is not in its text, and neither is the step's.
+ */
+export const ALLOWLIST_STEP = 'Prove the allowlist allows the stubs and nothing wider';
+
+/** The scan job's step that scans the push's own commits, by the flags it carries: the one step of the job that reads git. */
+export const scanStep = (workflow: Workflow): Step | undefined =>
+  runSteps(workflow, SCAN).find((step) => step.run?.includes('--log-opts') === true);
+
+/** The scan job's step that proves its allowlist, by its name. */
+export const allowlistStep = (workflow: Workflow): Step | undefined =>
+  runSteps(workflow, SCAN).find((step) => step.name === ALLOWLIST_STEP);

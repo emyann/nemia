@@ -1039,11 +1039,7 @@ test('the daemon names on the lease what its hold serves, and names none when it
     [undefined],
     'a daemon whose hold answers nothing names no holder',
   );
-  assert.equal(
-    'holder' in read(),
-    false,
-    'and the lease a new daemon takes carries no holder of the last, however the last one ended',
-  );
+  assert.equal('holder' in read(), false, 'and the lease a new daemon takes carries no holder of the last, however the last one ended');
   clear();
 });
 

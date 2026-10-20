@@ -4,12 +4,16 @@
  * from its agent, `nemia start`'s refusal of a name the file does not declare, and what the tick files — no harness arguments, no schema,
  * no hold, and a brief that names nothing of this machine. The agent itself, reached over HTTP, is `remote-step.test.ts`'s. `WF_ROOT` is
  * set before the import, since the module reads it as it loads.
+ *
+ * The holder's branch of `credentials` is here too, beside the remote one: a lease written by hand for a process that is alive and
+ * is not this one — the test runner that started it, `process.ppid`, which needs no process started — and the token written into the
+ * file a holder's engine mints it in. That path is the runtime's own, and that the two processes agree on
+ * it is what `apps/api/test/holder-stream.boundary.test.ts` proves with a real holder; this file proves the branch that reads it.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
 import { STEP_KEYS, WorkflowError } from '../step/step.ts';
 import { REMOTE_REFUSED_KEYS } from './harness.ts';
 import { parseWorkflow } from '../workflow/index.ts';
@@ -178,10 +182,6 @@ test("the holder's token is answered for its scheme and a harness the lease name
   const { procStartOf } = await import('../runner.ts');
   const { BEARER } = await import('agent-runtime');
   const engineRoot = path.join(ROOT, 'engine');
-  /**
-   * The file a holder's engine mints its token into, written here by hand: the path is the runtime's own, and that the two agree
-   * on it is what `apps/api/test/holder-stream.boundary.test.ts` proves with a real holder. This file proves the branch.
-   */
   const tokenFile = path.join(engineRoot, 'a2a', 'holder-token');
   const writeToken = (token: string) => {
     fs.mkdirSync(path.dirname(tokenFile), { recursive: true, mode: 0o700 });
@@ -189,10 +189,8 @@ test("the holder's token is answered for its scheme and a harness the lease name
   };
   const forgetToken = () => fs.rmSync(tokenFile, { force: true });
   const daemonJson = path.join(ROOT, 'daemon.json');
-  const sleeper = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 120_000)'], { stdio: 'ignore' });
-  const held = sleeper.pid!;
+  const held = process.ppid;
   t.after(() => {
-    sleeper.kill();
     fs.rmSync(daemonJson, { force: true });
     forgetToken();
   });

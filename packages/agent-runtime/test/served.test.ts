@@ -164,7 +164,12 @@ test('the three served methods are the handler the runtime already had: its card
 test('the viewer dials its `follow` and nothing else: every other verb is the value it was', () => {
   const ops = handOps() as SeamOps;
   const card = cardJsonOf(servedCardOf('claude', ops, URL_AT));
-  const dialled = holderSeamOf(() => ({ card }), 'claude', () => 'tok-1', ops);
+  const dialled = holderSeamOf(
+    () => ({ card }),
+    'claude',
+    () => 'tok-1',
+    ops,
+  );
   assert.notEqual(dialled.follow, ops.follow, 'the follow is the holder’s');
   const kept = Object.keys(ops).filter((k) => k !== 'follow');
   assert.deepEqual(
@@ -181,7 +186,12 @@ test('the viewer dials its `follow` and nothing else: every other verb is the va
 
 test('a holder function answering nothing reads the session here: the follow is the ops’ own, and nothing is dialled', async () => {
   const ops = handOps() as SeamOps;
-  const seam = holderSeamOf(() => undefined, 'claude', () => 'tok-1', ops);
+  const seam = holderSeamOf(
+    () => undefined,
+    'claude',
+    () => 'tok-1',
+    ops,
+  );
   assert.deepEqual(await Effect.runPromise(Stream.runCollect(seam.follow!(NAME))), MOMENTS, 'the moments are the ones the ops give');
 });
 
@@ -199,11 +209,7 @@ test('the holder is asked at each follow, not at the build: nothing first, a car
     },
     ops,
   );
-  assert.deepEqual(
-    await Effect.runPromise(Stream.runCollect(seam.follow!(NAME))),
-    MOMENTS,
-    'with no holder up, the follow reads here',
-  );
+  assert.deepEqual(await Effect.runPromise(Stream.runCollect(seam.follow!(NAME))), MOMENTS, 'with no holder up, the follow reads here');
   assert.deepEqual(asked, [], 'and nothing was dialled for it');
   holding = true;
   const dialled = await Effect.runPromise(Effect.exit(Stream.runCollect(seam.follow!(NAME))));

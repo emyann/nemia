@@ -855,7 +855,6 @@ const servingOf = (harnesses: Record<string, HarnessConfig>, made: Record<string
   return { ops: Object.fromEntries(Object.entries(made).filter(([name]) => held.includes(name))), events };
 };
 
-
 /**
  * The verbs of the sessions run attached: `hold`, with the port it serves while it holds (`servedOf`), and `drain`, which writes the
  * drain's file or removes it.

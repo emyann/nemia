@@ -64,19 +64,26 @@ function writeRun(taskId: string): void {
   );
 }
 
+/** A child spawned with all three of its streams piped, so each is there to read and to write. */
+type Piped = ChildProcess & {
+  stdin: NonNullable<ChildProcess['stdin']>;
+  stdout: NonNullable<ChildProcess['stdout']>;
+  stderr: NonNullable<ChildProcess['stderr']>;
+};
+
 /** The holder, up and holding: its child, what it said of itself, and the way to tell it to go. */
 async function holder(cwd: string): Promise<{ child: ChildProcess; held: Held; stderr: () => string; stop: () => void }> {
   const child = spawn(process.execPath, [HOLDER], {
     env: { ...process.env, CLAUDE_CONFIG_DIR: config, WF_ROOT: root },
     stdio: ['pipe', 'pipe', 'pipe'],
-  });
+  }) as Piped;
   const out: string[] = [];
   const err: string[] = [];
-  child.stdout!.setEncoding('utf8');
-  child.stdout!.on('data', (chunk: string) => void out.push(chunk));
-  child.stderr!.setEncoding('utf8');
-  child.stderr!.on('data', (chunk: string) => void err.push(chunk));
-  child.stdin!.end(JSON.stringify({ root, cwd, plan: PLAN }));
+  child.stdout.setEncoding('utf8');
+  child.stdout.on('data', (chunk: string) => void out.push(chunk));
+  child.stderr.setEncoding('utf8');
+  child.stderr.on('data', (chunk: string) => void err.push(chunk));
+  child.stdin.end(JSON.stringify({ root, cwd, plan: PLAN }));
   const said = async (): Promise<Held> => {
     for (;;) {
       const line = out
@@ -91,21 +98,6 @@ async function holder(cwd: string): Promise<{ child: ChildProcess; held: Held; s
   return { child, held: await said(), stderr: () => err.join(''), stop: () => void child.kill('SIGKILL') };
 }
 
-/** The blocks of a server-sent event stream, each its fields. */
-type Block = { event?: string; data?: string; id?: string };
-const blocks = (text: string): Block[] =>
-  text
-    .split('\n\n')
-    .filter((b) => b.trim())
-    .map((b) => {
-      const block: Block = {};
-      for (const line of b.split('\n')) {
-        const at = line.indexOf(':');
-        if (at > 0) block[line.slice(0, at) as keyof Block] = line.slice(at + 1).trimStart();
-      }
-      return block;
-    });
-
 test(
   'a viewer api follows a holder api’s live session through its own stream route, and reads it from the files with the holder gone',
   WAITED,
@@ -113,34 +105,25 @@ test(
     const cwd = path.join(root, 'holder-work');
     const up = await holder(cwd);
     t.after(() => up.stop());
-    assert.deepEqual(
-      Object.keys(up.held.cards),
-      ['claude'],
-      `the holder serves the one harness it runs attached: ${up.stderr()}`,
-    );
+    assert.deepEqual(Object.keys(up.held.cards), ['claude'], `the holder serves the one harness it runs attached: ${up.stderr()}`);
     writeRun(up.held.taskId);
 
     const lease = JSON.parse(fs.readFileSync(path.join(root, 'daemon.json'), 'utf8')) as { pid: number; holder?: object };
     assert.equal(lease.pid, up.child.pid, 'the lease is the holder’s');
     assert.deepEqual(lease.holder, up.held.cards, 'and names what it serves, by harness');
 
-    /**
-     * The token the holder minted for its port, read while it holds: the hold forgets it as it ends, so the walk that proves where
-     * it is and is not is made with the token in hand.
-     */
     const tokenFile = path.join(root, 'engine', 'a2a', 'holder-token');
     const token = fs.readFileSync(tokenFile, 'utf8').trim();
-    assert.ok(token.length > 0, 'the holder minted a token for the port it serves');
+    assert.ok(token.length > 0, 'the holder minted a token for the port it serves, read while it holds: the hold forgets it as it ends');
     assert.equal(fs.statSync(tokenFile).mode & 0o777, 0o600, 'kept to its own user');
 
-    /** The viewer's own api, its logs kept so they can be searched for the token rather than printed. */
     const said: string[] = [];
     const keeper = Logger.make(({ message }) => void said.push((Array.isArray(message) ? message : [message]).join(' ')));
+    assert.deepEqual(said, [], 'the viewer’s own log lines are kept rather than printed, so they can be searched for the token');
     const viewer = appOf(Layer.merge(liveOf(), Logger.layer([keeper])));
     t.after(() => viewer.runtime.dispose());
 
     const res = await viewer.app.request(`/api/runs/${RUN}/steps/${STEP}/transcript/stream`);
-    // The body of this one never ends while the holder is up, so it is read only when the status says the follow was refused.
     if (res.status !== 200) assert.fail(`the viewer follows the step: ${await res.text()}`);
     const reader = res.body!.getReader();
     const decoder = new TextDecoder();
@@ -156,7 +139,12 @@ test(
     const pumped = pump();
     t.after(() => reader.cancel());
 
-    await until(t, () => text.includes('Half '), () => `the first piece over the wire: ${text}`, { bell: rung });
+    await until(
+      t,
+      () => text.includes('Half '),
+      () => `the first piece over the wire: ${text}`,
+      { bell: rung },
+    );
     assert.equal(
       fs.existsSync(path.join(config, 'projects', 'stand-in')),
       false,
@@ -164,7 +152,12 @@ test(
     );
 
     fs.writeFileSync(path.join(cwd, 'more'), '');
-    await until(t, () => text.includes('a thought'), () => `the rest of it as it was written: ${text}`, { bell: rung });
+    await until(
+      t,
+      () => text.includes('a thought'),
+      () => `the rest of it as it was written: ${text}`,
+      { bell: rung },
+    );
 
     const answered = async (route: string): Promise<string> => (await viewer.app.request(route)).text();
     const answers = [await answered('/api/daemon'), await answered(`/api/runs/${RUN}`), text];
@@ -201,11 +194,7 @@ test(
       assert.equal(answer.includes(token), false, `no answer carries the token: ${what}`);
     }
     assert.equal(said.join('\n').includes(token), false, 'and no log line of the api carries it');
-    assert.equal(
-      `${up.stderr()}`.includes(token),
-      false,
-      'nor any line the holder said',
-    );
+    assert.equal(up.stderr().includes(token), false, 'nor any line the holder said');
     assert.equal(fs.existsSync(tokenFile), false, 'and the hold forgot its token as it ended');
   },
 );

@@ -83,9 +83,13 @@ holds what every change needs.
 - **A workflow step never pushes, never merges into the base branch, never force-deletes a branch**, and its agent's `disallowedTools:`
   refuses the push and the delete (a `dontAsk` agent's: no allow reaches them; `packages/agent-orchestrator/test/agent-fences.test.ts`).
   `.claude/settings.json` denies none of it: pushing and opening a pull request are the person's, or done by their session when they ask.
-  A person merges after a trial merge. The one exception is a run's ending step (a workflow's last step, `workspace: main`), filed only
-  once a person approves it: it stages the merge of the run's own result branch, and the run executes the ship's `check:` on the merged
-  tree and commits on exit 0 or aborts the merge (`landingDue`).
+  What a step may not type, the run does in its place, as two frozen scripts read out of git and run with `node`, never as a tool a fence
+  could not tell apart: `workflows/build/pull-request.ts` pushes a run's own branch and opens or updates its pull request, and
+  `workflows/build/landing.ts` merges that pull request and fast-forwards the checkout. The one exception to the rule is a run's ending
+  step (a workflow's last step, `workspace: main`), filed only once a person approves it: it runs `landing.ts merge`, which refuses
+  anything but this run's own green pull request — `mergeable`, `ci` green at the head the review read, no result branch left out — then
+  merges it with a merge commit whose message the step wrote and fast-forwards the base branch here; the run then executes the step's
+  `check:`, which is `landing.ts receipt`, and records the commit that landed on its exit 0 (`landingDue`).
 - If you are a workflow step, commit as you go: the run commits only what you leave uncommitted, in one commit under your step's name.
 
 ## Agents in this repository

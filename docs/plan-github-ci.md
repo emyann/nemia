@@ -171,28 +171,38 @@ means success read alike to a pattern and differ exactly on the result nobody fo
 pages, and coverage — every page in exactly one shard, in the pages' order — is proved in `apps/web/test/e2e-pages.test.ts` over the pages
 that exist. So the file cannot quietly test less than it claims.
 
-**The owner pushes `main` by hand after each landing**, and reads the verdict off GitHub's own notification or the Actions tab. Nothing in
-Nemia reads CI today, and `push: main` fires after the landing has already committed: CI reports on a landing and never gates one, so a
-red `main` is a normal state to be fixed, not a blocked one. One push after each landing is also what makes one CI run name one landing,
-and the verdict attributable.
+~~**The owner pushes `main` by hand after each landing**~~ — no longer so since the intent `a-run-s-change-is-a-pull-req-t452`
+(2026-10-19): a run pushes its own branch and opens its pull request (`workflows/build/pull-request.ts`), its round check waits on the
+`ci` context of that head, and the landing merges the pull request on GitHub and fast-forwards `main` in the owner's checkout
+(`workflows/build/landing.ts`). CI now gates a landing rather than reporting on one: `ci` is required on the head the review read, and
+a red or missing one is the landing's refusal. Nothing is pushed by hand, and one pull request names one landing.
 
 ## 6. The factory ships through pull requests
 
-A named follow-on intent's work, not this one's: the pull-request landing, the merge queue, `merge_group`, and Nemia reading CI's verdict
-through a place's `checks` verb, with `checks:` and several named checks as its first card. What changes there:
+**Done, 2026-10-19/20, by the intent `a-run-s-change-is-a-pull-req-t452`** — all but the merge queue. The factory now merges through
+pull requests end to end: a run pushes only its own branch, opens the pull request its round check waits on, and lands by merging that
+pull request with `--merge` at the sha the review read, then fast-forwarding the checkout. The frozen scripts carry both acts, and every
+agent's fence refuses `gh` and `git push` whole.
 
-- **Pushing.** A run pushes its own result branch (`wf/<run>/…`), never main. CLAUDE.md's "Never push" becomes "push only your
-  run's branch"; branch protection, not `settings.json`, is what refuses a push to main.
-- **The ship step** opens the PR (`gh pr create`, the body from the run's closeouts) and enables auto-merge into the queue. The
-  gate stays where it is: the owner approves the ship at its gate, or approves the PR, and only then does it enter the queue.
-- **The run reads CI.** A ship's step waits on the PR's checks and the queue's result, read with `gh`, level-triggered like
-  everything else: merged, failed with the failing job's log, or still waiting. A runtime harness that "runs" a CI check, or the
-  ship reading the PR's status on each tick; the plan for that step chooses.
+**The next follow-on: a merge queue.** Not a card, and not scheduled. The landing's check is a receipt now, so nothing re-runs the suite
+on the merged tree; a base that moves between `ci` and the merge is covered by GitHub's own `mergeable` and the required-context rule on
+a linear fast-forward, and by this factory landing one run at a time with a person at the gate. A merge queue (`merge_group`) would
+cover it properly, and would be the moment to add Nemia reading CI's verdict through a place's `checks` verb with `checks:` and several
+named checks. What was planned here, for the record:
+
+- ~~**Pushing.**~~ Done: a run pushes its own result branch (`wf/<run>/…`), never main, through the frozen script; the agents' fences
+  refuse `git push` whole, and branch protection refuses a push to main.
+- ~~**The ship step** opens the PR~~ Done, by implement rather than the ending: the pull request is opened once a round, so `ci` judges
+  every round. The gate stays where it was — the owner approves the landing at its gate, having read `ci` green — and auto-merge is not
+  used: the landing session merges, so a refusal is a `blocked` sign-off a person reads.
+- **The run reads CI.** Done for the one `ci` context, read by the frozen script: the round's check waits on it and the landing refuses
+  anything but `SUCCESS` at the head. Reading a queue's result, and several named checks through a place's `checks` verb, is the merge
+  queue's.
 - **Round checks.** Settled by the CI intent, not here: they stay local, and narrow to what the change touched. A round proves the
   bound, the pictures, the probes, the mutants, the types and the lint whole, and the tests of the packages whose turbo inputs cover the
   diff; the whole forced suite and the whole e2e become CI's, and the laptop stops paying for them.
-- **What goes away.** The shipper's trial merge and hand-run check, the chasing of main, and the tick's clean-up of a merge left
-  on main.
+- **What went away.** The landing's whole-suite check on the merged tree, and the hand push of main. The trial merge at the gate stays
+  as advice a person reads, and `landingDue` and the git place are untouched: the tick still takes back a merge left staged on main.
 
 CLAUDE.md sections to rewrite then: *Git* (push, merge, the ship's exception), *Rules the code keeps* ("No command from a
 checkout" as CODEOWNERS), and every lesson about the ship's check.
@@ -215,5 +225,6 @@ checkout" as CODEOWNERS), and every lesson about the ship's check.
 4. Steps 5 and 6 above are now the intent `the-ci-is-the-check-nemia-s-j94s` and its follow-on, cut into six cards: the workflow file
    with its guard test, this document and the README badge; the e2e shards with the build job and the generated-file guard; gitleaks,
    `CODEOWNERS` and the two `private` lines; then the three that narrow Nemia's own checks — the diff-to-packages mapping, the round's
-   narrowing, and the landing's narrowing with its inside-or-outside label. The ship through a pull request and the merge queue are the
-   follow-on's.
+   narrowing, and the landing's narrowing with its inside-or-outside label. The ship through a pull request was the follow-on
+   `a-run-s-change-is-a-pull-req-t452`, landed 2026-10-19/20 in two cards: the pull request opens, and the landing merges it. A merge
+   queue is named in §6 and scheduled as nothing.

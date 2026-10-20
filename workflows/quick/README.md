@@ -43,14 +43,16 @@ Each script is read from the run's base (`git show "$WF_BASE_REF:…"`), never f
 No typecheck, no lint, no test of a package and no e2e page on this machine: nothing here runs Ada's tests for her before the gate. Her
 session runs the tests of what she changed, the types, the lint and the e2e pages a change to the board touches, as `CLAUDE.md`,
 *Check your work*, says of a step's session; CI's `ci` context runs the suite, the types, the lint and the whole e2e on the commit the
-check pushed, and the check waits on it. Land's check then runs the whole suite, the types, the lint and the whole e2e on the merged
-tree, whatever was touched, and is `build`'s land check to the letter (`agent-fences.test.ts` holds the two steps equal but their `after:`). Main
-has one guard, whatever the workflow.
+check pushed, and the check waits on it. Land then merges that same pull request through `build`'s `landing.ts` and fast-forwards the
+checkout, and its check is the receipt that the merge happened — `build`'s land step to the letter (`agent-fences.test.ts` holds the two
+equal but their `after:`), note, check, fence and budget. Main has one guard, whatever the workflow: GitHub's required `ci` context on
+the head the review read, and a merge that refuses anything but this run's own green pull request.
 
-**A landing whose check refuses**: the merge is aborted and nothing landed. The work goes back to implement at once, with what the
-check said (`nemia decide <run>` prints it): `nemia retry <run> implement --message "<what failed>"`. Then it comes to the gate
-again, since an approval is for one try. Whoever operates the factory sends it back, by instruction (`NEMIA.md`): no step is filed
-by itself.
+**A landing that refuses**: nothing is merged and the checkout is untouched. Where the pull request is red or unmergeable, the work goes
+back to implement with what refused it (`nemia decide <run>` prints the land step's `blocked`): `nemia retry <run> implement --message
+"<what failed>"`. Then it comes to the gate again, since an approval is for one try. Where it was the fast-forward that was declined, a
+person brings the checkout onto `origin/<base>` and retries land itself, the line the refusal printed. Whoever operates the factory
+sends it back, by instruction (`NEMIA.md`): no step is filed by itself.
 
 ## The closeout, and the gate
 

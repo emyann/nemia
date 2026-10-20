@@ -11,11 +11,14 @@ import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { REPO } from './team.ts';
+import { loadWorkflows } from '../src/folder/folder.store.ts';
+import { REPO, placesOf } from './team.ts';
 import { scratch } from './scratch.ts';
 import { CI_URL, GREEN, type Called, type Gh, type Rule, bareOrigin, ghStub, gitIn, listed, passing, rollup, tip } from './origin.ts';
 
-const SCRIPT = path.join(REPO, 'workflows', 'build', 'pull-request.ts');
+const BUILD = path.join(REPO, 'workflows', 'build');
+
+const SCRIPT = path.join(BUILD, 'pull-request.ts');
 
 /** The retry line a refusal of the wait must print, for the run and step the branch names. */
 const RETRY = 'nemia retry r-1 implement --recheck';
@@ -74,7 +77,7 @@ function body(text = 'What this round changed.\n'): string {
   return file;
 }
 
-test('open pushes the run\'s branch and creates the pull request with the title and body it was given, never a draft', () => {
+test("open pushes the run's branch and creates the pull request with the title and body it was given, never a draft", () => {
   const at = placed();
   at.gh.answers([
     { when: 'auth status' },
@@ -83,7 +86,7 @@ test('open pushes the run\'s branch and creates the pull request with the title 
     { when: 'pr create', out: 'https://github.com/o/r/pull/7' },
   ]);
   const file = body();
-  const r = pr(at, 'open', ['--title', 'A run\'s change is a pull request', '--body-file', file]);
+  const r = pr(at, 'open', ['--title', "A run's change is a pull request", '--body-file', file]);
   assert.equal(r.code, 0, r.err);
   assert.equal(tip(at.bare!, at.branch), gitIn(at.repo, 'rev-parse', 'HEAD').trim(), 'the branch is on origin at HEAD');
   const created = asked(r.calls, 'pr', 'create');
@@ -216,7 +219,7 @@ test('REFUSED: a draft pull request, or one based on another branch than the rem
   assert.match(based.err, /gh pr edit 7 --base main/);
 });
 
-test("REFUSED: two open pull requests for one branch, naming the close a person types", () => {
+test('REFUSED: two open pull requests for one branch, naming the close a person types', () => {
   const at = placed();
   const head = gitIn(at.repo, 'rev-parse', 'HEAD').trim();
   const two = JSON.stringify([
@@ -240,7 +243,7 @@ test("push pushes the hand-off commit and proves the pull request's head is the 
   assert.match(r.out, new RegExp(`wf pr: #7 is at ${handed.slice(0, 12)}, the commit this check judges`));
 });
 
-test("REFUSED: a pull request whose head is another commit, and none open at all; each names the open line", () => {
+test('REFUSED: a pull request whose head is another commit, and none open at all; each names the open line', () => {
   const at = placed();
   const was = gitIn(at.repo, 'rev-parse', 'HEAD').trim();
   at.gh.answers(passing(at.repo));
@@ -332,4 +335,25 @@ test('REFUSED: no ci context within the bound, and a ci still pending at its end
   assert.match(unfinished.err, /`ci` for #7 was still in_progress after 0 s/);
   assert.ok(unfinished.err.includes(CI_URL), unfinished.err);
   assert.ok(unfinished.err.includes(RETRY), unfinished.err);
+});
+
+test("build's implement check pushes through the script before the typecheck, waits on CI last, and runs no suite and no e2e itself", () => {
+  const check = loadWorkflows(BUILD, placesOf(BUILD)).find((step) => step.name === 'implement')?.check;
+  assert.equal(typeof check, 'string', 'workflows/build has an implement step with a check');
+  const frozen = check as string;
+  const clauses = [...frozen.matchAll(/node\s+"\$\w+\/([\w-]+\.ts)"\s+(check|push|wait)?/g)].map(([, script, verb]) =>
+    verb ? `${script} ${verb}` : script,
+  );
+  assert.deepEqual(clauses, ['pictures.ts', 'probe.ts check', 'pull-request.ts push', 'mutants.ts', 'pull-request.ts wait']);
+  assert.ok(
+    frozen.indexOf('pull-request.ts" push') < frozen.indexOf('npm run typecheck'),
+    `the push is before the typecheck, so CI's wall time overlaps the local gates:\n${frozen}`,
+  );
+  assert.doesNotMatch(frozen, /npm test/, "the suite is CI's now, on the pushed commit");
+  assert.doesNotMatch(frozen, /npm run e2e/, 'and so is the whole e2e');
+  for (const verb of ['push', 'wait'])
+    assert.ok(
+      frozen.includes(`git show "$WF_BASE_REF:workflows/build/pull-request.ts"`),
+      `${verb} reads the script from the run's base:\n${frozen}`,
+    );
 });

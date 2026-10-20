@@ -85,7 +85,7 @@ const READS_THE_PULL_REQUEST = [
   "GitHub's `ci` context judged the suite, the types, the lint, the whole e2e and the build on the commit implement pushed",
   '**Read the pull request and its checks**, read-only, by the address implement named in its `artifacts` as a value',
   'A red, cancelled or absent `ci` is a finding',
-  'You open, edit, merge and close none: those are refused you, and a person\'s.',
+  "You open, edit, merge and close none: those are refused you, and a person's.",
 ];
 
 /** What review is told of the base: to say whether the branch holds it, and when a branch behind is a finding that sends the work back. */

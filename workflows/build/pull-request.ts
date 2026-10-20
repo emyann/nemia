@@ -326,6 +326,43 @@ function push(): string[] {
   return [said, `#${pr.number} is at ${at.slice(0, 12)}, the commit this check judges: ${pr.url}`];
 }
 
+/** How the wait reads the `ci` entries of a head: none reported, none over yet, every one passed, or one that did not. */
+type Seen = 'absent' | 'pending' | 'passed' | 'failed';
+
+/** How `ours`, the `ci` entries of the head, read now. */
+function seenOf(ours: readonly Entry[]): Seen {
+  if (ours.length === 0) return 'absent';
+  if (ours.every(pending)) return 'pending';
+  return ours.every((entry) => verdict(entry) === PASSED) ? 'passed' : 'failed';
+}
+
+/** The refusal of a `ci` that gave a verdict this round cannot land on: what it said, why, and what to type next. */
+const redly = (pr: Pr, ours: readonly Entry[], entries: readonly Entry[], retry: string): string =>
+  [
+    `\`${CONTEXT}\` for #${pr.number} is ${ours.map(verdict).join(', ').toLowerCase()}, so this round is red where it is judged.`,
+    `  The Actions URL: ${linkOf(ours[0]) || `${pr.url}/checks`}`,
+    ...why(entries),
+    retry,
+  ].join('\n');
+
+/** The refusal of a `ci` that never came, or never finished, within the bound the wait carries. */
+function unanswered(seen: Seen, pr: Pr, ours: readonly Entry[], entries: readonly Entry[], secs: number, retry: string): string {
+  const checks = `${pr.url}/checks`;
+  if (seen === 'pending')
+    return [
+      `\`${CONTEXT}\` for #${pr.number} was still ${ours.map((entry) => (entry.status ?? entry.state ?? '').toLowerCase()).join(', ')} after ${secs} s.`,
+      `  The Actions URL: ${linkOf(ours[0]) || checks}`,
+      retry,
+    ].join('\n');
+  return [
+    `no \`${CONTEXT}\` context was reported for #${pr.number} within ${secs} s, and \`${CONTEXT}\` is the one context the base branch ` +
+      'requires: nothing has judged this commit.',
+    `  The Actions URL: ${checks}`,
+    ...(entries.length ? why(entries) : ['no check at all was reported for this head']),
+    retry,
+  ].join('\n');
+}
+
 /** `wait`: the `ci` context of the pull request's head, waited out and read; its refusal says why CI went red. */
 function wait(): string[] {
   const { branch, run: ofRun, step, onto } = placed();
@@ -339,39 +376,11 @@ function wait(): string[] {
   for (;;) {
     const entries = rollup(pr.number);
     const ours = entries.filter((entry) => nameOf(entry) === CONTEXT);
-    const checks = `${pr.url}/checks`;
-    if (ours.length === 0) {
-      if (over(start))
-        throw new Refusal(
-          [
-            `no \`${CONTEXT}\` context was reported for #${pr.number} within ${start} s, and \`${CONTEXT}\` is the one context the base ` +
-              'branch requires: nothing has judged this commit.',
-            `  The Actions URL: ${checks}`,
-            ...(entries.length ? why(entries) : ['no check at all was reported for this head']),
-            retry,
-          ].join('\n'),
-        );
-    } else if (ours.every(pending)) {
-      if (over(whole))
-        throw new Refusal(
-          [
-            `\`${CONTEXT}\` for #${pr.number} was still ${ours.map((entry) => (entry.status ?? entry.state ?? '').toLowerCase()).join(', ')} after ${whole} s.`,
-            `  The Actions URL: ${linkOf(ours[0]) || checks}`,
-            retry,
-          ].join('\n'),
-        );
-    } else {
-      const bad = ours.filter((entry) => verdict(entry) !== PASSED);
-      if (bad.length === 0) return [`\`${CONTEXT}\` passed on ${pr.headRefOid.slice(0, 12)}: ${pr.url}`];
-      throw new Refusal(
-        [
-          `\`${CONTEXT}\` for #${pr.number} is ${bad.map(verdict).join(', ').toLowerCase()}, so this round is red where it is judged.`,
-          `  The Actions URL: ${linkOf(bad[0]) || checks}`,
-          ...why(entries),
-          retry,
-        ].join('\n'),
-      );
-    }
+    const seen = seenOf(ours);
+    if (seen === 'passed') return [`\`${CONTEXT}\` passed on ${pr.headRefOid.slice(0, 12)}: ${pr.url}`];
+    if (seen === 'failed') throw new Refusal(redly(pr, ours, entries, retry));
+    const bound = seen === 'absent' ? start : whole;
+    if (over(bound)) throw new Refusal(unanswered(seen, pr, ours, entries, bound, retry));
     sleep(poll);
   }
 }

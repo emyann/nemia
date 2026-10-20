@@ -787,7 +787,7 @@ test("REFUSED: Ada without its deny of pkill and killall, read from its file as 
 const ghWrites = (step: string): string[] =>
   FENCED.filter((call) => /^gh\b/.test(call.command ?? '')).map((call) => `${step}: ${shown(call)}`);
 
-test("REFUSED: Ada and Otto without their deny of gh, read from their files as a run reads them, are open on every gh write", () => {
+test('REFUSED: Ada and Otto without their deny of gh, read from their files as a run reads them, are open on every gh write', () => {
   for (const agent of ['ada', 'otto']) {
     const step = shippedStepOf(agent);
     const line = step.disallowedTools!.filter((rule) => rule !== 'Bash(gh)' && rule !== 'Bash(gh:*)');

@@ -118,7 +118,8 @@ The tests need no live harness, and nothing a clean `ubuntu-latest` lacks: the a
 
 **Prose is not what holds the workflow to the repository.** `packages/agent-orchestrator/test/ci-workflow.test.ts` refuses, each by its
 own sentence naming the fix: a workspace with a suite and no leg, a leg that does not filter to its own workspace, a node floor adrift
-from `engines.node`, a node version left unquoted (YAML reads `24.16` as a number and setup-node installs another release), a timezone
+from `engines.node`, one of the two jobs that run whole on the floor pinned off it — or unpinned, or gone — a node version left
+unquoted (YAML reads `24.16` as a number and setup-node installs another release), a timezone
 the leg does not run its suite under and a run of it that drops `--force`, a `cancel-in-progress` that would cancel a run of `main`, a
 job outside the gate's `needs`, a gate without `always()`, a gate step not given the results through its environment or interpolating an
 expression into its shell, an action that is not GitHub's own by major tag, and the trigger that would run a fork's code against a

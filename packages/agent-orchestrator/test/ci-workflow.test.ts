@@ -33,6 +33,16 @@ const FILTERED = '--filter=${{ matrix.workspace }}';
 /** What the gate's step must be given, the needed jobs' results as JSON, through the environment and not the command line. */
 const RESULTS = '${{ toJSON(needs) }}';
 
+/** The action every job installs its node with, by the prefix that matches it at any major tag. */
+const SETUP_NODE = 'actions/setup-node';
+
+/**
+ * The jobs this repository's CI plan runs whole on the floor `engines.node` claims, each pinning its node by hand rather than off the
+ * legs' matrix (`docs/plan-github-ci.md`: "`npm run lint` and `npm run typecheck`, whole, on the floor"). A job added later that runs
+ * on another node — an e2e shard, a build — is none of these and claims no floor.
+ */
+const PINNED = ['lint', 'typecheck'];
+
 /** A workspace of this repository, by the name a turbo filter gives it, and whether it has a suite to run. */
 type Workspace = { name: string; suite: boolean };
 
@@ -102,6 +112,38 @@ function nodeDrift(workflow: Workflow, engine: string): string[] {
       `the ${LEGS} job's matrix.node in ${FILE} does not test ${floor}, the floor engines.node claims in package.json: add '${floor}' to the matrix, or lower engines.node to a version the matrix tests`,
     );
   return sentences;
+}
+
+/**
+ * A job that runs whole on the floor and is pinned off it. `nodeDrift` holds the legs' matrix; nothing held these, so the file could
+ * claim `>=24.16.0` in `engines.node` and still lint on 22.18.0, where `npm ci` refuses the job with `EBADENGINE`.
+ */
+function pinDrift(workflow: Workflow, engine: string): string[] {
+  const floor = /^>=(\d+\.\d+\.\d+)$/.exec(engine)?.[1];
+  if (floor === undefined) return [];
+  return PINNED.flatMap((name) => {
+    const job = workflow.jobs[name];
+    if (job === undefined)
+      return [
+        `${FILE} has no ${name} job, which this repository's CI plan runs whole on the floor engines.node claims: add the job back, or take ${name} off PINNED in this test and say in docs/plan-github-ci.md what runs on the floor instead`,
+      ];
+    const pins = (job.steps ?? [])
+      .filter((step) => step.uses?.startsWith(SETUP_NODE))
+      .flatMap((step) => {
+        const pin = (step.with ?? {})['node-version'];
+        return pin === undefined ? [] : [pin];
+      });
+    if (pins.length === 0)
+      return [
+        `the ${name} job in ${FILE} pins no node-version, so it runs on whatever the runner happens to ship: it runs whole on the floor, so give its setup-node step node-version: '${floor}'`,
+      ];
+    return pins
+      .filter((pin) => pin !== floor)
+      .map(
+        (pin) =>
+          `the ${name} job in ${FILE} runs on node ${String(pin)}, not ${floor}, the floor engines.node claims in package.json: it runs whole on the floor, so write node-version: '${floor}', or npm ci refuses the job with EBADENGINE`,
+      );
+  });
 }
 
 /** A gate that does not run whatever happens, or that does not need every other job of the file. */
@@ -234,6 +276,7 @@ function targetDrift(text: string): string[] {
 const drift = (workflow: Workflow, workspaces: Workspace[], engine: string, text: string): string[] => [
   ...legDrift(workflow, workspaces),
   ...nodeDrift(workflow, engine),
+  ...pinDrift(workflow, engine),
   ...gateDrift(workflow),
   ...actionDrift(workflow),
   ...zoneDrift(workflow),
@@ -278,7 +321,7 @@ test('the shipped CI workflow runs on the three events, reads alone, and caches 
   assert.deepEqual(cached, [], 'setup-node caches no install here: the lockfile install is part of what is tested');
 });
 
-test('REFUSED: a workspace with no leg, a leg with no workspace, a node floor adrift, an unquoted node, a job outside the gate, a third party, a timezone untested, a run unforced, a landing cancelled, a fork with a writable token', () => {
+test('REFUSED: a workspace with no leg, a leg with no workspace, a node floor adrift, an unquoted node, a floor-running job pinned off the floor, unpinned and gone, a job outside the gate, a third party, a timezone untested, a run unforced, a landing cancelled, a fork with a writable token', () => {
   const workspaces = readWorkspaces();
   const engine = readEngine();
   const text = workflowText();
@@ -319,6 +362,30 @@ test('REFUSED: a workspace with no leg, a leg with no workspace, a node floor ad
   assert.deepEqual(nodeDrift(unquoted, engine), [
     "the test job's matrix.node in .github/workflows/ci.yml holds 22.18 unquoted: YAML reads it as a number and setup-node then installs another version, so write it '22.18'",
     "the test job's matrix.node in .github/workflows/ci.yml does not test 24.16.0, the floor engines.node claims in package.json: add '24.16.0' to the matrix, or lower engines.node to a version the matrix tests",
+  ]);
+
+  const setupOf = (workflow: Workflow, job: string): Step => {
+    const step = (workflow.jobs[job]?.steps ?? []).find((each) => each.uses?.startsWith(SETUP_NODE));
+    assert.ok(step?.with !== undefined, `the ${job} job pins its node through setup-node today`);
+    return step;
+  };
+
+  const lowered = structuredClone(shipped);
+  setupOf(lowered, 'lint').with!['node-version'] = '22.18.0';
+  assert.deepEqual(pinDrift(lowered, '>=24.16.0'), [
+    "the lint job in .github/workflows/ci.yml runs on node 22.18.0, not 24.16.0, the floor engines.node claims in package.json: it runs whole on the floor, so write node-version: '24.16.0', or npm ci refuses the job with EBADENGINE",
+  ]);
+
+  const unpinned = structuredClone(shipped);
+  delete setupOf(unpinned, 'typecheck').with!['node-version'];
+  assert.deepEqual(pinDrift(unpinned, '>=24.16.0'), [
+    "the typecheck job in .github/workflows/ci.yml pins no node-version, so it runs on whatever the runner happens to ship: it runs whole on the floor, so give its setup-node step node-version: '24.16.0'",
+  ]);
+
+  const renamed = structuredClone(shipped);
+  delete renamed.jobs['lint'];
+  assert.deepEqual(pinDrift(renamed, '>=24.16.0'), [
+    '.github/workflows/ci.yml has no lint job, which this repository\'s CI plan runs whole on the floor engines.node claims: add the job back, or take lint off PINNED in this test and say in docs/plan-github-ci.md what runs on the floor instead',
   ]);
 
   const unneeded = structuredClone(shipped);

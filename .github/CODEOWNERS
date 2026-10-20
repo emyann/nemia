@@ -1,0 +1,19 @@
+# What a branch could edit to weaken its own check (docs/plan-github-ci.md, "4. GitHub", step 5).
+#
+# A pull request that edits the workflow that checks it, the harness settings that fence a step, the workflows a run is made of, or a
+# package's scripts needs the owner's review. Everything else is unowned on purpose: a review of the code is the run's, not this file's.
+#
+# This is prose to GitHub until branch protection requires a code owner's review, which is the owner's hand step. What it must cover is
+# refused by packages/agent-orchestrator/test/ci-workflow.test.ts, by the path left out.
+
+# The check itself: this workflow, and every file beside it.
+/.github/ @emyann
+
+# What a harness may do from a checkout: a step's fences are here.
+/.claude/settings.json @emyann
+
+# The workflows a run is made of, their agents, and the scripts their checks run.
+/workflows/ @emyann
+
+# The root's scripts, workspaces and engines: `npm test` and `npm run lint` are what CI runs.
+/package.json @emyann

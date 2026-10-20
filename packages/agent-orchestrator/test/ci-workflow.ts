@@ -78,3 +78,21 @@ export const staleStep = (workflow: Workflow): Step | undefined => runSteps(work
 
 /** The gate's steps that run a command: the one that turns the needed jobs' results into the `ci` context. */
 export const gateSteps = (workflow: Workflow): Step[] => runSteps(workflow, GATE);
+
+/** The job that scans the push's or the pull request's new commits for a secret. */
+export const SCAN = 'gitleaks';
+
+/** What the scan is configured by, and the one file that says what it allows, as the sentences that refuse a wider scan name it. */
+export const SCAN_CONFIG = '.gitleaks.toml';
+
+/** Where the owner is named on what a branch could edit to weaken its own check. */
+export const OWNERS = '.github/CODEOWNERS';
+
+/** Who owns each of them: the person who reviews a change to the check itself. */
+export const OWNER = '@emyann';
+
+/** What `OWNERS` must give that owner, each a path of this repository, as the intent's own constraint lists them. */
+export const OWNED = ['.github/', '.claude/settings.json', 'workflows/', 'package.json'];
+
+/** The packages that are published from nowhere, so that an accidental `npm publish -w` is refused by npm itself. */
+export const PRIVATE = ['packages/agent-orchestrator', 'packages/agent-runtime'];

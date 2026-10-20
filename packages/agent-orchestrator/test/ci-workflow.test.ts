@@ -37,6 +37,8 @@ import {
   LEGS,
   readWorkflow,
   runSteps,
+  SCAN,
+  SCAN_CONFIG,
   shardRunStep,
   staleStep,
   STALE_STEP,
@@ -383,8 +385,120 @@ function buildDrift(workflow: Workflow, generated: readonly string[] = GENERATED
   return sentences;
 }
 
+/** Where the runtime writes its deliberate stub secrets, the one file the scan's allowlist may name. */
+const STUBS = 'packages/agent-runtime/test/remote-agent.test.ts';
+
+/**
+ * A stub secret of that file: a word, four hex digits and SECRET, which is how the runtime's test writes a token nobody can use. A bare
+ * `'SECRET'` is not one — gitleaks flags a string by its entropy, and that has none.
+ */
+const stubSecrets = (): string[] =>
+  [...fs.readFileSync(path.join(ROOT, STUBS), 'utf8').matchAll(/'([a-z]+-[\da-f]{4}-SECRET[^'\n]*)'/g)].map((found) => found[1]);
+
+/** What the scan is configured by, or an empty string where the file is not there, which is a drift of its own. */
+const readConfig = (): string => {
+  const file = path.join(ROOT, SCAN_CONFIG);
+  return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+};
+
+/**
+ * What the one allowlist of `SCAN_CONFIG` names, read off its own text: the files it is scoped to, and the shapes it allows in them.
+ * Each array is read greedily to the last bracket of its line, since a regex of its own holds brackets and a lazy or negated class
+ * would end the array inside one.
+ */
+function readAllowlist(text: string): { paths: string[]; regexes: string[] } {
+  const listed = (key: string): string[] => {
+    const array = new RegExp(`^${key} = \\[(.*)\\]$`, 'm').exec(text)?.[1] ?? '';
+    return [...array.matchAll(/'([^']*)'/g)].map((found) => found[1]);
+  };
+  return { paths: listed('paths'), regexes: listed('regexes') };
+}
+
+/**
+ * An allowlist that has drifted from the file it was written for. Both ways are invisible: a shape no longer matched turns the scan red
+ * on a stub nobody can use, and an unanchored shape allows a real secret that happens to hold one — the whole job reporting green over
+ * a leak.
+ */
+function allowDrift(text: string, stubs: readonly string[]): string[] {
+  const { paths, regexes } = readAllowlist(text);
+  const sentences: string[] = [];
+  if (paths.length !== 1 || !paths[0].includes(STUBS.replaceAll('.', '\\.')))
+    sentences.push(
+      `the allowlist in ${SCAN_CONFIG} is scoped to ${JSON.stringify(paths)}, not to ${STUBS} alone: it is the one file of this repository that may hold a stub secret, so scope the allowlist to it with paths = ['${STUBS.replaceAll('.', '\\.')}$'] and nothing wider`,
+    );
+  return [
+    ...sentences,
+    ...regexes
+      .filter((regex) => !(regex.startsWith('^') && regex.endsWith('$')))
+      .map(
+        (regex) =>
+          `the allowlist in ${SCAN_CONFIG} holds ${regex}, anchored at neither end: write it ^${regex}$, or a real secret that happens to hold a stub's shape is allowed along with it`,
+      ),
+    ...stubs
+      .filter((stub) => !regexes.some((regex) => new RegExp(regex).test(stub)))
+      .map(
+        (stub) =>
+          `${STUBS} writes the stub secret ${stub}, which no regex in ${SCAN_CONFIG} matches: add its shape to the allowlist, anchored at both ends, or the ${SCAN} job refuses every push over a secret nobody can use`,
+      ),
+  ];
+}
+
+/** The flags the scan must carry: the range of new commits, the redaction a public log needs, and the allowlist above. */
+const SCAN_FLAGS = ['--log-opts', '--redact', `--config ${SCAN_CONFIG}`];
+
+/** A download URL that pins the version it takes, through the step's own env, rather than a tag that floats to the latest release. */
+const PINNED = /gitleaks\/releases\/download\/v\$\{VERSION\}\//;
+
+/**
+ * A scan job that is not there, takes its binary unpinned or unchecked, scans without its allowlist or over the whole history, or whose
+ * checkout is shallow. The last reads as a scan and is none: the range names the commit before this push, which the shallow default has
+ * not, so git refuses the range and the job that was to find a secret finds nothing.
+ */
+function scanDrift(workflow: Workflow, config: string): string[] {
+  const job = workflow.jobs[SCAN];
+  if (job === undefined)
+    return [
+      `${FILE} has no ${SCAN} job: add the job that downloads gitleaks at a pinned version, checks it against that release's sha256 and scans the push's new commits with --config ${SCAN_CONFIG}, or a secret committed to a public repository is noticed by nobody`,
+    ];
+  const sentences: string[] = [];
+  if (config === '')
+    sentences.push(
+      `${SCAN_CONFIG} is not in this repository, so the ${SCAN} job scans with gitleaks' own rules alone: write it, allowing the stub secrets of ${STUBS} and nothing else, or every push is refused over them`,
+    );
+  const runs = runSteps(workflow, SCAN)
+    .map((step) => `${step.run ?? ''}\n${Object.values(step.env ?? {}).join('\n')}`)
+    .join('\n');
+  if (!PINNED.test(runs))
+    sentences.push(
+      `the ${SCAN} job in ${FILE} does not download gitleaks from a release pinned by \${VERSION}: write the URL .../releases/download/v\${VERSION}/..., with the version in the step's env, or a release that moves under it moves what CI refuses`,
+    );
+  if (!runs.includes('sha256sum --check') || !/[\da-f]{64}/.test(runs))
+    sentences.push(
+      `the ${SCAN} job in ${FILE} does not check the download against a sha256: give the step env SHA256 with the 64-digit hash from that release's gitleaks_<version>_checksums.txt and pipe it to \`sha256sum --check --strict -\`, or a third party's bytes run here unverified`,
+    );
+  sentences.push(
+    ...SCAN_FLAGS.filter((flag) => !runs.includes(flag)).map(
+      (flag) =>
+        `the ${SCAN} job's scan in ${FILE} does not pass ${flag}: add it to the gitleaks command, or the scan reads the whole history instead of this push's commits, allows what ${SCAN_CONFIG} says it allows, or prints a found secret into a public run's log`,
+    ),
+  );
+  if ((job.steps ?? []).find((step) => step.uses?.startsWith('actions/checkout') === true)?.with?.['fetch-depth'] !== 0)
+    sentences.push(
+      `the ${SCAN} job's checkout in ${FILE} does not pass fetch-depth: 0: the range names the commit before this push, which the shallow default has not, so git refuses the range and the job fails having scanned nothing`,
+    );
+  return sentences;
+}
+
 /** Every clause, over the shipped file. */
-const drift = (workflow: Workflow, workspaces: Workspace[], engine: string, text: string, pages: readonly string[]): string[] => [
+const drift = (
+  workflow: Workflow,
+  workspaces: Workspace[],
+  engine: string,
+  text: string,
+  pages: readonly string[],
+  config: string,
+  stubs: readonly string[],
+): string[] => [
   ...legDrift(workflow, workspaces),
   ...nodeDrift(workflow, engine),
   ...gateDrift(workflow),
@@ -397,6 +511,8 @@ const drift = (workflow: Workflow, workspaces: Workspace[], engine: string, text
   ...shardDrift(workflow, pages),
   ...boundDrift(workflow),
   ...buildDrift(workflow),
+  ...scanDrift(workflow, config),
+  ...allowDrift(config, stubs),
 ];
 
 test('the shipped CI workflow agrees with the repository it checks', () => {
@@ -408,7 +524,9 @@ test('the shipped CI workflow agrees with the repository it checks', () => {
   );
   const pages = readPages();
   assert.ok(pages.length > 100, `${NAMES_PATH} names ${pages.length} pages: the shard clause reads a list that is not the e2e's`);
-  assert.deepEqual(drift(readWorkflow(), workspaces, readEngine(), workflowText(), pages), []);
+  const stubs = stubSecrets();
+  assert.equal(stubs.length, 3, `${STUBS} writes ${stubs.length} stub secrets today, and every one of them is held by a clause`);
+  assert.deepEqual(drift(readWorkflow(), workspaces, readEngine(), workflowText(), pages, readConfig(), stubs), []);
 });
 
 test('the shipped CI workflow runs on the three events, reads alone, and caches no install', () => {
@@ -689,5 +807,89 @@ test('REFUSED: no build job, a generator not run, a staleness step that names on
   assert.deepEqual(buildDrift(unnamed), [
     'the build job in .github/workflows/ci.yml has no step named Refuse a stale generated file: give it the step that refuses a diff of ' +
       'apps/web/src/routeTree.gen.ts and apps/web/theme/ by name, which ci-build.boundary.test.ts runs as GitHub runs it',
+  ]);
+});
+
+test('REFUSED: no scan job, a download unpinned or unchecked, a scan without its flags, a shallow checkout, and an allowlist adrift from the stubs', () => {
+  const shipped = readWorkflow();
+  const config = readConfig();
+  const stubs = stubSecrets();
+  assert.deepEqual(scanDrift(shipped, config), [], 'the scan job is pinned, checked, flagged and deep today');
+  assert.deepEqual(allowDrift(config, stubs), [], "the allowlist matches each of the file's stub secrets today");
+
+  const unscanned = structuredClone(shipped);
+  delete unscanned.jobs[SCAN];
+  assert.deepEqual(scanDrift(unscanned, config), [
+    `.github/workflows/ci.yml has no gitleaks job: add the job that downloads gitleaks at a pinned version, checks it against that release's sha256 and scans the push's new commits with --config ${SCAN_CONFIG}, or a secret committed to a public repository is noticed by nobody`,
+  ]);
+
+  assert.deepEqual(scanDrift(shipped, ''), [
+    `${SCAN_CONFIG} is not in this repository, so the gitleaks job scans with gitleaks' own rules alone: write it, allowing the stub secrets of ${STUBS} and nothing else, or every push is refused over them`,
+  ]);
+
+  const floating = structuredClone(shipped);
+  const download = runSteps(floating, SCAN)[0];
+  assert.ok(download?.run?.includes('releases/download/v${VERSION}/') === true, 'the download pins its version today');
+  download.run = download.run.replace('download/v${VERSION}/', 'latest/download/');
+  assert.deepEqual(scanDrift(floating, config), [
+    'the gitleaks job in .github/workflows/ci.yml does not download gitleaks from a release pinned by ${VERSION}: write the URL ' +
+      ".../releases/download/v${VERSION}/..., with the version in the step's env, or a release that moves under it moves what CI refuses",
+  ]);
+
+  for (const [why, mangle] of [
+    ['the check taken out', (step: Step) => (step.run = step.run?.replace('sha256sum --check', 'cat'))],
+    ['no hash to check against', (step: Step) => delete (step.env ?? {}).SHA256],
+  ] as const) {
+    const unchecked = structuredClone(shipped);
+    mangle(runSteps(unchecked, SCAN)[0]);
+    assert.deepEqual(
+      scanDrift(unchecked, config),
+      [
+        'the gitleaks job in .github/workflows/ci.yml does not check the download against a sha256: give the step env SHA256 with the ' +
+          "64-digit hash from that release's gitleaks_<version>_checksums.txt and pipe it to `sha256sum --check --strict -`, or a third " +
+          "party's bytes run here unverified",
+      ],
+      why,
+    );
+  }
+
+  for (const flag of SCAN_FLAGS) {
+    const unflagged = structuredClone(shipped);
+    const scan = runSteps(unflagged, SCAN).find((step) => step.run?.includes(flag) === true);
+    assert.ok(scan?.run !== undefined, `the scan passes ${flag} today`);
+    scan.run = scan.run.replaceAll(flag, '');
+    assert.deepEqual(scanDrift(unflagged, config), [
+      `the gitleaks job's scan in .github/workflows/ci.yml does not pass ${flag}: add it to the gitleaks command, or the scan reads the ` +
+        `whole history instead of this push's commits, allows what ${SCAN_CONFIG} says it allows, or prints a found secret into a ` +
+        "public run's log",
+    ]);
+  }
+
+  const shallow = structuredClone(shipped);
+  const checkout = (shallow.jobs[SCAN].steps ?? []).find((step) => step.uses?.startsWith('actions/checkout') === true);
+  assert.equal(checkout?.with?.['fetch-depth'], 0, 'the scan checks the whole history out today');
+  delete checkout.with;
+  assert.deepEqual(scanDrift(shallow, config), [
+    "the gitleaks job's checkout in .github/workflows/ci.yml does not pass fetch-depth: 0: the range names the commit before this push, " +
+      'which the shallow default has not, so git refuses the range and the job fails having scanned nothing',
+  ]);
+
+  const wide = config.replace("paths = ['packages", "paths = ['packages/agent-runtime/test/', 'packages");
+  assert.deepEqual(allowDrift(wide, stubs), [
+    `the allowlist in ${SCAN_CONFIG} is scoped to ["packages/agent-runtime/test/","packages/agent-runtime/test/remote-agent\\\\.test\\\\.ts$"], ` +
+      `not to ${STUBS} alone: it is the one file of this repository that may hold a stub secret, so scope the allowlist to it with ` +
+      "paths = ['packages/agent-runtime/test/remote-agent\\.test\\.ts$'] and nothing wider",
+  ]);
+
+  const loose = config.replace('^key-[0-9a-f]{4}-SECRET$', 'key-[0-9a-f]{4}-SECRET');
+  assert.deepEqual(allowDrift(loose, stubs), [
+    `the allowlist in ${SCAN_CONFIG} holds key-[0-9a-f]{4}-SECRET, anchored at neither end: write it ^key-[0-9a-f]{4}-SECRET$, or a ` +
+      "real secret that happens to hold a stub's shape is allowed along with it",
+  ]);
+
+  const renamed = config.replace('^tok-', '^tkn-');
+  assert.deepEqual(allowDrift(renamed, stubs), [
+    `${STUBS} writes the stub secret tok-3f9a-SECRET-7c21, which no regex in ${SCAN_CONFIG} matches: add its shape to the allowlist, ` +
+      'anchored at both ends, or the gitleaks job refuses every push over a secret nobody can use',
   ]);
 });

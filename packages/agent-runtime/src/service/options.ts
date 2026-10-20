@@ -284,14 +284,15 @@ export const heldHarnessesOf = (harnesses: Record<string, HarnessConfig>): strin
  * Why one of `options.holder`'s names cannot be taken, or `undefined`: the first `holderRefusal` refuses, in the options' order.
  * The harnesses it is read against are the ones the engine will run — `DEFAULT_HARNESSES` where the options name none, as `make`
  * reads them — so a holder of the `claude` harness is taken by an engine that was given no `harnesses` at all. Only the names
- * are read here: what each function answers is refused at the follow that asks it (`holderAgentRefusal`).
+ * are read here, and that each entry is a function at all: what a function *answers* is refused at the follow that asks it
+ * (`holderAgentRefusal`).
  */
 const holdersRefusalOf = (options: EngineOptions): string | undefined => {
   const harnesses = options.harnesses ?? DEFAULT_HARNESSES;
   const names = Object.keys(harnesses);
   const held = heldHarnessesOf(harnesses);
-  for (const name of Object.keys(options.holder ?? {})) {
-    const refused = holderRefusal(name, { harnesses: names, claude: held.includes(name) });
+  for (const [name, holder] of Object.entries(options.holder ?? {})) {
+    const refused = holderRefusal(name, holder, { harnesses: names, claude: held.includes(name) });
     if (refused) return refused;
   }
   return undefined;

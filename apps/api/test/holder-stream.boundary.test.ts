@@ -71,8 +71,11 @@ type Piped = ChildProcess & {
   stderr: NonNullable<ChildProcess['stderr']>;
 };
 
-/** The holder, up and holding: its child, what it said of itself, and the way to tell it to go. */
-async function holder(cwd: string): Promise<{ child: ChildProcess; held: Held; stderr: () => string; stop: () => void }> {
+/**
+ * The holder, up and holding: its child, what it said of itself, everything it wrote on either stream — both searched for the
+ * token, since its engine logs on its stdout and the SDK's child writes on its stderr — and the way to tell it to go.
+ */
+async function holder(cwd: string): Promise<{ child: ChildProcess; held: Held; said: () => string; stop: () => void }> {
   const child = spawn(process.execPath, [HOLDER], {
     env: { ...process.env, CLAUDE_CONFIG_DIR: config, WF_ROOT: root },
     stdio: ['pipe', 'pipe', 'pipe'],
@@ -84,7 +87,7 @@ async function holder(cwd: string): Promise<{ child: ChildProcess; held: Held; s
   child.stderr.setEncoding('utf8');
   child.stderr.on('data', (chunk: string) => void err.push(chunk));
   child.stdin.end(JSON.stringify({ root, cwd, plan: PLAN }));
-  const said = async (): Promise<Held> => {
+  const held = async (): Promise<Held> => {
     for (;;) {
       const line = out
         .join('')
@@ -95,7 +98,7 @@ async function holder(cwd: string): Promise<{ child: ChildProcess; held: Held; s
       await new Promise((r) => setTimeout(r, 25));
     }
   };
-  return { child, held: await said(), stderr: () => err.join(''), stop: () => void child.kill('SIGKILL') };
+  return { child, held: await held(), said: () => `${out.join('')}\n${err.join('')}`, stop: () => void child.kill('SIGKILL') };
 }
 
 test(
@@ -105,7 +108,7 @@ test(
     const cwd = path.join(root, 'holder-work');
     const up = await holder(cwd);
     t.after(() => up.stop());
-    assert.deepEqual(Object.keys(up.held.cards), ['claude'], `the holder serves the one harness it runs attached: ${up.stderr()}`);
+    assert.deepEqual(Object.keys(up.held.cards), ['claude'], `the holder serves the one harness it runs attached: ${up.said()}`);
     writeRun(up.held.taskId);
 
     const lease = JSON.parse(fs.readFileSync(path.join(root, 'daemon.json'), 'utf8')) as { pid: number; holder?: object };
@@ -119,7 +122,6 @@ test(
 
     const said: string[] = [];
     const keeper = Logger.make(({ message }) => void said.push((Array.isArray(message) ? message : [message]).join(' ')));
-    assert.deepEqual(said, [], 'the viewer’s own log lines are kept rather than printed, so they can be searched for the token');
     const viewer = appOf(Layer.merge(liveOf(), Logger.layer([keeper])));
     t.after(() => viewer.runtime.dispose());
 
@@ -193,8 +195,13 @@ test(
     ] as const) {
       assert.equal(answer.includes(token), false, `no answer carries the token: ${what}`);
     }
-    assert.equal(said.join('\n').includes(token), false, 'and no log line of the api carries it');
-    assert.equal(up.stderr().includes(token), false, 'nor any line the holder said');
+    assert.ok(
+      said.some((l) => l.includes(`/api/runs/${RUN}/steps/${STEP}/transcript/stream`)),
+      `the viewer's own lines are kept and there to search — the request line of the very follow that dialled the holder among them: ${JSON.stringify(said)}`,
+    );
+    assert.equal(said.join('\n').includes(token), false, 'and no log line of the api carries the token');
+    assert.ok(up.said().includes('"what":"held"'), 'the holder’s own streams are kept and there to search');
+    assert.equal(up.said().includes(token), false, 'nor any line the holder wrote, on either of its streams');
     assert.equal(fs.existsSync(tokenFile), false, 'and the hold forgot its token as it ended');
   },
 );

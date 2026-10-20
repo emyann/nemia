@@ -121,18 +121,29 @@ const local =
  * harness's sessions are held by one process — a remote agent's are the other party's, followed at its own address, and every
  * other harness's are read off the store both engines share.
  *
- * It reads the name alone. What the holder function answers is not here to read at the build — it is asked at each follow —
- * so the two checks that read the agent are `holderAgentRefusal`'s, made at the follow that asks for it, in the same words. A
- * `credentials` that answers for no scheme is not refused here either: only `authOf` knows whether it answers for this scheme
- * and this agent, and it refuses the first follow in words naming the fix.
+ * Then `holder` itself, which is a function asked at every follow: anything else — a card inline, as the option took before it was
+ * asked per follow — is refused here, as every other function-valued option of `EngineOptions` is, rather than throwing out of the
+ * first follow with no words.
+ *
+ * What that function *answers* is not here to read at the build, since it is asked at each follow, so the two checks that read the
+ * agent are `holderAgentRefusal`'s, made at the follow that asks for it, in the same words. A `credentials` that answers for no
+ * scheme is not refused here either: only `authOf` knows whether it answers for this scheme and this agent, and it refuses the
+ * first follow in words naming the fix.
  */
-export const holderRefusal = (harness: string, place: { harnesses: readonly string[]; claude: boolean }): string | undefined => {
+export const holderRefusal = (
+  harness: string,
+  holder: unknown,
+  place: { harnesses: readonly string[]; claude: boolean },
+): string | undefined => {
   if (!place.harnesses.includes(harness)) {
     const runs = place.harnesses.length ? place.harnesses.map((n) => `\`${n}\``).join(', ') : 'none';
     return `\`holder\` names the \`${harness}\` harness, which this engine does not run: it runs ${runs}. Name a harness of \`harnesses\`, whose sessions the holder runs.`;
   }
   if (!place.claude) {
     return `\`holder\` names the \`${harness}\` harness, which this engine does not run as Claude Code attached (\`'claude'\`): a port serves the sessions one process holds attached, and no other harness has any — a remote agent's are the other party's, followed at its own address, and every other harness's are read off the store both engines share. Follow this harness's sessions here, and take the entry off.`;
+  }
+  if (typeof holder !== 'function') {
+    return `the holder of the \`${harness}\` harness is a function, \`() => { card } | undefined\`, asked at every follow of that harness's sessions: give one answering the card that engine's \`hold()\` answered for this harness, or \`undefined\` while no one holds them, and its token through \`credentials\`.`;
   }
   return undefined;
 };

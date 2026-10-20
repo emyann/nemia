@@ -114,7 +114,10 @@ test('the served card is read back by a viewer as the card of an agent given inl
     authOf(read.card, URL_AT, 'claude', () => 'tok-1'),
     { headers: { authorization: 'Bearer tok-1' } },
   );
-  assert.equal(holderRefusal('claude', { harnesses: ['claude'], claude: true }), undefined);
+  assert.equal(
+    holderRefusal('claude', () => ({ card: json }), { harnesses: ['claude'], claude: true }),
+    undefined,
+  );
   assert.equal(holderAgentRefusal('claude', { card: json }), undefined);
 });
 
@@ -239,19 +242,32 @@ test('REFUSED at the follow: an entry with a key other than `card`, and a card t
 test('REFUSED before the engine builds: a holder named for a harness it does not run, and one it does not run attached', () => {
   const card = cardJsonOf(servedCardOf('claude', handOps(), URL_AT));
   const place = { harnesses: ['claude', 'reviewer', 'stand'], claude: true };
+  const held = () => ({ card });
   assert.match(
-    holderRefusal('codex', place)!,
+    holderRefusal('codex', held, place)!,
     /`holder` names the `codex` harness, which this engine does not run: it runs `claude`, `reviewer`, `stand`\./,
   );
   for (const other of ['reviewer', 'stand']) {
     assert.match(
-      holderRefusal(other, { ...place, claude: false })!,
+      holderRefusal(other, held, { ...place, claude: false })!,
       /which this engine does not run as Claude Code attached/,
       `${other}: a harness whose sessions no process of ours holds — a remote agent's, a detached one's — is no holder`,
     );
   }
-  assert.equal(holderRefusal('claude', place), undefined, 'and the name of a harness it runs attached is taken');
-  assert.equal(holderAgentRefusal('claude', { card }), undefined, 'as is the card a holder served');
+  for (const [what, given] of [
+    ['a card inline, as the option took before it was asked per follow', { card }],
+    ['a card inline with no `card` key', { url: 'http://a.example' }],
+    ['a string', 'a-card'],
+    ['nothing', undefined],
+  ] as const) {
+    assert.match(
+      holderRefusal('claude', given, place)!,
+      /the holder of the `claude` harness is a function, `\(\) => \{ card \} \| undefined`, asked at every follow/,
+      `${what} is no holder, and is refused before the engine builds rather than throwing out of the first follow`,
+    );
+  }
+  assert.equal(holderRefusal('claude', held, place), undefined, 'and a function for a harness it runs attached is taken');
+  assert.equal(holderAgentRefusal('claude', { card }), undefined, 'as is the card that function answers');
 });
 
 test('REFUSED at the follow: what a holder function answers that this runtime cannot dial', () => {

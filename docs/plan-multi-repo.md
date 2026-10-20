@@ -55,7 +55,8 @@ In the order they block.
    `.claude/settings.json` does not allow is denied with no prompt, and the session carries on without it — so a repository
    whose tests are `pytest`, or `npm run test:integration`, has to allow them, or its reviewer never runs them.
 6. **`wf` lives in this checkout.** It is `packages/agent-orchestrator`'s `bin` (`bin/wf.ts`), reached with `npx wf` from here,
-   on Node's type stripping (>= 22.18). A card that names no repository starts where `wf up` was started
+   on Node's type stripping (unflagged from 22.18, and the floor `engines.node` claims is now 24.16). A card that names no
+   repository starts where `wf up` was started
    (`cli/main.ts`; `runner.ts:1773, 1837`).
 7. **A worktree's dependencies are npm's.** `provisionDeps` links the checkout's `node_modules` or runs `npm ci` when the
    lockfile moved (`runner.ts:813-844`, `deps.ts`). With neither it does nothing, harmlessly; pnpm, yarn and a Python

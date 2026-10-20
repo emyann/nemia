@@ -95,5 +95,10 @@ Whole and forced (`npx turbo run test --force --continue`), 7,318 tests, 0 failu
 
 `npm run typecheck`, `npm run lint` and `npm run build` exit 0. The three mutants below are killed, 0 refused.
 
+**After merging the base** (`5ac2215`, "Serve a holder's own sessions over A2A, and dial the follow" — 23 files of agent-runtime,
+merged with no conflict), the whole suite was run forced again on 24.16.0 under `init.defaultBranch main`: 7,340 tests, 0 failures,
+with typecheck and lint at 0. That merged code had never run on the floor's binary before; it does. The mutants were tried again on
+the merged result, and all three are still killed.
+
 **What this does not prove:** the next CI run on main is the owner's to push after the landing, on runners this step cannot execute.
 The closest proof is the table above — the floor's own binary, under the runner's own git default.

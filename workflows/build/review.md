@@ -59,8 +59,10 @@ from your workspace git names its tip `main-worktree/HEAD`, whatever that branch
 with `again: true` only where the base moved under the change: a file both changed, named by
 `git diff --name-only HEAD...main-worktree/HEAD` and by `git diff --name-only main-worktree/HEAD...HEAD`; a file the base changed that
 the change's code or tests read; or a measure the change wrote, a baseline or a count that only shrinks, over files the base changed.
-Name those files in the finding, its `kind` `other`. Any other branch behind is no finding: say so in your summary, and the landing's
-check runs the whole suite on the merged tree. Once implement has merged the base, the diff your brief names shows the base's landings
+Name those files in the finding, its `kind` `other`. Any other branch behind is no finding: say so in your summary. Nothing runs the
+suite on the merged tree — the landing's check is a receipt — so what covers the rest is GitHub's own `mergeable` on the pull request
+and the `ci` context required of the commit you read: a base that moved under a green pull request makes the landing refuse rather
+than land, which costs a retry and never a broken base. Once implement has merged the base, the diff your brief names shows the base's landings
 with the change: read the change alone with `git diff main-worktree/HEAD...HEAD`.
 
 **Open the change when a picture cannot show it**: when it changes what a page does when pressed, typed into or hovered, or a state no

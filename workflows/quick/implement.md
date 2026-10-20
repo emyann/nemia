@@ -47,9 +47,10 @@ grows past the bound, do not trim it to fit, split it or drop its tests: sign of
 the branch and waits on CI: it runs `change.ts size`, `pictures.ts`, `probe.ts`, `mutants.ts`, `pull-request.ts push` and
 `pull-request.ts wait`, in that order, and nothing else. Run them yourself before you sign off, as `CLAUDE.md`, *Check your work*, says
 of a step's session: the tests of what you changed, the types and the lint, and for a change to the board the e2e pages it touches, with
-pictures. CI's `ci` context runs the suite, the types, the lint and the whole e2e on the commit your check pushed, before the gate, and
-the landing's check runs them again on the merged tree, after a person approved. A failure in either comes back to you, with what the
-check said; a failure at the landing aborts it, and nothing landed.
+pictures. CI's `ci` context runs the suite, the types, the lint and the whole e2e on the commit your check pushed, before the gate, and that is
+the last thing any suite reads: the landing merges that same commit and its check is only the receipt that it was merged. A red `ci`
+comes back to you, with what the check said; a landing refuses before anything is merged — a pull request GitHub calls unmergeable, a
+`ci` no longer green — and nothing landed.
 
 **Name the pages** the change touches in your closeout's `pages`, each by the name `npm run e2e -- --pages <name,…>` takes, `[]` when
 it touches none: they are the pages you ran, and nothing reads them but the person at the gate.
@@ -82,8 +83,9 @@ each to a copy of your result and refuses the step when its test still passes, w
 runs nothing unmutated. Try them first: `node workflows/build/mutants.ts <closeout.json>` after you commit. Name none only for a
 change that adds no rule, saying why in `noMutants`.
 
-**Merge the base before you sign off**, on every try: the base moves while you work, and the landing's check runs the whole suite on
-the merged tree. The bound counts your own change alone, from the base you merged last. The base is the branch the repository's own checkout is on, and from your worktree git names its tip
+**Merge the base before you sign off**, on every try: the base moves while you work, `ci` judges the commit your check pushes and
+nothing judges the merged tree afterwards — the landing's check is a receipt — so a base you did not merge is a base GitHub may call
+unmergeable at the landing, which refuses rather than lands. The bound counts your own change alone, from the base you merged last. The base is the branch the repository's own checkout is on, and from your worktree git names its tip
 `main-worktree/HEAD`, whatever that branch is called. Commit your work, then `git merge main-worktree/HEAD`, made as the `git` skill
 says a merge is made: keep both meanings in each conflict, and sign off `blocked` where both cannot hold. Then run again the tests of
 what the merge touched: those of each file of yours it changed, and of each file it changed that your code or your tests read.

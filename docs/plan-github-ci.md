@@ -214,7 +214,9 @@ checkout" as CODEOWNERS), and every lesson about the ship's check.
 3. ~~The Jev experiments' recorded run data~~ — decided: moved out of the tree, history kept.
 4. ~~Round checks: local (as now) or in CI on each push~~ — decided 2026-10-19 with the CI intent: **local, and narrowed to what the
    change touched**. The whole forced suite and the whole e2e are CI's; a round keeps only what a clean runner cannot do sooner, and the
-   landing proves the merge's own diff on the merged tree.
+   landing proves the merge's own diff on the merged tree. That last clause was overtaken the next day by
+   `a-run-s-change-is-a-pull-req-t452`: the landing's check is a receipt and proves nothing of the tree, `ci` on the pull request's head
+   being the whole of it. The decision's first half — local round checks, narrowed — stands.
 
 ## Cards, once the name is chosen
 

@@ -58,8 +58,9 @@ each to a copy of your result and refuses the step when its test still passes, w
 runs nothing unmutated. Try them first: `node workflows/build/mutants.ts <closeout.json>` after you commit. Name none only for a
 change that adds no rule, saying why in `noMutants`.
 
-**Merge the base before you sign off**, on every try: the base moves while you work, and the landing's check runs the whole suite on
-the merged tree. The base is the branch the repository's own checkout is on, and from your worktree git names its tip
+**Merge the base before you sign off**, on every try: the base moves while you work, `ci` judges the commit your check pushes and
+nothing judges the merged tree afterwards — the landing's check is a receipt — so a base you did not merge is a base GitHub may call
+unmergeable at the landing, which refuses rather than lands. The base is the branch the repository's own checkout is on, and from your worktree git names its tip
 `main-worktree/HEAD`, whatever that branch is called. Commit your work, then `git merge main-worktree/HEAD`, made as the `git` skill
 says a merge is made: keep both meanings in each conflict, and sign off `blocked` where both cannot hold. Then run again the tests of
 what the merge touched: those of each file of yours it changed, and of each file it changed that your code or your tests read.

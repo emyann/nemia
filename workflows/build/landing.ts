@@ -9,7 +9,9 @@
  *   result branch and the sha the reviewer read, `mergeable` MERGEABLE, the `ci` context SUCCESS at that sha, and every other
  *   `wf/<id>/*` tip reachable from it — then merges it with a merge commit whose subject and body are the ones it was given
  *   (`gh pr merge --merge --match-head-commit <sha>`, never `--delete-branch`: the repository auto-deletes the head branch), and
- *   fast-forwards the checkout (`git fetch origin && git merge --ff-only origin/<base>`).
+ *   fast-forwards the checkout (`git fetch origin && git merge --ff-only origin/<base>`). **Level-triggered**: it reads the world
+ *   rather than what a last try left, so a retry after a merge that went through and a fast-forward that was then declined — the one
+ *   failure between the two acts — does the fast-forward alone and merges nothing a second time.
  * - `receipt --run <id>`, which the land step's `check:` runs: it refuses unless the pull request is `MERGED` with a merge commit that
  *   is reachable from HEAD, the checkout is clean on the base with no merge in progress, and every `wf/<id>/*` tip is an ancestor of
  *   HEAD — the three facts the run's own `landingDue` needs to record `landed: {commit}` on the commit that landed.
@@ -17,8 +19,10 @@
  * The run is given, never read from HEAD: the checkout a landing runs in is on the base branch, not on a run's branch. Refuses, exit 1
  * on stderr with what to do next — the exact `nemia retry` line where a person must act: a run with no result branch here; a dirty
  * checkout, one with a merge in progress, or one not on the base; no `origin`; no `gh` on the PATH or none authenticated; no open pull
- * request for the run, or two; a draft, another base, a head that is not the branch's tip, a `mergeable` that is not MERGEABLE, a `ci`
- * that is not SUCCESS, a result branch the head leaves out; a `gh pr merge` GitHub declines; and a fast-forward git declines.
+ * request for the run, or two, or one merged beside one open; a draft, another base, a head that is not the branch's tip, a `mergeable`
+ * that is not MERGEABLE, a `ci` that is not SUCCESS, a result branch the head leaves out; a `gh pr merge` GitHub declines; and a
+ * fast-forward git declines. The receipt takes the merged pull request among whatever the run has — a closed one beside it is no
+ * refusal, a second merged one is — and refuses where none is merged.
  */
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -198,6 +202,24 @@ function pulls(id: string, state: string): Pr[] {
   return all.filter((pr) => pr.headRefName?.startsWith(`wf/${id}/`));
 }
 
+/**
+ * Where this run's pull requests stand, in one read: every one whose head is a branch of `wf/<id>/`, those of them GitHub has merged,
+ * and those still open. Both verbs read the world rather than assume what the last try left: a `merge` whose `gh pr merge` went through
+ * and whose fast-forward was then declined is retried against a pull request that is MERGED and no longer open, and a run that ever had
+ * a second pull request closed keeps that closed one in `all` for good.
+ */
+function standing(id: string): { all: Pr[]; merged: Pr[]; open: Pr[] } {
+  const all = pulls(id, 'all');
+  const inState = (state: string): Pr[] => all.filter((pr) => (pr.state ?? '').toUpperCase() === state);
+  return { all, merged: inState('MERGED'), open: inState('OPEN') };
+}
+
+/** Two pull requests of one run merged: which landing the run is to record is nobody's to guess. */
+const twoMerged = (found: readonly Pr[], id: string): string =>
+  `${found.length} pull requests of \`wf/${id}/\` are merged (${found.map((pr) => `#${pr.number}`).join(', ')}), and a run lands ` +
+  `one: which of them is this run's landing is a person's to say, and the run records only one commit. Read ` +
+  `${found.map((pr) => pr.url).join(' and ')}.`;
+
 /** The one pull request of this run, read as each verb requires one; refuses none, and two. */
 function sole(found: readonly Pr[], id: string, state: string, open: string): Pr {
   if (found.length === 0)
@@ -323,8 +345,23 @@ function merge(args: string[]): string[] {
   authed();
   const onto = base();
   onBase(branch, onto);
+  const { merged: already, open } = standing(id);
+  if (already.length > 1) throw new Refusal(twoMerged(already, id));
+  if (already.length === 1) {
+    const was = already[0];
+    if (open.length)
+      throw new Refusal(
+        `#${was.number} of this run is merged already and #${open.map((pr) => pr.number).join(', #')} is still open, so which pull ` +
+          `request is this run's landing is a person's to say: they close the open one (\`gh pr close <number>\`) where the merge ` +
+          `that happened is the landing, and the step is retried. Nothing is merged here.`,
+      );
+    return [
+      `#${was.number} was merged already, at ${was.headRefOid.slice(0, 12)}: nothing is merged a second time`,
+      ...forwarded(was, onto, id),
+    ];
+  }
   const pr = sole(
-    pulls(id, 'open'),
+    open,
     id,
     'open',
     'The implement step opens it, so a run with none goes round again; a person reopens one that was closed ' +
@@ -349,21 +386,33 @@ function merge(args: string[]): string[] {
       `GitHub declined to merge #${pr.number} at ${pr.headRefOid.slice(0, 12)}: ${merged.err}\n` +
         `  Nothing landed and this checkout is untouched. Read ${pr.url}.\n${retryLine(id)}`,
     );
-  const said = [`#${pr.number} merged at ${pr.headRefOid.slice(0, 12)} with a merge commit: ${pr.url}`];
+  return [
+    `#${pr.number} merged at ${pr.headRefOid.slice(0, 12)} with a merge commit: ${pr.url}`,
+    ...forwarded(pr, onto, id),
+  ];
+}
+
+/**
+ * The checkout fast-forwarded onto what GitHub merged: what it did, for stdout. Refuses a fetch that failed and a fast-forward git
+ * declined, each saying that the merge did happen and naming the command a person types — and never merging in their checkout.
+ */
+function forwarded(pr: Pr, onto: string, id: string): string[] {
   const fetched = run('git', ['fetch', 'origin']);
   if (fetched.status !== 0)
     throw new Refusal(
       `#${pr.number} is merged on GitHub, but \`git fetch origin\` failed here: ${fetched.err}\n` +
-        `  The change is on \`${onto}\` upstream; this checkout is behind it.\n${retryLine(id)}`,
+        `  The change is on \`${onto}\` upstream; this checkout is behind it. Running the merge again from here fast-forwards it ` +
+        `alone, since the pull request is already merged.\n${retryLine(id)}`,
     );
   const forward = run('git', ['merge', '--ff-only', `origin/${onto}`]);
   if (forward.status !== 0)
     throw new Refusal(
       `#${pr.number} is merged on GitHub, but \`git merge --ff-only origin/${onto}\` was declined here: ${forward.err}\n` +
         `  This checkout holds commits \`${onto}\` upstream does not, and a landing never merges in a person's checkout. A person ` +
-        `brings it onto \`origin/${onto}\`, then the step is retried.\n${retryLine(id)}`,
+        `brings it onto \`origin/${onto}\` — \`git log origin/${onto}..HEAD\` says what is in the way — and the merge run again ` +
+        `fast-forwards it alone, the pull request being merged already.\n${retryLine(id)}`,
     );
-  return [...said, `\`${onto}\` here is fast-forwarded to ${git('what commit HEAD is', 'rev-parse', 'HEAD').slice(0, 12)}`];
+  return [`\`${onto}\` here is fast-forwarded to ${git('what commit HEAD is', 'rev-parse', 'HEAD').slice(0, 12)}`];
 }
 
 /** `receipt`: the three facts the run records a landing on — merged with a merge commit, the checkout clean on it, no branch left out. */
@@ -374,12 +423,16 @@ function receipt(args: string[]): string[] {
   origin();
   authed();
   const onto = base();
-  const pr = sole(pulls(id, 'all'), id, 'all', 'The merge is the landing session\'s to make, with `landing.ts merge`.');
-  if ((pr.state ?? '').toUpperCase() !== 'MERGED')
+  const { all, merged } = standing(id);
+  if (merged.length > 1) throw new Refusal(twoMerged(merged, id));
+  if (merged.length === 0)
     throw new Refusal(
-      `#${pr.number} is \`${(pr.state ?? 'unknown').toLowerCase()}\`, not merged, so nothing of this run landed: the merge is made ` +
-        `with \`landing.ts merge --run ${id} --subject … --body-file …\`, and ${pr.url} says why it was not.`,
+      `no pull request of \`wf/${id}/\` is merged${
+        all.length ? ` — ${all.map((pr) => `#${pr.number} is \`${(pr.state ?? 'unknown').toLowerCase()}\``).join(', ')} — ` : ', '
+      }so nothing of this run landed: the merge is made with ` +
+        `\`landing.ts merge --run ${id} --subject … --body-file …\`${all.length ? `, and ${all[0].url} says why it was not` : ''}.`,
     );
+  const pr = merged[0];
   const oid = pr.mergeCommit?.oid;
   if (!oid) throw new Refusal(`#${pr.number} is merged but names no merge commit, so there is nothing to record: read ${pr.url}`);
   const parents = git(`the parents of ${oid.slice(0, 12)}`, 'rev-list', '--parents', '-n', '1', oid).split(' ').slice(1);

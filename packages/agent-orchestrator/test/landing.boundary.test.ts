@@ -10,6 +10,12 @@
  * merge commit's first parent is the base. `land-check.boundary.test.ts`, whose whole subject was that forced suite on the merged tree,
  * went with it; the last test here is what is left of it — the land steps' checks run no suite and no e2e, and nothing but the receipt.
  *
+ * The one failure between the landing's two acts has a retry that must survive it: `gh pr merge` goes through, the fast-forward is
+ * declined, the step signs off `blocked` with the retry line, a person brings the checkout onto `origin/main` as that refusal names,
+ * and the step is run again. GitHub now says MERGED and no pull request of the run is open, so the second run does the fast-forward
+ * alone and merges nothing twice; the merge verb reads the world rather than what the last try left, and the receipt takes the merged
+ * pull request among whatever the run has rather than insisting on a single one, since a closed one beside it cannot be closed again.
+ *
  * Its subject is git, `gh` and a spawned script: a boundary file.
  */
 import { test } from 'node:test';
@@ -432,9 +438,16 @@ test('REFUSED: a receipt whose pull request is not merged, or merged as a commit
     w.gh.answers(landed(w, { state }));
     const r = land(w, 'receipt', ['--run', RUN]);
     assert.equal(r.code, 1, `${state}: ${r.out}`);
-    assert.ok(r.err.includes(`#7 is \`${state.toLowerCase()}\`, not merged, so nothing of this run landed`), r.err);
+    assert.match(r.err, /no pull request of `wf\/r-1\/` is merged/);
+    assert.ok(r.err.includes(`#7 is \`${state.toLowerCase()}\``), r.err);
     assert.match(r.err, /landing\.ts merge --run r-1 --subject … --body-file …/);
   }
+
+  w.gh.answers([...landed(w).filter((rule) => rule.when !== 'pr list'), { when: 'pr list', out: '[]' }]);
+  const none = land(w, 'receipt', ['--run', RUN]);
+  assert.equal(none.code, 1, none.out);
+  assert.match(none.err, /no pull request of `wf\/r-1\/` is merged, so nothing of this run landed/);
+  assert.match(none.err, /landing\.ts merge --run r-1 --subject … --body-file …/);
 
   w.gh.answers(landed(w, { mergeCommit: { oid: w.tip } }));
   const squashed = land(w, 'receipt', ['--run', RUN]);
@@ -479,6 +492,68 @@ test('REFUSED: a receipt in a checkout the fast-forward did not reach, one that 
   assert.equal(l.code, 1, l.out);
   assert.match(l.err, /`wf\/r-1\/review` is not an ancestor of this checkout's HEAD/);
   assert.match(l.err, /the run would record a landing that left it out/);
+});
+
+test('merge after a fast-forward it was declined merges nothing a second time: it reads the pull request merged and fast-forwards alone', () => {
+  const w = world();
+  w.gh.answers(mergeable(w));
+  fs.writeFileSync(path.join(w.repo, 'mine.ts'), 'export const mine = 1;\n');
+  gitIn(w.repo, 'add', '-A');
+  gitIn(w.repo, 'commit', '-qm', 'a commit of the checkout that origin does not have');
+  const declined = land(w, 'merge', args());
+  assert.equal(declined.code, 1, declined.out);
+  assert.match(declined.err, /was declined here/);
+  assert.match(declined.err, /the merge run again\s+fast-forwards it alone, the pull request being merged already/);
+  assert.match(declined.err, /git log origin\/main\.\.HEAD/);
+  assert.equal(asked(declined.calls, 'pr', 'merge').length, 1, 'GitHub merged it once');
+
+  gitIn(w.repo, 'reset', '-q', '--hard', 'HEAD~1');
+  w.gh.answers(landed(w));
+  const again = land(w, 'merge', args());
+  assert.equal(again.code, 0, again.err);
+  assert.equal(asked(again.calls, 'pr', 'merge').length, 1, 'nothing is merged a second time');
+  assert.match(again.out, /wf land: #7 was merged already, at [0-9a-f]{12}: nothing is merged a second time/);
+  assert.match(again.out, /wf land: `main` here is fast-forwarded to [0-9a-f]{12}/);
+  assert.deepEqual(stands(w.repo), { branch: 'main', head: w.merged, clean: true, merging: false });
+
+  const receipt = land(w, 'receipt', ['--run', RUN]);
+  assert.equal(receipt.code, 0, receipt.err);
+});
+
+test('the receipt takes the merged pull request among the ones the run has: a closed one beside it is no refusal, two merged ones are', () => {
+  const w = world();
+  w.gh.answers(mergeable(w));
+  assert.equal(land(w, 'merge', args()).code, 0);
+  const merged = JSON.parse(listed(w, { state: 'MERGED', mergeCommit: { oid: w.merged } })) as Record<string, unknown>[];
+  const closed = { ...merged[0], number: 8, url: 'https://github.com/o/r/pull/8', state: 'CLOSED', mergeCommit: null };
+
+  w.gh.answers([...landed(w).filter((rule) => rule.when !== 'pr list'), { when: 'pr list', out: JSON.stringify([closed, ...merged]) }]);
+  const beside = land(w, 'receipt', ['--run', RUN]);
+  assert.equal(beside.code, 0, `a closed pull request beside the merged one is no refusal: it cannot be closed again\n${beside.err}`);
+  assert.match(beside.out, /wf land: #7 is merged as [0-9a-f]{12}, a merge commit/);
+
+  w.gh.answers([
+    ...landed(w).filter((rule) => rule.when !== 'pr list'),
+    { when: 'pr list', out: JSON.stringify([...merged, { ...merged[0], number: 8, url: 'https://github.com/o/r/pull/8' }]) },
+  ]);
+  const both = land(w, 'receipt', ['--run', RUN]);
+  assert.equal(both.code, 1, both.out);
+  assert.match(both.err, /2 pull requests of `wf\/r-1\/` are merged \(#7, #8\)/);
+  assert.match(both.err, /is a person's to say/);
+});
+
+test('REFUSED: a merge of a run that has one pull request merged and another still open, which of them landed being nobody to guess', () => {
+  const w = world();
+  const merged = JSON.parse(listed(w, { state: 'MERGED', mergeCommit: { oid: w.merged } })) as Record<string, unknown>[];
+  const open = JSON.parse(listed(w, { number: 8, url: 'https://github.com/o/r/pull/8' })) as Record<string, unknown>[];
+  w.gh.answers([...mergeable(w).filter((rule) => rule.when !== 'pr list'), { when: 'pr list', out: JSON.stringify([...merged, ...open]) }]);
+  const r = land(w, 'merge', args());
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.err, /#7 of this run is merged already and #8 is still open/);
+  assert.match(r.err, /gh pr close <number>/);
+  assert.match(r.err, /Nothing is merged here/);
+  assert.equal(asked(r.calls, 'pr', 'merge').length, 0);
+  assert.equal(stands(w.repo).head, w.base, 'and the checkout is untouched');
 });
 
 test("both land steps' checks are the receipt alone, frozen out of HEAD in the checkout, and run no suite and no e2e", () => {

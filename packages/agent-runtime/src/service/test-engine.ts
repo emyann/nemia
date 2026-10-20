@@ -428,7 +428,7 @@ export const testEngine = (): TestEngine => {
       sweep: unkept('sweep'),
       removeBody: unkept('removeBody'),
       compact: unkept('compact'),
-      hold: () => Effect.void,
+      hold: () => Effect.succeed(null),
       drain: (holder) =>
         drainRefusalOf(holder) === undefined
           ? Effect.sync(() => void held.drains.push(holder))

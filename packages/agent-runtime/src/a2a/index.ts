@@ -6,3 +6,7 @@ export type { SeamOps } from './client.ts';
 export { remoteConfigRefusal } from './card.ts';
 export { remoteOps, remoteRefuses } from './remote.ts';
 export type { Credentials, MissingCredential, RemoteAgent } from './remote.ts';
+export { servedOf } from './listener.ts';
+export type { Served } from './listener.ts';
+export { holderRefusal, holderSeamOf } from './holder-follow.ts';
+export type { HolderAgent } from './holder-follow.ts';

@@ -13,6 +13,11 @@
  * What the gate's script actually decides is run rather than read, next door in `ci-gate.boundary.test.ts`: matching its text would
  * prove nothing about its verdict.
  *
+ * It reads the e2e's own `pages/NAMES` too, only to refuse a shard count the pages cannot fill: which pages a shard visits is dealt by
+ * the runner from the pages that exist (`shardOf`, `apps/web/test/e2e/pages.ts`), and coverage is proved there, over them. A hand-written
+ * shard list anywhere here would be the second list of pages that `apps/web/CLAUDE.md` forbids — a new page is its file and its NAMES
+ * line and nothing else — so there is no list to diff, and the clause holds the wiring instead: the leg's shard, and the matrix's count.
+ *
  * The test reads files outside this package, the workflow and the root's `package.json`: `turbo.json` lists `.github/` among this
  * package's test inputs (`turbo-inputs.test.ts`), or turbo replays a pass from its cache after an edit to the workflow.
  */
@@ -20,7 +25,25 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { FILE, GATE, gateSteps, LEGS, readWorkflow, type Step, type Workflow, workflowText } from './ci-workflow.ts';
+import {
+  BOUND,
+  BUILD,
+  E2E,
+  E2E_COMMAND,
+  FILE,
+  GATE,
+  GENERATED,
+  gateSteps,
+  LEGS,
+  readWorkflow,
+  runSteps,
+  shardRunStep,
+  staleStep,
+  STALE_STEP,
+  type Step,
+  type Workflow,
+  workflowText,
+} from './ci-workflow.ts';
 
 const ROOT = path.join(import.meta.dirname, '..', '..', '..');
 
@@ -272,8 +295,138 @@ function targetDrift(text: string): string[] {
     : [];
 }
 
+/** The expression the shard's run must be given its shard by: the leg's own, never a literal, or every leg would run shard 1. */
+const SHARD_FLAG = '--shard ${{ matrix.shard }}';
+
+/** The expression the shard count must be written as: read back off the matrix, so the count is written once, in the matrix itself. */
+const OF_FLAG = '--of ${{ strategy.job-total }}';
+
+/** The command the bound job must run: the one reader of `PAGES_BOUND_MS`, which no copy in YAML may stand in for. */
+const BOUND_COMMAND = 'apps/web/test/e2e/pages-bound.ts';
+
+/** The pages the e2e has, read off its own NAMES: a name a line, the blank lines left out. */
+const readPages = (): string[] =>
+  fs
+    .readFileSync(path.join(ROOT, 'apps', 'web', 'test', 'e2e', 'pages', NAMES_FILE), 'utf8')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+/** Where the e2e says which pages there are, relative to the repository, as the sentences that refuse a shard count name it. */
+const NAMES_FILE = 'NAMES';
+const NAMES_PATH = 'apps/web/test/e2e/pages/NAMES';
+
+/** The shards the e2e job's matrix names, as YAML read them. */
+const shardLegs = (workflow: Workflow): unknown[] => workflow.jobs[E2E]?.strategy?.matrix?.shard ?? [];
+
+/**
+ * A shard matrix that is not 1..n contiguous, a run that does not take its shard off the leg or its count off the matrix, and more shards
+ * than the e2e has pages. The first is the invisible one: shards [1, 2, 4] of `strategy.job-total` 3 run shard 4 of 3, which the runner
+ * refuses, while shard 3's pages are visited by nobody — and a literal `--of 4` beside three legs would leave a quarter of the pages
+ * unvisited, green.
+ */
+function shardDrift(workflow: Workflow, pages: readonly string[]): string[] {
+  const shards = shardLegs(workflow);
+  const sentences: string[] = [];
+  const wanted = Array.from({ length: shards.length || 4 }, (_shard, i) => i + 1);
+  if (!shards.length || shards.some((shard, i) => shard !== wanted[i]))
+    sentences.push(
+      `the ${E2E} job's matrix.shard in ${FILE} reads ${JSON.stringify(shards)}, not 1 to ${wanted.length} in order: write it [${wanted.join(', ')}], since the run takes its count off strategy.job-total and a shard outside 1..n visits nothing while another's pages are visited by nobody`,
+    );
+  const run = shardRunStep(workflow)?.run;
+  if (run === undefined)
+    sentences.push(
+      `the ${E2E} job in ${FILE} has no step that runs \`${E2E_COMMAND}\`: give it one passing ${SHARD_FLAG} ${OF_FLAG}, or the job reports green having visited no page`,
+    );
+  else
+    for (const flag of [SHARD_FLAG, OF_FLAG])
+      if (!run.includes(flag))
+        sentences.push(
+          `the ${E2E} job's run of \`${E2E_COMMAND}\` in ${FILE} does not pass ${flag}: write it \`${E2E_COMMAND} -- ${SHARD_FLAG} ${OF_FLAG}\`, or the shards visit the wrong pages — every leg the same one, or a count adrift from the legs, and the pages of a shard nobody runs are never visited`,
+        );
+  if (shards.length > pages.length)
+    sentences.push(
+      `the ${E2E} job's matrix.shard in ${FILE} names ${shards.length} shards and ${NAMES_PATH} names ${pages.length} pages: a shard of them would visit nothing, so cut the matrix to ${pages.length} shards at most`,
+    );
+  return sentences;
+}
+
+/**
+ * A bound job that is not there, does not wait for the shards, or does not run the one command that sums their page time. `--pages` and
+ * `--shard` both silence the bound inside a run (`planOf`), so without this job nothing in CI holds the whole e2e's cost — and
+ * `PAGES_BOUND_MS` has one writer, in `apps/web/test/e2e/timing.ts`, which is why the sum is this command's and no comparison in YAML.
+ */
+function boundDrift(workflow: Workflow): string[] {
+  const job = workflow.jobs[BOUND];
+  if (job === undefined)
+    return [
+      `${FILE} has no ${BOUND} job: a shard silences the e2e's bound the way --pages does, so add the job that needs ${E2E} and runs \`node ${BOUND_COMMAND} <dir>\` over the shards' page times, or nothing in CI holds the whole e2e's cost`,
+    ];
+  return [
+    ...((job.needs ?? []).includes(E2E)
+      ? []
+      : [
+          `the ${BOUND} job in ${FILE} does not need ${E2E}: add ${E2E} to its needs, or it runs before the shards have written their page times and sums nothing`,
+        ]),
+    ...(runSteps(workflow, BOUND).some((step) => step.run?.includes(BOUND_COMMAND) === true)
+      ? []
+      : [
+          `the ${BOUND} job in ${FILE} does not run \`node ${BOUND_COMMAND}\`: it is the one place the shards' page times are summed against PAGES_BOUND_MS, whose only writer is apps/web/test/e2e/timing.ts, so run it rather than comparing a copy of the bound here`,
+        ]),
+  ];
+}
+
+/** The two commands the build job must run, and what each writes, as the sentence that refuses its absence names it. */
+const BUILT: { command: string; writes: string }[] = [
+  { command: 'npm run build', writes: 'apps/web/src/routeTree.gen.ts' },
+  { command: 'npm run theme:generate', writes: 'apps/web/theme/' },
+];
+
+/**
+ * A build job that is not there, does not run a generator, or whose staleness step does not name a generated path — and a `GENERATED`
+ * path this repository does not have, which would make the step guard nothing while reading as though it guarded everything.
+ */
+function buildDrift(workflow: Workflow, generated: readonly string[] = GENERATED): string[] {
+  const sentences = generated
+    .filter((generated) => !fs.existsSync(path.join(ROOT, generated)))
+    .map(
+      (path_) =>
+        `GENERATED in ci-workflow.ts names ${path_}, which this repository does not have: a step that diffs a path that is not there refuses nothing, so write the path the generator writes, or take it off the list`,
+    );
+  if (workflow.jobs[BUILD] === undefined)
+    return [
+      ...sentences,
+      `${FILE} has no ${BUILD} job: add the job that runs ${BUILT.map((built) => `\`${built.command}\``).join(' and ')} and then refuses a diff of ${generated.join(' and ')}, or a generated file committed stale passes CI and fails a person's typecheck`,
+    ];
+  const runs = runSteps(workflow, BUILD)
+    .filter((step) => step.name !== STALE_STEP)
+    .map((step) => step.run ?? '')
+    .join('\n');
+  sentences.push(
+    ...BUILT.filter((built) => !runs.includes(built.command)).map(
+      (built) =>
+        `the ${BUILD} job in ${FILE} does not run \`${built.command}\`: it is what writes ${built.writes}, so without it the staleness step reads the committed bytes against themselves and refuses nothing`,
+    ),
+  );
+  const stale = staleStep(workflow)?.run;
+  if (stale === undefined)
+    sentences.push(
+      `the ${BUILD} job in ${FILE} has no step named ${STALE_STEP}: give it the step that refuses a diff of ${generated.join(' and ')} by name, which ci-build.boundary.test.ts runs as GitHub runs it`,
+    );
+  else
+    sentences.push(
+      ...generated
+        .filter((path_) => !stale.includes(path_))
+        .map(
+          (path_) =>
+            `the ${BUILD} job's ${STALE_STEP} step in ${FILE} does not name ${path_}: a generator rewrites it, so add it to the paths the step diffs, or a stale ${path_} reports green`,
+        ),
+    );
+  return sentences;
+}
+
 /** Every clause, over the shipped file. */
-const drift = (workflow: Workflow, workspaces: Workspace[], engine: string, text: string): string[] => [
+const drift = (workflow: Workflow, workspaces: Workspace[], engine: string, text: string, pages: readonly string[]): string[] => [
   ...legDrift(workflow, workspaces),
   ...nodeDrift(workflow, engine),
   ...pinDrift(workflow, engine),
@@ -284,6 +437,9 @@ const drift = (workflow: Workflow, workspaces: Workspace[], engine: string, text
   ...verdictDrift(workflow),
   ...cancelDrift(workflow),
   ...targetDrift(text),
+  ...shardDrift(workflow, pages),
+  ...boundDrift(workflow),
+  ...buildDrift(workflow),
 ];
 
 test('the shipped CI workflow agrees with the repository it checks', () => {
@@ -293,7 +449,9 @@ test('the shipped CI workflow agrees with the repository it checks', () => {
     workspaces.filter((workspace) => workspace.suite).length >= 4,
     'the scan found fewer than four workspaces with a test script: the leg clause reads nothing',
   );
-  assert.deepEqual(drift(readWorkflow(), workspaces, readEngine(), workflowText()), []);
+  const pages = readPages();
+  assert.ok(pages.length > 100, `${NAMES_PATH} names ${pages.length} pages: the shard clause reads a list that is not the e2e's`);
+  assert.deepEqual(drift(readWorkflow(), workspaces, readEngine(), workflowText(), pages), []);
 });
 
 test('the shipped CI workflow runs on the three events, reads alone, and caches no install', () => {
@@ -397,6 +555,14 @@ test('REFUSED: a workspace with no leg, a leg with no workspace, a node floor ad
     "the ci job in .github/workflows/ci.yml does not need lint: branch protection names ci and nothing else, so add lint to the gate's needs, or its failure reports green",
   ]);
 
+  const unbounded = structuredClone(shipped);
+  const grown = unbounded.jobs[GATE]?.needs;
+  assert.ok(grown?.includes(BOUND) === true, `the gate needs ${BOUND} today, which this clause is what refuses forgetting`);
+  unbounded.jobs[GATE].needs = grown.filter((job) => job !== BOUND);
+  assert.deepEqual(gateDrift(unbounded), [
+    `the ci job in .github/workflows/ci.yml does not need ${BOUND}: branch protection names ci and nothing else, so add ${BOUND} to the gate's needs, or its failure reports green`,
+  ]);
+
   const always = structuredClone(shipped);
   delete always.jobs[GATE]?.if;
   assert.deepEqual(gateDrift(always), [
@@ -448,5 +614,147 @@ test('REFUSED: a workspace with no leg, a leg with no workspace, a node floor ad
   const target = ['pull', 'request', 'target'].join('_');
   assert.deepEqual(targetDrift(text.replace('pull_request:', `${target}:`)), [
     `.github/workflows/ci.yml names ${target}: a fork's code must not run with a token that can write, so trigger on pull_request instead and read nothing of the fork's with write access`,
+  ]);
+});
+
+test('REFUSED: a shard matrix that is not 1..n, a shard taken off no leg, a count written as a literal, more shards than the e2e has pages', () => {
+  const shipped = readWorkflow();
+  const pages = readPages();
+  const shardsOf = (workflow: Workflow): unknown[] => {
+    const matrix = workflow.jobs[E2E]?.strategy?.matrix;
+    assert.ok(matrix !== undefined, `the ${E2E} job has a matrix today`);
+    matrix.shard ??= [];
+    return matrix.shard;
+  };
+
+  assert.deepEqual(shardLegs(shipped), [1, 2, 3, 4], 'the e2e runs in four shards today');
+
+  assert.deepEqual(shardDrift(shipped, pages), [], 'the shards are wired to the matrix and the pages today');
+  for (const [why, legs] of [
+    ['not contiguous', [1, 2, 4, 8]],
+    ['none at all, as a half-written matrix leaves it', []],
+  ] as const) {
+    const adrift = structuredClone(shipped);
+    shardsOf(adrift).splice(0, 4, ...legs);
+    assert.deepEqual(
+      shardDrift(adrift, pages),
+      [
+        `the e2e job's matrix.shard in .github/workflows/ci.yml reads ${JSON.stringify(legs)}, not 1 to ${legs.length || 4} in order: ` +
+          `write it [${Array.from({ length: legs.length || 4 }, (_leg, i) => i + 1).join(', ')}], since the run takes its count off ` +
+          'strategy.job-total and a shard ' +
+          "outside 1..n visits nothing while another's pages are visited by nobody",
+      ],
+      why,
+    );
+  }
+
+  const literal = structuredClone(shipped);
+  const run = shardRunStep(literal);
+  assert.ok(run?.run !== undefined, 'the e2e job runs the e2e today');
+  run.run = run.run.replace('--of ${{ strategy.job-total }}', '--of 4');
+  assert.deepEqual(shardDrift(literal, pages), [
+    "the e2e job's run of `npm run e2e` in .github/workflows/ci.yml does not pass --of ${{ strategy.job-total }}: write it " +
+      '`npm run e2e -- --shard ${{ matrix.shard }} --of ${{ strategy.job-total }}`, or the shards visit the wrong pages — every leg the ' +
+      'same one, or a count adrift from the legs, and the pages of a shard nobody runs are never visited',
+  ]);
+
+  const everyone = structuredClone(shipped);
+  const same = shardRunStep(everyone);
+  same!.run = same!.run!.replace('--shard ${{ matrix.shard }}', '--shard 1');
+  assert.deepEqual(shardDrift(everyone, pages), [
+    "the e2e job's run of `npm run e2e` in .github/workflows/ci.yml does not pass --shard ${{ matrix.shard }}: write it " +
+      '`npm run e2e -- --shard ${{ matrix.shard }} --of ${{ strategy.job-total }}`, or the shards visit the wrong pages — every leg the ' +
+      'same one, or a count adrift from the legs, and the pages of a shard nobody runs are never visited',
+  ]);
+
+  const unrun = structuredClone(shipped);
+  unrun.jobs[E2E].steps = (unrun.jobs[E2E].steps ?? []).filter((step) => step.run?.includes(E2E_COMMAND) !== true);
+  assert.deepEqual(shardDrift(unrun, pages), [
+    'the e2e job in .github/workflows/ci.yml has no step that runs `npm run e2e`: give it one passing --shard ${{ matrix.shard }} ' +
+      '--of ${{ strategy.job-total }}, or the job reports green having visited no page',
+  ]);
+
+  assert.deepEqual(shardDrift(shipped, ['factory', 'runs', 'say']), [
+    "the e2e job's matrix.shard in .github/workflows/ci.yml names 4 shards and apps/web/test/e2e/pages/NAMES names 3 pages: " +
+      'a shard of them would visit nothing, so cut the matrix to 3 shards at most',
+  ]);
+});
+
+test('REFUSED: no job that sums the shards, one that does not wait for them, and one that does not run the bound', () => {
+  const shipped = readWorkflow();
+  assert.deepEqual(boundDrift(shipped), [], 'the bound job is there, needs the shards and runs the bound today');
+
+  const ungated = structuredClone(shipped);
+  delete ungated.jobs[BOUND];
+  assert.deepEqual(boundDrift(ungated), [
+    ".github/workflows/ci.yml has no e2e-bound job: a shard silences the e2e's bound the way --pages does, so add the job that needs " +
+      "e2e and runs `node apps/web/test/e2e/pages-bound.ts <dir>` over the shards' page times, or nothing in CI holds the whole e2e's cost",
+  ]);
+
+  const racing = structuredClone(shipped);
+  racing.jobs[BOUND].needs = [];
+  assert.deepEqual(boundDrift(racing), [
+    'the e2e-bound job in .github/workflows/ci.yml does not need e2e: add e2e to its needs, or it runs before the shards have written ' +
+      'their page times and sums nothing',
+  ]);
+
+  const unsummed = structuredClone(shipped);
+  unsummed.jobs[BOUND].steps = (unsummed.jobs[BOUND].steps ?? []).filter((step) => step.run === undefined);
+  assert.deepEqual(boundDrift(unsummed), [
+    'the e2e-bound job in .github/workflows/ci.yml does not run `node apps/web/test/e2e/pages-bound.ts`: it is the one place the ' +
+      "shards' page times are summed against PAGES_BOUND_MS, whose only writer is apps/web/test/e2e/timing.ts, so run it rather than " +
+      'comparing a copy of the bound here',
+  ]);
+});
+
+test('REFUSED: no build job, a generator not run, a staleness step that names one generated path, and a path this repository has not', () => {
+  const shipped = readWorkflow();
+  assert.deepEqual(buildDrift(shipped), [], 'the build job runs both generators and names both generated paths today');
+
+  const unbuilt = structuredClone(shipped);
+  delete unbuilt.jobs[BUILD];
+  assert.deepEqual(buildDrift(unbuilt), [
+    '.github/workflows/ci.yml has no build job: add the job that runs `npm run build` and `npm run theme:generate` and then refuses a ' +
+      "diff of apps/web/src/routeTree.gen.ts and apps/web/theme/, or a generated file committed stale passes CI and fails a person's typecheck",
+  ]);
+
+  for (const [command, writes] of [
+    ['npm run build', 'apps/web/src/routeTree.gen.ts'],
+    ['npm run theme:generate', 'apps/web/theme/'],
+  ] as const) {
+    const ungenerated = structuredClone(shipped);
+    const steps = ungenerated.jobs[BUILD].steps ?? [];
+    assert.ok(
+      steps.some((step) => step.run?.includes(command) === true),
+      `the build job runs \`${command}\` today`,
+    );
+    ungenerated.jobs[BUILD].steps = steps.filter((step) => step.name === STALE_STEP || step.run?.includes(command) !== true);
+    assert.deepEqual(buildDrift(ungenerated), [
+      `the build job in .github/workflows/ci.yml does not run \`${command}\`: it is what writes ${writes}, so without it the staleness ` +
+        'step reads the committed bytes against themselves and refuses nothing',
+    ]);
+  }
+
+  const half = structuredClone(shipped);
+  const stale = staleStep(half);
+  assert.ok(stale?.run !== undefined, `the build job has its ${STALE_STEP} step today`);
+  stale.run = stale.run.replaceAll('apps/web/theme/', '');
+  assert.deepEqual(buildDrift(half), [
+    "the build job's Refuse a stale generated file step in .github/workflows/ci.yml does not name apps/web/theme/: a generator " +
+      'rewrites it, so add it to the paths the step diffs, or a stale apps/web/theme/ reports green',
+  ]);
+
+  assert.deepEqual(buildDrift(shipped, ['apps/web/src/routeTree.gen.ts', 'apps/web/no-such-generated-file.ts']), [
+    'GENERATED in ci-workflow.ts names apps/web/no-such-generated-file.ts, which this repository does not have: a step that diffs a ' +
+      'path that is not there refuses nothing, so write the path the generator writes, or take it off the list',
+    "the build job's Refuse a stale generated file step in .github/workflows/ci.yml does not name apps/web/no-such-generated-file.ts: " +
+      'a generator rewrites it, so add it to the paths the step diffs, or a stale apps/web/no-such-generated-file.ts reports green',
+  ]);
+
+  const unnamed = structuredClone(shipped);
+  unnamed.jobs[BUILD].steps = (unnamed.jobs[BUILD].steps ?? []).filter((step) => step.name !== STALE_STEP);
+  assert.deepEqual(buildDrift(unnamed), [
+    'the build job in .github/workflows/ci.yml has no step named Refuse a stale generated file: give it the step that refuses a diff of ' +
+      'apps/web/src/routeTree.gen.ts and apps/web/theme/ by name, which ci-build.boundary.test.ts runs as GitHub runs it',
   ]);
 });

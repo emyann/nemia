@@ -90,8 +90,8 @@ must be its own. GitHub's own actions by major tag, and a third party's taken as
 trigger: `nemia upgrade`'s own trial build is a release's gate.
 
 What it runs, all of it reporting **one required context, `ci`**, from a single gate job that `needs` every other job with `always()`, so
-branch protection is configured once and never touched as the job list grows. The first three are built; the last two come with cards 2
-and 3, and the gate's `needs` clause is what refuses adding a job and forgetting to wire it in:
+branch protection is configured once and never touched as the job list grows. All but gitleaks are built; that comes with card 3, and the
+gate's `needs` clause is what refuses adding a job and forgetting to wire it in:
 
 - **Ten test legs**: one per workspace, on node 24.16.0 — the floor `engines.node` claims — and 24, each leg running its package's suite
   twice, under `TZ=UTC` and `TZ=America/New_York`. Both runs pass `--force`: `turbo.json` hashes no environment, so without it the second
@@ -104,11 +104,16 @@ and 3, and the gate's `needs` clause is what refuses adding a job and forgetting
   ships it (22.23.3, the line's latest, carries 1.51.0), and 24.16.0 is the first 24.x that does — 24.15.0 still carries 1.51.0. So the
   floor is the first release the suite passes on, not a round number.
 - **`npm run lint` and `npm run typecheck`**, whole, on the floor.
-- **The whole e2e in four shards** (card 2), every page named in `apps/web/test/e2e/pages/NAMES`, with a gate summing their page
-  time against `PAGES_BOUND_MS`, Playwright's browsers cached, and a failing page's pictures uploaded. npm itself is never cached:
-  the lockfile's own install is part of what is tested.
-- **A build job** (card 2) that refuses a stale generated file by name, `git diff --exit-code` over `apps/web/src/routeTree.gen.ts` and
-  `apps/web/theme/`.
+- **The whole e2e in four shards**, each leg running `npm run e2e -- --shard ${{ matrix.shard }} --of ${{ strategy.job-total }}`: the
+  runner deals the pages itself from the pages that exist (`shardOf`, `apps/web/test/e2e/pages.ts`), so the shard count is written once,
+  in the matrix, and a new e2e page is still its file and its line in `apps/web/test/e2e/pages/NAMES` and nothing else. Each shard
+  uploads its page times, and an `e2e-bound` job sums every shard's against `PAGES_BOUND_MS` — the bound that is the whole run's and
+  additive, which a shard silences inside a run exactly as `--pages` does — through `node apps/web/test/e2e/pages-bound.ts`, whose
+  refusal names the slowest pages, or the shard that wrote nothing. Playwright's browsers are cached, keyed on the lockfile; only a
+  failing page's pictures are uploaded. npm itself is never cached: the lockfile's own install is part of what is tested.
+- **A build job** that runs `npm run build` and `npm run theme:generate` and then refuses a stale generated file by name, over
+  `apps/web/src/routeTree.gen.ts` and `apps/web/theme/`. Both generators were run twice on the committed tree before the job was
+  written, and write the same bytes: the job's verdict rests on that.
 - **gitleaks** (card 3) over the incoming commits, as a pinned binary with a two-line allowlist, and `CODEOWNERS` over what a branch
   could edit to weaken its own check.
 
@@ -123,11 +128,19 @@ unquoted (YAML reads `24.16` as a number and setup-node installs another release
 the leg does not run its suite under and a run of it that drops `--force`, a `cancel-in-progress` that would cancel a run of `main`, a
 job outside the gate's `needs`, a gate without `always()`, a gate step not given the results through its environment or interpolating an
 expression into its shell, an action that is not GitHub's own by major tag, and the trigger that would run a fork's code against a
-writable token. What the gate's script decides is not read but run, in `packages/agent-orchestrator/test/ci-gate.boundary.test.ts`:
+writable token. Card 2 added three clauses of its own: an `e2e` matrix that is not 1..n in order or a run of the e2e that does not take
+its shard off the leg (`--shard ${{ matrix.shard }}`) and its count off the matrix (`--of ${{ strategy.job-total }}`), with more shards
+than `pages/NAMES` has pages; an `e2e-bound` job missing, not needing the shards, or not running `pages-bound.ts`, which is the one
+place `PAGES_BOUND_MS` is applied and the reason no copy of the number is in the YAML; and a `build` job that does not run a generator,
+or whose staleness step forgets one of the generated paths — those paths being read from one list, which is itself refused when it names
+a path this repository does not have. What the gate's script decides is not read but run, in
+`packages/agent-orchestrator/test/ci-gate.boundary.test.ts`, and the build job's staleness step likewise in
+`packages/agent-orchestrator/test/ci-build.boundary.test.ts`, whose last test runs a step that lists the stale files and forgets to fail,
+to show that a text match over the step would have passed it:
 against every result GitHub can hand it and three it cannot, because a list of the words that mean failure and a check that every result
-means success read alike to a pattern and differ exactly on the result nobody foresaw. The shard list adrift from `NAMES` is card 2's
-clause, written with the shards themselves — there is no shard list to drift from until then. So the file cannot quietly test less than
-it claims.
+means success read alike to a pattern and differ exactly on the result nobody foresaw. There is no shard list anywhere to drift from `NAMES`: the runner deals the
+pages, and coverage — every page in exactly one shard, in the pages' order — is proved in `apps/web/test/e2e-pages.test.ts` over the pages
+that exist. So the file cannot quietly test less than it claims.
 
 **The owner pushes `main` by hand after each landing**, and reads the verdict off GitHub's own notification or the Actions tab. Nothing in
 Nemia reads CI today, and `push: main` fires after the landing has already committed: CI reports on a landing and never gates one, so a

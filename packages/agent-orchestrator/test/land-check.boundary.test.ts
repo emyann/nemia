@@ -5,8 +5,8 @@
  * turbo does not hash, and the doc breaks a test or a typecheck that reads it. The shipped check must refuse it; the same check with
  * `npm test && npm run typecheck` in place of the forced pair passes it, which proves the fixture really meets turbo's cache. A merge that
  * touches the web app runs the e2e, which builds the app itself, and no build before it: the fixture's `build` and `e2e` each leave a mark.
- * Implement's check does the same in a round, where `WF_BASE_REF` names the base the work began on: the e2e runs there, before review.
- * Implement's round check runs the tests forced too, the round's one run of the whole suite: a round's doc that breaks a test is refused.
+ * Implement's round check runs no suite and no e2e of its own — `ci` runs them on the commit it pushed (`pull-request.boundary.test.ts`) —
+ * so what is held here is the landing's alone.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -181,82 +181,4 @@ test('a landing that touches the web app runs the e2e, which builds the app, and
   assert.equal(shipped.status, 0, shipped.out);
   assert.ok(fs.existsSync(path.join(dir, E2E_RAN)), `the e2e ran:\n${shipped.out}`);
   assert.ok(!fs.existsSync(path.join(dir, BUILT)), `the app was built a second time, before the e2e:\n${shipped.out}`);
-});
-
-/** The scripts implement's check reads from the run's base, as the base holds them. */
-const BASE_SCRIPTS = ['mutants.ts', 'pictures.ts', 'probe.ts'];
-
-/**
- * A scratch monorepo whose main holds the fixture and the scripts implement's check reads from its base, with a branch on it that writes
- * `doc`, checked out, as a round's work leaves it; a `claude` on its path that lists no session, for the check's look for a live probe.
- * The repository, its base, and what a round's check is given that a landing's is not.
- */
-const round = (doc: string): { dir: string; env: Record<string, string> } => {
-  const dir = scratch('wf-round-check-');
-  const scripts = Object.fromEntries(
-    BASE_SCRIPTS.map((name) => [`workflows/build/${name}`, fs.readFileSync(path.join(BUILD, name), 'utf8')]),
-  );
-  for (const [name, text] of Object.entries({ ...files(), ...scripts })) {
-    fs.mkdirSync(path.dirname(path.join(dir, name)), { recursive: true });
-    fs.writeFileSync(path.join(dir, name), text);
-  }
-  fs.mkdirSync(path.join(dir, 'home'));
-  fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(dir, 'node_modules'));
-  git(dir, 'init', '-q', '-b', 'main');
-  git(dir, 'add', '-A');
-  git(dir, 'commit', '-qm', 'fixture');
-  const base = git(dir, 'rev-parse', 'HEAD').trim();
-  git(dir, 'checkout', '-q', '-b', 'work');
-  fs.mkdirSync(path.dirname(path.join(dir, doc)), { recursive: true });
-  fs.writeFileSync(path.join(dir, doc), 'a round of work\n');
-  git(dir, 'add', '-A');
-  git(dir, 'commit', '-qm', 'work');
-  const bin = scratch('wf-round-bin-');
-  fs.writeFileSync(path.join(bin, 'claude'), '#!/bin/sh\necho "[]"\n', { mode: 0o755 });
-  const closeout = path.join(scratch('wf-round-closeout-'), 'closeout.json');
-  fs.writeFileSync(closeout, JSON.stringify({ outcome: 'done', summary: 's', artifacts: [], mutants: [], noMutants: 'a fixture' }));
-  const env = {
-    PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}`,
-    TMPDIR: scratch('wf-round-tmp-'),
-    WF_BASE_REF: base,
-    WF_RUN: 'r-1',
-    WF_CLOSEOUT: closeout,
-    WF_ARTIFACTS: scratch('wf-round-files-'),
-  };
-  return { dir, env };
-};
-
-test("implement's round check, given its base, runs the e2e on a change to the web app, which builds the app, and no build before it", () => {
-  const web = round('apps/web/test/note.md');
-  const ran = sh(web.dir, checkOf('implement'), web.env);
-  assert.equal(ran.status, 0, ran.out);
-  assert.ok(fs.existsSync(path.join(web.dir, E2E_RAN)), `a round's check ran the e2e:\n${ran.out}`);
-  assert.ok(!fs.existsSync(path.join(web.dir, BUILT)), `the app was built a second time, before the e2e:\n${ran.out}`);
-  const elsewhere = round('docs/other.md');
-  const skipped = sh(elsewhere.dir, checkOf('implement'), elsewhere.env);
-  assert.equal(skipped.status, 0, skipped.out);
-  assert.ok(!fs.existsSync(path.join(elsewhere.dir, E2E_RAN)), `no e2e for a change outside the web app and the api:\n${skipped.out}`);
-});
-
-/** Implement's check, whose tests turbo runs forced, with them run through the root's script, which lets turbo replay a cached pass. */
-const IMPLEMENT_FORCED = 'npm test -- --force && npm run typecheck && npm run lint';
-
-test("implement's round check runs the tests forced: a round's doc that breaks a test is refused, though turbo holds the last round's pass", () => {
-  const check = checkOf('implement');
-  assert.ok(check.includes(IMPLEMENT_FORCED), check);
-  const { dir, env } = round('docs/other.md');
-  const warm = sh(dir, 'npm test && npm run typecheck', env);
-  assert.equal(warm.status, 0, `the last round passes:\n${warm.out}`);
-  fs.writeFileSync(path.join(dir, 'docs', 'name.md'), 'Formerly\n');
-  git(dir, 'add', '-A');
-  git(dir, 'commit', '-qm', 'rename');
-  const control = sh(dir, check.replace(IMPLEMENT_FORCED, 'npm test && npm run typecheck && npm run lint'), env);
-  assert.equal(
-    control.status,
-    0,
-    `turbo replays the last round's pass after a change to a doc it does not hash; if it hashes the doc now, the fixture needs another file:\n${control.out}`,
-  );
-  const shipped = sh(dir, check, env);
-  assert.notEqual(shipped.status, 0, `implement's check passed a round that breaks a test:\n${shipped.out}`);
-  assert.match(shipped.out, /Failed:\s+p#test/);
 });

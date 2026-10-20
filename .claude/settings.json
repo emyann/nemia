@@ -36,6 +36,8 @@
       "Bash(git blame:*)",
       "Bash(git shortlog:*)",
       "Bash(git describe:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr checks:*)",
       "Bash(cd:*)",
       "WebSearch",
       "WebFetch",

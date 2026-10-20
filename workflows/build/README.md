@@ -11,9 +11,13 @@ design → implement ⇄ review → land
 Implement's check runs the mutants Ada's closeout names (`mutants.ts`, read from the run's base, never from the tree it judges): each on a
 copy of her result, and a mutant its test does not kill refuses the step.
 
-Where the work touches `apps/web/` or `apps/api/`, or the root's `package.json`, `package-lock.json` or `turbo.json`, implement's check
-runs the whole e2e (`npm run e2e`, which builds the app), so a round reaches review with the board's pages passed; land's check runs it
-again on the merged tree.
+Implement pushes its branch and opens the pull request through `pull-request.ts`, read from the base as the others are: it pushes this
+run's own branch, never another and never the base and never forced, and opens or updates the one pull request of the branch, never a
+draft, printing the address that goes on Ada's closeout as an artifact value. Her check pushes again through the same script and refuses
+unless the pull request's head is the commit it judges, then waits on the `ci` context (1800 s for it to start, 2400 s whole): CI runs
+the suite, the types, the lint, the whole e2e and the build on that commit, and a red, cancelled or missing `ci` is the check's refusal,
+with the Actions URL, the failing jobs and a bounded tail of their log — no agent of this team may type `gh`, so the script reads it for
+them. Land's check runs the whole suite, the types, the lint and the whole e2e again on the merged tree.
 
 It also runs `pictures.ts`, read from the base as well, first: a change under `apps/web/src` touches the board's pages, and refuses the
 step unless the closeout's `artifacts` names a picture, an image file (`.png`, `.jpg`, `.jpeg`, `.webp`, `.gif`, `.avif`) of more than 0
@@ -38,8 +42,8 @@ prove their rule. `wf stats` totals each per day, `—` on a day no review close
 
 Land's check runs the tests and the typecheck forced (`turbo run … --force`) on the merged tree, so a change turbo does not hash, such as a
 doc or a workflow file, cannot land on a pass turbo replays from its cache.
-Implement's check runs the tests forced too (`npm test -- --force`): it is the round's one run of the whole suite, its session running
-only the tests of what it changed, and a round that changes only such a file must not pass on the last round's replay.
+Implement's check runs no suite itself: `ci` runs it on the pushed commit, on clean runners and with no cache of this machine's, and
+Ada's session runs only the tests of what she changed.
 
 Implement merges the base into its branch before each sign-off (`git merge main-worktree/HEAD`: the tip of the branch the repository's
 own checkout is on, whatever it is called), so its check runs on the merged tree, and measures again what its change wrote by a measure.
@@ -59,5 +63,5 @@ The agents and their skills are any software factory's, and say nothing of this 
 the steps (`build-told.test.ts`). Implement and review each declare their own closeout (`output:`, `implement.schema.json` and
 `review.schema.json` beside them): the mutants are this workflow's check, and review's schema is the reviewer's with `mutants` added.
 Both add `look`, this repository's skill for its board, to the skills design, implement and review are given. Design and review deny
-the build and the e2e on their own `disallowedTools:`, and review the whole suite, which implement's check already ran; the checks
-they do run are named in their notes and allowed by `.claude/settings.json`.
+the build and the e2e on their own `disallowedTools:`, and review the whole suite, which `ci` runs on the commit implement pushed; the
+checks they do run are named in their notes and allowed by `.claude/settings.json`, the two reads of the pull request among them.

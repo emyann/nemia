@@ -4,20 +4,39 @@ input: design
 place: git
 agent: ada
 context: 400k
-check: { if [ -n "${WF_BASE_REF:-}" ]; then p=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/build/pictures.ts" > "$p/pictures.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/build/pictures.ts, so no picture can be asked for; start the run on a base that has it" >&2; false; }; } && node "$p/pictures.ts" "${WF_CLOSEOUT:-}"; c=$?; rm -rf "$p"; [ "$c" -eq 0 ]; else echo "wf check: pictures are asked only in a run's check, where WF_BASE_REF names the base the work began on"; fi; } && { if [ -n "${WF_BASE_REF:-}" ]; then q=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/build/probe.ts" > "$q/probe.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/build/probe.ts, so no probe can be read; start the run on a base that has it" >&2; false; }; } && node "$q/probe.ts" check; c=$?; rm -rf "$q"; [ "$c" -eq 0 ]; else echo "wf check: probes are read only in a run's check, where WF_BASE_REF and WF_RUN name the run"; fi; } && npm test -- --force && npm run typecheck && npm run lint && { if [ -n "${WF_BASE_REF:-}" ]; then m=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/build/mutants.ts" > "$m/mutants.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/build/mutants.ts, so no mutant can be run; start the run on a base that has it" >&2; false; }; } && node "$m/mutants.ts" "${WF_CLOSEOUT:-}"; c=$?; rm -rf "$m"; [ "$c" -eq 0 ]; else echo "wf check: the mutants run only in a run's check, where WF_BASE_REF names the base whose runner judges them"; fi; } && { if [ -n "${WF_BASE_REF:-}" ]; then range="$WF_BASE_REF...HEAD"; else range=HEAD...MERGE_HEAD; fi; touched=$(git -c core.quotePath=false diff --no-renames --name-only "$range" --) || { echo "wf check: cannot tell what the work touched, since git diff --name-only $range failed; the build and the e2e are not skipped on a guess" >&2; false; }; } && if printf '%s\n' "$touched" | grep -Eq '^(apps/(web|api)/|package(-lock)?\.json$|turbo\.json$)'; then npm run e2e; else echo "wf check: nothing under apps/web/ or apps/api/, nor the root's package.json, package-lock.json or turbo.json, was touched: no build, no e2e"; fi
+check: { if [ -n "${WF_BASE_REF:-}" ]; then p=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/build/pictures.ts" > "$p/pictures.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/build/pictures.ts, so no picture can be asked for; start the run on a base that has it" >&2; false; }; } && node "$p/pictures.ts" "${WF_CLOSEOUT:-}"; c=$?; rm -rf "$p"; [ "$c" -eq 0 ]; else echo "wf check: pictures are asked only in a run's check, where WF_BASE_REF names the base the work began on"; fi; } && { if [ -n "${WF_BASE_REF:-}" ]; then q=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/build/probe.ts" > "$q/probe.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/build/probe.ts, so no probe can be read; start the run on a base that has it" >&2; false; }; } && node "$q/probe.ts" check; c=$?; rm -rf "$q"; [ "$c" -eq 0 ]; else echo "wf check: probes are read only in a run's check, where WF_BASE_REF and WF_RUN name the run"; fi; } && { if [ -n "${WF_BASE_REF:-}" ]; then r=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/build/pull-request.ts" > "$r/pull-request.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/build/pull-request.ts, so the branch cannot be pushed and no pull request can be proven; start the run on a base that has it" >&2; false; }; } && node "$r/pull-request.ts" push; c=$?; rm -rf "$r"; [ "$c" -eq 0 ]; else echo "wf check: the branch is pushed, and its pull request proven to be at the commit this check judges, only in a run's check, where WF_BASE_REF names the base the work began on"; fi; } && npm run typecheck && npm run lint && { if [ -n "${WF_BASE_REF:-}" ]; then m=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/build/mutants.ts" > "$m/mutants.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/build/mutants.ts, so no mutant can be run; start the run on a base that has it" >&2; false; }; } && node "$m/mutants.ts" "${WF_CLOSEOUT:-}"; c=$?; rm -rf "$m"; [ "$c" -eq 0 ]; else echo "wf check: the mutants run only in a run's check, where WF_BASE_REF names the base whose runner judges them"; fi; } && { if [ -n "${WF_BASE_REF:-}" ]; then w=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/build/pull-request.ts" > "$w/pull-request.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/build/pull-request.ts, so CI's verdict cannot be read; start the run on a base that has it" >&2; false; }; } && node "$w/pull-request.ts" wait; c=$?; rm -rf "$w"; [ "$c" -eq 0 ]; else echo "wf check: CI's verdict is waited for only in a run's check, where WF_BASE_REF names the base the work began on"; fi; }
 budget: 40
 skills: effect, shadcn, change-the-board, look, see-a-dashboard, apps/web:ds-build, apps/web:ds-theme, apps/web:ds-spec
 mcp: playwright
-disallowedTools: SendMessage, CronCreate, CronDelete, RemoteTrigger, Bash(git push), Bash(git push:*), Bash(git branch -D:*), Bash(git branch --delete --force:*), Bash(pkill:*), Bash(killall:*), mcp__playwright__browser_run_code_unsafe, Bash(claude *--bg*), Bash(claude *--background*), Bash(claude *remote-control*), Edit(//**/.claude/settings.local.json), Edit(~/.claude/settings.json), Edit(~/.claude.json), Bash(*:4318*), Bash(*:4317*)
+disallowedTools: SendMessage, CronCreate, CronDelete, RemoteTrigger, Bash(git push), Bash(git push:*), Bash(gh), Bash(gh:*), Bash(git branch -D:*), Bash(git branch --delete --force:*), Bash(pkill:*), Bash(killall:*), mcp__playwright__browser_run_code_unsafe, Bash(claude *--bg*), Bash(claude *--background*), Bash(claude *remote-control*), Edit(//**/.claude/settings.local.json), Edit(~/.claude/settings.json), Edit(~/.claude.json), Bash(*:4318*), Bash(*:4317*)
 output: implement.schema.json
 ---
+**Open the pull request before you sign off**, once a round and after you merged the base: this run's change is judged on GitHub, and
+your fence refuses every `git push` and every `gh` call, so the push and the pull request are one frozen script, read from the base as
+your check reads it. Copy it out and run it:
+
+```
+p=$(mktemp -d) && git show main-worktree/HEAD:workflows/build/pull-request.ts > "$p/pull-request.ts"
+node "$p/pull-request.ts" open --title "<the card's line>" --body-file "$WF_STEP_FILES/pr-body.md"
+```
+
+Write that body first, in a file of your files directory: what the change does and what proves it, a few paragraphs, amended as the
+rounds go. The script pushes your own branch, never another and never the base and never forced, and opens the pull request or brings
+the open one up to date, never a draft. Name the address it prints (`wf pr: <url>`) in your `artifacts` as a value, `{"name": "pull
+request", "value": "<the url>"}`.
+
+Your check then pushes again through the same script, so CI's verdict is for the commit it judges, and waits on the `ci` context: CI
+runs the suite, the types, the lint, the whole e2e and the build on that commit, and a red, cancelled or missing `ci` comes back as the
+check's refusal, with the Actions URL, the failing jobs and the tail of their log — your next try is handed that, since you may type no
+`gh` yourself.
+
 When the change touches `apps/web`, picture the pages and the states it touches, in light and dark, and at a phone's width where the
 page sets one: `WF_ARTIFACTS=<your files directory> npm run e2e -- --photos --pages <name,…>` pictures the pages named, in both themes,
 and visits no other. The `look` skill says how, and how to picture a state no page reaches.
 Name each picture in `artifacts` by its absolute path. `npm run e2e` without `--photos` takes no picture but a failing page's.
 The check refuses a change under `apps/web/src` whose `artifacts` names no picture that is there (`pictures.ts`); a change only under
 `apps/web/test` asks for none. Run the e2e on the pages the change touches, `npm run e2e -- --pages <name,…>`, never the whole suite
-but to measure it: this step's check runs every page, in workers, outside your session.
+but to measure it: CI runs every page, in workers, on the commit your check pushes.
 
 When the change touches `apps/web`, load `shadcn` for the board's components, and load `change-the-board` before `shadcn`: it says
 where your shell must be for that load.

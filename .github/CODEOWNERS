@@ -4,7 +4,7 @@
 # package's scripts needs the owner's review. Everything else is unowned on purpose: a review of the code is the run's, not this file's.
 #
 # This is prose to GitHub until branch protection requires a code owner's review, which is the owner's hand step. What it must cover is
-# refused by packages/agent-orchestrator/test/ci-workflow.test.ts, by the path left out.
+# refused by packages/agent-orchestrator/test/repo-guards.test.ts, by the path left out.
 
 # The check itself: this workflow, and every file beside it.
 /.github/ @emyann
@@ -15,5 +15,7 @@
 # The workflows a run is made of, their agents, and the scripts their checks run.
 /workflows/ @emyann
 
-# The root's scripts, workspaces and engines: `npm test` and `npm run lint` are what CI runs.
-/package.json @emyann
+# Every workspace's manifest, and the root's, which is why this one pattern carries no leading slash: unanchored, gitignore-style
+# matching reaches a package.json at any depth. CI's legs run each workspace's own `test` script, so a package's manifest weakens the
+# check as surely as the workflow does, and `/package.json` would own the root's alone.
+package.json @emyann

@@ -37,6 +37,8 @@ import {
   LEGS,
   readWorkflow,
   runSteps,
+  ALLOWLIST_STEP,
+  allowlistStep,
   SCAN,
   SCAN_CONFIG,
   shardRunStep,
@@ -414,12 +416,58 @@ function readAllowlist(text: string): { paths: string[]; regexes: string[] } {
   return { paths: listed('paths'), regexes: listed('regexes') };
 }
 
+/** The one gitleaks rule the allowlist is scoped to: the rule that flags the stub secrets, by their entropy. */
+const RULE = 'generic-api-key';
+
+/** Each table of `SCAN_CONFIG` in order, by its header, with the key lines under it, the comments left out. */
+const blocks = (text: string): { header: string; lines: string[] }[] => {
+  const found: { header: string; lines: string[] }[] = [];
+  for (const line of text.split('\n').map((line) => line.trim())) {
+    if (line === '' || line.startsWith('#')) continue;
+    const header = /^\[\[?([\w.]+)\]\]?$/.exec(line);
+    if (header !== null) found.push({ header: header[1], lines: [] });
+    else if (found.length > 0) found[found.length - 1].lines.push(line);
+  }
+  return found;
+};
+
+/**
+ * How the one allowlist is nested, which is the one thing about this file no reading of it can tell and the one thing that went wrong:
+ * a top-level `[[allowlists]]` is global, and a global allowlist's `paths` entry skips the whole file whatever its `condition`, so the
+ * file allows every secret in `STUBS` while its own comment says it allows two shapes. Nested under a `[[rules]]` block naming the
+ * rule it is scoped to that rule alone — and because gitleaks appends an allowlist array and replaces every other attribute, the block
+ * must carry its `id` and nothing else, or the default rule is replaced by one that detects nothing.
+ */
+function formDrift(text: string): string[] {
+  const found = blocks(text);
+  if (found.some((block) => block.header === 'allowlists'))
+    return [
+      `${SCAN_CONFIG} holds a top-level [[allowlists]]: a global allowlist's paths entry skips the whole file whatever its condition, so every secret in ${STUBS} is allowed and a real one pasted in beside the stubs goes through. Nest it instead as [[rules.allowlists]] under a [[rules]] block carrying id = "${RULE}", which scopes it to that one rule`,
+    ];
+  const rules = found.filter((block) => block.header === 'rules');
+  const rule = rules.find((block) => block.lines.includes(`id = "${RULE}"`));
+  if (rules.length !== 1 || rule === undefined || found.filter((block) => block.header === 'rules.allowlists').length !== 1)
+    return [
+      `${SCAN_CONFIG} does not nest one [[rules.allowlists]] under one [[rules]] block carrying id = "${RULE}": write it that way, or the allowlist is global and skips every secret in the file its paths names rather than the two shapes it lists`,
+    ];
+  return rule.lines
+    .map((line) => /^([\w-]+)\s*=/.exec(line)?.[1])
+    .filter((key) => key !== undefined && key !== 'id')
+    .map(
+      (key) =>
+        `${SCAN_CONFIG}'s [[rules]] block carries ${key} beside its id: gitleaks appends an allowlist array but replaces every other attribute of a rule, so the default ${RULE} rule becomes one that detects nothing and the scan goes blind to every generic key in the repository. Take ${key} out, leaving the id and the [[rules.allowlists]] block under it`,
+    );
+}
+
 /**
  * An allowlist that has drifted from the file it was written for. Both ways are invisible: a shape no longer matched turns the scan red
  * on a stub nobody can use, and an unanchored shape allows a real secret that happens to hold one — the whole job reporting green over
  * a leak.
  */
 function allowDrift(text: string, stubs: readonly string[]): string[] {
+  if (text === '') return [];
+  const form = formDrift(text);
+  if (form.length > 0) return form;
   const { paths, regexes } = readAllowlist(text);
   const sentences: string[] = [];
   if (paths.length !== 1 || !paths[0].includes(STUBS.replaceAll('.', '\\.')))
@@ -444,7 +492,7 @@ function allowDrift(text: string, stubs: readonly string[]): string[] {
 }
 
 /** The flags the scan must carry: the range of new commits, the redaction a public log needs, and the allowlist above. */
-const SCAN_FLAGS = ['--log-opts', '--redact', `--config ${SCAN_CONFIG}`];
+const SCAN_FLAGS = ['--log-opts', '--redact', '--exit-code 2', `--config ${SCAN_CONFIG}`];
 
 /** A download URL that pins the version it takes, through the step's own env, rather than a tag that floats to the latest release. */
 const PINNED = /gitleaks\/releases\/download\/v\$\{VERSION\}\//;
@@ -475,6 +523,10 @@ function scanDrift(workflow: Workflow, config: string): string[] {
   if (!runs.includes('sha256sum --check') || !/[\da-f]{64}/.test(runs))
     sentences.push(
       `the ${SCAN} job in ${FILE} does not check the download against a sha256: give the step env SHA256 with the 64-digit hash from that release's gitleaks_<version>_checksums.txt and pipe it to \`sha256sum --check --strict -\`, or a third party's bytes run here unverified`,
+    );
+  if (allowlistStep(workflow) === undefined)
+    sentences.push(
+      `the ${SCAN} job in ${FILE} has no step named "${ALLOWLIST_STEP}": add back the step that scans a fixture with the pinned binary, with ${SCAN_CONFIG} and without it, and refuses unless the stub shapes are allowed at their one path and nothing else is. It is the only thing that proves what ${SCAN_CONFIG} allows, since a configuration's meaning is not in its text`,
     );
   sentences.push(
     ...SCAN_FLAGS.filter((flag) => !runs.includes(flag)).map(
@@ -810,7 +862,7 @@ test('REFUSED: no build job, a generator not run, a staleness step that names on
   ]);
 });
 
-test('REFUSED: no scan job, a download unpinned or unchecked, a scan without its flags, a shallow checkout, and an allowlist adrift from the stubs', () => {
+test('REFUSED: no scan job, a download unpinned or unchecked, a scan without its flags, a shallow checkout, a self-check dropped, and an allowlist global, unnested or adrift', () => {
   const shipped = readWorkflow();
   const config = readConfig();
   const stubs = stubSecrets();
@@ -891,5 +943,48 @@ test('REFUSED: no scan job, a download unpinned or unchecked, a scan without its
   assert.deepEqual(allowDrift(renamed, stubs), [
     `${STUBS} writes the stub secret tok-3f9a-SECRET-7c21, which no regex in ${SCAN_CONFIG} matches: add its shape to the allowlist, ` +
       'anchored at both ends, or the gitleaks job refuses every push over a secret nobody can use',
+  ]);
+
+  const unproven = structuredClone(shipped);
+  assert.ok(allowlistStep(unproven) !== undefined, 'the scan job proves its own allowlist today');
+  unproven.jobs[SCAN].steps = (unproven.jobs[SCAN].steps ?? []).filter((step) => step.name !== ALLOWLIST_STEP);
+  assert.deepEqual(scanDrift(unproven, config), [
+    `the gitleaks job in .github/workflows/ci.yml has no step named "${ALLOWLIST_STEP}": add back the step that scans a fixture with ` +
+      `the pinned binary, with ${SCAN_CONFIG} and without it, and refuses unless the stub shapes are allowed at their one path and ` +
+      `nothing else is. It is the only thing that proves what ${SCAN_CONFIG} allows, since a configuration's meaning is not in its text`,
+  ]);
+
+  // The form the quick run's draft of this card shipped, verbatim: the operator's run of 2026-10-19 measured it allowing every finding
+  // in that file, the two planted GitHub tokens included, where the scoped form leaves the planted ones and allows the stubs alone.
+  const global = [
+    '[extend]',
+    'useDefault = true',
+    '',
+    '[[allowlists]]',
+    'condition = "AND"',
+    "paths = ['packages/agent-runtime/test/remote-agent\\.test\\.ts$']",
+    "regexes = ['^tok-[0-9a-f]{4}-SECRET-[0-9a-f]{4}$', '^key-[0-9a-f]{4}-SECRET$']",
+    '',
+  ].join('\n');
+  assert.deepEqual(allowDrift(global, stubs), [
+    `${SCAN_CONFIG} holds a top-level [[allowlists]]: a global allowlist's paths entry skips the whole file whatever its condition, so ` +
+      `every secret in ${STUBS} is allowed and a real one pasted in beside the stubs goes through. Nest it instead as ` +
+      '[[rules.allowlists]] under a [[rules]] block carrying id = "generic-api-key", which scopes it to that one rule',
+  ]);
+
+  const unnested = config.replace('[[rules]]\nid = "generic-api-key"\n\n', '');
+  assert.notEqual(unnested, config, 'the allowlist is nested under its rule today');
+  assert.deepEqual(allowDrift(unnested, stubs), [
+    `${SCAN_CONFIG} does not nest one [[rules.allowlists]] under one [[rules]] block carrying id = "generic-api-key": write it that ` +
+      'way, or the allowlist is global and skips every secret in the file its paths names rather than the two shapes it lists',
+  ]);
+
+  // The key goes on the rule block itself, not into the comment above it, which names the form in prose.
+  const replaced = config.replace('\nid = "generic-api-key"\n', '\nid = "generic-api-key"\nregex = \'(?i)api[_-]?key\'\n');
+  assert.notEqual(replaced, config, 'the rule block carries its id and nothing else today');
+  assert.deepEqual(allowDrift(replaced, stubs), [
+    `${SCAN_CONFIG}'s [[rules]] block carries regex beside its id: gitleaks appends an allowlist array but replaces every other ` +
+      'attribute of a rule, so the default generic-api-key rule becomes one that detects nothing and the scan goes blind to every ' +
+      'generic key in the repository. Take regex out, leaving the id and the [[rules.allowlists]] block under it',
   ]);
 });

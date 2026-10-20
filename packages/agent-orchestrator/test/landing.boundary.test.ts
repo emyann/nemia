@@ -5,6 +5,11 @@
  * checkout a real refusal, with a stub `gh` first on the PATH that records each call and answers from a fixture (`test/origin.ts`),
  * each a bounded subprocess.
  *
+ * The landing's check stops running the suite here: `ci` runs it forced, on clean runners with no cache of this machine's, on the head
+ * the review read (`.github/workflows/ci.yml`, held by `ci-workflow.test.ts`, which refuses a run of it that is not `--force`d), and the
+ * merge commit's first parent is the base. `land-check.boundary.test.ts`, whose whole subject was that forced suite on the merged tree,
+ * went with it; the last test here is what is left of it — the land steps' checks run no suite and no e2e, and nothing but the receipt.
+ *
  * Its subject is git, `gh` and a spawned script: a boundary file.
  */
 import { test } from 'node:test';
@@ -135,7 +140,7 @@ const asked = (calls: readonly Called[], ...words: string[]): Called[] =>
   calls.filter((call) => words.every((word, i) => call.argv[i] === word));
 
 /** A file holding the merge commit's body: its path. */
-function body(text = "What landed, and why.\n\nRun r-1: 1 commit.\n"): string {
+function body(text = 'What landed, and why.\n\nRun r-1: 1 commit.\n'): string {
   const file = path.join(scratch('wf-land-files-'), 'merge-body.md');
   fs.writeFileSync(file, text);
   return file;
@@ -284,10 +289,7 @@ test('REFUSED: a draft pull request, one based on another branch, and one whose 
   moved.gh.answers(mergeable(moved, { headRefOid: moved.base }));
   const m = land(moved, 'merge', args());
   assert.equal(m.code, 1, m.out);
-  assert.ok(
-    m.err.includes(`#7 has ${moved.base.slice(0, 12)} as its head and \`${RESULT}\` is at ${moved.tip.slice(0, 12)} here`),
-    m.err,
-  );
+  assert.ok(m.err.includes(`#7 has ${moved.base.slice(0, 12)} as its head and \`${RESULT}\` is at ${moved.tip.slice(0, 12)} here`), m.err);
   assert.match(m.err, /the commit that would land is not the one the review read/);
   assert.equal(asked(m.calls, 'pr', 'merge').length, 0);
   assert.equal(stands(moved.repo).head, moved.base, 'the checkout is untouched');
@@ -491,6 +493,6 @@ test("both land steps' checks are the receipt alone, frozen out of HEAD in the c
     assert.doesNotMatch(frozen, /\$WF_BASE_REF/, 'a workspace: main step is given no base ref');
     assert.doesNotMatch(frozen, /turbo run test|npm test/, "the suite is ci's, on the head the review read");
     assert.doesNotMatch(frozen, /npm run e2e/, 'and so is the whole e2e');
-    assert.doesNotMatch(frozen, /--delete-branch/, 'and the head branch is GitHub\'s to delete');
+    assert.doesNotMatch(frozen, /--delete-branch/, "and the head branch is GitHub's to delete");
   }
 });

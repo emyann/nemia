@@ -182,9 +182,10 @@ export const checkContract = (command: string): string =>
   ].join('\n');
 
 /**
- * The check, told to an ending that lands on it (`landsOnCheck` in `status/status.ts`) in place of `checkContract`: the step lands the run's
- * result the way its own step says, and the run judges it and records what landed. Appended to its brief, so the shipper's recipe and the
- * run's mechanism cannot say two things: the run executes the command in the checkout once the step signs off, and on its exit 0 records
+ * The check, told to an ending that lands on it (`landsOnCheck` in `status/status.ts`) in place of `checkContract`: the step lands the
+ * run's result the way its own step says, and the run judges it and records what landed. Appended to its brief, so the shipper's recipe
+ * and the run's mechanism cannot say two things: the run executes the command in the checkout once the step signs off, and on its exit 0
+ * records
  * the landing — committing the merge with the closeout's `message` where the step staged one — and otherwise lands nothing, a check that
  * did not finish included, which is no verdict. What a session would do instead — run the suite in a turn it cannot hold open, commit on
  * what it read of it — is what the run refuses here by doing it itself. Shape-neutral on purpose: a factory that lands by merging its own

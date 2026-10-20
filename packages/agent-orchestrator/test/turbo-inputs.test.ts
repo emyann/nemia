@@ -13,7 +13,8 @@
  * The board's test of the look's parts reads the trigger skill of a change to the board, which names each part
  * (`apps/web/test/look.test.ts`), and its test of a merge reads the root's `CLAUDE.md` and `.gitattributes`
  * (`apps/web/test/e2e-merge.test.ts`), so the web's test lists all three.
- * The CI guard here reads the repository's Actions workflow (`ci-workflow.test.ts`), so this package's test lists `.github/` too.
+ * The CI guard here reads the repository's Actions workflow and the secret scan's allowlist (`ci-workflow.test.ts`), so this package's
+ * test lists `.github/` and `.gitleaks.toml` too; `CODEOWNERS` is under `.github/` (`repo-guards.test.ts`).
  * `INPUTS` names, for each such task, the globs it must list beside its own files; `missingInputs` refuses a task or a glob left out.
  */
 import { test } from 'node:test';
@@ -34,6 +35,7 @@ const INPUTS: Record<string, readonly string[]> = {
     '$TURBO_DEFAULT$',
     '$TURBO_ROOT$/.oxlintrc.json',
     '$TURBO_ROOT$/.github/**',
+    '$TURBO_ROOT$/.gitleaks.toml',
     '$TURBO_ROOT$/lint/**',
     '$TURBO_ROOT$/tools/**',
     ...APPS,
@@ -109,6 +111,9 @@ test("REFUSED: a task that drops the apps' tests or root files, the team, the te
   ]);
   assert.deepEqual(missingInputs(dropping('agent-orchestrator#test', '$TURBO_ROOT$/.github/**')), [
     'agent-orchestrator#test does not list $TURBO_ROOT$/.github/** among its inputs in turbo.json: add it, or turbo replays it from its cache',
+  ]);
+  assert.deepEqual(missingInputs(dropping('agent-orchestrator#test', '$TURBO_ROOT$/.gitleaks.toml')), [
+    'agent-orchestrator#test does not list $TURBO_ROOT$/.gitleaks.toml among its inputs in turbo.json: add it, or turbo replays it from its cache',
   ]);
   assert.deepEqual(missingInputs(dropping('agent-orchestrator#test', '$TURBO_ROOT$/workflows/agents/**')), [
     'agent-orchestrator#test does not list $TURBO_ROOT$/workflows/agents/** among its inputs in turbo.json: add it, or turbo replays it from its cache',

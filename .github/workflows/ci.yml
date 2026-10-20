@@ -196,12 +196,60 @@ jobs:
           fi
           echo "ci: the generated files are the bytes their generators write."
 
+  gitleaks:
+    # The push's or the pull request's new commits, scanned for a secret. The history's own 4,021 commits were audited by hand on
+    # 2026-10-19 with this very version and held no secret (docs/plan-github-ci.md, "3. What the history exposes"), so what is left to
+    # watch is what arrives — and a range keeps the scan a second long instead of minutes of false positives from the history.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The whole history: the range below names a commit before this push, which the shallow default has not, and git refuses a
+          # range whose first end it cannot resolve.
+          fetch-depth: 0
+      - name: Download gitleaks and check it against its release's sha256
+        # A pinned download in a run step, never a third party's action: nothing of theirs runs with this token, and the version and
+        # the bytes are both this file's. v8.30.1 is the version the owner's audit used. To move it, change both lines below together:
+        # take the new hash from gitleaks_<version>_checksums.txt of that release.
+        env:
+          VERSION: 8.30.1
+          SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        run: |
+          curl -fsSL -o gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz"
+          echo "${SHA256}  gitleaks.tar.gz" | sha256sum --check --strict -
+          tar -xzf gitleaks.tar.gz gitleaks
+          ./gitleaks version
+      - name: Scan this push's new commits
+        # The shas come through env and are never interpolated into the command line: on a pull request they are a fork's to name.
+        # --redact, because this repository is public and a finding's log is too: the scan says which commit and line, never the secret.
+        env:
+          BEFORE: ${{ github.event.before }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ -n "$BASE" ]; then
+            range="$BASE..$HEAD_SHA"
+          elif [ -n "$BEFORE" ] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ]; then
+            range="$BEFORE..$GITHUB_SHA"
+          else
+            # workflow_dispatch, and a branch's first push, which has no commit before it: the tip's own commit.
+            range="$GITHUB_SHA~1..$GITHUB_SHA"
+          fi
+          echo "ci: scanning $range"
+          ./gitleaks git --config .gitleaks.toml --log-opts "$range" --redact --no-banner . || {
+            echo "ci: gitleaks found a secret in a commit of this push, listed above by file and line (the value itself is redacted)." >&2
+            echo "ci: Take it out of the code, rotate it, and rewrite the commit that holds it - a secret pushed once is spent." >&2
+            echo "ci: If it is a stub nobody can use, allow its shape and its one file in .gitleaks.toml, and nothing wider." >&2
+            exit 1
+          }
+
   # The one context branch protection requires. It needs every other job, so protection is configured once and never touched as the job
   # list changes, and always() makes it run even when one of them fails, is skipped or is cancelled — each of which it reads as a failure.
   ci:
     runs-on: ubuntu-latest
     if: always()
-    needs: [test, lint, typecheck, e2e, e2e-bound, build]
+    needs: [test, lint, typecheck, e2e, e2e-bound, build, gitleaks]
     steps:
       - name: Every job succeeded
         # toJSON(needs) goes through env, never interpolated into the shell: on a pull request from a fork, an expression the branch

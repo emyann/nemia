@@ -1689,7 +1689,7 @@ function runs(step: Step, calls: readonly Call[], settings: Settings = SETTINGS,
  * The git questions review-a-change names in its step 2, on the line that says which Bash runs, each placeholder (`<commit>`) filled in
  * with an argument a session types.
  */
-const askedGit = (from = 'Bash runs only the checks below'): string[] =>
+const askedGit = (from = 'Bash runs only the checks and reads your step names'): string[] =>
   checksOf('.claude/skills/review-a-change/SKILL.md', from, /`(git\s[^`]*)`/g).map((command) => command.replace(/<[^<>]+>/g, '4c8a05b'));
 
 /** Agora's step, its agent's `allowedTools` line cut back to what it allowed before git's questions, or replaced by `allowed`. */

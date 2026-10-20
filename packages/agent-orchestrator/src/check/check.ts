@@ -30,15 +30,20 @@ import type { Workflow } from '../step/step.ts';
  * The seconds a step's check may run before the engine stops it, where the check does not land the run: a round's check. A hung check must
  * not hold a run for ever.
  *
- * A guard against a hang, not a budget, so it is set well above the slowest round check: the whole suite forced, the typecheck and the
- * lint, each mutant the closeout names, which its runner fails past five minutes, and the build and the e2e where the change touches the
- * board, the api or the root's package files, which takes as long as the workers the machine gives it: its runner refuses on what its
- * pages cost, never on its own time. The number is twice the slowest round check, rounded up to five minutes, never less than 2400.
+ * A guard against a hang, not a budget, so it is set well above the slowest round check: the pictures, the probe, the push of the round's
+ * commit, the typecheck, the lint, each mutant the closeout names, which its runner fails past five minutes, and last the wait on
+ * GitHub's `ci` context, which carries a bound of its own (`WHOLE_SECONDS`, 2400 s in `workflows/build/pull-request.ts`) so that a red or
+ * missing verdict comes back as the script's refusal in words — the Actions URL, the failing jobs, the retry line — and not as a check
+ * this deadline killed. So the number is above the clauses before the wait plus the wait itself: with 3300 those clauses have 900 s, which
+ * `pull-request.boundary.test.ts` holds against the script's number. The suite, the types, the lint, the whole e2e and the build run in
+ * `ci`, on the pushed commit, and no longer here.
  *
- * Measured from the round checks' journals, spawned to ended: 346 passed round checks that ran the mutants over a week, median 22 s, p90
- * 160 s, slowest 865 s, the forced suite, four mutants and the e2e; most replayed the suite from turbo's cache, which the forced suite no
- * longer does. One more was stopped at the old 1200 s with five of its nine mutants left; tried again, those five took 303 s, one of them
- * ended at five minutes, so it would have run an estimated 1510 s whole. Twice that, rounded up to five minutes, is 3300.
+ * Measured from the round checks' journals while the check still ran the suite and the e2e itself, spawned to ended: 346 passed round
+ * checks that ran the mutants over a week, median 22 s, p90 160 s, slowest 865 s, the forced suite, four mutants and the e2e; most
+ * replayed the suite from turbo's cache, which the forced suite no longer did. One more was stopped at the old 1200 s with five of its
+ * nine mutants left; tried again, those five took 303 s, one of them ended at five minutes, so it would have run an estimated 1510 s
+ * whole. Twice that, rounded up to five minutes, is 3300. The clauses that remain are a part of those numbers, so the measurement is a
+ * ceiling for them; it is made again, the same way, once a round check whose wait was short takes more than half of this number.
  *
  * Longer than `LANDING_CHECK_DEADLINE_SECONDS`, rightly: a landing's check runs no mutant, and a round's runs as many as its closeout
  * names. A constant rather than a step key: every shipped check is the same command family and none needs another number.

@@ -10,7 +10,7 @@
  * - `push`, which the round's check runs first: it pushes again, so the commit CI judges is the commit the check judges, then refuses
  *   unless an open, non-draft pull request for this branch, based on the remote's default branch, has `headRefOid` equal to `HEAD`.
  * - `wait`, which the round's check runs last: it polls the `ci` context of that head (`gh pr view --json statusCheckRollup`), 1800 s
- *   for it to start and 2400 s whole (`WF_CI_WAIT_SECONDS` lowers both, `WF_CI_POLL_SECONDS` the interval), and on a red, cancelled or
+ *   for it to start (`WF_CI_START_SECONDS`) and 2400 s whole (`WF_CI_WAIT_SECONDS`), `WF_CI_POLL_SECONDS` the interval; on a red, cancelled or
  *   absent `ci` refuses by name with the Actions URL, the failing jobs, a bounded tail of each failing job's log — the next try reads
  *   why CI went red here, since no agent may call `gh` itself — and the `nemia retry <run> <step> --recheck` line.
  *
@@ -28,10 +28,18 @@ class Refusal extends Error {}
 /** The one context branch protection requires of the base branch, and the only verdict this script reads (`.github/workflows/ci.yml`). */
 const CONTEXT = 'ci';
 
-/** How long `ci` has to be reported at all, in seconds: a queue longer than this is a refusal, answered by a `--recheck`. */
+/**
+ * How long `ci` has to be reported at all, in seconds: a queue longer than this is a refusal, answered by a `--recheck`.
+ * `WF_CI_START_SECONDS` lowers it for a test, on its own, so the two stages of the wait are told apart by a fixture.
+ */
 const START_SECONDS = 1800;
 
-/** How long the whole wait may take, in seconds, the start included. */
+/**
+ * How long the whole wait may take, in seconds, the start included; `WF_CI_WAIT_SECONDS` lowers it for a test. It must stay well under
+ * the round check's own deadline (`CHECK_DEADLINE_SECONDS`, 3300 s), which is the whole of the clauses before it as well: a wait longer
+ * than what is left of that deadline would be killed by the engine, and the person would get no refusal in words.
+ * `pull-request.boundary.test.ts` holds the two numbers against each other.
+ */
 const WHOLE_SECONDS = 2400;
 
 /** How long the wait sleeps between two polls, in seconds. */
@@ -369,7 +377,7 @@ function wait(): string[] {
   const pr = sole(pulls(branch), branch, onto);
   const retry = `  Then: nemia retry ${ofRun} ${step} --recheck`;
   const whole = seconds('WF_CI_WAIT_SECONDS', WHOLE_SECONDS);
-  const start = Math.min(seconds('WF_CI_WAIT_SECONDS', START_SECONDS), whole);
+  const start = Math.min(seconds('WF_CI_START_SECONDS', START_SECONDS), whole);
   const poll = seconds('WF_CI_POLL_SECONDS', POLL_SECONDS);
   const began = Date.now();
   const over = (secs: number): boolean => Date.now() - began >= secs * 1000;

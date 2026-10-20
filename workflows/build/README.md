@@ -63,5 +63,5 @@ The agents and their skills are any software factory's, and say nothing of this 
 the steps (`build-told.test.ts`). Implement and review each declare their own closeout (`output:`, `implement.schema.json` and
 `review.schema.json` beside them): the mutants are this workflow's check, and review's schema is the reviewer's with `mutants` added.
 Both add `look`, this repository's skill for its board, to the skills design, implement and review are given. Design and review deny
-the build and the e2e on their own `disallowedTools:`, and review the whole suite, which implement's check already ran; the checks
-they do run are named in their notes and allowed by `.claude/settings.json`.
+the build and the e2e on their own `disallowedTools:`, and review the whole suite, which `ci` runs on the commit implement pushed; the
+checks they do run are named in their notes and allowed by `.claude/settings.json`, the two reads of the pull request among them.

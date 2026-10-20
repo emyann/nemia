@@ -4,6 +4,9 @@
  * a scratch repository whose `origin` is a bare repository, so a push is a real push and a diverged tip a real rejection, with a stub
  * `gh` first on the PATH that records each call and answers from a fixture (`test/origin.ts`), each a bounded subprocess.
  *
+ * The wait's two bounds are told apart by `WF_CI_START_SECONDS` and `WF_CI_WAIT_SECONDS`, each read on its own, and the shipped numbers
+ * are held against the words of `workflows/build/README.md` and against a round check's own deadline.
+ *
  * Its subject is git and a spawned script: a boundary file.
  */
 import { test } from 'node:test';
@@ -12,6 +15,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadWorkflows } from '../src/folder/folder.store.ts';
+import { CHECK_DEADLINE_SECONDS } from '../src/check/check.ts';
 import { REPO, placesOf } from './team.ts';
 import { scratch } from './scratch.ts';
 import { CI_URL, GREEN, type Called, type Gh, type Rule, bareOrigin, ghStub, gitIn, listed, passing, rollup, tip } from './origin.ts';
@@ -351,9 +355,79 @@ test("build's implement check pushes through the script before the typecheck, wa
   );
   assert.doesNotMatch(frozen, /npm test/, "the suite is CI's now, on the pushed commit");
   assert.doesNotMatch(frozen, /npm run e2e/, 'and so is the whole e2e');
-  for (const verb of ['push', 'wait'])
+  for (const verb of ['push', 'wait']) {
+    const clause = clauseOf(frozen, verb);
     assert.ok(
-      frozen.includes(`git show "$WF_BASE_REF:workflows/build/pull-request.ts"`),
-      `${verb} reads the script from the run's base:\n${frozen}`,
+      clause.includes('git show "$WF_BASE_REF:workflows/build/pull-request.ts"'),
+      `${verb} reads the script from the run's base, in its own clause:\n${clause}`,
     );
+    assert.match(clause, /mktemp -d/, `${verb} reads it into a directory of its own:\n${clause}`);
+  }
+});
+
+/**
+ * The clause of the frozen check `frozen` that runs the pull-request script's `verb`: from the `{` that opens it to the `node … <verb>`
+ * that ends it, so what the clause holds is read against that verb alone and not against another's.
+ */
+function clauseOf(frozen: string, verb: string): string {
+  const ends = frozen.indexOf(`/pull-request.ts" ${verb}`);
+  assert.ok(ends > 0, `the check runs the script's ${verb}:\n${frozen}`);
+  const opens = frozen.lastIndexOf('{ if [ -n "${WF_BASE_REF:-}" ]', ends);
+  assert.ok(opens >= 0, `the ${verb} clause opens on the base:\n${frozen}`);
+  return frozen.slice(opens, ends);
+}
+
+test('the wait tells its two bounds apart: the start is its own, and what is left of the check deadline bounds the whole', () => {
+  const at = placed();
+  at.gh.answers([
+    ...passing(at.repo).filter((rule) => rule.when !== 'pr view'),
+    { when: 'pr view', out: JSON.stringify({ statusCheckRollup: [{ name: 'lint', status: 'COMPLETED', conclusion: 'SUCCESS' }] }) },
+  ]);
+  const absent = pr(at, 'wait', [], { WF_CI_START_SECONDS: '0', WF_CI_WAIT_SECONDS: '5', WF_CI_POLL_SECONDS: '0' });
+  assert.equal(absent.code, 1, absent.out);
+  assert.match(
+    absent.err,
+    /no `ci` context was reported for #7 within 0 s/,
+    'a `ci` that was never reported is refused on the start bound, not on the whole',
+  );
+
+  const slow = placed();
+  slow.gh.answers([
+    ...passing(slow.repo).filter((rule) => rule.when !== 'pr view'),
+    { when: 'pr view', outs: [JSON.stringify({ statusCheckRollup: [] }), rollup({ status: 'IN_PROGRESS' }), GREEN] },
+  ]);
+  const late = pr(slow, 'wait', [], { WF_CI_START_SECONDS: '600', WF_CI_WAIT_SECONDS: '600', WF_CI_POLL_SECONDS: '0' });
+  assert.equal(late.code, 0, late.err);
+  assert.equal(asked(late.calls, 'pr', 'view').length, 3, 'a `ci` that has not been reported yet is waited for, within the start bound');
+
+  const started = placed();
+  started.gh.answers([
+    ...passing(started.repo).filter((rule) => rule.when !== 'pr view'),
+    { when: 'pr view', out: rollup({ status: 'IN_PROGRESS' }) },
+  ]);
+  const unfinished = pr(started, 'wait', [], { WF_CI_START_SECONDS: '600', WF_CI_WAIT_SECONDS: '0', WF_CI_POLL_SECONDS: '0' });
+  assert.equal(unfinished.code, 1, unfinished.out);
+  assert.match(unfinished.err, /was still in_progress after 0 s/, 'a `ci` that started is bounded by the whole, not by the start');
+});
+
+/** The number the script's constant `name` holds, read from its shipped text; it must be there. */
+function shippedSeconds(name: 'START_SECONDS' | 'WHOLE_SECONDS'): number {
+  const found = new RegExp(`const\\s+${name}\\s*=\\s*(\\d+);`).exec(fs.readFileSync(SCRIPT, 'utf8'));
+  assert.ok(found, `pull-request.ts declares ${name}`);
+  return Number(found[1]);
+}
+
+test("the wait's two bounds are the numbers the README states, and both fit under a round check's own deadline", () => {
+  const start = shippedSeconds('START_SECONDS');
+  const whole = shippedSeconds('WHOLE_SECONDS');
+  assert.ok(start < whole, `the start bound ${start} is within the whole ${whole}: the wait has two stages`);
+  const readme = fs.readFileSync(path.join(BUILD, 'README.md'), 'utf8');
+  assert.match(readme, new RegExp(`${start}\\s*s\\s+for\\s+it\\s+to\\s+start`), "build's README states the start bound");
+  assert.match(readme, new RegExp(`${whole}\\s*s\\s+whole`), "build's README states the whole bound");
+  assert.ok(
+    CHECK_DEADLINE_SECONDS - whole >= 900,
+    `the round check's deadline is ${CHECK_DEADLINE_SECONDS} s and the wait takes up to ${whole} s of it: the clauses before it — the ` +
+      'pictures, the probe, the push, the typecheck, the lint and every mutant — have what is left, and 900 s is the least that is ' +
+      'honest. Re-measure the deadline (src/check/check.ts) before you raise the wait.',
+  );
 });

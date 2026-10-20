@@ -38,15 +38,16 @@ holds what every change needs.
   `check:` runs it after the types. A rule turned off, or a line allowed with `oxlint-disable-next-line`, says why beside it.
 - `npm run build`, then `npm run e2e -- --pages <the pages the change touches>` (and `--photos` when pictures are due), when you touch
   `apps/web`: its assertions, in the dark theme, by workers in parallel, each with its own store, api and app (`apps/web/CLAUDE.md`).
-  A session never runs it whole but to measure it: implement's round check and the landing's run every page.
+  A session never runs it whole but to measure it: `ci`'s `e2e` job runs every page on the commit implement's round check pushed, and
+  the landing's check runs them again on the merged tree.
 - `node tools/observe/render/render.ts --out <dir>` when you touch `tools/observe`: it renders the checkout's dashboards on a throwaway
   stack with fake data, never the live one, and a step hands over the `dashboard-<name>.png` and `.txt` it writes (`see-a-dashboard`).
   It needs `docker`, takes a minute and a half, and is never run by the suite.
 - Run them before you commit, a step's session scoped as above. Green is the floor, not the bar: a change that makes the suite pass by
   weakening a test is a finding to report, not a fix.
 - Turbo does not see `workflows/`, nor a doc, though some tests read docs: a step's session runs the tests that read the doc or workflow
-  file it touched, and the round's check runs them all forced; outside a run, type `npx turbo run test --force --continue` after
-  touching one.
+  file it touched, and `ci` runs them all, on clean runners with no cache of this machine's, on the commit the round's check pushed;
+  outside a run, type `npx turbo run test --force --continue` after touching one.
 - A run's check leaves what its tests cost in `WF_ARTIFACTS`, a `test-costs-<package>-<stamp>.json` per package and try; `node
   tools/test-costs/report.ts <dir>...` ranks them. A package's peak is its largest process, not the sum of the files running at once.
 - **A run's checks inherit the daemon's environment** (`WF_MAX_CONCURRENT=50` on the owner's machine): a test that relies on a default

@@ -33,7 +33,8 @@ record, not a repository's branch). The decisive check: the whole suite, forced,
 
 ## Causes 2 and 3 — the Node floor
 
-Measured on the official binaries in `~/.cache/hkb-node/`, not from a changelog:
+Measured on the official nodejs.org binaries already in the owner's node cache under `~/.cache/`
+(`node-v22.18.0-linux-x64`, `node-v22.23.3-linux-x64`, `node-v24.16.0-linux-x64`), not read from a changelog:
 
 | Node | libuv | `--test-isolation=none` | millisecond times changed through `utimes` |
 | --- | --- | --- | --- |

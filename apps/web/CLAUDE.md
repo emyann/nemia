@@ -103,8 +103,9 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   `lib/following.ts`, her chat's `lib/chatFollowing.ts`.
 - Both conversations are drawn by the one family of `components/conversation/` on the one turn shape of `lib/conversation.ts`, each
   mapping its own events onto that shape through an adapter of its own: her chat's is `chatItems` (`lib/chatFollowing.ts`). A family
-  part writes every data mark under the prefix its caller names (`mark`), never a `data-chat-` of its own — hers names `chat`, a step's
-  session `session` — and what is one conversation's alone stays in that conversation's folder (her kept message, her asks).
+  part writes every data mark under the prefix its caller names (`mark`), never a `data-chat-` of its own and never a prefix quoted at
+  the call — hers names `chat`, a step's session `session`; `test/conversation.test.ts` reads both forms off every `.tsx` of the folder
+  — and what is one conversation's alone stays in that conversation's folder (her kept message, her asks).
 - A value two files under `lib/api/` need sits in a sibling that imports no sibling: the builder's saves decode a `WorkflowListing`, so
   they sit in `workflows.ts` beside its schema.
 

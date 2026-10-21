@@ -7,7 +7,7 @@
  * not running; `keeps(id, sizes)` plants what `kept` answers of a task, and `failKept(n)` fails the next `n` as a store that does not
  * list fails one; `plantTranscript(id, n, events)` plants what `transcript` reads of an attempt, and `restart(id)` starts a task's next;
  * `plantMcpState(name, state)` plants the state a server reads as, `failMcpState(why)` makes the next read a look that failed, and
- * `mcpReads` counts the reads asked, which is how a test proves a pass read a factory's states once rather than once per step.
+ * `mcpReads` counts the reads asked, which is how a test proves a pass read a record's states once rather than once per task.
  *
  * It keeps `file`, `view`, `list`, `stop`, `logs`, `feed`, `output`, `say`, `interrupt`, `transcript`, `forget`, `kept` and
  * `mcpState`, each

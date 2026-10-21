@@ -259,9 +259,9 @@ const tomlStrings = (m: Record<string, string> | undefined) =>
  * The transport is written because a url without one is the half-formed entry `mcpRefuses` exists to prevent: Codex names the
  * transport itself ("invalid transport"), so a remote server that does not say which is one that loads and says nothing.
  *
- * **No oauth table.** A remote server's `oauth` is dropped here, and a factory's server reaches a Codex session unsigned. Nothing of
+ * **No oauth table.** A remote server's `oauth` is dropped here, and a recorded server reaches a Codex session unsigned. Nothing of
  * Codex has been measured — not whether it reads such a table, not what it would call the fields, not where it would file a
- * credential — so writing one would be a guess spelled as configuration. A Codex step is shown its servers rather than refused
+ * credential — so writing one would be a guess spelled as configuration. A Codex task is shown its servers rather than refused
  * them, and the state a board reads of one is unread, never a false `connected`; Codex's sign-in is measured before it is built.
  */
 export const codexMcpServers = (mcp: Record<string, McpServer>): string =>

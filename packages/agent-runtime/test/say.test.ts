@@ -360,10 +360,19 @@ test(
   },
 );
 
+/** Whether the worker of `runFile` has closed its session's input and written the state it ended on: nothing writes it after. */
+const workerDone = (runFile: string): true | undefined => {
+  const run = JSON.parse(fs.readFileSync(runFile, 'utf8')) as { inputClosed?: boolean; state?: string };
+  return run.inputClosed === true && run.state !== 'working' ? true : undefined;
+};
+
 /**
  * The run of `runFile` written as it stands when its worker has closed the session's input and its process has not exited yet: a
  * job on the SDK leaves its result and ends with it, so there is no window to wait for. The rule under test is the worker's —
  * that a word said after the harness's closing line is refused rather than appended for nobody — and it is read off this file.
+ *
+ * Written once `workerDone` says the worker has written its last state, or that write lands on top of this one and the say is
+ * refused for a session that has ended, which is another rule.
  *
  * @returns the file as it was, to write back once the rule has been read
  */
@@ -386,7 +395,7 @@ test(
     letGo();
     const workerFile = (ext: string) => path.join(root, 'runs', 'claude', `ae/${id}/1`.replace(/[^a-zA-Z0-9]+/g, '_') + ext);
     const runFile = workerFile('.json');
-    await heard(t, () => (JSON.parse(fs.readFileSync(runFile, 'utf8')).inputClosed ? true : undefined), 'its input closed at its result');
+    await heard(t, () => workerDone(runFile), 'its input closed at its result, and its worker done writing');
     assert.deepEqual(
       (await Effect.runPromise(engine.view(id))).state.said.map((s) => s.text),
       ['finish and linger'],

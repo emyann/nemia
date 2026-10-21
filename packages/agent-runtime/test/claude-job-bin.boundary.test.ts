@@ -12,6 +12,8 @@
  * - a request `attachedOptions` refuses never starts Claude Code: the bin leaves 1 with the refusal's own words, which the worker
  *   records as an attempt that could not start;
  * - a SIGTERM aborts the session: the bin ends, and the Claude Code it started is gone with it.
+ *
+ * A boundary test: real processes, the bin's and the Claude Code the SDK spawns for it, and nothing of either stood in for.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

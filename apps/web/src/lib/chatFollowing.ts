@@ -3,12 +3,14 @@
  * state (`ChatFollowed`), the merge of the stream's events by their id (`mergeChatEvents`), what each of its frames does
  * (`changedChat`, `followChat`), the one translation of the api's presence and her level into the board's (`presenceOf`), the map from
  * her step's state to a trace line's (`traceStatusOf`), her consecutive steps folded into a turn (`foldChat`), the links read out of
- * her words (`linksOf`), and the words the read-back controls say.
+ * her words (`linksOf`), how an ask of hers is drawn (`drawnAsk`) and what is left to answer of one of several questions
+ * (`askLeft`, `askAnswered`, `asksOpen`), which of them the composer's own words answer (`askInWords`, `wordsAnswer`), and
+ * the words the read-back controls say.
  *
  * Beside the effect in `lib/useNemiaChat.ts`, as `lib/following.ts` sits beside `lib/useStepTranscript.ts`. The transport under
  * `followChat` is the one follower both conversations run on, `lib/follow.ts`.
  */
-import type { ChatEvent, ChatPresence } from './api/chat.ts';
+import type { AskPick, AskQuestion, ChatEvent, ChatPresence } from './api/chat.ts';
 import { chatDataOf } from './api/chat.ts';
 import { duration } from './canvas.ts';
 import { follow, type Followed, type Follower, type Frames, type StreamLike } from './follow.ts';
@@ -21,6 +23,47 @@ export type ChatStep = Extract<ChatEvent, { kind: 'step' }>;
 
 /** Her message, the person's, or the keeper's marker. */
 export type ChatMessage = Extract<ChatEvent, { kind: 'message' }>;
+
+/** A question of hers or a proposal: a call of hers waiting on the person, until they answer it. */
+export type ChatAsk = Extract<ChatEvent, { kind: 'question' | 'proposal' }>;
+
+/** How an ask is drawn: as the action buttons of a proposal, as the radio form of one question, or as the flow of several. */
+export type AskDrawn = 'actions' | 'form' | 'many';
+
+/**
+ * How the ask `questions` is drawn, the canvas's three boards: `many` for several questions (board 7b, a tab for each and a recap);
+ * `actions` for one question whose every choice carries no explanation, which the proposal's buttons say whole (boards 5 and 6); and
+ * `form` for one question whose choices explain themselves, which the radio form draws (board 7). Pure, and the same rule the package
+ * reads to say whether an ask is a proposal.
+ */
+export const drawnAsk = (questions: readonly AskQuestion[]): AskDrawn =>
+  questions.length > 1 ? 'many' : (questions[0]?.options ?? []).every((option) => option.description.trim() === '') ? 'actions' : 'form';
+
+/** Whether the question `question` is answered by `pick`: a label chosen, or words of their own with something in them. */
+export const askAnswered = (pick: AskPick | undefined): boolean =>
+  pick === undefined ? false : pick.words === undefined ? (pick.labels ?? []).length > 0 : pick.words.trim() !== '';
+
+/** What the recap says of how many are left: `2 not answered` while any is, `All answered` once none is. */
+export const askLeft = (open: number): string => (open > 0 ? `${open} not answered` : 'All answered');
+
+/** The asks of `events` the person has not answered: what the composer's words and the panel's cue are about. */
+export const asksOpen = (events: readonly ChatEvent[]): ChatAsk[] =>
+  events.filter((event): event is ChatAsk => (event.kind === 'question' || event.kind === 'proposal') && event.chose === undefined);
+
+/**
+ * The ask of hers the composer's own words answer, where there is one: exactly one ask waits on the person and it is drawn as the form
+ * (board 7), one question whose choices explain themselves. A proposal's choices are said whole by its own buttons and take no words
+ * of the person's, and several questions are answered in their own flow, each with a row for their words; so for either, and for two
+ * asks at once — where the words would name no question — the composer is what it always is, and this is `undefined`. Pure.
+ */
+export const askInWords = (events: readonly ChatEvent[]): ChatAsk | undefined => {
+  const open = asksOpen(events);
+  const one = open.length === 1 ? open[0] : undefined;
+  return one !== undefined && drawnAsk(one.questions) === 'form' ? one : undefined;
+};
+
+/** The person's own words from the composer as the answer to the one question `ask` waits on: the pick its held call takes. Pure. */
+export const wordsAnswer = (ask: ChatAsk, text: string): AskPick[] => [{ question: ask.questions[0]?.question ?? '', words: text }];
 
 /** A trace line's state for each state one of her steps can be in: done draws plain, so it takes none. */
 const TRACE_STATUS: Record<ChatStep['state'], TraceStatus | undefined> = {

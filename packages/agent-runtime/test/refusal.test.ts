@@ -330,6 +330,39 @@ test('REFUSED at shipped defaults: a long-lived task on a harness that ends its 
   );
 });
 
+test('REFUSED: `mayAsk: true` on a session the runtime does not hold open, and taken on a long-lived Claude Code session', async () => {
+  const options = {
+    root: scratch('ae-may-ask-'),
+    journal: asyncStore(memoryStore()),
+    harnesses: { claude: 'claude' as const, bg: 'claude-bg' as const, codex },
+  };
+  const engine = builtEngine(Engine.layer(options));
+  const refused = (spec: Filing) => Effect.runPromise(Effect.flip(engine.file(spec)));
+  const asked = { ...ok, config: { mayAsk: true } };
+  const job = await refused({ ...asked, harness: 'claude' });
+  assert.equal(job._tag, 'FileRefused');
+  assert.equal(
+    job.message,
+    "`mayAsk: true` holds a call that would ask a person open until one answers it, and only a session this runtime holds open for as long as that can hold one: the `claude` harness has no session the runtime holds. File the task `restartPolicy: 'Always'` on a Claude Code background session, or leave `mayAsk` off.",
+  );
+  const elsewhere = await refused({ ...asked, harness: 'codex' });
+  assert.match(elsewhere.message, /the `codex` harness has no session the runtime holds/);
+  const kept = await refused({ ...asked, harness: 'bg' });
+  assert.match(
+    kept.message,
+    /the `bg` harness ends the session with its turn unless it is filed long-lived/,
+    'a long-lived filing is owed',
+  );
+  assert.ok(
+    await Effect.runPromise(engine.file({ ...asked, harness: 'bg', restartPolicy: 'Always' })),
+    'a long-lived background session holds a call open, so it takes it',
+  );
+  assert.ok(
+    await Effect.runPromise(engine.file({ ...ok, harness: 'claude', restartPolicy: 'Always', config: { background: true, mayAsk: true } })),
+    'and so does the `claude` harness told to run the session in the background',
+  );
+});
+
 test("Claude Code's own runners refuse Codex's arguments, so a runner reached without the engine's door refuses them too", () => {
   const task = { ...ok, config: { codex: { trustFrom: '/repo' } } };
   const says =

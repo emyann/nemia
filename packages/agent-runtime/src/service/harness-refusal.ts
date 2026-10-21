@@ -89,7 +89,21 @@ export const harnessRefusalOf = (spec: TaskSpec & { harness: string }, harnesses
 
 /** What a task asks of its harness that only another harness of this engine gives: its arguments, then a long-lived session. */
 const misplaced = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined =>
-  argsMisplaced(spec, harnesses) ?? longLivedMisplaced(spec, harnesses);
+  argsMisplaced(spec, harnesses) ?? longLivedMisplaced(spec, harnesses) ?? mayAskMisplaced(spec, harnesses);
+
+/**
+ * Why a task's `config.mayAsk: true` cannot go to its harness — or `undefined`: holding a call open while a person answers it needs a
+ * session the runtime holds open for as long as the ask lasts, which is a long-lived Claude Code session (`restartPolicy: 'Always'` on
+ * `claude` with `config.background: true`, or on `claude-bg`). Every other session ends its turn with the call, so a call held in one
+ * would be cut before an answer could reach it.
+ */
+const mayAskMisplaced = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined => {
+  if (spec.config?.mayAsk !== true) return undefined;
+  const h = harnesses[spec.harness];
+  const open = h === 'claude-bg' || (h === 'claude' && spec.config.background === true);
+  if (open && spec.restartPolicy === 'Always') return undefined;
+  return `\`mayAsk: true\` holds a call that would ask a person open until one answers it, and only a session this runtime holds open for as long as that can hold one: the \`${spec.harness}\` harness${open ? ' ends the session with its turn unless it is filed long-lived' : ' has no session the runtime holds'}. File the task \`restartPolicy: 'Always'\` on a Claude Code background session, or leave \`mayAsk\` off.`;
+};
 
 /**
  * Why a task's `restartPolicy: 'Always'` cannot go to its harness — or `undefined`: a harness whose session ends with its turn,

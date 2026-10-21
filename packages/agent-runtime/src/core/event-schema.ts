@@ -65,6 +65,7 @@ const harnessArgs = {
   niceness: Schema.optional(Schema.Finite),
   mounts: Schema.optional(Schema.mutable(Schema.Array(Schema.Struct({ path: Schema.String, readOnly: Schema.Boolean })))),
   callAdmission: Schema.optional(Schema.Struct({ command: Strings, tools: Strings })),
+  mayAsk: Schema.optional(Schema.Boolean),
 };
 
 /**

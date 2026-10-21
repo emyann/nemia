@@ -120,3 +120,7 @@ chat-kept
 chat-stop
 unstreamed-session
 chat-retrying
+chat-asks
+chat-asks-many
+chat-proposal
+chat-asks-words

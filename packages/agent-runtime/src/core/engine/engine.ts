@@ -22,6 +22,7 @@ import {
   type Bridge,
   type Event,
   type Now,
+  type SessionAsk,
   type Sighting,
   type State,
   type Usage,
@@ -109,6 +110,13 @@ export type TaskView = {
   waitingFor?: string;
   /** The tool call the attempt in flight is in, and since when, as its harness sees it (`Sighting.calling`). Absent between calls. */
   calling?: { tool: string; since: string };
+  /**
+   * The questions the attempt in flight is waiting on a person for, as its harness holds them (`Sighting.asks`). Absent from a
+   * harness that cannot say, and from a task whose session may ask nobody. Carried, never judged.
+   */
+  asks?: SessionAsk[];
+  /** The asks of the attempt in flight whose held call took the person's answer (`Sighting.asksTaken`). Carried, never judged. */
+  asksTaken?: string[];
   /**
    * Where a task filed `queued` stands with the layer above: `queued` while its current turn waits for the word to start,
    * `admitted` once given and until the next pass starts it. Beside the phase, never in it: the phase of either is `pending`
@@ -838,6 +846,21 @@ const unreadOfTask = (state: State, unreadWhy: ReadonlyMap<string, string> | und
 };
 
 /**
+ * What the sighting of the attempt in flight carries into a view untouched: the word a `needs-human` phase waits for — there is no
+ * question to answer about a session nobody is waiting on, so it is carried under no other phase — the call the attempt is in, the
+ * questions it waits on a person for, and the asks whose held call took an answer. None of it is judged.
+ */
+const carriedOf = (sighting: Sighting | undefined, phase: TaskView['phase']) => {
+  const waitingFor = phase === 'needs-human' ? sighting?.waitingFor : undefined;
+  return {
+    ...(waitingFor ? { waitingFor } : {}),
+    ...(sighting?.calling ? { calling: sighting.calling } : {}),
+    ...(sighting?.asks ? { asks: sighting.asks } : {}),
+    ...(sighting?.asksTaken ? { asksTaken: sighting.asksTaken } : {}),
+  };
+};
+
+/**
  * A task's view from its folded record and one observation. Pure: `view` reads the record for it, and `tick` hands in the
  * fold it made.
  *
@@ -858,8 +881,7 @@ const unreadOfTask = (state: State, unreadWhy: ReadonlyMap<string, string> | und
  * 9. `between attempts` — a long-lived task backing off before its restart among them — or `pending` before the first.
  *
  * Its `sessionId` is the sighting's, or else the id its last end was recorded with: a released session is in no
- * observation, and that id is what `logs` reads then. `waitingFor` is carried only where the phase is `needs-human`: the
- * word answers "waiting for what?", and there is no question to answer about a session nobody is waiting on. Carried, not
+ * observation, and that id is what `logs` reads then. What the sighting carries through untouched is `carriedOf`'s, never
  * judged — `decide` never saw it. So is its `bridge`, which only a task that asked for one carries (`bridgeOfTask`), and why the
  * look left its session unread (`unreadWhy`, the look's words by the last attempt's name), only for a session not seen.
  */
@@ -868,7 +890,6 @@ export function viewOfState(state: State, observed: ReadonlyMap<string, Sighting
   const last = state.attempts.at(-1);
   const sighting = last ? observed.get(nameFor(taskId, last.n)) : undefined;
   const phase = phaseOfView(state, observed, sighting);
-  const waitingFor = phase === 'needs-human' ? sighting?.waitingFor : undefined;
   const admission = admissionOf(state);
   const bridge = bridgeOfTask(state.config, state.settled !== null, sighting?.bridge);
   const unread = sighting ? undefined : unreadOfTask(state, unreadWhy);
@@ -878,8 +899,7 @@ export function viewOfState(state: State, observed: ReadonlyMap<string, Sighting
     phase,
     sessionId: sighting?.sessionId ?? last?.nativeId ?? null,
     usage: state.restartPolicy === 'Always' ? (last?.usage ?? undefined) : sighting?.usage,
-    ...(waitingFor ? { waitingFor } : {}),
-    ...(sighting?.calling ? { calling: sighting.calling } : {}),
+    ...carriedOf(sighting, phase),
     ...(admission ? { admission } : {}),
     ...(bridge ? { bridge } : {}),
     ...(unread ? { unreadWhy: unread } : {}),

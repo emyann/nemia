@@ -109,6 +109,7 @@ const failure = (p: Promise<unknown>): Promise<Error & { _tag?: string; exitCode
 const VERBS = [
   'admit',
   'answer',
+  'answerAsk',
   'close',
   'compact',
   'drain',

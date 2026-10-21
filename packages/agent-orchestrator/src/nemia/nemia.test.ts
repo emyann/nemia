@@ -63,6 +63,18 @@ test("REFUSED: the keeper delivers the person's chat words only while she is kep
   assert.deepEqual(nemiaDue({ ...MANUAL, owed: true, up: true }, OPEN, HERS), ['stop', 'drop'], 'leaving');
 });
 
+test('REFUSED: a question of hers is written down and its answer carried only while she is kept and her session is live', () => {
+  const ASKING = { ...SEMI, asking: true, up: true };
+  assert.deepEqual(nemiaDue(ASKING, OPEN, HERS), ['record']);
+  assert.deepEqual(nemiaDue({ ...ASKING, asking: false }, OPEN, HERS), [], 'her view holds no question: nothing to write down');
+  assert.deepEqual(nemiaDue({ ...ASKING, up: false }, OPEN, HERS), [], 'kept but down: no session holds a question open');
+  assert.deepEqual(nemiaDue({ ...ASKING, answered: true }, OPEN, HERS), ['record', 'answer'], 'written down first, then answered');
+  assert.deepEqual(nemiaDue({ ...SEMI, answered: true, up: true }, OPEN, HERS), ['answer'], 'an answer owed of a question gone');
+  assert.deepEqual(nemiaDue({ ...SEMI, answered: true, asking: true }, OPEN, HERS), [], 'down: carried on a later beat');
+  assert.deepEqual(nemiaDue({ ...ASKING, answered: true }, OPEN, undefined), ['subscribe'], 'filed: not yet kept');
+  assert.deepEqual(nemiaDue({ ...MANUAL, asking: true, answered: true, up: true }, OPEN, HERS), ['stop', 'drop'], 'leaving');
+});
+
 test('her custom words changed are those she was not last filed or told with; her shipped instruction is never compared', () => {
   const FILED = 'Her shipped instruction.\n\nAnswer in French.\n';
   assert.equal(customChanged({ words: 'Answer in French.' }, 'Answer in French.', 'Another instruction.\n'), false);

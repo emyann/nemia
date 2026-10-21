@@ -27,12 +27,43 @@ export type ChatEvent =
   | { kind: 'message'; id: string; at: string; from: ChatFrom; text: string; delivered?: string | null }
   | { kind: 'step'; id: string; at: string; tool: string; sentence: string; fact?: string; state: StepState }
   | { kind: 'session'; id: string; at: string; attempt: number }
-  | { kind: 'question'; id: string; at: string; text: string; options: string[] }
-  | { kind: 'proposal'; id: string; at: string; text: string };
+  | ({ kind: 'question' } & AskEvent)
+  | ({ kind: 'proposal' } & AskEvent);
+
+/**
+ * A question of hers waiting on the person, or a proposal, which is one question whose choices explain nothing (`drawnAsk`): the
+ * event's own id, when she asked it, `call` the id of the call of hers an answer is filed against, `text` the first question's words,
+ * and every question as she asked it. `chose` is the person's answer once
+ * they gave it, each question's by the question's own words, with `choseAt` when they did; both absent while it waits on them.
+ */
+export type AskEvent = {
+  id: string;
+  at: string;
+  call: string;
+  text: string;
+  questions: AskQuestion[];
+  chose?: Record<string, string>;
+  choseAt?: string;
+};
+
+/** One choice of a question: what it reads as, what it means, and whether she recommended it. */
+export type AskOption = { label: string; description: string; recommended: boolean };
+
+/** One question of an ask: what it asks, the short word it is labelled by, its choices, and whether the person may pick several. */
+export type AskQuestion = { question: string; header: string; options: AskOption[]; multiSelect: boolean };
+
+/** An ask of hers as the chat keeps it: its own id, when she asked it, and its questions. */
+export type Ask = { id: string; at: string; questions: AskQuestion[] };
+
+/** The person's answer to an ask: which ask, when they answered, and each question's answer by the question's own words. */
+export type AskAnswer = { id: string; at: string; answers: Record<string, string> };
+
+/** The keeper's mark of an answer owed no longer: which ask, and how it reached her (`AnswerOwed`). */
+export type AnswerMark = { id: string; how: AnswerOwed; at: string };
 
 /**
  * Where the task is: `up`, its session live; `answering`, a turn in progress; `waitsOnYou`, what waits on the person (the runs waiting,
- * and the task's own open questions and proposals); `unread`, the agent's messages after the person's read mark.
+ * and the task's own questions and proposals they have not answered); `unread`, the agent's messages after the person's read mark.
  */
 export type Presence = { up: boolean; answering: boolean; waitsOnYou: number; unread: number };
 
@@ -74,6 +105,8 @@ export type ChatSources = {
   outbox: readonly OutboxEntry[];
   delivered: readonly DeliveredMark[];
   stops: readonly SourceStop[];
+  asks: readonly Ask[];
+  answers: readonly AskAnswer[];
   phase: string;
 };
 
@@ -205,6 +238,11 @@ export function projectChat(sources: ChatSources): ChatEvent[] {
     const stops = sources.stops.filter((stop) => stop.attempt === session.attempt).map(stopEvent);
     out.push(...placedInTime(own, stops));
   }
+  const answered = new Map(sources.answers.map((a) => [a.id, a]));
+  const asks = sources.asks.map((ask) => askEvent(ask, answered.get(ask.id)));
+  const withAsks = placedInTime(out, asks);
+  out.length = 0;
+  out.push(...withAsks);
   const shown = new Set(out.map((e) => e.id));
   const marked = new Map(sources.delivered.map((mark) => [mark.id, mark.said]));
   for (const entry of sources.outbox)
@@ -235,6 +273,155 @@ function placedInTime(own: readonly ChatEvent[], marks: readonly ChatEvent[]): C
   return out;
 }
 
+/** The suffix a recommended choice's label carries, as the question tool's own words tell her to write it. */
+const RECOMMENDED = /\s*\(recommended\)\s*$/i;
+
+/** One choice as the board draws it: its label without the suffix she marked it with, and `recommended` where it carried one. */
+const optionOf = (o: { label: string; description: string }): AskOption => {
+  const label = o.label.replace(RECOMMENDED, '');
+  return { label, description: o.description, recommended: label !== o.label };
+};
+
+/**
+ * An ask as the chat keeps it, off what the runtime says of the call her session holds open: each question as she asked it, each
+ * choice's recommendation read out of its label (`RECOMMENDED`), since that is where the question tool's own words put it. Pure.
+ */
+export const askOf = (raw: {
+  id: string;
+  at: string;
+  questions: readonly {
+    question: string;
+    header: string;
+    options: readonly { label: string; description: string }[];
+    multiSelect: boolean;
+  }[];
+}): Ask => ({
+  id: raw.id,
+  at: raw.at,
+  questions: raw.questions.map((q) => ({
+    question: q.question,
+    header: q.header,
+    options: q.options.map(optionOf),
+    multiSelect: q.multiSelect,
+  })),
+});
+
+/** The questions of an ask as one key: each question's own words, in order, so two asks of the same words key the same. Pure. */
+export const askKey = (ask: Pick<Ask, 'questions'>): string => JSON.stringify(ask.questions.map((q) => q.question));
+
+/** The id of the ask among `asks` asking the same questions as `ask` under another id, where there is one. Pure. */
+export const sameWords = (asks: readonly Ask[], ask: Pick<Ask, 'id' | 'questions'>): string | undefined => {
+  const key = askKey(ask);
+  return asks.find((one) => one.id !== ask.id && askKey(one) === key)?.id;
+};
+
+/**
+ * The answer already recorded for an ask of the same questions as `ask` under another id, the latest where there are several: what a
+ * question she asks again — a restart cut her session between the ask and the answer, so she asks it afresh under a new call — is
+ * answered from, rather than put to the person a second time. `undefined` where no earlier ask of those words was answered. Pure.
+ */
+export const answeredBefore = (
+  asks: readonly Ask[],
+  answers: readonly AskAnswer[],
+  ask: Pick<Ask, 'id' | 'questions'>,
+): AskAnswer | undefined => {
+  const key = askKey(ask);
+  const same = new Set(asks.filter((one) => one.id !== ask.id && askKey(one) === key).map((one) => one.id));
+  return answers.filter((answer) => same.has(answer.id)).at(-1);
+};
+
+/** How the board draws an ask. */
+export type AskDrawn = 'actions' | 'form' | 'many';
+
+/**
+ * Which drawing an ask takes: `many`, a tab per question and a Submit, for more than one question; `actions`, her proposal's buttons,
+ * for one question whose every choice explains nothing — a description she deliberately left empty; `form`, the radio fieldset, for
+ * every other one question. Pure.
+ */
+export const drawnAsk = (ask: Pick<Ask, 'questions'>): AskDrawn => {
+  if (ask.questions.length !== 1) return 'many';
+  const one = ask.questions[0];
+  return one !== undefined && one.options.every((o) => o.description.trim() === '') ? 'actions' : 'form';
+};
+
+/** The event kind an ask is drawn as: a proposal where its drawing is her action buttons, a question otherwise. */
+const kindOfAsk = (ask: Pick<Ask, 'questions'>): 'question' | 'proposal' => (drawnAsk(ask) === 'actions' ? 'proposal' : 'question');
+
+/** An ask as the chat draws it, with the person's answer where they have given one. Pure. */
+export const askEvent = (ask: Ask, answer: AskAnswer | undefined): ChatEvent => ({
+  kind: kindOfAsk(ask),
+  id: `q:${ask.id}`,
+  at: ask.at,
+  call: ask.id,
+  text: ask.questions[0]?.question ?? '',
+  questions: ask.questions,
+  ...(answer === undefined ? {} : { chose: answer.answers, choseAt: answer.at }),
+});
+
+/** What the person chose for one question: the question by its own words, the labels they ticked, or the words they wrote instead. */
+export type AskPick = { question: string; labels?: readonly string[]; words?: string };
+
+/**
+ * The person's picks as the answer her held call takes: each question's answer by the question's own words, a multi-select's labels
+ * joined with `", "`, and words of their own carried as the answer's value rather than any word of ours. Refused (`Invalid`) for a
+ * question of the ask left out, a label that is no choice of it, words that are blank, and several labels for a question that takes
+ * one. Pure.
+ */
+export function answerFor(ask: Pick<Ask, 'questions'>, picks: readonly AskPick[]): Record<string, string> {
+  const answers: Record<string, string> = {};
+  for (const q of ask.questions) {
+    const pick = picks.find((p) => p.question === q.question);
+    if (pick === undefined) throw new Invalid({ message: `\`${q.question}\` is not answered: answer every question of the ask.` });
+    answers[q.question] = answerOne(q, pick);
+  }
+  return answers;
+}
+
+/** One question's answer, off the person's pick: their own words where they wrote some, else the labels they ticked. */
+function answerOne(q: AskQuestion, pick: AskPick): string {
+  if (pick.words !== undefined) {
+    if (pick.words.trim() === '')
+      throw new Invalid({ message: `the words answering \`${q.question}\` are empty: write something, or pick a choice.` });
+    return pick.words;
+  }
+  const labels = pick.labels ?? [];
+  if (labels.length === 0) throw new Invalid({ message: `\`${q.question}\` is not answered: pick a choice, or answer in your own words.` });
+  if (labels.length > 1 && !q.multiSelect)
+    throw new Invalid({ message: `\`${q.question}\` takes one choice, and ${labels.length} were picked: pick one.` });
+  const stray = labels.find((label) => !q.options.some((o) => o.label === label));
+  if (stray !== undefined)
+    throw new Invalid({
+      message: `\`${stray}\` is no choice of \`${q.question}\`: pick one of ${q.options.map((o) => `\`${o.label}\``).join(', ')}, or answer in your own words.`,
+    });
+  return labels.join(', ');
+}
+
+/** What an answer of the person's is owed: back through the call she holds open, said to her as words, or marked and nothing else. */
+export type AnswerOwed = 'return' | 'words' | 'mark';
+
+/**
+ * What an answer is owed, off the two facts the runtime reports of its ask: `taken`, its held call took an answer already, so the
+ * answer reached her and nothing is owed but the mark; `open`, its call is still waiting, so the answer goes back through it; neither,
+ * so no call of it is waiting any more — a turn ended, a holder let go — and the answer is said to her as words. Pure.
+ */
+export const askDue = (open: boolean, taken: boolean): AnswerOwed => (taken ? 'mark' : open ? 'return' : 'words');
+
+/**
+ * The words an answer whose call was cut is said to her in, naming each question and what the person answered: she was asking, the
+ * call did not wait for the answer, and this is it.
+ */
+export const askWords = (ask: Pick<Ask, 'questions'>, answers: Record<string, string>): string =>
+  [
+    'The person answered on the board a question of yours whose call did not wait for them.',
+    ...ask.questions.map((q) => `You asked: ${q.question} They answered: ${answers[q.question] ?? '(nothing)'}`),
+  ].join(' ');
+
+/** Whether a chat event is an ask of hers, which the board draws as a proposal or a question. */
+const asked = (e: ChatEvent): e is ChatEvent & { kind: 'question' | 'proposal' } => e.kind === 'question' || e.kind === 'proposal';
+
+/** How many asks of hers the person has not answered: what joins the count her face shows. Pure. */
+export const asksWaiting = (events: readonly ChatEvent[]): number => events.filter((e) => asked(e) && e.chose === undefined).length;
+
 /** A page of a chat: its events, oldest first, and the id to ask `before` for the page older than it, null where there is none. */
 export type ChatPage = { events: ChatEvent[]; before: string | null };
 
@@ -259,7 +446,16 @@ export function chatPage(events: readonly ChatEvent[], before: string | undefine
  * How much of each source a stream has sent: its sessions (`attempts`), the last one's transcript events (`events`), the saids, the
  * outbox entries and the delivered marks.
  */
-export type ChatCursor = { attempts: number; events: number; said: number; outbox: number; delivered: number; stops: number };
+export type ChatCursor = {
+  attempts: number;
+  events: number;
+  said: number;
+  outbox: number;
+  delivered: number;
+  stops: number;
+  asks: number;
+  answers: number;
+};
 
 /** The cursor of everything `sources` holds. Pure. */
 export const cursorOf = (sources: ChatSources): ChatCursor => ({
@@ -269,10 +465,16 @@ export const cursorOf = (sources: ChatSources): ChatCursor => ({
   outbox: sources.outbox.length,
   delivered: sources.delivered.length,
   stops: sources.stops.length,
+  asks: sources.asks.length,
+  answers: sources.answers.length,
 });
 
-/** A cursor as a stream's event id: its six counts, dot-separated. Pure. */
-export const chatCursor = (c: ChatCursor): string => [c.attempts, c.events, c.said, c.outbox, c.delivered, c.stops].join('.');
+/** A cursor as a stream's event id: its counts, dot-separated. Pure. */
+export const chatCursor = (c: ChatCursor): string =>
+  [c.attempts, c.events, c.said, c.outbox, c.delivered, c.stops, c.asks, c.answers].join('.');
+
+/** How many counts a cursor holds, and the fewest a tab open across a deploy that added one still carries. */
+const [COUNTS, COUNTS_LEAST] = [8, 5];
 
 /**
  * The words a cursor no read gave is refused with. A chat event's own id is no cursor: what a stream resumes from is the `cursor` a read
@@ -282,15 +484,16 @@ const NOT_A_CURSOR = (text: string) =>
   `${text} is not a cursor a chat read gave: pass the \`cursor\` a read answered, which a stream writes as its last event's \`id\`, or none to read it whole.`;
 
 /**
- * The cursor `text` names. A cursor of five counts, which a tab open across the deploy that added the stops still carries, reads as
- * one that had seen no stop. Refused (`Invalid`) where it is not five or six whole counts. Pure.
+ * The cursor `text` names. A cursor of fewer counts than today's, which a tab open across the deploy that added one still carries,
+ * reads as one that had seen none of what it does not count. Refused (`Invalid`) where it is not `COUNTS_LEAST` to `COUNTS` whole
+ * counts. Pure.
  */
 export function readChatCursor(text: string): ChatCursor {
   const parts = text.split('.');
-  if ((parts.length !== 5 && parts.length !== 6) || parts.some((p) => !/^(0|[1-9]\d*)$/.test(p)))
+  if (parts.length < COUNTS_LEAST || parts.length > COUNTS || parts.some((p) => !/^(0|[1-9]\d*)$/.test(p)))
     throw new Invalid({ message: NOT_A_CURSOR(text) });
-  const [attempts, events, said, outbox, delivered, stops = 0] = parts.map(Number) as [number, number, number, number, number, number?];
-  return { attempts, events, said, outbox, delivered, stops };
+  const [attempts = 0, events = 0, said = 0, outbox = 0, delivered = 0, stops = 0, asks = 0, answers = 0] = parts.map(Number);
+  return { attempts, events, said, outbox, delivered, stops, asks, answers };
 }
 
 /**
@@ -305,7 +508,9 @@ export function sourcesAt(sources: ChatSources, c: ChatCursor, text: string): Ch
     c.said > sources.said.length ||
     c.outbox > sources.outbox.length ||
     c.delivered > sources.delivered.length ||
-    c.stops > sources.stops.length;
+    c.stops > sources.stops.length ||
+    c.asks > sources.asks.length ||
+    c.answers > sources.answers.length;
   if (beyond) throw new Invalid({ message: NOT_A_CURSOR(text) });
   const sessions = sources.sessions.slice(0, c.attempts);
   return {
@@ -315,6 +520,8 @@ export function sourcesAt(sources: ChatSources, c: ChatCursor, text: string): Ch
     outbox: sources.outbox.slice(0, c.outbox),
     delivered: sources.delivered.slice(0, c.delivered),
     stops: sources.stops.slice(0, c.stops),
+    asks: sources.asks.slice(0, c.asks),
+    answers: sources.answers.slice(0, c.answers),
   };
 }
 
@@ -351,10 +558,16 @@ const unreadOf = (events: readonly ChatEvent[], mark: ReadMark | undefined): num
 };
 
 /**
- * Where the task is, off its phase (none where no task is filed), what waits on the person (`waiting`), its chat and the person's read
- * mark: unread the agent's messages the mark leaves unread (`unreadOf`). Pure.
+ * Where the task is, off its phase (none where no task is filed), the runs that wait on the person (`waiting`), its chat and the
+ * person's read mark: `waitsOnYou` the runs waiting and the asks of its own the person has not answered (`asksWaiting`), unread the
+ * agent's messages the mark leaves unread (`unreadOf`). Pure.
  */
 export function presenceOf(phase: string | undefined, waiting: number, events: readonly ChatEvent[], mark: ReadMark | undefined): Presence {
   const up = phase !== undefined && upOf(phase);
-  return { up, answering: up && answeringOf(phase), waitsOnYou: waiting, unread: unreadOf(events, mark) };
+  return {
+    up,
+    answering: up && answeringOf(phase),
+    waitsOnYou: waiting + asksWaiting(events),
+    unread: unreadOf(events, mark),
+  };
 }

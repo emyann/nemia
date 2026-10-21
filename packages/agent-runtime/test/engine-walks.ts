@@ -579,6 +579,39 @@ const ANSWER: readonly Walk[] = [
   },
 ];
 
+/** A server a factory might record, remote and plain: what the state read is handed. */
+const SERVER = { type: 'http' as const, url: 'https://e.example/mcp' };
+
+const MCP_STATE: readonly Walk[] = [
+  {
+    name: 'a state read is refused a record that is no map of remote servers by name, an empty one, and an entry with no url',
+    walk: async ({ engine }) => [
+      await asked(engine.mcpState(undefined as never)),
+      await asked(engine.mcpState([SERVER] as never)),
+      await asked(engine.mcpState({})),
+      await asked(engine.mcpState({ local: { command: 'npx' } as never })),
+      await asked(engine.mcpState({ github: SERVER, local: { command: 'npx' } as never })),
+    ],
+    says: [
+      { refused: 'McpStateRefused' },
+      { refused: 'McpStateRefused' },
+      { refused: 'McpStateRefused' },
+      { refused: 'McpStateRefused' },
+      { refused: 'McpStateRefused' },
+    ],
+  },
+  {
+    name: 'a state read journals nothing and touches no task: a task filed beside it is untouched, and no task is made',
+    walk: async ({ engine }) => {
+      await asked(engine.file(task('a')));
+      await asked(engine.mcpState({ github: SERVER }));
+      const list = await asked(engine.list());
+      return [(list as { views: unknown[] }).views.length, (await Effect.runPromise(engine.view('a'))).phase];
+    },
+    says: [1, 'pending'],
+  },
+];
+
 /** The contract: every kept verb's walks. */
 export const WALKS = {
   file: FILE,
@@ -596,6 +629,7 @@ export const WALKS = {
   kept: KEPT,
   hold: HOLD,
   drain: DRAIN,
+  mcpState: MCP_STATE,
 } as const;
 
 /** A verb the stand-in keeps. */
@@ -664,6 +698,12 @@ export type Apart = {
 
 /** What the stand-in does not hold of the engine: a test that needs one of these needs the real engine, in a boundary file. */
 export const APART: readonly Apart[] = [
+  {
+    name: 'the state of a server a record holds',
+    why: 'a state is read inside a Claude Code session, and the stand-in opens none: it answers what a test planted (`plantMcpState`), where an engine with no Claude Code harness refuses the read and one with it spawns a CLI. A test that needs a state read for real needs the real engine, with a Claude Code harness, in a boundary file.',
+    walk: ({ engine }) => asked(engine.mcpState({ github: SERVER })),
+    standIn: { read: true, servers: [{ name: 'github', status: 'pending' }] },
+  },
   {
     name: 'the feed after a filing',
     why: 'the feed is the journal, entry by entry, and the stand-in keeps none',

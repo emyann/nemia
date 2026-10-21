@@ -88,6 +88,8 @@ import {
 import { harnessRefusalOf } from './harness-refusal.ts';
 import { traceparentOf } from '../harness/telemetry.ts';
 import { attachedSessions, putDrain, liftDrain, type Attached } from '../harness/claude/index.ts';
+import { mcpServersRead, mcpStateRefusal, type McpServersRead } from '../harness/mcp-state.ts';
+import type { RemoteMcpServer } from '../harness/seam.ts';
 
 /** Options an engine cannot be built from (`optionsRefusalOf`), and why. Nothing was built. */
 export class EngineRefused extends Schema.TaggedError<EngineRefused>()('EngineRefused', {
@@ -109,6 +111,14 @@ export class TranscriptRefused extends Schema.TaggedError<TranscriptRefused>()('
  * reports no quota. Nothing was asked.
  */
 export class QuotaRefused extends Schema.TaggedError<QuotaRefused>()('QuotaRefused', {
+  message: Schema.String,
+}) {}
+
+/**
+ * A state read this engine will not make, and why: a record that is no map of remote servers, an empty one, an entry with no `url`,
+ * or an engine with no Claude Code harness to read it through. Nothing was opened.
+ */
+export class McpStateRefused extends Schema.TaggedError<McpStateRefused>()('McpStateRefused', {
   message: Schema.String,
 }) {}
 
@@ -385,6 +395,23 @@ export type EngineShape = {
    */
   readonly quota: (harness?: string) => Effect.Effect<HarnessQuota, QuotaRefused | RunnerError>;
   /**
+   * The state of each of `servers` — a factory's record, every server of it in one short-lived Claude Code session with the servers
+   * inline, asked once and ended (`mcpServersRead`): `connected`, `needs-auth`, `failed`, `pending` or `disabled`, the harness's own
+   * words carried and never re-worded, with the tool count of a connected one and the error of a failed one. No turn begins, so the
+   * read costs no token; it costs one CLI spawn, whatever the record's size. No task is touched and nothing is journalled.
+   *
+   * The bytes handed over are `mcpServerOf`'s, the same the step's session will be given, so a sign-in made against what this read
+   * judged is the sign-in that session finds.
+   *
+   * A look that failed answers `{ read: false, why }` and never an empty list: an absence read off a failed look is not an absence,
+   * and a caller reads that as "the state is unread", never as `needs-auth`.
+   *
+   * Refused — `McpStateRefused`, and nothing opened — in this order: a record that is not a map of servers by name; an empty record;
+   * an entry with no `url`, a server the harness starts having no connection to report; and an engine with no Claude Code harness,
+   * naming the harnesses it has.
+   */
+  readonly mcpState: (servers: Record<string, RemoteMcpServer>) => Effect.Effect<McpServersRead, McpStateRefused>;
+  /**
    * Answer a task held open (`holdOpen`) that waits for one — phase `input-required`. Journalled as an `input` entry — `at`,
    * `text`, and `config` if given — which is returned, and which `view` carries as `state.inputs`. The next tick starts
    * the task's next turn: an attempt that continues the session that signed (`--resume`), told `text` in place of the
@@ -616,6 +643,29 @@ const quotaVerbOf = (runners: Record<string, SeamOps>, fallback: string): Engine
   });
 
 /**
+ * `mcpState` over the harnesses this engine has: refused where the record is no record of remote servers (`mcpStateRefusal`), then
+ * where the engine runs no Claude Code harness — the state is read through the Agent SDK's own `query()`, which is the road a harness
+ * configured as `claude` runs on (`heldHarnessesOf`), so an engine with none has nothing to read it through.
+ *
+ * Traced where it opens a session, as `Engine.mcpState` with how many servers were asked: a refusal opens nothing and makes no span.
+ */
+const mcpStateVerbOf = (harnesses: Record<string, HarnessConfig>, cwd: string, executable: string | undefined): EngineShape['mcpState'] =>
+  Effect.fnUntraced(function* (servers: Record<string, RemoteMcpServer>) {
+    const refuse = (message: string) => Effect.fail(new McpStateRefused({ message }));
+    const refused = mcpStateRefusal(servers);
+    if (refused) return yield* refuse(refused);
+    const held = heldHarnessesOf(harnesses);
+    if (!held.length) {
+      return yield* refuse(
+        `a server's state is read inside a Claude Code session, and this engine runs no Claude Code harness. Its harnesses are: ${Object.keys(harnesses).join(', ') || 'none'}.`,
+      );
+    }
+    return yield* Effect.promise(() => mcpServersRead(servers, cwd, { ...(executable === undefined ? {} : { executable }) })).pipe(
+      Effect.withSpan('Engine.mcpState', { attributes: { servers: Object.keys(servers).length } }),
+    );
+  });
+
+/**
  * `ops` with its observes counted into `observed`, under `name`, on the way (`ObserveCount`): each call, its time, what it listed, the
  * registries it asked (`spawned`), and whether it left anything unread, a failed look counting as unread.
  */
@@ -831,6 +881,7 @@ const make = (options: EngineOptions) =>
       follow: followVerbOf(read, runners, harnessOf),
       ...writtenVerbsOf(go, read, runners, harnesses, harnessOf),
       quota: quotaVerbOf(runners, fallback),
+      mcpState: mcpStateVerbOf(harnesses, root, options.claudeExecutable),
       answer: answerVerb,
       close: (taskId) => go(close(taskId)),
       feed: feedVerb,

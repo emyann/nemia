@@ -39,6 +39,7 @@ const LIES: { readonly [V in Kept]: (answer: Answer) => Answer } = {
   kept: Effect.match({ onFailure: () => ({ tasks: [] }), onSuccess: () => ({ tasks: [{ taskId: 'elsewhere' }] }) }),
   hold: Effect.map(() => 'elsewhere'),
   drain: Effect.catch(() => Effect.void),
+  mcpState: Effect.catch(() => Effect.succeed({ read: true, servers: [] })),
 };
 
 /** A new stand-in whose `verb` does what it does and answers `lie` of its true answer. */

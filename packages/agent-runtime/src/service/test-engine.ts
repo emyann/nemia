@@ -5,9 +5,12 @@
  * by id (`filings`) and by what it was filed with (`specs`), each stop taken (`stopped`), each word said (`said`), each interrupt asked
  * (`interrupts`) and each `forget` call by call (`forgets`); `refuseSay(n)` refuses the next `n` says as the runtime refuses a session
  * not running; `keeps(id, sizes)` plants what `kept` answers of a task, and `failKept(n)` fails the next `n` as a store that does not
- * list fails one; `plantTranscript(id, n, events)` plants what `transcript` reads of an attempt, and `restart(id)` starts a task's next.
+ * list fails one; `plantTranscript(id, n, events)` plants what `transcript` reads of an attempt, and `restart(id)` starts a task's next;
+ * `plantMcpState(name, state)` plants the state a server reads as, `failMcpState(why)` makes the next read a look that failed, and
+ * `mcpReads` counts the reads asked, which is how a test proves a pass read a factory's states once rather than once per step.
  *
- * It keeps `file`, `view`, `list`, `stop`, `logs`, `feed`, `output`, `say`, `interrupt`, `transcript`, `forget` and `kept`, each
+ * It keeps `file`, `view`, `list`, `stop`, `logs`, `feed`, `output`, `say`, `interrupt`, `transcript`, `forget`, `kept` and
+ * `mcpState`, each
  * answering what the real engine answers over a harness that costs nothing: `test/engine-walks.ts` holds the walks both run, and `APART`
  * there what this one cannot say. Every other verb dies naming itself. Reached from another package through `agent-runtime/testing`
  * alone, and by no file of a `src`.
@@ -23,10 +26,13 @@ import {
   isTranscriptCursor,
   ListRefused,
   listRefusalOf,
+  McpStateRefused,
   TRANSCRIPT_START,
   TranscriptRefused,
   type EngineShape,
 } from './engine.ts';
+import { mcpStateRefusal, type McpServerState, type McpServersRead } from '../harness/mcp-state.ts';
+import type { RemoteMcpServer } from '../harness/seam.ts';
 
 /** One event of a session's transcript, as `transcript` answers it. */
 type TranscriptEvent = Effect.Success<ReturnType<EngineShape['transcript']>>['events'][number];
@@ -234,6 +240,12 @@ export type TestEngine = {
   readonly keeps: (id: string, sizes: TestKeeps) => void;
   /** Fails the next `times` asks of `kept` with a `JournalError`, as the engine fails one over a store that does not list. */
   readonly failKept: (times: number) => void;
+  /** The record of each `mcpState` read asked, by the server names it was handed, in order: one entry per read. */
+  readonly mcpReads: Array<readonly string[]>;
+  /** Plants the state the server `name` reads as, in place of what was planted before; one planted nothing reads `pending`. */
+  readonly plantMcpState: (name: string, state: TestMcpState) => void;
+  /** Makes every `mcpState` read a look that failed, with `why`; `undefined` lets them read again. */
+  readonly failMcpState: (why: string | undefined) => void;
 };
 
 /**
@@ -293,6 +305,36 @@ const keptVerbOf = (tasks: Map<string, TestTask>, sizes: Map<string, TestKeeps>,
       };
     };
     return Effect.sync(() => ({ tasks: [...tasks.keys()].map(of) }));
+  };
+
+/**
+ * What a test plants of one server's state: its words, and the tool count and error that go with them. A server a test plants nothing
+ * for reads `pending`, as the real read reads a server the harness named nothing of.
+ */
+export type TestMcpState = Omit<McpServerState, 'name'>;
+
+/**
+ * `mcpState` over what a test planted: refuses a record as the real verb refuses one (`mcpStateRefusal`, its own words and its own
+ * order), counts the read in `reads`, then answers a planted look that failed, else each server of the record once, in the record's
+ * order, with what was planted of it and `pending` where nothing was.
+ *
+ * It keeps no harness, so unlike the real verb it refuses no engine for having none: that difference is declared on `APART`.
+ */
+const mcpStateOf = (
+  planted: Map<string, TestMcpState>,
+  reads: Array<readonly string[]>,
+  failures: { why: string | undefined },
+): EngineShape['mcpState'] =>
+  function (servers: Record<string, RemoteMcpServer>) {
+    const refused = mcpStateRefusal(servers);
+    if (refused) return Effect.fail(new McpStateRefused({ message: refused }));
+    reads.push(Object.keys(servers));
+    const why = failures.why;
+    if (why !== undefined) return Effect.succeed<McpServersRead>({ read: false, why });
+    return Effect.succeed<McpServersRead>({
+      read: true,
+      servers: Object.keys(servers).map((name) => ({ name, ...(planted.get(name) ?? { status: 'pending' as const }) })),
+    });
   };
 
 /**
@@ -397,7 +439,20 @@ const sayAskedOf =
 
 /** The kept verbs over what a stand-in holds. */
 const keptOf = (
-  held: Omit<TestEngine, 'layer' | 'refuseSay' | 'settle' | 'keeps' | 'failKept' | 'plantAsk' | 'cutAsks' | 'plantTranscript' | 'restart'>,
+  held: Omit<
+    TestEngine,
+    | 'layer'
+    | 'refuseSay'
+    | 'settle'
+    | 'keeps'
+    | 'failKept'
+    | 'plantAsk'
+    | 'cutAsks'
+    | 'plantTranscript'
+    | 'restart'
+    | 'plantMcpState'
+    | 'failMcpState'
+  >,
   sayRefusals: { left: number },
   sizes: Map<string, TestKeeps>,
   keptFailures: { left: number },
@@ -481,13 +536,17 @@ export const testEngine = (): TestEngine => {
     interrupts: [] as string[],
     answered: [] as TestAnswer[],
     drains: [] as (number | null)[],
+    mcpReads: [] as Array<readonly string[]>,
   };
   const sayRefusals = { left: 0 };
   const sizes = new Map<string, TestKeeps>();
   const keptFailures = { left: 0 };
+  const mcpPlanted = new Map<string, TestMcpState>();
+  const mcpFailure: { why: string | undefined } = { why: undefined };
   const layer = Layer.succeed(Engine)(
     Engine.of({
       ...keptOf(held, sayRefusals, sizes, keptFailures),
+      mcpState: mcpStateOf(mcpPlanted, held.mcpReads, mcpFailure),
       tick: unkept('tick'),
       admit: unkept('admit'),
       follow: unkept('follow'),
@@ -545,5 +604,24 @@ export const testEngine = (): TestEngine => {
   const failKept = (times: number) => {
     keptFailures.left = times;
   };
-  return { layer, ...held, refuseSay, settle, keeps, failKept, plantAsk, cutAsks, plantTranscript, restart };
+  const plantMcpState = (name: string, state: TestMcpState) => {
+    mcpPlanted.set(name, state);
+  };
+  const failMcpState = (why: string | undefined) => {
+    mcpFailure.why = why;
+  };
+  return {
+    layer,
+    ...held,
+    refuseSay,
+    settle,
+    keeps,
+    failKept,
+    plantAsk,
+    cutAsks,
+    plantTranscript,
+    restart,
+    plantMcpState,
+    failMcpState,
+  };
 };

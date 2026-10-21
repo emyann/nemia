@@ -85,7 +85,8 @@ export type EngineOptions = {
   /**
    * The Claude Code the attached sessions are run with (`pathToClaudeCodeExecutable`), where it is not the Agent SDK's own bundled
    * CLI: a command of this runtime's own, as a container's is. Read by both roads the SDK runs — a held session (`hold`) and a
-   * job's own process (`claudeJobSpec`, as `AE_CLAUDE_EXECUTABLE`) — and by neither road Claude Code runs itself: a `--bg`
+   * job's own process (`claudeJobSpec`, as `AE_CLAUDE_EXECUTABLE`) — and by the session a state read opens (`mcpState`), which is
+   * the same road — and by neither road Claude Code runs itself: a `--bg`
    * session runs the `claude` on the PATH, whatever this says. Absent: the SDK's own.
    */
   claudeExecutable?: string;

@@ -84,7 +84,8 @@ const safe = (name: string): string => name.replace(/[^A-Za-z0-9._-]/g, '_');
 
 /**
  * The files of the session under `name`: its run file, its stop, the interrupt another process asks its turn's end with, the words said
- * to it, its capture, and its MCP config.
+ * to it, its capture, and its MCP config — which nothing writes any more, an attached session's servers riding `Options.mcpServers`
+ * (`attached-options.ts`), and which the spawn clears so a session started by an older runtime leaves none behind unread.
  */
 export const filesOf = (root: string, name: string) => {
   const base = path.join(attachedDir(root), safe(name));

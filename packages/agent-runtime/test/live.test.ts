@@ -265,9 +265,14 @@ const MCP_CLOSEOUT = {
   additionalProperties: false,
 };
 
-/** The smallest MCP server: newline-delimited JSON-RPC on stdio, with one tool, `ping`. */
+/**
+ * The smallest MCP server: newline-delimited JSON-RPC on stdio, with one tool, `ping`. Given a first argument, it writes the arguments
+ * after it to that file as it starts, which is how the attached case below reads what Claude Code made of a `${NAME:-default}` in them.
+ */
 const PROBE_SERVER = `
+import fs from 'node:fs';
 import readline from 'node:readline';
+if (process.argv[2]) fs.writeFileSync(process.argv[2], JSON.stringify(process.argv.slice(3)));
 const send = (m) => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', ...m }) + '\\n');
 readline.createInterface({ input: process.stdin }).on('line', (line) => {
   let msg; try { msg = JSON.parse(line); } catch { return; }
@@ -1668,6 +1673,10 @@ const ATTACHED_BRIEF = [
   'connected, connecting or failed. Use an empty list for none. Call no MCP tool, and no tool at all except Bash for the sleep and',
   'the one that gives your closing statement.',
 ].join(' ');
+/** A variable the task's own `env` sets, and one nothing sets, each as Claude Code reads it when it spawns a server. */
+const SET_VAR = '${AE_PROBE_WORD:-plain}';
+const UNSET_VAR = '${AE_PROBE_NOBODY_SETS:-defaulted}';
+
 const ATTACHED_CLOSEOUT = {
   type: 'object',
   properties: {
@@ -1690,6 +1699,7 @@ test(
     fs.writeFileSync(server, PROBE_SERVER);
     const prompt = path.join(cwd, 'agent.md');
     fs.writeFileSync(prompt, ATTACHED_PROMPT);
+    const argv = path.join(cwd, 'server-argv.json');
     const name = 'ae/live-attached/1';
     const attached = attachedSessions(root);
     const scope = Scope.makeUnsafe();
@@ -1708,8 +1718,9 @@ test(
           config: {
             effort: 'low',
             budgetUsd: 2,
-            mcp: { aeprobe: { command: process.execPath, args: [server] } },
+            mcp: { aeprobe: { command: process.execPath, args: [server, argv, SET_VAR, UNSET_VAR] } },
             claude: { appendSystemPromptFile: prompt },
+            env: { AE_PROBE_WORD: 'expanded' },
           },
         }),
       );
@@ -1730,6 +1741,14 @@ test(
       assert.equal(closeout.own, 'yes', 'with Claude Code’s own instructions, which the `claude_code` preset renders');
       assert.equal(closeout.order, 'before', 'and those come first: the agent’s prompt is appended after them');
       assert.equal(fs.existsSync(path.join(cwd, 'MEMORY.md')), false, 'auto-memory is off in the one settings object: no MEMORY.md');
+      const given = JSON.parse(fs.readFileSync(argv, 'utf8')) as string[];
+      t.diagnostic(`the server's own arguments: ${JSON.stringify(given)}`);
+      assert.deepEqual(
+        given,
+        ['expanded', 'defaulted'],
+        'a `${NAME:-default}` in a server\u2019s arguments is expanded where the servers ride `Options.mcpServers` inline, as it is ' +
+          'from a config file: the repository\u2019s own `${WF_STEP_FILES:-/tmp/playwright-mcp}` still names a folder outside the workspace',
+      );
     } finally {
       await Effect.runPromise(Scope.close(scope, Exit.void));
       const id = readRun(filesOf(root, name).run)?.sessionId;

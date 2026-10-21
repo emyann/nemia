@@ -868,7 +868,12 @@ Agent SDK's `Options.mcpServers` with `Options.strictMcpConfig` (`everyMcpServer
 `--mcp-config`. So the owner-only 0600 line is the other paths': on this one a server's `env` or
 `headers` value is in the child's `/proc/<pid>/cmdline`, readable by every user of the machine, and
 the runner writes no MCP file at all — it clears a stale one at each spawn, for a session an older
-runtime started.
+runtime started. A `${NAME:-default}` in a server's arguments is expanded all the same
+(measured on Claude Code 2.1.306: a variable the task's `env` set came back expanded, and one
+nothing sets came back as its default), so the repository's own
+`--output-dir ${WF_STEP_FILES:-/tmp/playwright-mcp}` still writes outside the workspace here, and an
+inline map is no worse than a file for it.
+
 A `.mcp.json` that is not JSON ends the attempt `unstartable`, naming the file: named on the command
 line, it stops Claude Code before a session exists. With `worktree`, the file named is the `cwd`'s
 own, not the worktree's copy of it. Both files are named by absolute path: Claude Code resolves the

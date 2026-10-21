@@ -127,7 +127,10 @@ down is in `docs/architecture.md`, *Who owns what*.
 - **An attached session's MCP servers are `Options.mcpServers`, which the SDK spells onto the child's argv as inline JSON**
   (`sdk.mjs`, `--mcp-config <json>`), with `Options.strictMcpConfig` as the fence: that path writes no MCP config file, and a
   server's `env` or `headers` secret is in `/proc/<pid>/cmdline` rather than a 0600 file — a job, `claude --bg` and
-  `claude-detached` still name a file (`writeMcpConfig`). `Settings.autoCompactWindow`, in the one settings object, moves the window
+  `claude-detached` still name a file (`writeMcpConfig`). **Claude Code expands a `${NAME:-default}` in a server's arguments from
+  the inline map too**, not from a config file alone (measured 2.1.306, `test/live.test.ts`: a variable the task's `env` set came
+  back expanded and one nothing sets came back as its default), so the repository's own
+  `--output-dir ${WF_STEP_FILES:-/tmp/playwright-mcp}` still writes outside the workspace on this road. `Settings.autoCompactWindow`, in the one settings object, moves the window
   `--autocompact <n>` moves (measured 0.3.270 against the real CLI: 150000 either way gave `rawMaxTokens: 150000`, against the
   model's 200000 asked for neither), and the flag stays only where `claude.settings` is a file's path the runtime will not rewrite.
 - **`Options.settings` overwrites a `settings` left on `extraArgs`, and `extraArgs` stringifies its values** (`sdk.mjs`): so

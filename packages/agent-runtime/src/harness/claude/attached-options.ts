@@ -147,9 +147,11 @@ const askedOf = (r: SpawnRequest): AttachedOptions => ({
  *   `includePartialMessages` is set (`sdk.d.ts:1736`, `--include-partial-messages` to its CLI), and a follow of the session reads
  *   their `text_delta`s and nothing else (`attached-follow.ts`); the capture goes on dropping them;
  * - the mode, `auto` unless the task names one; the servers on `Options.mcpServers` (`sdk.d.ts:1813`) and nothing but them
- *   (`Options.strictMcpConfig`, `sdk.d.ts:2145`), no Chrome; `--setting-sources project`; Claude Code's own system prompt as the
- *   preset `claude_code`, which a `claude -p` job has by default and the SDK leaves empty when unasked, with the agent's own prompt
- *   appended to it (`promptOf`) and not to nothing;
+ *   (`Options.strictMcpConfig`, `sdk.d.ts:2145`) — the SDK spells that map onto the child's argv as inline JSON, and Claude Code
+ *   expands a `${NAME:-default}` in a server's arguments there as it does from a config file (measured 2.1.306,
+ *   `test/live.test.ts`), so the checkout's own `--output-dir` still resolves — no Chrome; `--setting-sources project`; Claude
+ *   Code's own system prompt as the preset `claude_code`, which a `claude -p` job has by default and the SDK leaves empty when
+ *   unasked, with the agent's own prompt appended to it (`promptOf`) and not to nothing;
  * - the model, the effort, the context window as `Settings.autoCompactWindow` in those same settings (`sdk.d.ts:8353`), the closing
  *   statement's schema (`outputFormat`, handed on as it was given, unread), the session to resume, the worktree, and the spend cap;
  * - the environment: the engine's own, its telemetry taken out (`withoutTelemetry`), with the task's `env`, `CLAUDE_JOB_ENV` and the

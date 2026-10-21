@@ -4,6 +4,9 @@
  * for what frames a conversation rather than being said in it (`Note`). Who said it and when stands over each bubble (`Who`), which a
  * conversation's own parts take for a bubble of their own.
  *
+ * The message a conversation is being told as it is written is the agent's bubble alone (`Writing`), with no `Who` over it: who is
+ * saying it and when are the whole message's, which takes its place the moment it is read.
+ *
  * Every data mark is written under the prefix `marks` names (`mark`), so each conversation keeps the names its own pages read.
  */
 import type { ReactNode } from 'react';
@@ -59,6 +62,21 @@ function Theirs({ said, marks }: { said: Spoken; marks: string }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/** The message being written, as it comes: the agent's bubble, its words as they stand, and nothing said over it yet. */
+export function Writing({ text, marks }: { text: string; marks: string }) {
+  return (
+    <div {...mark(marks, 'message', 'writing')} className="flex max-w-[94%] flex-col gap-1.5">
+      <div
+        {...mark(marks, 'bubble', 'writing')}
+        className="bg-surface-container-highest px-3.5 py-2.5 whitespace-pre-wrap text-body-medium text-on-surface"
+        style={{ clipPath: cutShape(BUBBLE_CUT) }}
+      >
+        {text}
+      </div>
     </div>
   );
 }

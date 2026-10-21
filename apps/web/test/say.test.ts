@@ -1,12 +1,12 @@
 /**
  * The session page's prompt box and the words it shows, as rules: whether the box may send to a step (`sayable`), what it holds once its
- * words are said (`textAfterSaid`), what was said merged with what the page has just said (`mergeSaid`), which of the session's lines is
+ * what was said merged with what the page has just said (`mergeSaid`), which of the session's lines is
  * its record of the words arriving (`heardIn`), and where each thing said lies among the conversation's turns (`withSaid`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Said, TranscriptEvent } from '../src/lib/api.ts';
-import { mergeSaid, sayable, textAfterSaid, type Sayable } from '../src/lib/say.ts';
+import { mergeSaid, sayable, type Sayable } from '../src/lib/say.ts';
 import { foldTranscript, heardIn, tailStart, withSaid } from '../src/lib/transcript.ts';
 
 const step = (status: string, taskId: string | null = 't-1') => ({ name: 'implement', taskId, status });
@@ -102,14 +102,6 @@ test("what a person said is a turn of its own among the conversation's, before t
 test('words said while calls wait leave them waiting: a told turn does not end the tail, as words the session says do', () => {
   const calls = foldTranscript(EVENTS.slice(0, 4));
   assert.equal(tailStart(withSaid(calls, [said(at(45), 'Also check the api.')])), tailStart(calls));
-});
-
-test('the box is emptied once the words it sent are said — what was typed after them is kept without them, so Send again does not say them twice', () => {
-  assert.equal(textAfterSaid('Widen it.', 'Widen it.'), '');
-  assert.equal(textAfterSaid('Widen it. And the api', 'Widen it.'), 'And the api', 'typed on after sending: the sent words leave');
-  assert.equal(textAfterSaid('Widen it.  ', 'Widen it.'), '', 'only whitespace after them');
-  assert.equal(textAfterSaid('Something else entirely', 'Widen it.'), 'Something else entirely');
-  assert.equal(textAfterSaid('', 'Widen it.'), '', 'emptied by hand meanwhile');
 });
 
 /** The session's own line for words it was handed, as the engine reads Claude Code's: a system event. */

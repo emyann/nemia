@@ -1,11 +1,10 @@
 import { useMemo, useState } from 'react';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { RefreshCwIcon } from 'lucide-react';
-import { Conversation } from '@/components/conversation/Conversation';
-import { ConversationBand } from '@/components/conversation/ConversationBand';
 import { DebugPanel } from '@/components/DebugPanel';
-import { PromptBox } from '@/components/conversation/PromptBox';
+import { SessionRetryingBand, SessionStoppedBand, SessionUnreadableBand } from '@/components/session/SessionBand';
+import { SessionComposer } from '@/components/session/SessionComposer';
+import { SessionQuiet, SessionTalk } from '@/components/session/SessionTalk';
 import { RunGone } from '@/components/RunGone';
 import { StatusChip, StepNote } from '@/components/StatusChip';
 import { loadRun, runGone, runQuery, type RunDetail, type Said } from '@/lib/api';
@@ -87,8 +86,11 @@ function SessionRead({ runId, name }: { runId: string; name: string }) {
 }
 
 /**
- * The session of `step` in `run`: its header, its Debug panel, its conversation, and the box to say more. The transcript is told whether
- * the step waits on a person's word — its session over, nothing of it running — and never whether the run is held: a hold (the CLI's
+ * The session of `step` in `run`: its header, its Debug panel, the bands over its talk, its talk, and the composer under it — which is
+ * drawn only while there is a session to say anything to, the stopped band standing in its place where there is not (`sayable`).
+ *
+ * The transcript is told whether the step waits on a person's word — its session over, nothing of it running — and never whether the
+ * run is held: a hold (the CLI's
  * `hold`) answers nothing, and the session runs or rests as it did. What this page said that the run, as last read, does not have yet is
  * kept with the task it was said to, so a later try starts afresh. Words the transcript shows reaching the session are drawn once, as what
  * was said, where they reached it (`heardIn`).
@@ -102,6 +104,7 @@ function Session({ run, step }: { run: RunDetail; step: Step }) {
     const heard = heardIn(following.events, said);
     return withSaid(foldTranscript(heard.events), heard.said);
   }, [following.events, said]);
+  const say = sayable(run, step);
   return (
     <div className="flex h-[calc(100svh-var(--frame-top))] min-h-96 flex-col">
       <header aria-label="The step" className="shrink-0 space-y-1 border-b px-4 py-3">
@@ -121,47 +124,46 @@ function Session({ run, step }: { run: RunDetail; step: Step }) {
           )}
         </div>
         <StepNote note={step.note} />
-        {following.retrying !== null && (
-          <ConversationBand role="status" what="retrying" icon={<RefreshCwIcon />} title="Reading the session again">
-            {`${following.retrying} Nothing is lost; what it says next arrives a moment later.`}
-          </ConversationBand>
-        )}
-        {following.error && <p className="text-body-medium text-failure">{following.error}</p>}
       </header>
       <DebugPanel run={run} step={step} />
-      <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 px-4 pt-3 pb-4">
+        {following.retrying !== null && <SessionRetryingBand why={following.retrying} />}
+        {following.error !== null && <SessionUnreadableBand why={following.error} />}
+        {!say.open && <SessionStoppedBand why={say.why} />}
         <SessionBody step={step} following={following} turns={turns} />
+        {say.open && (
+          <SessionComposer
+            runId={run.id}
+            step={step.name}
+            line={step.commands.say}
+            onSaid={(entry) =>
+              setSent((before) => ({ taskId: step.taskId, said: [...(before.taskId === step.taskId ? before.said : []), entry] }))
+            }
+          />
+        )}
       </div>
-      <PromptBox
-        runId={run.id}
-        step={step.name}
-        line={step.commands.say}
-        sayable={sayable(run, step)}
-        onSaid={(entry) =>
-          setSent((before) => ({ taskId: step.taskId, said: [...(before.taskId === step.taskId ? before.said : []), entry] }))
-        }
-      />
     </div>
   );
 }
 
-/** A quiet line in the session's place: why there is no conversation to draw, or that it is being read. */
-const quiet = (text: string) => <p className="p-6 text-body-medium text-muted-foreground">{text}</p>;
-
 /**
- * The session's conversation, `turns` folded off what `following` read, and the message being written after them: or why there is none —
- * the step not filed, no session of its task started (`sessionToRead`), its conversation still being read, or nothing in it the engine can
- * read.
+ * The session's talk, `turns` folded off what `following` read, and the message being written after them: or why there is none — the
+ * step not filed, no session of its task started (`sessionToRead`), its conversation still being read, or nothing in it the engine can
+ * read, each of which the family's empty shell carries (`SessionQuiet`).
  */
 function SessionBody({ step, following, turns }: { step: Step; following: Following; turns: Turn[] }) {
-  if (!step.taskId) return quiet('Not filed yet, so there is no session to show.');
-  if (!sessionToRead(step)) return quiet('No session of it has started yet, so there is no conversation to show.');
-  if (following.loading) return quiet('Reading the conversation…');
+  if (!step.taskId) return <SessionQuiet words="Not filed yet, so there is no session to show." />;
+  if (!sessionToRead(step)) return <SessionQuiet words="No session of it has started yet, so there is no conversation to show." />;
+  if (following.loading) return <SessionQuiet words="Reading the conversation…" />;
   if (turns.length || following.partial)
-    return <Conversation turns={turns} live={following.live} partial={following.partial?.text ?? null} className="min-h-0 flex-1" />;
-  if (following.error) return null;
-  return quiet(
-    following.live ? 'Nothing said yet. The page follows the session as it goes.' : 'Its session said nothing the engine can read.',
+    return <SessionTalk who={step.name} turns={turns} live={following.live} writing={following.partial?.text ?? null} />;
+  if (following.error !== null) return null;
+  return (
+    <SessionQuiet
+      words={
+        following.live ? 'Nothing said yet. The page follows the session as it goes.' : 'Its session said nothing the engine can read.'
+      }
+    />
   );
 }
 

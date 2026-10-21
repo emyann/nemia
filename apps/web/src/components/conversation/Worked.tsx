@@ -8,8 +8,10 @@
  * under the prefix `marks` names (`mark`), so each conversation keeps the names its own pages read.
  */
 import {
+  BrainIcon,
   FileTextIcon,
   GlobeIcon,
+  InfoIcon,
   PauseIcon,
   PencilIcon,
   SearchIcon,
@@ -35,8 +37,13 @@ import { cn } from '@/lib/utils';
 /** A turn of a conversation: what the family's `work` item holds. */
 type Work = Extract<ConversationItem, { kind: 'work' }>;
 
-/** The glyph a line is drawn with, by the tool it called; a tool the board does not know draws the plain one. */
+/**
+ * The glyph a line is drawn with, by the tool it called; a tool the board does not know draws the plain one. A line that called
+ * nothing names what it is instead — a thought of the session's, a line its harness wrote — and is drawn by that.
+ */
 const TOOL_ICON: Record<string, typeof WrenchIcon> = {
+  Thinking: BrainIcon,
+  Harness: InfoIcon,
   Read: FileTextIcon,
   Write: PencilIcon,
   Edit: PencilIcon,

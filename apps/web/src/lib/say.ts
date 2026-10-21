@@ -1,14 +1,15 @@
 /**
- * The session page's prompt box, as rules: whether it may send to a step's session, and what was said to the step, with what the page has
+ * The session page's composer, as rules: whether it may send to a step's session, and what was said to the step, with what the page has
  * just said. Pure, so the rules are held by tests without a browser (test/say.test.ts).
  *
  * The facts are the api's — the step's word, its task, the run's cancellation, and `said`, off the engine's journal — which are the
- * package's and the engine's. What the box says when it is closed is the board's: it points at where a person can act instead.
+ * package's and the engine's. What is said where there is nobody to say anything to is the board's: the composer is not drawn at all,
+ * and the stopped band carries these words, which point at where a person can act instead (`components/session/SessionBand.tsx`).
  */
 import type { RunDetail, Said } from './api';
 import { stepState } from './status.ts';
 
-/** Whether the box may send to a step's session — or why not, and where to go instead. */
+/** Whether the composer may send to a step's session — or why not, and where to go instead. */
 export type Sayable = { open: true } | { open: false; why: string };
 
 /**
@@ -17,7 +18,7 @@ export type Sayable = { open: true } | { open: false; why: string };
  * step not filed, a task the engine has no record of, one filed and not started, and a session that has ended — signed off, checked, failed
  * or stopped — which is the run page's to answer or try again. A held run stays open: a hold stops what is filed next and the answers to a
  * gate, never a session at work, and the CLI's `say` is not refused on it. What the page cannot see coming, the api refuses in the
- * package's words or the engine's, and the box shows that refusal as it is.
+ * package's words or the engine's, and the composer shows that refusal as it is.
  */
 export function sayable(
   run: Pick<RunDetail, 'cancelledAt'>,
@@ -56,11 +57,3 @@ export function mergeSaid(read: readonly Said[], sent: readonly Said[]): Said[] 
   const known = new Set(read.map(key));
   return [...read, ...sent.filter((s) => !known.has(key(s)))].sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
 }
-
-/**
- * What the prompt box holds once the api has said `sent`: nothing, when it still holds those words; what was typed after them, when a
- * person went on typing while they were being said — the sent words leave, so Send again does not say them twice; and everything, when the
- * box was rewritten meanwhile, since that is not what was sent.
- */
-export const textAfterSaid = (now: string, sent: string): string =>
-  now === sent ? '' : now.startsWith(sent) ? now.slice(sent.length).trimStart() : now;

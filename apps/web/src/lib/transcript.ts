@@ -5,10 +5,14 @@
  * (`TranscriptEvent`, via GET …/transcript), in the order its reads gave them; the turns are what the session page
  * and the inspector's Activity tab draw, in the same order.
  *
- * Folding follows Claude Code web: the tool calls between two things said fold into one line — "Ran 3 commands,
- * searched code, read 3 files" — that opens to the calls. A thought or a system line between two calls rides in the fold;
- * one before the first call or after the last is drawn on its own. A lone call is drawn as itself. The closeout — the
- * `StructuredOutput` call — is never folded: it is named, on its own, and it ends a fold as words do.
+ * Folding follows Claude Code web: the tool calls between two things said fold into one turn that opens to the calls. A
+ * thought or a system line between two calls rides in the fold; one before the first call or after the last is drawn on
+ * its own. A lone call is drawn as itself. The closeout — the `StructuredOutput` call — is never folded: it is named, on
+ * its own, and it ends a fold as words do.
+ *
+ * Beside it, `lib/sessionItems.ts` maps these turns onto the one shape both of the board's conversations are drawn by
+ * (`lib/conversation.ts`), as `chatItems` is hers: a file of its own, since the two together pass the 500 lines a file is
+ * held to.
  */
 import type { RunDetail, Said, StepTry, TranscriptEvent } from './api';
 
@@ -52,7 +56,6 @@ export type FoldedTurn = ToolTurn | ThinkingTurn | SystemTurn;
 export type ToolsTurn = {
   kind: 'tools';
   key: string;
-  summary: string;
   turns: FoldedTurn[];
   calls: number;
   failed: number;
@@ -270,75 +273,12 @@ function drawn(stretch: FoldedTurn[]): Turn[] {
   const tools: ToolsTurn = {
     kind: 'tools',
     key: `tools:${calls[0].id}`,
-    summary: summaryOf(calls),
     turns: folded,
     calls: calls.length,
     failed: calls.filter((call) => call.result?.isError).length,
     waiting: calls.filter((call) => !call.result).length,
   };
   return [...stretch.slice(0, first), tools, ...stretch.slice(last + 1)];
-}
-
-/** How a kind of call is counted and said: `one` for a count of one, `many` for more. */
-type Verb = { group: string; one: string; many: (n: number) => string; subject?: (input: Record<string, unknown>) => string[] };
-
-const onePath = (input: Record<string, unknown>) => {
-  const file = input.file_path ?? input.notebook_path;
-  return typeof file === 'string' ? [file] : [];
-};
-
-/**
- * How each tool's calls are counted and said, by the tool's name: Claude Code's, and Codex's two items, `CommandExecution` and
- * `FileChange`. The same act under another name is said the same: `Glob` as `Grep`, `Write`, `MultiEdit` and `NotebookEdit` as `Edit`,
- * `Agent` as `Task`.
- */
-const VERBS: Record<string, Verb> = {
-  Bash: { group: 'command', one: 'ran a command', many: (n) => `ran ${n} commands` },
-  Read: { group: 'read', one: 'read a file', many: (n) => `read ${n} files`, subject: onePath },
-  Grep: { group: 'search', one: 'searched code', many: (n) => `searched code ${n} times` },
-  Edit: { group: 'edit', one: 'edited a file', many: (n) => `edited ${n} files`, subject: onePath },
-  WebSearch: { group: 'web', one: 'searched the web', many: (n) => `searched the web ${n} times` },
-  WebFetch: { group: 'fetch', one: 'fetched a page', many: (n) => `fetched ${n} pages` },
-  Task: { group: 'agent', one: 'ran an agent', many: (n) => `ran ${n} agents` },
-  TodoWrite: { group: 'todo', one: 'updated its plan', many: (n) => `updated its plan ${n} times` },
-};
-VERBS.Glob = VERBS.Grep!;
-VERBS.Write = VERBS.Edit!;
-VERBS.MultiEdit = VERBS.Edit!;
-VERBS.NotebookEdit = VERBS.Edit!;
-VERBS.Agent = VERBS.Task!;
-VERBS.CommandExecution = VERBS.Bash!;
-VERBS.FileChange = {
-  ...VERBS.Edit,
-  subject: (input) => (input.changes && typeof input.changes === 'object' ? Object.keys(input.changes) : []),
-};
-
-/** An MCP tool by its server — `mcp__playwright__browser_click` is `playwright` — and any other by its name. */
-const verbOf = (name: string): Verb => {
-  if (Object.hasOwn(VERBS, name)) return VERBS[name];
-  const used = /^mcp__(.+?)__/.exec(name)?.[1] ?? name;
-  return { group: `use:${used}`, one: `used ${used}`, many: (n) => `used ${used} ${n} times` };
-};
-
-/**
- * What a run of calls did, in the words Claude Code web uses — "Ran 3 commands, searched code, read 3 files" — each kind
- * in the order it first came. Files are counted once each, however often they were read or edited; a call that names no
- * file counts once.
- */
-export function summaryOf(calls: readonly ToolCall[]): string {
-  const counted = new Map<string, { verb: Verb; calls: number; subjects: Set<string> }>();
-  for (const call of calls) {
-    const verb = verbOf(call.name);
-    const seen = counted.get(verb.group) ?? { verb, calls: 0, subjects: new Set<string>() };
-    counted.set(verb.group, seen);
-    const subjects = verb.subject?.(inputOf(call)) ?? [];
-    if (subjects.length) subjects.forEach((s) => seen.subjects.add(s));
-    else seen.calls += 1;
-  }
-  const said = [...counted.values()]
-    .map(({ verb, calls: n, subjects }) => (n + subjects.size === 1 ? verb.one : verb.many(n + subjects.size)))
-    .join(', ');
-  return said.charAt(0).toUpperCase() + said.slice(1);
 }
 
 const inputOf = (call: ToolCall): Record<string, unknown> =>

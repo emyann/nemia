@@ -11,12 +11,21 @@
  *
  * `TalkEmpty` is the same scrolling shell for a conversation with nothing said yet, which its caller's own greeting stands in. Every
  * data mark either writes is under the prefix `marks` names (`mark`).
+ *
+ * `density` is how closely it stands: a page of its own gives its items the room they want, a panel beside something else
+ * (`compact`, the run page's Activity tab) half of it. It is the talk's own layout, so it sits on the talk's elements and on nothing a
+ * host hands down — a class on a parent is overridden by the type role of every text under it.
+ *
+ * `writing` is the message the conversation is being told as it is written, drawn under the items until the whole of it takes its
+ * place. It is the talk's too, and not an item of its caller's: what is drawn grows with every character of it, which `drawnCount`
+ * cannot see, so the talk would stop following its latest halfway through a message.
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { drawnCount, mark, newWords, type ConversationItem } from '@/lib/conversation';
 import { markScrolls } from '@/lib/useScrollMark';
+import { cn } from '@/lib/utils';
 import { Jump } from './Jump';
-import { Note, Said } from './Said';
+import { Note, Said, Writing } from './Said';
 import { Worked } from './Worked';
 
 /** One item of the talk, drawn by its kind; an `own` item is the caller's, drawn by the `drawOwn` it handed over. */
@@ -42,10 +51,24 @@ type Props<Own> = {
   readable: string | null;
   onRead: (through: string) => void;
   drawOwn?: (own: Own) => ReactNode;
+  density?: 'page' | 'compact';
+  writing?: string | null;
 };
 
 /** The talk: what `items` holds, with the new line, the jump pill, the read mark's sentinel, and the caller's own items drawn. */
-export function Talk<Own>({ items, marks, label, backLabel, newAt, unread, readable, onRead, drawOwn }: Props<Own>) {
+export function Talk<Own>({
+  items,
+  marks,
+  label,
+  backLabel,
+  newAt,
+  unread,
+  readable,
+  onRead,
+  drawOwn,
+  density = 'page',
+  writing = null,
+}: Props<Own>) {
   const box = useRef<HTMLDivElement>(null);
   const end = useRef<HTMLDivElement>(null);
   const [atEnd, setAtEnd] = useState(true);
@@ -68,7 +91,7 @@ export function Talk<Own>({ items, marks, label, backLabel, newAt, unread, reada
   const drawn = drawnCount(items);
   useEffect(() => {
     if (atEnd) end.current?.scrollIntoView({ block: 'end' });
-  }, [atEnd, drawn]);
+  }, [atEnd, drawn, writing]);
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
@@ -79,7 +102,7 @@ export function Talk<Own>({ items, marks, label, backLabel, newAt, unread, reada
         aria-label={atEnd ? label : backLabel}
         // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a box that scrolls is reached by the keyboard
         tabIndex={0}
-        className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto"
+        className={cn('flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto', density === 'compact' ? 'gap-2' : 'gap-4')}
       >
         {items.map((item) => (
           <div key={item.id} className="contents">
@@ -93,6 +116,11 @@ export function Talk<Own>({ items, marks, label, backLabel, newAt, unread, reada
             <Block item={item} marks={marks} drawOwn={drawOwn} />
           </div>
         ))}
+        {writing !== null && writing !== '' && (
+          <div {...mark(marks, 'partial')}>
+            <Writing text={writing} marks={marks} />
+          </div>
+        )}
         <div ref={end} aria-hidden="true" className="h-px shrink-0" />
       </div>
       {!atEnd && unread > 0 && (

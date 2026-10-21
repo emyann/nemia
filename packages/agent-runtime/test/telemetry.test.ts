@@ -86,18 +86,31 @@ test("a Claude Code session told where to export is handed every signal over OTL
   assert.deepEqual(claudeTelemetryEnv({ ...told, telemetry: undefined }), {}, 'told nowhere, it is handed nothing');
 });
 
-test("a job is handed its telemetry in its session's environment beside the job's own, and nothing more when told nowhere", () => {
+/** `told`, with the engine's collector asking for its tools' details. */
+const detailed: SpawnRequest = { ...told, telemetry: { endpoint: ENDPOINT, toolDetails: true } };
+
+/**
+ * What `env` carries of the telemetry variables a session is handed when it is told somewhere (`detailed`, its tools' details
+ * included) and of the engine's own (`ENGINE_OWN`): empty for a session told nowhere, whatever the process that laid that
+ * environment carried itself. Read against an environment the seat sets rather than the machine's, and excusing no key for being in
+ * `process.env`: a run's checks inherit the daemon's `OTEL_EXPORTER_OTLP_ENDPOINT`, which is the leak such a seat is for.
+ */
+const telemetryIn = (env: NodeJS.ProcessEnv): NodeJS.ProcessEnv =>
+  Object.fromEntries(
+    [...new Set([...Object.keys(claudeTelemetryEnv(detailed)), ...Object.keys(ENGINE_OWN)])]
+      .filter((name) => name in env)
+      .map((name) => [name, env[name]]),
+  );
+
+test("a job is handed its telemetry in its session's environment beside the job's own, and nothing more when told nowhere", (t) => {
   const laid = (r: SpawnRequest) => {
     const env = attachedOptions(r).env!;
     return Object.fromEntries(Object.entries({ ...CLAUDE_JOB_ENV, ...claudeTelemetryEnv(told) }).map(([k]) => [k, env[k]]));
   };
   assert.deepEqual(laid(told), { ...CLAUDE_JOB_ENV, ...claudeTelemetryEnv(told) }, 'laid on `Options.env` by the job’s own process');
+  withEnv(t, ENGINE_OWN);
   const nowhere = attachedOptions({ ...told, telemetry: undefined }).env!;
-  assert.deepEqual(
-    Object.keys(claudeTelemetryEnv(told)).filter((k) => nowhere[k] !== undefined && !(k in process.env)),
-    [],
-    'told nowhere, the session is handed none of it',
-  );
+  assert.deepEqual(telemetryIn(nowhere), {}, 'told nowhere, the session is handed none of it');
   assert.equal(claudeJob.command(told, { requestFile: '/r.json' }).env, undefined, 'and nothing of it is on the engine’s own child');
 });
 
@@ -114,9 +127,6 @@ test("a background session is handed its telemetry in its --settings' env, over 
   assert.deepEqual(settingsOf({ ...told, telemetry: undefined }), off, "no settings given: the session's auto-memory off alone");
   assert.deepEqual(telemeteredFlags({ settings: '/a/settings.json' }, told), { settings: '/a/settings.json' }, 'a file is not rewritten');
 });
-
-/** `told`, with the engine's collector asking for its tools' details. */
-const detailed: SpawnRequest = { ...told, telemetry: { endpoint: ENDPOINT, toolDetails: true } };
 
 test("a Claude Code session told to say its tools' details is handed OTEL_LOG_TOOL_DETAILS, the one variable more", () => {
   assert.deepEqual(claudeTelemetryEnv(detailed), { ...claudeTelemetryEnv(told), OTEL_LOG_TOOL_DETAILS: '1' });

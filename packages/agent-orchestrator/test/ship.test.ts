@@ -1516,7 +1516,7 @@ test('the whole screen of a run whose result a person merged by hand, its ending
   assert.deepEqual(await decideScreen(t, e, [id], { '<id>': id, '<repo>': repo, '<root>': ROOT }, stand().place), [
     '<id>  add sub',
     '',
-    '  shipped — wf/<id>/implement is already on main',
+    '  shipped — wf/<id>/run is already on main',
     '  ship never ran: nothing is left for it to merge, and nothing waits on you — close the record if you want it closed: nemia cancel <id>',
   ]);
 });
@@ -1546,7 +1546,7 @@ test("the whole screen of an ending whose check did not finish on the merge, wit
     '  once more, on the next tick:',
     '    ship: its check did not finish, so the run aborted the merge and nothing landed on main. Merge and check again:  nemia retry <id> ship',
     '',
-    '  touched  wf/<id>/implement',
+    '  touched  wf/<id>/run',
     '    (root)  1 file   +1 −0',
     '  lesson  nothing written where the next agent reads',
     '',
@@ -1581,10 +1581,10 @@ test("the whole screen of an ending whose check did not finish on the merge, wit
     '  cost  run not measured',
     '  timeline  run  queued —  ran —  wall not known',
     '',
-    '  wf/<id>/implement  — 1 file: +1 −0',
+    '  wf/<id>/run  — 1 file: +1 −0',
     '',
-    '  branch    wf/<id>/implement is ahead of main by 1 commit',
-    '  merges    wf/<id>/implement merges cleanly onto main',
+    '  branch    wf/<id>/run is ahead of main by 1 commit',
+    '  merges    wf/<id>/run merges cleanly onto main',
     '  others    no other run is in flight on main',
   ]);
 });
@@ -1599,7 +1599,7 @@ test("the whole screen of an ending whose check refused the merge, with the chec
     '  once more, on the next tick:',
     '    ship: failed (check) — nothing landed on main: its check refused the merge (exit 1). Ship again, when what stopped it was not the work — a dirty checkout, a flaky test. Continue its session, told what happened:  nemia retry <id> ship  (--fresh, or --model <m>, for a new session)',
     '',
-    '  touched  wf/<id>/implement',
+    '  touched  wf/<id>/run',
     '    (root)  1 file   +1 −0',
     '  lesson  nothing written where the next agent reads',
     '',
@@ -1632,10 +1632,10 @@ test("the whole screen of an ending whose check refused the merge, with the chec
     '  cost  run not measured',
     '  timeline  run  queued —  ran —  wall not known',
     '',
-    '  wf/<id>/implement  — 1 file: +1 −0',
+    '  wf/<id>/run  — 1 file: +1 −0',
     '',
-    '  branch    wf/<id>/implement is ahead of main by 1 commit',
-    '  merges    wf/<id>/implement merges cleanly onto main',
+    '  branch    wf/<id>/run is ahead of main by 1 commit',
+    '  merges    wf/<id>/run merges cleanly onto main',
     '  others    no other run is in flight on main',
     "  semantic  merges cleanly onto main, and ship's landing check refused the merged tree at <base>: a conflict of meaning, not of text",
   ]);
@@ -1664,7 +1664,7 @@ test('the whole screen of a run whose ending waits for the checkout, first filed
     '  once more, on the next tick:',
     '    ship: blocked. Ship again, when what stopped it was not the work — a dirty checkout, a flaky test. Continue its session, told what happened:  nemia retry <second> ship  (--fresh, or --model <m>, for a new session)',
     '',
-    '  touched  wf/<second>/implement',
+    '  touched  wf/<second>/run',
     '    (root)  1 file   +1 −0',
     '  lesson  nothing written where the next agent reads',
     '',
@@ -1690,9 +1690,9 @@ test('the whole screen of a run whose ending waits for the checkout, first filed
     '  cost  run not measured',
     '  timeline  run  queued —  ran —  wall not known',
     '',
-    '  wf/<second>/implement  — 1 file: +1 −0',
+    '  wf/<second>/run  — 1 file: +1 −0',
     '',
-    '  branch    wf/<second>/implement is ahead of main by 1 commit',
+    '  branch    wf/<second>/run is ahead of main by 1 commit',
   ]);
   await runWith(e, retryRun(second.id, 'ship', { mode: 'nudge', message: 'the check was green here; run it again' }));
   await runWith(e, advanceRun(readRun(second.id)));

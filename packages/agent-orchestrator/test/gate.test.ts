@@ -324,7 +324,7 @@ test("REFUSED at shipped defaults: a parent whose last step waits at its gate ha
   stand().world.commit(wt, 'add parent.txt');
   b.settle(`${parent.id}-implement`, 'succeeded', SIGNED);
   await runWith(b.e, advanceRun(readRun(parent.id)));
-  stand().world.stage(repo, `wf/${parent.id}/implement`);
+  stand().world.stage(repo, readRun(parent.id).steps.implement.branch!);
   stand().world.commit(repo, 'merge the parent');
 
   const child = await runPlaced(startRun({ brief: 'the child', repo, workflowDir: planned(), isolate: false, after: [parent.id] }));

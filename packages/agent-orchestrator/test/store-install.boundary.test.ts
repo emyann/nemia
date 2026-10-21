@@ -32,6 +32,7 @@ const { advanceRun, cancelRun, forgetRun, startRun, startPlan, runWith: runEngin
 const runWith = runOver(runEngine, gitPlaceLayer);
 const runPlaced = runGiven(gitPlaceLayer);
 const { readRun } = await import('../src/record/record.store.ts');
+const { LINE_NAME } = await import('../src/run.ts');
 
 /** A repository with one commit, so `nemia start` has a base to record. */
 const aRepo = (): string => {
@@ -228,7 +229,7 @@ test("a step's worktree gets what .worktreeinclude lists from the main checkout 
   const { e, tasks } = board();
   const pass = await runWith(e, advanceRun(readRun(run.id)));
   const wt = readRun(run.id).steps.implement.workspace!;
-  assert.equal(wt, path.join(ROOT, 'worktrees', run.id, 'implement'), 'a worktree, as shipped');
+  assert.equal(wt, path.join(ROOT, 'worktrees', run.id, LINE_NAME), 'a worktree, as shipped');
 
   assert.equal(
     fs.readFileSync(path.join(wt, '.env.local'), 'utf8'),
@@ -377,7 +378,7 @@ test('a pass that dies after cutting a worktree does not wedge every pass after 
     },
   });
   await assert.rejects(runWith(dying, advanceRun(readRun(run.id))), /the tick died here/);
-  const wt = path.join(ROOT, 'worktrees', run.id, 'implement');
+  const wt = path.join(ROOT, 'worktrees', run.id, LINE_NAME);
   assert.ok(fs.existsSync(path.join(wt, '.git')), 'the worktree and its branch were made');
 
   const pass = await runWith(e, advanceRun(readRun(run.id)));
@@ -457,7 +458,7 @@ const heldInNpmCi = async (t: TestContext, b: ReturnType<typeof board>, brief: s
   const run = await runPlaced(startRun({ brief, repo, workflowDir: folder() }));
   const pass = runWith(b.e, advanceRun(readRun(run.id)));
   while (!fs.existsSync(started)) await new Promise((r) => setTimeout(r, 10));
-  const wt = path.join(ROOT, 'worktrees', run.id, 'implement');
+  const wt = path.join(ROOT, 'worktrees', run.id, LINE_NAME);
   assert.ok(worktreesOf(repo).includes(wt), 'the pass has cut the worktree, and not filed the step');
   return {
     run,

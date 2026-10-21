@@ -458,8 +458,9 @@ export function inventoryUnread(
  * Only what is inside `dir`, the run's own directory (`worktrees/<id>`): never the repository itself, where a `--no-worktree` run worked,
  * and never another run's, whose id may start with this one's. Git's list decides, so a worktree a pass cut and died before filing is found
  * too. Each carries the step a hand-off commits what it holds under: the last step, in the order they run, that the record puts in it —
- * every step after the first in a line of work inherits its directory — or, where the record puts none, its directory's name, which is the
- * name of the step it was cut for.
+ * every step after the first in a line of work inherits its directory — or, where the record puts none, its directory's name: the step a
+ * fork or a merge was cut for, and `run` for the run's own line of work, which is named for the run and not for whichever step cut it
+ * (`cutName`). A worktree a pass cut and died before filing is the case the fallback is for, and the commit is made either way.
  */
 export function runWorktrees(
   run: Run,

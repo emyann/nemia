@@ -58,8 +58,8 @@ const lines = (n: number, tag = 'line'): string => Array.from({ length: n }, (_,
 const files = (n: number, dir = 'src'): Record<string, string> =>
   Object.fromEntries(Array.from({ length: n }, (_, i) => [`${dir}/f${i}.ts`, `export const f${i} = ${i};\n`]));
 
-/** The branch a run's work is on, which the pull-request script the shipped check runs requires (`wf/<run>/<step>`). */
-const BRANCH = 'wf/r-1/implement';
+/** The branch a run's work is on, which the pull-request script the shipped check runs requires (`wf/<run>/run` for a run's own line). */
+const BRANCH = 'wf/r-1/run';
 
 /** A scratch repository on `main` holding `base`, with the run's branch checked out on it, a bare `origin`, and the base's commit. */
 function based(base: Record<string, string> = {}): { repo: string; base: string } {
@@ -251,7 +251,7 @@ test("REFUSED at shipped defaults: implement's check, as frozen, runs its six cl
   );
   const unopened = run(signed, {}, [...passing(repo).filter((rule) => rule.when !== 'pr list'), { when: 'pr list', out: '[]' }]);
   assert.notEqual(unopened.code, 0, unopened.out);
-  assert.match(unopened.err, /no open pull request has wf\/r-1\/implement as its head/);
+  assert.match(unopened.err, /no open pull request has wf\/r-1\/run as its head/);
   assert.deepEqual(
     printed(unopened).map((at) => at >= 0),
     [true, true, true, true, false, false],

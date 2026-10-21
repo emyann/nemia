@@ -158,7 +158,7 @@ export {
 } from './cap/cap.ts';
 export type { CheckoutHold, InFlight, MainClaim, RunSlot } from './cap/cap.ts';
 export { resultSteps, tipBranches, tipsSeen, workChecks } from './branches/index.ts';
-export { GIVEN, givenPlan, handOffDue, workspacePlan } from './workspace/workspace.ts';
+export { cutName, GIVEN, givenPlan, handOffDue, LINE_NAME, workspacePlan } from './workspace/workspace.ts';
 export type { Given, GivenFrom, WorkspacePlan } from './workspace/workspace.ts';
 export { saidLines, saidWord, sayRefusal } from './say/say.ts';
 export type { Said, SaidTo } from './say/say.ts';

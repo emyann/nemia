@@ -34,7 +34,7 @@ const SCRIPT = path.join(BUILD, 'landing.ts');
 
 /** The run every fixture here lands, and the branch its result is on. */
 const RUN = 'r-1';
-const RESULT = `wf/${RUN}/implement`;
+const RESULT = `wf/${RUN}/run`;
 
 /** The retry line a refusal that needs a person must print, for the run and the step the environment names. */
 const RETRY = `nemia retry ${RUN} land`;
@@ -43,9 +43,9 @@ const RETRY = `nemia retry ${RUN} land`;
 type World = { repo: string; bare: string; base: string; tip: string; merged: string; gh: Gh };
 
 /**
- * A checkout on `main` with a commit, a result branch `wf/r-1/implement` one commit ahead, and an `origin` whose `main` holds the merge
- * commit GitHub would have made of the two — so `git merge --ff-only origin/main` is the fast-forward the merge verb ends with. The
- * checkout itself is left on the base at the commit before the merge, as the owner's is when a landing starts.
+ * A checkout on `main` with a commit, a result branch `wf/r-1/run` — a run's own line of work — one commit ahead, and an `origin`
+ * whose `main` holds the merge commit GitHub would have made of the two — so `git merge --ff-only origin/main` is the fast-forward the
+ * merge verb ends with. The checkout itself is left on the base at the commit before the merge, as the owner's is when a landing starts.
  */
 function world({ extra }: { extra?: string } = {}): World {
   const repo = scratch('wf-land-repo-');

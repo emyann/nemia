@@ -108,6 +108,8 @@ import {
   stepTaskId,
   durationWord,
   tryNote,
+  cutName,
+  LINE_NAME,
   workspacePlan,
   gated,
   hasStarted,
@@ -466,6 +468,31 @@ test('several roots each fork from the base — a run may start wide', () => {
   const wide = [step('a'), step('b')];
   assert.deepEqual(workspacePlan(wide, wide[0]), { kind: 'fork', from: null });
   assert.deepEqual(workspacePlan(wide, wide[1]), { kind: 'fork', from: null });
+});
+
+test("a run's line of work is cut under the run's own name, not the step's that cut it", () => {
+  const chain = [step('implement'), step('review', ['implement']), step('respond', ['review'])];
+  assert.equal(cutName(chain, chain[0]), LINE_NAME, 'one worktree and one branch per card: `wf/<run>/run`, the card and no step');
+  assert.equal(LINE_NAME, 'run');
+});
+
+test('a fork beside the line, a fan-in and a second root each keep their own step name — each is a line of its own', () => {
+  const fan = [step('split'), step('a', ['split']), step('b', ['split']), step('merge', ['a', 'b'])];
+  assert.equal(cutName(fan, fan[0]), LINE_NAME, "split forks off the base: it is the run's own line");
+  assert.equal(cutName(fan, fan[1]), 'a', 'a fork with a parent is cut beside the line and named for its step');
+  assert.equal(cutName(fan, fan[2]), 'b');
+  assert.equal(cutName(fan, fan[3]), 'merge', 'a fan-in merges into a cut of its own');
+
+  const wide = [step('a'), step('b')];
+  assert.equal(cutName(wide, wide[0]), LINE_NAME, "the first root is the run's line");
+  assert.equal(cutName(wide, wide[1]), 'b', 'the second root is another line, and keeps its step name');
+});
+
+test('the name of a cut is a function of the step set alone, whatever order the set is read in', () => {
+  const chain = [step('implement'), step('review', ['implement'])];
+  const other = [chain[1], chain[0]];
+  assert.equal(cutName(other, chain[0]), LINE_NAME, "the workflow's order says which root is the line, and `review` is no root");
+  assert.equal(cutName(other, chain[1]), 'review');
 });
 
 test("`workspace: main` is the repository's own checkout, and the run's result is the work the ending step acts on, not its branch", () => {

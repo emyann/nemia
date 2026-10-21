@@ -50,6 +50,7 @@ const {
 const runWith = runOver(runEngine, gitPlaceLayer);
 const runPlaced = runGiven(gitPlaceLayer);
 const { listRuns, readRun } = await import('../src/record/record.store.ts');
+const { LINE_NAME } = await import('../src/run.ts');
 const { passStanding } = await import('../src/standing/standing.verb.ts');
 /** A pass's read of where every run's branches stand, written to `standing.json` as the tick writes it: what `nemia ls` reads. */
 const aPass = (e: Engine) => runWith(e, passStanding(listRuns()));
@@ -182,7 +183,7 @@ const aDone = async (b: ReturnType<typeof board>, repo: string, { merged = false
   git(wt, 'commit', '-q', '-m', 'add fix');
   b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
   await runWith(b.e, advanceRun(readRun(run.id)));
-  if (merged) git(repo, 'merge', '-q', '--no-ff', '-m', 'merge', `wf/${run.id}/implement`);
+  if (merged) git(repo, 'merge', '-q', '--no-ff', '-m', 'merge', readRun(run.id).steps.implement.branch!);
   return run;
 };
 
@@ -441,7 +442,7 @@ test('a held run files nothing — the next step, nor on a hold written between 
     fs.existsSync(holdFileOf(run.id)) && !b.filings.includes(`${run.id}-implement`),
     'signed off and not merged has not shipped: the hold stands',
   );
-  git(repo, 'merge', '-q', '--no-ff', '-m', 'merge', `wf/${target.id}/implement`);
+  git(repo, 'merge', '-q', '--no-ff', '-m', 'merge', readRun(target.id).steps.implement.branch!);
   const lifted = await runWith(b.e, advanceRun(readRun(run.id)));
   assert.ok(lifted.notes.includes(`the hold is lifted: ${target.id} has shipped`), lifted.notes.join('\n'));
   assert.ok(!fs.existsSync(holdFileOf(run.id)), 'the hold file is gone');
@@ -732,11 +733,13 @@ test('REFUSED at shipped defaults: a hold on a pruned run and on a folder run, a
 
   const dropped = await aDone(b, repo);
   git(repo, 'worktree', 'remove', '--force', readRun(dropped.id).steps.implement.workspace!);
-  git(repo, 'branch', '-q', '-D', `wf/${dropped.id}/implement`);
+  git(repo, 'branch', '-q', '-D', `wf/${dropped.id}/${LINE_NAME}`);
   await refused(
     t,
     b.e,
-    new RegExp(`^--until ${dropped.id}: wf/${dropped.id}/implement is gone, and git cannot find it on main, so ${id} would wait for ever`),
+    new RegExp(
+      `^--until ${dropped.id}: wf/${dropped.id}/${LINE_NAME} is gone, and git cannot find it on main, so ${id} would wait for ever`,
+    ),
     'hold',
     id,
     '--until',
@@ -765,7 +768,7 @@ test('REFUSED at shipped defaults: a hold put again while the tick or --off lift
   git(wt, 'commit', '-q', '-m', 'target');
   b.settle(`${target.id}-implement`, 'succeeded', SIGNED);
   await runWith(b.e, advanceRun(readRun(target.id)));
-  git(repo, 'merge', '-q', '--no-ff', '-m', 'merge', `wf/${target.id}/implement`);
+  git(repo, 'merge', '-q', '--no-ff', '-m', 'merge', readRun(target.id).steps.implement.branch!);
   const pass = await runWith(b.e, advanceRun(stale));
   assert.ok(
     !pass.notes.some((n) => n.startsWith('the hold is lifted')),
@@ -953,7 +956,7 @@ test('the whole screen of a loop out of rounds, and of the round a person asks f
     '    review: it asked for round 2, and `rounds: 1` are spent. Its findings are below. Once more — implement continued, then a new review:  nemia round <id> review',
     '    review: enough — go on with what is there; its findings stay on the record, and the run ends with them on the record:  nemia accept <id> review --message "<why>"',
     '',
-    '  touched  wf/<id>/implement',
+    '  touched  wf/<id>/run',
     '    nothing — the branch changed no file against the base',
     '  lesson  nothing written where the next agent reads',
     '',
@@ -976,12 +979,12 @@ test('the whole screen of a loop out of rounds, and of the round a person asks f
     '  cost  run not measured',
     '  timeline  run  queued —  ran —  wall not known',
     '',
-    '  wf/<id>/implement',
+    '  wf/<id>/run',
     '',
-    '  branch    wf/<id>/implement is on main',
+    '  branch    wf/<id>/run is on main',
     '',
-    '  ship it   git -C <repo> merge --no-ff wf/<id>/implement',
-    '  drop it   git -C <repo> branch -D wf/<id>/implement',
+    '  ship it   git -C <repo> merge --no-ff wf/<id>/run',
+    '  drop it   git -C <repo> branch -D wf/<id>/run',
   ]);
   await runWith(b.e, roundRun(loop.id, 'review'));
   assert.deepEqual(await decideScreen(t, b.e, [loop.id], { '<id>': loop.id, '<root>': ROOT }), [
@@ -1011,7 +1014,7 @@ test('the whole screen of a loop a person accepted as it stands', async (t) => {
     '',
     '  UNVERIFIED: implement, review  — no check: declared; only its own word says it worked',
     '',
-    '  touched  wf/<id>/implement',
+    '  touched  wf/<id>/run',
     '    (root)  1 file   +1 −0',
     '  lesson  nothing written where the next agent reads',
     '',
@@ -1035,12 +1038,12 @@ test('the whole screen of a loop a person accepted as it stands', async (t) => {
     '  cost  run not measured',
     '  timeline  run  queued —  ran —  wall not known',
     '',
-    '  wf/<id>/implement  — 1 file: +1 −0',
+    '  wf/<id>/run  — 1 file: +1 −0',
     '',
-    '  branch    wf/<id>/implement is ahead of main by 1 commit',
+    '  branch    wf/<id>/run is ahead of main by 1 commit',
     '',
-    '  ship it   git -C <repo> merge --no-ff wf/<id>/implement',
-    '  drop it   git -C <repo> branch -D wf/<id>/implement',
+    '  ship it   git -C <repo> merge --no-ff wf/<id>/run',
+    '  drop it   git -C <repo> branch -D wf/<id>/run',
   ]);
 });
 

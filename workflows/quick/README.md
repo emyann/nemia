@@ -60,7 +60,7 @@ Implement's closeout is `build`'s with two fields more (`implement.schema.json`)
 written before the work; and `pages`, the e2e pages she ran, which nothing reads but the person. At land's gate a person is shown the
 plan, the pages, the mutants, the pictures and how many files and lines the branch touched (`nemia decide <run>`, and the run's page); the check's
 `wf size:` line is handed to the landing step. The board does not show the change itself at a gate: read it in a
-terminal, `git diff main...wf/<run>/implement`, until it does.
+terminal, `git diff main...wf/<run>/run`, until it does.
 
 A person approves the landing, `nemia approve <run> land`, or sends the work back to implement, the one step there is to send it to:
 `nemia retry <run> implement --message "<objection>"`.

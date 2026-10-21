@@ -9,6 +9,8 @@
  *   prints `wf pr: <url>`, which goes on her closeout as an artifact value.
  * - `push`, which the round's check runs first: it pushes again, so the commit CI judges is the commit the check judges, then refuses
  *   unless an open, non-draft pull request for this branch, based on the remote's default branch, has `headRefOid` equal to `HEAD`.
+ *   GitHub moves a pull request's head a moment after the push it follows, so that head is read again for a bounded few seconds
+ *   (`HEAD_SECONDS`) before the refusal: a head that stays elsewhere is still refused, and says how long it was read for.
  * - `wait`, which the round's check runs last: it polls the `ci` context of that head (`gh pr view --json statusCheckRollup`), 1800 s
  *   for it to start (`WF_CI_START_SECONDS`) and 2400 s whole (`WF_CI_WAIT_SECONDS`), `WF_CI_POLL_SECONDS` the interval; on a red, cancelled or
  *   absent `ci` refuses by name with the Actions URL, the failing jobs, a bounded tail of each failing job's log — the next try reads
@@ -46,6 +48,16 @@ const WHOLE_SECONDS = 2400;
 
 /** How long the wait sleeps between two polls, in seconds. */
 const POLL_SECONDS = 15;
+
+/**
+ * How long, in seconds, the push reads the pull request's head again for before it refuses one that is not `HEAD`: GitHub moves the head
+ * a moment after the push, and a read straight away has refused a round whose push had landed (`#448`, 2026-10-21). It is bounded and
+ * short — the check waits on CI for far longer after it — and `WF_PR_HEAD_SECONDS` lowers it for a test.
+ */
+const HEAD_SECONDS = 30;
+
+/** How long the push sleeps between two reads of the head, in seconds; `WF_PR_HEAD_POLL_SECONDS` lowers it for a test. */
+const HEAD_POLL_SECONDS = 3;
 
 /** The most lines of a failing job's log the refusal prints, from its end: enough to read, never a log in a closeout. */
 const LOG_LINES = 40;
@@ -331,17 +343,34 @@ function open(args: string[]): string[] {
   return [...said, 'opened', url.trim()];
 }
 
+/**
+ * The one open pull request of `branch`, read again until its head is `at` or the bound is out: GitHub reports the head of a push a
+ * moment after it, so the first read after a push that landed can still name the commit before it. Refuses a head that stays elsewhere.
+ */
+function headed(branch: string, onto: string, at: string): Pr {
+  const whole = seconds('WF_PR_HEAD_SECONDS', HEAD_SECONDS);
+  const poll = seconds('WF_PR_HEAD_POLL_SECONDS', HEAD_POLL_SECONDS);
+  const began = Date.now();
+  for (;;) {
+    const pr = sole(pulls(branch), branch, onto);
+    if (pr.headRefOid === at) return pr;
+    const secs = Math.round((Date.now() - began) / 1000);
+    if (Date.now() - began >= whole * 1000)
+      throw new Refusal(
+        `#${pr.number} has ${pr.headRefOid.slice(0, 12)} as its head and this workspace is on ${at.slice(0, 12)}, ${secs} s after the ` +
+          `push, so CI's verdict would be for another commit than the one this check judges. Open or update the pull request from this ` +
+          `workspace:\n  ${OPEN_LINE}`,
+      );
+    sleep(poll);
+  }
+}
+
 /** `push`: the commit CI judges made the commit the check judges, proven by the pull request's head. */
 function push(): string[] {
   const { branch, onto } = placed();
   const said = pushing(branch);
   const at = head();
-  const pr = sole(pulls(branch), branch, onto);
-  if (pr.headRefOid !== at)
-    throw new Refusal(
-      `#${pr.number} has ${pr.headRefOid.slice(0, 12)} as its head and this workspace is on ${at.slice(0, 12)}, so CI's verdict would ` +
-        `be for another commit than the one this check judges. Open or update the pull request from this workspace:\n  ${OPEN_LINE}`,
-    );
+  const pr = headed(branch, onto, at);
   return [said, `#${pr.number} is at ${at.slice(0, 12)}, the commit this check judges: ${pr.url}`];
 }
 

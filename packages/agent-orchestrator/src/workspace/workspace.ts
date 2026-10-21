@@ -20,8 +20,8 @@
  *   prompt. A hardlink is no path anywhere else: every file's path is inside the worktree, and no data
  *   is copied.
  *
- * The same file says where a step works (`workspacePlan`, `givenPlan`) and which finished steps hand their work off on a pass
- * (`handOffDue`).
+ * The same file says where a step works (`workspacePlan`, `givenPlan`), what the cut it works in is called (`cutName`, `LINE_NAME`) and
+ * which finished steps hand their work off on a pass (`handOffDue`).
  */
 import path from 'node:path';
 import type { Workflow } from '../step/step.ts';
@@ -386,4 +386,30 @@ export function workspacePlan(steps: readonly Workflow[], step: Workflow): Works
   const parent = step.after[0];
   const siblings = steps.filter((s) => s.after.includes(parent));
   return siblings.length === 1 ? { kind: 'inherit', from: parent } : { kind: 'fork', from: parent };
+}
+
+/** The leaf a run's own line of work is cut under: `worktrees/<run>/run` on `wf/<run>/run`. */
+export const LINE_NAME = 'run';
+
+/**
+ * What a cut of `step` is called — the leaf under `worktrees/<run>/` and `wf/<run>/`. Pure, a function of the frozen step set alone, so a
+ * pass that died halfway and a restart name the same cut the same way.
+ *
+ * A run's line of work is one workspace and one branch per card, named for the run and not for whichever step happened to cut it:
+ * `LINE_NAME`. The line is the first step in the workflow's order that forks off the run's base ref (`{ kind: 'fork', from: null }`), and
+ * every step that inherits from it stands in the same cut. So a person in the store, and a reader of a pull request on GitHub, see
+ * `wf/<run>/run`: the card, and no step.
+ *
+ * Every other cut keeps its step's name — a fork with a parent, a fan-in merge, and a second root of a run that starts wide — because
+ * those are lines of work beside the run's own, and each needs a worktree and a branch of its own.
+ *
+ * The run's branch is not `wf/<run>`: git keeps refs as files, so a ref `wf/<run>` cannot sit beside the refs `wf/<run>/<step>` a fork
+ * cuts. The leaf keeps both shapes under one directory and one ref prefix, which is what every reader of these names already keys on.
+ */
+export function cutName(steps: readonly Workflow[], step: Workflow): string {
+  const line = steps.find((s) => {
+    const plan = workspacePlan(steps, s);
+    return plan.kind === 'fork' && plan.from === null;
+  });
+  return line && line.name === step.name ? LINE_NAME : step.name;
 }

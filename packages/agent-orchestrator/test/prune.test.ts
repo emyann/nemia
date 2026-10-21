@@ -167,7 +167,7 @@ const aFinished = async (
   for (const named of (said as { artifacts?: string[] }).artifacts ?? []) if (path.isAbsolute(named)) aShot(run.id, path.basename(named));
   b.settle(`${run.id}-implement`, 'succeeded', said, costUsd === undefined ? undefined : { costUsd });
   await runWith(b.e, advanceRun(readRun(run.id)));
-  const branch = `wf/${run.id}/implement`;
+  const branch = readRun(run.id).steps.implement.branch!;
   if (merged) git(repo, 'merge', '-q', '--no-ff', '-m', 'merge', branch);
   return { run, repo, wt, branch, outside };
 };
@@ -937,7 +937,7 @@ test('the whole screen of a pruned run over its budget', async (t) => {
       '  BLOCKED: implement',
       '  OVER BUDGET: implement ($3.40 of $3)  — nothing more is filed for it, raised or not, since the run was pruned at <at> — its worktrees were removed (nemia prune); nothing after it ran',
       '',
-      '  touched  wf/<id>/implement',
+      '  touched  wf/<id>/run',
       '    (root)  1 file   +1 −0',
       '  lesson  nothing written where the next agent reads',
       '',
@@ -954,12 +954,12 @@ test('the whole screen of a pruned run over its budget', async (t) => {
       '  cost  run $3.40',
       '  timeline  run  queued —  ran —  wall not known',
       '',
-      '  wf/<id>/implement  — 1 file: +1 −0',
+      '  wf/<id>/run  — 1 file: +1 −0',
       '',
-      '  branch    wf/<id>/implement is ahead of main by 1 commit',
+      '  branch    wf/<id>/run is ahead of main by 1 commit',
       '',
-      '  ship it   git -C <repo> merge --no-ff wf/<id>/implement',
-      '  drop it   git -C <repo> branch -D wf/<id>/implement',
+      '  ship it   git -C <repo> merge --no-ff wf/<id>/run',
+      '  drop it   git -C <repo> branch -D wf/<id>/run',
     ],
   );
 });

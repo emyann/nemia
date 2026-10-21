@@ -28,6 +28,7 @@ const { main } = await import('../src/cli/main.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 const { advanceRun, runWith: runEngine } = await import('../src/runner.ts');
 const { readRun } = await import('../src/record/record.store.ts');
+const { LINE_NAME } = await import('../src/run.ts');
 
 const stand = eachTest(testPlace);
 const engine = eachTest(testEngine);
@@ -68,7 +69,7 @@ test('a run started, read and removed through `main` is answered by the place `m
 
   await advanced(id);
   const workspace = readRun(id).steps.implement.workspace!;
-  assert.equal(world.tip(repo, `wf/${id}/implement`), base, 'its workspace is cut on the same place');
+  assert.equal(world.tip(repo, `wf/${id}/${LINE_NAME}`), base, 'its workspace is cut on the same place');
   assert.equal(world.head(workspace), base);
 
   fs.writeFileSync(path.join(workspace, 'flag.ts'), 'export const flag = true;\n');
@@ -77,15 +78,15 @@ test('a run started, read and removed through `main` is answered by the place `m
   const decided = (await typed(t, 'decide', id)).join('\n').split('\n');
   assert.match(decided[0], new RegExp(`^${id}`), 'nemia decide read the run');
   assert.ok(
-    decided.includes(`  branch    wf/${id}/implement is ahead of main by 1 commit`),
+    decided.includes(`  branch    wf/${id}/${LINE_NAME} is ahead of main by 1 commit`),
     `where the branch stands is the handed place's answer: git never made this repository\n${decided.join('\n')}`,
   );
-  assert.ok(decided.includes(`  wf/${id}/implement  — 1 file: +1 −0`), `and what it changed is too\n${decided.join('\n')}`);
+  assert.ok(decided.includes(`  wf/${id}/${LINE_NAME}  — 1 file: +1 −0`), `and what it changed is too\n${decided.join('\n')}`);
 
   await typed(t, 'rm', id);
   assert.equal(fs.existsSync(path.join(ROOT, 'runs', `${id}.json`)), false, 'nemia rm forgot the run');
   assert.equal(fs.existsSync(workspace), false, 'its workspace removed by the place it was handed');
-  assert.notEqual(world.tip(repo, `wf/${id}/implement`), base, 'what the step left handed off on its branch first');
+  assert.notEqual(world.tip(repo, `wf/${id}/${LINE_NAME}`), base, 'what the step left handed off on its branch first');
 });
 
 /** Every file of the CLI's code, by its path from the package, with its text. */

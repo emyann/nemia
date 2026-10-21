@@ -21,6 +21,7 @@ const { advanceRun, forgetRun, startRun, runWith: runEngine, gitPlaceLayer } = a
 const runWith = runOver(runEngine, gitPlaceLayer);
 const runPlaced = runGiven(gitPlaceLayer);
 const { readRun } = await import('../src/record/record.store.ts');
+const { LINE_NAME } = await import('../src/run.ts');
 
 const git = (cwd: string, ...args: string[]) =>
   execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
@@ -78,5 +79,5 @@ test("REFUSED before, now forgotten: a store under a link — git lists each wor
   assert.ok(
     !fs.existsSync(wt) && !fs.existsSync(path.join(ROOT, 'worktrees', run.id)) && !fs.existsSync(path.join(ROOT, 'runs', `${run.id}.json`)),
   );
-  assert.equal(git(repo, 'show', '--name-only', '--format=', `wf/${run.id}/implement`), 'left.txt');
+  assert.equal(git(repo, 'show', '--name-only', '--format=', `wf/${run.id}/${LINE_NAME}`), 'left.txt');
 });

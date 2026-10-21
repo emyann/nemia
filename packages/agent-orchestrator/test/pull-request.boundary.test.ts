@@ -24,11 +24,14 @@ const BUILD = path.join(REPO, 'workflows', 'build');
 
 const SCRIPT = path.join(BUILD, 'pull-request.ts');
 
-/** The retry line a refusal of the wait must print, for the run and step the branch names. */
+/**
+ * The retry line a refusal of the wait must print: the run the branch names, and the step `WF_STEP` says — or, with it unset, the
+ * constant fallback. The branch cannot say it: a run's line of work is `wf/<run>/run`, which names no step.
+ */
 const RETRY = 'nemia retry r-1 implement --recheck';
 
 /** A place to push from: a scratch repository on `branch`, its `origin` a bare repository, and a stub `gh` answering `rules`. */
-function placed({ branch = 'wf/r-1/implement', remote = true } = {}): { repo: string; bare: string | undefined; branch: string; gh: Gh } {
+function placed({ branch = 'wf/r-1/run', remote = true } = {}): { repo: string; bare: string | undefined; branch: string; gh: Gh } {
   const repo = scratch('wf-pr-repo-');
   gitIn(repo, 'init', '-q', '-b', branch);
   fs.writeFileSync(path.join(repo, 'a.ts'), 'export const a = 1;\n');
@@ -101,7 +104,7 @@ test("open pushes the run's branch and creates the pull request with the title a
     '--base',
     'main',
     '--head',
-    'wf/r-1/implement',
+    'wf/r-1/run',
     '--title',
     "A run's change is a pull request",
     '--body-file',
@@ -140,20 +143,17 @@ test("REFUSED: a HEAD that is on no run's branch, or on the remote's default bra
     const at = placed({ branch });
     const r = pr(at, 'push');
     assert.equal(r.code, 1, branch);
-    assert.match(r.err, /not a run's `wf\/<run>\/<step>`/);
-    assert.match(r.err, /git switch wf\/<run>\/<step>/);
+    assert.match(r.err, /not a run's `wf\/<run>\/<leaf>`/);
+    assert.match(r.err, /git switch wf\/<run>\/run/);
     assert.equal(tip(at.bare!, branch), null, 'nothing is pushed');
     assert.deepEqual(r.calls, [], 'no gh is called');
   }
-  const named = placed({ branch: 'wf/r-1/implement' });
-  named.gh.answers([
-    { when: 'auth status' },
-    { when: 'repo view', out: JSON.stringify({ defaultBranchRef: { name: 'wf/r-1/implement' } }) },
-  ]);
+  const named = placed();
+  named.gh.answers([{ when: 'auth status' }, { when: 'repo view', out: JSON.stringify({ defaultBranchRef: { name: 'wf/r-1/run' } }) }]);
   const base = pr(named, 'push');
   assert.equal(base.code, 1, base.out);
-  assert.match(base.err, /HEAD is on `wf\/r-1\/implement`, the remote's default branch, and this script never pushes the base/);
-  assert.equal(tip(named.bare!, 'wf/r-1/implement'), null, 'nothing is pushed');
+  assert.match(base.err, /HEAD is on `wf\/r-1\/run`, the remote's default branch, and this script never pushes the base/);
+  assert.equal(tip(named.bare!, 'wf/r-1/run'), null, 'nothing is pushed');
 });
 
 test('REFUSED: no origin remote, no gh on the PATH, and a gh that is not authenticated, each naming what to type', () => {
@@ -233,7 +233,7 @@ test('REFUSED: two open pull requests for one branch, naming the close a person 
   at.gh.answers([...passing(at.repo).filter((rule) => rule.when !== 'pr list'), { when: 'pr list', out: two }]);
   const r = pr(at, 'push');
   assert.equal(r.code, 1, r.out);
-  assert.match(r.err, /2 open pull requests have wf\/r-1\/implement as its head \(#7, #8\)/);
+  assert.match(r.err, /2 open pull requests have wf\/r-1\/run as its head \(#7, #8\)/);
   assert.match(r.err, /gh pr close <number>/);
 });
 
@@ -262,7 +262,7 @@ test('REFUSED: a pull request whose head is another commit, and none open at all
   none.gh.answers([...passing(none.repo).filter((rule) => rule.when !== 'pr list'), { when: 'pr list', out: '[]' }]);
   const unopened = pr(none, 'push');
   assert.equal(unopened.code, 1, unopened.out);
-  assert.match(unopened.err, /no open pull request has wf\/r-1\/implement as its head, and CI judges a pull request's head/);
+  assert.match(unopened.err, /no open pull request has wf\/r-1\/run as its head, and CI judges a pull request's head/);
   assert.match(unopened.err, /node pull-request\.ts open --title "<the card's line>" --body-file "\$WF_STEP_FILES\/pr-body\.md"/);
 });
 
@@ -292,7 +292,7 @@ test('REFUSED: a red ci, with the Actions URL, the failing jobs, a tail of the f
     },
     { when: 'run view', out: log },
   ]);
-  const r = pr(at, 'wait', [], { WF_CI_POLL_SECONDS: '0' });
+  const r = pr(at, 'wait', [], { WF_CI_POLL_SECONDS: '0', WF_STEP: 'implement' });
   assert.equal(r.code, 1, r.out);
   assert.match(r.err, /`ci` for #7 is failure, so this round is red where it is judged/);
   assert.ok(r.err.includes(`The Actions URL: ${CI_URL}`), r.err);
@@ -315,6 +315,23 @@ test('REFUSED: a red ci, with the Actions URL, the failing jobs, a tail of the f
     assert.ok(refused.err.includes(conclusion.toLowerCase()), refused.err);
     assert.ok(refused.err.includes(RETRY), refused.err);
   }
+});
+
+test('the retry line a red ci prints names the step the check is of, which the branch no longer says: `WF_STEP`, or the fallback without it', () => {
+  const red = (more: Record<string, string>) => {
+    const at = placed();
+    at.gh.answers([
+      ...passing(at.repo).filter((rule) => rule.when !== 'pr view'),
+      { when: 'pr view', out: rollup({ status: 'COMPLETED', conclusion: 'FAILURE' }) },
+      { when: 'run view', out: 'boom' },
+    ]);
+    const r = pr(at, 'wait', [], { WF_CI_POLL_SECONDS: '0', ...more });
+    assert.equal(r.code, 1, r.out);
+    return r.err;
+  };
+  assert.ok(red({ WF_STEP: 'review' }).includes('nemia retry r-1 review --recheck'), "the check's own step, as the run set it");
+  assert.ok(red({}).includes(RETRY), 'and the fallback with WF_STEP unset: `implement`, the pushing step of both build and quick');
+  assert.ok(!red({}).includes('nemia retry r-1 run --recheck'), "never the branch's leaf, which names no step a person could retry");
 });
 
 test('REFUSED: no ci context within the bound, and a ci still pending at its end, each by the name of the context', () => {

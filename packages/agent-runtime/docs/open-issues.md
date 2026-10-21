@@ -101,7 +101,7 @@ where it shows, and the six tests above are what names it.
 engine task succeeded.
 
 **Effect.** A step that fails or is stopped keeps anything it did not commit only in its worktree
-(`~/.agent-workflows/worktrees/<run>/<step>`): not on its branch, not merged into later steps, not
+(`~/.agent-workflows/worktrees/<run>/run`): not on its branch, not merged into later steps, not
 shown by `wf decide`, and lost if the worktree is removed. The closeout contract tells steps "the run
 commits whatever you left", which holds only for succeeded steps.
 

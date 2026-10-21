@@ -132,6 +132,7 @@ const droppedByHand = (repo: string, wt: string, branch: string): void => {
 /** A run as one waiting on it reads it, where its branches stand asked now, as a person's verb asks them (`standingLiveOf`). */
 const parentNow = (id: string) => standingLiveOf([id]).pipe(Effect.flatMap((git) => parentRead(id, git)));
 const { listRuns, markCancelled, readAnswers, readAsks, readRun } = await import('../src/record/record.store.ts');
+const { LINE_NAME } = await import('../src/run.ts');
 const { passStanding } = await import('../src/standing/standing.verb.ts');
 /** A pass's read of where every run's branches stand, written to `standing.json` as the tick writes it: what `nemia ls` reads. */
 const aPass = (e: Engine) => runWith(e, passStanding(listRuns()));
@@ -807,6 +808,21 @@ test("a step named for another step's check is refused at `nemia start`, before 
   );
 });
 
+test("REFUSED: a step named `run`, the name a run's own line of work is cut under, at `nemia start`, before anything is spent", async () => {
+  const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
+  fs.writeFileSync(path.join(dir, `${LINE_NAME}.md`), '---\nplace: git\n---\nrun it\n');
+  fs.writeFileSync(path.join(dir, 'review.md'), `---\nafter: ${LINE_NAME}\nplace: git\n---\nreview it\n`);
+  await assert.rejects(
+    async () => await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: dir })),
+    (err: Error & { exitCode?: number }) =>
+      err.exitCode === 2 &&
+      /a step may not be named `run`/.test(err.message) &&
+      /would claim one branch/.test(err.message) &&
+      /Rename run\.md/.test(err.message),
+    "its cut and the run's line would both ask the place for `wf/<id>/run`",
+  );
+});
+
 test('`nemia ls` and `nemia decide` read a refused check from the streams the runtime kept of it', async () => {
   const run = await started(folder('check: npm test'));
   const { e, settle, outputs } = board();
@@ -1159,12 +1175,28 @@ function placeAnswering<V extends 'make' | 'handoff'>(verb: V, outcome: PlaceOut
   return { layer: PlaceTag.layer(placeOver(stand().place, { [verb]: answer })), asked: () => asked };
 }
 
+test("a run's line of work is cut under the run's own name, not the step's that cut it — and every step that inherits it stands there", async () => {
+  const run = await isolated(aRepo());
+  const { e, settle } = board();
+  await runWith(e, advanceRun(readRun(run.id)));
+  const implement = readRun(run.id).steps.implement;
+  assert.equal(implement.workspace, path.join(ROOT, 'worktrees', run.id, LINE_NAME), 'one worktree per card, named for the run');
+  assert.equal(implement.branch, `wf/${run.id}/${LINE_NAME}`, 'and one branch, which is what a pull request on GitHub reads');
+  settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  await runWith(e, advanceRun(readRun(run.id)));
+  assert.deepEqual(
+    [readRun(run.id).steps.review.workspace, readRun(run.id).steps.review.branch],
+    [implement.workspace, implement.branch],
+    'review inherits the line: the same directory and the same branch, with no git operation',
+  );
+});
+
 test('REFUSED at shipped defaults: a make that answers a workspace other than the one it was asked for is read as not heard — the step is not filed, the notes say both, its record holds no workspace, and the next pass asks again', async () => {
   const run = await isolated(aRepo());
   const elsewhere = scratch('wf-store-elsewhere-');
   const place = placeAnswering('make', { answer: { workspace: elsewhere, branch: 'b', conflicts: [], notes: [] } });
   const { e, filings } = board();
-  const at = path.join(ROOT, 'worktrees', run.id, 'implement');
+  const at = path.join(ROOT, 'worktrees', run.id, LINE_NAME);
   for (const pass of [1, 2]) {
     const ticked = await runWith(e, advanceRun(readRun(run.id)).pipe(Effect.provide(place.layer)));
     assert.deepEqual(ticked.notes, [
@@ -3142,7 +3174,7 @@ const aParent = async (
     world().commit(wt, `add ${work}`);
   }
   if (signed) b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
-  return { run, wt, branch: `wf/${run.id}/implement` };
+  return { run, wt, branch: readRun(run.id).steps.implement.branch! };
 };
 
 const runsWritten = () => fs.readdirSync(path.join(ROOT, 'runs')).length;
@@ -5056,7 +5088,7 @@ test('REFUSED at shipped defaults: `nemia rm` on a run with a step in flight, on
   ]);
   assert.match(printed[4], new RegExp(`^${escaped(over.run.id)}  forgotten: removed 1 worktree; `));
   for (const id of [running.id, ready.id, asked.id, parent.run.id]) {
-    assert.ok(under('runs', `${id}.json`) && under('worktrees', id, 'implement'), `${id}: record and worktree kept`);
+    assert.ok(under('runs', `${id}.json`) && under('worktrees', id, LINE_NAME), `${id}: record and worktree kept`);
   }
   assert.ok(under('runs', `${asked.id}.asks`, 'retry-implement-2'), 'and the ask');
   assert.deepEqual(b.stopped, [], 'nothing stopped: cancelling is its own verb');
@@ -5098,7 +5130,7 @@ test('REFUSED at shipped defaults: a check a pass filed and died before writing 
     held.refusal,
     `implement's check is pending. It was cancelled at ${at}, and a tick stops what is in flight: nemia rm ${run.id} once it has settled (nemia ls ${run.id}).`,
   );
-  assert.ok(under('runs', `${run.id}.json`) && under('worktrees', run.id, 'implement'));
+  assert.ok(under('runs', `${run.id}.json`) && under('worktrees', run.id, LINE_NAME));
   b.settle(`${run.id}-implement-check`, 'stopped');
   assert.equal((await runWith(b.e, forgetRun(run.id))).kind, 'forgotten');
 });
@@ -5186,7 +5218,7 @@ test("`nemia rm --delete-branches` deletes a branch merged into its run's base a
     assert.deepEqual(printed, [
       `${id}  not forgotten: ${JSON.stringify(id)} is not a run's id, and nemia rm removes what is under WF_ROOT by id — lowercase letters, digits and dashes: give the id nemia ls prints, as in nemia rm add-a-flag-x1y2.`,
     ]);
-    assert.ok(under('runs', `${kept.run.id}.json`) && under('worktrees', kept.run.id, 'implement'), 'the store is where it was');
+    assert.ok(under('runs', `${kept.run.id}.json`) && under('worktrees', kept.run.id, LINE_NAME), 'the store is where it was');
   }
 });
 
@@ -5487,7 +5519,7 @@ test("`nemia rm`'s program, given the engine as a service, answers what its plai
   assert.deepEqual([forgot.kind, forgot.removed], ['forgotten', [wt]]);
   assert.deepEqual(
     forgot.branches.map((f) => [f.branch, f.deleted]),
-    [[`wf/${run.id}/implement`, true]],
+    [[`wf/${run.id}/${LINE_NAME}`, true]],
     'what it was asked, honoured',
   );
   assert.ok(!under('runs', `${run.id}.json`) && !under('worktrees', run.id));

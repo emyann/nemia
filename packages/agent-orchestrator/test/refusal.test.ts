@@ -110,10 +110,13 @@ function modulesLoaded(entry: string, more: readonly string[] = []): string[] {
 /**
  * The modules each entry the api loads is pinned to: its own files, the runtime's vocabulary door's and `effect/Data`'s, measured on the
  * pinned `effect`.
+ *
+ * `agent-orchestrator/workflow` is 54 rather than 52 since `stepSetRefusal` reads `LINE_NAME`, the name a run's own line of work is cut
+ * under, from `workspace/workspace.ts`: two pure modules more, that file and `record/record.ts`, and no file that touches a disk.
  */
 const PINNED_MODULES: Record<string, { all: number; effect: number }> = {
   'agent-orchestrator/run': { all: 98, effect: 15 },
-  'agent-orchestrator/workflow': { all: 52, effect: 15 },
+  'agent-orchestrator/workflow': { all: 54, effect: 15 },
 };
 
 const isEffectModule = (url: string): boolean => url.includes('/node_modules/effect/');

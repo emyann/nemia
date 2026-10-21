@@ -13,6 +13,7 @@ import { promisify } from 'node:util';
 import { Effect } from 'effect';
 import { lastLines } from '../check/check.ts';
 import {
+  cutName,
   depsPlan,
   isModuleKey,
   lockfilePackages,
@@ -363,7 +364,9 @@ const madeBy = Effect.fn('madeBy')(function* (place: Place, request: PlaceReques
  *
  * `inherit` costs nothing — the step continues where the last one left off. `fork` and `merge` are cut by the run's place, its `make` asked
  * off the event loop of `place`, for a workspace of their own at
- * `<HOME>/worktrees/<run>/<step>` on `wf/<run>/<step>`, merged with the line of work of each other step a merge waits on: what stops two
+ * `<HOME>/worktrees/<run>/<leaf>` on `wf/<run>/<leaf>`, the leaf `cutName` gives it — `run` for the run's own line of work, one workspace
+ * and one branch per card, and the step's own name for a fork beside it or a fan-in's merge — merged with the line of work of each other
+ * step a merge waits on: what stops two
  * concurrent steps from editing the same directory. A workspace already cut is taken up where it stands, by the place. A merge that
  * conflicts is left conflicted, its paths answered (`conflicts`) for the step's brief: resolving it is the job. The dependencies are
  * provisioned after, in the workspace the place made, on the merged tree and its lockfile.
@@ -384,8 +387,8 @@ export const workspaceFor = Effect.fn('workspaceFor')(function* (run: Run, steps
   }
   const asked = yield* madeBy(place, {
     repo: run.repo,
-    at: path.join(HOME, 'worktrees', run.id, step.name),
-    name: `wf/${run.id}/${step.name}`,
+    at: path.join(HOME, 'worktrees', run.id, cutName(steps, step)),
+    name: `wf/${run.id}/${cutName(steps, step)}`,
     from: plan.kind === 'merge' ? of(plan.from).branch : plan.from ? of(plan.from).branch : run.baseRef,
     also: plan.kind === 'merge' ? plan.also.map((other) => of(other).branch) : [],
   });

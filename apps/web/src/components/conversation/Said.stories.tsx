@@ -57,8 +57,7 @@ export const Yours: StoryObj = {
 };
 
 /** A quiet line that frames the conversation rather than being said in it. */
-export const AQuietNote: StoryObj = {
-  name: 'A quiet note',
+export const QuietNote: StoryObj = {
   render: () => (
     <div style={PANEL}>
       <Note what="keeper" marks="chat">
@@ -69,8 +68,7 @@ export const AQuietNote: StoryObj = {
 };
 
 /** The three one after another, as the talk lays them out. */
-export const ATalk: StoryObj = {
-  name: 'One after another',
+export const OneAfterAnother: StoryObj = {
   render: () => (
     <div style={PANEL}>
       <Said said={THEIRS} marks="chat" />

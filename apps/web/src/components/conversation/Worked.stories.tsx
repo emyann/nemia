@@ -87,8 +87,7 @@ export const Openable: StoryObj = {
 };
 
 /** The same line opened. */
-export const Opened_Line: StoryObj = {
-  name: 'An opened line',
+export const OpenedLine: StoryObj = {
   render: () => (
     <div style={PANEL}>
       <WorkedLine

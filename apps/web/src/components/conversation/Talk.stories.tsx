@@ -59,7 +59,6 @@ const drawOwn = (own: Own) => (
 
 /** An item of every kind at once: the person's words, a folded turn, the agent's words with links, a quiet note, and the caller's own. */
 export const EveryKind: StoryObj = {
-  name: 'An item of every kind',
   render: () => (
     <div style={PANEL}>
       <Talk
@@ -79,7 +78,6 @@ export const EveryKind: StoryObj = {
 
 /** The same talk with the line that says what is new, over the first item the person has not read. */
 export const WhatIsNew: StoryObj = {
-  name: 'The line over what is new',
   render: () => (
     <div style={PANEL}>
       <Talk

@@ -10,8 +10,7 @@ export default meta;
 const PANEL = { width: 460, padding: 16, background: 'var(--card)' };
 
 /** A quiet note at rest, over an accent at its left. */
-export const ANote: StoryObj = {
-  name: 'A quiet note',
+export const QuietNote: StoryObj = {
   render: () => (
     <div style={PANEL}>
       <ConversationBand role="status" what="stopped" icon={<PauseIcon />} title="Her session stopped">
@@ -22,8 +21,7 @@ export const ANote: StoryObj = {
 };
 
 /** A thing that went wrong, in the failure's container whole. */
-export const AFailure: StoryObj = {
-  name: 'A failure',
+export const Failure: StoryObj = {
   render: () => (
     <div style={PANEL}>
       <ConversationBand role="alert" what="unreadable" icon={<CircleXIcon />} title="The board cannot read her chat">

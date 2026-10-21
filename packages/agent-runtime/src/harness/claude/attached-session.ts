@@ -174,7 +174,13 @@ const questionsOf = (input: unknown): AskQuestion[] => {
 /**
  * The person's answers to the call `id` of `live`, waited for: the ask written down once (`appendAsk`), then the session's answers file
  * read every `ASK_EVERY_MS` until a line names the call, which is written down as closed and answered; nothing where the call's signal
- * aborted or the holder let the session go first, which leaves the ask open — and the layer above then owes the answer as words.
+ * aborted, the holder let the session go, or the turn ended first, which leaves the ask open — and the layer above then owes the
+ * answer as words.
+ *
+ * A turn's end is read off `live.asking`, which `took` clears as it cuts every open ask of the session: from then on `answerOn`
+ * refuses an answer for this call, so a wait that read on would read the answers file for the rest of the holder's life. The SDK
+ * promises nothing of the call's signal on an interrupt — it documents it only as signalled "if the operation should be aborted" —
+ * and the call is told what every cut call is told (`ASK_CUT`), which names the turn's end among its causes.
  */
 const askedOf = async (
   root: string,
@@ -197,7 +203,7 @@ const askedOf = async (
       live.asking.delete(id);
       return { questions, answers: given.answers };
     }
-    if (signal.aborted || live.letGo) return undefined;
+    if (signal.aborted || live.letGo || !live.asking.has(id)) return undefined;
     await new Promise((r) => setTimeout(r, ASK_EVERY_MS));
   }
 };

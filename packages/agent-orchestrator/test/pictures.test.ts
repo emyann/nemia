@@ -37,8 +37,8 @@ const write = (dir: string, files: Record<string, string>): void => {
   }
 };
 
-/** The branch a run's work is on, which the pull-request script the shipped check runs requires (`wf/<run>/<step>`). */
-const BRANCH = 'wf/r-1/implement';
+/** The branch a run's work is on, which the pull-request script the shipped check runs requires (`wf/<run>/run` for a run's own line). */
+const BRANCH = 'wf/r-1/run';
 
 /** A scratch repository whose base commit holds `base` and whose HEAD, one commit on, adds `work`; with the base's commit. */
 function workOn(work: Record<string, string>, base: Record<string, string> = {}): { repo: string; base: string } {

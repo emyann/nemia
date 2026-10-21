@@ -167,7 +167,7 @@ const PATH_TOOLS = ['Read', ...EDITING_TOOLS];
 
 /**
  * Where a denied call was made: the session's own directory (the step's workspace on the run record) and the run's id. A new run works
- * in directories named by its own id — `worktrees/<id>/<step>`, `runs/<id>/…` — so a path offered as denied would name this run's and
+ * in directories named by its own id — `worktrees/<id>/run`, `runs/<id>/…` — so a path offered as denied would name this run's and
  * never match the next's.
  */
 export type DeniedAt = { cwd?: string; runId?: string };

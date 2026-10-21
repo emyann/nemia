@@ -21,6 +21,7 @@ const { startRun } = await import('../src/start/start.verb.ts');
 const { gitPlaceLayer } = await import('../src/place/shipped.store.ts');
 const runPlaced = runGiven(gitPlaceLayer);
 const { markCancelled } = await import('../src/record/record.store.ts');
+const { LINE_NAME } = await import('../src/run.ts');
 
 const BIN = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
 
@@ -55,8 +56,9 @@ async function waitFor(ok: () => boolean): Promise<void> {
 }
 
 /**
- * A cancelled run of one step, `implement`, on a scratch repository, with its worktree where a pass puts it — `worktrees/<id>/implement`,
- * on `wf/<id>/implement` — clean, so `nemia rm` asks its place to remove it without a hand-off.
+ * A cancelled run of one step, `implement`, on a scratch repository, with its worktree where a pass puts it — `worktrees/<id>/run`, on
+ * `wf/<id>/run`, the run's own line of work, named for the run and not for the step that cut it — clean, so `nemia rm` asks its place to
+ * remove it without a hand-off.
  */
 async function aCancelledRun() {
   const repo = fs.mkdtempSync(path.join(DIR, 'repo-'));
@@ -65,8 +67,8 @@ async function aCancelledRun() {
   const workflowDir = fs.mkdtempSync(path.join(DIR, 'one-'));
   fs.writeFileSync(path.join(workflowDir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   const run = await runPlaced(startRun({ brief: 'add a flag', repo, workflowDir }));
-  const wt = path.join(STORE, 'worktrees', run.id, 'implement');
-  git(repo, 'worktree', 'add', '-q', '-b', `wf/${run.id}/implement`, wt);
+  const wt = path.join(STORE, 'worktrees', run.id, LINE_NAME);
+  git(repo, 'worktree', 'add', '-q', '-b', `wf/${run.id}/${LINE_NAME}`, wt);
   markCancelled(run.id);
   return { id: run.id, repo, wt };
 }

@@ -1322,7 +1322,7 @@ waiting on you looked like one you could ignore. The outcome now sits beside the
 
 ```
 fix-the-parser-k2q9  Fix the parser so a trailing comma is not an error
-   implement      verified ✓           wf/fix-the-parser-k2q9/implement
+   implement      verified ✓           wf/fix-the-parser-k2q9/run
    respond        waiting
    review         succeeded · BLOCKED  wf/fix-the-parser-k2q9/review
    → waiting on you: review  —  wf decide fix-the-parser-k2q9
@@ -2127,11 +2127,11 @@ dropped. **Nothing in the packages knows what shipping means.**
 ```text
 $ wf ls add-sub-8imz
 add-sub-8imz  add sub
-   implement      verified ✓            wf/add-sub-8imz/implement
-   review         unverified · done     wf/add-sub-8imz/implement
+   implement      verified ✓            wf/add-sub-8imz/run
+   review         unverified · done     wf/add-sub-8imz/run
    ship           awaiting approval                                 · approve it: wf approve add-sub-8imz ship — or send it back: wf retry add-sub-8imz review --message "<objection>"
    → to decide: Ship it: stage the merge of this run's result onto the base branch, and sign off with the message to commit it with. — wf approve add-sub-8imz ship
-   → result: wf/add-sub-8imz/implement  —  wf decide add-sub-8imz
+   → result: wf/add-sub-8imz/run  —  wf decide add-sub-8imz
 ```
 
 **`--after` is unchanged.** A child run starts when its parent has shipped as git sees it — the result branch
@@ -2258,7 +2258,7 @@ wf retry r-xyz plan --message "Store the flag before you parse it."   # or send 
 ```text
 $ wf ls r-xyz
 parse-the-flag-option-in-cli-idk2  Parse the --flag option in cli.ts
-   plan           awaiting approval    wf/parse-the-flag-option-in-cli-idk2/plan  · approve it: wf approve parse-the-flag-option-in-cli-idk2 plan — or send it back: wf retry parse-the-flag-option-in-cli-idk2 plan --message "<objection>"
+   plan           awaiting approval    wf/parse-the-flag-option-in-cli-idk2/run  · approve it: wf approve parse-the-flag-option-in-cli-idk2 plan — or send it back: wf retry parse-the-flag-option-in-cli-idk2 plan --message "<objection>"
    implement      waiting
    review         waiting
    → waiting on you: approve plan  —  wf decide parse-the-flag-option-in-cli-idk2
@@ -2433,7 +2433,7 @@ have shipped. A conflict between B and C is still a person's to resolve, at the 
   first. So each run's own tick records its result branches' tips once it has finished (`tips` on its
   record: what `wf decide` offers to ship), and when a branch is gone, git is asked whether that commit is on
   the base. D can wait on B and C while B is merged and cleaned up and C is still in review: once C ships,
-  D starts. A branch dropped unmerged reads `waiting on a-1x2y (wf/a-1x2y/implement gone)`, and so does one
+  D starts. A branch dropped unmerged reads `waiting on a-1x2y (wf/a-1x2y/run gone)`, and so does one
   deleted before any tick saw its run finish (`wf up` not running). Either is a person's to resolve.
 
 `wf ls` shows the wait on each root, where `waiting` would be: `waiting on a-1x2y`, naming every parent
@@ -3593,7 +3593,7 @@ What is under `WF_ROOT` (`~/.agent-workflows` by default), and what `wf rm` does
 | `runs/<id>/work/<step>/given/` | a folder step's copy of the run's inputs and of the folders it waits on | the tick, as it makes the folder | removed with the run |
 | `runs/<id>/artifacts/<step>/` | a step's files | the step; the tick collects into it | removed |
 | `checks/<id>-<step>[-try<n>]-check.stderr`, `.stdout` | a check's streams, from before the runtime kept them | the check | removed |
-| `worktrees/<id>/<step>/` | a step's worktree, with its own `node_modules` | the tick (`git worktree add`) | committed, then removed through git |
+| `worktrees/<id>/run/` (`worktrees/<id>/<step>/` for a fork) | the run's line of work, or a fork's, with its own `node_modules` | the tick (`git worktree add`) | committed, then removed through git |
 | `tick-stats.json` | what the last pass cost, phase by phase, the tick's to write (`src/meter/meter.ts`): what `wf up --stats`, the api and the Factory's header read |
 | `tick-recent.json` | the last 150 passes, oldest first, each its time, phases and what it saw (`RecentPass`): what `wf passes` and the api's `GET /api/passes` read | the tick (`recordRecentPass`), through a hidden file and a rename, the oldest dropped past 150 | not touched |
 | `feed.jsonl` | what the tick judged of each run and step, a line each time it changed, and a line each time a daemon takes the store (`nemia watch`) | the daemon: its tick, and `up`'s start | kept: the run's lines stay, and the next pass writes its one `removed` |

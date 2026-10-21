@@ -67,9 +67,26 @@ export type SpawnRequest = {
  * it as they are. Harness vocabulary: carried on the task, read by a runner, never by `decide`. A
  * `url` needs its `type`, because Claude Code loads nothing from one without it.
  */
-export type McpServer =
-  | { type?: 'stdio'; command: string; args?: string[]; env?: Record<string, string> }
-  | { type: 'http' | 'sse'; url: string; headers?: Record<string, string> };
+export type McpServer = LocalMcpServer | RemoteMcpServer;
+
+/** A server the harness starts beside the session, as a `.mcp.json` entry gives it. */
+export type LocalMcpServer = { type?: 'stdio'; command: string; args?: string[]; env?: Record<string, string> };
+
+/**
+ * A server the harness connects to, as a `.mcp.json` entry gives it, with the facts of an OAuth client where one signs in.
+ *
+ * `oauth` is **not declared** on the SDK's `McpHttpServerConfig` (`sdk.d.ts:1083-1098`): it was measured working at SDK 0.3.270 —
+ * a server handed inline with it reported `needs-auth`, signed in, and a second session with the same config found the sign-in — and
+ * it rides the untyped seam, so an SDK that renames or validates it breaks the sign-in with nothing failing the typecheck. It carries
+ * no secret: Claude Code reads the client secret from its own store alone, and `oauth` sits outside the sign-in key's hash
+ * (`name|sha256({type,url,headers})[:16]`), which is why changing it asks for no new sign-in.
+ */
+export type RemoteMcpServer = {
+  type: 'http' | 'sse';
+  url: string;
+  headers?: Record<string, string>;
+  oauth?: { clientId: string; callbackPort?: number };
+};
 
 /**
  * One thing that happened in a session's conversation, in the same shape for every harness.

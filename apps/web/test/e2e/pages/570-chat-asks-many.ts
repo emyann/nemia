@@ -92,6 +92,13 @@ export default {
         'the one write carries every answer, and her chat draws them on the ask',
       );
       await expectCount(panel.locator('[data-chat-qtab]'), 0, 'which asks nothing more of the person');
+      const asked = panel.locator('[data-chat-asked]');
+      for (const [i, question] of ASK.questions.entries())
+        await expectVisible(
+          asked.locator('dt', { hasText: question.question }),
+          `the question the tabs asked is kept where the answer is, ${i + 1} of ${ASK.questions.length}: the chat is a history`,
+        );
+      await expectCount(asked.locator('dd'), ASK.questions.length, 'each with the answer the person gave it');
     } finally {
       back();
     }

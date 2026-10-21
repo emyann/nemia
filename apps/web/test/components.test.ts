@@ -7391,4 +7391,20 @@ test('her several questions are drawn as the flow: a tab each and Submit, number
   assert.match(html, /data-chat-own/);
   assert.match(html, /data-chat-of[^>]*>1 OF 2/);
   assert.doesNotMatch(html, /data-chat-submit/, 'the Submit tab is reached, never drawn beside the question in hand');
+  assert.doesNotMatch(html, /data-chat-asked/, 'while it waits, the tabs say the questions: nothing is said twice');
+});
+
+test('her several questions answered keep each question beside the answer it was given, the tabs that asked them gone', () => {
+  const questions = [askQuestion(), { ...askQuestion(), question: 'And the values?', header: 'Values' }];
+  const chose = { [askQuestion().question]: 'Cut it on read', 'And the values?': 'Hand them' };
+  const html = renderToStaticMarkup(createElement(ChatAskMany, { ask: askEvent('question', questions, chose), onAnswer: () => undefined }));
+  assert.doesNotMatch(html, /data-chat-qtab/, 'an answered ask asks nothing more');
+  assert.match(html, /data-chat-asked/);
+  for (const [question, answer] of Object.entries(chose))
+    assert.match(
+      html,
+      new RegExp(`${question.replace(/[?]/g, '\\?')}</dt><dd[^>]*>${answer}`),
+      'what she asked stands over what the person answered it, so the history reads as a history',
+    );
+  assert.match(html, new RegExp(`You chose: Cut it on read · Hand them · ${timeOfDay(CHOSE_AT)}`));
 });

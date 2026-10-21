@@ -5,7 +5,9 @@
  * off until every question has one.
  *
  * Nothing is filed until Submit: the answer is one write of every question's at once, as the call she holds open takes it. Her words
- * over the flow are no bubble of their own: an ask's words are its first question's, which the tab in hand says itself.
+ * over the flow are no bubble of their own: an ask's words are its first question's, which the tab in hand says itself. Answered, the
+ * tabs go and the questions with them, so what was asked is drawn beside what was answered (`Asked`): the chat is a history, and an
+ * answer alone says nothing of the question it answered.
  * `drawnAsk` says when an ask is drawn this way.
  */
 import { useState } from 'react';
@@ -155,6 +157,25 @@ function Recap({ ask, picks, onBack, onSubmit }: { ask: Ask; picks: Picks; onBac
   );
 }
 
+/**
+ * Every question of an answered ask beside the answer the person gave it: what the tabs showed while it waited, kept where the chat
+ * keeps the answer, so a person reading their own history reads the questions too. Nothing at all while it waits: the tabs say them.
+ */
+function Asked({ ask }: { ask: Ask }) {
+  const chose = ask.chose;
+  if (chose === undefined) return null;
+  return (
+    <dl data-chat-asked className="m-0 flex flex-col gap-2 bg-surface-container-highest px-3.5 py-3">
+      {ask.questions.map((question) => (
+        <div key={question.question} className="flex flex-col gap-0.5">
+          <dt className="text-body-small text-on-surface-variant">{question.question}</dt>
+          <dd className="m-0 text-body-medium">{chose[question.question] ?? 'Not answered'}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 /** Board 7b: her questions one tab at a time, then the recap, and one write of every answer at Submit. */
 export function ChatAskMany({ ask, onAnswer }: { ask: Ask; onAnswer: (id: string, picks: readonly AskPick[]) => void }) {
   const last = ask.questions.length;
@@ -197,6 +218,7 @@ export function ChatAskMany({ ask, onAnswer }: { ask: Ask; onAnswer: (id: string
           )}
         </>
       )}
+      <Asked ask={ask} />
       <AskChose ask={ask} />
     </div>
   );

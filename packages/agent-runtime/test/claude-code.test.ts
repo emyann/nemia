@@ -48,6 +48,10 @@ const BG_ID = '5e551011-0000-4000-8000-00000000000b';
  * `type` last, as Claude Code's does. `--bg` records its arguments, the same two variables in `bg-env`, and the file `sees` as it
  * finds it in `bg-saw` (`absent` when there is none); `agents` lists what `agents.json` holds, a line in `agents-calls` each time;
  * `stop` and `rm` are recorded in order.
+ *
+ * It is the stand-in Claude Code (`STAND_IN`) that the job road runs, not this one; `fake` sets the stand-in's plan and folder on
+ * this process's environment, which reaches it because a job's own process lays the engine's environment under `Options.env`
+ * (`attachedOptions`). `JOB_ID` is the session id it answers under, which `CLAUDE_INIT_START` reads off its first line.
  */
 const fake = (sees?: string, plan: object = {}) => {
   const dir = tmp('bin');
@@ -84,11 +88,6 @@ const fake = (sees?: string, plan: object = {}) => {
   );
   const prev = process.env.PATH;
   process.env.PATH = `${dir}:${prev}`;
-  /**
-   * The stand-in Claude Code's plan and folder, on this process's environment: a job's own process lays the engine's environment
-   * under `Options.env` (`attachedOptions`), so what is set here reaches the stand-in the SDK runs. `JOB_ID` is the session id it
-   * answers under, which `CLAUDE_INIT_START` reads off its first line.
-   */
   const prevStandIn = { dir: process.env.STANDIN_DIR, plan: process.env.STANDIN_PLAN };
   process.env.STANDIN_DIR = dir;
   process.env.STANDIN_PLAN = JSON.stringify({ id: JOB_ID, cost: 0.03, output: { outcome: 'done' }, ...plan });
@@ -118,7 +117,10 @@ const fake = (sees?: string, plan: object = {}) => {
     end: () => fs.writeFileSync(path.join(dir, 'end'), ''),
     restore: () => {
       process.env.PATH = prev;
-      for (const [key, value] of [['STANDIN_DIR', prevStandIn.dir], ['STANDIN_PLAN', prevStandIn.plan]] as const) {
+      for (const [key, value] of [
+        ['STANDIN_DIR', prevStandIn.dir],
+        ['STANDIN_PLAN', prevStandIn.plan],
+      ] as const) {
         if (value === undefined) delete process.env[key];
         else process.env[key] = value;
       }
@@ -756,12 +758,15 @@ test("Claude Code's own flags (`config.claude`) are handed over as written, afte
   );
   const { appendSystemPromptFile: _, ...rest } = claude;
   const flagged = attachedOptions({ name: 'ae/t/1', brief: 'b', cwd: '/r', config: { tools: ['Read', 'Skill'], claude: rest } });
-  assert.deepEqual(flagged.plugins?.map((p) => p.path), [path.resolve('/r', '/a/nemia-x'), path.resolve('/r', '/a/nemia-y')]);
+  assert.deepEqual(
+    flagged.plugins?.map((p) => p.path),
+    [path.resolve('/r', '/a/nemia-x'), path.resolve('/r', '/a/nemia-y')],
+  );
   assert.deepEqual(flagged.settings, { outputStyle: 'nemia-x:no-coding', autoMemoryEnabled: false });
   assert.equal(
     flagged.extraArgs?.bare,
     null,
-    "a job: what the SDK has no option for is on `extraArgs`, the rest on its own option — held to this argv fact for fact by `attached-options.test.ts`",
+    'a job: what the SDK has no option for is on `extraArgs`, the rest on its own option — held to this argv fact for fact by `attached-options.test.ts`',
   );
 });
 
@@ -825,11 +830,7 @@ test('a mount is `--add-dir` and its path, ended by a flag, a read-only one an e
   const denied = (await spawnArgvs({ mounts: [{ path: '/srv/notes', readOnly: true }] })).map(
     ([, args]) => args[args.indexOf('--disallowedTools') + 1],
   );
-  assert.deepEqual(
-    denied,
-    ['Edit(//srv/notes/**)', 'Edit(//srv/notes/**)'],
-    'a read-only mount alone is a deny list of its own',
-  );
+  assert.deepEqual(denied, ['Edit(//srv/notes/**)', 'Edit(//srv/notes/**)'], 'a read-only mount alone is a deny list of its own');
 });
 
 test('a task with no mounts is given what it was given before mounts existed, on a job, on claude-detached and on a background session', async () => {
@@ -914,61 +915,55 @@ test("the mount guard and the vocabulary door's `unruledIn` refuse the same path
   }
 });
 
-test(
-  "a job reads its checkout's shared settings and neither the operator's nor a `settings.local.json` — once, on a job and on `claude-detached`; a background session is not given it",
-  async () => {
-    const { claudeDetached } = await import('../src/harness/claude/code.ts');
-    const sources = (args: string[]) => args.flatMap((a, i) => (a === '--setting-sources' ? [args[i + 1]] : []));
-    const f = fake();
-    let bg: string[];
-    try {
-      await Effect.runPromise(opsIn(tmp('root')).spawn({ name: 'ae/b/1', brief: 'go', cwd: f.dir, config: { background: true } }));
-      bg = f.read('bg-args')!;
-    } finally {
-      f.restore();
-    }
-    assert.deepEqual(sources(claudeDetached.command({ name: 'ae/t/1', brief: 'b', cwd: '/r' }).args), ['project'], 'claude-detached');
-    assert.deepEqual(
-      attachedOptions({ name: 'ae/t/1', brief: 'b', cwd: '/r', config: { claude: { settings: '{}' } } }).settingSources,
-      ['project'],
-      "a job, on the SDK's own option, beside the caller's own settings",
-    );
-    assert.deepEqual(sources(bg), [], 'a background session reads what it read before');
-  },
-);
+test("a job reads its checkout's shared settings and neither the operator's nor a `settings.local.json` — once, on a job and on `claude-detached`; a background session is not given it", async () => {
+  const { claudeDetached } = await import('../src/harness/claude/code.ts');
+  const sources = (args: string[]) => args.flatMap((a, i) => (a === '--setting-sources' ? [args[i + 1]] : []));
+  const f = fake();
+  let bg: string[];
+  try {
+    await Effect.runPromise(opsIn(tmp('root')).spawn({ name: 'ae/b/1', brief: 'go', cwd: f.dir, config: { background: true } }));
+    bg = f.read('bg-args')!;
+  } finally {
+    f.restore();
+  }
+  assert.deepEqual(sources(claudeDetached.command({ name: 'ae/t/1', brief: 'b', cwd: '/r' }).args), ['project'], 'claude-detached');
+  assert.deepEqual(
+    attachedOptions({ name: 'ae/t/1', brief: 'b', cwd: '/r', config: { claude: { settings: '{}' } } }).settingSources,
+    ['project'],
+    "a job, on the SDK's own option, beside the caller's own settings",
+  );
+  assert.deepEqual(sources(bg), [], 'a background session reads what it read before');
+});
 
 const JOB_ENV_KEYS = ['CLAUDE_CODE_DISABLE_BACKGROUND_TASKS', 'BASH_DEFAULT_TIMEOUT_MS'] as const;
 
-test(
-  "REFUSED at shipped defaults: a job runs with background tasks off and its calls' default timeout at the most one may take, on a job and on `claude-detached`; a background session is left as it is",
-  async () => {
-    const { claudeDetached } = await import('../src/harness/claude/code.ts');
-    const saved = JOB_ENV_KEYS.map((key) => [key, process.env[key]] as const);
-    for (const key of JOB_ENV_KEYS) delete process.env[key];
-    const f = fake();
-    let job: Record<string, string | undefined> | undefined;
-    let bg: string[] | undefined;
-    try {
-      job = attachedOptions({ name: 'ae/j/1', brief: 'go', cwd: f.dir }).env;
-      await Effect.runPromise(opsIn(tmp('root')).spawn({ name: 'ae/b/1', brief: 'go', cwd: f.dir, config: { background: true } }));
-      bg = f.read('bg-env');
-    } finally {
-      f.restore();
-      for (const [key, value] of saved) if (value !== undefined) process.env[key] = value;
-    }
-    assert.deepEqual(
-      JOB_ENV_KEYS.map((key) => job?.[key]),
-      ['1', '600000'],
-      "the environment a job's own process lays on the session it runs",
-    );
-    assert.deepEqual(
-      claudeDetached.command({ name: 'ae/t/1', brief: 'b', cwd: '/r' }).env,
-      { CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1', BASH_DEFAULT_TIMEOUT_MS: '600000' },
-      'claude-detached',
-    );
-    assert.deepEqual(bg, ['unset unset'], 'a background session runs as it did before');
-  },
-);
+test("REFUSED at shipped defaults: a job runs with background tasks off and its calls' default timeout at the most one may take, on a job and on `claude-detached`; a background session is left as it is", async () => {
+  const { claudeDetached } = await import('../src/harness/claude/code.ts');
+  const saved = JOB_ENV_KEYS.map((key) => [key, process.env[key]] as const);
+  for (const key of JOB_ENV_KEYS) delete process.env[key];
+  const f = fake();
+  let job: Record<string, string | undefined> | undefined;
+  let bg: string[] | undefined;
+  try {
+    job = attachedOptions({ name: 'ae/j/1', brief: 'go', cwd: f.dir }).env;
+    await Effect.runPromise(opsIn(tmp('root')).spawn({ name: 'ae/b/1', brief: 'go', cwd: f.dir, config: { background: true } }));
+    bg = f.read('bg-env');
+  } finally {
+    f.restore();
+    for (const [key, value] of saved) if (value !== undefined) process.env[key] = value;
+  }
+  assert.deepEqual(
+    JOB_ENV_KEYS.map((key) => job?.[key]),
+    ['1', '600000'],
+    "the environment a job's own process lays on the session it runs",
+  );
+  assert.deepEqual(
+    claudeDetached.command({ name: 'ae/t/1', brief: 'b', cwd: '/r' }).env,
+    { CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1', BASH_DEFAULT_TIMEOUT_MS: '600000' },
+    'claude-detached',
+  );
+  assert.deepEqual(bg, ['unset unset'], 'a background session runs as it did before');
+});
 
 test('a bridge asked in `config.claude` reaches a background session as --remote-control, first of the bag and directly before the mode when it is written first', async () => {
   const f = fake();

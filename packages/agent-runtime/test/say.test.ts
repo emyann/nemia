@@ -360,6 +360,20 @@ test(
   },
 );
 
+/**
+ * The run of `runFile` written as it stands when its worker has closed the session's input and its process has not exited yet: a
+ * job on the SDK leaves its result and ends with it, so there is no window to wait for. The rule under test is the worker's —
+ * that a word said after the harness's closing line is refused rather than appended for nobody — and it is read off this file.
+ *
+ * @returns the file as it was, to write back once the rule has been read
+ */
+const withInputClosed = (runFile: string): string => {
+  const was = fs.readFileSync(runFile, 'utf8');
+  const run = JSON.parse(was) as Record<string, unknown>;
+  fs.writeFileSync(runFile, JSON.stringify({ ...run, state: 'working', inputClosed: true, exitCode: undefined }));
+  return was;
+};
+
 test(
   'a job that has given its result reads nothing more: words said before it exits are rejected, not journalled — and once it has settled, refused',
   WAITED,
@@ -380,13 +394,7 @@ test(
     );
     assert.equal(told().length, 2, 'and the only ones its session read');
 
-    /**
-     * A run whose input its worker closed and whose process has not exited yet: a job on the SDK leaves its result and ends with
-     * it, so this state is written here rather than waited for — the rule under test is the worker's, that a word said after the
-     * closing line is refused rather than appended for nobody.
-     */
-    const was = JSON.parse(fs.readFileSync(runFile, 'utf8')) as Record<string, unknown>;
-    fs.writeFileSync(runFile, JSON.stringify({ ...was, state: 'working', inputClosed: true, exitCode: undefined }));
+    const was = withInputClosed(runFile);
     const before = fs.readFileSync(workerFile('.inbox.jsonl'), 'utf8');
     await assert.rejects(
       Effect.runPromise(engine.say(id, 'one more thing')),
@@ -404,7 +412,7 @@ test(
     );
     assert.equal(fs.readFileSync(workerFile('.inbox.jsonl'), 'utf8'), before, 'nothing appended');
     assert.equal(before.split('\n').filter(Boolean).length, 1);
-    fs.writeFileSync(runFile, JSON.stringify(was));
+    fs.writeFileSync(runFile, was);
 
     await Effect.runPromise(engine.stop(id));
     for (let i = 0; i < 20 && !(await Effect.runPromise(engine.view(id))).state.settled; i++) {

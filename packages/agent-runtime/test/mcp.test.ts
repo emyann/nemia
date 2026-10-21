@@ -116,7 +116,6 @@ const jobServers = (cwd: string, config: TaskSpec['config'] = {}) => {
   };
 };
 
-
 const MCP = {
   browser: { command: 'npx', args: ['-y', '@playwright/mcp'], env: { HEADLESS: '1' } },
   docs: { type: 'http', url: 'https://docs.example/mcp', headers: { Authorization: 'Bearer t' } },

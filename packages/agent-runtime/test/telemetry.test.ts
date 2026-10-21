@@ -383,7 +383,7 @@ test("a job of an engine given no collector is handed no telemetry, the engine's
   assert.deepEqual(posts, []);
 });
 
-test("a job's own env reaches its claude, laid under the job's: a task cannot turn background tasks back on", async (t) => {
+test("a job's own env reaches its claude, laid under the job's: a task cannot turn background tasks back on", async () => {
   const claude = standInClaude();
   const files = scratch('ae-telemetry-files-');
   const engine = builtEngine(EngineService.layer({ root: scratch('ae-telemetry-'), harnesses: { job: claude.harness } }));

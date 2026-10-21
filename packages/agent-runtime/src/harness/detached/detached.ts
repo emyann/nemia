@@ -24,7 +24,6 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import type { Denial, Sighting, Usage } from '../../core/index.ts';
 import { RunnerError, type McpServer, type RunnerOps, type SessionKept, type SpawnRequest, type TranscriptEvent } from '../seam.ts';
-import { sessionMcp, writeMcpConfig } from '../mcp.ts';
 import { forgetFiles, keptOf } from '../forget.ts';
 import { withoutTelemetry } from '../telemetry.ts';
 import { readTranscript } from '../transcript.ts';
@@ -36,6 +35,7 @@ import { outputIn, saidFilesAt, saidWhen, type SaidMemo } from './said.ts';
 import { compactOps } from './compact.ts';
 import { lookedFor } from './looked.ts';
 import { detachedStateOf, firstRunFile, leased, runFileIn, type Carried, type Run, type RunFile } from './run-file.ts';
+import { spawnFiles, spawnInput } from './spawn-files.ts';
 
 export { detachedStateOf, STALE_MS } from './run-file.ts';
 import { followOf, type PartialMark } from './follow.ts';
@@ -254,14 +254,6 @@ const isDirectory = (p: string) => {
     return false;
   }
 };
-const sizeOf = (p: string) => {
-  try {
-    return fs.statSync(p).size;
-  } catch {
-    return 0;
-  }
-};
-
 /**
  * What the worker is given to write on a harness's stdin: the brief's line first; then each line of the inbox from `from`
  * on — the inbox's size when the run was spawned, so a run spawned again under a name finds no words said to the one
@@ -676,16 +668,15 @@ const startWorker = (file: string, cwd: string): void => {
  *      refuses one; this is for a journal written otherwise, or by hand, and a caller of the runner itself.
  *   2. Refuses a `cwd` that is not a directory, because `spawn` does not throw for it: the child emits the error later,
  *      and, unheard, that event kills the process that launched the worker — the engine.
- *   3. Clears the previous attempt's closeout, output and its streams, what was read of its output, its spawn request and stop: a re-spawn of the same
- *      attempt must not find the previous one's answer waiting for it, in its file or in the output a spec reads one from,
- *      nor a stop asked of it, which its worker would read as asked of this one and start nothing.
- *   4. Writes the closeout's schema, and writes or clears the MCP config: a re-spawn is given the servers its task names,
- *      no more. For a spec with `needsRequest`, writes the spawn request and the `io` computed for it, and hands `command` its path. The inbox is never written or cleared: it is the person's, and a run spawned again under the name starts
- *      past what was said to the one before it (`RunInput.from`).
- *   5. Writes the run file before the launch, with no pid: the run is intended, and a crash here leaves a file that says
+ *   3. Clears what the previous attempt under the name left and writes the files the run is given, taking the `io` they say
+ *      (`spawnFiles`): a re-spawn of the same attempt must not find the previous one's answer waiting for it, nor a stop
+ *      asked of it; it is given the closeout's schema, the servers its task names and no more, and, for a spec with
+ *      `needsRequest`, the spawn request itself. The inbox is never written or cleared: it is the person's, and a run
+ *      spawned again under the name starts past what was said to the one before it (`RunInput.from`).
+ *   4. Writes the run file before the launch, with no pid: the run is intended, and a crash here leaves a file that says
  *      so. The worker overwrites it with its own pid the moment it starts, keeping what the spawn wrote. A resumed run of a
  *      spec with `resumeCostCarried` carries its parent's totals on it (`carried`), found among the run files once, here.
- *   6. Launches the worker detached, stdio ignored, unref'd: it outlives this process by design. Its `error` event is
+ *   5. Launches the worker detached, stdio ignored, unref'd: it outlives this process by design. Its `error` event is
  *      heard, so a launch that fails after `spawn` returns never takes the engine down with it; the run file it leaves
  *      says working with no pid, and the lease calls that dead.
  *
@@ -802,37 +793,19 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
           if (!isDirectory(r.cwd)) throw new Error(`cwd ${r.cwd} is not a directory`);
           fs.mkdirSync(dir, { recursive: true });
           const streams = { stdout: streamFileOf(dir, r.name, 'stdout'), stderr: streamFileOf(dir, r.name, 'stderr') };
-          const cleared = [closeoutFile(r.name), logFile(r.name), saidFiles(r.name).kept, stopFile(r.name), requestFile(r.name)];
-          for (const f of [...cleared, ...Object.values(streams)]) {
-            fs.rmSync(f, { force: true });
-          }
           outputs.delete(r.name);
-          let io: HarnessIO = {};
-          if (r.closeoutSchema) {
-            fs.writeFileSync(schemaFile(r.name), JSON.stringify(r.closeoutSchema));
-            io = { closeoutSchemaFile: schemaFile(r.name), closeoutFile: closeoutFile(r.name) };
-          }
-          const mcp = sessionMcp(r.cwd, r.config);
-          /**
-           * A spec that reads the spawn request itself is handed its servers in it, and names no file: its own config under the
-           * name is cleared all the same, so a re-spawn leaves no servers behind. `sessionMcp` is read either way, since it is
-           * what refuses a `checkoutMcp` name the checkout does not declare, before anything runs.
-           */
-          const mcpConfigFile = writeMcpConfig(mcpFile(r.name), spec.needsRequest ? undefined : mcp);
-          if (mcpConfigFile) io = { ...io, mcpConfigFile };
-          io = { ...io, ...spec.prepare?.(r) };
-          if (spec.needsRequest) {
-            /** Owner-only: the request carries the task's `config`, whose `mcp` may hold an `env` or a header that is a secret. */
-            fs.writeFileSync(requestFile(r.name), JSON.stringify({ request: r, io }), { mode: 0o600 });
-            io = { ...io, requestFile: requestFile(r.name) };
-          }
+          const io = spawnFiles(spec, r, {
+            schema: schemaFile(r.name),
+            closeout: closeoutFile(r.name),
+            mcp: mcpFile(r.name),
+            request: requestFile(r.name),
+            log: logFile(r.name),
+            kept: saidFiles(r.name).kept,
+            stop: stopFile(r.name),
+            streams,
+          });
           const { cmd, args, env } = spec.command(r, io);
-          const input: RunInput | undefined = spec.input && {
-            first: spec.input.line(r.brief),
-            inbox: inboxFile(r.name),
-            from: sizeOf(inboxFile(r.name)),
-            closesOn: spec.input.closesOn,
-          };
+          const input = spawnInput(spec, r, inboxFile(r.name));
           const plan = {
             name: r.name,
             cmd,

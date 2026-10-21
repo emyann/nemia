@@ -96,9 +96,19 @@ test('an engine with no holder runs a Claude Code job to its end on the Agent SD
       Effect.catchCause(() => Effect.void),
     ),
   );
-  await until(t, () => seen.includes('Half '), () => `the text so far: ${seen.join('|')}`, { everyMs: 50 });
+  await until(
+    t,
+    () => seen.includes('Half '),
+    () => `the text so far: ${seen.join('|')}`,
+    { everyMs: 50 },
+  );
   fs.writeFileSync(path.join(dir, 'more'), '');
-  await until(t, () => seen.includes('a thought'), () => `and the rest of it: ${seen.join('|')}`, { everyMs: 50 });
+  await until(
+    t,
+    () => seen.includes('a thought'),
+    () => `and the rest of it: ${seen.join('|')}`,
+    { everyMs: 50 },
+  );
 
   await Effect.runPromise(engine.say(taskId, 'and again'));
   await until(t, () => wrote(dir, 'said.jsonl').length === 2, 'the words reached the session mid-turn', { everyMs: 50 });

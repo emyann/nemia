@@ -979,7 +979,7 @@ const refusedWith = (read: () => HarnessOutput): string => {
 /** The refusal of a Claude Code line, as `printedLinesOf` words it: the line, its kind, its field and what is there, and the fix. */
 const printedRefusal = (line: number, kind: string, field: string, found: string) =>
   `line ${line} of the session's output is ${kind} line whose \`${field}\` ${found}. An output that holds it is refused, never read` +
-  ' as saying nothing: run a Claude Code whose output this runtime reads — the lines `claude -p` prints, which a job\'s own' +
+  " as saying nothing: run a Claude Code whose output this runtime reads — the lines `claude -p` prints, which a job's own" +
   " process prints from the Agent SDK's messages — or a runtime whose schema for the line in" +
   ' `PRINTED` (`harness/claude/print.ts`) reads this one.';
 
@@ -1419,8 +1419,12 @@ test('a spec that needs the spawn request is written one, and a spec that does n
   await Effect.runPromise(detachedOps(spy(true), dir).spawn(request));
   const at = given[0]?.requestFile;
   assert.equal(at, path.join(dir, 'runs', 'sh', 'ae_t_req_1.request.json'), 'the path it was given is the run’s own file');
-  const wrote = JSON.parse(fs.readFileSync(at!, 'utf8')) as { request: typeof request; io: HarnessIO };
-  assert.deepEqual(wrote.request, { ...request, cwd: path.resolve(dir) }, 'the spawn request whole, its cwd resolved as the runner resolved it');
+  const wrote = JSON.parse(fs.readFileSync(at, 'utf8')) as { request: typeof request; io: HarnessIO };
+  assert.deepEqual(
+    wrote.request,
+    { ...request, cwd: path.resolve(dir) },
+    'the spawn request whole, its cwd resolved as the runner resolved it',
+  );
   assert.equal(wrote.io.trustedDirs?.[0], '/somewhere', 'and the io the runner computed, the spec’s own `prepare` in it');
   assert.ok(wrote.io.closeoutFile, 'and what the runner chose itself');
   assert.equal(wrote.io.requestFile, undefined, 'the file does not name itself');

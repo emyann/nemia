@@ -91,7 +91,8 @@ const inputOf = () => {
 
 /** The spawn request the runner wrote at `at`, whole. */
 const requestAt = (at: string | undefined): SpawnRequest => {
-  if (!at) throw new Refused('no spawn request file was given. The runner writes one for a spec with `needsRequest` and names it on the argv.');
+  if (!at)
+    throw new Refused('no spawn request file was given. The runner writes one for a spec with `needsRequest` and names it on the argv.');
   try {
     return (JSON.parse(fs.readFileSync(at, 'utf8')) as { request: SpawnRequest }).request;
   } catch (e) {

@@ -86,6 +86,7 @@ nemia-untrusted
 nemia-turn-on
 nemia
 factory-levels
+factory-servers
 bridge
 unread-session
 decide-unread

@@ -115,6 +115,7 @@ export const capabilities = (extra: Partial<Capabilities> = {}): Capabilities =>
       error: null,
       notAsked: null,
       checkedAt: '2026-09-30T05:00:00.000Z',
+      factoryState: null,
     },
     {
       name: 'remote',
@@ -128,6 +129,7 @@ export const capabilities = (extra: Partial<Capabilities> = {}): Capabilities =>
       error: null,
       notAsked: 'not enabled',
       checkedAt: null,
+      factoryState: 'needs-auth',
     },
   ],
   denied: [{ rule: 'Bash(git push *)', source: '.claude/settings.json' }],

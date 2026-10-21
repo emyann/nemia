@@ -63,12 +63,15 @@ export type FactoryServersRead = ServersListing & { readonly shipped: readonly S
 const ADD_PUT_SHAPE =
   '`{ "url": "https://…", "transport"?: "http" | "sse", "header"?: ["<name>=<value>", …], "clientId"?: "<id>", "callbackPort"?: "<port>" }`';
 
+/** The server a factory's server route names, off the path: the last segment of `/api/factories/<factory>/servers/<server>`. */
+const serverOf = (at: Named): string => at.path.split('/').pop() ?? '';
+
 /** The route of a factory's server `at` names, as a refusal says it: `PUT /api/factories/<name>/servers/<server>`. */
-const serverRoute = ({ method, factory, server }: Named): string => `${method} /api/factories/${factory}/servers/${server}`;
+const serverRoute = (at: Named): string => `${at.method} /api/factories/${at.factory}/servers/${serverOf(at)}`;
 
 /** A name in a server's route that is no factory's or no server's, in the package's words, before anything is read. */
 const serverNamed = (at: Named): string | null => {
-  const wrong = factoryNameRefusal(at.factory) ?? serverNameRefusal(at.server);
+  const wrong = factoryNameRefusal(at.factory) ?? serverNameRefusal(serverOf(at));
   return wrong === undefined ? null : `${serverRoute(at)}: ${wrong}`;
 };
 
@@ -131,3 +134,9 @@ export const factoryServers = new Hono<ApiEnv>().get('/api/factories/:factory/se
     return c.json({ ...listing, shipped: shippedServers() } satisfies FactoryServersRead);
   }),
 );
+
+/** The words the two writing server routes are refused in, by the verb each is served as on the CLI (`WORDS`). */
+export const FACTORY_SERVER_WORDS = {
+  'factory server add': FACTORY_SERVER_ADD_WORDS,
+  'factory server rm': FACTORY_SERVER_RM_WORDS,
+};

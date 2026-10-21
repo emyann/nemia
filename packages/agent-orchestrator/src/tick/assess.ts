@@ -3,6 +3,7 @@
  * whether the run is finished and what stopped it (`stoppedOnWord`). Pure; the tick acts on it, and the verbs and the screens ask it.
  */
 import { retriesDue, type Retry, type RetryAsk } from '../retry/index.ts';
+import type { RetryBriefing } from '../brief/index.ts';
 import {
   heldByCheckout,
   roundSpans,
@@ -15,8 +16,9 @@ import {
 } from '../status/status.ts';
 import { toDecide, type ToDecide } from '../ending/ending.ts';
 import type { Workflow } from '../step/step.ts';
+import { isRemoteHarness } from '../harness/harness.ts';
 import { satisfiesAfter, stopsFollowers, type CloseoutAsked, type Run, type StepStatus, type TaskPhase } from '../record/record.ts';
-import type { Closeout } from '../closeout/index.ts';
+import { envelopeRefusals, type Closeout } from '../closeout/index.ts';
 import type { Verdict } from '../check/check.ts';
 import type { CheckoutHold } from '../cap/cap.ts';
 import { roundsDue } from '../round/round.ts';
@@ -171,3 +173,18 @@ function stoppedOnWord(each: ReadonlyArray<{ status: StepStatus; own: StepStatus
   if (stops.some((s) => [s.status, s.own].some((w) => w === 'failed' || w === 'stopped' || w === 'failed (check)'))) return 'failed';
   return stops.length && stops.every((s) => s.status === 'awaiting approval') ? 'awaiting approval' : 'blocked';
 }
+
+/** What the run refused of the last try's closeout's envelope (`envelopeRefusals`), as its next try is told it; nothing for none. */
+export const refusedTold = (said: Closeout | undefined): Pick<RetryBriefing, 'refused'> => {
+  const refused = said ? envelopeRefusals(said) : [];
+  return refused.length ? { refused } : {};
+};
+
+/**
+ * What a filing says of how its session runs — the harness's arguments, a session to continue, a hold and a closing statement's schema —
+ * for a step on a local harness, and nothing for one on a remote A2A agent (`harness: a2a:<name>`), which runs as its operator configured
+ * it. The runtime refuses a `config` with any key in it, one whose value is undefined included (`remoteRefuses`), so the fields are left
+ * out, not emptied; and a try of a remote step is a new Task, never a turn of the last one.
+ */
+export const localFields = <T extends object>(step: Workflow, fields: () => T): T | Record<string, never> =>
+  isRemoteHarness(step.harness) ? {} : fields();

@@ -13,6 +13,52 @@ import type { HarnessArgs } from './args.ts';
 const isMap = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const isStringMap = (v: unknown) => isMap(v) && Object.values(v).every((s) => typeof s === 'string');
 
+/** Why `mcp.<name>`, a server with a `command`, is not one a harness can start — or `undefined`. */
+const localRefuses = (name: string, server: Record<string, unknown>): string | undefined => {
+  const at = `\`mcp.${name}\``;
+  if (typeof server.command !== 'string' || !server.command)
+    return `\`mcp.${name}.command\` is not a program to run. Give it as a string, like "npx".`;
+  if (server.type !== undefined && server.type !== 'stdio')
+    return `${at} has a \`command\` and \`type: ${JSON.stringify(server.type)}\`. Leave \`type\` out, or give "stdio".`;
+  if (server.args !== undefined && !(Array.isArray(server.args) && server.args.every((a) => typeof a === 'string'))) {
+    return `\`mcp.${name}.args\` is not a list of strings. Give one argument per entry, like ["-y", "@playwright/mcp"].`;
+  }
+  if (server.env !== undefined && !isStringMap(server.env))
+    return `\`mcp.${name}.env\` is not a map of strings. Quote every value, like { "PORT": "3000" }.`;
+  return undefined;
+};
+
+/**
+ * Why `mcp.<name>.oauth` is not an OAuth client — or `undefined`. It holds what a sign-in needs and no secret: a task's `config` is
+ * journalled with it, and the harness reads a secret from its own store alone, so one named here is refused by name.
+ */
+const oauthRefuses = (name: string, oauth: unknown): string | undefined => {
+  if (!isMap(oauth)) return `\`mcp.${name}.oauth\` is not an OAuth client. Give it as { "clientId": "Iv23li...", "callbackPort": 8791 }.`;
+  const odd = Object.keys(oauth).find((k) => !['clientId', 'callbackPort'].includes(k));
+  if (odd) {
+    return `\`mcp.${name}.oauth\` has \`${odd}\`, which it does not take: it holds \`clientId\` and \`callbackPort\` and no secret, which the harness reads from its own store alone. Take \`${odd}\` off it.`;
+  }
+  if (typeof oauth.clientId !== 'string' || !oauth.clientId)
+    return `\`mcp.${name}.oauth\` names no client. Set \`clientId\` to the OAuth app's client id, as a string.`;
+  const port = oauth.callbackPort;
+  if (port !== undefined && !(typeof port === 'number' && Number.isSafeInteger(port) && port > 0 && port < 65536)) {
+    return `\`mcp.${name}.oauth.callbackPort\` is not a port. Give the port the OAuth app's callback is registered on, a whole number from 1 to 65535, like 8791.`;
+  }
+  return undefined;
+};
+
+/** Why `mcp.<name>`, a server with a `url`, is not one a harness can reach — or `undefined`. */
+const remoteRefuses = (name: string, server: Record<string, unknown>, at: string): string | undefined => {
+  if (typeof server.url !== 'string' || !server.url)
+    return `\`mcp.${name}.url\` is not an address. Give it as a string, like "https://example.com/mcp".`;
+  if (server.type !== 'http' && server.type !== 'sse') {
+    return `${at} has a \`url\` and ${server.type === undefined ? 'no `type`' : `\`type: ${JSON.stringify(server.type)}\``}. Give "type": "http", or "sse": the harness loads no server from a url without one.`;
+  }
+  if (server.headers !== undefined && !isStringMap(server.headers))
+    return `\`mcp.${name}.headers\` is not a map of strings. Quote every value, like { "Authorization": "Bearer ..." }.`;
+  return server.oauth === undefined ? undefined : oauthRefuses(name, server.oauth);
+};
+
 /**
  * Why a task's `mcp` is not a map of MCP servers, as a sentence that says what to write — or
  * `undefined`. Closed, like a brief's keys, because Claude Code does not refuse an entry it cannot
@@ -35,40 +81,8 @@ export const mcpRefuses = (mcp: unknown): string | undefined => {
       (k) => !(local ? ['type', 'command', 'args', 'env'] : ['type', 'url', 'headers', 'oauth']).includes(k),
     );
     if (stray) return `${at} has \`${stray}\`, which a server with a \`${local ? 'command' : 'url'}\` does not take. ${shape}`;
-    if (local) {
-      if (typeof server.command !== 'string' || !server.command)
-        return `\`mcp.${name}.command\` is not a program to run. Give it as a string, like "npx".`;
-      if (server.type !== undefined && server.type !== 'stdio')
-        return `${at} has a \`command\` and \`type: ${JSON.stringify(server.type)}\`. Leave \`type\` out, or give "stdio".`;
-      if (server.args !== undefined && !(Array.isArray(server.args) && server.args.every((a) => typeof a === 'string'))) {
-        return `\`mcp.${name}.args\` is not a list of strings. Give one argument per entry, like ["-y", "@playwright/mcp"].`;
-      }
-      if (server.env !== undefined && !isStringMap(server.env))
-        return `\`mcp.${name}.env\` is not a map of strings. Quote every value, like { "PORT": "3000" }.`;
-    } else {
-      if (typeof server.url !== 'string' || !server.url)
-        return `\`mcp.${name}.url\` is not an address. Give it as a string, like "https://example.com/mcp".`;
-      if (server.type !== 'http' && server.type !== 'sse') {
-        return `${at} has a \`url\` and ${server.type === undefined ? 'no `type`' : `\`type: ${JSON.stringify(server.type)}\``}. Give "type": "http", or "sse": Claude Code loads no server from a url without one.`;
-      }
-      if (server.headers !== undefined && !isStringMap(server.headers))
-        return `\`mcp.${name}.headers\` is not a map of strings. Quote every value, like { "Authorization": "Bearer ..." }.`;
-      const oauth = server.oauth;
-      if (oauth !== undefined) {
-        if (!isMap(oauth))
-          return `\`mcp.${name}.oauth\` is not an OAuth client. Give it as { "clientId": "Iv23li...", "callbackPort": 8791 }.`;
-        const odd = Object.keys(oauth).find((k) => !['clientId', 'callbackPort'].includes(k));
-        if (odd) {
-          return `\`mcp.${name}.oauth\` has \`${odd}\`, which it does not take: it holds \`clientId\` and \`callbackPort\` and no secret, which Claude Code reads from its own store alone. Take \`${odd}\` off it.`;
-        }
-        if (typeof oauth.clientId !== 'string' || !oauth.clientId)
-          return `\`mcp.${name}.oauth\` names no client. Set \`clientId\` to the OAuth app's client id, as a string.`;
-        const port = oauth.callbackPort;
-        if (port !== undefined && !(typeof port === 'number' && Number.isSafeInteger(port) && port > 0 && port < 65536)) {
-          return `\`mcp.${name}.oauth.callbackPort\` is not a port. Give the port the OAuth app's callback is registered on, a whole number from 1 to 65535, like 8791.`;
-        }
-      }
-    }
+    const why = local ? localRefuses(name, server) : remoteRefuses(name, server, at);
+    if (why) return why;
   }
   return undefined;
 };

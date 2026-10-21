@@ -3,6 +3,13 @@
  * model, budget and closing statement `claude -p` is given for the same task (`claudePrintFlags`), each on the SDK's own option where
  * it has one, and on `extraArgs` where it has none. Pure but for the files it reads — the checkout's `.mcp.json` and the agent's own
  * prompt — and it writes none: the servers ride `Options.mcpServers` and the prompt `Options.systemPrompt`.
+ *
+ * **`mcpServers` here is the one site that names the SDK's shape for a server, so the one that says where the shape and ours part.** A
+ * recorded server carries `oauth: { clientId, callbackPort }` (`mcpServerOf`), and `oauth` is not declared on `McpHttpServerConfig`
+ * (`sdk.d.ts:1083-1098`). It was measured working at SDK 0.3.270 — a server handed inline with it reported `needs-auth`, signed in, and
+ * a second session with the same config found the sign-in — and the cast is what lets it through, so no typecheck reads it and no test
+ * of ours can hold it. An SDK that renames the field or validates its input breaks every sign-in silently: the server simply comes back
+ * `needs-auth` for ever. Look for it in `sdk.d.ts` on each SDK bump, and say here when it is declared.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -175,14 +182,6 @@ export const attachedOptions = (r: SpawnRequest): AttachedOptions => {
     settingSources: ['project'],
     settings: windowed ? { ...settings, autoCompactWindow: window } : settings,
     systemPrompt,
-    /**
-     * The one site that names the SDK's shape for a server, so the one that says where the shape and ours part: a recorded server
-     * carries `oauth: { clientId, callbackPort }` (`mcpServerOf`), and **`oauth` is not declared on `McpHttpServerConfig`**
-     * (`sdk.d.ts:1083-1098`). It was measured working at SDK 0.3.270 — a server handed inline with it reported `needs-auth`, signed
-     * in, and a second session with the same config found the sign-in — and the cast is what lets it through, so no typecheck reads
-     * it and no test of ours can hold it. An SDK that renames the field or validates its input breaks every sign-in silently: the
-     * server simply comes back `needs-auth` for ever. Look for it in `sdk.d.ts` on each SDK bump, and say here when it is declared.
-     */
     ...(Object.keys(servers).length ? { mcpServers: servers as NonNullable<Options['mcpServers']> } : {}),
     strictMcpConfig: true,
     ...askedOf(r),

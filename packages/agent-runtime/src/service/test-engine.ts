@@ -452,6 +452,7 @@ const keptOf = (
     | 'restart'
     | 'plantMcpState'
     | 'failMcpState'
+    | 'mcpReads'
   >,
   sayRefusals: { left: number },
   sizes: Map<string, TestKeeps>,
@@ -520,6 +521,35 @@ const taskFor = (tasks: Map<string, TestTask>, id: string, before: string): Test
   return t;
 };
 
+/** The task `id` started again: the attempt it had kept as a failed earlier try, and a new attempt at work in its place. */
+const restartIn = (tasks: Map<string, TestTask>, id: string): TestTask => {
+  const t = tasks.get(id);
+  if (!t?.attempt) throw new Error(`the test engine holds no started task ${id}: settle it at work before restarting it`);
+  t.earlier.push(attemptOf(t, 'failed', {}));
+  t.attempt = null;
+  t.attempt = attemptOf(t, 'running (working)', {});
+  t.phase = 'running (working)';
+  return t;
+};
+
+/**
+ * What the stand-in holds about MCP states: what a read answers for each server planted, the failure a read is made to answer instead,
+ * and every read asked of it, in order — with the verb that serves them and the two a test moves them by.
+ */
+const mcpHeld = () => {
+  const planted = new Map<string, TestMcpState>();
+  const failure: { why: string | undefined } = { why: undefined };
+  const mcpReads: Array<readonly string[]> = [];
+  return {
+    mcpState: mcpStateOf(planted, mcpReads, failure),
+    read: {
+      mcpReads,
+      plantMcpState: (name: string, state: TestMcpState) => void planted.set(name, state),
+      failMcpState: (why: string | undefined) => void Object.assign(failure, { why }),
+    },
+  };
+};
+
 /**
  * A stand-in with no task on it, and the layer that serves it: new at each call, so two share nothing.
  *
@@ -536,17 +566,15 @@ export const testEngine = (): TestEngine => {
     interrupts: [] as string[],
     answered: [] as TestAnswer[],
     drains: [] as (number | null)[],
-    mcpReads: [] as Array<readonly string[]>,
   };
   const sayRefusals = { left: 0 };
   const sizes = new Map<string, TestKeeps>();
   const keptFailures = { left: 0 };
-  const mcpPlanted = new Map<string, TestMcpState>();
-  const mcpFailure: { why: string | undefined } = { why: undefined };
+  const mcp = mcpHeld();
   const layer = Layer.succeed(Engine)(
     Engine.of({
       ...keptOf(held, sayRefusals, sizes, keptFailures),
-      mcpState: mcpStateOf(mcpPlanted, held.mcpReads, mcpFailure),
+      mcpState: mcp.mcpState,
       tick: unkept('tick'),
       admit: unkept('admit'),
       follow: unkept('follow'),
@@ -586,33 +614,14 @@ export const testEngine = (): TestEngine => {
   const cutAsks = (id: string) => asking(id, 'cutting', () => []);
   const plantTranscript = (id: string, n: number, events: readonly TranscriptEvent[]) =>
     void taskFor(held.tasks, id, 'planting its transcript').transcripts.set(n, [...events]);
-  const restart = (id: string): TestTask => {
-    const t = held.tasks.get(id);
-    if (!t?.attempt) throw new Error(`the test engine holds no started task ${id}: settle it at work before restarting it`);
-    t.earlier.push(attemptOf(t, 'failed', {}));
-    t.attempt = null;
-    t.attempt = attemptOf(t, 'running (working)', {});
-    t.phase = 'running (working)';
-    return t;
-  };
-  const refuseSay = (times: number) => {
-    sayRefusals.left = times;
-  };
-  const keeps = (id: string, planted: TestKeeps) => {
-    sizes.set(id, planted);
-  };
-  const failKept = (times: number) => {
-    keptFailures.left = times;
-  };
-  const plantMcpState = (name: string, state: TestMcpState) => {
-    mcpPlanted.set(name, state);
-  };
-  const failMcpState = (why: string | undefined) => {
-    mcpFailure.why = why;
-  };
+  const restart = (id: string): TestTask => restartIn(held.tasks, id);
+  const refuseSay = (times: number) => void Object.assign(sayRefusals, { left: times });
+  const keeps = (id: string, planted: TestKeeps) => void sizes.set(id, planted);
+  const failKept = (times: number) => void Object.assign(keptFailures, { left: times });
   return {
     layer,
     ...held,
+    ...mcp.read,
     refuseSay,
     settle,
     keeps,
@@ -621,7 +630,5 @@ export const testEngine = (): TestEngine => {
     cutAsks,
     plantTranscript,
     restart,
-    plantMcpState,
-    failMcpState,
   };
 };

@@ -660,7 +660,7 @@ const mcpStateVerbOf = (harnesses: Record<string, HarnessConfig>, cwd: string, e
         `a server's state is read inside a Claude Code session, and this engine runs no Claude Code harness. Its harnesses are: ${Object.keys(harnesses).join(', ') || 'none'}.`,
       );
     }
-    return yield* Effect.promise(() => mcpServersRead(servers, cwd, { ...(executable === undefined ? {} : { executable }) })).pipe(
+    return yield* Effect.promise(() => mcpServersRead(servers, cwd, executable === undefined ? {} : { executable })).pipe(
       Effect.withSpan('Engine.mcpState', { attributes: { servers: Object.keys(servers).length } }),
     );
   });
@@ -731,6 +731,21 @@ const writtenVerbsOf = (...given: Parameters<typeof sayVerbOf>) => ({
  *
  * Fails with `EngineRefused` for what `optionsRefusalOf` refuses.
  */
+/**
+ * The verbs that ask a harness something in a session of their own, opened for the ask and let go with it: what is left of a plan's
+ * usage (`quota`), and the state of each server a caller hands (`mcpState`).
+ */
+const askedVerbsOf = (
+  runners: Record<string, SeamOps>,
+  fallback: string,
+  harnesses: Record<string, HarnessConfig>,
+  root: string,
+  executable: string | undefined,
+): Pick<EngineShape, 'quota' | 'mcpState'> => ({
+  quota: quotaVerbOf(runners, fallback),
+  mcpState: mcpStateVerbOf(harnesses, root, executable),
+});
+
 const make = (options: EngineOptions) =>
   Effect.gen(function* () {
     const refused = optionsRefusalOf(options);
@@ -880,8 +895,7 @@ const make = (options: EngineOptions) =>
       output: outputVerbOf(read, runners, harnessOf),
       follow: followVerbOf(read, runners, harnessOf),
       ...writtenVerbsOf(go, read, runners, harnesses, harnessOf),
-      quota: quotaVerbOf(runners, fallback),
-      mcpState: mcpStateVerbOf(harnesses, root, options.claudeExecutable),
+      ...askedVerbsOf(runners, fallback, harnesses, root, options.claudeExecutable),
       answer: answerVerb,
       close: (taskId) => go(close(taskId)),
       feed: feedVerb,

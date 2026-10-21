@@ -20,7 +20,7 @@ import { factoryServers, factoryServersFile, writeFactoryServers } from './serve
 import { factoryServerRefusal, serverNameRefusal, type FactoryServers } from './servers.ts';
 
 /** The text under `key`, as the spec read it. */
-const textOf = (args: Args, key: string): string => (typeof args[key] === 'string' ? (args[key] as string) : '');
+const textOf = (args: Args, key: string): string => (typeof args[key] === 'string' ? args[key] : '');
 
 /** One server of a factory's record as a listing gives it: its facts, and the harness's word for its state, or `null` where unread. */
 export type ServerListed = {
@@ -335,15 +335,17 @@ const NOTHING: ServersBefore = { refusal: null, notes: [], refuses: () => null }
  *   not an absence, and a step refused on a harness that was merely busy would be refused for ever.
  */
 export const serversBefore = Effect.fn('serversBefore')(function* (factory: string) {
-  const read: FactoryServers | { readonly refused: string } = yield* tried(() => factoryServers(factory)).pipe(
+  const read: { readonly record: FactoryServers } | { readonly refused: string } = yield* tried(() => factoryServers(factory)).pipe(
+    Effect.map((record) => ({ record })),
     Effect.catch((err) => Effect.succeed({ refused: err.message })),
   );
   if ('refused' in read) {
     const refusal = `the servers ${factory} records cannot be read: ${read.refused}`;
     return { refusal, notes: [], refuses: (_h, named) => (named?.length ? refusal : null) } satisfies ServersBefore;
   }
-  if (!Object.keys(read).length) return NOTHING;
-  const { by, unread } = yield* statesOf(read);
+  const record = read.record;
+  if (!Object.keys(record).length) return NOTHING;
+  const { by, unread } = yield* statesOf(record);
   const notes = unread === null ? [] : [`the state of ${factory}'s MCP servers is unread: ${unread}`];
   return {
     refusal: null,
@@ -356,3 +358,29 @@ export const serversBefore = Effect.fn('serversBefore')(function* (factory: stri
     },
   } satisfies ServersBefore;
 });
+
+/**
+ * The servers of `factory` as a pass about to file `ready` steps needs them: one look for the whole pass, since a look is a session
+ * spawned, and no look at all for a pass with no step to file. What the look left unread is noted on `notes`, once for the pass.
+ */
+export const serversFiling = Effect.fn('serversFiling')(function* (factory: string, ready: readonly string[], notes: string[]) {
+  if (!ready.length) return undefined;
+  const servers = yield* serversBefore(factory);
+  notes.push(...servers.notes);
+  return servers;
+});
+
+/**
+ * Whether `step` is held back for want of a sign-in, read off that one look, noting on `notes` which server and what to do where it
+ * is: its session would start, reach no tool of that server, and spend a try finding out. A step whose harness files no sign-in of its
+ * own, a step naming no server, and a look that failed each hold back nothing.
+ */
+export const unsignedStep = (
+  servers: ServersBefore | undefined,
+  step: { readonly name: string; readonly harness?: string; readonly agent?: { readonly mcp?: readonly string[] } },
+  notes: string[],
+): boolean => {
+  const why = servers?.refuses(step.harness, step.agent?.mcp) ?? null;
+  if (why !== null) notes.push(`${step.name}: not filed — ${why}`);
+  return why !== null;
+};

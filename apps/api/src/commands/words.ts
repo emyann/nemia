@@ -10,19 +10,18 @@ import { AGENTS_COPY, AGENTS_CUSTOM, AUTO_CONFIRM, AUTO_DROP } from './library.t
 import { LEVEL, SUBSCRIBE, UNSUBSCRIBE } from './sessions.ts';
 import { FACTORY_RULES_WORDS } from '../factories/rules.ts';
 import { FACTORY_SCHEDULE, FACTORY_UNSCHEDULE } from '../factories/schedules.ts';
-import { FACTORY_SERVER_ADD_WORDS, FACTORY_SERVER_RM_WORDS } from '../servers/index.ts';
+import { FACTORY_SERVER_WORDS } from '../servers/index.ts';
 
 /**
  * What a route's path names: the run and the step — `step` empty on a route that names none, `runId` on a route of the store's own, where
  * `step` is a factory's hire's — the `name` of what else it names, a card or an agent, the `factory` a hire or an instruction names,
- * the `server` a factory's server route names, and the request's `method` and `path`, as a refusal says the route.
+ * and the request's `method` and `path`, as a refusal says the route — a server a factory's route names is read off the path.
  */
 export type Named = {
   readonly runId: string;
   readonly step: string;
   readonly name: string;
   readonly factory: string;
-  readonly server: string;
   readonly method: string;
   readonly path: string;
 };
@@ -405,20 +404,18 @@ const PRUNE: RouteWords = {
 };
 
 /** A drop of the card `name`, as the guard's refusals word it. */
-const dropGuard = (name: string): Guarded => ({
-  route: `DELETE /api/inbox/${name}`,
-  does: 'drops a card',
-  forAnother: 'drop one',
-  why: 'a card dropped is an idea gone, and nothing keeps a copy',
-  reach: 'drop the card from the board',
-  instead: `Drop it from the board's Inbox page, or with \`nemia inbox rm ${name}\``,
-  shape: 'no body, or `{}`: the card is named in the path',
-});
-
 /** A card dropped, as the guard's refusals word it; a name that would leave the inbox is refused in the package's words. */
 const INBOX_RM: RouteWords = {
   shape: '`{}`',
-  guard: ({ name }) => dropGuard(name),
+  guard: ({ name }): Guarded => ({
+    route: `DELETE /api/inbox/${name}`,
+    does: 'drops a card',
+    forAnother: 'drop one',
+    why: 'a card dropped is an idea gone, and nothing keeps a copy',
+    reach: 'drop the card from the board',
+    instead: `Drop it from the board's Inbox page, or with \`nemia inbox rm ${name}\``,
+    shape: 'no body, or `{}`: the card is named in the path',
+  }),
   issue: () => () => 'DELETE /api/inbox/:name takes no body: `{}`.',
   named: ({ name }) => inboxNameRefusal(name) ?? null,
 };
@@ -653,6 +650,5 @@ export const WORDS: Readonly<Record<string, RouteWords>> = {
   'factory fire': FACTORY_FIRE,
   'factory schedule': FACTORY_SCHEDULE,
   'factory unschedule': FACTORY_UNSCHEDULE,
-  'factory server add': FACTORY_SERVER_ADD_WORDS,
-  'factory server rm': FACTORY_SERVER_RM_WORDS,
+  ...FACTORY_SERVER_WORDS,
 };

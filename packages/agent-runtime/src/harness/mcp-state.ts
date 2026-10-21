@@ -60,18 +60,23 @@ export type McpStatusAsk = (
 export const claudeMcpStatus: McpStatusAsk = async (servers, cwd, executable) => {
   const abort = new AbortController();
   let close = () => {};
-  const held = (async function* () {
-    await new Promise<void>((resolve) => {
-      close = resolve;
-    });
-  })();
+  const held: AsyncIterable<never> = {
+    [Symbol.asyncIterator]: () => ({
+      next: async () => {
+        await new Promise<void>((resolve) => {
+          close = resolve;
+        });
+        return { done: true as const, value: undefined as never };
+      },
+    }),
+  };
   const options: Options = {
     cwd,
     abortController: abort,
     settingSources: [],
     strictMcpConfig: true,
-    mcpServers: servers as NonNullable<Options['mcpServers']>,
-    env: withoutTelemetry(process.env) as NodeJS.ProcessEnv,
+    mcpServers: servers,
+    env: withoutTelemetry(process.env),
     ...(executable === undefined ? {} : { pathToClaudeCodeExecutable: executable }),
   };
   const q = query({ prompt: held, options });
@@ -121,11 +126,12 @@ const saidOf = (s: McpServerStatus): Omit<McpServerState, 'name' | 'status'> => 
 });
 
 /**
- * The state of each server of `servers`, read in one session (`how.ask`, the real one by default, `how.withinMs` its bound): every server of the record named once,
- * in the record's own order, with what the harness said of it — and a server the harness named not at all left `pending`, since it
- * was handed and has reported nothing.
+ * The state of each server of `servers`, read in one session (`how.ask`, the real one by default, `how.withinMs` its bound): every
+ * server of the record named once, in the record's own order, with what the harness said of it — and a server the harness named not at
+ * all left `pending`, since it was handed and has reported nothing.
  *
- * A look that failed answers `{ read: false, why }`, naming what to type: a task whose server's state could not be read is filed, not refused.
+ * A look that failed answers `{ read: false, why }`, naming what to type: a task whose server's state could not be read is filed, not
+ * refused.
  * A state word the harness does not have — an SDK that grew a sixth — is carried as a failed look rather than re-worded, so no caller
  * reads an unknown word as `connected`.
  */
@@ -160,14 +166,14 @@ export const mcpServersRead = async (
   if (odd) {
     return {
       read: false,
-      why: `the harness said \`${odd.name}\` is "${odd.status}", which is no state this runtime knows (${MCP_STATES.join(', ')}): a newer Claude Code grew one. Read ${'`sdk.d.ts`'} and add it to MCP_STATES in src/harness/mcp-state.ts.`,
+      why: `the harness said \`${odd.name}\` is "${odd.status}", which is no state this runtime knows (${MCP_STATES.join(', ')}): a newer harness grew one. Read \`sdk.d.ts\` and add it to MCP_STATES in src/harness/mcp-state.ts.`,
     };
   }
   return {
     read: true,
     servers: Object.keys(servers).map((name) => {
       const s = by.get(name);
-      return s ? { name, status: s.status as McpServerState['status'], ...saidOf(s) } : { name, status: 'pending' as const };
+      return s ? { name, status: s.status, ...saidOf(s) } : { name, status: 'pending' as const };
     }),
   };
 };

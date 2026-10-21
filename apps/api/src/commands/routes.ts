@@ -196,7 +196,6 @@ const namedBy = (c: Context<ApiEnv>): Named => ({
   step: c.req.param('step') ?? '',
   name: c.req.param('name') ?? '',
   factory: c.req.param('factory') ?? '',
-  server: c.req.param('server') ?? '',
   method: c.req.method,
   path: c.req.path,
 });

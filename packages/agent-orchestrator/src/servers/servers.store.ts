@@ -47,7 +47,7 @@ export function readFactoryServers(name: string): FactoryServersFile | undefined
     const { path: at, words } = firstRefusal(raw, read.failure);
     throw new Invalid({ message: `${file}: ${at.length ? `its ${at.join('.')} ` : ''}${words}: ${fix}.` });
   }
-  return { servers: read.success.servers as FactoryServers };
+  return { servers: read.success.servers };
 }
 
 /** The factory `name`'s servers, `{}` where none was written: what a caller that only reads them takes. */

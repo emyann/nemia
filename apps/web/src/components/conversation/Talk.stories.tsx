@@ -52,7 +52,7 @@ const ITEMS: ConversationItem<Own>[] = [
 
 /** What the caller draws for an `own` item of its own. */
 const drawOwn = (own: Own) => (
-  <div data-chat-own className="border border-outline-variant px-3.5 py-2.5 text-body-medium text-on-surface">
+  <div data-own className="border border-outline-variant px-3.5 py-2.5 text-body-medium text-on-surface">
     {own.words}
   </div>
 );

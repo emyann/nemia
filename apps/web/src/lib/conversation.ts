@@ -2,8 +2,9 @@
  * The one turn shape both of the board's conversations draw — Nemia's chat and a step's session — and everything about it that is
  * pure, so a node test proves it without a browser: the item the family's list holds (`ConversationItem`, one of four kinds), the line
  * of a turn (`ConversationLine`), the state a line can be in (`ConversationState`) and the map from it to a trace line's
- * (`traceStatusOf`), the words a folded turn, a jump pill and a new line say (`turnWords`, `jumpWords`, `newWords`), and `mark`, the
- * one writer of a family part's data attribute.
+ * (`traceStatusOf`), the words a folded turn, a jump pill and a new line say (`turnWords`, `jumpWords`, `newWords`), how much of a
+ * conversation is drawn, which is what a talk follows its latest by (`drawnCount`), and `mark`, the one writer of a family part's
+ * data attribute.
  *
  * It knows nothing of either conversation's events: each maps its own onto this shape through an adapter of its own — hers is
  * `chatItems` in `lib/chatFollowing.ts` — so the family in `components/conversation/` draws one thing and names neither.
@@ -73,6 +74,14 @@ export type ConversationItem<Own = never> =
 export const mark = (prefix: string, what: string, value?: string): Record<string, string | true> => ({
   [`data-${prefix}-${what}`]: value ?? true,
 });
+
+/**
+ * How much of `items` is drawn, counting a turn by its lines: the number a talk follows its latest by. A turn's lines are folded into
+ * one item, so the count of the items alone stands still while a turn grows — and a talk that watched it would follow the first line
+ * of a turn and then stand where it was for every line after, the growing turn pushing its foot off the screen.
+ */
+export const drawnCount = (items: readonly ConversationItem<unknown>[]): number =>
+  items.reduce((drawn, item) => drawn + (item.kind === 'work' ? item.lines.length : 1), 0);
 
 /** The one line a folded turn says: `Worked for 2m 14s · 9 steps`, over `ms` and how many `lines` it holds. */
 export const turnWords = (ms: number, lines: number): string => `Worked for ${duration(ms)} · ${lines === 1 ? '1 step' : `${lines} steps`}`;

@@ -4,7 +4,8 @@
  * and the sentinel at its foot that says the latest is on screen — which is when the read mark is posted (`onRead`), and when the jump
  * pill goes.
  *
- * It scrolls on its own, its bar drawn by `markScrolls`, and follows the latest while the person is at its foot: read back, it stays
+ * It scrolls on its own, its bar drawn by `markScrolls`, and follows the latest while the person is at its foot — by `drawnCount`,
+ * which counts a turn by its lines, since a turn grows a line at a time and the items it is one of do not: read back, it stays
  * where they left it. It takes the room its panel gives it and no more — the panel is bounded by the window — so a long talk scrolls
  * inside it rather than growing the panel past the screen, and on a page of its own it fills the frame down to the composer.
  *
@@ -12,7 +13,7 @@
  * data mark either writes is under the prefix `marks` names (`mark`).
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { mark, newWords, type ConversationItem } from '@/lib/conversation';
+import { drawnCount, mark, newWords, type ConversationItem } from '@/lib/conversation';
 import { markScrolls } from '@/lib/useScrollMark';
 import { Jump } from './Jump';
 import { Note, Said } from './Said';
@@ -64,9 +65,10 @@ export function Talk<Own>({ items, marks, label, backLabel, newAt, unread, reada
     if (atEnd && readable !== null) onRead(readable);
   }, [atEnd, readable, onRead]);
 
+  const drawn = drawnCount(items);
   useEffect(() => {
     if (atEnd) end.current?.scrollIntoView({ block: 'end' });
-  }, [atEnd, items.length]);
+  }, [atEnd, drawn]);
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">

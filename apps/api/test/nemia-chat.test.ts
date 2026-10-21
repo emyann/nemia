@@ -16,7 +16,6 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Ask, ChatEvent, ChatHistory } from 'agent-orchestrator';
-import { root } from './harness.ts';
 import { at, said, withHer } from './her.ts';
 import { app } from '../src/app.ts';
 

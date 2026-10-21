@@ -16,4 +16,4 @@ export { CompactRefused } from './compact.ts';
 export type { CompactReport } from './compact.ts';
 export { refusalWords } from './refusal.ts';
 export { testEngine } from './test-engine.ts';
-export type { Printed, TestEnd, TestEngine, TestFiling, TestKeeps, TestTask } from './test-engine.ts';
+export type { Printed, TestAnswer, TestEnd, TestEngine, TestFiling, TestKeeps, TestTask } from './test-engine.ts';

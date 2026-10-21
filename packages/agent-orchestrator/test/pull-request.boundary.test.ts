@@ -247,14 +247,35 @@ test("push pushes the hand-off commit and proves the pull request's head is the 
   assert.match(r.out, new RegExp(`wf pr: #7 is at ${handed.slice(0, 12)}, the commit this check judges`));
 });
 
+test("push reads the pull request's head again for a bounded few seconds, since GitHub moves it a moment after the push", () => {
+  const at = placed();
+  const was = gitIn(at.repo, 'rev-parse', 'HEAD').trim();
+  const pushed = commit(at.repo, 'handed-off.ts');
+  at.gh.answers([
+    ...passing(at.repo).filter((rule) => rule.when !== 'pr list'),
+    { when: 'pr list', outs: [listed(was), listed(was), listed(pushed)] },
+  ]);
+  const r = pr(at, 'push', [], { WF_PR_HEAD_SECONDS: '600', WF_PR_HEAD_POLL_SECONDS: '0' });
+  assert.equal(r.code, 0, r.err);
+  assert.equal(asked(r.calls, 'pr', 'list').length, 3, 'it read the head again until GitHub had caught up with the push');
+  assert.match(r.out, new RegExp(`wf pr: #7 is at ${pushed.slice(0, 12)}, the commit this check judges`));
+  assert.equal(tip(at.bare!, at.branch), pushed, 'and the branch was pushed once, before the reads');
+  assert.equal(r.calls.filter((call) => call.argv[0] === 'pr' && call.argv[1] === 'create').length, 0);
+});
+
 test('REFUSED: a pull request whose head is another commit, and none open at all; each names the open line', () => {
   const at = placed();
   const was = gitIn(at.repo, 'rev-parse', 'HEAD').trim();
   at.gh.answers(passing(at.repo));
   const now = commit(at.repo, 'later.ts');
-  const stale = pr(at, 'push');
+  const stale = pr(at, 'push', [], { WF_PR_HEAD_SECONDS: '0' });
   assert.equal(stale.code, 1, stale.out);
   assert.ok(stale.err.includes(`#7 has ${was.slice(0, 12)} as its head and this workspace is on ${now.slice(0, 12)}`), stale.err);
+  assert.match(
+    stale.err,
+    /0 s after the push/,
+    'a head that stays elsewhere for the bound is still refused, and says how long it was read',
+  );
   assert.match(stale.err, /CI's verdict would be for another commit than the one this check judges/);
   assert.match(stale.err, /node pull-request\.ts open --title "<the card's line>" --body-file "\$WF_STEP_FILES\/pr-body\.md"/);
 

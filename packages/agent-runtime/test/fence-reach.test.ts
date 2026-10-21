@@ -7,7 +7,8 @@ import assert from 'node:assert/strict';
 import { fenceReach, unruledIn } from '../src/harness/reach.ts';
 import { CLAUDE_PERMISSION_MODES } from '../src/harness/claude/vocabulary.ts';
 import { CODEX_SANDBOXES } from '../src/harness/codex/vocabulary.ts';
-import { claudeJob } from '../src/harness/claude/code.ts';
+import { claudeDetached } from '../src/harness/claude/code.ts';
+import { attachedOptions } from '../src/harness/claude/attached-options.ts';
 import { claudeArgv } from '../src/harness/claude/bg.ts';
 import { codex } from '../src/harness/codex/codex.ts';
 
@@ -36,7 +37,8 @@ test('the word a task naming none runs in is what the runner gives it: a job and
   const task = { name: 'ae/t/1', brief: 'b', cwd: '/r' };
   for (const harness of CLAUDES) {
     assert.equal(fenceReach(harness)!.by, 'mode');
-    assert.equal(after(claudeJob.command(task).args, '--permission-mode'), fenceReach(harness)!.given, `${harness}, a job`);
+    assert.equal(attachedOptions(task).permissionMode, fenceReach(harness)!.given, `${harness}, a job on the SDK`);
+    assert.equal(after(claudeDetached.command(task).args, '--permission-mode'), fenceReach(harness)!.given, `${harness}, claude -p`);
     assert.equal(after(claudeArgv(task, []), '--permission-mode'), fenceReach(harness)!.given, `${harness}, a background session`);
   }
   assert.equal(after(codex.command(task).args, '-s'), fenceReach('codex')!.given);

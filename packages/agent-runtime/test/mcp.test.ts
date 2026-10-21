@@ -22,6 +22,7 @@ import path from 'node:path';
 import type { McpServer, TaskSpec } from '../src/index.ts';
 import { Engine } from '../src/index.ts';
 import { claudeOps } from '../src/harness/claude/bg.ts';
+import { attachedOptions } from '../src/harness/claude/attached-options.ts';
 import { detachedOps, type HarnessIO, type HarnessSpec } from '../src/harness/detached/detached.ts';
 import { codex } from '../src/harness/codex/codex.ts';
 import { codexMcpServerNames, everyMcpServer } from '../src/harness/mcp.ts';
@@ -100,38 +101,56 @@ const configsUnder = (root: string) =>
 
 const CLAUDES = ['claude', 'claude-detached'] as const;
 
+/**
+ * The servers a job is given, and how, read off the options its own process builds from its spawn request (`attachedOptions`):
+ * `servers` is `Options.mcpServers`, `strict` whether nothing else loads, and `chrome` whether the operator's Chrome is left on.
+ * A job names no `--mcp-config` at all — there is no argv of ours on that road — so what it loads is read here and the files it
+ * writes are read under the engine's root.
+ */
+const jobServers = (cwd: string, config: TaskSpec['config'] = {}) => {
+  const given = attachedOptions({ name: 'ae/t/1', brief: 'the prompt', cwd, config });
+  return {
+    servers: given.mcpServers,
+    strict: given.strictMcpConfig === true,
+    chrome: !Object.hasOwn(given.extraArgs ?? {}, 'no-chrome'),
+  };
+};
+
 const MCP = {
   browser: { command: 'npx', args: ['-y', '@playwright/mcp'], env: { HEADLESS: '1' } },
   docs: { type: 'http', url: 'https://docs.example/mcp', headers: { Authorization: 'Bearer t' } },
 } satisfies Record<string, McpServer>;
 
 test("no mcp and no .mcp.json: Claude Code is spawned strict, with no config — none of the operator's servers", WAITED, async (t) => {
-  for (const harness of CLAUDES) {
-    const { args, root } = await spawnAtDefaults(t, { cwd: tmp('bare'), harness });
-    assert.ok(args, `${harness} was spawned`);
-    assert.ok(args.includes('--strict-mcp-config'), `${harness}: strict, so user scope and claude.ai connectors stay unloaded`);
-    assert.ok(args.includes('--no-chrome'), `${harness}: nor the operator's Chrome, which no config names and strict leaves on`);
-    assert.equal(args.includes('--mcp-config'), false, `${harness}: and no server is named in their place`);
-    assert.deepEqual(configsUnder(root), [], `${harness}: nothing written for a task that named no servers`);
-    if (harness === 'claude-detached') assert.equal(args[args.indexOf('-p') + 1], 'the prompt', `${harness}: the prompt survives`);
-    else assert.equal(args.includes('the prompt'), false, `${harness}: the prompt is not an argument`);
-  }
+  const cwd = tmp('bare');
+  const { args, root } = await spawnAtDefaults(t, { cwd, harness: 'claude-detached' });
+  assert.ok(args, 'claude-detached was spawned');
+  assert.ok(args.includes('--strict-mcp-config'), 'strict, so user scope and claude.ai connectors stay unloaded');
+  assert.ok(args.includes('--no-chrome'), "nor the operator's Chrome, which no config names and strict leaves on");
+  assert.equal(args.includes('--mcp-config'), false, 'and no server is named in their place');
+  assert.deepEqual(configsUnder(root), [], 'nothing written for a task that named no servers');
+  assert.equal(args[args.indexOf('-p') + 1], 'the prompt', 'the prompt survives');
+
+  const job = jobServers(cwd);
+  assert.equal(job.servers, undefined, 'a job: no server is given in their place');
+  assert.ok(job.strict, 'a job: strict all the same');
+  assert.equal(job.chrome, false, "a job: and not the operator's Chrome");
 });
 
 test(".mcp.json in the checkout: named, so strict keeps the repository's servers — and only those", WAITED, async (t) => {
   const cwd = tmp('checkout');
   fs.writeFileSync(path.join(cwd, '.mcp.json'), JSON.stringify({ mcpServers: { repo: { command: 'repo-server' } } }));
-  for (const harness of CLAUDES) {
-    const { args } = await spawnAtDefaults(t, { cwd, harness });
-    assert.ok(args, `${harness} was spawned`);
-    const { configs, next } = mcpConfigsOf(args);
-    assert.deepEqual(configs, [path.join(cwd, '.mcp.json')], `${harness}: the checkout's file, and nothing else`);
-    assert.equal(next, '--strict-mcp-config', `${harness}: still strict, and the variadic list is ended by it, not by the prompt`);
-    assert.ok(args.includes('--no-chrome'), `${harness}: and still no Chrome`);
-  }
+  const { args } = await spawnAtDefaults(t, { cwd, harness: 'claude-detached' });
+  assert.ok(args, 'claude-detached was spawned');
+  const { configs, next } = mcpConfigsOf(args);
+  assert.deepEqual(configs, [path.join(cwd, '.mcp.json')], "the checkout's file, and nothing else");
+  assert.equal(next, '--strict-mcp-config', 'still strict, and the variadic list is ended by it, not by the prompt');
+  assert.ok(args.includes('--no-chrome'), 'and still no Chrome');
   assert.equal((await spawnAtDefaults(t, { cwd, harness: 'claude', config: { background: true } })).args?.at(-1), 'the prompt');
-  const job = (await spawnAtDefaults(t, { cwd, harness: 'claude' })).args!;
-  assert.equal(job.includes('the prompt'), false);
+
+  const job = jobServers(cwd);
+  assert.deepEqual(job.servers, { repo: { command: 'repo-server' } }, "a job: the checkout's servers, as a value");
+  assert.ok(job.strict && !job.chrome, 'a job: still strict, still no Chrome');
 });
 
 test('a checkout whose .mcp.json is not JSON is refused before anything runs: unstartable, naming the file', WAITED, async (t) => {
@@ -151,22 +170,25 @@ test(
   async (t) => {
     const cwd = tmp('checkout');
     fs.writeFileSync(path.join(cwd, '.mcp.json'), JSON.stringify({ mcpServers: { repo: { command: 'repo-server' } } }));
-    for (const harness of CLAUDES) {
-      const { args } = await spawnAtDefaults(t, { cwd, harness, config: { mcp: MCP } });
-      assert.ok(args, `${harness} was spawned`);
-      const { configs, next } = mcpConfigsOf(args);
-      assert.equal(configs.length, 2, `${harness}: ${JSON.stringify(configs)}`);
-      assert.equal(configs[0], path.join(cwd, '.mcp.json'), `${harness}: the repository's servers first`);
-      assert.deepEqual(
-        JSON.parse(fs.readFileSync(configs[1], 'utf8')),
-        { mcpServers: MCP },
-        `${harness}: the task's servers, exactly, and no other`,
-      );
-      assert.ok(path.relative(cwd, configs[1]).startsWith('..'), `${harness}: written outside the workspace`);
-      assert.equal(fs.statSync(configs[1]).mode & 0o077, 0, `${harness}: readable by its owner only — an env or a header may be a secret`);
-      assert.equal(next, '--strict-mcp-config', harness);
-      assert.ok(args.includes('--no-chrome'), `${harness}: a task's servers do not bring the operator's Chrome back`);
-    }
+    const harness = 'claude-detached';
+    const { args } = await spawnAtDefaults(t, { cwd, harness, config: { mcp: MCP } });
+    assert.ok(args, `${harness} was spawned`);
+    const { configs, next } = mcpConfigsOf(args);
+    assert.equal(configs.length, 2, `${harness}: ${JSON.stringify(configs)}`);
+    assert.equal(configs[0], path.join(cwd, '.mcp.json'), `${harness}: the repository's servers first`);
+    assert.deepEqual(
+      JSON.parse(fs.readFileSync(configs[1], 'utf8')),
+      { mcpServers: MCP },
+      `${harness}: the task's servers, exactly, and no other`,
+    );
+    assert.ok(path.relative(cwd, configs[1]).startsWith('..'), `${harness}: written outside the workspace`);
+    assert.equal(fs.statSync(configs[1]).mode & 0o077, 0, `${harness}: readable by its owner only — an env or a header may be a secret`);
+    assert.equal(next, '--strict-mcp-config', harness);
+    assert.ok(args.includes('--no-chrome'), `${harness}: a task's servers do not bring the operator's Chrome back`);
+
+    const job = jobServers(cwd, { mcp: MCP });
+    assert.deepEqual(job.servers, { repo: { command: 'repo-server' }, ...MCP }, "a job: the checkout's and the task's, as one value");
+    assert.ok(job.strict && !job.chrome, 'a job: still strict, still no Chrome');
     assert.deepEqual(fs.readdirSync(cwd), ['.mcp.json'], 'nothing landed in the checkout');
   },
 );
@@ -330,7 +352,7 @@ test(
   WAITED,
   async (t) => {
     const cwd = checkoutOf();
-    for (const task of [{ harness: 'claude' }, { harness: 'claude-detached' }, { harness: 'claude', config: { background: true } }]) {
+    for (const task of [{ harness: 'claude-detached' }, { harness: 'claude', config: { background: true } }]) {
       const label = JSON.stringify(task);
       const { args, root } = await spawnAtDefaults(t, { cwd, ...task, config: { ...task.config, checkoutMcp: [] } });
       assert.ok(args, `${label} was spawned`);
@@ -338,14 +360,17 @@ test(
       assert.ok(args.includes('--strict-mcp-config') && args.includes('--no-chrome'), `${label}: and nothing else loads in their place`);
       assert.deepEqual(configsUnder(root), [], `${label}: nothing written`);
     }
+    const job = jobServers(cwd, { checkoutMcp: [] });
+    assert.equal(job.servers, undefined, "a job: the checkout's servers are not given");
+    assert.ok(job.strict && !job.chrome, 'a job: and nothing else loads in their place');
   },
 );
 
 test("checkoutMcp: names loads those entries alone, as the file gives them, from the task's own 0600 config", WAITED, async (t) => {
   const cwd = checkoutOf();
-  for (const task of [{ harness: 'claude' }, { harness: 'claude-detached' }, { harness: 'claude', config: { background: true } }]) {
+  const own = { mine: { command: 'x' } };
+  for (const task of [{ harness: 'claude-detached' }, { harness: 'claude', config: { background: true } }]) {
     const label = JSON.stringify(task);
-    const own = { mine: { command: 'x' } };
     const { args } = await spawnAtDefaults(t, { cwd, ...task, config: { ...task.config, checkoutMcp: ['a'], mcp: own } });
     assert.ok(args, `${label} was spawned`);
     const { configs, next } = mcpConfigsOf(args);
@@ -359,6 +384,11 @@ test("checkoutMcp: names loads those entries alone, as the file gives them, from
     assert.equal(fs.statSync(configs[0]).mode & 0o077, 0, `${label}: owner-only`);
     assert.equal(next, '--strict-mcp-config', label);
   }
+  assert.deepEqual(
+    jobServers(cwd, { checkoutMcp: ['a'], mcp: own }).servers,
+    { a: TWO.a, ...own },
+    "a job: a verbatim, and the task's, given as a value and written to no file",
+  );
 });
 
 test(
@@ -387,7 +417,7 @@ test(
       assert.equal(unparsed.attempt?.reason, 'unstartable', harness);
       assert.match(unparsed.attempt?.error ?? '', /\.mcp\.json is not valid JSON .*Fix the file\./, harness);
     }
-    const none = await spawnAtDefaults(t, { cwd: tmp('bare'), harness: 'claude', config: { checkoutMcp: [] } });
+    const none = await spawnAtDefaults(t, { cwd: tmp('bare'), harness: 'claude-detached', config: { checkoutMcp: [] } });
     assert.ok(none.args, 'no name reads no file: a checkout with none starts');
   },
 );
@@ -443,7 +473,7 @@ test(
     const id = await Effect.runPromise(engine.file({ brief: 'b', cwd, harness: 'claude', config: { checkoutMcp: ['a'] } }));
     const again = builtEngine(Engine.layer({ root }));
     assert.deepEqual((await Effect.runPromise(again.view(id))).state.config?.checkoutMcp, ['a']);
-    const { args } = await spawnAtDefaults(t, { cwd, harness: 'claude' });
+    const { args } = await spawnAtDefaults(t, { cwd, harness: 'claude-detached' });
     assert.deepEqual(mcpConfigsOf(args!).configs, [path.join(cwd, '.mcp.json')]);
   },
 );

@@ -6,7 +6,10 @@
  * writes into `STANDIN_DIR`: `argv.jsonl` (each start's arguments), `initialize.jsonl` (each `initialize` request's payload, the
  * system prompt the SDK sends included), `said.jsonl` (each user message's text), `asked.jsonl` (each hook it asked, as it asks),
  * `answers.jsonl` (each answer to a control request it sent), `taken.jsonl` (each control request the SDK sent it, by subtype, with
- * what it carried) and `pid` (its own, on each start).
+ * what it carried), `env.json` (the environment it was started with, whole) and `pid` (its own, on each start).
+ *
+ * `STANDIN_POST_LOG` has it post one `api_request` log to the collector its own environment names, before its result, as Claude
+ * Code exports from the environment it is given (`postLog`).
  *
  * Its session id is `stand-in-session`, its plan's `id` where it gives one, or the one `--resume=<id>` names, as the SDK writes it.
  */
@@ -63,6 +66,7 @@ const sessionId = resumed ?? plan.id ?? 'stand-in-session';
 const note = (file: string, value: unknown) => fs.appendFileSync(path.join(dir, file), `${JSON.stringify(value)}\n`);
 note('argv.jsonl', argv);
 fs.writeFileSync(path.join(dir, 'pid'), String(process.pid));
+fs.writeFileSync(path.join(dir, 'env.json'), JSON.stringify(process.env));
 
 const print = (line: object) => process.stdout.write(`${JSON.stringify(line)}\n`);
 const pending = new Map<string, (response: unknown) => void>();
@@ -109,6 +113,31 @@ const hooked = async (event: string, tool: string, id: string, more: object = {}
 };
 
 /**
+ * One `api_request` log posted to the collector its own environment names, as Claude Code exports from the environment it was
+ * started in: the resource attributes of `OTEL_RESOURCE_ATTRIBUTES` and the trace of `TRACEPARENT`, read off that environment and
+ * nothing else. Nothing where it names no collector.
+ */
+const postLog = async (): Promise<void> => {
+  const endpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+  if (!endpoint) return;
+  const attributes = (process.env.OTEL_RESOURCE_ATTRIBUTES ?? '')
+    .split(',')
+    .filter(Boolean)
+    .map((pair) => {
+      const at = pair.indexOf('=');
+      return { key: pair.slice(0, at), value: { stringValue: decodeURIComponent(pair.slice(at + 1)) } };
+    });
+  const traceId = (process.env.TRACEPARENT ?? '').split('-')[1] ?? '';
+  await fetch(`${endpoint}/v1/logs`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      resourceLogs: [{ resource: { attributes }, scopeLogs: [{ logRecords: [{ body: { stringValue: 'api_request' }, traceId }] }] }],
+    }),
+  });
+};
+
+/**
  * Waits until the turn in flight is interrupted, or until `held` settles, whichever comes first: a call held at its hooks when an
  * interrupt comes is left unanswered, as Claude Code leaves it, and the turn ends all the same with a result of its own.
  */
@@ -151,6 +180,7 @@ const work = async () => {
   if (plan.stream && argv.includes('--include-partial-messages')) await streamed();
   if (plan.transcript) wrote();
   if (plan.hold) await appears('end');
+  if (process.env.STANDIN_POST_LOG) await postLog();
   const cut = interrupted;
   interrupted = false;
   if (plan.fold) mine = [...mine, ...queued.splice(0).map((q) => q.uuid)];

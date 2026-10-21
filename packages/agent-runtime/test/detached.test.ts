@@ -976,10 +976,11 @@ const refusedWith = (read: () => HarnessOutput): string => {
   }
 };
 
-/** `claude -p`'s refusal of a line, as `printedLinesOf` words it: the line, its kind, its field and what is there, and the fix. */
+/** The refusal of a Claude Code line, as `printedLinesOf` words it: the line, its kind, its field and what is there, and the fix. */
 const printedRefusal = (line: number, kind: string, field: string, found: string) =>
-  `line ${line} of the \`claude -p\` output is ${kind} line whose \`${field}\` ${found}. An output that holds it is refused, never read` +
-  ' as saying nothing: run a Claude Code whose `claude -p` output this runtime reads, or a runtime whose schema for the line in' +
+  `line ${line} of the session's output is ${kind} line whose \`${field}\` ${found}. An output that holds it is refused, never read` +
+  " as saying nothing: run a Claude Code whose output this runtime reads — the lines `claude -p` prints, which a job's own" +
+  " process prints from the Agent SDK's messages — or a runtime whose schema for the line in" +
   ' `PRINTED` (`harness/claude/print.ts`) reads this one.';
 
 /** A Claude Code job `name` written into `dir` as its worker leaves it, in `state`: its output a line of stderr, then `lines`. */
@@ -1402,6 +1403,88 @@ test('the runner merges what a spec prepares into what its command is given', as
   assert.ok(given?.closeoutFile, 'alongside what the runner chose itself');
 });
 
+test('a spec that needs the spawn request is written one, and a spec that does not is written none', async () => {
+  const dir = root();
+  const given: (HarnessIO | undefined)[] = [];
+  const spy = (needsRequest?: true): HarnessSpec => ({
+    name: 'sh',
+    ...(needsRequest ? { needsRequest } : {}),
+    prepare: () => ({ trustedDirs: ['/somewhere'] }),
+    command: (_r, io) => {
+      given.push(io);
+      return { cmd: 'sh', args: ['-c', 'exit 0'] };
+    },
+  });
+  const request = { name: 'ae/t-req/1', brief: 'the brief', cwd: dir, closeoutSchema: { type: 'object' } };
+  await Effect.runPromise(detachedOps(spy(true), dir).spawn(request));
+  const at = given[0]?.requestFile;
+  assert.equal(at, path.join(dir, 'runs', 'sh', 'ae_t_req_1.request.json'), 'the path it was given is the run’s own file');
+  const wrote = JSON.parse(fs.readFileSync(at, 'utf8')) as { request: typeof request; io: HarnessIO };
+  assert.deepEqual(
+    wrote.request,
+    { ...request, cwd: path.resolve(dir) },
+    'the spawn request whole, its cwd resolved as the runner resolved it',
+  );
+  assert.equal(wrote.io.trustedDirs?.[0], '/somewhere', 'and the io the runner computed, the spec’s own `prepare` in it');
+  assert.ok(wrote.io.closeoutFile, 'and what the runner chose itself');
+  assert.equal(wrote.io.requestFile, undefined, 'the file does not name itself');
+
+  await Effect.runPromise(detachedOps(spy(), dir).spawn({ ...request, name: 'ae/t-req/2' }));
+  assert.equal(given[1]?.requestFile, undefined, 'a spec that does not ask is given no path');
+  assert.equal(fs.existsSync(path.join(dir, 'runs', 'sh', 'ae_t_req_2.request.json')), false, 'and no file is written for it');
+});
+
+test('a respawn under the same name finds no stale spawn request, and a forget takes the file with the rest', async (t) => {
+  const dir = root();
+  const spec: HarnessSpec = { name: 'sh', needsRequest: true, command: () => ({ cmd: 'sh', args: ['-c', 'exit 0'] }) };
+  const ops = detachedOps(spec, dir);
+  const at = path.join(dir, 'runs', 'sh', 'ae_t_req_1.request.json');
+  await Effect.runPromise(ops.spawn({ name: 'ae/t-req/1', brief: 'the first', cwd: dir }));
+  await settle(t, ops, 'ae/t-req/1', 'completed');
+  await Effect.runPromise(ops.spawn({ name: 'ae/t-req/1', brief: 'the second', cwd: dir }));
+  assert.equal(
+    (JSON.parse(fs.readFileSync(at, 'utf8')) as { request: { brief: string } }).request.brief,
+    'the second',
+    'the second spawn’s request, never the first’s left behind',
+  );
+  await settle(t, ops, 'ae/t-req/1', 'completed');
+  const forgotten = await Effect.runPromise(ops.forget!({ name: 'ae/t-req/1' }, { dry: false }));
+  assert.ok(forgotten.files.includes(at), `the request file is forgotten with the rest: ${forgotten.files.join(', ')}`);
+  assert.equal(fs.existsSync(at), false);
+});
+
+test('a spec that reads its own spawn request is given its servers in it, and no MCP config file is written for it', async () => {
+  const dir = root();
+  const given: (HarnessIO | undefined)[] = [];
+  const spec = (needsRequest?: true): HarnessSpec => ({
+    name: 'sh',
+    ...(needsRequest ? { needsRequest } : {}),
+    command: (_r, io) => {
+      given.push(io);
+      return { cmd: 'sh', args: ['-c', 'exit 0'] };
+    },
+  });
+  const config = { mcp: { a: { command: 'a-server' } } };
+  await Effect.runPromise(detachedOps(spec(true), dir).spawn({ name: 'ae/t-req/1', brief: 'x', cwd: dir, config }));
+  assert.equal(given[0]?.mcpConfigFile, undefined, 'no config file is named for it');
+  assert.equal(fs.existsSync(path.join(dir, 'runs', 'sh', 'ae_t_req_1.mcp.json')), false, 'and none is written');
+  const wrote = JSON.parse(fs.readFileSync(given[0]!.requestFile!, 'utf8')) as { request: { config?: typeof config } };
+  assert.deepEqual(wrote.request.config, config, 'the servers are in the request the harness reads');
+  assert.equal(fs.statSync(given[0]!.requestFile!).mode & 0o077, 0, 'owner-only: a server’s env or header may be a secret');
+
+  await Effect.runPromise(detachedOps(spec(), dir).spawn({ name: 'ae/t-req/2', brief: 'x', cwd: dir, config }));
+  assert.ok(given[1]?.mcpConfigFile, 'a spec that reads no request is still handed a file, as it always was');
+});
+
+test('a spawn request beside a run file is no run of its own', async (t) => {
+  const dir = root();
+  const spec: HarnessSpec = { name: 'sh', needsRequest: true, command: () => ({ cmd: 'sh', args: ['-c', 'exit 0'] }) };
+  const ops = detachedOps(spec, dir);
+  await Effect.runPromise(ops.spawn({ name: 'ae/t-req/1', brief: 'x', cwd: dir }));
+  await settle(t, ops, 'ae/t-req/1', 'completed');
+  assert.deepEqual([...(await Effect.runPromise(ops.observe)).keys()], ['ae/t-req/1'], 'one run listed, not two');
+});
+
 test('at shipped defaults neither detached harness is given a tool list or an effort', async () => {
   const { codex } = await import('../src/harness/codex/codex.ts');
   const { claudeDetached } = await import('../src/harness/claude/code.ts');
@@ -1733,11 +1816,11 @@ test('REFUSED: a cost or an API time that is not a number of 0 or more is no abs
   );
   assert.match(
     refusedWith(() => claudeResultOutput(resultLine({ total_cost_usd: -1 }))),
-    /^line 1 of the `claude -p` output is a `result` line whose `total_cost_usd` is -1, where /,
+    /^line 1 of the session's output is a `result` line whose `total_cost_usd` is -1, where /,
   );
   assert.match(
     refusedWith(() => claudeStreamOutput(['a warning on stderr', resultLine({ duration_api_ms: null })].join('\n'))),
-    /^line 2 of the `claude -p` output is a `result` line whose `duration_api_ms` is null, where Claude Code prints number\. /,
+    /^line 2 of the session's output is a `result` line whose `duration_api_ms` is null, where Claude Code prints number\. /,
     'the stream reads the same result, and counts its lines from the first, stderr included',
   );
 });

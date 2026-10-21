@@ -120,7 +120,7 @@ export type ClaudeFlags = {
    * Bridge a background session to claude.ai (`--remote-control`, with a name for it as a string), where anyone signed in to the
    * account can drive it — type into it, answer its prompts, stop it — from a browser or a phone. Never a default, for that reason.
    * A journal an older runtime wrote may carry it as a harness argument of its own, which `upgrade` moves here (`FORMER_ARGS`).
-   * Refused on a job — `claude -p` opens no bridge — and on any
+   * Refused on a job — a session held by its own process for one prompt opens no bridge — and on any
    * harness but Claude Code; a harness brought as a `RunnerOps` is handed it on the spawn, and asked only its own `refuses`.
    */
   remoteControl?: true | string;
@@ -305,20 +305,20 @@ export const claudeRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefi
 export const claudePrintRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefined =>
   claudeRefuses(task) ??
   (bridgeAsked(task)
-    ? '`claude.remoteControl` asks for a session bridged to claude.ai, and `claude -p` runs a prompt and exits: only a Claude Code background session (`claude --bg --remote-control`) is bridged. Leave `claude.remoteControl` off.'
+    ? '`claude.remoteControl` asks for a session bridged to claude.ai, and a session that runs one prompt and exits is held by its own process, which serves no bridge for anyone to reach: only a Claude Code background session (`claude --bg --remote-control`) is bridged. Leave `claude.remoteControl` off.'
     : undefined);
 
 /**
  * What a Claude Code background session cannot be asked for, beyond what Claude Code cannot (`claudeRefuses`): a spend
  * cap. `claude --bg` takes `--max-budget-usd` and keeps nothing of it — its help says the flag "only works with --print",
  * and a `--bg` session given a cap spends past it and ends on its own (`test/live.test.ts`). A cap that caps nothing is refused rather than
- * carried; `claude -p` keeps one.
+ * carried; a job keeps one, on `Options.maxBudgetUsd`, and so does `claude -p`.
  */
 export const claudeBgRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefined =>
   claudeRefuses(task) ??
   (task.config?.budgetUsd === undefined
     ? undefined
-    : `\`budgetUsd: ${task.config.budgetUsd}\` is a spend cap, and a \`claude --bg\` session does not keep one: Claude Code takes \`--max-budget-usd\` only with \`--print\`, and a background session spends past a cap it is given. File the task on \`claude-detached\`, which runs \`claude -p\` and ends the session at its cap, or leave \`budgetUsd\` off.`);
+    : `\`budgetUsd: ${task.config.budgetUsd}\` is a spend cap, and a \`claude --bg\` session does not keep one: Claude Code takes \`--max-budget-usd\` only with \`--print\`, and a background session spends past a cap it is given. File the task on \`claude\`, whose jobs run one prompt and end at their cap, or on \`claude-detached\`, which runs \`claude -p\` and does the same, or leave \`budgetUsd\` off.`);
 
 /**
  * What Claude Code cannot be asked for as the engine runs it by default, in the mode the task chose. A job (`claude -p`, the
@@ -332,10 +332,10 @@ export const claudeCodeRefuses = (task: Omit<SpawnRequest, 'name'>): string | un
   if (task.config?.background) {
     return task.config?.budgetUsd === undefined
       ? undefined
-      : `\`budgetUsd: ${task.config.budgetUsd}\` is a spend cap, and a \`claude --bg\` session does not keep one: Claude Code takes \`--max-budget-usd\` only with \`--print\`, and a background session spends past a cap it is given. Leave \`config.background\` off to run the task as a job (\`claude -p\`), which ends the session at its cap, or leave \`budgetUsd\` off.`;
+      : `\`budgetUsd: ${task.config.budgetUsd}\` is a spend cap, and a \`claude --bg\` session does not keep one: Claude Code takes \`--max-budget-usd\` only with \`--print\`, and a background session spends past a cap it is given. Leave \`config.background\` off to run the task as a job, which ends the session at its cap, or leave \`budgetUsd\` off.`;
   }
   return bridgeAsked(task)
-    ? '`claude.remoteControl` bridges a session to claude.ai, and only a background session (`claude --bg`) can be bridged: a job runs `claude -p`, which opens no bridge. Give `config.background: true` as well, or leave `claude.remoteControl` off.'
+    ? '`claude.remoteControl` bridges a session to claude.ai, and only a background session (`claude --bg`) can be bridged: a job runs one prompt in a process of its own, which opens no bridge. Give `config.background: true` as well, or leave `claude.remoteControl` off.'
     : undefined;
 };
 

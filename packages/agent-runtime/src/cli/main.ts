@@ -329,10 +329,10 @@ const HELP = `ae — an engine for agent sessions
     effort           claude: low | medium | high | xhigh | max
                      codex:  none | minimal | low | medium | high | xhigh | max
     budgetUsd        dollars one attempt may spend — a job on claude, or claude-detached:
-                     claude -p ends the session at it; a background session keeps no cap
+                     the session ends at it; a background session keeps no cap
     background       true — claude only: run the session as claude --bg, which a person
-                     can attach to, instead of as a job (claude -p, the default); ae say
-                     reaches either
+                     can attach to, instead of as a job (the Agent SDK, the default); ae
+                     say reaches either
     holdOpen         true — when a turn ends done, wait for ae answer or ae close
                      rather than settle: input-required, with nothing running
     queued           true — wait for ae admit <id> before it starts

@@ -123,6 +123,29 @@ const fake = fakeClaude();
 process.env.PATH = `${fake.bin}:${process.env.PATH}`;
 const work = tmp('work');
 
+const { STAND_IN } = await import('./attached-held.ts');
+
+/**
+ * The stand-in Claude Code a job runs on the Agent SDK, and the folder it writes what it saw into: a job is no `claude`
+ * command line, so what reached its session is read here (`said.jsonl`) rather than off the fake `claude`'s stdin. Its plan
+ * holds every turn at the file `end` and works each message as a turn of its own, so a job stays at work while it is told
+ * things — and goes on running after its first result, which is the state a word said too late is refused in.
+ */
+const STAND_IN_PLAN = { id: '5e551011-0000-4000-8000-0000000000aa', turns: 'many', hold: true };
+
+/** What the session whose stand-in writes into `dir` was told, in order: every user message it read. */
+const toldIn = (dir: string): string[] | undefined => {
+  try {
+    return fs
+      .readFileSync(path.join(dir, 'said.jsonl'), 'utf8')
+      .split('\n')
+      .filter(Boolean)
+      .map((l) => JSON.parse(l) as string);
+  } catch {
+    return undefined;
+  }
+};
+
 /**
  * A session's inbox: a Unix socket that reads each connection's lines, answers nothing, and closes its end once the
  * sender has, as Claude Code's does. `neverCloses` reads the line and keeps its end open, as a process busy past the
@@ -287,43 +310,37 @@ const heard = <T>(t: Waiter, read: () => T | undefined | Promise<T | undefined>,
 
 /** A job filed at shipped defaults — no `background` — and ticked until its harness has read its brief on its stdin, in test `t`. */
 const job = async (t: Waiter, engine: EngineShape, brief: string, spec: Partial<TaskSpec> = {}) => {
-  const id = await Effect.runPromise(engine.file({ brief, cwd: work, ...spec }));
+  const dir = tmp(`stand-in-${brief}`);
+  const id = await Effect.runPromise(
+    engine.file({
+      brief,
+      cwd: work,
+      ...spec,
+      config: { ...spec.config, env: { STANDIN_DIR: dir, STANDIN_PLAN: JSON.stringify(STAND_IN_PLAN) } },
+    }),
+  );
   await Effect.runPromise(engine.tick());
-  await heard(t, () => fake.stdin(brief), `${brief} read its brief`);
-  return id;
+  await heard(t, () => (toldIn(dir)?.includes(brief) ? true : undefined), `${brief} read its brief`);
+  return { id, told: () => toldIn(dir)!, letGo: () => fs.writeFileSync(path.join(dir, 'end'), '') };
 };
 
 test(
   'at shipped defaults, a job is told on its stdin: the words, verbatim, as the next user message after its brief — then journalled',
   WAITED,
   async (t) => {
-    const engine = builtEngine(EngineService.layer({ root: tmp('board') }));
-    const id = await job(t, engine, 'job-told');
+    const engine = builtEngine(EngineService.layer({ root: tmp('board'), claudeExecutable: STAND_IN }));
+    const { id, told } = await job(t, engine, 'job-told');
     const text = 'Widen the scope to `apps/api` too.\nAnd answer: yes, "keep" the old route — ça va.';
 
     const said = await Effect.runPromise(engine.say(id, text));
     assert.equal(said.attempt, 1);
     assert.deepEqual((await Effect.runPromise(engine.view(id))).state.said, [said], 'journalled');
-    const read = await heard(
-      t,
-      () => {
-        const l = fake.stdin('job-told');
-        return l && l.length > 1 ? l : undefined;
-      },
-      'the words on its stdin',
-    );
-    assert.deepEqual(
-      read,
-      [
-        { type: 'user', message: { role: 'user', content: 'job-told' } },
-        { type: 'user', message: { role: 'user', content: text } },
-      ],
-      'one line each, a line break in the words kept inside theirs',
-    );
+    const read = await heard(t, () => (told().length > 1 ? told() : undefined), 'the words on its input');
+    assert.deepEqual(read, ['job-told', text], 'one message each, a line break in the words kept inside theirs');
 
     await Effect.runPromise(engine.say(id, 'and the web app'));
-    await heard(t, () => (fake.stdin('job-told')!.length === 3 ? true : undefined), 'the second words');
-    assert.equal(fake.stdin('job-told')![2].message.content, 'and the web app', 'in the order they were said');
+    await heard(t, () => (told().length === 3 ? true : undefined), 'the second words');
+    assert.equal(told()[2], 'and the web app', 'in the order they were said');
     await Effect.runPromise(engine.stop(id));
     await Effect.runPromise(engine.tick());
   },
@@ -333,29 +350,61 @@ test(
   "a job in bypassPermissions is told: what Claude Code's inbox holds for an approval is a background session's, and a job has no inbox",
   WAITED,
   async (t) => {
-    const engine = builtEngine(EngineService.layer({ root: tmp('board') }));
-    const id = await job(t, engine, 'job-bypass', { config: { permissionMode: 'bypassPermissions' } });
+    const engine = builtEngine(EngineService.layer({ root: tmp('board'), claudeExecutable: STAND_IN }));
+    const { id, told } = await job(t, engine, 'job-bypass', { config: { permissionMode: 'bypassPermissions' } });
     await Effect.runPromise(engine.say(id, 'carry on'));
-    await heard(t, () => (fake.stdin('job-bypass')!.length === 2 ? true : undefined), 'the words on its stdin');
+    await heard(t, () => (told().length === 2 ? true : undefined), 'the words on its input');
     assert.equal((await Effect.runPromise(engine.view(id))).state.said.length, 1);
     await Effect.runPromise(engine.stop(id));
     await Effect.runPromise(engine.tick());
   },
 );
 
+/** Whether the worker of `runFile` has closed its session's input and written the state it ended on: nothing writes it after. */
+const workerDone = (runFile: string): true | undefined => {
+  const run = JSON.parse(fs.readFileSync(runFile, 'utf8')) as { inputClosed?: boolean; state?: string };
+  return run.inputClosed === true && run.state !== 'working' ? true : undefined;
+};
+
+/**
+ * The run of `runFile` written as it stands when its worker has closed the session's input and its process has not exited yet: a
+ * job on the SDK leaves its result and ends with it, so there is no window to wait for. The rule under test is the worker's —
+ * that a word said after the harness's closing line is refused rather than appended for nobody — and it is read off this file.
+ *
+ * Written once `workerDone` says the worker has written its last state, or that write lands on top of this one and the say is
+ * refused for a session that has ended, which is another rule.
+ *
+ * @returns the file as it was, to write back once the rule has been read
+ */
+const withInputClosed = (runFile: string): string => {
+  const was = fs.readFileSync(runFile, 'utf8');
+  const run = JSON.parse(was) as Record<string, unknown>;
+  fs.writeFileSync(runFile, JSON.stringify({ ...run, state: 'working', inputClosed: true, exitCode: undefined }));
+  return was;
+};
+
 test(
   'a job that has given its result reads nothing more: words said before it exits are rejected, not journalled — and once it has settled, refused',
   WAITED,
   async (t) => {
     const root = tmp('board');
-    const engine = builtEngine(EngineService.layer({ root }));
-    const id = await job(t, engine, 'job-lingers');
+    const engine = builtEngine(EngineService.layer({ root, claudeExecutable: STAND_IN }));
+    const { id, told, letGo } = await job(t, engine, 'job-lingers');
     await Effect.runPromise(engine.say(id, 'finish and linger'));
+    await heard(t, () => (told().length === 2 ? true : undefined), 'the words on its input');
+    letGo();
     const workerFile = (ext: string) => path.join(root, 'runs', 'claude', `ae/${id}/1`.replace(/[^a-zA-Z0-9]+/g, '_') + ext);
     const runFile = workerFile('.json');
-    await heard(t, () => (JSON.parse(fs.readFileSync(runFile, 'utf8')).inputClosed ? true : undefined), 'its input closed at its result');
-    assert.equal(JSON.parse(fs.readFileSync(runFile, 'utf8')).state, 'working', 'and it is still running');
+    await heard(t, () => workerDone(runFile), 'its input closed at its result, and its worker done writing');
+    assert.deepEqual(
+      (await Effect.runPromise(engine.view(id))).state.said.map((s) => s.text),
+      ['finish and linger'],
+      'the words said before its result are the only ones journalled',
+    );
+    assert.equal(told().length, 2, 'and the only ones its session read');
 
+    const was = withInputClosed(runFile);
+    const before = fs.readFileSync(workerFile('.inbox.jsonl'), 'utf8');
     await assert.rejects(
       Effect.runPromise(engine.say(id, 'one more thing')),
       (e: Refusal) => {
@@ -370,9 +419,9 @@ test(
       ['finish and linger'],
       'nothing more journalled',
     );
-    assert.equal(fake.stdin('job-lingers')!.length, 2, 'nothing written on');
-    const inbox = fs.readFileSync(workerFile('.inbox.jsonl'), 'utf8');
-    assert.equal(inbox.split('\n').filter(Boolean).length, 1, 'nothing appended');
+    assert.equal(fs.readFileSync(workerFile('.inbox.jsonl'), 'utf8'), before, 'nothing appended');
+    assert.equal(before.split('\n').filter(Boolean).length, 1);
+    fs.writeFileSync(runFile, was);
 
     await Effect.runPromise(engine.stop(id));
     for (let i = 0; i < 20 && !(await Effect.runPromise(engine.view(id))).state.settled; i++) {

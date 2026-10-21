@@ -329,13 +329,16 @@ test(
     const { renderedFlags } = await import('../src/agents/agents.ts');
     const scribe = parseAgent('scribe', '---\nharnessPrompt: no-coding\nskills: write-a-note, mind-the-tone\n---\nYou write.\n');
     const step = parseWorkflow('write', '---\nplace: git\nagent: scribe\n---\nWrite.\n', undefined, new Map([['scribe', scribe]]));
-    const claude = renderedFlags(step, '/runs/r/agents/write');
+    const dir = scratch('wf-fence-auto-');
+    const agents = path.join(dir, 'agents', 'write');
+    fs.mkdirSync(path.join(agents, 'nemia-scribe'), { recursive: true });
+    fs.writeFileSync(path.join(agents, 'prompt.md'), 'You write.\n');
+    const claude = renderedFlags(step, agents);
     assert.deepEqual(
       Object.keys(claude ?? {}).sort(),
       ['appendSystemPromptFile', 'pluginDir', 'settings'],
       'what the tick files for an agent with instructions, skills and harnessPrompt: no-coding, every flag renderedFlags gives but systemPromptFile',
     );
-    const dir = scratch('wf-fence-auto-');
     fs.writeFileSync(
       path.join(dir, 'claude'),
       [
@@ -351,7 +354,9 @@ test(
     const prev = process.env.PATH;
     process.env.PATH = `${dir}:${prev}`;
     try {
-      const e = plainEngine(Engine.layer({ root: path.join(dir, 'root'), harnesses: { claude: 'claude' } }));
+      const e = plainEngine(
+        Engine.layer({ root: path.join(dir, 'root'), harnesses: { claude: 'claude' }, claudeExecutable: path.join(dir, 'claude') }),
+      );
       const id = await Effect.runPromise(e.file({ brief: 'b', cwd: dir, harness: 'claude', config: { claude } }));
       await until(
         t,
@@ -368,11 +373,16 @@ test(
     }
     const args = fs.readFileSync(path.join(dir, 'args'), 'utf8').split('\n');
     assert.equal(args[args.indexOf('--permission-mode') + 1], fenceReach('claude')!.given, "the runtime's answer, which the parser reads");
-    assert.equal(args[args.indexOf('--append-system-prompt-file') + 1], '/runs/r/agents/write/prompt.md');
-    assert.equal(args[args.indexOf('--plugin-dir') + 1], '/runs/r/agents/write/nemia-scribe');
+    assert.equal(args[args.indexOf('--plugin-dir') + 1], path.join(agents, 'nemia-scribe'));
     assert.equal(
       args[args.indexOf('--settings') + 1],
       '{"outputStyle":"nemia-scribe:no-coding","skillOverrides":{"write-a-note":"off","mind-the-tone":"off"},"autoMemoryEnabled":false}',
+    );
+    assert.deepEqual(
+      args.filter((a) => a.startsWith('--append-system-prompt')),
+      [],
+      "the agent's prompt is no flag on a job: the SDK carries it in the session's first message, as `systemPrompt`'s append " +
+        '(`harness/claude/attached-options.ts`, pinned by `attached-options.test.ts` in the runtime)',
     );
   },
 );

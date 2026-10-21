@@ -11,10 +11,11 @@
  * The server is spawned as Claude Code spawns the entry, in the session's cwd, speaking JSON-RPC on stdio; listing its tools launches no
  * browser, so that test costs nothing and needs no install.
  *
- * A step's session loads only the servers its agent's `mcp:` line and its own name: started on a fake `claude` that records its argv, a
- * session of a step and an agent that name none is named no MCP config in a checkout that has one, a step that names one over an agent
- * that names none is named that one alone and no rule that allows a tool of it, and every shipped step given the `look` skill names
- * `playwright`, itself or by its agent.
+ * A step's session loads only the servers its agent's `mcp:` line and its own name: a step is a Claude Code job, which runs on the Agent
+ * SDK, so the argv read here is the one the SDK itself gives Claude Code — a fake `claude` the engine is handed as its executable
+ * records it, and the servers come inline on it. A session of a step and an agent that name none is named no MCP config in a checkout
+ * that has one, a step that names one over an agent that names none is named that one alone and no rule that allows a tool of it, and
+ * every shipped step given the `look` skill names `playwright`, itself or by its agent.
  *
  * The last test runs against the real harness — skipped unless `AE_LIVE=1`, because it spends money. It files a task at shipped defaults:
  * the engine's built-in harnesses, `claude` first, asked for a background session, with no `mcp` on the task, so the only servers it can
@@ -322,7 +323,7 @@ test('every shipped step given the look skill names playwright, itself or by its
 });
 
 /** A fake `claude` in a new folder, first on PATH while `f` runs: it writes the argv of the session it is started for to `args`. */
-const withFakeClaude = async <T>(f: (args: string) => Promise<T>): Promise<T> => {
+const withFakeClaude = async <T>(f: (args: string, claude: string) => Promise<T>): Promise<T> => {
   const bin = scratch('wf-mcp-bin-');
   const args = path.join(bin, 'args');
   fs.writeFileSync(
@@ -333,7 +334,7 @@ const withFakeClaude = async <T>(f: (args: string) => Promise<T>): Promise<T> =>
   const prev = process.env.PATH;
   process.env.PATH = `${bin}:${prev}`;
   try {
-    return await f(args);
+    return await f(args, path.join(bin, 'claude'));
   } finally {
     process.env.PATH = prev;
   }
@@ -374,8 +375,10 @@ const sessionArgv = async (t: Parameters<typeof until>[0], agent: string, own = 
       landingDenied: () => [],
     },
   );
-  return withFakeClaude(async (args) => {
-    const e = plainEngine(EngineService.layer({ root: scratch('wf-mcp-root-'), harnesses: { claude: 'claude' } }));
+  return withFakeClaude(async (args, claude) => {
+    const e = plainEngine(
+      EngineService.layer({ root: scratch('wf-mcp-root-'), harnesses: { claude: 'claude' }, claudeExecutable: claude }),
+    );
     const id = await Effect.runPromise(e.file({ brief: 'b', cwd, harness: 'claude', config }));
     await until(
       t,
@@ -403,25 +406,28 @@ test(
 
 test("a session of an agent that names one of its checkout's servers is started with that one alone", WAITED, async (t) => {
   const { cwd, args } = await sessionArgv(t, 'mcp: repo\n');
-  const configs = mcpConfigsOf(args);
-  assert.equal(configs.length, 1, JSON.stringify(configs));
-  assert.notEqual(configs[0], path.join(cwd, '.mcp.json'), "not the checkout's file, which names another too");
-  assert.deepEqual(JSON.parse(fs.readFileSync(configs[0], 'utf8')), { mcpServers: { repo: { command: 'repo-server' } } });
+  assert.notEqual(mcpConfigsOf(args)[0], path.join(cwd, '.mcp.json'), "not the checkout's file, which names another too");
+  assert.deepEqual(loadedConfig(args), { mcpServers: { repo: { command: 'repo-server' } } });
 });
 
-/** The servers the one MCP config named on `args` holds, by name, in its order. */
-const serversLoaded = (args: string[]): string[] => {
+/**
+ * The one MCP config named on `args`, parsed: the Agent SDK hands a job's servers inline, as the JSON of the config itself, where a
+ * `claude -p` command line named a file; both are read, so this says what the session loads on either road.
+ */
+const loadedConfig = (args: string[]): { mcpServers: Record<string, unknown> } => {
   const configs = mcpConfigsOf(args);
   assert.equal(configs.length, 1, JSON.stringify(configs));
-  return Object.keys((JSON.parse(fs.readFileSync(configs[0], 'utf8')) as { mcpServers: object }).mcpServers);
+  const one = configs[0];
+  return JSON.parse(one.trimStart().startsWith('{') ? one : fs.readFileSync(one, 'utf8')) as { mcpServers: Record<string, unknown> };
 };
+
+/** The servers the one MCP config named on `args` holds, by name, in its order. */
+const serversLoaded = (args: string[]): string[] => Object.keys(loadedConfig(args).mcpServers);
 
 test('a session of a step that names a server, filled by an agent that names none, is started with that one alone', WAITED, async (t) => {
   const { cwd, args } = await sessionArgv(t, 'description: Looks.\n', 'mcp: repo\n');
-  const configs = mcpConfigsOf(args);
-  assert.equal(configs.length, 1, JSON.stringify(configs));
-  assert.notEqual(configs[0], path.join(cwd, '.mcp.json'), "not the checkout's file, which names another too");
-  assert.deepEqual(JSON.parse(fs.readFileSync(configs[0], 'utf8')), { mcpServers: { repo: { command: 'repo-server' } } });
+  assert.notEqual(mcpConfigsOf(args)[0], path.join(cwd, '.mcp.json'), "not the checkout's file, which names another too");
+  assert.deepEqual(loadedConfig(args), { mcpServers: { repo: { command: 'repo-server' } } });
   assert.ok(args.includes('--strict-mcp-config'));
 });
 

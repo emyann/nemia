@@ -1,6 +1,8 @@
 /**
- * What `claude -p` prints on stdout as it enters the runtime, `--output-format json` and `stream-json` alike: each line of a kind the
- * runtime reads decoded by its schema here (`PRINTED`), where a reader reads it. Only a line that parses as a JSON object of a kind
+ * The lines the runtime keeps of a Claude Code session, as they enter it: printed by `claude -p` — `--output-format json` and
+ * `stream-json` alike — for a `claude-detached` run and for every `-p` run already stored, and by `bin/ae-claude-job.ts` from the
+ * Agent SDK's messages for a job, which is the same stream. Each line of a kind the runtime reads is decoded by its schema here
+ * (`PRINTED`), where a reader reads it. Only a line that parses as a JSON object of a kind
  * the reader reads is decoded; stderr the worker captures beside it, a line torn mid-write, a line of any other type, and a `system`
  * line of any other subtype pass undecoded.
  *
@@ -113,8 +115,9 @@ const DECODERS = Object.fromEntries(KINDS.map((k) => [k, Schema.decodeUnknownRes
 >;
 
 const FIX =
-  'An output that holds it is refused, never read as saying nothing: run a Claude Code whose `claude -p` output this runtime reads,' +
-  ' or a runtime whose schema for the line in `PRINTED` (`harness/claude/print.ts`) reads this one.';
+  'An output that holds it is refused, never read as saying nothing: run a Claude Code whose output this runtime reads — the lines' +
+  " `claude -p` prints, which a job's own process prints from the Agent SDK's messages — or a runtime whose schema for the line in" +
+  ' `PRINTED` (`harness/claude/print.ts`) reads this one.';
 
 /** The kind of `value` when it is a JSON object of one of `kinds`, or `undefined` for anything else. */
 const kindOf = (value: unknown, kinds: readonly PrintedKind[]): PrintedKind | undefined => {
@@ -151,7 +154,7 @@ const refusal = (at: number, kind: PrintedKind, value: unknown, error: Schema.Sc
     .split(' ')
     .map((k) => `\`${k}\``)
     .join(' ');
-  return `line ${at} of the \`claude -p\` output is ${kind.startsWith('a') ? 'an' : 'a'} ${named} line whose ${field} ${words}. ${FIX}`;
+  return `line ${at} of the session's output is ${kind.startsWith('a') ? 'an' : 'a'} ${named} line whose ${field} ${words}. ${FIX}`;
 };
 
 /**

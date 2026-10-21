@@ -1,9 +1,10 @@
 /**
  * Claude Code as the engine runs it by default: a step is a job, and a session a person means to reach is a background one.
  *
- * A job is `claude -p`, detached by the engine's worker (`harness/detached/detached.ts`): it runs its brief to completion and exits,
- * so its end is its exit and its result — no registry to read, no quiet rule, a spend cap it keeps. Under `-p` no mode
- * waits on a prompt; a call it may not make is denied and the session carries on, and the result says what was denied.
+ * A job is one session on the Agent SDK, in a process of its own (`bin/ae-claude-job.ts`), detached by the engine's worker
+ * (`harness/detached/detached.ts`): it runs its brief to completion and exits, so its end is its exit and its result — no registry
+ * to read, no quiet rule, a spend cap it keeps. Nobody is there to ask (`permissionPrompts: 'none'`); a call it may not make is
+ * denied and the session carries on, and the result says what was denied.
  * It reads its brief on its stdin, and words a person says while it works after it, until its result. A background session
  * (`config.background: true`) is `claude --bg` (`claudeOps`): a person can attach to it, say words to it, and bridge it to
  * claude.ai. One harness, two modes, chosen per task.
@@ -13,13 +14,17 @@
  * restart, before any observe, reaches the right one. A job resumed from a background session's id is a job: the mode
  * is the new attempt's, and `claude -p --resume` continues a `--bg` session.
  *
- * A job's argv is built here too (`claudePrintArgs`), and so is `claude-detached` (`claudeDetached`): Claude Code run as
+ * A job's own options are the attached road's, fact for fact (`attachedOptions`), built in its process from the spawn request the
+ * runner wrote for it: one translation of a task into a Claude Code session, whether a daemon holds it or nothing does. What is
+ * still built here as a `claude -p` argv is `claude-detached` alone (`claudeDetached`, `claudePrintArgs`): Claude Code run as
  * `claude -p`, detached by the engine's worker rather than by the harness, whose output is one JSON object at its exit.
- * Both run with background tasks off (`CLAUDE_JOB_ENV`); a background session's environment is its own.
+ * Both run with background tasks off (`CLAUDE_JOB_ENV`, a job's laid on its session's own environment by `attachedOptions`); a
+ * background session's environment is its own.
  */
 import { Effect, Stream } from 'effect';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { nameParts, type Sighting } from '../../core/index.ts';
 import { claudeOps, type ClaudeOptions } from './bg.ts';
 import { claudeQuota } from './quota.ts';
@@ -48,8 +53,9 @@ import { RunnerError } from '../error.ts';
 import type { Attached } from './attached.ts';
 
 /**
- * The arguments `claude -p` is given, whichever of the engine's specs runs it, given how its output is to be printed: the
- * format goes first, where the brief's `-p` has already taken its value and the variadic lists after it cannot take one.
+ * The arguments `claude -p` is given — `claude-detached`'s, the one spec that still runs it — given how its output is to be
+ * printed: the format goes first, where the brief's `-p` has already taken its value and the variadic lists after it cannot take
+ * one.
  */
 export const claudePrintArgs = (r: SpawnRequest, io: HarnessIO | undefined, output: string[]): string[] => [
   '-p',
@@ -59,8 +65,8 @@ export const claudePrintArgs = (r: SpawnRequest, io: HarnessIO | undefined, outp
 ];
 
 /**
- * What `claude -p` is given beside its brief and its formats: the same whether the brief is `-p`'s value or the first line
- * on its stdin (`claudeJob`). In order:
+ * What `claude -p` is given beside its brief and its formats (`claude-detached`'s flags; a job's same facts are
+ * `attachedOptions`, held to this argv fact for fact by `attached-options.test.ts`). In order:
  *
  * 1. `--tools`, `--disallowedTools` and `--allowedTools`, each joined by commas: variadic, and ended by the flag after
  *    each, as for `claude --bg`. The allow list is not the fence's opposite: a rule there says a tool the session has may
@@ -157,45 +163,51 @@ export const claudeDetached: HarnessSpec = {
   callAdmission: true,
 };
 
+/** The process one Claude Code job's session runs in, `bin/ae-claude-job.ts`, found from this file's own folder as `WORKER` is. */
+export const CLAUDE_JOB_BIN = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'bin', 'ae-claude-job.ts');
+
 /**
- * A step run as a job: `claude -p`, its output a stream. The stream's first line names the session, so its id is known
- * while it runs and its transcript can be read then; each call it was denied is a line as it happens, so a job killed
- * before its result still says what it was denied (`claudeStreamOutput`). `--verbose` is what `-p` needs to print a
- * stream at all. `--permission-prompts none` says what `-p` does in every mode: a call that would ask is denied, never
- * waited on — said on the command line, so no default of Claude Code's can make a job wait on a person who is not there.
+ * A step run as a job: one session on the Agent SDK, run by a process of ours (`CLAUDE_JOB_BIN`) that the worker detaches as it
+ * detaches any harness. The bin reads the spawn request the runner wrote for it (`needsRequest`), builds the session's options
+ * with `attachedOptions` — the same translation a held session is given, fact for fact — and prints each of the SDK's messages as
+ * one JSON line, which is the stream `claude -p --output-format stream-json --verbose --include-partial-messages` printed: so
+ * every reader of a job, and every `-p` run already stored, reads the same thing. Nothing on this road builds a `claude -p` argv.
  *
- * Its input is a stream too (`--input-format stream-json`): the brief is the first user message on its stdin, and each
- * word said to it while it works is another, which it takes into the turn it is working. It reads its stdin until
- * it ends, so the worker ends it at the job's first result, and the job exits. Its closeout, its spend cap and what it is
- * denied are as they are under a prompt.
+ * The stream's first line names the session, so its id is known while it runs and its transcript can be read then; each call it
+ * was denied is a line as it happens, so a job killed before its result still says what it was denied (`claudeStreamOutput`).
+ * Nobody is there to ask, so the bin runs the session `permissionPrompts: 'none'` (`sdk.d.ts:1870`): a call that would ask is
+ * denied at once, never waited on, and no decision of the bin's can be left in flight when it dies.
  *
+ * Its input is a stream too: the brief is the first user message on its stdin, and each word said to it while it works is
+ * another, which it takes into the turn it is working. The bin reads its stdin until it ends, so the worker ends it at the job's
+ * first result, and the session ends with it. Its closeout, its spend cap and what it is denied are as they were under `-p`.
+ *
+ * - `command`: this runtime's node running the bin, the request file its one argument. `AE_CLAUDE_EXECUTABLE` where the engine
+ *   names a Claude Code (`claudeJobSpec`'s `executable`), and nothing else: the session's own environment —
+ *   the task's `env`, `CLAUDE_JOB_ENV` and its telemetry — is laid by `attachedOptions` on `Options.env` inside the bin, and
+ *   leaving it here would stamp the engine's own child with the session's telemetry.
+ * - `needsRequest`: the bin is handed the spawn request whole, which no argv could carry.
  * - `input.line`: a user message; the session is the job's own, so it names none.
- * - `input.closesOn`: its result, the line after which a `-p` session reads nothing more; Claude Code prints its `type` far
+ * - `input.closesOn`: its result, the line after which the bin reads nothing more; a producer prints its `type` far
  *   down the line, so it is parsed, never matched at the line's start.
- * - `resumeCostCarried`: `claude -p --resume` prints its parent's cost and API time on in its own.
- * - `streams` and `partials`: `--include-partial-messages` prints each text block in pieces as it is written, read from the stdout
- *   the worker keeps whole, so the job is followed live (`follow`, `claudePartials`).
+ * - `resumeCostCarried`: a resumed Claude Code prints its parent's cost and API time on in its own.
+ * - `streams` and `partials`: the bin prints the SDK's `stream_event` messages — each text block in pieces as it is written
+ *   (`includePartialMessages`) — read from the stdout the worker keeps whole, so the job is followed live (`follow`,
+ *   `claudePartials`).
  * - `keepOutput`: once the job has ended, its capture keeps only what the readers read (`claudeStreamKept`); the conversation is
  *   Claude Code's own transcript's (`transcript`).
+ * - `prepare`: not for what it puts in `io` — the servers ride `Options.mcpServers`, read by `everyMcpServer` inside the bin, and
+ *   a job writes no MCP config file — but for what it throws: a checkout whose `.mcp.json` is not JSON refuses the spawn here,
+ *   before the worker starts, so the attempt ends `unstartable` in those words rather than failing inside the bin.
  */
-export const claudeJob: HarnessSpec = {
+export const claudeJobSpec = (executable?: string): HarnessSpec => ({
   name: 'claude',
-  command: (r, io) => ({
-    cmd: 'claude',
-    args: [
-      '-p',
-      '--input-format',
-      'stream-json',
-      '--output-format',
-      'stream-json',
-      '--verbose',
-      '--include-partial-messages',
-      '--permission-prompts',
-      'none',
-      ...claudePrintFlags(r, io),
-    ],
-    env: { ...r.config?.env, ...CLAUDE_JOB_ENV, ...claudeTelemetryEnv(r) },
+  command: (_r, io) => ({
+    cmd: process.execPath,
+    args: [CLAUDE_JOB_BIN, io!.requestFile!],
+    ...(executable ? { env: { AE_CLAUDE_EXECUTABLE: executable } } : {}),
   }),
+  needsRequest: true,
   input: {
     line: (text) => JSON.stringify({ type: 'user', message: { role: 'user', content: text } }),
     closesOn: { key: 'type', value: 'result' },
@@ -215,7 +227,10 @@ export const claudeJob: HarnessSpec = {
   mounts: { readOnly: true, writable: true },
   callAdmission: true,
   resumeCostCarried: true,
-};
+});
+
+/** A job's spec as the engine runs it with the Claude Code on the PATH: `claudeJobSpec()`, named for the readers that take a spec. */
+export const claudeJob: HarnessSpec = claudeJobSpec();
 
 /** A part of a look, read: what it answered, or what its failure said (`causeWords`). */
 type Read<A> = { value: A; why?: undefined } | { value?: undefined; why: string };
@@ -256,9 +271,10 @@ export const isClaudeJob = (sessionId: string) => nameParts(sessionId) !== undef
  */
 export const claudeCodeOps = (options: ClaudeOptions = {}, attached?: Attached): RunnerOps => {
   const root = options.root ?? path.join(os.homedir(), '.agent-engine');
-  const plain = detachedOps(claudeJob, root);
+  const spec = claudeJobSpec(options.claudeExecutable);
+  const plain = detachedOps(spec, root);
   const job = attached ? withAttached(plain, attached) : plain;
-  const plainFind = detachedFind(claudeJob, root);
+  const plainFind = detachedFind(spec, root);
   const findJob = (name: string) => (attached?.has(name) ? Effect.succeed({ sessionId: name }) : plainFind(name));
   const bg = claudeOps({ ...options, root });
   const of = (sessionId: string) => (isClaudeJob(sessionId) ? job : bg);

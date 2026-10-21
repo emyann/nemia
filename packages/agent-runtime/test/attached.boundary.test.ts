@@ -7,8 +7,9 @@
  * holder resumes a session told which call was cut, a stop and words from another engine reach the session, a call held at its hook as
  * the holder lets go is never written in flight, a holder whose pid another process has taken is gone, neither a drain nor a kill
  * reaches a process given a pid since, a let-go whose sessions never end still returns with its waits inside one budget, a resumed
- * session's cost leaves out what its parent spent, and a session is started on Claude Code's own system prompt with the agent's
- * appended to it.
+ * session's cost leaves out what its parent spent, a session is started on Claude Code's own system prompt with the agent's appended
+ * to it — as text on the `initialize` request, not as a flag naming a file — and its servers ride the child's argv as the inline JSON
+ * the SDK compiles `Options.mcpServers` to, strict, with the context window a key of the one settings object.
  *
  * And, of a long-lived attached request (`restartPolicy: 'Always'`), which runs here by the runtime's own rule: a turn's end is not
  * the session's end, the session is written `idle` and heard again across turns, an interrupted turn's `error_during_execution` result
@@ -776,17 +777,52 @@ test("a session is started on Claude Code's own system prompt, the agent's appen
   t.after(h.close);
   await Effect.runPromise(h.attached.ops.spawn(request));
   await until(t, () => run(root)?.state === 'completed', 'the session completed', { everyMs: 50 });
-  const [init] = lines(dir, 'initialize.jsonl') as { systemPrompt?: unknown }[];
+  const [init] = lines(dir, 'initialize.jsonl') as { systemPrompt?: unknown; appendSystemPrompt?: unknown }[];
   assert.ok(init, 'the SDK sent an initialize request');
   assert.equal(
     init.systemPrompt,
     undefined,
     `the preset sends no prompt of ours, so Claude Code renders its own; it sent ${JSON.stringify(init.systemPrompt)}`,
   );
+  assert.equal(
+    init.appendSystemPrompt,
+    'you are the agent',
+    "the agent's own prompt is appended on the initialize request (`sdk.d.ts:4176`), as its text and not its file's path",
+  );
   const [argv] = lines(dir, 'argv.jsonl') as string[][];
-  const at = argv.indexOf('--append-system-prompt-file');
-  assert.deepEqual(argv.slice(at, at + 2), ['--append-system-prompt-file', prompt], "the agent's own prompt is still appended");
+  assert.ok(!argv.includes('--append-system-prompt-file'), "the prompt is no longer a flag: the SDK carries it in the session's init");
   assert.ok(!argv.includes('--system-prompt'), "no prompt of ours is spawned: the preset is Claude Code's own");
+});
+
+test('a task’s servers ride the child’s argv as inline JSON, strict, and the window rides the settings', WAITED, async (t) => {
+  const { root, dir, request } = place(
+    { output: {} },
+    { contextTokens: 150_000, mcp: { probe: { command: 'probe-server', args: ['--once'] } } },
+  );
+  const stale = filesOf(root, NAME).mcp;
+  fs.mkdirSync(path.dirname(stale), { recursive: true });
+  fs.writeFileSync(stale, JSON.stringify({ mcpServers: { gone: { command: 'a server it was not given' } } }));
+  const h = await holder(root);
+  t.after(h.close);
+  await Effect.runPromise(h.attached.ops.spawn(request));
+  await until(t, () => run(root)?.state === 'completed', 'the session completed', { everyMs: 50 });
+  const [argv] = lines(dir, 'argv.jsonl') as string[][];
+  const at = argv.indexOf('--mcp-config');
+  assert.ok(at >= 0, `the SDK compiled \`mcpServers\` onto the child's argv; it gave ${argv.join(' ')}`);
+  assert.deepEqual(
+    JSON.parse(argv[at + 1]),
+    { mcpServers: { probe: { command: 'probe-server', args: ['--once'] } } },
+    'the servers themselves, inline, where the runtime used to name a file of its own',
+  );
+  assert.ok(argv.includes('--strict-mcp-config'), '`strictMcpConfig` is still the fence');
+  assert.equal(fs.existsSync(stale), false, 'a config an older runtime left under this name is cleared at the spawn, never read');
+  assert.ok(!argv.includes('--autocompact'), 'the window is no flag of ours any more');
+  const settings = argv.indexOf('--settings');
+  assert.deepEqual(
+    JSON.parse(argv[settings + 1]),
+    { autoMemoryEnabled: false, autoCompactWindow: 150_000 },
+    'it rides the one settings object, beside auto-memory off: `Settings.autoCompactWindow`, which the SDK spells as `--settings`',
+  );
 });
 
 test("a long-lived session is started on that same prompt: one path builds an attached session's options", WAITED, async (t) => {
@@ -797,10 +833,11 @@ test("a long-lived session is started on that same prompt: one path builds an at
   t.after(h.close);
   await Effect.runPromise(h.attached.ops.spawn(request));
   await idle(t, root, 'the long-lived session answered its first turn');
-  const [init] = lines(dir, 'initialize.jsonl') as { systemPrompt?: unknown }[];
+  const [init] = lines(dir, 'initialize.jsonl') as { systemPrompt?: unknown; appendSystemPrompt?: unknown }[];
   assert.ok(init, 'the SDK sent an initialize request');
   assert.equal(init.systemPrompt, undefined, 'the preset sends no prompt of ours here either');
+  assert.equal(init.appendSystemPrompt, 'you are the agent', "the agent's own prompt is appended to a long-lived session too");
   const [argv] = lines(dir, 'argv.jsonl') as string[][];
-  assert.ok(argv.includes('--append-system-prompt-file'), "the agent's own prompt is appended to a long-lived session too");
+  assert.ok(!argv.includes('--append-system-prompt-file'), 'and neither session has it as a flag');
   assert.ok(!argv.includes('--system-prompt'), 'and no prompt of ours is spawned: Claude Code renders its own');
 });

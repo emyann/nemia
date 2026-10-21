@@ -69,7 +69,9 @@ const refusals = (config: unknown, repo: string): string[] => {
 
 /**
  * Why an `--output-dir` is not a step's files directory with an absolute default outside the repository, `${WF_STEP_FILES:-/abs}`,
- * one sentence each — none when it is. Claude Code expands the variable as it spawns the server; a nested one it does not.
+ * one sentence each — none when it is. Claude Code expands the variable as it spawns the server; a nested one it does not. It
+ * expands it from the inline map an attached session's `Options.mcpServers` becomes as well as from a config file (measured on
+ * Claude Code 2.1.306, `agent-runtime/test/live.test.ts`), so this rule holds on every road.
  */
 const outputDirRefusals = (dir: string | undefined, repo: string): string[] => {
   if (dir === undefined) return ['writes its files to .playwright-mcp, relative to the workspace, where the run commits them'];

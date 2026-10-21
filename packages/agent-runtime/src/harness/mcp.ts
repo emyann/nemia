@@ -1,8 +1,9 @@
 /**
  * A task's MCP servers, as Claude Code is handed them: what the engine refuses of a task's `mcp`, the checkout's own
- * `.mcp.json` and the entries a task picks of it, the task's config written to a file, and the flags that load those and nothing
- * else. And as Codex is handed them: the server names an operator's Codex config already has, and a task's servers as its
- * `mcp_servers` table.
+ * `.mcp.json` and the entries a task picks of it, the task's config written to a file, the flags that load those and
+ * nothing else, and every server a session is given as one value (`everyMcpServer`), which an attached session rides on
+ * `Options.mcpServers` instead of a file. And as Codex is handed them: the server names an operator's Codex config already
+ * has, and a task's servers as its `mcp_servers` table.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -125,10 +126,28 @@ export const sessionMcp = (cwd: string, config: HarnessArgs | undefined): Record
   config?.checkoutMcp ? { ...pickedCheckoutMcp(cwd, config.checkoutMcp), ...config.mcp } : config?.mcp;
 
 /**
+ * Every server a session is given, as a value: the checkout's own `.mcp.json` whole, as `claude -p` reads its second config — unless
+ * the task picks entries of it by name (`checkoutMcp`), which `sessionMcp` has already taken — with the session's own laid over it, so
+ * the task's server wins a name both give. `{}` where neither gives one.
+ *
+ * What `writeMcpConfig` writes to a file, for the caller that hands the map over as a value instead: an attached session's
+ * `Options.mcpServers` (`sdk.d.ts:1813`). The values are a `.mcp.json`'s and a task's, read as they were written and never checked
+ * here, so the type says `unknown` and the caller that hands them to the SDK is the one that names the SDK's shape.
+ */
+export const everyMcpServer = (cwd: string, config: HarnessArgs | undefined): Record<string, unknown> => {
+  const checkout = config?.checkoutMcp ? undefined : checkoutMcpConfig(cwd);
+  const theirs = checkout ? ((JSON.parse(fs.readFileSync(checkout, 'utf8')) as { mcpServers?: object }).mcpServers ?? {}) : {};
+  return { ...theirs, ...sessionMcp(cwd, config) };
+};
+
+/**
  * A session's servers (`sessionMcp`), written to `file` as an MCP config (`{"mcpServers": …}`) — or `file` cleared when
  * there is none, so a re-spawn never finds servers it was not given. Owner-only: an `env` or
- * `headers` value may be a secret. Returns the file's absolute path, as `checkoutMcpConfig` does: a
- * `file` given relative is relative to the engine, not to the session's cwd.
+ * `headers` value may be a secret. For the paths that hand Claude Code a `--mcp-config` file of their own — a job,
+ * `claude --bg`, `claude-detached`; an attached session hands the servers over as a value (`everyMcpServer`), which the SDK
+ * spells onto the child's argv, so the owner-only file is no part of that path and this warning is not its cover. Returns
+ * the file's absolute path, as `checkoutMcpConfig` does: a `file` given relative is relative to the engine, not to the
+ * session's cwd.
  */
 export const writeMcpConfig = (file: string, mcp: Record<string, unknown> | undefined): string | undefined => {
   if (!mcp || !Object.keys(mcp).length) {

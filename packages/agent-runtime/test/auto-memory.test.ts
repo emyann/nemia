@@ -54,11 +54,16 @@ test("a task's own settings keep every key they hold, and auto-memory is off bes
 
 test("an attached session is given auto-memory off on the SDK's own settings, the task's keys kept", () => {
   const dir = scratch('auto-memory');
-  assert.deepEqual(attachedOptions(taskOf(dir), `${dir}/mcp.json`).settings, { autoMemoryEnabled: false }, 'nothing given');
+  assert.deepEqual(attachedOptions(taskOf(dir)).settings, { autoMemoryEnabled: false }, 'nothing given');
   assert.deepEqual(
-    attachedOptions(taskOf(dir, { settings: JSON.stringify({ outputStyle: 'x' }) }), `${dir}/mcp.json`).settings,
+    attachedOptions(taskOf(dir, { settings: JSON.stringify({ outputStyle: 'x' }) })).settings,
     { outputStyle: 'x', autoMemoryEnabled: false },
     "the task's own settings",
+  );
+  assert.deepEqual(
+    attachedOptions({ ...taskOf(dir), config: { contextTokens: 150_000 } }).settings,
+    { autoMemoryEnabled: false, autoCompactWindow: 150_000 },
+    'the context window is a key of those same settings, and auto-memory stays off beside it',
   );
 });
 

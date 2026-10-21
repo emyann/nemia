@@ -860,6 +860,20 @@ shape, with the fix in the sentence: a key an entry does not take, an argument o
 a string, and a `url` with no `type`, from which Claude Code loads nothing and says nothing. The
 runner's file is outside the workspace, owner-only, and rewritten or cleared on every spawn; the map
 itself is journalled as filed, like every field on the task, so a secret in it is on disk there too.
+
+**An attached session names no file.** The table above is of the paths that spell a command line — a
+job, `claude-detached`, `claude --bg`. An attached session's servers are the merged map itself, on the
+Agent SDK's `Options.mcpServers` with `Options.strictMcpConfig` (`everyMcpServer`,
+`attachedOptions`), and the SDK compiles that onto the Claude Code child's argv as inline JSON on
+`--mcp-config`. So the owner-only 0600 line is the other paths': on this one a server's `env` or
+`headers` value is in the child's `/proc/<pid>/cmdline`, readable by every user of the machine, and
+the runner writes no MCP file at all — it clears a stale one at each spawn, for a session an older
+runtime started. A `${NAME:-default}` in a server's arguments is expanded all the same
+(measured on Claude Code 2.1.306: a variable the task's `env` set came back expanded, and one
+nothing sets came back as its default), so the repository's own
+`--output-dir ${WF_STEP_FILES:-/tmp/playwright-mcp}` still writes outside the workspace here, and an
+inline map is no worse than a file for it.
+
 A `.mcp.json` that is not JSON ends the attempt `unstartable`, naming the file: named on the command
 line, it stops Claude Code before a session exists. With `worktree`, the file named is the `cwd`'s
 own, not the worktree's copy of it. Both files are named by absolute path: Claude Code resolves the
@@ -1036,6 +1050,20 @@ the flag and its value, and a list the flag once per entry. They go after the va
 agent-orchestrator gives — `appendSystemPromptFile`, `systemPromptFile`, `pluginDir`, `settings`, and `remoteControl` (above) — are typed
 (`ClaudeFlags`), and any other the CLI has is taken. It is how an agent's body reaches the system prompt and its skills a
 plugin directory of the step's own, and the runtime reads none of it: `domain.ts` and `engine.ts` never open `config`.
+
+An **attached** session has no command line of the runtime's making, so each of those keys reaches it on the Agent SDK's own
+`Options` where the SDK has one (`attachedOptions`, SDK 0.3.270): `appendSystemPromptFile` and `systemPromptFile` as
+`systemPrompt` — the file's text, read when the session is spawned, appended to the `claude_code` preset or in place of it, from the
+task's own `cwd` where the path is relative, as Claude Code resolved the flag's path from inside the child and as `pluginDir` is
+resolved —
+`pluginDir` as `plugins`, and `settings` as `settings`. Giving both prompt files is refused there, naming
+`claude-detached`, which takes both flags: the SDK has the one option, and what Claude Code does given both is unmeasured. What
+stays raw, on `extraArgs`: `--no-chrome` and `--worktree`, which `sdk.d.ts` has no option for, and whatever else a task writes
+here — a flag only Claude Code has, which is what this bag is for. The context window, which is `contextTokens` and not a
+`claude` key, rides `Settings.autoCompactWindow` in those same settings, and falls back to `--autocompact` for the one task whose
+`claude.settings` is a file's path: there is no settings object of the runtime's to put it in, and the runtime rewrites no
+settings file. Both reach the same window (measured against Claude Code on SDK 0.3.270: 150000 asked either way, `rawMaxTokens:
+150000`; a session asked for neither got the model's 200000).
 
 `file()` refuses a `claude` that is not an object of camelCase keys, two letters or more, whose values each say one thing
 on the command line (`false`, `null`, `''`, an object and an empty list do not); a flag the runtime gives itself
@@ -2158,8 +2186,10 @@ road alone reads it, as a job and a `--bg` session run the `claude` on the PATH.
   holder at all does; a card it answers that this runtime cannot read is refused at that follow, in words, with nothing dialled.
   The port goes with the scope: the server stops, every open socket is destroyed, and the token's file is forgotten
   (`holderTokenOf` reads it while it is there, for whoever hands a viewer its credentials).
-- **The fence.** The job's, fact for fact (`attachedOptions`, held to `claudePrintFlags` by its test). A call that would ask a
-  person is answered in the holder (`canUseTool`): denied, and written as a denial.
+- **The fence.** The job's, fact for fact (`attachedOptions`, held to `claudePrintFlags` by its test), each fact on the SDK's own
+  `Options` where it has one — the servers as `mcpServers` with `strictMcpConfig`, the agent's prompt as `systemPrompt`'s `append`
+  on the `claude_code` preset, the context window as `autoCompactWindow` in the one `settings` object — and on `extraArgs` where it
+  has none. A call that would ask a person is answered in the holder (`canUseTool`): denied, and written as a denial.
 - **Let go.** As the holder's scope closes, new calls wait at their `PreToolUse` hook, it waits with no bound for each call in
   flight, then writes each session `parked` and stops it; a call still held at its hook then is never written in flight.
 - **Taken up.** On a look, a holder adopts a session parked, or one whose holder's process is gone: it kills what is left of

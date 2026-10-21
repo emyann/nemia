@@ -10,7 +10,9 @@
  * that `lost` would only hide the reason.
  *
  * Every case below goes through the engine's own harnesses with a fake `claude` and `codex` on PATH, each writing down
- * the argv it was given, so what is checked is what the engine really runs.
+ * the argv it was given, so what is checked is what the engine really runs. The last two are of `everyMcpServer` alone, the same
+ * servers as a value rather than a file: what an attached session rides on `Options.mcpServers`, whose own spawn is pinned in
+ * `attached.boundary.test.ts`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,7 +24,7 @@ import { Engine } from '../src/index.ts';
 import { claudeOps } from '../src/harness/claude/bg.ts';
 import { detachedOps, type HarnessIO, type HarnessSpec } from '../src/harness/detached/detached.ts';
 import { codex } from '../src/harness/codex/codex.ts';
-import { codexMcpServerNames } from '../src/harness/mcp.ts';
+import { codexMcpServerNames, everyMcpServer } from '../src/harness/mcp.ts';
 import { scratch } from './scratch.ts';
 import { builtEngine } from './engine.ts';
 import { until, WAITED, type Waiter } from '../src/waits/index.ts';
@@ -445,3 +447,36 @@ test(
     assert.deepEqual(mcpConfigsOf(args!).configs, [path.join(cwd, '.mcp.json')]);
   },
 );
+
+test('everyMcpServer answers the servers a session gets as one value: the checkout whole, the task laid over it', () => {
+  const cwd = tmp('every');
+  fs.writeFileSync(
+    path.join(cwd, '.mcp.json'),
+    JSON.stringify({ mcpServers: { repo: { command: 'repo-server' }, both: { type: 'http', url: 'https://theirs' } } }),
+  );
+  assert.deepEqual(
+    everyMcpServer(cwd, { mcp: { mine: { command: 'my-server' }, both: { command: 'ours' } } }),
+    { repo: { command: 'repo-server' }, both: { command: 'ours' }, mine: { command: 'my-server' } },
+    "the whole file, as `claude -p` reads its second config, with the task's own winning a name both give",
+  );
+  assert.deepEqual(
+    everyMcpServer(cwd, { checkoutMcp: ['repo'], mcp: { mine: { command: 'my-server' } } }),
+    { repo: { command: 'repo-server' }, mine: { command: 'my-server' } },
+    'a task that picks entries by name gets those and no more of the file, as `pickedCheckoutMcp` picks them',
+  );
+  assert.deepEqual(everyMcpServer(cwd, { checkoutMcp: [] }), {}, 'and `checkoutMcp: []` leaves the file out altogether');
+});
+
+test('everyMcpServer answers {} for a cwd with no .mcp.json and a task with no server, and refuses a file that is not JSON', () => {
+  const bare = tmp('every-bare');
+  assert.deepEqual(everyMcpServer(bare, undefined), {}, 'no config of ours is named when there is nothing to name');
+  assert.deepEqual(everyMcpServer(bare, {}), {});
+  const broken = tmp('every-broken');
+  const file = path.join(broken, '.mcp.json');
+  fs.writeFileSync(file, '{ not json');
+  assert.throws(
+    () => everyMcpServer(broken, undefined),
+    (err: Error) => err.message.includes(file) && err.message.includes('not valid JSON'),
+    'refused here as `checkoutMcpConfig` refuses it, before a session exists',
+  );
+});

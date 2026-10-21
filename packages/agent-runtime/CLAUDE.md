@@ -117,9 +117,25 @@ down is in `docs/architecture.md`, *Who owns what*.
 - **The Agent SDK (0.3.270) speaks to its CLI in control requests both ways, and writes a resume as one argument, `--resume=<id>`**: the
   stand-in CLI (`test/fixtures/stand-in-claude.ts`) answers `initialize` and asks `hook_callback` and `can_use_tool` as it does, and
   `test/attached.boundary.test.ts` pins it; an SDK update that moves the protocol fails there first.
-- **The SDK sends an empty system prompt when `systemPrompt` is unasked**, so an agent's own prompt on `append-system-prompt-file` is
-  appended to nothing: `attachedOptions` asks for the preset `claude_code`, which a `claude -p` job has by default (measured 0.3.270:
-  the `initialize` request carried `[""]` without it, and none with it).
+- **The SDK sends an empty system prompt when `systemPrompt` is unasked**, so an agent's own prompt appended to it is appended to
+  nothing: `attachedOptions` asks for the preset `claude_code`, which a `claude -p` job has by default (measured 0.3.270:
+  the `initialize` request carried `[""]` without it, and none with it). The agent's own prompt rides that preset's `append`, as the
+  file's text read at spawn, and reaches the CLI as `appendSystemPrompt` on the `initialize` request, never as
+  `--append-system-prompt-file`; so does `systemPromptFile`, as `systemPrompt` alone, and a task giving both is refused by name. A
+  resumed session keeps the prompt it was recorded with (`systemPrompt`'s own `snapshot`, which defaults on, `sdk.d.ts:2203-2256`),
+  so a prompt file edited mid-session reaches no live session until it is compacted.
+- **An attached session's MCP servers are `Options.mcpServers`, which the SDK spells onto the child's argv as inline JSON**
+  (`sdk.mjs`, `--mcp-config <json>`), with `Options.strictMcpConfig` as the fence: that path writes no MCP config file, and a
+  server's `env` or `headers` secret is in `/proc/<pid>/cmdline` rather than a 0600 file — a job, `claude --bg` and
+  `claude-detached` still name a file (`writeMcpConfig`). **Claude Code expands a `${NAME:-default}` in a server's arguments from
+  the inline map too**, not from a config file alone (measured 2.1.306, `test/live.test.ts`: a variable the task's `env` set came
+  back expanded and one nothing sets came back as its default), so the repository's own
+  `--output-dir ${WF_STEP_FILES:-/tmp/playwright-mcp}` still writes outside the workspace on this road. `Settings.autoCompactWindow`, in the one settings object, moves the window
+  `--autocompact <n>` moves (measured 0.3.270 against the real CLI: 150000 either way gave `rawMaxTokens: 150000`, against the
+  model's 200000 asked for neither), and the flag stays only where `claude.settings` is a file's path the runtime will not rewrite.
+- **`Options.settings` overwrites a `settings` left on `extraArgs`, and `extraArgs` stringifies its values** (`sdk.mjs`): so
+  `Options.settings` is the only writer of a session's settings — an object there is JSON the SDK writes itself — and an object left
+  in the `extraArgs` bag would reach the CLI as `[object Object]`.
 
 ## A2A and remote agents
 

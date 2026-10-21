@@ -296,7 +296,7 @@ export const startSession = (
   };
   writeRun(root, run);
   live.unanswered.add(live.input.push(first));
-  const given = attachedOptions(r, filesOf(root, run.name).mcp);
+  const given = attachedOptions(r);
   const q = query({
     prompt: live.input,
     options: {

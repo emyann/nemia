@@ -325,8 +325,8 @@ const opsOf = (
   spawn: (r) =>
     Effect.try({
       try: () => {
-        const { out, stop, interrupt, say } = filesOf(root, r.name);
-        for (const f of [out, stop, interrupt, say]) fs.rmSync(f, { force: true });
+        const { out, stop, interrupt, say, mcp } = filesOf(root, r.name);
+        for (const f of [out, stop, interrupt, say, mcp]) fs.rmSync(f, { force: true });
         const run: AttachedRun = {
           name: r.name,
           state: 'working',

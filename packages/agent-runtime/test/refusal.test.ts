@@ -334,7 +334,7 @@ test('REFUSED: `mayAsk: true` on a session this runtime does not hold attached, 
   const options = {
     root: scratch('ae-may-ask-'),
     journal: asyncStore(memoryStore()),
-    harnesses: { claude: 'claude' as const, bg: 'claude-bg' as const, codex },
+    harnesses: { claude: 'claude' as const, hers: 'claude' as const, bg: 'claude-bg' as const, codex },
   };
   const engine = builtEngine(Engine.layer(options));
   const refused = (spec: Filing) => Effect.runPromise(Effect.flip(engine.file(spec)));
@@ -356,6 +356,15 @@ test('REFUSED: `mayAsk: true` on a session this runtime does not hold attached, 
   assert.ok(
     await Effect.runPromise(engine.file({ ...ok, harness: 'claude', restartPolicy: 'Always', config: { background: true, mayAsk: true } })),
     'the long-lived `claude` session this runtime holds attached holds a call open, so it takes it',
+  );
+  assert.ok(
+    await Effect.runPromise(engine.file({ ...ok, harness: 'hers', restartPolicy: 'Always', config: { background: true, mayAsk: true } })),
+    'which harnesses hold a call is read off their configuration (`heldHarnessesOf`), never off the name: a harness named anything and configured `claude` holds one',
+  );
+  assert.match(
+    (await refused({ ...asked, harness: 'hers' })).message,
+    /the `hers` harness runs this task as a job/,
+    'and the same harness filed as a job is refused in the words of a harness whose session ends with its turn',
   );
 });
 

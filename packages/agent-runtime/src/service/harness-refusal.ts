@@ -4,7 +4,7 @@
  */
 import { CLAUDE_CONTEXT_TOKENS, bridgeAsked, claudeBgRefuses, claudeCodeRefuses } from '../harness/claude/index.ts';
 import { remoteRefuses } from '../a2a/index.ts';
-import { isClaude, isRemote, isSpec, type HarnessConfig, type TaskSpec } from './options.ts';
+import { heldHarnessesOf, isClaude, isRemote, isSpec, type HarnessConfig, type TaskSpec } from './options.ts';
 
 /**
  * Why a task cannot be filed on its harness, in that harness's words — or `undefined`. Asked after `refusalOf`, what
@@ -96,12 +96,12 @@ const misplaced = (spec: TaskSpec & { harness: string }, harnesses: Record<strin
  * process drives on the Agent SDK, which is a long-lived session of a harness configured the literal `'claude'`
  * (`restartPolicy: 'Always'`, the one request that runs attached, `attachedLongLived`) and no other. A `claude --bg` session is driven
  * by no `query()` of ours and catches none of its calls, however long it lives, and every other session ends its turn with the call,
- * so a call held in one would be cut before an answer could reach it. The same one rule `heldHarnessesOf` reads.
+ * so a call held in one would be cut before an answer could reach it. Which harnesses those are is asked of `heldHarnessesOf`, the
+ * one rule, rather than read off the literal again here: the day a second configuration is held, this refusal moves with it.
  */
 const mayAskMisplaced = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined => {
   if (spec.config?.mayAsk !== true) return undefined;
-  const h = harnesses[spec.harness];
-  const held = h === 'claude';
+  const held = heldHarnessesOf(harnesses).includes(spec.harness);
   if (held && spec.restartPolicy === 'Always') return undefined;
   return `\`mayAsk: true\` holds a call that would ask a person open until one answers it, and only a session this runtime holds attached can hold one: the \`${spec.harness}\` harness${held ? ' runs this task as a job, which ends its session with its turn' : ' has no session this runtime holds attached'}. File the task \`restartPolicy: 'Always'\` on a harness configured \`'claude'\`, which this runtime holds attached, or leave \`mayAsk\` off.`;
 };

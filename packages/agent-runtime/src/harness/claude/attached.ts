@@ -335,7 +335,9 @@ export const attachedSessions = (root: string, executable?: string, options: { l
 
 /**
  * `answer` over the sessions under `root`: the person's answers written beside the session (`appendAnswer`), where its held call reads
- * them. Refused for a session no holder runs, and for an ask it does not hold open — one already answered included.
+ * them. Refused for a session no holder runs, and for an ask it does not hold open — one already answered included — and a refusal
+ * is what it is thrown as (`Refusal`, carried out as `refused: true`): nothing of it will change by asking again, and the verb above
+ * tells a refusal from a send that may yet pass by that mark alone (`answerVerbOf`, `AnswerRefused` against `AnswerUnsent`).
  */
 const answerOn =
   (root: string): NonNullable<RunnerOps['answer']> =>
@@ -344,19 +346,26 @@ const answerOn =
       try: () => {
         const run = readRun(filesOf(root, session.name).run);
         if (run === undefined || !isOpen(run.state))
-          throw new Error(
+          throw new Refusal(
             `\`${session.name}\` is ${run ? run.state : 'not an attached session'}, so no call of it is waiting on a person.`,
           );
         if (!openAsks(root, session.name).some((ask) => ask.id === given.id))
-          throw new Error(`\`${session.name}\` has no ask \`${given.id}\` waiting on a person: read its asks again (\`ae ls\`).`);
+          throw new Refusal(`\`${session.name}\` has no ask \`${given.id}\` waiting on a person: read its asks again (\`ae ls\`).`);
         appendAnswer(root, session.name, { id: given.id, at: new Date().toISOString(), answers: given.answers });
       },
       catch: failed('answer'),
     });
 
-/** Why a verb failed, as the runner's error. */
+/** What a verb refuses, thrown where it is read: nothing the harness can do will take it, and asking again will not change that. */
+class Refusal extends Error {}
+
+/** Why a verb failed, as the runner's error, a `Refusal` of it carried out as the refusal it is. */
 const failed = (verb: string) => (cause: unknown) =>
-  new RunnerError({ verb, message: `claude: ${cause instanceof Error ? cause.message : String(cause)}` });
+  new RunnerError({
+    verb,
+    message: `claude: ${cause instanceof Error ? cause.message : String(cause)}`,
+    ...(cause instanceof Refusal ? { refused: true } : {}),
+  });
 
 /**
  * The runner's verbs over the sessions under `root`: `live`, those at work in this process, and `start`, how one is started. A name is

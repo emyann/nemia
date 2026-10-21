@@ -248,6 +248,11 @@ test('REFUSED: an answer to an ask the session does not hold open is refused, na
     Effect.flip(h.attached.ops.answer!({ name: NAME, sessionId: NAME }, { id: 'not-an-ask', answers: {} })),
   );
   assert.match(refused.message, /has no ask `not-an-ask` waiting on a person/);
+  assert.equal(
+    refused.refused,
+    true,
+    'and it is marked the refusal it is, which is what tells `answerAsk` to fail `AnswerRefused` rather than the `AnswerUnsent` a caller asks again on',
+  );
   fs.rmSync(path.join(dir, 'nothing'), { force: true });
   await h.close();
 });

@@ -126,7 +126,7 @@ function Session({ run, step }: { run: RunDetail; step: Step }) {
         <StepNote note={step.note} />
       </header>
       <DebugPanel run={run} step={step} />
-      <div className="flex min-h-0 flex-1 flex-col gap-3 px-4 pt-3 pb-4">
+      <div className="mx-auto flex w-full max-w-3xl min-h-0 flex-1 flex-col gap-3 px-4 pt-3 pb-4">
         {following.retrying !== null && <SessionRetryingBand why={following.retrying} />}
         {following.error !== null && <SessionUnreadableBand why={following.error} />}
         {!say.open && <SessionStoppedBand why={say.why} />}

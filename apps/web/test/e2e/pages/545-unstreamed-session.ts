@@ -109,10 +109,10 @@ const says = (f: ReturnType<typeof files>, uuid: string, text: string) => {
 export default {
   /**
    * A step at work whose session no live stream can be had of. The page writes UNSTREAMED, a step in a `claude-detached` job, and opens
-   * its session: the header draws the quiet band that says the api is reading it again on a beat, and no red sentence — the page used to
-   * close its stream for good there and blank the conversation. What the session said is drawn all the same, and what it says next
-   * arrives on the same stream a beat later. It leaves for the list before every file it writes is taken back and the engine's feed cut
-   * back, so no session is drawn losing its run, and each page after it, in either theme, reads the store as seeded.
+   * its session: a quiet band over the talk says the api is reading it again on a beat, and nothing is drawn in the failure's colour —
+   * the page used to close its stream for good there and blank the conversation. What the session said is drawn all the same, and what
+   * it says next arrives on the same stream a beat later. It leaves for the list before every file it writes is taken back and the
+   * engine's feed cut back, so no session is drawn losing its run, and each page after it, in either theme, reads the store as seeded.
    */
   name: 'unstreamed-session',
   route: '/runs',
@@ -124,10 +124,10 @@ export default {
     try {
       written(f);
       await page.goto(new URL(`/runs/${UNSTREAMED.id}/steps/${UNSTREAMED.step}`, page.url()).href, { waitUntil: 'load' });
-      const top = page.locator('header[aria-label="The step"]');
-      await expectVisible(top.locator('[data-band="retrying"]'), 'the header says the api is reading the session again, quietly');
-      await expectCount(top.locator('.text-failure'), 0, 'and says nothing in the colour of a thing gone wrong');
-      const talk = page.getByRole('region', { name: "The step's conversation" });
+      const band = page.locator('[data-band="retrying"]');
+      await expectVisible(band, 'a quiet band over the talk says the api is reading the session again');
+      await expectCount(page.locator('main .text-failure, main [data-band="unreadable"]'), 0, 'and nothing says a thing went wrong');
+      const talk = page.getByRole('log', { name: "The step's conversation" });
       await expectVisible(talk.getByText(UNSTREAMED.first, { exact: true }), 'what the session said is drawn, not blanked');
       await settled(page);
       await photograph(page, path.join(OUT, `unstreamed-session-band-${await themeOf(page)}.png`), { fullPage: true });
@@ -137,7 +137,7 @@ export default {
         talk.getByText(UNSTREAMED.next, { exact: true }),
         'and what it says next arrives on the same stream, a beat later',
       );
-      await expectVisible(top.locator('[data-band="retrying"]'), 'the band stays while no live stream can be had');
+      await expectVisible(band, 'the band stays while no live stream can be had');
     } finally {
       await page.goto(new URL('/runs', page.url()).href, { waitUntil: 'load' });
       await idle(page);

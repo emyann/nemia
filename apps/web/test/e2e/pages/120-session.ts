@@ -5,10 +5,11 @@ import type { PageSpec } from '../visit.ts';
 
 export default {
   /**
-   * A settled step's session, read once: its chip and a link back to the run at the top, then the conversation down to the prompt box,
-   * which ends at the window's foot — the prompt, the calls with nothing said between them folded into one line, thoughts
-   * folded, the session's words from their markdown, a system line and the closeout. The session has ended, so the prompt box is closed,
-   * with why and where to go instead. The conversation is photographed from its start, scrolled up as a reader scrolls to it.
+   * A settled step's session, read once, drawn by the one conversation family: its chip and a link back to the run at the top, then the
+   * band that says nothing more arrives here, and the talk down to the window's foot — the brief folded to a line that opens, the calls
+   * and the thoughts among them folded into one turn, the session's words from their markdown in the agent's bubble, a line the harness
+   * wrote on its own as a quiet marker, and the closeout. The session has ended, so no composer is drawn at all: the band carries why,
+   * and where to go instead. The talk is photographed from its start, scrolled up as a reader scrolls to it.
    */
   name: 'session',
   route: `/runs/${FAKE.id}/steps/${SESSION.step}`,
@@ -20,69 +21,75 @@ export default {
     await expectVisible(top.locator(`a[href="/runs/${FAKE.id}"]`, { hasText: FAKE.title }), 'a link back to the run, by what it asked');
     await expectCount(top.locator('[data-following]'), 0, 'a settled task is read once, not followed');
 
-    const talk = page.getByRole('region', { name: "The step's conversation" });
-    await expectVisible(talk, 'the conversation');
-    const prompt = page.locator(`section[aria-label="Say something to ${SESSION.step}"]`);
-    await expectVisible(prompt, 'a prompt box below the conversation');
-    const [box, below, foot] = [await talk.boundingBox(), await prompt.boundingBox(), { y: page.viewportSize()?.height ?? 0 }];
-    if (!box || !below || !foot || Math.abs(box.y + box.height - below.y) > 2 || Math.abs(below.y + below.height - foot.y) > 2) {
+    const talk = page.getByRole('log', { name: "The step's conversation" });
+    await expectVisible(talk, 'the talk, drawn by the family');
+    await expectVisible(page.locator('[data-session-talk="latest"]'), 'opened at its latest');
+    const stopped = page.locator('[data-band="stopped"]');
+    await expectVisible(stopped, 'a band over the talk says nothing more arrives here');
+    await expectVisible(
+      stopped.getByText(
+        `${SESSION.step}'s session has ended, so there is nobody to say anything to. To tell the step something, answer it or try it again from the run page`,
+        { exact: false },
+      ),
+      'with why, and where to go instead',
+    );
+    await expectCount(page.locator('[data-session-composer]'), 0, 'and no composer at all: the fact is said once, in one voice');
+    const [box, foot] = [await talk.boundingBox(), { y: page.viewportSize()?.height ?? 0 }];
+    if (!box || Math.abs(box.y + box.height - foot.y) > 24) {
       throw new Refused(
-        `the conversation takes the page's height down to the prompt box, which ends at the window's foot — the conversation ends at ${box ? Math.round(box.y + box.height) : 'nothing'} px, ` +
-          `the box spans ${below ? `${Math.round(below.y)}–${Math.round(below.y + below.height)}` : 'nothing'} px, the window ends at ${foot.y} px`,
+        `the talk takes the page's height down to the window's foot — it ends at ${box ? Math.round(box.y + box.height) : 'nothing'} px, the window at ${foot.y} px`,
       );
     }
-    await expectVisible(
-      talk.locator('[data-turn="said"][data-role="user"]', { hasText: 'Implement what was asked.' }),
-      'the prompt, said by the user',
-    );
 
-    const fold = talk.locator('[data-turn="tools"]');
-    await expectCount(fold, 1, 'one fold: the calls with nothing said between them');
+    const brief = talk.locator('[data-session-brief]');
+    await expectVisible(brief.getByRole('button', { name: 'What it was told' }), 'the brief is a line, so the session’s words read first');
+    await expectCount(talk.getByText('Give the board a look.'), 0, 'folded: the brief’s words are drawn nowhere');
+    await brief.getByRole('button', { name: 'What it was told' }).click();
+    await expectVisible(talk.getByText('Give the board a look.'), 'opened, they are');
+
+    await expectCount(
+      talk.locator('[data-session-turn="folded"]'),
+      3,
+      'three turns of work: the thought the session had before its first words, the calls with nothing said between them, and the lone edit after them',
+    );
+    const fold = talk.locator('[data-session-turn="folded"]').filter({ hasText: SESSION.folded });
     const line = fold.getByRole('button', { name: SESSION.folded });
-    await expectVisible(line, `folded into one line in Claude Code web's words: ${SESSION.folded}`);
-    await expectVisible(fold.getByText('1 failed', { exact: true }), 'the line says one of its calls failed');
-    await expectCount(fold.locator('[data-turn="tool"]'), 0, 'folded: its calls are behind the line');
+    await expectVisible(line, `folded into one line in the family's words: ${SESSION.folded}`);
+    await expectCount(fold.locator('[data-session-step]'), 0, 'folded: its lines are behind the line');
     await line.click();
-    await expectCount(fold.locator('[data-turn="tool"]'), SESSION.calls, `opened: each of its ${SESSION.calls} calls`);
+    await expectCount(fold.locator('[data-session-step]'), SESSION.lines, `opened: each of its ${SESSION.lines} lines`);
+    await expectCount(fold.locator('[data-session-step="error"]'), 1, 'the call that failed says so on its line');
     await expectVisible(
-      fold.locator('[data-turn="tool"][data-tool="Bash"] [data-tool-state="error"]'),
-      'the call that failed says so on its line',
+      fold.locator('[data-session-step]', { hasText: 'Thought, with no text kept' }),
+      'a thought between two calls rides in the turn, and says no text was kept',
     );
-    await expectVisible(
-      fold.locator('[data-turn="thinking"]', { hasText: 'Thought, with no text kept' }),
-      'a thought between two calls rides in the fold, and says no text was kept',
-    );
-    await expectCount(talk.locator('[data-turn="tool"][data-tool="Edit"]'), 1, 'a lone call after words is drawn as itself');
+    const read = fold.locator('[data-session-step]', { hasText: 'Read' }).first();
+    await expectCount(talk.getByText(SESSION.readFirstLine, { exact: true }), 0, 'a line’s result is behind it');
+    await read.click();
+    await expectVisible(talk.locator('[data-session-came]', { hasText: SESSION.readFirstLine }), 'opened, what came back is drawn');
+    await expectVisible(talk.locator('[data-session-asked]', { hasText: 'file_path' }), 'and what it asked, as JSON over more than a line');
 
-    await expectCount(talk.getByText(SESSION.thought), 0, 'a thought is folded: its text is not drawn');
-    await talk.locator('[data-turn="thinking"]').first().getByRole('button', { name: 'Thought', exact: true }).click();
-    await expectVisible(talk.getByText(SESSION.thought), 'opened, its text is');
+    const alone = talk.locator('[data-session-turn="folded"]').first();
+    await expectCount(talk.getByText(SESSION.thought), 0, 'the thought the session had on its own is behind its turn and its line');
+    await alone.getByRole('button', { name: 'Worked for 0s · 1 step' }).click();
+    await alone.getByRole('button', { name: 'Thought', exact: true }).click();
+    await expectVisible(talk.getByText(SESSION.thought), 'opened, its words are drawn');
+
     await expectVisible(
-      talk.locator('[data-turn="said"][data-role="assistant"] li', { hasText: SESSION.listed }),
+      talk.locator('[data-session-bubble="agent"] li', { hasText: SESSION.listed }),
       "the session's words, drawn from their markdown",
     );
-    await expectVisible(talk.locator('[data-turn="system"]', { hasText: SESSION.system }), 'a system line, quietly');
+    await expectVisible(talk.locator('[data-session-marker="system"]', { hasText: SESSION.system }), 'a line the harness wrote, quietly');
 
-    const closeout = talk.locator('section[aria-label="Closeout"]');
-    await expectVisible(closeout.locator('[data-outcome="blocked"]'), 'the closeout, named, with its outcome');
+    const closeout = talk.locator('[data-session-closeout]');
+    await expectVisible(closeout.locator('[data-session-outcome="blocked"]'), 'the closeout, named, with its outcome');
     await expectVisible(closeout.getByText(SESSION.closeout.needs), 'and what it needs');
     await expectCount(
       page.getByRole('link', { name: /Claude Code web/ }),
       0,
       'no link to Claude Code web: nothing the engine reads carries a URL for a session',
     );
-    const field = prompt.getByRole('textbox', { name: `What to say to ${SESSION.step}'s session` });
-    await expectVisible(field, 'the prompt box, closed');
-    if (await field.isEnabled())
-      throw new Refused(`the prompt box is disabled for a step whose session has ended (${SESSION.step} settled)`);
-    if (await prompt.getByRole('button', { name: 'Send' }).isEnabled()) throw new Refused('and so is Send');
-    await expectVisible(
-      prompt.locator('[data-closed]', {
-        hasText: `${SESSION.step}'s session has ended, so there is nobody to say anything to. To tell the step something, answer it or try it again from the run page`,
-      }),
-      'with why, and where to go instead',
-    );
-    await expectCount(talk.locator('[data-turn="told"]'), 0, 'nobody said anything to it: no turn of yours');
+    await expectCount(talk.locator('[data-session-message="told"]'), 0, 'nobody said anything to it: no turn of yours');
     await expectCount(page.locator('main input, main textarea:not([disabled])'), 0, 'nothing else to type into');
 
     await talk.hover();
@@ -91,8 +98,8 @@ export default {
     await expectNone(async () => {
       const px = await scrolled();
       return px > 0 ? `it stopped ${px} px down` : null;
-    }, 'the conversation scrolls up to its start for the photograph, from its end, where the scroller opens and only the closeout shows');
-    await expectInside(talk.locator('[data-turn="said"][data-role="user"]'), talk, 'the prompt is in view for the photograph');
-    await expectInside(line, talk, `the fold's line (${SESSION.folded}) is in view for the photograph`);
+    }, 'the talk scrolls up to its start for the photograph, from its end, where it opens and only the closeout shows');
+    await expectInside(brief, talk, 'the brief is in view for the photograph');
+    await expectInside(line, talk, `the turn's line (${SESSION.folded}) is in view for the photograph`);
   },
 } satisfies PageSpec;

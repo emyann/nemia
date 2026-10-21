@@ -27,11 +27,14 @@ import {
 const FAMILY = path.join(import.meta.dirname, '..', 'src', 'components', 'conversation');
 
 /**
- * Every data mark in `source` that names a conversation of its own: a part writes each through `mark`, under the prefix its caller
- * hands over, so a literal `data-chat-…` or `data-session-…` in one of them is the rule broken. A mark that is no conversation's —
- * the band's bare `data-band`, the look's `data-cut-ring` — is none.
+ * Every place in `source` where a part names a conversation of its own, in either of the two forms that does it: a literal
+ * `data-chat-…` or `data-session-…` attribute written by hand, and a quoted literal handed to `mark` as its prefix
+ * (`mark('chat', 'jump')`), which writes the same attribute through the one writer and so leaves no literal to find. A part writes
+ * every mark through `mark` under the prefix its caller hands over, so either is the rule broken. A mark that is no conversation's —
+ * the band's bare `data-band`, the look's `data-cut-ring` — is none, and neither is `mark(marks, …)`, whose prefix is the caller's.
  */
-export const namedMarks = (source: string): string[] => source.match(/data-(?:chat|session)-[\w-]*/g) ?? [];
+export const namedMarks = (source: string): string[] =>
+  source.match(/data-(?:chat|session)-[\w-]*|\bmark\(\s*(?:'[^']*'|"[^"]*"|`[^`]*`)/g) ?? [];
 
 test('a family part writes its mark under the prefix its caller names, so each conversation keeps the names its pages read', () => {
   assert.deepEqual(mark('chat', 'talk', 'latest'), { 'data-chat-talk': 'latest' });
@@ -63,10 +66,18 @@ test('the words the family says: a folded turn, the pill over the talk, and the 
 
 test('REFUSED: a family part that names a conversation itself; a mark built from the caller’s prefix, and one of neither, are not', () => {
   assert.deepEqual(namedMarks('<div data-chat-talk="latest" />'), ['data-chat-talk']);
-  assert.deepEqual(namedMarks("<Trace {...mark('session', 'turn', 'running')} />"), []);
   assert.deepEqual(namedMarks('<div data-session-step={line.state} />'), ['data-session-step']);
+  assert.deepEqual(
+    namedMarks("<Trace {...mark('session', 'turn', 'running')} />"),
+    ["mark('session'"],
+    'a prefix hard-coded at the call writes the same attribute, and is the same rule broken',
+  );
+  assert.deepEqual(namedMarks('{...mark("chat", \'jump\')}'), ['mark("chat"'], 'in either quote');
+  assert.deepEqual(namedMarks("{...mark(`chat`, 'jump')}"), ['mark(`chat`'], 'and in a template of none');
+  assert.deepEqual(namedMarks("{...mark(\n    'chat',\n    'jump',\n  )}"), ["mark(\n    'chat'"], 'however the formatter breaks the line');
   assert.deepEqual(namedMarks('<div data-band={what} data-cut-ring marks="chat" />'), [], 'a mark that is no conversation’s');
-  assert.deepEqual(namedMarks("{...mark(marks, 'talk', atEnd ? 'latest' : 'back')}"), []);
+  assert.deepEqual(namedMarks("{...mark(marks, 'talk', atEnd ? 'latest' : 'back')}"), [], 'and a prefix that is the caller’s');
+  assert.deepEqual(namedMarks("{...mark(marks, 'talk', 'latest')}"), [], 'whatever the arguments after it are');
 
   const parts = fs
     .readdirSync(FAMILY)

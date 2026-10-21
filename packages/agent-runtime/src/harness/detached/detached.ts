@@ -796,7 +796,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
           outputs.delete(r.name);
           const io = spawnFiles(spec, r, {
             schema: schemaFile(r.name),
-            closeout: closeoutFile(r.name),
+            answer: closeoutFile(r.name),
             mcp: mcpFile(r.name),
             request: requestFile(r.name),
             log: logFile(r.name),

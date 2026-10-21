@@ -466,12 +466,6 @@
       }
     },
     {
-      "files": ["apps/web/src/components/conversation/PromptBox.tsx"],
-      "rules": {
-        "max-lines-per-function": ["error", { "max": 96, "skipBlankLines": true, "skipComments": true }]
-      }
-    },
-    {
       "files": ["apps/web/src/lib/factory.ts"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 124, "skipBlankLines": true, "skipComments": true }],

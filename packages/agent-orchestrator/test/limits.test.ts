@@ -70,7 +70,6 @@ const RECORD: Record<string, Partial<Record<Rule, number>>> = {
   'apps/web/src/components/StepNode.tsx': { 'max-lines-per-function': 2, complexity: 1, 'sonarjs/cognitive-complexity': 1 },
   'apps/web/src/components/StepRail.tsx': { 'max-lines-per-function': 1 },
   'apps/web/src/components/WorkflowBuilder.tsx': { 'max-lines-per-function': 1 },
-  'apps/web/src/components/conversation/PromptBox.tsx': { 'max-lines-per-function': 1 },
   'apps/web/src/lib/factory.ts': { 'max-lines-per-function': 1, complexity: 1, 'sonarjs/cognitive-complexity': 1 },
   'apps/web/src/lib/feed.ts': { 'max-lines-per-function': 1 },
   'apps/web/src/lib/gate.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 1 },

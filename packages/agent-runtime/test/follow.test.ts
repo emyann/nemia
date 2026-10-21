@@ -129,9 +129,9 @@ test('REFUSED: a job whose stdout says a piece of text under no number fails the
   const message = (Cause.squash(exit.cause) as Error).message;
   assert.match(
     message,
-    /^claude: `ae\/f2\/1`'s output cannot be followed: line 3 of the `claude -p` output is a `stream_event` line whose `event/,
+    /^claude: `ae\/f2\/1`'s output cannot be followed: line 3 of the session's output is a `stream_event` line whose `event/,
   );
-  assert.match(message, /run a Claude Code whose `claude -p` output this runtime reads/);
+  assert.match(message, /run a Claude Code whose output this runtime reads/);
 });
 
 test('REFUSED: a name with no run is not followed', async () => {

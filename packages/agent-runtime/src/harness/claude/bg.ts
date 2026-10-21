@@ -105,6 +105,12 @@ export type ClaudeOptions = {
   /** The bridge of the session `sessionId` its process `pid` holds (`claudeBridge`, by default). Injectable for the same reason. */
   bridgeOf?: (pid: number, sessionId: string) => Promise<Bridge>;
   /**
+   * The Claude Code a job's session runs (`EngineOptions.claudeExecutable`, `pathToClaudeCodeExecutable`), handed to the job's
+   * process as `AE_CLAUDE_EXECUTABLE` (`claudeJobSpec`). Absent: the SDK's own. A `--bg` session runs the `claude` on the PATH
+   * whatever this says — it is Claude Code's own road, not the SDK's.
+   */
+  claudeExecutable?: string;
+  /**
    * Where the runner writes what it hands the CLI by path — a task's MCP config — what it records at spawn — a resumed session's
    * parent's last call — and what it records as it looks — when it first saw a working session's transcript as it stands
    * (`quiet.ts`). Default `~/.agent-engine`.

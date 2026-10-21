@@ -1,5 +1,7 @@
 /**
- * An attached session is fenced as a `claude -p` job is for the same task: every fact of `claudePrintFlags`' argv is in
+ * A session the SDK runs is fenced as `claude -p` is for the same task — a held session and a job alike, since
+ * `bin/ae-claude-job.ts` builds its options with this very function: every fact of `claudePrintFlags`' argv (`claude-detached`'s,
+ * the one spec that still spells a command line) is in
  * `attachedOptions`, on the SDK's own option where it has one and on `extraArgs` where it has none, the closing statement's schema is
  * handed on unread, and the session is given Claude Code's own system prompt, which a job has by default, with the agent's appended
  * to it.

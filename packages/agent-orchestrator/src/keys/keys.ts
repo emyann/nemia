@@ -75,7 +75,7 @@ export function backgroundOf(step: string, background: string | undefined): bool
   if (background === undefined) return undefined;
   if (background !== 'true' && background !== 'false') {
     refuse(
-      `${step}: \`background: ${background}\` is not \`true\` or \`false\`. \`background: true\` runs every session of the step as a Claude Code background session (\`claude --bg\`); \`background: false\`, or no line, runs it as a job (\`claude -p\`). Write one of the two, or delete the line.`,
+      `${step}: \`background: ${background}\` is not \`true\` or \`false\`. \`background: true\` runs every session of the step as a Claude Code background session (\`claude --bg\`); \`background: false\`, or no line, runs it as a job, on the Agent SDK. Write one of the two, or delete the line.`,
     );
   }
   return background === 'true';
@@ -294,7 +294,7 @@ export const DENIALS: readonly string[] = ['fail'];
 /**
  * `denials:` as written: `fail`, or refused — and refused where the run would never read a denial, rather than accepted and never met: on
  * codex, whose `codex exec` records none, and beside `background: true`, whose `claude --bg` session records none (agent-runtime's open
- * issue 28). Only a job, `claude -p` on `claude` or `claude-detached`, says what it was denied.
+ * issue 28). Only a job — on the Agent SDK for `claude`, `claude -p` for `claude-detached` — says what it was denied.
  */
 export function denialsOf(
   step: string,
@@ -315,7 +315,7 @@ export function denialsOf(
   }
   if (background) {
     refuse(
-      `${step}: \`denials: fail\` stops the step on a call the harness denied, and \`background: true\` runs it as a Claude Code background session (\`claude --bg\`), whose denials are not read (agent-runtime's open issue 28) — so the line would never stop anything. Delete \`background: true\` to run the step as a job (\`claude -p\`), which records each call it was denied, or delete \`denials: fail\`.`,
+      `${step}: \`denials: fail\` stops the step on a call the harness denied, and \`background: true\` runs it as a Claude Code background session (\`claude --bg\`), whose denials are not read (agent-runtime's open issue 28) — so the line would never stop anything. Delete \`background: true\` to run the step as a job, which records each call it was denied, or delete \`denials: fail\`.`,
     );
   }
   return 'fail';

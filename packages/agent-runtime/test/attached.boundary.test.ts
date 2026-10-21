@@ -720,6 +720,11 @@ test("a session cut at its holder's bound is resumed told which call did not fin
  * A session its holder can never wait out, as the let-go finds it in `live`: a call in flight that never ends, a `done` that never
  * settles and a call held at a hook that never lets go, so each of the let-go's three waits runs to whatever it was given. `facts`
  * are written on its run file. Nothing of the session's input is modelled: the let-go reads none of it.
+ *
+ * The budget is the purse's, and the purse spends it on the clock: a wait given 800 ms whose elapsed `monoNow` reads as 799 — it
+ * keeps whole milliseconds — leaves 201 for the next, so what was given can stand one millisecond per take above the budget. The
+ * sum is held to that, never to a wall-clock bound: the share is a ceiling on the long wait, never a floor on the short ones
+ * (`letGoOf`, `harness/claude/attached.ts`), so a take debited its whole allowance would leave the last wait nothing.
  */
 const stuck = (facts: Partial<Parameters<typeof writeRun>[1]> = {}): Live =>
   ({
@@ -753,7 +758,7 @@ test('a let-go whose session never ends returns all the same, its three waits in
   const purse = await letGone(root, new Map([[NAME, stuck()]]), 1_000);
   assert.equal(purse.given.length, 3, 'each of its three waits took from the one purse, so each of them is bounded');
   assert.ok(
-    purse.given.reduce((a, b) => a + b, 0) <= 1_000,
+    purse.given.reduce((a, b) => a + b, 0) <= 1_000 + purse.given.length,
     `the waits of one let-go add up to no more than its budget, not ${purse.given.join(' + ')}`,
   );
   assert.ok(purse.given[0] > 0 && purse.given[1] > 0, 'and the waits before the last each had something to wait with');

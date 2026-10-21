@@ -136,8 +136,8 @@ That's the whole engine. `decide()` is pure, total, and returns exactly one step
 effectful is the four verbs of `Runner`, and four optional ones: one that finds a session by its name for less than observing them all, one that lets a finished session go, one that reads its conversation, and one that hands a running session a person's words. Kubernetes' control plane for the loop, durable
 execution's journal for the memory, and the local harness as the kubelet.
 
-**The engine never holds a session.** A step on `claude` runs as a job, `claude -p` in a worker the engine
-detaches, whose run file is its registry; a session filed with `config.background: true` runs as `claude --bg`, which hands it
+**The engine never holds a session.** A step on `claude` runs as a job — one session on the Agent SDK in a process of its own
+(`bin/ae-claude-job.ts`), in a worker the engine detaches, whose run file is its registry; a session filed with `config.background: true` runs as `claude --bg`, which hands it
 to the harness, which already owns resume, stop, logs and a registry that outlives us. Either way the session outlives the engine. So a three-hour session is not a three-hour
 process here — the engine can be killed, upgraded or restarted at any point in it.
 
@@ -361,7 +361,7 @@ Bring your own harness — three ways, in order of how much you have to write:
 
 | | |
 |---|---|
-| `'claude'` | Claude Code as the engine runs it by default: a step as a job (`claude -p`), and a background session (`claude --bg`) when its task asks with `config.background: true` |
+| `'claude'` | Claude Code as the engine runs it by default: a step as a job (one session on the Agent SDK, in a process of its own), and a background session (`claude --bg`) when its task asks with `config.background: true` |
 | `'claude-bg'` | Claude Code's background sessions alone; it keeps the registry |
 | a `HarnessSpec` | any CLI that runs a prompt and exits — a command and an exit code |
 | a `RunnerOps` | four Effect methods, and six optional ones, `find`, `output`, `release`, `transcript`, `say` and `refuses`, for anything else at all; its own `refuses` is asked by `file` |
@@ -399,7 +399,7 @@ Four are wired:
 
 | harness | how it runs | who keeps the registry |
 |---|---|---|
-| `claude` | a job: `claude -p --input-format stream-json --output-format stream-json`, in a worker we detach; with `config.background: true`, `claude --bg --name` | a job: **us**, a run file; a background session: **the harness** — `claude agents --json`, free |
+| `claude` | a job: `query()` in `bin/ae-claude-job.ts`, in a worker we detach, printing the SDK's messages as the stream `claude -p --output-format stream-json` printed; with `config.background: true`, `claude --bg --name` | a job: **us**, a run file; a background session: **the harness** — `claude agents --json`, free |
 | `codex` | `codex exec --json`, in a worker we detach | **us** — a directory of run files |
 | `claude-detached` | `claude -p --output-format json`, same worker | us (there to compare the two paths) |
 | `command` | the process a task's `config.command` names, same worker — no agent at all | us |
@@ -923,7 +923,8 @@ other argument.
 
 ### Settings: the checkout's, never the operator's
 
-A job, whether it runs on `claude` or on `claude-detached`, is spawned with `--setting-sources project` (`claudePrintFlags`). It reads the
+A job, whether it runs on `claude` or on `claude-detached`, is spawned reading the project's setting sources alone
+(`settingSources: ['project']` for a job, `--setting-sources project` for `claude-detached`). It reads the
 `.claude/settings.json` of its `cwd`, and neither that folder's `.claude/settings.local.json`, where Claude Code's "don't ask again" writes a
 person's allow rules, so a job in a person's checkout is fenced as it would be in a worktree, nor the operator's `~/.claude/settings.json`: not their
 default mode, allow and deny rules, `additionalDirectories`, enabled plugins, `~/.claude/skills`, hooks, `statusLine`, `outputStyle`, `model`,
@@ -1018,7 +1019,7 @@ and `tty`: whether anything may attach to the workload, declared on the workload
 | harness | `claude.remoteControl` |
 |---|---|
 | `claude` with `background: true` | `--remote-control`, on every attempt |
-| `claude`, a job | refused at `file()`: file it with `background: true`, since a job runs a prompt and exits |
+| `claude`, a job | refused at `file()`: file it with `background: true`, since a job's session is held by its own process for one prompt, and nothing serves a bridge for it |
 | `claude-detached` | refused at `file()`, by its spec: `claude -p` runs a prompt and exits, and its help offers Remote Control only to an interactive session |
 | `codex`, and any other `HarnessSpec` — agent-orchestrator's `check` | refused at `file()`, naming the harness and the one to file on |
 | a `RunnerOps` brought as its own | asked only its own `refuses`: handed `claude.remoteControl` on the spawn, to honour or not |
@@ -2153,9 +2154,10 @@ clean — so `decide` does not make it yet.
 
 A third way to run a Claude Code task to its end, beside the job and `--bg`: `query()` in the process that holds the engine's
 attached sessions (`harness/claude/attached.ts`). The process takes `hold()` in a scope; while it holds, a `claude` task that is
-no `background` session spawns attached, and any other engine, or the same one before `hold`, runs it as a `claude -p` job. The
-Claude Code it drives is the Agent SDK's own bundled CLI, or the command `EngineOptions.claudeExecutable` names — the attached
-road alone reads it, as a job and a `--bg` session run the `claude` on the PATH.
+no `background` session spawns attached, and any other engine, or the same one before `hold`, runs it as a job in a process of
+its own. The Claude Code either road drives is the Agent SDK's own bundled CLI, or the command `EngineOptions.claudeExecutable`
+names — a held session is given it here, a job's own process as `AE_CLAUDE_EXECUTABLE`; a `--bg` session runs the `claude` on the
+PATH, whatever it says.
 
 - **Who holds them.** One process: the one whose engine took `hold()`. It spawns, adopts and resumes; another engine reads the
   run files under `<root>/runs/attached/` and writes a stop (`<name>.stop`) or words to say (`<name>.say.jsonl`) beside one, which
@@ -2186,7 +2188,8 @@ road alone reads it, as a job and a `--bg` session run the `claude` on the PATH.
   holder at all does; a card it answers that this runtime cannot read is refused at that follow, in words, with nothing dialled.
   The port goes with the scope: the server stops, every open socket is destroyed, and the token's file is forgotten
   (`holderTokenOf` reads it while it is there, for whoever hands a viewer its credentials).
-- **The fence.** The job's, fact for fact (`attachedOptions`, held to `claudePrintFlags` by its test), each fact on the SDK's own
+- **The fence.** `claude -p`'s, fact for fact (`attachedOptions`, held to `claudePrintFlags` by its test, and the one translation
+  a job's own process uses too), each fact on the SDK's own
   `Options` where it has one — the servers as `mcpServers` with `strictMcpConfig`, the agent's prompt as `systemPrompt`'s `append`
   on the `claude_code` preset, the context window as `autoCompactWindow` in the one `settings` object — and on `extraArgs` where it
   has none. A call that would ask a person is answered in the holder (`canUseTool`): denied, and written as a denial.
@@ -2270,7 +2273,7 @@ of pure code sits beside it.
 | `src/harness/claude/quiet.ts` | when a working `--bg` session's transcript was first seen at its mtime, on the monotonic clock, per attempt under the root: written by a look only when the mtime or the boot differs, cleared at spawn, read fresh on every look |
 | `src/harness/claude/parent.ts` | what a resumed `--bg` session's spawn records of its parent: the id of the parent's last StructuredOutput call, and whose a statement is by it |
 | `src/harness/claude/trust.ts` | Claude Code's trust of a folder in its `.claude.json` (`claudeConfigFile`, in `CLAUDE_CONFIG_DIR` when set): read by `claudeTrusts`, and one key set by `claudeTrust`, which keeps every other key and a write that lands meanwhile |
-| `src/harness/claude/code.ts` | Claude Code as the engine runs it by default: a step as a job (`claude -p`), attached while the process holds (`withAttached`), or a background session (`claude --bg`) when the task asks, each verb routed by the session id's shape and its run file; and `claude -p`'s argv and the `claude-detached` spec |
+| `src/harness/claude/code.ts` | Claude Code as the engine runs it by default: a step as a job (`claudeJobSpec`, the bin), attached while the process holds (`withAttached`), or a background session (`claude --bg`) when the task asks, each verb routed by the session id's shape and its run file; and `claude -p`'s argv and the `claude-detached` spec |
 | `src/harness/claude/job-env.ts` | the environment a session run to its end is given, a job's or an attached one's (`CLAUDE_JOB_ENV`) |
 | `src/harness/claude/attached.ts` | Claude Code attached on the Agent SDK (`attachedSessions`): the holder's `hold`, adoption and resume, and the runner's verbs over the run files |
 | `src/harness/claude/attached-bridge.ts` | the claude.ai bridge of an attached session, behind one door: the SDK's undeclared `enableRemoteControl` read off the `query()` object, its answer decoded, and refused in words where it is absent |
@@ -2300,6 +2303,7 @@ of pure code sits beside it.
 | `src/harness/detached/looked.ts` | what a detached look at the names it was told found: each sighting, the names left unread and why each was (`unreadWhy`), and every warning to log |
 | `src/harness/detached/follow.ts` | a detached session followed live (`followOf`): its run file, its whole stdout lines read for the text being written, and its transcript, each read on from where the last read stopped, on a watch's wake or each second |
 | `src/harness/detached/output.ts` | what a detached session's output says: `claude -p`'s result and stream, decoded by `print.ts` or refused, read for closeout, usage, cost, a spent budget and denials, and the stream for the skills loaded and the files touched |
+| `src/harness/detached/spawn-files.ts` | the files a spawn clears and writes beside a run before the worker is launched, and what they say to the harness (`spawnFiles`, `HarnessIO`): the closeout's schema, the MCP config, what the spec prepares, and the spawn request a spec that reads one is given (`needsRequest`); and the stdin the worker writes (`spawnInput`) |
 | `src/harness/detached/run-file.ts` | a detached run's file as the worker and the spawn write it: its schema (`RunFileSchema`), its read (`runFileIn`), the first one a spawn writes, and its state as a sighting says it, its heartbeat's lease (`STALE_MS`) included |
 | `src/harness/detached/said.ts` | what was read of a finished run's output, kept beside its log keyed by the log's size and mtime and the readers' version — or a former one they only added fields to (`SAID_EXTENDED`) — so each process reads a log once per change of it; and an ended run's capture rewritten there to what its spec keeps (`keepOutput`, `keepCapture`), only when it reads the same |
 | `src/harness/detached/compact.ts` | the captures already on disk rewritten once to what their readers read (`compactRuns`), a detached runner's `compact`: a run whose worker ended, one capture at a time, each left whole and named where it is at work, has no run file, or does not read the same |
@@ -2344,6 +2348,7 @@ of pure code sits beside it.
 | `src/cli/lines.ts` | the lines `ae` prints for a person: a task, an attempt, a journal entry, a usage, the limits a task was filed with |
 | `bin/ae.ts` | the `ae` entry point: a refusal prints its sentence and exits 2 |
 | `bin/ae-worker.ts` | the detached worker: babysits one harness process, keeps the run file |
+| `bin/ae-claude-job.ts` | a Claude Code job's own process: one session on the Agent SDK's `query()`, built from the spawn request the runner wrote, printing each message as one line of the stream a job's readers read |
 | `src/core/decide.test.ts` | every branch of the decision, no harness needed |
 | `test/engine.test.ts` | the crash cases, what a pass reports (`running` per harness) and that it chooses no order, the pass refusing an argument, the fields carried, against a fake harness |
 | `test/completion.test.ts` | Claude Code's "done" and "quiet", its argv and its usage, with a fake `claude` on `PATH` |

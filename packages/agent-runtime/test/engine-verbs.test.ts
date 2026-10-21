@@ -858,7 +858,7 @@ test('file() refuses a config.budgetUsd that is not dollars above 0, and one on 
   await refused(
     engine,
     { brief: 'b', cwd: '/r', config: { budgetUsd: 5, background: true } },
-    /`budgetUsd: 5` is a spend cap, and a `claude --bg` session does not keep one.*Leave `config\.background` off to run the task as a job \(`claude -p`\), which ends the session at its cap/,
+    /`budgetUsd: 5` is a spend cap, and a `claude --bg` session does not keep one.*Leave `config\.background` off to run the task as a job, which ends the session at its cap/,
   );
   await refused(
     engine,

@@ -46,7 +46,7 @@ export type ToolTurn = { kind: 'tool'; key: string; call: ToolCall };
 export type SystemTurn = { kind: 'system'; key: string; at: string; text: string };
 export type CloseoutTurn = { kind: 'closeout'; key: string; call: ToolCall };
 /**
- * Words a person said to the session (the CLI's `say`, or the session page's prompt box), off the engine's journal of the step's task: "you
+ * Words a person said to the session (the CLI's `say`, or the session page's composer), off the engine's journal of the step's task: "you
  * said" — and when the session's transcript shows them reaching it (`heardIn`).
  */
 export type ToldTurn = { kind: 'told'; key: string; at: string; attempt: number; text: string; arrived: string | null };

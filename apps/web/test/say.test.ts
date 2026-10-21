@@ -1,7 +1,7 @@
 /**
- * The session page's prompt box and the words it shows, as rules: whether the box may send to a step (`sayable`), what it holds once its
- * what was said merged with what the page has just said (`mergeSaid`), which of the session's lines is
- * its record of the words arriving (`heardIn`), and where each thing said lies among the conversation's turns (`withSaid`).
+ * The session page's composer and the words it shows, as rules: whether it may send to a step at all (`sayable`), what was said to the
+ * step merged with what the page has just said (`mergeSaid`), which of the session's lines is its record of the words arriving
+ * (`heardIn`), and where each thing said lies among the conversation's turns (`withSaid`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

@@ -5,18 +5,19 @@
  * the same entry with a toolset header, which is kept; and a local server, against the same entry given a `url`. And the split's
  * precedence is proven by a name that is on both the record and the checkout's list, which must leave `checkoutMcp` altogether.
  *
- * A store of its own, since `WF_ROOT` is read as the module loads.
+ * A store of its own, since `WF_ROOT` is read as the module loads: every part of the package is imported dynamically, after it is set,
+ * or a file that ran first in the same process would have fixed the store's root already.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { DEFAULT_FACTORY } from '../factory/factory.ts';
-import { factoryServerRefusal, factoryServersRefusal, serverNameRefusal, splitServers } from './servers.ts';
 import { scratch } from '../../test/scratch.ts';
 
 const ROOT = scratch('wf-servers-');
 process.env.WF_ROOT = ROOT;
+const { DEFAULT_FACTORY } = await import('../factory/factory.ts');
+const { factoryServerRefusal, factoryServersRefusal, serverNameRefusal, splitServers } = await import('./servers.ts');
 const { factoryServers, factoryServersFile, readFactoryServers, writeFactoryServers } = await import('./servers.store.ts');
 
 /** The hosted GitHub server as a factory records it: a toolset header, and the facts of an OAuth client with no secret. */

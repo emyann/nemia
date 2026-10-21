@@ -70,9 +70,16 @@ const listedOf = (name: string, server: FactoryServers[string], state: McpServer
   ...(state?.error === undefined ? {} : { error: state.error }),
 });
 
-/** A factory's record with every server's state, read now: one ask of the engine for the whole record. */
+/**
+ * A factory's record with every server's state, read now: one ask of the engine for the whole record. Refused (`Missing`) for a name
+ * the store has no factory under — a listing of nothing would read as a factory that records none — and never for the default
+ * factory, which is no file.
+ */
 export const serversListed = Effect.fn('serversListed')(function* (factory: string) {
-  const record = yield* tried(() => factoryServers(factory));
+  const record = yield* tried(() => {
+    factoryThere(factory, 'listed');
+    return factoryServers(factory);
+  });
   const { by, unread } = yield* statesOf(record);
   return {
     factory,

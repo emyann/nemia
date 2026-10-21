@@ -794,11 +794,14 @@ test("a session is started on Claude Code's own system prompt, the agent's appen
   assert.ok(!argv.includes('--system-prompt'), "no prompt of ours is spawned: the preset is Claude Code's own");
 });
 
-test('a task\u2019s servers ride the child\u2019s argv as inline JSON, strict, and the window is still a flag', WAITED, async (t) => {
+test('a task’s servers ride the child’s argv as inline JSON, strict, and the window rides the settings', WAITED, async (t) => {
   const { root, dir, request } = place(
     { output: {} },
     { contextTokens: 150_000, mcp: { probe: { command: 'probe-server', args: ['--once'] } } },
   );
+  const stale = filesOf(root, NAME).mcp;
+  fs.mkdirSync(path.dirname(stale), { recursive: true });
+  fs.writeFileSync(stale, JSON.stringify({ mcpServers: { gone: { command: 'a server it was not given' } } }));
   const h = await holder(root);
   t.after(h.close);
   await Effect.runPromise(h.attached.ops.spawn(request));
@@ -812,7 +815,7 @@ test('a task\u2019s servers ride the child\u2019s argv as inline JSON, strict, a
     'the servers themselves, inline, where the runtime used to name a file of its own',
   );
   assert.ok(argv.includes('--strict-mcp-config'), '`strictMcpConfig` is still the fence');
-  assert.equal(fs.existsSync(filesOf(root, NAME).mcp), false, 'and nothing writes the per-task MCP file any more');
+  assert.equal(fs.existsSync(stale), false, 'a config an older runtime left under this name is cleared at the spawn, never read');
   assert.ok(!argv.includes('--autocompact'), 'the window is no flag of ours any more');
   const settings = argv.indexOf('--settings');
   assert.deepEqual(

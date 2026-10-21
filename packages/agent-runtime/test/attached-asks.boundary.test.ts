@@ -7,6 +7,7 @@
  * the input's own questions, and `answers` keyed by each question's text and valued by the chosen label; the ask closed `taken`
  * afterwards; a multi-select's labels joined with `", "` and own words carried as the answer's value rather than the word 'Other';
  * a question whose holder died is closed as cut when the next holder adopts the session, so nothing waits on a person twice;
+ * a turn ended with a question open (the interrupt path) leaves no wait reading the answers file, its call denied `ASK_CUT`;
  * and the guard made to refuse — a session whose task does not say a person can be asked (`config.mayAsk`) denies the same call with
  * `DENIED_HERE` and writes no ask, and every other tool is denied in a session that does.
  */
@@ -222,6 +223,34 @@ test('a question whose holder died is closed as cut when the next holder adopts 
   const seen = (await Effect.runPromise(h.attached.ops.observe)).get(NAME)!;
   assert.deepEqual(seen.asks, [], 'the sighting says nothing waits');
   assert.equal(seen.asksTaken, undefined, 'and no call of it took an answer: it is owed as words');
+});
+
+test('a turn ended with a question open stops waiting for an answer, its call told the answer comes as words', WAITED, async (t) => {
+  const { root, dir, request } = place({ call: 'AskUserQuestion', callInput: { questions: [ONE] } }, { mayAsk: true });
+  const h = await holder(root);
+  t.after(h.close);
+  await Effect.runPromise(h.attached.ops.spawn(request));
+  const ask = await waiting(t, root);
+  await Effect.runPromise(h.attached.ops.interrupt!({ name: NAME, sessionId: NAME }));
+  const cut = await until(t, () => readRun(filesOf(root, NAME).run)?.state === 'idle', 'the interrupted turn ended', { everyMs: 50 });
+  assert.equal(cut, true);
+  assert.deepEqual(openAsks(root, NAME), [], "the turn's end closes the ask: no call of it is waiting on a person any more");
+  const told = await until(t, () => answered(dir).find((a) => a.event === 'PreToolUse'), 'the held call let go', { everyMs: 50 });
+  assert.deepEqual(
+    told.answer,
+    askHookOutput(undefined),
+    'the wait left with the turn, and its call is denied, told the answer comes as words',
+  );
+  const refused = await Effect.runPromise(
+    Effect.flip(
+      h.attached.ops.answer!({ name: NAME, sessionId: NAME }, { id: ask.id, answers: { [ONE.question]: 'First line as it is' } }),
+    ),
+  );
+  assert.match(
+    refused.message,
+    /has no ask `.+` waiting on a person/,
+    'and no answer can reach that call again, which is why the wait is pointless',
+  );
 });
 
 test('a question whose answer never came is denied at its hook, told the answer comes as words', () => {

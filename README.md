@@ -1,5 +1,7 @@
 # Nemia
 
+[![ci](https://github.com/emyann/nemia/actions/workflows/ci.yml/badge.svg)](https://github.com/emyann/nemia/actions/workflows/ci.yml)
+
 **Nemia — Recruit intelligence.** Said NEH-mee-ah.
 
 Nemia runs teams of agents. A runtime keeps each agent session alive to completion; an orchestrator sequences steps from folders of
@@ -40,7 +42,8 @@ names with how to stop it. That daemon has the service's environment, not your s
 
 ## No build step, except the web app
 
-The packages and the API are TypeScript that Node runs directly (type stripping, Node >= 22.18).
+The packages and the API are TypeScript that Node runs directly (type stripping, unflagged since Node 22.18; the floor
+`engines.node` claims is 24.16, which is not where stripping arrived but where libuv keeps a file's millisecond time).
 Node refuses to strip types under `node_modules`, but a workspace is a symlink whose realpath is
 outside it, so importing `agent-orchestrator` from the API runs the `.ts` source.
 

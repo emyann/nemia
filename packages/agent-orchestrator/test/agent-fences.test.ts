@@ -141,6 +141,18 @@ const FENCED: Call[] = [
   { tool: 'Bash', command: 'cd packages/agent-orchestrator && pkill -f "turbo run test"' },
   { tool: 'Bash', command: 'timeout 5 pkill -f turbo' },
   { tool: 'Bash', command: 'true; killall node' },
+  { tool: 'Bash', command: 'gh pr create --title x --body y' },
+  { tool: 'Bash', command: 'gh pr merge 7 --merge' },
+  { tool: 'Bash', command: 'gh pr edit 7 --body x' },
+  { tool: 'Bash', command: 'gh pr ready 7' },
+  { tool: 'Bash', command: 'gh pr close 7' },
+  { tool: 'Bash', command: 'gh pr comment 7 -b x' },
+  { tool: 'Bash', command: 'gh pr review 7 --approve' },
+  { tool: 'Bash', command: 'gh api -X POST repos/o/r/pulls' },
+  { tool: 'Bash', command: 'gh repo delete o/r' },
+  { tool: 'Bash', command: 'gh release create v1' },
+  { tool: 'Bash', command: 'gh workflow run ci.yml' },
+  { tool: 'Bash', command: 'gh run rerun 1' },
   { tool: 'mcp__playwright__browser_run_code_unsafe' },
 ];
 
@@ -539,7 +551,7 @@ test('every shipped agent is named by a shipped step, so the fence below reads e
       assert.ok(named.has(path.basename(file, '.md')), `${path.join(dir, file)} is named by no shipped step`);
 });
 
-test('every shipped step is refused git push, a forced branch delete, a kill by name and browser_run_code_unsafe: by its own deny in auto, by no allow in dontAsk, by a read-only sandbox on codex', () => {
+test('every shipped step is refused git push, a forced branch delete, a kill by name, every gh write and browser_run_code_unsafe: by its own deny in auto, by no allow in dontAsk, by a read-only sandbox on codex', () => {
   const open = shipped().flatMap(({ dir, step }) => unfenced(step).map((what) => `${path.relative(REPO, dir)}/${what}`));
   assert.deepEqual(open, []);
   assert.ok(
@@ -712,7 +724,8 @@ test("REFUSED: a watcher's step without its own deny of the forced delete is ope
     folderOf({
       supervise:
         'workspace: main\nslot: none\nharness: claude\nbackground: true\npermissionMode: dontAsk\n' +
-        'disallowedTools: Bash(git push:*), Bash(git branch -D:*), Bash(git branch --delete --force:*), Bash(pkill:*), Bash(killall:*), ' +
+        'disallowedTools: Bash(git push:*), Bash(gh), Bash(gh:*), Bash(git branch -D:*), Bash(git branch --delete --force:*), ' +
+        'Bash(pkill:*), Bash(killall:*), ' +
         'mcp__playwright__browser_run_code_unsafe',
     }),
   ).find((s) => s.name === 'supervise')!;
@@ -768,6 +781,41 @@ test("REFUSED: Ada without its deny of pkill and killall, read from its file as 
     unfenced(bare).includes(`${bare.name}: Bash(cd packages/agent-orchestrator && pkill -f "turbo run test")`),
     'the form that killed a landing check',
   );
+});
+
+/** Every call of `FENCED` that writes through `gh`, as `unfenced` names it for `step`: the whole of `gh` is denied, so each is every. */
+const ghWrites = (step: string): string[] =>
+  FENCED.filter((call) => /^gh\b/.test(call.command ?? '')).map((call) => `${step}: ${shown(call)}`);
+
+test('REFUSED: Ada and Otto without their deny of gh, read from their files as a run reads them, are open on every gh write', () => {
+  for (const agent of ['ada', 'otto']) {
+    const step = shippedStepOf(agent);
+    const line = step.disallowedTools!.filter((rule) => rule !== 'Bash(gh)' && rule !== 'Bash(gh:*)');
+    assert.equal(line.length, step.disallowedTools!.length - 2, `${agent} denies gh whole, bare and with arguments`);
+    const bare = shippedWith(agent, 'build', 'disallowedTools', line.join(', '), ...denyFilesOf(agent));
+    assert.equal(bare.permissionMode, 'auto', `${agent} runs auto, so its own deny is its fence`);
+    assert.deepEqual(unfenced(bare), ghWrites(bare.name));
+    assert.ok(ghWrites(bare.name).length >= 12, 'every gh write a session could type is a call here');
+  }
+});
+
+/** The two reads of the pull request review's note names, and the settings' allows that reach them and nothing else. */
+const PR_READS = ['gh pr view 7', 'gh pr checks 7'];
+const PR_READ_ALLOWS = ['Bash(gh pr view:*)', 'Bash(gh pr checks:*)'];
+
+test("the two gh reads review's note names are allowed Agora by the settings, and REFUSED with either allow dropped", () => {
+  const review = shippedStepOf('agora');
+  assert.equal(review.permissionMode, 'dontAsk', 'nothing reaches Agora but an allow');
+  const named = checksOf('workflows/build/review.md', '**Read the pull request and its checks**', /`(gh\s[^`]*)`/g);
+  assert.deepEqual(named, PR_READS, "review's note names the two reads and no other gh call");
+  assert.deepEqual(unallowed(review, named), [], "Agora's fence refuses neither read");
+  for (const allow of PR_READ_ALLOWS) {
+    assert.ok(SETTINGS_ALLOWS.includes(allow), `${allow} is in the settings`);
+    const without = SETTINGS_ALLOWS.filter((rule) => rule !== allow);
+    assert.equal(unallowed(review, named, without).length, 1, `${allow} is what reaches one of them`);
+  }
+  assert.deepEqual(unallowed(review, named, []), named, 'Agora allows neither itself');
+  assert.deepEqual(unfenced(review), [], 'and neither allow reaches a gh write');
 });
 
 test('REFUSED: a dontAsk step an allow of pkill reaches is open on each kill by pkill whose every part some allow reaches', () => {
@@ -1252,8 +1300,9 @@ test("quick's land is build's land but its after: main has one guard, whatever t
 
 test("REFUSED: a quick land whose check, workspace, gate, fence or budget is no more build's is unequal to it", () => {
   const edits: [string, (text: string) => string][] = [
-    ['check', (text) => text.replace('npx turbo run test --force --continue && ', '')],
-    ['check', (text) => text.replace('else npm run e2e; fi', 'else true; fi')],
+    ['check', (text) => text.replace('receipt --run "$WF_RUN"', 'receipt --run "$WF_STEP"')],
+    ['check', (text) => text.replace('git show "HEAD:workflows/build/landing.ts"', 'cat workflows/build/landing.ts')],
+    ['note', (text) => text.replace('It deletes no branch and stages no merge here.', '')],
     ['workspace and gate', (text) => text.replace('workspace: main\n', '').replace('gate: true\n', '')],
     ['fence', (text) => text.replace(', Bash(*:4317*)', '')],
     ['budget', (text) => text.replace('budget: 10', 'budget: 11')],
@@ -1641,7 +1690,7 @@ function runs(step: Step, calls: readonly Call[], settings: Settings = SETTINGS,
  * The git questions review-a-change names in its step 2, on the line that says which Bash runs, each placeholder (`<commit>`) filled in
  * with an argument a session types.
  */
-const askedGit = (from = 'Bash runs only the checks below'): string[] =>
+const askedGit = (from = 'Bash runs only the checks and reads your step names'): string[] =>
   checksOf('.claude/skills/review-a-change/SKILL.md', from, /`(git\s[^`]*)`/g).map((command) => command.replace(/<[^<>]+>/g, '4c8a05b'));
 
 /** Agora's step, its agent's `allowedTools` line cut back to what it allowed before git's questions, or replaced by `allowed`. */

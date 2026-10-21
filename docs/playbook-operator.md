@@ -144,20 +144,24 @@ show (motion, a live board).
 
 A landing that fails its check costs a round and the person's time. Before showing one:
 
-1. **Read the trial merges:** `nemia decide <run>` at an ending's gate says whether each branch merges onto main as it is now
+1. **Open the pull request and read `ci` green.** The landing merges the run's own pull request on GitHub and refuses anything else:
+   not a draft, based on main, its head the commit the review read, `mergeable`, and the `ci` context `SUCCESS` at that commit. Its
+   address is on the implement closeout as an artifact value. A red, pending or missing `ci`, or an unmergeable pull request, means a
+   round first — an approval over one only spends a session and comes back `blocked`.
+2. **Read the trial merges:** `nemia decide <run>` at an ending's gate says whether each branch merges onto main as it is now
    (`merges`), which runs in flight on main its branches conflict with and in which files (`others`, `collides`), and, after a landing
    its check refused, whether the merge was clean as text (`semantic`); the board's gate shows the same facts. A textual conflict with
    main means a round first.
-2. **Order the landings ahead of it:** a run that `collides` with it will need a merge after whichever lands first.
-3. **Know what a trial merge cannot see.** Two runs that merge cleanly can still fail together: a new guard on main that the other
+3. **Order the landings ahead of it:** a run that `collides` with it will need a merge after whichever lands first.
+4. **Know what a trial merge cannot see.** Two runs that merge cleanly can still fail together: a new guard on main that the other
    branch breaks, a name deleted on main that the other branch imports, or two changes that disagree on a meaning (on 2026-10-05 the
    journal cursor and the tick-pass card's read counts merged cleanly and failed two tests together). When main moved in the area the run
    touched, grep the branch for what main removed or now refuses.
-4. **Order the collision.** When two runs conflict, land the one at its gate, unless the other is expensive or on its last round; then
+5. **Order the collision.** When two runs conflict, land the one at its gate, unless the other is expensive or on its last round; then
    hold the ready one and have it merge main after.
-5. **If it cannot land yet, hold it:** `nemia hold <run> --until <run> --why "…"` the moment you know, and tell the person why in one
+6. **If it cannot land yet, hold it:** `nemia hold <run> --until <run> --why "…"` the moment you know, and tell the person why in one
    line. An open gate is an invitation to approve.
-6. **When the reviewer could not verify a rule**, verify it yourself in a scratch worktree before approving, and report what you ran.
+7. **When the reviewer could not verify a rule**, verify it yourself in a scratch worktree before approving, and report what you ran.
 
 Scratch worktree, never the main checkout:
 
@@ -199,11 +203,17 @@ rm "$S"/node_modules; git worktree remove "$S"
   stop the api by the pid its lease names and wait for `stoppedAt`; start it; `nemia resume`. Several landings queued together share one
   restart after the last. Run one restart helper at a time. Never stop the daemon with the harness's task-stop, never by a name pattern.
 - **After a rename of the CLI or a new bin**, `npm install` in the main checkout at a gap links it; check the tree stays clean.
-- **A failed landing check:** nothing landed and the merge was aborted. Read the check's `✖ failing tests:` block and name the cause. A
-  check that did not finish (a deadline) is no refusal: file the landing again, after removing the cause (a deadline too short for the
-  load). A real refusal is sent back to the step that built the change, with the check's words (`nemia decide <run>` prints them),
-  without waiting to be asked: in `quick`, `nemia retry <run> implement --message "<what failed>"`; in `build`, through review, as
-  *Send a landing back* says. The next landing is approved by whoever approved the first: an approval is for one try.
+- **Main is fast-forwarded by the run**, not by hand: the landing merges the pull request on GitHub, then runs `git fetch origin && git
+  merge --ff-only origin/main` in the owner's checkout. Nothing is pushed afterwards, and GitHub deletes the head branch.
+- **A landing that signed off `blocked`:** nothing was merged and the checkout is untouched. The refusal names the exact `nemia retry`
+  line to type. Where it was the pull request — red `ci`, unmergeable, a head that moved past the review — send the work back to the
+  step that built it, with the refusal's words, without waiting to be asked: in `quick`, `nemia retry <run> implement --message "<what
+  failed>"`; in `build`, through review, as *Send a landing back* says. Where it was the fast-forward that was declined, the owner's
+  checkout holds commits `origin/main` does not: bring it onto `origin/main` by hand, then `nemia retry <run> land`. The next landing
+  is approved by whoever approved the first: an approval is for one try.
+- **A failed landing check:** the check is a receipt now, so a refusal says the merge did not happen as the step claimed — the pull
+  request not merged, a squash instead of a merge commit, a checkout the fast-forward did not reach, a branch of the run left out.
+  Read it and name the cause. A check that did not finish (a deadline) is no refusal: file the landing again.
 - **Never touch the main checkout** (npm, git, a file) while a landing is checking in it.
 
 ## Filing and chaining
@@ -237,7 +247,7 @@ Approval in one context never extends to another. The modes used so far:
   person's decisions or a recommendation, and landings after reading the review, a clean trial merge and the pictures of a web change.
   It handles send-backs to merge main, holds, retries of a check that did not finish, extra rounds within the cost line, and planned
   follow-up cards. It brings the person taste and design choices with no decision behind them, runs past their line, anything outward
-  (push, pull request), a host restart, and cancelling or removing a run.
+  (push, pull request, the merge of one), a host restart, and cancelling or removing a run.
 - **"Approve by judgement" (a night or a nap):** technical specs and landings by judgement; taste and design wait; a dated log and a
   recap on return.
 - **Per-run consent** ("run the interview, unless you need me"): only for that run.
@@ -293,7 +303,8 @@ Nemia off, Semi-auto stops at every gate, Auto is what the person's custom instr
 **For this factory's instruction (building Nemia):** the layers and `docs/architecture.md`; trial merges against main and every landing
 ahead; a web change's pictures are the implementer's, read by the reviewer; command-table and frame cards collide, so chain them; restart
 the daemon after code landings, paused, until release and upgrade; store names and the `wf/` branch prefix stay; a landing check has its
-own deadline (2700 s), measured from a week of landings.
+own deadline (2700 s), measured from a week of landings, now bounding a receipt rather than a suite; a landing merges the run's own
+green pull request and nothing is pushed by hand.
 
 **For the steps of `build`:** implement pictures the pages a web change touches (light, dark, the phone where it matters); review reads them
 and may ask git read-only questions; design, implement and review list `effect`, `shadcn` and `change-the-board`.
@@ -318,6 +329,7 @@ English; never push or open a pull request unless asked.
 | A step could not read what it was pointed to | see *Empowering the agents* |
 | Two branches that merge cleanly but fail together | prose only: the operator's checks before a landing gate |
 | A conflict found at the landing gate has no direct way back to implement | prose only: send back through review with `again` |
+| A landing staged in the owner's checkout judged a tree no CI had seen, and main was pushed by hand after it | the landing merges the run's own green pull request (`workflows/build/landing.ts`), `ci` required on its head, and fast-forwards the checkout; the check is a receipt |
 
 ## What a supervisor agent needs
 

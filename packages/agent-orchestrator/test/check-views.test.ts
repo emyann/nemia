@@ -17,7 +17,7 @@ import path from 'node:path';
 import type { Run } from '../src/run.ts';
 import { checkArgv } from '../src/check/check.ts';
 import { scratch } from './scratch.ts';
-import { until, WAITED, type Waiter } from './waits.ts';
+import { until, WAITED, type Waiter } from 'agent-runtime/testing';
 import { Effect } from 'effect';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runOver } from './placed.ts';

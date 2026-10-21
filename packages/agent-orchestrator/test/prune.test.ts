@@ -15,7 +15,7 @@ import { promised } from './promised.ts';
 import { Effect } from 'effect';
 import { runGiven, runOver } from './placed.ts';
 import { placeHeld, placeOver, unreadBy } from './place-over.ts';
-import { until, WAITED } from './waits.ts';
+import { until, WAITED } from 'agent-runtime/testing';
 import type { Place } from '../src/place/place.store.ts';
 import type { PlaceRequests, PlaceVerb } from '../src/place/place.ts';
 import type { Turned } from '../src/runner.ts';

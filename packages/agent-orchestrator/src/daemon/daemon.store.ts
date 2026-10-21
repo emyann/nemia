@@ -210,6 +210,7 @@ const DaemonFileSchema = Schema.Struct({
       commit: Schema.optionalKey(Schema.String),
     }),
   ),
+  holder: Schema.optionalKey(Schema.Record(Schema.String, Schema.Record(Schema.String, Schema.Unknown))),
 });
 
 /** The file as a daemon writes it, or undefined when the text does not read as one (`DaemonFileSchema`). */
@@ -418,6 +419,36 @@ export function heldUrl(url: string): boolean {
   if (file?.pid !== process.pid || file.stoppedAt) return false;
   writeDaemon({ ...file, url });
   return true;
+}
+
+/**
+ * Write down what the engine of this process serves on its own port, `cards`, by harness name, into the file this process holds the
+ * store by — only while it names this process and has not let the store go: a file of another holder, or none, is not this process's
+ * to write, as `heldUrl`'s is not. One writer of the lease, as ever. Answers whether it was written.
+ *
+ * The cards carry nothing secret, and this file is no place for one: the token a viewer needs is the holder engine's own, kept 0600
+ * in its store, and asked for there (`holderTokenOf`).
+ */
+export function heldHolder(cards: Record<string, Record<string, unknown>>): boolean {
+  const file = readDaemon()?.file;
+  if (file?.pid !== process.pid || file.stoppedAt) return false;
+  writeDaemon({ ...file, holder: cards });
+  return true;
+}
+
+/**
+ * What another process on this store holds and serves, by harness name, or `undefined` — what a viewer configures its engine's
+ * `holder` from, read afresh at every follow, never captured.
+ *
+ * Nothing is answered unless the lease is ticking and its pid is not this process's. A lease that stopped, whose process is gone or
+ * that has gone stalled names a port no one is listening on, so there is nothing to dial; and a lease *this* process holds names
+ * this process's own port, which it must never dial — it answers that follow off its own engine, and a viewer that dialled itself
+ * would ask its own port for a session it already holds.
+ */
+export function holderOnStore(now: Instant = instantNow()): Record<string, Record<string, unknown>> | undefined {
+  const standing = daemonStanding(now);
+  if (standing.kind !== 'ticking' || standing.file.pid === process.pid) return undefined;
+  return standing.file.holder;
 }
 
 /**

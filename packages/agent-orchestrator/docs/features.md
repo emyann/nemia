@@ -6072,3 +6072,35 @@ level that is none a 422 naming `--at-least`, and one of the wrong type a 400 na
 
 What it leaves: nothing of the slice. A reader that needs the daemon to do less work for a narrow selector — a dropped line still costs
 the stream its read — is a later intent's.
+
+## Shipped: a run's change is a pull request (2026-10-19/20)
+
+The intent `a-run-s-change-is-a-pull-req-t452`, 25 decisions signed by the owner on 2026-10-19, in two build cards. Card 1, *the pull
+request opens*: implement pushes its own branch and opens or updates the one pull request of it through `workflows/build/pull-request.ts`,
+read out of the run's base, and its round check pushes again and waits on the `ci` context of that head. Card 2, *the landing merges it*:
+the land step merges that pull request on GitHub with `--merge --match-head-commit <sha>` at the head the review read and fast-forwards
+`main` in the owner's checkout, through `workflows/build/landing.ts`, and its `check:` is the receipt alone. Neither card touched
+`landingDue` nor the git place: `onHead` already records a landing whose result is on HEAD with nothing staged, which is exactly what the
+fast-forward leaves.
+
+**CI cards 4, 5 and 6** of `the-ci-is-the-check-nemia-s-j94s` — the diff-to-packages mapping, the round's narrowing, and the landing's
+narrowing with its inside-or-outside label — are **cancelled, 2026-10-19**, about $240 of work this intent's two cards (about $160)
+replaced: `ci` runs the whole suite, the types, the lint, the whole e2e and the build on clean runners, so a round's check narrows to
+nothing to narrow and a landing's check runs no suite at all.
+
+**The four readings of decision 24**, to be taken and judged by a person, gating nothing. No test asserts any of them and nothing
+refuses a slow round:
+
+1. The round's and the landing's `checkMs` from `nemia stats`, against the same ten-run weather the CI intent measured.
+2. The laptop's load, from the `machine.load` gauge and the timeline dashboard, before and after.
+3. CI's wall time per pull-request run and per `push: main` run, read off the Actions tab once.
+4. A count of landings whose `push: main` run came back red — the number that says whether a merge queue is worth a card. A merge queue
+   is named as the next follow-on in `docs/plan-github-ci.md`, §6, and is scheduled as nothing.
+
+The wait's bound starts at 1800 s for `ci` to be reported and 2400 s whole (`START_SECONDS`, `WHOLE_SECONDS` in `pull-request.ts`), to
+be re-measured once reading 3 is known.
+
+What it leaves: the merge queue, and Nemia reading several named checks through a place's `checks` verb with `checks:` — both the next
+follow-on's, neither a card. And the receipt freezes `landing.ts` from `HEAD`, which after the fast-forward holds the run's own copy of
+it: a run could mis-record its own landing, never land an unreviewed one, since the merge verb is frozen and run while HEAD is still the
+base. The owner chose `HEAD` over `HEAD^1` on 2026-10-20.

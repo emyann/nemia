@@ -13,7 +13,7 @@
     "apps/*"
   ],
   "engines": {
-    "node": ">=22.18.0"
+    "node": ">=24.16.0"
   },
   "nemia": {
     "daemon": "apps/api/src/main.ts"

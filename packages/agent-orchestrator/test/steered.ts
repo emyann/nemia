@@ -7,7 +7,7 @@
  */
 import { Clock, Duration, Effect, Layer } from 'effect';
 import { TestClock } from 'effect/testing';
-import { bell, type Bell } from './waits.ts';
+import { bell, type Bell } from 'agent-runtime/testing';
 
 /** A steered clock: its layer, the rests asked and woken in milliseconds, in order, the bell rung at each, and the hand that moves it. */
 export type Steered = {

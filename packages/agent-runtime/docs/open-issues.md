@@ -74,6 +74,27 @@ probe recorded what a live Claude Code lists there, nor whether the partial text
 the orchestrator's `stops.jsonl` alone. Nothing is said to her about the stop (the person's answer at design: *board only, as
 specified*). A follow-up card decides whether the receipt should be read, and whether she should be told.
 
+### 38. A file time written through `utimes` and compared exactly is carried by the Node floor, not by the code
+
+**Where.** `src/harness/detached/said.ts`: the capture cache writes a kept file's time with `fs.utimesSync(own, atimeMs / 1000,
+mtimeMs / 1000)` (:143) and then compares what it reads back exactly — `parsed.mtimeMs !== key.mtimeMs` (:83), `mtimeMs !== key.mtimeMs`
+(:141), `known.mtimeMs !== key.mtimeMs` (:257) — and `detached/compact.ts:83` carries `capture.key.mtimeMs` forward into a new key.
+Beside them, `agent-orchestrator/src/record/files.store.ts:334` and `src/artifacts/artifacts.store.ts:240` write a time the same way,
+and `core/engine/bodies.ts:82` writes `now`.
+
+**What is wrong.** libuv 1.51.0 truncates a millisecond time set through `utimes`: 496 of 1,000 consecutive millisecond values read
+back changed — `1767323045678` kept, `1767323045677.999` read. Every `!==` above then reads a cache it wrote itself as stale, and the
+six runtime tests that failed in GitHub Actions run 39336719053 on Node 22.18.0 were that one bug: two in `test/said.test.ts` compared
+the time directly, and the four in `test/shell.test.ts` and `test/unsigned.test.ts` never settled a quiet session, because the capture
+the quiescence reads was discarded on every look. Measured on official binaries: 22.18.0 and 22.23.3 (libuv 1.51.0) change 496 of
+1,000; 24.16.0 and 24.20.0 (libuv 1.52.1) change none.
+
+**What was done, and what was not.** The repository's floor rose to Node 24.16.0, the first release carrying libuv 1.52.1 — 24.15.0
+still carries 1.51.0, and no Node 22 release ships 1.52 at all, so there was no 22 to fix this on. The owner chose the floor over a
+workaround (2026-10-19), and **the code is unchanged**: nothing rounds, and nothing compares a file time with a tolerance. If the floor
+is ever lowered, or the runtime is ever run on another libuv or another kernel that keeps a coarser time, these are the comparisons
+where it shows, and the six tests above are what names it.
+
 ### 2. `advance` hands off only steps that succeeded
 
 **Where.** `agent-orchestrator/src/runner.ts:318` commits a finished step's leftover work only when its
@@ -1454,3 +1475,22 @@ settle; it found a third: an attempt cut at its budget and listed `done` (or qui
 and settled `succeeded`. None of the 507 ends on the record is `budget`, so it was not seen live; it is `failed` now.
 Each of the three fails the contract test when reverted. agent-orchestrator reads a check ended `deadline` or `operator` as
 `unfinished` whatever exit code its end carries, as it read one left open.
+
+## A holder's served port carries no retry and refuses no protocol version
+
+The port a holder serves (`src/a2a/listener.ts`) answers an `A2A-Version` header it does not read: `validateVersion` is exported by
+`@a2a-js/sdk/server` and never called on the JSON-RPC road, and `ServerCallContext.requestedVersion` defaults to `'0.3'`, so a client
+asking for a version the card does not declare is served all the same. And a viewer's dropped follow ends rather than subscribing again
+(`src/a2a/holder-follow.ts`): a reader asks again from the cursor it holds, where a remote agent's follow resubscribes
+(`remote-follow.ts`). Neither is wrong today — the port is reached over loopback by a process the layer above handed the token to — and
+both wait for the slice that needs them.
+
+## `file()` refuses a long-lived Claude Code task's `env`, though an attached session would take it
+
+A task filed on the `claude` harness with `restartPolicy: 'Always'` and `config.background: true` is refused its `config.env`, in
+words saying the session "runs in a pre-spawned process and ignores its asker's environment" (`fileRefusal`). True of a `--bg`
+session, and not of the same task while a holder holds: it runs attached on the Agent SDK, which lays the env in the child it
+spawns (`attachedLongLived`, `harness/claude/code.ts`). The refusal is read at filing, where nothing knows whether a holder will
+be there when the pass spawns it — so it refuses the wider case. Met while writing `test/holder-follow.boundary.test.ts`, which
+files its session as a job instead, which runs attached just the same. Nothing is wrong on the record: no caller is given a session
+without the env it asked for.

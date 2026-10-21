@@ -12,7 +12,7 @@ import { Cause, Effect, Exit, Layer, Logger, ManagedRuntime, Stream } from 'effe
 import type { Engine } from '../runtime-client.ts';
 import { nextOf, type StepMoment } from './following.ts';
 import { scratch } from '../../test/scratch.ts';
-import { bell, until, WAITED } from '../../test/waits.ts';
+import { bell, until, WAITED } from 'agent-runtime/testing';
 
 const ROOT = scratch('wf-following-');
 process.env.WF_ROOT = ROOT;

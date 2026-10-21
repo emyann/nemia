@@ -13,6 +13,10 @@
  * the trigger skill first and where `ds-spec`'s reader runs from (`KIT_READER_TOLD`). The three are told of the look's own parts too,
  * by the folder's name (`LOOK_PARTS_TOLD`).
  *
+ * Both implement steps are told how the pull request is opened (`OPENS_THE_PULL_REQUEST`): the frozen script read from the base, the
+ * address named on the closeout, and what the check then does with it; review is told what its check did run and the two reads of the
+ * pull request that are its own (`READS_THE_PULL_REQUEST`), and claims no more that the check ran the whole suite.
+ *
  * The quick workflow's implement is told what build's is (`IMPLEMENT_TOLD`), and what makes a build quick (`QUICK_TOLD`): its plan
  * first, no decision of its own, the bound and the pages it names; it is given the kit's skills as build's steps are.
  *
@@ -80,6 +84,18 @@ const MERGES_THE_BASE = [
   'merge the commit it names and no other',
 ];
 
+/**
+ * What review is told of CI and of the pull request: what implement's check did run, that `ci` judged the suite on the pushed commit,
+ * and the two reads of its own — never a write, which its fence refuses.
+ */
+const READS_THE_PULL_REQUEST = [
+  "Implement's check ran the declarations, the typecheck and the lint on this round's tree, and waited on CI",
+  "GitHub's `ci` context judged the suite, the types, the lint, the whole e2e and the build on the commit implement pushed",
+  '**Read the pull request and its checks**, read-only, by the address implement named in its `artifacts` as a value',
+  'A red, cancelled or absent `ci` is a finding',
+  "You open, edit, merge and close none: those are refused you, and a person's.",
+];
+
 /** What review is told of the base: to say whether the branch holds it, and when a branch behind is a finding that sends the work back. */
 const HOLDS_THE_BASE = [
   '**Say whether the branch holds the base**',
@@ -131,9 +147,24 @@ const LOOK_PARTS_TOLD = [
   'through its door, before it draws one of its own: `change-the-board` says which part.',
 ];
 
+/**
+ * What implement is told of the pull request: to open it through the frozen script, read from the base, since it may type neither a push
+ * nor a `gh` call; to name its address on its closeout; and what its check then does with it.
+ */
+const OPENS_THE_PULL_REQUEST = [
+  '**Open the pull request before you sign off**, once a round and after you merged the base',
+  'git show main-worktree/HEAD:workflows/build/pull-request.ts',
+  'node "$p/pull-request.ts" open --title "<the card\'s line>" --body-file "$WF_STEP_FILES/pr-body.md"',
+  'The script pushes your own branch, never another and never the base and never forced',
+  'Name the address it prints (`wf pr: <url>`) in your `artifacts` as a value',
+  "Your check then pushes again through the same script, so CI's verdict is for the commit it judges, and waits on the `ci` context",
+  "a red, cancelled or missing `ci` comes back as the check's refusal, with the Actions URL, the failing jobs and the tail of their log",
+];
+
 /** What an implement step is told, build's and quick's alike: the base, the board's components, its mutants, a dashboard rendered. */
 const IMPLEMENT_TOLD = [
   ...MERGES_THE_BASE,
+  ...OPENS_THE_PULL_REQUEST,
   "load `shadcn` for the board's components",
   '**Name your mutants** in the closeout: one per rule or guard the change adds',
   'Try them first: `node workflows/build/mutants.ts <closeout.json>` after you commit.',
@@ -191,7 +222,7 @@ const TOLD: Told[] = [
     says: [
       ...HOLDS_THE_BASE,
       SHADCN_READ,
-      "Implement's check ran the whole test suite on this round's tree, forced",
+      ...READS_THE_PULL_REQUEST,
       'Run the typecheck and the lint yourself, each bare and one command per call: `npx turbo run typecheck --force`, `npm run lint`.',
       "Run a package's tests, `npx turbo run test --force --continue --filter=<package>`, only where a finding needs a run to stand on.",
       '**Judge the mutants, do not run them**',
@@ -430,6 +461,22 @@ test('REFUSED: design or review told no more to open a served board, when the pi
   assert.deepEqual(cut('review', /, mcp__playwright__browser_navigate\(url:\*:8787\*\)/), [
     'build/review: denies mcp__playwright__browser_navigate(url:*:8787*)',
   ]);
+});
+
+test('REFUSED: implement told no more to open the pull request, or review to read it, is named', () => {
+  const cut = (workflow: string, step: string, sentence: string): string[] =>
+    untold(
+      workflow,
+      shippedEdited(workflow, step, (text) => text.replace(across(sentence), '')),
+    );
+  for (const sentence of OPENS_THE_PULL_REQUEST) {
+    assert.deepEqual(cut('build', 'implement', sentence), [`build/implement: says "${sentence}"`]);
+    assert.deepEqual(cut('quick', 'implement', sentence), [`quick/implement: says "${sentence}"`]);
+  }
+  for (const sentence of READS_THE_PULL_REQUEST) assert.deepEqual(cut('build', 'review', sentence), [`build/review: says "${sentence}"`]);
+  const steps = loadWorkflows(path.join(HOLDER, 'build'), placesOf(path.join(HOLDER, 'build')));
+  const review = steps.find((step) => step.name === 'review')!;
+  assert.doesNotMatch(review.body, /ran the whole test suite/, "review no longer claims implement's check ran the suite");
 });
 
 test('REFUSED: implement told no more to merge the base, or review to say whether the branch holds it, is named', () => {

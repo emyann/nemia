@@ -173,18 +173,20 @@ test("REFUSED: what is not a refusal is a defect the tick's program dies of, rec
   assert.deepEqual(await programOn(e, { repo: ROOT }).then((p) => p.runs.length), 1, 'the next pass reads the store as before');
 });
 
-test("the tick's program says in its type what it needs and what it refuses: run without the engine, it does not typecheck, and a refusal is its failure", () => {
-  const typed: EffectOf<Pass, Refusal, Service | PlaceService> = tickRun();
+/**
+ * The tick's program says in its type what it needs and what it refuses: run without the engine, it does not typecheck, and a refusal
+ * is its failure. Nothing calls this: the typecheck reads its lines, and an `@ts-expect-error` over code that stops erring is the
+ * failure.
+ */
+function _tickProgramTypes(e: Engine) {
+  void (tickRun() satisfies EffectOf<Pass, Refusal, Service | PlaceService>);
   // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
-  const infallible: EffectOf<Pass, never, Service | PlaceService> = tickRun();
-  const unprovided = () =>
-    // @ts-expect-error -- tickRun requires EngineService, and runPromise takes no requirement
-    Effect.runPromise(tickRun());
-  const unplaced = (e: Engine) =>
-    // @ts-expect-error -- a program that asks the place is given none: the engine alone does not give it
-    runEngine(e, tickRun());
-  assert.deepEqual([typeof typed, typeof infallible, typeof unprovided, typeof unplaced], ['object', 'object', 'function', 'function']);
-});
+  void (tickRun() satisfies EffectOf<Pass, never, Service | PlaceService>);
+  // @ts-expect-error -- tickRun requires EngineService, and runPromise takes no requirement
+  void Effect.runPromise(tickRun());
+  // @ts-expect-error -- a program that asks the place is given none: the engine alone does not give it
+  void runEngine(e, tickRun());
+}
 
 test('a pass whose series cannot be written keeps its own cost and says so: the series are lost, never the pass; the quota read rides on it', async (t) => {
   const old = new Date(Date.now() - 3_600_000).toISOString();

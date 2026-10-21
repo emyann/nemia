@@ -271,6 +271,7 @@ export {
   ceilings,
   daemonFile,
   daemonStanding,
+  heldHolder,
   identify,
   lastCeilings,
   lastPassCost,

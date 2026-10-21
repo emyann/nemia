@@ -28,24 +28,27 @@ holds what every change needs.
   `packages/agent-runtime` and `apps/web`. Where a file alone does not say enough (a shared helper, a type many files read, a package's
   test setup), the packages it touched: `npx turbo run test --force --continue --filter=<package>`, the package by its `name`
   (`agent-orchestrator`, `agent-runtime`, `api`, `web`). Typecheck and lint run whole: they are cheap. Implement's round check runs the
-  whole suite forced (`workflows/build/implement.md`), and the landing's again on the merged tree; a session runs it only to measure
-  it, as the e2e's rule says. A failing test it did not run is the check's refusal, answered in the next try. Outside a run no check
-  follows you: run the whole suite before you commit.
+  declarations, the typecheck and the lint, and pushes the round's commit and waits on GitHub's `ci` context, which runs the whole
+  suite on it (`workflows/build/implement.md`); the landing's check runs no suite at all — it is the receipt that the pull request `ci`
+  judged was merged (`workflows/build/landing.ts`) — so the commit `ci` passed on is the last thing any suite reads; a session runs the
+  whole suite only to measure it, as the e2e's rule says. A failing test it did not run is the check's refusal, answered in the next try. Outside a
+  run no check follows you: run the whole suite before you commit.
 - `npm run typecheck` — `tsc --noEmit` per package, over its `src` and its `test/` (the web's `test/e2e/` under its own tsconfig);
   `agent-orchestrator/test/suite.test.ts` refuses a test file no typecheck reads.
 - `npm run lint` — oxlint (`.oxlintrc.json`) and `oxfmt --check` (`.oxfmtrc.json`); `npm run format` writes the layout. Every shipped
   `check:` runs it after the types. A rule turned off, or a line allowed with `oxlint-disable-next-line`, says why beside it.
 - `npm run build`, then `npm run e2e -- --pages <the pages the change touches>` (and `--photos` when pictures are due), when you touch
   `apps/web`: its assertions, in the dark theme, by workers in parallel, each with its own store, api and app (`apps/web/CLAUDE.md`).
-  A session never runs it whole but to measure it: implement's round check and the landing's run every page.
+  A session never runs it whole but to measure it: `ci`'s `e2e` job runs every page on the commit implement's round check pushed, which
+  is the commit the landing merges; the landing's check runs no page.
 - `node tools/observe/render/render.ts --out <dir>` when you touch `tools/observe`: it renders the checkout's dashboards on a throwaway
   stack with fake data, never the live one, and a step hands over the `dashboard-<name>.png` and `.txt` it writes (`see-a-dashboard`).
   It needs `docker`, takes a minute and a half, and is never run by the suite.
 - Run them before you commit, a step's session scoped as above. Green is the floor, not the bar: a change that makes the suite pass by
   weakening a test is a finding to report, not a fix.
 - Turbo does not see `workflows/`, nor a doc, though some tests read docs: a step's session runs the tests that read the doc or workflow
-  file it touched, and the round's check runs them all forced; outside a run, type `npx turbo run test --force --continue` after
-  touching one.
+  file it touched, and `ci` runs them all, on clean runners with no cache of this machine's, on the commit the round's check pushed;
+  outside a run, type `npx turbo run test --force --continue` after touching one.
 - A run's check leaves what its tests cost in `WF_ARTIFACTS`, a `test-costs-<package>-<stamp>.json` per package and try; `node
   tools/test-costs/report.ts <dir>...` ranks them. A package's peak is its largest process, not the sum of the files running at once.
 - **A run's checks inherit the daemon's environment** (`WF_MAX_CONCURRENT=50` on the owner's machine): a test that relies on a default
@@ -81,9 +84,13 @@ holds what every change needs.
 - **A workflow step never pushes, never merges into the base branch, never force-deletes a branch**, and its agent's `disallowedTools:`
   refuses the push and the delete (a `dontAsk` agent's: no allow reaches them; `packages/agent-orchestrator/test/agent-fences.test.ts`).
   `.claude/settings.json` denies none of it: pushing and opening a pull request are the person's, or done by their session when they ask.
-  A person merges after a trial merge. The one exception is a run's ending step (a workflow's last step, `workspace: main`), filed only
-  once a person approves it: it stages the merge of the run's own result branch, and the run executes the ship's `check:` on the merged
-  tree and commits on exit 0 or aborts the merge (`landingDue`).
+  What a step may not type, the run does in its place, as two frozen scripts read out of git and run with `node`, never as a tool a fence
+  could not tell apart: `workflows/build/pull-request.ts` pushes a run's own branch and opens or updates its pull request, and
+  `workflows/build/landing.ts` merges that pull request and fast-forwards the checkout. The one exception to the rule is a run's ending
+  step (a workflow's last step, `workspace: main`), filed only once a person approves it: it runs `landing.ts merge`, which refuses
+  anything but this run's own green pull request — `mergeable`, `ci` green at the head the review read, no result branch left out — then
+  merges it with a merge commit whose message the step wrote and fast-forwards the base branch here; the run then executes the step's
+  `check:`, which is `landing.ts receipt`, and records the commit that landed on its exit 0 (`landingDue`).
 - If you are a workflow step, commit as you go: the run commits only what you leave uncommitted, in one commit under your step's name.
 
 ## Agents in this repository
@@ -102,7 +109,7 @@ What the `create-an-agent` skill, being generic, does not say here:
 - `packages/agent-runtime/docs/open-issues.md` — what is still wrong or half-verified.
 - `.claude/skills/` — the repository's skills. Ours: `look`, `see-a-dashboard` (a dashboard of the side Grafana, rendered and read),
   `effect` (how we write Effect 4), `create-an-agent` (how an agent is made here) and `change-the-board` (the trigger of shadcn and of the
-  kit's skills, for a change under apps/web). Vendored unchanged, pinned in `skills-lock.json`
+  kit's skills, and the board's own traps, for a change under apps/web). Vendored unchanged, pinned in `skills-lock.json`
   and credited in `THIRD_PARTY_NOTICES.md`: `shadcn` (it is loaded, and its CLI runs, from `apps/web`, where `components.json` is:
   loaded from the root it refuses with `monorepo_root`), `grilling` and `grill-me` (Iris's interview), and `react-aria` (Adobe's
   documentation of React Aria, for the board's own parts: taken from the root by `npx skills add https://react-aria.adobe.com -a

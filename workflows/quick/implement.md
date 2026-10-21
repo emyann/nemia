@@ -2,13 +2,32 @@
 place: git
 agent: ada
 context: 200k
-check: { if [ -n "${WF_BASE_REF:-}" ]; then s=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/quick/change.ts" > "$s/change.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/quick/change.ts, so the change cannot be measured; start the run on a base that has it" >&2; false; }; } && node "$s/change.ts" size; c=$?; rm -rf "$s"; [ "$c" -eq 0 ]; else echo "wf check: a change is measured only in a run's check, where WF_BASE_REF names the base the work began on"; fi; } && { if [ -n "${WF_BASE_REF:-}" ]; then p=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/build/pictures.ts" > "$p/pictures.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/build/pictures.ts, so no picture can be asked for; start the run on a base that has it" >&2; false; }; } && node "$p/pictures.ts" "${WF_CLOSEOUT:-}"; c=$?; rm -rf "$p"; [ "$c" -eq 0 ]; else echo "wf check: pictures are asked only in a run's check, where WF_BASE_REF names the base the work began on"; fi; } && { if [ -n "${WF_BASE_REF:-}" ]; then q=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/build/probe.ts" > "$q/probe.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/build/probe.ts, so no probe can be read; start the run on a base that has it" >&2; false; }; } && node "$q/probe.ts" check; c=$?; rm -rf "$q"; [ "$c" -eq 0 ]; else echo "wf check: probes are read only in a run's check, where WF_BASE_REF and WF_RUN name the run"; fi; } && { if [ -n "${WF_BASE_REF:-}" ]; then m=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/build/mutants.ts" > "$m/mutants.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/build/mutants.ts, so no mutant can be run; start the run on a base that has it" >&2; false; }; } && node "$m/mutants.ts" "${WF_CLOSEOUT:-}"; c=$?; rm -rf "$m"; [ "$c" -eq 0 ]; else echo "wf check: the mutants run only in a run's check, where WF_BASE_REF names the base whose runner judges them"; fi; }
+check: { if [ -n "${WF_BASE_REF:-}" ]; then s=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/quick/change.ts" > "$s/change.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/quick/change.ts, so the change cannot be measured; start the run on a base that has it" >&2; false; }; } && node "$s/change.ts" size; c=$?; rm -rf "$s"; [ "$c" -eq 0 ]; else echo "wf check: a change is measured only in a run's check, where WF_BASE_REF names the base the work began on"; fi; } && { if [ -n "${WF_BASE_REF:-}" ]; then p=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/build/pictures.ts" > "$p/pictures.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/build/pictures.ts, so no picture can be asked for; start the run on a base that has it" >&2; false; }; } && node "$p/pictures.ts" "${WF_CLOSEOUT:-}"; c=$?; rm -rf "$p"; [ "$c" -eq 0 ]; else echo "wf check: pictures are asked only in a run's check, where WF_BASE_REF names the base the work began on"; fi; } && { if [ -n "${WF_BASE_REF:-}" ]; then q=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/build/probe.ts" > "$q/probe.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/build/probe.ts, so no probe can be read; start the run on a base that has it" >&2; false; }; } && node "$q/probe.ts" check; c=$?; rm -rf "$q"; [ "$c" -eq 0 ]; else echo "wf check: probes are read only in a run's check, where WF_BASE_REF and WF_RUN name the run"; fi; } && { if [ -n "${WF_BASE_REF:-}" ]; then m=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/build/mutants.ts" > "$m/mutants.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/build/mutants.ts, so no mutant can be run; start the run on a base that has it" >&2; false; }; } && node "$m/mutants.ts" "${WF_CLOSEOUT:-}"; c=$?; rm -rf "$m"; [ "$c" -eq 0 ]; else echo "wf check: the mutants run only in a run's check, where WF_BASE_REF names the base whose runner judges them"; fi; } && { if [ -n "${WF_BASE_REF:-}" ]; then r=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/build/pull-request.ts" > "$r/pull-request.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/build/pull-request.ts, so the branch cannot be pushed and no pull request can be proven; start the run on a base that has it" >&2; false; }; } && node "$r/pull-request.ts" push; c=$?; rm -rf "$r"; [ "$c" -eq 0 ]; else echo "wf check: the branch is pushed, and its pull request proven to be at the commit this check judges, only in a run's check, where WF_BASE_REF names the base the work began on"; fi; } && { if [ -n "${WF_BASE_REF:-}" ]; then w=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/build/pull-request.ts" > "$w/pull-request.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/build/pull-request.ts, so CI's verdict cannot be read; start the run on a base that has it" >&2; false; }; } && node "$w/pull-request.ts" wait; c=$?; rm -rf "$w"; [ "$c" -eq 0 ]; else echo "wf check: CI's verdict is waited for only in a run's check, where WF_BASE_REF names the base the work began on"; fi; }
 budget: 20
 skills: effect, shadcn, change-the-board, look, react-aria, see-a-dashboard, apps/web:ds-build, apps/web:ds-theme, apps/web:ds-spec
 mcp: playwright
-disallowedTools: SendMessage, CronCreate, CronDelete, RemoteTrigger, Bash(git push), Bash(git push:*), Bash(git branch -D:*), Bash(git branch --delete --force:*), Bash(pkill:*), Bash(killall:*), mcp__playwright__browser_run_code_unsafe, Bash(claude *--bg*), Bash(claude *--background*), Bash(claude *remote-control*), Edit(//**/.claude/settings.local.json), Edit(~/.claude/settings.json), Edit(~/.claude.json), Bash(*:4318*), Bash(*:4317*)
+disallowedTools: SendMessage, CronCreate, CronDelete, RemoteTrigger, Bash(git push), Bash(git push:*), Bash(gh), Bash(gh:*), Bash(git branch -D:*), Bash(git branch --delete --force:*), Bash(pkill:*), Bash(killall:*), mcp__playwright__browser_run_code_unsafe, Bash(claude *--bg*), Bash(claude *--background*), Bash(claude *remote-control*), Edit(//**/.claude/settings.local.json), Edit(~/.claude/settings.json), Edit(~/.claude.json), Bash(*:4318*), Bash(*:4317*)
 output: implement.schema.json
 ---
+**Open the pull request before you sign off**, once a round and after you merged the base: this run's change is judged on GitHub, and
+your fence refuses every `git push` and every `gh` call, so the push and the pull request are one frozen script, read from the base as
+your check reads it. Copy it out and run it:
+
+```
+p=$(mktemp -d) && git show main-worktree/HEAD:workflows/build/pull-request.ts > "$p/pull-request.ts"
+node "$p/pull-request.ts" open --title "<the card's line>" --body-file "$WF_STEP_FILES/pr-body.md"
+```
+
+Write that body first, in a file of your files directory: what the change does and what proves it, a few paragraphs, amended as the
+rounds go. The script pushes your own branch, never another and never the base and never forced, and opens the pull request or brings
+the open one up to date, never a draft. Name the address it prints (`wf pr: <url>`) in your `artifacts` as a value, `{"name": "pull
+request", "value": "<the url>"}`.
+
+Your check then pushes again through the same script, so CI's verdict is for the commit it judges, and waits on the `ci` context: CI
+runs the suite, the types, the lint, the whole e2e and the build on that commit, and a red, cancelled or missing `ci` comes back as the
+check's refusal, with the Actions URL, the failing jobs and the tail of their log — your next try is handed that, since you may type no
+`gh` yourself.
+
 This is a quick build: no spec was written for you and no review follows. You are handed a card, and the person who approves the
 landing reads your plan and your change at its gate.
 
@@ -24,11 +43,14 @@ read, which of two behaviours), sign off `blocked` and say in `needs` what is un
 grows past the bound, do not trim it to fit, split it or drop its tests: sign off `blocked`, and say in `needs` that the card is a
 `build` card and why.
 
-**Nothing runs your tests for you before the gate.** The check proves the bound, the pictures, the probes and the mutants: it runs
-`change.ts size`, `pictures.ts`, `probe.ts` and `mutants.ts`, in that order, and nothing else. Run them yourself before you sign off, as
-`CLAUDE.md`, *Check your work*, says of a step's session: the tests of what you changed, the types and the lint, and for a change to
-the board the e2e pages it touches, with pictures. The whole suite and the whole e2e run in the landing's check on the merged tree,
-after a person approved. A failure there aborts the landing and comes back to you, with what the check said.
+**Nothing runs your tests for you before the gate.** The check proves the bound, the pictures, the probes and the mutants, then pushes
+the branch and waits on CI: it runs `change.ts size`, `pictures.ts`, `probe.ts`, `mutants.ts`, `pull-request.ts push` and
+`pull-request.ts wait`, in that order, and nothing else. Run them yourself before you sign off, as `CLAUDE.md`, *Check your work*, says
+of a step's session: the tests of what you changed, the types and the lint, and for a change to the board the e2e pages it touches, with
+pictures. CI's `ci` context runs the suite, the types, the lint and the whole e2e on the commit your check pushed, before the gate, and that is
+the last thing any suite reads: the landing merges that same commit and its check is only the receipt that it was merged. A red `ci`
+comes back to you, with what the check said; a landing refuses before anything is merged — a pull request GitHub calls unmergeable, a
+`ci` no longer green — and nothing landed.
 
 **Name the pages** the change touches in your closeout's `pages`, each by the name `npm run e2e -- --pages <name,…>` takes, `[]` when
 it touches none: they are the pages you ran, and nothing reads them but the person at the gate.
@@ -39,7 +61,7 @@ and visits no other. The `look` skill says how, and how to picture a state no pa
 Name each picture in `artifacts` by its absolute path. `npm run e2e` without `--photos` takes no picture but a failing page's.
 The check refuses a change under `apps/web/src` whose `artifacts` names no picture that is there (`pictures.ts`); a change only under
 `apps/web/test` asks for none. Run the e2e on the pages the change touches, `npm run e2e -- --pages <name,…>`, never the whole suite
-but to measure it: no check runs a page before the gate.
+but to measure it: CI runs every page on the commit your check pushes, before the gate.
 
 When the change touches `apps/web`, load `shadcn` for the board's components, and load `change-the-board` before `shadcn`: it says
 where your shell must be for that load.
@@ -61,8 +83,9 @@ each to a copy of your result and refuses the step when its test still passes, w
 runs nothing unmutated. Try them first: `node workflows/build/mutants.ts <closeout.json>` after you commit. Name none only for a
 change that adds no rule, saying why in `noMutants`.
 
-**Merge the base before you sign off**, on every try: the base moves while you work, and the landing's check runs the whole suite on
-the merged tree. The bound counts your own change alone, from the base you merged last. The base is the branch the repository's own checkout is on, and from your worktree git names its tip
+**Merge the base before you sign off**, on every try: the base moves while you work, `ci` judges the commit your check pushes and
+nothing judges the merged tree afterwards — the landing's check is a receipt — so a base you did not merge is a base GitHub may call
+unmergeable at the landing, which refuses rather than lands. The bound counts your own change alone, from the base you merged last. The base is the branch the repository's own checkout is on, and from your worktree git names its tip
 `main-worktree/HEAD`, whatever that branch is called. Commit your work, then `git merge main-worktree/HEAD`, made as the `git` skill
 says a merge is made: keep both meanings in each conflict, and sign off `blocked` where both cannot hold. Then run again the tests of
 what the merge touched: those of each file of yours it changed, and of each file it changed that your code or your tests read.

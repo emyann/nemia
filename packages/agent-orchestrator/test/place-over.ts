@@ -6,7 +6,7 @@
 import { Effect } from 'effect';
 import type { Place } from '../src/place/place.store.ts';
 import type { PlaceOutcome, PlaceRequests, PlaceVerb } from '../src/place/place.ts';
-import { bell, type Bell } from './waits.ts';
+import { bell, type Bell } from 'agent-runtime/testing';
 
 /** The verbs a test answers itself, each from its request. */
 export type OwnVerbs = { readonly [V in PlaceVerb]?: (request: PlaceRequests[V]) => PlaceOutcome<V> };

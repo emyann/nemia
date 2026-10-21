@@ -85,8 +85,8 @@ fs.cpSync(path.join(TEAM, 'agents'), path.join(ROOT, 'agents'), { recursive: tru
 fs.cpSync(path.join(TEAM, 'skills'), path.join(ROOT, 'skills'), { recursive: true });
 
 /**
- * What the shipper's own `disallowedTools:` denies: what no step needs, and a push, a forced branch delete, a kill by name and the
- * browser's unsafe tool.
+ * What the shipper's own `disallowedTools:` denies: what no step needs, and a push, `gh` whole, a forced branch delete, a kill by name
+ * and the browser's unsafe tool.
  */
 const SHIPPER_DENIED = [
   'SendMessage',
@@ -95,6 +95,8 @@ const SHIPPER_DENIED = [
   'RemoteTrigger',
   'Bash(git push)',
   'Bash(git push:*)',
+  'Bash(gh)',
+  'Bash(gh:*)',
   'Bash(git branch -D:*)',
   'Bash(git branch --delete --force:*)',
   'Bash(pkill:*)',

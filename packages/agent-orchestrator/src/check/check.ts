@@ -30,15 +30,20 @@ import type { Workflow } from '../step/step.ts';
  * The seconds a step's check may run before the engine stops it, where the check does not land the run: a round's check. A hung check must
  * not hold a run for ever.
  *
- * A guard against a hang, not a budget, so it is set well above the slowest round check: the whole suite forced, the typecheck and the
- * lint, each mutant the closeout names, which its runner fails past five minutes, and the build and the e2e where the change touches the
- * board, the api or the root's package files, which takes as long as the workers the machine gives it: its runner refuses on what its
- * pages cost, never on its own time. The number is twice the slowest round check, rounded up to five minutes, never less than 2400.
+ * A guard against a hang, not a budget, so it is set well above the slowest round check: the pictures, the probe, the push of the round's
+ * commit, the typecheck, the lint, each mutant the closeout names, which its runner fails past five minutes, and last the wait on
+ * GitHub's `ci` context, which carries a bound of its own (`WHOLE_SECONDS`, 2400 s in `workflows/build/pull-request.ts`) so that a red or
+ * missing verdict comes back as the script's refusal in words — the Actions URL, the failing jobs, the retry line — and not as a check
+ * this deadline killed. So the number is above the clauses before the wait plus the wait itself: with 3300 those clauses have 900 s, which
+ * `pull-request.boundary.test.ts` holds against the script's number. The suite, the types, the lint, the whole e2e and the build run in
+ * `ci`, on the pushed commit, and no longer here.
  *
- * Measured from the round checks' journals, spawned to ended: 346 passed round checks that ran the mutants over a week, median 22 s, p90
- * 160 s, slowest 865 s, the forced suite, four mutants and the e2e; most replayed the suite from turbo's cache, which the forced suite no
- * longer does. One more was stopped at the old 1200 s with five of its nine mutants left; tried again, those five took 303 s, one of them
- * ended at five minutes, so it would have run an estimated 1510 s whole. Twice that, rounded up to five minutes, is 3300.
+ * Measured from the round checks' journals while the check still ran the suite and the e2e itself, spawned to ended: 346 passed round
+ * checks that ran the mutants over a week, median 22 s, p90 160 s, slowest 865 s, the forced suite, four mutants and the e2e; most
+ * replayed the suite from turbo's cache, which the forced suite no longer did. One more was stopped at the old 1200 s with five of its
+ * nine mutants left; tried again, those five took 303 s, one of them ended at five minutes, so it would have run an estimated 1510 s
+ * whole. Twice that, rounded up to five minutes, is 3300. The clauses that remain are a part of those numbers, so the measurement is a
+ * ceiling for them; it is made again, the same way, once a round check whose wait was short takes more than half of this number.
  *
  * Longer than `LANDING_CHECK_DEADLINE_SECONDS`, rightly: a landing's check runs no mutant, and a round's runs as many as its closeout
  * names. A constant rather than a step key: every shipped check is the same command family and none needs another number.
@@ -177,23 +182,30 @@ export const checkContract = (command: string): string =>
   ].join('\n');
 
 /**
- * The check, told to an ending that lands on it (`landsOnCheck` in `status/status.ts`) in place of `checkContract`: the step stages the
- * merge, and the run judges and lands it. Appended to its brief, so the shipper's recipe and the run's mechanism cannot say two things: the
- * run executes the command on the merged tree once the step signs off, commits the merge with the closeout's `message` when it exits 0, and
- * aborts it otherwise — a check that did not finish included, which is no verdict. What a session would do instead — run the suite in a
- * turn it cannot hold open, commit on what it read of it — is what the run refuses here by doing it itself. How to stage it, and what the
- * session is denied, are its place's words (`words`, `landingWords`); with none, it is sent to its place's skill.
+ * The check, told to an ending that lands on it (`landsOnCheck` in `status/status.ts`) in place of `checkContract`: the step lands the
+ * run's result the way its own step says, and the run judges it and records what landed. Appended to its brief, so the shipper's recipe
+ * and the run's mechanism cannot say two things: the run executes the command in the checkout once the step signs off, and on its exit 0
+ * records
+ * the landing — committing the merge with the closeout's `message` where the step staged one — and otherwise lands nothing, a check that
+ * did not finish included, which is no verdict. What a session would do instead — run the suite in a turn it cannot hold open, commit on
+ * what it read of it — is what the run refuses here by doing it itself. Shape-neutral on purpose: a factory that lands by merging its own
+ * pull request on GitHub and a factory that stages a local merge are both told this, and the recipe of either is its step's own note.
+ * How to stage a merge, and what the session is denied, are its place's words (`words`, `landingWords`); with none, it is sent to its
+ * place's skill (*Stage a landing*).
  */
 export const landingContract = (command: string, words?: LandingWords): string =>
   [
     '',
     '## The run checks and lands your merge',
     '',
-    `Once you sign off, the run executes ${codeSpan(command)} in this checkout, on the merge you left staged, as it executes any step's check.`,
-    "When it exits 0 the run commits the merge onto the base branch, with the `message` your closeout gives, as the commit's message;",
-    'anything else — a refusal, or a check that did not finish — and the run aborts the merge, and nothing lands.',
+    `Once you sign off, the run executes ${codeSpan(command)} in this checkout, as it executes any step's check.`,
+    'When it exits 0 the run records what landed, and where you left a merge staged it commits that merge onto the base branch, with',
+    "the `message` your closeout gives as the commit's message; anything else — a refusal, or a check that did not finish — and nothing",
+    'lands, a merge you staged being taken back.',
     '',
-    `So stage the merge and sign off: stage every result branch in one merge that commits nothing, ${words ? codeSpan(words.stage) : "as your place's skill says (*Stage a landing*)"}, leave it staged, and do not run`,
+    "How this factory lands is your step's to say, and the landing is yours to make before you sign off, with the `message` that",
+    'records what landed. Where your step stages a merge: stage every result branch in one merge that commits nothing,',
+    `${words ? codeSpan(words.stage) : "as your place's skill says (*Stage a landing*)"}, leave it staged, and do not run`,
     'the check, commit, or abort a clean merge yourself. Where it does not merge cleanly, abort it and sign off `blocked`, saying why.',
     `${words?.denied.length ? `Your fence denies ${words.denied.map(codeSpan).join(' and ')}` : 'Committing it is denied you'} for that reason; a merge that commits as it merges would land it all the same, unchecked.`,
     "A try that follows a refusal is handed what the check said: the work is the run's result and not yours to change here.",

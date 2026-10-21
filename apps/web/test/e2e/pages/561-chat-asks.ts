@@ -75,5 +75,25 @@ export default {
     } finally {
       back();
     }
+
+    const cut = herChat({ session: 'up', asks: [{ ...ASK, cut: true }] });
+    try {
+      await page.reload({ waitUntil: 'load' });
+      await idle(page);
+      const panel = await openChat(page);
+      await expectVisible(
+        panel.locator('[data-chat-ask="form"]'),
+        'a question whose call was cut with nothing answered is still drawn: the person may answer it, and her answer comes as words',
+      );
+      await expectNone(
+        async () => {
+          const said = await chatFieldOf(page).getAttribute('placeholder');
+          return said === ASKING_WORDS ? `the composer still invites ${JSON.stringify(said)}` : null;
+        },
+        'but the composer waits on nobody for it: nothing of hers is held open for the words to answer',
+      );
+    } finally {
+      cut();
+    }
   },
 } satisfies PageSpec;

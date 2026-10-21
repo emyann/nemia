@@ -182,14 +182,14 @@ test('the stream sends presence first, then her events with the cursor, and resu
   assert.deepEqual(JSON.parse(first[0].data!), { up: true, answering: true, waitsOnYou: 0, unread: 2 });
   assert.deepEqual(textsOf(first), ['One.', 'Two.']);
   const cursor = first.filter((b) => b.id !== undefined).at(-1)?.id;
-  assert.equal(cursor, '1.2.0.0.0.0.0.0');
+  assert.equal(cursor, '1.2.0.0.0.0.0.0.0');
   said(sessionId, ['Three.'], 2);
   const resumed = await streamed(
     await app.request('/api/nemia/chat/stream', { headers: { 'Last-Event-ID': cursor } }),
     (said) => textsOf(said).length >= 1,
   );
   assert.deepEqual(textsOf(resumed), ['Three.']);
-  assert.equal(resumed.filter((b) => b.id !== undefined).at(-1)?.id, '1.3.0.0.0.0.0.0');
+  assert.equal(resumed.filter((b) => b.id !== undefined).at(-1)?.id, '1.3.0.0.0.0.0.0.0');
 });
 
 test('a read that fails under an open stream is `unreadable` with retrying, and the first beat that works after it says `readable`', async () => {

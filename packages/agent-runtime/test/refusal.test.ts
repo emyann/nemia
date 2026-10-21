@@ -330,7 +330,7 @@ test('REFUSED at shipped defaults: a long-lived task on a harness that ends its 
   );
 });
 
-test('REFUSED: `mayAsk: true` on a session the runtime does not hold open, and taken on a long-lived Claude Code session', async () => {
+test('REFUSED: `mayAsk: true` on a session this runtime does not hold attached, and taken on the one it does', async () => {
   const options = {
     root: scratch('ae-may-ask-'),
     journal: asyncStore(memoryStore()),
@@ -343,23 +343,21 @@ test('REFUSED: `mayAsk: true` on a session the runtime does not hold open, and t
   assert.equal(job._tag, 'FileRefused');
   assert.equal(
     job.message,
-    "`mayAsk: true` holds a call that would ask a person open until one answers it, and only a session this runtime holds open for as long as that can hold one: the `claude` harness has no session the runtime holds. File the task `restartPolicy: 'Always'` on a Claude Code background session, or leave `mayAsk` off.",
+    "`mayAsk: true` holds a call that would ask a person open until one answers it, and only a session this runtime holds attached can hold one: the `claude` harness runs this task as a job, which ends its session with its turn. File the task `restartPolicy: 'Always'` on a harness configured `'claude'`, which this runtime holds attached, or leave `mayAsk` off.",
   );
   const elsewhere = await refused({ ...asked, harness: 'codex' });
-  assert.match(elsewhere.message, /the `codex` harness has no session the runtime holds/);
-  const kept = await refused({ ...asked, harness: 'bg' });
+  assert.match(elsewhere.message, /the `codex` harness has no session this runtime holds attached/);
+  const detached = await refused({ ...asked, harness: 'bg', restartPolicy: 'Always' });
   assert.match(
-    kept.message,
-    /the `bg` harness ends the session with its turn unless it is filed long-lived/,
-    'a long-lived filing is owed',
+    detached.message,
+    /the `bg` harness has no session this runtime holds attached/,
+    'a `claude --bg` session is driven by no `query()` of ours, so no call of it is caught at a hook: a long-lived filing does not make it hold one',
   );
   assert.ok(
-    await Effect.runPromise(engine.file({ ...asked, harness: 'bg', restartPolicy: 'Always' })),
-    'a long-lived background session holds a call open, so it takes it',
-  );
-  assert.ok(
-    await Effect.runPromise(engine.file({ ...ok, harness: 'claude', restartPolicy: 'Always', config: { background: true, mayAsk: true } })),
-    'and so does the `claude` harness told to run the session in the background',
+    await Effect.runPromise(
+      engine.file({ ...ok, harness: 'claude', restartPolicy: 'Always', config: { background: true, mayAsk: true } }),
+    ),
+    'the long-lived `claude` session this runtime holds attached holds a call open, so it takes it',
   );
 });
 

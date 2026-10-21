@@ -92,17 +92,18 @@ const misplaced = (spec: TaskSpec & { harness: string }, harnesses: Record<strin
   argsMisplaced(spec, harnesses) ?? longLivedMisplaced(spec, harnesses) ?? mayAskMisplaced(spec, harnesses);
 
 /**
- * Why a task's `config.mayAsk: true` cannot go to its harness — or `undefined`: holding a call open while a person answers it needs a
- * session the runtime holds open for as long as the ask lasts, which is a long-lived Claude Code session (`restartPolicy: 'Always'` on
- * `claude` with `config.background: true`, or on `claude-bg`). Every other session ends its turn with the call, so a call held in one
- * would be cut before an answer could reach it.
+ * Why a task's `config.mayAsk: true` cannot go to its harness — or `undefined`: a call is held open at the hook of the session this
+ * process drives on the Agent SDK, which is a long-lived session of a harness configured the literal `'claude'`
+ * (`restartPolicy: 'Always'`, the one request that runs attached, `attachedLongLived`) and no other. A `claude --bg` session is driven
+ * by no `query()` of ours and catches none of its calls, however long it lives, and every other session ends its turn with the call,
+ * so a call held in one would be cut before an answer could reach it. The same one rule `heldHarnessesOf` reads.
  */
 const mayAskMisplaced = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined => {
   if (spec.config?.mayAsk !== true) return undefined;
   const h = harnesses[spec.harness];
-  const open = h === 'claude-bg' || (h === 'claude' && spec.config.background === true);
-  if (open && spec.restartPolicy === 'Always') return undefined;
-  return `\`mayAsk: true\` holds a call that would ask a person open until one answers it, and only a session this runtime holds open for as long as that can hold one: the \`${spec.harness}\` harness${open ? ' ends the session with its turn unless it is filed long-lived' : ' has no session the runtime holds'}. File the task \`restartPolicy: 'Always'\` on a Claude Code background session, or leave \`mayAsk\` off.`;
+  const held = h === 'claude';
+  if (held && spec.restartPolicy === 'Always') return undefined;
+  return `\`mayAsk: true\` holds a call that would ask a person open until one answers it, and only a session this runtime holds attached can hold one: the \`${spec.harness}\` harness${held ? ' runs this task as a job, which ends its session with its turn' : ' has no session this runtime holds attached'}. File the task \`restartPolicy: 'Always'\` on a harness configured \`'claude'\`, which this runtime holds attached, or leave \`mayAsk\` off.`;
 };
 
 /**

@@ -10,10 +10,15 @@
  * would be facts the board does not have. A chat the api cannot stream and is reading again on a beat says so quietly, apart from that
  * failure, and draws no greeting either, for the same reason (`ChatRetryingBand`).
  *
+ * While exactly one question of hers waits on the person, drawn as the form (`askInWords`), the composer invites their own words and
+ * what they write answers that question (`wordsAnswer`) rather than being said to her as the next message; for a proposal, for
+ * several questions and for none, it sends as it always does.
+ *
  * Escape closes it while it floats, as the frame's own bar closes on Escape; the page closes on nothing, being a page.
  */
 import { useEffect } from 'react';
 import { CutFrame } from '@/components/look';
+import { askInWords, wordsAnswer } from '@/lib/chatFollowing';
 import { sessionOf } from '@/lib/nemia';
 import type { NemiaLevel } from '@/lib/api';
 import type { Presence } from '@/lib/presence';
@@ -46,6 +51,7 @@ export function ChatPanel({ chat, nemia, presence, atWork, now, mode, onGrow, on
   const grown = mode !== 'float';
   const unreadable = state.error !== null;
   const retrying = state.retrying;
+  const inWords = askInWords(state.events);
 
   useEffect(() => {
     if (mode === 'page') return;
@@ -74,7 +80,7 @@ export function ChatPanel({ chat, nemia, presence, atWork, now, mode, onGrow, on
         {retrying !== null && <ChatRetryingBand why={retrying} />}
         {unreadable && <ChatUnreadableBand why={state.error ?? ''} />}
         {state.events.length > 0 ? (
-          <ChatTalk events={state.events} unread={state.presence.unread} onRead={chat.markRead} />
+          <ChatTalk events={state.events} unread={state.presence.unread} onRead={chat.markRead} onAnswer={chat.answer} />
         ) : (
           !state.loading &&
           !unreadable &&
@@ -91,7 +97,12 @@ export function ChatPanel({ chat, nemia, presence, atWork, now, mode, onGrow, on
           </div>
         )}
         <div className="shrink-0">
-          <ChatComposer presence={presence} onSend={chat.send} onStop={chat.stop} />
+          <ChatComposer
+            presence={presence}
+            asking={inWords !== undefined}
+            onSend={(text) => (inWords === undefined ? chat.send(text) : chat.answer(inWords.call, wordsAnswer(inWords, text)))}
+            onStop={chat.stop}
+          />
         </div>
       </section>
     </CutFrame>

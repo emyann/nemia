@@ -155,7 +155,36 @@ export type Sighting = {
    * judged**: `decide` does not read it; a person learns from it which call a stop of the engine's process waits for.
    */
   calling?: { tool: string; since: string };
+  /**
+   * The questions the session is waiting on a person for, each held open where its task may ask one (`config.mayAsk`), for a harness
+   * that holds such a call (Claude Code attached on the Agent SDK). `[]` from such a harness while none waits, and absent from one
+   * that cannot say. **Carried, never judged**: `decide` does not read it; a layer above draws each question and answers it
+   * (`RunnerOps.answer`).
+   */
+  asks?: SessionAsk[];
+  /**
+   * The asks of this session whose held call took the person's answer, by their ids, for the same harness. What tells an answer that
+   * reached the session through its own call from one whose call was cut — a turn ended, a holder let go — which the layer above owes
+   * the session as words instead. **Carried, never judged.**
+   */
+  asksTaken?: string[];
 };
+
+/**
+ * One question a session is waiting on a person for, as its harness recorded the call: the call's own id, when it was made, and the
+ * questions it asked. Carried whole, in the harness's own shape — what a question means, and which of them a person sees first, is the
+ * layer above's.
+ */
+export type SessionAsk = { id: string; at: string; questions: AskQuestion[] };
+
+/**
+ * One question of an ask: what it asks, the short word it is labelled by, the choices offered, and whether a person may pick several.
+ * Carried, never judged.
+ */
+export type AskQuestion = { question: string; header: string; options: AskOption[]; multiSelect: boolean };
+
+/** One choice of a question: what it reads as, what it means, and the mock-up it carries where it has one. Carried, never judged. */
+export type AskOption = { label: string; description: string; preview?: string };
 
 /** A session's bridge: the link that opens it, or no link and why, in words that say what to do. */
 export type Bridge = { url: string } | { url: null; why: string };

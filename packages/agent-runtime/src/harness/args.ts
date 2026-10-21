@@ -143,6 +143,13 @@ export type HarnessArgs = {
    * command and the tools it sees (`admissionRefusalOf`).
    */
   callAdmission?: Admission;
+  /**
+   * Whether a person can be asked through this session, as a Pod's container is given `stdin`: a call of the session's that would
+   * ask a person is held open while the question waits on one, and answered from outside (`RunnerOps.answer`). Absent or false: such
+   * a call is denied, as no person is there. Only a session the runtime holds open can hold a call, so it is refused on any other
+   * (`harnessRefusalOf`), and unless true or false.
+   */
+  mayAsk?: boolean;
 };
 
 /**
@@ -174,6 +181,7 @@ const KEYS: Record<keyof HarnessArgs, true> = {
   niceness: true,
   mounts: true,
   callAdmission: true,
+  mayAsk: true,
 };
 export const HARNESS_ARGS = Object.keys(KEYS) as ReadonlyArray<keyof HarnessArgs>;
 
@@ -325,7 +333,14 @@ const ownArgsRefusalOf = (config: HarnessArgs): string | undefined =>
   commandArgsRefusalOf(config) ??
   checkoutMcpRefusalOf(config) ??
   mountsRefusalOf(config.mounts) ??
-  admissionRefusalOf(config.callAdmission);
+  admissionRefusalOf(config.callAdmission) ??
+  mayAskRefusalOf(config);
+
+/** Why a task's `mayAsk` is not whether a person can be asked through its session — or `undefined`: anything but true or false. */
+const mayAskRefusalOf = ({ mayAsk }: HarnessArgs): string | undefined =>
+  mayAsk === undefined || typeof mayAsk === 'boolean'
+    ? undefined
+    : `\`mayAsk: ${JSON.stringify(mayAsk)}\` is not true or false. Give true to hold a call that would ask a person while one answers it, or leave it out to have such a call denied.`;
 
 /**
  * Why a task's `checkoutMcp` names no servers of a checkout's `.mcp.json` — or `undefined`: not a list of server names, a name

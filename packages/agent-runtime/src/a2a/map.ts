@@ -97,7 +97,9 @@ const agentSays = (messageId: string, name: string, contextId: string, text: str
 
 /**
  * A spawn, as the user Message that asks for it. The name is the Task's id; the session it continues, `resumeFrom`, its
- * `contextId`, empty for a spawn that starts cold; `config` travels whole, unopened.
+ * `contextId`, empty for a spawn that starts cold; `config` travels whole, unopened. Every other key of the request is on the
+ * metadata, `restartPolicy` among them: a harness reads off it whether the session stays open between turns, and one that reached
+ * this seam without it would run a long-lived session as a job (`attachedLongLived`).
  */
 export const messageOf = (r: SpawnRequest, messageId: string): Message => ({
   messageId,
@@ -109,6 +111,7 @@ export const messageOf = (r: SpawnRequest, messageId: string): Message => ({
     cwd: r.cwd,
     harness: r.harness,
     config: r.config,
+    restartPolicy: r.restartPolicy,
     closeoutSchema: r.closeoutSchema,
     resource: r.resource,
     traceparent: r.traceparent,
@@ -199,6 +202,7 @@ export const spawnOf = (m: Message): SpawnRequest => {
     cwd: md.cwd,
     harness: md.harness,
     config: md.config,
+    restartPolicy: md.restartPolicy,
     closeoutSchema: md.closeoutSchema,
     resumeFrom: m.contextId || undefined,
     resource: md.resource,

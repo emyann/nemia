@@ -42,6 +42,8 @@ export {
   FollowRefused,
   InterruptRefused,
   InterruptUnsent,
+  AnswerRefused,
+  AnswerUnsent,
   SayRefused,
   SayUnsent,
   QuotaRefused,
@@ -51,7 +53,7 @@ export {
   CompactRefused,
   refusalWords,
 } from './service/index.ts';
-export type { CompactReport, EngineShape, ForgetReport, KeptReport } from './service/index.ts';
+export type { Answering, AskAnswered, CompactReport, EngineShape, ForgetReport, KeptReport } from './service/index.ts';
 export type { EngineOptions, HarnessConfig, Pooled, TaskSpec, TickReport, EngineIo, ObserveCount } from './service/options.ts';
 /**
  * Why a task's configuration on one of the harnesses an engine runs by default is one `file()` refuses, in the runtime's words, or
@@ -132,6 +134,7 @@ export { admissionHook, sdkRunner } from './harness/index.ts';
 export { a2aRunner } from './a2a/index.ts';
 
 export type { Event, State, Attempt, Sighting, EndReason, Usage, Said, Denial, Input, Bridge } from './core/index.ts';
+export type { AskOption, AskQuestion, SessionAsk } from './core/index.ts';
 export type { SessionState, Ended, Outcome } from './core/index.ts';
 /**
  * The task's lifecycle as plain data — states, edges, first and final states, and the verbs written from outside it — for a board to

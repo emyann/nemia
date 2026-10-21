@@ -1,13 +1,23 @@
 /**
  * Nemia's chat on the board: her history a page at a time with where she is, the same followed as server-sent events, the person's
- * words sent, their read mark moved, and the turn she is answering stopped. Each is a program of the package's chat (`chatHistory`,
- * `chatSince`, `chatSend`, `chatRead`, `chatStop`)
+ * words sent, a question of hers answered, their read mark moved, and the turn she is answering stopped. Each is a program of the
+ * package's chat (`chatHistory`, `chatSince`, `chatSend`, `chatAnswer`, `chatRead`, `chatStop`)
  * over her place (`nemiaChatPlace`), and no command of the table: a write of the person's files kept out of her own fence.
  */
 import { Schema } from 'effect';
 import { Hono } from 'hono';
 import { type SSEStreamingApi, streamSSE } from 'hono/streaming';
-import { chatHistory, chatRead, chatSend, chatSince, chatStop, nemiaChatPlace, type ChatChanges, type ChatReads } from 'agent-orchestrator';
+import {
+  chatAnswer,
+  chatHistory,
+  chatRead,
+  chatSend,
+  chatSince,
+  chatStop,
+  nemiaChatPlace,
+  type ChatChanges,
+  type ChatReads,
+} from 'agent-orchestrator';
 import { NotBlank, readBody, type Words } from '../body.ts';
 import { refusedBeforeReading, type Guarded } from '../guard.ts';
 import { type ApiEnv, served, type Served } from '../layer.ts';
@@ -19,9 +29,16 @@ export const CHAT_BEAT_MS = 2000;
 const SEND_SHAPE = '`{ "text": "<what you write to Nemia>" }`';
 const READ_SHAPE = '`{ "through": "<the id of the last event you saw>" }`';
 const STOP_SHAPE = '`{}`';
+const ANSWER_SHAPE = '`{ "id": "<the question\'s id>", "picks": [{ "question": "<its words>", "labels": ["<a choice>"] }] }`';
 
 const SEND_BODY = Schema.Struct({ text: Schema.String });
 const READ_BODY = Schema.Struct({ through: NotBlank });
+const PICK_BODY = Schema.Struct({
+  question: NotBlank,
+  labels: Schema.optional(Schema.Array(Schema.String)),
+  words: Schema.optional(Schema.String),
+});
+const ANSWER_BODY = Schema.Struct({ id: NotBlank, picks: Schema.Array(PICK_BODY) });
 
 /** A write of the person's to her chat, in the words its guard refuses it in. */
 const guarded = (route: string, does: string, shape: string): Guarded => ({
@@ -73,6 +90,10 @@ async function sent(stream: SSEStreamingApi, read: ChatChanges, shown: string): 
  *   which takes the notice off the page.
  * - `POST /api/nemia/chat/send` — `{ text }` put in her outbox, which the keeper says to her once she is up: 201 with the entry
  *   `{ id, at, text }`. 400 for a body that is not one, 422 for text that is empty or too long.
+ * - `POST /api/nemia/chat/answer` — `{ id, picks }`, the person's answer to a question or a proposal of hers: each pick names the
+ *   question by its own words and carries the `labels` chosen or `words` of the person's own. 200 with the answer
+ *   `{ id, at, answers }`, keyed by each question's words, which the keeper carries to her held call or says to her as words. 404 for
+ *   a question her chat does not hold, 409 for one answered already, 422 for picks that do not answer it.
  * - `POST /api/nemia/chat/read` — `{ through }`, the last event the person saw: 200 with the mark `{ through, at }`, never moved back.
  *   404 for an event her chat does not hold.
  * - `POST /api/nemia/chat/stop` — the turn she is answering ended, her session left open to hear the next words: 200 with the stop
@@ -143,6 +164,21 @@ export const nemiaChat = new Hono<ApiEnv>()
       );
       if (refused) return c.json({ error: refused.error }, refused.status);
       return c.json(await runPlaced(s.placeService, s.e, chatStop(nemiaChatPlace())));
+    }),
+  )
+  .post('/api/nemia/chat/answer', (c) =>
+    served(c, async (s) => {
+      const route = 'POST /api/nemia/chat/answer';
+      const refused = refusedBeforeReading(
+        guarded(route, "answers a question of Nemia's", ANSWER_SHAPE),
+        c.req.header('host'),
+        c.req.header('sec-fetch-site'),
+        c.req.header('content-type'),
+      );
+      if (refused) return c.json({ error: refused.error }, refused.status);
+      const read = await readBody(c.req, ANSWER_BODY, `${route} takes a JSON body: ${ANSWER_SHAPE}.`, wordsOf(route, 'id', ANSWER_SHAPE));
+      if ('status' in read) return c.json({ error: read.error }, read.status);
+      return c.json(await runPlaced(s.placeService, s.e, chatAnswer(nemiaChatPlace(), read.body)));
     }),
   )
   .post('/api/nemia/chat/read', (c) =>

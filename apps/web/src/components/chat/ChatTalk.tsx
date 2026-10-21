@@ -1,5 +1,6 @@
 /**
- * The talk of Nemia's chat: her events oldest first, each drawn by what it is (`ChatMessage`, `ChatTurn`), the line that says how many
+ * The talk of Nemia's chat: her events oldest first, each drawn by what it is (`ChatMessage`, `ChatTurn`, and an ask of hers by
+ * `drawnAsk` — `ChatProposal`, `ChatAsk` or `ChatAskMany`), the line that says how many
  * are new over the first of them the person has not read (`newFrom`), and the sentinel at its foot that says her latest is on screen —
  * which is when the read mark is posted (`onRead`), and when the jump pill goes.
  *
@@ -8,24 +9,49 @@
  * inside it rather than growing the panel past the screen, and on her own page it fills the frame down to the composer.
  */
 import { useEffect, useRef, useState } from 'react';
-import { foldChat, newFrom, newWords, readableFrom, type ChatItem } from '@/lib/chatFollowing';
-import type { ChatEvent } from '@/lib/api';
+import { drawnAsk, foldChat, newFrom, newWords, readableFrom, type ChatAsk as Ask, type ChatItem } from '@/lib/chatFollowing';
+import type { AskPick, ChatEvent } from '@/lib/api';
 import { markScrolls } from '@/lib/useScrollMark';
 import { ChatJump } from './ChatJump';
+import { ChatAsk } from './ChatAsk';
+import { ChatAskMany } from './ChatAskMany';
 import { ChatMarkerLine, ChatMessage } from './ChatMessage';
+import { ChatProposal } from './ChatProposal';
 import { ChatTurn } from './ChatTurn';
 
-/** One block of the talk, drawn by what it is: a turn of her steps, her words, the person's, or a quiet line. */
-function Block({ item }: { item: ChatItem }) {
+/** An ask of hers, drawn as `drawnAsk` says: the proposal's actions, one question's form, or the flow of several. */
+function Asked({ ask, onAnswer }: { ask: Ask; onAnswer: Answering }) {
+  const drawn = drawnAsk(ask.questions);
+  if (drawn === 'many') return <ChatAskMany ask={ask} onAnswer={onAnswer} />;
+  if (drawn === 'actions') return <ChatProposal ask={ask} onAnswer={onAnswer} />;
+  return <ChatAsk ask={ask} onAnswer={onAnswer} />;
+}
+
+/** The person's answer to an ask of hers, filed whole. */
+type Answering = (id: string, picks: readonly AskPick[]) => void;
+
+/** One block of the talk, drawn by what it is: a turn of her steps, her words, the person's, an ask of hers, or a quiet line. */
+function Block({ item, onAnswer }: { item: ChatItem; onAnswer: Answering }) {
   if (item.kind === 'turn') return <ChatTurn turn={item} />;
   const event = item.event;
   if (event.kind === 'message') return <ChatMessage message={event} />;
+  if (event.kind === 'question' || event.kind === 'proposal') return <Asked ask={event} onAnswer={onAnswer} />;
   if (event.kind === 'session') return <ChatMarkerLine what="session">{`A session of hers began — her ${event.attempt}`}</ChatMarkerLine>;
   return null;
 }
 
-/** The talk: what `events` holds, folded, with the new line, the jump pill and the read mark's sentinel. */
-export function ChatTalk({ events, unread, onRead }: { events: readonly ChatEvent[]; unread: number; onRead: (through: string) => void }) {
+/** The talk: what `events` holds, folded, with the new line, the jump pill, the read mark's sentinel, and the asks answered. */
+export function ChatTalk({
+  events,
+  unread,
+  onRead,
+  onAnswer,
+}: {
+  events: readonly ChatEvent[];
+  unread: number;
+  onRead: (through: string) => void;
+  onAnswer: Answering;
+}) {
   const box = useRef<HTMLDivElement>(null);
   const end = useRef<HTMLDivElement>(null);
   const [atEnd, setAtEnd] = useState(true);
@@ -72,7 +98,7 @@ export function ChatTalk({ events, unread, onRead }: { events: readonly ChatEven
                 <hr className="min-w-0 flex-1 border-alive/55" />
               </div>
             )}
-            <Block item={item} />
+            <Block item={item} onAnswer={onAnswer} />
           </div>
         ))}
         <div ref={end} aria-hidden="true" className="h-px shrink-0" />

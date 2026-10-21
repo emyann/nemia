@@ -555,6 +555,30 @@ const KEPT: readonly Walk[] = [
   },
 ];
 
+const ANSWER: readonly Walk[] = [
+  {
+    name: 'answering an ask of a task nothing was filed under, of one not started, of one at work that holds none open and of one settled is refused, and journals nothing',
+    walk: async ({ engine, settle }) => {
+      await asked(engine.file(task('a')));
+      const given = { id: 'q1', answers: { 'Which way?': 'This one' } };
+      const unstarted = [await asked(engine.answerAsk('nope', given)), await asked(engine.answerAsk('a', given))];
+      await settle('a', 'running (working)');
+      const working = await asked(engine.answerAsk('a', given));
+      const after = (await Effect.runPromise(engine.view('a'))).state;
+      await settle('a', 'succeeded', { exitCode: 0 });
+      return [...unstarted, working, after.said, after.attempts.at(-1)?.ended ?? null, await asked(engine.answerAsk('a', given))];
+    },
+    says: [
+      { refused: 'AnswerRefused' },
+      { refused: 'AnswerRefused' },
+      { refused: 'AnswerRefused' },
+      [],
+      null,
+      { refused: 'AnswerRefused' },
+    ],
+  },
+];
+
 /** The contract: every kept verb's walks. */
 export const WALKS = {
   file: FILE,
@@ -566,6 +590,7 @@ export const WALKS = {
   list: LIST,
   say: SAY,
   interrupt: INTERRUPT,
+  answerAsk: ANSWER,
   transcript: TRANSCRIPT,
   forget: FORGET,
   kept: KEPT,

@@ -20,7 +20,8 @@ import readline from 'node:readline';
 /**
  * What the stand-in does after each user message, in order: `deny`, print a `permission_denied` line for that tool; `ask`, send
  * a `can_use_tool` request for that tool; `call`, run that tool, its `PreToolUse` hooks asked first, held until the file `release`
- * appears in its folder; `nested`, once the file `nest` appears, ask the `PreToolUse` hooks of a second call of that tool, while
+ * appears in its folder or until an `interrupt` request comes, which ends the turn with that call still held and unanswered, as
+ * Claude Code leaves it; `nested`, once the file `nest` appears, ask the `PreToolUse` hooks of a second call of that tool, while
  * `call`'s is still in flight and before its release, carrying `agent_id` as a sub-agent's call does where `fromSubAgent`; `hold`,
  * wait until the file `end` appears, or until an `interrupt` request comes; then its result, `output` as its `structured_output` and
  * `cost` as its `total_cost_usd` (0.01 when absent).
@@ -43,7 +44,11 @@ type Plan = {
   transcript?: boolean;
   deny?: string;
   ask?: string;
+  /** The input the `can_use_tool` request for `ask` carries; `{}` when none. */
+  askInput?: unknown;
   call?: string;
+  /** The `tool_input` the `PreToolUse` hooks of `call` are given; absent when none. */
+  callInput?: unknown;
   nested?: string;
   fromSubAgent?: boolean;
   hold?: boolean;
@@ -132,6 +137,21 @@ const postLog = async (): Promise<void> => {
   });
 };
 
+/**
+ * Waits until the turn in flight is interrupted, or until `held` settles, whichever comes first: a call held at its hooks when an
+ * interrupt comes is left unanswered, as Claude Code leaves it, and the turn ends all the same with a result of its own.
+ */
+const cutOff = async (held: Promise<unknown>) => {
+  let over = false;
+  void held.then(() => {
+    over = true;
+  });
+  for (;;) {
+    if (interrupted || over) return;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+};
+
 /** The uuids of the user messages the turn in flight consumed: the one it took, and any it folded in as it ended. */
 let mine: string[] = [];
 
@@ -140,16 +160,19 @@ const work = async () => {
   print({ type: 'system', subtype: 'init', session_id: sessionId, cwd: process.cwd(), tools: [], model: 'stand-in' });
   if (plan.deny) print({ type: 'system', subtype: 'permission_denied', tool_name: plan.deny, tool_use_id: 'denied-1', session_id: sessionId });
   if (plan.ask)
-    note('answers.jsonl', { event: 'can_use_tool', answer: await ask({ subtype: 'can_use_tool', tool_name: plan.ask, input: {}, tool_use_id: 'asked-1' }) });
+    note('answers.jsonl', {
+      event: 'can_use_tool',
+      answer: await ask({ subtype: 'can_use_tool', tool_name: plan.ask, input: plan.askInput ?? {}, tool_use_id: 'asked-1' }),
+    });
   if (plan.call && !interrupted) {
     print({ type: 'assistant', session_id: sessionId, message: { role: 'assistant', content: [{ type: 'tool_use', id: 'call-1', name: plan.call, input: {} }] } });
-    await hooked('PreToolUse', plan.call, 'call-1');
+    await cutOff(hooked('PreToolUse', plan.call, 'call-1', plan.callInput === undefined ? {} : { tool_input: plan.callInput }));
   }
   if (plan.nested) {
     await appears('nest');
     await hooked('PreToolUse', plan.nested, 'call-2', plan.fromSubAgent ? { agent_id: 'stand-in-sub-agent' } : {});
   }
-  if (plan.call) {
+  if (plan.call && !interrupted) {
     await appears('release');
     await hooked('PostToolUse', plan.call, 'call-1');
     print({ type: 'user', session_id: sessionId, message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'call-1', content: 'ok' }] } });

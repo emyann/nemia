@@ -28,10 +28,10 @@ export class InterruptUnsent extends Schema.TaggedError<InterruptUnsent>()('Inte
 const STOP = 'Stop the task (`ae stop`) to end its session, or leave the turn to finish.';
 
 /**
- * The attempt `interrupt` ends the turn of, read off the journal. Refused, in words that say what to do, for a task settled, asked to
- * stop, not started, or whose last attempt has ended.
+ * The attempt a verb written from outside a session acts on, read off the journal. Refused, in words that say what to do, for a task
+ * settled, asked to stop, not started, or whose last attempt has ended.
  */
-const openAttemptOf = (taskId: string, state: State): { last: Attempt } | { refused: string } => {
+export const openAttemptOf = (taskId: string, state: State): { last: Attempt } | { refused: string } => {
   const last = state.attempts.at(-1);
   if (state.settled) return { refused: `\`${taskId}\` has settled (${state.settled}): no session of it is running, and no turn is in it.` };
   if (state.stopRequested) return { refused: `\`${taskId}\` has been asked to stop: its session is being stopped, not steered.` };

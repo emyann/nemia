@@ -259,6 +259,16 @@ export type RunnerOps = {
    */
   readonly interrupt?: (session: { name: string; sessionId: string }) => Effect.Effect<void, RunnerError>;
   /**
+   * Answer a call of the session's that is held open waiting on a person (`Sighting.asks`): the ask by the id the sighting gave it,
+   * and the person's answer to each question, by the question's own text. Optional, and left off every harness that holds no such
+   * call. Resolves once the harness has taken the answer; rejects when it did not, and then nothing was answered. Journals nothing
+   * and answers nothing the engine acts on: the next pass reads the session's asks as it reads any other fact of it.
+   */
+  readonly answer?: (
+    session: { name: string; sessionId: string },
+    answer: { id: string; answers: Record<string, string> },
+  ) => Effect.Effect<void, RunnerError>;
+  /**
    * What the harness's subscription has left, asked of the harness once: one process, or one request, a call, and nothing kept between
    * calls. Optional, for a harness that can tell (Claude Code: its `get_usage` control request). It touches no session and is journalled
    * nowhere. Every way an ask can go is a `HarnessQuota`, so it fails only where the seam between it and its caller does.
@@ -419,6 +429,22 @@ const merged = (results: readonly (readonly [string, Observation])[], owner: Map
  * - `release` goes only to the harness that reported the session, and only if it has the verb: sent to the fallback
  *   instead, a release would ask the wrong registry to remove something by an id it never gave.
  */
+/** `answer` routed to `ops`, or refused where that harness holds no call open for a person. */
+const answerOn = (
+  ops: RunnerOps,
+  session: { name: string; sessionId: string },
+  given: { id: string; answers: Record<string, string> },
+): Effect.Effect<void, RunnerError> =>
+  ops.answer
+    ? ops.answer(session, given)
+    : Effect.fail(
+        new RunnerError({
+          verb: 'answer',
+          message: `the \`${session.sessionId}\` session's harness holds no call open for a person to answer.`,
+          refused: true,
+        }),
+      );
+
 export const composite = (harnesses: Record<string, RunnerOps>, fallback: string): RunnerOps => {
   const pick = (name?: string) => harnesses[name ?? fallback] ?? harnesses[fallback];
 
@@ -497,6 +523,8 @@ export const composite = (harnesses: Record<string, RunnerOps>, fallback: string
             }),
           );
     },
+
+    answer: (session, given) => answerOn(pick(owner.get(session.sessionId)), session, given),
 
     logs: (sessionId) =>
       owner.has(sessionId)

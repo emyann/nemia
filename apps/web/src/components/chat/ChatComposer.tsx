@@ -1,6 +1,7 @@
 /**
  * The composer of Nemia's chat: a field that grows with what is written, Enter sends and Shift+Enter makes a new line, the two hints
- * the canvas draws under it, and one button on its right. What it invites is `composerWords`, by where she is; while this browser keeps
+ * the canvas draws under it, and one button on its right. What it invites is `composerWords`, by where she is and whether a question
+ * of hers waits on the person (`asking`); while this browser keeps
  * a message the api would not take, the field takes nothing — there is nowhere for it to go. While she answers the button is the stop
  * (`composerButton`), which ends her turn and leaves her session open, and the field stays live, so Enter still sends her the next
  * words; her turn over, it is the send again.
@@ -26,7 +27,17 @@ const Key = ({ children }: { children: string }) => (
 );
 
 /** The field, its button, and the hints: `send` takes what was written once there is something in it, `stop` ends the turn she is in. */
-export function ChatComposer({ presence, onSend, onStop }: { presence: Presence; onSend: (text: string) => void; onStop: () => void }) {
+export function ChatComposer({
+  presence,
+  asking,
+  onSend,
+  onStop,
+}: {
+  presence: Presence;
+  asking: boolean;
+  onSend: (text: string) => void;
+  onStop: () => void;
+}) {
   const [text, setText] = useState('');
   const form = useRef<HTMLFormElement>(null);
   const off = presence.notSent;
@@ -51,7 +62,7 @@ export function ChatComposer({ presence, onSend, onStop }: { presence: Presence;
             value={text}
             disabled={off}
             rows={1}
-            placeholder={composerWords(presence)}
+            placeholder={composerWords(presence, asking)}
             onChange={(event) => setText(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {

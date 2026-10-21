@@ -1,8 +1,8 @@
 /**
- * Nemia's chat (`GET /api/nemia/chat`, `GET /api/nemia/chat/stream`, `POST /api/nemia/chat/send`, `POST /api/nemia/chat/read` and
- * `POST /api/nemia/chat/stop`, the api's `nemia/chat.ts`): a page of her history with where she is, the same followed as server-sent
- * events, the person's words put in her outbox, their read mark moved, and the turn she is answering ended. Each type with the schema
- * `get` and `send` decode it with.
+ * Nemia's chat (`GET /api/nemia/chat`, `GET /api/nemia/chat/stream`, `POST /api/nemia/chat/send`, `POST /api/nemia/chat/answer`,
+ * `POST /api/nemia/chat/read` and `POST /api/nemia/chat/stop`, the api's `nemia/chat.ts`): a page of her history with where she is, the
+ * same followed as server-sent events, the person's words put in her outbox, a question of hers answered, their read mark moved, and
+ * the turn she is answering ended. Each type with the schema `get` and `send` decode it with.
  */
 import { Option, Schema } from 'effect';
 import { get, send } from './read.ts';
@@ -13,23 +13,77 @@ export type ChatFrom = 'agent' | 'person' | 'keeper';
 /** Mirrors the package's `StepState`: done, at work, failed, not begun, or waiting on the person. */
 export type ChatStepState = 'done' | 'running' | 'error' | 'pending' | 'waits';
 
+/** Mirrors the package's `AskOption`: one choice of a question, its explanation, and whether her words marked it recommended. */
+export type AskOption = { label: string; description: string; recommended: boolean };
+
+/** Mirrors the package's `AskQuestion`: one question of an ask, its header, its choices, and whether it takes several of them. */
+export type AskQuestion = { question: string; header: string; options: readonly AskOption[]; multiSelect: boolean };
+
+/** Mirrors the package's `AskPick`: the person's answer to one question — the labels they chose, or words of their own. */
+export type AskPick = { question: string; labels?: readonly string[]; words?: string };
+
+/**
+ * What a question and a proposal carry alike: her words, her questions, and the person's choice once they made one. `call` is the id
+ * of the call of hers an answer is filed against (`answerChat`), which the event's own id is made of. `cutAt` is when the call that
+ * asked it stopped waiting with nothing answered — her session was let go between the ask and the answer — so nothing of hers is
+ * held open for it and it waits on nobody (`asksOpen`); the person may answer it still, and their answer reaches her as words.
+ */
+export type AskEvent = {
+  id: string;
+  at: string;
+  call: string;
+  text: string;
+  questions: readonly AskQuestion[];
+  chose?: Record<string, string>;
+  choseAt?: string;
+  cutAt?: string;
+};
+
 /**
  * Mirrors the package's `ChatEvent`, unique by its `id`: a `message`, the person's carrying when it was delivered (`delivered`, null
  * while it waits in her outbox); a `step`, one tool call with its sentence, a `fact` and its state; a `session` line where one of her
- * sessions ended and the next began; a `question` and a `proposal`, named in the shape and emitted by nobody until S5.
+ * sessions ended and the next began; a `question` and a `proposal`, each an `AskEvent` — a call of hers waiting on the person, the
+ * proposal her one-question ask.
  */
 export type ChatEvent =
   | { kind: 'message'; id: string; at: string; from: ChatFrom; text: string; delivered?: string | null }
   | { kind: 'step'; id: string; at: string; tool: string; sentence: string; fact?: string; state: ChatStepState }
   | { kind: 'session'; id: string; at: string; attempt: number }
-  | { kind: 'question'; id: string; at: string; text: string; options: readonly string[] }
-  | { kind: 'proposal'; id: string; at: string; text: string };
+  | ({ kind: 'question' } & AskEvent)
+  | ({ kind: 'proposal' } & AskEvent);
 
 /** Decodes a `ChatFrom`. */
 const ChatFromSchema = Schema.Literals(['agent', 'person', 'keeper']);
 
 /** Decodes a `ChatStepState`. */
 const ChatStepStateSchema = Schema.Literals(['done', 'running', 'error', 'pending', 'waits']);
+
+/** Decodes an `AskOption`. */
+const AskOptionSchema = Schema.Struct({
+  label: Schema.String,
+  description: Schema.String,
+  recommended: Schema.Boolean,
+}) satisfies Schema.Schema<AskOption>;
+
+/** Decodes an `AskQuestion`. */
+const AskQuestionSchema = Schema.Struct({
+  question: Schema.String,
+  header: Schema.String,
+  options: Schema.Array(AskOptionSchema),
+  multiSelect: Schema.Boolean,
+}) satisfies Schema.Schema<AskQuestion>;
+
+/** What a `question` and a `proposal` carry alike, for the member of each. */
+const ASK_FIELDS = {
+  id: Schema.String,
+  at: Schema.String,
+  call: Schema.String,
+  text: Schema.String,
+  questions: Schema.Array(AskQuestionSchema),
+  chose: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+  choseAt: Schema.optionalKey(Schema.String),
+  cutAt: Schema.optionalKey(Schema.String),
+};
 
 /**
  * Decodes a `ChatEvent`. Its members stand by the keys they own, the widest first, so none is read by a member it extends; each is
@@ -53,15 +107,9 @@ const ChatEventSchema = Schema.Union([
     text: Schema.String,
     delivered: Schema.optionalKey(Schema.NullOr(Schema.String)),
   }),
-  Schema.Struct({
-    kind: Schema.Literal('question'),
-    id: Schema.String,
-    at: Schema.String,
-    text: Schema.String,
-    options: Schema.Array(Schema.String),
-  }),
+  Schema.Struct({ kind: Schema.Literal('question'), ...ASK_FIELDS }),
+  Schema.Struct({ kind: Schema.Literal('proposal'), ...ASK_FIELDS }),
   Schema.Struct({ kind: Schema.Literal('session'), id: Schema.String, at: Schema.String, attempt: Schema.Number }),
-  Schema.Struct({ kind: Schema.Literal('proposal'), id: Schema.String, at: Schema.String, text: Schema.String }),
 ]) satisfies Schema.Schema<ChatEvent>;
 
 /**
@@ -102,6 +150,16 @@ const ChatSentSchema = Schema.Struct({
   at: Schema.String,
   text: Schema.String,
 }) satisfies Schema.Schema<ChatSent>;
+
+/** Mirrors the package's `AskAnswer`: the person's answer to one ask of hers, keyed by each question's own words. */
+export type ChatAnswer = { id: string; at: string; answers: Record<string, string> };
+
+/** Decodes a `ChatAnswer`. */
+const ChatAnswerSchema = Schema.Struct({
+  id: Schema.String,
+  at: Schema.String,
+  answers: Schema.Record(Schema.String, Schema.String),
+}) satisfies Schema.Schema<ChatAnswer>;
 
 /** Mirrors the package's `SourceStop`: when the turn she was answering was asked to end, and of which attempt of hers. */
 export type ChatStop = { at: string; attempt: number };
@@ -172,6 +230,17 @@ export const sendChat = (text: string): Promise<ChatSent> =>
   send('POST', `${chatPath}/send`, ChatSentSchema, {
     body: { text },
     may: 'The message may be in her outbox already: read her chat again before sending it a second time.',
+  });
+
+/**
+ * The person's `picks` filed as their answer to the ask `id`: the answer as her chat keeps it, keyed by each question's own words,
+ * which the keeper carries to the call she holds open or says to her as words. It refuses an ask her chat does not hold, one answered
+ * already, and picks that do not answer it.
+ */
+export const answerChat = (id: string, picks: readonly AskPick[]): Promise<ChatAnswer> =>
+  send('POST', `${chatPath}/answer`, ChatAnswerSchema, {
+    body: { id, picks },
+    may: 'The answer may be filed already: read her chat again, which draws it, before answering a second time.',
   });
 
 /** The person's read mark moved to the event `through`: the mark as it stands, which never moves back. */

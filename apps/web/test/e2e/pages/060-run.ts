@@ -265,6 +265,7 @@ export default {
       `${SESSION.step}'s Activity tab links to its session's page`,
     );
     await settled(page);
+    await photograph(page, path.join(OUT, `run-activity-${await themeOf(page)}.png`), { fullPage: true });
 
     await graph.locator(`.react-flow__node[data-id="${FAKE.unverified}"]`).click();
     const output = stepBar(page, FAKE.id, FAKE.unverified);

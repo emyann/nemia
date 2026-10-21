@@ -812,11 +812,18 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
             fs.writeFileSync(schemaFile(r.name), JSON.stringify(r.closeoutSchema));
             io = { closeoutSchemaFile: schemaFile(r.name), closeoutFile: closeoutFile(r.name) };
           }
-          const mcpConfigFile = writeMcpConfig(mcpFile(r.name), sessionMcp(r.cwd, r.config));
+          const mcp = sessionMcp(r.cwd, r.config);
+          /**
+           * A spec that reads the spawn request itself is handed its servers in it, and names no file: its own config under the
+           * name is cleared all the same, so a re-spawn leaves no servers behind. `sessionMcp` is read either way, since it is
+           * what refuses a `checkoutMcp` name the checkout does not declare, before anything runs.
+           */
+          const mcpConfigFile = writeMcpConfig(mcpFile(r.name), spec.needsRequest ? undefined : mcp);
           if (mcpConfigFile) io = { ...io, mcpConfigFile };
           io = { ...io, ...spec.prepare?.(r) };
           if (spec.needsRequest) {
-            fs.writeFileSync(requestFile(r.name), JSON.stringify({ request: r, io }));
+            /** Owner-only: the request carries the task's `config`, whose `mcp` may hold an `env` or a header that is a secret. */
+            fs.writeFileSync(requestFile(r.name), JSON.stringify({ request: r, io }), { mode: 0o600 });
             io = { ...io, requestFile: requestFile(r.name) };
           }
           const { cmd, args, env } = spec.command(r, io);

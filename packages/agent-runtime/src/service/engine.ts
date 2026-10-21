@@ -678,7 +678,7 @@ const make = (options: EngineOptions) =>
     const observedNow = () => copyOf(observed);
     const attached = attachedSessions(root, options.claudeExecutable);
     const { credentials, missingCredential, telemetry } = options;
-    const made = runnersOf(harnesses, root, credentials, missingCredential, telemetry, attached);
+    const made = runnersOf(harnesses, root, credentials, missingCredential, telemetry, attached, options.claudeExecutable);
     const runners = Object.fromEntries(Object.entries(made).map(seamOf(harnesses, events, counted, options)));
     const layer = Layer.mergeAll(journal, Runner.layer(composite(runners, fallback)), tickMemoLayer(), admissionOf(options, harnesses));
     const go = <A, E>(e: Effect.Effect<A, E, Journal | Runner>): Effect.Effect<A, E> => e.pipe(Effect.provide(layer));

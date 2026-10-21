@@ -1404,19 +1404,19 @@ test('the runner merges what a spec prepares into what its command is given', as
 
 test('a spec that needs the spawn request is written one, and a spec that does not is written none', async () => {
   const dir = root();
-  let given: HarnessIO | undefined;
+  const given: (HarnessIO | undefined)[] = [];
   const spy = (needsRequest?: true): HarnessSpec => ({
     name: 'sh',
     ...(needsRequest ? { needsRequest } : {}),
     prepare: () => ({ trustedDirs: ['/somewhere'] }),
     command: (_r, io) => {
-      given = io;
+      given.push(io);
       return { cmd: 'sh', args: ['-c', 'exit 0'] };
     },
   });
   const request = { name: 'ae/t-req/1', brief: 'the brief', cwd: dir, closeoutSchema: { type: 'object' } };
   await Effect.runPromise(detachedOps(spy(true), dir).spawn(request));
-  const at = given?.requestFile;
+  const at = given[0]?.requestFile;
   assert.equal(at, path.join(dir, 'runs', 'sh', 'ae_t_req_1.request.json'), 'the path it was given is the run’s own file');
   const wrote = JSON.parse(fs.readFileSync(at!, 'utf8')) as { request: typeof request; io: HarnessIO };
   assert.deepEqual(wrote.request, { ...request, cwd: path.resolve(dir) }, 'the spawn request whole, its cwd resolved as the runner resolved it');
@@ -1424,9 +1424,8 @@ test('a spec that needs the spawn request is written one, and a spec that does n
   assert.ok(wrote.io.closeoutFile, 'and what the runner chose itself');
   assert.equal(wrote.io.requestFile, undefined, 'the file does not name itself');
 
-  given = undefined;
   await Effect.runPromise(detachedOps(spy(), dir).spawn({ ...request, name: 'ae/t-req/2' }));
-  assert.equal(given?.requestFile, undefined, 'a spec that does not ask is given no path');
+  assert.equal(given[1]?.requestFile, undefined, 'a spec that does not ask is given no path');
   assert.equal(fs.existsSync(path.join(dir, 'runs', 'sh', 'ae_t_req_2.request.json')), false, 'and no file is written for it');
 });
 
@@ -1447,6 +1446,29 @@ test('a respawn under the same name finds no stale spawn request, and a forget t
   const forgotten = await Effect.runPromise(ops.forget!({ name: 'ae/t-req/1' }, { dry: false }));
   assert.ok(forgotten.files.includes(at), `the request file is forgotten with the rest: ${forgotten.files.join(', ')}`);
   assert.equal(fs.existsSync(at), false);
+});
+
+test('a spec that reads its own spawn request is given its servers in it, and no MCP config file is written for it', async () => {
+  const dir = root();
+  const given: (HarnessIO | undefined)[] = [];
+  const spec = (needsRequest?: true): HarnessSpec => ({
+    name: 'sh',
+    ...(needsRequest ? { needsRequest } : {}),
+    command: (_r, io) => {
+      given.push(io);
+      return { cmd: 'sh', args: ['-c', 'exit 0'] };
+    },
+  });
+  const config = { mcp: { a: { command: 'a-server' } } };
+  await Effect.runPromise(detachedOps(spec(true), dir).spawn({ name: 'ae/t-req/1', brief: 'x', cwd: dir, config }));
+  assert.equal(given[0]?.mcpConfigFile, undefined, 'no config file is named for it');
+  assert.equal(fs.existsSync(path.join(dir, 'runs', 'sh', 'ae_t_req_1.mcp.json')), false, 'and none is written');
+  const wrote = JSON.parse(fs.readFileSync(given[0]!.requestFile!, 'utf8')) as { request: { config?: typeof config } };
+  assert.deepEqual(wrote.request.config, config, 'the servers are in the request the harness reads');
+  assert.equal(fs.statSync(given[0]!.requestFile!).mode & 0o077, 0, 'owner-only: a server’s env or header may be a secret');
+
+  await Effect.runPromise(detachedOps(spec(), dir).spawn({ name: 'ae/t-req/2', brief: 'x', cwd: dir, config }));
+  assert.ok(given[1]?.mcpConfigFile, 'a spec that reads no request is still handed a file, as it always was');
 });
 
 test('a spawn request beside a run file is no run of its own', async (t) => {

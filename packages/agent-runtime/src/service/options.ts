@@ -84,8 +84,9 @@ export type EngineOptions = {
   telemetry?: Telemetry;
   /**
    * The Claude Code the attached sessions are run with (`pathToClaudeCodeExecutable`), where it is not the Agent SDK's own bundled
-   * CLI: a command of this runtime's own, as a container's is. Read by the attached road alone, while this engine holds (`hold`) —
-   * a job and a `--bg` session run the `claude` on the PATH, whatever this says. Absent: the SDK's own.
+   * CLI: a command of this runtime's own, as a container's is. Read by both roads the SDK runs — a held session (`hold`) and a
+   * job's own process (`claudeJobSpec`, as `AE_CLAUDE_EXECUTABLE`) — and by neither road Claude Code runs itself: a `--bg`
+   * session runs the `claude` on the PATH, whatever this says. Absent: the SDK's own.
    */
   claudeExecutable?: string;
   /**
@@ -241,10 +242,11 @@ export const runnersOf = (
   missingCredential?: MissingCredential,
   telemetry?: Telemetry,
   attached?: Attached,
+  claudeExecutable?: string,
 ): Record<string, RunnerOps> =>
   Object.fromEntries(
     Object.entries(harnesses).map(([name, h]): [string, RunnerOps] => {
-      const ops = runnerOf(name, h, root, credentials, missingCredential, attached);
+      const ops = runnerOf(name, h, root, credentials, missingCredential, attached, claudeExecutable);
       return [name, telemetry ? telemetered(ops, telemetry) : ops];
     }),
   );
@@ -257,9 +259,10 @@ const runnerOf = (
   credentials?: Credentials,
   missingCredential?: MissingCredential,
   attached?: Attached,
+  claudeExecutable?: string,
 ): RunnerOps =>
   h === 'claude'
-    ? claudeCodeOps({ root }, attached)
+    ? claudeCodeOps({ root, ...(claudeExecutable ? { claudeExecutable } : {}) }, attached)
     : h === 'claude-bg'
       ? claudeOps({ root })
       : isSpec(h)

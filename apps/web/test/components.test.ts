@@ -7264,12 +7264,12 @@ test('a turn at work draws its lines, the one that waits on a person in yours; a
   assert.doesNotMatch(folded, /data-chat-step=/, 'a closed fold lays out none of its steps');
 });
 
-test('REFUSED: a family part that writes one conversation\u2019s marks: the prefix its caller names is the one it writes', () => {
+test('REFUSED: a family part that writes one conversation’s marks: the prefix its caller names is the one it writes', () => {
   const work = workOf([chatStep('t:1', 'done', 0), chatStep('t:2', 'running', 4)]);
   const session = renderToStaticMarkup(createElement(Worked, { work, marks: 'session' }));
   assert.match(session, /data-session-turn="running"/);
   assert.match(session, /data-session-step="running"/);
-  assert.doesNotMatch(session, /data-chat-/, 'and nothing of the other conversation\u2019s names');
+  assert.doesNotMatch(session, /data-chat-/, 'and nothing of the other conversation’s names');
   const hers = renderToStaticMarkup(createElement(Worked, { work, marks: 'chat' }));
   assert.match(hers, /data-chat-turn="running"/);
   assert.doesNotMatch(hers, /data-session-/);

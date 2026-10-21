@@ -73,6 +73,13 @@ test('REFUSED: a question of hers is written down and its answer carried only wh
   assert.deepEqual(nemiaDue({ ...SEMI, answered: true, asking: true }, OPEN, HERS), [], 'down: carried on a later beat');
   assert.deepEqual(nemiaDue({ ...ASKING, answered: true }, OPEN, undefined), ['subscribe'], 'filed: not yet kept');
   assert.deepEqual(nemiaDue({ ...MANUAL, asking: true, answered: true, up: true }, OPEN, HERS), ['stop', 'drop'], 'leaving');
+  assert.deepEqual(
+    nemiaDue({ ...SEMI, closing: true, up: true }, OPEN, HERS),
+    ['record'],
+    'her view holds no question, and the chat holds one whose call is gone: the beat runs to mark what became of it',
+  );
+  assert.deepEqual(nemiaDue({ ...SEMI, closing: false, up: true }, OPEN, HERS), [], 'nothing open and nothing to mark');
+  assert.deepEqual(nemiaDue({ ...SEMI, closing: true, up: false }, OPEN, HERS), [], 'down: the world is read again when she is up');
 });
 
 test('her custom words changed are those she was not last filed or told with; her shipped instruction is never compared', () => {

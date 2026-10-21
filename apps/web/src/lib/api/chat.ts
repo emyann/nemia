@@ -24,7 +24,9 @@ export type AskPick = { question: string; labels?: readonly string[]; words?: st
 
 /**
  * What a question and a proposal carry alike: her words, her questions, and the person's choice once they made one. `call` is the id
- * of the call of hers an answer is filed against (`answerChat`), which the event's own id is made of.
+ * of the call of hers an answer is filed against (`answerChat`), which the event's own id is made of. `cutAt` is when the call that
+ * asked it stopped waiting with nothing answered — her session was let go between the ask and the answer — so nothing of hers is
+ * held open for it and it waits on nobody (`asksOpen`); the person may answer it still, and their answer reaches her as words.
  */
 export type AskEvent = {
   id: string;
@@ -34,6 +36,7 @@ export type AskEvent = {
   questions: readonly AskQuestion[];
   chose?: Record<string, string>;
   choseAt?: string;
+  cutAt?: string;
 };
 
 /**
@@ -79,6 +82,7 @@ const ASK_FIELDS = {
   questions: Schema.Array(AskQuestionSchema),
   chose: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
   choseAt: Schema.optionalKey(Schema.String),
+  cutAt: Schema.optionalKey(Schema.String),
 };
 
 /**

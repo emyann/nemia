@@ -12,17 +12,20 @@
  * are what make a cut delivery finish rather than repeat.
  *
  * A controller: it reaches the runtime through the client, and is the one writer of the delivered marks (`appendDelivered`) and of the
- * answers' (`appendAnswerDone`), and the one that copies an ask into the chat (`appendAsk`).
+ * answers' (`appendAnswerDone`), the one that copies an ask into the chat (`appendAsk`), and the one that marks what became of an
+ * ask's call (`appendAskClosed`).
  */
 import { Effect } from 'effect';
-import { EngineService, asked, type Engine } from '../runtime-client.ts';
+import { EngineService, asked, type Engine, type TaskView } from '../runtime-client.ts';
 import {
   appendAnswerDone,
   appendAsk,
+  appendAskClosed,
   appendDelivered,
   readAnswers,
   readAnswersDone,
   readAsks,
+  readAsksClosed,
   readDelivered,
   readOutbox,
 } from './chat.store.ts';
@@ -30,8 +33,10 @@ import {
   answeredBefore,
   sameWords,
   askDue,
+  askKey,
   askOf,
   askWords,
+  cutOf,
   framedForHer,
   type AnswerOwed,
   type Ask,
@@ -117,8 +122,34 @@ export const recordAsks = Effect.fn('recordAsks')(function* (taskId: string, dir
     const before = answeredBefore(asks, answers, ask);
     if (before !== undefined) yield* carry(e, taskId, 'return', ask, { ...before, id: ask.id });
   }
+  yield* Effect.sync(() => markCuts(dir, view.asks));
   return copied;
 });
+
+/**
+ * What became of each unanswered ask's call, marked: `cut` for one no call of hers waits on any more, so the board stops asking the
+ * person for it and the count her face shows stops counting it; `again` for one marked cut whose words a call of hers is asking
+ * afresh, which waits on them once more. The ask's words are what a call is read by, not its id: her restarted session asks the same
+ * question under a new call id, and `recordAsks` keeps the one copy the person is asked.
+ *
+ * Level-triggered, and idempotent: each beat reads the asks the session holds now and marks only what the marks do not say already.
+ * `live` is `undefined` from a harness that cannot say what its session holds open, and from a look that did not read the session at
+ * all, and nothing is marked then: an absence read off a harness that does not report asks is no absence, and reading it as one
+ * would close a question the person is still owed.
+ */
+const markCuts = (dir: string, live: TaskView['asks']): void => {
+  if (live === undefined) return;
+  const asks = readAsks(dir);
+  const answered = new Set(readAnswers(dir).map((answer) => answer.id));
+  const cut = cutOf(readAsksClosed(dir));
+  const asking = new Set(live.map((raw) => askKey(askOf(raw))));
+  for (const ask of asks) {
+    if (answered.has(ask.id)) continue;
+    const waits = asking.has(askKey(ask));
+    const closed = cut.has(ask.id);
+    if (waits === closed) appendAskClosed(dir, { id: ask.id, how: waits ? 'again' : 'cut', at: new Date().toISOString() });
+  }
+};
 
 /** What one carry of the answers did: those returned through the call she holds open, those said as words, and those only marked. */
 export type AnswersCarried = Record<AnswerOwed, string[]>;
@@ -172,6 +203,21 @@ const carry = (e: Engine, taskId: string, owes: AnswerOwed, ask: Ask, answer: As
     Effect.orDie,
     Effect.map((reached) => reached !== undefined),
   );
+};
+
+/**
+ * Whether the chat kept in `dir` holds an ask whose marks no longer say what became of its call, given the asks `live` its session
+ * holds open now: one unanswered that no call of its words waits on and no `cut` mark names yet, or one marked cut whose words a call
+ * of hers is asking again. The two are one rule: a mark is owed wherever an ask's marks and the world disagree — no call waiting and
+ * no `cut` mark, or a call waiting and a `cut` mark that stands. `undefined` live asks are a harness that cannot say, and nothing is
+ * owed on them. What makes the keeper's beat run the record even where nothing new waits on the person; `recordAsks` does the marking.
+ */
+export const closesOwed = (dir: string, live: TaskView['asks']): boolean => {
+  if (live === undefined) return false;
+  const answered = new Set(readAnswers(dir).map((answer) => answer.id));
+  const cut = cutOf(readAsksClosed(dir));
+  const asking = new Set(live.map((raw) => askKey(askOf(raw))));
+  return readAsks(dir).some((ask) => !answered.has(ask.id) && asking.has(askKey(ask)) === cut.has(ask.id));
 };
 
 /** Whether the chat kept in `dir` holds an answer no mark names yet: what the keeper owes her. */

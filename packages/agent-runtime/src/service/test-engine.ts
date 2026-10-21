@@ -68,6 +68,12 @@ export type TestTask = {
   /** The questions of its session waiting on a person, planted by `plantAsk`, and those whose call took an answer (`answerAsk`). */
   asks: SessionAsk[];
   asksTaken: string[];
+  /**
+   * Whether its harness says what its session holds open at all: false until an ask is planted, true from then on, and true still
+   * once every ask of it is gone. A harness that says reports `[]` while none waits; one that cannot say reports nothing, which is
+   * no absence (`Sighting.asks`), so the two are not the same view.
+   */
+  asksSaid: boolean;
 };
 
 /** How an attempt ended, by the phase its task settled in. */
@@ -124,7 +130,7 @@ const viewOf = (id: string, t: TestTask | undefined): TaskView => {
     phase: t.phase,
     sessionId: t.attempt ? sessionOf(id) : null,
     ...(waits ? { admission: 'queued' } : {}),
-    ...(t.asks.length ? { asks: t.asks.map((ask) => ({ ...ask })) } : {}),
+    ...(t.asksSaid ? { asks: t.asks.map((ask) => ({ ...ask })) } : {}),
     ...(t.asksTaken.length ? { asksTaken: [...t.asksTaken] } : {}),
   };
 };
@@ -214,6 +220,11 @@ export type TestEngine = {
   readonly plantTranscript: (id: string, n: number, events: readonly TranscriptEvent[]) => void;
   /** Plants a question of a task's session waiting on a person, which `view` says and `answerAsk` answers. */
   readonly plantAsk: (id: string, ask: SessionAsk) => void;
+  /**
+   * Cuts every question of the task's session that waits on a person, as a holder that let the session go cuts them: its harness
+   * goes on saying what it holds open, and says it holds none. Throws for a task never filed.
+   */
+  readonly cutAsks: (id: string) => void;
   /**
    * Ends the task `id`'s attempt in flight as its harness ended it, failed, and starts the next at work, as a long-lived task restarts.
    * Throws for a task never filed or not started.
@@ -386,7 +397,7 @@ const sayAskedOf =
 
 /** The kept verbs over what a stand-in holds. */
 const keptOf = (
-  held: Omit<TestEngine, 'layer' | 'refuseSay' | 'settle' | 'keeps' | 'failKept' | 'plantAsk' | 'plantTranscript' | 'restart'>,
+  held: Omit<TestEngine, 'layer' | 'refuseSay' | 'settle' | 'keeps' | 'failKept' | 'plantAsk' | 'cutAsks' | 'plantTranscript' | 'restart'>,
   sayRefusals: { left: number },
   sizes: Map<string, TestKeeps>,
   keptFailures: { left: number },
@@ -414,6 +425,7 @@ const keptOf = (
           printed: {},
           asks: [],
           asksTaken: [],
+          asksSaid: false,
         });
         return filed.id;
       }),
@@ -504,6 +516,13 @@ export const testEngine = (): TestEngine => {
     const t = held.tasks.get(id);
     if (!t) throw new Error(`the test engine holds no task ${id}: file it before planting its ask`);
     t.asks = [...t.asks, { ...ask }];
+    t.asksSaid = true;
+  };
+  const cutAsks = (id: string) => {
+    const t = held.tasks.get(id);
+    if (!t) throw new Error(`the test engine holds no task ${id}: file it before cutting its asks`);
+    t.asks = [];
+    t.asksSaid = true;
   };
   const plantTranscript = (id: string, n: number, events: readonly TranscriptEvent[]) => {
     const t = held.tasks.get(id);
@@ -528,5 +547,5 @@ export const testEngine = (): TestEngine => {
   const failKept = (times: number) => {
     keptFailures.left = times;
   };
-  return { layer, ...held, refuseSay, settle, keeps, failKept, plantAsk, plantTranscript, restart };
+  return { layer, ...held, refuseSay, settle, keeps, failKept, plantAsk, cutAsks, plantTranscript, restart };
 };

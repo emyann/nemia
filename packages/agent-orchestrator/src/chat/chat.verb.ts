@@ -31,6 +31,7 @@ import {
   appendStop,
   readAnswers,
   readAsks,
+  readAsksClosed,
   readDelivered,
   readOutbox,
   readReadMark,
@@ -102,6 +103,7 @@ const sourcesOf = (place: ChatPlace) =>
       stops: readStops(place.dir),
       asks: readAsks(place.dir),
       answers: readAnswers(place.dir),
+      closed: readAsksClosed(place.dir),
     }));
     const view = place.task === undefined ? undefined : yield* asked('view', e.view(place.task));
     if (place.task === undefined || view === undefined || !view.state.filedAt)

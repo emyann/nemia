@@ -46,9 +46,16 @@ export const askAnswered = (pick: AskPick | undefined): boolean =>
 /** What the recap says of how many are left: `2 not answered` while any is, `All answered` once none is. */
 export const askLeft = (open: number): string => (open > 0 ? `${open} not answered` : 'All answered');
 
-/** The asks of `events` the person has not answered: what the composer's words and the panel's cue are about. */
+/**
+ * The asks of `events` that wait on the person: what the composer's words and the panel's cue are about. One the person answered
+ * waits on nobody, and neither does one whose call was cut (`cutAt`): she has been told as much, and the board asks for nothing it
+ * is not holding a call open for.
+ */
 export const asksOpen = (events: readonly ChatEvent[]): ChatAsk[] =>
-  events.filter((event): event is ChatAsk => (event.kind === 'question' || event.kind === 'proposal') && event.chose === undefined);
+  events.filter(
+    (event): event is ChatAsk =>
+      (event.kind === 'question' || event.kind === 'proposal') && event.chose === undefined && event.cutAt === undefined,
+  );
 
 /**
  * The ask of hers the composer's own words answer, where there is one: exactly one ask waits on the person and it is drawn as the form

@@ -10,7 +10,7 @@ import { testEngine } from 'agent-runtime/testing';
 import { scratch } from '../../test/scratch.ts';
 import { eachTest } from '../../test/placed.ts';
 import { engineOf, runWith } from '../runtime-client.ts';
-import { appendAnswer, appendAsk, readAnswers, readAnswersDone, readAsks } from './chat.store.ts';
+import { appendAnswer, appendAsk, readAnswers, readAnswersDone, readAsks, readAsksClosed } from './chat.store.ts';
 import {
   answeredBefore,
   answerFor,
@@ -26,7 +26,7 @@ import {
   type AskQuestion,
   type ChatSources,
 } from './chat.ts';
-import { answersDue, answersOwed, recordAsks } from './deliver.verb.ts';
+import { answersDue, answersOwed, closesOwed, recordAsks } from './deliver.verb.ts';
 
 const engine = eachTest(testEngine);
 
@@ -65,6 +65,7 @@ const sources = (over: Partial<ChatSources> = {}): ChatSources => ({
   stops: [],
   asks: [],
   answers: [],
+  closed: [],
   phase: 'idle',
   ...over,
 });
@@ -256,4 +257,59 @@ test('REFUSED: a say the task will not take leaves the answer owed, and the next
   assert.deepEqual(readAnswersDone(dir), [], 'nothing is marked for an answer she was not told');
   assert.deepEqual((await runWith(e, answersDue(id, dir))).words, ['call-1']);
   assert.equal(engine().said.length, 1);
+});
+
+test('an ask whose call her session no longer holds is closed as cut: it stops waiting on the person, and is drawn as cut', async () => {
+  const { e, id, dir } = await filed();
+  engine().plantAsk(id, RAW);
+  await runWith(e, recordAsks(id, dir));
+  assert.equal(asksWaiting(projectChat(sources({ asks: readAsks(dir), closed: readAsksClosed(dir) }))), 1);
+  assert.equal(closesOwed(dir, []), true, 'a call the session no longer holds is a mark the keeper owes');
+  engine().cutAsks(id);
+  await runWith(e, recordAsks(id, dir));
+  assert.deepEqual(
+    readAsksClosed(dir).map((mark) => [mark.id, mark.how]),
+    [['call-1', 'cut']],
+  );
+  assert.deepEqual(readAsks(dir), [kept], 'and the ask itself is never rewritten: what became of its call is a mark of its own');
+  const drawn = projectChat(sources({ asks: readAsks(dir), closed: readAsksClosed(dir) }));
+  const one = drawn[0];
+  assert.equal(one?.kind === 'question' && typeof one.cutAt, 'string', 'the board draws it as a question nobody is holding open');
+  assert.equal(asksWaiting(drawn), 0, 'and it counts on nobody: her call did not wait for the answer');
+  assert.equal(presenceOf('idle', 2, drawn, undefined).waitsOnYou, 2);
+  await runWith(e, recordAsks(id, dir));
+  assert.equal(readAsksClosed(dir).length, 1, 'a second beat marks it no second time');
+  assert.equal(closesOwed(dir, []), false, 'and the keeper owes no mark once what became of the call is marked');
+});
+
+test('REFUSED: a harness that cannot say what its session holds open closes nothing, nor does a look that read no session', async () => {
+  const { e, id, dir } = await filed();
+  appendAsk(dir, kept);
+  assert.equal(closesOwed(dir, undefined), false, 'an absence read off a harness that does not report asks is no absence');
+  await runWith(e, recordAsks(id, dir));
+  assert.deepEqual(readAsksClosed(dir), [], 'her task says nothing of its asks, so nothing of the person’s question is closed');
+  assert.equal(asksWaiting(projectChat(sources({ asks: readAsks(dir), closed: readAsksClosed(dir) }))), 1);
+});
+
+test('a question cut and then asked again waits on the person once more, and the one ask of it is drawn once', async () => {
+  const { e, id, dir } = await filed();
+  engine().plantAsk(id, RAW);
+  await runWith(e, recordAsks(id, dir));
+  engine().cutAsks(id);
+  await runWith(e, recordAsks(id, dir));
+  engine().plantAsk(id, { ...RAW, id: 'call-2' });
+  assert.equal(closesOwed(dir, [{ ...RAW, id: 'call-2' }]), true, 'her words asked afresh are a mark the keeper owes');
+  assert.deepEqual(await runWith(e, recordAsks(id, dir)), [], 'the same words are written down as no second ask');
+  assert.deepEqual(
+    readAsksClosed(dir).map((mark) => mark.how),
+    ['cut', 'again'],
+  );
+  const drawn = projectChat(sources({ asks: readAsks(dir), closed: readAsksClosed(dir) }));
+  assert.deepEqual(
+    drawn.map((event) => event.id),
+    ['q:call-1'],
+    'the chat draws the one question it is, whatever call of hers is holding it',
+  );
+  assert.equal(asksWaiting(drawn), 1, 'and it waits on the person once, never twice and never nil');
+  assert.equal(presenceOf('idle', 0, drawn, undefined).waitsOnYou, 1);
 });

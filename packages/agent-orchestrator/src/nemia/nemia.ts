@@ -91,7 +91,9 @@ export type NemiaAct = 'file' | 'subscribe' | 'stop' | 'drop' | 'tell' | 'delive
  * id; whether her harness trusts her folder (`trusted`, absent for a harness that keeps no trust, which is read as trusted); and whether
  * the person's custom words are not those she was last filed or told with (`stale`), read only while she is kept; whether her session is
  * live (`up`); whether the person's chat holds words not yet delivered to her (`owed`); whether her session holds a question open on
- * the person (`asking`, off her task's view); and whether the chat holds an answer of theirs not yet carried to her (`answered`).
+ * the person (`asking`, off her task's view); whether the chat holds an ask whose mark no longer says what became of its call
+ * (`closing`, a question cut with nothing answered, or one cut and asked again); and whether the chat holds an answer of theirs not
+ * yet carried to her (`answered`).
  */
 export type Keeping = {
   above: boolean;
@@ -101,6 +103,7 @@ export type Keeping = {
   up?: boolean;
   owed?: boolean;
   asking?: boolean;
+  closing?: boolean;
   answered?: boolean;
 };
 
@@ -125,7 +128,8 @@ export function nemiaState(keeping: Keeping, task: HerTask | undefined, subscrib
  * What the keeper owes on a beat, in order: at `due`, file; at `filed`, subscribe, dropping first a subscription left for another task or
  * without her floor; at `kept`, tell her the person's custom words where they are not those her task was filed with (`stale`), then
  * deliver the person's chat words where some are owed and her session is live (`owed`, `up`), write down the questions her live session
- * holds open (`record`, where her task's view says one waits: `asking`), and carry the person's answers where one is
+ * holds open and mark what became of a question it no longer holds (`record`, where her task's view says one waits, `asking`, or the
+ * chat holds one whose mark does not say what became of its call, `closing`), and carry the person's answers where one is
  * owed (`answered`); at `leaving`, stop the open task and drop
  * the subscription; at `stopped`, drop a subscription left; else nothing, at `untrusted` too: a session filed in a folder her harness does
  * not trust would be refused at its start. A task settled from outside is never filed again: the person said so by stopping it. Pure.
@@ -141,7 +145,7 @@ export function nemiaDue(keeping: Keeping, task: HerTask | undefined, subscribed
   return [
     ...(keeping.stale === true ? (['tell'] as const) : []),
     ...(keeping.owed === true && keeping.up === true ? (['deliver'] as const) : []),
-    ...(keeping.asking === true && keeping.up === true ? (['record'] as const) : []),
+    ...((keeping.asking === true || keeping.closing === true) && keeping.up === true ? (['record'] as const) : []),
     ...(keeping.answered === true && keeping.up === true ? (['answer'] as const) : []),
   ];
 }

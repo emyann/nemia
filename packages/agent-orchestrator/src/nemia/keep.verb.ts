@@ -22,7 +22,7 @@ import { readFactories } from '../factory/factory.store.ts';
 import { feedSize } from '../feed/feed.store.ts';
 import { dropSubscription, listSubscriptions, putSubscription } from '../subscription/subscription.store.ts';
 import { EngineService, asked, over, trustedFolder, type Engine } from '../runtime-client.ts';
-import { answersDue, answersOwed, deliverOutbox, outboxOwed, recordAsks } from '../chat/deliver.verb.ts';
+import { answersDue, answersOwed, closesOwed, deliverOutbox, outboxOwed, recordAsks } from '../chat/deliver.verb.ts';
 import { upOf } from '../chat/chat.ts';
 import {
   composePrompt,
@@ -197,18 +197,20 @@ const ACTS: Record<NemiaAct, (e: Engine, id: string) => Effect.Effect<void>> = {
 const act = (e: Engine, id: string, owed: NemiaAct) => ACTS[owed](e, id).pipe(Effect.andThen(Metric.update(NEMIA_ACTS, 1)));
 
 /**
- * Her task's record off the engine, undefined where none is filed under `id`, whether her session is live (`upOf`) and whether it
- * holds a question open on the person (`asking`, off the view's `asks`).
+ * Her task's record off the engine, undefined where none is filed under `id`, whether her session is live (`upOf`), whether it
+ * holds a question open on the person (`asking`, off the view's `asks`) and whether the chat holds one whose mark no longer says what
+ * became of its call (`closing`, `closesOwed` read against the same view).
  */
 const herTask = (e: Engine, id: string | undefined) =>
   Effect.gen(function* () {
-    if (id === undefined) return { task: undefined, up: false, asking: false };
+    if (id === undefined) return { task: undefined, up: false, asking: false, closing: false };
     const { state, phase, asks } = yield* asked('view', e.view(id));
-    if (!state.filedAt) return { task: undefined, up: false, asking: false };
+    if (!state.filedAt) return { task: undefined, up: false, asking: false, closing: false };
     return {
       task: { settled: Boolean(state.settled), stopRequested: state.stopRequested } satisfies HerTask,
       up: upOf(phase),
       asking: (asks ?? []).length > 0,
+      closing: closesOwed(nemiaDir(), asks),
     };
   });
 
@@ -227,14 +229,14 @@ export const keepOnce = Effect.fn('keepOnce')(function* () {
   const e = yield* EngineService;
   const id = readLevel()?.task;
   const above = (yield* levelsNow()).some((row) => row.level !== 'manual');
-  const { task, up, asking } = yield* herTask(e, id);
+  const { task, up, asking, closing } = yield* herTask(e, id);
   const trusted = trustedFolder(DEFAULT_HARNESS, nemiaDir());
   const keeping = { above, ...(id === undefined ? {} : { task: id }), ...(trusted === undefined ? {} : { trusted }) };
   const subscribed = herSubscription();
   const kept = nemiaState(keeping, task, subscribed) === 'kept';
   const stale = kept && customChanged(readTold(), nemiaCustom(), filedPrompt());
   const owed = nemiaDue(
-    { ...keeping, stale, up, asking, owed: kept && outboxOwed(nemiaDir()), answered: kept && answersOwed(nemiaDir()) },
+    { ...keeping, stale, up, asking, closing, owed: kept && outboxOwed(nemiaDir()), answered: kept && answersOwed(nemiaDir()) },
     task,
     subscribed,
   );

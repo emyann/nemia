@@ -35,6 +35,9 @@ export type ChatEvent =
  * event's own id, when she asked it, `call` the id of the call of hers an answer is filed against, `text` the first question's words,
  * and every question as she asked it. `chose` is the person's answer once
  * they gave it, each question's by the question's own words, with `choseAt` when they did; both absent while it waits on them.
+ * `cutAt` is when the call that asked it stopped waiting with nothing answered — her session was let go, or died, between the ask
+ * and the answer — and says the board draws it as a question that is nobody's to answer now; absent while a call of its words is
+ * waiting, and absent once the person answered it, an answer being what it means either way.
  */
 export type AskEvent = {
   id: string;
@@ -44,6 +47,7 @@ export type AskEvent = {
   questions: AskQuestion[];
   chose?: Record<string, string>;
   choseAt?: string;
+  cutAt?: string;
 };
 
 /** One choice of a question: what it reads as, what it means, and whether she recommended it. */
@@ -60,6 +64,13 @@ export type AskAnswer = { id: string; at: string; answers: Record<string, string
 
 /** The keeper's mark of an answer owed no longer: which ask, and how it reached her (`AnswerOwed`). */
 export type AnswerMark = { id: string; how: AnswerOwed; at: string };
+
+/**
+ * The keeper's mark of what became of an ask's call: `cut`, no call of its words waits on the person any more, so the ask is
+ * nobody's to answer; `again`, a call of hers is asking those words afresh, so it waits once more. The latest mark of an ask holds,
+ * which is how a question cut and asked again is drawn as the one question it is without any line being rewritten.
+ */
+export type AskClose = { id: string; how: 'cut' | 'again'; at: string };
 
 /**
  * Where the task is: `up`, its session live; `answering`, a turn in progress; `waitsOnYou`, what waits on the person (the runs waiting,
@@ -107,6 +118,7 @@ export type ChatSources = {
   stops: readonly SourceStop[];
   asks: readonly Ask[];
   answers: readonly AskAnswer[];
+  closed: readonly AskClose[];
   phase: string;
 };
 
@@ -239,7 +251,8 @@ export function projectChat(sources: ChatSources): ChatEvent[] {
     out.push(...placedInTime(own, stops));
   }
   const answered = new Map(sources.answers.map((a) => [a.id, a]));
-  const asks = sources.asks.map((ask) => askEvent(ask, answered.get(ask.id)));
+  const cut = cutOf(sources.closed);
+  const asks = sources.asks.map((ask) => askEvent(ask, answered.get(ask.id), cut.get(ask.id)));
   const withAsks = placedInTime(out, asks);
   out.length = 0;
   out.push(...withAsks);
@@ -348,7 +361,7 @@ export const drawnAsk = (ask: Pick<Ask, 'questions'>): AskDrawn => {
 const kindOfAsk = (ask: Pick<Ask, 'questions'>): 'question' | 'proposal' => (drawnAsk(ask) === 'actions' ? 'proposal' : 'question');
 
 /** An ask as the chat draws it, with the person's answer where they have given one. Pure. */
-export const askEvent = (ask: Ask, answer: AskAnswer | undefined): ChatEvent => ({
+export const askEvent = (ask: Ask, answer: AskAnswer | undefined, cutAt?: string): ChatEvent => ({
   kind: kindOfAsk(ask),
   id: `q:${ask.id}`,
   at: ask.at,
@@ -356,7 +369,21 @@ export const askEvent = (ask: Ask, answer: AskAnswer | undefined): ChatEvent => 
   text: ask.questions[0]?.question ?? '',
   questions: ask.questions,
   ...(answer === undefined ? {} : { chose: answer.answers, choseAt: answer.at }),
+  ...(answer === undefined && cutAt !== undefined ? { cutAt } : {}),
 });
+
+/**
+ * When each ask's call stopped waiting on the person, by the ask's id, off the keeper's marks: the latest mark of an ask is the one
+ * that holds, so an ask marked `cut` and then `again` is waiting once more and is in no entry of this. Pure.
+ */
+export const cutOf = (closed: readonly AskClose[]): Map<string, string> => {
+  const cut = new Map<string, string>();
+  for (const mark of closed) {
+    if (mark.how === 'cut') cut.set(mark.id, mark.at);
+    else cut.delete(mark.id);
+  }
+  return cut;
+};
 
 /** What the person chose for one question: the question by its own words, the labels they ticked, or the words they wrote instead. */
 export type AskPick = { question: string; labels?: readonly string[]; words?: string };
@@ -419,8 +446,13 @@ export const askWords = (ask: Pick<Ask, 'questions'>, answers: Record<string, st
 /** Whether a chat event is an ask of hers, which the board draws as a proposal or a question. */
 const asked = (e: ChatEvent): e is ChatEvent & { kind: 'question' | 'proposal' } => e.kind === 'question' || e.kind === 'proposal';
 
-/** How many asks of hers the person has not answered: what joins the count her face shows. Pure. */
-export const asksWaiting = (events: readonly ChatEvent[]): number => events.filter((e) => asked(e) && e.chose === undefined).length;
+/**
+ * How many asks of hers wait on the person: what joins the count her face shows. An ask whose call was cut with nothing answered
+ * (`cutAt`) waits on nobody — nothing of hers is held open for it, and she has been told as much — so it is not counted, or a
+ * session let go between a question and its answer would leave the count wrong for as long as the chat lasts. Pure.
+ */
+export const asksWaiting = (events: readonly ChatEvent[]): number =>
+  events.filter((e) => asked(e) && e.chose === undefined && e.cutAt === undefined).length;
 
 /** A page of a chat: its events, oldest first, and the id to ask `before` for the page older than it, null where there is none. */
 export type ChatPage = { events: ChatEvent[]; before: string | null };
@@ -455,6 +487,7 @@ export type ChatCursor = {
   stops: number;
   asks: number;
   answers: number;
+  closed: number;
 };
 
 /** The cursor of everything `sources` holds. Pure. */
@@ -467,14 +500,15 @@ export const cursorOf = (sources: ChatSources): ChatCursor => ({
   stops: sources.stops.length,
   asks: sources.asks.length,
   answers: sources.answers.length,
+  closed: sources.closed.length,
 });
 
 /** A cursor as a stream's event id: its counts, dot-separated. Pure. */
 export const chatCursor = (c: ChatCursor): string =>
-  [c.attempts, c.events, c.said, c.outbox, c.delivered, c.stops, c.asks, c.answers].join('.');
+  [c.attempts, c.events, c.said, c.outbox, c.delivered, c.stops, c.asks, c.answers, c.closed].join('.');
 
 /** How many counts a cursor holds, and the fewest a tab open across a deploy that added one still carries. */
-const [COUNTS, COUNTS_LEAST] = [8, 5];
+const [COUNTS, COUNTS_LEAST] = [9, 5];
 
 /**
  * The words a cursor no read gave is refused with. A chat event's own id is no cursor: what a stream resumes from is the `cursor` a read
@@ -492,8 +526,9 @@ export function readChatCursor(text: string): ChatCursor {
   const parts = text.split('.');
   if (parts.length < COUNTS_LEAST || parts.length > COUNTS || parts.some((p) => !/^(0|[1-9]\d*)$/.test(p)))
     throw new Invalid({ message: NOT_A_CURSOR(text) });
-  const [attempts = 0, events = 0, said = 0, outbox = 0, delivered = 0, stops = 0, asks = 0, answers = 0] = parts.map(Number);
-  return { attempts, events, said, outbox, delivered, stops, asks, answers };
+  const [attempts = 0, events = 0, said = 0, outbox = 0, delivered = 0, stops = 0, asks = 0, answers = 0, closed = 0] =
+    parts.map(Number);
+  return { attempts, events, said, outbox, delivered, stops, asks, answers, closed };
 }
 
 /**
@@ -510,7 +545,8 @@ export function sourcesAt(sources: ChatSources, c: ChatCursor, text: string): Ch
     c.delivered > sources.delivered.length ||
     c.stops > sources.stops.length ||
     c.asks > sources.asks.length ||
-    c.answers > sources.answers.length;
+    c.answers > sources.answers.length ||
+    c.closed > sources.closed.length;
   if (beyond) throw new Invalid({ message: NOT_A_CURSOR(text) });
   const sessions = sources.sessions.slice(0, c.attempts);
   return {
@@ -522,6 +558,7 @@ export function sourcesAt(sources: ChatSources, c: ChatCursor, text: string): Ch
     stops: sources.stops.slice(0, c.stops),
     asks: sources.asks.slice(0, c.asks),
     answers: sources.answers.slice(0, c.answers),
+    closed: sources.closed.slice(0, c.closed),
   };
 }
 

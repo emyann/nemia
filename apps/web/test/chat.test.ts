@@ -402,6 +402,9 @@ test('the asks waiting on the person are those with no choice on them: one answe
     ['q:question'],
   );
   assert.deepEqual(asksOpen([done]), [], 'answered: the composer asks for nothing');
+  const cut = { ...asked('question', [EXPLAINED]), cutAt: at(4) };
+  assert.deepEqual(asksOpen([cut]), [], 'her call was cut with nothing answered: nothing of hers is held open for it');
+  assert.equal(askInWords([cut]), undefined, 'so the composer is what it always is, and what they write is said to her');
 });
 
 test('the composer\u2019s own words answer one question drawn as the form, and no proposal, no flow and no two at once', () => {
@@ -419,7 +422,7 @@ test('the composer\u2019s own words answer one question drawn as the form, and n
 
 test("an ask her stream sends is read whole — its questions, the choices and the person's answer on it", () => {
   const { stream, now, stop } = followed();
-  stream.send('chat', asked('question', [EXPLAINED]));
+  stream.send('chat', { ...asked('question', [EXPLAINED]), cutAt: at(4) });
   stream.send('chat', asked('proposal', [PLAIN], { [PLAIN.question]: 'Cut it on read' }));
   const events = now().events;
   assert.deepEqual(
@@ -428,6 +431,7 @@ test("an ask her stream sends is read whole — its questions, the choices and t
   );
   const [one, two] = events;
   assert.deepEqual(one?.kind === 'question' ? one.questions : [], [EXPLAINED], 'the questions are read as she asked them');
+  assert.equal(one?.kind === 'question' ? one.cutAt : undefined, at(4), 'and a call cut with nothing answered says when it was');
   assert.deepEqual(two?.kind === 'proposal' ? two.chose : undefined, { [PLAIN.question]: 'Cut it on read' });
   assert.equal(two?.kind === 'proposal' ? two.choseAt : undefined, at(3));
   stop();

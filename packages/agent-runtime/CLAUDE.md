@@ -122,8 +122,8 @@ down is in `docs/architecture.md`, *Who owns what*.
   the `initialize` request carried `[""]` without it, and none with it). The agent's own prompt rides that preset's `append`, as the
   file's text read at spawn, and reaches the CLI as `appendSystemPrompt` on the `initialize` request, never as
   `--append-system-prompt-file`; so does `systemPromptFile`, as `systemPrompt` alone, and a task giving both is refused by name. A
-  resumed session keeps the prompt it was recorded with (`systemPromptSnapshot` defaults on), so a prompt file edited mid-session
-  reaches no live session.
+  resumed session keeps the prompt it was recorded with (`systemPrompt`'s own `snapshot`, which defaults on, `sdk.d.ts:2203-2256`),
+  so a prompt file edited mid-session reaches no live session until it is compacted.
 - **An attached session's MCP servers are `Options.mcpServers`, which the SDK spells onto the child's argv as inline JSON**
   (`sdk.mjs`, `--mcp-config <json>`), with `Options.strictMcpConfig` as the fence: that path writes no MCP config file, and a
   server's `env` or `headers` secret is in `/proc/<pid>/cmdline` rather than a 0600 file — a job, `claude --bg` and

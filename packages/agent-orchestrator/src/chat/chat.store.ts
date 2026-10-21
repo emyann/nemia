@@ -65,7 +65,7 @@ const QuestionSchema = Schema.Struct({
 const AskSchema = Schema.Struct({ id: Moment, at: Moment, questions: Schema.mutable(Schema.Array(QuestionSchema)) });
 const AnswerSchema = Schema.Struct({ id: Moment, at: Moment, answers: Schema.Record(Schema.String, Schema.String) });
 const AnswerDoneSchema = Schema.Struct({ id: Moment, how: Schema.Literals(['return', 'words', 'mark']), at: Moment });
-const AskCloseSchema = Schema.Struct({ id: Moment, how: Schema.Literals(['cut', 'again']), at: Moment });
+const AskCloseSchema = Schema.Struct({ id: Moment, how: Schema.Literals(['cut', 'again']), at: Moment, call: Schema.optionalKey(Moment) });
 
 /** One turn the person stopped: when they stopped it, and which attempt of the task was answering. */
 export const StopSchema = Schema.Struct({ at: Moment, attempt: Schema.Finite });

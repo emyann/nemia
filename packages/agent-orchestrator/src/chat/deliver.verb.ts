@@ -36,11 +36,13 @@ import {
   askKey,
   askOf,
   askWords,
+  callsOf,
   cutOf,
   framedForHer,
   type AnswerOwed,
   type Ask,
   type AskAnswer,
+  type AskClose,
   type SourceSaid,
 } from './chat.ts';
 
@@ -127,10 +129,37 @@ export const recordAsks = Effect.fn('recordAsks')(function* (taskId: string, dir
 });
 
 /**
- * What became of each unanswered ask's call, marked: `cut` for one no call of hers waits on any more, so the board stops asking the
- * person for it and the count her face shows stops counting it; `again` for one marked cut whose words a call of hers is asking
- * afresh, which waits on them once more. The ask's words are what a call is read by, not its id: her restarted session asks the same
- * question under a new call id, and `recordAsks` keeps the one copy the person is asked.
+ * The mark each unanswered ask of the chat in `dir` owes, given the asks `live` its session holds open now: one per ask whose marks
+ * and the world disagree about which call of hers waits on the person for it. The ask's words are what a call is read by, not its id
+ * — her restarted session asks the same question under a new call id, and `recordAsks` keeps the one copy the person is asked — so
+ * the call the marks say (`callsOf`; the ask's own id where no mark names another, and none at all where a `cut` mark stands) is
+ * compared with the call asking those words now: `cut` where none does, and `again` naming that call where one does and it is not
+ * the call the marks name already.
+ *
+ * An ask the person has answered is marked `cut` by nothing — nothing of theirs waits on it any more, and the board draws it by
+ * their answer — but a call of hers asking its words afresh is marked all the same: the answer on record is owed to that call, and
+ * `answersDue` reads its taking of it under that call's own id. Reads the chat's files each time, and carries nothing between beats.
+ */
+const closesFor = (dir: string, live: NonNullable<TaskView['asks']>): AskClose[] => {
+  const answered = new Set(readAnswers(dir).map((answer) => answer.id));
+  const closed = readAsksClosed(dir);
+  const [cut, calls] = [cutOf(closed), callsOf(closed)];
+  const asking = new Map(live.map((raw) => askOf(raw)).map((ask) => [askKey(ask), ask.id]));
+  const owed: AskClose[] = [];
+  for (const ask of readAsks(dir)) {
+    const now = asking.get(askKey(ask));
+    const said = cut.has(ask.id) ? undefined : (calls.get(ask.id) ?? ask.id);
+    if (now === said || (now === undefined && answered.has(ask.id))) continue;
+    const at = new Date().toISOString();
+    owed.push(now === undefined ? { id: ask.id, how: 'cut', at } : { id: ask.id, how: 'again', at, call: now });
+  }
+  return owed;
+};
+
+/**
+ * What became of each unanswered ask's call, marked, where the session's asks could be read at all (`closesFor`): `cut` for one no
+ * call of hers waits on any more, so the board stops asking the person for it and the count her face shows stops counting it;
+ * `again`, naming the call, for one a call of hers is asking afresh, which waits once more and whose answer goes to that call.
  *
  * Level-triggered, and idempotent: each beat reads the asks the session holds now and marks only what the marks do not say already.
  * `live` is `undefined` from a harness that cannot say what its session holds open, and from a look that did not read the session at
@@ -139,16 +168,7 @@ export const recordAsks = Effect.fn('recordAsks')(function* (taskId: string, dir
  */
 const markCuts = (dir: string, live: TaskView['asks']): void => {
   if (live === undefined) return;
-  const asks = readAsks(dir);
-  const answered = new Set(readAnswers(dir).map((answer) => answer.id));
-  const cut = cutOf(readAsksClosed(dir));
-  const asking = new Set(live.map((raw) => askKey(askOf(raw))));
-  for (const ask of asks) {
-    if (answered.has(ask.id)) continue;
-    const waits = asking.has(askKey(ask));
-    const closed = cut.has(ask.id);
-    if (waits === closed) appendAskClosed(dir, { id: ask.id, how: waits ? 'again' : 'cut', at: new Date().toISOString() });
-  }
+  for (const mark of closesFor(dir, live)) appendAskClosed(dir, mark);
 };
 
 /** What one carry of the answers did: those returned through the call she holds open, those said as words, and those only marked. */
@@ -158,6 +178,12 @@ export type AnswersCarried = Record<AnswerOwed, string[]>;
  * Each answer of the person's in the chat kept in `dir` that no mark names yet, carried to the task `taskId` and marked: `return`,
  * back through the call its ask holds open, which its own result gives her; `words`, said to her naming the question and what they
  * answered (`askWords`), where no call of it is waiting any more; `mark`, nothing said, its held call having taken the answer already.
+ *
+ * Which call is waiting for an answer is read by the ask's words, not by its id: her restarted session asks a cut question afresh
+ * under a call id of its own, and the chat keeps the one ask under the first call's, so the answer goes to the call asking those
+ * words now — the one the live asks name, or the one the keeper's `again` mark named when it saw it, whose taking of the answer is
+ * recorded under that id too. Read by the ask's id alone, an answer her new call had already taken would be said to her a second
+ * time, in words that say her call did not wait for it.
  *
  * An answer returned through a call is not marked by the beat that returned it: the mark waits until the runtime says the call took it
  * (`asksTaken`), so a holder that died between the two leaves the answer owed, and the next beat says it as words rather than losing
@@ -170,14 +196,18 @@ export const answersDue = Effect.fn('answersDue')(function* (taskId: string, dir
   const carried: AnswersCarried = { return: [], words: [], mark: [] };
   if (owed.length === 0) return carried;
   const view = yield* asked('view', e.view(taskId));
-  const open = new Set((view.asks ?? []).map((ask) => ask.id));
+  const live = (view.asks ?? []).map((raw) => askOf(raw));
+  const open = new Set(live.map((ask) => ask.id));
   const taken = new Set(view.asksTaken ?? []);
+  const asking = new Map(live.map((ask) => [askKey(ask), ask.id]));
+  const calls = callsOf(readAsksClosed(dir));
   const asks = new Map(readAsks(dir).map((ask) => [ask.id, ask]));
   for (const answer of owed) {
     const ask = asks.get(answer.id);
     if (ask === undefined) continue;
-    const owes = askDue(open.has(answer.id), taken.has(answer.id));
-    const reached = yield* carry(e, taskId, owes, ask, answer);
+    const call = asking.get(askKey(ask)) ?? calls.get(ask.id) ?? ask.id;
+    const owes = askDue(open.has(call), taken.has(call));
+    const reached = yield* carry(e, taskId, owes, { ...ask, id: call }, answer);
     if (!reached) continue;
     if (owes !== 'return') appendAnswerDone(dir, { id: answer.id, how: owes, at: new Date().toISOString() });
     carried[owes].push(answer.id);
@@ -212,13 +242,7 @@ const carry = (e: Engine, taskId: string, owes: AnswerOwed, ask: Ask, answer: As
  * no `cut` mark, or a call waiting and a `cut` mark that stands. `undefined` live asks are a harness that cannot say, and nothing is
  * owed on them. What makes the keeper's beat run the record even where nothing new waits on the person; `recordAsks` does the marking.
  */
-export const closesOwed = (dir: string, live: TaskView['asks']): boolean => {
-  if (live === undefined) return false;
-  const answered = new Set(readAnswers(dir).map((answer) => answer.id));
-  const cut = cutOf(readAsksClosed(dir));
-  const asking = new Set(live.map((raw) => askKey(askOf(raw))));
-  return readAsks(dir).some((ask) => !answered.has(ask.id) && asking.has(askKey(ask)) === cut.has(ask.id));
-};
+export const closesOwed = (dir: string, live: TaskView['asks']): boolean => live !== undefined && closesFor(dir, live).length > 0;
 
 /** Whether the chat kept in `dir` holds an answer no mark names yet: what the keeper owes her. */
 export const answersOwed = (dir: string): boolean => {

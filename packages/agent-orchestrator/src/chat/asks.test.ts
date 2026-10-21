@@ -313,3 +313,52 @@ test('a question cut and then asked again waits on the person once more, and the
   assert.equal(asksWaiting(drawn), 1, 'and it waits on the person once, never twice and never nil');
   assert.equal(presenceOf('idle', 0, drawn, undefined).waitsOnYou, 1);
 });
+
+test('a question cut, asked again, and answered then goes to the call that is waiting for it, and is said to her no second time', async () => {
+  const { e, id, dir } = await filed();
+  const words = RAW.questions[0].question;
+  engine().plantAsk(id, RAW);
+  await runWith(e, recordAsks(id, dir));
+  engine().cutAsks(id);
+  await runWith(e, recordAsks(id, dir));
+  engine().plantAsk(id, { ...RAW, id: 'call-2' });
+  appendAnswer(dir, { id: 'call-1', at: new Date().toISOString(), answers: { [words]: 'Cut it on read' } });
+  await runWith(e, recordAsks(id, dir));
+  assert.deepEqual(
+    readAsksClosed(dir).map((mark) => [mark.how, mark.call]),
+    [
+      ['cut', undefined],
+      ['again', 'call-2'],
+    ],
+    'the mark that says her words are asked again names the call asking them',
+  );
+  assert.deepEqual(
+    engine().answered.map((one) => one.id),
+    ['call-2'],
+    'the answer the person gave the first call is written into the call holding the question now',
+  );
+  const carried = await runWith(e, answersDue(id, dir));
+  assert.deepEqual(carried.mark, ['call-1'], 'and the beat after finds that call took it: nothing is owed her but the mark');
+  assert.deepEqual(engine().said, [], 'nothing of it is said as words: her call did wait for the person, under its own id');
+  assert.deepEqual(
+    readAnswersDone(dir).map((m) => [m.id, m.how]),
+    [['call-1', 'mark']],
+  );
+  assert.equal(answersOwed(dir), false);
+});
+
+test('her words asked under a call no mark of them names are marked as asked again, cut or not', async () => {
+  const { e, id, dir } = await filed();
+  engine().plantAsk(id, RAW);
+  await runWith(e, recordAsks(id, dir));
+  engine().cutAsks(id);
+  engine().plantAsk(id, { ...RAW, id: 'call-2' });
+  assert.equal(closesOwed(dir, [{ ...RAW, id: 'call-2' }]), true, 'a beat that never saw the cut still owes the mark of the new call');
+  await runWith(e, recordAsks(id, dir));
+  assert.deepEqual(
+    readAsksClosed(dir).map((mark) => [mark.how, mark.call]),
+    [['again', 'call-2']],
+  );
+  assert.equal(closesOwed(dir, [{ ...RAW, id: 'call-2' }]), false, 'and once the mark names the call, nothing more is owed');
+  assert.equal(asksWaiting(projectChat(sources({ asks: readAsks(dir), closed: readAsksClosed(dir) }))), 1);
+});

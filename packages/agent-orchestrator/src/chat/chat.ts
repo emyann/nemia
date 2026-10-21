@@ -67,10 +67,11 @@ export type AnswerMark = { id: string; how: AnswerOwed; at: string };
 
 /**
  * The keeper's mark of what became of an ask's call: `cut`, no call of its words waits on the person any more, so the ask is
- * nobody's to answer; `again`, a call of hers is asking those words afresh, so it waits once more. The latest mark of an ask holds,
- * which is how a question cut and asked again is drawn as the one question it is without any line being rewritten.
+ * nobody's to answer; `again`, a call of hers is asking those words afresh, so it waits once more, and `call` is that call's own id,
+ * which her restarted session gave it. The latest mark of an ask holds, which is how a question cut and asked again is drawn as the
+ * one question it is without any line being rewritten, and how the answer to it finds the call that is waiting for it now.
  */
-export type AskClose = { id: string; how: 'cut' | 'again'; at: string };
+export type AskClose = { id: string; how: 'cut' | 'again'; at: string; call?: string };
 
 /**
  * Where the task is: `up`, its session live; `answering`, a turn in progress; `waitsOnYou`, what waits on the person (the runs waiting,
@@ -383,6 +384,21 @@ export const cutOf = (closed: readonly AskClose[]): Map<string, string> => {
     else cut.delete(mark.id);
   }
   return cut;
+};
+
+/**
+ * The call each ask's words are being asked by now, by the ask's id, off the keeper's marks: the `call` of the latest `again` mark of
+ * an ask, which a later `cut` takes away. Her restarted session asks a cut question afresh under a call id of its own, and the chat
+ * keeps the one ask under the first call's: this is what says where the person's answer to it goes, and whose taking of it to read.
+ * Pure.
+ */
+export const callsOf = (closed: readonly AskClose[]): Map<string, string> => {
+  const calls = new Map<string, string>();
+  for (const mark of closed) {
+    if (mark.how === 'again' && mark.call !== undefined) calls.set(mark.id, mark.call);
+    else calls.delete(mark.id);
+  }
+  return calls;
 };
 
 /** What the person chose for one question: the question by its own words, the labels they ticked, or the words they wrote instead. */

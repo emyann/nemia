@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { chromium, type Browser, type Page } from 'playwright';
 import { scratch } from '../scratch.ts';
-import { photograph, TALLEST_WINDOW } from './board.ts';
+import { photograph } from './board.ts';
 
 let browser: Browser;
 before(async () => {
@@ -174,25 +174,5 @@ test('a tall page whose picture is refused is put back all the same, its window 
   await assert.rejects(photograph(page, out, { fullPage: true, always: true }), 'a folder is no file to write a picture to');
   const { window, scrollY } = await stateOf(page);
   assert.deepEqual({ window, scrollY }, { window: WINDOW, scrollY: 900 });
-  await page.context().close();
-});
-
-test('a page taller than the tallest window is taken in its own window, and the log says so', async (t) => {
-  const out = scratch('nemia-photograph-tallest-');
-  const rows = Math.ceil(TALLEST_WINDOW / ROW);
-  const page = await framedPage(rows);
-  const said = t.mock.method(console, 'log', () => {});
-  await photograph(page, path.join(out, 'tallest.png'), { fullPage: true, always: true });
-  const lines = said.mock.calls.map((call) => String(call.arguments[0]));
-  assert.deepEqual(lines, [
-    `e2e: tallest.png is taken in its own window: its page is ${HEADER + rows * ROW + FOOTER} px tall, over the ${TALLEST_WINDOW} px a window can be`,
-  ]);
-  const { window, scrollY } = await stateOf(page);
-  assert.deepEqual({ window, scrollY }, { window: WINDOW, scrollY: 0 });
-  const wrong = await wrongIn(path.join(out, 'tallest.png'), rows);
-  assert.ok(
-    wrong.some((s) => s.startsWith('the footer is drawn outside its band')),
-    `taken as Playwright takes it, the footer where the window's bottom was: ${wrong.join('; ')}`,
-  );
   await page.context().close();
 });

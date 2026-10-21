@@ -1516,3 +1516,12 @@ four layers (the orchestrator's `step.ts`, `cap.ts`, `try.ts`, `status.ts`, `key
 `runtime-client.ts`, `flags.ts` and `discipline.ts`; `apps/api`'s `reach.ts` and `detail.ts`; the board's
 `test/e2e/pages/545-unstreamed-session.ts`; `apps/docs`; and some thirty test files), and a task already filed on the name is
 refused from the day it goes.
+
+## Prose above the runtime still equates a job with `claude -p`
+
+The words a person is given were rewritten with the road: the runtime's refusals and README, the `ae` help, the step keys'
+refusals and a try's. Doc comments in the layers above were not, all of them: `claude -p` is still written for a job in some 170
+places under `packages/agent-orchestrator/src`, `apps/api/src` and the plan docs (`record.ts`, `validate.ts`, `step.ts`,
+`discipline.ts`, `reach.ts`, `detail.ts` among them). None of it is read by the machinery — it is prose, and it dates from when a
+job was a command line. It is worth a sweep, and the sweep that retires `claude-detached` is the moment for it, since the two
+readings have to be told apart line by line: the harness that still spells `-p`, and the job that no longer does.

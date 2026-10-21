@@ -123,13 +123,13 @@ test('REFUSED: a focus ring in a file that draws a cut: a clip takes a rectangul
   const drawing = filesUnder(SRC).filter(
     (file) => /\.tsx?$/.test(file) && /\bcut(?:Shape|Ring)\(/.test(fs.readFileSync(path.join(SRC, file), 'utf8')),
   );
-  assert.ok(drawing.includes('components/chat/ChatComposer.tsx'), `the files that draw a cut are read: ${drawing.join(', ')}`);
+  assert.ok(drawing.includes('components/conversation/Composer.tsx'), `the files that draw a cut are read: ${drawing.join(', ')}`);
   for (const file of drawing)
     assert.deepEqual(ringedCut(fs.readFileSync(path.join(SRC, file), 'utf8')), [], `${file} draws a ring the cut would break`);
 });
 
 test("a field drawn in a cut takes the look's cut field, and the send beside it a band in the cut shape", () => {
-  const composer = fs.readFileSync(path.join(SRC, 'components', 'chat', 'ChatComposer.tsx'), 'utf8');
+  const composer = fs.readFileSync(path.join(SRC, 'components', 'conversation', 'Composer.tsx'), 'utf8');
   assert.match(composer, /import\s*\{[^}]*\bCutField\b[^}]*\}\s*from\s*'@\/components\/look'/, 'the field through the door');
   assert.match(composer, /<CutField\s+size=\{COMPOSER_CUT\}/, 'its edge is drawn in its cut, never a ring a clip breaks');
   assert.doesNotMatch(composer, /ring-outline-variant|ring-inset/, 'and no rectangular edge is left on it');

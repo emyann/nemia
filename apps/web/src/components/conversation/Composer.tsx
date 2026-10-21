@@ -1,17 +1,15 @@
 /**
- * The composer of Nemia's chat: a field that grows with what is written, Enter sends and Shift+Enter makes a new line, the two hints
- * the canvas draws under it, and one button on its right. What it invites is `composerWords`, by where she is and whether a question
- * of hers waits on the person (`asking`); while this browser keeps
- * a message the api would not take, the field takes nothing — there is nowhere for it to go. While she answers the button is the stop
- * (`composerButton`), which ends her turn and leaves her session open, and the field stays live, so Enter still sends her the next
- * words; her turn over, it is the send again.
+ * The composer of a conversation of the board: a field that grows with what is written, Enter sends and Shift+Enter makes a new line,
+ * the two hints under it, and one button on its right. What it invites (`placeholder`), what a reader is told it is (`label`) and
+ * whether it takes anything at all (`off`) are its caller's — a family part knows no conversation's vocabulary, the two buttons' labels
+ * included. Where a `stop` is given the button is it, which ends the turn and leaves the session open, and the field stays live, so
+ * Enter still sends the next words; where there is none it is the send. Its data marks are under the prefix `marks` names (`mark`).
  */
 import { useRef, useState } from 'react';
 import { ArrowUpIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CutField, cutRing, cutShape } from '@/components/look';
-import { composerButton, composerWords } from '@/lib/nemia';
-import type { Presence } from '@/lib/presence';
+import { mark } from '@/lib/conversation';
 
 /** How far the composer's two corners and its button are cut, in pixels. */
 const COMPOSER_CUT = 10;
@@ -26,27 +24,26 @@ const Key = ({ children }: { children: string }) => (
   </span>
 );
 
-/** The field, its button, and the hints: `send` takes what was written once there is something in it, `stop` ends the turn she is in. */
-export function ChatComposer({
-  presence,
-  asking,
-  onSend,
-  onStop,
-}: {
-  presence: Presence;
-  asking: boolean;
+type Props = {
+  marks: string;
+  label: string;
+  placeholder: string;
+  off: boolean;
+  sendLabel: string;
   onSend: (text: string) => void;
-  onStop: () => void;
-}) {
+  stop?: { label: string; press: () => void };
+};
+
+/** The field, its button, and the hints: `onSend` takes what was written once there is something in it, `stop` ends the turn. */
+export function Composer({ marks, label, placeholder, off, sendLabel, onSend, stop }: Props) {
   const [text, setText] = useState('');
   const form = useRef<HTMLFormElement>(null);
-  const off = presence.notSent;
   const ready = text.trim() !== '' && !off;
-  const stops = composerButton(presence) === 'stop';
+  const stops = stop !== undefined;
   return (
     <form
       ref={form}
-      data-chat-composer={off ? 'off' : 'open'}
+      {...mark(marks, 'composer', off ? 'off' : 'open')}
       className="flex flex-col gap-2"
       onSubmit={(event) => {
         event.preventDefault();
@@ -58,11 +55,11 @@ export function ChatComposer({
       <CutField size={COMPOSER_CUT} ground={off ? 'bg-surface-container' : 'bg-surface-container-high'}>
         <div className="flex min-h-13 items-end gap-2.5 py-1.5 pr-1.5 pl-3.5">
           <textarea
-            aria-label="Message to Nemia"
+            aria-label={label}
             value={text}
             disabled={off}
             rows={1}
-            placeholder={composerWords(presence, asking)}
+            placeholder={placeholder}
             onChange={(event) => setText(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
@@ -81,12 +78,12 @@ export function ChatComposer({
             />
             <Button
               type={stops ? 'button' : 'submit'}
-              data-chat-button={stops ? 'stop' : 'send'}
-              aria-label={stops ? 'Stop her answer' : 'Send'}
+              {...mark(marks, 'button', stops ? 'stop' : 'send')}
+              aria-label={stop?.label ?? sendLabel}
               size="icon"
               variant="secondary"
               isDisabled={stops ? false : !ready}
-              onPress={stops ? onStop : undefined}
+              onPress={stop?.press}
               className="relative rounded-none"
               style={{ clipPath: cutShape(COMPOSER_CUT) }}
             >

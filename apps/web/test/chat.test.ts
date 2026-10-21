@@ -1,8 +1,8 @@
 /**
- * Nemia's chat where it is pure: the merge of her stream's events by their id, where she is as her face reads it, a step's state as a
- * trace line's, her steps folded into a turn, the links read out of her words, how an ask of hers is drawn and what is left of one,
- * the read-back words, and a message the api would not take, kept in this browser and sent once. Each rule with a fixture that breaks
- * it.
+ * Nemia's chat where it is pure: the merge of her stream's events by their id, where she is as her face reads it, her steps folded
+ * into a turn and that fold mapped onto the one shape the family draws (`chatItems`), the links read out of her words, how an ask of
+ * hers is drawn and what is left of one, which of her messages are new, and a message the api would not take, kept in this browser and
+ * sent once. Each rule with a fixture that breaks it.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,17 +15,14 @@ import {
   changedChat,
   drawnAs,
   drawnAsk,
+  chatItems,
   foldChat,
   followChat,
-  jumpWords,
   linksOf,
   mergeChatEvents,
   newFrom,
-  newWords,
   presenceOf,
   readableFrom,
-  traceStatusOf,
-  turnWords,
   unreadChat,
   wordsAnswer,
   type ChatAsk,
@@ -34,6 +31,7 @@ import {
   type ChatMessage,
   type ChatStep,
 } from '../src/lib/chatFollowing.ts';
+import { turnWords } from '../src/lib/conversation.ts';
 import { CHAT_OUTBOX_KEY, editKept, forgetKept, keepUnsent, parseKept, readKept, sendingOnce } from '../src/lib/chatOutbox.ts';
 import { composerButton, composerWords } from '../src/lib/nemia.ts';
 import { faceOf, UP, type Presence } from '../src/lib/presence.ts';
@@ -105,15 +103,6 @@ test("her presence is the api's, her level and this browser's kept message — a
   assert.equal(faceOf(every), 'surprised', 'what waits on a person comes first in the owner’s order');
 });
 
-test('each state one of her steps can be in draws as a trace line says, and done draws plain', () => {
-  const states: ChatStep['state'][] = ['done', 'running', 'error', 'pending', 'waits'];
-  assert.deepEqual(
-    states.map((state) => traceStatusOf(state)),
-    [undefined, 'running', 'error', 'pending', 'yours'],
-  );
-  assert.notEqual(traceStatusOf('waits'), 'pending', 'a step that waits on a person is the look’s own state, never at rest');
-});
-
 test('her consecutive steps fold into one turn, in the order they came, and a turn with a step at work or waiting is running', () => {
   const folded = foldChat([
     message('p:1', 1, 'person', 'What is waiting on me?'),
@@ -133,9 +122,7 @@ test('her consecutive steps fold into one turn, in the order they came, and a tu
     'the turn keeps the order they came in',
   );
   assert.equal(turn.running, false);
-  assert.equal(turnWords(turn), 'Worked for 2m 14s · 3 steps');
-  assert.equal(turnWords({ ms: 134_000, steps: turn.steps }), 'Worked for 2m 14s · 3 steps');
-  assert.equal(turnWords({ ms: 134_000, steps: [turn.steps[0]] }), 'Worked for 2m 14s · 1 step');
+  assert.equal(turnWords(turn.ms, turn.steps.length), 'Worked for 2m 14s · 3 steps');
   const live = foldChat([step('t:1:a', 2, 'done'), step('t:1:b', 3, 'running')])[0] as Extract<ChatItem, { kind: 'turn' }>;
   assert.equal(live.running, true, 'a turn whose step is at work is still running');
   assert.equal(
@@ -147,11 +134,7 @@ test('her consecutive steps fold into one turn, in the order they came, and a tu
   assert.equal(apart.filter((item) => item.kind === 'turn').length, 2, 'steps either side of her words are two turns');
 });
 
-test('the read-back words say how many are new, and the line is drawn over the first of her messages the person has not read', () => {
-  assert.equal(jumpWords(2), '2 new · Jump to the latest');
-  assert.equal(jumpWords(1), '1 new · Jump to the latest');
-  assert.equal(newWords(2), '2 new');
-  assert.equal(newWords(1), '1 new');
+test('the line that says what is new is drawn over the first of her messages the person has not read', () => {
   const events = [
     message('m:1:a', 1, 'agent', 'One.'),
     message('p:1:b', 2, 'person', 'Mine.'),
@@ -466,4 +449,85 @@ test("the composer's button is the stop while she answers, and the send every ot
     'send',
     'a message this browser kept means the api is not there to be asked for a stop either',
   );
+});
+
+test('her adapter maps her events onto the one shape the family draws: each kind, in the order they came, with what it carries', () => {
+  const items = chatItems([
+    step('t:1:a', 2, 'done', 'Read the inbox'),
+    step('t:1:b', 136, 'waits', 'Waits for your approval'),
+    message('m:1:c', 140, 'agent', 'Two gates: [the run](/runs/r-1) and [the card](/inbox/c-2).'),
+    message('p:1:d', 141, 'person', 'Land the first.'),
+    message('k:1:e', 142, 'keeper', 'She was told what you wrote.'),
+    { kind: 'session', id: 's:1:f', at: at(143), attempt: 4 },
+    asked('question', [EXPLAINED]),
+  ]);
+  assert.deepEqual(
+    items.map((item) => [item.kind, item.id]),
+    [
+      ['work', 't:1:a'],
+      ['said', 'm:1:c'],
+      ['said', 'p:1:d'],
+      ['note', 'k:1:e'],
+      ['note', 's:1:f'],
+      ['own', 'q:question'],
+    ],
+    'the ids her events carry, in the order they came',
+  );
+  const work = items[0];
+  if (work.kind !== 'work') throw new Error('her consecutive steps are one turn');
+  assert.deepEqual(
+    work.lines.map((line) => [line.id, line.tool, line.sentence, line.state]),
+    [
+      ['t:1:a', 'Read', 'Read the inbox', 'done'],
+      ['t:1:b', 'Read', 'Waits for your approval', 'waits'],
+    ],
+  );
+  assert.equal(work.running, true, 'a turn whose line waits on a person is still at work');
+  assert.equal(work.ms, 134_000);
+  assert.equal(
+    work.lines.every((line) => line.input === undefined && line.result === undefined),
+    true,
+    'her steps open on nothing',
+  );
+
+  const hers = items[1];
+  if (hers.kind !== 'said') throw new Error('her words are said');
+  assert.deepEqual(
+    { who: hers.who, yours: hers.yours, markdown: hers.markdown, text: hers.text },
+    { who: 'Nemia', yours: false, markdown: true, text: 'Two gates: the run and the card.' },
+    'her links are taken out of the sentence, which reads plain',
+  );
+  assert.deepEqual(hers.links, [
+    { words: 'the run', href: '/runs/r-1' },
+    { words: 'the card', href: '/inbox/c-2' },
+  ]);
+
+  const theirs = items[2];
+  if (theirs.kind !== 'said') throw new Error("the person's words are said");
+  assert.deepEqual(
+    { who: theirs.who, yours: theirs.yours, markdown: theirs.markdown, text: theirs.text, links: theirs.links },
+    {
+      who: 'You',
+      yours: true,
+      markdown: false,
+      text: 'Land the first.',
+      links: [],
+    },
+  );
+
+  assert.deepEqual(
+    items.slice(3, 5).map((item) => (item.kind === 'note' ? [item.what, item.words] : null)),
+    [
+      ['keeper', 'She was told what you wrote.'],
+      ['session', 'A session of hers began — her 4'],
+    ],
+    "the keeper's framing and the rule between two of her sessions are quiet lines",
+  );
+
+  const own = items[5];
+  if (own.kind !== 'own') throw new Error('an ask of hers is her own to draw');
+  assert.equal(own.own.kind, 'question', 'carrying the event, which her talk draws itself');
+  assert.equal(own.own.questions[0], EXPLAINED);
+
+  assert.deepEqual(chatItems([]), [], 'nothing said is nothing drawn');
 });

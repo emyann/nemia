@@ -880,6 +880,28 @@ test(
   },
 );
 
+const WORKED_OPENABLE = 'conversation-worked--openable';
+
+test("a conversation's line opens on a press and shows what it asked and what came back", WAITED, async () => {
+  const page = await openParts(browser, built, 'dark', alone(WORKED_OPENABLE));
+  try {
+    const asked = page.locator('[data-chat-asked]');
+    const came = page.locator('[data-chat-came]');
+    assert.equal(await asked.count(), 0, 'closed, a line lays out nothing it holds');
+    await page.locator(`${story(WORKED_OPENABLE)} [data-slot="trace-collapsible-trigger"]`).click();
+    await asked.waitFor();
+    assert.match((await asked.textContent()) ?? '', /rg -n drainsThis/, 'what it asked');
+    assert.match((await came.textContent()) ?? '', /feed\.ts:88/, 'and what came back');
+    assert.equal(
+      await came.evaluate((block) => getComputedStyle(block).overflowY),
+      'auto',
+      'each block scrolls inside its own cap, so a long result does not push the talk open',
+    );
+  } finally {
+    await page.context().close();
+  }
+});
+
 /** The running line's title in Trace's story of it: the animation it runs and the image its text is painted with. */
 async function shimmerOf(page: Page): Promise<{ animation: string; image: string }> {
   return page

@@ -7227,9 +7227,10 @@ test('the run page draws one tag per kind the run is behind on, and the verb to 
   assert.equal(renderToStaticMarkup(createElement(KindsBehind, { run: unpinned() })), '', 'and so does one the api pinned nothing for');
 });
 
-const { ChatTurn } = await import('../src/components/chat/ChatTurn.tsx');
+const { Worked, WorkedLine } = await import('../src/components/conversation/Worked.tsx');
 const { ChatLostBand, ChatRetryingBand, ChatStoppedBand, ChatUnreadableBand } = await import('../src/components/chat/ChatBand.tsx');
-const { foldChat } = await import('../src/lib/chatFollowing.ts');
+const { chatItems } = await import('../src/lib/chatFollowing.ts');
+type ConversationLine = import('../src/lib/conversation.ts').ConversationLine;
 const { dockWords } = await import('../src/lib/presence.ts');
 type ChatEvent = import('../src/lib/api.ts').ChatEvent;
 
@@ -7243,22 +7244,79 @@ const chatStep = (id: string, state: 'done' | 'running' | 'waits', second: numbe
   state,
 });
 
-test('a turn at work draws its steps, the one that waits on a person in yours; a finished turn folds and lays out nothing it holds', () => {
-  const turnOf = (steps: Extract<ChatEvent, { kind: 'step' }>[]) => {
-    const [item] = foldChat(steps);
-    if (item.kind !== 'turn') throw new Error('her consecutive steps fold into a turn');
-    return item;
-  };
-  const live = turnOf([chatStep('t:1', 'done', 0), chatStep('t:2', 'waits', 4)]);
-  const running = renderToStaticMarkup(createElement(ChatTurn, { turn: live }));
+/** The family's turn over `steps` of hers, through her adapter onto the one shape it draws. */
+const workOf = (steps: Extract<ChatEvent, { kind: 'step' }>[]) => {
+  const [item] = chatItems(steps);
+  if (item.kind !== 'work') throw new Error('her consecutive steps fold into one turn of the family');
+  return item;
+};
+
+test('a turn at work draws its lines, the one that waits on a person in yours; a finished turn folds and lays out nothing it holds', () => {
+  const live = workOf([chatStep('t:1', 'done', 0), chatStep('t:2', 'waits', 4)]);
+  const running = renderToStaticMarkup(createElement(Worked, { work: live, marks: 'chat' }));
   assert.match(running, /data-chat-turn="running"/);
   assert.match(running, /data-status="yours"[^>]*data-chat-step="waits"/, 'a step that waits on a person is the look’s own state');
   assert.match(running, /border-l-2 border-yours/);
-  const over = turnOf([chatStep('t:1', 'done', 0), chatStep('t:2', 'done', 134)]);
-  const folded = renderToStaticMarkup(createElement(ChatTurn, { turn: over }));
+  const over = workOf([chatStep('t:1', 'done', 0), chatStep('t:2', 'done', 134)]);
+  const folded = renderToStaticMarkup(createElement(Worked, { work: over, marks: 'chat' }));
   assert.match(folded, /data-chat-turn="folded"/);
   assert.match(folded, /Worked for 2m 14s · 2 steps/);
   assert.doesNotMatch(folded, /data-chat-step=/, 'a closed fold lays out none of its steps');
+});
+
+test('REFUSED: a family part that writes one conversation’s marks: the prefix its caller names is the one it writes', () => {
+  const work = workOf([chatStep('t:1', 'done', 0), chatStep('t:2', 'running', 4)]);
+  const session = renderToStaticMarkup(createElement(Worked, { work, marks: 'session' }));
+  assert.match(session, /data-session-turn="running"/);
+  assert.match(session, /data-session-step="running"/);
+  assert.doesNotMatch(session, /data-chat-/, 'and nothing of the other conversation’s names');
+  const hers = renderToStaticMarkup(createElement(Worked, { work, marks: 'chat' }));
+  assert.match(hers, /data-chat-turn="running"/);
+  assert.doesNotMatch(hers, /data-session-/);
+});
+
+/** One line of a turn, as a conversation's adapter gives it. */
+const line = (over: Partial<ConversationLine> = {}): ConversationLine => ({
+  id: 'l:1',
+  tool: 'Grep',
+  sentence: 'Searched for drainsThis',
+  fact: '3 matches',
+  state: 'done',
+  ...over,
+});
+
+test('a line opens to what it asked and what came back where it has either, and a line with neither has nothing to open', () => {
+  const plain = renderToStaticMarkup(createElement(WorkedLine, { line: line(), marks: 'chat' }));
+  assert.match(plain, /data-slot="trace-line"/);
+  assert.doesNotMatch(plain, /<button/, 'a line that carries neither draws no trigger');
+  assert.doesNotMatch(plain, /data-slot="trace-collapsible"/, 'and no fold');
+
+  const both = renderToStaticMarkup(
+    createElement(WorkedLine, { line: line({ input: 'rg -n drainsThis', result: 'feed.ts:88' }), marks: 'chat', open: true }),
+  );
+  assert.match(both, /data-slot="trace-collapsible-trigger"/, 'a line that carries either opens');
+  assert.match(both, /data-chat-asked[^>]*>rg -n drainsThis</, 'what it asked');
+  assert.match(both, /data-chat-came[^>]*>feed\.ts:88</, 'and what came back');
+  assert.match(both, /data-kind="body"/, "in the Trace's own body");
+  assert.match(both, /data-chat-asked="true"[^>]*max-h-56 overflow-y-auto/, 'each block capped, and scrolling inside itself');
+  assert.match(both, /data-chat-came="true"[^>]*max-h-56 overflow-y-auto/);
+  assert.doesNotMatch(both, /text-failure/, 'a call that did not fail draws no failure');
+
+  const failed = renderToStaticMarkup(
+    createElement(WorkedLine, { line: line({ state: 'error', input: 'npm run lint', result: 'exit 1' }), marks: 'chat', open: true }),
+  );
+  assert.match(failed, /data-chat-came="true"[^>]*text-failure/, "a result that failed is in the failure's ink");
+
+  const asking = renderToStaticMarkup(
+    createElement(WorkedLine, { line: line({ state: 'running', input: 'rg -n drainsThis' }), marks: 'chat', open: true }),
+  );
+  assert.match(asking, /data-chat-asked/, 'a call still at work has its input before it has a result');
+  assert.doesNotMatch(asking, /data-chat-came/);
+
+  const closed = renderToStaticMarkup(
+    createElement(WorkedLine, { line: line({ input: 'rg -n drainsThis', result: 'feed.ts:88' }), marks: 'chat' }),
+  );
+  assert.doesNotMatch(closed, /rg -n drainsThis/, 'a closed fold lays out nothing it holds');
 });
 
 test("her session stopped is a status, the daemon lost an alert in the failure's colour, and neither is dimmed by an opacity", async () => {

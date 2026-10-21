@@ -42,7 +42,7 @@ const git = (dir: string, ...args: string[]): string =>
   });
 
 /** A place to probe from: a scratch repository on `branch`, a home, a store and a stub `claude` listing `rows`; trusted unless not. */
-function placed({ branch = 'wf/r-1/implement', rows = [] as unknown[], trust = true } = {}): {
+function placed({ branch = 'wf/r-1/run', rows = [] as unknown[], trust = true } = {}): {
   repo: string;
   home: string;
   probes: string;
@@ -126,7 +126,8 @@ test('REFUSED: a probe from a branch that is no run, with a label that names no 
   const off = placed({ branch: 'main' });
   const branch = probe(off, ['start', 'a', '--', 'p']);
   assert.equal(branch.code, 1);
-  assert.match(branch.err, /the branch here is `main`, not a run's `wf\/<run>\/<step>`/);
+  assert.match(branch.err, /the branch here is `main`, not a run's `wf\/<run>\/<leaf>`/);
+  assert.match(branch.err, /`wf\/<run>\/run` for a run's own line of work/);
   assert.deepEqual(branch.calls, []);
   const at = placed();
   for (const label of ['A', 'a-b', '']) {
@@ -244,7 +245,7 @@ const implementCheck = (): string => {
 /** A scratch repository whose base commit holds `files`, one commit on: the repository and the base's commit. */
 function based(files: Record<string, string>): { repo: string; base: string } {
   const repo = scratch('wf-probe-check-');
-  git(repo, 'init', '-q', '-b', 'wf/r-1/implement');
+  git(repo, 'init', '-q', '-b', 'wf/r-1/run');
   for (const [name, text] of Object.entries({ 'README.md': 'base\n', ...files })) {
     fs.mkdirSync(path.dirname(path.join(repo, name)), { recursive: true });
     fs.writeFileSync(path.join(repo, name), text);

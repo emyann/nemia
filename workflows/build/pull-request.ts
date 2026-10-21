@@ -12,9 +12,11 @@
  * - `wait`, which the round's check runs last: it polls the `ci` context of that head (`gh pr view --json statusCheckRollup`), 1800 s
  *   for it to start (`WF_CI_START_SECONDS`) and 2400 s whole (`WF_CI_WAIT_SECONDS`), `WF_CI_POLL_SECONDS` the interval; on a red, cancelled or
  *   absent `ci` refuses by name with the Actions URL, the failing jobs, a bounded tail of each failing job's log — the next try reads
- *   why CI went red here, since no agent may call `gh` itself — and the `nemia retry <run> <step> --recheck` line.
+ *   why CI went red here, since no agent may call `gh` itself — and the `nemia retry <run> <step> --recheck` line, whose step is the
+ *   check's own (`WF_STEP`).
  *
- * The branch is read from `HEAD`, never given: a run's branch is `wf/<run>/<step>`, which names the run and the step the refusals print.
+ * The branch is read from `HEAD`, never given: a run's branch is `wf/<run>/<leaf>` — `wf/<run>/run` for the run's own line of work, one
+ * branch per card, and `wf/<run>/<step>` for a fork beside it or a fan-in's merge — and the run it names is what the refusals print.
  * Refuses, exit 1 on stderr with what to do next: a HEAD that is on no such branch or on the remote's default branch; no `origin`; no
  * `gh` on the PATH or none authenticated; a push git rejects, which is answered by merging the base and never by a force; a draft pull
  * request, or one based on another branch; no open pull request where one is owed; a `headRefOid` that is not `HEAD`; and a `ci` that is
@@ -50,6 +52,12 @@ const LOG_LINES = 40;
 
 /** The most failing jobs the refusal names. */
 const JOBS = 10;
+
+/**
+ * The step the `nemia retry` line names where the check's own environment does not say (`WF_STEP`, `src/check/check.ts`): the pushing step
+ * of both `build` and `quick`. The branch cannot say it — a run's line of work is named for the run, not for the step that cut it.
+ */
+const STEP = 'implement';
 
 /** How long a call of `git` or `gh` may take, in milliseconds. */
 const BOUND = 120_000;
@@ -115,17 +123,20 @@ function parsed<T>(what: string, text: string): T {
   }
 }
 
-/** The branch this workspace is on, with the run and the step it names; refuses any other branch. */
-function branchOf(): { branch: string; run: string; step: string } {
+/**
+ * The branch this workspace is on, with the run it names and its leaf; refuses any other branch. The leaf is `run` for a run's own line of
+ * work and a step's name for a fork or a merge, so it is no step to type: the retry line reads the step off `WF_STEP` instead.
+ */
+function branchOf(): { branch: string; run: string; leaf: string } {
   const head = run('git', ['symbolic-ref', '--short', 'HEAD']);
   const branch = head.status === 0 ? head.out.trim() : '';
   const named = /^wf\/([^/]+)\/([^/]+)$/.exec(branch);
   if (!named)
     throw new Refusal(
-      `the branch here is ${branch ? `\`${branch}\`` : 'none'}, not a run's \`wf/<run>/<step>\`, and this script pushes a run's own ` +
-        "branch and no other: run it from the step's own workspace (`git switch wf/<run>/<step>`)",
+      `the branch here is ${branch ? `\`${branch}\`` : 'none'}, not a run's \`wf/<run>/<leaf>\`, and this script pushes a run's own ` +
+        "branch and no other: run it from the step's own workspace (`git switch wf/<run>/run`)",
     );
-  return { branch, run: named[1], step: named[2] };
+  return { branch, run: named[1], leaf: named[2] };
 }
 
 /** `gh auth status` passing; refuses with the one command a person types when it does not. */
@@ -290,8 +301,8 @@ function openArgs(args: string[]): { title: string; bodyFile: string } {
   return { title: opts['--title'], bodyFile: opts['--body-file'] };
 }
 
-/** The branch, its run and step, with the remote's default branch, every guard of the act passed. */
-function placed(): { branch: string; run: string; step: string; onto: string } {
+/** The branch, the run it names and its leaf, with the remote's default branch, every guard of the act passed. */
+function placed(): { branch: string; run: string; leaf: string; onto: string } {
   const named = branchOf();
   origin();
   authed();
@@ -299,7 +310,7 @@ function placed(): { branch: string; run: string; step: string; onto: string } {
   if (named.branch === onto)
     throw new Refusal(
       `HEAD is on \`${onto}\`, the remote's default branch, and this script never pushes the base: switch to the run's own branch ` +
-        `(\`git switch wf/${named.run}/${named.step}\`) and run it again`,
+        `(\`git switch wf/${named.run}/${named.leaf}\`) and run it again`,
     );
   return { ...named, onto };
 }
@@ -373,9 +384,9 @@ function unanswered(seen: Seen, pr: Pr, ours: readonly Entry[], entries: readonl
 
 /** `wait`: the `ci` context of the pull request's head, waited out and read; its refusal says why CI went red. */
 function wait(): string[] {
-  const { branch, run: ofRun, step, onto } = placed();
+  const { branch, run: ofRun, onto } = placed();
   const pr = sole(pulls(branch), branch, onto);
-  const retry = `  Then: nemia retry ${ofRun} ${step} --recheck`;
+  const retry = `  Then: nemia retry ${ofRun} ${process.env.WF_STEP || STEP} --recheck`;
   const whole = seconds('WF_CI_WAIT_SECONDS', WHOLE_SECONDS);
   const start = Math.min(seconds('WF_CI_START_SECONDS', START_SECONDS), whole);
   const poll = seconds('WF_CI_POLL_SECONDS', POLL_SECONDS);

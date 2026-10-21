@@ -214,7 +214,7 @@ const aParent = async (
     gitIn(wt, 'commit', '-q', '-m', `add ${work}`);
   }
   if (signed) b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
-  return { run, wt, branch: `wf/${run.id}/implement` };
+  return { run, wt, branch: readRun(run.id).steps.implement.branch! };
 };
 
 const worktreesOf = (repo: string) =>

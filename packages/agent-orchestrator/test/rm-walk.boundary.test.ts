@@ -32,6 +32,7 @@ const { advanceRun, startRun, runWith: runEngine, gitPlaceLayer } = await import
 const runWith = runOver(runEngine, gitPlaceLayer);
 const runPlaced = runGiven(gitPlaceLayer);
 const { readRun } = await import('../src/record/record.store.ts');
+const { LINE_NAME } = await import('../src/run.ts');
 
 /** A run record over `/repo`, without worktrees: a test of the record, not of git. */
 const aRun = (id: string, steps: Run['steps']): Run => ({
@@ -240,7 +241,7 @@ test("`nemia rm` forgets a run that is over, at shipped defaults: its worktree r
   const run = await runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: folder() }));
   await runWith(b.e, advanceRun(readRun(run.id)));
   const wt = readRun(run.id).steps.implement.workspace!;
-  assert.equal(wt, path.join(ROOT, 'worktrees', run.id, 'implement'));
+  assert.equal(wt, path.join(ROOT, 'worktrees', run.id, LINE_NAME));
   b.settle(`${run.id}-implement`, 'failed');
   await runWith(b.e, advanceRun(readRun(run.id)));
 
@@ -261,7 +262,7 @@ test("`nemia rm` forgets a run that is over, at shipped defaults: its worktree r
 
   const { printed, error } = await rmTyped(t, b.e, run.id);
   assert.equal(error, undefined);
-  const branch = `wf/${run.id}/implement`;
+  const branch = `wf/${run.id}/${LINE_NAME}`;
   const commit = gitIn(repo, 'rev-parse', branch);
   assert.deepEqual(printed, [
     `${run.id}  forgotten: removed 1 worktree, committed what implement left uncommitted on ${branch} as ${commit.slice(0, 7)}; ` +

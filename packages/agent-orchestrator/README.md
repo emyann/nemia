@@ -1165,6 +1165,30 @@ The rule is git's, and `assess` decides it as a pure function:
 **`after: a, b` already meant "wait for both". It now also means "and give me both."** No new key:
 the thing the author asked for is the thing they get.
 
+### One workspace and one branch per card
+
+A cut is named for the **run**, never for whichever step happened to make it. The run's own line of
+work — the first step in the workflow's order that forks off the base ref, and every step that
+inherits from it — is cut at `<WF_ROOT>/worktrees/<id>/run` on `wf/<id>/run`. So a person reading the
+store, and a reader of a pull request on GitHub, see one workspace and one branch per card:
+`wf/a-run-s-worktree-and-branch-1iai/run` — the card, and no step. `build`'s design, implement and
+review all stand in that one directory on that one branch, as they always did; only the name has
+stopped claiming otherwise.
+
+A fork beside the line, a fan-in's merge, and a second root of a run that starts wide are each a line
+of their own, and each keeps its step's name: `worktrees/<id>/<step>` on `wf/<id>/<step>`.
+
+The run's branch is **not** `wf/<id>`: git keeps refs as files, so a ref `wf/<id>` cannot sit beside
+the refs `wf/<id>/<step>` a fork cuts. Keeping a leaf under `worktrees/<id>/` and `wf/<id>/` leaves
+both shapes where every reader of these names already looks — `nemia rm`, `nemia prune`, the daemon's
+sweep, the disk reading, the place's inventory prefix, the frozen scripts — so none of them learns a
+second shape, and a run already in flight keeps the paths and branch its record holds.
+
+A step may therefore not be named `run`: its cut and the run's line would claim one branch, so
+`stepSetRefusal` refuses the workflow at `nemia start`, naming `run.md` to rename. `cutName`
+(`src/workspace/workspace.ts`) is the whole rule, pure and a function of the frozen step set alone, so
+a pass that died halfway and a restart name the same cut the same way.
+
 ### Why engineers talk, and why agents shouldn't have to
 
 Two engineers on overlapping files coordinate by talking because isolation is expensive *for them*
@@ -2082,7 +2106,7 @@ dropped. **Nothing in the packages knows what shipping means.**
   a restart changes nothing.
 - **A run's result is the work the ending acts on**, not the ending's own branch: `resultSteps` reads the steps
   before it, so *has it shipped*, *what did it touch* and *what is there to decide* are asked of
-  `wf/<run>/implement`, never of `main`, which would answer yes to everything.
+  `wf/<run>/run`, never of `main`, which would answer yes to everything.
 - **`→ to decide`**, the fifth reason a run waits on a person, beside blocked, unsigned, over budget and at a
   gate. A run is one to decide when it is at its result and a last step's gate has nobody's approval — said in
   that step's own prose where it is an ending that has not run, and by its name where it is a step that has
@@ -3563,7 +3587,7 @@ What is under `WF_ROOT` (`~/.agent-workflows` by default), and what `wf rm` does
 | `feed.jsonl` | what the tick judged of each run and step, a line each time it changed, and a line each time a daemon takes the store (`nemia watch`) | the daemon: its tick, and `up`'s start | kept: the run's lines stay, and the next pass writes its one `removed` |
 | `forgetting/<id>.json` | the engine's tasks of a run `wf rm` removed, until the engine forgets them | `wf rm`; the tick lifts it | written, then lifted once each task is forgotten |
 | `engine/` | the engine's board: tasks, journal, feed | the engine | each task of the run forgotten through the runtime's `forget`, once settled |
-| `wf/<id>/<step>`, in the repository | a step's branch | the tick | kept; `--delete-branches` |
+| `wf/<id>/run`, in the repository (`wf/<id>/<step>` for a fork) | the run's line of work, or a fork's | the tick | kept; `--delete-branches` |
 
 ## Freeing the space: `wf prune`
 
@@ -3886,7 +3910,7 @@ for the same reason, and so does the `wf` command.
 | `tick.json` | the ceilings the last pass ran with, the tick's to write: what `wf ls` and `wf decide` judge the cap on runs in flight by |
 | `standing.json` | where the result branches stood on the last pass, the tick's to write (`src/standing/standing.store.ts`): for each repository, place and base branch, the place's `standing` answer or the words it was not read with, and when |
 | `feed.jsonl` | what the tick judged of each run and each step, a line each time it changed, and a line each time a daemon takes the store, the daemon's to append (`src/feed/feed.ts`, `src/feed/feed.store.ts`): what `nemia watch` reads and follows, and nothing decides on |
-| `worktrees/<id>/<step>/` | each step's workspace |
+| `worktrees/<id>/run/` (`worktrees/<id>/<step>/` for a fork) | the run's line of work, or a fork's |
 | `checks/` | each check's stderr |
 | `engine/` | the engine's board: `AE_ROOT` for `ae watch` |
 | `workflows/` | your workflows, beside the repository's, as the board lists them |

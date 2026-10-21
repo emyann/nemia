@@ -1872,7 +1872,8 @@ What was built:
   has spent, and a run another run waits on and has not started on (`gated`), naming the runs it would strand. The last two apply to a run
   nobody called off: a cancelled run whose tasks have settled is forgettable. `runWorktrees` takes only what git lists inside
   `worktrees/<id>/`, with the step a hand-off commits under: the last step on the record that works in the directory, or its directory's
-  name. `branchFates` takes only `wf/<id>/…` branches. `checkLogsOf` takes `<id>-<step>[-try<n>]-check.stderr` for the record's steps,
+  name — which for a run's own line of work is `run`, not a step's name, since a cut is named for the run (*A run's worktree and branch
+  are named for the run*); the commit is still made. `branchFates` takes only `wf/<id>/…` branches. `checkLogsOf` takes `<id>-<step>[-try<n>]-check.stderr` for the record's steps,
   or, with no record, any under the id that could be no other stored run's, whose id is longer or shorter. `idRefusal` takes only what
   `runId` mints: lowercase letters, digits and dashes.
 - **`forget` in forget.verb.ts**, in an order a `wf rm` that dies can finish when run again. It reads the run as `cancel` does, adopting a check,
@@ -3754,7 +3755,7 @@ What was built, four commits:
   branch is still a person's, so the git commands are printed for it. Level-triggered: `branchStandings` asks git on the pass that asks and stores nothing, as `shipped` is asked
   and not stored, so a branch a person merged by hand stops being one to decide with nobody telling the run. `wf ls` says
   `→ to decide: <the ending's first line> — wf approve <run> <step>`, above `→ waiting on you` and never the same step twice.
-- **`wf decide` reports facts**: `branch    wf/<id>/implement is ahead of main by 3 commits` (or `is on main`, or `is gone`), then
+- **`wf decide` reports facts**: `branch    wf/<id>/run is ahead of main by 3 commits` (or `is on main`, or `is gone`), then
   `to decide  ship has not run: this workflow's ending, and your approval is what runs it:` with the step's first paragraph as it is
   written, the `wf approve` and the send-back. `git merge --no-ff` and `git branch -D` are printed only for a folder with no ending step:
   a folder that says what shipping is does not also tell a person to type it. `wf start` says `ends at: ship — nothing of it runs until
@@ -6104,3 +6105,22 @@ What it leaves: the merge queue, and Nemia reading several named checks through 
 follow-on's, neither a card. And the receipt freezes `landing.ts` from `HEAD`, which after the fast-forward holds the run's own copy of
 it: a run could mis-record its own landing, never land an unreviewed one, since the merge verb is frozen and run while HEAD is still the
 base. The owner chose `HEAD` over `HEAD^1` on 2026-10-20.
+
+## Shipped: a run's worktree and branch are named for the run (2026-10-21)
+
+The card `a-run-s-worktree-and-branch-1iai`. Seeing `~/.agent-workflows/worktrees/<run>/design/` the owner asked why there was a worktree
+per step. There never was — in a line of work every step inherits the first one's workspace and branch — but the name said otherwise, and
+since the GitHub move the branch is also what a reader of the public repository sees as a pull request's branch, so a pull request implement
+pushed read as coming from `…/design`.
+
+A cut is now named for the run: the run's own line of work — the first step in the workflow's order that forks off the base ref, and every
+step that inherits from it — is cut at `worktrees/<id>/run` on `wf/<id>/run` (`cutName` and `LINE_NAME`, `src/workspace/workspace.ts`, read
+by `workspaceFor`). A fork beside the line, a fan-in's merge and a second root each keep their step's name, as before. The leaf, rather
+than a flat `wf/<id>`, because git refuses a ref `wf/<id>` beside the refs `wf/<id>/<step>` a fork cuts — and because both shapes then stay
+under `worktrees/<id>/` and `wf/<id>/`, where `nemia rm`, `nemia prune`, the daemon's sweep, the disk reading, the place's inventory prefix
+and the frozen scripts already look: no reader changed, and a run in flight keeps the paths and branch its record holds.
+
+Two things changed behind the rename. A step may not be named `run` — its cut and the run's line would claim one branch — so
+`stepSetRefusal` refuses the workflow at `nemia start`, naming `run.md` to rename; no shipped workflow has such a step. And
+`pull-request.ts`'s `nemia retry <run> <step> --recheck` line now takes the step from `WF_STEP` with `implement` as its fallback, as
+`landing.ts` does: read off the branch it would have named `run`, which is no step a person can retry.

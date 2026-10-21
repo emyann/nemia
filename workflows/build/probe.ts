@@ -3,7 +3,7 @@
  * a probe, and the check that none is left running when the step signs off.
  *
  * - `start <label> [--answer "<what to press>"] [--settings <file or json>] -- <prompt>` starts a background session named
- *   `<run>-probe-<label>`, the run read from the branch (`wf/<run>/<step>`), in the machinery's folder `$WF_ROOT/probes` (`WF_ROOT`
+ *   `<run>-probe-<label>`, the run read from the branch (`wf/<run>/<leaf>`), in the machinery's folder `$WF_ROOT/probes` (`WF_ROOT`
  *   `~/.agent-workflows` by default). Its first message opens with `[nemia probe] run <run>:` and says `no action needed`, or, with
  *   `--answer`, what the person must press. Remote Control, which reaches the person's phone, is given only with `--answer`; the step
  *   then stops `blocked` on the `needs` line it prints. `--settings` is passed to the session, so a measurement of rules or hooks edits
@@ -11,7 +11,7 @@
  * - `list` prints this run's probes and their state; `stop [label]` stops this run's live probes, or the one named.
  * - `check`, for a run's check: refuses while a probe named for `WF_RUN` is live, naming `stop`. No `claude` on the PATH is no probe.
  *
- * Refuses, exit 1 on stderr with what to do next: a branch that is not `wf/<run>/<step>`, a label that is not lower-case letters and
+ * Refuses, exit 1 on stderr with what to do next: a branch that is not a run's `wf/<run>/<leaf>`, a label that is not lower-case letters and
  * digits, a probe folder Claude Code has not trusted (trust is read from its `.claude.json`, never written: a person runs `claude` there
  * once), and a listing `claude agents` cannot give.
  */
@@ -57,14 +57,15 @@ function trusted(dir: string): boolean {
   return typeof projects === 'object' && projects !== null && projects[path.resolve(dir)]?.hasTrustDialogAccepted === true;
 }
 
-/** The run this workspace's branch is of, `wf/<run>/<step>`; refuses any other branch. */
+/** The run this workspace's branch is of, `wf/<run>/<leaf>`; refuses any other branch. */
 function runOfBranch(): string {
   const head = spawnSync('git', ['symbolic-ref', '--short', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
   const branch = head.status === 0 ? head.stdout.trim() : '';
   const run = /^wf\/([^/]+)\/[^/]+$/.exec(branch)?.[1];
   if (!run)
     throw new Refusal(
-      `the branch here is ${branch ? `\`${branch}\`` : 'none'}, not a run's \`wf/<run>/<step>\`: start a probe from the step's own workspace`,
+      `the branch here is ${branch ? `\`${branch}\`` : 'none'}, not a run's \`wf/<run>/<leaf>\` — \`wf/<run>/run\` for a run's own line of ` +
+        "work, `wf/<run>/<step>` for a fork beside it: start a probe from the step's own workspace",
     );
   return run;
 }

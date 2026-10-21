@@ -4,7 +4,8 @@
  * with her floor (`NEMIA_FLOOR`), both taken away once none is, whether a level set or a raise's end made it so; and while she is kept, the
  * person's custom words told to her open task (`say`) once they are not those she was last filed or told with (`customChanged`), which
  * are recorded, and her instruction written, only after she was told: a change to her shipped instruction alone tells her nothing; and
- * while she is kept and her session live, the person's chat words delivered to her (`deliverOutbox`).
+ * while she is kept and her session live, the person's chat words delivered to her (`deliverOutbox`), the questions her session holds
+ * open written down (`recordAsks`) and the person's answers to them carried to her (`answersDue`).
  * Level-triggered: it carries nothing between beats, so a restart owes what the files and the engine say. A task stopped from outside is
  * never filed again.
  *
@@ -21,7 +22,7 @@ import { readFactories } from '../factory/factory.store.ts';
 import { feedSize } from '../feed/feed.store.ts';
 import { dropSubscription, listSubscriptions, putSubscription } from '../subscription/subscription.store.ts';
 import { EngineService, asked, over, trustedFolder, type Engine } from '../runtime-client.ts';
-import { deliverOutbox, outboxOwed } from '../chat/deliver.verb.ts';
+import { answersDue, answersOwed, closesOwed, deliverOutbox, outboxOwed, recordAsks } from '../chat/deliver.verb.ts';
 import { upOf } from '../chat/chat.ts';
 import {
   composePrompt,
@@ -129,6 +130,7 @@ export function nemiaSpec(id: string): Parameters<Engine['file']>[0] {
     config: {
       ...(step.model === undefined ? {} : { model: step.model }),
       permissionMode: step.permissionMode,
+      mayAsk: true,
       ...(step.disallowedTools === undefined ? {} : { disallowedTools: step.disallowedTools }),
       allowedTools: [...(step.allowedTools ?? []), ...fence.allow, memory, ...(quota === undefined ? [] : [`Bash(${quotaCall(quota)})`])],
       callAdmission: {
@@ -187,18 +189,29 @@ const ACTS: Record<NemiaAct, (e: Engine, id: string) => Effect.Effect<void>> = {
     }),
   tell: tellHer,
   deliver: (e, id) => deliverOutbox(id, nemiaDir()).pipe(over(e), Effect.asVoid),
+  record: (e, id) => recordAsks(id, nemiaDir()).pipe(over(e), Effect.asVoid),
+  answer: (e, id) => answersDue(id, nemiaDir()).pipe(over(e), Effect.asVoid),
 };
 
 /** One act owed on her task `id`, counted once done. */
 const act = (e: Engine, id: string, owed: NemiaAct) => ACTS[owed](e, id).pipe(Effect.andThen(Metric.update(NEMIA_ACTS, 1)));
 
-/** Her task's record off the engine, undefined where none is filed under `id`, and whether her session is live (`upOf`). */
+/**
+ * Her task's record off the engine, undefined where none is filed under `id`, whether her session is live (`upOf`), whether it
+ * holds a question open on the person (`asking`, off the view's `asks`) and whether the chat holds one whose mark no longer says what
+ * became of its call (`closing`, `closesOwed` read against the same view).
+ */
 const herTask = (e: Engine, id: string | undefined) =>
   Effect.gen(function* () {
-    if (id === undefined) return { task: undefined, up: false };
-    const { state, phase } = yield* asked('view', e.view(id));
-    if (!state.filedAt) return { task: undefined, up: false };
-    return { task: { settled: Boolean(state.settled), stopRequested: state.stopRequested } satisfies HerTask, up: upOf(phase) };
+    if (id === undefined) return { task: undefined, up: false, asking: false, closing: false };
+    const { state, phase, asks } = yield* asked('view', e.view(id));
+    if (!state.filedAt) return { task: undefined, up: false, asking: false, closing: false };
+    return {
+      task: { settled: Boolean(state.settled), stopRequested: state.stopRequested } satisfies HerTask,
+      up: upOf(phase),
+      asking: (asks ?? []).length > 0,
+      closing: closesOwed(nemiaDir(), asks),
+    };
   });
 
 /** Her subscription as the keeper reads it: the task it tells and whether it carries her floor, or undefined where there is none. */
@@ -216,13 +229,17 @@ export const keepOnce = Effect.fn('keepOnce')(function* () {
   const e = yield* EngineService;
   const id = readLevel()?.task;
   const above = (yield* levelsNow()).some((row) => row.level !== 'manual');
-  const { task, up } = yield* herTask(e, id);
+  const { task, up, asking, closing } = yield* herTask(e, id);
   const trusted = trustedFolder(DEFAULT_HARNESS, nemiaDir());
   const keeping = { above, ...(id === undefined ? {} : { task: id }), ...(trusted === undefined ? {} : { trusted }) };
   const subscribed = herSubscription();
   const kept = nemiaState(keeping, task, subscribed) === 'kept';
   const stale = kept && customChanged(readTold(), nemiaCustom(), filedPrompt());
-  const owed = nemiaDue({ ...keeping, stale, up, owed: kept && outboxOwed(nemiaDir()) }, task, subscribed);
+  const owed = nemiaDue(
+    { ...keeping, stale, up, asking, closing, owed: kept && outboxOwed(nemiaDir()), answered: kept && answersOwed(nemiaDir()) },
+    task,
+    subscribed,
+  );
   for (const one of owed) if (id !== undefined || one === 'drop') yield* act(e, id ?? '', one);
   return owed;
 });

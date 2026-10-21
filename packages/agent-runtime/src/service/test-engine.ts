@@ -13,7 +13,7 @@
  * alone, and by no file of a `src`.
  */
 import { Effect, Layer } from 'effect';
-import type { Attempt, Said, State } from '../core/index.ts';
+import type { Attempt, Said, SessionAsk, State } from '../core/index.ts';
 import { JournalError, StopRefused, type TaskView } from '../core/engine/index.ts';
 import {
   attemptRefusal,
@@ -36,6 +36,10 @@ import type { TaskSpec } from './options.ts';
 import { notACount, notAStream, OutputRefused } from './output.ts';
 import { SayRefused } from './say.ts';
 import { InterruptRefused } from './interrupt.ts';
+import { AnswerRefused, type Answering } from './answer.ts';
+
+/** One answer asked of the stand-in: the task, the ask by its id, and each question's answer by the question's own text. */
+export type TestAnswer = { taskId: string; id: string; answers: Record<string, string> };
 
 /** A task as it was filed: its spec, under the id it was filed with or given. */
 export type TestFiling = TaskSpec & { readonly id: string };
@@ -61,6 +65,15 @@ export type TestTask = {
   earlier: Attempt[];
   transcripts: Map<number, TranscriptEvent[]>;
   printed: Printed;
+  /** The questions of its session waiting on a person, planted by `plantAsk`, and those whose call took an answer (`answerAsk`). */
+  asks: SessionAsk[];
+  asksTaken: string[];
+  /**
+   * Whether its harness says what its session holds open at all: false until an ask is planted, true from then on, and true still
+   * once every ask of it is gone. A harness that says reports `[]` while none waits; one that cannot say reports nothing, which is
+   * no absence (`Sighting.asks`), so the two are not the same view.
+   */
+  asksSaid: boolean;
 };
 
 /** How an attempt ended, by the phase its task settled in. */
@@ -117,6 +130,8 @@ const viewOf = (id: string, t: TestTask | undefined): TaskView => {
     phase: t.phase,
     sessionId: t.attempt ? sessionOf(id) : null,
     ...(waits ? { admission: 'queued' } : {}),
+    ...(t.asksSaid ? { asks: t.asks.map((ask) => ({ ...ask })) } : {}),
+    ...(t.asksTaken.length ? { asksTaken: [...t.asksTaken] } : {}),
   };
 };
 
@@ -188,6 +203,8 @@ export type TestEngine = {
   readonly said: { taskId: string; text: string }[];
   /** Each task an interrupt was asked of, in the order asked, whether or not it was refused. */
   readonly interrupts: string[];
+  /** Each ask an answer was asked of, in the order asked, whether or not it was refused. */
+  readonly answered: TestAnswer[];
   /** Each holder a drain was put for, or null where one was lifted, in order. */
   readonly drains: (number | null)[];
   /** Refuses the next `times` says, whatever the task. */
@@ -201,6 +218,13 @@ export type TestEngine = {
   readonly settle: (id: string, phase: string, end?: TestEnd) => TestTask;
   /** Plants the transcript the attempt `n` of the task `id` read, in place of what was planted before. Throws for a task never filed. */
   readonly plantTranscript: (id: string, n: number, events: readonly TranscriptEvent[]) => void;
+  /** Plants a question of a task's session waiting on a person, which `view` says and `answerAsk` answers. */
+  readonly plantAsk: (id: string, ask: SessionAsk) => void;
+  /**
+   * Cuts every question of the task's session that waits on a person, as a holder that let the session go cuts them: its harness
+   * goes on saying what it holds open, and says it holds none. Throws for a task never filed.
+   */
+  readonly cutAsks: (id: string) => void;
   /**
    * Ends the task `id`'s attempt in flight as its harness ended it, failed, and starts the next at work, as a long-lived task restarts.
    * Throws for a task never filed or not started.
@@ -311,14 +335,74 @@ const interruptAskedOf =
       return { at: new Date().toISOString(), attempt: t.attempt.n };
     });
 
+/**
+ * `answerAsk` over what a stand-in holds: every answer noted in `answered`, whether it was taken or refused, and refused in the
+ * engine's own words for a task it does not hold, one settled, one whose attempt has not started, and an ask its session does not hold
+ * open — which a stand-in holds only where one was planted (`plantAsk`). Taken, the ask leaves `asks` and joins `asksTaken`, as a
+ * held call that took an answer leaves it on the session's record.
+ */
+const answerAskedOf =
+  (tasks: Map<string, TestTask>, answered: TestAnswer[], settledIn: (id: string) => string | null) => (taskId: string, given: Answering) =>
+    Effect.gen(function* () {
+      answered.push({ taskId, id: given.id, answers: given.answers });
+      const refuse = (message: string) => Effect.fail(new AnswerRefused({ message }));
+      const t = tasks.get(taskId);
+      if (!t) return yield* refuse(unknown(taskId));
+      if (settledIn(taskId))
+        return yield* refuse(`\`${taskId}\` has settled (${t.phase}): no session of it is running, and no turn is in it.`);
+      if (!t.attempt) return yield* refuse(`\`${taskId}\` has not started an attempt yet, so there is no turn to end.`);
+      if (!t.asks.some((ask) => ask.id === given.id)) {
+        return yield* refuse(
+          `\`${taskId}\` has no ask \`${given.id}\` waiting on a person: read its asks again, and answer one its session still holds open.`,
+        );
+      }
+      t.asks = t.asks.filter((ask) => ask.id !== given.id);
+      t.asksTaken = [...t.asksTaken, given.id];
+      return { at: new Date().toISOString(), attempt: t.attempt.n };
+    });
+
+/**
+ * `say` over what a stand-in holds: the words journalled on the task and noted in `said`, with where its transcript stood (`after`),
+ * and refused in the engine's own words for a task it does not hold, one settled, one not started, and the next `refuseSay` asks.
+ */
+const sayAskedOf =
+  (
+    tasks: Map<string, TestTask>,
+    said: { taskId: string; text: string }[],
+    sayRefusals: { left: number },
+    settledIn: (id: string) => string | null,
+  ) =>
+  (taskId: string, text: string) =>
+    Effect.gen(function* () {
+      const refuse = (message: string) => Effect.fail(new SayRefused({ message }));
+      const t = tasks.get(taskId);
+      if (!t) return yield* refuse(unknown(taskId));
+      if (settledIn(taskId)) return yield* refuse(`\`${taskId}\` has settled (${t.phase}): no session of it is running to hear anything.`);
+      if (!t.attempt) return yield* refuse(`\`${taskId}\` has not started an attempt yet, so there is no session to hear anything.`);
+      if (sayRefusals.left > 0) {
+        sayRefusals.left -= 1;
+        return yield* refuse(`${taskId}'s attempt is not running yet: ask again`);
+      }
+      const last = t.transcripts.get(t.attempt.n)?.at(-1);
+      const heard: Said = {
+        at: new Date().toISOString(),
+        attempt: t.attempt.n,
+        text,
+        after: last === undefined ? null : { kind: last.kind, id: last.id },
+      };
+      t.said.push(heard);
+      said.push({ taskId, text });
+      return heard;
+    });
+
 /** The kept verbs over what a stand-in holds. */
 const keptOf = (
-  held: Omit<TestEngine, 'layer' | 'refuseSay' | 'settle' | 'keeps' | 'failKept' | 'plantTranscript' | 'restart'>,
+  held: Omit<TestEngine, 'layer' | 'refuseSay' | 'settle' | 'keeps' | 'failKept' | 'plantAsk' | 'cutAsks' | 'plantTranscript' | 'restart'>,
   sayRefusals: { left: number },
   sizes: Map<string, TestKeeps>,
   keptFailures: { left: number },
 ) => {
-  const { tasks, filings, specs, stopped, forgets, said, interrupts } = held;
+  const { tasks, filings, specs, stopped, forgets, said, interrupts, answered } = held;
   const settledIn = (id: string) => {
     const t = tasks.get(id);
     return t ? outcomeOf(t.phase) : null;
@@ -339,6 +423,9 @@ const keptOf = (
           earlier: [],
           transcripts: new Map(),
           printed: {},
+          asks: [],
+          asksTaken: [],
+          asksSaid: false,
         });
         return filed.id;
       }),
@@ -362,34 +449,20 @@ const keptOf = (
     logs: (id) => Effect.sync(() => (tasks.get(id)?.attempt ? '(the test engine keeps no logs)' : '(no session yet)')),
     feed: () => Effect.succeed({ entries: [], cursor: 0 }),
     output: outputOf(tasks),
-    say: (taskId, text) =>
-      Effect.gen(function* () {
-        const refuse = (message: string) => Effect.fail(new SayRefused({ message }));
-        const t = tasks.get(taskId);
-        if (!t) return yield* refuse(unknown(taskId));
-        if (settledIn(taskId))
-          return yield* refuse(`\`${taskId}\` has settled (${t.phase}): no session of it is running to hear anything.`);
-        if (!t.attempt) return yield* refuse(`\`${taskId}\` has not started an attempt yet, so there is no session to hear anything.`);
-        if (sayRefusals.left > 0) {
-          sayRefusals.left -= 1;
-          return yield* refuse(`${taskId}'s attempt is not running yet: ask again`);
-        }
-        const last = t.transcripts.get(t.attempt.n)?.at(-1);
-        const heard: Said = {
-          at: new Date().toISOString(),
-          attempt: t.attempt.n,
-          text,
-          after: last === undefined ? null : { kind: last.kind, id: last.id },
-        };
-        t.said.push(heard);
-        said.push({ taskId, text });
-        return heard;
-      }),
+    say: sayAskedOf(tasks, said, sayRefusals, settledIn),
     interrupt: interruptAskedOf(tasks, interrupts, settledIn),
+    answerAsk: answerAskedOf(tasks, answered, settledIn),
     transcript: transcriptOf(tasks),
     forget: forgetVerbOf(tasks, forgets, settledIn),
     kept: keptVerbOf(tasks, sizes, keptFailures),
   } satisfies Partial<EngineShape>;
+};
+
+/** The task `id` of `tasks`, for a hand that moves it: thrown for one never filed, in words saying what to do `before` it. */
+const taskFor = (tasks: Map<string, TestTask>, id: string, before: string): TestTask => {
+  const t = tasks.get(id);
+  if (!t) throw new Error(`the test engine holds no task ${id}: file it before ${before}`);
+  return t;
 };
 
 /**
@@ -406,6 +479,7 @@ export const testEngine = (): TestEngine => {
     forgets: [] as { taskIds: string[]; yes: boolean }[],
     said: [] as { taskId: string; text: string }[],
     interrupts: [] as string[],
+    answered: [] as TestAnswer[],
     drains: [] as (number | null)[],
   };
   const sayRefusals = { left: 0 };
@@ -436,8 +510,7 @@ export const testEngine = (): TestEngine => {
     }),
   );
   const settle = (id: string, phase: string, end?: TestEnd): TestTask => {
-    const t = held.tasks.get(id);
-    if (!t) throw new Error(`the test engine holds no task ${id}: file it before settling it`);
+    const t = taskFor(held.tasks, id, 'settling it');
     const unstarted = phase === 'pending' || (phase === 'stopped' && !t.attempt && !end);
     const { printed, ...over } = end ?? {};
     t.attempt = unstarted ? null : attemptOf(t, phase, over);
@@ -445,11 +518,15 @@ export const testEngine = (): TestEngine => {
     t.phase = phase;
     return t;
   };
-  const plantTranscript = (id: string, n: number, events: readonly TranscriptEvent[]) => {
-    const t = held.tasks.get(id);
-    if (!t) throw new Error(`the test engine holds no task ${id}: file it before planting its transcript`);
-    t.transcripts.set(n, [...events]);
+  const asking = (id: string, what: string, asks: (held: SessionAsk[]) => SessionAsk[]) => {
+    const t = taskFor(held.tasks, id, `${what} its asks`);
+    t.asks = asks(t.asks);
+    t.asksSaid = true;
   };
+  const plantAsk = (id: string, ask: SessionAsk) => asking(id, 'planting', (now) => [...now, { ...ask }]);
+  const cutAsks = (id: string) => asking(id, 'cutting', () => []);
+  const plantTranscript = (id: string, n: number, events: readonly TranscriptEvent[]) =>
+    void taskFor(held.tasks, id, 'planting its transcript').transcripts.set(n, [...events]);
   const restart = (id: string): TestTask => {
     const t = held.tasks.get(id);
     if (!t?.attempt) throw new Error(`the test engine holds no started task ${id}: settle it at work before restarting it`);
@@ -468,5 +545,5 @@ export const testEngine = (): TestEngine => {
   const failKept = (times: number) => {
     keptFailures.left = times;
   };
-  return { layer, ...held, refuseSay, settle, keeps, failKept, plantTranscript, restart };
+  return { layer, ...held, refuseSay, settle, keeps, failKept, plantAsk, cutAsks, plantTranscript, restart };
 };

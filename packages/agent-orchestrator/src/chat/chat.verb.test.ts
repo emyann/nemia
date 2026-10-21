@@ -2,10 +2,11 @@
  * The chat's reads and the person's writes over the engine's stand-in and the test place: a history paged across two attempts with
  * the line between them, a stream's read resumed after its cursor, the person's words put in the outbox and refused when empty or too
  * long, the read mark moved forward only, refused for an event the chat does not hold, and the turn she is answering stopped, which
- * leaves one quiet marker on her record. A store of its own, since `WF_ROOT` is read
- * as the module loads.
+ * leaves one quiet marker on her record, and her question answered, refused for one the chat does not hold and one answered already.
+ * A store of its own, since `WF_ROOT` is read as the module loads.
  */
 import { test } from 'node:test';
+import { Effect } from 'effect';
 import assert from 'node:assert/strict';
 import { testEngine } from 'agent-runtime/testing';
 import { scratch } from '../../test/scratch.ts';
@@ -13,8 +14,8 @@ import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
 
 process.env.WF_ROOT = scratch('wf-chat-verb-');
-const { chatHistory, chatRead, chatSend, chatSince, chatStop } = await import('./chat.verb.ts');
-const { readOutbox, readReadMark, readStops } = await import('./chat.store.ts');
+const { chatAnswer, chatHistory, chatRead, chatSend, chatSince, chatStop } = await import('./chat.verb.ts');
+const { appendAsk, readAnswers, readOutbox, readReadMark, readStops } = await import('./chat.store.ts');
 const { engineOf, runWith: runEngine } = await import('../runtime-client.ts');
 
 const engine = eachTest(testEngine);
@@ -134,4 +135,50 @@ test('REFUSED: a stop with no session of hers filed, and one the runtime will no
     /has not started an attempt yet, so there is no turn to end/.test(err.message),
   );
   assert.deepEqual(readStops(unstarted.dir), [], 'a turn the runtime did not end is on no record');
+});
+
+/** Her one question, as the chat's record keeps it. */
+const QUESTION = 'What does the board show as an old closeout’s one line?';
+const ASK = {
+  id: 'call-1',
+  at: '2026-10-16T18:02:00.000Z',
+  questions: [
+    {
+      question: QUESTION,
+      header: 'Summary',
+      options: [
+        { label: 'Cut it on read', description: 'The first line, cut at a word.', recommended: true },
+        { label: 'First line as it is', description: 'The board cuts it by its layout.', recommended: false },
+      ],
+      multiSelect: false,
+    },
+  ],
+};
+
+test("the person's answer to her question is a file of their own, which her chat then draws", async () => {
+  const { e, place } = await twoAttempts();
+  appendAsk(place.dir, ASK);
+  const answer = await runWith(e, chatAnswer(place, { id: 'call-1', picks: [{ question: QUESTION, labels: ['Cut it on read'] }] }));
+  assert.deepEqual(answer.answers, { [QUESTION]: 'Cut it on read' });
+  assert.deepEqual(readAnswers(place.dir), [answer]);
+  const read = await runWith(e, chatHistory(place, { limit: 50 }));
+  const drawn = read.events.find((one) => one.kind === 'question');
+  assert.equal(drawn?.kind === 'question' && drawn.chose?.[QUESTION], 'Cut it on read');
+  assert.equal(read.presence.waitsOnYou, 0, 'and it waits on them no longer');
+});
+
+test('REFUSED: an answer to a question the chat does not hold, and to one answered already', async () => {
+  const { e, place } = await twoAttempts();
+  appendAsk(place.dir, ASK);
+  const picks = [{ question: QUESTION, labels: ['Cut it on read'] }];
+  const missing = await runWith(e, Effect.flip(chatAnswer(place, { id: 'call-9', picks })));
+  assert.equal(missing._tag, 'Missing');
+  assert.match(missing.message, /call-9 is no question of this chat/);
+  await runWith(e, chatAnswer(place, { id: 'call-1', picks }));
+  const twice = await runWith(e, Effect.flip(chatAnswer(place, { id: 'call-1', picks })));
+  assert.equal(twice._tag, 'Conflict');
+  assert.match(twice.message, /was answered at .*: read her chat again/);
+  assert.equal(readAnswers(place.dir).length, 1, 'and the person is never recorded as answering twice');
+  const invalid = await runWith(e, Effect.flip(chatAnswer(place, { id: 'call-1', picks: [] })));
+  assert.equal(invalid._tag, 'Conflict', 'an ask already answered is refused before its picks are read');
 });

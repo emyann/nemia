@@ -88,6 +88,7 @@ const spawnAsked = {
   cwd: '/repo',
   harness: 'fake',
   config: { model: 'opus', permissionMode: 'dontAsk', tools: ['Read', 'Edit'] },
+  restartPolicy: undefined,
   closeoutSchema: { type: 'object' },
   resumeFrom: undefined,
   resource: { task: 't-words' },

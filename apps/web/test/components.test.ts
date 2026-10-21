@@ -29,7 +29,7 @@ const { StepBody, StepPolicy, Told } = await import('../src/components/Told.tsx'
 const { RunGone } = await import('../src/components/RunGone.tsx');
 const { KindsBehind } = await import('../src/components/KindsBehind.tsx');
 const { instantWhole, instantWords } = await import('../src/lib/instant.ts');
-const { timeToTheSecond } = await import('../src/lib/timeOfDay.ts');
+const { timeOfDay, timeToTheSecond } = await import('../src/lib/timeOfDay.ts');
 type RunDetail = import('../src/lib/api.ts').RunDetail;
 type StepReach = import('../src/lib/api.ts').StepReach;
 type ReadOnlyCommands = import('../src/lib/api.ts').ReadOnlyCommands;
@@ -7310,4 +7310,101 @@ test('a chat the api cannot stream and reads again on a beat is a quiet note at 
   assert.match(html, /Her session is not pushed as it is written\. Nothing is lost/);
   assert.match(html, /border-rest/, 'a note the board makes of itself is rest, not a write refused');
   assert.doesNotMatch(html, /failure/, 'the colour that says a write was refused says nothing here');
+});
+
+const { ChatAsk } = await import('../src/components/chat/ChatAsk.tsx');
+const { ChatAskMany } = await import('../src/components/chat/ChatAskMany.tsx');
+const { ChatProposal } = await import('../src/components/chat/ChatProposal.tsx');
+type AskQuestion = import('../src/lib/api.ts').AskQuestion;
+type ChatAskEvent = Extract<ChatEvent, { kind: 'question' | 'proposal' }>;
+
+/** One question of hers, its choices explained; `plain` is the same with nothing to explain, which her proposal draws as actions. */
+const askQuestion = (plain = false): AskQuestion => ({
+  question: 'What the board shows as an old closeout’s one line?',
+  header: 'Summary',
+  options: [
+    { label: 'Cut it on read', description: plain ? '' : 'The first line, cut at a word.', recommended: true },
+    { label: 'First line as it is', description: plain ? '' : 'The board cuts it by its layout.', recommended: false },
+  ],
+  multiSelect: false,
+});
+
+/** An ask of hers in her chat, its choice on it where one was made. */
+const askEvent = (kind: 'question' | 'proposal', questions: readonly AskQuestion[], chose?: Record<string, string>): ChatAskEvent => ({
+  kind,
+  id: 'q:call-1',
+  call: 'call-1',
+  at: new Date(Date.UTC(2026, 9, 15, 22, 2, 0)).toISOString(),
+  text: 'The design signed off with a question it cannot settle alone. [Read the design](/runs/r-1)',
+  questions,
+  ...(chose === undefined ? {} : { chose, choseAt: CHOSE_AT.toISOString() }),
+});
+
+/** When the person chose, and the time of day the board writes it as, read where the draw reads it: a moment is drawn in the zone
+ * the browser is in, and the runner's is not this machine's. */
+const CHOSE_AT = new Date(Date.UTC(2026, 9, 15, 22, 4, 0));
+
+test('her one question with its choices explained is drawn as the form: the choice, why, the Recommended tag, and the link in her words', () => {
+  const html = renderToStaticMarkup(createElement(ChatAsk, { ask: askEvent('question', [askQuestion()]), onAnswer: () => undefined }));
+  assert.match(html, /data-chat-ask="form"/);
+  assert.match(html, /data-chat-tag="asks you"/);
+  assert.match(html, /1 of 1 · Summary/);
+  assert.match(html, /data-chat-option="Cut it on read"/);
+  assert.match(html, /The first line, cut at a word\./, 'a choice that explains itself says why on its row');
+  assert.match(html, /data-chat-recommended/);
+  assert.match(html, /Recommended/);
+  assert.match(html, /href="\/runs\/r-1"/, 'the link her words carry is a plain link beside the Answer');
+  assert.match(html, /disabled=""/, 'nothing is chosen yet, so the Answer is off');
+});
+
+test('her proposal is drawn as its actions, each choice said whole by its own button, and answered it says what was chosen', () => {
+  const asks = renderToStaticMarkup(
+    createElement(ChatProposal, { ask: askEvent('proposal', [askQuestion(true)]), onAnswer: () => undefined }),
+  );
+  assert.match(asks, /data-chat-ask="actions"/);
+  assert.match(asks, /data-chat-tag="proposes"/);
+  assert.match(asks, /data-chat-action="Cut it on read"/);
+  assert.match(asks, /data-chat-action="First line as it is"/);
+  assert.doesNotMatch(asks, /data-chat-option=/, 'a choice with nothing to explain is a button, never a row of a form');
+  const chose = renderToStaticMarkup(
+    createElement(ChatProposal, {
+      ask: askEvent('proposal', [askQuestion(true)], { [askQuestion().question]: 'Cut it on read' }),
+      onAnswer: () => undefined,
+    }),
+  );
+  assert.match(chose, /data-chat-tag="proposed"/);
+  assert.match(chose, /data-chat-chose/);
+  assert.match(chose, new RegExp(`You chose: Cut it on read · ${timeOfDay(CHOSE_AT)}`));
+  assert.doesNotMatch(chose, /data-chat-action=/, 'an answered proposal asks nothing more');
+});
+
+test('her several questions are drawn as the flow: a tab each and Submit, numbered choices, her own words, and N OF M', () => {
+  const questions = [askQuestion(), { ...askQuestion(), question: 'And the values?', header: 'Values' }];
+  const html = renderToStaticMarkup(createElement(ChatAskMany, { ask: askEvent('question', questions), onAnswer: () => undefined }));
+  assert.match(html, /data-chat-ask="many"/);
+  assert.match(html, /data-chat-qtab="on"[^>]*>Summary/);
+  assert.match(html, /data-chat-qtab="off"[^>]*>Values/);
+  assert.match(html, /Submit/);
+  assert.match(html, /1\./, 'the choices are numbered');
+  assert.match(html, /data-chat-option="own"/);
+  assert.match(html, /Your own words/);
+  assert.match(html, /data-chat-own/);
+  assert.match(html, /data-chat-of[^>]*>1 OF 2/);
+  assert.doesNotMatch(html, /data-chat-submit/, 'the Submit tab is reached, never drawn beside the question in hand');
+  assert.doesNotMatch(html, /data-chat-asked/, 'while it waits, the tabs say the questions: nothing is said twice');
+});
+
+test('her several questions answered keep each question beside the answer it was given, the tabs that asked them gone', () => {
+  const questions = [askQuestion(), { ...askQuestion(), question: 'And the values?', header: 'Values' }];
+  const chose = { [askQuestion().question]: 'Cut it on read', 'And the values?': 'Hand them' };
+  const html = renderToStaticMarkup(createElement(ChatAskMany, { ask: askEvent('question', questions, chose), onAnswer: () => undefined }));
+  assert.doesNotMatch(html, /data-chat-qtab/, 'an answered ask asks nothing more');
+  assert.match(html, /data-chat-asked/);
+  for (const [question, answer] of Object.entries(chose))
+    assert.match(
+      html,
+      new RegExp(`${question.replace(/[?]/g, '\\?')}</dt><dd[^>]*>${answer}`),
+      'what she asked stands over what the person answered it, so the history reads as a history',
+    );
+  assert.match(html, new RegExp(`You chose: Cut it on read · Hand them · ${timeOfDay(CHOSE_AT)}`));
 });

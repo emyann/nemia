@@ -2,8 +2,11 @@
  * A chat's own files, in the folder `chat/` of the folder it is kept in: what the person wrote (`outbox.jsonl`, appended by the
  * person's verb alone), the keeper's marks of what it delivered (`delivered.jsonl`, appended by the delivery alone), the turns the
  * person stopped (`stops.jsonl`, appended by `chatStop` alone), and the person's
- * read mark (`read.json`, written whole by the person's verb alone). One writer each, composed on read; none is ever rewritten but the
- * read mark, which its one writer replaces.
+ * read mark (`read.json`, written whole by the person's verb alone), the questions of hers the keeper saw waiting on the person
+ * (`asks.jsonl`, appended by the keeper's record alone), their answers to them (`answers.jsonl`, appended by the person's verb alone)
+ * the keeper's marks of each answer owed no longer (`answers-done.jsonl`, appended by the delivery alone) and its marks of an ask
+ * whose call is gone or asking again (`asks-closed.jsonl`, appended by the keeper's record alone). One writer each,
+ * composed on read; none is ever rewritten but the read mark, which its one writer replaces.
  *
  * Beneath the controllers: it imports no runtime.
  */
@@ -11,7 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Result, Schema } from 'effect';
 import { Invalid } from '../refusal/refusal.ts';
-import type { DeliveredMark, OutboxEntry, ReadMark, SourceStop } from './chat.ts';
+import type { AnswerMark, Ask, AskAnswer, AskClose, DeliveredMark, OutboxEntry, ReadMark, SourceStop } from './chat.ts';
 
 /** The chat's folder within `dir`. */
 export const chatDir = (dir: string): string => path.join(dir, 'chat');
@@ -28,11 +31,41 @@ export const stopsFile = (dir: string): string => path.join(chatDir(dir), 'stops
 /** The person's read mark. */
 export const readMarkFile = (dir: string): string => path.join(chatDir(dir), 'read.json');
 
+/** The questions of hers the keeper saw waiting on the person, one ask a line. */
+export const asksFile = (dir: string): string => path.join(chatDir(dir), 'asks.jsonl');
+
+/** The person's answers to them, one a line. */
+export const answersFile = (dir: string): string => path.join(chatDir(dir), 'answers.jsonl');
+
+/** The keeper's marks of the answers owed no longer, one a line. */
+export const answersDoneFile = (dir: string): string => path.join(chatDir(dir), 'answers-done.jsonl');
+
+/**
+ * The keeper's marks of an ask whose call is no longer waiting on the person (`cut`), and of one whose words a call of hers is
+ * asking again (`again`), one a line, the latest of an ask's marks the one that holds. An ask is never rewritten, so what became of
+ * its call is a mark of its own.
+ */
+export const asksClosedFile = (dir: string): string => path.join(chatDir(dir), 'asks-closed.jsonl');
+
 const Moment = Schema.String.check(Schema.isNonEmpty());
 
 const OutboxSchema = Schema.Struct({ id: Moment, at: Moment, text: Schema.String });
 const DeliveredSchema = Schema.Struct({ id: Moment, said: Moment, attempt: Schema.Finite });
 const ReadSchema = Schema.Struct({ through: Moment, at: Moment });
+
+const OptionSchema = Schema.Struct({ label: Schema.String, description: Schema.String, recommended: Schema.Boolean });
+
+const QuestionSchema = Schema.Struct({
+  question: Moment,
+  header: Schema.String,
+  options: Schema.mutable(Schema.Array(OptionSchema)),
+  multiSelect: Schema.Boolean,
+});
+
+const AskSchema = Schema.Struct({ id: Moment, at: Moment, questions: Schema.mutable(Schema.Array(QuestionSchema)) });
+const AnswerSchema = Schema.Struct({ id: Moment, at: Moment, answers: Schema.Record(Schema.String, Schema.String) });
+const AnswerDoneSchema = Schema.Struct({ id: Moment, how: Schema.Literals(['return', 'words', 'mark']), at: Moment });
+const AskCloseSchema = Schema.Struct({ id: Moment, how: Schema.Literals(['cut', 'again']), at: Moment, call: Schema.optionalKey(Moment) });
 
 /** One turn the person stopped: when they stopped it, and which attempt of the task was answering. */
 export const StopSchema = Schema.Struct({ at: Moment, attempt: Schema.Finite });
@@ -101,6 +134,30 @@ export function readReadMark(dir: string): ReadMark | undefined {
   }
   return { ...decoded(ReadSchema, raw, readMarkFile(dir)) };
 }
+
+/** The questions of hers the keeper saw waiting, oldest first. */
+export const readAsks = (dir: string): Ask[] => linesOf(asksFile(dir), AskSchema).map((a) => ({ ...a }));
+
+/** The person's answers to them, oldest first. */
+export const readAnswers = (dir: string): AskAnswer[] => linesOf(answersFile(dir), AnswerSchema).map((a) => ({ ...a }));
+
+/** The keeper's marks of the answers owed no longer, in the order it made them. */
+export const readAnswersDone = (dir: string): AnswerMark[] => linesOf(answersDoneFile(dir), AnswerDoneSchema).map((m) => ({ ...m }));
+
+/** The keeper's marks of what became of each ask's call, in the order it made them: the last of an ask's is what holds. */
+export const readAsksClosed = (dir: string): AskClose[] => linesOf(asksClosedFile(dir), AskCloseSchema).map((m) => ({ ...m }));
+
+/** Appends a question of hers the keeper saw waiting. The keeper's record is its one writer. */
+export const appendAsk = (dir: string, ask: Ask): void => appendLine(asksFile(dir), ask);
+
+/** Appends the person's answer to one. The person's verb is its one writer. */
+export const appendAnswer = (dir: string, answer: AskAnswer): void => appendLine(answersFile(dir), answer);
+
+/** Appends the keeper's mark of an answer owed no longer. The delivery is its one writer. */
+export const appendAnswerDone = (dir: string, mark: AnswerMark): void => appendLine(answersDoneFile(dir), mark);
+
+/** One mark of what became of an ask's call, appended by the keeper's record alone. */
+export const appendAskClosed = (dir: string, mark: AskClose): void => appendLine(asksClosedFile(dir), mark);
 
 /** Appends what the person wrote to the outbox. The person's verb is its one writer. */
 export const appendOutbox = (dir: string, entry: OutboxEntry): void => appendLine(outboxFile(dir), entry);

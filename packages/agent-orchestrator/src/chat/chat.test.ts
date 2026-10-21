@@ -65,6 +65,9 @@ const twoSessions = (over: Partial<ChatSources> = {}): ChatSources => ({
   outbox: [],
   delivered: [],
   stops: [],
+  asks: [],
+  answers: [],
+  closed: [],
   phase: 'idle',
   ...over,
 });
@@ -159,7 +162,7 @@ test('a cursor round-trips, and what changed since it is the new events and thos
   const outbox = [{ id: 'o1', at: at(11), text: 'Hi' }];
   const before = twoSessions({ outbox });
   const cursor = chatCursor(cursorOf(before));
-  assert.equal(cursor, '2.1.0.1.0.0');
+  assert.equal(cursor, '2.1.0.1.0.0.0.0.0');
   assert.deepEqual(readChatCursor(cursor), cursorOf(before));
   const now = twoSessions({
     outbox,
@@ -173,8 +176,8 @@ test('a cursor round-trips, and what changed since it is the new events and thos
   assert.equal(changed[0]?.kind === 'message' && changed[0].delivered, at(13));
 });
 
-test('REFUSED: a cursor that is no five or six counts, or counts more than the chat holds, naming the fix', () => {
-  for (const bad of ['', '1.2.3', 'a.b.c.d.e', '1.2.3.4.-1', '01.0.0.0.0', '1.0.0.0.0.0.0', '1.0.0.0.0.x'])
+test('REFUSED: a cursor of too few or too many counts, or counting more than the chat holds, naming the fix', () => {
+  for (const bad of ['', '1.2.3', 'a.b.c.d.e', '1.2.3.4.-1', '01.0.0.0.0', '1.0.0.0.0.0.0.0.0.0', '1.0.0.0.0.x'])
     assert.throws(
       () => readChatCursor(bad),
       (err: Error) => err.message.includes('is not a cursor a chat read gave: pass the `cursor`'),
@@ -192,10 +195,27 @@ test('REFUSED: a cursor that is no five or six counts, or counts more than the c
     (err: Error) => /not a cursor/.test(err.message),
     'a cursor that counts a stop the chat does not hold is none',
   );
+  assert.throws(
+    () => sourcesAt(twoSessions(), readChatCursor('2.1.0.1.0.1.0.0.1'), '2.1.0.1.0.1.0.0.1'),
+    (err: Error) => /not a cursor/.test(err.message),
+    'nor is one that counts a mark of an ask’s call the chat does not hold',
+  );
 });
 
-test('a cursor of five counts, which a tab open across the deploy still carries, reads as one that had seen no stop', () => {
-  assert.deepEqual(readChatCursor('2.1.0.1.0'), { attempts: 2, events: 1, said: 0, outbox: 1, delivered: 0, stops: 0 });
+test('a cursor of fewer counts than today, which a tab open across the deploy still carries, reads as one that had seen none of the rest', () => {
+  const none = { said: 0, delivered: 0, stops: 0, asks: 0, answers: 0, closed: 0 };
+  assert.deepEqual(readChatCursor('2.1.0.1.0'), { attempts: 2, events: 1, outbox: 1, ...none });
+  assert.deepEqual(readChatCursor('2.1.0.1.0.0'), { attempts: 2, events: 1, outbox: 1, ...none });
+  assert.deepEqual(readChatCursor('2.1.0.1.0.0.3.2'), { attempts: 2, events: 1, outbox: 1, ...none, asks: 3, answers: 2 });
+  assert.deepEqual(readChatCursor('2.1.0.1.0.0.3.2.1'), {
+    attempts: 2,
+    events: 1,
+    outbox: 1,
+    ...none,
+    asks: 3,
+    answers: 2,
+    closed: 1,
+  });
 });
 
 test("a turn the person stopped is the keeper's quiet marker, in its place in time, and no new kind of event", () => {

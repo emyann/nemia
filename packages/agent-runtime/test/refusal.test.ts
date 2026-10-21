@@ -330,6 +330,44 @@ test('REFUSED at shipped defaults: a long-lived task on a harness that ends its 
   );
 });
 
+test('REFUSED: `mayAsk: true` on a session this runtime does not hold attached, and taken on the one it does', async () => {
+  const options = {
+    root: scratch('ae-may-ask-'),
+    journal: asyncStore(memoryStore()),
+    harnesses: { claude: 'claude' as const, hers: 'claude' as const, bg: 'claude-bg' as const, codex },
+  };
+  const engine = builtEngine(Engine.layer(options));
+  const refused = (spec: Filing) => Effect.runPromise(Effect.flip(engine.file(spec)));
+  const asked = { ...ok, config: { mayAsk: true } };
+  const job = await refused({ ...asked, harness: 'claude' });
+  assert.equal(job._tag, 'FileRefused');
+  assert.equal(
+    job.message,
+    "`mayAsk: true` holds a call that would ask a person open until one answers it, and only a session this runtime holds attached can hold one: the `claude` harness runs this task as a job, which ends its session with its turn. File the task `restartPolicy: 'Always'` on a harness configured `'claude'`, which this runtime holds attached, or leave `mayAsk` off.",
+  );
+  const elsewhere = await refused({ ...asked, harness: 'codex' });
+  assert.match(elsewhere.message, /the `codex` harness has no session this runtime holds attached/);
+  const detached = await refused({ ...asked, harness: 'bg', restartPolicy: 'Always' });
+  assert.match(
+    detached.message,
+    /the `bg` harness has no session this runtime holds attached/,
+    'a `claude --bg` session is driven by no `query()` of ours, so no call of it is caught at a hook: a long-lived filing does not make it hold one',
+  );
+  assert.ok(
+    await Effect.runPromise(engine.file({ ...ok, harness: 'claude', restartPolicy: 'Always', config: { background: true, mayAsk: true } })),
+    'the long-lived `claude` session this runtime holds attached holds a call open, so it takes it',
+  );
+  assert.ok(
+    await Effect.runPromise(engine.file({ ...ok, harness: 'hers', restartPolicy: 'Always', config: { background: true, mayAsk: true } })),
+    'which harnesses hold a call is read off their configuration (`heldHarnessesOf`), never off the name: a harness named anything and configured `claude` holds one',
+  );
+  assert.match(
+    (await refused({ ...asked, harness: 'hers' })).message,
+    /the `hers` harness runs this task as a job/,
+    'and the same harness filed as a job is refused in the words of a harness whose session ends with its turn',
+  );
+});
+
 test("Claude Code's own runners refuse Codex's arguments, so a runner reached without the engine's door refuses them too", () => {
   const task = { ...ok, config: { codex: { trustFrom: '/repo' } } };
   const says =

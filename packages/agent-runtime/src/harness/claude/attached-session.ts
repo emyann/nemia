@@ -4,18 +4,30 @@
  * comes, and its run file rewritten as its facts change (`attached-file.ts`). A new call waits at its `PreToolUse` hook while this
  * process holds back the session's calls (`Held`), and a call that belongs to a call already in flight — one of the session's own
  * calls in flight, or a sub-agent's, which the SDK marks with `agent_id` — is never held, or the call it belongs to could never end;
- * a call that would ask a person is answered here, denied, as no person is there.
+ * a call that would ask a person is answered here: held open while the question waits on one and let through with their answers where
+ * the session's task says a person can be asked (`config.mayAsk`), denied otherwise, as no person is there.
  */
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import { query, type CanUseTool, type HookCallbackMatcher, type HookEvent, type SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 import { attachedOptions } from './attached-options.ts';
-import { alive, childFacts, filesOf, writeRun, type AttachedRun, type AttachedState } from './attached-file.ts';
+import {
+  alive,
+  appendAsk,
+  childFacts,
+  cutAsks,
+  filesOf,
+  readAnswers,
+  writeRun,
+  type AttachedRun,
+  type AttachedState,
+} from './attached-file.ts';
 import { bridgeStateOf, enableBridge } from './attached-bridge.ts';
 import { bridgeAsked } from './vocabulary.ts';
 import { claudeStreamKept } from '../detached/output.ts';
 import type { SpawnRequest } from '../seam.ts';
+import type { AskOption, AskQuestion } from '../../core/index.ts';
 
 /** What a session's new calls ask before they start: whether this process holds back a new call of `live` now. */
 export type Held = (live: Live) => boolean;
@@ -78,6 +90,8 @@ export type Live = {
   waiting: number;
   open: boolean;
   unanswered: Set<string>;
+  /** The calls of this session's that are waiting on a person now, by the call's id: what keeps one ask written down once. */
+  asking: Set<string>;
   q?: { interrupt?: () => Promise<void> };
   done: Promise<void>;
   pushed?: (m: SDKMessage) => void;
@@ -108,6 +122,104 @@ const waitWhile = async (held: Held, signal: AbortSignal, live: Live): Promise<v
  */
 const inside = (input: unknown): boolean => typeof (input as { agent_id?: unknown }).agent_id === 'string';
 
+/** The tool a session calls to ask a person a question, as Claude Code names it. */
+export const ASK_TOOL = 'AskUserQuestion';
+
+/** How often a held ask reads whether the person's answer has been written, in milliseconds. */
+const ASK_EVERY_MS = 250;
+
+/** What a call that would ask a person is told where no answer reached it: its holder was let go, or its turn was ended. */
+export const ASK_CUT =
+  'The question went to the person and this call did not wait for their answer: the session was paused or its turn was ended while it ' +
+  'waited. Their answer is said to you as words once they give it, naming the question. Carry on without it.';
+
+/** What the hook says of a call it let through: the person answered it, and their answer is in the call's own input. */
+export const ASK_ANSWERED = 'The person answered this question on the board, and their answer is in the call.';
+
+/** One choice of a question, as the call's input gave it: nothing where it names no label. */
+const optionOf = (raw: unknown): AskOption[] => {
+  const o = (raw ?? {}) as { label?: unknown; description?: unknown; preview?: unknown };
+  if (typeof o.label !== 'string' || o.label === '') return [];
+  return [
+    {
+      label: o.label,
+      description: typeof o.description === 'string' ? o.description : '',
+      ...(typeof o.preview === 'string' ? { preview: o.preview } : {}),
+    },
+  ];
+};
+
+/**
+ * The questions of an `AskUserQuestion` call's input, as the harness gave them: none where the input holds no question with a text and
+ * a choice, so a call this runtime cannot draw is never written down as an ask a person could answer.
+ */
+const questionsOf = (input: unknown): AskQuestion[] => {
+  const asked = (input as { questions?: unknown })?.questions;
+  if (!Array.isArray(asked)) return [];
+  return asked.flatMap((raw) => {
+    const q = (raw ?? {}) as { question?: unknown; header?: unknown; options?: unknown; multiSelect?: unknown };
+    const options = Array.isArray(q.options) ? q.options.flatMap(optionOf) : [];
+    if (typeof q.question !== 'string' || q.question === '' || options.length === 0) return [];
+    return [
+      {
+        question: q.question,
+        header: typeof q.header === 'string' ? q.header : '',
+        options,
+        multiSelect: q.multiSelect === true,
+      } satisfies AskQuestion,
+    ];
+  });
+};
+
+/**
+ * The person's answers to the call `id` of `live`, waited for: the ask written down once (`appendAsk`), then the session's answers file
+ * read every `ASK_EVERY_MS` until a line names the call, which is written down as closed and answered; nothing where the call's signal
+ * aborted or the holder let the session go first, which leaves the ask open — and the layer above then owes the answer as words.
+ */
+const askedOf = async (
+  root: string,
+  live: Live,
+  id: string,
+  input: unknown,
+  signal: AbortSignal,
+): Promise<{ questions: AskQuestion[]; answers: Record<string, string> } | undefined> => {
+  const questions = questionsOf(input);
+  if (questions.length === 0) return undefined;
+  if (!live.asking.has(id)) {
+    live.asking.add(id);
+    appendAsk(root, live.run.name, { id, at: new Date().toISOString(), questions });
+  }
+  for (;;) {
+    const given = readAnswers(root, live.run.name).find((a) => a.id === id);
+    if (given !== undefined) {
+      const at = new Date().toISOString();
+      appendAsk(root, live.run.name, { id, at, closed: at, how: 'taken' });
+      live.asking.delete(id);
+      return { questions, answers: given.answers };
+    }
+    if (signal.aborted || live.letGo) return undefined;
+    await new Promise((r) => setTimeout(r, ASK_EVERY_MS));
+  }
+};
+
+/**
+ * What a `PreToolUse` hook answers a question's call with: let through (`allow`) with the person's answers in its input where they
+ * answered, so the call's own result carries their answer to the session; denied, naming what happens instead (`ASK_CUT`), where none
+ * came — the holder let the session go, or the turn was ended, and the answer is owed to the session as words.
+ */
+export const askHookOutput = (given: { questions: AskQuestion[]; answers: Record<string, string> } | undefined) => ({
+  hookSpecificOutput: {
+    hookEventName: 'PreToolUse' as const,
+    ...(given === undefined
+      ? { permissionDecision: 'deny' as const, permissionDecisionReason: ASK_CUT }
+      : {
+          permissionDecision: 'allow' as const,
+          permissionDecisionReason: ASK_ANSWERED,
+          updatedInput: { questions: given.questions, answers: given.answers },
+        }),
+  },
+});
+
 /** What a denied call is told: no person is there to ask, and what the fence allows is all it gets. */
 export const DENIED_HERE =
   'No person is here to approve this call, so it is denied. Do what you can with the tools you are allowed, and say in your answer what you were denied.';
@@ -125,7 +237,7 @@ const rewrite = (root: string, live: Live, patch: Partial<AttachedRun> = {}): vo
 };
 
 /** The hooks that keep the call in flight, a new one held while `held` says so. */
-const hooksOf = (root: string, live: Live, held: Held): Partial<Record<HookEvent, HookCallbackMatcher[]>> => {
+const hooksOf = (root: string, live: Live, held: Held, mayAsk: boolean): Partial<Record<HookEvent, HookCallbackMatcher[]>> => {
   const ended = async (_input: unknown, id: string | undefined) => {
     if (id && live.calls.delete(id)) rewrite(root, live);
     return {};
@@ -144,7 +256,8 @@ const hooksOf = (root: string, live: Live, held: Held): Partial<Record<HookEvent
             const tool = (input as { tool_name?: string }).tool_name ?? 'a tool';
             if (id) live.calls.set(id, { tool, since: new Date().toISOString() });
             rewrite(root, live);
-            return {};
+            if (tool !== ASK_TOOL || !mayAsk || id === undefined) return {};
+            return askHookOutput(await askedOf(root, live, id, (input as { tool_input?: unknown }).tool_input, signal));
           },
         ],
       },
@@ -160,10 +273,26 @@ const capture = (root: string, name: string, line: object): void => {
   if (kept) fs.appendFileSync(filesOf(root, name).out, `${kept}\n`);
 };
 
-/** A call that would ask a person, answered: denied, and written to the capture as a denial as it happens. */
-const deniedHere =
-  (root: string, name: string): CanUseTool =>
-  async (tool, _input, { toolUseID }) => {
+/**
+ * A call that would ask a person, answered.
+ *
+ * Where the session's task says a person can be asked through it (`config.mayAsk`), an `AskUserQuestion` call is held open while the
+ * question waits on one and let through with their answers in its input, as the SDK's own page documents the flow: the call's result
+ * then carries their answer to the session as if it had asked a person at a terminal. Every other call is denied, and so is that one
+ * in a session whose task says no person can be asked: no person is there. A denial is written to the capture as it happens.
+ *
+ * The same ask is held at the session's `PreToolUse` hook too (`hooksOf`), which runs before the rest of the flow: whichever of the
+ * two the installed CLI consults, the ask is written down once (`askedOf`) and answered the same way.
+ */
+const decidedHere =
+  (root: string, name: string, live: Live, mayAsk: boolean): CanUseTool =>
+  async (tool, input, { toolUseID, signal }) => {
+    if (mayAsk && tool === ASK_TOOL) {
+      const given = await askedOf(root, live, toolUseID, input, signal);
+      if (given !== undefined) return { behavior: 'allow', updatedInput: { questions: given.questions, answers: given.answers } };
+      capture(root, name, { type: 'system', subtype: 'permission_denied', tool_name: tool, tool_use_id: toolUseID });
+      return { behavior: 'deny', message: ASK_CUT };
+    }
     capture(root, name, { type: 'system', subtype: 'permission_denied', tool_name: tool, tool_use_id: toolUseID });
     return { behavior: 'deny', message: DENIED_HERE };
   };
@@ -219,6 +348,8 @@ const took = (root: string, live: Live, m: SDKMessage): void => {
   else if (bridged !== undefined) rewrite(root, live, { bridge: { ...live.run.bridge, state: bridged } });
   else if (m.type === 'result') {
     live.calls.clear();
+    live.asking.clear();
+    cutAsks(root, live.run.name);
     answered(live, m);
     if (live.open) return rewrite(root, live, { state: live.unanswered.size ? 'working' : 'idle', sessionId: m.session_id });
     live.input.close();
@@ -287,6 +418,7 @@ export const startSession = (
 ): Live => {
   const abort = new AbortController();
   const open = r.restartPolicy === 'Always';
+  const mayAsk = r.config?.mayAsk === true;
   const live: Live = {
     run,
     abort,
@@ -296,6 +428,7 @@ export const startSession = (
     waiting: 0,
     open,
     unanswered: new Set(),
+    asking: new Set(),
     done: Promise.resolve(),
     ...(options.pushed ? { pushed: options.pushed } : {}),
   };
@@ -308,8 +441,8 @@ export const startSession = (
       ...given,
       ...(options.resume ? { resume: options.resume } : {}),
       abortController: abort,
-      canUseTool: deniedHere(root, run.name),
-      hooks: hooksOf(root, live, options.held),
+      canUseTool: decidedHere(root, run.name, live, mayAsk),
+      hooks: hooksOf(root, live, options.held, mayAsk),
       ...(options.executable ? { pathToClaudeCodeExecutable: options.executable } : {}),
       spawnClaudeCodeProcess: (o) => {
         const child = spawn(o.command, o.args, { cwd: o.cwd, env: o.env, stdio: ['pipe', 'pipe', 'pipe'], detached: true });

@@ -330,6 +330,8 @@ export const claudeCodeOps = (options: ClaudeOptions = {}, attached?: Attached):
 
     say: (session, text) => of(session.sessionId).say!(session, text),
 
+    ...answerOf(attached),
+
     quota: claudeQuota(),
 
     forget: (session, options) =>
@@ -374,6 +376,13 @@ const interruptThrough = (ops: RunnerOps, session: { name: string; sessionId: st
           refused: true,
         }),
       );
+
+/**
+ * The verb that answers a call one of the attached sessions holds open, where this engine holds them: a call is caught at a hook only
+ * in a session this process drives on the Agent SDK, so an engine with no holder offers the verb at all, and a question of a job's or
+ * of a `--bg` session's is refused where it is read rather than routed to a runner with no call waiting.
+ */
+const answerOf = (attached?: Attached): Pick<RunnerOps, 'answer'> => (attached ? { answer: attached.ops.answer } : {});
 
 /**
  * Whether a long-lived request runs attached: one filed `restartPolicy: 'Always'` while this process holds the attached sessions. A

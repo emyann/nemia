@@ -7,6 +7,7 @@ import { LOOP_REPLIES, stepPlace, type Workflow, WorkflowError } from '../step/s
 import { fenceReach, type FenceReach } from 'agent-runtime/vocabulary';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 import { contextText, sessionContext } from '../keys/index.ts';
+import { LINE_NAME } from '../workspace/workspace.ts';
 
 /**
  * Whether a team works in folders the run makes, with no git repository (`place: folder`): every step says it, or none does
@@ -344,7 +345,8 @@ export function terminalSteps(steps: readonly Workflow[]): Workflow[] {
 /**
  * Why a folder's steps are no step set to run, with the fix, or undefined where they are one.
  *
- * Structural, and about the set alone, so it is pure and can be asked of a folder nobody is starting: a step named for another step's
+ * Structural, and about the set alone, so it is pure and can be asked of a folder nobody is starting: a step named `run` (`LINE_NAME`),
+ * the name a run's own line of work is cut under, whose cut and the run's would claim one branch; a step named for another step's
  * check (`<name>-check`) or try (`<name>-try<N>`, `<name>-try<N>-check`), whose tasks a run files under those names and would read one as
  * the other; and, where the run's steps work in place (`isolate: false`), a team that says `place: folder`, which has no base branch to
  * work on, one that can run two steps at once (`fansOut`), which would share a directory, and an ending (`workspace: main`), which would
@@ -371,6 +373,13 @@ export function stepSetRefusal(steps: readonly Workflow[], isolate: boolean): st
     return (
       `${ending.name}: \`workspace: main\` ends this workflow by merging the run's result branch onto the base branch, and --no-worktree gives the run no result branch — every step works on the base branch itself, where the work already is, so there would be nothing to merge.\n` +
       `Either drop --no-worktree, or start a workflow whose last step is not an ending.`
+    );
+  const line = steps.find((s) => s.name === LINE_NAME);
+  if (line)
+    return (
+      `${LINE_NAME}: a step may not be named \`${LINE_NAME}\`. A run cuts its own line of work — one worktree and one branch per card — ` +
+      `under that name (\`worktrees/<run>/${LINE_NAME}\` on \`wf/<run>/${LINE_NAME}\`), so this step's cut and the run's would claim one ` +
+      `branch. Rename ${LINE_NAME}.md.`
     );
   const clash = steps.find((s) => s.check && steps.some((other) => other.name === `${s.name}-check`));
   if (clash)

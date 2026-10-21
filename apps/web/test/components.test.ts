@@ -29,7 +29,7 @@ const { StepBody, StepPolicy, Told } = await import('../src/components/Told.tsx'
 const { RunGone } = await import('../src/components/RunGone.tsx');
 const { KindsBehind } = await import('../src/components/KindsBehind.tsx');
 const { instantWhole, instantWords } = await import('../src/lib/instant.ts');
-const { timeToTheSecond } = await import('../src/lib/timeOfDay.ts');
+const { timeOfDay, timeToTheSecond } = await import('../src/lib/timeOfDay.ts');
 type RunDetail = import('../src/lib/api.ts').RunDetail;
 type StepReach = import('../src/lib/api.ts').StepReach;
 type ReadOnlyCommands = import('../src/lib/api.ts').ReadOnlyCommands;
@@ -7337,8 +7337,12 @@ const askEvent = (kind: 'question' | 'proposal', questions: readonly AskQuestion
   at: new Date(Date.UTC(2026, 9, 15, 22, 2, 0)).toISOString(),
   text: 'The design signed off with a question it cannot settle alone. [Read the design](/runs/r-1)',
   questions,
-  ...(chose === undefined ? {} : { chose, choseAt: new Date(Date.UTC(2026, 9, 15, 22, 4, 0)).toISOString() }),
+  ...(chose === undefined ? {} : { chose, choseAt: CHOSE_AT.toISOString() }),
 });
+
+/** When the person chose, and the time of day the board writes it as, read where the draw reads it: a moment is drawn in the zone
+ * the browser is in, and the runner's is not this machine's. */
+const CHOSE_AT = new Date(Date.UTC(2026, 9, 15, 22, 4, 0));
 
 test('her one question with its choices explained is drawn as the form: the choice, why, the Recommended tag, and the link in her words', () => {
   const html = renderToStaticMarkup(createElement(ChatAsk, { ask: askEvent('question', [askQuestion()]), onAnswer: () => undefined }));
@@ -7370,7 +7374,7 @@ test('her proposal is drawn as its actions, each choice said whole by its own bu
   );
   assert.match(chose, /data-chat-tag="proposed"/);
   assert.match(chose, /data-chat-chose/);
-  assert.match(chose, /You chose: Cut it on read · 6:04 PM/);
+  assert.match(chose, new RegExp(`You chose: Cut it on read · ${timeOfDay(CHOSE_AT)}`));
   assert.doesNotMatch(chose, /data-chat-action=/, 'an answered proposal asks nothing more');
 });
 

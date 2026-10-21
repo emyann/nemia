@@ -11,6 +11,10 @@
  * - The MCP fence: a session filed with no `mcp`, in an empty directory, on a machine whose operator has servers, claude.ai
  *   connectors and Claude in Chrome, reports no MCP server and no MCP tool; the control, given one server, reports that server
  *   and its tool. Servers connect after a `--bg` session starts, so the brief waits for them.
+ * - An attached session's typed options, which only the real Claude Code can answer for (the stand-in pins the SDK's protocol, not
+ *   Claude Code's behaviour): a session held on `query()` with its servers on `Options.mcpServers`, its agent prompt on
+ *   `Options.systemPrompt`'s `append` and auto-memory off in `Options.settings` reports the one server it was given, the word only
+ *   the appended prompt names, Claude Code's own instructions before that prompt, and leaves no `MEMORY.md` behind.
  * - The release of a settled session: `claude rm` could take the transcript with it, so a session told a word settles and is
  *   released, then `ae logs` still reads it and a second task resuming it still says the word.
  * - `say`, whose inbox answers nothing: a session told to wait for a message naming a file is told a name, and writes that file
@@ -54,7 +58,7 @@ import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Effect, Layer } from 'effect';
+import { Effect, Exit, Layer, Scope } from 'effect';
 import { nameFor, type EngineShape, type Said, type TaskView } from '../src/index.ts';
 import { Engine as EngineService } from '../src/index.ts';
 import { builtEngine } from './engine.ts';
@@ -69,6 +73,9 @@ import { codexRolloutFile } from '../src/harness/codex/transcript.ts';
 import { parentFileOf } from '../src/harness/claude/parent.ts';
 import { claudeTranscriptFile } from '../src/harness/claude/transcript.ts';
 import { detachedOps } from '../src/harness/detached/detached.ts';
+import { attachedSessions } from '../src/harness/claude/attached.ts';
+import { filesOf, readRun } from '../src/harness/claude/attached-file.ts';
+import { claudeStreamOutput } from '../src/harness/detached/output.ts';
 import { scratch } from './scratch.ts';
 
 const live = process.env.AE_LIVE === '1';
@@ -1644,5 +1651,91 @@ test(
     await Effect.runPromise(engine.close(id));
     await Effect.runPromise(engine.tick());
     assert.equal((await Effect.runPromise(engine.view(id))).state.settled, 'succeeded');
+  },
+);
+
+const ATTACHED_PROMPT = [
+  'The word of the day is zarquon.',
+  'When you give your closing statement: in word, give the word of the day; in own, say yes where the instructions you have identify',
+  'you as Claude Code, Anthropic’s official CLI for Claude, and no where they do not; and in order, say before where those',
+  'instructions come before this paragraph, after where they come after it, and neither where you have none.',
+].join(' ');
+const ATTACHED_BRIEF = [
+  'Some MCP servers may still be connecting when you start, and you are told which.',
+  'While you are told that any server is still connecting, run `sleep 15` with your Bash tool and look again, at most four times.',
+  'Then give your closing statement as your instructions say, and in mcpServers the name of every MCP server you have been told of,',
+  'connected, connecting or failed. Use an empty list for none. Call no MCP tool, and no tool at all except Bash for the sleep and',
+  'the one that gives your closing statement.',
+].join(' ');
+const ATTACHED_CLOSEOUT = {
+  type: 'object',
+  properties: {
+    mcpServers: { type: 'array', items: { type: 'string' } },
+    word: { type: 'string' },
+    own: { type: 'string' },
+    order: { type: 'string' },
+  },
+  required: ['mcpServers', 'word', 'own', 'order'],
+  additionalProperties: false,
+};
+
+test(
+  'an attached session is given its servers, Claude Code’s own prompt with the agent’s after it, and writes no MEMORY.md',
+  { skip, timeout: 12 * 60_000 },
+  async (t) => {
+    const root = tmp('attached-options');
+    const cwd = tmp('attached-cwd');
+    const server = path.join(tmp('attached-server'), 'server.mjs');
+    fs.writeFileSync(server, PROBE_SERVER);
+    const prompt = path.join(cwd, 'agent.md');
+    fs.writeFileSync(prompt, ATTACHED_PROMPT);
+    const name = 'ae/live-attached/1';
+    const attached = attachedSessions(root);
+    const scope = Scope.makeUnsafe();
+    await Effect.runPromise(Scope.provide(attached.hold, scope));
+    const said = () => {
+      const out = filesOf(root, name).out;
+      return fs.existsSync(out) ? claudeStreamOutput(fs.readFileSync(out, 'utf8')) : {};
+    };
+    try {
+      await Effect.runPromise(
+        attached.ops.spawn({
+          name,
+          brief: ATTACHED_BRIEF,
+          cwd,
+          closeoutSchema: ATTACHED_CLOSEOUT,
+          config: {
+            effort: 'low',
+            budgetUsd: 2,
+            mcp: { aeprobe: { command: process.execPath, args: [server] } },
+            claude: { appendSystemPromptFile: prompt },
+          },
+        }),
+      );
+      const bound = Date.now() + 10 * 60_000;
+      let state = readRun(filesOf(root, name).run)?.state;
+      while (Date.now() < bound && (state === undefined || state === 'working' || state === 'idle')) {
+        await new Promise((r) => setTimeout(r, 5_000));
+        state = readRun(filesOf(root, name).run)?.state;
+      }
+      const closeout = (said().closeout?.payload ?? {}) as Record<string, unknown>;
+      t.diagnostic(`${state}: ${JSON.stringify(closeout)}`);
+      assert.equal(state, 'completed', `the session ran to its end; it was ${state}`);
+      assert.deepEqual(closeout.mcpServers, ['aeprobe'], 'the servers `Options.mcpServers` gave it, and no other');
+      assert.equal(closeout.word, 'zarquon', 'the agent’s own prompt reached it, as `systemPrompt`’s `append` and not a file’s path');
+      assert.equal(closeout.own, 'yes', 'with Claude Code’s own instructions, which the `claude_code` preset renders');
+      assert.equal(closeout.order, 'before', 'and those come first: the agent’s prompt is appended after them');
+      assert.equal(fs.existsSync(path.join(cwd, 'MEMORY.md')), false, 'auto-memory is off in the one settings object: no MEMORY.md');
+    } finally {
+      await Effect.runPromise(Scope.close(scope, Exit.void));
+      const id = readRun(filesOf(root, name).run)?.sessionId;
+      if (id) {
+        for (const verb of ['stop', 'rm']) {
+          try {
+            execFileSync('claude', [verb, id.split('-')[0]], { stdio: 'ignore', timeout: 30_000 });
+          } catch {}
+        }
+      }
+    }
   },
 );

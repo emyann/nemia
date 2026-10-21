@@ -946,7 +946,7 @@ test(
     const saved = JOB_ENV_KEYS.map((key) => [key, process.env[key]] as const);
     for (const key of JOB_ENV_KEYS) delete process.env[key];
     const f = fake();
-    let job: Record<string, string> | undefined;
+    let job: Record<string, string | undefined> | undefined;
     let bg: string[] | undefined;
     try {
       job = attachedOptions({ name: 'ae/j/1', brief: 'go', cwd: f.dir }).env;

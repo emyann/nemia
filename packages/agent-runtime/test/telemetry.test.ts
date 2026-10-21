@@ -14,7 +14,9 @@ import { Engine as EngineService, type HarnessConfig, type TaskView } from '../s
 import type { SpawnRequest } from '../src/harness/seam.ts';
 import { traceparentOf, withoutTelemetry, type Telemetry } from '../src/harness/telemetry.ts';
 import { claudeTelemetryEnv, telemeteredFlags } from '../src/harness/claude/telemetry.ts';
-import { CLAUDE_JOB_ENV, claudeDetached, claudeJob } from '../src/harness/claude/code.ts';
+import { CLAUDE_JOB_ENV, claudeDetached, claudeJob, claudeJobSpec } from '../src/harness/claude/code.ts';
+import { attachedOptions } from '../src/harness/claude/attached-options.ts';
+import { STAND_IN } from './attached-held.ts';
 import { claudeArgv, claudeOps } from '../src/harness/claude/bg.ts';
 import { commandHarness } from '../src/harness/command/command.ts';
 import { asyncOps } from './promise-runner.ts';
@@ -84,9 +86,19 @@ test("a Claude Code session told where to export is handed every signal over OTL
   assert.deepEqual(claudeTelemetryEnv({ ...told, telemetry: undefined }), {}, 'told nowhere, it is handed nothing');
 });
 
-test("a job is handed its telemetry in its environment beside the job's own, and nothing more when told nowhere", () => {
-  assert.deepEqual(claudeJob.command(told).env, { ...CLAUDE_JOB_ENV, ...claudeTelemetryEnv(told) });
-  assert.deepEqual(claudeJob.command({ ...told, telemetry: undefined }).env, CLAUDE_JOB_ENV);
+test("a job is handed its telemetry in its session's environment beside the job's own, and nothing more when told nowhere", () => {
+  const laid = (r: SpawnRequest) => {
+    const env = attachedOptions(r).env!;
+    return Object.fromEntries(Object.entries({ ...CLAUDE_JOB_ENV, ...claudeTelemetryEnv(told) }).map(([k]) => [k, env[k]]));
+  };
+  assert.deepEqual(laid(told), { ...CLAUDE_JOB_ENV, ...claudeTelemetryEnv(told) }, 'laid on `Options.env` by the job’s own process');
+  const nowhere = attachedOptions({ ...told, telemetry: undefined }).env!;
+  assert.deepEqual(
+    Object.keys(claudeTelemetryEnv(told)).filter((k) => nowhere[k] !== undefined && !(k in process.env)),
+    [],
+    'told nowhere, the session is handed none of it',
+  );
+  assert.equal(claudeJob.command(told, { requestFile: '/r.json' }).env, undefined, 'and nothing of it is on the engine’s own child');
 });
 
 test("a background session is handed its telemetry in its --settings' env, over the settings it was given, and nothing when told nowhere", () => {
@@ -109,7 +121,7 @@ const detailed: SpawnRequest = { ...told, telemetry: { endpoint: ENDPOINT, toolD
 test("a Claude Code session told to say its tools' details is handed OTEL_LOG_TOOL_DETAILS, the one variable more", () => {
   assert.deepEqual(claudeTelemetryEnv(detailed), { ...claudeTelemetryEnv(told), OTEL_LOG_TOOL_DETAILS: '1' });
   assert.equal(Object.keys(claudeTelemetryEnv(detailed)).length, Object.keys(claudeTelemetryEnv(told)).length + 1);
-  assert.deepEqual(claudeJob.command(detailed).env, { ...CLAUDE_JOB_ENV, ...claudeTelemetryEnv(told), OTEL_LOG_TOOL_DETAILS: '1' });
+  assert.equal(attachedOptions(detailed).env?.OTEL_LOG_TOOL_DETAILS, '1', "a job's session is handed it too");
 });
 
 test("a background session told to say its tools' details is handed OTEL_LOG_TOOL_DETAILS in its --settings' env", () => {
@@ -290,45 +302,34 @@ const collector = async (t: TestContext) => {
 };
 
 /**
- * A stub `claude` first on PATH for the rest of test `t`: it writes the telemetry variables and `TASK_FILES` it was started with to
- * `env.json`, posts a
- * log to `$OTEL_EXPORTER_OTLP_ENDPOINT/v1/logs` with the resource `OTEL_RESOURCE_ATTRIBUTES` says and the trace `TRACEPARENT` names,
- * as Claude Code does, when told an endpoint, then signs off as a job.
+ * The stand-in Claude Code a job's own process runs on the Agent SDK (`fixtures/stand-in-claude.ts`), named as the engine's
+ * `claudeExecutable` by the spec this answers: it writes the environment it was started with to `env.json`, and posts one
+ * `api_request` log to `$OTEL_EXPORTER_OTLP_ENDPOINT/v1/logs` with the resource `OTEL_RESOURCE_ATTRIBUTES` says and the trace
+ * `TRACEPARENT` names, as Claude Code does. `env` answers the telemetry variables and `TASK_FILES` it saw, and nothing else.
  */
-const stubClaude = (t: TestContext) => {
-  const dir = scratch('ae-telemetry-bin-');
-  const script = `#!${process.execPath}
-const fs = require('node:fs');
-const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => /^(OTEL_|TRACE|CLAUDE_CODE_ENABLE_TELEMETRY$|CLAUDE_CODE_ENHANCED_TELEMETRY_BETA$|CLAUDE_CODE_DISABLE_BACKGROUND_TASKS$|TASK_FILES$)/.test(k)));
-fs.writeFileSync(${JSON.stringify(path.join(dir, 'env.json'))}, JSON.stringify(env));
-const attributes = (process.env.OTEL_RESOURCE_ATTRIBUTES ?? '').split(',').filter(Boolean).map((pair) => {
-  const at = pair.indexOf('=');
-  return { key: pair.slice(0, at), value: { stringValue: decodeURIComponent(pair.slice(at + 1)) } };
-});
-const traceId = (process.env.TRACEPARENT ?? '').split('-')[1] ?? '';
-const log = { resourceLogs: [{ resource: { attributes }, scopeLogs: [{ logRecords: [{ body: { stringValue: 'api_request' }, traceId }] }] }] };
-let started = false;
-process.stdin.on('data', async () => {
-  if (started) return;
-  started = true;
-  const endpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
-  if (endpoint) await fetch(endpoint + '/v1/logs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(log) });
-  console.log(JSON.stringify({ type: 'system', subtype: 'init', session_id: ${JSON.stringify(JOB_ID)} }));
-  console.log(JSON.stringify({ subtype: 'success', is_error: false, session_id: ${JSON.stringify(JOB_ID)}, total_cost_usd: 0, type: 'result' }));
-  process.exit(0);
-});
-`;
-  fs.writeFileSync(path.join(dir, 'claude'), script, { mode: 0o755 });
-  withEnv(t, { PATH: `${dir}:${process.env.PATH}` });
-  return { env: () => JSON.parse(fs.readFileSync(path.join(dir, 'env.json'), 'utf8')) as Record<string, string> };
+const standInClaude = () => {
+  const dir = scratch('ae-telemetry-standin-');
+  const env = { STANDIN_DIR: dir, STANDIN_PLAN: JSON.stringify({ id: JOB_ID }), STANDIN_POST_LOG: '1' };
+  return {
+    harness: claudeJobSpec(STAND_IN),
+    env,
+    saw: () =>
+      Object.fromEntries(
+        Object.entries(JSON.parse(fs.readFileSync(path.join(dir, 'env.json'), 'utf8')) as Record<string, string>).filter(([k]) =>
+          /^(OTEL_|TRACE|CLAUDE_CODE_ENABLE_TELEMETRY$|CLAUDE_CODE_ENHANCED_TELEMETRY_BETA$|CLAUDE_CODE_DISABLE_BACKGROUND_TASKS$|TASK_FILES$)/.test(
+            k,
+          ),
+        ),
+      ),
+  };
 };
 
 test("a job exports to the engine's collector, tagged with its labels and task, in the filing's trace — never as the engine", async (t) => {
   withEnv(t, ENGINE_OWN);
   const { endpoint, posts } = await collector(t);
-  const claude = stubClaude(t);
+  const claude = standInClaude();
   const engine = builtEngine(
-    EngineService.layer({ root: scratch('ae-telemetry-'), harnesses: { job: claudeJob }, telemetry: { endpoint } }),
+    EngineService.layer({ root: scratch('ae-telemetry-'), harnesses: { job: claude.harness }, telemetry: { endpoint } }),
   );
   const { id, traceId } = await Effect.runPromise(
     Effect.gen(function* () {
@@ -337,6 +338,7 @@ test("a job exports to the engine's collector, tagged with its labels and task, 
         brief: 'b',
         cwd: scratch('ae-telemetry-cwd-'),
         harness: 'job',
+        config: { env: claude.env },
         labels: { run: 'r,1', step: 'implement' },
       });
       return { id: filed, traceId: above.traceId };
@@ -362,7 +364,7 @@ test("a job exports to the engine's collector, tagged with its labels and task, 
       },
     },
   ]);
-  const seen = claude.env();
+  const seen = claude.saw();
   assert.equal(seen.OTEL_EXPORTER_OTLP_ENDPOINT, endpoint);
   assert.equal(seen.OTEL_SERVICE_NAME, undefined, "the engine's own service name never reaches a session");
   assert.equal(seen.TRACESTATE, undefined);
@@ -371,28 +373,30 @@ test("a job exports to the engine's collector, tagged with its labels and task, 
 test("a job of an engine given no collector is handed no telemetry, the engine's own included, and posts nothing", async (t) => {
   withEnv(t, ENGINE_OWN);
   const { posts } = await collector(t);
-  const claude = stubClaude(t);
-  const engine = builtEngine(EngineService.layer({ root: scratch('ae-telemetry-'), harnesses: { job: claudeJob } }));
-  const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: scratch('ae-telemetry-cwd-'), harness: 'job' }));
+  const claude = standInClaude();
+  const engine = builtEngine(EngineService.layer({ root: scratch('ae-telemetry-'), harnesses: { job: claude.harness } }));
+  const id = await Effect.runPromise(
+    engine.file({ brief: 'b', cwd: scratch('ae-telemetry-cwd-'), harness: 'job', config: { env: claude.env } }),
+  );
   assert.equal((await settled(engine, id)).state.settled, 'succeeded');
-  assert.deepEqual(claude.env(), { CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1' });
+  assert.deepEqual(claude.saw(), { CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1' });
   assert.deepEqual(posts, []);
 });
 
 test("a job's own env reaches its claude, laid under the job's: a task cannot turn background tasks back on", async (t) => {
-  const claude = stubClaude(t);
+  const claude = standInClaude();
   const files = scratch('ae-telemetry-files-');
-  const engine = builtEngine(EngineService.layer({ root: scratch('ae-telemetry-'), harnesses: { job: claudeJob } }));
+  const engine = builtEngine(EngineService.layer({ root: scratch('ae-telemetry-'), harnesses: { job: claude.harness } }));
   const id = await Effect.runPromise(
     engine.file({
       brief: 'b',
       cwd: scratch('ae-telemetry-cwd-'),
       harness: 'job',
-      config: { env: { TASK_FILES: files, CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '0' } },
+      config: { env: { ...claude.env, TASK_FILES: files, CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '0' } },
     }),
   );
   assert.equal((await settled(engine, id)).state.settled, 'succeeded');
-  assert.deepEqual(claude.env(), { TASK_FILES: files, CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1' });
+  assert.deepEqual(claude.saw(), { TASK_FILES: files, CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1' });
 });
 
 test("a claude-detached task's own env reaches its command, laid under the job's", () => {

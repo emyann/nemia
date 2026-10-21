@@ -76,6 +76,7 @@ import { detachedOps } from '../src/harness/detached/detached.ts';
 import { attachedSessions } from '../src/harness/claude/attached.ts';
 import { filesOf, readRun } from '../src/harness/claude/attached-file.ts';
 import { claudeStreamOutput } from '../src/harness/detached/output.ts';
+import { until as waitUntil } from '../src/waits/index.ts';
 import { scratch } from './scratch.ts';
 
 const live = process.env.AE_LIVE === '1';
@@ -1712,12 +1713,15 @@ test(
           },
         }),
       );
-      const bound = Date.now() + 10 * 60_000;
-      let state = readRun(filesOf(root, name).run)?.state;
-      while (Date.now() < bound && (state === undefined || state === 'working' || state === 'idle')) {
-        await new Promise((r) => setTimeout(r, 5_000));
-        state = readRun(filesOf(root, name).run)?.state;
-      }
+      const state = await waitUntil(
+        t,
+        () => {
+          const s = readRun(filesOf(root, name).run)?.state;
+          return s === undefined || s === 'working' || s === 'idle' ? undefined : s;
+        },
+        'the attached session ended',
+        { everyMs: 5_000 },
+      );
       const closeout = (said().closeout?.payload ?? {}) as Record<string, unknown>;
       t.diagnostic(`${state}: ${JSON.stringify(closeout)}`);
       assert.equal(state, 'completed', `the session ran to its end; it was ${state}`);

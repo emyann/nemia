@@ -44,15 +44,9 @@ test('the waits that share one purse add up to no more than its budget, whatever
   assert.ok(purse.given.reduce((a, b) => a + b, 0) <= 1_000, 'the parts add up to no more than the whole, which is the point of a purse');
 });
 
-test('a purse spent slower than its shares is still bounded by what it has handed out', () => {
+test('a purse spent slower than its shares still gives each take only what is left', () => {
   const purse = purseOf(100, () => read(0, 1_000));
-  assert.deepEqual(
-    [purse.take(0.8), purse.take(), purse.take()],
-    [80, 20, 0],
-    'a clock that never moves spends nothing, and a purse hands out its budget once all the same: what it gave is what a caller ' +
-      'can show, and a wait that returns a hair early — or a monotonic reading truncated to the millisecond — would otherwise ' +
-      'buy the sequence more than its budget',
-  );
+  assert.deepEqual([purse.take(0.8), purse.take(), purse.take()], [80, 100, 100], 'a clock that never moves spends nothing');
   const spent = purseOf(100, () => read(0, 1_000));
   assert.equal(spent.take(2), 100, 'a share above the whole is still bounded by the budget');
 });

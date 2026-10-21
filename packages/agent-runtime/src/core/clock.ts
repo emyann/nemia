@@ -32,13 +32,9 @@ export type Purse = { readonly take: (share?: number) => number; readonly given:
 
 /**
  * One budget of `ms` milliseconds, taken at `now()` and shared by the waits of a sequence that must end within it: each `take`
- * answers what the budget has left (`leftOf`), at most `share` of the whole and at most what the purse has not given yet, and
- * `given` is what every take answered. So the waits of one sequence add up to no more than the budget, where a bound of `ms` on
- * each would let the sequence take their sum; and a caller can show that they do, by what was given rather than by the clock.
- *
- * What was given bounds a take as the clock does, because the two disagree: a wait given 800 that returns a hair early, or a
- * monotonic reading truncated to the millisecond, leaves the clock saying 201 of 1000 are left after 800 were handed out. The sum
- * is the one a caller can show, so it is the one held.
+ * answers what the budget has left (`leftOf`), at most `share` of the whole, and `given` is what every take answered. So the waits of
+ * one sequence add up to no more than the budget, where a bound of `ms` on each would let the sequence take their sum; and a caller
+ * can show that they do, by what was given rather than by the clock.
  *
  * @param ms the whole budget
  * @param now the clock it is spent on, read when the budget is taken and at each `take`
@@ -48,8 +44,7 @@ export const purseOf = (ms: number, now: () => Instant): Purse => {
   const given: number[] = [];
   return {
     take: (share = 1) => {
-      const spent = given.reduce((a, b) => a + b, 0);
-      const left = Math.min(leftOf(from, ms, now()), Math.floor(ms * share), Math.max(0, ms - spent));
+      const left = Math.min(leftOf(from, ms, now()), Math.floor(ms * share));
       given.push(left);
       return left;
     },

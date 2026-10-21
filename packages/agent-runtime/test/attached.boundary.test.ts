@@ -9,7 +9,7 @@
  * reaches a process given a pid since, a let-go whose sessions never end still returns with its waits inside one budget, a resumed
  * session's cost leaves out what its parent spent, a session is started on Claude Code's own system prompt with the agent's appended
  * to it — as text on the `initialize` request, not as a flag naming a file — and its servers ride the child's argv as the inline JSON
- * the SDK compiles `Options.mcpServers` to, strict, with the context window still a flag of its own.
+ * the SDK compiles `Options.mcpServers` to, strict, with the context window a key of the one settings object.
  *
  * And, of a long-lived attached request (`restartPolicy: 'Always'`), which runs here by the runtime's own rule: a turn's end is not
  * the session's end, the session is written `idle` and heard again across turns, an interrupted turn's `error_during_execution` result
@@ -813,11 +813,12 @@ test('a task\u2019s servers ride the child\u2019s argv as inline JSON, strict, a
   );
   assert.ok(argv.includes('--strict-mcp-config'), '`strictMcpConfig` is still the fence');
   assert.equal(fs.existsSync(filesOf(root, NAME).mcp), false, 'and nothing writes the per-task MCP file any more');
-  const window = argv.indexOf('--autocompact');
+  assert.ok(!argv.includes('--autocompact'), 'the window is no flag of ours any more');
+  const settings = argv.indexOf('--settings');
   assert.deepEqual(
-    argv.slice(window, window + 2),
-    ['--autocompact', '150000'],
-    'the window is still a flag: the SDK 0.3.270 has no `Options` that moves it',
+    JSON.parse(argv[settings + 1]),
+    { autoMemoryEnabled: false, autoCompactWindow: 150_000 },
+    'it rides the one settings object, beside auto-memory off: `Settings.autoCompactWindow`, which the SDK spells as `--settings`',
   );
 });
 

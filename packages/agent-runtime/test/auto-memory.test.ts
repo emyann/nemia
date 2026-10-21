@@ -60,6 +60,11 @@ test("an attached session is given auto-memory off on the SDK's own settings, th
     { outputStyle: 'x', autoMemoryEnabled: false },
     "the task's own settings",
   );
+  assert.deepEqual(
+    attachedOptions({ ...taskOf(dir), config: { contextTokens: 150_000 } }).settings,
+    { autoMemoryEnabled: false, autoCompactWindow: 150_000 },
+    'the context window is a key of those same settings, and auto-memory stays off beside it',
+  );
 });
 
 test('settings given as a file are handed over as they are: the runtime rewrites no file', () => {

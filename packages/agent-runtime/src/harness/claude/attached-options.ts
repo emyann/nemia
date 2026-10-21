@@ -144,8 +144,8 @@ const askedOf = (r: SpawnRequest): AttachedOptions => ({
  *   (`Options.strictMcpConfig`, `sdk.d.ts:2145`), no Chrome; `--setting-sources project`; Claude Code's own system prompt as the
  *   preset `claude_code`, which a `claude -p` job has by default and the SDK leaves empty when unasked, with the agent's own prompt
  *   appended to it (`promptOf`) and not to nothing;
- * - the model, the effort, the context window, the closing statement's schema (`outputFormat`, handed on as it was given, unread), the
- *   session to resume, the worktree, and the spend cap;
+ * - the model, the effort, the context window as `Settings.autoCompactWindow` in those same settings (`sdk.d.ts:8353`), the closing
+ *   statement's schema (`outputFormat`, handed on as it was given, unread), the session to resume, the worktree, and the spend cap;
  * - the environment: the engine's own, its telemetry taken out (`withoutTelemetry`), with the task's `env`, `CLAUDE_JOB_ENV` and the
  *   session's own telemetry laid over it, as a job's.
  *
@@ -156,6 +156,8 @@ export const attachedOptions = (r: SpawnRequest): AttachedOptions => {
   const c = r.config;
   const { extra, plugins, settings, systemPrompt } = extraOf(admittedFlags(c));
   const servers = everyMcpServer(r.cwd, c);
+  const window = c?.contextTokens;
+  const windowed = window !== undefined && typeof settings === 'object';
   return {
     cwd: r.cwd,
     ...fenceOf(c),
@@ -163,23 +165,26 @@ export const attachedOptions = (r: SpawnRequest): AttachedOptions => {
     includePartialMessages: true,
     permissionMode: (c?.permissionMode ?? CLAUDE_DEFAULT_MODE) as Options['permissionMode'],
     settingSources: ['project'],
-    settings,
+    settings: windowed ? { ...settings, autoCompactWindow: window } : settings,
     systemPrompt,
     ...(Object.keys(servers).length ? { mcpServers: servers as NonNullable<Options['mcpServers']> } : {}),
     strictMcpConfig: true,
     ...askedOf(r),
     /**
-     * What is left of Claude Code's command line: `config.claude`'s own flags, and the three keys the Agent SDK 0.3.270 has no
-     * `Options` for — `--no-chrome` (Claude in Chrome connects even in a strict session, `claudeMcpArgs`), `--worktree`, and
-     * `--autocompact`. The window is a flag on purpose: `Settings.autoCompactWindow` (`sdk.d.ts:8353`) is the settings key that
-     * looks like it, and measured on 0.3.270 it does not move the session's window, so `contextTokens` keeps the flag that does.
-     * Everything else a task gives here is a flag only Claude Code has; look for an `Options` for it before adding another, and
-     * say in this note when there is none.
+     * What is left of Claude Code's command line: `config.claude`'s own flags, and the two the Agent SDK 0.3.270 has no `Options`
+     * for — `--no-chrome`, because Claude in Chrome connects even in a strict session (`claudeMcpArgs`), and `--worktree`. Looked
+     * for in `sdk.d.ts` and not there; everything else a task gives here is a flag only Claude Code has. Look for an `Options`
+     * before adding another, and say in this note when there is none.
+     *
+     * `--autocompact` beside them for the one task that cannot carry `autoCompactWindow`: where `config.claude.settings` is a
+     * file's path there is no settings object of ours to put the window in, and the runtime rewrites no settings file
+     * (`memorylessSettings`). The two reach the same window, measured on 0.3.270 against the real Claude Code: 150000 asked each
+     * way gave `rawMaxTokens: 150000`, where a session asked for neither got the model's 200000.
      */
     extraArgs: {
       ...extra,
       'no-chrome': null,
-      ...(c?.contextTokens !== undefined ? { autocompact: String(c.contextTokens) } : {}),
+      ...(window !== undefined && !windowed ? { autocompact: String(window) } : {}),
       ...(c?.worktree ? { worktree: worktreeName(r) } : {}),
     },
     env: { ...withoutTelemetry(process.env), ...c?.env, ...CLAUDE_JOB_ENV, ...claudeTelemetryEnv(r) },

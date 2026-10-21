@@ -4,8 +4,9 @@
  * handed on unread, and the session is given Claude Code's own system prompt, which a job has by default, with the agent's appended
  * to it.
  *
- * Which keys are on which is the subject: the servers and their fence, and the agent's prompt, are typed options, and `extraArgs`
- * holds exactly the three flags the SDK 0.3.270 has no option for beside whatever `config.claude` gives of its own. So each typed
+ * Which keys are on which is the subject: the servers and their fence, the agent's prompt and the context window are typed options,
+ * and `extraArgs` holds exactly the two flags the SDK 0.3.270 has no option for beside whatever `config.claude` gives of its own, with
+ * the window beside them for the one task whose settings are a file the runtime will not rewrite. So each typed
  * option is asserted by its own name, and the whole of `extraArgs` is read in one `deepEqual`: a key moved back onto the command line
  * fails by its own name, and a key added to the bag fails as a question — has the SDK an option for it?
  */
@@ -77,7 +78,7 @@ test('every deny, allow, tool and added folder of the job is in the attached opt
   assert.deepEqual(given.additionalDirectories, argv.slice(argv.indexOf('--add-dir') + 1, argv.indexOf('--add-dir') + 3));
 });
 
-test('the mode, model, effort, budget, resume, context window, worktree and flags of the job are in the attached options', () => {
+test('the mode, model, effort, budget, resume, worktree, settings and window of the job are in the attached options', () => {
   const argv = claudePrintFlags(RICH, undefined);
   const given = attachedOptions(RICH);
   assert.equal(given.permissionMode, valuesOf(argv, '--permission-mode')[0]);
@@ -86,9 +87,12 @@ test('the mode, model, effort, budget, resume, context window, worktree and flag
   assert.equal(String(given.maxBudgetUsd), valuesOf(argv, '--max-budget-usd')[0]);
   assert.equal(given.resume, valuesOf(argv, '--resume')[0]);
   assert.deepEqual(given.settingSources, valuesOf(argv, '--setting-sources'));
-  assert.equal(given.extraArgs?.autocompact, valuesOf(argv, '--autocompact')[0]);
   assert.equal(given.extraArgs?.worktree, valuesOf(argv, '--worktree')[0]);
-  assert.deepEqual(given.settings, JSON.parse(valuesOf(argv, '--settings')[0]), "the job's settings, on the SDK's own option");
+  assert.deepEqual(
+    given.settings,
+    { ...(JSON.parse(valuesOf(argv, '--settings')[0]) as object), autoCompactWindow: Number(valuesOf(argv, '--autocompact')[0]) },
+    "the job's settings, on the SDK's own option, the window the job spells as a flag in them",
+  );
   assert.deepEqual(given.plugins, [{ type: 'local', path: path.resolve(CWD, valuesOf(argv, '--plugin-dir')[0]) }]);
 });
 
@@ -161,11 +165,23 @@ test('a prompt file that cannot be read is refused, naming the key and the path'
   );
 });
 
+test('the context window is a key of those same settings, and no flag of its own', () => {
+  const given = attachedOptions(RICH);
+  assert.equal(given.settings && typeof given.settings === 'object' && given.settings.autoCompactWindow, 200_000);
+  assert.equal(given.extraArgs?.autocompact, undefined, 'the window is no longer spelled onto the command line');
+});
+
+test('a task whose settings are a file’s path keeps the window as a flag: the runtime rewrites no settings file', () => {
+  const given = attachedOptions(withClaude({ settings: '/a/settings.json', appendSystemPromptFile: APPEND }));
+  assert.equal(given.settings, '/a/settings.json', 'the path as given, as `auto-memory.test.ts` holds for the settings themselves');
+  assert.equal(given.extraArgs?.autocompact, '200000', 'and the window on the one flag left that reaches it');
+});
+
 test('extraArgs holds the flags the SDK has no option for, and nothing else', () => {
   assert.deepEqual(
     attachedOptions(RICH).extraArgs,
-    { 'mcp-debug': null, 'no-chrome': null, autocompact: '200000', worktree: 'tree' },
-    'the task’s own unmapped flag, and the three of 0.3.270: no Chrome, the window, the worktree',
+    { 'mcp-debug': null, 'no-chrome': null, worktree: 'tree' },
+    'the task’s own unmapped flag, and the two of 0.3.270: no Chrome and the worktree',
   );
 });
 

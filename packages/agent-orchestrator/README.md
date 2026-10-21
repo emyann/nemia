@@ -622,11 +622,20 @@ Claude Code's flags for it in the engine's `config.claude` (docs/spike-2026-09-2
   SKILL.md says `preload: true`. `--append-system-prompt-file` appends it to Claude Code's own prompt, which is kept (F1).
 - `nemia-<agent>/` — a plugin of the step's own (`--plugin-dir`, F4, F5): `skills/<name>/`, each copied whole from where the load found
   it, so a session loads them with the `Skill` tool as `nemia-<agent>:<name>`, and nothing of the machine's own plugins is touched.
-  `--settings` turns each of those names `off` in `skillOverrides`, which Claude Code applies to no plugin's skill: a bare skill of the
-  same name — the repository's `.claude/skills/<name>`, a nested folder's or Claude Code's own — is not listed to the job, so the session
-  sees the frozen copy once, and a call to the bare name is refused (*"Skill look is disabled for model invocation in skillOverrides
-  settings"*, Claude Code 2.1.285). An agent's body or a skill's that says *load `look`* still reaches the copy: told so, a session
-  calls `nemia-<agent>:look`, the one it is listed.
+  `--settings` turns `off` in `skillOverrides` every skill name the run could see when it was frozen — each name the lookup found in any
+  of its places, and each `folder:name` written on any agent's or any step's `skills:` line of the folder, with its bare form — so a step
+  is listed its own plugin's skills and no other of Nemia's: not the repository's `.claude/skills/<name>`, not a nested folder's, and not
+  one another step of the same folder names. It is a hard default of every factory, with no key to turn it off, computed once for the
+  folder and frozen per step (`StepAgent.offSkills`); a record frozen before it is listed what it was. Claude Code applies no override to
+  the skill of a plugin given by `--plugin-dir`, so the session keeps each frozen copy once, and a call to a bare name is refused
+  (*"Skill look is disabled for model invocation in skillOverrides settings"*, Claude Code 2.1.285). An agent's body or a skill's that
+  says *load `look`* still reaches the copy: told so, a session calls `nemia-<agent>:look`, the one it is listed. Claude Code's own
+  bundled skills are governed by another key, `disableBundledSkills`, which the run sets neither way: they stay listed beside the step's
+  own. Measured again at Claude Code 2.1.306: an override of a bare name takes that skill out of a session's listing, whether it is a
+  skill of `.claude/skills/` or one of a plugin installed from a marketplace, whose `<plugin>:<name>` goes with its bare name — which
+  reaches no job, since a job is spawned with `--setting-sources project` and is listed no operator plugin at all (F24); the bundled
+  skills stay listed with no `disableBundledSkills` set; and the skills of a plugin given by `--plugin-dir` stay listed under
+  `<plugin>:<name>` though every bare name of them is off, which is what this leans on.
 - `mcp:` — the MCP servers its sessions load, by the names the checkout's `.mcp.json` gives them, comma-separated: `mcp: playwright`.
   A session loads the servers its agent and its step name and no other: where neither has a line it loads none, and neither does a
   step with no agent.
@@ -653,8 +662,8 @@ step it comes after, through `after:` and on, mounted read-only (`handedMounts`)
 and writes none of it in any mode, and its brief names each by its path (`mountsLine`). Its own folder is as it was, and the folder of a step it does not come after is not mounted. A step's
 `model:` and `effort:` go on
 the step or its agent, or it gets Claude Code's default rather than whatever the person running `wf up` set. And a repository whose commits
-must carry no `Co-Authored-By` trailer says `attribution` in its settings, as this one does. The skills a step is listed are its plugin's and
-the repository's, and none from `~/.claude/skills` or the operator's plugins (F24).
+must carry no `Co-Authored-By` trailer says `attribution` in its settings, as this one does. The skills a step is listed are its plugin's and Claude Code's own
+bundled ones, and none of the repository's, none from `~/.claude/skills` and none of the operator's plugins (F24, `skillOverrides`).
 
 `skills:` names skills, each lowercase words joined by dashes. A skill is a folder holding a `SKILL.md`, looked for in `skills/`
 beside `agents/` in each place agents are, in order: the workflow's own folder of agents' parent, then the repository's `.claude/`
@@ -672,7 +681,8 @@ repository, and where nothing is read with a repository; its links follow the on
 The run freezes it as `skills/<name>` in the step's plugin and the session loads it as `nemia-<agent>:<name>`, while the frozen
 record, the versions, the rules, the stats' loaded skills and the brief of an unrendered step say it as its line writes it. A session
 loads a skill by its bare name, so one step holds one skill of a name, through its line, its agent's or both, and a second is refused at
-load naming both; two steps of one run may each hold one. `--settings` turns off the bare name and the line's name. A template names
+load naming both; two steps of one run may each hold one. `--settings` turns off the bare name and the line's name, on every step of the
+folder: a step that names no skill of a folder is listed none of them either. A template names
 such a skill and never carries it: its check passes the name, its export leaves the skill out and says so, and a start on a repository
 that lacks it is refused by name; an agent copied into the library keeps the name, and no skill is filed for it.
 

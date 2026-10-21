@@ -19,12 +19,20 @@
  *
  * The quick workflow's implement is told what build's is (`IMPLEMENT_TOLD`), and what makes a build quick (`QUICK_TOLD`): its plan
  * first, no decision of its own, the bound and the pages it names; it is given the kit's skills as build's steps are.
+ *
+ * The four steps that touch the board — build's design, implement and review, and quick's implement — are each given `react-aria`, this
+ * repository's vendored skill for the board's own parts, on their `skills:` line and not on a team-portable agent's.
+ *
+ * And what becomes of Claude Code's own prompt for each agent of the team (`PROMPTS`, `promptsWrong`): `harnessPrompt: no-coding` for the
+ * five who write no code, nothing for Ada, who writes it. An agent the table does not name is refused, so a new one says its value.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadWorkflows } from '../src/folder/folder.store.ts';
+import { parseAgent, type Agent } from '../src/workflow.ts';
+import { isReadme } from '../src/step/step.ts';
 import { outputFields } from '../src/step/step.ts';
 import { skillFolders } from '../src/skills/skills.store.ts';
 import { givenSkillOf } from '../src/keys/given-skill.ts';
@@ -196,7 +204,7 @@ const TOLD: Told[] = [
       ...KIT_READER_TOLD,
       ...LOOK_PARTS_TOLD,
     ],
-    adds: ['shadcn', 'look'],
+    adds: ['shadcn', 'look', 'react-aria'],
     denies: ['Bash(cd:*)', ...NO_BUILD, ...BROWSER_FENCE],
     declares: [],
   },
@@ -204,7 +212,7 @@ const TOLD: Told[] = [
     workflow: 'build',
     step: 'implement',
     says: IMPLEMENT_TOLD,
-    adds: ['shadcn', 'look', 'see-a-dashboard'],
+    adds: ['shadcn', 'look', 'react-aria', 'see-a-dashboard'],
     denies: [],
     declares: ['mutants', 'noMutants'],
   },
@@ -232,7 +240,7 @@ const TOLD: Told[] = [
       ...KIT_READER_TOLD,
       ...LOOK_PARTS_TOLD,
     ],
-    adds: ['shadcn', 'look', 'see-a-dashboard'],
+    adds: ['shadcn', 'look', 'react-aria', 'see-a-dashboard'],
     denies: ['Bash(cd:*)', ...NO_BUILD, ...WHOLE_SUITE, ...BROWSER_FENCE],
     declares: ['findings', 'mutants', 'again'],
   },
@@ -240,7 +248,7 @@ const TOLD: Told[] = [
     workflow: 'quick',
     step: 'implement',
     says: [...IMPLEMENT_TOLD, ...QUICK_TOLD],
-    adds: ['shadcn', 'look', 'see-a-dashboard'],
+    adds: ['shadcn', 'look', 'react-aria', 'see-a-dashboard'],
     denies: [],
     declares: ['plan', 'pages', 'mutants', 'noMutants'],
   },
@@ -302,6 +310,92 @@ function shippedEdited(workflow: string, step: string, edit: (text: string) => s
   return loadWorkflows(path.join(root, workflow), { repo: REPO });
 }
 
+/**
+ * What becomes of Claude Code's own prompt for each agent of this repository's team (`harnessPrompt:`): `no-coding`, which drops its
+ * `# Doing tasks` section, for the five who write no code, and none — `keep` — for Ada, who is the one who does. A new agent of the team
+ * fails `promptsWrong` until it is named here.
+ */
+const PROMPTS: Readonly<Record<string, string | undefined>> = {
+  ada: undefined,
+  agora: 'no-coding',
+  argus: 'no-coding',
+  iris: 'no-coding',
+  otto: 'no-coding',
+  seldon: 'no-coding',
+};
+
+/** The agents of the team in `dir`, each by its file's name, with its frontmatter parsed. */
+const agentsOf = (dir: string): Agent[] =>
+  fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith('.md') && !isReadme(f))
+    .sort()
+    .map((f) =>
+      parseAgent(path.basename(f, '.md'), fs.readFileSync(path.join(dir, f), 'utf8'), (beside) => {
+        try {
+          return fs.readFileSync(path.resolve(dir, beside), 'utf8');
+        } catch {
+          return undefined;
+        }
+      }),
+    );
+
+/**
+ * A line for each agent of the team in `dir` whose `harnessPrompt:` is not what `PROMPTS` says, `<name>: harnessPrompt <what it says>`,
+ * and one for an agent `PROMPTS` does not name at all.
+ */
+function promptsWrong(dir: string): string[] {
+  return agentsOf(dir)
+    .map((agent) =>
+      !Object.hasOwn(PROMPTS, agent.name)
+        ? `${agent.name}: is in no table`
+        : agent.harnessPrompt === PROMPTS[agent.name]
+          ? ''
+          : `${agent.name}: harnessPrompt ${agent.harnessPrompt ?? 'none'}`,
+    )
+    .filter(Boolean);
+}
+
+test("the five of this repository's team who write no code drop Claude Code's coding instructions, and Ada alone keeps them", () => {
+  const dir = path.join(HOLDER, 'agents');
+  assert.deepEqual(promptsWrong(dir), [], 'every agent says what PROMPTS says, and none is missing from it');
+  assert.deepEqual(
+    agentsOf(dir).map((a) => a.name),
+    Object.keys(PROMPTS),
+    'the table names the team and no one else',
+  );
+});
+
+test('REFUSED: one of the five without `harnessPrompt: no-coding`, or Ada with it, is named', () => {
+  const edited = (name: string, edit: (text: string) => string): string[] => {
+    const root = scratch('wf-told-prompts-');
+    fs.cpSync(path.join(HOLDER, 'agents'), root, { recursive: true });
+    const file = path.join(root, `${name}.md`);
+    const text = fs.readFileSync(file, 'utf8');
+    const changed = edit(text);
+    assert.notEqual(changed, text, `${name}.md has what the edit changes`);
+    fs.writeFileSync(file, changed);
+    return promptsWrong(root);
+  };
+  for (const name of Object.keys(PROMPTS).filter((n) => PROMPTS[n] === 'no-coding')) {
+    assert.deepEqual(
+      edited(name, (text) => text.replace('harnessPrompt: no-coding\n', '')),
+      [`${name}: harnessPrompt none`],
+    );
+    assert.deepEqual(
+      edited(name, (text) => text.replace('harnessPrompt: no-coding', 'harnessPrompt: keep')),
+      [`${name}: harnessPrompt keep`],
+    );
+  }
+  assert.deepEqual(
+    edited('ada', (text) =>
+      text.replace('skills: implement-a-change, git\n', 'skills: implement-a-change, git\nharnessPrompt: no-coding\n'),
+    ),
+    ['ada: harnessPrompt no-coding'],
+    'Ada writes the code, and keeps the instructions for it',
+  );
+});
+
 test('each shipped step still says, adds, denies and declares what its agent and its skill said before', () => {
   for (const workflow of new Set(TOLD.map((told) => told.workflow))) {
     const dir = path.join(HOLDER, workflow);
@@ -310,10 +404,14 @@ test('each shipped step still says, adds, denies and declares what its agent and
 });
 
 test('REFUSED: a step that adds a skill no more, or declares its closeout no more, is named', () => {
-  const unskilled = shippedEdited('build', 'implement', (text) =>
-    text.replace('skills: effect, shadcn, change-the-board, look, see-a-dashboard, ', 'skills: effect, shadcn, change-the-board, look, '),
-  );
+  const unskilled = shippedEdited('build', 'implement', (text) => text.replace(' see-a-dashboard,', ''));
   assert.deepEqual(untold('build', unskilled), ['build/implement: skill see-a-dashboard']);
+  for (const step of KIT_STEPS) {
+    const dropped = shippedEdited('build', step, (text) => text.replace(' react-aria,', ''));
+    assert.deepEqual(untold('build', dropped), [`build/${step}: skill react-aria`], `${step} without react-aria is named`);
+  }
+  const quick = shippedEdited('quick', 'implement', (text) => text.replace(' react-aria,', ''));
+  assert.deepEqual(untold('quick', quick), ['quick/implement: skill react-aria']);
   const undeclared = shippedEdited('build', 'implement', (text) => text.replace('output: implement.schema.json\n', ''));
   assert.deepEqual(untold('build', undeclared), ['build/implement: declares mutants', 'build/implement: declares noMutants']);
 });

@@ -141,6 +141,18 @@ test('a question of hers is answered by the person, drawn with their choice, and
   assert.equal(after.presence.waitsOnYou, 0, 'answered: it waits on nobody');
 });
 
+test('a question whose call was cut is served with the moment it was, and waits on nobody', async () => {
+  withHer(['One.']);
+  const ask = waiting();
+  const marks = path.join(root, 'nemia', 'chat', 'asks-closed.jsonl');
+  fs.writeFileSync(marks, `${JSON.stringify({ id: ask.id, how: 'cut', at: at(5) })}\n`);
+  const page = (await asked('GET', '/api/nemia/chat')).body as unknown as ChatHistory;
+  const drawn = page.events.find((e: ChatEvent) => e.kind === 'question');
+  assert.equal(drawn?.kind === 'question' ? drawn.cutAt : undefined, at(5), 'the board is told her call is no longer waiting');
+  assert.equal(page.presence.waitsOnYou, 0, 'and nothing of hers is held open for it, so it waits on nobody');
+  assert.equal(page.cursor.split('.').length, 9, 'the marks are a count of the cursor a stream resumes from');
+});
+
 test('REFUSED: a question her chat does not hold is a 404, one answered already a 409, picks that do not answer it a 422, a body that is none a 400', async () => {
   withHer(['One.']);
   const ask = waiting();

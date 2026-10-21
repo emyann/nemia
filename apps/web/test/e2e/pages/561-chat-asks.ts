@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { chatFieldOf, chatPanelOf, herChat, openChat, photograph, themeOf, type HerAsk } from '../board.ts';
+import { chatFieldOf, herChat, openChat, photograph, themeOf, type HerAsk } from '../board.ts';
 import { expectCount, expectNone, expectVisible, idle, Refused, settled } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
@@ -74,31 +74,6 @@ export default {
       await photograph(page, path.join(OUT, `chat-asks-answered-${await themeOf(page)}.png`), { fullPage: true });
     } finally {
       back();
-    }
-
-    const cut = herChat({ session: 'up', asks: [{ ...ASK, cut: true }] });
-    try {
-      await page.reload({ waitUntil: 'load' });
-      await idle(page);
-      const panel = await openChat(page);
-      await expectVisible(
-        panel.locator('[data-chat-ask="form"]'),
-        'a question whose call was cut with nothing answered is still drawn: the person may answer it, and her answer comes as words',
-      );
-      await expectNone(
-        async () => {
-          const said = await chatFieldOf(page).getAttribute('placeholder');
-          return said === ASKING_WORDS ? `the composer still invites ${JSON.stringify(said)}` : null;
-        },
-        'but the composer waits on nobody for it: nothing of hers is held open for the words to answer',
-      );
-      // The panel is closed before the fixture goes back, so no stream of hers resumes on a cursor counting the marks it took away:
-      // a read of a chat that shrank under an open tab is refused, and the refusal would be this page's.
-      await page.keyboard.press('Escape');
-      await expectCount(chatPanelOf(page), 0, 'her panel closes on Escape, and its stream with it');
-      await idle(page);
-    } finally {
-      cut();
     }
   },
 } satisfies PageSpec;

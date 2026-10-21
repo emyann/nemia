@@ -257,8 +257,6 @@ test(
   WAITED,
   async (t) => {
     const { root, dir, request } = place({ call: 'AskUserQuestion', callInput: { questions: [ONE] } }, { mayAsk: true });
-    // A long-lived background session is refused an `env` of its own, so the stand-in is told where to write and what to do
-    // through this process's own environment, which `attachedOptions` lays under the task's.
     const own = { ...process.env };
     Object.assign(process.env, request.config!.env);
     t.after(() => void Object.assign(process.env, { STANDIN_DIR: own.STANDIN_DIR, STANDIN_PLAN: own.STANDIN_PLAN }));
@@ -270,7 +268,13 @@ test(
       await Effect.runPromise(Scope.close(scope, Exit.void));
     });
     const id = await Effect.runPromise(
-      engine.file({ brief: request.brief, cwd: dir, harness: 'claude', restartPolicy: 'Always', config: { background: true, mayAsk: true } }),
+      engine.file({
+        brief: request.brief,
+        cwd: dir,
+        harness: 'claude',
+        restartPolicy: 'Always',
+        config: { background: true, mayAsk: true },
+      }),
     );
     const ask = await until(
       t,
@@ -287,9 +291,11 @@ test(
     const taken = await Effect.runPromise(engine.answerAsk(id, { id: ask.id, answers }));
     assert.equal(taken.attempt, 1, 'the answer names the attempt whose session held the call');
     await until(t, () => answered(dir).some((a) => a.event === 'PreToolUse'), 'the held call answered', { everyMs: 50 });
+    const let_through = answered(dir).find((a) => a.event === 'PreToolUse')?.answer as
+      | { hookSpecificOutput: { updatedInput: unknown } }
+      | undefined;
     assert.deepEqual(
-      (answered(dir).find((a) => a.event === 'PreToolUse')?.answer as { hookSpecificOutput: { updatedInput: unknown } })
-        .hookSpecificOutput.updatedInput,
+      let_through?.hookSpecificOutput.updatedInput,
       { questions: [ONE], answers },
       'the person’s answer reaches the session’s own call through the engine’s door, not through the holder’s ops',
     );

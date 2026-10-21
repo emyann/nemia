@@ -526,8 +526,7 @@ export function readChatCursor(text: string): ChatCursor {
   const parts = text.split('.');
   if (parts.length < COUNTS_LEAST || parts.length > COUNTS || parts.some((p) => !/^(0|[1-9]\d*)$/.test(p)))
     throw new Invalid({ message: NOT_A_CURSOR(text) });
-  const [attempts = 0, events = 0, said = 0, outbox = 0, delivered = 0, stops = 0, asks = 0, answers = 0, closed = 0] =
-    parts.map(Number);
+  const [attempts = 0, events = 0, said = 0, outbox = 0, delivered = 0, stops = 0, asks = 0, answers = 0, closed = 0] = parts.map(Number);
   return { attempts, events, said, outbox, delivered, stops, asks, answers, closed };
 }
 

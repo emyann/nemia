@@ -458,6 +458,13 @@ const keptOf = (
   } satisfies Partial<EngineShape>;
 };
 
+/** The task `id` of `tasks`, for a hand that moves it: thrown for one never filed, in words saying what to do `before` it. */
+const taskFor = (tasks: Map<string, TestTask>, id: string, before: string): TestTask => {
+  const t = tasks.get(id);
+  if (!t) throw new Error(`the test engine holds no task ${id}: file it before ${before}`);
+  return t;
+};
+
 /**
  * A stand-in with no task on it, and the layer that serves it: new at each call, so two share nothing.
  *
@@ -503,8 +510,7 @@ export const testEngine = (): TestEngine => {
     }),
   );
   const settle = (id: string, phase: string, end?: TestEnd): TestTask => {
-    const t = held.tasks.get(id);
-    if (!t) throw new Error(`the test engine holds no task ${id}: file it before settling it`);
+    const t = taskFor(held.tasks, id, 'settling it');
     const unstarted = phase === 'pending' || (phase === 'stopped' && !t.attempt && !end);
     const { printed, ...over } = end ?? {};
     t.attempt = unstarted ? null : attemptOf(t, phase, over);
@@ -512,23 +518,15 @@ export const testEngine = (): TestEngine => {
     t.phase = phase;
     return t;
   };
-  const plantAsk = (id: string, ask: SessionAsk) => {
-    const t = held.tasks.get(id);
-    if (!t) throw new Error(`the test engine holds no task ${id}: file it before planting its ask`);
-    t.asks = [...t.asks, { ...ask }];
+  const asking = (id: string, what: string, asks: (held: SessionAsk[]) => SessionAsk[]) => {
+    const t = taskFor(held.tasks, id, `${what} its asks`);
+    t.asks = asks(t.asks);
     t.asksSaid = true;
   };
-  const cutAsks = (id: string) => {
-    const t = held.tasks.get(id);
-    if (!t) throw new Error(`the test engine holds no task ${id}: file it before cutting its asks`);
-    t.asks = [];
-    t.asksSaid = true;
-  };
-  const plantTranscript = (id: string, n: number, events: readonly TranscriptEvent[]) => {
-    const t = held.tasks.get(id);
-    if (!t) throw new Error(`the test engine holds no task ${id}: file it before planting its transcript`);
-    t.transcripts.set(n, [...events]);
-  };
+  const plantAsk = (id: string, ask: SessionAsk) => asking(id, 'planting', (now) => [...now, { ...ask }]);
+  const cutAsks = (id: string) => asking(id, 'cutting', () => []);
+  const plantTranscript = (id: string, n: number, events: readonly TranscriptEvent[]) =>
+    void taskFor(held.tasks, id, 'planting its transcript').transcripts.set(n, [...events]);
   const restart = (id: string): TestTask => {
     const t = held.tasks.get(id);
     if (!t?.attempt) throw new Error(`the test engine holds no started task ${id}: settle it at work before restarting it`);

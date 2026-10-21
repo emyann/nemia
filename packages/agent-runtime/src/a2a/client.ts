@@ -430,10 +430,20 @@ export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string)
     ...(offered.methods.includes('sessionTranscript') ? transcriptsThrough(transport) : {}),
     ...(offered.methods.includes('observeSessions') ? { observeFor } : {}),
     ...(offered.say ? { say } : {}),
-    ...(ops.answer ? { answer: ops.answer } : {}),
-    ...(ops.refuses ? { refuses: ops.refuses } : {}),
+    ...carried(ops),
   };
 };
+
+/**
+ * What the harness beneath the seam answers itself, carried through untouched rather than called over the transport: the person's
+ * answer to a call one of its sessions holds open, which is written where that session reads it, and what the harness refuses a task
+ * for. A2A has no call for either, and an adapter that rebuilt the ops without them would drop the verb silently
+ * (`Engine.answerAsk` then refuses every answer), which is why they are carried in one place.
+ */
+const carried = (ops: RunnerOps): Pick<SeamOps, 'answer' | 'refuses'> => ({
+  ...(ops.answer ? { answer: ops.answer } : {}),
+  ...(ops.refuses ? { refuses: ops.refuses } : {}),
+});
 
 /**
  * A session's conversation through the transport, as the seam offers it: `transcriptOf` by the session's name, `null` where no session

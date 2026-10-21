@@ -513,11 +513,8 @@ export type HerQuestion = {
   multiSelect?: boolean;
 };
 
-/**
- * One ask of hers in her chat: its id, its questions, the person's answer where the page plants one answered already, and `cut` for
- * one whose call stopped waiting with nothing answered, as the keeper's record marks it (`chat/asks-closed.jsonl`).
- */
-export type HerAsk = { id: string; questions: readonly HerQuestion[]; answers?: Record<string, string>; cut?: boolean };
+/** One ask of hers in her chat: its id, its questions, and the person's answer where the page plants one answered already. */
+export type HerAsk = { id: string; questions: readonly HerQuestion[]; answers?: Record<string, string> };
 
 /** What a page plants of her: her level, where her session is, her transcript, the read mark, the person's outbox, and her asks. */
 export type HerChat = {
@@ -665,8 +662,6 @@ export function herChat(what: HerChat): () => void {
       ask.answers === undefined ? [] : [{ id: ask.id, at: at(360 + i), answers: ask.answers }],
     );
     if (answered.length > 0) fs.writeFileSync(path.join(chat, 'answers.jsonl'), lines(answered));
-    const closed = what.asks.flatMap((ask, i) => (ask.cut === true ? [{ id: ask.id, how: 'cut', at: at(380 + i) }] : []));
-    if (closed.length > 0) fs.writeFileSync(path.join(chat, 'asks-closed.jsonl'), lines(closed));
   }
   if (what.read !== undefined) {
     fs.mkdirSync(path.join(nemiaDir, 'chat'), { recursive: true });

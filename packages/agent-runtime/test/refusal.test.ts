@@ -354,9 +354,7 @@ test('REFUSED: `mayAsk: true` on a session this runtime does not hold attached, 
     'a `claude --bg` session is driven by no `query()` of ours, so no call of it is caught at a hook: a long-lived filing does not make it hold one',
   );
   assert.ok(
-    await Effect.runPromise(
-      engine.file({ ...ok, harness: 'claude', restartPolicy: 'Always', config: { background: true, mayAsk: true } }),
-    ),
+    await Effect.runPromise(engine.file({ ...ok, harness: 'claude', restartPolicy: 'Always', config: { background: true, mayAsk: true } })),
     'the long-lived `claude` session this runtime holds attached holds a call open, so it takes it',
   );
 });

@@ -13,7 +13,7 @@ import { RunnerError, type RunnerOps } from '../src/harness/index.ts';
 import { forgetAsked, forgetLines, main } from '../src/cli/main.ts';
 import { scratch } from './scratch.ts';
 import { builtEngine } from './engine.ts';
-import { until, WAITED } from './waits.ts';
+import { until, WAITED } from '../src/waits/index.ts';
 import { asyncOps, type AsyncRunner } from './promise-runner.ts';
 
 const refusing: AsyncRunner = {

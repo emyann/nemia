@@ -14,7 +14,7 @@ import path from 'node:path';
 import { Effect, Exit, Fiber, Layer, Logger, ManagedRuntime, Metric, PubSub, References, Stream, type Duration } from 'effect';
 import { isRunLine, type FeedWords } from './feed.ts';
 import { scratch } from '../../test/scratch.ts';
-import { bell, until, WAITED } from '../../test/waits.ts';
+import { bell, until, WAITED } from 'agent-runtime/testing';
 
 const ROOT = scratch('wf-feed-verb-');
 const FEED = path.join(ROOT, 'feed.jsonl');

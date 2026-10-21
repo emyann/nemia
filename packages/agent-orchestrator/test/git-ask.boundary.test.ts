@@ -18,7 +18,7 @@ import { shippedGitPlace } from '../src/place/shipped.store.ts';
 import { meteredPass } from '../src/meter/tally.store.ts';
 import { running } from './running.ts';
 import { scratch } from './scratch.ts';
-import { until, WAITED } from './waits.ts';
+import { until, WAITED } from 'agent-runtime/testing';
 
 /** The environment git runs in: this process's, without its git variables, with no configuration read and one identity. */
 const ENV: NodeJS.ProcessEnv = {

@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import { scratch } from './scratch.ts';
-import { until, WAITED } from './waits.ts';
+import { until, WAITED } from 'agent-runtime/testing';
 
 const ROOT = scratch('wf-step-labels-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });

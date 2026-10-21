@@ -21,7 +21,7 @@ import type { Engine } from '../runtime-client.ts';
 import { nodeChild } from '../../test/child.ts';
 import { scratch } from '../../test/scratch.ts';
 import { promised } from '../../test/promised.ts';
-import { until, WAITED } from '../../test/waits.ts';
+import { until, WAITED } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven } from '../../test/placed.ts';
 import { collector, seriesOf } from '../../test/collector.ts';
@@ -34,8 +34,19 @@ delete process.env.WF_MAX_CONCURRENT;
 const { beat, daemonFile, daemonStanding, lastCeilings, procStartOf, readFeed } = await import('../runner.ts');
 const stand = eachTest(testPlace);
 const runPlaced = runGiven(() => stand().layer);
-const { parseDaemonFile, parsePassCost, parseRecentPasses, passed, recentFile, recentPasses, recordRecentPass, releaseStore, takeStore } =
-  await import('./daemon.store.ts');
+const {
+  heldHolder,
+  holderOnStore,
+  parseDaemonFile,
+  parsePassCost,
+  parseRecentPasses,
+  passed,
+  recentFile,
+  recentPasses,
+  recordRecentPass,
+  releaseStore,
+  takeStore,
+} = await import('./daemon.store.ts');
 const { PHASES, passCost } = await import('../meter/meter.ts');
 const { main: cli } = await import('../cli/main.ts');
 /** `nemia`, as a person types it, its commands given this test's place. */
@@ -124,6 +135,7 @@ const read = () =>
     passedMono?: { boot: string; ms: number };
     beatMono?: { boot: string; ms: number };
     release?: { kind: string; root: string; tag?: string; commit?: string };
+    holder?: Record<string, Record<string, unknown>>;
   };
 
 const STOP = Object.assign(new Error('the test stops the daemon'), { exitCode: 9 });
@@ -245,6 +257,64 @@ test("the beat writes only its own daemon's file: not over another holder, not a
   clear();
   beat(self);
   assert.equal(fs.existsSync(FILE), false, 'no file is not written by a beat');
+});
+
+/** The cards a holder writes on the lease: opaque to this layer, so a shape the runtime would read is all the fixture needs. */
+const CARDS = { claude: { name: 'claude', supportedInterfaces: [{ url: 'http://127.0.0.1:45671/claude' }] } };
+
+test('the lease carries what its holder serves: written by the holding process, and read back key for key through the schema', () => {
+  clear();
+  const { held } = takeStore({ every: 4000, cwd: '/here', by: 'api' });
+  assert.equal(heldHolder(CARDS), true, 'the process that holds the lease writes it');
+  assert.deepEqual(read().holder, CARDS, 'on the file');
+  assert.deepEqual(
+    parseDaemonFile(fs.readFileSync(FILE, 'utf8'))?.holder,
+    CARDS,
+    'and back through the schema, which names the key — a key it does not name is dropped on the next write',
+  );
+  const next = passed(held);
+  assert.deepEqual(read().holder, CARDS, 'and a pass of its own daemon keeps it');
+  beat(next);
+  assert.deepEqual(read().holder, CARDS, 'as does its beat');
+  clear();
+  takeStore({ every: 4000, cwd: '/here', by: 'api' });
+  assert.equal('holder' in read(), false, 'a daemon that writes none names none');
+  clear();
+});
+
+test('REFUSED: heldHolder writes nothing over another holder’s lease, nothing after a stop, and nothing where there is no lease', () => {
+  clear();
+  for (const [name, over] of [
+    ['another holder', { pid: LIVE }],
+    ['stopped', { stoppedAt: minutesAgo(0.1) }],
+  ] as const) {
+    const text = holdBy(process.pid, over);
+    assert.equal(heldHolder(CARDS), false, `${name}: it answers it wrote nothing`);
+    assert.equal(fs.readFileSync(FILE, 'utf8'), text, `${name}: and the file is byte for byte as it was`);
+  }
+  clear();
+  assert.equal(heldHolder(CARDS), false, 'no lease is no lease of this process’s');
+  assert.equal(fs.existsSync(FILE), false, 'and nothing is written');
+});
+
+test('holderOnStore answers another live process’s holder alone: never this process’s own, and never a lease nobody ticks', () => {
+  clear();
+  assert.equal(holderOnStore(), undefined, 'no lease names no holder');
+  holdBy(LIVE, { holder: CARDS });
+  assert.deepEqual(holderOnStore(), CARDS, 'a ticking lease of another live process names its holder');
+  holdBy(process.pid, { holder: CARDS });
+  assert.equal(holderOnStore(), undefined, 'a lease this process holds names no holder for it: a viewer never dials itself');
+  holdBy(LIVE, { holder: CARDS, stoppedAt: minutesAgo(0.1) });
+  assert.equal(holderOnStore(), undefined, 'a lease let go names a port no one listens on');
+  holdBy(GONE, { holder: CARDS });
+  assert.equal(holderOnStore(), undefined, 'nor does one whose process is gone');
+  holdBy(LIVE, { holder: CARDS, passedAt: minutesAgo(30), startedAt: minutesAgo(40) });
+  assert.equal(holderOnStore(), undefined, 'nor one that has gone silent past its window');
+  holdBy(LIVE);
+  assert.equal(holderOnStore(), undefined, 'a ticking lease that names no holder answers none');
+  fs.writeFileSync(FILE, 'not json');
+  assert.equal(holderOnStore(), undefined, 'and a file that does not read as a lease answers none');
+  clear();
 });
 
 test('the lease keeps the release its daemon runs: written as it takes the store, kept through a pass, a beat and its stop', () => {
@@ -930,6 +1000,46 @@ test('`up` as the api takes the store as the api, writes where it serves once it
   assert.ok(stopped.stoppedAt, 'let go as its scope closed');
   assert.equal(holdUrl('http://127.0.0.1:9999'), false, 'a lease let go takes no url');
   assert.equal(read().url, 'http://127.0.0.1:8787');
+  clear();
+});
+
+test('the daemon names on the lease what its hold serves, and names none when it holds nothing', async () => {
+  clear();
+  const { up } = await import('./up.verb.ts');
+  const { Effect } = await import('effect');
+  const ran = async (held: unknown) => {
+    const seen: ReturnType<typeof read>[] = [];
+    const e = promised({
+      hold: () => held,
+      tick: async () => {
+        seen.push(read());
+        throw STOP;
+      },
+      admit: async () => [],
+    });
+    const threw = await runPlaced(Effect.scoped(up(e, { every: 10, repo: ROOT, holder: 'api' }))).then(
+      () => assert.fail('the daemon returned'),
+      (err: unknown) => err,
+    );
+    assert.equal(threw, STOP);
+    return seen;
+  };
+  assert.deepEqual(
+    (await ran({ url: 'http://127.0.0.1:45671', token: 'tok-1', cards: CARDS })).map((f) => f.holder),
+    [CARDS],
+    'a daemon that holds something names it on the lease, before its first pass',
+  );
+  assert.equal(
+    JSON.stringify(read()).includes('tok-1'),
+    false,
+    'and never the token the hold answered beside the cards: the lease carries nothing secret',
+  );
+  assert.deepEqual(
+    (await ran(null)).map((f) => f.holder),
+    [undefined],
+    'a daemon whose hold answers nothing names no holder',
+  );
+  assert.equal('holder' in read(), false, 'and the lease a new daemon takes carries no holder of the last, however the last one ended');
   clear();
 });
 

@@ -74,7 +74,7 @@ import {
   taskOfSighting,
   type SessionMethod,
 } from './map.ts';
-import { subscription } from './follow.ts';
+import { goneOf, subscription } from './follow.ts';
 
 /**
  * What a harness said when a verb failed, carried out of the handler with its words unchanged. Anything else the handler
@@ -609,10 +609,13 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
     throw this.noPush();
   }
 
-  /** `SubscribeToTask`: the session followed live, where the driver follows it (`subscription`). */
-  async *resubscribe(params: SubscribeToTaskRequest, _context: ServerCallContext): AsyncGenerator<StreamResponse, void, undefined> {
+  /**
+   * `SubscribeToTask`: the session followed live, where the driver follows it (`subscription`), and let go of as the follower goes
+   * away, where the call says so (`goneOf`).
+   */
+  async *resubscribe(params: SubscribeToTaskRequest, context: ServerCallContext): AsyncGenerator<StreamResponse, void, undefined> {
     try {
-      yield* subscription(this.harness, this.ops, params);
+      yield* subscription(this.harness, this.ops, params, goneOf(context));
     } catch (cause) {
       throw cause instanceof RunnerError
         ? cause.refused

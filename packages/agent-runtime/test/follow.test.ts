@@ -13,7 +13,7 @@ import type { RunnerError } from '../src/harness/error.ts';
 import { claudeTranscriptEvents } from '../src/harness/claude/transcript.ts';
 import type { Followed } from '../src/harness/seam.ts';
 import { scratch } from './scratch.ts';
-import { bell, until, WAITED } from './waits.ts';
+import { bell, until, WAITED } from '../src/waits/index.ts';
 
 const line = (o: object) => `${JSON.stringify(o)}\n`;
 const event = (e: object) => line({ type: 'stream_event', event: e, session_id: 'sid-1' });

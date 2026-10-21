@@ -13,7 +13,7 @@ import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { leftBehind, reap, runningIn, scratch } from './scratch.ts';
-import { until, WAITED } from './waits.ts';
+import { until, WAITED } from '../src/waits/index.ts';
 
 const PACKAGE = path.join(import.meta.dirname, '..');
 

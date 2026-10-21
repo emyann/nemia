@@ -4,6 +4,11 @@
  * from its agent, `nemia start`'s refusal of a name the file does not declare, and what the tick files — no harness arguments, no schema,
  * no hold, and a brief that names nothing of this machine. The agent itself, reached over HTTP, is `remote-step.test.ts`'s. `WF_ROOT` is
  * set before the import, since the module reads it as it loads.
+ *
+ * The holder's branch of `credentials` is here too, beside the remote one: a lease written by hand for a process that is alive and
+ * is not this one — the test runner that started it, `process.ppid`, which needs no process started — and the token written into the
+ * file a holder's engine mints it in. That path is the runtime's own, and that the two processes agree on
+ * it is what `apps/api/test/holder-stream.boundary.test.ts` proves with a real holder; this file proves the branch that reads it.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -171,6 +176,56 @@ test('a secret is read from WF_A2A_<NAME>_<SCHEME>, upper case with a dash made 
   } finally {
     delete process.env.WF_A2A_SECOND_OPINION_API_KEY;
   }
+});
+
+test("the holder's token is answered for its scheme and a harness the lease names, and for nothing else", async (t) => {
+  const { procStartOf } = await import('../runner.ts');
+  const { BEARER } = await import('agent-runtime');
+  const engineRoot = path.join(ROOT, 'engine');
+  const tokenFile = path.join(engineRoot, 'a2a', 'holder-token');
+  const writeToken = (token: string) => {
+    fs.mkdirSync(path.dirname(tokenFile), { recursive: true, mode: 0o700 });
+    fs.writeFileSync(tokenFile, token, { mode: 0o600 });
+  };
+  const forgetToken = () => fs.rmSync(tokenFile, { force: true });
+  const daemonJson = path.join(ROOT, 'daemon.json');
+  const held = process.ppid;
+  t.after(() => {
+    fs.rmSync(daemonJson, { force: true });
+    forgetToken();
+  });
+  const lease = (over: Record<string, unknown> = {}) =>
+    fs.writeFileSync(
+      daemonJson,
+      JSON.stringify({
+        pid: held,
+        startedAt: new Date(Date.now() - 60_000).toISOString(),
+        cwd: ROOT,
+        every: 4000,
+        passedAt: new Date().toISOString(),
+        procStart: procStartOf(held),
+        holder: { claude: { name: 'claude' } },
+        ...over,
+      }),
+    );
+  writeToken('held-tok-1');
+  lease();
+  assert.equal(credentials(BEARER, 'http://127.0.0.1:45671/claude', 'claude'), 'held-tok-1', 'the holder of this store holds `claude`');
+  assert.equal(credentials('api-key', 'http://127.0.0.1:45671/claude', 'claude'), undefined, 'another scheme is not the card’s bearer');
+  assert.equal(credentials(BEARER, 'http://127.0.0.1:45671/codex', 'codex'), undefined, 'a harness the lease names no holder for');
+  lease({ pid: process.pid, procStart: procStartOf(process.pid) });
+  assert.equal(credentials(BEARER, 'http://127.0.0.1:45671/claude', 'claude'), undefined, 'a lease this process holds: never itself');
+  lease({ stoppedAt: new Date().toISOString() });
+  assert.equal(credentials(BEARER, 'http://127.0.0.1:45671/claude', 'claude'), undefined, 'a lease let go names no holder');
+  fs.rmSync(daemonJson, { force: true });
+  assert.equal(credentials(BEARER, 'http://127.0.0.1:45671/claude', 'claude'), undefined, 'and no lease at all names none');
+  lease();
+  forgetToken();
+  assert.equal(
+    credentials(BEARER, 'http://127.0.0.1:45671/claude', 'claude'),
+    undefined,
+    'a store whose token file is gone answers none, and the follow is refused in words naming the fix',
+  );
 });
 
 test('a secret not given is refused naming the variable to set, where to set it, and what to do after', () => {

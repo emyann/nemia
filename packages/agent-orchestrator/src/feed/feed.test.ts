@@ -37,7 +37,7 @@ import { runLabels, stepLabels } from '../telemetry/telemetry.ts';
 import { nodeChild } from '../../test/child.ts';
 import { scratch } from '../../test/scratch.ts';
 import { promised } from '../../test/promised.ts';
-import { bell, until, WAITED } from '../../test/waits.ts';
+import { bell, until, WAITED } from 'agent-runtime/testing';
 import { runGiven, runOver } from '../../test/placed.ts';
 
 const ROOT = scratch('wf-feed-');

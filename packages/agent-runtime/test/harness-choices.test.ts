@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { HARNESS_CHOICES, fenceReach } from '../src/vocabulary.ts';
 import { configRefusal } from '../src/index.ts';
-import { DEFAULT_HARNESSES } from '../src/service/harnesses.ts';
+import { DEFAULT_HARNESSES } from '../src/service/default-harnesses.ts';
 
 type Choices = typeof HARNESS_CHOICES;
 

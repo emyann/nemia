@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { a2aServer } from './a2a-server.ts';
 import { scratch } from './scratch.ts';
-import { until, WAITED } from './waits.ts';
+import { until, WAITED } from 'agent-runtime/testing';
 
 const ROOT = scratch('wf-remote-left-out-');
 process.env.WF_ROOT = ROOT;

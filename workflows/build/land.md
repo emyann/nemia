@@ -4,8 +4,25 @@ place: git
 workspace: main
 agent: otto
 gate: true
-check: npx turbo run test --force --continue && npx turbo run typecheck --force && npm run lint && { if [ -n "${WF_BASE_REF:-}" ]; then range="$WF_BASE_REF...HEAD"; else range=HEAD...MERGE_HEAD; fi; touched=$(git -c core.quotePath=false diff --no-renames --name-only "$range" --) || { echo "wf check: cannot tell what the work touched, since git diff --name-only $range failed; the build and the e2e are not skipped on a guess" >&2; false; }; } && if printf '%s\n' "$touched" | grep -Eq '^(apps/(web|api)/|package(-lock)?\.json$|turbo\.json$)'; then if [ -n "${WF_BASE_REF:-}" ]; then npm run build && echo "wf check: no e2e in a round's check; it runs once, on the merged tree, where no WF_BASE_REF is set"; else npm run e2e; fi; else echo "wf check: nothing under apps/web/ or apps/api/, nor the root's package.json, package-lock.json or turbo.json, was touched: no build, no e2e"; fi
+check: { r=$(mktemp -d) && { git show "HEAD:workflows/build/landing.ts" > "$r/landing.ts" || { echo "wf check: this checkout's HEAD has no workflows/build/landing.ts, so the landing this step made cannot be proven; land on a base that has it" >&2; false; }; } && node "$r/landing.ts" receipt --run "$WF_RUN"; c=$?; rm -rf "$r"; [ "$c" -eq 0 ]; }
 budget: 10
-disallowedTools: SendMessage, CronCreate, CronDelete, RemoteTrigger, Bash(git push), Bash(git push:*), Bash(git branch -D:*), Bash(git branch --delete --force:*), Bash(pkill:*), Bash(killall:*), mcp__playwright__browser_run_code_unsafe, Bash(claude *--bg*), Bash(claude *--background*), Bash(claude *remote-control*), Edit(//**/.claude/settings.local.json), Edit(~/.claude/settings.json), Edit(~/.claude.json), Bash(*:4318*), Bash(*:4317*)
+disallowedTools: SendMessage, CronCreate, CronDelete, RemoteTrigger, Bash(git push), Bash(git push:*), Bash(gh), Bash(gh:*), Bash(git branch -D:*), Bash(git branch --delete --force:*), Bash(pkill:*), Bash(killall:*), mcp__playwright__browser_run_code_unsafe, Bash(claude *--bg*), Bash(claude *--background*), Bash(claude *remote-control*), Edit(//**/.claude/settings.local.json), Edit(~/.claude/settings.json), Edit(~/.claude.json), Bash(*:4318*), Bash(*:4317*)
 ---
-Land this run's result on the base branch: stage the merge of its branch in the repository's own checkout and sign off with the commit message; the run commits it once its check passes on the merged tree.
+Land this run's result: merge its own pull request on GitHub, with a merge commit whose message you write, and fast-forward the base
+branch in this checkout. Both acts are the one frozen script this step's check also reads, so your fence can refuse every `gh` call and
+every `git push`. Copy it out and run it:
+
+```
+p=$(mktemp -d) && git show "HEAD:workflows/build/landing.ts" > "$p/landing.ts"
+node "$p/landing.ts" merge --run "<this run's id>" --subject "<the subject line>" --body-file "$WF_STEP_FILES/merge-message.md"
+```
+
+Write that body first, in a file of your files directory: what landed and why, read off `git log` and `git diff --stat` of the result
+branch against the base. The script refuses anything but this run's own green pull request — not a draft, based on the base branch, its
+head the commit the review read, mergeable, and `ci` green at that commit, with no result branch of the run left out — then merges it
+with `--merge` and fast-forwards this checkout onto what it merged. It deletes no branch and stages no merge here.
+
+Sign off `done` with that subject and body in `message`, the record of what landed. On a refusal, change nothing in this checkout: sign
+off `blocked`, quoting it whole and naming the exact `nemia retry` line it printed. The run then executes this step's check, which is
+the receipt that the merge happened — `ci` already judged the suite, the types, the lint, the e2e and the build on the head the review
+read.

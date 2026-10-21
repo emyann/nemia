@@ -16,7 +16,7 @@ import { watchedLine, type Watched } from '../subscription/index.ts';
 import { parseSelectors, selects } from '../watch/selector.ts';
 import { steeredClock } from '../../test/steered.ts';
 import { scratch } from '../../test/scratch.ts';
-import { bell, until, WAITED } from '../../test/waits.ts';
+import { bell, until, WAITED } from 'agent-runtime/testing';
 
 const ROOT = scratch('wf-watch-');
 process.env.WF_ROOT = ROOT;

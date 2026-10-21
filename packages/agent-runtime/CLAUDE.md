@@ -150,9 +150,30 @@ down is in `docs/architecture.md`, *Who owns what*.
   `wordsOf` leaves whole (`a2a/said.ts`); anything else is cut at 200.
 - **A paged read is served from the listing its token names** (`OPEN_LISTINGS`), never the latest.
 - **An async generator's `return` waits behind its pending `next`**: `Stream.fromAsyncIterable` calls it on interruption, so a silent
-  subscription is aborted first (`abortedOnReturn`, `a2a/remote-follow.ts`), or its interruption never ends.
+  subscription is aborted first (`abortedOnReturn`, `a2a/remote-follow.ts`), or its interruption never ends. The serving half has the
+  same trap: a holder's port leaves the signal of a follower that went away on the call's state (`STATE_GONE_KEY`), and the
+  subscription interrupts the driver's follow on it (`goneOf`, `a2a/follow.ts`), or a follower that dropped leaves the holder
+  following a silent session for its whole life.
 - **A test that shortens a remote harness's `requestMs` hands the agent its card (`opsOn`, `test/remote-follow.test.ts`) and waits for the
   send's answer**, or every request it does not test (the card read again after a failure, a subscription's headers) is held to it.
+- **A card a holder serves carries its security scheme, or a client finds no requirement and sends no header** (`authOf`): a port that
+  then refuses every request looks like a wrong token (`servedCardOf`, `a2a/served.ts`).
+- **A holder's port refuses a token in HTTP 401, never a JSON-RPC error inside a 200** (`a2a/listener.ts`): `clientFetchOf` reads the
+  kind off the status, and a refusal inside a 200 reaches a viewer as an unsupported operation, naming the wrong fix.
+- **A follow of a session this process runs is answered here**, off the files and the holder's own fan-out (`heldHere`,
+  `harness/claude/attached-follow.ts`): a test of a holder and a viewer is two processes, or the viewer dials nothing
+  (`test/holder-follow.boundary.test.ts`, whose holder runs the attached road against the stand-in CLI through
+  `EngineOptions.claudeExecutable`, and whose viewer is given the same `CLAUDE_CONFIG_DIR` so it reads the same transcript).
+- **A holder's port serves the harnesses configured as the literal `'claude'` and no others** (`heldHarnessesOf`,
+  `service/options.ts`, read by `servingOf`, by `holdersRefusalOf` and by a layer above through the door): those sessions are the
+  ones one process holds attached, and a `holder` named for any other harness — a remote agent's, a detached one's — is refused
+  before the engine builds (`holderRefusal`), since its sessions are read off the store both share.
+- **A holder is refused in two halves, and the second is at the follow** (`EngineOptions.holder`): the harness *names* are
+  refused before the engine builds (`holderRefusal`), and what the holder function *answers* — an entry whose key is not `card`, a
+  card that does not decode — at the follow that asked for it (`holderAgentRefusal`), since there is nothing to read until then.
+  The option is a function per harness, asked at each follow and never captured, because a layer above may build its engine once
+  for its whole process while a holder's port is ephemeral: a value would be the holder that was up at startup, which the
+  level-triggered rule refuses. `undefined` reads the files, exactly as an engine given no holder does.
 - **`Stream.retry` starts its schedule again at the attempt's first output**, an empty array included: a bound on failures in a row
   is counted by hand (`drops` in `followTask`).
 

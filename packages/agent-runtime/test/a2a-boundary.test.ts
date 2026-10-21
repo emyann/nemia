@@ -30,8 +30,11 @@ function specifiersIn(text: string): string[] {
   return [...found].sort();
 }
 
-/** The seam's files that speak no protocol: the registry's entry, and a send's lease read off it. */
-const SDK_FREE = ['src/a2a/entry.ts', 'src/a2a/sending.ts'];
+/**
+ * The seam's files that name no type or value of the SDK's: the registry's entry, the holder's token, a send's lease read off it,
+ * and the viewer's dialled follow, which speaks the protocol through the client and the card the rest of the seam reads for it.
+ */
+const SDK_FREE = ['src/a2a/entry.ts', 'src/a2a/holder-follow.ts', 'src/a2a/holder-token.ts', 'src/a2a/sending.ts'];
 
 /** The seam's files, by their path in the package. */
 const inSeam = (file: string) => /^src\/a2a\/[a-z0-9-]+\.ts$/.test(file) && file !== 'src/a2a/index.ts';
@@ -64,6 +67,9 @@ test('the scan reads the seam and the rest of the package — or it would pass b
     'src/a2a/entry.ts',
     'src/a2a/follow.ts',
     'src/a2a/handler.ts',
+    'src/a2a/holder-follow.ts',
+    'src/a2a/holder-token.ts',
+    'src/a2a/listener.ts',
     'src/a2a/map.ts',
     'src/a2a/remote-client.ts',
     'src/a2a/remote-events.ts',
@@ -71,6 +77,7 @@ test('the scan reads the seam and the rest of the package — or it would pass b
     'src/a2a/remote.ts',
     'src/a2a/said.ts',
     'src/a2a/sending.ts',
+    'src/a2a/served.ts',
   ]);
   assert.ok(files.includes('src/index.ts') && files.includes('src/core/engine/engine.ts') && files.includes('bin/ae.ts'));
   const sdkOf = (f: string) => specifiersIn(fs.readFileSync(path.join(PKG, f), 'utf8')).some((s) => s.startsWith(SDK));

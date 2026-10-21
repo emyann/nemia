@@ -30,6 +30,14 @@ const PAGE_FILE = /^(\d{3})-([a-z0-9]+(?:-[a-z0-9]+)*)\.ts$/;
 /** The order the pages are visited in: their file names, compared as plain strings. */
 export const orderOf = (names: readonly string[]): string[] => [...names].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 
+/**
+ * The pages shard `i` of `of` visits, `i` 1-based: dealt round-robin in the pages' own order, so neighbouring pages — which a number in
+ * tens puts near each other, and which tend to cost alike — land in different shards and the slow ones spread. The shards together are
+ * the pages, each once, in their order, and no two differ by more than one page. Pure: `e2e-pages.test.ts` holds it over the pages there
+ * are.
+ */
+export const shardOf = <P>(pages: readonly P[], i: number, of: number): P[] => pages.filter((_, at) => at % of === i - 1);
+
 /** The page a file is: its name without its number. */
 const nameOf = (file: string): string => PAGE_FILE.exec(file)![2];
 
@@ -122,31 +130,73 @@ export async function loadPages(dir = PAGES_DIR): Promise<PageSpec[]> {
  * a check makes, which is held to the e2e's bound (`overBound`, timing.ts). With no flag, every page in the dark theme, pictured by none:
  * the assertions alone. `--photos` visits light, then dark, and pictures each page visited; `--pages <name,…>` visits only the pages
  * named, in the order of the pages, and with `--photos` pictures them; `--contrast`, with `--photos`, has each picture's text pairs
- * `measured` beside it (contrast.ts), and is refused without it; `--workers <n>` sets how many workers visit them. Refuses a flag it
- * does not know, a name that is no page (listing the pages there are), `--pages` with no name after it, and `--workers` with no whole
- * number of one or more.
+ * `measured` beside it (contrast.ts), and is refused without it; `--workers <n>` sets how many workers visit them; and
+ * `--shard <i> --of <n>` visits shard `i` of `n`, dealt from the pages that exist (`shardOf`). A shard is no whole run either, so its
+ * pages are never summed against their bound: a reporter sums every shard's instead (pages-bound.ts). Refuses a flag it does not know, a
+ * name that is no page (listing the pages there are), `--pages` with no name after it, `--workers` with no whole number of one or more,
+ * one of `--shard` and `--of` without the other, `--shard` with `--pages`, a shard past the shards there are, and an `--of` past the
+ * pages there are.
  */
 export function planOf<P extends { name: string }>(
   argv: readonly string[],
   pages: readonly P[],
-): { visit: P[]; themes: Theme[]; pictured: (name: string) => boolean; measured: boolean; workers?: number; whole: boolean } {
+): {
+  visit: P[];
+  themes: Theme[];
+  pictured: (name: string) => boolean;
+  measured: boolean;
+  workers?: number;
+  shard?: { i: number; of: number };
+  whole: boolean;
+} {
   let photos = false;
   let measured = false;
   let named: string[] | undefined;
   let workers: number | undefined;
+  let shard: number | undefined;
+  let of: number | undefined;
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--photos') photos = true;
     else if (argv[i] === '--contrast') measured = true;
     else if (argv[i] === '--pages') named = namesAfter(argv[++i]);
     else if (argv[i] === '--workers') workers = workersAfter(argv[++i]);
+    else if (argv[i] === '--shard') shard = wholeAfter('--shard', 'the whole number of one shard', argv[++i]);
+    else if (argv[i] === '--of') of = wholeAfter('--of', 'the whole number of shards', argv[++i]);
     else
       throw new Error(
-        `the e2e takes --photos, --contrast, --pages <name,…> and --workers <n>, not ${argv[i]}: npm run e2e -- --photos --pages <name,…>`,
+        `the e2e takes --photos, --contrast, --pages <name,…>, --workers <n> and --shard <i> --of <n>, not ${argv[i]}: ` +
+          'npm run e2e -- --photos --pages <name,…>',
+      );
+  }
+  if (shard !== undefined && of === undefined)
+    throw new Error(
+      `--shard ${shard} says which shard to visit, and --of says how many shards there are: give both (--shard ${shard} --of 4)`,
+    );
+  if (of !== undefined && shard === undefined)
+    throw new Error(`--of ${of} says how many shards there are, and --shard says which of them to visit: give both (--shard 1 --of ${of})`);
+  if (shard !== undefined && of !== undefined) {
+    if (shard > of) throw new Error(`--shard ${shard} is no shard of ${of}: name a shard from 1 to ${of} (--shard 1 --of ${of})`);
+    if (of > pages.length)
+      throw new Error(
+        `--of ${of} asks for more shards than the e2e has pages (${pages.length}), and a shard of them would visit nothing: ` +
+          `give --of ${pages.length} at most`,
       );
   }
   if (measured && !photos)
     throw new Error('--contrast measures what is pictured, and nothing is without --photos: npm run e2e -- --photos --contrast');
   const themes: Theme[] = photos ? ['light', 'dark'] : ['dark'];
+  if (shard !== undefined && of !== undefined) {
+    if (named) throw new Error('--shard deals the pages itself and --pages names them: give one of the two, not both (--shard 1 --of 4)');
+    return {
+      visit: shardOf(pages, shard, of),
+      themes,
+      pictured: (name) => photos && name !== '',
+      measured,
+      workers,
+      shard: { i: shard, of },
+      whole: false,
+    };
+  }
   if (!named) return { visit: [...pages], themes, pictured: () => photos, measured, workers, whole: !photos };
   const all = pages.map((p) => p.name);
   const unknown = named.filter((name) => !all.includes(name));
@@ -168,6 +218,14 @@ function workersAfter(arg: string | undefined): number {
   const n = Number(arg);
   if (!arg || !/^\d+$/.test(arg) || n < 1)
     throw new Error(`--workers takes a whole number of workers, one or more (--workers 4), not ${arg ?? 'nothing'}`);
+  return n;
+}
+
+/** The whole number of one or more a flag is given; refuses anything else, and a flag in its place. `what` names what the number is. */
+function wholeAfter(flag: string, what: string, arg: string | undefined): number {
+  const n = Number(arg);
+  if (!arg || !/^\d+$/.test(arg) || n < 1)
+    throw new Error(`${flag} takes ${what}, one or more (--shard 1 --of 4), not ${arg ?? 'nothing'}`);
   return n;
 }
 

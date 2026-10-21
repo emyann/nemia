@@ -45,7 +45,7 @@ import type { Live } from '../src/harness/claude/attached-session.ts';
 import { claudeCodeOps } from '../src/harness/claude/code.ts';
 import { Engine } from '../src/index.ts';
 import { scratch } from './scratch.ts';
-import { until, WAITED } from './waits.ts';
+import { until, WAITED } from '../src/waits/index.ts';
 import { holder, inCall, kept, lines, NAME, place, run, STAND_IN } from './attached-held.ts';
 
 /**

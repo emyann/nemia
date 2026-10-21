@@ -33,11 +33,14 @@ to the person as a card to start, fold into another or drop, with what its stats
 
 - `build`'s design step's gate (Seldon's spec) is the person's when the spec changes the model, a layer's contract or anything of
   taste: a name, a shipped instruction, the board's look. Bring it with the spec's `why` and its placement findings quoted.
-- The landing step's gate (Otto) is approved only once a trial merge of the run's branch into `main` is clean; `nemia decide <run>`
-  reads it live (`merges`), with each run in flight on `main` its branch collides with and in which files (`others`, `collides`), and a
-  clean merge whose landing check refused the merged tree (`semantic`). Say what it read. When it does not merge cleanly, recommend
-  `nemia merge <run>`, not an approval. On `collides`, recommend an order: land the run at its gate first, unless the other is
-  expensive or on its last round; then `nemia hold <run> --until <other>`. Either way, the one that lands second merges `main` after.
+- The landing step's gate (Otto) is approved only once the run's own pull request is green and mergeable on GitHub: open it — its
+  address is on the implement closeout as an artifact — and read that the `ci` context passed on the head the review read. `nemia
+  decide <run>` reads the trial merge live too (`merges`), with each run in flight on `main` its branch collides with and in which
+  files (`others`, `collides`), and a clean merge whose landing check refused the merged tree (`semantic`). Say what both read. When it
+  does not merge cleanly, or `ci` is red or missing, recommend `nemia merge <run>` or a round of implement, not an approval: the
+  landing refuses anything but a green pull request, so an approval given over a red one only spends a session. On `collides`,
+  recommend an order: land the run at its gate first, unless the other is expensive or on its last round; then `nemia hold <run>
+  --until <other>`. Either way, the one that lands second merges `main` after.
   On `semantic`, recommend `nemia merge <run>`: the text merges, the meaning does not.
 - A check that refused a step's work exited with a number: quote its last lines and its exit code. A check that did not finish (no
   numeric exit) refused nothing: run it again, `nemia retry <run> <step> --recheck`, and say so. A check that refused twice for the
@@ -45,12 +48,17 @@ to the person as a card to start, fold into another or drop, with what its stats
 - A step whose approval must wait on another run's landing is held, not approved: `nemia hold <run> --until <run>`, and say why.
 - A change under `apps/web` is pictured by its implementer, in a light and a dark theme, and the reviewer reads the pictures: a landing
   step's gate of a web change whose implement closeout names none is sent back, not approved.
-- A landing check has its own deadline, 2700 s: one killed by it did not finish, and is no refusal (`--recheck`, above). One that took
-  more than half of it is worth an inbox card.
+- A landing check has its own deadline, 2700 s: one killed by it did not finish, and is no refusal (`--recheck`, above). It is a
+  receipt now — the pull request merged with a merge commit, the checkout clean on the base, every branch of the run an ancestor of
+  HEAD — and takes seconds, `ci` having judged the suite and the e2e on the head the review read. One that took more than half the
+  deadline is worth an inbox card.
 
 ## After a landing
 
-A landing changes `main`, not the running system: the daemon, the login service and the installed `nemia` run the release
+A landing merges the run's pull request on GitHub and fast-forwards `main` in the owner's checkout, both by the run: nothing is pushed
+or merged by hand afterwards, and the head branch is GitHub's to delete.
+
+It changes `main`, not the running system: the daemon, the login service and the installed `nemia` run the release
 `releases/current` names in the store, built from a tag. Nothing upgrades on its own. When the person chooses, they tag a commit of `main`
 and run `nemia upgrade <tag>`: it builds the tag from a clean export, runs its `release:check`, switches the pointer, and restarts the
 service onto it, paused, once no landing's check runs; a build or check that fails changes nothing and names its log. `nemia upgrade`
@@ -66,5 +74,6 @@ a run that passes it is the person's to continue.
 
 ## Never
 
-- Push, open a pull request or merge into `main` by hand: a run lands through its ending step, after the person approves it.
+- Push, open a pull request or merge into `main` by hand: a run opens its pull request through `workflows/build/pull-request.ts` and
+  merges it through `workflows/build/landing.ts`, at its ending step, after the person approves it.
 - Stop a process by its name: a run is cancelled with `nemia cancel`, held with `nemia hold`.

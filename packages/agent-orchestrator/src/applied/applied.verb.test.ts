@@ -9,13 +9,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parse, stringify } from 'yaml';
 import { scratch } from '../../test/scratch.ts';
-import { testEngine } from 'agent-runtime/testing';
+import { testEngine, until, WAITED } from 'agent-runtime/testing';
 import { teamCopy } from '../../test/team.ts';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
 import { heldUnasked } from '../../test/unasked.ts';
 import { steeredClock } from '../../test/steered.ts';
-import { until, WAITED } from '../../test/waits.ts';
 
 const ROOT = scratch('wf-applied-');
 process.env.WF_ROOT = ROOT;

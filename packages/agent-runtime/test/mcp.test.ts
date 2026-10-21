@@ -27,7 +27,7 @@ import { codex } from '../src/harness/codex/codex.ts';
 import { codexMcpServerNames, everyMcpServer } from '../src/harness/mcp.ts';
 import { scratch } from './scratch.ts';
 import { builtEngine } from './engine.ts';
-import { until, WAITED, type Waiter } from './waits.ts';
+import { until, WAITED, type Waiter } from '../src/waits/index.ts';
 
 const tmp = (label: string) => scratch(`ae-mcp-${label}-`);
 

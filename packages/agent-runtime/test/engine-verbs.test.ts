@@ -27,7 +27,7 @@ import { Engine as EngineService } from '../src/index.ts';
 import { scratch } from './scratch.ts';
 import { asyncStore, asyncOps, type AsyncJournal, type AsyncRunner } from './promise-runner.ts';
 import { builtEngine } from './engine.ts';
-import { bell, until, WAITED, type Waiter } from './waits.ts';
+import { bell, until, WAITED, type Waiter } from '../src/waits/index.ts';
 
 /** A store in twelve lines of plain async — what an application with its own database writes. */
 const memoryJournal = (): AsyncJournal => {

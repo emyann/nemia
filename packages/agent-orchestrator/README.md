@@ -1816,8 +1816,9 @@ output: implement.schema.json   # screenshots, pages
   a round's check builds and runs no e2e, and a gated ship, where it is not set, runs the line whole on the merged
   tree. In this repository `npm run e2e` (`apps/web/test/e2e/`) builds the web app, serves it to workers in parallel,
   each against a seeded store of its own, visits every page in headless Chromium in the dark theme, and asserts what
-  each page must have; with `--photos`, in a light and a dark theme, screenshots each into `WF_ARTIFACTS`. This
-  repository's own build workflow runs it in implement's round check too.
+  each page must have; with `--photos`, in a light and a dark theme, screenshots each into `WF_ARTIFACTS`. In this
+  repository the build workflow's round check runs no page itself: it pushes the round's commit and waits on
+  GitHub's `ci`, whose `e2e` job visits them all on that commit.
 - **`implement` declares `screenshots` and `pages`**, and `review` reads the diff, is handed those and nothing else
   of implement, and looks at the screenshots and the pages side by side. Its schema can say where a finding is as
   `where: { file, line }` for the code or `{ page, theme }` for what a person sees, strict, so a finding that names
@@ -2006,12 +2007,14 @@ dropped. **Nothing in the packages knows what shipping means.**
   such a folder started `--no-worktree` is refused too: it has no result branch to merge.
   Its brief carries one way of handing a file over rather than the usual two: what it leaves in that checkout is collected by nobody, so
   it is told the run's artifacts directory, and that the checkout is to be left as it was found.
-- **The run checks the merge and lands it, not the ending's session.** A gated `workspace: main` step with a `check:`
-  stages the merge (`git merge --no-ff --no-commit`) and signs off with the commit message as its closeout's `message`
+- **The run checks the landing and records it, not the ending's session.** A gated `workspace: main` step with a `check:`
+  lands the run's result the way its own step says — staging the merge (`git merge --no-ff --no-commit`) where that is
+  the way its factory lands — and signs off with the message that records what landed as its closeout's `message`
   (`shipper.schema.json`): a subject of what shipped, the run's own title, and a short body read off `git log` and
   `git diff --stat` — never git's `Merge branch '…'`. Its brief says so under *The run checks and lands your merge*
-  (`landingContract`). The tick then files the step's check as it files any — the `check` harness in the checkout,
-  `LANDING_CHECK_DEADLINE_SECONDS` (measured on its own: the whole suite and the e2e on the merged tree, and no mutant), `nice`d, its streams kept as a check's are, no `WF_BASE_REF`: mid-merge,
+  (`landingContract`), which is shape-neutral: the packages know nothing of what shipping means, so the recipe is the
+  step's own note and the staging command its place's (`landingWords`). The tick then files the step's check as it files any — the `check` harness in the checkout,
+  `LANDING_CHECK_DEADLINE_SECONDS` (measured on its own: the whole suite and the e2e on the merged tree where a factory runs them there, and no mutant), `nice`d, its streams kept as a check's are, no `WF_BASE_REF`: mid-merge,
   `HEAD...MERGE_HEAD` is what the merge brings — and, on the pass that reads the check settled (`landingDue`, pure;
   `landEnding` in `ending/ending.verb.ts` acts through the place's `land`), commits the merge with the message on exit 0 or
   aborts it on anything else: a refusal, a check that did not finish, a message left blank, a merge that
@@ -3190,6 +3193,18 @@ not read, a holder that `stopped`, one whose process is `gone` (`kill(pid, 0)` f
 (`stalled`), or one `ticking`. The interval is a whole number of milliseconds from 1 to 2147483647 and anything else is refused, exit 2,
 before the store is taken: `wf up -5` would write an interval the file does not read back, and a holder that does not read holds nothing.
 
+The lease also names what the daemon's own engine holds, `holder`: the cards it serves on its port, by the harness each is for, written
+right after it took the lease and held its engine (`heldHolder`), by that process, which is the one writer of the file — the api's url and
+the holder's cards are both facts of the process that holds it. Another process on this store reads them (`holderOnStore`) to follow one
+of those sessions live over that port rather than off the files, and reads them afresh at every follow: a holder's port is ephemeral, and
+a process that read it once would dial a dead port after any restart. Nothing is answered for a lease that stopped, whose process is gone
+or that has gone silent — there is no port to dial — nor for a lease the asking process itself holds, which would be a viewer dialling
+itself.
+
+Nothing secret is on the lease. The bearer token that port asks for is the holder engine's own, kept 0600 in the runtime's store, and a
+viewer asks the runtime for it at the moment it dials (`holderTokenOf`); it is on no line of a log, in no answer of the api, and on no
+screen of the board.
+
 - **A second daemon is refused by name, exit 2, while the store is ticked**, both ways round — an api while a `wf up` ticks, a `wf up`
   while an api does, and either while one of its own kind does — naming the pid, where and since when it ticks, its last pass,
   and how to stop it: `kill <pid>`, that pid, which is the node process and not an `npm exec` wrapper around it (killing the wrapper can
@@ -3879,7 +3894,7 @@ for the same reason, and so does the `wf` command.
 | `inbox/` | cards before they are started, one `<name>.md` each (`wf inbox`); a card started leaves it |
 | `queue/` | a queued card's last start that did not happen, `<name>.json`, the tick's to write: the card's text, the repository tried, why, and whether it was a refusal |
 | `factories/` | a factory each, `<name>.json` holding `{ "repos": [...], "workflows": [...], "hires": {...} }`, `wf factory add`, `attach`, `detach`, `hire` and `fire`'s to write and `wf factory rm`'s to remove; the default factory is no file |
-| `daemon.json` | the store taken by one `wf up`, its to write alone: pid, start, cwd, interval, last completed pass, and `stoppedAt` once it stopped (`src/daemon/daemon.ts`) |
+| `daemon.json` | the store taken by one `wf up`, its to write alone: pid, start, cwd, interval, last completed pass, `stoppedAt` once it stopped, and what its engine holds and serves (`holder`, never a secret) (`src/daemon/daemon.ts`) |
 | `tick.json` | the ceilings the last pass ran with, the tick's to write: what `wf ls` and `wf decide` judge the cap on runs in flight by |
 | `standing.json` | where the result branches stood on the last pass, the tick's to write (`src/standing/standing.store.ts`): for each repository, place and base branch, the place's `standing` answer or the words it was not read with, and when |
 | `feed.jsonl` | what the tick judged of each run and each step, a line each time it changed, and a line each time a daemon takes the store, the daemon's to append (`src/feed/feed.ts`, `src/feed/feed.store.ts`): what `nemia watch` reads and follows, and nothing decides on |

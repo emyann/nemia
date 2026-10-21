@@ -16,7 +16,7 @@ import path from 'node:path';
 import type { HarnessSpec, Sighting } from '../src/index.ts';
 import { Engine } from '../src/index.ts';
 import { scratch } from './scratch.ts';
-import { until, WAITED, type Waiter } from './waits.ts';
+import { until, WAITED, type Waiter } from '../src/waits/index.ts';
 import { builtEngine } from './engine.ts';
 import { asyncOps } from './promise-runner.ts';
 

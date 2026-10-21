@@ -18,6 +18,8 @@ import test, { type TestContext } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { Effect, Exit, Scope } from 'effect';
 import { attachedSessions } from '../src/harness/claude/attached.ts';
+import { Engine } from '../src/index.ts';
+import { builtEngine } from './engine.ts';
 import { alive, appendAsk, crashNote, filesOf, openAsks, readRun, writeRun } from '../src/harness/claude/attached-file.ts';
 import { processStart } from '../src/harness/claude/inbox.ts';
 import { ASK_ANSWERED, ASK_CUT, askHookOutput, DENIED_HERE } from '../src/harness/claude/attached-session.ts';
@@ -249,3 +251,47 @@ test('REFUSED: an answer to an ask the session does not hold open is refused, na
   fs.rmSync(path.join(dir, 'nothing'), { force: true });
   await h.close();
 });
+
+test(
+  'an ask of a `claude` task is answered through `Engine.answerAsk`, the verb carried whole down the engine’s own seam',
+  WAITED,
+  async (t) => {
+    const { root, dir, request } = place({ call: 'AskUserQuestion', callInput: { questions: [ONE] } }, { mayAsk: true });
+    // A long-lived background session is refused an `env` of its own, so the stand-in is told where to write and what to do
+    // through this process's own environment, which `attachedOptions` lays under the task's.
+    const own = { ...process.env };
+    Object.assign(process.env, request.config!.env);
+    t.after(() => void Object.assign(process.env, { STANDIN_DIR: own.STANDIN_DIR, STANDIN_PLAN: own.STANDIN_PLAN }));
+    const engine = builtEngine(Engine.layer({ root, harnesses: { claude: 'claude' }, claudeExecutable: STAND_IN }));
+    const scope = Scope.makeUnsafe();
+    await Effect.runPromise(Scope.provide(engine.hold(), scope));
+    t.after(async () => {
+      fs.writeFileSync(path.join(dir, 'release'), '');
+      await Effect.runPromise(Scope.close(scope, Exit.void));
+    });
+    const id = await Effect.runPromise(
+      engine.file({ brief: request.brief, cwd: dir, harness: 'claude', restartPolicy: 'Always', config: { background: true, mayAsk: true } }),
+    );
+    const ask = await until(
+      t,
+      async () => {
+        await Effect.runPromise(engine.tick());
+        return (await Effect.runPromise(engine.view(id))).asks?.[0];
+      },
+      'the task’s view holding a question',
+      { everyMs: 100 },
+    );
+    assert.deepEqual(ask.questions, [ONE], 'the ask reaches the layer above through the view, as the view carries it');
+
+    const answers = { [ONE.question]: 'First line as it is' };
+    const taken = await Effect.runPromise(engine.answerAsk(id, { id: ask.id, answers }));
+    assert.equal(taken.attempt, 1, 'the answer names the attempt whose session held the call');
+    await until(t, () => answered(dir).some((a) => a.event === 'PreToolUse'), 'the held call answered', { everyMs: 50 });
+    assert.deepEqual(
+      (answered(dir).find((a) => a.event === 'PreToolUse')?.answer as { hookSpecificOutput: { updatedInput: unknown } })
+        .hookSpecificOutput.updatedInput,
+      { questions: [ONE], answers },
+      'the person’s answer reaches the session’s own call through the engine’s door, not through the holder’s ops',
+    );
+  },
+);

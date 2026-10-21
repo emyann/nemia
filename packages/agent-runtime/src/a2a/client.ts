@@ -430,6 +430,7 @@ export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string)
     ...(offered.methods.includes('sessionTranscript') ? transcriptsThrough(transport) : {}),
     ...(offered.methods.includes('observeSessions') ? { observeFor } : {}),
     ...(offered.say ? { say } : {}),
+    ...(ops.answer ? { answer: ops.answer } : {}),
     ...(ops.refuses ? { refuses: ops.refuses } : {}),
   };
 };

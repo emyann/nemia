@@ -330,6 +330,13 @@ export const claudeCodeOps = (options: ClaudeOptions = {}, attached?: Attached):
 
     say: (session, text) => of(session.sessionId).say!(session, text),
 
+    /**
+     * The person's answer to a call one of these sessions holds open, which only a session this process holds attached can hold:
+     * an engine with no holder offers the verb at all, so a question of a job's or of a `--bg` session's is refused where it is
+     * read, never routed to a runner that has no call waiting.
+     */
+    ...(attached ? { answer: (session: Parameters<NonNullable<RunnerOps['answer']>>[0], given: Parameters<NonNullable<RunnerOps['answer']>>[1]) => attached.ops.answer!(session, given) } : {}),
+
     quota: claudeQuota(),
 
     forget: (session, options) =>

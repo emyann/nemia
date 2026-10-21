@@ -5,8 +5,8 @@
  * - A background session (`claude --bg`) in `acceptEdits` or `auto` sits on its first call outside its folder waiting on a permission
  *   prompt nobody answers; `dontAsk` denies instead and `bypassPermissions` allows instead. Every other mode is refused by the name of
  *   the step in it, and the fixture puts that step second, so a rule that only reads the first step fails.
- * - A job waits on nobody in any mode: `claude -p` in a folder is denied each call it cannot make and exits on its own, and so a claude
- *   step with no `background: true` passes in every mode, as `claude-detached` does, which is `claude -p` by another road. `codex exec`
+ * - A job waits on nobody in any mode: a job in a folder is denied each call it cannot make and exits on its own, and so a claude
+ *   step with no `background: true` passes in every mode, as `claude-detached` does, the same session by another road. `codex exec`
  *   is not interactive and has one shell fenced by its `sandbox:`, so a codex folder team is never judged on Claude Code's words,
  *   which would tell it to write a `permissionMode: dontAsk` codex does not take.
  */
@@ -2046,7 +2046,7 @@ test('`denials: fail` is read on a job of `claude` and `claude-detached`, and a 
   assert.throws(
     () => fm('supervise', 'background: true\ndenials: fail'),
     refusedWith(
-      /^supervise: `denials: fail` stops the step on a call the harness denied, and `background: true` runs it as a Claude Code background session \(`claude --bg`\), whose denials are not read \(agent-runtime's open issue 28\) — so the line would never stop anything\. Delete `background: true` to run the step as a job \(`claude -p`\), which records each call it was denied, or delete `denials: fail`\.$/,
+      /^supervise: `denials: fail` stops the step on a call the harness denied, and `background: true` runs it as a Claude Code background session \(`claude --bg`\), whose denials are not read \(agent-runtime's open issue 28\) — so the line would never stop anything\. Delete `background: true` to run the step as a job, which records each call it was denied, or delete `denials: fail`\.$/,
     ),
   );
   const step = fm('review', 'denials: fail\nallowedTools: Edit(**)');

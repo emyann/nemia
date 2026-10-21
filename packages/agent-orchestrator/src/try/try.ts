@@ -128,7 +128,7 @@ export function untriedOf(agent: TriedAgent, home: string): Untried | null {
   }
   if (agent.keys.remote === 'true') {
     return {
-      why: `${agent.name} says \`remote: true\`, which bridges a background session to claude.ai, and a try runs as a job (\`claude -p\`), which is never bridged. Delete \`remote: true\` to try it.`,
+      why: `${agent.name} says \`remote: true\`, which bridges a background session to claude.ai, and a try runs as a job, which is never bridged. Delete \`remote: true\` to try it.`,
       copy: null,
     };
   }

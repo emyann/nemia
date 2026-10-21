@@ -89,15 +89,23 @@ export type EngineOptions = {
    */
   claudeExecutable?: string;
   /**
-   * The engines that hold the sessions this one only reads, by the harness each holds: the card that engine served on its own port
-   * (`Served.cards`), as the JSON it answered. Given one, this engine's `follow` of that harness's sessions is dialled on that port
+   * The engines that hold the sessions this one only reads, by the harness each holds: for each, a function asked at every follow
+   * of that harness's sessions, answering the card that engine served on its own port (`Served.cards`), as the JSON it answered, or
+   * `undefined` for a harness no one holds now. Given a card, this engine's `follow` of that session is dialled on that port
    * (`holderSeamOf`) and nothing else is: a spawn, a stop, words said, a view, a transcript, logs and output are read here, off the
-   * files both engines share, so this engine still answers with the holder down — just not live. The token is not here: `credentials`
-   * gives it for the card's `bearer` scheme, and a `holder` with no `credentials` that answers is refused at the first follow, in
-   * words naming the fix. Named for a harness this engine does not run as Claude Code attached (`'claude'`) it is refused before
-   * the engine builds: no other harness's sessions are held by a process of ours.
+   * files both engines share, so this engine still answers with the holder down — just not live, which is also what `undefined`
+   * answers: that follow reads the files, exactly as an engine given no holder at all does.
+   *
+   * A function and not a value, because a holder's port is ephemeral while a layer above may build its engine once for its whole
+   * process: a value would be the holder that was up when the engine was built, and a viewer would dial a dead port after any
+   * restart of the holder. The token is not here: `credentials` gives it for the card's `bearer` scheme, and a `holder` with no
+   * `credentials` that answers is refused at the first follow, in words naming the fix.
+   *
+   * Named for a harness this engine does not run, or does not run as Claude Code attached (`'claude'`), it is refused before the
+   * engine builds (`holderRefusal`): no other harness's sessions are held by a process of ours. What the function answers is
+   * refused at the follow that asked for it (`holderAgentRefusal`), since there is nothing to read until then.
    */
-  holder?: Record<string, HolderAgent>;
+  holder?: Record<string, () => HolderAgent | undefined>;
 };
 
 /** A task to file (`Engine.file`). */
@@ -261,16 +269,30 @@ const runnerOf = (
           : h;
 
 /**
- * Why one of `options.holder`'s entries cannot be taken, or `undefined`: the first `holderRefusal` refuses, in the options' order.
+ * Which of `harnesses` a holder can hold: the names configured as the literal `'claude'`, and no other. Those are the sessions one
+ * process holds attached, and the only ones another process cannot read live off the files both engines share — a remote agent's are
+ * the other party's, a detached one's and a command's are on the store. One rule, read by what a holder serves (`servingOf` in
+ * `engine.ts`), by what `holder` may name (`holdersRefusalOf`), and by a layer above that configures a viewer off the runtime's door:
+ * a copy of the literal elsewhere drifts the day the rule changes.
+ */
+export const heldHarnessesOf = (harnesses: Record<string, HarnessConfig>): string[] =>
+  Object.entries(harnesses)
+    .filter(([, h]) => h === 'claude')
+    .map(([name]) => name);
+
+/**
+ * Why one of `options.holder`'s names cannot be taken, or `undefined`: the first `holderRefusal` refuses, in the options' order.
  * The harnesses it is read against are the ones the engine will run — `DEFAULT_HARNESSES` where the options name none, as `make`
- * reads them — so a holder of the `claude` harness is taken by an engine that was given no `harnesses` at all.
+ * reads them — so a holder of the `claude` harness is taken by an engine that was given no `harnesses` at all. Only the names
+ * are read here, and that each entry is a function at all: what a function *answers* is refused at the follow that asks it
+ * (`holderAgentRefusal`).
  */
 const holdersRefusalOf = (options: EngineOptions): string | undefined => {
   const harnesses = options.harnesses ?? DEFAULT_HARNESSES;
   const names = Object.keys(harnesses);
-  for (const [name, agent] of Object.entries(options.holder ?? {})) {
-    const h = Object.hasOwn(harnesses, name) ? harnesses[name] : undefined;
-    const refused = holderRefusal(name, agent, { harnesses: names, claude: h === 'claude' });
+  const held = heldHarnessesOf(harnesses);
+  for (const [name, holder] of Object.entries(options.holder ?? {})) {
+    const refused = holderRefusal(name, holder, { harnesses: names, claude: held.includes(name) });
     if (refused) return refused;
   }
   return undefined;

@@ -2146,11 +2146,18 @@ road alone reads it, as a job and a `--bg` session run the `claude` on the PATH.
   read live for itself. Every other method of A2A is refused in the SDK's own error (`a2a/listener.ts`, `a2a/served.ts`). One token is minted per hold, kept `0600` under `<root>/a2a/holder-token`, never printed, and checked on every
   request, the card's read included: without it, or with a wrong one, the answer is HTTP 401. Whoever took the hold hands the
   address, the token and a harness's card to whoever should read it — the runtime writes no file of another layer's. An engine
-  given that card inline (`holder: { <harness>: { card } }`, refused for a harness it does not run as `'claude'`) and a
-  `credentials` answer follows a session of the holder's through
-  the port, and spawns, says, stops and reads every transcript from the files itself, so a viewer still reads the conversation with
-  the holder gone (`a2a/holder-follow.ts`). The port goes with the scope: the server stops, every open socket is destroyed, and the
-  token's file is forgotten.
+  given a holder for that harness (`holder: { <harness>: () => ({ card }) }`, refused before it builds for a harness it does not
+  run as `'claude'`, and for an entry that is not a function) and a `credentials` that answers for the card's `bearer` scheme
+  follows a session of the holder's through the port, and spawns, says, stops and reads every transcript from the files itself, so
+  a viewer still reads the conversation with the holder gone (`a2a/holder-follow.ts`).
+
+  The entry is a function, asked at **every** follow of that harness's sessions, and never a card captured when the engine was
+  built: a layer above may build its engine once for its whole process — the api does — while a holder's port is ephemeral, so a
+  captured card would be whichever holder was up at startup, and a viewer would dial a dead port after any restart of the holder.
+  Answering `undefined` means no one holds those sessions now, and that follow reads the files, exactly as an engine given no
+  holder at all does; a card it answers that this runtime cannot read is refused at that follow, in words, with nothing dialled.
+  The port goes with the scope: the server stops, every open socket is destroyed, and the token's file is forgotten
+  (`holderTokenOf` reads it while it is there, for whoever hands a viewer its credentials).
 - **The fence.** The job's, fact for fact (`attachedOptions`, held to `claudePrintFlags` by its test). A call that would ask a
   person is answered in the holder (`canUseTool`): denied, and written as a denial.
 - **Let go.** As the holder's scope closes, new calls wait at their `PreToolUse` hook, it waits with no bound for each call in

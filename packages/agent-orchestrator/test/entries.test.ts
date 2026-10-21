@@ -219,6 +219,7 @@ const PINNED: Record<string, string[]> = {
     'helpOf',
     'hireAgent',
     'hireRefusal',
+    'heldHolder',
     'hireRefusalOf',
     'hold',
     'holdAdvice',

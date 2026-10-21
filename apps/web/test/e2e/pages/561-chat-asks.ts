@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { chatFieldOf, herChat, openChat, photograph, themeOf, type HerAsk } from '../board.ts';
+import { chatFieldOf, chatPanelOf, herChat, openChat, photograph, themeOf, type HerAsk } from '../board.ts';
 import { expectCount, expectNone, expectVisible, idle, Refused, settled } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
@@ -92,6 +92,11 @@ export default {
         },
         'but the composer waits on nobody for it: nothing of hers is held open for the words to answer',
       );
+      // The panel is closed before the fixture goes back, so no stream of hers resumes on a cursor counting the marks it took away:
+      // a read of a chat that shrank under an open tab is refused, and the refusal would be this page's.
+      await page.keyboard.press('Escape');
+      await expectCount(chatPanelOf(page), 0, 'her panel closes on Escape, and its stream with it');
+      await idle(page);
     } finally {
       cut();
     }

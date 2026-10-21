@@ -739,6 +739,7 @@ test('a spawn the harness takes: the request reaches it whole, and the Task is w
         cwd: '/repo',
         harness: 'fake',
         config: { model: 'opus' },
+        restartPolicy: undefined,
         closeoutSchema: undefined,
         resumeFrom: undefined,
         resource: undefined,

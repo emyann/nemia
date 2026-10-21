@@ -51,13 +51,18 @@ const extraValueOf = (key: string, value: string | number | true | string[]): st
   );
 };
 
-/** The text of the prompt file `key` names, refused — saying what to do — where it cannot be read. */
-const promptText = (key: string, file: string): string => {
+/**
+ * The text of the prompt file `key` names, read from the session's own `cwd` where the path is relative — as Claude Code resolved the
+ * flag's path from inside the child's cwd, and as the plugin folders are resolved — and refused, saying what to do, where it cannot be
+ * read.
+ */
+const promptText = (key: string, cwd: string, file: string): string => {
+  const at = path.resolve(cwd, file);
   try {
-    return fs.readFileSync(file, 'utf8');
+    return fs.readFileSync(at, 'utf8');
   } catch (e) {
     throw new Error(
-      `\`config.claude.${key}\` names ${file}, which cannot be read (${(e as Error).message}), and an attached session is given the prompt's text on the SDK's \`systemPrompt\`, not the file's path. Write the file before the task is spawned, or take the key off the task.`,
+      `\`config.claude.${key}\` names ${at}, which cannot be read (${(e as Error).message}), and an attached session is given the prompt's text on the SDK's \`systemPrompt\`, not the file's path. Write the file before the task is spawned, or take the key off the task.`,
       { cause: e },
     );
   }
@@ -72,17 +77,17 @@ const promptText = (key: string, file: string): string => {
  * Refused, naming both keys and the harness that takes both flags, where a task gives both: the SDK has the one option where the CLI
  * had two flags, and what Claude Code does given both is unmeasured, so the runtime does not choose for the person.
  */
-const promptOf = (append: string | undefined, replace: string | undefined): Options['systemPrompt'] => {
+const promptOf = (cwd: string, append: string | undefined, replace: string | undefined): Options['systemPrompt'] => {
   if (append !== undefined && replace !== undefined) {
     throw new Error(
       "`config.claude.appendSystemPromptFile` and `config.claude.systemPromptFile` are both given, and an attached session carries the one `systemPrompt` the Agent SDK takes: a prompt appended to Claude Code's own, or a prompt in place of it, never both. Give one of the two, or file the task on `claude-detached`, which takes both flags.",
     );
   }
-  if (replace !== undefined) return promptText('systemPromptFile', replace);
+  if (replace !== undefined) return promptText('systemPromptFile', cwd, replace);
   return {
     type: 'preset',
     preset: 'claude_code',
-    ...(append === undefined ? {} : { append: promptText('appendSystemPromptFile', append) }),
+    ...(append === undefined ? {} : { append: promptText('appendSystemPromptFile', cwd, append) }),
   };
 };
 
@@ -90,9 +95,10 @@ const promptOf = (append: string | undefined, replace: string | undefined): Opti
  * `config.claude` as `extraArgs` takes it, each flag by its name without `--`, with its plugin folders apart, its settings apart
  * with the session's auto-memory off in them (`memorylessSettings`), as the SDK's own `settings` option takes them (an object, or a
  * file's path as given, which the runtime does not rewrite), and its prompt files apart as the SDK's own `systemPrompt`
- * (`promptOf`).
+ * (`promptOf`), each of those paths taken from `cwd` where it is relative.
  */
 const extraOf = (
+  cwd: string,
   flags: ClaudeFlags | undefined,
 ): {
   extra: Record<string, string | null>;
@@ -106,7 +112,7 @@ const extraOf = (
     extra: Object.fromEntries(given.map(([key, value]) => [claudeFlagName(key).slice(2), extraValueOf(key, value)])),
     plugins: pluginDir ?? [],
     settings: memorylessSettings(settings) ?? settings,
-    systemPrompt: promptOf(appendSystemPromptFile, systemPromptFile),
+    systemPrompt: promptOf(cwd, appendSystemPromptFile, systemPromptFile),
   };
 };
 
@@ -154,7 +160,7 @@ const askedOf = (r: SpawnRequest): AttachedOptions => ({
  */
 export const attachedOptions = (r: SpawnRequest): AttachedOptions => {
   const c = r.config;
-  const { extra, plugins, settings, systemPrompt } = extraOf(admittedFlags(c));
+  const { extra, plugins, settings, systemPrompt } = extraOf(r.cwd, admittedFlags(c));
   const servers = everyMcpServer(r.cwd, c);
   const window = c?.contextTokens;
   const windowed = window !== undefined && typeof settings === 'object';

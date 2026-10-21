@@ -1048,7 +1048,9 @@ plugin directory of the step's own, and the runtime reads none of it: `domain.ts
 
 An **attached** session has no command line of the runtime's making, so each of those keys reaches it on the Agent SDK's own
 `Options` where the SDK has one (`attachedOptions`, SDK 0.3.270): `appendSystemPromptFile` and `systemPromptFile` as
-`systemPrompt` — the file's text, read when the session is spawned, appended to the `claude_code` preset or in place of it —
+`systemPrompt` — the file's text, read when the session is spawned, appended to the `claude_code` preset or in place of it, from the
+task's own `cwd` where the path is relative, as Claude Code resolved the flag's path from inside the child and as `pluginDir` is
+resolved —
 `pluginDir` as `plugins`, and `settings` as `settings`. Giving both prompt files is refused there, naming
 `claude-detached`, which takes both flags: the SDK has the one option, and what Claude Code does given both is unmeasured. What
 stays raw, on `extraArgs`: `--no-chrome` and `--worktree`, which `sdk.d.ts` has no option for, and whatever else a task writes

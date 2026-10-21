@@ -29,6 +29,7 @@ const APPEND = path.join(CWD, 'agent.md');
 const REPLACE = path.join(CWD, 'whole.md');
 fs.writeFileSync(APPEND, 'you are the agent');
 fs.writeFileSync(REPLACE, 'you are nobody Claude Code knows');
+fs.writeFileSync(path.join(CWD, 'beside.md'), 'you are the agent beside the work');
 fs.writeFileSync(
   path.join(CWD, '.mcp.json'),
   JSON.stringify({ mcpServers: { repo: { command: 'repo-server' }, both: { command: 'theirs' } } }),
@@ -146,6 +147,19 @@ test('a task with systemPromptFile is given that file’s text in place of Claud
     attachedOptions(withClaude({})).systemPrompt,
     { type: 'preset', preset: 'claude_code' },
     'and a task naming no prompt file still asks for the preset: the SDK sends an empty system prompt when it is unasked',
+  );
+});
+
+test('a prompt file named relatively is read from the session’s own cwd, as Claude Code read the flag’s path and as a plugin folder is', () => {
+  assert.deepEqual(
+    attachedOptions(withClaude({ appendSystemPromptFile: 'beside.md' })).systemPrompt,
+    { type: 'preset', preset: 'claude_code', append: 'you are the agent beside the work' },
+    'the file in the task’s cwd, never one beside whatever process the engine runs in',
+  );
+  assert.equal(
+    attachedOptions(withClaude({ systemPromptFile: 'beside.md' })).systemPrompt,
+    'you are the agent beside the work',
+    'and the same for the prompt that replaces Claude Code’s own',
   );
 });
 

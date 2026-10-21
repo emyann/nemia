@@ -272,6 +272,11 @@ export const killGroup = (pid: number | undefined): void => {
  * it continues. `executable` is the Claude Code it runs, the SDK's own when absent, and `pushed` is given every message it gives. It
  * ends `completed` or `failed` by its result, `canceled` when aborted, `failed` when its messages end with none; a session let go
  * (`letGo`) is left as its holder wrote it.
+ *
+ * The session's options are built before its run file is written: `attachedOptions` refuses a task whose prompt file cannot be read,
+ * whose `config.claude` flag is given two values or whose checkout's `.mcp.json` is not JSON, and a spawn refused that way must leave
+ * nothing behind — a run file saying `state: 'working'` with this holder's pid would be read by every later pass as a held, open
+ * sighting of a session `query()` never started, which `releaseFinished` never takes because it never finishes.
  */
 export const startSession = (
   root: string,
@@ -294,9 +299,9 @@ export const startSession = (
     done: Promise.resolve(),
     ...(options.pushed ? { pushed: options.pushed } : {}),
   };
+  const given = attachedOptions(r);
   writeRun(root, run);
   live.unanswered.add(live.input.push(first));
-  const given = attachedOptions(r);
   const q = query({
     prompt: live.input,
     options: {

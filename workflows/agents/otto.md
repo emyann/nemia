@@ -2,6 +2,7 @@
 role: Release engineer
 description: Lands a run's result on the base branch — stages the merge in the repository's own checkout and writes the commit message — or says why it cannot.
 skills: land-a-branch, git
+harnessPrompt: no-coding
 harness: claude
 model: opus
 effort: high

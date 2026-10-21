@@ -18,7 +18,8 @@ import { fansOut, orderSteps, terminalSteps, parseWorkflow, validate, WorkflowEr
 import { isFolderTeam, splitFrontmatter, stepPlace } from '../src/workflow.ts';
 import { loadWorkflows, workflowDescription, workflowFolder, workflowReadme } from '../src/folder/folder.store.ts';
 import { CLOSEOUT_FIELDS, DEFAULT_ROUNDS, loopSpan, outputFields, STEP_KEY_MEANINGS, STEP_KEYS, type StepKey } from '../src/workflow.ts';
-import { agentsDir, parseFolder, renderStep, sessionContext, stepNameRefusal, type StepDraft } from '../src/workflow.ts';
+import { agentsDir, asFileSays, parseFolder, renderStep, sessionContext, stepNameRefusal, type StepDraft } from '../src/workflow.ts';
+import { skillsFor } from '../src/skills/read.store.ts';
 import { loadAgents } from '../src/agents/read.store.ts';
 import { allowRuleOf, disallowedBy, DENIALS, HARNESSES } from '../src/workflow.ts';
 import { CLAUDE_PERMISSION_MODES, CODEX_SANDBOXES } from 'agent-runtime';
@@ -2481,7 +2482,7 @@ test('`renderStep` is the parser run backwards: every step of every folder there
       const text = renderStep(step);
       assert.deepEqual(
         parseWorkflow(step.name, text, read, agents),
-        step,
+        asFileSays(step),
         `${path.relative(root, dir)}/${step.name}.md, rendered:\n${text}`,
       );
       assert.equal(renderStep(parseWorkflow(step.name, text, read, agents)), text, 'and renders to the same text again');
@@ -2491,6 +2492,7 @@ test('`renderStep` is the parser run backwards: every step of every folder there
         steps.map((step) => [step.name, renderStep(step)]),
         read,
         agents,
+        skillsFor(dir, placesOf(dir)),
       ),
       steps,
       dir,

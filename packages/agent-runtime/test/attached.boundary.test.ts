@@ -9,7 +9,9 @@
  * reaches a process given a pid since, a let-go whose sessions never end still returns with its waits inside one budget, a resumed
  * session's cost leaves out what its parent spent, a session is started on Claude Code's own system prompt with the agent's appended
  * to it — as text on the `initialize` request, not as a flag naming a file — and its servers ride the child's argv as the inline JSON
- * the SDK compiles `Options.mcpServers` to, strict, with the context window a key of the one settings object.
+ * the SDK compiles `Options.mcpServers` to, strict, with the context window a key of the one settings object, and a spawn whose
+ * options are refused — a prompt file that cannot be read, a flag given two values, a checkout `.mcp.json` that is not JSON — leaves
+ * no run file behind, so no later pass reads a held sighting of a session that never started.
  *
  * And, of a long-lived attached request (`restartPolicy: 'Always'`), which runs here by the runtime's own rule: a turn's end is not
  * the session's end, the session is written `idle` and heard again across turns, an interrupted turn's `error_during_execution` result
@@ -43,6 +45,7 @@ import { purseOf } from '../src/core/clock.ts';
 import { instantNow } from '../src/core/engine/now.ts';
 import type { Live } from '../src/harness/claude/attached-session.ts';
 import { claudeCodeOps } from '../src/harness/claude/code.ts';
+import type { SpawnRequest } from '../src/harness/seam.ts';
 import { Engine } from '../src/index.ts';
 import { scratch } from './scratch.ts';
 import { until, WAITED } from '../src/waits/index.ts';
@@ -840,4 +843,29 @@ test("a long-lived session is started on that same prompt: one path builds an at
   const [argv] = lines(dir, 'argv.jsonl') as string[][];
   assert.ok(!argv.includes('--append-system-prompt-file'), 'and neither session has it as a flag');
   assert.ok(!argv.includes('--system-prompt'), 'and no prompt of ours is spawned: Claude Code renders its own');
+});
+
+test('a spawn whose options are refused leaves no run file behind: no held sighting of a session that never started', async (t) => {
+  const bad = (what: string, config: SpawnRequest['config'], mcp?: string) => {
+    const { root, dir, request } = place({ output: {} }, config);
+    if (mcp !== undefined) fs.writeFileSync(path.join(dir, '.mcp.json'), mcp);
+    return { what, root, request };
+  };
+  const cases = [
+    bad('a prompt file that cannot be read', { claude: { appendSystemPromptFile: 'not-there.md' } }),
+    bad('a `config.claude` flag given two values', { claude: { someFlag: ['one', 'two'] } }),
+    bad('a checkout `.mcp.json` that is not JSON', {}, '{ not json'),
+  ];
+  for (const { what, root, request } of cases) {
+    const h = await holder(root);
+    t.after(h.close);
+    const exit = await Effect.runPromiseExit(h.attached.ops.spawn(request));
+    assert.ok(Exit.isFailure(exit), `${what}: the spawn is refused`);
+    assert.equal(fs.existsSync(filesOf(root, NAME).run), false, `${what}: no run file is left for a session query() never started`);
+    assert.deepEqual(
+      [...(await Effect.runPromise(h.attached.ops.observe)).keys()],
+      [],
+      `${what}: and a later pass reads no sighting at all, held or otherwise`,
+    );
+  }
 });

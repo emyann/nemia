@@ -631,10 +631,11 @@ Claude Code's flags for it in the engine's `config.claude` (docs/spike-2026-09-2
   (*"Skill look is disabled for model invocation in skillOverrides settings"*, Claude Code 2.1.285). An agent's body or a skill's that
   says *load `look`* still reaches the copy: told so, a session calls `nemia-<agent>:look`, the one it is listed. Claude Code's own
   bundled skills are governed by another key, `disableBundledSkills`, which the run sets neither way: they stay listed beside the step's
-  own. Measured again at Claude Code 2.1.306: an override of a bare name takes that skill out of a session's listing; an override of a
-  name nothing has is ignored, with no warning; the skills of a `--plugin-dir` plugin stay listed under `<plugin>:<name>` though their
-  bare names are off; and the skills of a plugin installed from a marketplace do not — which reaches no job, since a job is spawned with
-  `--setting-sources project` and is listed no operator plugin at all (F24).
+  own. Measured again at Claude Code 2.1.306: an override of a bare name takes that skill out of a session's listing, whether it is a
+  skill of `.claude/skills/` or one of a plugin installed from a marketplace, whose `<plugin>:<name>` goes with its bare name — which
+  reaches no job, since a job is spawned with `--setting-sources project` and is listed no operator plugin at all (F24); the bundled
+  skills stay listed with no `disableBundledSkills` set; and the skills of a plugin given by `--plugin-dir` stay listed under
+  `<plugin>:<name>` though every bare name of them is off, which is what this leans on.
 - `mcp:` — the MCP servers its sessions load, by the names the checkout's `.mcp.json` gives them, comma-separated: `mcp: playwright`.
   A session loads the servers its agent and its step name and no other: where neither has a line it loads none, and neither does a
   step with no agent.

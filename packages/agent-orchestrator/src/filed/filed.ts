@@ -8,6 +8,8 @@ import type { Mount, Run, StepRecord } from '../record/record.ts';
 import { stepMounts } from '../factory/factory.ts';
 import { handedMounts, type HandedFiles } from '../artifacts/artifacts.ts';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
+import { splitServers, type FactoryServers } from '../servers/servers.ts';
+import type { RemoteMcpServer } from '../runtime-client.ts';
 
 /**
  * The harness's arguments a step is filed with, which the engine carries to the runner unread (`HarnessArgs`), all from the workflow the
@@ -16,8 +18,9 @@ import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
  * an ending's read of the run's artifacts folder (`runArtifacts`, `filedAllows`), the folders the run mounts (`mounts`, frozen at start),
  * writable where the step's `writable:` names one (`stepMounts`), then the folders its brief names beside them (`filedFolders`): the
  * artifacts folder of each step it comes after, read-only, then the store's folders its `reads:` names, read-only, the inbox at `t.inbox`,
- * then the run's inputs folder at `t.inputs`, read-only, given only for a run given inputs; the key left out with none, the servers of
- * the checkout its sessions load (`checkoutMcpOf`), the step's files directory in its session's environment (`stepFilesEnv`), and the
+ * then the run's inputs folder at `t.inputs`, read-only, given only for a run given inputs; the key left out with none, the MCP servers
+ * its sessions load, its factory's record first and the checkout's `.mcp.json` for the rest (`serversOf`), the step's files directory in
+ * its session's environment (`stepFilesEnv`), and the
  * harness's own arguments (`own`) last. The runtime judges no budget:
  * `budgetUsd` is the harness's own cap, and whether the step went over is this package's (`ownStatus`). Pure.
  */
@@ -33,6 +36,13 @@ export const filedConfig = <Own extends object>(
     inputs?: string;
     own: Own;
     landingDenied: () => readonly string[];
+    /**
+     * The servers the run's factory records (`factoryServers`), read by the caller's store and handed in: a name the step's agent gives
+     * resolves against these before the checkout's `.mcp.json`. One writer hands it — `filedAt`, which every caller spreads — because a
+     * caller that passed none would silently give the step no factory server and have it refused for a name the checkout does not
+     * declare. `{}` or absent: every name resolves against the checkout, as it did.
+     */
+    servers?: FactoryServers;
   },
 ) => ({
   model: t.model,
@@ -45,7 +55,7 @@ export const filedConfig = <Own extends object>(
   background: step.background,
   budgetUsd: t.budgetUsd,
   ...mountsOf([...(stepMounts(step, run.mounts) ?? []), ...folders(filedFolders(step, steps, t))]),
-  ...checkoutMcpOf(step),
+  ...serversOf(step, t.servers),
   ...stepFilesEnv(step, t.runArtifacts),
   ...t.own,
 });
@@ -120,11 +130,25 @@ export const inputsMounts = (
 ): Mount[] => (dir !== undefined && local(step.harness) && !isFolderTeam(steps) ? [{ path: dir, readOnly: true }] : []);
 
 /**
- * The MCP servers of its checkout a step's sessions load, as a config holds them: the names its frozen agent gives (`StepAgent.mcp`),
- * none for a step with no agent, and no key for an agent frozen before it named any, whose sessions load the whole file as they did.
+ * The MCP servers a step's sessions load, as a config holds them: the names its frozen agent gives (`StepAgent.mcp`), split against the
+ * factory's record (`splitServers`) — a name the factory records rides the task's own `mcp`, as the servers themselves, and is left out
+ * of `checkoutMcp`; the rest stay `checkoutMcp`, names of the checkout's `.mcp.json`.
+ *
+ * The factory comes first, and the name is *removed* from `checkoutMcp` rather than left on both: a name on both lists trips the
+ * runtime's own "one would hide the other" refusal (`checkoutMcpRefusalOf`) and refuses the step instead of resolving it.
+ *
+ * None for a step with no agent, and no key at all for an agent frozen before it named any, whose sessions load the whole file as they
+ * did.
  */
-const checkoutMcpOf = (step: Pick<Workflow, 'agent'>): { checkoutMcp?: string[] } =>
-  step.agent === undefined ? { checkoutMcp: [] } : step.agent.mcp === undefined ? {} : { checkoutMcp: step.agent.mcp };
+const serversOf = (
+  step: Pick<Workflow, 'agent'>,
+  record: FactoryServers | undefined,
+): { checkoutMcp?: string[]; mcp?: Record<string, RemoteMcpServer> } => {
+  if (step.agent === undefined) return { checkoutMcp: [] };
+  if (step.agent.mcp === undefined) return {};
+  const { mcp, checkout } = splitServers(step.agent.mcp, record);
+  return { checkoutMcp: checkout, ...(mcp === undefined ? {} : { mcp }) };
+};
 
 /** `mounts` as a config holds them: the key, or none for no folder. */
 const mountsOf = (mounts: Mount[]): { mounts?: Mount[] } => (mounts.length ? { mounts } : {});

@@ -159,7 +159,7 @@ export { folderTrust, trustFolder, trustedFolder, type FolderTrust, type FolderT
  * says it, and what a whole read answers — the states, or that the look failed and why, never an empty list. Read through the engine's
  * `mcpState`, the one verb that opens a session to ask.
  */
-export { MCP_STATES } from './harness/mcp-state.ts';
+export { MCP_STATES, signsInMcp } from './harness/mcp-state.ts';
 export type { McpServerState, McpServersRead } from './harness/mcp-state.ts';
 /** One MCP server a caller records and a harness is handed, and the one producer of its bytes (`mcpServerOf`). */
 export { mcpServerOf } from './harness/mcp.ts';

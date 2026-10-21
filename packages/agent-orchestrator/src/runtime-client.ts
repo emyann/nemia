@@ -86,6 +86,11 @@ export { mcpServerOf, type LocalMcpServer, type RemoteMcpServer } from 'agent-ru
  * never an empty list. Asked of the engine's `mcpState`, and refused by `McpStateRefused`.
  */
 export { MCP_STATES, McpStateRefused, type McpServerState, type McpServersRead } from 'agent-runtime';
+/**
+ * Whether a harness files a sign-in for a remote MCP server, read off its name: the runtime's judgement, carried, for the pass that
+ * will not start a step whose server needs one. A harness it answers false for is shown its servers and never refused them.
+ */
+export { signsInMcp } from 'agent-runtime';
 
 /**
  * The allow rules the repository's own harness configuration grants a session started in it, as the harness reads them

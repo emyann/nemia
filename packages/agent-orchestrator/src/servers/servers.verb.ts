@@ -10,7 +10,7 @@
  * `levels.verb.ts` has the default factory's special case.
  */
 import { Effect } from 'effect';
-import { EngineService, tried, type McpServerState, type McpServersRead } from '../runtime-client.ts';
+import { EngineService, signsInMcp, tried, type McpServerState, type McpServersRead } from '../runtime-client.ts';
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { DEFAULT_FACTORY, noFactoryLine } from '../factory/factory.ts';
@@ -299,3 +299,53 @@ export const FACTORY_SERVER_RM: Command<{ file: string; removed: string }> = {
     `recorded: ${file} — the sign-in the harness filed for it is left in the harness's own store`,
   ],
 };
+
+/** What a pass read of a run's factory record before it files: the servers, their states, and why a step of it may not start. */
+export type ServersBefore = {
+  /** Why no step with a factory server may start now, naming the file and the command: `null` where every one may. */
+  readonly refusal: string | null;
+  /** The notes the pass says of this read, whatever it decided: the states it could not read, said once for the pass. */
+  readonly notes: readonly string[];
+  /** Why the step `step` of agent `agent`'s named servers may not start now, or `null`. */
+  readonly refuses: (harness: string | undefined, named: readonly string[] | undefined) => string | null;
+};
+
+/** A pass that read nothing, because the factory records no server: no step is refused, and nothing is noted. */
+const NOTHING: ServersBefore = { refusal: null, notes: [], refuses: () => null };
+
+/**
+ * What the run's factory records, read once for the pass, with the state of every server of it read in one ask of the engine: the
+ * judgement a pass makes before it files a step whose agent names one.
+ *
+ * - A factory that records no server reads nothing and asks nothing: no engine ask, no spawn, no cost.
+ * - A record that does not read refuses every step that names a server, naming the file and the command that writes it again — the
+ *   filing itself was handed no server for it (`recordedServers`), so the step would otherwise be refused for a name the checkout
+ *   does not declare, which names the wrong fix.
+ * - A server that reports `needs-auth` refuses the steps that name it, on a harness that files a sign-in (`signsInMcp`); the note says
+ *   the server, the factory and the sign-in to make. On any other harness nothing is refused: the servers reach the session unsigned,
+ *   and a state of one there is unread rather than false.
+ * - A look that failed refuses nothing at all and says the states are unread, once for the pass: an absence read off a failed look is
+ *   not an absence, and a step refused on a harness that was merely busy would be refused for ever.
+ */
+export const serversBefore = Effect.fn('serversBefore')(function* (factory: string) {
+  const read: FactoryServers | { readonly refused: string } = yield* tried(() => factoryServers(factory)).pipe(
+    Effect.catch((err) => Effect.succeed({ refused: err.message })),
+  );
+  if ('refused' in read) {
+    const refusal = `the servers ${factory} records cannot be read: ${read.refused}`;
+    return { refusal, notes: [], refuses: (_h, named) => (named?.length ? refusal : null) } satisfies ServersBefore;
+  }
+  if (!Object.keys(read).length) return NOTHING;
+  const { by, unread } = yield* statesOf(read);
+  const notes = unread === null ? [] : [`the state of ${factory}'s MCP servers is unread: ${unread}`];
+  return {
+    refusal: null,
+    notes,
+    refuses: (harness, named) => {
+      if (!named?.length || !signsInMcp(harness)) return null;
+      const waiting = named.filter((name) => by.get(name)?.status === 'needs-auth');
+      if (!waiting.length) return null;
+      return `its \`mcp: ${named.join(', ')}\` names ${waiting.map((n) => `\`${n}\``).join(', ')}, which ${factory} records and which ${waiting.length > 1 ? 'report' : 'reports'} needs-auth: a session of it would reach no tool of ${waiting.length > 1 ? 'those servers' : 'that server'}. Sign ${waiting.length > 1 ? 'them' : 'it'} in on the factory's settings page, then the next pass files the step`;
+    },
+  } satisfies ServersBefore;
+});

@@ -7,7 +7,7 @@
  * it may call. Pure; the file is `servers.store.ts`'s and the verbs `servers.verb.ts`'s.
  */
 import { Schema } from 'effect';
-import type { RemoteMcpServer } from '../runtime-client.ts';
+import { mcpServerOf, type RemoteMcpServer } from '../runtime-client.ts';
 import { SERVER_NAME } from '../keys/index.ts';
 
 /** The header a factory refuses to record by name: a person types no secret, and a server signs in instead. */
@@ -113,7 +113,10 @@ export const factoryServersRefusal = (servers: Readonly<Record<string, unknown>>
  * The factory comes first: a name it records is taken out of `checkoutMcp` altogether, which both gives the factory precedence and
  * keeps the runtime's existing "one would hide the other" refusal (`checkoutMcpRefusalOf`) untripped — a name on both lists would
  * otherwise refuse the step rather than resolve. A name the factory does not record resolves against the checkout exactly as it did,
- * and is still refused there when the file does not declare it. Pure.
+ * and is still refused there when the file does not declare it.
+ *
+ * Each server it supplies goes through `mcpServerOf`, the runtime's one producer of a server's bytes, so a session is handed the same
+ * spelling a state read was: the harness files a sign-in under those bytes, and two spellings are two servers to it. Pure.
  */
 export const splitServers = (
   named: readonly string[] | undefined,
@@ -122,5 +125,5 @@ export const splitServers = (
   if (!named?.length) return { checkout: [] };
   const mine = named.filter((name) => record !== undefined && Object.hasOwn(record, name));
   const checkout = named.filter((name) => !mine.includes(name));
-  return { ...(mine.length ? { mcp: Object.fromEntries(mine.map((name) => [name, record![name]])) } : {}), checkout };
+  return { ...(mine.length ? { mcp: Object.fromEntries(mine.map((name) => [name, mcpServerOf(record![name])])) } : {}), checkout };
 };

@@ -10,6 +10,10 @@
  * would be facts the board does not have. A chat the api cannot stream and is reading again on a beat says so quietly, apart from that
  * failure, and draws no greeting either, for the same reason (`ChatRetryingBand`).
  *
+ * Her talk, her empty shell and her composer are the family's (`components/conversation/`), under the `chat` prefix every page of hers
+ * reads; the panel is where her presence becomes the composer's words (`composerWords`), its label and its button (`composerButton`),
+ * so no part of the family knows her vocabulary.
+ *
  * While exactly one question of hers waits on the person, drawn as the form (`askInWords`), the composer invites their own words and
  * what they write answers that question (`wordsAnswer`) rather than being said to her as the next message; for a proposal, for
  * several questions and for none, it sends as it always does.
@@ -19,16 +23,17 @@
 import { useEffect } from 'react';
 import { CutFrame } from '@/components/look';
 import { askInWords, wordsAnswer } from '@/lib/chatFollowing';
-import { sessionOf } from '@/lib/nemia';
+import { composerButton, composerWords, sessionOf } from '@/lib/nemia';
 import type { NemiaLevel } from '@/lib/api';
 import type { Presence } from '@/lib/presence';
 import type { NemiaChat } from '@/lib/useNemiaChat';
 import { cn } from '@/lib/utils';
+import { Composer } from '@/components/conversation/Composer';
+import { TalkEmpty } from '@/components/conversation/Talk';
 import { ChatLostBand, ChatRetryingBand, ChatStoppedBand, ChatUnreadableBand } from './ChatBand';
-import { ChatComposer } from './ChatComposer';
 import { ChatEmpty } from './ChatEmpty';
 import { ChatHeader, type ChatMode } from './ChatHeader';
-import { ChatKeptMessage } from './ChatMessage';
+import { ChatKeptMessage } from './ChatKept';
 import { ChatTalk } from './ChatTalk';
 
 /** How far the panel's two corners are cut, in pixels: the look's card cut, nearest the canvas's 22. */
@@ -85,9 +90,9 @@ export function ChatPanel({ chat, nemia, presence, atWork, now, mode, onGrow, on
           !state.loading &&
           !unreadable &&
           retrying === null && (
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
+            <TalkEmpty marks="chat">
               <ChatEmpty nemia={nemia} presence={presence} atWork={atWork} onSend={chat.send} />
-            </div>
+            </TalkEmpty>
           )
         )}
         {kept !== null && (
@@ -97,11 +102,14 @@ export function ChatPanel({ chat, nemia, presence, atWork, now, mode, onGrow, on
           </div>
         )}
         <div className="shrink-0">
-          <ChatComposer
-            presence={presence}
-            asking={inWords !== undefined}
+          <Composer
+            marks="chat"
+            label="Message to Nemia"
+            placeholder={composerWords(presence, inWords !== undefined)}
+            off={presence.notSent}
+            sendLabel="Send"
             onSend={(text) => (inWords === undefined ? chat.send(text) : chat.answer(inWords.call, wordsAnswer(inWords, text)))}
-            onStop={chat.stop}
+            {...(composerButton(presence) === 'stop' ? { stop: { label: 'Stop her answer', press: chat.stop } } : {})}
           />
         </div>
       </section>

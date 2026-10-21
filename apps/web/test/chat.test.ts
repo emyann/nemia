@@ -484,7 +484,11 @@ test('her adapter maps her events onto the one shape the family draws: each kind
   );
   assert.equal(work.running, true, 'a turn whose line waits on a person is still at work');
   assert.equal(work.ms, 134_000);
-  assert.equal(work.lines.every((line) => line.input === undefined && line.result === undefined), true, 'her steps open on nothing');
+  assert.equal(
+    work.lines.every((line) => line.input === undefined && line.result === undefined),
+    true,
+    'her steps open on nothing',
+  );
 
   const hers = items[1];
   if (hers.kind !== 'said') throw new Error('her words are said');
@@ -500,13 +504,16 @@ test('her adapter maps her events onto the one shape the family draws: each kind
 
   const theirs = items[2];
   if (theirs.kind !== 'said') throw new Error("the person's words are said");
-  assert.deepEqual({ who: theirs.who, yours: theirs.yours, markdown: theirs.markdown, text: theirs.text, links: theirs.links }, {
-    who: 'You',
-    yours: true,
-    markdown: false,
-    text: 'Land the first.',
-    links: [],
-  });
+  assert.deepEqual(
+    { who: theirs.who, yours: theirs.yours, markdown: theirs.markdown, text: theirs.text, links: theirs.links },
+    {
+      who: 'You',
+      yours: true,
+      markdown: false,
+      text: 'Land the first.',
+      links: [],
+    },
+  );
 
   assert.deepEqual(
     items.slice(3, 5).map((item) => (item.kind === 'note' ? [item.what, item.words] : null)),

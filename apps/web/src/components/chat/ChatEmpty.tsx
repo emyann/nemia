@@ -1,7 +1,8 @@
 /**
  * Nemia's chat with nothing said yet: her face, her greeting, what she is for, the three tags the canvas gives it — her level, how
  * many factories she keeps, how many runs are at work — and the four things a person may start with, each of which, pressed, goes to
- * her outbox as if it had been typed and Entered (the owner's answer at design's gate).
+ * her outbox as if it had been typed and Entered (the owner's answer at design's gate). The shell it scrolls in is the family's
+ * (`conversation/TalkEmpty`), which writes the mark a page of hers selects it by.
  */
 import { Button } from '@/components/ui/button';
 import { container } from '@/lib/meaning';
@@ -37,7 +38,7 @@ export function ChatEmpty({
 }) {
   const factories = nemia?.factories.length ?? 0;
   return (
-    <div data-chat-empty className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4">
       <div className="flex flex-col items-start gap-3 px-0.5 pt-4">
         <NemiaFace presence={presence} size={60} />
         <h3 className="text-title-medium text-on-surface">I keep your factories running.</h3>

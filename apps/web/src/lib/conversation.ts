@@ -75,8 +75,7 @@ export const mark = (prefix: string, what: string, value?: string): Record<strin
 });
 
 /** The one line a folded turn says: `Worked for 2m 14s · 9 steps`, over `ms` and how many `lines` it holds. */
-export const turnWords = (ms: number, lines: number): string =>
-  `Worked for ${duration(ms)} · ${lines === 1 ? '1 step' : `${lines} steps`}`;
+export const turnWords = (ms: number, lines: number): string => `Worked for ${duration(ms)} · ${lines === 1 ? '1 step' : `${lines} steps`}`;
 
 /** The words the line between what was read and what is new says: `2 new`. */
 export const newWords = (unread: number): string => (unread === 1 ? '1 new' : `${unread} new`);

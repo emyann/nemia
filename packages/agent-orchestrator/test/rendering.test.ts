@@ -8,10 +8,21 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { Result, Schema } from 'effect';
 import { codex, CODEX_SANDBOXES } from 'agent-runtime';
 import { CLAUDE_AUTO_DROPPED } from 'agent-runtime/vocabulary';
-import { autoDropped, modeOf, parseAgent, parseWorkflow, renderAgent, WorkflowError, type Agent, type Workflow } from '../src/workflow.ts';
-import { loadWorkflows } from '../src/folder/folder.store.ts';
+import {
+  asNamed,
+  autoDropped,
+  modeOf,
+  parseAgent,
+  parseWorkflow,
+  renderAgent,
+  WorkflowError,
+  type Agent,
+  type Workflow,
+} from '../src/workflow.ts';
+import { FrozenStepSchema, loadWorkflows } from '../src/folder/folder.store.ts';
 import { agentsFor, agentVersion } from '../src/agents/read.store.ts';
 import { PLACE_SKILLS, isShippedPlace, lookupRoots, skillsFor } from '../src/skills/read.store.ts';
 import { SHIPPED_PLACE } from '../src/place/shipped.store.ts';
@@ -539,34 +550,51 @@ test("the prompt heads each layer it composes with that layer's number and its o
   assert.ok(!renderedPrompt(told, []).includes(HEAD.policy), "the step's policy heads its brief, and is never in the prompt");
 });
 
-test("the flags: the prompt appended by default and for no-coding, in place of Claude Code's for own; the plugin for skills or a style; the style by its namespaced name; each named skill's bare copy off", () => {
+test("the flags: the prompt appended by default and for no-coding, in place of Claude Code's for own; the plugin for skills or a style; the style by its namespaced name; every skill the run could see off", () => {
   const dir = '/runs/r/agents/build';
   const flags = (agent: string, files: Record<string, string> = {}) => renderedFlags(resolved(agent, files), dir);
   const skill = { 'workflows/skills/write-a-note/SKILL.md': SKILL('write-a-note') };
-  assert.deepEqual(flags('---\n---\nYou build.\n'), { appendSystemPromptFile: `${dir}/prompt.md` });
+  const PLACE = { git: 'off' } as const;
+  assert.deepEqual(flags('---\n---\nYou build.\n'), {
+    appendSystemPromptFile: `${dir}/prompt.md`,
+    settings: JSON.stringify({ skillOverrides: PLACE }),
+  });
   assert.deepEqual(flags('---\nskills: write-a-note\n---\nYou build.\n', skill), {
     appendSystemPromptFile: `${dir}/prompt.md`,
     pluginDir: [`${dir}/nemia-builder`],
-    settings: JSON.stringify({ skillOverrides: { 'write-a-note': 'off' } }),
+    settings: JSON.stringify({ skillOverrides: { ...PLACE, 'write-a-note': 'off' } }),
   });
   assert.deepEqual(flags('---\nharnessPrompt: no-coding\nskills: write-a-note\n---\nYou build.\n', skill), {
     appendSystemPromptFile: `${dir}/prompt.md`,
     pluginDir: [`${dir}/nemia-builder`],
-    settings: JSON.stringify({ outputStyle: 'nemia-builder:no-coding', skillOverrides: { 'write-a-note': 'off' } }),
+    settings: JSON.stringify({ outputStyle: 'nemia-builder:no-coding', skillOverrides: { ...PLACE, 'write-a-note': 'off' } }),
   });
-  assert.deepEqual(flags('---\nharnessPrompt: replace\n---\nYou build.\n'), { systemPromptFile: `${dir}/prompt.md` });
-  assert.deepEqual(flags('---\nharnessPrompt: keep\n---\nYou build.\n'), { appendSystemPromptFile: `${dir}/prompt.md` });
+  assert.deepEqual(flags('---\nharnessPrompt: replace\n---\nYou build.\n'), {
+    systemPromptFile: `${dir}/prompt.md`,
+    settings: JSON.stringify({ skillOverrides: PLACE }),
+  });
+  assert.deepEqual(flags('---\nharnessPrompt: keep\n---\nYou build.\n'), {
+    appendSystemPromptFile: `${dir}/prompt.md`,
+    settings: JSON.stringify({ skillOverrides: PLACE }),
+  });
   assert.deepEqual(flags('---\nharnessPrompt: no-coding\n---\nYou build.\n'), {
     appendSystemPromptFile: `${dir}/prompt.md`,
     pluginDir: [`${dir}/nemia-builder`],
-    settings: JSON.stringify({ outputStyle: 'nemia-builder:no-coding' }),
+    settings: JSON.stringify({ outputStyle: 'nemia-builder:no-coding', skillOverrides: PLACE }),
   });
-  assert.deepEqual(flags('---\nsystemPrompt: own\n---\nYou build.\n'), { systemPromptFile: `${dir}/prompt.md` }, 'own is replace');
-  assert.deepEqual(flags('---\nsystemPrompt: default\n---\nYou build.\n'), { appendSystemPromptFile: `${dir}/prompt.md` });
+  assert.deepEqual(
+    flags('---\nsystemPrompt: own\n---\nYou build.\n'),
+    { systemPromptFile: `${dir}/prompt.md`, settings: JSON.stringify({ skillOverrides: PLACE }) },
+    'own is replace',
+  );
+  assert.deepEqual(flags('---\nsystemPrompt: default\n---\nYou build.\n'), {
+    appendSystemPromptFile: `${dir}/prompt.md`,
+    settings: JSON.stringify({ skillOverrides: PLACE }),
+  });
   assert.deepEqual(flags('---\nsystemPrompt: no-coding\n---\nYou build.\n'), {
     appendSystemPromptFile: `${dir}/prompt.md`,
     pluginDir: [`${dir}/nemia-builder`],
-    settings: JSON.stringify({ outputStyle: 'nemia-builder:no-coding' }),
+    settings: JSON.stringify({ outputStyle: 'nemia-builder:no-coding', skillOverrides: PLACE }),
   });
   assert.equal(
     flags('---\nmodel: opus\n---\n'),
@@ -580,6 +608,53 @@ test("the flags: the prompt appended by default and for no-coding, in place of C
     ),
     undefined,
     'nothing to render: a step with no agent',
+  );
+});
+
+test("a step's session is told to turn off every skill the run could see, its own among them, and the plugin's copies survive it", () => {
+  const dir = '/runs/r/agents/build';
+  const files = {
+    'workflows/skills/write-a-note/SKILL.md': SKILL('write-a-note'),
+    'workflows/skills/other/SKILL.md': SKILL('other'),
+  };
+  const step = resolved('---\nskills: write-a-note\n---\nYou build.\n', files);
+  assert.deepEqual(step.agent?.offSkills, ['git', 'other', 'write-a-note'], 'every name the lookup found, bare and sorted');
+  const settings = JSON.parse(renderedFlags(step, dir)!.settings!) as { skillOverrides: Record<string, string> };
+  assert.deepEqual(
+    settings.skillOverrides,
+    { git: 'off', other: 'off', 'write-a-note': 'off' },
+    'the one it names is off too, and so are the two it does not: `other`, which no line of the folder names, and the place skill',
+  );
+  assert.deepEqual(renderedFlags(step, dir)!.pluginDir, [`${dir}/nemia-builder`], 'its own copy is in its plugin');
+  assert.ok(
+    !Object.keys(settings.skillOverrides).some((name) => name.includes(':')),
+    'no override names a plugin-scoped form (`nemia-builder:write-a-note`), which is why the session keeps what it is given',
+  );
+  assert.equal('disableBundledSkills' in settings, false, "Claude Code's own bundled skills stay listed: no key either way");
+});
+
+test('a record frozen before the off-list renders the settings it was filed with, and a step whose folder is gone is told none of it', () => {
+  const record = {
+    name: 'build',
+    after: [],
+    body: 'You build.\n\nGo.',
+    agent: { name: 'builder', keys: [], body: 'Go.', given: {}, instructions: 'You build.', skills: ['write-a-note'] },
+  };
+  const decoded = Schema.decodeUnknownResult(FrozenStepSchema)(record);
+  assert.ok(Result.isSuccess(decoded), Result.isFailure(decoded) ? String(decoded.failure) : '');
+  const frozen = asNamed(decoded.success);
+  assert.equal('offSkills' in (frozen.agent ?? {}), false, 'the key is optional: a record written before it reads back without it');
+  assert.equal(
+    renderedFlags(frozen, '/runs/r/agents/build')?.settings,
+    JSON.stringify({ skillOverrides: { 'write-a-note': 'off' } }),
+    'its session is listed what it was: the names its agent carries, and no more',
+  );
+  const off = { ...frozen, agent: { ...frozen.agent!, offSkills: ['git', 'other', 'write-a-note'] } };
+  assert.equal('offSkills' in unrendered(off).agent!, false, 'a step whose rendered folder is gone drops the off-list with its skills');
+  assert.equal(
+    renderedFlags(unrendered(off), '/runs/r/agents/build'),
+    undefined,
+    'and is filed with no flags at all, so nothing turns off the skills its brief tells it whole',
   );
 });
 
@@ -652,7 +727,10 @@ test("nemia start renders each Claude Code step's agent under runs/<id>/agents/<
   assert.deepEqual(write.config?.claude, {
     appendSystemPromptFile: path.join(at, 'prompt.md'),
     pluginDir: [path.join(at, 'nemia-scribe')],
-    settings: JSON.stringify({ outputStyle: 'nemia-scribe:no-coding', skillOverrides: { 'write-a-note': 'off', 'mind-the-tone': 'off' } }),
+    settings: JSON.stringify({
+      outputStyle: 'nemia-scribe:no-coding',
+      skillOverrides: { git: 'off', 'mind-the-tone': 'off', 'write-a-note': 'off' },
+    }),
   });
   assert.ok(
     write.brief.startsWith(`${PRECEDENCE}\n\nWrite about tides.\n`),
@@ -721,8 +799,16 @@ test('a rendered step whose plugin is under another name, as a start before the 
   );
   assert.match(write.brief, /\n## Skill `write-a-note`\n\nHow to write a note\./, 'and its skills told whole');
   const plain = filed.get(`${run.id}-plain`)!;
-  assert.deepEqual(plain.config?.claude, { appendSystemPromptFile: path.join(agentFilesDir(run, 'plain'), 'prompt.md') });
+  assert.deepEqual(plain.config?.claude, {
+    appendSystemPromptFile: path.join(agentFilesDir(run, 'plain'), 'prompt.md'),
+    settings: JSON.stringify({ skillOverrides: { git: 'off', 'mind-the-tone': 'off', 'write-a-note': 'off' } }),
+  });
   assert.equal(fs.readdirSync(agentFilesDir(run, 'plain')).join(), 'prompt.md', 'its folder holds no plugin, and names none');
+  assert.deepEqual(
+    (readRun(run.id).workflow ?? []).find((s) => s.name === 'plain')?.agent?.offSkills,
+    ['git', 'mind-the-tone', 'write-a-note'],
+    'a step that names no skill is told to turn off the two another step of its folder names, and the place skill beside them',
+  );
 });
 
 test("a repository run's step whose folder is gone is told a skill from the run's repository too, as its start found it", async () => {

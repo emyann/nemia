@@ -67,7 +67,9 @@ given (`skills`), and a step may add more for its own position, but never take o
 
 On Claude Code, each step's agent is rendered when the run starts: its instructions, your custom instructions and the factory's rules
 go after Claude Code's own prompt, and its skills
-become a plugin of the step's own, `nemia-<agent>`, which the session loads by name.
+become a plugin of the step's own, `nemia-<agent>`, which the session loads by name. A step's session is listed the skills its agent and
+its step name, and Claude Code's own bundled ones, and no other of the repository's: every other skill name the run could see is turned
+off, so a step is never listed one another step was given.
 
 ## What an agent is told: five layers
 

@@ -1,7 +1,9 @@
 /**
  * A skill named with its folder (`app:y`), at `nemia start` and at the folder's check (`loadWorkflows`): a step's line or its agent's
  * names it, the run reads it from that folder of the repository and freezes its files under its bare name, the name the prompt gives
- * and a session lists, while the record, the versions and the settings say it as the line writes it. Refused by name, with no run left:
+ * and a session lists, while the record, the versions and the settings say it as the line writes it. The settings turn off the folder's
+ * whole off-list (`StepAgent.offSkills`), so a step that names no skill of a folder is told to turn off the one another step of its folder
+ * names, under both its bare name and the name that line writes. Refused by name, with no run left:
  * a folder that holds no such skill, a read with no repository, and two skills of one bare name in one step — which two steps of one
  * run are each given. The reader's rule is held beside its code (`src/skills/read.store.test.ts`). The shipped build folder gives
  * the design system kit's three skills to its design, implement and review this way: loaded and started at shipped defaults on a copy
@@ -117,8 +119,33 @@ for (const [by, workflow] of [
     assert.ok(!prompt.includes('app:y'), prompt);
     assert.equal(
       renderedFlags(step, agentFilesDir(run, 'implement'))?.settings,
-      JSON.stringify({ skillOverrides: { 'implement-a-change': 'off', y: 'off', 'app:y': 'off' } }),
+      JSON.stringify({
+        skillOverrides: {
+          y: 'off',
+          'app:y': 'off',
+          'ask-for-another-round': 'off',
+          git: 'off',
+          'implement-a-change': 'off',
+          'review-a-change': 'off',
+          'trial-merge-a-branch': 'off',
+        },
+      }),
       'the bare name and the name of the nested folder are both hidden: the frozen copy is the one `y` the session sees',
+    );
+    const review = (readRun(run.id).workflow ?? []).find((s) => s.name === 'review')!;
+    assert.deepEqual(review.agent?.skills, ['review-a-change', 'ask-for-another-round'], 'review names no skill of a folder');
+    assert.deepEqual(
+      JSON.parse(renderedFlags(review, agentFilesDir(run, 'review'))!.settings!).skillOverrides,
+      {
+        y: 'off',
+        'app:y': 'off',
+        'ask-for-another-round': 'off',
+        git: 'off',
+        'implement-a-change': 'off',
+        'review-a-change': 'off',
+        'trial-merge-a-branch': 'off',
+      },
+      "a step that names no skill of a folder is told to turn off `y` and `app:y` all the same: implement names it, and the off-list is the folder's",
     );
   });
 }

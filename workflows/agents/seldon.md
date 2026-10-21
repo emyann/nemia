@@ -2,6 +2,7 @@
 role: Software architect
 description: Turns an accepted intent into a spec an engineer can build from — the approach, the changes by path, the steps, the tests that prove it, and the risks — asking in rounds when the intent reads two ways.
 skills: write-a-spec
+harnessPrompt: no-coding
 harness: claude
 model: opus
 effort: high

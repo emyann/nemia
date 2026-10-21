@@ -73,7 +73,9 @@ down is in `docs/architecture.md`, *Who owns what*.
   `task_complete` or `item_completed`. One that does not decode refuses the `transcript` verb, naming the line by its byte offset
   and the rollout, never read as saying nothing. A field the runtime starts reading is added to the schema; any other record
   passes undecoded.
-- **A `claude -p` line of a kind the runtime reads is decoded by `PRINTED` (`harness/claude/print.ts`)**: a `result`, a `system`
+- **A line of a kind the runtime reads is decoded by `PRINTED` (`harness/claude/print.ts`)** — printed by `claude -p` for a
+  `claude-detached` run and for every `-p` run already stored, and by `bin/ae-claude-job.ts` from the SDK's messages for a job:
+  a `result`, a `system`
   `permission_denied` or `init`, an `assistant` line's `tool_use` blocks. One that does not decode refuses the output: that session alone
   is unread while its process runs and failed once it has ended (`lookOf`), never read with no answer. A field the runtime starts
   reading is added to the schema; any other line passes undecoded.
@@ -87,11 +89,20 @@ down is in `docs/architecture.md`, *Who owns what*.
 - **A test runs at whatever niceness and IO class its parent gave it, and a worker it starts inherits both**: read a niceness
   relative to the test's own (`ownNiceness`, `test/command.test.ts`), and prove an argv the IO class would hide by calling the
   harness's `command`.
-- **A stream-json line is parsed for its `type`, never matched at its start** (`closesOn` in `bin/ae-worker.ts`): a job reading
-  `--input-format stream-json` exits only when its stdin ends.
+- **A stream-json line is parsed for its `type`, never matched at its start** (`closesOn` in `bin/ae-worker.ts`): a job's own
+  process reads its stdin as its session's input and ends the session only when that stdin ends.
+- **A job's holder is its own process** (`bin/ae-claude-job.ts`, `claudeJobSpec`): the worker spawns it, its heartbeat and
+  `STALE_MS` are the job's lease, and nothing of a job is read through `Sighting.held`, which `decide` reads for a long-lived task
+  alone. So a job keeps the detached road whole — its run file, its capture, its `say` inbox, its follow, its stop — and gains only
+  the SDK translation: `attachedOptions` is one function for both roads, and a flag added there reaches a held session and a job
+  alike. The runner writes the bin its spawn request as a file (`HarnessSpec.needsRequest`, `<name>.request.json`, owner-only
+  because the task's `config.mcp` may carry a secret), since no argv could carry it.
+- **A job is denied by `permissionPrompts: 'none'`** (`sdk.d.ts:1870`), never by a `canUseTool` of ours: a decision in the bin's
+  process would die with it, and Claude Code prints the `system`/`permission_denied` line the readers already count.
 - **A detached session's id is read by the worker from its spec's `start` event, on whole stdout lines** (`readers`, `bin/ae-worker.ts`).
   Measured 2026-10-06: `codex exec --json` (0.154.0) prints `thread.started` first; `claude -p` (2.1.291) prints `system`/`init` first
-  under `--output-format stream-json --verbose`, and one `result` line under `--output-format json`.
+  under `--output-format stream-json --verbose`, and one `result` line under `--output-format json`. A job's bin prints the SDK's
+  messages in order, whose first is that same `system`/`init`.
 - **A turn's end is not the session's end for a long-lived attached request** (`took`, `harness/claude/attached-session.ts`): the run
   file is rewritten `idle`, the input stays open, and an `is_error` result fails nothing. The SDK reads `errors` off a result whose
   subtype is not `success`, so a stand-in's interrupted result carries one or `readMessages` throws. Words pushed on its input begin
@@ -127,7 +138,8 @@ down is in `docs/architecture.md`, *Who owns what*.
 - **An attached session's MCP servers are `Options.mcpServers`, which the SDK spells onto the child's argv as inline JSON**
   (`sdk.mjs`, `--mcp-config <json>`), with `Options.strictMcpConfig` as the fence: that path writes no MCP config file, and a
   server's `env` or `headers` secret is in `/proc/<pid>/cmdline` rather than a 0600 file — a job, `claude --bg` and
-  `claude-detached` still name a file (`writeMcpConfig`). **Claude Code expands a `${NAME:-default}` in a server's arguments from
+  `claude-detached` still name a file (`writeMcpConfig`) — a job no longer does: its servers ride the same `Options.mcpServers`,
+  and `detachedOps` clears the config under its name rather than writing one. **Claude Code expands a `${NAME:-default}` in a server's arguments from
   the inline map too**, not from a config file alone (measured 2.1.306, `test/live.test.ts`: a variable the task's `env` set came
   back expanded and one nothing sets came back as its default), so the repository's own
   `--output-dir ${WF_STEP_FILES:-/tmp/playwright-mcp}` still writes outside the workspace on this road. `Settings.autoCompactWindow`, in the one settings object, moves the window
@@ -203,7 +215,7 @@ What Claude Code does as the steps meet it. Where the orchestrator's code holds 
   (`restartOf`, `src/core/long-lived.test.ts`); its listing in the gap is `blocked` with no `pid` (`respawning`). Whether the fork's
   copies of its parent's lines keep their uuids is unmeasured (2026-10-07: no probe resumes); nothing reads either way on it: a follow
   starts at the transcript's end (`bgFollowOf`), and a `moved` starts the board's conversation afresh.
-- **A job (`claude -p`) never waits on a prompt; a background session in a folder nobody opened blocks in any mode that can ask**:
+- **A job never waits on a prompt; a background session in a folder nobody opened blocks in any mode that can ask**:
   the modes that ask nobody are this package's answer (`unasking` in `fenceReach`, `src/harness/reach.ts`), and the orchestrator's
   `validateFolderMode` refuses a `background: true` step of a folder team in any other.
 - **A job reads neither user settings nor `settings.local.json`** (`--setting-sources project`): what a step needs goes on the step, its
@@ -275,7 +287,9 @@ What Claude Code does as the steps meet it. Where the orchestrator's code holds 
   a task's `env` laid under it and the telemetry, never over (`test/telemetry.test.ts`):
   measured on 2.1.289, `run_in_background` is ignored and the call runs in the foreground, a bare 130 s call completes (cut at 120 s
   with background tasks off alone, moved to the background with neither), and a shell `&` still detaches, its `$!` alive to `kill -0`.
-- **A job (`claude -p`) exports logs, metrics and traces from its environment over `http/json`, flushed at exit, and joins `TRACEPARENT`**;
+- **A job exports logs, metrics and traces from its environment over `http/json`, flushed at exit, and joins `TRACEPARENT`** — an
+  environment `attachedOptions` now composes onto `Options.env` inside the bin, where the SDK replaces the child's environment
+  entirely (`sdk.d.ts:1535`), so the engine's own telemetry is off the bin's process and the session's is on the CLI's;
   a `--bg` session runs in a pre-spawned process, ignores the asker's environment and `TRACEPARENT`, and exports only what `--settings`'
   `env` says; a job's Bash tool sees no `OTEL_*`, but `TRACEPARENT` (2.1.291, 2026-10-06; `claudeTelemetryEnv`, `telemeteredFlags`).
   Whether a `--bg` session's Bash tool inherits that `env`'s telemetry is unmeasured: its `env.PATH` reaches it, so a `claude -p` run

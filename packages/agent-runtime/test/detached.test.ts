@@ -976,10 +976,11 @@ const refusedWith = (read: () => HarnessOutput): string => {
   }
 };
 
-/** `claude -p`'s refusal of a line, as `printedLinesOf` words it: the line, its kind, its field and what is there, and the fix. */
+/** The refusal of a Claude Code line, as `printedLinesOf` words it: the line, its kind, its field and what is there, and the fix. */
 const printedRefusal = (line: number, kind: string, field: string, found: string) =>
-  `line ${line} of the \`claude -p\` output is ${kind} line whose \`${field}\` ${found}. An output that holds it is refused, never read` +
-  ' as saying nothing: run a Claude Code whose `claude -p` output this runtime reads, or a runtime whose schema for the line in' +
+  `line ${line} of the session's output is ${kind} line whose \`${field}\` ${found}. An output that holds it is refused, never read` +
+  ' as saying nothing: run a Claude Code whose output this runtime reads — the lines `claude -p` prints, which a job\'s own' +
+  " process prints from the Agent SDK's messages — or a runtime whose schema for the line in" +
   ' `PRINTED` (`harness/claude/print.ts`) reads this one.';
 
 /** A Claude Code job `name` written into `dir` as its worker leaves it, in `state`: its output a line of stderr, then `lines`. */
@@ -1811,11 +1812,11 @@ test('REFUSED: a cost or an API time that is not a number of 0 or more is no abs
   );
   assert.match(
     refusedWith(() => claudeResultOutput(resultLine({ total_cost_usd: -1 }))),
-    /^line 1 of the `claude -p` output is a `result` line whose `total_cost_usd` is -1, where /,
+    /^line 1 of the session's output is a `result` line whose `total_cost_usd` is -1, where /,
   );
   assert.match(
     refusedWith(() => claudeStreamOutput(['a warning on stderr', resultLine({ duration_api_ms: null })].join('\n'))),
-    /^line 2 of the `claude -p` output is a `result` line whose `duration_api_ms` is null, where Claude Code prints number\. /,
+    /^line 2 of the session's output is a `result` line whose `duration_api_ms` is null, where Claude Code prints number\. /,
     'the stream reads the same result, and counts its lines from the first, stderr included',
   );
 });

@@ -1494,3 +1494,25 @@ spawns (`attachedLongLived`, `harness/claude/code.ts`). The refusal is read at f
 be there when the pass spawns it — so it refuses the wider case. Met while writing `test/holder-follow.boundary.test.ts`, which
 files its session as a job instead, which runs attached just the same. Nothing is wrong on the record: no caller is given a session
 without the env it asked for.
+
+## A resumed job's carried cost is unverified on the SDK road
+
+`claudeJobSpec` keeps `resumeCostCarried: true`: a resumed Claude Code prints its parent's cost and API time on in its own
+totals, so the runner reads the parent's off its run file and takes them off (`lessCarried`). That was measured of
+`claude -p --resume`. A job now runs the same Claude Code through the Agent SDK's `query()` with `Options.resume`, which the SDK
+spells as `--resume=<id>` on the same CLI, so the same result message should carry the same totals — but nothing in this change
+measures it: the probe of 2026-10-21 ran a fresh job, and the suite's stand-in prints whatever its plan says. If the SDK's result
+does not carry the parent's totals, a resumed job's cost is reported low by the carry taken off it. A probe that resumes a real
+job and compares its `total_cost_usd` with its parent's would settle it.
+
+## `claude-detached` still spells `claude -p`, and is the only road that does
+
+The job's `-p` path went in the run of 2026-10-21 (`workflows/build`, `every-claude-code-job-runs-o-6kfb`); `claude-detached` did
+not, by the person's answer at the design gate: keep it, retire it in its own intent. So `claudePrintArgs`, `claudePrintFlags`,
+`claudeResultOutput`, `CLAUDE_RESULT_START` and the `-p` envelope reader stay, for the one harness that still runs a command line —
+and `claudePrintFlags` is also what `attached-options.test.ts` holds `attachedOptions` to, fact for fact, which is worth keeping
+whichever way the name goes. Retiring the harness is a build run of its own: the name is some 343 places in 85 files across all
+four layers (the orchestrator's `step.ts`, `cap.ts`, `try.ts`, `status.ts`, `keys.ts`, `validate.ts`, `harness.ts`,
+`runtime-client.ts`, `flags.ts` and `discipline.ts`; `apps/api`'s `reach.ts` and `detail.ts`; the board's
+`test/e2e/pages/545-unstreamed-session.ts`; `apps/docs`; and some thirty test files), and a task already filed on the name is
+refused from the day it goes.

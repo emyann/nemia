@@ -20,7 +20,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { workspaces } from './repo-files.ts';
+import { workspaces } from './workspaces.ts';
 
 const ROOT = path.join(import.meta.dirname, '..', '..', '..');
 const PKG = path.join(import.meta.dirname, '..');

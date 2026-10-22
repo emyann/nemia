@@ -28,7 +28,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
-import { REPO, workspaces } from './repo-files.ts';
+import { REPO, workspaces } from './workspaces.ts';
 import { scratch } from './scratch.ts';
 
 test("the workspaces are the root package.json's: a dir/* glob as its folders with a package.json, a folder as it is", () => {
@@ -45,7 +45,7 @@ test("the workspaces are the root package.json's: a dir/* glob as its folders wi
 });
 
 test("the root's test script lets every package finish when one fails, so a failure is reported where it is", () => {
-  const root = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '..', '..', '..', 'package.json'), 'utf8')) as {
+  const root = JSON.parse(fs.readFileSync(path.join(REPO, 'package.json'), 'utf8')) as {
     scripts: Record<string, string>;
   };
   const words = root.scripts.test.split(/\s+/);
@@ -102,7 +102,10 @@ test('REFUSED: a package whose tests beside the code its test script does not ru
 
 test("every package's test script runs the tests beside its code", () => {
   const packages = workspaces().map((dir) => path.join(REPO, dir));
-  assert.ok(testsBeside(path.join(import.meta.dirname, '..')).length > 0, "the scan finds the tests beside this package's code");
+  assert.ok(
+    testsBeside(path.join(REPO, 'packages', 'agent-orchestrator')).length > 0,
+    "the scan finds the tests beside the orchestrator's code",
+  );
   const refused = packages.flatMap((dir) => {
     const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')) as { name: string; scripts: Record<string, string> };
     return unrunBeside(pkg.name, pkg.scripts.test ?? '', testsBeside(dir).length);

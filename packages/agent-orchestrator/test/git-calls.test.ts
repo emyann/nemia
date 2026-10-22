@@ -24,7 +24,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
 import { argumentsOf, calleeName, calleeRoot, factsOf, literalParts, runsGit, SPAWNS, type FileFacts } from './git-spawns.ts';
-import { workspaces } from './repo-files.ts';
+import { workspaces } from './workspaces.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = path.join(import.meta.dirname, '..', '..', '..');

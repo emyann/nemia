@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { REPO } from './team.ts';
+import { REPO } from './workspaces.ts';
 import { scratch } from './scratch.ts';
 
 const SCRIPT = path.join(REPO, 'workflows', 'janitor', 'cards.ts');

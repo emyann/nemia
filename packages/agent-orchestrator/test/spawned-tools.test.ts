@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
-import { workspaces } from './repo-files.ts';
+import { workspaces } from './workspaces.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = path.join(import.meta.dirname, '..', '..', '..');

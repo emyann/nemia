@@ -27,16 +27,16 @@ holds what every change needs.
   changed (beside it, or under its package's `test/` naming it), and for a doc, a skill or a workflow file the tests that read it (grep
   the tests for its path), each from its package's folder as its `test` script loads it: `node --import ./test/ambient.ts --test <file>`
   in `packages/agent-orchestrator`, `node --import ./test/harness.ts --test <file>` in `apps/api`, `node --test <file>` in
-  `packages/agent-runtime` and `apps/web`. Where a file alone does not say enough (a shared helper, a type many files read, a package's
+  `packages/agent-runtime`, `apps/web` and `tools/guards`. Where a file alone does not say enough (a shared helper, a type many files read, a package's
   test setup), the packages it touched: `npx turbo run test --force --continue --filter=<package>`, the package by its `name`
-  (`agent-orchestrator`, `agent-runtime`, `api`, `web`). Typecheck and lint run whole: they are cheap. Implement's round check runs the
+  (`agent-orchestrator`, `agent-runtime`, `api`, `web`, `guards`). Typecheck and lint run whole: they are cheap. Implement's round check runs the
   declarations, the typecheck and the lint, and pushes the round's commit and waits on GitHub's `ci` context, which runs the whole
   suite on it (`workflows/build/implement.md`); the landing's check runs no suite at all — it is the receipt that the pull request `ci`
   judged was merged (`workflows/build/landing.ts`) — so the commit `ci` passed on is the last thing any suite reads; a session runs the
   whole suite only to measure it, as the e2e's rule says. A failing test it did not run is the check's refusal, answered in the next try. Outside a
   run no check follows you: run the whole suite before you commit.
 - `npm run typecheck` — `tsc --noEmit` per package, over its `src` and its `test/` (the web's `test/e2e/` under its own tsconfig);
-  `agent-orchestrator/test/suite.test.ts` refuses a test file no typecheck reads.
+  `tools/guards/test/suite.test.ts` refuses a test file no typecheck reads.
 - `npm run lint` — oxlint (`.oxlintrc.json`) and `oxfmt --check` (`.oxfmtrc.json`); `npm run format` writes the layout. Every shipped
   `check:` runs it after the types. A rule turned off, or a line allowed with `oxlint-disable-next-line`, says why beside it.
 - `npm run build`, then `npm run e2e -- --pages <the pages the change touches>` (and `--photos` when pictures are due), when you touch
@@ -48,11 +48,11 @@ holds what every change needs.
   It needs `docker`, takes a minute and a half, and is never run by the suite.
 - Run them before you commit, a step's session scoped as above. Green is the floor, not the bar: a change that makes the suite pass by
   weakening a test is a finding to report, not a fix.
-- Turbo does not see `workflows/`, nor a doc, though some tests read docs: a step's session runs the tests that read the doc or workflow
+- Turbo sees `workflows/` and the docs only through `guards#test`'s inputs, though tests elsewhere read them too: a step's session runs the tests that read the doc or workflow
   file it touched, and `ci` runs them all, on clean runners with no cache of this machine's, on the commit the round's check pushed;
   outside a run, type `npx turbo run test --force --continue` after touching one. The tests that read files of every package —
-  `agent-orchestrator`'s `claude-md-cites.test.ts` over every `CLAUDE.md`, `comments.test.ts`, and `test-rules.test.ts` over every
-  test file — are re-run the same way after a test, a doc or a name moves anywhere.
+  `tools/guards`' `claude-md-cites.test.ts` over every `CLAUDE.md` and `test-rules.test.ts` over every test file, and
+  `agent-orchestrator`'s `comments.test.ts` — are re-run the same way after a test, a doc or a name moves anywhere.
 - A run's check leaves what its tests cost in `WF_ARTIFACTS`, a `test-costs-<package>-<stamp>.json` per package and try; `node
   tools/test-costs/report.ts <dir>...` ranks them. A package's peak is its largest process, not the sum of the files running at once.
 - **A run's checks inherit the daemon's environment** (`WF_MAX_CONCURRENT=50` on the owner's machine): a test that relies on a default
@@ -72,8 +72,8 @@ holds what every change needs.
 - **Prose is not a constraint.** If the packages need an agent to do something, the machinery refuses the alternative.
 - **Errors say what to do next.** A message names the fix — the command to type, the field to set — and not only what went wrong: what
   a refusal is thrown as and the exit code it carries are refused when they are wrong, its words are nobody's to check, and a test
-  that asserts a whole sentence of them is refused (`packages/agent-orchestrator/test/test-rules.test.ts`), what still does being a
-  debt that only shrinks (`test/test-rules.baseline.ts`).
+  that asserts a whole sentence of them is refused (`tools/guards/test/test-rules.test.ts`), what still does being a
+  debt that only shrinks (`tools/guards/test/test-rules.baseline.ts`).
 - **A state machine is drawn by its code.** A new machine prints its own Mermaid diagram, held between `diagram:<name>` markers in its
   package's docs whose begin line names the command; never a drawing. A diagram that has drifted from what its command prints is
   another matter, and refused.
@@ -155,15 +155,18 @@ What the `create-an-agent` skill, being generic, does not say here:
   factories get no workflow or agent from the package.
 - `apps/docs/` — the documentation site (Astro Starlight) for a person who will use Nemia: landed material only, the state diagrams read
   from their markers at build; it imports no package (`apps/docs/CLAUDE.md`).
+- `tools/guards/` — the repository's own guards, never shipped: the tests that hold its CI, docs, workflows and test infrastructure
+  rather than a layer's code, a workspace of their own (`guards`) whose `ci` job runs them only when `tools/guards/due.ts` says a push
+  touched what they read (`tools/guards/CLAUDE.md`). A config guard that imports the orchestrator past its three entries stays in it.
 - `tools/test-costs/` — the repository's test-cost recorder, on every package's `test` script: a probe in each test file's process, a
-  reporter beside spec, and `report.ts`; held by `agent-orchestrator/test/test-costs.test.ts` and `suite.test.ts`.
+  reporter beside spec, and `report.ts`; held by `tools/guards/test/test-costs.test.ts` and `suite.test.ts`.
 - `tools/journal-bytes/` — what a copy of a runtime store's journals cost, by event kind, the share that is a copy, and the heap a
   full read holds, before and after a refile through bodies (`node --expose-gc tools/journal-bytes/report.ts <root> [--refile <dir>]`).
 - `tools/observe/` — the side Grafana for building Nemia, never shipped: `docker compose -f tools/observe/compose.yaml up -d`, the daemon
   started with `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318` (the live daemon alone: a probe goes to a held throwaway,
   `node tools/observe/render/render.ts --hold`, at the collector address it prints), and its six dashboards held to the code's names by
   `agent-orchestrator/test/observe.test.ts`, and its timing of a step (the collector's command head and test scope, Tempo's span metrics and
-  retention) by `observe-time.test.ts`. Its profiler preload, `tools/observe/profile/` (installed there alone), is off unless
+  retention) by `tools/guards/test/observe-time.test.ts`. Its profiler preload, `tools/observe/profile/` (installed there alone), is off unless
   `PYROSCOPE_SERVER_ADDRESS` is set, held by `agent-orchestrator/test/profile.test.ts`.
   `tools/observe/render/` draws a checkout's dashboards before they land: a throwaway stack under a name of its own, fake data, a
   picture and the text of every panel (`tools/observe/README.md`, *See a change rendered*), held by

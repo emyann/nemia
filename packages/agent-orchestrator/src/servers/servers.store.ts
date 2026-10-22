@@ -7,7 +7,7 @@
  *
  * Beneath the controllers, beside `record.store.ts`, the one store file it imports — for `firstRefusal` alone: the store's root is
  * no module's to read, so every function here takes it as a required `home: string` and a caller that forgets it does not compile
- * (`test/root-given.test.ts`, `packages/agent-orchestrator/CLAUDE.md`).
+ * (`test/root-given.test.ts`, and the package's own contributor guide).
  */
 import fs from 'node:fs';
 import path from 'node:path';

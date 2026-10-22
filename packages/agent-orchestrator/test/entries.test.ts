@@ -369,6 +369,7 @@ const PINNED: Record<string, string[]> = {
     'seriesMemo',
     'serverNameRefusal',
     'setInstruction',
+    'shippedServers',
     'setSchedule',
     'signoffsSpent',
     'lackLines',

@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import { Result, Schema } from 'effect';
 import { FrozenStepSchema, loadWorkflows, type FrozenStepFields } from '../src/folder/folder.store.ts';
 import { asNamed, FORMER_KEYS, stepPlace, type Workflow } from '../src/workflow.ts';
+import { ownDenies } from '../src/workflow/index.ts';
 import { renderedFlags } from '../src/agents/agents.ts';
 import { placesOf, shippedFolders, TEAM_DEV } from './team.ts';
 
@@ -33,6 +34,27 @@ test("every step of every folder shipped and of the tests' team, frozen, reads b
     }
   }
   assert.ok(agents > 0, 'a step names an agent, so the agent is read too');
+});
+
+test("a step frozen with its agent's denies apart keeps them, and one frozen before reads as it was, its line the step's own whole", () => {
+  const agent = { name: 'ada', keys: ['disallowedTools' as const], body: 'Do it.', given: {} };
+  const step: Workflow = {
+    name: 'implement',
+    after: [],
+    body: 'Do it.',
+    disallowedTools: ['Bash(npm run build)', 'Bash(git push)'],
+    agent: { ...agent, agentDenies: ['Bash(git push)'] },
+  };
+  const now = decode(frozen(step));
+  assert.ok(Result.isSuccess(now), Result.isFailure(now) ? String(now.failure) : '');
+  assert.deepEqual(now.success, frozen(step), 'the agent\'s denies are kept');
+  assert.deepEqual(ownDenies(now.success as Workflow), ['Bash(npm run build)']);
+  const before = decode(frozen({ ...step, agent }));
+  assert.ok(Result.isSuccess(before), Result.isFailure(before) ? String(before.failure) : '');
+  assert.deepEqual(before.success, frozen({ ...step, agent }), 'a record from before decodes unchanged');
+  assert.deepEqual(before.success.disallowedTools, step.disallowedTools, 'and is filed with the list it had');
+  assert.deepEqual(ownDenies(before.success as Workflow), step.disallowedTools, 'its line read back whole');
+  assert.ok(Result.isFailure(decode(frozen({ ...step, agent: { ...agent, agentDenies: 'Bash(git push)' } }) as unknown)), 'a list, or refused');
 });
 
 test('a step with every key the parser types, its agent and its output reads as it was frozen; one key off, it is refused', () => {

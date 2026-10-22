@@ -6,7 +6,7 @@ check: { if [ -n "${WF_BASE_REF:-}" ]; then s=$(mktemp -d) && { git show "$WF_BA
 budget: 20
 skills: effect, shadcn, change-the-board, look, react-aria, see-a-dashboard, apps/web:ds-build, apps/web:ds-theme, apps/web:ds-spec
 mcp: playwright
-disallowedTools: SendMessage, CronCreate, CronDelete, RemoteTrigger, Bash(git push), Bash(git push:*), Bash(gh), Bash(gh:*), Bash(git branch -D:*), Bash(git branch --delete --force:*), Bash(pkill:*), Bash(killall:*), mcp__playwright__browser_run_code_unsafe, Bash(claude *--bg*), Bash(claude *--background*), Bash(claude *remote-control*), Edit(//**/.claude/settings.local.json), Edit(~/.claude/settings.json), Edit(~/.claude.json), Bash(*:4318*), Bash(*:4317*), mcp__github__merge_pull_request, mcp__github__push_files, mcp__github__create_or_update_file, mcp__github__delete_file, mcp__github__create_branch, mcp__github__create_repository, mcp__github__fork_repository, mcp__github__create_pull_request, mcp__github__update_pull_request, mcp__github__update_pull_request_branch, mcp__github__pull_request_review_write, mcp__github__add_comment_to_pending_review, mcp__github__add_reply_to_pull_request_comment, mcp__github__add_issue_comment, mcp__github__update_issue_comment, mcp__github__issue_write, mcp__github__sub_issue_write, mcp__github__actions_run_trigger, mcp__github__assign_copilot_to_issue, mcp__github__request_copilot_review
+disallowedTools: Bash(*:4318*), Bash(*:4317*)
 output: implement.schema.json
 ---
 **Open the pull request before you sign off**, once a round and after you merged the base: this run's change is judged on GitHub, and

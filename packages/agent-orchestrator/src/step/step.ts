@@ -280,6 +280,13 @@ export type StepAgent = {
    */
   addedSkills?: string[];
   /**
+   * Its agent's `disallowedTools:` rules, frozen with a step whose own file writes a `disallowedTools:` line, which adds to them: the
+   * step's `disallowedTools` is its own rules, then each of these its own do not cover (`deniesWith`), and `renderStep` writes back the
+   * step's own alone (`ownDenies`). Absent on a step with no line of its own, which is given its agent's whole, on one whose agent denies
+   * nothing, and on a record frozen before the key, whose list is the step's own line whole.
+   */
+  agentDenies?: string[];
+  /**
    * Every skill name the run's folder could see when `nemia start` froze it — each bare name the lookup found, and each `folder:name`
    * written on any agent's or any step's `skills:` line in the folder, with its bare form — which the step's session is told to turn off
    * (`skillOverrides`, `sessionSettings`), so it is listed its own plugin's skills alone and no other of Nemia's. Computed once for the

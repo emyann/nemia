@@ -1,14 +1,15 @@
 /**
- * Fences only tighten: a step that names an agent, or is hired one, may narrow the agent's fence and never widen it. `fenceRefusal` judges
- * the fence keys a step writes itself — `tools:`, `allowedTools:`, `disallowedTools:`, `permissionMode:` and `sandbox:` — against its
- * agent's, a step that runs a fenced agent on the other harness, whose fence cannot be compared with the agent's, and a step's
+ * Fences only tighten: a step that names an agent, or is hired one, may narrow the agent's fence and never widen it. A step's
+ * `disallowedTools:` adds to its agent's (`deniesWith`), so the session is refused the union and a step can never lift one of its agent's
+ * denies. `fenceRefusal` judges the other fence keys a step writes itself, which replace its agent's — `tools:`, `allowedTools:`,
+ * `permissionMode:` and `sandbox:` — against its agent's, a step that runs a fenced agent on the other harness, whose fence cannot be compared with the agent's, and a step's
  * `background: true` over an agent an allow rule would widen: a background session also reads the person's own settings.
  * `addedSkillsRefusal` judges a skill a step adds to its agent's, which the agent's fence must let the session load.
  *
  * `writable:` is the one key that reaches past the fence's directory, and it widens where a step's writes reach, never what it may do:
  * `refuseUnwritable` refuses it over a fence that writes nothing.
  */
-import { AGENTS_FOLDER, refuse, type StepKey, type Workflow } from '../step/step.ts';
+import { AGENTS_FOLDER, refuse, type StepAgent, type StepKey, type Workflow } from '../step/step.ts';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 import { bareSkillOf, rulesOf, toolsOf } from '../keys/index.ts';
 import type { Agent } from '../agents/agents.ts';
@@ -43,8 +44,8 @@ const IN_DIRECTORY = ['Edit(**)', 'Read(**)'];
  * The fence that holds a session of an agent to its directory, never wider than the agent's own (`fenceRefusal` lets it through):
  * the mode the runtime holds a session to its directory in, or the agent's mode `mode` where that is narrower; and `Edit(**)` under a
  * mode that edits unasked (`editsUnasked`), else those of the agent's allow rules `allows`, as written, that a rule inside the directory
- * covers. Undefined when the agent has allow rules and none is inside its directory: a step's list replaces its agent's and cannot be
- * empty, so the agent's own would run.
+ * covers. Undefined when the agent has allow rules and none is inside its directory: a step's allow list replaces its agent's and
+ * cannot be empty, so the agent's own would run.
  */
 export function directoryFence(
   mode: string | undefined,
@@ -91,7 +92,7 @@ function narrowerThan(reach: FenceReach, asked: string, own: string): string[] |
 /**
  * Why step `step` would widen its agent's fence, or `undefined` when it does not: `own` are the keys the step writes itself, the
  * sandbox under its own name (`codexSandboxNamed`), and `resolved` the step they were read into, with the agent's. A key the step
- * does not write is its agent's and widens nothing, and `background: true` widens it as an allow rule would (`backgroundRefusal`). A
+ * does not write is its agent's and widens nothing, nor does its `disallowedTools:`, which adds to its agent's (`deniesWith`); `background: true` widens it as an allow rule would (`backgroundRefusal`). A
  * remote step is left to `remoteRefusal` in harness.ts, which refuses every fence key there. The refusal names the step, the key, what it
  * would add, and the fix.
  */
@@ -101,15 +102,15 @@ export function fenceRefusal(step: string, agent: Agent, own: Partial<Record<Ste
   const file = `${AGENTS_FOLDER}/${agent.name}.md`;
   const moved = movedRefusal(step, agent, file, harness);
   if (moved !== undefined) return moved;
-  const judge: Record<FenceKey, (said: Said) => string | undefined> = {
+  const judge: Record<Exclude<FenceKey, 'disallowedTools'>, (said: Said) => string | undefined> = {
     tools: (said) => toolsRefusal(said, resolved.tools ?? [], agentTools(agent, file)),
     allowedTools: (said) =>
       allowsRefusal(said, resolved.allowedTools ?? [], agentRules(agent, file, 'allowedTools'), agent.keys.permissionMode),
-    disallowedTools: (said) => deniesRefusal(said, resolved.disallowedTools ?? [], agentRules(agent, file, 'disallowedTools')),
     permissionMode: (said) => modeRefusal(said, reachOf(harness), resolved.permissionMode ?? '', agent.keys.permissionMode),
     sandbox: (said) => sandboxRefusal(said, reachOf(harness), resolved.sandbox ?? '', agent.keys.sandbox),
   };
   for (const key of FENCE_KEYS) {
+    if (key === 'disallowedTools') continue;
     const why = own[key] === undefined ? undefined : judge[key]({ step, line: `${key}: ${own[key]}`, agent: agent.name, file });
     if (why !== undefined) return why;
   }
@@ -145,6 +146,31 @@ export function addedSkillsRefusal(
     return `${step}: \`skills: ${line}\` adds \`${skill}\` to ${agent.name}'s skills, and ${file} ${why}: a session loads a skill with the \`Skill\` tool, and a step never widens its agent's fence. ${fix} in ${file} (every step of ${agent.name} gets it), or take \`${skill}\` off this step's \`skills:\`.`;
   }
   return undefined;
+}
+
+/** The rules agent `agent`'s own `disallowedTools:` denies, `[]` for none. */
+export const agentDeniesOf = (agent: Agent): string[] => agentRules(agent, `${AGENTS_FOLDER}/${agent.name}.md`, 'disallowedTools');
+
+/**
+ * What a session of a step is refused: the step's own `disallowedTools:` rules `own`, in their written order, then each of its agent's
+ * denies `agents` that no rule of its own already covers (`covers`). A step's line adds to its agent's, so a deny the team adds to an
+ * agent reaches every step that hires it, and a line copied before it still reads; a line that repeats every one of its agent's denies,
+ * as every step's had to before, resolves to itself.
+ */
+export const deniesWith = (own: readonly string[], agents: readonly string[]): string[] => [
+  ...own,
+  ...agents.filter((deny) => !own.some((by) => covers(by, deny))),
+];
+
+/**
+ * The denies step `step`'s own file writes, read back from the resolved step: its `disallowedTools` but those its agent gave it
+ * (`StepAgent.agentDenies`), what `renderStep` writes and the brief tells as the step's own fence. The resolved list where the step's
+ * provenance names none.
+ */
+export function ownDenies(step: { disallowedTools?: readonly string[] | null; agent?: string | StepAgent | null }): string[] {
+  const given = typeof step.agent === 'object' && step.agent !== null ? step.agent.agentDenies : undefined;
+  const denies = [...(step.disallowedTools ?? [])];
+  return given === undefined ? denies : denies.filter((rule) => !given.includes(rule));
 }
 
 /** The harness an agent runs on by its own file. */
@@ -192,14 +218,6 @@ function allowsRefusal(said: Said, rules: readonly string[], agents: readonly st
   const added = rules.filter((rule) => !modeGrants(mode, rule) && !agents.some((by) => covers(by, rule)));
   if (!added.length) return undefined;
   return `${said.step}: \`${said.line}\` would allow its agent ${said.agent} ${listed(added)}, which ${said.file} does not allow ${tighten(said, `Take ${added.length > 1 ? 'them' : 'it'} off the line, or allow ${added.length > 1 ? 'them' : 'it'} in \`allowedTools:\``)}`;
-}
-
-/** Refused: a `disallowedTools:` list that leaves out a deny of the agent's, which it would lift: a step's list replaces its agent's. */
-function deniesRefusal(said: Said, rules: readonly string[], agents: readonly string[]): string | undefined {
-  const lifted = agents.filter((deny) => !rules.some((by) => covers(by, deny)));
-  if (!lifted.length) return undefined;
-  const whole = [...agents, ...rules.filter((rule) => !agents.includes(rule))].join(', ');
-  return `${said.step}: \`${said.line}\` would lift ${listed(lifted)}, which ${said.file} denies its agent ${said.agent}: a step's \`disallowedTools:\` replaces its agent's, and a step may only tighten its agent's fence. Keep the agent's denies on the line and add yours — \`disallowedTools: ${whole}\` — or attach another agent.`;
 }
 
 /** Refused: a permission mode wider than the agent's, or than the runtime's default when its file names none, as `modes` ranks them. */

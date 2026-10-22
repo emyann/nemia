@@ -61,7 +61,7 @@ import type { Agent, Agents, SkillsFound } from '../agents/agents.ts';
 import { headedLayers } from './layers.ts';
 import { tallyOf } from '../tally/tally.ts';
 import { mergedOutput } from '../keys/index.ts';
-import { addedSkillsRefusal, fenceRefusal, refuseUnwritable } from './fence.ts';
+import { addedSkillsRefusal, agentDeniesOf, deniesWith, fenceRefusal, ownDenies, refuseUnwritable } from './fence.ts';
 
 /** A factory's `rules` as a step on `harness` is told them, trimmed: none for blank rules, and none on a remote agent. */
 const rulesTold = (rules: string | undefined, harness: string | undefined): string | undefined =>
@@ -85,7 +85,8 @@ const wordsAbove = (agent: Agent, factoryRules: string | undefined) => ({
  *
  * `agents` are the agents `agent:` may name (`loadAgents`). A step that names one is resolved here, once: each role key the agent sets is
  * the step's unless the step sets it too — the fence under either name, `permissionMode:` or `sandbox:`, as one key, so a step with a fence
- * of its own is given neither of its agent's; a fence key the step sets may only narrow its agent's (`fenceRefusal`). What the step is
+ * of its own is given neither of its agent's; a fence key the step sets may only narrow its agent's (`fenceRefusal`), but for `disallowedTools:`, which adds to its agent's: the
+ * session is refused the step's own rules, then each of the agent's they do not cover (`deniesWith`, `StepAgent.agentDenies`). What the step is
  * told is the agent's instructions, then a person's custom instructions for it (`Agent.customInstructions`), then the step's own note,
  * each under the heading of its layer's number and owner (`headedLayers`) — the agent's alone when the step has none. Custom
  * instructions are words and set no key. The step's own
@@ -152,7 +153,9 @@ export function parseWorkflow(
   const output = mergedOutput(name, agent.name, outputOf(name, agent.keys.output, agent.read), outputOf(name, meta.output, read));
   const resolved = { ...inherited, ...meta };
   delete resolved.output;
-  const step = stepFrom(name, resolved, body, read, spelled, output);
+  const stated = stepFrom(name, resolved, body, read, spelled, output);
+  const agentDenies = meta.disallowedTools === undefined ? [] : agentDeniesOf(agent);
+  const step = agentDenies.length ? { ...stated, disallowedTools: deniesWith(stated.disallowedTools ?? [], agentDenies) } : stated;
   agentStepRefusal(name, agent, meta, step, skills);
   refuseUnwritable(step, agent.name);
   const added = step.skills?.filter((skill) => !agent.skills?.includes(skill));
@@ -175,6 +178,7 @@ export function parseWorkflow(
       ...wordsAbove(agent, factoryRules),
       ...(sessionSkills.length && { skills: sessionSkills }),
       ...(added && { addedSkills: added }),
+      ...(agentDenies.length && { agentDenies }),
       ...(agent.harnessPrompt !== undefined && { harnessPrompt: agent.harnessPrompt }),
       mcp: sessionServers(agent, step),
     },
@@ -443,7 +447,8 @@ const EMPTY_IS_UNSET: readonly StepKey[] = [
  * A step whose `agent` says where its keys came from (`StepAgent`, as the parser resolves one) is written as its file was: `agent:`, the
  * keys the step set itself and its own note — never what the agent gave it, which would pin the agent's words in every step's file. A key
  * it did not set but whose value was changed since it was read is written too, as the step's own: a change is never dropped. Its body is
- * its own note, whatever `body` says. A step whose `agent` is a name is a draft of the step's own: every key it sets is written, after
+ * its own note, whatever `body` says. Its `disallowedTools:` is written without the denies its agent gave it (`ownDenies`), since a step's
+ * line adds to its agent's: one that only repeated them writes no line. A step whose `agent` is a name is a draft of the step's own: every key it sets is written, after
  * `agent:`, and its body is its own note.
  *
  * It judges nothing the parser judges: a value the parser would refuse is written as given, and the parser refuses it in its own words
@@ -465,7 +470,7 @@ export function renderStep(step: StepDraft): string {
   if ((step.workspace as string | undefined) === 'folder') refuse(placeWritten(step.name));
   const provenance = step.agent != null && typeof step.agent === 'object' ? step.agent : undefined;
   const lines = STEP_KEYS.flatMap((key) => {
-    const value = writtenValue(step.name, key, key === 'agent' ? (provenance?.name ?? step.agent) : step[key]);
+    const value = writtenValue(step.name, key, key === 'agent' ? (provenance?.name ?? step.agent) : ownValue(step, key));
     if (provenance && key !== 'agent' && !provenance.keys.includes(key) && value === provenance.given?.[key]) return [];
     return value === undefined ? [] : [`${key}: ${value}`];
   });
@@ -473,6 +478,10 @@ export function renderStep(step: StepDraft): string {
   if (lines.length) return `---\n${lines.map((line) => `${line}\n`).join('')}---\n${body}\n`;
   return /^---[ \t]*(?:\n|$)/.test(body) ? `---\n\n---\n${body}\n` : `${body}\n`;
 }
+
+/** The value of `key` the step's own file holds: its own denies alone for `disallowedTools`, its agent's left to it (`ownDenies`). */
+const ownValue = (step: StepDraft, key: StepKey): unknown =>
+  key === 'disallowedTools' && step.disallowedTools != null ? ownDenies(step) : step[key];
 
 /**
  * One key's value as its line writes it, or `undefined` for a key the step does not set. `output:` is written as the file it names, the

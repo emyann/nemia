@@ -58,8 +58,8 @@ import { isRemoteHarness } from '../harness/harness.ts';
  * the skills it is given (`skills:`), which are also what its card says it can do; what becomes of Claude Code's own prompt
  * (`harnessPrompt:`); the MCP servers of the checkout its sessions load, by name (`mcp:`); and who does the work and how. A step that
  * names the agent (`agent:`) takes the last of those as its own defaults,
- * and a key it sets itself wins, but a fence key (`tools`, `allowedTools`, `disallowedTools`, `permissionMode`, `sandbox`) may only narrow
- * the agent's, and `background: true` is refused over an agent in any mode but the widest (`fenceRefusal`). Everything else a step
+ * and a key it sets itself wins, but its `disallowedTools:` adds to the agent's, and the other fence keys (`tools`, `allowedTools`,
+ * `permissionMode`, `sandbox`) may only narrow the agent's, and `background: true` is refused over an agent in any mode but the widest (`fenceRefusal`). Everything else a step
  * sets is wiring — where the step sits in its workflow, what it reads, how it is judged and for how long — and belongs on the step: an
  * agent file that sets one is refused by name.
  */

@@ -1,7 +1,8 @@
 # Nemia's own check, on clean runners off the owner's machine (docs/plan-github-ci.md, "5. CI").
 #
 # A reader of CI has no test to ask, so the reasons are beside the lines. What this file must agree with in the repository — a workspace
-# with no leg, a node floor adrift from engines.node, a job outside the gate's needs, an action that is not GitHub's own by major tag —
+# with no leg, a node floor adrift from engines.node, a job outside the gate's needs, an action that is not GitHub's own by major tag,
+# a set of shards that does not tile a suite, a second timezone run for a workspace that reads no local time —
 # is refused by packages/agent-orchestrator/test/ci-workflow.test.ts, not by this comment.
 name: ci
 
@@ -25,16 +26,37 @@ concurrency:
 
 jobs:
   test:
-    name: test ${{ matrix.workspace }} on node ${{ matrix.node }}
+    # The shard is empty on every leg but the orchestrator's, where it reads ' 1/2' or ' 2/2': two shards of one workspace on one node
+    # must read apart in the run's summary, or a person cannot tell which half failed.
+    name: test ${{ matrix.workspace }} on node ${{ matrix.node }} ${{ matrix.shard }}
     runs-on: ubuntu-latest
     strategy:
-      # Every leg runs: one package's failure on one node says nothing about the other nine.
+      # Every leg runs: one package's failure on one node says nothing about the other eleven.
       fail-fast: false
       matrix:
-        workspace: [agent-runtime, agent-orchestrator, api, web, docs]
+        # The orchestrator is not here: its suite is run in halves, and a matrix cannot split one combination, so its four legs arrive
+        # through include below.
+        workspace: [agent-runtime, api, web, docs]
         # Quoted, both of them: YAML reads 24.16 as a number and setup-node then installs the wrong Node. 24.16.0 is the floor
         # engines.node claims; 24 is its line's latest.
         node: ['24.16.0', '24']
+        # The orchestrator's suite is the longest of the five (766 s for its leg's two passes, measured over 8 ci runs on 2026-10-21),
+        # so it runs in two halves. An include entry whose workspace the axis above does not name cannot be added to a combination, so
+        # GitHub makes a leg of its own of it: four legs here, two nodes by two halves. Each half is named <i>/2, which is what
+        # node --test-shard takes, and the fractions must tile 1..n of n or a half of the suite is run by nobody.
+        include:
+          - workspace: agent-orchestrator
+            node: '24.16.0'
+            shard: '1/2'
+          - workspace: agent-orchestrator
+            node: '24.16.0'
+            shard: '2/2'
+          - workspace: agent-orchestrator
+            node: '24'
+            shard: '1/2'
+          - workspace: agent-orchestrator
+            node: '24'
+            shard: '2/2'
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -49,16 +71,29 @@ jobs:
           git config --global user.email 'ci@nemia.invalid'
           git config --global init.defaultBranch main
       - run: npm ci
-      # Both runs pass --force: turbo.json hashes no environment (envMode loose passes it through without hashing it), so without it the
-      # second run replays the first from the cache and the second timezone is never tested.
+      # Both runs pass --force: turbo.json hashes no environment (envMode loose passes it through without hashing it, WF_TEST_SHARD as
+      # well as TZ), so without it the second run replays the first from the cache and the second timezone is never tested.
+      #
+      # The half this leg runs travels in WF_TEST_SHARD, which the orchestrator's own test script expands into --test-shard before its
+      # globs. Not as a turbo `-- --test-shard=1/2` argument: turbo appends that after the script's own arguments, where node has
+      # stopped parsing options and reads it as a file pattern instead (options.globPatterns is argv past the first positional). And
+      # not through NODE_OPTIONS, which every node child the suite spawns would inherit. Empty on every leg but the orchestrator's,
+      # where the script's hole expands to nothing and the suite runs whole.
       - name: test under TZ=UTC
         run: npx turbo run test --force --filter=${{ matrix.workspace }}
         env:
           TZ: UTC
+          WF_TEST_SHARD: ${{ matrix.shard }}
+      # The web alone, and the reason is a measurement of 2026-10-21: local time is read in apps/web/src/lib and nowhere else in this
+      # repository, and in 54 ci runs the America/New_York pass never failed on its own — each of the 8 failures had already failed
+      # under UTC. The web's leg is 47 s a pass, so its second zone is cheap; the other four legs were 21 runner-minutes a push for a
+      # zone no code of theirs can read. A workspace that grows a local-time read needs its second zone back here.
       - name: test under TZ=America/New_York
+        if: matrix.workspace == 'web'
         run: npx turbo run test --force --filter=${{ matrix.workspace }}
         env:
           TZ: America/New_York
+          WF_TEST_SHARD: ${{ matrix.shard }}
 
   lint:
     # Whole, and on the floor engines.node claims: the linter's verdict does not differ by node, so one leg is enough.

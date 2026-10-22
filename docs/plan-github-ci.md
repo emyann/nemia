@@ -199,7 +199,7 @@ named checks. What was planned here, for the record:
   anything but `SUCCESS` at the head. Reading a queue's result, and several named checks through a place's `checks` verb, is the merge
   queue's.
 - **Round checks.** Settled by the CI intent, not here: they stay local, and narrow to what the change touched. A round proves the
-  bound, the pictures, the probes, the mutants, the types and the lint whole, and the tests of the packages whose turbo inputs cover the
+  bound, the pictures, the probes, the types and the lint whole, and the tests of the packages whose turbo inputs cover the
   diff; the whole forced suite and the whole e2e become CI's, and the laptop stops paying for them.
 - **What went away.** The landing's whole-suite check on the merged tree, and the hand push of main. The trial merge at the gate stays
   as advice a person reads, and `landingDue` and the git place are untouched: the tick still takes back a merge left staged on main.

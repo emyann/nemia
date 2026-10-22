@@ -25,9 +25,10 @@
  * Every read-only agent of the team (`READ_ONLY_AGENTS`) asks each of git's read-only questions by its own allow, whatever the settings
  * say, and runs no git write (`GIT_READS`, `GIT_WRITES`, `runs`); the four carry one and the same set of rules, each names the place's
  * own skill, which grants no tool so their Skill tool loads it (`placeSkillUnnamed`, `allowedToolsOf`), and git whole, `git worktree`
- * whole or `git branch` whole in place of a rule of the set opens a write. Every git question Agora's skill names is one that allow
- * reaches (`askedGit`). Its step is refused the whole suite
- * its round's check already ran by a deny of its own of each spelling (`WHOLE_SUITE`), and runs a package's tests and a file's
+ * whole or `git branch` whole in place of a rule of the set opens a write. `git grep`'s pager option, the one read of the set that runs
+ * a program of its own, is denied by each of them beside the allow (`GIT_GREP_PAGER`). Every git question Agora's skill names is one
+ * that allow reaches (`askedGit`). Its step is refused the whole suite its round's check already ran by a deny of its own of each
+ * spelling (`WHOLE_SUITE`), and runs a package's tests and a file's
  * (`SCOPED_TESTS`). An agent's fence names no command of this repository: the checks a step names in its note are allowed by the
  * settings (`CHECKERS`, `unallowed`), and the denies that answer those allows are the step's own.
  * The render of a checkout's dashboards (`tools/observe/render/render.ts`) starts a container, so it is the implementer's alone: design
@@ -1770,6 +1771,35 @@ test('the read-only agents carry one and the same set of git rules, so no line o
 
 test('every read-only agent is refused every git write: no allow of its own, of the settings or of a skill reaches one', () => {
   for (const agent of READ_ONLY_AGENTS) assert.deepEqual(runs(shippedStepOf(agent), GIT_WRITES), [], agent);
+});
+
+/**
+ * `git grep`'s pager option, which runs a program of its own on the files that matched (`-O<command>`,
+ * `--open-files-in-pager=<command>`), in the spellings a session types: glued, after another option, and spelled out. It is the one read
+ * of the set that can run anything, so each read-only agent denies it beside the allow, and the deny is matched against the command as
+ * typed, with any assignment kept.
+ */
+const GIT_GREP_PAGER: Call[] = [
+  'git grep -Osh foo HEAD',
+  'git grep -n -Osh foo HEAD',
+  'git grep --open-files-in-pager=sh foo HEAD',
+  'GIT_PAGER=sh git grep -Osh foo HEAD',
+].map((command) => ({ tool: 'Bash', command }));
+
+test("every read-only agent denies git grep's pager option, which would run a program of its own, and asks a plain git grep all the same", () => {
+  for (const agent of READ_ONLY_AGENTS) {
+    const step = shippedStepOf(agent);
+    assert.deepEqual(runs(step, GIT_GREP_PAGER), [], agent);
+    assert.deepEqual(runs(step, [{ tool: 'Bash', command: 'git grep -n foo HEAD' }], {}, []), ['Bash(git grep -n foo HEAD)'], agent);
+  }
+});
+
+test("REFUSED: a read-only agent without its deny of git grep's pager option runs a program by it", () => {
+  for (const agent of READ_ONLY_AGENTS) {
+    const step = shippedStepOf(agent);
+    const open = { ...step, disallowedTools: (step.disallowedTools ?? []).filter((rule) => !rule.startsWith('Bash(git grep ')) };
+    assert.deepEqual(runs(open, GIT_GREP_PAGER), GIT_GREP_PAGER.map(shown), agent);
+  }
 });
 
 test('REFUSED: a read-only agent allowed git whole, git worktree whole or git branch whole runs a write', () => {

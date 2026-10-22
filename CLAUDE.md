@@ -107,7 +107,9 @@ What the `create-an-agent` skill, being generic, does not say here:
   no allow from a step reaches) carry the same read-only git set on their own `allowedTools:` in `workflows/agents/`, and each holds the
   place's `git` skill on its `skills:`; the two writers (Ada, Otto) run `auto` and need no allow. Nothing in the set writes the
   repository, its refs or its configuration — `git merge-tree`, which writes a loose object and no ref, is the one that writes bytes —
-  and `git push` stays refused by Ada's and Otto's `disallowedTools:`. The set is on the agents rather than in `.claude/settings.json` so
+  and `git push` stays refused by Ada's and Otto's `disallowedTools:`. `git grep` is in the set, and its pager option — `-O<command>`,
+  `--open-files-in-pager=<command>`, which runs a program of its own on the files that matched — is denied beside the allow on each of
+  the four and on each step that replaces their deny list, since no allow rule can exclude an option. The set is on the agents rather than in `.claude/settings.json` so
   that the team travels to a factory that is not this checkout; `packages/agent-orchestrator/test/agent-fences.test.ts` holds every read
   open to each of the four, every write refused, and the four lines equal.
 

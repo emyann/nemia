@@ -134,7 +134,7 @@ const folder = (): string => {
 };
 
 /**
- * An engine board a test settles by hand, as gate.test.ts's: what each task was filed with, and every filing. `settle` takes a check's
+ * An engine board a test settles by hand, as the story's stage: what each task was filed with, and every filing. `settle` takes a check's
  * exit code where it is given: a check settled with none did not finish (`exitVerdicts`). `list` views the tasks it is handed that were
  * filed. A check's stdout is empty unless a test gives it (`printed`), and an `Error` given in its place is what reading it throws.
  */

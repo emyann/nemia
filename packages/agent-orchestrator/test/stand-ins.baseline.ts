@@ -93,7 +93,6 @@ export const REAL_REACH: Baseline = {
   'packages/agent-orchestrator/test/run.test.ts': ['place'],
   'packages/agent-orchestrator/test/runtime-client.test.ts': ['hand'],
   'packages/agent-orchestrator/test/schedule.test.ts': ['hand'],
-  'packages/agent-orchestrator/test/ship.test.ts': ['hand'],
   'packages/agent-orchestrator/test/slots.test.ts': ['engine'],
   'packages/agent-orchestrator/test/stand-in-run.test.ts': ['git', 'process'],
   'packages/agent-orchestrator/test/start-config.test.ts': ['place'],

@@ -1999,8 +1999,72 @@ const GIT_WRITES_A_FILE: Call[] = [
 /** The deny that answers `--output` anywhere in a git command, on each read-only agent and on each of its steps. */
 const WRITES_A_FILE_DENY = 'Bash(git *--output*)';
 
+/**
+ * Every spelling of a read outside the repository a read-only step must not run, as typed, each measured on git 2.43 to read a file
+ * outside the folder its Read and Grep are fenced to: `--no-index` on `diff` and `grep` (`grep` takes it abbreviated down to `--no-ind`;
+ * `diff` takes it whole, and refuses `--no-ind` and `--no-inde` as ambiguous with `--no-indent-heuristic`), `blame --contents` (taken
+ * down to `--con`, `--co` being ambiguous with `--color-by-age`), and `grep -f`, joined to its file or apart, first or late (2.43's
+ * `grep` has no `--file`: it refuses it as ambiguous). Its denies name a word that opens `-f`, so `--full-name` and `--files-with-matches`
+ * stay asked. Not here, as no deny string reaches them: a bundled `-nf <file>`, which no glob tells from a pattern, and a path outside
+ * the working tree with no option typed (`git diff /etc/hostname f`), where git compares the two files on its own (root `CLAUDE.md`,
+ * *Agents in this repository*).
+ */
+const GIT_READS_OUTSIDE: Call[] = [
+  'git diff --no-index /etc/hostname CLAUDE.md',
+  'git diff --stat --no-index /etc/hostname CLAUDE.md',
+  'git grep --no-index foo',
+  'git grep -n --no-ind foo',
+  'git blame --contents /etc/hostname CLAUDE.md',
+  'git blame --con=/etc/hostname CLAUDE.md',
+  'git grep -f /etc/hostname',
+  'git grep -n -f/etc/hostname HEAD',
+  'FOO=1 git grep --no-index foo',
+  'timeout 5 git blame CLAUDE.md --contents /etc/hostname',
+].map((command) => ({ tool: 'Bash', command }));
+
+/** The denies that answer a read outside the repository, on each read-only agent and on each of its steps. */
+const READS_OUTSIDE_DENIES = ['Bash(git *--no-ind*)', 'Bash(git blame *--con*)', 'Bash(git grep -f*)', 'Bash(git grep * -f*)'];
+
 /** Every deny a read-only agent's line and each of its steps' own line carries beside the read set. */
-const READ_SET_DENIES = [...RUNS_A_PROGRAM_DENIES, WRITES_A_FILE_DENY];
+const READ_SET_DENIES = [...RUNS_A_PROGRAM_DENIES, WRITES_A_FILE_DENY, ...READS_OUTSIDE_DENIES];
+
+test('every read-only step is refused every spelling of a read outside the repository the fence can read, and still asks each read', () => {
+  for (const { named, step } of readOnlySteps()) {
+    assert.deepEqual(runs(step, GIT_READS_OUTSIDE), [], named);
+    assert.deepEqual(runs(step, GIT_READS, {}, []), GIT_READS.map(shown), named);
+  }
+});
+
+test('REFUSED: a read-only step without the denies of a read outside reads one by each, and each deny refuses its own spellings', () => {
+  for (const { named, step } of readOnlySteps()) {
+    const denies = step.disallowedTools ?? [];
+    for (const rule of READS_OUTSIDE_DENIES) assert.ok(denies.includes(rule), `${named} denies ${rule}, so taking it off says something`);
+    const open = { ...step, disallowedTools: denies.filter((rule) => !READS_OUTSIDE_DENIES.includes(rule)) };
+    assert.deepEqual(runs(open, GIT_READS_OUTSIDE), GIT_READS_OUTSIDE.map(shown), named);
+  }
+  const step = shippedStepOf('agora');
+  const without = (rule: string): string[] =>
+    runs({ ...step, disallowedTools: (step.disallowedTools ?? []).filter((kept) => kept !== rule) }, GIT_READS_OUTSIDE);
+  assert.deepEqual(without('Bash(git *--no-ind*)'), [
+    'Bash(git diff --no-index /etc/hostname CLAUDE.md)',
+    'Bash(git diff --stat --no-index /etc/hostname CLAUDE.md)',
+    'Bash(git grep --no-index foo)',
+    'Bash(git grep -n --no-ind foo)',
+    'Bash(FOO=1 git grep --no-index foo)',
+  ]);
+  assert.deepEqual(without('Bash(git blame *--con*)'), [
+    'Bash(git blame --contents /etc/hostname CLAUDE.md)',
+    'Bash(git blame --con=/etc/hostname CLAUDE.md)',
+    'Bash(timeout 5 git blame CLAUDE.md --contents /etc/hostname)',
+  ]);
+  assert.deepEqual(without('Bash(git grep -f*)'), ['Bash(git grep -f /etc/hostname)']);
+  assert.deepEqual(without('Bash(git grep * -f*)'), ['Bash(git grep -n -f/etc/hostname HEAD)']);
+  const flags: Call[] = ['git grep --full-name -n foo HEAD', 'git grep --files-with-matches foo HEAD'].map((command) => ({
+    tool: 'Bash',
+    command,
+  }));
+  assert.deepEqual(runs(step, flags, {}, []), flags.map(shown), 'a long option that holds -f is still asked');
+});
 
 test('every read-only step is refused every spelling of --output the fence can read, and still asks each read', () => {
   for (const { named, step } of readOnlySteps()) {

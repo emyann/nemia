@@ -110,8 +110,8 @@ What the `create-an-agent` skill, being generic, does not say here:
 - **Every agent of the team reads the repository through git.** The four read-only ones (Seldon, Agora, Iris, Argus, each `dontAsk`, which
   no allow from a step reaches) carry the same read-only git set on their own `allowedTools:` in `workflows/agents/`, and each holds the
   place's `git` skill on its `skills:`; the three writers (Ada, Grace, Otto) run `auto` and need no allow. Nothing in the set writes
-  the repository, its refs or its configuration — `git merge-tree`, which writes a loose object and no ref, is the one that writes bytes
-  — and `git push` stays refused by the writers' `disallowedTools:`, Grace's held equal to Ada's. **What the set would let git write a
+  the repository's history, its refs or its configuration — `git merge-tree` writes a loose object and no ref, and `git status` and
+  `git describe --dirty` refresh the worktree's index and rewrite it when they can take its lock — and `git push` stays refused by the writers' `disallowedTools:`, Grace's held equal to Ada's. **What the set would let git write a
   file or run a program by is denied beside it**, on each of the four and on each step that replaces their deny list, since no allow rule can exclude an option and an allow is
   matched with a leading assignment stripped: `Bash(git grep *O*)` and `Bash(git grep *--op*)` for the pager option, which runs a
   command on the files that matched (every short spelling carries a capital `O`, git bundling it after other short options; every long
@@ -122,12 +122,16 @@ What the `create-an-agent` skill, being generic, does not say here:
   naming something else, or a `nohup` or `timeout` before it, would carry the whole of git's environment through. `Bash(git
   *--output*)` refuses `--output=<file>`, which `diff`, `diff-tree`, `log`, `show`, `rev-list`, `blame` and `shortlog` take and which
   creates or truncates the file it names, written anywhere after `git`: a deny that names it right after the verb misses it later in
-  the line. These denies hold the forms as typed and no other: a Bash rule matches the text, so a spelling the shell rejoins —
+  the line. **What the set would let git read outside the repository by is denied too**, by name: `Bash(git *--no-ind*)` for
+  `--no-index` on `diff` and `grep` (`grep` takes it down to `--no-ind`), `Bash(git blame *--con*)` for `blame --contents <file>` (taken
+  down to `--con`), and `Bash(git grep -f*)` and `Bash(git grep * -f*)` for `grep -f <file>`, a word that opens `-f` (2.43's `grep` has
+  no `--file`). A path outside the working tree no deny can tell apart: `git diff ../outside f` or `git diff /etc/hostname f` compares
+  the two files with no option typed, and a bundled `git grep -nf <file>` is a word no glob tells from a pattern. These denies hold the forms as typed and no other: a Bash rule matches the text, so a spelling the shell rejoins —
   quoted (`--out''put`), escaped (`--out\put`), brace-split or put together from a `$` — passes each of them, and what the set
   writes or runs by such a spelling is open until something reads the line as the shell does. Adding a verb to the set means asking
   what file it can be made to write and what program it can be made to run. The set is on the agents rather than in `.claude/settings.json` so
   that the team travels to a factory that is not this checkout; `packages/agent-orchestrator/test/agent-fences.test.ts` holds every read
-  open to each of the four, every write refused, every spelling of `--output` it can read refused, and the four lines equal.
+  open to each of the four, every write refused, every spelling of `--output` and of a read outside it can read refused, and the four lines equal.
 
 ## Where things are
 

@@ -4164,7 +4164,7 @@ test("REFUSED: `nemia say` on a step the run does not have, a step not filed, a 
   for (const words of [[''], [' \n '], []]) {
     await assert.rejects(
       main(['say', run.id, 'implement', ...words], e),
-      refusedNaming('Conflict', 'say: `text` is empty'),
+      refusedNaming('Conflict', 'say: `text` is empty', 'Give the words'),
       `the engine's refusal of empty words, from the verb and from the command line with none at all: ${JSON.stringify(words)}`,
     );
   }

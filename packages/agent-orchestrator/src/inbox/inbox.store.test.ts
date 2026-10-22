@@ -621,7 +621,7 @@ test('REFUSED by name at shipped defaults, before a run is written and with the 
   );
   await assert.rejects(
     async () => await runPlaced(startFromInbox({ name: kept.card.name, workflow: 'dev', brief: '  \n', callerRepo: repo })),
-    refusedWith('Invalid', `${kept.card.file}: the brief`, 'is empty'),
+    refusedWith('Invalid', `${kept.card.file}: the brief`, 'is empty', 'Give what the run is asked to do', 'leave it out'),
   );
   await assert.rejects(
     starting('add a flag', '--workflows', path.join(repo, 'workflows', 'dev'), '--repo', repo, '--brief', 'x'),

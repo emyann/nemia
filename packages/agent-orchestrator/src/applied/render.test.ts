@@ -224,8 +224,10 @@ test("a harness's options, and a block of a harness it does not run on, are refu
   });
   const { out } = rendered(dir);
   assert.equal(out.refusals.length, 3, out.refusals.join('\n'));
-  const said = (prefix: string, token: string) => out.refusals.some((r) => r.startsWith(prefix) && r.includes(token));
-  assert.ok(said('agents/reviewer/agent.yaml: `codex:`', 'claude'), out.refusals.join('\n'));
-  assert.ok(said('agents/reviewer/agent.yaml: `claude.options`', 'claude'), out.refusals.join('\n'));
-  assert.ok(said('workflows/dev/workflow.yaml, step implement: `codex:`', 'claude'), out.refusals.join('\n'));
+  const said = (prefix: string, ...tokens: string[]) =>
+    out.refusals.some((r) => r.startsWith(prefix) && tokens.every((token) => r.includes(token)));
+  const block = ['a block for codex', 'runs on claude', 'Remove the block'];
+  assert.ok(said('agents/reviewer/agent.yaml: `codex:`', ...block), out.refusals.join('\n'));
+  assert.ok(said('agents/reviewer/agent.yaml: `claude.options`', 'handed to claude', 'Remove it'), out.refusals.join('\n'));
+  assert.ok(said('workflows/dev/workflow.yaml, step implement: `codex:`', ...block), out.refusals.join('\n'));
 });

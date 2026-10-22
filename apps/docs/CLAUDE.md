@@ -12,7 +12,7 @@ its root. A page holds landed material only; a term designed and not built sits 
 - A line beautiful-mermaid would read as nothing fails the build, naming it (`unreadLines`), but the flowchart parser makes a stray word
   a node, so that guard catches a broken edge, not every slip: read the picture.
 - A backticked span with a space in it, or a colon that no digits follow, is read by no check of a page's citations: a command
-  (`npm run dev`) or a key with its colon passes unread, so a name the code does not have yet is said in words `(no test yet)`.
+  (`npm run dev`) or a key with its colon passes unread, so a name the code does not have yet is said in words.
 - **A link is to a page or an anchor that is there**: `starlight-links-validator` fails the build on one that is not, its heading's slug
   included.
 

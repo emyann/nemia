@@ -63,7 +63,9 @@ down is in `docs/architecture.md`, *Who owns what*.
 - **A long text of a line is a body named by its sha256, resolved on every read** (`core/engine/bodies.ts`): its field takes the
   place of the one it stands for (`STANDS_FOR`), so a read gives the event key for key.
 - **Every feed write goes through `filesOps.append` under `feed.lock`** (`withFeedLock`), a rotation too; a rotated feed has a header
-  and a sealed file (`core/engine/feed.ts`): read it through `readFeed`, never as plain lines from byte 0.
+  and a sealed file (`core/engine/feed.ts`): read it through `readFeed`, never as plain lines from byte 0. How long a write waits for
+  a live holder before it refuses naming it is `FEED_LOCK_WAIT_MS`, carried as `withFeedLock`'s and `Journal.filesOps`'s last
+  argument and named in the refusal, so a test shortens it rather than waiting the shipped bound out.
 - **A `claude agents --json` row of ours is decoded by `RegistryRowSchema` (`harness/claude/registry.ts`)**: one that does not decode
   fails the whole read, so every background session is unread, never absent. A field the runtime starts reading is added to the schema;
   a row not ours (no `ae/` name, no `state`) is skipped undecoded.

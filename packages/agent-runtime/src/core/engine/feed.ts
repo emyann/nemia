@@ -278,14 +278,17 @@ const breakDead = (lock: string, dead: Holder): void => {
   }
 };
 
-/** The words of a lock held past `FEED_LOCK_WAIT_MS` by a live process, saying what to do. */
-const heldWords = (lock: string, holder: Holder | undefined): string =>
+/** The words of a lock held past `waitMs` by a live process, saying what to do: the bound it names is the one it waited. */
+const heldWords = (lock: string, holder: Holder | undefined, waitMs: number): string =>
   holder
-    ? `the feed's lock, ${lock}, is held by process ${holder.pid} since ${holder.at}, alive, past ${FEED_LOCK_WAIT_MS} ms: if it is stopped, continue it or end it, then write again. Nothing was written.`
-    : `the feed's lock, ${lock}, is not one this runtime wrote, and nobody has let it go in ${FEED_LOCK_WAIT_MS} ms: if no \`ae\` and no engine runs on this store, remove it, then write again. Nothing was written.`;
+    ? `the feed's lock, ${lock}, is held by process ${holder.pid} since ${holder.at}, alive, past ${waitMs} ms: if it is stopped, continue it or end it, then write again. Nothing was written.`
+    : `the feed's lock, ${lock}, is not one this runtime wrote, and nobody has let it go in ${waitMs} ms: if no \`ae\` and no engine runs on this store, remove it, then write again. Nothing was written.`;
 
-/** Take the lock `lock`: linked from a file of this take's own, so it is whole when it is there. Answers the token it was taken with. */
-const takeLock = (lock: string): string => {
+/**
+ * Take the lock `lock`: linked from a file of this take's own, so it is whole when it is there. Answers the token it was taken
+ * with. A live holder is waited for up to `waitMs`, then named in the refusal.
+ */
+const takeLock = (lock: string, waitMs: number): string => {
   const token = randomUUID();
   const mine = `${lock}.${token}`;
   fs.writeFileSync(mine, JSON.stringify({ pid: process.pid, token, at: new Date().toISOString() }));
@@ -305,7 +308,7 @@ const takeLock = (lock: string): string => {
         breakDead(lock, holder);
         continue;
       }
-      if (elapsedMs(t0, instantNow()) >= FEED_LOCK_WAIT_MS) throw new Error(heldWords(lock, holder));
+      if (elapsedMs(t0, instantNow()) >= waitMs) throw new Error(heldWords(lock, holder, waitMs));
       pause(2);
     }
   } finally {
@@ -320,13 +323,16 @@ const releaseLock = (lock: string, token: string): void => {
 
 /**
  * `fn`, run holding the feed's lock under `root`, which every append and every rotation takes: one at a time, across processes.
- * Waits for a live holder up to `FEED_LOCK_WAIT_MS`, then throws naming it; a holder whose process is gone is broken. Not
- * re-entrant: `fn` takes it again only to wait out the bound.
+ * Waits for a live holder up to `waitMs`, by default the shipped `FEED_LOCK_WAIT_MS`, then throws naming the bound it waited; a
+ * holder whose process is gone is broken. Not re-entrant: `fn` takes it again only to wait out the bound.
+ *
+ * The bound is a parameter so that a test of what a held lock does can shorten it rather than wait the shipped one out, and still
+ * measure its floor at the bound it gave (`test/feed-rotation.test.ts`). Its default is the shipped constant, so no caller changes.
  */
-export const withFeedLock = <A>(root: string, fn: () => A): A => {
+export const withFeedLock = <A>(root: string, fn: () => A, waitMs = FEED_LOCK_WAIT_MS): A => {
   fs.mkdirSync(root, { recursive: true });
   const { lock } = feedFiles(root);
-  const token = takeLock(lock);
+  const token = takeLock(lock, waitMs);
   try {
     return fn();
   } finally {
@@ -503,28 +509,32 @@ const sealTail = (root: string, now: Seen, built: Built, forget: ReadonlySet<str
  * One try at a rotation (`rotateFeed`): the sealed file built outside the lock, then, under it, finished and renamed into place
  * unless another rotation changed the files meanwhile, which answers `undefined`; and `then`, under the same lock.
  */
-const rotateOnce = (root: string, forget: ReadonlySet<string>, then: () => void): ForgottenFeed | undefined => {
+const rotateOnce = (root: string, forget: ReadonlySet<string>, then: () => void, waitMs: number): ForgottenFeed | undefined => {
   const seen = seeFeed(root, true);
   let built: Built | undefined;
   try {
     built = sealUpTo(root, seen, forget);
     const b = built;
-    return withFeedLock(root, () => {
-      const now = seeFeed(root);
-      try {
-        if (!sameFiles(seen, now)) return undefined;
-        const bytesBefore = sizeOf(now);
-        built = undefined;
-        const linesForgotten = sealTail(root, now, b, forget);
-        then();
-        const after = seeFeed(root);
-        const bytesAfter = sizeOf(after);
-        closeSeen(after);
-        return { linesForgotten, bytesBefore, bytesAfter, linesByTask: Object.fromEntries(b.w.byTask) };
-      } finally {
-        closeSeen(now);
-      }
-    });
+    return withFeedLock(
+      root,
+      () => {
+        const now = seeFeed(root);
+        try {
+          if (!sameFiles(seen, now)) return undefined;
+          const bytesBefore = sizeOf(now);
+          built = undefined;
+          const linesForgotten = sealTail(root, now, b, forget);
+          then();
+          const after = seeFeed(root);
+          const bytesAfter = sizeOf(after);
+          closeSeen(after);
+          return { linesForgotten, bytesBefore, bytesAfter, linesByTask: Object.fromEntries(b.w.byTask) };
+        } finally {
+          closeSeen(now);
+        }
+      },
+      waitMs,
+    );
   } finally {
     if (built) {
       if (built.w.fd >= 0) fs.closeSync(built.w.fd);
@@ -540,9 +550,9 @@ const rotateOnce = (root: string, forget: ReadonlySet<string>, then: () => void)
  * since, and two renames: a rotation that met another's work done meanwhile starts again, ten times at most. Nothing is renamed
  * when no line was forgotten.
  */
-export const rotateFeed = (root: string, forget: ReadonlySet<string>, then: () => void): ForgottenFeed => {
+export const rotateFeed = (root: string, forget: ReadonlySet<string>, then: () => void, waitMs = FEED_LOCK_WAIT_MS): ForgottenFeed => {
   for (let tries = 0; tries < 10; tries++) {
-    const done = rotateOnce(root, forget, then);
+    const done = rotateOnce(root, forget, then, waitMs);
     if (done) return done;
   }
   throw new Error(`the feed under ${root} was rotated by another ten times while this one ran: nothing was forgotten; forget again.`);

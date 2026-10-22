@@ -21,7 +21,7 @@ import {
 } from '../event-schema.ts';
 import { FORMER_ARGS, HARNESS_ARGS, type HarnessArgs } from '../../harness/args.ts';
 import { countRead, countWrite } from './tally.ts';
-import { feedLinesOf, readFeed, rotateFeed, withFeedLock, type ForgottenFeed } from './feed.ts';
+import { FEED_LOCK_WAIT_MS, feedLinesOf, readFeed, rotateFeed, withFeedLock, type ForgottenFeed } from './feed.ts';
 import { BodyRefused, filesBodies, memoryBodies, resolver, split, type BodyOps, type BodyRef, type Resolved } from './bodies.ts';
 import { removeBody, sweep } from './sweep.ts';
 
@@ -448,8 +448,11 @@ export class Journal extends Context.Service<Journal, JournalShape>()('engine/Jo
    * The same implementation as a plain value, for a caller that needs its optional `subscribe`. A line is read as its JSON,
    * or as its text where it is none — a write cut short — for the decoder to refuse by place. A task's journal is read through
    * one `journalReader` for the value's life, so a read costs a `stat` and the bytes appended since this value last read it.
+   *
+   * `lockWaitMs` is how long a write waits for the feed's lock before it refuses naming its holder, by default the shipped
+   * `FEED_LOCK_WAIT_MS`: a parameter so that a test of what a held lock does can shorten it rather than wait the shipped one out.
    */
-  static filesOps = (root: string): BodiedJournalOps => {
+  static filesOps = (root: string, lockWaitMs = FEED_LOCK_WAIT_MS): BodiedJournalOps => {
     const dir = path.join(root, 'tasks');
     const file = (id: string) => path.join(dir, `${id}.jsonl`);
     const feedFile = path.join(root, 'feed.jsonl');
@@ -468,14 +471,18 @@ export class Journal extends Context.Service<Journal, JournalShape>()('engine/Jo
       append: (taskId, event) =>
         Effect.try({
           try: () =>
-            withFeedLock(root, () => {
-              fs.mkdirSync(dir, { recursive: true });
-              if (event.kind !== 'filed' && !fs.existsSync(file(taskId))) throw new Error(forgottenWords(taskId, file(taskId)));
-              fs.appendFileSync(file(taskId), JSON.stringify(event) + '\n');
-              countWrite();
-              fs.appendFileSync(feedFile, JSON.stringify({ taskId, event }) + '\n');
-              countWrite();
-            }),
+            withFeedLock(
+              root,
+              () => {
+                fs.mkdirSync(dir, { recursive: true });
+                if (event.kind !== 'filed' && !fs.existsSync(file(taskId))) throw new Error(forgottenWords(taskId, file(taskId)));
+                fs.appendFileSync(file(taskId), JSON.stringify(event) + '\n');
+                countWrite();
+                fs.appendFileSync(feedFile, JSON.stringify({ taskId, event }) + '\n');
+                countWrite();
+              },
+              lockWaitMs,
+            ),
           catch: fail(taskId),
         }),
       read: (taskId) => Effect.try({ try: () => journals(file(taskId)), catch: fail(taskId) }),
@@ -502,9 +509,14 @@ export class Journal extends Context.Service<Journal, JournalShape>()('engine/Jo
       forget: (taskIds) =>
         Effect.try({
           try: () =>
-            rotateFeed(root, new Set(taskIds), () => {
-              for (const id of taskIds) fs.rmSync(file(id), { force: true });
-            }),
+            rotateFeed(
+              root,
+              new Set(taskIds),
+              () => {
+                for (const id of taskIds) fs.rmSync(file(id), { force: true });
+              },
+              lockWaitMs,
+            ),
           catch: fail('*'),
         }),
 

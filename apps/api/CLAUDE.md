@@ -2,7 +2,7 @@
 
 The workflows behind HTTP, and the feed as a stream: Hono over the orchestrator's public contract (`agent-orchestrator`,
 `agent-orchestrator/run`, `agent-orchestrator/workflow`; the entries:
-`packages/agent-orchestrator/test/contract.test.ts`), and nothing below it: its source imports no runtime `(no test yet)`, while its
+`packages/agent-orchestrator/test/contract.test.ts`), and nothing below it: its source imports no runtime, while its
 tests may import the runtime's public entries to build fakes. A harness fact it needs comes from the orchestrator; what it holds today
 below its layer is in `docs/architecture.md`, *Who owns what*.
 

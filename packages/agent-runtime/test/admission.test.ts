@@ -56,7 +56,13 @@ const board = (maxConcurrent: number | undefined, pools: { a?: string; b?: strin
     b: { ...asyncOps(fake(sessions)), ...(pools.b ? { pool: pools.b } : {}) },
   };
   const engine = builtEngine(
-    Engine.layer({ root: scratch('ae-admission-root-'), journal: asyncStore(journal), harnesses, defaultHarness: 'a', ...(maxConcurrent ? { maxConcurrent } : {}) }),
+    Engine.layer({
+      root: scratch('ae-admission-root-'),
+      journal: asyncStore(journal),
+      harnesses,
+      defaultHarness: 'a',
+      ...(maxConcurrent ? { maxConcurrent } : {}),
+    }),
   );
   return { engine, sessions, journal };
 };
@@ -240,7 +246,14 @@ test('an engine unschedulable admits no queued task on any pass while it says so
   let unschedulable = false;
   const harnesses: Record<string, HarnessConfig> = { a: asyncOps(fake(sessions)) };
   const engine = builtEngine(
-    Engine.layer({ root: scratch('ae-admission-root-'), journal: asyncStore(journal), harnesses, defaultHarness: 'a', maxConcurrent: 3, unschedulable: () => unschedulable }),
+    Engine.layer({
+      root: scratch('ae-admission-root-'),
+      journal: asyncStore(journal),
+      harnesses,
+      defaultHarness: 'a',
+      maxConcurrent: 3,
+      unschedulable: () => unschedulable,
+    }),
   );
   await fileAt(journal, 'before', '2026-10-04T09:00:00.000Z');
   await Effect.runPromise(engine.tick());
@@ -261,7 +274,14 @@ test('an engine unschedulable admits no queued task on any pass while it says so
 
 test('REFUSED at shipped defaults: an `unschedulable` that is not a function builds no engine', () => {
   assert.throws(
-    () => builtEngine(Engine.layer({ journal: memoryJournal(), unschedulable: true } as never)),
+    () =>
+      builtEngine(
+        Engine.layer({
+          root: scratch('ae-admission-root-'),
+          journal: memoryJournal(),
+          unschedulable: true as never,
+        }),
+      ),
     (err: Error) => err.message.includes('`unschedulable` is a function, `() => boolean`, asked on every pass'),
   );
 });

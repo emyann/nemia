@@ -221,7 +221,12 @@ test('start() ticks on a timer and never overlaps', WAITED, async (t) => {
   const sessions = new Map<string, Sighting>();
   const { harness, seen } = slowHarness(sessions, 60);
   const engine = builtEngine(
-    EngineService.layer({ root: scratch('ae-engine-verbs-root-'), journal: asyncStore(memoryJournal()), harnesses: { fake: asyncOps(harness) }, defaultHarness: 'fake' }),
+    EngineService.layer({
+      root: scratch('ae-engine-verbs-root-'),
+      journal: asyncStore(memoryJournal()),
+      harnesses: { fake: asyncOps(harness) },
+      defaultHarness: 'fake',
+    }),
   );
   await Effect.runPromise(engine.file({ brief: 'b', cwd: '/repo' }));
 
@@ -260,7 +265,12 @@ test(
     const sessions = new Map<string, Sighting>();
     const { harness, seen, begun } = slowHarness(sessions, 60);
     const engine = builtEngine(
-      EngineService.layer({ root: scratch('ae-engine-verbs-root-'), journal: asyncStore(memoryJournal()), harnesses: { fake: asyncOps(harness) }, defaultHarness: 'fake' }),
+      EngineService.layer({
+        root: scratch('ae-engine-verbs-root-'),
+        journal: asyncStore(memoryJournal()),
+        harnesses: { fake: asyncOps(harness) },
+        defaultHarness: 'fake',
+      }),
     );
     await Effect.runPromise(engine.file({ brief: 'b', cwd: '/repo' }));
 
@@ -506,7 +516,12 @@ test("a brought store's subscribe wakes a watcher, which hears a write it did no
     },
   };
   const engine = builtEngine(
-    EngineService.layer({ root: scratch('ae-engine-verbs-root-'), journal: store, harnesses: { fake: asyncOps(fakeHarness(new Map())) }, defaultHarness: 'fake' }),
+    EngineService.layer({
+      root: scratch('ae-engine-verbs-root-'),
+      journal: store,
+      harnesses: { fake: asyncOps(fakeHarness(new Map())) },
+      defaultHarness: 'fake',
+    }),
   );
   await Effect.runPromise(engine.file({ brief: 'first', cwd: '/r', id: 'first' }));
 
@@ -560,7 +575,8 @@ const survives = (body: string) =>
     import { Effect } from 'effect';
     import { Engine } from '${path.resolve('src/index.ts')}';
     import { builtEngine } from '${path.resolve('test/engine.ts')}';
-    const engine = builtEngine(Engine.layer({ root: ${JSON.stringify(root)} }));
+    const root = ${JSON.stringify(root)};
+    const engine = builtEngine(Engine.layer({ root }));
     ${body}
   `,
       ],
@@ -588,7 +604,7 @@ test('watch() keeps its host process alive, even with a store that cannot push',
       append: () => Effect.void, read: () => Effect.succeed([]), list: Effect.succeed([]),
       feed: () => Effect.succeed({ entries: [], cursor: 0 }),
     };
-    Effect.runSync(builtEngine(Engine.layer({ journal: store })).watch({ onEntry: () => {} }));
+    Effect.runSync(builtEngine(Engine.layer({ root, journal: store })).watch({ onEntry: () => {} }));
   `),
     true,
     "a store with no `subscribe`, the kind a consumer brings, has only the interval to hold the loop open: the file store's fs.watch holds it by itself",
@@ -709,7 +725,14 @@ test('a harness brought as a spec is asked its own refusals; one brought as a ru
 test('a runner brought as its own RunnerOps is asked its own refusal, and the task it refuses is not journalled', async () => {
   const journal = memoryJournal();
   const own = { ...asyncOps(fakeHarness(new Map())), refuses: (task: TaskSpec) => (task.brief === 'no' ? 'own runs no "no"' : undefined) };
-  const engine = builtEngine(EngineService.layer({ root: scratch('ae-engine-verbs-root-'), journal: asyncStore(journal), harnesses: { own }, defaultHarness: 'own' }));
+  const engine = builtEngine(
+    EngineService.layer({
+      root: scratch('ae-engine-verbs-root-'),
+      journal: asyncStore(journal),
+      harnesses: { own },
+      defaultHarness: 'own',
+    }),
+  );
   await refused(engine, { brief: 'no', cwd: '/r' }, /own runs no "no"/);
   assert.deepEqual(await journal.list(), [], 'nothing was journalled');
   assert.ok(await Effect.runPromise(engine.file({ brief: 'yes', cwd: '/r' })));
@@ -920,7 +943,9 @@ test('the engine refuses a `maxConcurrent` that is not a whole number from 1, an
     );
   }
   for (const maxConcurrent of [1, 3, undefined]) {
-    assert.doesNotThrow(() => builtEngine(EngineService.layer({ root: scratch('ae-engine-verbs-root-'), journal: asyncStore(memoryJournal()), maxConcurrent })));
+    assert.doesNotThrow(() =>
+      builtEngine(EngineService.layer({ root: scratch('ae-engine-verbs-root-'), journal: asyncStore(memoryJournal()), maxConcurrent })),
+    );
   }
 });
 
@@ -934,7 +959,14 @@ test('the engine refuses a harness whose `pool` is not a name, naming the harnes
   ] as const;
   for (const [name, harness] of badPool) {
     assert.throws(
-      () => builtEngine(EngineService.layer({ root: scratch('ae-engine-verbs-root-'), journal: asyncStore(memoryJournal()), harnesses: { [name]: harness } as never })),
+      () =>
+        builtEngine(
+          EngineService.layer({
+            root: scratch('ae-engine-verbs-root-'),
+            journal: asyncStore(memoryJournal()),
+            harnesses: { [name]: harness } as never,
+          }),
+        ),
       (e: Error & { _tag?: string }) => {
         assert.equal(e._tag, 'EngineRefused', e.message);
         assert.match(e.message, new RegExp(`^the \`${name}\` harness names the \`pool\` .*, which is not a name\\.`));
@@ -1020,7 +1052,9 @@ test("file() refuses claude.remoteControl on every harness with no such flag, by
   assert.deepEqual((filed as { config?: object }).config, { claude: { remoteControl: true } }, 'on the record, for the runner');
   assert.equal((await Effect.runPromise(engine.view(id))).state.config?.claude?.remoteControl, true);
 
-  const bare = builtEngine(EngineService.layer({ root: scratch('ae-engine-verbs-root-'), journal: asyncStore(memoryJournal()), harnesses: { codex } }));
+  const bare = builtEngine(
+    EngineService.layer({ root: scratch('ae-engine-verbs-root-'), journal: asyncStore(memoryJournal()), harnesses: { codex } }),
+  );
   await refused(
     bare,
     { brief: 'b', cwd: '/r', config: { claude: { remoteControl: true } } },
@@ -1039,7 +1073,13 @@ test('file() refuses background on every harness with no such mode, and remoteCo
       ),
     );
   }
-  const bg = builtEngine(EngineService.layer({ root: scratch('ae-engine-verbs-root-'), journal: asyncStore(memoryJournal()), harnesses: { claude: 'claude-bg' } }));
+  const bg = builtEngine(
+    EngineService.layer({
+      root: scratch('ae-engine-verbs-root-'),
+      journal: asyncStore(memoryJournal()),
+      harnesses: { claude: 'claude-bg' },
+    }),
+  );
   await refused(
     bg,
     { brief: 'b', cwd: '/r', config: { background: true } },
@@ -1129,7 +1169,11 @@ test('a HarnessSpec is given a contextTokens only when it declares the windows i
   const windowed: HarnessSpec = { ...bare, name: 'windowed', contextTokens: { least: 8_000, most: 32_000 } };
   const runner: AsyncRunner = { spawn: async () => {}, observe: async () => new Map(), stop: async () => {}, logs: async () => '' };
   const engine = builtEngine(
-    EngineService.layer({ root: scratch('ae-engine-verbs-root-'), journal: asyncStore(memoryJournal()), harnesses: { bare, windowed, runner: asyncOps(runner) } }),
+    EngineService.layer({
+      root: scratch('ae-engine-verbs-root-'),
+      journal: asyncStore(memoryJournal()),
+      harnesses: { bare, windowed, runner: asyncOps(runner) },
+    }),
   );
   await refused(
     engine,
@@ -1143,7 +1187,9 @@ test('a HarnessSpec is given a contextTokens only when it declares the windows i
     "a runner's own business",
   );
 
-  const none = builtEngine(EngineService.layer({ root: scratch('ae-engine-verbs-root-'), journal: asyncStore(memoryJournal()), harnesses: { codex } }));
+  const none = builtEngine(
+    EngineService.layer({ root: scratch('ae-engine-verbs-root-'), journal: asyncStore(memoryJournal()), harnesses: { codex } }),
+  );
   await refused(
     none,
     { brief: 'b', cwd: '/r', config: { contextTokens: 200000 } },
@@ -1207,7 +1253,12 @@ test('an AsyncRunner whose spawn rejects is not taken to have started nothing â€
     },
   };
   const engine = builtEngine(
-    EngineService.layer({ root: scratch('ae-engine-verbs-root-'), journal: asyncStore(memoryJournal()), harnesses: { launcher: asyncOps(launcher) }, defaultHarness: 'launcher' }),
+    EngineService.layer({
+      root: scratch('ae-engine-verbs-root-'),
+      journal: asyncStore(memoryJournal()),
+      harnesses: { launcher: asyncOps(launcher) },
+      defaultHarness: 'launcher',
+    }),
   );
   const maybe = await Effect.runPromise(engine.file({ brief: 'start', cwd: '/r' }));
   const no = await Effect.runPromise(engine.file({ brief: 'refuse', cwd: '/r' }));

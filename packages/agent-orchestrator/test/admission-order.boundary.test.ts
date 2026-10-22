@@ -245,6 +245,7 @@ test("REFUSED without the momentum: at a ceiling of one, the runtime admits a ru
     const sessions = new Map<string, Sighting>();
     const e = plainEngine(
       RuntimeEngine.layer({
+        root: scratch('wf-admission-order-engine-'),
         journal: asyncStore(memoryJournal()),
         harnesses: { claude: asyncOps(startsInOrder(sessions)) },
         defaultHarness: 'claude',

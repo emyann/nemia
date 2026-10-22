@@ -108,6 +108,25 @@ async function expectRows(section: Locator, states: States): Promise<void> {
         `${name}'s chip says the state the api answered, ${JSON.stringify(state ?? UNREAD)} — it says ${JSON.stringify(word)}`,
       );
     if (!(await chip.getAttribute('title'))) throw new Refused(`${name}'s chip says in its title what its word means`);
+    await expectSignIn(section, name, state);
+  }
+}
+
+/**
+ * A row offers the sign-in its state asks for, and no other: Sign in where the api answered `needs-auth` for a server with an OAuth
+ * client, Sign out where it answered `connected`, neither for any other state or a server with no client (`docs`). Neither is pressed:
+ * the states come from a real harness session, and a press would write that harness's own store.
+ */
+async function expectSignIn(section: Locator, name: string, state: string | null): Promise<void> {
+  const row = section.locator(`[data-factory-server="${name}"]`);
+  const signs = name in RECORDED && 'oauth' in RECORDED[name as keyof typeof RECORDED];
+  const offered = signs && state === 'needs-auth' ? 'Sign in' : signs && state === 'connected' ? 'Sign out' : null;
+  for (const button of ['Sign in', 'Sign out']) {
+    const shown = await row.getByRole('button', { name: button, exact: true }).count();
+    if (shown !== (button === offered ? 1 : 0))
+      throw new Refused(
+        `${name}, answered ${JSON.stringify(state)}, ${button === offered ? 'offers' : 'does not offer'} ${button} — it shows ${shown}`,
+      );
   }
 }
 

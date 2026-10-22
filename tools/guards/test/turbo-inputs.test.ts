@@ -5,8 +5,8 @@
  * lint tests here read `.oxlintrc.json` and `lint/`, and this package's suite reads the apps' tests (`suite.test.ts`, `comments.test.ts`).
  * The declared-imports scan here reads every workspace package's `package.json` and source, the apps' configs and the runtime's files
  * among them, and the runtime's contract test reads the `.ts` files at each app's root too. The vocabulary test here reads this
- * repository's team from `workflows/agents/` (`words.test.ts`), and the citation test here reads every `CLAUDE.md` of the repository,
- * the root's and the apps' among them (`claude-md-cites.test.ts`). Every package's test script loads the test-cost probe and reporter from
+ * repository's team from `workflows/agents/` (`words.test.ts`), and its whole-repository scans (`names.test.ts`, `others.test.ts`) read
+ * the root's and the apps' `CLAUDE.md` among every file. Every package's test script loads the test-cost probe and reporter from
  * `tools/test-costs/`, so each package's test lists `tools/` too. The docs' tests read the packages' docs for the diagrams they draw,
  * every source for the names their pages cite, and the paths those pages cite, at the root and under `docs/` and `workflows/`.
  * The api's test of what `npm run dev` watches reads every workspace package's `package.json` and sources (`dev-watch.test.ts`).
@@ -16,7 +16,11 @@
  * The repository's own guards read the files they hold (`guards#test`): the CI guard reads the Actions workflow, the secret scan's
  * allowlist, the stub secrets of the runtime's `remote-agent.test.ts`, the e2e's page names, the board's generated paths and every
  * workspace's manifest (`tools/guards/test/ci-workflow.test.ts`, `tools/guards/test/ci-scan.boundary.test.ts`), and
- * `tools/guards/test/repo-guards.test.ts` reads `CODEOWNERS`, under `.github/`, and the packages' manifests. The same list is what
+ * `tools/guards/test/repo-guards.test.ts` reads `CODEOWNERS`, under `.github/`, and the packages' manifests. The citation guard reads
+ * every `CLAUDE.md` and every test file, the apps' among them (`claude-md-cites.test.ts`); the licence guard the root's `LICENSE` and
+ * `README.md` (`license.test.ts`); the team's guards and the git reads' guard `.claude/settings.json` and the skills (`team-words.test.ts`,
+ * `team-portable.test.ts`, `git-reads.test.ts`), the five layers' guard the docs site's pages (`agent-layers-doc.test.ts`); the
+ * orchestrator's own files reach this task through its dependency on `agent-orchestrator`. The same list is what
  * `tools/guards/due.ts` reads to say whether CI owes the guards their suite.
  * `INPUTS` names, for each such task, the globs it must list beside its own files; `missingInputs` refuses a task or a glob left out.
  */
@@ -28,6 +32,15 @@ import path from 'node:path';
 const ROOT = path.join(import.meta.dirname, '..', '..', '..');
 
 const APPS = ['$TURBO_ROOT$/apps/*/src/**', '$TURBO_ROOT$/apps/*/test/**'];
+
+/**
+ * The apps' test files, under their `test/` and beside their code to the depth they keep them, which `claude-md-cites.test.ts` resolves
+ * a citation to: not the apps' whole source, which would make the guards due on every change to the board.
+ */
+const APP_TESTS = ['$TURBO_ROOT$/apps/*/test/**', '$TURBO_ROOT$/apps/*/src/*.test.ts*', '$TURBO_ROOT$/apps/*/src/*/*.test.ts*'];
+
+/** Every `CLAUDE.md` of the repository, the root's, the apps' and the packages': what `claude-md-cites.test.ts` reads. */
+const CLAUDE_FILES = ['$TURBO_ROOT$/CLAUDE.md', '$TURBO_ROOT$/apps/*/CLAUDE.md', '$TURBO_ROOT$/packages/*/CLAUDE.md'];
 
 /** The trigger skill of a change to the board, which `apps/web/test/look.test.ts` reads for the look's parts. */
 const BOARD_SKILL = '$TURBO_ROOT$/.claude/skills/change-the-board/SKILL.md';
@@ -64,6 +77,13 @@ const INPUTS: Record<string, readonly string[]> = {
     '$TURBO_ROOT$/apps/web/test/e2e/pages/NAMES',
     '$TURBO_ROOT$/apps/web/src/routeTree.gen.ts',
     '$TURBO_ROOT$/apps/web/theme/**',
+    ...APP_TESTS,
+    '$TURBO_ROOT$/apps/docs/src/content/docs/**',
+    ...CLAUDE_FILES,
+    '$TURBO_ROOT$/README.md',
+    '$TURBO_ROOT$/LICENSE',
+    '$TURBO_ROOT$/.claude/settings.json',
+    '$TURBO_ROOT$/.claude/skills/**',
   ],
   'agent-runtime#test': [
     '$TURBO_DEFAULT$',

@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Locator, Page } from 'playwright';
+import type { Locator, Page, Request } from 'playwright';
 import { photograph, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { FACTORIES } from '../seed.ts';
@@ -49,16 +49,31 @@ const recorded = (file: string): Record<string, { url?: string; headers?: Record
         .servers ?? {})
     : {};
 
+/** Whether `request` is a read of the factory's servers, which is what reads their states. */
+const isStatesRead = (request: Request): boolean =>
+  request.method() === 'GET' && new URL(request.url()).pathname === `/api/factories/${FACTORY}/servers`;
+
 /**
- * The api's own answer to a states read, as a map by name, around `act` — the page's load, or a press of Check again. A read is made on
- * those two alone, never on the board's poll, so the answer the chips are judged against is the one that drew them.
+ * The api's own answer to a states read, as a map by name, around `act` — the page's load, or a press of Check again — and the network
+ * idle after it. A read is made on those two alone, once each, never on the board's poll nor again on the page's mount or focus: every
+ * read issued from the start of `act` until the network idles is counted, one is refused but exactly one, and the answer the chips are
+ * judged against is that read's, so it is the one that drew them — never a read an earlier navigation left in flight.
  */
 async function statesRead(page: Page, what: string, act: () => Promise<unknown>): Promise<States> {
-  const read = page.waitForResponse(
-    (r) => r.request().method() === 'GET' && new URL(r.url()).pathname === `/api/factories/${FACTORY}/servers`,
-    { timeout: WAIT_MS },
-  );
-  const [answer] = await Promise.all([read, act()]);
+  const reads: Request[] = [];
+  const count = (request: Request) => {
+    if (isStatesRead(request)) reads.push(request);
+  };
+  page.on('request', count);
+  try {
+    await act();
+    await idle(page);
+  } finally {
+    page.off('request', count);
+  }
+  if (reads.length !== 1) throw new Refused(`${what} reads the states once — it read them ${reads.length} times`);
+  const answer = await reads[0].response();
+  if (!answer) throw new Refused(`${what} reads the states — the read got no answer`);
   if (answer.status() !== 200) throw new Refused(`${what} reads the states — the api answered ${answer.status()}: ${await answer.text()}`);
   const body = (await answer.json()) as { servers?: Array<{ name?: string; state?: string | null }> };
   const states: States = new Map();
@@ -119,7 +134,6 @@ async function expectRows(section: Locator, states: States): Promise<void> {
  */
 async function checkAgain(page: Page, section: Locator): Promise<void> {
   const states = await statesRead(page, 'Check again', () => section.getByRole('button', { name: 'Check again', exact: true }).click());
-  await idle(page);
   await expectRows(section, states);
 }
 
@@ -194,7 +208,6 @@ export default {
     const harnessWas = harnessFolder();
     try {
       const states = await statesRead(page, "the page's load", () => page.reload({ waitUntil: 'load' }));
-      await idle(page);
       const section = page.locator('section[data-factory-servers]');
       await expectVisible(section, "the factory's servers are a section of its settings");
       await expectVisible(

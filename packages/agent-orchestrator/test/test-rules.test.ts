@@ -106,8 +106,13 @@ const SAID = /\b(?:message|stderr|refus\w*|why|words|cause|error\w*|Error|err)\b
  * template holding a `${…}` is left out — what it expects is not a sentence this file fixes — and so is a class of a pattern
  * (`[^\n]`), which carries no sentence either.
  */
-const LITERALS =
-  /'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"|`((?:[^`\\$]|\\.|\$(?!\{))*)`|\/((?:[^/\\\n[]|\\.|\[[^\]\n]*\])+)\//g;
+const LITERALS = /'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"|`((?:[^`\\$]|\\.|\$(?!\{))*)`|\/((?:[^/\\\n[]|\\.|\[[^\]\n]*\])+)\//g;
+
+/**
+ * The assertion `call`'s own expression, its literals blanked: what it is asserting *about*. Read without them because a sentence
+ * that happens to hold the word `refused` would otherwise name itself as what the code said.
+ */
+const subjectOf = (call: string): string => call.replace(LITERALS, (found) => found.replace(/[^\n]/g, ' '));
 
 /**
  * Each line of `text` whose assertion over what the code said expects a whole sentence, by its line and the sentence's opening
@@ -123,9 +128,7 @@ export const pinnedWords = (text: string): string[] => {
   const lineAt = (index: number) => clean.slice(0, index).split('\n').length;
   const found = new Map<number, string>();
   for (const { at, call } of assertions(clean)) {
-    // The subject is the code's own expression, so the literals are blanked before it is read: a sentence that happens to hold the
-    // word `refused` would otherwise name itself as what the code said.
-    if (!SAID.test(call.replace(LITERALS, (found) => found.replace(/[^\n]/g, ' ')))) continue;
+    if (!SAID.test(subjectOf(call))) continue;
     for (const m of call.matchAll(LITERALS)) {
       const body = m[1] ?? m[2] ?? m[3] ?? m[4];
       if (body === undefined) continue;
@@ -139,19 +142,23 @@ export const pinnedWords = (text: string): string[] => {
 };
 
 /**
- * The bounds in milliseconds `clean` imports from a module of a package's `src`: a name of capitals, digits and underscores ending
- * `_MS`, which is how this repository names every shipped bound on a length of time. A bound the test declares itself — `const
- * SHORT_MS = 200` — is not one of them, and a floor at it is the rule's own answer rather than what it refuses; so is a shipped
- * constant that is no duration (`HEADER_BYTES`), which nothing waits for. Whether the bound is a second or a tenth of one the text
- * does not say, and the rule does not ask: a floor at a bound the shipped code owns is paid for by every pass whatever its value,
- * and the answer — shorten it at the code's own seam — is the same either way.
+ * The bounds in milliseconds `clean` imports from a module of a package's `src`: a name of capitals, digits and underscores whose
+ * last two letters are those of a millisecond, which is how this repository names every shipped bound on a length of time. A bound
+ * the test declares itself — `const SHORT_MS = 200` — is not one of them, and a floor at it is the rule's own answer rather than what
+ * it refuses; so is a shipped constant that is no duration (`HEADER_BYTES`), which nothing waits for. Whether the bound is a second or
+ * a tenth of one the text does not say, and the rule does not ask: a floor at a bound the shipped code owns is paid for by every pass
+ * whatever its value, and the answer — shorten it at the code's own seam — is the same either way.
  */
 const shippedBounds = (clean: string): string[] => {
   const names = new Set<string>();
   for (const m of clean.matchAll(/^[ \t]*import\s*(?:type\s+)?\{([\s\S]*?)\}\s*from\s*['"]([^'"]*)['"]/gm)) {
     if (!/(?:^|\/)src\//.test(m[2])) continue;
     for (const part of m[1].split(',')) {
-      const name = part.trim().split(/\s+as\s+/).pop()?.trim();
+      const name = part
+        .trim()
+        .split(/\s+as\s+/)
+        .pop()
+        ?.trim();
       if (name && /^[A-Z][A-Z0-9_]*_MS$/.test(name)) names.add(name);
     }
   }
@@ -173,10 +180,7 @@ export const waitedOut = (text: string): string[] => {
   if (!bounds.length) return [];
   const lineAt = (index: number) => clean.slice(0, index).split('\n').length;
   const bound = `(?:${bounds.join('|')})`;
-  const floor = new RegExp(
-    String.raw`(?<![\w$.])([a-z]\w*)\s*>=\s*${bound}(?![\w$])|(?<![\w$.])${bound}\s*<=\s*([a-z]\w*)(?![\w$])`,
-    'g',
-  );
+  const floor = new RegExp(String.raw`(?<![\w$.])([a-z]\w*)\s*>=\s*${bound}(?![\w$])|(?<![\w$.])${bound}\s*<=\s*([a-z]\w*)(?![\w$])`, 'g');
   const found = new Map<number, string>();
   for (const { at, call } of assertions(clean)) {
     for (const m of call.matchAll(floor)) {
@@ -315,7 +319,11 @@ test('no test of the repository pins a sentence of what the code said but those 
   const held = sweep(files, pinnedWords);
   assert.ok(Object.keys(held).length > 0, 'and reads their sources: the debt is not empty yet');
   assert.deepEqual(
-    owingOf(held, PINNED_WORDS, 'assert the fact, its kind and the exit code, never the sentence (`.claude/skills/implement-a-change/SKILL.md`, step 2)'),
+    owingOf(
+      held,
+      PINNED_WORDS,
+      'assert the fact, its kind and the exit code, never the sentence (`.claude/skills/implement-a-change/SKILL.md`, step 2)',
+    ),
     [],
   );
 });

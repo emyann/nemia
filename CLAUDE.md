@@ -50,7 +50,9 @@ holds what every change needs.
   weakening a test is a finding to report, not a fix.
 - Turbo does not see `workflows/`, nor a doc, though some tests read docs: a step's session runs the tests that read the doc or workflow
   file it touched, and `ci` runs them all, on clean runners with no cache of this machine's, on the commit the round's check pushed;
-  outside a run, type `npx turbo run test --force --continue` after touching one.
+  outside a run, type `npx turbo run test --force --continue` after touching one. The tests that read files of every package —
+  `agent-orchestrator`'s `claude-md-cites.test.ts` over every `CLAUDE.md`, `comments.test.ts`, and `test-rules.test.ts` over every
+  test file — are re-run the same way after a test, a doc or a name moves anywhere.
 - A run's check leaves what its tests cost in `WF_ARTIFACTS`, a `test-costs-<package>-<stamp>.json` per package and try; `node
   tools/test-costs/report.ts <dir>...` ranks them. A package's peak is its largest process, not the sum of the files running at once.
 - **A run's checks inherit the daemon's environment** (`WF_MAX_CONCURRENT=50` on the owner's machine): a test that relies on a default
@@ -69,7 +71,9 @@ holds what every change needs.
   transition is wrong after a restart.
 - **Prose is not a constraint.** If the packages need an agent to do something, the machinery refuses the alternative.
 - **Errors say what to do next.** A message names the fix — the command to type, the field to set — and not only what went wrong: what
-  a refusal is thrown as and the exit code it carries are refused when they are wrong, its words are nobody's to check.
+  a refusal is thrown as and the exit code it carries are refused when they are wrong, its words are nobody's to check, and a test
+  that asserts a whole sentence of them is refused (`packages/agent-orchestrator/test/test-rules.test.ts`), what still does being a
+  debt that only shrinks (`test/test-rules.baseline.ts`).
 - **A state machine is drawn by its code.** A new machine prints its own Mermaid diagram, held between `diagram:<name>` markers in its
   package's docs whose begin line names the command; never a drawing. A diagram that has drifted from what its command prints is
   another matter, and refused.

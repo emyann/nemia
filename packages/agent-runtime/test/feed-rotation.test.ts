@@ -30,9 +30,9 @@ const said = (n: number) => ({ kind: 'input', at: `2026-10-05T00:01:${String(n %
 const ownerOf = (n: number) => (n <= 3 ? ['a', 'b', 'c'][n - 1] : n % 3 === 0 ? 'a' : n % 5 === 0 ? 'c' : 'b');
 
 /** A store of thirty feed lines over the tasks `a`, `b` and `c`, through the files store's own appends. */
-const store = async () => {
+const store = async (lockWaitMs?: number) => {
   const root = scratch('ae-feed-rotation-');
-  const ops = Journal.filesOps(root);
+  const ops = Journal.filesOps(root, lockWaitMs);
   for (let n = 1; n <= 30; n++) await Effect.runPromise(ops.append(ownerOf(n), (n <= 3 ? filed(n) : said(n)) as never));
   return { root, ops, head: path.join(root, 'feed.jsonl'), sealed: path.join(root, 'feed.sealed.jsonl') };
 };
@@ -247,11 +247,19 @@ const reap = (child: ChildProcess) => {
 const exited = (child: ChildProcess) =>
   child.exitCode !== null ? Promise.resolve(child.exitCode) : new Promise<number | null>((r) => child.once('exit', (code) => r(code)));
 
+/**
+ * The bound this test shortens the lock's wait to, at the seam `Journal.filesOps` gives for it: the shipped default is
+ * `FEED_LOCK_WAIT_MS`, and waiting it out cost every pass of this file the whole 2 s to prove what a floor at 200 ms proves — that
+ * the append waited the bound it was given and then refused, naming it.
+ */
+const HELD_MS = 200;
+
 test(
-  "a holder of the feed's lock that is stopped keeps an append out for FEED_LOCK_WAIT_MS, which then fails naming it, and writes nothing",
+  "a holder of the feed's lock that is stopped keeps an append out for the lock's bound, which then fails naming it, and writes nothing",
   WAITED,
   async (t) => {
-    const { root, ops, head } = await store();
+    assert.ok(HELD_MS < FEED_LOCK_WAIT_MS, 'the bound is shortened at the seam, never lengthened past the shipped one');
+    const { root, ops, head } = await store(HELD_MS);
     const feedUrl = pathToFileURL(path.join(PACKAGE, 'src', 'core', 'engine', 'feed.ts')).href;
     const code = `import { withFeedLock } from '${feedUrl}'; withFeedLock(process.env.FEED_ROOT, () => process.kill(process.pid, 'SIGSTOP'));`;
     const child = spawn(process.execPath, ['--input-type=module', '-e', code], {
@@ -266,7 +274,8 @@ test(
       const t0 = instantNow();
       const error = await Effect.runPromise(Effect.flip(ops.append('b', said(31) as never)));
       const waited = elapsedMs(t0, instantNow());
-      assert.ok(waited >= FEED_LOCK_WAIT_MS, `waited ${waited} ms on the clock the lock is bounded by, at least the bound`);
+      assert.ok(waited >= HELD_MS, `waited ${waited} ms on the clock the lock is bounded by, at least the bound it was given`);
+      assert.ok(error.message.includes(`past ${HELD_MS} ms`), error.message);
       assert.ok(error.message.includes(path.join(root, 'feed.lock')), error.message);
       assert.ok(error.message.includes(`process ${pid}`), error.message);
       assert.ok(error.message.includes('if it is stopped, continue it or end it'), error.message);

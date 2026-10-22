@@ -36,12 +36,11 @@ description: "Review a change in this repository as a second engineer would: aga
      silently inert. One fixture that breaks the rule is what is owed; a guard that ships with none is the finding.
    - A fixture that does not break the rule the test claims to hold — the same order, the same name — so the test would pass with the
      rule gone.
-   - An assertion that pins a refusal's whole sentence: its words are nobody's to check (root `CLAUDE.md`, *Rules the code keeps*),
-     and what still pins one is a shrinking debt (`packages/agent-orchestrator/test/test-rules.baseline.ts`). A new line in that
-     baseline is the finding, as is a line lowered while the assertions are still there.
+   - An assertion that pins a refusal's whole sentence, where the repository's own rules say its words are nobody's to check. Where
+     the repository keeps a count of what still pins one, a new line in it is the finding, as is a line lowered while the
+     assertions are still there.
    - A test that waits out a shipped default — a floor standing at a bound the shipped code owns, rather than at a bound the test
-     shortened at the code's own seam: it buys a second of proof with a second of every pass, and the same baseline counts what is
-     left.
+     shortened at the code's own seam: it buys a second of proof with a second of every pass.
    - A wall-clock bound, or a wait for a length of time rather than for the event being counted: it passes on the author's machine and
      fails under load.
    - A test that reads source text with a slice that can silently match nothing, so an assertion of absence passes for nothing.

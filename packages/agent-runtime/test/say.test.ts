@@ -28,6 +28,8 @@ import { fileURLToPath } from 'node:url';
 import type { EngineShape, Event, FeedEntry, Sighting, TaskSpec, TranscriptEvent } from '../src/index.ts';
 import { scratch } from './scratch.ts';
 import { until, WAITED, type Waiter } from '../src/waits/index.ts';
+import { instantNow } from '../src/core/engine/now.ts';
+import { elapsedMs } from '../src/core/clock.ts';
 import type { AsyncJournal, AsyncRunner } from './promise-runner.ts';
 
 const tmp = (label: string) => scratch(`ae-say-${label}-`);
@@ -638,12 +640,25 @@ test("a socket another user owns is refused — the check on what lstat said, ha
   await box.close();
 });
 
+/**
+ * The deadline this test shortens the post to, at the seam `ClaudeOptions` gives for it: the shipped default is `SAY_TIMEOUT_MS`,
+ * 5 s, and waiting it out cost every pass of this file the whole 5 s to prove what 200 ms proves — that an inbox slow to close its
+ * end was given the words all the same. `EngineOptions.sayTimeoutMs` carries it to the harness that holds it, as `claudeExecutable`
+ * beside it is carried: a harness brought as ops of a test's own has no background session (`harness-refusal.ts`), so the bound
+ * cannot ride on those. The floor below says the deadline is what resolved the post and not the inbox; what the deadline's value
+ * is the suite's own cost says, and no assertion of a ceiling, which would fail under load.
+ */
+const SAID_MS = 200;
+
 test('an inbox that reads the words and never closes its end — a process busy past the deadline — was given them: said, and journalled', async () => {
-  const engine = builtEngine(EngineService.layer({ root: tmp('board') }));
+  const engine = builtEngine(EngineService.layer({ root: tmp('board'), sayTimeoutMs: SAID_MS }));
   const { id, row } = await running(engine, {}, false);
   const box = await inbox({ neverCloses: true });
   register(row, { messagingSocketPath: box.path });
+  const t0 = instantNow();
   const said = await Effect.runPromise(engine.say(id, 'are you there'));
+  const waited = elapsedMs(t0, instantNow());
+  assert.ok(waited >= SAID_MS, `waited ${waited} ms: the inbox never closed, so only the deadline it was given resolved the post`);
   assert.deepEqual(
     (await box.heard(1)).map((l) => l.message?.content),
     ['are you there'],
@@ -799,8 +814,8 @@ test("an AsyncRunner's say that rejects journals nothing; a journal that fails a
 });
 
 /**
- * `promiseHarness` with a conversation: `transcript` answers `events` as they stand, or rejects with `unread`, and `say` puts the words'
- * arrival on the end of them, as a session that reads them writes it.
+ * `promiseHarness` with a conversation: `transcript` answers `events` as they stand, or rejects with `unread`, and `say` puts the
+ * words' arrival on the end of them, as a session that reads them writes it.
  */
 const talkingHarness = (heard: string[], events: TranscriptEvent[], unread?: string): AsyncRunner => {
   const base = promiseHarness([]);

@@ -8,7 +8,7 @@
  *
  * 914 lines in 209 files, as the sweep reads them the day the rule was written, 516 of them in the orchestrator. The card
  * that opened this counted it in tests — "at least 412 orchestrator tests pin a whole sentence" — and in that unit this sweep finds
- * 277 orchestrator tests, about a third fewer. The difference is the subject: this sweep reads the assertion's own expression with the literals
+ * 277, about a third fewer. The difference is the subject: this sweep reads the assertion's own expression with the literals
  * blanked, so an assertion over a page's heading, a rendered line or a brief the test wrote itself is not counted for holding the
  * word "refused" inside the sentence it expects. It is the narrower and the defensible read of "a refusal's words", and the debt is
  * understated against the card's figure by that much.
@@ -237,7 +237,4 @@ export const PINNED_WORDS: Readonly<Record<string, number>> = {
 };
 
 /** Each test file by its path from the repository root, and the lines of it that floor a duration at a bound the shipped code owns. */
-export const WAITED_OUT: Readonly<Record<string, number>> = {
-  'packages/agent-runtime/test/feed-rotation.test.ts': 1,
-  'packages/agent-runtime/test/remote-agent.test.ts': 1,
-};
+export const WAITED_OUT: Readonly<Record<string, number>> = {};

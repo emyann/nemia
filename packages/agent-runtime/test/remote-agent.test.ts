@@ -17,7 +17,7 @@ import { ClientFactory, JsonRpcTransportFactory, RestTransportFactory } from '@a
 import { AgentCard, Role } from '@a2a-js/sdk';
 import type { EngineShape, EngineOptions, TaskSpec, TaskView } from '../src/index.ts';
 import { Engine as EngineService } from '../src/index.ts';
-import { REQUEST_MS, SPAWN_WAIT_MS, remoteOps } from '../src/a2a/remote.ts';
+import { REQUEST_MS, SEND_MS, SPAWN_WAIT_MS, remoteOps } from '../src/a2a/remote.ts';
 import { RUNTIME_EXTENSION } from '../src/a2a/map.ts';
 import { apiKey, bearer, mtls, remoteServer, type Binding, type RemoteServer, type ServerOptions } from './remote-server.ts';
 import { scratch } from './scratch.ts';
@@ -826,15 +826,29 @@ test(
   },
 );
 
-test(`at shipped defaults an agent that holds every request holds a pass ${REQUEST_MS / 1000} s at most, and the task reads as last seen`, async () => {
+/**
+ * The request bound this test gives the remote ops, at the seam `remoteOps` provides for it (`requestMs`): the shipped default is
+ * `REQUEST_MS`, which `remoteOps` names at the one site that holds it (`src/a2a/remote.ts`) and which the engine reaches by passing
+ * none (`src/service/options.ts`). Waiting the shipped 10 s out instead cost this file 20 s of every pass and proved nothing more —
+ * that the bound reaches the request is what a floor at it says, and the floor says it at 0.3 s.
+ */
+const HELD_MS = 300;
+
+test('a request the agent holds holds a pass for the request bound, and the task reads as last seen', async () => {
   const s = await serve({ script: HELD });
-  const { e } = engineOn(s);
-  const id = await Effect.runPromise(e.file(task()));
-  await running(e, id);
+  const root = scratch('ae-remote-');
+  const card = (await (await fetch(`${s.url}/.well-known/agent-card.json`)).json()) as Record<string, unknown>;
+  assert.ok(HELD_MS < REQUEST_MS, 'the bound is shortened at the seam, never lengthened past the shipped one');
+  const ops = remoteOps('remote', { card }, root, undefined, HELD_MS, { spawnWaitMs: SEND_MS });
+  await Effect.runPromise(ops.spawn({ name: 'ae/held/1', brief: 'b', cwd: '/w' }));
+  const taskId = JSON.parse(fs.readFileSync(entryFile(root, 'ae/held/1'), 'utf8')).taskId as string;
+  assert.equal(taskId, s.tasks()[0], 'the Task the agent made, before anything is held');
+
   s.hanging.a2a = true;
-  const [ms] = await timed(() => Effect.runPromise(e.tick()));
-  assert.ok(ms >= REQUEST_MS - 100, `${ms} ms`);
-  assert.equal((await Effect.runPromise(e.view(id))).phase, 'running (working)');
+  const [ms, seen] = await timed(() => Effect.runPromise(ops.observe));
+  assert.ok(ms >= HELD_MS, `${ms} ms: the observe waited the request bound out before it gave up on the read`);
+  assert.equal(seen.get('ae/held/1')?.sessionId, taskId);
+  assert.equal(seen.get('ae/held/1')?.state, 'working', 'as last seen');
 });
 
 test(

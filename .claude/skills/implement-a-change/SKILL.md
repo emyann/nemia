@@ -12,10 +12,10 @@ description: "Build a change from its spec in this repository: tests first where
      that way have been silently inert. One fixture per rule, never one per form, word or spelling: the fixture breaks the rule the
      guard holds, and a second that breaks it again in another wording proves nothing the first did not. A guard with no fixture at
      all does not ship.
-   - **A refusal's words are nobody's to check** (root `CLAUDE.md`, *Rules the code keeps*). Assert the fact — that it refused — its
-     kind (`_tag`, `refused`) and the exit code it carries; never the sentence. A test that pins a message's whole wording breaks
-     the day the message is made clearer, which is how a sentence comes to be owned by its test. What still pins one is counted in
-     `packages/agent-orchestrator/test/test-rules.baseline.ts`, and that count only shrinks: no new line may be added to it.
+   - **A refusal's words are nobody's to check**, where the repository's own rules say so. Assert the fact — that it refused — its
+     kind and the exit code it carries; never the sentence. A test that pins a message's whole wording breaks the day the message is
+     made clearer, which is how a sentence comes to be owned by its test. Where the repository counts what still pins one, that
+     count only shrinks: no new line is added to it.
    - **A rule about order or names is proven by a fixture that breaks it.** Give the fixture the opposite order or another name, and
      check the test fails without the rule.
    - **A time measured on a machine is a floor, never a ceiling.** Assert identities — the parts add up to no more than the whole —

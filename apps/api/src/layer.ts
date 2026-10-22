@@ -31,9 +31,7 @@ import { McpAsker } from './capabilities/capabilities.ts';
 import type { LastSaid } from './detail/detail.ts';
 import { placeFor } from './factories/place.ts';
 import { QuotaAsker } from './factory/quota.ts';
-import { CHAT_BEAT_MS } from './nemia/chat.ts';
 import { Followings } from './steps/following.ts';
-import { STEP_BEAT_MS } from './steps/steps.ts';
 import { Engine, StoreRoot } from './store.ts';
 import type { StepRun } from './step/step.ts';
 
@@ -86,14 +84,13 @@ export class ReadMemo extends Context.Service<
 
 /**
  * How often the api's streams read again what nothing pushes to them: a step's conversation no live stream can be had of (`step`,
- * `STEP_BEAT_MS`, `readAgain` in steps/steps.ts), Nemia's chat (`chat`, `CHAT_BEAT_MS`, nemia/chat.ts), and the feed's file for the lines
- * no hub brought (`feed`, none for the package's own beat, `followFeed`). The shipped beats by default; a test gives shorter ones with
+ * `readAgain` in steps/steps.ts), Nemia's chat (`chat`, nemia/chat.ts), and the feed's file for the lines no hub brought (`feed`,
+ * `followFeed`). Each left out is the shipped beat its own module names (`STEP_BEAT_MS`, `CHAT_BEAT_MS`, the package's own for the
+ * feed), so this file imports none of them; a test gives shorter ones with
  * `appOf(Layer.merge(liveOf(), Layer.succeed(Beats)({ ...Beats.defaultValue(), step: … })))` rather than wait them out.
  */
-export type BeatsShape = { readonly step: number; readonly chat: number; readonly feed?: Duration.Input };
-export const Beats = Context.Reference<BeatsShape>('api/Beats', {
-  defaultValue: () => ({ step: STEP_BEAT_MS, chat: CHAT_BEAT_MS }),
-});
+export type BeatsShape = { readonly step?: number; readonly chat?: number; readonly feed?: Duration.Input };
+export const Beats = Context.Reference<BeatsShape>('api/Beats', { defaultValue: () => ({}) });
 
 /**
  * Every service a handler may read: what an app's layer provides whole, the steps followed live among them (`Followings`), and the place

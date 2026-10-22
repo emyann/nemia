@@ -120,7 +120,7 @@ export const nemiaChat = new Hono<ApiEnv>()
         let unread = false;
         while (!stream.aborted) {
           shown = await sent(stream, read, shown);
-          await stream.sleep(s.beats.chat);
+          await stream.sleep(s.beats.chat ?? CHAT_BEAT_MS);
           if (stream.aborted) break;
           try {
             read = await runPlaced(s.placeService, s.e, chatSince(nemiaChatPlace(), read.cursor, readsOf(s)));

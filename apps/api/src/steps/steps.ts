@@ -500,7 +500,7 @@ export const steps = new Hono<ApiEnv>()
       }
       return streamSSE(c, async (stream) => {
         if (!read.open) return settledFrom(stream, read);
-        const r: Reading = { runtime: c.var.runtime, followings, e, placeService, id, step, beatMs: beats.step };
+        const r: Reading = { runtime: c.var.runtime, followings, e, placeService, id, step, beatMs: beats.step ?? STEP_BEAT_MS };
         const stopped = await followed(stream, r, taskId, read);
         if (stopped === null) return;
         const same = stopped.taskId === taskId;

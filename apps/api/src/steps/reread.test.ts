@@ -85,15 +85,15 @@ test('the beat is the folder’s one timer, and it waits the served beat, `STEP_
     ['r.beatMs', 'r.beatMs'],
     'each wait of the beat is the one beat, and nothing waits for another reason',
   );
-  assert.match(routes, /beatMs:\s*beats\.step\b/, "the beat is the app's served `Beats.step`");
+  assert.match(routes, /beatMs:\s*beats\.step \?\? STEP_BEAT_MS\b/, "the beat is the app's served `Beats.step`, `STEP_BEAT_MS` unserved");
   assert.equal(
     Effect.runSync(
       Effect.gen(function* () {
         return (yield* Beats).step;
       }),
     ),
-    STEP_BEAT_MS,
-    'shipped at `STEP_BEAT_MS`',
+    undefined,
+    'served none by default, so the shipped `STEP_BEAT_MS` is the beat',
   );
 });
 

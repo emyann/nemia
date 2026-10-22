@@ -15,7 +15,7 @@ export type Otlp = { url: string; serviceName: string; every: { traces?: number;
 
 /**
  * The standard OTel variables that say how often each signal is posted, in whole milliseconds: the span batch's delay, the log
- * batch's, and the metric reader's interval. Effect's own `layerConfig` exporters read the first the same way.
+ * batch's, and the metric reader's interval. Effect's own exporters built from config read the first the same way.
  */
 export const EXPORT_INTERVALS = {
   traces: 'OTEL_BSP_SCHEDULE_DELAY',

@@ -28,7 +28,7 @@ import { steeredClock } from '../../test/steered.ts';
 import { until, WAITED, type Waiter } from 'agent-runtime/testing';
 
 /**
- * `program` run to its end on a steered clock: each exporter's flush as its layer closes is bounded by Effect's `shutdownTimeout`, 3 s
+ * `program` run to its end on a steered clock: each exporter's flush as its layer closes is bounded by Effect's shutdown timeout, 3 s
  * by default (`OtlpTracer`, `OtlpLogger`, `OtlpMetrics`), which a collector that does not answer waits out; so each such rest is waited
  * for as it is asked, then moved past, a millisecond short and then the millisecond, never waited on the wall clock.
  */

@@ -2,8 +2,8 @@
  * How the git place runs git (`place/git/git.ts`), both ways of asking, against scratch repositories: `ask`, off the event loop, and
  * `askNow` answer the same; a question is git processes and no other between; a verb that throws is unread in one sentence naming it; a
  * git held past its deadline is unread in the deadline's words, with everything it started gone, a child deaf to SIGTERM killed after
- * the grace the ask gave and named, and the next question answered; an ask interrupted leaves nothing running; and the shipped place counts each
- * question, and each git process it starts, in the pass's `place` phase.
+ * the grace the ask gave and named, and the next question answered; an ask interrupted leaves nothing running; and the shipped place
+ * counts each question, and each git process it starts, in the pass's `place` phase.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

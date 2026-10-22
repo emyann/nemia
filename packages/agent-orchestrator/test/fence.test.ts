@@ -15,6 +15,7 @@ import { scratch } from './scratch.ts';
 import { Effect } from 'effect';
 import { plainEngine } from './promised.ts';
 import { until, WAITED } from 'agent-runtime/testing';
+import { sdkArgValue } from './sdk-argv.ts';
 
 const ROOT = scratch('wf-fence-');
 process.env.WF_ROOT = ROOT;
@@ -372,10 +373,10 @@ test(
       process.env.PATH = prev;
     }
     const args = fs.readFileSync(path.join(dir, 'args'), 'utf8').split('\n');
-    assert.equal(args[args.indexOf('--permission-mode') + 1], fenceReach('claude')!.given, "the runtime's answer, which the parser reads");
-    assert.equal(args[args.indexOf('--plugin-dir') + 1], path.join(agents, 'nemia-scribe'));
+    assert.equal(sdkArgValue(args, '--permission-mode'), fenceReach('claude')!.given, "the runtime's answer, which the parser reads");
+    assert.equal(sdkArgValue(args, '--plugin-dir'), path.join(agents, 'nemia-scribe'));
     assert.equal(
-      args[args.indexOf('--settings') + 1],
+      sdkArgValue(args, '--settings'),
       '{"outputStyle":"nemia-scribe:no-coding","skillOverrides":{"write-a-note":"off","mind-the-tone":"off"},"autoMemoryEnabled":false}',
     );
     assert.deepEqual(

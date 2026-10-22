@@ -7,7 +7,8 @@
  * to the journal fails nothing else.
  *
  * The shape pinned: an `ended` carries, off the same sighting as `usage` and `exitCode`, `denials` (the tool calls a harness
- * denied the session), `skills` (the skills it loaded) and `limit` (the limit its harness says it stopped at), and, for a task
+ * denied the session), `skills` (the skills it loaded), `ranOn` (the model its session really ran on) and `limit` (the limit its
+ * harness says it stopped at), and, for a task
  * that asked for a closing statement, `stated`, whether one came; `filed` carries `holdOpen`, and a task held open writes
  * `input` and `closed` — the fifth run; the spend cap is one of the harness's arguments, so `filed`, a spawn and an `input`
  * carry it under `config`.
@@ -146,6 +147,7 @@ test('a session that signs off: spawned, ended with its statement and usage, set
       denials: undefined,
       skills: undefined,
       files: undefined,
+      ranOn: undefined,
       limit: undefined,
     },
     { kind: 'settled', at: '<at>', outcome: 'succeeded', note: undefined },
@@ -180,6 +182,7 @@ test("a session that ends with no statement where one was asked: ended as its ha
       denials: undefined,
       skills: undefined,
       files: undefined,
+      ranOn: undefined,
       limit: undefined,
     },
     { kind: 'settled', at: '<at>', outcome: 'succeeded', note: undefined },
@@ -262,6 +265,7 @@ test('a person stops it: the session is stopped, its attempt ended by the operat
       denials: undefined,
       skills: undefined,
       files: undefined,
+      ranOn: undefined,
       limit: undefined,
     },
     { kind: 'settled', at: '<at>', outcome: 'stopped', note: 'operator' },
@@ -298,6 +302,7 @@ test('what the harness denied the session is written on its end, as it said it, 
     denials,
     skills: undefined,
     files: undefined,
+    ranOn: undefined,
     limit: undefined,
   });
   assert.deepEqual((await Effect.runPromise(b.engine.view(id))).state.attempts[0]?.denials, denials);
@@ -427,6 +432,7 @@ test('a task held open: it signs and waits, an answer is a turn that continues i
     denials: undefined,
     skills: undefined,
     files: undefined,
+    ranOn: undefined,
     limit: undefined,
   });
   assert.deepEqual(await b.record(id), [

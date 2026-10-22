@@ -25,11 +25,22 @@ const RECORDED = {
 const ADDED = { name: 'linear', url: 'https://mcp.linear.app/mcp', header: 'X-Team=nemia' };
 
 /**
- * The words a chip may carry here. The seat's `claude` answers the SDK's status request with an empty success, so no server is named in
- * the answer and each is `pending`; where the SDK could not be spoken to at all the states are unread, which is not an absence. Any
- * other word would mean the board read a state nobody reported.
+ * The five words a harness has for a server's state, as the runtime carries them (`MCP_STATES`), and the board's word for none read.
+ * A word outside this set means a harness grew one nobody has read, which the board draws as read and concludes nothing from.
+ *
+ * Which of them each server carries is not fixed here, and no seat of the e2e makes it so: the states are read by a real harness
+ * session — the Agent SDK's own bundled Claude Code, not the `claude` first on the api's PATH, since the read names no executable —
+ * and that session dials the recorded addresses for real. So `docs`, an address that answers nothing, reads `pending` while its connect
+ * is still open and `failed` once the connect has failed, by how far the session got before it answered. The page holds every chip to
+ * the state the api answered instead, which is the board's own promise and is true whatever the harness said.
  */
-const CHIPS = ['pending', 'unread'];
+const HARNESS_STATES = ['connected', 'needs-auth', 'failed', 'pending', 'disabled'];
+
+/** The word the board shows where no state was read (`UNREAD_STATE`), which is not an absence. */
+const UNREAD = 'unread';
+
+/** The state the api answered for each server of the record, by name: the harness's own word, or `null` where the look failed. */
+type States = Map<string, string | null>;
 
 /** The record as it stands in the store, by server name, read as the package writes it (`{ servers }`). */
 const recorded = (file: string): Record<string, { url?: string; headers?: Record<string, string> }> =>
@@ -37,6 +48,23 @@ const recorded = (file: string): Record<string, { url?: string; headers?: Record
     ? ((JSON.parse(fs.readFileSync(file, 'utf8')) as { servers?: Record<string, { url?: string; headers?: Record<string, string> }> })
         .servers ?? {})
     : {};
+
+/**
+ * The api's own answer to a states read, as a map by name, around `act` — the page's load, or a press of Check again. A read is made on
+ * those two alone, never on the board's poll, so the answer the chips are judged against is the one that drew them.
+ */
+async function statesRead(page: Page, what: string, act: () => Promise<unknown>): Promise<States> {
+  const read = page.waitForResponse(
+    (r) => r.request().method() === 'GET' && new URL(r.url()).pathname === `/api/factories/${FACTORY}/servers`,
+    { timeout: WAIT_MS },
+  );
+  const [answer] = await Promise.all([read, act()]);
+  if (answer.status() !== 200) throw new Refused(`${what} reads the states — the api answered ${answer.status()}: ${await answer.text()}`);
+  const body = (await answer.json()) as { servers?: Array<{ name?: string; state?: string | null }> };
+  const states: States = new Map();
+  for (const s of body.servers ?? []) if (typeof s.name === 'string') states.set(s.name, s.state ?? null);
+  return states;
+}
 
 /** The answer to the next `method` on a server's own route under the factory. */
 const answered = (page: Page, method: 'PUT' | 'DELETE') =>
@@ -52,18 +80,33 @@ async function wrote(page: Page, section: Locator, button: string, method: 'PUT'
   await idle(page);
 }
 
-/** Each recorded server is a row, with a state the harness reported or none read, its address, its headers and its sign-in facts. */
-async function expectRows(section: Locator): Promise<void> {
+/**
+ * Each recorded server is a row, with the state the api answered for it, its address, its headers and its sign-in facts. The chip
+ * carries the harness's own word, or `unread` where none was read: a chip that said another state than the one the answer held — the
+ * last read's word left on a stale cache, a word invented for an absence — would be the board reporting a state nobody did.
+ */
+async function expectRows(section: Locator, states: States): Promise<void> {
   await expectCount(section.locator('[data-factory-server]'), 2, 'each server of the record is a row, once');
   const row = section.locator('[data-factory-server="github"]');
   await expectVisible(row.getByText(RECORDED.github.url, { exact: false }), "a row shows the server's address");
   await expectVisible(row.locator('[data-server-headers]', { hasText: 'X-MCP-Toolsets' }), 'and the headers it is reached with');
   await expectVisible(row.locator('[data-server-oauth]', { hasText: 'Iv23li-e2e' }), 'and the client it signs in as');
   for (const name of ['github', 'docs']) {
+    const state = states.get(name);
+    if (state === undefined)
+      throw new Refused(
+        `the api answers a state for \`${name}\`, which the record holds — it answered for ${JSON.stringify([...states.keys()])}`,
+      );
+    if (state !== null && !HARNESS_STATES.includes(state))
+      throw new Refused(
+        `\`${name}\`'s state is a word a harness has (${HARNESS_STATES.join(', ')}) or none read — the api answered ${JSON.stringify(state)}`,
+      );
     const chip = section.locator(`[data-factory-server="${name}"] [data-server-state]`);
     const word = await chip.getAttribute('data-server-state');
-    if (word === null || !CHIPS.includes(word))
-      throw new Refused(`${name}'s chip says a state the harness reported, or that none was read — it says ${JSON.stringify(word)}`);
+    if (word !== (state ?? UNREAD))
+      throw new Refused(
+        `${name}'s chip says the state the api answered, ${JSON.stringify(state ?? UNREAD)} — it says ${JSON.stringify(word)}`,
+      );
     if (!(await chip.getAttribute('title'))) throw new Refused(`${name}'s chip says in its title what its word means`);
   }
 }
@@ -75,15 +118,9 @@ async function expectRows(section: Locator): Promise<void> {
  * the rows off what came back.
  */
 async function checkAgain(page: Page, section: Locator): Promise<void> {
-  const read = page.waitForResponse(
-    (r) => r.request().method() === 'GET' && new URL(r.url()).pathname === `/api/factories/${FACTORY}/servers`,
-    { timeout: WAIT_MS },
-  );
-  const [answer] = await Promise.all([read, section.getByRole('button', { name: 'Check again', exact: true }).click()]);
-  if (answer.status() !== 200)
-    throw new Refused(`Check again reads the states — the api answered ${answer.status()}: ${await answer.text()}`);
+  const states = await statesRead(page, 'Check again', () => section.getByRole('button', { name: 'Check again', exact: true }).click());
   await idle(page);
-  await expectRows(section);
+  await expectRows(section, states);
 }
 
 /** The form records a remote server, which the store's record holds and the list draws; Remove takes it off again. */
@@ -135,10 +172,12 @@ function harnessFolder(): () => void {
 export default {
   /**
    * A factory's MCP servers on its settings page: the two the record holds, each a row with the state its harness reported — or none
-   * read, drawn as unread, which is not an absence — its address, its headers and the client it signs in as. The section says the
-   * servers are handed to the steps whose agent names one, before the checkout's `.mcp.json`, and that the state is read on load and on
-   * a press alone, which Check again then does. The form records a remote server, which lands in the store's record and in the list, and
-   * Remove takes it off again. The record is taken back whatever happens.
+   * read, drawn as unread, which is not an absence — its address, its headers and the client it signs in as. Each chip is held to the
+   * state the api answered for that server, not to a word fixed here: the read starts a real harness session that dials the recorded
+   * addresses, so which word comes back is the network's and the harness's, and what the page is about is that the board carries it.
+   * The section says the servers are handed to the steps whose agent names one, before the checkout's `.mcp.json`, and that the state
+   * is read on load and on a press alone, which Check again then does. The form records a remote server, which lands in the store's
+   * record and in the list, and Remove takes it off again. The record is taken back whatever happens.
    *
    * What the api refuses of a record — an `Authorization` header, a local server — is proven in its own tests
    * (`apps/api/src/servers/servers.test.ts`, each answered 422 by name) and not driven through the board, since the e2e's watch counts
@@ -154,7 +193,7 @@ export default {
     fs.writeFileSync(file, `${JSON.stringify({ servers: RECORDED }, null, 2)}\n`);
     const harnessWas = harnessFolder();
     try {
-      await page.reload({ waitUntil: 'load' });
+      const states = await statesRead(page, "the page's load", () => page.reload({ waitUntil: 'load' }));
       await idle(page);
       const section = page.locator('section[data-factory-servers]');
       await expectVisible(section, "the factory's servers are a section of its settings");
@@ -166,7 +205,7 @@ export default {
         section.locator('[data-servers-told]', { hasText: 'read when this page opens and when you press Check again' }),
         'and that a state is read on load and on a press, never on the poll',
       );
-      await expectRows(section);
+      await expectRows(section, states);
       await checkAgain(page, section);
       await settled(page);
       await photograph(page, path.join(OUT, `factory-servers-listed-${await themeOf(page)}.png`), { fullPage: true });

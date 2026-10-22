@@ -5,9 +5,10 @@
  *
  * What it holds, each a rule the bin states and nothing else proves:
  *
- * - a job's session is denied by Claude Code itself (`permissionPrompts: 'none'`, `sdk.d.ts:1870`) — the argv the SDK gives it
- *   carries `--permission-prompts none`, so no decision of this process is asked for, which is the point: a decision held here
- *   would die with this process, unanswered;
+ * - a job's session is denied by Claude Code itself (`permissionPrompts: 'none'`, `sdk.d.ts:2054`) — the argv the SDK gives it
+ *   carries `--permission-prompts=none` (the joined form from SDK 0.3.295; read through `sdkArgValue`, which takes either and
+ *   refuses an absent flag), so no decision of this process is asked for, which is the point: a decision held here would die with
+ *   this process, unanswered;
  * - a session that ends with no result line leaves 1 and says so, rather than being read as a session that said nothing;
  * - a request `attachedOptions` refuses never starts Claude Code: the bin leaves 1 with the refusal's own words, which the worker
  *   records as an attempt that could not start;
@@ -22,6 +23,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { scratch } from './scratch.ts';
+import { sdkArgValue } from './sdk-argv.ts';
 import { until, WAITED } from '../src/waits/index.ts';
 
 const BIN = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'ae-claude-job.ts');
@@ -84,7 +86,7 @@ test("a job's session is denied by Claude Code, and a session with no result lea
 
   const argv = JSON.parse(fs.readFileSync(path.join(dir, 'argv.json'), 'utf8')) as string[];
   assert.equal(
-    argv[argv.indexOf('--permission-prompts') + 1],
+    sdkArgValue(argv, '--permission-prompts'),
     'none',
     `Claude Code answers its own prompts, so nothing is asked of a process that would die with its answer: ${argv.join(' ')}`,
   );

@@ -262,8 +262,21 @@ test("the `claude` the api's engine runs is the harness's: it resolves there, an
   assert.match(fs.readFileSync(calls, 'utf8'), /^agents --all --json$/m);
 });
 
-/** The flags the Agent SDK starts Claude Code with for an ask of the usage, read off one (0.3.270): no `-p` among them. */
-const SDK_FLAGS = ['--output-format', 'stream-json', '--verbose', '--input-format', 'stream-json', '--setting-sources='];
+/**
+ * The flags the Agent SDK starts Claude Code with for an ask of the usage, read off one (0.3.308, the version
+ * `packages/agent-runtime/test/sdk-pin.ts` pins): no `-p` among them. The fake is spawned with them so this test's start looks like
+ * the SDK's; the ask itself is the control request below, which is what the fake answers.
+ */
+const SDK_FLAGS = [
+  '--output-format',
+  'stream-json',
+  '--verbose',
+  '--input-format',
+  'stream-json',
+  '--setting-sources=',
+  '--strict-mcp-config',
+  '--no-session-persistence',
+];
 
 /** A control response as the fake prints one, and the SDK reads it; `answered` below reads the next line the fake printed as one. */
 type Answered = { type: string; response: { request_id: string; subtype: string; response?: unknown } };

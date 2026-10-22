@@ -17,7 +17,7 @@ import { printedKindOf } from '../src/harness/claude/print.ts';
 import { SAID_DIGEST, SAID_EXTENDED, SAID_VERSION } from '../src/harness/detached/said.ts';
 import { codexOutput } from '../src/harness/codex/stream.ts';
 import { ioCounts } from '../src/core/engine/tally.ts';
-import { CONVERSATION_STREAM, FILES_STREAM, READER_STREAMS, resultLine, stream } from './reader-streams.ts';
+import { CONVERSATION_STREAM, FILES_STREAM, MODEL, READER_STREAMS, resultLine, stream } from './reader-streams.ts';
 import { scratch } from './scratch.ts';
 
 /** A spec of `claude -p`'s stream, whose reads of an output are counted. */
@@ -128,10 +128,10 @@ test('a kept output of another version is read again from the log, never trusted
 });
 
 test('a kept output of a version the readers only added fields to is taken as it is: the log is not read, and what it lacks is absent', async () => {
-  assert.deepEqual(SAID_EXTENDED, [1, 2, 3, 4]);
+  assert.deepEqual(SAID_EXTENDED, [1, 2, 3, 4, 6]);
   for (const version of SAID_EXTENDED) {
     const kept = await withKept(({ log, kept }) => keep(kept, log, { version }));
-    assert.deepEqual(kept, { payload: 'kept', reads: 0 }, `version ${version}: no skills nor files, read before they were`);
+    assert.deepEqual(kept, { payload: 'kept', reads: 0 }, `version ${version}: no skills, files nor model, read before they were`);
   }
 });
 
@@ -276,7 +276,11 @@ test('a session killed before its result still reads, kept, what it was denied, 
   assert.deepEqual(claudeStreamOutput(kept).denials, [{ tool: 'Bash', what: 'git' }]);
   assert.match(kept, /git push origin main/, 'a denied call keeps its input whole');
   const lone = [stream.init, stream.denied('toolu_b', 'Bash')].join('\n');
-  assert.deepEqual(claudeStreamOutput(claudeStreamKept(lone)), { denials: [{ tool: 'Bash' }], skills: [] });
+  assert.deepEqual(
+    claudeStreamOutput(claudeStreamKept(lone)),
+    { denials: [{ tool: 'Bash' }], skills: [], ranOn: MODEL },
+    'the keep keeps the `init` line whole, so the model the session really started on survives it',
+  );
 });
 
 /** The ids of the calls a capture says were denied: by a `permission_denied` line or its result's `permission_denials`. */

@@ -242,6 +242,11 @@ export type HarnessOutput = {
   skills?: string[];
   /** Each file the session read or wrote, once, relative to its folder: `[]` when it touched none. Absent when the harness cannot say. */
   files?: string[];
+  /**
+   * What the session really ran on, as its own start line resolved the alias it was asked for — `config.model` is what was asked,
+   * this is what happened, and the two are different facts. Absent when the harness does not say.
+   */
+  ranOn?: string;
 };
 
 /** The worker a detached run is spawned with, `bin/ae-worker.ts`, found from this file's own folder. */
@@ -287,6 +292,7 @@ const sightingOf = (
   ...(output?.read.denials?.length ? { denials: output.read.denials } : {}),
   ...(output?.read.skills ? { skills: output.read.skills } : {}),
   ...(output?.read.files ? { files: output.read.files } : {}),
+  ...(output?.read.ranOn ? { ranOn: output.read.ranOn } : {}),
 });
 
 /** What a spec's reader said of a run's output (`outputIn`): what it read, why it refused it, or nothing, with no output yet. */

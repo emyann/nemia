@@ -96,7 +96,7 @@ so the board asks less often: 20 minutes after the first such answer, then 40, 8
 long as it lasts; the first good reading begins it again. `HKB_QUOTA_BACKOFF_MS` sets the first wait (`0` asks on
 every read). The waits are kept in the api's memory, as the rest is: a restart costs one ask.
 
-**Why not the Agent SDK.** `@anthropic-ai/claude-agent-sdk` (0.3.270) has the same request as
+**Why not the Agent SDK.** `@anthropic-ai/claude-agent-sdk` (0.3.308) has the same request as
 `query.usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET({ skipBehaviors })`, typed
 `SDKControlGetUsageResponse`: it writes the same control request to the same `claude`, and would get the same
 answers, `rate_limits: null` included (its type says "or null when unavailable"). The api asks the CLI itself and

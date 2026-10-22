@@ -40,6 +40,7 @@ import { scratch } from './scratch.ts';
 import { placesOf, shippedFolders } from './team.ts';
 import { plainEngine } from './promised.ts';
 import { until, WAITED } from 'agent-runtime/testing';
+import { sdkArgValue } from './sdk-argv.ts';
 
 const REPO = path.resolve(import.meta.dirname, '..', '..', '..');
 const read = (file: string) => JSON.parse(fs.readFileSync(path.join(REPO, file), 'utf8'));
@@ -442,7 +443,7 @@ test(
   async (t) => {
     const { args } = await sessionArgv(t, 'permissionMode: dontAsk\nallowedTools: Read\n', 'mcp: repo\n');
     assert.deepEqual(serversLoaded(args), ['repo'], 'the server is loaded');
-    assert.equal(args[args.indexOf('--permission-mode') + 1], 'dontAsk', 'in the mode that denies what no rule allows');
+    assert.equal(sdkArgValue(args, '--permission-mode'), 'dontAsk', 'in the mode that denies what no rule allows');
     assert.deepEqual(
       args.filter((arg) => arg.includes('mcp__')),
       [],

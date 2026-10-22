@@ -1,6 +1,6 @@
 /**
  * A stand-in for Claude Code as the Agent SDK runs it (`pathToClaudeCodeExecutable`), speaking the SDK's stdio protocol as
- * `@anthropic-ai/claude-agent-sdk` 0.3.270 does: control requests both ways (`initialize`, `hook_callback`, `can_use_tool`,
+ * `@anthropic-ai/claude-agent-sdk` 0.3.308 does: control requests both ways (`initialize`, `hook_callback`, `can_use_tool`,
  * `interrupt`, `remote_control`, `get_usage` — that one answered by `usageAnswer` from the recorded answer `STANDIN_USAGE` names,
  * after `STANDIN_USAGE_MS`), and stream-json lines out. What it does is its plan, `STANDIN_PLAN` (`Plan`), and what it saw it
  * writes into `STANDIN_DIR`: `argv.jsonl` (each start's arguments), `initialize.jsonl` (each `initialize` request's payload, the

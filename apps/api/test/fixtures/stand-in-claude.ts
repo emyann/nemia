@@ -1,6 +1,6 @@
 /**
  * Claude Code as the Agent SDK runs it, for the api's test seat: the stand-in the fake `claude` on PATH hands every call that is not
- * `claude agents`. It speaks the SDK's stdio protocol (`@anthropic-ai/claude-agent-sdk` 0.3.270, as
+ * `claude agents`. It speaks the SDK's stdio protocol (`@anthropic-ai/claude-agent-sdk` 0.3.308, as
  * `packages/agent-runtime/test/fixtures/stand-in-claude.ts` speaks it for the runtime's own tests): a line of JSON each way, a
  * `control_request` answered by a `control_response` carrying the request's own id.
  *

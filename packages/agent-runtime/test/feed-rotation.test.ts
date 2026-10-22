@@ -250,7 +250,8 @@ const exited = (child: ChildProcess) =>
 /**
  * The bound this test shortens the lock's wait to, at the seam `Journal.filesOps` gives for it: the shipped default is
  * `FEED_LOCK_WAIT_MS`, and waiting it out cost every pass of this file the whole 2 s to prove what a floor at 200 ms proves — that
- * the append waited the bound it was given and then refused, naming it.
+ * the append waited the bound it was given and then refused, naming it. The floor needs no slack for a timer's jitter: no timer
+ * decides it, the lock refusing only once `elapsedMs` over `instantNow()` from its own start, later than this test's, reaches the bound.
  */
 const HELD_MS = 200;
 

@@ -642,13 +642,20 @@ test("a socket another user owns is refused — the check on what lstat said, ha
 
 /**
  * The deadline this test shortens the post to, at the seam `ClaudeOptions` gives for it: the shipped default is `SAY_TIMEOUT_MS`,
- * 5 s, and waiting it out cost every pass of this file the whole 5 s to prove what 200 ms proves — that an inbox slow to close its
+ * 5 s, and waiting it out cost every pass of this file the whole 5 s to prove what half a second proves — that an inbox slow to close its
  * end was given the words all the same. `EngineOptions.sayTimeoutMs` carries it to the harness that holds it, as `claudeExecutable`
  * beside it is carried: a harness brought as ops of a test's own has no background session (`harness-refusal.ts`), so the bound
  * cannot ride on those. The floor below says the deadline is what resolved the post and not the inbox; what the deadline's value
  * is the suite's own cost says, and no assertion of a ceiling, which would fail under load.
  */
-const SAID_MS = 200;
+const SAID_MS = 500;
+
+/**
+ * How far under the deadline a clock read around the post may come back: the post is resolved by a `setTimeout`, which fires up to a
+ * millisecond or so before `instantNow()` reads its delay gone, `monoNow` keeping whole milliseconds besides. 50 ms holds any such
+ * jitter and still stands far above a post the inbox answers by closing its end, which resolves in a few milliseconds.
+ */
+const TIMER_SLACK_MS = 50;
 
 test('an inbox that reads the words and never closes its end — a process busy past the deadline — was given them: said, and journalled', async () => {
   const engine = builtEngine(EngineService.layer({ root: tmp('board'), sayTimeoutMs: SAID_MS }));
@@ -658,7 +665,10 @@ test('an inbox that reads the words and never closes its end — a process busy 
   const t0 = instantNow();
   const said = await Effect.runPromise(engine.say(id, 'are you there'));
   const waited = elapsedMs(t0, instantNow());
-  assert.ok(waited >= SAID_MS, `waited ${waited} ms: the inbox never closed, so only the deadline it was given resolved the post`);
+  assert.ok(
+    waited >= SAID_MS - TIMER_SLACK_MS,
+    `waited ${waited} ms: the inbox never closed, so only the deadline it was given resolved the post`,
+  );
   assert.deepEqual(
     (await box.heard(1)).map((l) => l.message?.content),
     ['are you there'],

@@ -834,6 +834,13 @@ test(
  */
 const HELD_MS = 300;
 
+/**
+ * How far under a timer's bound a clock read around it may come back: the request is aborted by a `setTimeout`, which fires up to
+ * a millisecond or so before `performance.now()` reads its delay gone (on `ci`, 299.74 ms of a 300 ms bound). 50 ms holds any such
+ * jitter and still stands far above an observe that is not held at all, which answers in a few milliseconds.
+ */
+const TIMER_SLACK_MS = 50;
+
 test('a request the agent holds holds a pass for the request bound, and the task reads as last seen', async () => {
   const s = await serve({ script: HELD });
   const root = scratch('ae-remote-');
@@ -846,7 +853,7 @@ test('a request the agent holds holds a pass for the request bound, and the task
 
   s.hanging.a2a = true;
   const [ms, seen] = await timed(() => Effect.runPromise(ops.observe));
-  assert.ok(ms >= HELD_MS, `${ms} ms: the observe waited the request bound out before it gave up on the read`);
+  assert.ok(ms >= HELD_MS - TIMER_SLACK_MS, `${ms} ms: the observe waited the request bound out before it gave up on the read`);
   assert.equal(seen.get('ae/held/1')?.sessionId, taskId);
   assert.equal(seen.get('ae/held/1')?.state, 'working', 'as last seen');
 });

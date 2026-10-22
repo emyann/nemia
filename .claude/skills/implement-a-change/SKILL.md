@@ -22,8 +22,10 @@ description: "Build a change from its spec in this repository: tests first where
      never a wall-clock bound, and wait for the event you count, never for a length of time. A test of what is ordered or worded by
      the clock seeds the clock rather than sleeping, and a duration a program decides on is not read off the wall clock. **A
      shipped default is not waited out**: shorten the bound at the seam the code gives for it — a parameter, an option, a harness's
-     own ops — measure the floor there, and name the shipped constant at the one site that holds it. A test whose floor stands at a
-     bound the shipped code owns has bought a second of proof with a second of every pass, and the guard refuses a new one.
+     own ops — measure the floor there, and name the shipped constant at the one site that holds it. A floor at a bound a timer
+     decides sits a little under it, since a timer fires up to a millisecond before a clock read around it says its delay is gone,
+     and far above what the call takes unbounded: break it on purpose and see how far. A test whose floor stands at a bound the
+     shipped code owns has bought a second of proof with a second of every pass, and the guard refuses a new one.
    - **A test that fails only under load is a race until shown otherwise.** Make it happen on demand first — a throwaway preload the
      process is started with, a process frozen with `SIGSTOP` (wait for its state to say so before `SIGCONT`) — then fix it.
    - **A test that depends on the environment sets it**, and takes its temporary folders from the repository's own helper rather than

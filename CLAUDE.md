@@ -109,9 +109,9 @@ What the `create-an-agent` skill, being generic, does not say here:
 - Its checks are *Check your work*, forced for `workflows/`; a new agent is named in *Where things are*.
 - **Every agent of the team reads the repository through git.** The four read-only ones (Seldon, Agora, Iris, Argus, each `dontAsk`, which
   no allow from a step reaches) carry the same read-only git set on their own `allowedTools:` in `workflows/agents/`, and each holds the
-  place's `git` skill on its `skills:`; the two writers (Ada, Otto) run `auto` and need no allow. Nothing in the set writes the
-  repository, its refs or its configuration — `git merge-tree`, which writes a loose object and no ref, is the one that writes bytes —
-  and `git push` stays refused by Ada's and Otto's `disallowedTools:`. **What the set would let git run a program by is denied beside
+  place's `git` skill on its `skills:`; the three writers (Ada, Grace, Otto) run `auto` and need no allow. Nothing in the set writes
+  the repository, its refs or its configuration — `git merge-tree`, which writes a loose object and no ref, is the one that writes bytes
+  — and `git push` stays refused by the writers' `disallowedTools:`, Grace's held equal to Ada's. **What the set would let git run a program by is denied beside
   it**, on each of the four and on each step that replaces their deny list, since no allow rule can exclude an option and an allow is
   matched with a leading assignment stripped: `Bash(git grep *O*)` and `Bash(git grep *--op*)` for the pager option, which runs a
   command on the files that matched (every short spelling carries a capital `O`, git bundling it after other short options; every long
@@ -147,7 +147,9 @@ What the `create-an-agent` skill, being generic, does not say here:
   breakdown and its preview, the rail, the scan lines, the pager, the text link, the copy id) behind one door, each with its stories beside it; Nemia's Storybook
   (`npm run storybook`, from `apps/web`) shows them to a person, and `change-the-board` says which to take (`apps/web/CLAUDE.md`).
 - `workflows/` — this repository's own team, `agents/`: Iris (product engineer), Seldon (software architect), Ada (software engineer),
-  Agora (code reviewer), Otto (release engineer), Argus (janitor); and four workflows: `intake` (an idea to an intent), `build` (an
+  Grace (lead software engineer, who builds a wide card through subagents), Agora (code reviewer), Otto (release engineer), Argus
+  (janitor). No workflow here names Grace: she fills implement in `build-team`, a person's copy of `build` kept in the store, not in
+  the repository. And four workflows: `intake` (an idea to an intent), `build` (an
   intent to main, started `--after` the intake run), `quick` (a small card that settles its change to main: implement, then a review
   whose pass files an ungated land, within the bound `workflows/quick/README.md` says) and `janitor` (on demand: the stats to inbox cards, none started). What Nemia ships:
   the git place `place/git` (`packages/agent-orchestrator/place/git`: its skill, and its code, given as `gitPlaceLayer`), the skills the api lists as shipped

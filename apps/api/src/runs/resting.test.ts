@@ -612,8 +612,9 @@ test("a held run's decision reads what holds it and none of its own tasks: a ses
   }
 });
 
-test('a finished page read warm asks the engine for no journal the whole list does not, none of a run at rest; the light answer adds the journals of the runs that wait on a person, alone', async () => {
+test('a finished page read warm adds the journals of that page\u2019s own rows and no other, a smaller page asking less; the light answer adds the journals of the runs that wait on a person, alone', async () => {
   aFinishedRun('r-paged');
+  aFinishedRun('r-paged-too');
   branchOff('wf/r-asks/implement');
   blocked('r-asks-implement');
   writeRun('r-asks', 'Answer it');
@@ -632,24 +633,37 @@ test('a finished page read warm asks the engine for no journal the whole list do
           return (await res.json()) as T;
         }),
       );
-    const page = await read<{ runs: { id: string }[] }>('/api/runs-finished?size=100');
+    const page = await read<{ runs: { id: string; clock: unknown }[] }>('/api/runs-finished?size=100');
     assert.ok(
       page.value.runs.some((run) => run.id === 'r-paged'),
       'the finished run is on the page',
     );
-    assert.equal(page.asked, whole.asked, 'what the whole list asks warm, and no journal of a run at rest');
-    const open = await read<{ waiting: { id: string; clock: unknown }[] }>('/api/runs-open');
-    const waiting = open.value.waiting.map((run) => run.id);
-    assert.ok(waiting.includes('r-asks'), 'the run that waits on a person is among the waiting');
     assert.ok(
-      open.value.waiting.every((run) => run.clock !== null),
-      'each with its clock read',
+      page.value.runs.every((run) => run.clock !== null),
+      'each row with its clock read: its Clock cell breaks it down',
     );
-    const theirs = new Set(waiting.flatMap((id) => runTasks(runStore.runs.read(id))));
+    const journalsOf = (ids: readonly string[]) => new Set(ids.flatMap((id) => runTasks(runStore.runs.read(id))));
+    const paged = journalsOf(page.value.runs.map((run) => run.id));
+    assert.equal(page.asked, whole.asked + paged.size, "the whole list's, and the journals of that page's own rows alone");
+    const one = await read<{ runs: { id: string }[] }>('/api/runs-finished?size=1');
+    const first = journalsOf(one.value.runs.map((run) => run.id));
+    assert.ok(first.size < paged.size, `the fixture holds more rows than a page of one — ${first.size} of ${paged.size}`);
+    assert.equal(one.asked, whole.asked + first.size, "a page of one asks less: what the read costs is the page's, never the store's");
+    type Row = { id: string; clock: unknown };
+    const open = await read<{ waiting: Row[]; inFlight: Row[] }>('/api/runs-open');
+    const theirs = journalsOf([...open.value.waiting, ...open.value.inFlight].map((run) => run.id));
+    assert.ok(
+      open.value.waiting.some((run) => run.id === 'r-asks'),
+      'the run that waits on a person is among the waiting',
+    );
+    assert.ok(
+      [...open.value.waiting, ...open.value.inFlight].every((run) => run.clock !== null),
+      'each row with its clock read, in flight as much as waiting',
+    );
     assert.ok(theirs.has('r-asks-implement') && !theirs.has('r-paged-implement'));
     assert.deepEqual(runStore.runs.read('r-asks').after, ['r-paged'], 'it was started after the finished run, whose journal is not read');
-    assert.equal(open.asked, whole.asked + theirs.size, "the whole list's, and the journals of the runs that wait on a person alone");
+    assert.equal(open.asked, whole.asked + theirs.size, "the whole list's, and the journals of the open runs alone: no finished run's");
   } finally {
-    for (const file of ['r-paged.json', 'r-asks.json']) fs.rmSync(path.join(root, 'runs', file));
+    for (const file of ['r-paged.json', 'r-paged-too.json', 'r-asks.json']) fs.rmSync(path.join(root, 'runs', file));
   }
 });

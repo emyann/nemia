@@ -2,8 +2,8 @@
  * Every temporary root a test makes comes from `scratch`, which takes it away with whatever runs in it (`scratch.ts`):
  * a call of `os.tmpdir` anywhere else under `test/`, or in a test beside the code in `src/`, is refused, and the copy of the helper
  * in each workspace the root package.json names, `tools/guards` among them, is the runtime's; and the guards' copies of `repo-files.ts`
- * and `workspaces.ts` are the orchestrator's. A test of where the code under test runs a process names the temp directory with `machineTempDir()`, which
- * the scan refuses only on a line that makes a root with `mkdtempSync`.
+ * and `workspaces.ts` are the orchestrator's. A test of where the code under test runs a process names the temp directory with
+ * `machineTempDir()`, which the scan refuses only on a line that makes a root with `mkdtempSync`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

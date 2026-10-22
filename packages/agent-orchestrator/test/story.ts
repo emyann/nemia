@@ -1,7 +1,7 @@
 /**
  * A story told as one test: a person's walk through a run, its checkpoints named subtests that share the state the walk built.
  *
- *     const stage = staged({ runWith: runEngine, main: cli });
+ *     const stage = staged({ runWith: runEngine, main: cli, engineOf });
  *     test('a gated run waits for its approval, then goes on', async (t) => {
  *       const s = story(t);
  *       await s.test('start freezes the gate', async () => { … stage.runPlaced(startRun(…)) … });
@@ -14,14 +14,14 @@
  *
  * The stage is what a story's checkpoints share, made new for each top-level test (`eachTest`): the test place, the engine's stand-in
  * and the controllers' engine over it, `runWith`/`runPlaced`/`main` given that place, and a steered clock made on first ask. It
- * reaches nothing real, so a file told on it stays off `stand-ins.baseline.ts`. The file hands in the runner's `runWith` and the CLI's
- * `main`, which it imports after setting its environment: this module loads no part of the package that reads the environment as it
- * loads.
+ * reaches nothing real, so a file told on it stays off `stand-ins.baseline.ts`. The file hands in the runner's `runWith`, the CLI's
+ * `main` and the client's `engineOf`, which it imports after setting its environment: this module loads no value of `src`, where a
+ * store may read its root as it loads, so a file may import it at its head.
  */
 import type { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../place/memory/index.ts';
-import { engineOf, type Engine, type EngineService } from '../src/runtime-client.ts';
+import type { Engine, EngineService, engineOf } from '../src/runtime-client.ts';
 import type { Place, PlaceService } from '../src/place/place.store.ts';
 import type { StoreRoot } from '../src/config/root.store.ts';
 import { eachTest, runGiven, runOver } from './placed.ts';
@@ -103,13 +103,13 @@ export type Stage = {
  * The stage of each top-level test of the file that calls this at its head, as `eachTest` makes it: a story's checkpoints, its
  * subtests, share their test's.
  */
-export function staged(given: { runWith: RunWith; main: Main }): Stage {
+export function staged(given: { runWith: RunWith; main: Main; engineOf: typeof engineOf }): Stage {
   const stand = eachTest(testPlace);
   const each = eachTest(() => {
     const made = testEngine();
     const settle = (id: string, phase: string, closeout?: unknown, exitCode?: number) =>
       made.settle(id, phase, { ...(closeout === undefined ? {} : { closeout }), ...(exitCode === undefined ? {} : { exitCode }) });
-    const board: Board = { ...made, settle, e: engineOf(made.layer) };
+    const board: Board = { ...made, settle, e: given.engineOf(made.layer) };
     return { board, clock: undefined as Steered | undefined };
   });
   return {

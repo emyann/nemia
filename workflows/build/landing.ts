@@ -268,7 +268,9 @@ function judged(pr: Pr, onto: string, named: readonly { branch: string; tip: str
   if (pr.baseRefName !== onto)
     throw new Refusal(
       `#${pr.number} is based on \`${pr.baseRefName}\`, not on the base branch \`${onto}\`, so merging it would not land on the ` +
-        `base: a person rebases it (\`gh pr edit ${pr.number} --base ${onto}\`), then the step is retried`,
+        `base: a person moves its base (\`gh pr edit ${pr.number} --base ${onto}\`, or ` +
+        `\`gh api -X PATCH repos/{owner}/{repo}/pulls/${pr.number} -f base=${onto}\` where \`gh pr edit\` fails on GitHub's ` +
+        `deprecated Projects query), then the step is retried`,
     );
   const mine = named.find((branch) => branch.branch === pr.headRefName);
   if (!mine)

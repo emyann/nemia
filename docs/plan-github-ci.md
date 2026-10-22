@@ -107,8 +107,9 @@ and forgetting to wire it in:
   The second zone was every leg's until the card of 2026-10-21 measured what it bought. Local time is read in `apps/web/src/lib` (8
   files) and nowhere else: the orchestrator, the runtime and the api read none, and the runtime's one hit formats a number. In 54 `ci`
   runs the New York pass never failed on its own — each of the 8 failures had already failed under UTC. The web's pass is 47 s, so its
-  second zone is cheap; the other four legs were about 21 runner-minutes a push for a zone no code of theirs can read. A workspace that
-  grows a local-time read needs its second zone back in the file: nothing scans for one, and the risk is named here rather than held.
+  second zone is cheap; the shape measured then had ten legs, and the second zone of the eight that are not the web's came to about 21
+  runner-minutes a push for a zone no code of theirs can read. A workspace that grows a local-time read needs its second zone back in
+  the file: nothing scans for one, and the risk is named here rather than held.
 
   The orchestrator's leg was the longest job of the run, 766 s for its two passes against one pass of 364 s, so its suite runs in two
   halves with Node's `--test-shard=<i>/2`. Its four legs arrive through `matrix.include` rather than a `shard` axis: a matrix cannot

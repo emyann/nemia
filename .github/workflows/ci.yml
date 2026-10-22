@@ -77,8 +77,9 @@ jobs:
       # The half this leg runs travels in WF_TEST_SHARD, which the orchestrator's own test script expands into --test-shard before its
       # globs. Not as a turbo `-- --test-shard=1/2` argument: turbo appends that after the script's own arguments, where node has
       # stopped parsing options and reads it as a file pattern instead (options.globPatterns is argv past the first positional). And
-      # not through NODE_OPTIONS, which every node child the suite spawns would inherit. Empty on every leg but the orchestrator's,
-      # where the script's hole expands to nothing and the suite runs whole.
+      # not through NODE_OPTIONS, which every node child the suite spawns would inherit. On the orchestrator's four legs it reads
+      # 1/2 or 2/2 and the hole expands to --test-shard=<i>/2; on every other leg it is empty, the hole expands to nothing and that
+      # package's suite runs whole.
       - name: test under TZ=UTC
         run: npx turbo run test --force --filter=${{ matrix.workspace }}
         env:
@@ -86,8 +87,9 @@ jobs:
           WF_TEST_SHARD: ${{ matrix.shard }}
       # The web alone, and the reason is a measurement of 2026-10-21: local time is read in apps/web/src/lib and nowhere else in this
       # repository, and in 54 ci runs the America/New_York pass never failed on its own — each of the 8 failures had already failed
-      # under UTC. The web's leg is 47 s a pass, so its second zone is cheap; the other four legs were 21 runner-minutes a push for a
-      # zone no code of theirs can read. A workspace that grows a local-time read needs its second zone back here.
+      # under UTC. The web's leg is 47 s a pass, so its second zone is cheap; the measured shape had ten legs, and the second zone of
+      # the eight that are not the web's came to 21 runner-minutes a push for a zone no code of theirs can read. A workspace that grows
+      # a local-time read needs its second zone back here.
       - name: test under TZ=America/New_York
         if: matrix.workspace == 'web'
         run: npx turbo run test --force --filter=${{ matrix.workspace }}

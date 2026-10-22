@@ -127,5 +127,5 @@ export const passing = (repo: string): Rule[] => [
   { when: 'pr list', out: listed(gitIn(repo, 'rev-parse', 'HEAD').trim()) },
   { when: 'pr view', out: GREEN },
   { when: 'pr create', out: PR.url },
-  { when: 'pr edit', out: PR.url },
+  { when: 'api -X PATCH', out: JSON.stringify({ number: 7, url: PR.url }) },
 ];

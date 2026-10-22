@@ -35,7 +35,7 @@ const write = (file: string, text: string) => {
 
 /** A step's task that ran once on Codex and signed off with `closeout`. */
 const signedOff = (taskId: string, closeout: object) => {
-  Effect.runSync(engine().file({ id: taskId, brief: 'Do it.', cwd: '/code/app', maxAttempts: 1, harness: 'codex' }));
+  Effect.runSync(engine().file({ id: taskId, brief: 'Do it.', cwd: '/code/app', harness: 'codex' }));
   standIn.settle(taskId, 'succeeded', { exitCode: 0, closeout });
 };
 

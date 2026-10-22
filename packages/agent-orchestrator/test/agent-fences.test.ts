@@ -70,7 +70,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import { loadWorkflows } from '../src/folder/folder.store.ts';
+import { parseAgent } from '../src/agents/agents.ts';
 import { stepPlace, WorkflowError, type Workflow } from '../src/step/step.ts';
 import { readSkillRules, RULES_FILE } from '../src/skills/read.store.ts';
 import { appliesMatch, appliesOf, type SkillRule } from '../src/skills/skills.ts';
@@ -549,11 +551,57 @@ test('the matcher splits a command into the parts Claude Code matches, strips th
   assert.deepEqual(deniedPartsOfCall({ tool: 'Edit' }), [{ tool: 'Edit' }]);
 });
 
-test('every shipped agent is named by a shipped step, so the fence below reads each one', () => {
+/**
+ * The agents of the team no shipped step names, each with the agent whose fence is theirs: Grace runs in `build-team`, a person's copy of
+ * build kept in their store, not in this repository, and her fence is Ada's, so every test here of Ada's fence holds hers.
+ */
+const FENCED_AS: Readonly<Record<string, string>> = { grace: 'ada' };
+
+/** An agent's own fence, as its file in `dir` says it: its permission mode and its deny list. */
+const ownFenceOf = (name: string, dir: string): { permissionMode?: string; disallowedTools?: string } => {
+  const { keys } = parseAgent(name, fs.readFileSync(path.join(dir, `${name}.md`), 'utf8'));
+  return { permissionMode: keys.permissionMode, disallowedTools: keys.disallowedTools };
+};
+
+/** A line for each agent of `FENCED_AS` in `dir` whose own fence is not its twin's. */
+const fencesApart = (dir: string): string[] =>
+  Object.entries(FENCED_AS)
+    .filter(([name, twin]) => !isDeepStrictEqual(ownFenceOf(name, dir), ownFenceOf(twin, dir)))
+    .map(([name, twin]) => `${name}: fenced apart from ${twin}`);
+
+test('every shipped agent is named by a shipped step, so the fence below reads each one, or is fenced as one that is', () => {
   const named = new Set(shipped().flatMap(({ step }) => (step.agent ? [step.agent.name] : [])));
-  for (const dir of AGENT_FOLDERS)
-    for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.md') && f !== 'README.md'))
-      assert.ok(named.has(path.basename(file, '.md')), `${path.join(dir, file)} is named by no shipped step`);
+  for (const [name, twin] of Object.entries(FENCED_AS)) {
+    assert.ok(!named.has(name), `${name} is named by a shipped step now: take it off FENCED_AS`);
+    assert.ok(named.has(twin), `${twin}, whose fence ${name} keeps, is named by a shipped step`);
+  }
+  for (const dir of AGENT_FOLDERS) {
+    for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.md') && f !== 'README.md')) {
+      const name = path.basename(file, '.md');
+      assert.ok(named.has(name) || Object.hasOwn(FENCED_AS, name), `${path.join(dir, file)} is named by no shipped step`);
+    }
+    assert.deepEqual(fencesApart(dir), [], "each keeps its twin's permission mode and deny list, rule for rule");
+  }
+});
+
+test("REFUSED: Grace without one rule of Ada's deny list, or in another mode, is named", () => {
+  const edited = (edit: (text: string) => string): string[] => {
+    const root = scratch('wf-fences-grace-');
+    fs.cpSync(path.join(SHIPPED_HOLDERS[0], 'agents'), root, { recursive: true });
+    const file = path.join(root, 'grace.md');
+    const text = fs.readFileSync(file, 'utf8');
+    assert.notEqual(edit(text), text, 'grace.md has what the edit changes');
+    fs.writeFileSync(file, edit(text));
+    return fencesApart(root);
+  };
+  assert.deepEqual(
+    edited((text) => text.replace(', mcp__github__merge_pull_request', '')),
+    ['grace: fenced apart from ada'],
+  );
+  assert.deepEqual(
+    edited((text) => text.replace('permissionMode: auto', 'permissionMode: bypassPermissions')),
+    ['grace: fenced apart from ada'],
+  );
 });
 
 test('every shipped step is refused git push, a forced branch delete, a kill by name, every gh write and browser_run_code_unsafe: by its own deny in auto, by no allow in dontAsk, by a read-only sandbox on codex', () => {

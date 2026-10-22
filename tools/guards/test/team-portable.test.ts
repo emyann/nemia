@@ -147,7 +147,7 @@ test('the matcher takes a word whole, and lets through what any factory says', (
 
 test('every file of the team is read, and holds a name it must', () => {
   const files = team();
-  assert.deepEqual(filesOf(AGENTS, '.md').length, 6, 'the six agents');
+  assert.deepEqual(filesOf(AGENTS, '.md').length, 7, 'the seven agents');
   for (const { file, holds } of TEAM_FILES) assert.ok(files.get(file)?.includes(holds), `${file} holds ${holds}`);
   for (const skill of ['write-a-spec', 'review-a-change'])
     assert.ok(files.has(`.claude/skills/${skill}/rules.json`), `${skill}'s rules are read`);

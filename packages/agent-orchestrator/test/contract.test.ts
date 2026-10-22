@@ -12,13 +12,15 @@
  * files, which is the rule it keeps.
  *
  * Every workspace package, this one included, declares in its package.json the workspace packages it imports: its source in
- * `dependencies`, its tests in `dependencies` or `devDependencies`. That scan reads every file git lists under apps/ and packages/.
+ * `dependencies`, its tests in `dependencies` or `devDependencies`. That scan reads every file git lists under each workspace the root
+ * package.json names, `tools/guards` among them.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { workspaces } from './repo-files.ts';
 
 const ROOT = path.join(import.meta.dirname, '..', '..', '..');
 const PKG = path.join(import.meta.dirname, '..');
@@ -215,11 +217,9 @@ test('./workflow is the pure format, and what reads a folder from disk is export
 /** A workspace package as its package.json says: its folder from the root, its name, and the names it declares. */
 type Manifest = { dir: string; name: string; dependencies: Record<string, string>; devDependencies: Record<string, string> };
 
-/** Every workspace package: each folder under apps/ and packages/ with a package.json, read from it. */
+/** Every workspace package: each workspace the root package.json names (`workspaces`), read from its package.json. */
 function manifests(): Manifest[] {
-  return ['apps', 'packages']
-    .flatMap((top) => fs.readdirSync(path.join(ROOT, top)).map((name) => `${top}/${name}`))
-    .filter((dir) => fs.existsSync(path.join(ROOT, dir, 'package.json')))
+  return workspaces()
     .sort()
     .map((dir) => {
       const json = JSON.parse(fs.readFileSync(path.join(ROOT, dir, 'package.json'), 'utf8')) as Partial<Manifest>;
@@ -262,7 +262,7 @@ test('the declared-imports scan reads every workspace package, and finds workspa
   const all = manifests();
   const names = all.map((m) => m.name);
   const files = packageFiles(all);
-  for (const dir of ['apps/api', 'apps/web', 'packages/agent-orchestrator', 'packages/agent-runtime'])
+  for (const dir of ['apps/api', 'apps/web', 'packages/agent-orchestrator', 'packages/agent-runtime', 'tools/guards'])
     assert.ok(
       files.some(({ manifest }) => manifest.dir === dir),
       `the scan reads ${dir}`,

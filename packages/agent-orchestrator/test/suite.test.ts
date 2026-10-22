@@ -19,12 +19,30 @@
  * Each package's `test` script records what its tests cost when a run's check gives it `WF_ARTIFACTS` (`tools/test-costs/`): it loads
  * the probe into every test file's process, keeps the spec reporter on stdout, where a check's log and its `nemia <word>: ` lines are read,
  * and adds the cost reporter on stderr.
+ *
+ * A package here is each workspace the root `package.json` names (`workspaces` in `repo-files.ts`): `tools/guards`, the home of the
+ * repository's own guards, is held as every package is.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
+import { REPO, workspaces } from './repo-files.ts';
+import { scratch } from './scratch.ts';
+
+test("the workspaces are the root package.json's: a dir/* glob as its folders with a package.json, a folder as it is", () => {
+  assert.ok(workspaces().includes('tools/guards'), 'the sweeps below read the home of the guards');
+  assert.ok(workspaces().includes('packages/agent-orchestrator'));
+  const root = scratch('wf-workspaces-');
+  for (const dir of ['packages/b', 'packages/a', 'packages/notes', 'tools/guards']) fs.mkdirSync(path.join(root, dir), { recursive: true });
+  for (const dir of ['packages/b', 'packages/a']) fs.writeFileSync(path.join(root, dir, 'package.json'), '{}');
+  const plant = (globs: string[]) => fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ workspaces: globs }));
+  plant(['tools/guards', 'packages/*', 'apps/*']);
+  assert.deepEqual(workspaces(root), ['tools/guards', 'packages/a', 'packages/b']);
+  plant(['packages/**']);
+  assert.throws(() => workspaces(root), /dir\/\*/, 'REFUSED: a glob it does not read, which a sweep would read as nothing');
+});
 
 test("the root's test script lets every package finish when one fails, so a failure is reported where it is", () => {
   const root = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '..', '..', '..', 'package.json'), 'utf8')) as {
@@ -39,8 +57,7 @@ test("the root's test script lets every package finish when one fails, so a fail
 });
 
 test("every file under each package's test/, and every test beside its code in src/, is in a tsconfig the package's typecheck script runs", () => {
-  const repo = path.join(import.meta.dirname, '..', '..', '..');
-  const packages = ['packages', 'apps'].flatMap((top) => fs.readdirSync(path.join(repo, top)).map((name) => path.join(repo, top, name)));
+  const packages = workspaces().map((dir) => path.join(REPO, dir));
   let seen = 0;
   for (const dir of packages) {
     const testDir = path.join(dir, 'test');
@@ -51,7 +68,7 @@ test("every file under each package's test/, and every test beside its code in s
       ...(fs.readdirSync(testDir, { recursive: true }) as string[]).filter((f) => /\.tsx?$/.test(f)).map((f) => path.join(testDir, f)),
       ...testsBeside(dir),
     ];
-    const unchecked = tests.filter((f) => !checked.has(f)).map((f) => path.relative(repo, f));
+    const unchecked = tests.filter((f) => !checked.has(f)).map((f) => path.relative(REPO, f));
     assert.deepEqual(unchecked, [], `${pkg.name}'s typecheck (${pkg.scripts.typecheck}) leaves these out: include them in its tsconfig`);
     seen += tests.length;
   }
@@ -84,8 +101,7 @@ test('REFUSED: a package whose tests beside the code its test script does not ru
 });
 
 test("every package's test script runs the tests beside its code", () => {
-  const repo = path.join(import.meta.dirname, '..', '..', '..');
-  const packages = ['packages', 'apps'].flatMap((top) => fs.readdirSync(path.join(repo, top)).map((name) => path.join(repo, top, name)));
+  const packages = workspaces().map((dir) => path.join(REPO, dir));
   assert.ok(testsBeside(path.join(import.meta.dirname, '..')).length > 0, "the scan finds the tests beside this package's code");
   const refused = packages.flatMap((dir) => {
     const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')) as { name: string; scripts: Record<string, string> };
@@ -149,15 +165,16 @@ test('REFUSED: a package whose test script runs its files unbounded, or bounded 
 });
 
 test("every package's test script bounds how many test files run at once, the same bound in each", () => {
-  const repo = path.join(import.meta.dirname, '..', '..', '..');
-  const scripts = ['packages', 'apps'].flatMap((top) =>
-    fs.readdirSync(path.join(repo, top)).map((name) => {
-      const pkg = JSON.parse(fs.readFileSync(path.join(repo, top, name, 'package.json'), 'utf8')) as {
-        name: string;
-        scripts: Record<string, string>;
-      };
-      return { name: pkg.name, script: pkg.scripts.test ?? '' };
-    }),
+  const scripts = workspaces().map((dir) => {
+    const pkg = JSON.parse(fs.readFileSync(path.join(REPO, dir, 'package.json'), 'utf8')) as {
+      name: string;
+      scripts: Record<string, string>;
+    };
+    return { name: pkg.name, script: pkg.scripts.test ?? '' };
+  });
+  assert.ok(
+    scripts.some((s) => s.name === 'guards'),
+    "the sweep reads tools/guards, the repository's own guards, as a package",
   );
   assert.ok(scripts.filter((s) => s.script).length >= 4, `read ${scripts.length} packages' test scripts, fewer than the workspace has`);
   assert.deepEqual(unbounded(scripts), []);
@@ -196,8 +213,7 @@ test('REFUSED: a test script without the probe, the spec reporter on stdout, or 
 });
 
 test("every package's test script records what its tests cost", () => {
-  const repo = path.join(import.meta.dirname, '..', '..', '..');
-  const packages = ['packages', 'apps'].flatMap((top) => fs.readdirSync(path.join(repo, top)).map((name) => path.join(repo, top, name)));
+  const packages = workspaces().map((dir) => path.join(REPO, dir));
   assert.ok(packages.length >= 4, `read ${packages.length} packages`);
   const refused = packages.flatMap((dir) => {
     const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')) as { name: string; scripts: Record<string, string> };

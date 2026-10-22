@@ -1,13 +1,14 @@
 /**
  * Every temporary root a test makes comes from `scratch`, which takes it away with whatever runs in it (`scratch.ts`):
- * a call of `os.tmpdir` anywhere else under `test/`, or in a test beside the code in `src/`, is refused, and each
- * package's copy of the helper is this one. A test of where the code under test runs a process names the temp directory
- * with `machineTempDir()`, which the scan refuses only on a line that makes a root with `mkdtempSync`.
+ * a call of `os.tmpdir` anywhere else under `test/`, or in a test beside the code in `src/`, is refused, and the copy of the helper
+ * in each workspace the root package.json names, `tools/guards` among them, is the runtime's. A test of where the code under test runs a
+ * process names the temp directory with `machineTempDir()`, which the scan refuses only on a line that makes a root with `mkdtempSync`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { REPO, workspaces } from './repo-files.ts';
 
 const TEST = import.meta.dirname;
 /** The one copy the others are held to. */
@@ -66,4 +67,14 @@ test("the helper is the runtime's, byte for byte", () => {
     fs.readFileSync(RUNTIME, 'utf8'),
     'copy packages/agent-runtime/test/scratch.ts over this one: a change to it is made there and copied to every package',
   );
+});
+
+test("each workspace's copy of the helper is the runtime's, byte for byte", () => {
+  const copies = workspaces()
+    .map((dir) => `${dir}/test/scratch.ts`)
+    .filter((file) => fs.existsSync(path.join(REPO, file)));
+  assert.ok(copies.includes('tools/guards/test/scratch.ts'), "the guards' home is read");
+  const runtime = fs.readFileSync(RUNTIME, 'utf8');
+  const apart = copies.filter((file) => fs.readFileSync(path.join(REPO, file), 'utf8') !== runtime);
+  assert.deepEqual(apart, [], 'copy packages/agent-runtime/test/scratch.ts over each of these');
 });

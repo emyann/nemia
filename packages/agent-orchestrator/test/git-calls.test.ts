@@ -1,7 +1,8 @@
 /**
  * No package and no app takes a dependency on git (the git-out design in docs/, *The rule*): a git call belongs to the place's code
- * (`place/git`), given as a service, never to a `src`. Over `packages/*\/src` and `apps/*\/src`, tests left out (`sourcesOf`), four things
- * are refused, each a matcher of `MATCHERS` over the file's syntax tree, so a call oxfmt splits over lines is the same call:
+ * (`place/git`), given as a service, never to a `src`. Over the `src` of each workspace the root package.json names, tests left out
+ * (`sourcesOf`), four things are refused, each a matcher of `MATCHERS` over the file's syntax tree, so a call oxfmt splits over lines
+ * is the same call:
  *
  * - **`spawn`**: `'git'` as the command handed to one of `SPAWNS`, written there or held by a `const` of the same file;
  * - **`wrapper`**: a call of a helper that wraps such a spawn (`WRAPPERS`);
@@ -23,6 +24,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
 import { argumentsOf, calleeName, calleeRoot, factsOf, literalParts, runsGit, SPAWNS, type FileFacts } from './git-spawns.ts';
+import { workspaces } from './repo-files.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = path.join(import.meta.dirname, '..', '..', '..');
@@ -108,12 +110,12 @@ function sitesIn(file: string, text: string, matchers: readonly Matcher[] = MATC
 /** Whether a file of a `src` is left out: a test, beside its code or in a `test` folder. */
 const isTest = (file: string): boolean => /\.test\.tsx?$/.test(file) || file.split('/').includes('test');
 
-/** Every `.ts` and `.tsx` under the `src` of each package and app of `root`, by its path from `root`, but the tests. */
+/**
+ * Every `.ts` and `.tsx` under the `src` of each workspace the root package.json of `root` names, by its path from `root`, but the tests.
+ * A workspace with no `src`, as `tools/guards` (a CI tool, which asks git as `workflows/build/landing.ts` does), has none.
+ */
 function sourcesOf(root: string): string[] {
-  const srcs = ['packages', 'apps'].flatMap((layer) => {
-    const at = path.join(root, layer);
-    return fs.existsSync(at) ? fs.readdirSync(at).map((name) => `${layer}/${name}/src`) : [];
-  });
+  const srcs = workspaces(root).map((dir) => `${dir}/src`);
   return srcs
     .filter((src) => fs.existsSync(path.join(root, src)))
     .flatMap((src) =>
@@ -242,7 +244,7 @@ test('REFUSED: each matcher does work — its plants are refused with it, and pa
   }
 });
 
-test("the scan reads every package's and app's src, and no test, script or file outside a src", () => {
+test("the scan reads every workspace's src, and no test, script or file outside a src", () => {
   const root = scratch('git-calls-');
   const site = "execFileSync('git', ['status']);\n";
   const files = [
@@ -255,12 +257,16 @@ test("the scan reads every package's and app's src, and no test, script or file 
     'apps/w/src/c.test.tsx',
     'apps/w/test/d.ts',
     'apps/w/src/notes.md',
+    'tools/g/src/e.ts',
+    'tools/other/src/f.ts',
   ];
   for (const file of files) {
     fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
     fs.writeFileSync(path.join(root, file), site);
   }
-  assert.deepEqual(sourcesOf(root), ['apps/w/src/c.tsx', 'packages/p/src/a.ts']);
+  for (const dir of ['packages/p', 'apps/w']) fs.writeFileSync(path.join(root, dir, 'package.json'), '{}');
+  fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ workspaces: ['packages/*', 'apps/*', 'tools/g'] }));
+  assert.deepEqual(sourcesOf(root).sort(), ['apps/w/src/c.tsx', 'packages/p/src/a.ts', 'tools/g/src/e.ts']);
 });
 
 test('the git calls of every src are held to their baseline, each entry naming its cards', () => {

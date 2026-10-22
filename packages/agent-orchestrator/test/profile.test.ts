@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { workspaces } from './repo-files.ts';
 import { scratch } from './scratch.ts';
 import { DEFAULT_SERVICE_NAME } from '../src/telemetry/telemetry.ts';
 import { DEFAULT_SERVICE, ENDPOINT_KEY, FLUSH_MS, PROFILER, profilingOf } from '../../../tools/observe/profile/profiling.ts';
@@ -119,13 +120,14 @@ test('profilingOf answers nothing for no endpoint, and the options for one', () 
 const naming = (files: { file: string; text: string }[]): string[] =>
   files.filter(({ text }) => text.includes(PROFILER) || text.includes('tools/observe/profile')).map(({ file }) => file);
 
-/** The files the repository ships: every workspace's `package.json`, the root's and its lockfile, and every source under a `src`. */
+/**
+ * The files the repository ships: the `package.json` of every workspace the root's names, the root's and its lockfile, and every source
+ * under a workspace's `src`. `tools/guards`, never shipped, is read with them: no guard of the repository's names the profiler either.
+ */
 function shippedFiles(): { file: string; text: string }[] {
-  const workspaces = ['packages', 'apps'].flatMap((top) =>
-    fs.readdirSync(path.join(REPO_ROOT, top)).map((name) => path.join(REPO_ROOT, top, name)),
-  );
-  const manifests = [REPO_ROOT, ...workspaces].map((dir) => path.join(dir, 'package.json')).filter((f) => fs.existsSync(f));
-  const sources = workspaces
+  const folders = workspaces().map((dir) => path.join(REPO_ROOT, dir));
+  const manifests = [REPO_ROOT, ...folders].map((dir) => path.join(dir, 'package.json')).filter((f) => fs.existsSync(f));
+  const sources = folders
     .map((dir) => path.join(dir, 'src'))
     .filter((dir) => fs.existsSync(dir))
     .flatMap((dir) => fs.readdirSync(dir, { recursive: true, encoding: 'utf8' }).map((f) => path.join(dir, f)))
@@ -141,6 +143,10 @@ test('nothing the repository ships names the profiler', () => {
   assert.ok(
     shipped.some(({ file }) => file === path.join('apps', 'api', 'src', 'main.ts')),
     'the api start is read',
+  );
+  assert.ok(
+    shipped.some(({ file }) => file === path.join('tools', 'guards', 'package.json')),
+    'every workspace is read',
   );
   assert.deepEqual(naming(shipped), []);
   assert.deepEqual(

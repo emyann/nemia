@@ -3,10 +3,10 @@
  *
  * `lint/comments.ts` is the oxlint plugin; `.oxlintrc.json` runs the guards in one override block per package, none with an
  * `"excludeFiles"`, and one block also covers the folders beside the packages: `lint/**`, the plugin itself, and `tools/**`, the
- * repository's test tooling. These tests run the repository's oxlint on fixtures with
- * the repository's own block, so a guard the block names that runs nothing — misspelled, set to `off`, or aimed at other files — fails
- * here. The last part is what a lint rule cannot see across files: a name a comment quotes in backticks is one the code has, in each
- * file a guard block covers.
+ * repository's test tooling and the home of its own guards, `tools/guards`, a workspace that block holds in place of one of its own.
+ * These tests run the repository's oxlint on fixtures with the repository's own block, so a guard the block names that runs nothing —
+ * misspelled, set to `off`, or aimed at other files — fails here. The last part is what a lint rule cannot see across files: a name a
+ * comment quotes in backticks is one the code has, in each file a guard block covers.
  *
  * No line that holds a comment is wider than oxfmt's print width, which wraps code but rewraps no comment: the plugin's rule refuses
  * one, in every folder a guard block covers.
@@ -24,6 +24,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import ts from 'typescript';
 import plugin, { COMMENT_WIDTH } from '../../../lint/comments.ts';
+import { workspaces } from './repo-files.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = path.join(import.meta.dirname, '..', '..', '..');
@@ -64,15 +65,17 @@ const excludedBlocks = (config: Config): string[] =>
     .filter((block) => block.excludeFiles !== undefined)
     .map(packageOf);
 
-/** Every workspace package: the folders under packages/ and apps/ with a package.json, from the root. */
-const workspacePackages = (): string[] =>
-  ['apps', 'packages']
-    .flatMap((top) => fs.readdirSync(path.join(ROOT, top)).map((name) => `${top}/${name}`))
-    .filter((dir) => fs.existsSync(path.join(ROOT, dir, 'package.json')))
-    .sort();
-
 /** The globs of the folders beside the packages, which one guard block, and one only, lists after its package: the plugin, the tooling. */
 const BESIDE = ['lint/**', 'tools/**'];
+
+/** Whether a workspace, from the root, lies under a folder beside the packages, whose glob guards it: `tools/guards` does. */
+const besideHolds = (dir: string): boolean => BESIDE.some((glob) => path.matchesGlob(`${dir}/package.json`, glob));
+
+/** Every workspace package with a guard block of its own: each workspace the root package.json names but one `BESIDE` holds, sorted. */
+const workspacePackages = (): string[] =>
+  workspaces()
+    .filter((dir) => !besideHolds(dir))
+    .sort();
 
 /** A jsPlugins specifier made absolute, as a config in another folder needs it: a path from the root, or a package the root installs. */
 const resolvePlugin = (specifier: string): string =>
@@ -384,6 +387,7 @@ function besideUnguarded(blocks: Block[]): string[] {
 test('there is one guard block per workspace package, each covering its package, and one also the folders beside them', () => {
   const blocks = guardBlocks(readConfig());
   assert.deepEqual(blocks.map(packageOf).sort(), workspacePackages(), 'a package has no guard block, or two, or a block names no package');
+  assert.ok(workspaces().filter(besideHolds).includes('tools/guards'), "the guards' home is held by the block of the folders beside");
   assert.deepEqual(besideUnguarded(blocks), []);
 });
 
@@ -437,11 +441,11 @@ test('REFUSED: a file of ours beside the vendored folders is no vendored file', 
 });
 
 /**
- * Every source file of ours git lists under packages/, apps/, lint/ and tools/, tracked or not yet added, that is on disk, from the root:
+ * Every source file of ours git lists under each workspace, lint/ and tools/, tracked or not yet added, that is on disk, from the root:
  * no generated route tree, and no file under a vendored folder.
  */
 const sourceFiles = (): string[] =>
-  execFileSync('git', ['ls-files', '-co', '--exclude-standard', 'packages', 'apps', 'lint', 'tools'], {
+  execFileSync('git', ['ls-files', '-co', '--exclude-standard', ...workspaces(), 'lint', 'tools'], {
     cwd: ROOT,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],

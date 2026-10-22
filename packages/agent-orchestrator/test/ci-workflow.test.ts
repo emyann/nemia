@@ -72,8 +72,12 @@ const HIDDEN = /(^|\/)\.[^/]/;
 /** A `node-version` that is an expression, the legs' `${{ matrix.node }}`: held by `nodeDrift` off the matrix, not by its pin. */
 const OFF_MATRIX = /\$\{\{/;
 
-/** A workspace of this repository, by the name a turbo filter gives it, and whether it has a suite to run. */
-type Workspace = { name: string; suite: boolean };
+/**
+ * A workspace of this repository, by the name a turbo filter gives it, whether it has a suite to run, and the `test` script that runs
+ * it: a leg that runs a shard of a suite is held against the script that would have to take the shard, since a script with no hole for
+ * it runs the whole suite under every shard and the leg reports a half it never ran.
+ */
+type Workspace = { name: string; suite: boolean; test?: string };
 
 /** Every workspace the root `package.json` claims, expanded from its globs: the folders under them that hold a `package.json`. */
 function readWorkspaces(): Workspace[] {
@@ -88,7 +92,7 @@ function readWorkspaces(): Workspace[] {
       const file = path.join(dir, 'package.json');
       if (!fs.existsSync(file)) return [];
       const pkg = JSON.parse(fs.readFileSync(file, 'utf8')) as { name: string; scripts?: Record<string, string> };
-      return [{ name: pkg.name, suite: pkg.scripts?.test !== undefined }];
+      return [{ name: pkg.name, suite: pkg.scripts?.test !== undefined, test: pkg.scripts?.test }];
     })
     .sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -97,34 +101,85 @@ function readWorkspaces(): Workspace[] {
 const readEngine = (): string =>
   (JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')) as { engines: { node: string } }).engines.node;
 
-/** The workspaces the matrix names, one leg each. */
+/** The workspaces the matrix's own axis names: the legs that run a whole suite. */
 const legWorkspaces = (workflow: Workflow): unknown[] => workflow.jobs[LEGS]?.strategy?.matrix?.workspace ?? [];
 
-/** The node versions the matrix names, as YAML read them: a string, or a number where a quote was forgotten. */
+/** The node versions the matrix's axis names, as YAML read them: a string, or a number where a quote was forgotten. */
 const legNodes = (workflow: Workflow): unknown[] => workflow.jobs[LEGS]?.strategy?.matrix?.node ?? [];
+
+/** The entries of the matrix's `include`, each of which `includeDrift` holds to the shape that makes a leg of its own. */
+const legIncludes = (workflow: Workflow): Record<string, unknown>[] =>
+  (workflow.jobs[LEGS]?.strategy?.matrix?.include ?? []) as Record<string, unknown>[];
+
+/** A leg of the test job: a workspace on a node, running the whole suite or the one shard of it the leg names. */
+type Leg = { workspace: unknown; node: unknown; shard: unknown };
+
+/**
+ * Every leg the test job expands to: the axes' cross product, plus one leg per `include` entry. An `include` entry makes a leg of its
+ * own only because its `workspace` is a value the axis does not hold — GitHub adds an entry's keys to the matching combinations
+ * otherwise — so this reading is true exactly while `includeDrift` is green, which is why that clause is beside this one.
+ */
+const legs = (workflow: Workflow): Leg[] => [
+  ...legWorkspaces(workflow).flatMap((workspace) => legNodes(workflow).map((node) => ({ workspace, node, shard: undefined }))),
+  ...legIncludes(workflow).map((entry) => ({ workspace: entry.workspace, node: entry.node, shard: entry.shard })),
+];
+
+/** The workspaces the legs run, each named once, in the order the legs name them. */
+const workedspaces = (workflow: Workflow): unknown[] => [...new Set(legs(workflow).map((leg) => leg.workspace))];
 
 /** A workspace with a suite and no leg, and a leg naming a workspace this repository does not have. */
 function legDrift(workflow: Workflow, workspaces: Workspace[]): string[] {
-  const legs = legWorkspaces(workflow);
+  const named = workedspaces(workflow);
   return [
     ...workspaces
-      .filter((workspace) => workspace.suite && !legs.includes(workspace.name))
+      .filter((workspace) => workspace.suite && !named.includes(workspace.name))
       .map(
         (workspace) =>
-          `${workspace.name} has a test script and no leg in ${FILE}: add ${workspace.name} to the ${LEGS} job's matrix.workspace, or CI reports green having never run its suite`,
+          `${workspace.name} has a test script and no leg in ${FILE}: add ${workspace.name} to the ${LEGS} job's matrix.workspace, or to its matrix.include with a shard of its own, or CI reports green having never run its suite`,
       ),
-    ...legs
+    ...named
       .filter((leg) => !workspaces.some((workspace) => workspace.name === leg))
       .map(
         (leg) =>
-          `the ${LEGS} job's matrix.workspace in ${FILE} names ${String(leg)}, which is no workspace of this repository: take it off the matrix, or add the workspace it means`,
+          `the ${LEGS} job's matrix in ${FILE} names ${String(leg)}, which is no workspace of this repository: take it off the matrix, or add the workspace it means`,
       ),
   ];
 }
 
-/** A node version written unquoted, an `engines.node` with no floor to read, and a matrix that does not test that floor. */
-function nodeDrift(workflow: Workflow, engine: string): string[] {
+/**
+ * An `include` entry that does not make a leg of its own. GitHub adds an entry's keys to every combination it does not contradict, and
+ * makes a new combination only of an entry whose value for an axis the axis does not hold: so an entry naming a workspace the axis
+ * already names would hand its shard to that workspace's existing legs rather than splitting them, and an entry with no node would be
+ * added to every leg of the matrix instead.
+ */
+function includeDrift(workflow: Workflow): string[] {
+  const axis = legWorkspaces(workflow);
   const nodes = legNodes(workflow);
+  return legIncludes(workflow).flatMap((entry, i) => {
+    if (entry.workspace === undefined)
+      return [
+        `the ${LEGS} job's matrix.include in ${FILE} has an entry (${i + 1} of ${legIncludes(workflow).length}) that names no workspace: GitHub adds such an entry's keys to every combination of the matrix instead of making a leg of its own, so give it workspace: <the workspace it is a shard of>, or take it off include`,
+      ];
+    if (axis.includes(entry.workspace))
+      return [
+        `the ${LEGS} job's matrix.include in ${FILE} holds an entry for ${String(entry.workspace)}, which matrix.workspace already names: GitHub adds such an entry's keys to the matching combinations instead of making a leg of its own, so its shard would be added to an existing leg rather than splitting it — take ${String(entry.workspace)} off matrix.workspace, or the entry off include`,
+      ];
+    if (entry.node === undefined)
+      return [
+        `the ${LEGS} job's matrix.include entry for ${String(entry.workspace)} in ${FILE} names no node: an entry that contradicts one axis and leaves another open is one leg, not one per node, so write node: '${String(nodes[0])}' on it — one entry per node the matrix names`,
+      ];
+    return [];
+  });
+}
+
+/**
+ * A node version written unquoted, an `engines.node` with no floor to read, a matrix that does not test that floor, and a workspace
+ * whose legs do not cover every node the axis names. The cross product gives that coverage for nothing; an `include` entry is written
+ * by hand, one per node, so a workspace that arrived through `include` can lose a node without a word — tested on one version while
+ * the matrix claims two.
+ */
+function nodeDrift(workflow: Workflow, engine: string): string[] {
+  const nodes = [...new Set(legs(workflow).map((leg) => leg.node))];
   const sentences = nodes
     .filter((node) => typeof node !== 'string')
     .map(
@@ -140,6 +195,13 @@ function nodeDrift(workflow: Workflow, engine: string): string[] {
     sentences.push(
       `the ${LEGS} job's matrix.node in ${FILE} does not test ${floor}, the floor engines.node claims in package.json: add '${floor}' to the matrix, or lower engines.node to a version the matrix tests`,
     );
+  const expanded = legs(workflow);
+  for (const workspace of workedspaces(workflow))
+    for (const node of legNodes(workflow))
+      if (!expanded.some((leg) => leg.workspace === workspace && leg.node === node))
+        sentences.push(
+          `${String(workspace)}'s legs in ${FILE} do not run on node ${String(node)}, which the ${LEGS} job's matrix.node names: give it a leg on every node the matrix names, or a workspace is tested on one version while the matrix claims two`,
+        );
   return sentences;
 }
 
@@ -233,33 +295,186 @@ function actionDrift(workflow: Workflow): string[] {
   );
 }
 
-/** The timezones every leg runs its suite under: the two the card names, in no particular order. */
-const ZONES = ['UTC', 'America/New_York'];
+/** The timezone every leg runs its suite under. */
+const ZONE_EVERY = 'UTC';
 
-/** Each run of the suite in the leg, by the timezone it sets and whether it passes `--force`. */
-const suiteRuns = (workflow: Workflow): { zone: string | undefined; forced: boolean }[] =>
+/** The second timezone, run by one leg alone. */
+const ZONE_LOCAL = 'America/New_York';
+
+/** The one workspace whose code reads local time, and so the one leg that runs its suite a second time. */
+const LOCAL_LEG = 'web';
+
+/** What the second zone's run step must be conditioned on, so it runs for that leg and no other. */
+const LOCAL_IF = `matrix.workspace == '${LOCAL_LEG}'`;
+
+/** The environment variable the orchestrator's `test` script reads its shard out of. */
+const SHARD_ENV = 'WF_TEST_SHARD';
+
+/** What that variable must be given: the leg's own shard, never a literal, or every leg would run the same half. */
+const SHARD_VALUE = '${{ matrix.shard }}';
+
+/** The hole a `test` script needs for a shard to reach `node --test`, which expands to nothing where no shard is set. */
+const SHARD_HOLE = '${WF_TEST_SHARD:+--test-shard=$WF_TEST_SHARD}';
+
+/** A shard as `node --test-shard` takes one: the index of a count, both counting from one. */
+const FRACTION = /^(\d+)\/(\d+)$/;
+
+/** Each run of the suite in the leg, by the timezone it sets, what it is conditioned on, its shard, and whether it passes `--force`. */
+const suiteRuns = (workflow: Workflow): { zone: string | undefined; if?: string; shard: string | undefined; forced: boolean }[] =>
   (workflow.jobs[LEGS]?.steps ?? [])
     .filter((step) => step.run?.includes('turbo run test') === true)
-    .map((step) => ({ zone: step.env?.TZ, forced: step.run?.includes('--force') === true }));
+    .map((step) => ({
+      zone: step.env?.TZ,
+      if: step.if,
+      shard: step.env?.[SHARD_ENV],
+      forced: step.run?.includes('--force') === true,
+    }));
 
 /**
- * A timezone the leg does not run its suite under, and a run that does not pass `--force`. The second is the invisible one: `turbo.json`
- * hashes no environment, so a run without it replays the run before it from the cache and that timezone is never tested at all.
+ * The zones the legs run their suites under, which is two things rather than one: every leg under `UTC`, and the web alone a second
+ * pass under `America/New_York`. The second zone is the web's because local time is read in `apps/web/src/lib` and nowhere else in
+ * this repository, and the condition on that step is what keeps four legs from paying for a zone their code cannot read: the sentences
+ * below refuse dropping it from the web, widening it back to every leg, and adding a third zone nothing here can account for.
+ * `docs/plan-github-ci.md` holds the measurement that chose it.
+ *
+ * A run that does not pass `--force` is the invisible one: `turbo.json` hashes no environment, so it replays the run before it from the
+ * cache and that timezone is never tested at all.
  */
 function zoneDrift(workflow: Workflow): string[] {
   const runs = suiteRuns(workflow);
-  return [
-    ...ZONES.filter((zone) => !runs.some((run) => run.zone === zone)).map(
-      (zone) =>
-        `the ${LEGS} job in ${FILE} does not run its suite under TZ=${zone}: give it a run step of the suite with env TZ: ${zone}, or a test whose verdict turns on the timezone passes CI and fails on a machine in the other`,
-    ),
+  const sentences: string[] = [];
+  const every = runs.filter((run) => run.zone === ZONE_EVERY);
+  if (every.length === 0)
+    sentences.push(
+      `the ${LEGS} job in ${FILE} does not run its suite under TZ=${ZONE_EVERY}: give it a run step of the suite with env TZ: ${ZONE_EVERY} and no if:, or a leg reports green having run no suite at all`,
+    );
+  sentences.push(
+    ...every
+      .filter((run) => run.if !== undefined)
+      .map(
+        (run) =>
+          `the ${LEGS} job's suite run under TZ=${ZONE_EVERY} in ${FILE} is conditioned on if: ${String(run.if)}: every leg runs its suite under ${ZONE_EVERY}, so take the condition off, or the legs it leaves out report green having run nothing`,
+      ),
+  );
+  const local = runs.filter((run) => run.zone === ZONE_LOCAL);
+  if (local.length === 0)
+    sentences.push(
+      `the ${LEGS} job in ${FILE} does not run its suite under TZ=${ZONE_LOCAL}: give it a run step of the suite with env TZ: ${ZONE_LOCAL} and if: ${LOCAL_IF}, or a test of the ${LOCAL_LEG}'s local-time code passes CI and fails on a machine in another zone`,
+    );
+  sentences.push(
+    ...local
+      .filter((run) => run.if !== LOCAL_IF)
+      .map(
+        (run) =>
+          `the ${LEGS} job's suite run under TZ=${ZONE_LOCAL} in ${FILE} is conditioned on ${run.if === undefined ? 'nothing' : `if: ${run.if}`}, not on if: ${LOCAL_IF}: ${LOCAL_LEG} is the one workspace of this repository whose code reads local time, so write if: ${LOCAL_IF} on that step, or the other legs run their suites twice for a zone they cannot read`,
+      ),
+  );
+  sentences.push(
+    ...runs
+      .filter((run) => run.zone !== ZONE_EVERY && run.zone !== ZONE_LOCAL)
+      .map(
+        (run) =>
+          `the ${LEGS} job in ${FILE} runs its suite under TZ=${String(run.zone)}, a zone this file knows nothing about: the legs run under ${ZONE_EVERY}, and ${LOCAL_LEG} alone a second pass under ${ZONE_LOCAL} — take the step off, or say in docs/plan-github-ci.md why a third zone is tested and hold it here`,
+      ),
+  );
+  sentences.push(
     ...runs
       .filter((run) => !run.forced)
       .map(
         (run) =>
           `the ${LEGS} job's suite run under TZ=${String(run.zone)} in ${FILE} does not pass --force: turbo hashes no environment, so it replays the run before it from the cache and that timezone is never tested`,
       ),
-  ];
+  );
+  return sentences;
+}
+
+/**
+ * A set of shards that does not tile the suite it splits, a shard written in a form `node --test-shard` does not take, a workspace whose
+ * `test` script cannot take a shard at all, and a suite run that does not hand the leg's own shard through the environment.
+ *
+ * Each is green on GitHub while testing less than it claims. Shards `1/2` alone leave half the files run by nobody; a script with no
+ * hole for the fraction runs the whole suite under both legs, which is slower than before and reports two halves it never ran; and the
+ * fraction cannot be appended from outside the script — node takes its file patterns off argv past the first positional, so a turbo
+ * `-- --test-shard=1/2` arrives as a glob that matches nothing.
+ *
+ * The shards are read per leg a shard splits — one workspace on one node — and a group whose shards do not read as fractions is
+ * reported for that alone, since nothing can be said about whether unreadable fractions tile. The `test` script and the run step's env
+ * are asked of a file that shards something and of no other, so a card that takes the shards off is not then held to a hole in a
+ * script and a variable nothing reads.
+ */
+function legShardDrift(workflow: Workflow, workspaces: Workspace[]): string[] {
+  const expanded = legs(workflow);
+  const sentences: string[] = [];
+  const sharded = new Set<unknown>();
+  const groups = new Map<string, Leg[]>();
+  for (const leg of expanded) {
+    const key = `${String(leg.workspace)} on node ${String(leg.node)}`;
+    groups.set(key, [...(groups.get(key) ?? []), leg]);
+  }
+  for (const [key, group] of groups) {
+    const named = group.filter((leg) => leg.shard !== undefined);
+    if (named.length === 0) continue;
+    sharded.add(group[0].workspace);
+    const unreadable = named.filter((leg) => typeof leg.shard !== 'string' || !FRACTION.test(leg.shard));
+    if (unreadable.length > 0) {
+      sentences.push(
+        ...unreadable.map(
+          (leg) =>
+            `the leg for ${key} in ${FILE} names shard ${JSON.stringify(leg.shard)}, which is not <i>/<n>: node --test-shard takes the index of a count, both counting from one, so write it '1/2', or take the shard off the leg and run its suite whole`,
+        ),
+      );
+      continue;
+    }
+    const have = named.map((leg) => leg.shard as string);
+    const total = Number(FRACTION.exec(have[0])![2]);
+    const want = Array.from({ length: total }, (_shard, i) => `${i + 1}/${total}`);
+    if (have.length !== want.length || want.some((shard, i) => shard !== have[i]))
+      sentences.push(
+        `the legs for ${key} in ${FILE} run shards ${JSON.stringify(have)}, which do not tile ${want.join(' … ')} in order: a shard no leg names is a part of that suite run by nobody, so give it a leg for each of ${want.join(' … ')}, or write no shard and run the suite whole`,
+      );
+    if (group.length !== named.length)
+      sentences.push(
+        `the legs for ${key} in ${FILE} are ${group.length}, of which ${named.length} name a shard: a leg beside the shards runs the whole suite again, so give every leg of that workspace and node a shard of its own, or none of them one`,
+      );
+  }
+  if (sharded.size === 0) return sentences;
+  for (const name of sharded) {
+    const workspace = workspaces.find((each) => each.name === name);
+    if (workspace === undefined) continue;
+    if (
+      workspace.test === undefined ||
+      !workspace.test.includes(SHARD_HOLE) ||
+      workspace.test.indexOf(SHARD_HOLE) > workspace.test.indexOf("'")
+    )
+      sentences.push(
+        `${workspace.name}'s legs in ${FILE} run shards of its suite and its test script cannot take one: write ${SHARD_HOLE} into that script, after --test and before its globs — node stops reading options at the first pattern, so a flag appended from outside is read as a file pattern — or every shard runs the whole suite and the leg reports a half it never ran`,
+      );
+  }
+  for (const run of suiteRuns(workflow)) {
+    if (run.shard === undefined)
+      sentences.push(
+        `the ${LEGS} job's suite run under TZ=${String(run.zone)} in ${FILE} is not given ${SHARD_ENV}: ${SHARD_VALUE} in its env: without it the script's shard hole expands to nothing and every shard leg runs the whole suite`,
+      );
+    else if (run.shard !== SHARD_VALUE)
+      sentences.push(
+        `the ${LEGS} job's suite run under TZ=${String(run.zone)} in ${FILE} is given ${SHARD_ENV}: ${run.shard}, not ${SHARD_VALUE}: every leg would run that one shard, and the rest of each suite is run by nobody`,
+      );
+  }
+  return sentences;
+}
+
+/**
+ * A leg name that does not name the shard. Two halves of one workspace's suite on one node then read alike in the run's summary, and a
+ * person reading a red `ci` cannot tell which half failed — nor the two apart in the timings this card was measured from.
+ */
+function nameDrift(workflow: Workflow): string[] {
+  if (!legs(workflow).some((leg) => leg.shard !== undefined)) return [];
+  const name = workflow.jobs[LEGS]?.name ?? '';
+  return name.includes(SHARD_VALUE)
+    ? []
+    : [
+        `the ${LEGS} job's name in ${FILE} does not name ${SHARD_VALUE}: two shards of one workspace on one node then read alike in the run's summary, and a person cannot tell which half failed`,
+      ];
 }
 
 /**
@@ -624,7 +839,10 @@ const drift = (
   stubs: readonly string[],
 ): string[] => [
   ...legDrift(workflow, workspaces),
+  ...includeDrift(workflow),
   ...nodeDrift(workflow, engine),
+  ...legShardDrift(workflow, workspaces),
+  ...nameDrift(workflow),
   ...pinDrift(workflow, engine),
   ...hiddenDrift(workflow),
   ...gateDrift(workflow),
@@ -647,6 +865,11 @@ test('the shipped CI workflow agrees with the repository it checks', () => {
   assert.ok(
     workspaces.filter((workspace) => workspace.suite).length >= 4,
     'the scan found fewer than four workspaces with a test script: the leg clause reads nothing',
+  );
+  assert.equal(
+    legs(readWorkflow()).length,
+    12,
+    'the matrix expands to twelve legs today: four workspaces on two nodes, and the orchestrator in two shards on each — a clause reading an empty matrix or an unexpanded include would bless the file having read nothing',
   );
   const pages = readPages();
   assert.ok(pages.length > 100, `${NAMES_PATH} names ${pages.length} pages: the shard clause reads a list that is not the e2e's`);
@@ -692,22 +915,39 @@ test('REFUSED: a workspace with no leg, a leg with no workspace, a node floor ad
     return matrix;
   };
 
+  const renode = (workflow: Workflow, to: unknown): void => {
+    const matrix = matrixOf(workflow);
+    matrix.node = [to, '24'];
+    for (const entry of matrix.include as { node?: unknown }[]) if (entry.node === '24.16.0') entry.node = to;
+  };
+
   const dropped = structuredClone(shipped);
   const without = legWorkspaces(dropped).filter((leg) => leg !== 'docs');
   assert.equal(without.length, legWorkspaces(dropped).length - 1, 'docs is a leg today');
   matrixOf(dropped).workspace = without;
   assert.deepEqual(legDrift(dropped, workspaces), [
-    "docs has a test script and no leg in .github/workflows/ci.yml: add docs to the test job's matrix.workspace, or CI reports green having never run its suite",
+    "docs has a test script and no leg in .github/workflows/ci.yml: add docs to the test job's matrix.workspace, or to its matrix.include with a shard of its own, or CI reports green having never run its suite",
   ]);
+
+  const unincluded = structuredClone(shipped);
+  assert.equal((matrixOf(unincluded).include ?? []).length, 4, "the orchestrator's four shard legs arrive through include today");
+  matrixOf(unincluded).include = [];
+  assert.deepEqual(
+    legDrift(unincluded, workspaces),
+    [
+      "agent-orchestrator has a test script and no leg in .github/workflows/ci.yml: add agent-orchestrator to the test job's matrix.workspace, or to its matrix.include with a shard of its own, or CI reports green having never run its suite",
+    ],
+    'the clause reads the include entries as legs: with them gone the orchestrator has none, and it is on the axis nowhere',
+  );
 
   const extra = structuredClone(shipped);
   matrixOf(extra).workspace = [...legWorkspaces(extra), 'legacy'];
   assert.deepEqual(legDrift(extra, workspaces), [
-    "the test job's matrix.workspace in .github/workflows/ci.yml names legacy, which is no workspace of this repository: take it off the matrix, or add the workspace it means",
+    "the test job's matrix in .github/workflows/ci.yml names legacy, which is no workspace of this repository: take it off the matrix, or add the workspace it means",
   ]);
 
   const adrift = structuredClone(shipped);
-  matrixOf(adrift).node = ['22.19.0', '24'];
+  renode(adrift, '22.19.0');
   assert.deepEqual(nodeDrift(adrift, '>=22.18.0'), [
     "the test job's matrix.node in .github/workflows/ci.yml does not test 22.18.0, the floor engines.node claims in package.json: add '22.18.0' to the matrix, or lower engines.node to a version the matrix tests",
   ]);
@@ -717,11 +957,21 @@ test('REFUSED: a workspace with no leg, a leg with no workspace, a node floor ad
     ]);
 
   const unquoted = structuredClone(shipped);
-  matrixOf(unquoted).node = [22.18, '24'];
+  renode(unquoted, 22.18);
   assert.deepEqual(nodeDrift(unquoted, engine), [
     "the test job's matrix.node in .github/workflows/ci.yml holds 22.18 unquoted: YAML reads it as a number and setup-node then installs another version, so write it '22.18'",
     "the test job's matrix.node in .github/workflows/ci.yml does not test 24.16.0, the floor engines.node claims in package.json: add '24.16.0' to the matrix, or lower engines.node to a version the matrix tests",
   ]);
+
+  const halfnoded = structuredClone(shipped);
+  matrixOf(halfnoded).include = (matrixOf(halfnoded).include as { node?: unknown }[]).filter((entry) => entry.node !== '24');
+  assert.deepEqual(
+    nodeDrift(halfnoded, engine),
+    [
+      "agent-orchestrator's legs in .github/workflows/ci.yml do not run on node 24, which the test job's matrix.node names: give it a leg on every node the matrix names, or a workspace is tested on one version while the matrix claims two",
+    ],
+    'an include entry is written by hand, one per node, so a workspace that arrived through include can lose a node without a word',
+  );
 
   const setupOf = (workflow: Workflow, job: string): Step => {
     const step = (workflow.jobs[job]?.steps ?? []).find((each) => each.uses?.startsWith(SETUP_NODE));
@@ -795,13 +1045,62 @@ test('REFUSED: a workspace with no leg, a leg with no workspace, a node floor ad
     "the test job in .github/workflows/ci.yml takes a-third-party/setup@v1: this workflow takes GitHub's own actions by major tag alone, so write it actions/<name>@v<major>, and take a third party's code as a pinned download in a run step instead",
   ]);
 
+  const stepsOf = (workflow: Workflow): Step[] => {
+    const steps = workflow.jobs[LEGS]?.steps;
+    assert.ok(steps !== undefined, `the ${LEGS} job has steps today`);
+    return steps;
+  };
+  const runOf = (workflow: Workflow, zone: string): Step => {
+    const step = stepsOf(workflow).find((each) => each.env?.TZ === zone);
+    assert.ok(step !== undefined, `the ${LEGS} job runs its suite under TZ=${zone} today`);
+    return step;
+  };
+
+  assert.equal(suiteRuns(shipped).length, 2, 'the leg has two suite runs today, the second of them the web leg alone');
+
   const onezone = structuredClone(shipped);
-  const legSteps = onezone.jobs[LEGS]?.steps;
-  assert.ok(legSteps !== undefined, `the ${LEGS} job has steps today`);
-  onezone.jobs[LEGS].steps = legSteps.filter((step) => step.env?.TZ !== 'America/New_York');
-  assert.equal(suiteRuns(onezone).length, 1, 'the leg runs its suite twice today');
+  onezone.jobs[LEGS].steps = stepsOf(onezone).filter((step) => step.env?.TZ !== 'America/New_York');
   assert.deepEqual(zoneDrift(onezone), [
-    'the test job in .github/workflows/ci.yml does not run its suite under TZ=America/New_York: give it a run step of the suite with env TZ: America/New_York, or a test whose verdict turns on the timezone passes CI and fails on a machine in the other',
+    "the test job in .github/workflows/ci.yml does not run its suite under TZ=America/New_York: give it a run step of the suite with env TZ: America/New_York and if: matrix.workspace == 'web', or a test of the web's local-time code passes CI and fails on a machine in another zone",
+  ]);
+
+  const nozone = structuredClone(shipped);
+  nozone.jobs[LEGS].steps = stepsOf(nozone).filter((step) => step.env?.TZ !== 'UTC');
+  assert.deepEqual(zoneDrift(nozone), [
+    'the test job in .github/workflows/ci.yml does not run its suite under TZ=UTC: give it a run step of the suite with env TZ: UTC and no if:, or a leg reports green having run no suite at all',
+  ]);
+
+  const everyleg = structuredClone(shipped);
+  delete runOf(everyleg, 'America/New_York').if;
+  assert.deepEqual(
+    zoneDrift(everyleg),
+    [
+      "the test job's suite run under TZ=America/New_York in .github/workflows/ci.yml is conditioned on nothing, not on if: matrix.workspace == 'web': web is the one workspace of this repository whose code reads local time, so write if: matrix.workspace == 'web' on that step, or the other legs run their suites twice for a zone they cannot read",
+    ],
+    'the second zone unconditioned is the cost this card took off: four legs paying a second pass for a zone no code of theirs reads',
+  );
+
+  const otherleg = structuredClone(shipped);
+  runOf(otherleg, 'America/New_York').if = "matrix.workspace == 'api'";
+  assert.deepEqual(zoneDrift(otherleg), [
+    "the test job's suite run under TZ=America/New_York in .github/workflows/ci.yml is conditioned on if: matrix.workspace == 'api', not on if: matrix.workspace == 'web': web is the one workspace of this repository whose code reads local time, so write if: matrix.workspace == 'web' on that step, or the other legs run their suites twice for a zone they cannot read",
+  ]);
+
+  const conditioned = structuredClone(shipped);
+  runOf(conditioned, 'UTC').if = "matrix.workspace == 'web'";
+  assert.deepEqual(zoneDrift(conditioned), [
+    "the test job's suite run under TZ=UTC in .github/workflows/ci.yml is conditioned on if: matrix.workspace == 'web': every leg runs its suite under UTC, so take the condition off, or the legs it leaves out report green having run nothing",
+  ]);
+
+  const third = structuredClone(shipped);
+  const tokyo = structuredClone(runOf(third, 'UTC'));
+  tokyo.name = 'test under TZ=Asia/Tokyo';
+  tokyo.env = { ...tokyo.env, TZ: 'Asia/Tokyo' };
+  stepsOf(third).push(tokyo);
+  assert.deepEqual(zoneDrift(third), [
+    'the test job in .github/workflows/ci.yml runs its suite under TZ=Asia/Tokyo, a zone this file knows nothing about: the legs run ' +
+      'under UTC, and web alone a second pass under America/New_York — take the step off, or say in docs/plan-github-ci.md why a third ' +
+      'zone is tested and hold it here',
   ]);
 
   const unforced = structuredClone(shipped);
@@ -825,6 +1124,163 @@ test('REFUSED: a workspace with no leg, a leg with no workspace, a node floor ad
   assert.deepEqual(targetDrift(text.replace('pull_request:', `${target}:`)), [
     `.github/workflows/ci.yml names ${target}: a fork's code must not run with a token that can write, so trigger on pull_request instead and read nothing of the fork's with write access`,
   ]);
+});
+
+test('REFUSED: an include entry the axis already names, one with no node or no workspace, shards that do not tile, a shard that is no fraction, a leg beside the shards, a test script with no hole for one, a suite run not given the shard or given a literal, and a job name that does not name it', () => {
+  const shipped = readWorkflow();
+  const workspaces = readWorkspaces();
+  assert.deepEqual(includeDrift(shipped), [], "the orchestrator's include entries each make a leg of their own today");
+  assert.deepEqual(
+    legShardDrift(shipped, workspaces),
+    [],
+    'the two shards tile the suite, the script takes one and both runs hand it on today',
+  );
+  assert.deepEqual(nameDrift(shipped), [], "the leg's name names its shard today");
+
+  const includeOf = (workflow: Workflow): Record<string, unknown>[] => {
+    const include = workflow.jobs[LEGS]?.strategy?.matrix?.include as Record<string, unknown>[] | undefined;
+    assert.equal(include?.length, 4, "the orchestrator's four shard legs arrive through include today");
+    return include;
+  };
+
+  const merged = structuredClone(shipped);
+  includeOf(merged).push({ workspace: 'web', node: '24.16.0', shard: '1/2' });
+  assert.deepEqual(
+    includeDrift(merged),
+    [
+      "the test job's matrix.include in .github/workflows/ci.yml holds an entry for web, which matrix.workspace already names: GitHub " +
+        "adds such an entry's keys to the matching combinations instead of making a leg of its own, so its shard would be added to an " +
+        'existing leg rather than splitting it — take web off matrix.workspace, or the entry off include',
+    ],
+    'the whole reading of the matrix rests on GitHub making a leg of an entry that contradicts an axis: an entry the axis agrees with ' +
+      'is merged into its legs instead, and the shard it carries would be handed to a leg that runs the suite whole',
+  );
+
+  const nodeless = structuredClone(shipped);
+  delete includeOf(nodeless)[0].node;
+  assert.deepEqual(includeDrift(nodeless), [
+    "the test job's matrix.include entry for agent-orchestrator in .github/workflows/ci.yml names no node: an entry that contradicts " +
+      "one axis and leaves another open is one leg, not one per node, so write node: '24.16.0' on it — one entry per node the matrix names",
+  ]);
+
+  const nameless = structuredClone(shipped);
+  delete includeOf(nameless)[0].workspace;
+  assert.deepEqual(includeDrift(nameless), [
+    "the test job's matrix.include in .github/workflows/ci.yml has an entry (1 of 4) that names no workspace: GitHub adds such an " +
+      "entry's keys to every combination of the matrix instead of making a leg of its own, so give it workspace: <the workspace it is " +
+      'a shard of>, or take it off include',
+  ]);
+
+  const half = structuredClone(shipped);
+  includeOf(half).splice(1, 1);
+  assert.deepEqual(
+    legShardDrift(half, workspaces),
+    [
+      'the legs for agent-orchestrator on node 24.16.0 in .github/workflows/ci.yml run shards ["1/2"], which do not tile 1/2 … 2/2 in ' +
+        'order: a shard no leg names is a part of that suite run by nobody, so give it a leg for each of 1/2 … 2/2, or write no shard ' +
+        'and run the suite whole',
+    ],
+    'the invisible one: the leg reports green having run half the suite, and says 1/2 in its name while the other half is run by nobody',
+  );
+
+  const untiled = structuredClone(shipped);
+  includeOf(untiled)[1].shard = '3/2';
+  assert.deepEqual(legShardDrift(untiled, workspaces), [
+    'the legs for agent-orchestrator on node 24.16.0 in .github/workflows/ci.yml run shards ["1/2","3/2"], which do not tile 1/2 … ' +
+      '2/2 in order: a shard no leg names is a part of that suite run by nobody, so give it a leg for each of 1/2 … 2/2, or write no ' +
+      'shard and run the suite whole',
+  ]);
+
+  for (const value of ['half', '1 of 2', 2]) {
+    const unreadable = structuredClone(shipped);
+    includeOf(unreadable)[1].shard = value;
+    assert.deepEqual(legShardDrift(unreadable, workspaces), [
+      `the leg for agent-orchestrator on node 24.16.0 in .github/workflows/ci.yml names shard ${JSON.stringify(value)}, which is not ` +
+        "<i>/<n>: node --test-shard takes the index of a count, both counting from one, so write it '1/2', or take the shard off the " +
+        'leg and run its suite whole',
+    ]);
+  }
+
+  const beside = structuredClone(shipped);
+  includeOf(beside).push({ workspace: 'agent-orchestrator', node: '24.16.0' });
+  assert.deepEqual(
+    legShardDrift(beside, workspaces),
+    [
+      'the legs for agent-orchestrator on node 24.16.0 in .github/workflows/ci.yml are 3, of which 2 name a shard: a leg beside the ' +
+        'shards runs the whole suite again, so give every leg of that workspace and node a shard of its own, or none of them one',
+    ],
+    'an entry whose shard was forgotten runs the whole suite beside its own halves, which is the slowest the job has ever been and ' +
+      'reads in the summary exactly like a third half',
+  );
+
+  const holeless = workspaces.map((workspace) =>
+    workspace.name === 'agent-orchestrator'
+      ? { ...workspace, test: workspace.test?.replace(' ${WF_TEST_SHARD:+--test-shard=$WF_TEST_SHARD}', '') }
+      : workspace,
+  );
+  assert.notDeepEqual(holeless, workspaces, "the orchestrator's test script carries the shard hole today");
+  assert.deepEqual(
+    legShardDrift(shipped, holeless),
+    [
+      "agent-orchestrator's legs in .github/workflows/ci.yml run shards of its suite and its test script cannot take one: write " +
+        '${WF_TEST_SHARD:+--test-shard=$WF_TEST_SHARD} into that script, after --test and before its globs — node stops reading ' +
+        'options at the first pattern, so a flag appended from outside is read as a file pattern — or every shard runs the whole suite ' +
+        'and the leg reports a half it never ran',
+    ],
+    'the hole is the whole route the fraction travels: without it both halves run the whole suite, slower than one pass was, each ' +
+      'reporting a half it never ran',
+  );
+
+  const late = workspaces.map((workspace) =>
+    workspace.name === 'agent-orchestrator'
+      ? {
+          ...workspace,
+          test:
+            workspace.test?.replace(' ${WF_TEST_SHARD:+--test-shard=$WF_TEST_SHARD}', '') +
+            ' ${WF_TEST_SHARD:+--test-shard=$WF_TEST_SHARD}',
+        }
+      : workspace,
+  );
+  assert.equal(
+    legShardDrift(shipped, late).length,
+    1,
+    'the hole after the globs is read by node as a file pattern, not as a flag, so a script that holds it there cannot take a shard either',
+  );
+
+  const unhanded = structuredClone(shipped);
+  const utc = (unhanded.jobs[LEGS]?.steps ?? []).find((step) => step.env?.TZ === 'UTC');
+  assert.ok(utc?.env !== undefined, 'the UTC run is given its environment today');
+  delete utc.env.WF_TEST_SHARD;
+  assert.deepEqual(legShardDrift(unhanded, workspaces), [
+    "the test job's suite run under TZ=UTC in .github/workflows/ci.yml is not given WF_TEST_SHARD: ${{ matrix.shard }} in its env: " +
+      "without it the script's shard hole expands to nothing and every shard leg runs the whole suite",
+  ]);
+
+  const literal = structuredClone(shipped);
+  const run = (literal.jobs[LEGS]?.steps ?? []).find((step) => step.env?.TZ === 'UTC');
+  run!.env!.WF_TEST_SHARD = '1/2';
+  assert.deepEqual(legShardDrift(literal, workspaces), [
+    "the test job's suite run under TZ=UTC in .github/workflows/ci.yml is given WF_TEST_SHARD: 1/2, not ${{ matrix.shard }}: every " +
+      'leg would run that one shard, and the rest of each suite is run by nobody',
+  ]);
+
+  const unnamed = structuredClone(shipped);
+  const name = unnamed.jobs[LEGS]?.name;
+  assert.ok(name?.includes('${{ matrix.shard }}') === true, "the leg's name names its shard today");
+  unnamed.jobs[LEGS].name = name.replace(' ${{ matrix.shard }}', '');
+  assert.deepEqual(nameDrift(unnamed), [
+    "the test job's name in .github/workflows/ci.yml does not name ${{ matrix.shard }}: two shards of one workspace on one node then " +
+      "read alike in the run's summary, and a person cannot tell which half failed",
+  ]);
+
+  const unsharded = structuredClone(unnamed);
+  unsharded.jobs[LEGS].strategy!.matrix!.include = [];
+  assert.deepEqual(
+    nameDrift(unsharded),
+    [],
+    'the shard is asked of the name only while a leg names one: a card that takes the shards off is not held to a name that reads an ' +
+      'empty expression',
+  );
 });
 
 test('REFUSED: a shard matrix that is not 1..n, a shard taken off no leg, a count written as a literal, more shards than the e2e has pages', () => {

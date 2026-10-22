@@ -19,7 +19,9 @@ holds what every change needs.
 - `npm test` — turbo runs `node --test test/*.test.ts` in every package, and `src/**/*.test.ts` where a package keeps tests beside its
   code, in parallel, with `--continue`; each package runs two test files at a time (`--test-concurrency=2` in its `test` script,
   chosen to keep a suite near 2 GB; `suite.test.ts` holds them equal). Not bare `node --test` from the root, nor a higher bound by
-  hand. To measure, type `npx turbo run test --force --continue`: without `--force` turbo replays a cached pass. Read `Failed:`
+  hand. `agent-orchestrator`'s script takes one knob besides: `WF_TEST_SHARD=<i>/<n>` runs the `<i>`th of `<n>` shards of its suite,
+  which `ci` sets per shard leg of that package (`.github/workflows/ci.yml`); unset — a person's run, a run's check — it runs every
+  file. To measure, type `npx turbo run test --force --continue`: without `--force` turbo replays a cached pass. Read `Failed:`
   first: a file marked `✖` with no failing test inside it is a package turbo interrupted, not a failure of that file.
 - **A step's session runs the tests of what it changed; the run's checks run the whole suite.** The test files about each file it
   changed (beside it, or under its package's `test/` naming it), and for a doc, a skill or a workflow file the tests that read it (grep

@@ -1,5 +1,8 @@
 /**
- * The inbox on disk: `$WF_ROOT/inbox/`, filed, listed and dropped through the verbs, as a person types them.
+ * The inbox on disk: `$WF_ROOT/inbox/`, filed, listed, started and dropped through the verbs, as a person types them — one story on
+ * `story(t)`, and a table of what each verb refuses (`nemia inbox add` and `rm`, and `nemia start` of a card). Kept focused: a card whose
+ * removal fails, or that is gone before it is removed, and a warm read of the inbox. A queued card the tick starts is the story of
+ * `test/queue-store.test.ts`.
  *
  * What a card is and what the listing says are pure, and live in inbox.test.ts. This is the part that is not: the folder, the name a card
  * is filed under, and the run records a listing reads. `WF_ROOT` is set before the import, since the module reads it as it loads, and
@@ -15,6 +18,7 @@ import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven } from '../../test/placed.ts';
 import { heldUnasked } from '../../test/unasked.ts';
+import { story } from '../../test/story.ts';
 
 const ROOT = scratch('wf-inbox-');
 const INBOX = path.join(ROOT, 'inbox');
@@ -109,538 +113,641 @@ const writeRecord = (id: string, from?: Run['from']) =>
     }),
   );
 
-test('the inbox is `$WF_ROOT/inbox/`, beside runs/ — and with no folder yet, `nemia inbox` says it is empty', async (t) => {
-  emptyInbox();
-  assert.equal(inboxDir(), path.join(ROOT, 'inbox'));
-  assert.deepEqual(readInbox(), []);
-  assert.deepEqual(await printedBy(t, 'inbox'), ['the inbox is empty — park an idea with nemia inbox add "<idea>"']);
-  assert.match((await printedBy(t, 'inbox', '--help'))[0], /^nemia inbox$/);
-  assert.ok(
-    (await printedBy(t, 'help')).some((l) => l.startsWith('  nemia inbox add "<idea>"|<file> [--workflow <name>] [--repo <path>]')),
-    'on the general help',
+test('a person parks ideas in the inbox, lists them, starts them and drops them', async (top) => {
+  const s = story(top);
+  await s.test('the inbox is `$WF_ROOT/inbox/`, beside runs/ — and with no folder yet, `nemia inbox` says it is empty', async (t) => {
+    emptyInbox();
+    assert.equal(inboxDir(), path.join(ROOT, 'inbox'));
+    assert.deepEqual(readInbox(), []);
+    assert.deepEqual(await printedBy(t, 'inbox'), ['the inbox is empty — park an idea with nemia inbox add "<idea>"']);
+    assert.match((await printedBy(t, 'inbox', '--help'))[0], /^nemia inbox$/);
+    assert.ok(
+      (await printedBy(t, 'help')).some((l) => l.startsWith('  nemia inbox add "<idea>"|<file> [--workflow <name>] [--repo <path>]')),
+      'on the general help',
+    );
+  });
+  await s.test(
+    '`nemia inbox add` files a card under the slug of its first line and a suffix — two ideas alike are two cards — `--workflow` and `--repo` write its keys, a file is read as a card when its frontmatter is one; `nemia inbox` lists each, with started as for a card a record names',
+    async (t) => {
+      emptyInbox();
+      const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
+      const added = await printedBy(t, 'inbox', 'add', "Cache the engine's views between passes\n\nThe tick reads each task twice.");
+      const [name] = inInbox();
+      assert.match(name, /^cache-the-engine-s-views-bet-[a-z0-9]{4}\.md$/, 'the slug runId makes of the first line, suffix included');
+      const card = path.join(INBOX, name);
+      assert.equal(
+        fs.readFileSync(card, 'utf8'),
+        "Cache the engine's views between passes\n\nThe tick reads each task twice.\n",
+        'no keys, no frontmatter',
+      );
+      assert.deepEqual(added, [
+        `${name.slice(0, -3)}  Cache the engine's views between passes`,
+        `filed: ${card} — start it with nemia start ${card} --workflows <w>`,
+      ]);
+
+      await printedBy(
+        t,
+        'inbox',
+        'add',
+        "Cache the engine's views between passes",
+        '--workflow',
+        'dev',
+        `--repo=${path.relative(process.cwd(), repo)}`,
+      );
+      const second = inInbox().find((f) => f !== name)!;
+      assert.ok(second && second !== name, 'a second card, not the first written over');
+      assert.equal(
+        fs.readFileSync(path.join(INBOX, second), 'utf8'),
+        `---\nworkflow: dev\nrepo: ${repo}\n---\nCache the engine's views between passes\n`,
+        '--repo written absolute',
+      );
+
+      const given = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'idea.md');
+      fs.writeFileSync(given, `---\nworkflow: ui\nrepo: /nowhere/at/all\n---\nShow the flag on the settings page.\n`);
+      await printedBy(t, 'inbox', 'add', given, '--repo', repo);
+      const third = inInbox().find((f) => f.startsWith('show-the-flag'))!;
+      assert.equal(
+        fs.readFileSync(path.join(INBOX, third), 'utf8'),
+        `---\nworkflow: ui\nrepo: ${repo}\n---\nShow the flag on the settings page.\n`,
+        "a file's card keys are read, and --repo written over its own",
+      );
+      assert.equal(fs.readFileSync(given, 'utf8').includes('/nowhere/at/all'), true, 'the file given is left as it was');
+      const byPath = addToInbox({ text: 'Store the flag', workflow: path.join(repo, 'workflows', 'dev') });
+      assert.equal(byPath.card.workflow, path.join(repo, 'workflows', 'dev'), 'a workflow given as a path is kept absolute');
+      const relative = path.relative(process.cwd(), path.join(repo, 'workflows', 'ui'));
+      assert.match(relative, /\//, 'a path, not a name');
+      await printedBy(t, 'inbox', 'add', 'Store the flag by path', '--workflow', relative);
+      const fourth = inInbox().find((f) => f.startsWith('store-the-flag-by-path'))!;
+      assert.equal(
+        fs.readFileSync(path.join(INBOX, fourth), 'utf8'),
+        `---\nworkflow: ${path.join(repo, 'workflows', 'ui')}\n---\nStore the flag by path\n`,
+        '--workflow given as a path from here is written absolute, so the inbox reads the same folder',
+      );
+      fs.rmSync(path.join(INBOX, fourth));
+
+      writeRecord('show-the-flag-on-the-settin-zz99', { inbox: third.slice(0, -3) });
+      writeRecord('an-unrelated-run-yy88');
+      fs.writeFileSync(path.join(INBOX, 'broken-a1b2.md'), '---\nharness: codex\n---\nx\n');
+      fs.writeFileSync(path.join(INBOX, 'notes.txt'), 'x');
+      fs.writeFileSync(path.join(INBOX, '.idea.md.swp'), 'x');
+      fs.writeFileSync(path.join(INBOX, 'README.md'), '# ideas\n');
+      const listed = readInbox();
+      assert.deepEqual(
+        listed.map((l) => [l.name, l.startedAs, l.error === null]),
+        [
+          ['broken-a1b2', [], false],
+          [name.slice(0, -3), [], true],
+          [second.slice(0, -3), [], true],
+          ['notes.txt', [], false],
+          [third.slice(0, -3), ['show-the-flag-on-the-settin-zz99'], true],
+          [byPath.card.name, [], true],
+        ].sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
+        'started, broken and non-card listed; hidden and README not',
+      );
+      const lines = await printedBy(t, 'inbox');
+      assert.ok(
+        lines.some((l) =>
+          new RegExp(
+            `^${escaped(second.slice(0, -3))} +Cache the engine's views between passes  workflow: dev  repo: ${escaped(repo)}$`,
+          ).test(l),
+        ),
+        lines.join('\n'),
+      );
+      assert.ok(
+        lines.some((l) =>
+          new RegExp(
+            `^${escaped(third.slice(0, -3))} +Show the flag on the settings page\\.  workflow: ui  repo: ${escaped(repo)}  started as show-the-flag-on-the-settin-zz99$`,
+          ).test(l),
+        ),
+        lines.join('\n'),
+      );
+      assert.ok(
+        lines.some((l) => /^broken-a1b2 +broken-a1b2\.md: `harness` is not a key an inbox card has\./.test(l)),
+        lines.join('\n'),
+      );
+      assert.deepEqual(lines.slice(-2), [
+        '',
+        `start one: nemia start ${path.join(INBOX, '<name>.md')} [--workflows <w>] [--repo <r>] [--factory <f>] — queue one: nemia inbox queue <name> — drop one: nemia inbox rm <name>`,
+      ]);
+      fs.rmSync(path.join(ROOT, 'runs', 'show-the-flag-on-the-settin-zz99.json'));
+      fs.rmSync(path.join(ROOT, 'runs', 'an-unrelated-run-yy88.json'));
+    },
+  );
+  await s.test("`nemia inbox add --factory` files a card that names its factory, over the text's own, and says it", async (t) => {
+    emptyInbox();
+    const { card, file } = addToInbox({ text: 'Build the page', factory: 'pipao' });
+    assert.equal(card.factory, 'pipao');
+    assert.equal(fs.readFileSync(file, 'utf8'), '---\nfactory: pipao\n---\nBuild the page\n');
+    const idea = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'idea.md');
+    fs.writeFileSync(idea, '---\nfactory: nemia\nworkflow: build\n---\nShip it\n');
+    const printed = await printedBy(t, 'inbox', 'add', idea, '--factory', 'pipao');
+    const [name] = printed[0].split('  ');
+    assert.equal(printed[0], `${name}  Ship it  workflow: build  factory: pipao`);
+    assert.equal(fs.readFileSync(path.join(INBOX, `${name}.md`), 'utf8'), '---\nworkflow: build\nfactory: pipao\n---\nShip it\n');
+    assert.equal(readInbox().find((l) => l.name === name)?.factory, 'pipao');
+  });
+  await s.test(
+    "`nemia inbox add <file>` writes a path in the file's own `workflow:` absolute against the file's folder, so the card starts on the workflow the file meant — not on the store's workflow of that name, read from the inbox",
+    async (t) => {
+      emptyInbox();
+      const repo = aRepoWith('dev');
+      const theStores = path.join(ROOT, 'workflows', 'dev');
+      fs.mkdirSync(theStores, { recursive: true });
+      fs.writeFileSync(path.join(theStores, 'implement.md'), "the store's own\n");
+      fs.mkdirSync(path.join(repo, 'plans'));
+      const idea = path.join(repo, 'plans', 'idea.md');
+      fs.writeFileSync(idea, `---\nworkflow: ../workflows/dev\nrepo: ${repo}\n---\nCache the views between passes\n`);
+      try {
+        await printedBy(t, 'inbox', 'add', idea);
+        const [filed] = inInbox();
+        assert.equal(
+          fs.readFileSync(path.join(INBOX, filed), 'utf8'),
+          `---\nworkflow: ${path.join(repo, 'workflows', 'dev')}\nrepo: ${repo}\n---\nCache the views between passes\n`,
+        );
+        const run = readRun((await printedBy(t, 'start', path.join(INBOX, filed)))[0].split(' ')[0]);
+        assert.equal(
+          run.workflowDir,
+          path.join(repo, 'workflows', 'dev'),
+          "the workflow the file meant, not the store's of the same name, which ../workflows/dev names when read from the inbox",
+        );
+        assert.equal(fs.readFileSync(idea, 'utf8').includes('workflow: ../workflows/dev'), true, 'the file given is left as it was');
+      } finally {
+        fs.rmSync(path.join(ROOT, 'workflows'), { recursive: true, force: true });
+      }
+    },
+  );
+  await s.test(
+    '`nemia inbox rm` drops a card without starting it — a name with no card is normal: it says so, and which cards there are, exit 0',
+    async (t) => {
+      emptyInbox();
+      const { card, file } = addToInbox({ text: 'Drop me' });
+      const kept = addToInbox({ text: 'Keep me' });
+      assert.deepEqual(await printedBy(t, 'inbox', 'rm', card.name), [`${card.name}  dropped, and nothing started — ${file} removed`]);
+      assert.equal(fs.existsSync(file), false);
+      assert.deepEqual(dropFromInbox(card.name), { removed: false, cards: [kept.card.name] });
+      assert.deepEqual(await printedBy(t, 'inbox', 'rm', card.name), [
+        `no card ${card.name} in the inbox. Its cards are: ${kept.card.name}. Nothing to drop.`,
+      ]);
+      assert.deepEqual(await printedBy(t, 'inbox', 'rm', `${kept.card.name}.md`), [
+        `no card ${kept.card.name}.md in the inbox. A card is named without its .md: \`${kept.card.name}\`. Its cards are: ${kept.card.name}. Nothing to drop.`,
+      ]);
+      assert.ok(fs.existsSync(kept.file), 'the other card is left');
+      emptyInbox();
+      assert.deepEqual(await printedBy(t, 'inbox', 'rm', 'anything'), [
+        'no card anything in the inbox. The inbox is empty. Nothing to drop.',
+      ]);
+    },
+  );
+  await s.test(
+    "`nemia start <inbox>/<name>.md` starts the card — its body the brief, its `workflow:` found in its `repo:` — writes `from` on the record and removes the card; `nemia decide` names the card under the run's line; a plan's card started so stays where it is",
+    async (t) => {
+      emptyInbox();
+      const repo = aRepoWith('dev', 'ui');
+      const { card, file } = addToInbox({
+        text: 'Cache the views between passes\n\nThe tick reads each task twice.',
+        workflow: 'dev',
+        repo,
+      });
+      const printed = await printedBy(t, 'start', file);
+      const id = printed[0].split(' ')[0];
+      assert.match(id, /^cache-the-views-between-pass-[a-z0-9]{4}$/, 'the run id from the body');
+      const run = readRun(id);
+      assert.deepEqual(
+        [run.brief, run.repo, run.workflowDir, run.from],
+        [
+          'Cache the views between passes\n\nThe tick reads each task twice.',
+          repo,
+          path.join(repo, 'workflows', 'dev'),
+          { inbox: card.name },
+        ],
+      );
+      assert.deepEqual(printed.slice(0, 3), [
+        `${id}  1 step(s): implement`,
+        `from inbox card ${card.name} — removed from the inbox`,
+        `workspace: ${repo}`,
+      ]);
+      assert.equal(fs.existsSync(file), false, 'the card left the inbox');
+      assert.deepEqual(readInbox(), []);
+      const decided = await printedBy(t, 'decide', id);
+      assert.deepEqual(decided.slice(0, 2), [`${id}  Cache the views between passes`, `  from inbox card ${card.name}`]);
+      const typed = await runPlaced(startRun({ brief: 'typed', repo, workflowDir: path.join(repo, 'workflows', 'dev') }));
+      assert.equal(
+        Object.hasOwn(JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${typed.id}.json`), 'utf8')), 'from'),
+        false,
+        'a run typed at nemia start carries no from',
+      );
+      assert.doesNotMatch((await printedBy(t, 'decide', typed.id)).join('\n'), /from inbox card/, 'and its decide screen names no card');
+
+      const plan = fs.mkdtempSync(path.join(ROOT, 'plan-'));
+      fs.writeFileSync(path.join(plan, 'a.md'), '---\nworkflow: dev\n---\nParse the flag\n');
+      const planned = readRun((await printedBy(t, 'start', path.join(plan, 'a.md'), '--repo', repo))[0].split(' ')[0]);
+      assert.deepEqual(
+        [planned.brief, planned.from],
+        ['Parse the flag', undefined],
+        "a plan's card is started by nemia start, with no from",
+      );
+      assert.ok(fs.existsSync(path.join(plan, 'a.md')), "the plan's card stays");
+    },
+  );
+  await s.test('`nemia start <inbox>/<name>`, the name as `nemia inbox` lists it, starts the card as `<name>.md` does', async (t) => {
+    emptyInbox();
+    const repo = aRepoWith('dev');
+    const { card, file } = addToInbox({ text: 'Cache the views between passes', workflow: 'dev', repo });
+    const other = addToInbox({ text: 'Show the flag', workflow: 'dev', repo });
+
+    const printed = await printedBy(t, 'start', path.join(INBOX, card.name));
+    const run = readRun(printed[0].split(' ')[0]);
+    assert.deepEqual(
+      [run.brief, run.workflowDir, run.from],
+      ['Cache the views between passes', path.join(repo, 'workflows', 'dev'), { inbox: card.name }],
+    );
+    assert.equal(printed[1], `from inbox card ${card.name} — removed from the inbox`);
+    assert.equal(fs.existsSync(file), false, 'the card left the inbox');
+    assert.ok(fs.existsSync(other.file), 'and the other card is where it was');
+  });
+  await s.test(
+    "a start says what the card does not, over what it does: --workflows over `workflow:`, --repo over `repo:`, the caller's repository without either, --brief in place of the body, and --after to wait on",
+    async (t) => {
+      emptyInbox();
+      const repo = aRepoWith('dev');
+      const other = aRepoWith('ui');
+      const mine = fs.mkdtempSync(path.join(ROOT, 'mine-'));
+      fs.writeFileSync(path.join(mine, 'implement.md'), '---\nplace: git\n---\nimplement it, mine\n');
+
+      const over = addToInbox({ text: 'Show the flag', workflow: 'dev', repo });
+      const run = readRun(
+        (
+          await printedBy(
+            t,
+            'start',
+            over.file,
+            '--workflows',
+            mine,
+            '--repo',
+            other,
+            '--brief',
+            'Show the flag on the settings page, beside the theme toggle.',
+          )
+        )[0].split(' ')[0],
+      );
+      assert.deepEqual(
+        [run.workflowDir, run.repo, run.brief, run.from],
+        [mine, other, 'Show the flag on the settings page, beside the theme toggle.', { inbox: over.card.name }],
+      );
+      assert.match(run.id, /^show-the-flag-on-the-setting-[a-z0-9]{4}$/, 'the id from the brief it was started with');
+
+      const bare = addToInbox({ text: 'Store the flag', workflow: 'ui' });
+      const cwd = process.cwd();
+      process.chdir(other);
+      let here: Run;
+      try {
+        here = readRun((await printedBy(t, 'start', bare.file))[0].split(' ')[0]);
+      } finally {
+        process.chdir(cwd);
+      }
+      assert.deepEqual(
+        [here.repo, here.workflowDir],
+        [fs.realpathSync(other), path.join(fs.realpathSync(other), 'workflows', 'ui')],
+        "no repo: on the card and none given: the caller's, nemia start's `.`, and its workflow: found there, by name",
+      );
+      const given = addToInbox({ text: 'Document the flag' });
+      const byBoard = await runPlaced(
+        startFromInbox({ name: given.card.name, workflow: path.join(repo, 'workflows', 'dev'), callerRepo: repo }),
+      );
+      assert.deepEqual([byBoard.run.repo, byBoard.run.workflowDir, byBoard.removed], [repo, path.join(repo, 'workflows', 'dev'), true]);
+
+      const brief = path.join(mine, 'work.md');
+      fs.writeFileSync(brief, 'Parse the flag in cli.ts.\n');
+      const waits = addToInbox({ text: 'Parse the flag', workflow: 'dev', repo });
+      const child = readRun((await printedBy(t, 'start', waits.file, '--brief', brief, '--after', byBoard.run.id))[0].split(' ')[0]);
+      assert.deepEqual(
+        [child.brief, child.after, child.from],
+        ['Parse the flag in cli.ts.', [byBoard.run.id], { inbox: waits.card.name }],
+        'a brief from a file, and what the card waits on, said at start',
+      );
+    },
+  );
+  await s.test(
+    "a card's `from:` is set and taken off by `nemia inbox from`, and its run is handed it as context before `--from`'s, a run both name once",
+    async (t) => {
+      emptyInbox();
+      const repo = aRepoWith('dev');
+      writeRecord('source-a1');
+      writeRecord('source-b2');
+      const card = addToInbox({ text: 'Read the sources', workflow: 'dev', repo });
+      const set = await printedBy(t, 'inbox', 'from', card.card.name, 'source-a1');
+      assert.match(set[0], /from: source-a1 — its run is handed what each concluded, as context, and waits on none/);
+      assert.match(fs.readFileSync(card.file, 'utf8'), /^from: source-a1$/m);
+      const off = await printedBy(t, 'inbox', 'from', card.card.name, '--off');
+      assert.match(off[0], /from: taken off \(was source-a1\)/);
+      assert.doesNotMatch(fs.readFileSync(card.file, 'utf8'), /^from:/m);
+
+      await printedBy(t, 'inbox', 'from', card.card.name, 'source-a1');
+
+      const started = await runPlaced(
+        startFromInbox({
+          name: card.card.name,
+          workflow: path.join(repo, 'workflows', 'dev'),
+          callerRepo: repo,
+          context: ['source-b2', 'source-a1'],
+        }),
+      );
+      assert.deepEqual(readRun(started.run.id).context, ['source-a1', 'source-b2']);
+      assert.equal(readRun(started.run.id).after, undefined, 'it waits on none');
+    },
+  );
+  await s.test(
+    "a plan's card is started by `nemia start <card>.md` — its id from the body, its `workflow:` found from its plan folder, --workflows over it; a card whose `after:` names cards starts only with --after; a frontmatter a card lacks is refused naming nemia inbox add, and a rule never closed is taken whole",
+    async (t) => {
+      const repo = aRepoWith('dev');
+      const dev = path.join(repo, 'workflows', 'dev');
+      const other = fs.mkdtempSync(path.join(ROOT, 'one-'));
+      fs.writeFileSync(path.join(other, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
+      const plan = fs.mkdtempSync(path.join(ROOT, 'plan-'));
+      const card = (keys: string, body: string) => `---\n${keys}\n---\n${body}\n`;
+      fs.writeFileSync(path.join(plan, 'a.md'), card('workflow: dev', 'Parse the flag option in cli'));
+      fs.writeFileSync(
+        path.join(plan, 'b.md'),
+        card(`# by a path from the plan folder\nworkflow: ${path.relative(plan, other)}`, 'Document the flag'),
+      );
+      fs.writeFileSync(path.join(plan, 'd.md'), card('workflow: dev\nafter: a, b', 'Show the flag'));
+      const startedBy = async (...argv: string[]) => readRun((await printedBy(t, 'start', ...argv))[0].split(' ')[0]);
+
+      const a = await startedBy(path.join(plan, 'a.md'), '--repo', repo);
+      assert.deepEqual(
+        [a.brief, a.workflowDir],
+        ['Parse the flag option in cli', dev],
+        'the body, and workflow: dev found as nemia plan finds it',
+      );
+      assert.match(a.id, /^parse-the-flag-option-in-cli-[a-z0-9]{4}$/);
+      const second = await startedBy(path.join(plan, 'b.md'), '--repo', repo);
+      assert.deepEqual(
+        [second.brief, second.workflowDir],
+        ['Document the flag', other],
+        'a path from the plan folder, not from where nemia start is typed',
+      );
+      assert.equal(
+        (await startedBy(path.join(plan, 'a.md'), '--repo', repo, '--workflows', other)).workflowDir,
+        other,
+        '--workflows over the card',
+      );
+
+      const before = runsWritten();
+      await assert.rejects(
+        main(['start', path.join(plan, 'd.md'), '--repo', repo], noEngine()),
+        refusedWith(
+          'Invalid',
+          `${path.join(plan, 'd.md')}: \`after: a, b\``,
+          `nemia start ${path.join(plan, 'd.md')} --after <a's run id> --after <b's run id>`,
+        ),
+      );
+      assert.equal(runsWritten(), before, 'no run written');
+      const d = await startedBy(path.join(plan, 'd.md'), '--workflows', dev, '--repo', repo, '--after', a.id, '--after', second.id);
+      assert.deepEqual([d.brief, d.after], ['Show the flag', [a.id, second.id]]);
+
+      const brief = path.join(fs.mkdtempSync(path.join(ROOT, 'brief-')), 'brief.md');
+      fs.writeFileSync(brief, '---\ntitle: the flag\nworkflow: dev\n---\nParse the flag.\n');
+      const unstarted = runsWritten();
+      await assert.rejects(
+        main(['start', brief, '--repo', repo, '--workflows', dev], noEngine()),
+        refusedWith('Invalid', `${brief}: \`title\``, "a plan's card", `nemia inbox add ${brief}`),
+      );
+      assert.equal(runsWritten(), unstarted, 'a frontmatter block is never started as the brief: no run written');
+      fs.writeFileSync(brief, '---\nA brief that opens with a rule.\n');
+      assert.equal(
+        (await startedBy(brief, '--repo', repo, '--workflows', dev)).brief,
+        '---\nA brief that opens with a rule.',
+        'and so is one that opens with a rule and never closes it',
+      );
+    },
   );
 });
 
-test('`nemia inbox add` files a card under the slug of its first line and a suffix — two ideas alike are two cards — `--workflow` and `--repo` write its keys, a file is read as a card when its frontmatter is one; `nemia inbox` lists each, with started as for a card a record names', async (t) => {
-  emptyInbox();
-  const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-  const added = await printedBy(t, 'inbox', 'add', "Cache the engine's views between passes\n\nThe tick reads each task twice.");
-  const [name] = inInbox();
-  assert.match(name, /^cache-the-engine-s-views-bet-[a-z0-9]{4}\.md$/, 'the slug runId makes of the first line, suffix included');
-  const card = path.join(INBOX, name);
-  assert.equal(
-    fs.readFileSync(card, 'utf8'),
-    "Cache the engine's views between passes\n\nThe tick reads each task twice.\n",
-    'no keys, no frontmatter',
-  );
-  assert.deepEqual(added, [
-    `${name.slice(0, -3)}  Cache the engine's views between passes`,
-    `filed: ${card} — start it with nemia start ${card} --workflows <w>`,
-  ]);
-
-  await printedBy(
-    t,
-    'inbox',
-    'add',
-    "Cache the engine's views between passes",
-    '--workflow',
-    'dev',
-    `--repo=${path.relative(process.cwd(), repo)}`,
-  );
-  const second = inInbox().find((f) => f !== name)!;
-  assert.ok(second && second !== name, 'a second card, not the first written over');
-  assert.equal(
-    fs.readFileSync(path.join(INBOX, second), 'utf8'),
-    `---\nworkflow: dev\nrepo: ${repo}\n---\nCache the engine's views between passes\n`,
-    '--repo written absolute',
-  );
-
-  const given = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'idea.md');
-  fs.writeFileSync(given, `---\nworkflow: ui\nrepo: /nowhere/at/all\n---\nShow the flag on the settings page.\n`);
-  await printedBy(t, 'inbox', 'add', given, '--repo', repo);
-  const third = inInbox().find((f) => f.startsWith('show-the-flag'))!;
-  assert.equal(
-    fs.readFileSync(path.join(INBOX, third), 'utf8'),
-    `---\nworkflow: ui\nrepo: ${repo}\n---\nShow the flag on the settings page.\n`,
-    "a file's card keys are read, and --repo written over its own",
-  );
-  assert.equal(fs.readFileSync(given, 'utf8').includes('/nowhere/at/all'), true, 'the file given is left as it was');
-  const byPath = addToInbox({ text: 'Store the flag', workflow: path.join(repo, 'workflows', 'dev') });
-  assert.equal(byPath.card.workflow, path.join(repo, 'workflows', 'dev'), 'a workflow given as a path is kept absolute');
-  const relative = path.relative(process.cwd(), path.join(repo, 'workflows', 'ui'));
-  assert.match(relative, /\//, 'a path, not a name');
-  await printedBy(t, 'inbox', 'add', 'Store the flag by path', '--workflow', relative);
-  const fourth = inInbox().find((f) => f.startsWith('store-the-flag-by-path'))!;
-  assert.equal(
-    fs.readFileSync(path.join(INBOX, fourth), 'utf8'),
-    `---\nworkflow: ${path.join(repo, 'workflows', 'ui')}\n---\nStore the flag by path\n`,
-    '--workflow given as a path from here is written absolute, so the inbox reads the same folder',
-  );
-  fs.rmSync(path.join(INBOX, fourth));
-
-  writeRecord('show-the-flag-on-the-settin-zz99', { inbox: third.slice(0, -3) });
-  writeRecord('an-unrelated-run-yy88');
-  fs.writeFileSync(path.join(INBOX, 'broken-a1b2.md'), '---\nharness: codex\n---\nx\n');
-  fs.writeFileSync(path.join(INBOX, 'notes.txt'), 'x');
-  fs.writeFileSync(path.join(INBOX, '.idea.md.swp'), 'x');
-  fs.writeFileSync(path.join(INBOX, 'README.md'), '# ideas\n');
-  const listed = readInbox();
-  assert.deepEqual(
-    listed.map((l) => [l.name, l.startedAs, l.error === null]),
-    [
-      ['broken-a1b2', [], false],
-      [name.slice(0, -3), [], true],
-      [second.slice(0, -3), [], true],
-      ['notes.txt', [], false],
-      [third.slice(0, -3), ['show-the-flag-on-the-settin-zz99'], true],
-      [byPath.card.name, [], true],
-    ].sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
-    'started, broken and non-card listed; hidden and README not',
-  );
-  const lines = await printedBy(t, 'inbox');
-  assert.ok(
-    lines.some((l) =>
-      new RegExp(`^${escaped(second.slice(0, -3))} +Cache the engine's views between passes  workflow: dev  repo: ${escaped(repo)}$`).test(
-        l,
-      ),
-    ),
-    lines.join('\n'),
-  );
-  assert.ok(
-    lines.some((l) =>
-      new RegExp(
-        `^${escaped(third.slice(0, -3))} +Show the flag on the settings page\\.  workflow: ui  repo: ${escaped(repo)}  started as show-the-flag-on-the-settin-zz99$`,
-      ).test(l),
-    ),
-    lines.join('\n'),
-  );
-  assert.ok(
-    lines.some((l) => /^broken-a1b2 +broken-a1b2\.md: `harness` is not a key an inbox card has\./.test(l)),
-    lines.join('\n'),
-  );
-  assert.deepEqual(lines.slice(-2), [
-    '',
-    `start one: nemia start ${path.join(INBOX, '<name>.md')} [--workflows <w>] [--repo <r>] [--factory <f>] — queue one: nemia inbox queue <name> — drop one: nemia inbox rm <name>`,
-  ]);
-  fs.rmSync(path.join(ROOT, 'runs', 'show-the-flag-on-the-settin-zz99.json'));
-  fs.rmSync(path.join(ROOT, 'runs', 'an-unrelated-run-yy88.json'));
-});
-
-test("`nemia inbox add --factory` files a card that names its factory, over the text's own, and says it — REFUSED by name: a name that is not a factory's, and the flag twice; nothing filed", async (t) => {
-  emptyInbox();
-  const { card, file } = addToInbox({ text: 'Build the page', factory: 'pipao' });
-  assert.equal(card.factory, 'pipao');
-  assert.equal(fs.readFileSync(file, 'utf8'), '---\nfactory: pipao\n---\nBuild the page\n');
-  const idea = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'idea.md');
-  fs.writeFileSync(idea, '---\nfactory: nemia\nworkflow: build\n---\nShip it\n');
-  const printed = await printedBy(t, 'inbox', 'add', idea, '--factory', 'pipao');
-  const [name] = printed[0].split('  ');
-  assert.equal(printed[0], `${name}  Ship it  workflow: build  factory: pipao`);
-  assert.equal(fs.readFileSync(path.join(INBOX, `${name}.md`), 'utf8'), '---\nworkflow: build\nfactory: pipao\n---\nShip it\n');
-  assert.equal(readInbox().find((l) => l.name === name)?.factory, 'pipao');
-
-  emptyInbox();
-  assert.throws(
-    () => addToInbox({ text: 'an idea', factory: 'Pipao' }),
-    refusedWith('Invalid', '`factory: Pipao`', 'pipao, say', 'nemia factory ls'),
-  );
-  await assert.rejects(
-    main(['inbox', 'add', 'an idea', '--factory', 'pipao', '--factory', 'nemia'], noEngine()),
-    refusedWith('Invalid', 'nemia inbox add takes --factory once'),
-  );
-  assert.deepEqual(inInbox(), [], 'nothing filed');
-});
-
-test('`nemia inbox rm` drops a card without starting it — a name with no card is normal: it says so, and which cards there are, exit 0', async (t) => {
-  emptyInbox();
-  const { card, file } = addToInbox({ text: 'Drop me' });
-  const kept = addToInbox({ text: 'Keep me' });
-  assert.deepEqual(await printedBy(t, 'inbox', 'rm', card.name), [`${card.name}  dropped, and nothing started — ${file} removed`]);
-  assert.equal(fs.existsSync(file), false);
-  assert.deepEqual(dropFromInbox(card.name), { removed: false, cards: [kept.card.name] });
-  assert.deepEqual(await printedBy(t, 'inbox', 'rm', card.name), [
-    `no card ${card.name} in the inbox. Its cards are: ${kept.card.name}. Nothing to drop.`,
-  ]);
-  assert.deepEqual(await printedBy(t, 'inbox', 'rm', `${kept.card.name}.md`), [
-    `no card ${kept.card.name}.md in the inbox. A card is named without its .md: \`${kept.card.name}\`. Its cards are: ${kept.card.name}. Nothing to drop.`,
-  ]);
-  assert.ok(fs.existsSync(kept.file), 'the other card is left');
-  emptyInbox();
-  assert.deepEqual(await printedBy(t, 'inbox', 'rm', 'anything'), ['no card anything in the inbox. The inbox is empty. Nothing to drop.']);
-});
-
-test('REFUSED by name at shipped defaults: `nemia inbox add` with no idea, an empty one, a directory, a file whose card has `after:`, a repo that is not a directory, a flag with no value or twice — and `nemia inbox rm` with a name that would leave the inbox, a hidden one, none, or two; nothing filed, nothing removed', async () => {
+test('REFUSED by name at shipped defaults: `nemia inbox add` and `nemia inbox rm` — nothing filed, nothing removed', async (t) => {
   emptyInbox();
   const add = (...argv: string[]) => main(['inbox', 'add', ...argv], noEngine());
-  await assert.rejects(
-    add(),
-    refusedWith('Invalid', 'takes the idea, first', 'nemia inbox add "<idea>"', '[--factory <name>]', 'nemia inbox add ./idea.md'),
-  );
-  await assert.rejects(add('--workflow', 'dev'), refusedWith('Invalid', 'takes the idea, first', 'nemia inbox add "<idea>"'));
-  await assert.rejects(add(''), refusedWith('Invalid', 'the idea has nothing in it', 'nemia inbox add "<idea>"'));
-  await assert.rejects(add('   '), refusedWith('Invalid', 'the idea has nothing in it', 'nemia inbox add "<idea>"'));
+  const rm = (...argv: string[]) => main(['inbox', 'rm', ...argv], noEngine());
   const dir = fs.mkdtempSync(path.join(ROOT, 'given-'));
   const empty = path.join(dir, 'empty.md');
   fs.writeFileSync(empty, '\n');
-  await assert.rejects(add(empty), refusedWith('Invalid', `${empty} has nothing in it`, 'nemia inbox add ./idea.md'));
-  await assert.rejects(add(dir), refusedWith('Invalid', `${dir} is a directory`, 'nemia inbox add ./idea.md'));
   const waits = path.join(dir, 'd.md');
   fs.writeFileSync(waits, '---\nworkflow: dev\nafter: b, c\n---\nShow the flag.\n');
-  await assert.rejects(add(waits), refusedWith('Invalid', `${waits}: \`after\``, 'nemia start <inbox>/<name>.md --after <runId>'));
-  await assert.rejects(add('an idea', '--repo', empty), refusedWith('Invalid', `\`repo: ${empty}\` names no directory`));
-  await assert.rejects(
-    add('an idea', '--repo', path.join(ROOT, 'no-such-repo')),
-    refusedWith('Invalid', `\`repo: ${path.join(ROOT, 'no-such-repo')}\` names no directory`),
-  );
-  assert.throws(
-    () => addToInbox({ text: 'an idea', repo: 'code/app' }),
-    refusedWith('Invalid', '`repo: code/app` is not an absolute path', '`repo: /home/me/code/app`'),
-  );
-  await assert.rejects(add('an idea', '--workflow'), refusedWith('Invalid', 'nemia inbox add "<idea>" --workflow <name>'));
-  await assert.rejects(add('an idea', '--workflow='), refusedWith('Invalid', 'nemia inbox add "<idea>" --workflow <name>'));
-  await assert.rejects(add('an idea', '--repo', ROOT, '--repo', ROOT), refusedWith('Invalid', 'nemia inbox add takes --repo once'));
-  await assert.rejects(
-    add('an idea', '--workflows', 'dev'),
-    refusedWith('Invalid', 'does not take --workflows', '--workflow <name>', '--repo <path>', '--factory <name>'),
-  );
-  await assert.rejects(add('an', 'idea'), refusedWith('Invalid', 'idea is a second', 'nemia inbox add "<idea>"'));
-  assert.deepEqual(inInbox(), [], 'nothing filed');
+  const gone = path.join(ROOT, 'no-such-repo');
+  const adds: Record<string, [() => unknown, ...named: string[]]> = {
+    'no idea': [() => add(), 'takes the idea, first', 'nemia inbox add "<idea>"', '[--factory <name>]', 'nemia inbox add ./idea.md'],
+    'a flag and no idea': [() => add('--workflow', 'dev'), 'takes the idea, first', 'nemia inbox add "<idea>"'],
+    'an empty idea': [() => add(''), 'the idea has nothing in it', 'nemia inbox add "<idea>"'],
+    'an idea of spaces': [() => add('   '), 'the idea has nothing in it', 'nemia inbox add "<idea>"'],
+    'an empty file': [() => add(empty), `${empty} has nothing in it`, 'nemia inbox add ./idea.md'],
+    'a directory': [() => add(dir), `${dir} is a directory`, 'nemia inbox add ./idea.md'],
+    'a file whose card has `after:`': [() => add(waits), `${waits}: \`after\``, 'nemia start <inbox>/<name>.md --after <runId>'],
+    'a repo that is a file': [() => add('an idea', '--repo', empty), `\`repo: ${empty}\` names no directory`],
+    'a repo that is not there': [() => add('an idea', '--repo', gone), `\`repo: ${gone}\` names no directory`],
+    'a repo given not absolute, to addToInbox': [
+      () => addToInbox({ text: 'an idea', repo: 'code/app' }),
+      '`repo: code/app` is not an absolute path',
+      '`repo: /home/me/code/app`',
+    ],
+    '--workflow with no value': [() => add('an idea', '--workflow'), 'nemia inbox add "<idea>" --workflow <name>'],
+    '--workflow= empty': [() => add('an idea', '--workflow='), 'nemia inbox add "<idea>" --workflow <name>'],
+    '--repo twice': [() => add('an idea', '--repo', ROOT, '--repo', ROOT), 'nemia inbox add takes --repo once'],
+    '--workflows, a flag of nemia start': [
+      () => add('an idea', '--workflows', 'dev'),
+      'does not take --workflows',
+      '--workflow <name>',
+      '--repo <path>',
+      '--factory <name>',
+    ],
+    'two ideas': [() => add('an', 'idea'), 'idea is a second', 'nemia inbox add "<idea>"'],
+    "a factory that is not a factory's name, to addToInbox": [
+      () => addToInbox({ text: 'an idea', factory: 'Pipao' }),
+      '`factory: Pipao`',
+      'pipao, say',
+      'nemia factory ls',
+    ],
+    '--factory twice': [() => add('an idea', '--factory', 'pipao', '--factory', 'nemia'), 'nemia inbox add takes --factory once'],
+  };
+  for (const [name, [refused, ...named]] of Object.entries(adds))
+    await t.test(`nemia inbox add: ${name}`, async () => {
+      await assert.rejects(async () => await refused(), refusedWith('Invalid', ...named));
+      assert.deepEqual(inInbox(), [], 'nothing filed');
+    });
 
   const { card, file } = addToInbox({ text: 'Stay where you are' });
-  const rm = (...argv: string[]) => main(['inbox', 'rm', ...argv], noEngine());
   writeRecord('r-outside');
-  for (const name of ['../runs/r-outside.json', '../runs/r-outside', 'sub/card', '..']) {
-    await assert.rejects(
-      rm(name),
-      refusedWith('Invalid', `\`${name}\` is not a card's name`, 'no slash', 'the name nemia inbox lists'),
-      name,
-    );
-  }
-  assert.throws(() => dropFromInbox('../runs/r-outside'), refusedWith('Invalid', "`../runs/r-outside` is not a card's name"));
-  await assert.rejects(rm('.hidden'), refusedWith('Invalid', "`.hidden` is not a card's name", 'hidden file'));
-  await assert.rejects(rm(), refusedWith('Invalid', 'nemia inbox rm <name>'));
-  await assert.rejects(rm(card.name, 'another'), refusedWith('Invalid', 'another is a second', 'nemia inbox rm <name>, once per card'));
-  await assert.rejects(
-    main(['inbox', 'list'], noEngine()),
-    refusedWith(
-      'Invalid',
+  const rms: Record<string, [() => unknown, ...named: string[]]> = {
+    '.hidden': [() => rm('.hidden'), "`.hidden` is not a card's name", 'hidden file'],
+    'no name': [() => rm(), 'nemia inbox rm <name>'],
+    'two names': [() => rm(card.name, 'another'), 'another is a second', 'nemia inbox rm <name>, once per card'],
+    'a path under runs/, to dropFromInbox': [() => dropFromInbox('../runs/r-outside'), "`../runs/r-outside` is not a card's name"],
+    'nemia inbox list, a form it does not have': [
+      () => main(['inbox', 'list'], noEngine()),
       'does not take list',
       'nemia inbox add "<idea>"',
       'nemia inbox queue <name>',
       'nemia inbox rm <name>',
       'nemia inbox --help',
-    ),
-  );
-  assert.ok(fs.existsSync(path.join(ROOT, 'runs', 'r-outside.json')), 'the record outside the inbox is still there');
-  assert.ok(fs.existsSync(file), 'and so is the card');
+    ],
+  };
+  for (const name of ['../runs/r-outside.json', '../runs/r-outside', 'sub/card', '..'])
+    rms[name] = [() => rm(name), `\`${name}\` is not a card's name`, 'no slash', 'the name nemia inbox lists'];
+  for (const [name, [refused, ...named]] of Object.entries(rms))
+    await t.test(`nemia inbox rm: ${name}`, async () => {
+      await assert.rejects(async () => await refused(), refusedWith('Invalid', ...named));
+      assert.ok(fs.existsSync(path.join(ROOT, 'runs', 'r-outside.json')), 'the record outside the inbox is still there');
+      assert.ok(fs.existsSync(file), 'and so is the card');
+    });
   fs.rmSync(path.join(ROOT, 'runs', 'r-outside.json'));
 });
 
-test("`nemia start <inbox>/<name>.md` starts the card — its body the brief, its `workflow:` found in its `repo:` — writes `from` on the record and removes the card; `nemia decide` names the card under the run's line; a plan's card started so stays where it is", async (t) => {
-  emptyInbox();
-  const repo = aRepoWith('dev', 'ui');
-  const { card, file } = addToInbox({ text: 'Cache the views between passes\n\nThe tick reads each task twice.', workflow: 'dev', repo });
-  const printed = await printedBy(t, 'start', file);
-  const id = printed[0].split(' ')[0];
-  assert.match(id, /^cache-the-views-between-pass-[a-z0-9]{4}$/, 'the run id from the body');
-  const run = readRun(id);
-  assert.deepEqual(
-    [run.brief, run.repo, run.workflowDir, run.from],
-    ['Cache the views between passes\n\nThe tick reads each task twice.', repo, path.join(repo, 'workflows', 'dev'), { inbox: card.name }],
-  );
-  assert.deepEqual(printed.slice(0, 3), [
-    `${id}  1 step(s): implement`,
-    `from inbox card ${card.name} — removed from the inbox`,
-    `workspace: ${repo}`,
-  ]);
-  assert.equal(fs.existsSync(file), false, 'the card left the inbox');
-  assert.deepEqual(readInbox(), []);
-  const decided = await printedBy(t, 'decide', id);
-  assert.deepEqual(decided.slice(0, 2), [`${id}  Cache the views between passes`, `  from inbox card ${card.name}`]);
-  const typed = await runPlaced(startRun({ brief: 'typed', repo, workflowDir: path.join(repo, 'workflows', 'dev') }));
-  assert.equal(
-    Object.hasOwn(JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${typed.id}.json`), 'utf8')), 'from'),
-    false,
-    'a run typed at nemia start carries no from',
-  );
-  assert.doesNotMatch((await printedBy(t, 'decide', typed.id)).join('\n'), /from inbox card/, 'and its decide screen names no card');
-
-  const plan = fs.mkdtempSync(path.join(ROOT, 'plan-'));
-  fs.writeFileSync(path.join(plan, 'a.md'), '---\nworkflow: dev\n---\nParse the flag\n');
-  const planned = readRun((await printedBy(t, 'start', path.join(plan, 'a.md'), '--repo', repo))[0].split(' ')[0]);
-  assert.deepEqual([planned.brief, planned.from], ['Parse the flag', undefined], "a plan's card is started by nemia start, with no from");
-  assert.ok(fs.existsSync(path.join(plan, 'a.md')), "the plan's card stays");
-});
-
-test('`nemia start <inbox>/<name>`, the name as `nemia inbox` lists it, starts the card as `<name>.md` does — and a path under the inbox that names no card is refused by name, never started as a brief whose text is the path or the file', async (t) => {
-  emptyInbox();
-  const repo = aRepoWith('dev');
-  const { card, file } = addToInbox({ text: 'Cache the views between passes', workflow: 'dev', repo });
-  const other = addToInbox({ text: 'Show the flag', workflow: 'dev', repo });
-  const before = runsWritten();
-  const starting = (...argv: string[]) => main(['start', ...argv], noEngine());
-
-  await assert.rejects(
-    starting(path.join(INBOX, 'cache-the-views'), '--repo', repo),
-    refusedWith('Missing', 'no card cache-the-views in', `Its cards are: ${[card.name, other.card.name].sort().join(', ')}.`),
-    'a name with no card, typed without its .md, is refused, never started as a run asked to do its own path',
-  );
-  fs.writeFileSync(path.join(INBOX, 'notes.txt'), 'Refactor everything.\n');
-  await assert.rejects(
-    starting(path.join(INBOX, 'notes.txt'), '--workflows', 'dev', '--repo', repo),
-    refusedWith('Missing', 'no card notes.txt in'),
-    'a file in the inbox that is not a card is refused, not read as a brief',
-  );
-  fs.mkdirSync(path.join(INBOX, 'drafts'));
-  fs.writeFileSync(path.join(INBOX, 'drafts', 'idea.md'), 'Refactor everything.\n');
-  await assert.rejects(
-    starting(path.join(INBOX, 'drafts', 'idea.md'), '--workflows', 'dev', '--repo', repo),
-    refusedWith('Invalid', "`drafts/idea` is not a card's name", 'no slash'),
-    'and so is one in a folder inside it',
-  );
-  assert.equal(runsWritten(), before, 'no run written');
-
-  const printed = await printedBy(t, 'start', path.join(INBOX, card.name));
-  const run = readRun(printed[0].split(' ')[0]);
-  assert.deepEqual(
-    [run.brief, run.workflowDir, run.from],
-    ['Cache the views between passes', path.join(repo, 'workflows', 'dev'), { inbox: card.name }],
-  );
-  assert.equal(printed[1], `from inbox card ${card.name} — removed from the inbox`);
-  assert.equal(fs.existsSync(file), false, 'the card left the inbox');
-  assert.ok(fs.existsSync(other.file), 'and the other card is where it was');
-});
-
-test("`nemia inbox add <file>` writes a path in the file's own `workflow:` absolute against the file's folder, so the card starts on the workflow the file meant — not on the store's workflow of that name, read from the inbox", async (t) => {
-  emptyInbox();
-  const repo = aRepoWith('dev');
-  const theStores = path.join(ROOT, 'workflows', 'dev');
-  fs.mkdirSync(theStores, { recursive: true });
-  fs.writeFileSync(path.join(theStores, 'implement.md'), "the store's own\n");
-  fs.mkdirSync(path.join(repo, 'plans'));
-  const idea = path.join(repo, 'plans', 'idea.md');
-  fs.writeFileSync(idea, `---\nworkflow: ../workflows/dev\nrepo: ${repo}\n---\nCache the views between passes\n`);
-  try {
-    await printedBy(t, 'inbox', 'add', idea);
-    const [filed] = inInbox();
-    assert.equal(
-      fs.readFileSync(path.join(INBOX, filed), 'utf8'),
-      `---\nworkflow: ${path.join(repo, 'workflows', 'dev')}\nrepo: ${repo}\n---\nCache the views between passes\n`,
-    );
-    const run = readRun((await printedBy(t, 'start', path.join(INBOX, filed)))[0].split(' ')[0]);
-    assert.equal(
-      run.workflowDir,
-      path.join(repo, 'workflows', 'dev'),
-      "the workflow the file meant, not the store's of the same name, which ../workflows/dev names when read from the inbox",
-    );
-    assert.equal(fs.readFileSync(idea, 'utf8').includes('workflow: ../workflows/dev'), true, 'the file given is left as it was');
-  } finally {
-    fs.rmSync(path.join(ROOT, 'workflows'), { recursive: true, force: true });
-  }
-});
-
-test("a start says what the card does not, over what it does: --workflows over `workflow:`, --repo over `repo:`, the caller's repository without either, --brief in place of the body, and --after to wait on", async (t) => {
-  emptyInbox();
-  const repo = aRepoWith('dev');
-  const other = aRepoWith('ui');
-  const mine = fs.mkdtempSync(path.join(ROOT, 'mine-'));
-  fs.writeFileSync(path.join(mine, 'implement.md'), '---\nplace: git\n---\nimplement it, mine\n');
-
-  const over = addToInbox({ text: 'Show the flag', workflow: 'dev', repo });
-  const run = readRun(
-    (
-      await printedBy(
-        t,
-        'start',
-        over.file,
-        '--workflows',
-        mine,
-        '--repo',
-        other,
-        '--brief',
-        'Show the flag on the settings page, beside the theme toggle.',
-      )
-    )[0].split(' ')[0],
-  );
-  assert.deepEqual(
-    [run.workflowDir, run.repo, run.brief, run.from],
-    [mine, other, 'Show the flag on the settings page, beside the theme toggle.', { inbox: over.card.name }],
-  );
-  assert.match(run.id, /^show-the-flag-on-the-setting-[a-z0-9]{4}$/, 'the id from the brief it was started with');
-
-  const bare = addToInbox({ text: 'Store the flag', workflow: 'ui' });
-  const cwd = process.cwd();
-  process.chdir(other);
-  let here: Run;
-  try {
-    here = readRun((await printedBy(t, 'start', bare.file))[0].split(' ')[0]);
-  } finally {
-    process.chdir(cwd);
-  }
-  assert.deepEqual(
-    [here.repo, here.workflowDir],
-    [fs.realpathSync(other), path.join(fs.realpathSync(other), 'workflows', 'ui')],
-    "no repo: on the card and none given: the caller's, nemia start's `.`, and its workflow: found there, by name",
-  );
-  const given = addToInbox({ text: 'Document the flag' });
-  const byBoard = await runPlaced(
-    startFromInbox({ name: given.card.name, workflow: path.join(repo, 'workflows', 'dev'), callerRepo: repo }),
-  );
-  assert.deepEqual([byBoard.run.repo, byBoard.run.workflowDir, byBoard.removed], [repo, path.join(repo, 'workflows', 'dev'), true]);
-
-  const brief = path.join(mine, 'work.md');
-  fs.writeFileSync(brief, 'Parse the flag in cli.ts.\n');
-  const waits = addToInbox({ text: 'Parse the flag', workflow: 'dev', repo });
-  const child = readRun((await printedBy(t, 'start', waits.file, '--brief', brief, '--after', byBoard.run.id))[0].split(' ')[0]);
-  assert.deepEqual(
-    [child.brief, child.after, child.from],
-    ['Parse the flag in cli.ts.', [byBoard.run.id], { inbox: waits.card.name }],
-    'a brief from a file, and what the card waits on, said at start',
-  );
-});
-
-test("a card's `from:` is set and taken off by `nemia inbox from`, and its run is handed it as context before `--from`'s, a run both name once — REFUSED: a `from:` run also waited on, nothing written", async (t) => {
-  emptyInbox();
-  const repo = aRepoWith('dev');
-  writeRecord('source-a1');
-  writeRecord('source-b2');
-  const card = addToInbox({ text: 'Read the sources', workflow: 'dev', repo });
-  const set = await printedBy(t, 'inbox', 'from', card.card.name, 'source-a1');
-  assert.match(set[0], /from: source-a1 — its run is handed what each concluded, as context, and waits on none/);
-  assert.match(fs.readFileSync(card.file, 'utf8'), /^from: source-a1$/m);
-  const off = await printedBy(t, 'inbox', 'from', card.card.name, '--off');
-  assert.match(off[0], /from: taken off \(was source-a1\)/);
-  assert.doesNotMatch(fs.readFileSync(card.file, 'utf8'), /^from:/m);
-
-  await printedBy(t, 'inbox', 'from', card.card.name, 'source-a1');
-  const before = runsWritten();
-  await assert.rejects(
-    async () =>
-      await runPlaced(
-        startFromInbox({ name: card.card.name, workflow: path.join(repo, 'workflows', 'dev'), callerRepo: repo, after: ['source-a1'] }),
-      ),
-    refusedWith('Invalid', 'from: source-a1', '--after source-a1'),
-  );
-  assert.equal(runsWritten(), before, 'nothing written');
-  assert.ok(fs.existsSync(card.file), 'the card is kept');
-
-  const started = await runPlaced(
-    startFromInbox({
-      name: card.card.name,
-      workflow: path.join(repo, 'workflows', 'dev'),
-      callerRepo: repo,
-      context: ['source-b2', 'source-a1'],
-    }),
-  );
-  assert.deepEqual(readRun(started.run.id).context, ['source-a1', 'source-b2']);
-  assert.equal(readRun(started.run.id).after, undefined, 'it waits on none');
-});
-
-test('REFUSED by name at shipped defaults, before a run is written and with the card left in the inbox: a card not there — naming those there are — a name that would leave the inbox, no workflow from the card or the flag, a workflow that does not load, a card that does not read, an empty --brief, --brief on anything but an inbox card, and an --after start() refuses', async () => {
+test('REFUSED by name at shipped defaults: `nemia start` of an inbox card, before a run is written and with the card left in the inbox', async (t) => {
   emptyInbox();
   const repo = aRepoWith('dev', 'ui');
   const kept = addToInbox({ text: 'Cache the views', repo });
-  const before = runsWritten();
-  const starting = (...argv: string[]) => main(['start', ...argv], noEngine());
-
-  await assert.rejects(
-    starting(path.join(INBOX, 'cache-the-view.md')),
-    refusedWith(
-      'Missing',
-      'no card cache-the-view in',
-      `Its cards are: ${kept.card.name}.`,
-      `nemia start ${path.join(INBOX, '<name>.md')}`,
-      'nemia inbox add "<idea>"',
-    ),
-  );
-  await assert.rejects(
-    async () => await runPlaced(startFromInbox({ name: '../runs/x', callerRepo: repo })),
-    refusedWith('Invalid', "`../runs/x` is not a card's name", 'no slash'),
-  );
-  await assert.rejects(
-    async () => await runPlaced(startFromInbox({ name: 'a/b', callerRepo: repo })),
-    refusedWith('Invalid', "`a/b` is not a card's name"),
-  );
-  await assert.rejects(
-    async () => await runPlaced(startFromInbox({ name: '', callerRepo: repo })),
-    refusedWith('Invalid', 'this name is empty', 'nemia inbox lists'),
-  );
-
-  await assert.rejects(
-    starting(kept.file),
-    refusedWith(
-      'Invalid',
-      `${kept.card.file}: no workflow`,
-      `workflows are: dev, ui, in ${path.join(repo, 'workflows')}.`,
-      `nemia start ${kept.file} --workflows dev`,
-      '`workflow: dev`',
-    ),
-  );
+  const other = addToInbox({ text: 'Show the flag', workflow: 'dev', repo });
   const loose = addToInbox({ text: 'Anywhere at all' });
-  await assert.rejects(
-    async () => await runPlaced(startFromInbox({ name: loose.card.name, callerRepo: fs.mkdtempSync(path.join(ROOT, 'bare-')) })),
-    refusedWith('Invalid', `${loose.card.file}: no workflow`, 'has no workflows', `nemia start ${loose.file} --workflows <dir>`),
-  );
-
   const nope = addToInbox({ text: 'Store the flag', workflow: 'nope', repo });
-  await assert.rejects(
-    starting(nope.file),
-    refusedWith(
-      'Invalid',
-      `${nope.card.file}: \`workflow: nope\``,
-      `no workflow folder at ${path.join(INBOX, 'nope')},`,
-      `named nope in ${path.join(repo, 'workflows')}.`,
-      'workflows are: dev, ui',
-    ),
-  );
-  await assert.rejects(
-    starting(kept.file, '--workflows', 'nope'),
-    refusedWith('Invalid', 'no workflow folder at ', `named nope in ${path.join(repo, 'workflows')}.`, 'workflows are: dev, ui'),
-  );
-
+  writeRecord('source-a1');
+  const sourced = addToInbox({ text: 'Read the sources', workflow: 'dev', repo });
+  await printedBy(t, 'inbox', 'from', sourced.card.name, 'source-a1');
   fs.writeFileSync(
     path.join(INBOX, 'hand-written-a1b2.md'),
     `---\nworkflow: dev\nrepo: ${repo}\nafter: ${kept.card.name}\n---\nShow the flag\n`,
-  );
-  await assert.rejects(
-    starting(path.join(INBOX, 'hand-written-a1b2.md')),
-    refusedWith('Invalid', 'hand-written-a1b2.md: `after`', 'nemia start <inbox>/hand-written-a1b2.md --after <runId>'),
   );
   fs.writeFileSync(
     path.join(INBOX, 'moved-repo-a1b2.md'),
     `---\nworkflow: dev\nrepo: ${path.join(ROOT, 'moved-away')}\n---\nShow the flag\n`,
   );
-  await assert.rejects(
-    starting(path.join(INBOX, 'moved-repo-a1b2.md')),
-    refusedWith('Invalid', 'moved-repo-a1b2.md: `repo: ', `${path.join(ROOT, 'moved-away')}\` names no directory`),
-  );
-
-  await assert.rejects(
-    starting(kept.file, '--workflows', 'dev', '--brief', ''),
-    refusedWith('Invalid', 'nemia start <inbox>/<name>.md --brief "<brief>"'),
-  );
-  await assert.rejects(
-    async () => await runPlaced(startFromInbox({ name: kept.card.name, workflow: 'dev', brief: '  \n', callerRepo: repo })),
-    refusedWith('Invalid', `${kept.card.file}: the brief`, 'is empty', 'Give what the run is asked to do', 'leave it out'),
-  );
-  await assert.rejects(
-    starting('add a flag', '--workflows', path.join(repo, 'workflows', 'dev'), '--repo', repo, '--brief', 'x'),
-    refusedWith('Invalid', `nemia start ${path.join(INBOX, '<name>.md')} --brief "<brief>"`, 'nemia start "<brief>"'),
-  );
-  await assert.rejects(
-    starting(kept.file, '--workflows', 'dev', '--brief', 'x', '--brief', 'y'),
-    refusedWith('Invalid', 'nemia start takes --brief once'),
-  );
-  await assert.rejects(
-    starting(kept.file, '--workflows', 'dev', '--after', 'no-such-run-zz99'),
-    refusedWith('Invalid', '--after no-such-run-zz99', 'nemia ls'),
-  );
-
-  assert.equal(runsWritten(), before, 'no run written');
-  for (const f of [kept.file, loose.file, nope.file, path.join(INBOX, 'hand-written-a1b2.md'), path.join(INBOX, 'moved-repo-a1b2.md')])
-    assert.ok(fs.existsSync(f), `${f} is still in the inbox`);
+  fs.writeFileSync(path.join(INBOX, 'notes.txt'), 'Refactor everything.\n');
+  fs.mkdirSync(path.join(INBOX, 'drafts'));
+  fs.writeFileSync(path.join(INBOX, 'drafts', 'idea.md'), 'Refactor everything.\n');
+  const cards = [...[kept, other, loose, nope, sourced].map((c) => c.card.name), 'hand-written-a1b2', 'moved-repo-a1b2'].sort();
+  const before = runsWritten();
+  const inbox = () => fs.readdirSync(INBOX).sort();
+  const there = inbox();
+  const starting = (...argv: string[]) => main(['start', ...argv], noEngine());
+  const fromInbox = (opts: Parameters<typeof startFromInbox>[0]) => runPlaced(startFromInbox(opts));
+  const rows: Record<string, [() => unknown, 'Missing' | 'Invalid', ...named: string[]]> = {
+    'a card not there, naming those there are': [
+      () => starting(path.join(INBOX, 'cache-the-view.md')),
+      'Missing',
+      'no card cache-the-view in',
+      `Its cards are: ${cards.join(', ')}.`,
+      `nemia start ${path.join(INBOX, '<name>.md')}`,
+      'nemia inbox add "<idea>"',
+    ],
+    'a name with no card, typed without its .md, never started as a run asked to do its own path': [
+      () => starting(path.join(INBOX, 'cache-the-views'), '--repo', repo),
+      'Missing',
+      'no card cache-the-views in',
+      `Its cards are: ${cards.join(', ')}.`,
+    ],
+    'a file in the inbox that is not a card, not read as a brief': [
+      () => starting(path.join(INBOX, 'notes.txt'), '--workflows', 'dev', '--repo', repo),
+      'Missing',
+      'no card notes.txt in',
+    ],
+    'a card in a folder inside the inbox': [
+      () => starting(path.join(INBOX, 'drafts', 'idea.md'), '--workflows', 'dev', '--repo', repo),
+      'Invalid',
+      "`drafts/idea` is not a card's name",
+      'no slash',
+    ],
+    'a name that leaves the inbox': [
+      () => fromInbox({ name: '../runs/x', callerRepo: repo }),
+      'Invalid',
+      "`../runs/x` is not a card's name",
+      'no slash',
+    ],
+    'a name with a slash': [() => fromInbox({ name: 'a/b', callerRepo: repo }), 'Invalid', "`a/b` is not a card's name"],
+    'no name': [() => fromInbox({ name: '', callerRepo: repo }), 'Invalid', 'this name is empty', 'nemia inbox lists'],
+    'no workflow from the card or the flag, naming those the repository has': [
+      () => starting(kept.file),
+      'Invalid',
+      `${kept.card.file}: no workflow`,
+      `workflows are: dev, ui, in ${path.join(repo, 'workflows')}.`,
+      `nemia start ${kept.file} --workflows dev`,
+      '`workflow: dev`',
+    ],
+    'no workflow, on a repository that has none': [
+      () => fromInbox({ name: loose.card.name, callerRepo: fs.mkdtempSync(path.join(ROOT, 'bare-')) }),
+      'Invalid',
+      `${loose.card.file}: no workflow`,
+      'has no workflows',
+      `nemia start ${loose.file} --workflows <dir>`,
+    ],
+    "the card's workflow does not load": [
+      () => starting(nope.file),
+      'Invalid',
+      `${nope.card.file}: \`workflow: nope\``,
+      `no workflow folder at ${path.join(INBOX, 'nope')},`,
+      `named nope in ${path.join(repo, 'workflows')}.`,
+      'workflows are: dev, ui',
+    ],
+    "the flag's workflow does not load": [
+      () => starting(kept.file, '--workflows', 'nope'),
+      'Invalid',
+      'no workflow folder at ',
+      `named nope in ${path.join(repo, 'workflows')}.`,
+      'workflows are: dev, ui',
+    ],
+    'a card that does not read: `after:`': [
+      () => starting(path.join(INBOX, 'hand-written-a1b2.md')),
+      'Invalid',
+      'hand-written-a1b2.md: `after`',
+      'nemia start <inbox>/hand-written-a1b2.md --after <runId>',
+    ],
+    'a card that does not read: its repo: moved away': [
+      () => starting(path.join(INBOX, 'moved-repo-a1b2.md')),
+      'Invalid',
+      'moved-repo-a1b2.md: `repo: ',
+      `${path.join(ROOT, 'moved-away')}\` names no directory`,
+    ],
+    'an empty --brief': [
+      () => starting(kept.file, '--workflows', 'dev', '--brief', ''),
+      'Invalid',
+      'nemia start <inbox>/<name>.md --brief "<brief>"',
+    ],
+    'a blank brief, to startFromInbox': [
+      () => fromInbox({ name: kept.card.name, workflow: 'dev', brief: '  \n', callerRepo: repo }),
+      'Invalid',
+      `${kept.card.file}: the brief`,
+      'is empty',
+      'Give what the run is asked to do',
+      'leave it out',
+    ],
+    '--brief on anything but an inbox card': [
+      () => starting('add a flag', '--workflows', path.join(repo, 'workflows', 'dev'), '--repo', repo, '--brief', 'x'),
+      'Invalid',
+      `nemia start ${path.join(INBOX, '<name>.md')} --brief "<brief>"`,
+      'nemia start "<brief>"',
+    ],
+    '--brief twice': [
+      () => starting(kept.file, '--workflows', 'dev', '--brief', 'x', '--brief', 'y'),
+      'Invalid',
+      'nemia start takes --brief once',
+    ],
+    'an --after start() refuses': [
+      () => starting(kept.file, '--workflows', 'dev', '--after', 'no-such-run-zz99'),
+      'Invalid',
+      '--after no-such-run-zz99',
+      'nemia ls',
+    ],
+    'a `from:` run also waited on': [
+      () => fromInbox({ name: sourced.card.name, workflow: path.join(repo, 'workflows', 'dev'), callerRepo: repo, after: ['source-a1'] }),
+      'Invalid',
+      'from: source-a1',
+      '--after source-a1',
+    ],
+  };
+  for (const [name, [refused, tag, ...named]] of Object.entries(rows))
+    await t.test(name, async () => {
+      await assert.rejects(async () => await refused(), refusedWith(tag, ...named));
+      assert.equal(runsWritten(), before, 'no run written');
+      assert.deepEqual(inbox(), there, 'every card still in the inbox');
+    });
+  fs.rmSync(path.join(ROOT, 'runs', 'source-a1.json'));
 });
-
 test(
   'REFUSED at shipped defaults: a card whose removal fails after its run is written is listed `started as` that run, and not started again until a person drops it',
   { skip: process.getuid?.() === 0 && 'root removes a file from a folder it may not write' },

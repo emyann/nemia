@@ -1,9 +1,9 @@
 /**
  * A step that never ends, shaped as a supervisor's — one step, `workspace: main`, `slot: none`, `remote: true`, a window of its own, no
  * check — run on disk against a board a test settles. What such a step watches is every other run: it asks by signing off `blocked`, and
- * acts on the answer. So the two things the package does for it are here: a step answered many times over, each answer a try of the same
- * session, and a run the cap on runs in flight (`WF_MAX_RUNS`) neither holds nor counts. `WF_ROOT` is read as the module loads, so it is
- * set before the import.
+ * acts on the answer. The package does two things for it: a step answered many times over, each answer a try of the same session, which
+ * is here; and a run the cap on runs in flight (`WF_MAX_RUNS`) neither holds nor counts, which is the cap's story in
+ * `queue-store.test.ts`. `WF_ROOT` is read as the module loads, so it is set before the import.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,7 +14,6 @@ import type { TaskPhase } from '../src/run.ts';
 import { scratch } from './scratch.ts';
 import { promised } from './promised.ts';
 import { Effect } from 'effect';
-import { Invalid } from '../src/refusal/refusal.ts';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from './placed.ts';
 
@@ -24,14 +23,10 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 process.env.WF_ROOT = ROOT;
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
-const { advanceRun, list, retryRun, runSlots, startRun, runWith: runEngine } = await import('../src/runner.ts');
+const { advanceRun, list, retryRun, startRun, runWith: runEngine } = await import('../src/runner.ts');
 const stand = eachTest(testPlace);
 const runWith = runOver(runEngine, () => stand().layer);
 const runPlaced = runGiven(() => stand().layer);
-const { passParents } = await import('../src/views/views.verb.ts');
-const { NOTHING_READ, standingReader } = await import('../src/standing/standing.verb.ts');
-/** The runs waited on as a read with no standing reads them: none of their branches asked. */
-const noParents = () => passParents(standingReader(NOTHING_READ));
 const { readRun } = await import('../src/record/record.store.ts');
 
 /** A repository with one commit, so `nemia start` has a base to record. */
@@ -210,71 +205,5 @@ test('a pass over a step answered again and again reads what it is working on, n
     held.steps.map((st) => st.status),
     ['over budget $1.20 of $1'],
     'the two tries counted together against the cap',
-  );
-});
-
-test("`slot: none` on disk: a watcher's run files its step at a full cap, counts against nothing, and holds no other run — while the run beside it waits", async () => {
-  const repo = aRepo();
-  const { e, filings, settle } = board();
-  const watcher = await runPlaced(startRun({ brief: 'supervise this repository', repo, workflowDir: FOLDER }));
-  const work = await runPlaced(
-    startRun({ brief: 'do the work', repo, workflowDir: folderOf({ implement: 'harness: claude' }), isolate: false }),
-  );
-
-  const full = { inFlight: 1, cap: 1 };
-  const held = await runWith(e, advanceRun(readRun(work.id), full));
-  assert.deepEqual([held.filed, held.held], [[], full], 'one slot, and it is taken: the work waits for a run slot');
-  const watching = await runWith(e, advanceRun(readRun(watcher.id), full));
-  assert.deepEqual(watching.filed, ['supervise'], 'the supervisor files its step all the same');
-  assert.equal(watching.held, undefined, 'and is not held');
-  assert.equal(watching.inFlight, false, "nor counted: what it filed is its own watching, not a run's work");
-
-  process.env.WF_MAX_RUNS = '1';
-  assert.deepEqual(
-    [...(await runWith(e, runSlots(e, [readRun(watcher.id), readRun(work.id)], process.env, noParents())))],
-    [],
-    'nothing held: with the supervisor running, one slot is still free for the work',
-  );
-  const free = await runWith(e, advanceRun(readRun(work.id), { inFlight: 0, cap: 1 }));
-  assert.deepEqual(free.filed, ['implement'], 'the work takes the slot the supervisor never held');
-  assert.equal(free.inFlight, true);
-
-  settle(`${watcher.id}-supervise`, 'succeeded', { outcome: 'blocked', summary: 'a run is ready', artifacts: [], needs: 'Merge it?' });
-  for (let pass = 0; pass < 2; pass++)
-    assert.equal(
-      (await runWith(e, advanceRun(readRun(watcher.id), { inFlight: 1, cap: 1 }))).inFlight,
-      false,
-      `pass ${pass}: its own filing is not counted while its session runs`,
-    );
-  assert.deepEqual([...(await runWith(e, runSlots(e, [readRun(watcher.id), readRun(work.id)], process.env, noParents())))], []);
-  delete process.env.WF_MAX_RUNS;
-  assert.ok(filings.includes(`${watcher.id}-supervise`) && filings.includes(`${work.id}-implement`));
-});
-
-test("REFUSED at `nemia start`, with nothing written: `slot: none` on a step of a workflow that has another — a slot is a run's, and the work beside it would run outside the cap", async () => {
-  const repo = aRepo();
-  const runs = () => fs.readdirSync(path.join(ROOT, 'runs')).filter((f) => f.endsWith('.json')).length;
-  const before = runs();
-  const shapes: Record<string, string>[] = [
-    { supervise: 'slot: none', implement: 'harness: claude' },
-    { implement: 'harness: claude', supervise: 'after: implement\nslot: none' },
-    { supervise: 'slot: none', review: 'after: supervise' },
-  ];
-  for (const steps of shapes) {
-    await assert.rejects(
-      async () => await runPlaced(startRun({ brief: 'watch it', repo, workflowDir: folderOf(steps) })),
-      (err: unknown) =>
-        err instanceof Invalid &&
-        err.exitCode === 2 &&
-        err.message.startsWith('supervise: `slot: none` takes this step') &&
-        err.message.includes('(WF_MAX_RUNS)') &&
-        err.message.includes("a slot is a run's, not a step's"),
-      Object.keys(steps).join(' + '),
-    );
-  }
-  assert.equal(runs(), before, 'nothing written');
-  assert.ok(
-    (await runPlaced(startRun({ brief: 'watch it', repo, workflowDir: FOLDER }))).id,
-    'a watcher alone in its workflow is the shape that is allowed: one step, and it starts',
   );
 });

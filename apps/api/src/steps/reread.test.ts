@@ -15,7 +15,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import { Beats } from '../layer.ts';
-import { STEP_BEAT_MS } from './steps.ts';
 
 const TIMERS: readonly [RegExp, string][] = [
   [/\.sleep\s*\(/, 'a sleep'],

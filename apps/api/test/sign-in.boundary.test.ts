@@ -24,26 +24,28 @@ fs.mkdirSync(path.join(root, 'factories', 'signmill'), { recursive: true });
 const SERVERS = path.join(import.meta.dirname, '..', '..', '..', 'workflows', 'servers');
 const GITHUB = JSON.parse(fs.readFileSync(path.join(SERVERS, 'github.json'), 'utf8')) as Record<string, unknown>;
 
-/**
- * The shipped secret, read off the package's own file by its shape — the test reaches it as a person reading the repository would,
- * since no entry exports it.
- */
-const SECRET = /'([0-9a-f]{40})'/.exec(
-  fs.readFileSync(
-    path.join(import.meta.dirname, '..', '..', '..', 'packages', 'agent-orchestrator', 'src', 'servers', 'clients.ts'),
-    'utf8',
-  ),
-)![1];
-
 const BOARD = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' };
 const URL = '/api/factories/signmill/servers';
 
-/** An app whose engine answers the three sign-in verbs from the runtime's stand-in, and everything else from the package's engine. */
+/**
+ * An app whose engine answers the three sign-in verbs from the runtime's stand-in, and everything else from the package's engine: the
+ * api has no door that hands its app the stand-in whole, which is why this file is a boundary test. Every secret the package hands the
+ * engine is caught in `handed`, so the search below looks for the very value the package holds, read off no file of its source.
+ */
 const appWith = () => {
   const stand = testEngine();
   const signing = Effect.runSync(Effect.provide(Effect.service(RuntimeEngine), stand.layer));
-  const e = { ...engine(), mcpSignIn: signing.mcpSignIn, mcpSignInState: signing.mcpSignInState, mcpSignOut: signing.mcpSignOut };
-  return { app: appOf(Layer.merge(liveOf(), Layer.succeed(Engine)(e as never))).app, stand };
+  const handed: string[] = [];
+  const e = {
+    ...engine(),
+    mcpSignIn: (name: string, server: Parameters<typeof signing.mcpSignIn>[1], secret?: string) => {
+      if (secret !== undefined) handed.push(secret);
+      return signing.mcpSignIn(name, server, secret);
+    },
+    mcpSignInState: signing.mcpSignInState,
+    mcpSignOut: signing.mcpSignOut,
+  };
+  return { app: appOf(Layer.merge(liveOf(), Layer.succeed(Engine)(e as never))).app, stand, handed };
 };
 
 /** The answer to `method` on `url`, as the board sends it: its status, and its body as text, so a search reads every byte. */
@@ -71,11 +73,15 @@ test('the shipped github file holds the hosted server, its toolsets and its clie
     headers: { 'X-MCP-Toolsets': 'context,repos,issues,pull_requests,users,actions' },
     oauth: { clientId: 'Iv23liQBfm9prqhvXkuY', callbackPort: 8791 },
   });
-  assert.equal(JSON.stringify(GITHUB).includes(SECRET), false);
+  assert.equal(
+    Object.keys(GITHUB.oauth as object).some((k) => /secret/i.test(k)),
+    false,
+    'the oauth part names no secret',
+  );
 });
 
 test('a sign-in answers the address to open, then its state; a sign-out answers that it signed out — and no body carries the secret', async () => {
-  const { app, stand } = appWith();
+  const { app, stand, handed } = appWith();
   await recorded(app, 'github', GITHUB);
   const started = await asked(app, 'POST', `${URL}/github/sign-in`);
   assert.equal(started.status, 200, started.text);
@@ -83,6 +89,9 @@ test('a sign-in answers the address to open, then its state; a sign-out answers 
   assert.match(authUrl, /^https:\/\/github\.com\/login\/oauth\/authorize\?client_id=Iv23liQBfm9prqhvXkuY/);
   assert.equal(typeof until, 'string');
   assert.deepEqual(stand.signIns, [{ name: 'github', secret: true }], 'the shipped client was handed its secret, inside the package');
+  const [SECRET] = handed;
+  assert.ok(SECRET && SECRET.length >= 20, 'the secret the package handed the engine, which every answer is searched for');
+  assert.equal(JSON.stringify(GITHUB).includes(SECRET), false, 'and the shipped file does not hold it');
   const waiting = await asked(app, 'GET', `${URL}/github/sign-in`);
   assert.equal(JSON.parse(waiting.text).state, 'waiting');
   const early = await asked(app, 'DELETE', `${URL}/github/sign-in`);
@@ -111,7 +120,8 @@ test('a sign-in answers the address to open, then its state; a sign-out answers 
 });
 
 test('FIXTURE: a body that held the secret would be caught by the same search', () => {
-  assert.equal(JSON.stringify({ shipped: [{ ...GITHUB, clientSecret: SECRET }] }).includes(SECRET), true);
+  const secret = 'a-secret-the-search-must-find';
+  assert.equal(JSON.stringify({ shipped: [{ ...GITHUB, clientSecret: secret }] }).includes(secret), true);
 });
 
 test('REFUSED: a server the factory does not record (404), a port another sign-in waits on (409), a bad name (400), another site (403)', async () => {

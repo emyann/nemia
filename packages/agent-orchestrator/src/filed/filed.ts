@@ -8,7 +8,7 @@ import type { Mount, Run, StepRecord } from '../record/record.ts';
 import { stepMounts } from '../factory/factory.ts';
 import { handedMounts, type HandedFiles } from '../artifacts/artifacts.ts';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
-import { splitServers, type FactoryServer, type FactoryServers } from '../servers/servers.ts';
+import { splitServers, type FactoryServer, type FactoryServers } from '../servers/index.ts';
 
 /**
  * The harness's arguments a step is filed with, which the engine carries to the runner unread (`HarnessArgs`), all from the workflow the

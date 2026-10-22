@@ -54,7 +54,8 @@ test("a step frozen with its agent's denies apart keeps them, and one frozen bef
   assert.deepEqual(before.success, frozen({ ...step, agent }), 'a record from before decodes unchanged');
   assert.deepEqual(before.success.disallowedTools, step.disallowedTools, 'and is filed with the list it had');
   assert.deepEqual(ownDenies(before.success as Workflow), step.disallowedTools, 'its line read back whole');
-  assert.ok(Result.isFailure(decode(frozen({ ...step, agent: { ...agent, agentDenies: 'Bash(git push)' } }) as unknown)), 'a list, or refused');
+  const one = { ...frozen(step) as object, agent: { ...agent, agentDenies: 'Bash(git push)' } };
+  assert.ok(Result.isFailure(decode(one)), 'a list, or refused');
 });
 
 test('a step with every key the parser types, its agent and its output reads as it was frozen; one key off, it is refused', () => {

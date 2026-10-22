@@ -111,11 +111,63 @@ test('the place declares what a landing is denied, the commands that commit its 
   assert.ok(fs.existsSync(path.join(GIT_SKILL, 'SKILL.md')), 'and it is still a skill');
 });
 
+/** The sections of the skill that are a step's that writes the repository, each of which opens by saying whose it is. */
+const WRITE_SECTIONS = ['Commit as you go', 'Stage a landing'];
+
+/** The read forms *Read what changed* names, each one a read-only step of any factory may type. */
+const READ_FORMS = [
+  'git diff',
+  'git status',
+  'git log',
+  'git show',
+  'git blame',
+  'git grep',
+  'git ls-files',
+  'git merge-base --is-ancestor',
+  'git worktree list',
+];
+
+/** The text of the section `name` of `skill`, up to the next heading of the same level. */
+function sectionOf(skill: string, name: string): string {
+  const start = skill.indexOf(`## ${name}\n`);
+  assert.ok(start >= 0, `SKILL.md holds a section ${name}`);
+  const rest = skill.slice(start);
+  const end = rest.indexOf('\n## ', 1);
+  return end < 0 ? rest : rest.slice(0, end);
+}
+
+/** The first line of the section `name` of `skill` after its heading. */
+const openerOf = (skill: string, name: string): string => sectionOf(skill, name).split('\n').slice(1).find(Boolean) ?? '';
+
 test("SKILL.md holds the sections a brief told no command sends a step to, every template names only holes the code fills, and the skill forbids nothing a team's fence holds", () => {
   const skill = fs.readFileSync(path.join(GIT_SKILL, 'SKILL.md'), 'utf8');
   for (const section of Object.values(SKILL_SECTIONS)) assert.match(skill, new RegExp(`^## ${section}$`, 'm'), section);
   assert.doesNotMatch(skill, /never push/i);
   assert.deepEqual(unknownHoles(gitPlace().declared.say), []);
+});
+
+test('each section of the skill that writes the repository opens by saying whose it is, and forbids the reader nothing', () => {
+  const skill = fs.readFileSync(path.join(GIT_SKILL, 'SKILL.md'), 'utf8');
+  for (const name of WRITE_SECTIONS) {
+    const opener = openerOf(skill, name);
+    assert.match(opener, /read-only step/, `${name} opens by saying whose section it is`);
+    assert.doesNotMatch(opener, /\bnever\b/i, `${name} opens saying whose work it is, not what the reader may not do`);
+  }
+});
+
+test('Read what changed names each read form a read-only step types, so the one section every such step is sent to is enough', () => {
+  const section = sectionOf(fs.readFileSync(path.join(GIT_SKILL, 'SKILL.md'), 'utf8'), SKILL_SECTIONS.read);
+  for (const form of READ_FORMS) assert.ok(section.includes(`\`${form}`), `${SKILL_SECTIONS.read} names ${form}: ${section}`);
+});
+
+test('REFUSED: a Stage a landing that opens with a prohibition, and a Read what changed with a form taken out, are each named', () => {
+  const skill = fs.readFileSync(path.join(GIT_SKILL, 'SKILL.md'), 'utf8');
+  const forbidding = skill.replace(/^## Stage a landing\n\n[^\n]+/m, '## Stage a landing\n\nA read-only step never commits here.');
+  assert.notEqual(forbidding, skill, 'Stage a landing opens with one line');
+  assert.match(openerOf(forbidding, 'Stage a landing'), /\bnever\b/i);
+  const cut = skill.replace('`git blame', '`git praise');
+  assert.notEqual(cut, skill, 'Read what changed names git blame');
+  assert.ok(!sectionOf(cut, SKILL_SECTIONS.read).includes('`git blame'));
 });
 
 test('open answers the repository as given, the commit HEAD is at, the branch it is on, and the file a staged merge is named in', () => {

@@ -103,6 +103,13 @@ What the `create-an-agent` skill, being generic, does not say here:
   precedence, and the routing rule that says which layer owns a new instruction (*Where a new instruction goes*).
 - An agent's questions are an output field `{ "x-shape": "questions" }`, expanded by `packages/agent-orchestrator/src/question/question.ts`.
 - Its checks are *Check your work*, forced for `workflows/`; a new agent is named in *Where things are*.
+- **Every agent of the team reads the repository through git.** The four read-only ones (Seldon, Agora, Iris, Argus, each `dontAsk`, which
+  no allow from a step reaches) carry the same read-only git set on their own `allowedTools:` in `workflows/agents/`, and each holds the
+  place's `git` skill on its `skills:`; the two writers (Ada, Otto) run `auto` and need no allow. Nothing in the set writes the
+  repository, its refs or its configuration — `git merge-tree`, which writes a loose object and no ref, is the one that writes bytes —
+  and `git push` stays refused by Ada's and Otto's `disallowedTools:`. The set is on the agents rather than in `.claude/settings.json` so
+  that the team travels to a factory that is not this checkout; `packages/agent-orchestrator/test/agent-fences.test.ts` holds every read
+  open to each of the four, every write refused, and the four lines equal.
 
 ## Where things are
 

@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
-import { compared, recordOf, withCoverage, type CoverageRecord, type FileCoverage } from '../../coverage/coverage.ts';
+import { compared, recordOf, withCoverage, type CoverageRecord, type FileCoverage, type V8Script } from '../../coverage/coverage.ts';
 import { main } from '../../coverage/compare.ts';
 
 const PKG = '/repo/packages/p';
@@ -28,23 +28,41 @@ const section = (file: string, hit: number[], missed: number[], branches: { take
     'end_of_record',
   ].join('\n');
 
-/**
- * A file's coverage with `hitLines` hit of `found`, and `branchHit` branches of `branchFound`: the first `branchHit` of line 1's
- * branches, as `section` takes them, unless `takenByLine` says others.
- */
-const cover = (
-  hitLines: number[],
-  found: number,
-  branchHit = 0,
-  branchFound = 0,
-  takenByLine: Record<string, number> = branchHit > 0 ? { 1: branchHit } : {},
-): FileCoverage => ({
+/** A file's coverage with `hitLines` hit of `found`, and `branchHit` branches of `branchFound`: no arm, as lcov alone leaves it. */
+const cover = (hitLines: number[], found: number, branchHit = 0, branchFound = 0): FileCoverage => ({
   lines: { found, hit: hitLines.length, hitLines },
-  branches: { found: branchFound, hit: branchHit, takenByLine },
+  branches: { found: branchFound, hit: branchHit },
+  arms: { taken: {}, untaken: {} },
 });
 
 /** A record of package `p` holding `files`. */
-const recordWith = (files: Record<string, FileCoverage>): CoverageRecord => ({ version: 1, package: 'p', files });
+const recordWith = (files: Record<string, FileCoverage>): CoverageRecord => ({ version: 2, package: 'p', files });
+
+/** A source with one branch: its `yes` arm opens on line 2, at its brace, its `no` arm on line 5. */
+const PICK = "export const pick = (x: boolean): string => {\n  if (x) {\n    return 'yes';\n  }\n  return 'no';\n};\n";
+const FN = { start: PICK.indexOf('(x'), end: PICK.indexOf('};') + 1 };
+const YES = { start: PICK.indexOf('{\n    return'), end: PICK.indexOf('  }\n') + 3 };
+const NO = { start: YES.end, end: FN.end - 1 };
+
+/**
+ * One process's coverage of `src/pick.ts`, as V8 writes it: `pick` called `calls` times, and the arms given by their counts. V8
+ * leaves out an arm's range where it ran as often as `pick`, so a process that took one arm alone reports only the other.
+ */
+const ran = (calls: number, arms: { yes?: number; no?: number }): V8Script[] => {
+  const range = (at: { start: number; end: number }, count = 1) => ({ startOffset: at.start, endOffset: at.end, count });
+  const blocks = [...(arms.yes === undefined ? [] : [range(YES, arms.yes)]), ...(arms.no === undefined ? [] : [range(NO, arms.no)])];
+  const functions = [{ ranges: [range({ start: 0, end: PICK.length })] }, { ranges: [range(FN, calls), ...blocks] }];
+  return [{ url: `file://${PKG}/src/pick.ts`, functions }];
+};
+
+/** The record of `src/pick.ts` from `processes`, its lines all hit in the lcov, as both arms of one file would leave them. */
+const pickRecord = (...processes: V8Script[][]): CoverageRecord =>
+  recordOf(
+    section(`${PKG}/src/pick.ts`, [1, 2, 3, 4, 5, 6], [], { taken: 2, not: 0 }),
+    PKG,
+    () => processes,
+    () => PICK,
+  );
 
 test('a record keeps the package’s own sources and drops its tests, its helpers, its fixtures and what lies outside it', async (t) => {
   const rows: { name: string; lcov: string; files: Record<string, FileCoverage> }[] = [
@@ -66,8 +84,8 @@ test('a record keeps the package’s own sources and drops its tests, its helper
   ];
   for (const row of rows) {
     await t.test(row.name, () => {
-      const record = recordOf(row.lcov, PKG);
-      assert.equal(record.version, 1);
+      const record = recordOf(row.lcov, PKG, () => []);
+      assert.equal(record.version, 2);
       assert.equal(record.package, 'p');
       assert.deepEqual(record.files, row.files);
     });
@@ -93,21 +111,33 @@ test('a comparison where every file hits what it did, or more, finds no fall', (
   assert.deepEqual(compared(before, recordWith({ 'src/a.ts': cover([1, 2, 3], 4, 2, 2) })), []);
 });
 
-test('a comparison finds the branches that fell where every line is still hit', () => {
-  const falls = compared(recordWith({ 'src/a.ts': cover([1], 1, 2, 2) }), recordWith({ 'src/a.ts': cover([1], 1, 1, 2) }));
-  assert.deepEqual(
-    falls.map((fall) => [fall.file, fall.linesLost, fall.branchesLost, fall.branches]),
-    [['src/a.ts', [], ['1 (2→1)'], { before: 2, after: 1 }]],
-  );
-});
-
-test("a REFUSED comparison names a line whose branch is no longer taken where another line's took its place", () => {
-  const before = recordWith({ 'src/a.ts': cover([1], 1, 1, 2, { 3: 1 }) });
-  const after = recordWith({ 'src/a.ts': cover([1], 1, 1, 2, { 4: 1 }) });
-  assert.deepEqual(
-    compared(before, after).map((fall) => [fall.file, fall.branchesLost]),
-    [['src/a.ts', ['3 (1→0)']]],
-  );
+test('a branch is judged by its arms, each taken when any test process took it', async (t) => {
+  const bothInOne = pickRecord(ran(2, { yes: 1, no: 1 }));
+  const rows: { name: string; after: CoverageRecord; lost: [string, number[]][] }[] = [
+    {
+      name: 'two arms run by two different test files are nothing lost, though each process leaves out the arm it took',
+      after: pickRecord(ran(1, { no: 0 }), ran(1, { yes: 0 })),
+      lost: [],
+    },
+    {
+      name: 'an arm no process reports is read as the range around it, here taken',
+      after: pickRecord(ran(1, {}), ran(1, { yes: 0 })),
+      lost: [],
+    },
+    {
+      name: 'an arm no test takes any more is REFUSED, by its file and line',
+      after: pickRecord(ran(1, { no: 0 })),
+      lost: [['src/pick.ts', [5]]],
+    },
+  ];
+  for (const row of rows) {
+    await t.test(row.name, () => {
+      assert.deepEqual(
+        compared(bothInOne, row.after).map((fall) => [fall.file, fall.armsLost]),
+        row.lost,
+      );
+    });
+  }
 });
 
 test('the coverage flags go right after the script’s node, so its reporters keep their destinations', () => {
@@ -130,6 +160,7 @@ test("compare's main answers 0 when nothing fell, 1 when a file's coverage fell,
   const same = write('same.json', recordWith({ 'src/a.ts': cover([1, 2], 2) }));
   const fell = write('fell.json', recordWith({ 'src/a.ts': cover([1], 2) }));
   const notRecord = write('other.json', { hello: 1 });
+  const older = write('older.json', { ...recordWith({}), version: 1 });
   const lines: string[] = [];
   const said = (line: string) => lines.push(line);
   assert.equal(main([before, same], said), 0);
@@ -148,6 +179,7 @@ test("compare's main answers 0 when nothing fell, 1 when a file's coverage fell,
     main([before, notRecord], () => {}),
     2,
   );
+  assert.equal(main([older, same], said), 2, 'a record written before the arms were kept is refused');
   assert.equal(
     main([before, path.join(dir, 'missing.json')], () => {}),
     2,

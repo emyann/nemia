@@ -1,7 +1,7 @@
 /**
  * `node tools/coverage/compare.ts <before.json> <after.json>`: says whether any source file's coverage fell between two records
  * `record.ts` wrote. Exit 0 when none fell, 1 naming each file that did and the lines it lost, 2 when the arguments are not two
- * records.
+ * records of version 2.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -18,8 +18,8 @@ const recordIn = (file: string): CoverageRecord | string => {
     return `${file} cannot be read as JSON (${(error as Error).message})`;
   }
   const record = parsed as Partial<CoverageRecord> | null;
-  if (record?.version !== 1 || typeof record.files !== 'object' || record.files === null) {
-    return `${file} is no coverage record of version 1`;
+  if (record?.version !== 2 || typeof record.files !== 'object' || record.files === null) {
+    return `${file} is no coverage record of version 2, which keeps each branch's arms: write it again with node tools/coverage/record.ts`;
   }
   return record as CoverageRecord;
 };
@@ -35,7 +35,7 @@ const totals = (record: CoverageRecord) =>
 const said = (fall: Fall): string => {
   if (fall.gone) return `${fall.file}: gone from after (it hit ${fall.lines.before} lines, ${fall.branches.before} branches)`;
   const lines = fall.linesLost.length > 0 ? `, lines lost: ${fall.linesLost.join(', ')}` : '';
-  const lost = `${lines}${fall.branchesLost.length > 0 ? `, branches taken fewer on lines: ${fall.branchesLost.join(' ')}` : ''}`;
+  const lost = `${lines}${fall.armsLost.length > 0 ? `, branches no test takes any more, on lines: ${fall.armsLost.join(', ')}` : ''}`;
   return `${fall.file}: lines hit ${fall.lines.before} → ${fall.lines.after}, branches hit ${fall.branches.before} → ${fall.branches.after}${lost}`;
 };
 

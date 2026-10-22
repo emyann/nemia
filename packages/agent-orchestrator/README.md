@@ -507,6 +507,11 @@ run page shows the same numbers (`toldLayers`, `folderFiles`).
 A procedure is none of them: it belongs in a skill the agent or the step is given. Nor is a rule the machinery can refuse: that belongs
 in a fence, a gate or a test, which holds whether or not the words were read.
 
+A capability is routed the same way, and lands on a fence: one a role needs everywhere — reading a repository through git's read-only
+commands, say — goes on each agent's own `allowedTools:` by question 1, never left to a folder's `.claude/settings.json`. Those settings
+bind whoever works in that folder and travel with no agent, so an agent that leans on them is fenced differently in the next factory; and
+a step cannot make up the difference, since a step may narrow its agent's fence and never widen it (below).
+
 The run page shows a step's layers apart, as the run froze them at `wf start` (`toldLayers`), never as the files read now: the agent's
 instructions and its own skills, your custom instructions, the factory's rules where the run froze some, the step's policy and the
 skills its `skills:` line adds, and the task, its brief after them. A skill the step adds is the step's layer, not its agent's: `wf start` freezes which they are (`StepAgent.addedSkills`),

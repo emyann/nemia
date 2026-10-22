@@ -2,7 +2,7 @@
   "rules": [
     {
       "id": "read-with-read",
-      "says": "Read a file with Read, list a folder with Glob and search with Grep; never ls, find, head, cat, grep, git grep, awk, sed or a pipe in Bash",
+      "says": "Read a file with Read, list a folder with Glob and search with Grep; never ls, find, head, cat, grep, awk, sed or a pipe in Bash — a revision is searched with git grep",
       "breaks": [
         "Bash(ls:*)",
         "Bash(find:*)",

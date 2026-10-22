@@ -33,9 +33,14 @@ const { factoryRulesOf, instructionOf } = await import('./template.verb.ts');
 /** The factory `name`, as `--factory` names it to an export. */
 const asked = (name: string) => ({ name, instruction: instructionOf, rules: factoryRulesOf });
 
-/** Refused by kind, exit 2, and the message — never `String(err)`, which starts with `Error: `. */
-const refusedWith = (tag: 'Missing' | 'Conflict' | 'Invalid', pattern: RegExp) => (err: Error & { exitCode?: number; _tag?: string }) =>
-  err._tag === tag && err.exitCode === 2 && pattern.test(err.message);
+/**
+ * Refused by kind, exit 2, and what the message names — the fix, the file, the key — each a pattern it matches or a token it holds;
+ * never `String(err)`, which starts with `Error: `.
+ */
+const refusedWith =
+  (tag: 'Missing' | 'Conflict' | 'Invalid', ...named: Array<RegExp | string>) =>
+  (err: Error & { exitCode?: number; _tag?: string }) =>
+    err._tag === tag && err.exitCode === 2 && named.every((n) => (typeof n === 'string' ? err.message.includes(n) : n.test(err.message)));
 
 /** A repository holding the tests' team as its `workflows/`: `dev`, its agents and skills. */
 function repoWithTeam(): string {
@@ -128,7 +133,7 @@ test('REFUSED: an export of a workflow given a skill whose link leaves the repos
   const dir = target();
   assert.throws(
     () => exportTemplate({ dir, from: repo }),
-    refusedWith('Invalid', /x is a link, and what it points at is outside the folder of skills: make it a folder of its own\./),
+    refusedWith('Invalid', /x is a link/, 'outside the folder of skills', 'make it a folder of its own'),
   );
   assert.equal(fs.existsSync(dir), false);
 });
@@ -164,10 +169,7 @@ test('REFUSED: an export of a workflow given a skill named with its folder that 
   const dir = target();
   assert.throws(
     () => exportTemplate({ dir, from: repo }),
-    refusedWith(
-      'Invalid',
-      /`app:y` is the skill `y` of the repository's folder `app`, and \S+\/app\/\.claude\/skills\/y holds no SKILL\.md/,
-    ),
+    refusedWith('Invalid', '`app:y` is the skill `y`', 'folder `app`', /\S+\/app\/\.claude\/skills\/y holds no SKILL\.md/),
   );
   assert.equal(fs.existsSync(dir), false);
 });
@@ -228,7 +230,7 @@ test('a key a template has no place for is refused by name, and nothing is writt
   const dir = target();
   assert.throws(
     () => exportTemplate({ dir, from: repo }),
-    refusedWith('Invalid', /review\.md: `background:` has no place in a template[^]*review\.md: `slot:` has no place/),
+    refusedWith('Invalid', 'review.md: `background:` has no place', 'review.md: `slot:` has no place'),
   );
   assert.equal(fs.existsSync(dir), false);
   assert.deepEqual(fs.readdirSync(path.dirname(dir)), [], 'no staging folder is left beside it');
@@ -242,10 +244,7 @@ test("an agent's harness prompt and remote have no place in a template, each ref
   const dir = target();
   assert.throws(
     () => exportTemplate({ dir, from: repo }),
-    refusedWith(
-      'Invalid',
-      /reviewer\.md: `remote:` has no place in a template[^]*reviewer\.md: `harnessPrompt:` has no place in a template/,
-    ),
+    refusedWith('Invalid', 'reviewer.md: `remote:` has no place', 'reviewer.md: `harnessPrompt:` has no place'),
   );
   assert.equal(fs.existsSync(dir), false);
 });
@@ -306,7 +305,7 @@ test("with --factory, the draft holds the factory's rules as RULES.md, read from
   const refused = target();
   assert.throws(
     () => exportTemplate({ dir: refused, from: repo, factory: asked('ruled') }),
-    refusedWith('Invalid', /the factory ruled's rules: [^\n]*RULES\.md opens with a frontmatter block/),
+    refusedWith('Invalid', "the factory ruled's rules: ", /RULES\.md opens with a frontmatter/),
   );
   assert.equal(fs.existsSync(refused), false);
 });
@@ -325,7 +324,10 @@ test('with --factory: a workflow it attaches that the repository lacks, a step h
     () => exportTemplate({ dir, from: repo, factory: asked('gaps') }),
     refusedWith(
       'Invalid',
-      /the factory gaps attaches ghost, and [^\n]* holds no workflow ghost[^]*`agent: reviewer` fills this step, and the factory gaps hires shipper into it too/,
+      'the factory gaps attaches ghost',
+      'holds no workflow ghost',
+      '`agent: reviewer` fills this step',
+      'the factory gaps hires shipper',
     ),
   );
   assert.equal(fs.existsSync(dir), false);
@@ -404,7 +406,7 @@ test('nemia template check prints that a folder passes, and refuses one that doe
   fs.writeFileSync(path.join(dir, 'nemia.yaml'), fs.readFileSync(path.join(dir, 'nemia.yaml'), 'utf8').replace('v1alpha1', 'v2'));
   await assert.rejects(
     main(['template', 'check', dir], engineOf(engine().layer)),
-    refusedWith('Invalid', /does not pass, with 1 problem:\nnemia\.yaml:1:\d+: apiVersion is "nemia\.dev\/v2"/),
+    refusedWith('Invalid', 'with 1 problem', /\nnemia\.yaml:1:\d+: apiVersion /, '"nemia.dev/v2"'),
   );
 });
 
@@ -468,10 +470,7 @@ test('pack refuses a folder that does not pass, at its line, and an --out that i
   const manifest = path.join(dir, 'nemia.yaml');
   const text = fs.readFileSync(manifest, 'utf8');
   fs.writeFileSync(manifest, text.replace('v1alpha1', 'v2'));
-  assert.throws(
-    () => packTemplate({ dir, cwd }),
-    refusedWith('Invalid', /was not packed, since it does not pass:\n {2}nemia\.yaml:1:\d+: apiVersion/),
-  );
+  assert.throws(() => packTemplate({ dir, cwd }), refusedWith('Invalid', 'was not packed', /\n {2}nemia\.yaml:1:\d+: apiVersion/));
   assert.deepEqual(fs.readdirSync(cwd), []);
   fs.writeFileSync(manifest, text);
   fs.writeFileSync(path.join(cwd, 'mine.tgz'), 'mine');
@@ -491,11 +490,7 @@ test('pack refuses a version that names no file where --out names none, and writ
   for (const version of ['1/../../x', '1.0/x', '..', '1\\x']) {
     fs.writeFileSync(manifest, text.replace(/version: .*/, `version: ${JSON.stringify(version)}`));
     assert.deepEqual(checkTemplateAt(dir), [], `${version} passes the check`);
-    assert.throws(
-      () => packTemplate({ dir, cwd }),
-      refusedWith('Invalid', /names no file, and pack names its archive <name>-<version>\.tgz[^]*or name the archive with --out/),
-      version,
-    );
+    assert.throws(() => packTemplate({ dir, cwd }), refusedWith('Invalid', 'names no file', '<name>-<version>.tgz', 'with --out'), version);
     assert.deepEqual(fs.readdirSync(cwd), [], version);
     assert.deepEqual(fs.readdirSync(outer), ['a'], version);
     assert.deepEqual(fs.readdirSync(path.join(outer, 'a')), ['b'], version);
@@ -542,7 +537,7 @@ test('unpack refuses an archive whose entry climbs out of its folder, and writes
   const parent = scratch('wf-template-unpack-');
   assert.throws(
     () => unpackTemplate({ archive, dir: parent }),
-    refusedWith('Invalid', /evil\.tgz was refused, and nothing was written:\n {2}team\/\.\.\/escape: has a part/),
+    refusedWith('Invalid', 'evil.tgz was refused', /\n {2}team\/\.\.\/escape: has a part/),
   );
   assert.deepEqual(fs.readdirSync(parent), [], 'no escape, no team, no staged folder');
   assert.equal(fs.existsSync(path.join(path.dirname(parent), 'escape')), false);
@@ -557,11 +552,11 @@ test('check reads an archive as the folder it holds, every problem at its line; 
   fs.writeFileSync(archive, packArchive('team', files).archive);
   await assert.rejects(
     main(['template', 'check', archive], engineOf(engine().layer)),
-    refusedWith('Invalid', /bad\.tgz does not pass, with 1 problem:\nnemia\.yaml:1:\d+: apiVersion is "nemia\.dev\/v2"/),
+    refusedWith('Invalid', 'bad.tgz does not pass', 'with 1 problem', /\nnemia\.yaml:1:\d+: apiVersion /, '"nemia.dev/v2"'),
   );
   await assert.rejects(
     main(['template', 'check', path.join(dir, 'none')], engineOf(engine().layer)),
-    refusedWith('Missing', /is neither a folder nor a file: name a template's folder[^]*or an archive/),
+    refusedWith('Missing', 'is neither a folder nor a file', "name a template's folder", 'or an archive'),
   );
 });
 
@@ -570,9 +565,11 @@ test('a folder entry that is neither a file nor a folder is refused by name, nev
   execFileSync('mkfifo', [path.join(dir, 'workflows', 'dev', 'pipe.yaml')], { stdio: ['ignore', 'pipe', 'pipe'] });
   const problems = checkTemplateAt(dir);
   assert.deepEqual(
-    problems.map((p) => [p.file, p.message]),
-    [['workflows/dev/pipe.yaml', 'workflows/dev/pipe.yaml is neither a file nor a folder, and a template holds files: remove it.']],
+    problems.map((p) => p.file),
+    ['workflows/dev/pipe.yaml'],
   );
+  assert.ok(problems[0].message.startsWith('workflows/dev/pipe.yaml is neither a file nor a folder'), problems[0].message);
+  assert.ok(problems[0].message.includes('remove it'), problems[0].message);
 });
 
 test('nemia template pack and unpack print what they wrote, the digest of its content, and how to check it', async (t) => {

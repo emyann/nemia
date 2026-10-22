@@ -172,7 +172,12 @@ function includeDrift(workflow: Workflow): string[] {
   });
 }
 
-/** A node version written unquoted, an `engines.node` with no floor to read, and a matrix that does not test that floor. */
+/**
+ * A node version written unquoted, an `engines.node` with no floor to read, a matrix that does not test that floor, and a workspace
+ * whose legs do not cover every node the axis names. The cross product gives that coverage for nothing; an `include` entry is written
+ * by hand, one per node, so a workspace that arrived through `include` can lose a node without a word — tested on one version while
+ * the matrix claims two.
+ */
 function nodeDrift(workflow: Workflow, engine: string): string[] {
   const nodes = [...new Set(legs(workflow).map((leg) => leg.node))];
   const sentences = nodes
@@ -190,8 +195,6 @@ function nodeDrift(workflow: Workflow, engine: string): string[] {
     sentences.push(
       `the ${LEGS} job's matrix.node in ${FILE} does not test ${floor}, the floor engines.node claims in package.json: add '${floor}' to the matrix, or lower engines.node to a version the matrix tests`,
     );
-  // Every workspace on every node the axis names. The cross product gives it for nothing; an include entry is written by hand, one per
-  // node, so a workspace that arrived through include can lose a node without a word.
   const expanded = legs(workflow);
   for (const workspace of workedspaces(workflow))
     for (const node of legNodes(workflow))
@@ -328,11 +331,11 @@ const suiteRuns = (workflow: Workflow): { zone: string | undefined; if?: string;
     }));
 
 /**
- * The zones the legs run their suites under, which is now two things rather than one: every leg under `UTC`, and the web alone a second
- * pass under `America/New_York`. The second zone was every leg's until the card of 2026-10-21 measured what it bought — local time is
- * read in `apps/web/src/lib` and nowhere else in this repository, and in 54 `ci` runs the New York pass never failed on its own — so
- * the condition on that step is what keeps four legs from paying for a zone their code cannot read, and the sentences below are what
- * refuses dropping it from the web, widening it back to every leg, or adding a third zone nothing here can account for.
+ * The zones the legs run their suites under, which is two things rather than one: every leg under `UTC`, and the web alone a second
+ * pass under `America/New_York`. The second zone is the web's because local time is read in `apps/web/src/lib` and nowhere else in
+ * this repository, and the condition on that step is what keeps four legs from paying for a zone their code cannot read: the sentences
+ * below refuse dropping it from the web, widening it back to every leg, and adding a third zone nothing here can account for.
+ * `docs/plan-github-ci.md` holds the measurement that chose it.
  *
  * A run that does not pass `--force` is the invisible one: `turbo.json` hashes no environment, so it replays the run before it from the
  * cache and that timezone is never tested at all.
@@ -393,13 +396,16 @@ function zoneDrift(workflow: Workflow): string[] {
  * hole for the fraction runs the whole suite under both legs, which is slower than before and reports two halves it never ran; and the
  * fraction cannot be appended from outside the script — node takes its file patterns off argv past the first positional, so a turbo
  * `-- --test-shard=1/2` arrives as a glob that matches nothing.
+ *
+ * The shards are read per leg a shard splits — one workspace on one node — and a group whose shards do not read as fractions is
+ * reported for that alone, since nothing can be said about whether unreadable fractions tile. The `test` script and the run step's env
+ * are asked of a file that shards something and of no other, so a card that takes the shards off is not then held to a hole in a
+ * script and a variable nothing reads.
  */
 function legShardDrift(workflow: Workflow, workspaces: Workspace[]): string[] {
   const expanded = legs(workflow);
   const sentences: string[] = [];
   const sharded = new Set<unknown>();
-  // Grouped by the leg a shard splits: one workspace on one node. A group whose shards do not read as fractions is reported for that
-  // alone, since nothing can be said about whether unreadable fractions tile.
   const groups = new Map<string, Leg[]>();
   for (const leg of expanded) {
     const key = `${String(leg.workspace)} on node ${String(leg.node)}`;
@@ -432,12 +438,14 @@ function legShardDrift(workflow: Workflow, workspaces: Workspace[]): string[] {
       );
   }
   if (sharded.size === 0) return sentences;
-  // The script that has to take the shard, and the env that has to carry it: asked only of a file that shards something today, so a
-  // card that takes the shards off is not then held to a hole and a variable nothing reads.
   for (const name of sharded) {
     const workspace = workspaces.find((each) => each.name === name);
     if (workspace === undefined) continue;
-    if (workspace.test === undefined || !workspace.test.includes(SHARD_HOLE) || workspace.test.indexOf(SHARD_HOLE) > workspace.test.indexOf("'"))
+    if (
+      workspace.test === undefined ||
+      !workspace.test.includes(SHARD_HOLE) ||
+      workspace.test.indexOf(SHARD_HOLE) > workspace.test.indexOf("'")
+    )
       sentences.push(
         `${workspace.name}'s legs in ${FILE} run shards of its suite and its test script cannot take one: write ${SHARD_HOLE} into that script, after --test and before its globs — node stops reading options at the first pattern, so a flag appended from outside is read as a file pattern — or every shard runs the whole suite and the leg reports a half it never ran`,
       );
@@ -907,7 +915,6 @@ test('REFUSED: a workspace with no leg, a leg with no workspace, a node floor ad
     return matrix;
   };
 
-  /** The node every leg of the shipped file runs beside 24: moved on the axis and on the include entries together, as a card would. */
   const renode = (workflow: Workflow, to: unknown): void => {
     const matrix = matrixOf(workflow);
     matrix.node = [to, '24'];
@@ -1092,7 +1099,7 @@ test('REFUSED: a workspace with no leg, a leg with no workspace, a node floor ad
   stepsOf(third).push(tokyo);
   assert.deepEqual(zoneDrift(third), [
     'the test job in .github/workflows/ci.yml runs its suite under TZ=Asia/Tokyo, a zone this file knows nothing about: the legs run ' +
-      "under UTC, and web alone a second pass under America/New_York — take the step off, or say in docs/plan-github-ci.md why a third " +
+      'under UTC, and web alone a second pass under America/New_York — take the step off, or say in docs/plan-github-ci.md why a third ' +
       'zone is tested and hold it here',
   ]);
 
@@ -1119,11 +1126,15 @@ test('REFUSED: a workspace with no leg, a leg with no workspace, a node floor ad
   ]);
 });
 
-test("REFUSED: an include entry the axis already names, one with no node or no workspace, shards that do not tile, a shard that is no fraction, a leg beside the shards, a test script with no hole for one, a suite run not given the shard or given a literal, and a job name that does not name it", () => {
+test('REFUSED: an include entry the axis already names, one with no node or no workspace, shards that do not tile, a shard that is no fraction, a leg beside the shards, a test script with no hole for one, a suite run not given the shard or given a literal, and a job name that does not name it', () => {
   const shipped = readWorkflow();
   const workspaces = readWorkspaces();
   assert.deepEqual(includeDrift(shipped), [], "the orchestrator's include entries each make a leg of their own today");
-  assert.deepEqual(legShardDrift(shipped, workspaces), [], 'the two shards tile the suite, the script takes one and both runs hand it on today');
+  assert.deepEqual(
+    legShardDrift(shipped, workspaces),
+    [],
+    'the two shards tile the suite, the script takes one and both runs hand it on today',
+  );
   assert.deepEqual(nameDrift(shipped), [], "the leg's name names its shard today");
 
   const includeOf = (workflow: Workflow): Record<string, unknown>[] => {
@@ -1224,7 +1235,9 @@ test("REFUSED: an include entry the axis already names, one with no node or no w
     workspace.name === 'agent-orchestrator'
       ? {
           ...workspace,
-          test: workspace.test?.replace(' ${WF_TEST_SHARD:+--test-shard=$WF_TEST_SHARD}', '') + ' ${WF_TEST_SHARD:+--test-shard=$WF_TEST_SHARD}',
+          test:
+            workspace.test?.replace(' ${WF_TEST_SHARD:+--test-shard=$WF_TEST_SHARD}', '') +
+            ' ${WF_TEST_SHARD:+--test-shard=$WF_TEST_SHARD}',
         }
       : workspace,
   );

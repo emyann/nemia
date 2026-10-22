@@ -6,10 +6,13 @@
 import {
   askEnded,
   asks,
+  away,
   bin,
   calls,
+  engineRoot,
   observations,
   recorded,
+  realHome,
   registry,
   root,
   scriptUnharnessed,
@@ -21,9 +24,10 @@ import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import ts from 'typescript';
-import { scratch } from './scratch.ts';
+import { machineTempDir, scratch } from './scratch.ts';
 import { app, runtime } from '../src/app.ts';
 import { Engine } from '../src/store.ts';
 import { engine, tickRun } from 'agent-orchestrator';
@@ -332,4 +336,23 @@ test("REFUSED: in `exit` mode the harness's `claude` ends 3 with its sentence, b
   } finally {
     usageAnswer(recorded('plan'));
   }
+});
+
+test("the three roots an api test process starts with are each a scratch folder, and none is the person's store", () => {
+  const temp = fs.realpathSync(machineTempDir());
+  for (const [name, dir, prefix] of [
+    ['WF_ROOT', root, 'nemia-api-store-'],
+    ['AE_ROOT', engineRoot, 'nemia-api-engine-store-'],
+    ['HOME', away, 'nemia-api-home-'],
+  ] as const) {
+    assert.equal(process.env[name], dir, `${name} is not what the harness made`);
+    assert.ok(path.isAbsolute(dir), `${name}=${dir} is not absolute`);
+    assert.ok(fs.realpathSync(dir).startsWith(`${temp}${path.sep}`), `${name}=${dir} is not under ${temp}`);
+    assert.ok(path.basename(dir).startsWith(prefix), `${name}=${dir} is not a scratch folder of this process's`);
+    for (const live of [path.join(realHome, '.agent-workflows'), path.join(realHome, '.agent-engine'), realHome]) {
+      assert.notEqual(fs.realpathSync(dir), live, `${name} is the person's own ${live}`);
+      assert.equal(fs.realpathSync(dir).startsWith(`${live}${path.sep}`), false, `${name} is under the person's own ${live}`);
+    }
+  }
+  assert.equal(fs.realpathSync(os.homedir()), fs.realpathSync(away), "os.homedir() still answers the person's own home");
 });

@@ -17,7 +17,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { AWAY, ENGINE, REAL_HOME, SENTINEL, STORE } from './ambient.ts';
-import { scratch } from './scratch.ts';
+import { machineTempDir, scratch } from './scratch.ts';
 
 const PACKAGE = path.join(import.meta.dirname, '..');
 const TELEMETRY = pathToFileURL(path.join(PACKAGE, 'src', 'telemetry', 'telemetry.ts')).href;
@@ -208,8 +208,8 @@ test("this file's own process has the scratch folder too", () => {
   assert.equal(path.basename(process.env.CLAUDE_CONFIG_DIR ?? '').startsWith('wf-ambient-claude-'), true);
 });
 
-test('the three roots a test process starts with are each a scratch folder, and none is the person\'s store', () => {
-  const temp = fs.realpathSync(os.tmpdir());
+test("the three roots a test process starts with are each a scratch folder, and none is the person's store", () => {
+  const temp = fs.realpathSync(machineTempDir());
   for (const [name, dir, prefix] of [
     ['WF_ROOT', STORE, 'wf-ambient-store-'],
     ['AE_ROOT', ENGINE, 'wf-ambient-engine-'],

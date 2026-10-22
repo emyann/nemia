@@ -14,7 +14,10 @@
  * default factory: a test of the refusal those starts meet as shipped deletes it first. And it sets `NEMIA_DAEMON_START=off`, so a `nemia`
  * a test spawns, or a command that ticks it types, starts no daemon of this checkout. And it deletes `OTEL_EXPORTER_OTLP_ENDPOINT`: the api
  * is the daemon, and one a test starts would post its spans to the collector the shell names; a test that exports sets the address of a
- * collector it made itself.
+ * collector it made itself. And neither store is the person's and neither is their home: it points `WF_ROOT`, `AE_ROOT` and `HOME` each at
+ * a scratch folder (`root`, `engineRoot`, `away`), so a module that pins a root as it loads pins a throwaway one and `os.homedir()`
+ * answers a throwaway too — the engine's store and `~/.claude.json` with it. A test that needs something of the person's own `$HOME`
+ * reads it from `realHome`.
  *
  * Installed as this module loads. The api's test script loads it with `--import` before any test file, and `node --test` loads that in
  * each test file's process and not in its own; each test file imports it first as well, by its path from the file, so a file run by hand
@@ -23,6 +26,7 @@
  * (`unharnessed`), and one that loads a module with `import()`: ESM evaluates a file's static imports in their order, so the api and the
  * package, imported after this, load over its store.
  */
+import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
@@ -87,9 +91,20 @@ process.env.PATH = `${bin}${path.delimiter}${process.env.PATH}`;
 /** Where Claude Code keeps its sessions and transcripts: `CLAUDE_CONFIG_DIR`, which the Claude runner reads as its module loads. */
 export const config = scratch('nemia-api-harness-claude-');
 process.env.CLAUDE_CONFIG_DIR = config;
+/** The person's own home, read before this file moved it: what a test that truly needs it asks for, by name. */
+export const realHome = os.homedir();
+
 /** The store's root, `WF_ROOT`: the package fixes its root (`HOME`) as its modules load. */
 export const root = scratch('nemia-api-store-');
 process.env.WF_ROOT = root;
+
+/** The engine's store, `AE_ROOT`: a throwaway too, so a runner that still reads it writes nowhere near `~/.agent-engine`. */
+export const engineRoot = scratch('nemia-api-engine-store-');
+process.env.AE_ROOT = engineRoot;
+
+/** What `os.homedir()` answers in an api test: a throwaway, so a root that still falls back to home falls into scratch. */
+export const away = scratch('nemia-api-home-');
+process.env.HOME = away;
 
 /** How many calls of `verb` the fake has answered. */
 const callsOf = (verb: string): number =>

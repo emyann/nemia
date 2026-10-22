@@ -1,5 +1,6 @@
 /**
- * The store as every run route reads it: the engine an app reads through and the store's root, as services (`Engine`, `StoreRoot`); every
+ * The store as every run route reads it: the engine an app reads through, as a service (`Engine`), and the store's root, which is the
+ * package's own service, re-exported here so a route has one import site for both (`StoreRoot`, given at `app.ts` from `WF_ROOT`); every
  * task's view, a run found by its id, one run judged (`judgedOn`), and the task a step's routes read. What the board's reading of a run
  * stands on — the views of its tasks, its workflow and steps, the feed's filing times — is the package's (`viewsFor`, `workflowsOf`,
  * `filedTimes`).
@@ -8,7 +9,6 @@ import { Context, Effect, Layer } from 'effect';
 import {
   asked,
   engine,
-  HOME,
   judge,
   judgedUnlessUnreadable,
   runStore,
@@ -39,14 +39,16 @@ export class Engine extends Context.Service<Engine, ReturnType<typeof engine>>()
 }
 
 /**
- * The store's root as the api's own reads and writes take it: your workflows, agents and skills, and a try's folder, looked for and written
- * under it. Live, the package's `HOME`, which it fixes as it loads (`WF_ROOT`). What the package reads by itself is under its `HOME`
- * whatever this says: the runs (`runStore`, `findRun`), the inbox and the queue, the daemon's file, and every verb a route calls. So a
- * test that gives another root moves where the api looks for yours, and nothing of the package's.
+ * The store's root, as the api's own reads and writes take it — your workflows, agents and skills, and a try's folder, looked for and
+ * written under it — and as the package takes it too: one service (`orchestrator/StoreRoot`), given by the app's layer from `WF_ROOT`
+ * (`storeRootLayer`, `app.ts`), with no default, so an app given none does not compile. A test that gives another root moves where the
+ * api looks for yours.
+ *
+ * What the package still reads off a root of its own, as its modules load — the runs (`runStore`, `findRun`), the inbox and the queue,
+ * the daemon's file — is named in `packages/agent-orchestrator/test/global-roots.baseline.ts`, and is owed its own threading; a test that
+ * means to move those sets `WF_ROOT` before it imports the package, as `test/harness.ts` does.
  */
-export class StoreRoot extends Context.Service<StoreRoot, string>()('api/StoreRoot') {
-  static readonly live: Layer.Layer<StoreRoot> = Layer.succeed(StoreRoot)(HOME);
-}
+export { StoreRoot } from 'agent-orchestrator';
 
 type Reader = Engine['Service'];
 

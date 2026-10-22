@@ -26,10 +26,13 @@
  * nothing here protects a file that forgets, but what it forgets is now a throwaway.
  *
  * Moving `HOME` moves `os.homedir()` for this process and every child it spawns, git's global configuration and `~/.claude.json` with it.
- * Every git call a test makes carries its own identity (`-c user.email`), and the shipped place carries `AS_RUN`, so no commit of a test
- * loses one. A test that needs something of the person's own `$HOME` reads it from `REAL_HOME`.
+ * So the throwaway home is given a `.gitconfig` of its own with a test identity (`GIT_IDENTITY`): a commit a test makes through a script
+ * that names no `-c user.email` of its own — a landing's merge commit, the ship's — was signed with the person's name until now, and is
+ * signed with this one instead. A test that needs something of the person's own `$HOME` reads it from `REAL_HOME`.
  */
+import fs from 'node:fs';
 import os from 'node:os';
+import path from 'node:path';
 import { scratch } from './scratch.ts';
 
 /** The value both ceilings start with in a test: not a count, so `maxRuns` and `maxConcurrent` refuse it with exit 2. */
@@ -59,3 +62,8 @@ process.env.AE_ROOT = ENGINE;
 /** What `os.homedir()` answers in a test: a folder of this process's, so a root that still falls back to home falls into scratch. */
 export const AWAY = scratch('wf-ambient-home-');
 process.env.HOME = AWAY;
+
+/** Who a commit a test makes is by, where the script making it names nobody: never the person running the suite. */
+export const GIT_IDENTITY = { name: 'nemia test', email: 'test@nemia.invalid' };
+
+fs.writeFileSync(path.join(AWAY, '.gitconfig'), `[user]\n\tname = ${GIT_IDENTITY.name}\n\temail = ${GIT_IDENTITY.email}\n`);

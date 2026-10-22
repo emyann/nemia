@@ -612,6 +612,30 @@ const MCP_STATE: readonly Walk[] = [
   },
 ];
 
+/** What `io` answers on `engine` now. */
+const ioOf = (engine: EngineShape) => Effect.runPromise(engine.io());
+
+const IO: readonly Walk[] = [
+  {
+    name: 'the totals are the reads, bytes, spawns, writes and locks, and the observes by harness',
+    walk: async ({ engine }) => Object.keys(await ioOf(engine)).sort(),
+    says: ['bytesRead', 'lockWaitMs', 'locks', 'observed', 'reads', 'spawned', 'writes'],
+  },
+  {
+    name: 'a view of a filed task counts a read, and a list after it takes none away',
+    walk: async ({ engine }) => {
+      await asked(engine.file(task('a')));
+      const before = (await ioOf(engine)).reads;
+      await Effect.runPromise(engine.view('a'));
+      const viewed = (await ioOf(engine)).reads;
+      await asked(engine.list());
+      const listed = (await ioOf(engine)).reads;
+      return [viewed > before, listed >= viewed];
+    },
+    says: [true, true],
+  },
+];
+
 /** The contract: every kept verb's walks. */
 export const WALKS = {
   file: FILE,
@@ -630,6 +654,7 @@ export const WALKS = {
   hold: HOLD,
   drain: DRAIN,
   mcpState: MCP_STATE,
+  io: IO,
 } as const;
 
 /** A verb the stand-in keeps. */
@@ -645,7 +670,6 @@ export const UNKEPT = [
   'answer',
   'close',
   'watch',
-  'io',
   'tallied',
   'start',
   'sweep',
@@ -698,6 +722,18 @@ export type Apart = {
 
 /** What the stand-in does not hold of the engine: a test that needs one of these needs the real engine, in a boundary file. */
 export const APART: readonly Apart[] = [
+  {
+    name: 'what a read costs',
+    why: 'the engine counts the files it opened and their bytes, and the stand-in opens none: `io` counts each read verb a test asked as one read, and no byte, spawn, write, lock or observe. A test that needs the files a read opened, or their bytes, needs the real engine, in a boundary file.',
+    walk: async ({ engine }) => {
+      await asked(engine.file(task('a')));
+      const before = await ioOf(engine);
+      await Effect.runPromise(engine.view('a'));
+      const after = await ioOf(engine);
+      return [after.reads - before.reads, after.bytesRead - before.bytesRead];
+    },
+    standIn: [1, 0],
+  },
   {
     name: 'the state of a server a record holds',
     why: 'a state is read inside a Claude Code session, and the stand-in opens none: it answers what a test planted (`plantMcpState`), where an engine with no Claude Code harness refuses the read and one with it spawns a CLI. A test that needs a state read for real needs the real engine, with a Claude Code harness, in a boundary file.',

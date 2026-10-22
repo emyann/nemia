@@ -37,7 +37,7 @@ import type { RemoteMcpServer } from '../harness/seam.ts';
 type TranscriptEvent = Effect.Success<ReturnType<EngineShape['transcript']>>['events'][number];
 import { ForgetRefused } from './forget.ts';
 import { KeptRefused, type KeptReport } from './kept.ts';
-import { mcpStateRefusal, type TaskSpec } from './options.ts';
+import { mcpStateRefusal, type EngineIo, type TaskSpec } from './options.ts';
 import { McpStateRefused } from './mcp-state.ts';
 import { notACount, notAStream, OutputRefused } from './output.ts';
 import { SayRefused } from './say.ts';
@@ -188,6 +188,30 @@ const transcriptOf =
     const from = after === undefined ? 0 : Number(after.split('.')[0]);
     return Effect.succeed({ events: events.slice(from), cursor: plantedCursor(Math.max(from, events.length)) });
   };
+
+/** The verbs whose asking `io` counts as one read each: what the stand-in answers out of what it holds. */
+const READS = ['view', 'list', 'logs', 'output', 'transcript'] as const;
+
+/**
+ * `verbs` with each read of `READS` counted once as it is asked, and `io`, which answers the count so far: the reads a test's verbs
+ * asked, where the engine counts the files it opened. No byte, spawn, write or lock is counted, and no harness observed (`APART`).
+ */
+const countedOf = <V extends Pick<EngineShape, (typeof READS)[number]>>(verbs: V): V & Pick<EngineShape, 'io'> => {
+  let reads = 0;
+  const counted = Object.fromEntries(
+    READS.map((verb) => [
+      verb,
+      (...args: unknown[]) =>
+        Effect.suspend(() => {
+          reads += 1;
+          return Reflect.apply(verbs[verb], verbs, args) as Effect.Effect<unknown, unknown>;
+        }),
+    ]),
+  ) as unknown as Pick<EngineShape, (typeof READS)[number]>;
+  const io = (): Effect.Effect<EngineIo> =>
+    Effect.sync(() => ({ bytesRead: 0, reads, spawned: 0, writes: 0, locks: 0, lockWaitMs: 0, observed: {} }));
+  return { ...verbs, ...counted, io };
+};
 
 /** A verb the stand-in does not keep: a test that reaches it has outgrown the stand-in. */
 const unkept = (verb: string) => () =>
@@ -573,7 +597,7 @@ export const testEngine = (): TestEngine => {
   const mcp = mcpHeld();
   const layer = Layer.succeed(Engine)(
     Engine.of({
-      ...keptOf(held, sayRefusals, sizes, keptFailures),
+      ...countedOf(keptOf(held, sayRefusals, sizes, keptFailures)),
       mcpState: mcp.mcpState,
       tick: unkept('tick'),
       admit: unkept('admit'),
@@ -583,7 +607,6 @@ export const testEngine = (): TestEngine => {
       answer: unkept('answer'),
       close: unkept('close'),
       watch: unkept('watch'),
-      io: unkept('io'),
       tallied: unkept('tallied'),
       start: unkept('start'),
       sweep: unkept('sweep'),

@@ -141,15 +141,19 @@ test('REFUSED at shipped defaults: an `Edit` allow over an agent whose mode asks
 test("a step's `disallowedTools:` adds to its agent's: the session is refused its own rules, then each of the agent's they do not cover", () => {
   const agents = agentsOf({ ada: '---\ndisallowedTools: Bash(git push), Bash(git push:*)\n---\nWork.\n' });
   const step = stepOf(agents, 'agent: ada\ndisallowedTools: Bash(npm run build)');
-  assert.deepEqual(step.disallowedTools, ['Bash(npm run build)', 'Bash(git push)', 'Bash(git push:*)'], 'a line that leaves them out loads');
-  assert.deepEqual(step.agent?.agentDenies, ['Bash(git push)', 'Bash(git push:*)'], 'the agent\'s are kept apart, to write the line back');
+  assert.deepEqual(
+    step.disallowedTools,
+    ['Bash(npm run build)', 'Bash(git push)', 'Bash(git push:*)'],
+    'a line that leaves them out loads',
+  );
+  assert.deepEqual(step.agent?.agentDenies, ['Bash(git push)', 'Bash(git push:*)'], "the agent's are kept apart, to write the line back");
   assert.deepEqual(
     stepOf(agents, 'agent: ada\ndisallowedTools: Bash(git push:*), Bash(npm run build), Bash(git push)').disallowedTools,
     ['Bash(git push:*)', 'Bash(npm run build)', 'Bash(git push)'],
     'a line that repeats every deny of its agent, as each had to before, resolves to itself',
   );
   assert.deepEqual(stepOf(agents, 'agent: ada\ndisallowedTools: Bash').disallowedTools, ['Bash'], 'a bare tool covers its rules');
-  assert.deepEqual(stepOf(agents, 'agent: ada').disallowedTools, ['Bash(git push)', 'Bash(git push:*)'], 'no line is the agent\'s');
+  assert.deepEqual(stepOf(agents, 'agent: ada').disallowedTools, ['Bash(git push)', 'Bash(git push:*)'], "no line is the agent's");
 });
 
 test("REFUSED at shipped defaults: `permissionMode:` wider than its agent's, or than the default when it names none", () => {

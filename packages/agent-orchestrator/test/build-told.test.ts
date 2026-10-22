@@ -470,7 +470,7 @@ test('REFUSED: a step that adds a skill no more, or declares its closeout no mor
 test('REFUSED: a step that denies a command no more is named', () => {
   const review = shippedEdited('build', 'review', (text) => text.replace(' Bash(npm run e2e),', ''));
   assert.deepEqual(untold('build', review), ['build/review: denies Bash(npm run e2e)']);
-  const intake = shippedEdited('intake', 'intake', (text) => text.replace(', Bash(npm run build)', ''));
+  const intake = shippedEdited('intake', 'intake', (text) => text.replace('Bash(npm run build), ', ''));
   assert.deepEqual(untold('intake', intake), ['intake/intake: denies Bash(npm run build)']);
   const janitor = shippedEdited('janitor', 'argus', (text) => text.replace(/^disallowedTools: .*\n/m, ''));
   assert.deepEqual(

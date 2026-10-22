@@ -47,14 +47,14 @@ test("a step frozen with its agent's denies apart keeps them, and one frozen bef
   };
   const now = decode(frozen(step));
   assert.ok(Result.isSuccess(now), Result.isFailure(now) ? String(now.failure) : '');
-  assert.deepEqual(now.success, frozen(step), 'the agent\'s denies are kept');
+  assert.deepEqual(now.success, frozen(step), "the agent's denies are kept");
   assert.deepEqual(ownDenies(now.success as Workflow), ['Bash(npm run build)']);
   const before = decode(frozen({ ...step, agent }));
   assert.ok(Result.isSuccess(before), Result.isFailure(before) ? String(before.failure) : '');
   assert.deepEqual(before.success, frozen({ ...step, agent }), 'a record from before decodes unchanged');
   assert.deepEqual(before.success.disallowedTools, step.disallowedTools, 'and is filed with the list it had');
   assert.deepEqual(ownDenies(before.success as Workflow), step.disallowedTools, 'its line read back whole');
-  const one = { ...frozen(step) as object, agent: { ...agent, agentDenies: 'Bash(git push)' } };
+  const one = { ...(frozen(step) as object), agent: { ...agent, agentDenies: 'Bash(git push)' } };
   assert.ok(Result.isFailure(decode(one)), 'a list, or refused');
 });
 

@@ -85,16 +85,15 @@ const wordsAbove = (agent: Agent, factoryRules: string | undefined) => ({
  *
  * `agents` are the agents `agent:` may name (`loadAgents`). A step that names one is resolved here, once: each role key the agent sets is
  * the step's unless the step sets it too — the fence under either name, `permissionMode:` or `sandbox:`, as one key, so a step with a fence
- * of its own is given neither of its agent's; a fence key the step sets may only narrow its agent's (`fenceRefusal`), but for `disallowedTools:`, which adds to its agent's: the
- * session is refused the step's own rules, then each of the agent's they do not cover (`deniesWith`, `StepAgent.agentDenies`). What the step is
- * told is the agent's instructions, then a person's custom instructions for it (`Agent.customInstructions`), then the step's own note,
- * each under the heading of its layer's number and owner (`headedLayers`) — the agent's alone when the step has none. Custom
- * instructions are words and set no key. The step's own
- * lines are read against the harness it runs on, its agent's where it names none, before the two are merged: a step's `permissionMode:`
- * on codex is its own `sandbox:`. A schema the agent's `output:` names is read beside the agent, and one the step names beside the
- * step; the step's output is both, merged (`mergedOutput`), each field with one owner, and a field both declare is refused naming it
- * and both declarers.
- * Everything downstream of the parser sees the resolved step; `agent` on it says what was the step's own.
+ * of its own is given neither of its agent's; a fence key the step sets may only narrow its agent's (`fenceRefusal`), but for
+ * `disallowedTools:`, which adds to its agent's: the session is refused the step's own rules, then each of the agent's they do not cover
+ * (`deniesWith`, `StepAgent.agentDenies`). What the step is told is the agent's instructions, then a person's custom instructions for it
+ * (`Agent.customInstructions`), then the step's own note, each under the heading of its layer's number and owner (`headedLayers`) — the
+ * agent's alone when the step has none. Custom instructions are words and set no key. The step's own lines are read against the harness it
+ * runs on, its agent's where it names none, before the two are merged: a step's `permissionMode:` on codex is its own `sandbox:`. A schema
+ * the agent's `output:` names is read beside the agent, and one the step names beside the step; the step's output is both, merged
+ * (`mergedOutput`), each field with one owner, and a field both declare is refused naming it and both declarers. Everything downstream of
+ * the parser sees the resolved step; `agent` on it says what was the step's own.
  *
  * `hired` is the agent a factory hires into a step (`Hire`): a step whose file names no agent is resolved with it exactly as if its file
  * said `agent: <name>`. A step whose file names its own agent and is hired one too is refused, naming both (`attachedAgent`).
@@ -153,9 +152,7 @@ export function parseWorkflow(
   const output = mergedOutput(name, agent.name, outputOf(name, agent.keys.output, agent.read), outputOf(name, meta.output, read));
   const resolved = { ...inherited, ...meta };
   delete resolved.output;
-  const stated = stepFrom(name, resolved, body, read, spelled, output);
-  const agentDenies = meta.disallowedTools === undefined ? [] : agentDeniesOf(agent);
-  const step = agentDenies.length ? { ...stated, disallowedTools: deniesWith(stated.disallowedTools ?? [], agentDenies) } : stated;
+  const { step, agentDenies } = withAgentDenies(stepFrom(name, resolved, body, read, spelled, output), meta, agent);
   agentStepRefusal(name, agent, meta, step, skills);
   refuseUnwritable(step, agent.name);
   const added = step.skills?.filter((skill) => !agent.skills?.includes(skill));
@@ -178,11 +175,22 @@ export function parseWorkflow(
       ...wordsAbove(agent, factoryRules),
       ...(sessionSkills.length && { skills: sessionSkills }),
       ...(added && { addedSkills: added }),
-      ...(agentDenies.length && { agentDenies }),
+      ...(agentDenies && { agentDenies }),
       ...(agent.harnessPrompt !== undefined && { harnessPrompt: agent.harnessPrompt }),
       mcp: sessionServers(agent, step),
     },
   };
+}
+
+/**
+ * Step `step`, read from its own lines `own` over its agent `agent`'s, with what its session is refused: where its own file writes a
+ * `disallowedTools:` line and its agent denies anything, its own rules then each of the agent's they do not cover (`deniesWith`), and
+ * the agent's apart, which the step's provenance keeps (`StepAgent.agentDenies`). Any other step as it was read, with none apart.
+ */
+function withAgentDenies(step: Workflow, own: Partial<Record<StepKey, string>>, agent: Agent): { step: Workflow; agentDenies?: string[] } {
+  const agentDenies = own.disallowedTools === undefined ? [] : agentDeniesOf(agent);
+  if (!agentDenies.length) return { step };
+  return { step: { ...step, disallowedTools: deniesWith(step.disallowedTools ?? [], agentDenies) }, agentDenies };
 }
 
 /**
@@ -448,8 +456,8 @@ const EMPTY_IS_UNSET: readonly StepKey[] = [
  * keys the step set itself and its own note — never what the agent gave it, which would pin the agent's words in every step's file. A key
  * it did not set but whose value was changed since it was read is written too, as the step's own: a change is never dropped. Its body is
  * its own note, whatever `body` says. Its `disallowedTools:` is written without the denies its agent gave it (`ownDenies`), since a step's
- * line adds to its agent's: one that only repeated them writes no line. A step whose `agent` is a name is a draft of the step's own: every key it sets is written, after
- * `agent:`, and its body is its own note.
+ * line adds to its agent's: one that only repeated them writes no line. A step whose `agent` is a name is a draft of the step's own:
+ * every key it sets is written, after `agent:`, and its body is its own note.
  *
  * It judges nothing the parser judges: a value the parser would refuse is written as given, and the parser refuses it in its own words
  * (`writeWorkflow` parses what it rendered before it writes). Refused here is only what a file cannot hold, which the parser would never

@@ -2,9 +2,9 @@
  * Fences only tighten: a step that names an agent, or is hired one, may narrow the agent's fence and never widen it. A step's
  * `disallowedTools:` adds to its agent's (`deniesWith`), so the session is refused the union and a step can never lift one of its agent's
  * denies. `fenceRefusal` judges the other fence keys a step writes itself, which replace its agent's — `tools:`, `allowedTools:`,
- * `permissionMode:` and `sandbox:` — against its agent's, a step that runs a fenced agent on the other harness, whose fence cannot be compared with the agent's, and a step's
- * `background: true` over an agent an allow rule would widen: a background session also reads the person's own settings.
- * `addedSkillsRefusal` judges a skill a step adds to its agent's, which the agent's fence must let the session load.
+ * `permissionMode:` and `sandbox:` — against its agent's, a step that runs a fenced agent on the other harness, whose fence cannot be
+ * compared with the agent's, and a step's `background: true` over an agent an allow rule would widen: a background session also reads the
+ * person's own settings. `addedSkillsRefusal` judges a skill a step adds to its agent's, which the agent's fence must let the session load.
  *
  * `writable:` is the one key that reaches past the fence's directory, and it widens where a step's writes reach, never what it may do:
  * `refuseUnwritable` refuses it over a fence that writes nothing.
@@ -90,11 +90,11 @@ function narrowerThan(reach: FenceReach, asked: string, own: string): string[] |
 }
 
 /**
- * Why step `step` would widen its agent's fence, or `undefined` when it does not: `own` are the keys the step writes itself, the
- * sandbox under its own name (`codexSandboxNamed`), and `resolved` the step they were read into, with the agent's. A key the step
- * does not write is its agent's and widens nothing, nor does its `disallowedTools:`, which adds to its agent's (`deniesWith`); `background: true` widens it as an allow rule would (`backgroundRefusal`). A
- * remote step is left to `remoteRefusal` in harness.ts, which refuses every fence key there. The refusal names the step, the key, what it
- * would add, and the fix.
+ * Why step `step` would widen its agent's fence, or `undefined` when it does not: `own` are the keys the step writes itself, the sandbox
+ * under its own name (`codexSandboxNamed`), and `resolved` the step they were read into, with the agent's. A key the step does not write is
+ * its agent's and widens nothing, nor does its `disallowedTools:`, which adds to its agent's (`deniesWith`); `background: true` widens it
+ * as an allow rule would (`backgroundRefusal`). A remote step is left to `remoteRefusal` in harness.ts, which refuses every fence key
+ * there. The refusal names the step, the key, what it would add, and the fix.
  */
 export function fenceRefusal(step: string, agent: Agent, own: Partial<Record<StepKey, string>>, resolved: Workflow): string | undefined {
   const harness = resolved.harness ?? DEFAULT_HARNESS;

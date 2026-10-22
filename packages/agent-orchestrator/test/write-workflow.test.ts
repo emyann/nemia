@@ -154,7 +154,7 @@ test("a draft naming its agent that sends the resolved denies, as the board list
   const dir = path.join(STORE, 'own-denies');
   const file = fs.readFileSync(path.join(STORE, 'agents', 'implementer.md'), 'utf8');
   const agentDenies = agentDeniesOf(parseAgent('implementer', file));
-  assert.ok(agentDenies.length, 'the tests\' implementer denies something');
+  assert.ok(agentDenies.length, "the tests' implementer denies something");
   const done = writeWorkflow(dir, [step('implement', { agent: 'implementer', disallowedTools: ['Bash(npm run build)', ...agentDenies] })]);
   assert.match(fs.readFileSync(path.join(dir, 'implement.md'), 'utf8'), /^disallowedTools: Bash\(npm run build\)$/m);
   assert.deepEqual(done.steps[0].disallowedTools, ['Bash(npm run build)', ...agentDenies], "the session is still refused the agent's");

@@ -904,12 +904,7 @@ for (const agent of ['ada', 'otto'])
     assert.equal(line.length, step.disallowedTools!.length - 1, `${agent} denies an edit of a folder's local settings`);
     const bare = shippedWith(agent, 'build', 'disallowedTools', line.join(', '));
     assert.deepEqual(editsDenied(bare, HARNESS_FILES), HARNESS_FILES.slice(1), 'the rule cut leaves the projects folder open');
-    const none = shippedWith(
-      agent,
-      'build',
-      'disallowedTools',
-      line.filter((rule) => !rule.startsWith('Edit(')).join(', '),
-    );
+    const none = shippedWith(agent, 'build', 'disallowedTools', line.filter((rule) => !rule.startsWith('Edit(')).join(', '));
     assert.deepEqual(editsDenied(none, HARNESS_FILES), [], 'and the trust and user settings with theirs');
   });
 
@@ -1110,14 +1105,10 @@ test('REFUSED: a browser tool an agent allows no more is reached no more, and br
       ['mcp__playwright__browser_click'],
       agent,
     );
-    const unsafe = shippedEdited(
-      agent,
-      workflow,
-      'a deny of browser_run_code_unsafe',
-      (text) =>
-        text
-          .replace(', mcp__playwright__browser_run_code_unsafe', '')
-          .replace(/^allowedTools: (.*)$/m, 'allowedTools: $1, mcp__playwright__browser_run_code_unsafe'),
+    const unsafe = shippedEdited(agent, workflow, 'a deny of browser_run_code_unsafe', (text) =>
+      text
+        .replace(', mcp__playwright__browser_run_code_unsafe', '')
+        .replace(/^allowedTools: (.*)$/m, 'allowedTools: $1, mcp__playwright__browser_run_code_unsafe'),
     );
     assert.deepEqual(unfenced(unsafe), [`${unsafe.name}: mcp__playwright__browser_run_code_unsafe`], agent);
     assert.deepEqual(
@@ -1164,7 +1155,7 @@ test('REFUSED: design or review with one of its four address rules cut opens the
 });
 
 test("REFUSED: a step or an agent that denies a browser tool its filename no more may have it write a file, the workspace's too", () => {
-  for (const { agent, workflow, file } of BROWSERS)
+  for (const { agent, workflow } of BROWSERS)
     for (const name of FILE_TOOLS) {
       const tool = `mcp__playwright__browser_${name}`;
       const cut = (text: string) => text.replace(`, ${tool}(filename:*)`, '');
@@ -2044,7 +2035,7 @@ test("REFUSED: a read-only step's own line cut to one rule lifts none of its age
   assert.deepEqual(runs(cut, GIT_RUNS_A_PROGRAM), [], 'its agent still refuses every program the set would run');
   assert.deepEqual(runs(cut, GIT_WRITES_A_FILE), [], 'and every --output');
   const alone = { ...cut, disallowedTools: ['Bash(npm run build)'] };
-  assert.deepEqual(runs(alone, GIT_RUNS_A_PROGRAM), GIT_RUNS_A_PROGRAM.map(shown), 'the line alone, as it once replaced its agent\'s');
+  assert.deepEqual(runs(alone, GIT_RUNS_A_PROGRAM), GIT_RUNS_A_PROGRAM.map(shown), "the line alone, as it once replaced its agent's");
 });
 
 test('REFUSED: a read-only step without those denies runs a program by each of them, and without any one of them a spelling runs', () => {
@@ -2957,11 +2948,8 @@ test("GitHub's tools are fenced per agent: Agora reads, Ada reads and writes not
 });
 
 test('REFUSED: Ada without her deny of merge_pull_request, read from her files as a run reads them, may merge; Agora allowed a write may write', () => {
-  const ada = shippedEdited(
-    'ada',
-    'build',
-    'a deny of merge_pull_request',
-    (text) => text.replace(', mcp__github__merge_pull_request', ''),
+  const ada = shippedEdited('ada', 'build', 'a deny of merge_pull_request', (text) =>
+    text.replace(', mcp__github__merge_pull_request', ''),
   );
   assert.deepEqual(
     GITHUB_WRITES.filter((tool) => !deniedTo(ada, GITHUB_WRITES).includes(tool)),

@@ -29,7 +29,7 @@ import {
 import { dueNote, nextTry, signoffsSpent, type EarlierTry, type RetryHow } from '../src/retry/retry-ask.ts';
 import { PRECEDENCE } from '../src/brief/index.ts';
 import { CLOSEOUT_SCHEMA, type Closeout } from '../src/closeout/closeout.ts';
-import { closeoutAsked } from '../src/views/views.verb.ts';
+import { closeoutAsked, closeoutOf, harnessBlocked } from '../src/views/views.verb.ts';
 import { endWords } from '../src/views/views-words.ts';
 import type { Verdict } from '../src/check/check.ts';
 import type { Workflow } from '../src/workflow.ts';
@@ -395,6 +395,19 @@ test("closeoutAsked and endWords: UNSIGNED is the LAST attempt's word, off what 
     assert.deepEqual([closeoutAsked(signed)('t1'), endingsOf(signed)], [true, [{ ended: 'done', reason: 'harness' }]]);
     const unasked = viewed('succeeded', [unstated], false);
     assert.deepEqual([closeoutAsked(unasked)('t1'), endingsOf(unasked)], [false, [{ ended: 'done', reason: 'harness' }]]);
+  });
+  await t.test('a task the views hold no view of — one the engine could not read — was asked nothing, is not blocked, said nothing', () => {
+    const none = new Map<string, TaskView>();
+    assert.equal(closeoutAsked(none)('t1'), false, 'not held to a closeout it may never have been asked for');
+    assert.equal(harnessBlocked(none)('t1'), false);
+    assert.equal(harnessBlocked(viewed('needs-human', []))('t1'), true, 'where the view is read, its harness may block it');
+    assert.equal(closeoutOf(none, r, 'implement'), undefined);
+    assert.equal(closeoutOf(viewed('pending', []), r, 'implement'), undefined, 'a view with no attempt has said nothing either');
+    const signed = viewed('succeeded', [
+      { ended: 'done', reason: 'harness', stated: true, closeout: { outcome: 'done', summary: 'did it', artifacts: [], needs: null } },
+    ]);
+    const closeout = closeoutOf(signed, r, 'implement');
+    assert.equal(closeout && 'outcome' in closeout ? closeout.outcome : closeout, 'done', 'and one that signed has');
   });
   type Attempt = TaskView['state']['attempts'][number];
   const state = { closeoutSchema: CLOSEOUT_SCHEMA } as unknown as TaskView['state'];

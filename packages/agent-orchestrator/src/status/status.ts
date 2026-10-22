@@ -1,9 +1,9 @@
 /**
  * Where one step of a run stands (`stepStatus`, `ownStatus`), and the facts it reads: a gate's (`hasGate`, `approvalOf`, `atGate`), an
- * ending's (`landsOnCheck`, `resultOnBase`), what a step may spend (`taskSpend`, `overBudget`, `budgetRefusal`), and a loop's (`roundOf`,
- * `loopOf`, `owedFields`). And what a step consumed, in words (`sumUsage`, `readWords`, `usedLines`, `dollars`, `durationWord`):
- * `views.verb.ts` asks the engine (`consumption`). Pure, and read by nearly every other part of the run's judgement; it reads the record
- * alone.
+ * ending's (`endsOnBase`, `landsOnCheck`, `resultOnBase`), what a step may spend (`taskSpend`, `overBudget`, `budgetRefusal`), and a
+ * loop's (`roundOf`, `loopOf`, `owedFields`). And what a step consumed, in words (`sumUsage`, `readWords`, `usedLines`, `dollars`,
+ * `durationWord`): `views.verb.ts` asks the engine (`consumption`). Pure, and read by nearly every other part of the run's judgement;
+ * it reads the record alone.
  */
 import type { Verdict } from '../check/check.ts';
 import { DEFAULT_ROUNDS, LOOP_REPLIES, outputFields, type Workflow } from '../step/step.ts';
@@ -105,15 +105,28 @@ function atGate(step: Workflow, run: Run, own: StepStatus, closeoutOf: (step: st
 }
 
 /**
- * Whether a step's gate holds it BEFORE it is filed rather than after it signs off: it is gated (`hasGate`) and works in the repository's
- * own checkout (`workspace: main`). Pure.
+ * Whether a step acts on the base branch itself: it works in the repository's own checkout (`workspace: main`). Pure, and read of the
+ * step alone — whoever files it, a person's approval (`approvedFirst`) or the workflow once a step that can send the work back has passed.
+ *
+ * It is what a run's ending is: the one step of a workflow that works where a person's own work is, on the branch everything lands on
+ * (`validateMainWorkspace` refuses a second, and refuses anything waiting on it).
+ */
+export const endsOnBase = (step: Pick<Workflow, 'workspace'>): boolean => step.workspace === 'main';
+
+/**
+ * Whether a step's gate holds it BEFORE it is filed rather than after it signs off: it is gated (`hasGate`) and acts on the base branch
+ * (`endsOnBase`). Pure.
  *
  * A gate holds what the approval decides. Where steps follow, that is the handoff, and the step runs first: a person reads what it
  * produced and says whether the work after it may start. An ending step in the repository's checkout produces nothing to read — it acts,
  * on the base branch, where nothing can be taken back — so the approval is of the act, and it is given before the step is filed.
+ *
+ * An ending with no gate is filed by its workflow instead, once the step before it — one that can send the work back (`loop:`) — passes:
+ * `quick`'s land, which its review routes. Nothing of this holds such a step: there is no approval to wait for, and nothing for a person
+ * to decide (`toDecide`, `endingSteps`).
  */
 export const approvedFirst = (step: Pick<Workflow, 'name' | 'gate' | 'workspace'>, run: Pick<Run, 'gates'>): boolean =>
-  step.workspace === 'main' && hasGate(step, run);
+  endsOnBase(step) && hasGate(step, run);
 
 /**
  * Whether the run waits at that step's gate now, with nothing of the step filed: it is approved first (`approvedFirst`), it has not been
@@ -189,9 +202,9 @@ export function unheld(steps: readonly Workflow[], run: Run, retry: readonly Ret
 }
 
 /**
- * Whether an ending step that acts on the base branch (`approvedFirst`) was filed on its approval and stopped there without doing it: its
- * try settled and it signed off blocked, ended without its closeout, failed — its session or its check — was stopped, or reached its
- * budget. Pure.
+ * Whether an ending step that acts on the base branch (`endsOnBase`) was filed — on an approval, or by its workflow — and stopped there
+ * without doing it: its try settled and it signed off blocked, ended without its closeout, failed — its session or its check — was
+ * stopped, or reached its budget. Pure.
  *
  * Such an ending has two ways on. Its own try (`nemia retry <run> <ending>`) does the act again, for what was not the work — a checkout
  * left dirty, a flaky test. And the send-back (`sendsBack` in `retryable`): the work does not hold on the base branch as it is now, so it
@@ -207,7 +220,7 @@ export function endingStopped(
   spendOf: SpendOf,
 ): boolean {
   const taskId = run.steps[step.name]?.taskId;
-  if (!approvedFirst(step, run) || !taskId || !SETTLED.has(phaseOf(taskId))) return false;
+  if (!endsOnBase(step) || !taskId || !SETTLED.has(phaseOf(taskId))) return false;
   const own = ownStatus(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf);
   return TRIED_FROM.has(own) || own === 'budget exhausted';
 }
@@ -229,15 +242,20 @@ export function sentBack(record: StepRecord): StepRecord {
 export const sendBackTo = (step: Workflow, run: Run): string[] => (run.steps[step.name]?.taskId ? [step.name] : [...step.after]);
 
 /**
- * Whether an ending's merge is landed by the run on its check: it works in the repository's own checkout, a person approves it before it
- * is filed (`approvedFirst`), and it has a `check:` — which the parser takes beside `workspace: main` only with `gate: true`. Pure.
+ * Whether an ending's merge is landed by the run on its check: it acts on the base branch (`endsOnBase`) and has a `check:` — which a
+ * workflow takes beside `workspace: main` only with `gate: true`, so that a person's approval files it, or with a step before it that can
+ * send the work back (`loop:`), so that its pass files it (`validateMainWorkspace`). Pure, and no reading of the gate: what the step is,
+ * not who files it.
  *
  * Such a step stages the merge and signs off; the run executes its check on the merged tree, as it executes any step's, and commits the
  * merge onto the base branch on its word, with the message the step signed off, or aborts it (`landingDue`). An ending with no check runs
  * one itself, in its prose, and commits or aborts on what it found.
+ *
+ * It still takes the run, which it no longer reads, so that every caller reads a step beside the run it belongs to and a gate started with
+ * cannot be made to change the answer by leaving it out.
  */
-export const landsOnCheck = (step: Pick<Workflow, 'name' | 'gate' | 'workspace' | 'check'>, run: Pick<Run, 'gates'>): boolean =>
-  approvedFirst(step, run) && step.check !== undefined;
+export const landsOnCheck = (step: Pick<Workflow, 'name' | 'gate' | 'workspace' | 'check'>, _run: Pick<Run, 'gates'>): boolean =>
+  endsOnBase(step) && step.check !== undefined;
 
 /**
  * Whether the checkout holds this step back on a pass: it works in the repository's own checkout (`workspace: main`), and another run's

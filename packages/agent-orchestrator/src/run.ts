@@ -68,6 +68,7 @@ export {
   addSpend,
   approvalOf,
   approvedFirst,
+  endsOnBase,
   askingTry,
   branchWord,
   budgetOf,

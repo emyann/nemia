@@ -1,14 +1,15 @@
 /**
- * A run of the shipped quick workflow (`workflows/quick`) on the stand-ins: `implement → land`, with no spec before and no review
- * between. Implement signs off its plan, its check answers, and the run waits at the landing's gate with land not filed; the gate shows
- * the plan and sends the work back to implement, the one step there is to send it to. A check that refuses leaves the run to a person:
- * the step declares no `retries:`, so a size refusal is never answered by a try that trims the work to fit, which a copy given one shows.
+ * A run of the shipped quick workflow (`workflows/quick`) on the stand-ins: `implement → review → land`, with no spec before it and no
+ * gate anywhere. Implement signs off its plan, its check answers, the review reads the change, and its pass files the landing with
+ * nobody's approval on disk — the run waits on no person. A review that asks again files implement again instead, on the run's own
+ * branch, and files no land. A check that refuses leaves the run to a person: the step declares no `retries:`, so a size refusal is
+ * never answered by a try that trims the work to fit, which a copy given one shows.
  *
  * The repository the run works on holds the checkout's skill folders, as a start in this checkout finds them.
  *
  * `WF_ROOT` is set before the runner is imported: the module reads it as it loads.
  */
-import { test, type TestContext } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -16,7 +17,6 @@ import { testPlace } from '../place/memory/index.ts';
 import { testEngine } from 'agent-runtime/testing';
 import { eachTest, runGiven, runOver } from './placed.ts';
 import { scratch } from './scratch.ts';
-import { decideScreen } from './screens.ts';
 import { REPO } from './team.ts';
 
 const ROOT = scratch('wf-quick-run-');
@@ -27,7 +27,7 @@ process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
 
-const { advanceRun, decideRun, sendBackTo, startRun, runWith: runEngine } = await import('../src/runner.ts');
+const { advanceRun, decideRun, endingSteps, sendBackTo, startRun, runWith: runEngine } = await import('../src/runner.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 const { readRun } = await import('../src/record/record.store.ts');
 
@@ -73,8 +73,10 @@ async function toTheCheck(dir: string) {
     (readRun(run.id).workflow ?? []).map((step) => [step.name, step.agent?.name, step.gate === true]),
     [
       ['implement', 'ada', false],
-      ['land', 'otto', true],
+      ['review', 'agora', false],
+      ['land', 'otto', false],
     ],
+    'implement, then a review that can send it back, then a landing nobody gates',
   );
   assert.deepEqual((await runWith(e, advanceRun(readRun(run.id)))).filed, ['implement']);
   const work = readRun(run.id).steps.implement.workspace!;
@@ -85,24 +87,56 @@ async function toTheCheck(dir: string) {
   return { id: run.id, b, e };
 }
 
-test('a quick run within the bound reaches the landing gate: land is not filed, and the gate sends the work back to implement', async (t: TestContext) => {
+/** The closeout of quick's review, flat, as Agora's schema requires it: `again` as given, and no finding. */
+const REVIEWED = (again: boolean) => ({
+  outcome: 'done',
+  summary: 'read it',
+  artifacts: [],
+  needs: null,
+  findings: [],
+  again,
+  replies: [],
+});
+
+test("a quick run within the bound reaches its review, and the review's pass files the landing with nobody's approval", async () => {
   const { id, b, e } = await toTheCheck(quickFolder());
   b.settle(`${id}-implement-check`, 'succeeded', { exitCode: 0 });
-  const waiting = await runWith(e, advanceRun(readRun(id)));
-  assert.deepEqual(waiting.filed, []);
-  assert.deepEqual(b.filings, [`${id}-implement`, `${id}-implement-check`], 'land waits at its gate');
+  assert.deepEqual((await runWith(e, advanceRun(readRun(id)))).filed, ['review'], 'the review is filed, not the landing');
+
+  b.settle(`${id}-review`, 'succeeded', { closeout: REVIEWED(false) });
+  assert.deepEqual((await runWith(e, advanceRun(readRun(id)))).filed, ['land'], 'and its pass files the landing');
   const run = readRun(id);
-  const land = (run.workflow ?? []).find((step) => step.name === 'land')!;
-  assert.deepEqual(sendBackTo(land, run), ['implement']);
+  assert.deepEqual(run.approvals ?? [], [], 'with nothing approved');
+  assert.deepEqual(
+    endingSteps(run.workflow ?? [], run).map((step) => step.name),
+    [],
+    "there is no gated ending: nothing of the landing is a person's to decide",
+  );
   const { decision } = await runWith(e, decideRun(id));
-  assert.deepEqual(decision.kind === 'awaiting' && decision.awaitingApproval, ['land']);
-  const screen = await decideScreen(t, e, [id], { '<id>': id }, stand().place);
-  for (const line of [
-    '    plan: Remove the rule beside each plate in Section; the runs page proves it.',
-    '  approve it    nemia approve <id> land [--message "<words>"]',
-    '  send it back  nemia retry <id> implement --message "<objection>"',
-  ])
-    assert.ok(screen.includes(line), `the gate's screen says ${line}:\n${screen.join('\n')}`);
+  assert.notEqual(decision.kind, 'awaiting', `the run waits on nobody, and nemia decide says ${decision.kind}`);
+});
+
+test("a quick review that asks again files implement again on the run's branch, and files no land", async () => {
+  const { id, b, e } = await toTheCheck(quickFolder());
+  b.settle(`${id}-implement-check`, 'succeeded', { exitCode: 0 });
+  await runWith(e, advanceRun(readRun(id)));
+  const branch = readRun(id).steps.implement.branch;
+
+  b.settle(`${id}-review`, 'succeeded', { closeout: REVIEWED(true) });
+  const round = await runWith(e, advanceRun(readRun(id)));
+  assert.deepEqual([round.filed, round.looped], [[], ['review']], "the review's loop goes round again, and no land is filed");
+  assert.equal(b.filings.at(-1), `${id}-implement-try2`, `implement is filed again: ${b.filings.join(', ')}`);
+  assert.ok(!b.filings.includes(`${id}-land`), b.filings.join(', '));
+  assert.equal(readRun(id).steps.implement.branch, branch, 'on the branch the work is on');
+});
+
+test('a quick run sends the work back to implement, the one step there is to send it to', async () => {
+  const { id, b, e } = await toTheCheck(quickFolder());
+  b.settle(`${id}-implement-check`, 'succeeded', { exitCode: 0 });
+  await runWith(e, advanceRun(readRun(id)));
+  const run = readRun(id);
+  const review = (run.workflow ?? []).find((step) => step.name === 'review')!;
+  assert.deepEqual(sendBackTo(review, run), ['review'], 'the review itself, once it has run');
 });
 
 test('REFUSED: a quick run whose check refuses files no land and no second try; a copy given retries: files one', async () => {

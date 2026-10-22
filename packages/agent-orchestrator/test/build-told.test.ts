@@ -18,9 +18,13 @@
  * pull request that are its own (`READS_THE_PULL_REQUEST`), and claims no more that the check ran the whole suite.
  *
  * The quick workflow's implement is told what build's is (`IMPLEMENT_TOLD`), and what makes a build quick (`QUICK_TOLD`): its plan
- * first, no decision of its own, the bound and the pages it names; it is given the kit's skills as build's steps are.
+ * first, no decision of its own, the bound and the pages it names; it is given the kit's skills as build's steps are. Its review is
+ * told what build's review is of the pull request and the base, and its own (`QUICK_REVIEW_TOLD`): the card in place of a spec, the
+ * bound, that nothing ran the suite on this machine, and that its pass lands the change with no person's gate after it — while what
+ * build's review alone says is `BUILD_REVIEW_TOLD`.
  *
- * The four steps that touch the board — build's design, implement and review, and quick's implement — are each given `react-aria`, this
+ * The five steps that touch the board — build's design, implement and review, and quick's implement and review — are each given
+ * `react-aria`, this
  * repository's vendored skill for the board's own parts, on their `skills:` line and not on a team-portable agent's.
  *
  * And what becomes of Claude Code's own prompt for each agent of the team (`PROMPTS`, `promptsWrong`): `harnessPrompt: no-coding` for the
@@ -88,10 +92,17 @@ const MERGES_THE_BASE = [
  * and the two reads of its own — never a write, which its fence refuses.
  */
 const READS_THE_PULL_REQUEST = [
-  "Implement's check ran the declarations, the typecheck and the lint on this round's tree, and waited on CI",
   "GitHub's `ci` context judged the suite, the types, the lint, the whole e2e and the build on the commit implement pushed",
   '**Read the pull request and its checks**, read-only, by the address implement named in its `artifacts` as a value',
   'A red, cancelled or absent `ci` is a finding',
+];
+
+/**
+ * What build's review alone is told of the check before it: that it ran the declarations, the typecheck and the lint, which quick's
+ * implement check does not — and that the merge is a person's, which in quick is the landing step's.
+ */
+const BUILD_REVIEW_TOLD = [
+  "Implement's check ran the declarations, the typecheck and the lint on this round's tree, and waited on CI",
   "You open, edit, merge and close none: those are refused you, and a person's.",
 ];
 
@@ -173,7 +184,9 @@ const IMPLEMENT_TOLD = [
 
 /** What quick's implement is told that build's is not: to plan first, to decide nothing, the bound, to run its tests and name its pages. */
 const QUICK_TOLD = [
-  'no spec was written for you and no review follows',
+  'no spec was written for you',
+  "a review reads your plan and your change — Agora's, read-only, which asks for another round or passes",
+  "Its pass lands the change: there is no person's gate after it",
   '**Write your plan first**, before you build: what changes, where, and what proves it',
   "It goes in your closeout's `plan`",
   '**Decide nothing the card does not give.**',
@@ -181,8 +194,28 @@ const QUICK_TOLD = [
   'The check measures it first (`workflows/quick/change.ts`) and refuses a change past either number',
   'do not trim it to fit, split it or drop its tests: sign off `blocked`',
   "**Name the pages** the change touches in your closeout's `pages`",
-  '**Nothing runs your tests for you before the gate.**',
+  '**Nothing runs your tests for you.**',
   "Run them yourself before you sign off, as `CLAUDE.md`, *Check your work*, says of a step's session",
+];
+
+/**
+ * What quick's review is told that build's is not: the card in place of a spec, implement's own declared fields, the bound, quick's five
+ * check scripts and that nothing ran the suite here, and that its pass lands the change with no person's gate after it.
+ */
+const QUICK_REVIEW_TOLD = [
+  'This is a quick run: **no spec was written**, so what was asked is the card itself',
+  'its `plan` — what it said would change, where, and what would prove it, written before the work — and its `pages` are declared fields you read there',
+  '**Your pass lands the change.** There is no gate after you',
+  "the run files `land`, which merges this run's pull request and fast-forwards the base branch, and nobody reads the change between your word and the merge",
+  '`again: true` is the only way back',
+  "you name no step: what comes after you is the workflow's, never yours",
+  '**A quick build is small**: at most 10 files and 300 lines changed',
+  'A change that only fits the bound because a test was trimmed, split off or left unwritten is a finding',
+  '**Nothing ran the suite on this machine.**',
+  "Implement's check is the cheap set and CI: `change.ts size`, `pictures.ts`, `probe.ts`, `pull-request.ts push` and `pull-request.ts wait`, in that order, and nothing else",
+  'no typecheck, no lint, no declaration, no test of a package and no e2e page here',
+  "You open, edit, merge and close none: those are refused you, and Otto's.",
+  'A page or a state the change touches with no picture of it is a finding: nobody else will look at the board before this lands.',
 ];
 
 const TOLD: Told[] = [
@@ -219,6 +252,7 @@ const TOLD: Told[] = [
       ...HOLDS_THE_BASE,
       SHADCN_READ,
       ...READS_THE_PULL_REQUEST,
+      ...BUILD_REVIEW_TOLD,
       'Run the typecheck and the lint yourself, each bare and one command per call: `npx turbo run typecheck --force`, `npm run lint`.',
       "Run a package's tests, `npx turbo run test --force --continue --filter=<package>`, only where a finding needs a run to stand on.",
       'Never build or run the e2e',
@@ -231,6 +265,27 @@ const TOLD: Told[] = [
       STOP_BOARD,
       "When the change touches `tools/observe`, read each dashboard's picture and text the implement step named in its `artifacts`",
       'You do not render one yourself: your fence refuses the command and Docker.',
+      ...KIT_READER_TOLD,
+      ...LOOK_PARTS_TOLD,
+    ],
+    adds: ['shadcn', 'look', 'react-aria', 'see-a-dashboard'],
+    denies: ['Bash(cd:*)', ...NO_BUILD, ...WHOLE_SUITE, ...BROWSER_FENCE],
+    declares: ['findings', 'again'],
+  },
+  {
+    workflow: 'quick',
+    step: 'review',
+    says: [
+      ...HOLDS_THE_BASE,
+      SHADCN_READ,
+      ...READS_THE_PULL_REQUEST,
+      'Run the typecheck and the lint yourself, each bare and one command per call: `npx turbo run typecheck --force`, `npm run lint`.',
+      "Run a package's tests, `npx turbo run test --force --continue --filter=<package>`, only where a finding needs a run to stand on.",
+      'Never build or run the e2e',
+      ...QUICK_REVIEW_TOLD,
+      NO_LIVE_BOARD,
+      NO_FILENAME,
+      STOP_BOARD,
       ...KIT_READER_TOLD,
       ...LOOK_PARTS_TOLD,
     ],
@@ -404,8 +459,10 @@ test('REFUSED: a step that adds a skill no more, or declares its closeout no mor
     const dropped = shippedEdited('build', step, (text) => text.replace(' react-aria,', ''));
     assert.deepEqual(untold('build', dropped), [`build/${step}: skill react-aria`], `${step} without react-aria is named`);
   }
-  const quick = shippedEdited('quick', 'implement', (text) => text.replace(' react-aria,', ''));
-  assert.deepEqual(untold('quick', quick), ['quick/implement: skill react-aria']);
+  for (const step of ['implement', 'review']) {
+    const quick = shippedEdited('quick', step, (text) => text.replace(' react-aria,', ''));
+    assert.deepEqual(untold('quick', quick), [`quick/${step}: skill react-aria`], `${step} without react-aria is named`);
+  }
   const undeclared = shippedEdited('quick', 'implement', (text) => text.replace('output: implement.schema.json\n', ''));
   assert.deepEqual(untold('quick', undeclared), ['quick/implement: declares plan', 'quick/implement: declares pages']);
 });
@@ -614,6 +671,24 @@ test("quick's implement is given every kit skill there is a folder of, and REFUS
   assert.deepEqual(kitDrift(quick, folders, triggerText(), ['implement']), []);
   const ungiven = shippedEdited('quick', 'implement', (text) => text.replace(', apps/web:ds-theme,', ','));
   assert.deepEqual(kitDrift(ungiven, folders, triggerText(), ['implement']), ['implement: not given apps/web:ds-theme']);
+});
+
+test("REFUSED: quick's review told no more what build's review is told of the pull request and the base, or what makes a quick review its own, is named", () => {
+  for (const sentence of [...HOLDS_THE_BASE, ...READS_THE_PULL_REQUEST, ...QUICK_REVIEW_TOLD])
+    assert.deepEqual(
+      untold(
+        'quick',
+        shippedEdited('quick', 'review', (text) => text.replace(across(sentence), '')),
+      ),
+      [`quick/review: says "${sentence}"`],
+      sentence,
+    );
+  const quick = fs.readFileSync(path.join(HOLDER, 'quick', 'review.md'), 'utf8');
+  const build = fs.readFileSync(path.join(HOLDER, 'build', 'review.md'), 'utf8');
+  for (const sentence of BUILD_REVIEW_TOLD) {
+    assert.ok(across(sentence).test(build), `build's review says "${sentence}"`);
+    assert.ok(!across(sentence).test(quick), `and quick's does not: its implement check ran neither, and Otto merges — "${sentence}"`);
+  }
 });
 
 test("REFUSED: quick's implement told no more what build's is told, or what makes a build quick, or that declares its plan no more, is named", () => {

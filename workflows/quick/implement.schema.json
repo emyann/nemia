@@ -3,7 +3,7 @@
   "properties": {
     "plan": {
       "type": "string",
-      "description": "The plan you wrote before you built, in a few lines: what changes, where, and what proves it. The person who approves the landing reads it at the gate."
+      "description": "The plan you wrote before you built, in a few lines: what changes, where, and what proves it. The review reads it against the change, and a plan the work went past without saying so is a finding."
     },
     "pages": {
       "type": "array",

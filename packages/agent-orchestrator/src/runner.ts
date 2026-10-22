@@ -95,6 +95,7 @@ export {
   approvalRefusal,
   approvalWordsRefusal,
   approvedFirst,
+  endsOnBase,
   artifactLines,
   branchWord,
   checkoutLine,

@@ -12,8 +12,11 @@ import type { TrialMerge } from '../place/place.ts';
 
 const STEPS: Workflow[] = [
   { name: 'implement', after: [], body: 'Build it.' },
-  { name: 'ship', after: ['implement'], body: 'Ship it.', workspace: 'main' },
+  { name: 'ship', after: ['implement'], body: 'Ship it.', workspace: 'main', check: 'npm test' },
 ];
+
+/** The same shape with no gate anywhere, as `quick` is: its ending lands on its check all the same, filed by the review before it. */
+const UNGATED = (): RepositoryRun => ({ ...refused(SHA), gates: [] });
 
 /** A repository run `id` on /code/app's main, gated at its ship, with `more` over it. */
 const run = (id: string, more: Partial<RepositoryRun> = {}): RepositoryRun => ({
@@ -91,9 +94,14 @@ test('trialsOf asks each of ours onto the base, then each of ours onto each bran
   );
 });
 
-test('collisionsDue reads the ending waiting at its gate, or one whose landing a check refused', () => {
+test('collisionsDue reads the ending waiting at its gate, or one whose landing a check refused — gated or not', () => {
   assert.equal(collisionsDue(STEPS, run('r-1'), { kind: 'approve', step: 'ship', says: null, filed: false }), 'ship');
   assert.equal(collisionsDue(STEPS, refused(SHA), undefined), 'ship');
+  assert.equal(
+    collisionsDue(STEPS, UNGATED(), undefined),
+    'ship',
+    "an ungated ending lands on its check in the same way, so its refused merge owes the same trials: quick's land, filed by its review",
+  );
 });
 
 test('REFUSED: collisionsDue for a result left to the person, an ending landed or untouched, a run called off or pruned', () => {
@@ -105,7 +113,16 @@ test('REFUSED: collisionsDue for a result left to the person, an ending landed o
   assert.equal(collisionsDue(STEPS, untouched, undefined), undefined);
   assert.equal(collisionsDue(STEPS, { ...refused(SHA), cancelledAt: '2026-10-05T02:00:00.000Z' }, undefined), undefined);
   assert.equal(collisionsDue(STEPS, { ...refused(SHA), pruned: { at: 'x' } } as unknown as Run, undefined), undefined);
-  assert.equal(collisionsDue([{ ...STEPS[0] }, { ...STEPS[1], name: 'land' }], refused(SHA), undefined), undefined, 'no gate at ship');
+  assert.equal(
+    collisionsDue([{ ...STEPS[0] }, { ...STEPS[1], check: undefined }], refused(SHA), undefined),
+    undefined,
+    'an ending with no `check:` lands nothing on one: its session commits or aborts in its own prose, and no check refused a merge',
+  );
+  assert.equal(
+    collisionsDue([{ ...STEPS[0] }, { ...STEPS[1], workspace: undefined }], refused(SHA), undefined),
+    undefined,
+    'and a step of the work ends nothing on the base branch',
+  );
 });
 
 test('collisionsOf words the base, each run it collides with and in which files, and what git could not say', () => {

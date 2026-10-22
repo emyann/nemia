@@ -1234,7 +1234,7 @@ test('design and review name the two commands of a served board, the settings al
 });
 
 /** The steps that design, write or judge a change, by workflow, and the skills each gives its session to list. */
-const WORK_STEPS: Record<string, string[]> = { build: ['design', 'implement', 'review'], quick: ['implement'] };
+const WORK_STEPS: Record<string, string[]> = { build: ['design', 'implement', 'review'], quick: ['implement', 'review'] };
 const WORK_SKILLS = ['effect', 'shadcn', 'change-the-board'];
 
 /**
@@ -1279,13 +1279,12 @@ test('REFUSED: a work step that gives one of the three skills no more is named, 
 });
 
 /**
- * What makes a landing step what it is, its `after` apart: where it works, its agent, its gate, its check, its budget, its fence and
- * its note.
+ * What makes a landing step what it is, its `after` and its gate apart: where it works, its agent, its check, its budget, its fence and
+ * its note. The gate is read on its own (`quick`'s land has none: its review files it), so that everything else is held equal.
  */
 const landingOf = (step: Step | undefined): unknown[] => [
   step?.workspace,
   step?.agent?.name,
-  step?.gate,
   step?.check,
   step?.budget,
   step?.disallowedTools,
@@ -1296,11 +1295,82 @@ const landingOf = (step: Step | undefined): unknown[] => [
 const landIn = (workflow: string, root = SHIPPED_HOLDERS[0]): Step | undefined =>
   loadWorkflows(path.join(root, workflow), { repo: REPO }).find((step) => step.name === 'land');
 
-test("quick's land is build's land but its after: main has one guard, whatever the workflow", () => {
+test("quick's land is build's land but its after and its gate: main has one guard, whatever the workflow", () => {
   const [build, quick] = [landIn('build'), landIn('quick')];
   assert.ok(build?.check && build.gate === true && build.workspace === 'main', 'build lands at a gate, in the checkout, on a check');
   assert.deepEqual(landingOf(quick), landingOf(build));
-  assert.deepEqual([build.after, quick?.after], [['review'], ['implement']]);
+  assert.deepEqual([build.after, quick?.after], [['review'], ['review']], "each waits on its workflow's review");
+  assert.deepEqual(
+    [build.gate, quick?.gate],
+    [true, undefined],
+    "build's landing waits for a person; quick's is filed by its review's pass, and nobody reads the change between",
+  );
+});
+
+/**
+ * What a judging step is fenced and equipped by, its own words apart: its agent, the loop it closes, its fence, its skills, its mcp
+ * servers and what it tallies. Its `input:`, its `rounds:`, its `budget:` and its note are each workflow's own.
+ */
+const judgingOf = (step: Step | undefined): unknown[] => [
+  step?.agent?.name,
+  step?.loop,
+  step?.disallowedTools,
+  step?.agent?.skills,
+  step?.mcp,
+  step?.tally,
+];
+
+/** The review step of the workflow `workflow`, read from `root`, a holder laid out as the shipped one. */
+const reviewIn = (workflow: string, root = SHIPPED_HOLDERS[0]): Step | undefined =>
+  loadWorkflows(path.join(root, workflow), { repo: REPO }).find((step) => step.name === 'review');
+
+test("quick's review is build's review but what each workflow says of its own: the same agent, loop, fence, skills, mcp and tally", () => {
+  const [build, quick] = [reviewIn('build'), reviewIn('quick')];
+  assert.ok(build?.loop === 'implement' && build.agent?.name === 'agora', "build's review is Agora's, closing implement's loop");
+  assert.deepEqual(judgingOf(quick), judgingOf(build));
+  assert.deepEqual(
+    [build.input, quick?.input],
+    [['design'], undefined],
+    "build's review reads the spec; a quick run has none, so the card is what was asked",
+  );
+  assert.deepEqual([build.rounds, quick?.rounds], [3, 2], "quick's loop caps tighter: a card that asks twice is a build card");
+  assert.deepEqual([build.budget, quick?.budget], [16, 12], "and a review within quick's bound costs less");
+  assert.equal(quick?.gate, undefined, "nothing waits on a person at quick's review: its pass files the landing");
+});
+
+/** Quick's review, read from a scratch copy of the shipped team whose `quick/review.md` is `edit`ed; `what` names what the edit changes. */
+function withReview(what: string, edit: (text: string) => string): Step | undefined {
+  const root = scratch('wf-fences-review-');
+  fs.cpSync(SHIPPED_HOLDERS[0], root, { recursive: true });
+  const file = path.join(root, 'quick', 'review.md');
+  const text = fs.readFileSync(file, 'utf8');
+  assert.notEqual(edit(text), text, `quick's review has the ${what} the edit changes`);
+  fs.writeFileSync(file, edit(text));
+  return reviewIn('quick', root);
+}
+
+test("REFUSED: a quick review whose skills, mcp or tally is no more build's is unequal to it; one with no loop, no agora or a loosened fence refuses the load", () => {
+  const edits: [string, (text: string) => string][] = [
+    ['skills', (text) => text.replace(', apps/web:ds-spec', '')],
+    ['mcp', (text) => text.replace('mcp: playwright\n', '')],
+    ['tally', (text) => text.replace(', findings.kind=placement', '')],
+  ];
+  assert.throws(
+    () => withReview('fence', (text) => text.replace(', Bash(*GIT_*)', '')),
+    /would lift `Bash\(\*GIT_\*\)`, which agents\/agora.md denies its agent agora/,
+    "nor the fence: a step may only tighten its agent's, so dropping one of Agora's is refused at load",
+  );
+  assert.throws(
+    () => withReview('loop', (text) => text.replace('loop: implement\n', '').replace('rounds: 2\n', '')),
+    /land: .*this step has no `gate: true` and waits on no step with a `loop:` \(it waits on review\)/,
+    "the loop needs no fixture here either: without it nothing can send the work back, so the whole folder is refused at load — quick's land has no gate and is filed by the review's pass",
+  );
+  assert.throws(
+    () => withReview('agent', (text) => text.replace('agent: agora', 'agent: ada')),
+    /declares no `output:`/,
+    "the agent needs no fixture here: no other shipped agent declares the `findings` its `tally:` counts, so a swap is refused at load — and that it is Agora's is held by the count of each read-only agent's steps",
+  );
+  for (const [what, edit] of edits) assert.notDeepEqual(judgingOf(withReview(what, edit)), judgingOf(reviewIn('build')), what);
 });
 
 test("REFUSED: a quick land whose check, workspace, gate, fence or budget is no more build's is unequal to it", () => {
@@ -1308,7 +1378,7 @@ test("REFUSED: a quick land whose check, workspace, gate, fence or budget is no 
     ['check', (text) => text.replace('receipt --run "$WF_RUN"', 'receipt --run "$WF_STEP"')],
     ['check', (text) => text.replace('git show "HEAD:workflows/build/landing.ts"', 'cat workflows/build/landing.ts')],
     ['note', (text) => text.replace('It deletes no branch and stages no merge here.', '')],
-    ['workspace and gate', (text) => text.replace('workspace: main\n', '').replace('gate: true\n', '')],
+    ['workspace', (text) => text.replace('workspace: main\n', '')],
     ['fence', (text) => text.replace(', Bash(*:4317*)', '')],
     ['budget', (text) => text.replace('budget: 10', 'budget: 11')],
   ];
@@ -1366,7 +1436,11 @@ test('every shipped dontAsk job given a skill that grants tools is told to read 
     .map(({ step }) => step)
     .filter(dontAskJob);
   const granted = jobs.filter((step) => (step.agent?.skills ?? []).some((skill) => grantingFileOf(skill) !== undefined));
-  assert.deepEqual(granted.map((step) => step.name).sort(), ['design', 'review'], 'design and review are given shadcn, which grants');
+  assert.deepEqual(
+    granted.map((step) => step.name).sort(),
+    ['design', 'review', 'review'],
+    "design and both reviews — build's and quick's — are given shadcn, which grants",
+  );
   assert.deepEqual(
     jobs.flatMap((step) => grantingSkillsUnread(step)),
     [],
@@ -1867,13 +1941,13 @@ test("each read-only agent's file names the three denies, and each of its steps'
   assert.deepEqual(runsAProgramUndenied(), []);
   assert.equal(
     shipped().filter(({ step }) => READ_ONLY_AGENTS.includes(step.agent?.name ?? '')).length,
-    4,
-    'one step per read-only agent today; a second one is a line of its own, which the guard above reads',
+    5,
+    "one step per read-only agent today but Agora, who reviews in build and in quick: each step's line is its own, and the guard above reads every one of them",
   );
 });
 
 test('REFUSED: an agent file or a step file of a read-only agent that drops one of the three denies is named', () => {
-  for (const file of ['agents/agora.md', 'build/review.md', 'intake/intake.md', 'janitor/argus.md'])
+  for (const file of ['agents/agora.md', 'build/review.md', 'quick/review.md', 'intake/intake.md', 'janitor/argus.md'])
     for (const rule of RUNS_A_PROGRAM_DENIES) {
       const root = scratch('wf-fences-denies-');
       fs.cpSync(SHIPPED_HOLDERS[0], root, { recursive: true });

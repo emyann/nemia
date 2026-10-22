@@ -4,7 +4,8 @@
  * whole to the agents that land, so the act is this script, read out of git into a directory of its own and run with `node`, as
  * `pull-request.ts` carries the push and the pull request card 1 opens. It imports nothing: a frozen clause copies one file.
  *
- * - `merge --run <id> --subject <line> --body-file <f>`, which the landing session types once a person has approved it: it refuses
+ * - `merge --run <id> --subject <line> --body-file <f>`, which the landing session types once its step has been filed — on a person's
+ *   approval in `build`, or by the workflow in `quick`, where the review's pass files it: it refuses
  *   anything but this run's own green pull request — not a draft, based on the remote's default branch, its head the tip of the run's
  *   result branch and the sha the reviewer read, `mergeable` MERGEABLE, the `ci` context SUCCESS at that sha, and every other
  *   `wf/<id>/*` tip reachable from it — then merges it with a merge commit whose subject and body are the ones it was given

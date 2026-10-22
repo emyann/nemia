@@ -89,7 +89,9 @@ holds what every change needs.
   What a step may not type, the run does in its place, as two frozen scripts read out of git and run with `node`, never as a tool a fence
   could not tell apart: `workflows/build/pull-request.ts` pushes a run's own branch and opens or updates its pull request, and
   `workflows/build/landing.ts` merges that pull request and fast-forwards the checkout. The one exception to the rule is a run's ending
-  step (a workflow's last step, `workspace: main`), filed only once a person approves it: it runs `landing.ts merge`, which refuses
+  step (a workflow's last step, `workspace: main`), filed once a person approves it — or, where its workflow puts before it a step that
+  can send the work back (`loop:`), once that step passes, which is how `quick` lands with no gate at all; an ending with a `check:` and
+  neither of the two is refused at load (`validateMainWorkspace`, `src/workflow/validate.ts`). It runs `landing.ts merge`, which refuses
   anything but this run's own green pull request — `mergeable`, `ci` green at the head the review read, no result branch left out — then
   merges it with a merge commit whose message the step wrote and fast-forwards the base branch here; the run then executes the step's
   `check:`, which is `landing.ts receipt`, and records the commit that landed on its exit 0 (`landingDue`).
@@ -144,8 +146,8 @@ What the `create-an-agent` skill, being generic, does not say here:
   (`npm run storybook`, from `apps/web`) shows them to a person, and `change-the-board` says which to take (`apps/web/CLAUDE.md`).
 - `workflows/` — this repository's own team, `agents/`: Iris (product engineer), Seldon (software architect), Ada (software engineer),
   Agora (code reviewer), Otto (release engineer), Argus (janitor); and four workflows: `intake` (an idea to an intent), `build` (an
-  intent to main, started `--after` the intake run), `quick` (a small card that settles its change to main: implement, then a gated
-  land, within the bound `workflows/quick/README.md` says) and `janitor` (on demand: the stats to inbox cards, none started). What Nemia ships:
+  intent to main, started `--after` the intake run), `quick` (a small card that settles its change to main: implement, then a review
+  whose pass files an ungated land, within the bound `workflows/quick/README.md` says) and `janitor` (on demand: the stats to inbox cards, none started). What Nemia ships:
   the git place `place/git` (`packages/agent-orchestrator/place/git`: its skill, and its code, given as `gitPlaceLayer`), the skills the api lists as shipped
   (`SHIPPED_SKILLS`, the checkout's `workflows/skills/`, none today), and Nemia's own agent once the Nemia slices build it. A person's
   factories get no workflow or agent from the package.

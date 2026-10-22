@@ -2730,6 +2730,18 @@ test('`renderStep` writes only what a step sets: `undefined`, `null` and an empt
   assert.equal(splitFrontmatter('implement', renderStep(rule)).body, '---\nThe brief, below a rule.');
 });
 
+test("`renderStep` of a step over an agent writes its own denies alone, which add to its agent's: one that only repeated them writes no line", () => {
+  const agents = new Map([['ada', parseAgent('ada', '---\ndisallowedTools: Bash(git push), Bash(git push:*)\n---\nWork.\n')]]);
+  const parsed = (text: string) => parseWorkflow('implement', text, undefined, agents);
+  const own = parsed('---\nagent: ada\nplace: git\ndisallowedTools: Bash(npm run build), Bash(git push)\n---\nDo it.\n');
+  const text = renderStep(own);
+  assert.match(text, /^disallowedTools: Bash\(npm run build\)$/m, "the agent's are not pinned into the step's file");
+  assert.deepEqual(parsed(text).disallowedTools, own.disallowedTools, 'and it reads back to what the session is refused');
+  const repeated = parsed('---\nagent: ada\nplace: git\ndisallowedTools: Bash(git push:*), Bash(git push)\n---\nDo it.\n');
+  assert.doesNotMatch(renderStep(repeated), /disallowedTools/, 'a line that only repeats its agent is no line');
+  assert.deepEqual(parsed(renderStep(repeated)).disallowedTools, ['Bash(git push)', 'Bash(git push:*)'], "which reads as the agent's");
+});
+
 test("REFUSED by `renderStep`, in the parser's words where the parser has them: a key no step has, `guide`; and what a file cannot hold — a line break in a value, a comma in a step's name in a list", () => {
   const step: StepDraft = { name: 'review', after: ['implement'], place: 'git', body: 'Review it.' };
   const parsersWords = (lines: string): string => {

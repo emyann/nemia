@@ -61,7 +61,8 @@ The number is precedence: where two layers say different things, the higher numb
 words arrive in is a separate thing — instructions, custom instructions, the factory's rules, the step's policy, then the task, with
 the folder's files read by the harness wherever the agent works. Which layer owns a new instruction is Nemia's own routing rule, *Where
 a new instruction goes*, said once in the shipped *Five layers* passage: ask it rather than guess. Fences only tighten: a step may narrow its agent's fence and
-never widen it — the loader refuses a step's `tools:`, `allowedTools:`, `disallowedTools:`, `permissionMode:` or `sandbox:` that would
+never widen it — a step's `disallowedTools:` adds to its agent's, and the loader refuses a step's `tools:`, `allowedTools:`,
+`permissionMode:` or `sandbox:` that would
 give the agent what its file does not, and a step's `background: true` over an agent in any mode but `bypassPermissions`. So the
 instructions say what holds for the role everywhere, and nothing about one workflow or one workspace.
 
@@ -101,7 +102,7 @@ own `skills:`: the session gets the agent's, then the step's, each once. The age
 - **A role that edits runs `auto`**, and denies by name what it must never do: `Bash(git push)`, `Bash(git push:*)`, `Bash(git branch
   -D:*)`, `Bash(git branch --delete --force:*)`, `Bash(pkill:*)`, `Bash(killall:*)`, `mcp__playwright__browser_run_code_unsafe`.
 - **A step only tightens it.** A step that needs a tool, an allow or a mode its agent's file does not give needs another agent; a
-  step's `disallowedTools:` replaces its agent's, so it repeats the agent's denies and adds its own.
+  step's `disallowedTools:` adds to its agent's: write only the denies the step adds; it can never take one of the agent's away.
 - **A background session** (`background: true`) also reads the person's user and local settings, where "don't ask again" writes allows:
   it denies those seven itself, whatever its mode. A step may set it only over an agent in `bypassPermissions`, the one mode no allow rule
   widens; over any other the loader refuses it.

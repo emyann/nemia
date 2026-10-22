@@ -11,7 +11,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { WorkflowError, type StepDraft, type Workflow } from '../src/workflow.ts';
+import { parseAgent, WorkflowError, type StepDraft, type Workflow } from '../src/workflow.ts';
+import { agentDeniesOf } from '../src/workflow/index.ts';
 import { loadWorkflows } from '../src/folder/folder.store.ts';
 import { scratch } from './scratch.ts';
 import { TEAM, TEAM_DEV } from './team.ts';
@@ -147,6 +148,16 @@ test('the README is written only when it is given, to the name the README alread
   assert.deepEqual([made.written, made.kept, made.removed], [['README.md', 'implement.md'], [], []]);
   assert.deepEqual(snapshot(fresh), { 'README.md': '# fresh\n\nA first step.\n', 'implement.md': '---\nplace: git\n---\nimplement it\n' });
   assert.deepEqual(loadWorkflows(fresh), made.steps);
+});
+
+test("a draft naming its agent that sends the resolved denies, as the board lists them, is written with the step's own alone", () => {
+  const dir = path.join(STORE, 'own-denies');
+  const file = fs.readFileSync(path.join(STORE, 'agents', 'implementer.md'), 'utf8');
+  const agentDenies = agentDeniesOf(parseAgent('implementer', file));
+  assert.ok(agentDenies.length, "the tests' implementer denies something");
+  const done = writeWorkflow(dir, [step('implement', { agent: 'implementer', disallowedTools: ['Bash(npm run build)', ...agentDenies] })]);
+  assert.match(fs.readFileSync(path.join(dir, 'implement.md'), 'utf8'), /^disallowedTools: Bash\(npm run build\)$/m);
+  assert.deepEqual(done.steps[0].disallowedTools, ['Bash(npm run build)', ...agentDenies], "the session is still refused the agent's");
 });
 
 test("written where the board lists workflows from — the store's workflows/ and a known repository's — and anywhere else with `{ anywhere: true }`", () => {

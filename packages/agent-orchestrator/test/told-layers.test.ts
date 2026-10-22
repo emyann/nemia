@@ -159,7 +159,12 @@ test("a record frozen before the added skills were: every skill the step's line 
 
 test("the step's fence lines are the fence keys its own file sets, as resolved: never a role key, never its agent's fence", () => {
   const step = stepOf('agent: dee\nmodel: sonnet\ndisallowedTools: Bash(git push:*), Bash(rm:*)');
-  assert.deepEqual(toldLayers(step, null).fence, [{ key: 'disallowedTools', value: 'Bash(git push:*), Bash(rm:*)' }]);
+  assert.deepEqual(toldLayers(step, null).fence, [{ key: 'disallowedTools', value: 'Bash(rm:*)' }], "its own denies, not its agent's");
+  const added = stepOf('agent: dee\ndisallowedTools: Bash(rm:*)');
+  assert.deepEqual(added.disallowedTools, ['Bash(rm:*)', 'Bash(git push:*)'], "a step's line adds to its agent's");
+  assert.deepEqual(toldLayers(added, null).fence, [{ key: 'disallowedTools', value: 'Bash(rm:*)' }]);
+  const repeated = stepOf('agent: dee\ndisallowedTools: Bash(git push:*)');
+  assert.deepEqual(toldLayers(repeated, null).fence, [], 'a line that only repeats its agent tightens nothing');
   const inherited = stepOf('agent: dee');
   assert.deepEqual(inherited.disallowedTools, ['Bash(git push:*)'], "the step runs its agent's fence");
   assert.deepEqual(toldLayers(inherited, null).fence, [], "the agent's fence is not the step's policy");

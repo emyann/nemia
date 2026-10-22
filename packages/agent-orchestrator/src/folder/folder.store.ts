@@ -261,6 +261,7 @@ const StepAgentSchema = Schema.StructWithRest(
     factoryRules: Schema.optionalKey(Schema.String),
     skills: Schema.optionalKey(Strings),
     addedSkills: Schema.optionalKey(Strings),
+    agentDenies: Schema.optionalKey(Strings),
     offSkills: Schema.optionalKey(Strings),
     harnessPrompt: Schema.optionalKey(Schema.Literals(HARNESS_PROMPTS)),
     mcp: Schema.optionalKey(Strings),

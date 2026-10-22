@@ -26,7 +26,7 @@ import { checkContract, checkHandedSection, landingContract, type CheckHanded, t
 import { artifactsContract } from '../artifacts/artifacts.ts';
 import { briefBody, rendersAgent, skillLayers } from '../agents/agents.ts';
 import { ownNote } from '../ending/ending.ts';
-import { FENCE_KEYS, headedLayers, type ComposedLayer } from '../workflow/index.ts';
+import { FENCE_KEYS, headedLayers, ownDenies, type ComposedLayer } from '../workflow/index.ts';
 import { INPUTS_HEADING, inputsLine, mountsLine } from '../start/index.ts';
 import { resultSteps, workChecks } from '../branches/index.ts';
 import { costsSection, type WorkflowCosts } from '../costs/index.ts';
@@ -440,13 +440,14 @@ export type ToldLayers = {
 
 /**
  * The fence lines step `step`'s own file sets over its agent's (`StepAgent.keys`), each as resolved, a list joined with `, `, in the
- * order of `FENCE_KEYS`: none for a step with no agent, whose fence is no layer over another's.
+ * order of `FENCE_KEYS`: none for a step with no agent, whose fence is no layer over another's. Its `disallowedTools:` is its own rules
+ * alone (`ownDenies`), which add to its agent's, and none where it only repeated them.
  */
 function fenceLines(step: Workflow): ToldLayers['fence'] {
   const own = step.agent?.keys ?? [];
   return FENCE_KEYS.flatMap((key) => {
-    const value = step[key];
-    if (!own.includes(key) || value === undefined) return [];
+    const value = key === 'disallowedTools' && step[key] !== undefined ? ownDenies(step) : step[key];
+    if (!own.includes(key) || value === undefined || (key === 'disallowedTools' && !value.length)) return [];
     return [{ key, value: Array.isArray(value) ? value.join(', ') : value }];
   });
 }

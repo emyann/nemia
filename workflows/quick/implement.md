@@ -38,9 +38,9 @@ as you wrote it, corrected where the work proved it wrong. Then build it, with t
 **Decide nothing the card does not give.** When the change needs a decision the card leaves open (a taste call, a name a person will
 read, which of two behaviours), sign off `blocked` and say in `needs` what is undecided; do not choose for them.
 
-**A quick build is small**: at most 10 files and 300 lines changed, added plus removed, tests and docs counted, generated files
+**A quick build is small**: at most 300 lines changed, in any number of files, added plus removed, tests and docs counted, generated files
 (`package-lock.json`, `apps/web/theme/`, `apps/web/src/routeTree.gen.ts`) left out. The check measures it first
-(`workflows/quick/change.ts`) and refuses a change past either number: a person then starts the card with `build`. When the work
+(`workflows/quick/change.ts`) and refuses a change past that number: a person then starts the card with `build`. When the work
 grows past the bound, do not trim it to fit, split it or drop its tests: sign off `blocked`, and say in `needs` that the card is a
 `build` card and why.
 

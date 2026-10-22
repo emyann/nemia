@@ -14,15 +14,16 @@ A card goes through `quick` when both hold:
 
 - **The card settles it.** It says what to change and leaves no decision: no taste call, no name, no choice between behaviours.
   Implement signs off `blocked` on a decision the card does not give, and never makes it.
-- **It is within the bound**: at most **10 files** and **300 lines** changed, added plus removed. Tests and docs count: the review
+- **It is within the bound**: at most **300 lines** changed, added plus removed. Tests and docs count: the review
   reads them, and a test changed to pass is what the review must catch. Generated files do not
   (`package-lock.json`, `apps/web/theme/`, `apps/web/src/routeTree.gen.ts`). Any part of the repository may be touched.
 
 Everything else goes through [`build`](../build/README.md): a change that needs a design, one past the bound, one a review is likely
 to send back twice. A card says which with `workflow: quick` or `workflow: build`.
 
-The numbers are `FILES` and `LINES` in `change.ts`, with `GENERATED`. Changing one is a quick card: the script, this file and the
-step's note, which `packages/agent-orchestrator/test/quick-check.boundary.test.ts` holds to the same numbers.
+The number is `LINES` in `change.ts`, with `GENERATED`; how many files the lines are in is not bounded, since the review reads
+every file. Changing either is a quick card: the script, this file and the
+step's note, which `packages/agent-orchestrator/test/quick-check.boundary.test.ts` holds to the same number.
 
 ## Implement's check
 

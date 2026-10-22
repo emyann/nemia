@@ -74,7 +74,8 @@ test("the add's headers go in mcpServerOf's order, the order the stored secret's
   assert.deepEqual(headers, ['X-MCP-Readonly: false', 'X-MCP-Toolsets: context,repos'], 'sorted by name, as mcpServerOf spells them');
   assert.deepEqual(args.slice(-2), ['github', 'https://api.githubcopilot.com/mcp/']);
   assert.deepEqual(args.slice(0, 6), ['mcp', 'add', '--scope', 'local', '--transport', 'http']);
-  const reversed = mcpAddArgs('github', { ...GITHUB, headers: { 'X-MCP-Toolsets': 'context,repos', 'X-MCP-Readonly': 'false' } });
+  assert.deepEqual(Object.keys(GITHUB.headers!), ['X-MCP-Toolsets', 'X-MCP-Readonly'], 'the record lists its headers unsorted');
+  const reversed = mcpAddArgs('github', { ...GITHUB, headers: { 'X-MCP-Readonly': 'false', 'X-MCP-Toolsets': 'context,repos' } });
   assert.deepEqual(reversed, args, 'a record that lists its headers in another order files the same key');
 });
 
@@ -88,10 +89,31 @@ test('a failing add is refused in the CLI’s words with the secret taken out, e
   assert.equal(told!.includes('MCP_CLIENT_SECRET=<secret>'), true, 'the CLI’s words are kept, the secret marked where it stood');
 });
 
-test('a sign-out is `claude mcp remove --scope local <name>`, and a remove the CLI refuses says to sign in first', async () => {
+test('a sign-out adds the server with no secret, then removes it at --scope local: a remove finds the token only through an added server', async () => {
   const ok = recording();
-  assert.equal(await clearSignIn(ok.cli, 'github', '/var/empty/root/mcp-sign-in'), undefined);
-  assert.deepEqual(ok.calls[0].args, ['mcp', 'remove', '--scope', 'local', 'github']);
-  const failing = recording(() => ({ code: 1, out: 'No MCP server found with name: github' }));
-  assert.equal(typeof (await clearSignIn(failing.cli, 'github', '/var/empty/root')), 'string', 'a remove the CLI turned down is one too');
+  assert.equal(await clearSignIn(ok.cli, 'github', GITHUB, '/var/empty/root/mcp-sign-in'), undefined);
+  assert.deepEqual(
+    ok.calls.map((c) => c.args.slice(0, 2)),
+    [
+      ['mcp', 'add'],
+      ['mcp', 'remove'],
+    ],
+  );
+  assert.deepEqual(ok.calls[0].args, mcpAddArgs('github', GITHUB, false), 'the add files the key a sign-in files');
+  assert.equal(ok.calls[0].args.includes('--client-secret'), false, 'a sign-out stores no secret');
+  assert.equal(ok.calls[0].env.MCP_CLIENT_SECRET, undefined);
+  assert.deepEqual(ok.calls[1].args, ['mcp', 'remove', '--scope', 'local', 'github']);
+});
+
+test('a sign-out whose add the CLI refuses, as it refuses a server already added, still removes; a refused remove is the refusal', async () => {
+  const added = recording((args) =>
+    args[1] === 'add' ? { code: 1, out: 'MCP server github already exists in local config' } : { code: 0, out: '' },
+  );
+  assert.equal(await clearSignIn(added.cli, 'github', GITHUB, '/var/empty/root'), undefined);
+  const failing = recording((args) => (args[1] === 'remove' ? { code: 1, out: 'cannot write the config' } : { code: 0, out: '' }));
+  assert.equal(
+    typeof (await clearSignIn(failing.cli, 'github', GITHUB, '/var/empty/root')),
+    'string',
+    'a remove the CLI turned down is one too',
+  );
 });

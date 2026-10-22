@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Locator, Page } from 'playwright';
+import type { Locator, Page, Response } from 'playwright';
 import { FINISHED_SIZE, type FinishedPage, type OpenRuns, type WaitingRun } from '../../../src/lib/api/runs.ts';
 import { rowsSaid } from '../../../src/lib/finished.ts';
 import { runClock, titleOf } from '../../../src/lib/factory.ts';
@@ -563,8 +563,28 @@ async function clocksSay(page: Page, open: OpenRuns, finished: FinishedPage): Pr
   }
 }
 
+/**
+ * The finished runs' first page as the page itself was last given it, kept as each answer arrives: its `asOf` is the instant the rows
+ * drew their words against. `answered` reads the api apart from the page and a moment later, so near a minute's edge its `asOf` says
+ * another word than the page drew.
+ */
+function finishedDrawn(page: Page): { last: () => FinishedPage | undefined; stop: () => void } {
+  let last: FinishedPage | undefined;
+  const seen = (response: Response) => {
+    const url = new URL(response.url());
+    if (url.pathname !== '/api/runs-finished' || url.searchParams.get('page') !== '1' || url.searchParams.has('ofFactory')) return;
+    if (response.ok())
+      response.json().then(
+        (body: FinishedPage) => void (last = body),
+        () => undefined,
+      );
+  };
+  page.on('response', seen);
+  return { last: () => last, stop: () => page.off('response', seen) };
+}
+
 /** A row in flight and a finished row say their plain facts: the factory, the steps, what it does now; how it ended, and when. */
-async function rowsSay(page: Page, open: OpenRuns, finished: FinishedPage): Promise<void> {
+async function rowsSay(page: Page, open: OpenRuns, finished: FinishedPage, given: () => FinishedPage | undefined): Promise<void> {
   const flying = open.inFlight.find((run) => !run.unreadable)!;
   const row = section(page, 'in-flight').locator(`tr[data-run="${flying.id}"]`);
   await expectTexts(row.locator(`a[href="/runs/${flying.id}"]`), [titleOf(flying)], 'a row in flight says its title, a link to the run');
@@ -602,9 +622,11 @@ async function rowsSay(page: Page, open: OpenRuns, finished: FinishedPage): Prom
     finished.runs.map((run) => run.id.slice(-4)),
     "and its id's end",
   );
-  const asOf = new Date(finished.asOf);
-  const whens = finished.runs.map((run) => [run.createdAt, run.finishedAt].map((at) => agoWords(new Date(at), asOf)).join('|'));
   await expectNone(async () => {
+    const last = given();
+    if (!last) return 'the page was given no answer of /api/runs-finished?page=1 to draw its rows against';
+    const asOf = new Date(last.asOf);
+    const whens = finished.runs.map((run) => [run.createdAt, run.finishedAt].map((at) => agoWords(new Date(at), asOf)).join('|'));
     const said = await section(page, 'finished')
       .locator('tr[data-run]')
       .evaluateAll((rows) => rows.map((row) => [...row.querySelectorAll('time')].map((time) => time.textContent).join('|')));
@@ -871,7 +893,7 @@ function regatedBack(): void {
 }
 
 /** What the page asserts while REGATED is in the store, from its two reads to the menu's places and back. */
-async function withRegated(page: Page): Promise<void> {
+async function withRegated(page: Page, drawn: () => FinishedPage | undefined): Promise<void> {
   await regated(page);
   const open = await answered<OpenRuns>(page, '/api/runs-open');
   const finished = await answered<FinishedPage>(page, `/api/runs-finished?page=1&size=${FINISHED_SIZE}`);
@@ -893,7 +915,7 @@ async function withRegated(page: Page): Promise<void> {
   await secondGate(page, open);
   await tableByKeyboard(page, finished);
   await finger(page, open, finished);
-  await rowsSay(page, open, finished);
+  await rowsSay(page, open, finished, drawn);
   await clocksSay(page, open, finished);
   await flightAligned(page);
   await lookDetails(page);
@@ -924,9 +946,11 @@ export default {
   route: '/runs',
   expect: async (page) => {
     await sidebar(page);
+    const drawn = finishedDrawn(page);
     try {
-      await withRegated(page);
+      await withRegated(page, drawn.last);
     } finally {
+      drawn.stop();
       regatedBack();
     }
     await expectCount(cardOf(page, REGATED.id), 0, `${REGATED.id} taken back, its card goes`);

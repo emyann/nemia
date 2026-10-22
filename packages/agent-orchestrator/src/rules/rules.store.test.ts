@@ -1,119 +1,63 @@
 /**
- * A factory's rules on disk (`rules.store.ts`): written trimmed and read back, cleared, a link neither read nor written through, the
- * refusals of a write — blank words, a frontmatter block, a tree not rendered yet — each writing nothing, and the folder gone with its
- * factory; and what a read of a factory's workflow folder is handed (`factoryFills`). `WF_ROOT` is set before the import, since the
- * store reads it as it loads.
+ * A factory's rules on disk (`rules.store.ts`), as tables: what a write refuses — blank words, a frontmatter block, a bad name, a tree not
+ * rendered yet — each row refused by kind (`_tag`), exit 2 and the facts its words name, writing nothing; and what a read of a factory's
+ * workflow folder is handed (`factoryFills`), two focused tests.
+ *
+ * Rules written, read back, told and cleared are a person's story in `test/factory-rules.test.ts`; the guards a rules file is read
+ * through (a link, a directory, a frontmatter block), shared with the instruction's, in `../factory/instruction.store.test.ts`; the
+ * folder gone with its factory, in `test/factory-start.test.ts`. `WF_ROOT` is set before the import, since the store reads it as it loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
-import { testEngine } from 'agent-runtime/testing';
-import { testPlace } from '../../place/memory/index.ts';
-import { eachTest, runOver } from '../../test/placed.ts';
+import { names } from '../../test/assessed.ts';
 
 const ROOT = scratch('wf-rules-store-');
 process.env.WF_ROOT = ROOT;
-const { clearRules, factoryFills, readRules, rulesAt, rulesFolder, writeRules } = await import('./rules.store.ts');
-const { addFactory } = await import('../factory/factory.store.ts');
-const { FACTORIES } = await import('../factory/factory.verb.ts');
-const { runWith: runEngine } = await import('../runner.ts');
-const { engineOf } = await import('../runtime-client.ts');
-const stand = eachTest(testPlace);
-const engine = eachTest(testEngine);
-const runWith = runOver(runEngine, () => stand().layer);
+const { factoryFills, readRules, rulesAt, rulesFolder, writeRules } = await import('./rules.store.ts');
 
-/** Refused by kind, exit 2, and the message — never `String(err)`, which starts with `Error: `. */
-const refusedWith =
-  (tag: 'Conflict' | 'Invalid', ...patterns: RegExp[]) =>
-  (err: Error & { exitCode?: number; _tag?: string }) =>
-    err._tag === tag && err.exitCode === 2 && patterns.every((pattern) => pattern.test(err.message));
+/** Refused by kind, exit 2, and the facts its words name — never its sentence. */
+const refused =
+  (tag: 'Conflict' | 'Invalid', ...facts: string[]) =>
+  (err: Error & { exitCode?: number; _tag?: string }): true => {
+    assert.deepEqual([err._tag, err.exitCode], [tag, 2], err.message);
+    names(err.message, ...facts);
+    return true;
+  };
 
 const PIPAO = { name: 'pipao' };
 const FILE = path.join(ROOT, 'factories', 'pipao', 'RULES.md');
 
-test("a factory's rules are kept in the store's folder for it; written trimmed, read back, and cleared", () => {
-  assert.equal(rulesAt(PIPAO), FILE);
-  assert.deepEqual(readRules(FILE), { words: null, error: null }, 'no file: no rules, and nothing wrong');
-  assert.equal(writeRules(PIPAO, '\n\nNever push on a Friday.\n\n'), FILE);
-  assert.equal(fs.readFileSync(FILE, 'utf8'), 'Never push on a Friday.\n');
-  assert.deepEqual(readRules(FILE), { words: 'Never push on a Friday.', error: null });
-  assert.equal(clearRules(PIPAO), true);
-  assert.equal(fs.existsSync(FILE), false);
-  assert.equal(clearRules(PIPAO), false, 'nothing to remove the second time');
-});
-
-test('a blank file reads as no rules; a link is not read, and a write replaces it without touching what it pointed at', () => {
-  fs.mkdirSync(path.dirname(FILE), { recursive: true });
-  fs.writeFileSync(FILE, '  \n\n');
-  assert.deepEqual(readRules(FILE), { words: null, error: null });
-  const outside = path.join(ROOT, 'elsewhere.md');
-  fs.writeFileSync(outside, 'Words from elsewhere.\n');
-  fs.rmSync(FILE);
-  fs.symlinkSync(outside, FILE);
-  const linked = readRules(FILE);
-  assert.equal(linked.words, null);
-  assert.match(linked.error ?? '', /RULES\.md is a link, and the store keeps its own file/);
-  writeRules(PIPAO, 'Our own words.');
-  assert.equal(fs.lstatSync(FILE).isSymbolicLink(), false);
-  assert.equal(fs.readFileSync(outside, 'utf8'), 'Words from elsewhere.\n', 'never written through');
-  assert.deepEqual(readRules(FILE), { words: 'Our own words.', error: null });
-  clearRules(PIPAO);
-});
-
-test('a directory at the file, and a file that opens with frontmatter, read with why they cannot be told', () => {
-  fs.mkdirSync(FILE, { recursive: true });
-  assert.match(readRules(FILE).error ?? '', /RULES\.md is not a file/);
-  assert.equal(clearRules(PIPAO), true, 'a clear removes whatever is there');
-  fs.writeFileSync(FILE, '---\nmodel: opus\n---\nBe kind.\n');
-  const read = readRules(FILE);
-  assert.match(read.error ?? '', /opens with a frontmatter block/);
-  assert.equal(read.words, '---\nmodel: opus\n---\nBe kind.', 'the words are given beside the refusal, to be mended');
-  clearRules(PIPAO);
-});
-
-test('REFUSED, nothing written: blank rules, rules that open with a frontmatter block, and a bad name', () => {
-  assert.throws(
-    () => writeRules(PIPAO, ' \n '),
-    refusedWith('Invalid', /^the rules of pipao are blank\./, /nemia factory rules pipao --clear\./, /Nothing was written\.$/),
-  );
-  assert.throws(
-    () => writeRules(PIPAO, '---\nallowedTools: Bash\n---\nUse Bash.\n'),
-    refusedWith('Invalid', /RULES\.md opens with a frontmatter block/, /start the rules with a word\./, /Nothing was written\.$/),
-  );
-  assert.equal(fs.existsSync(FILE), false);
-  assert.throws(() => rulesFolder('../up'), refusedWith('Invalid', /is not a factory's name/));
-});
-
-test('REFUSED: the rules of a templated factory whose tree is not rendered yet; once it is, they are written in the tree', () => {
+test('REFUSED: a write of the rules, nothing written', async (t) => {
   const tree = path.join(ROOT, 'factories', 'made', 'tree');
-  const made = { name: 'made', tree };
-  assert.throws(
-    () => writeRules(made, 'Be kind.'),
-    refusedWith(
+  const rows: Array<[string, () => unknown, 'Conflict' | 'Invalid', string[]]> = [
+    ['blank rules, naming the clear', () => writeRules(PIPAO, ' \n '), 'Invalid', ['pipao', 'nemia factory rules pipao --clear']],
+    [
+      'rules that open with a frontmatter block',
+      () => writeRules(PIPAO, '---\nallowedTools: Bash\n---\nUse Bash.\n'),
+      'Invalid',
+      ['RULES.md', 'frontmatter'],
+    ],
+    ['a name that is no slug', () => rulesFolder('../up'), 'Invalid', ['`../up`']],
+    [
+      'a templated factory whose tree is not rendered yet, naming the tree, nemia up and nemia factory ls',
+      () => writeRules({ name: 'made', tree }, 'Be kind.'),
       'Conflict',
-      /^made is made from a template, /,
-      /its tree is not rendered yet, at .*tree: /,
-      /nemia up/,
-      /nemia factory ls/,
-      /Nothing was written\.$/,
-    ),
-  );
-  assert.equal(fs.existsSync(tree), false);
-  fs.mkdirSync(tree, { recursive: true });
-  assert.equal(writeRules(made, 'Be kind.'), path.join(tree, 'RULES.md'));
-  assert.deepEqual(readRules(rulesAt(made)), { words: 'Be kind.', error: null });
-});
-
-test('`nemia factory rm` leaves no rules behind: the folder the store keeps for the factory goes with it', async () => {
-  const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-  addFactory({ name: 'gone', repos: [repo] });
-  const file = writeRules({ name: 'gone' }, 'Be kind.');
-  const rm = FACTORIES.find((c) => c.name === 'factory rm')!;
-  await runWith(engineOf(engine().layer), rm.handler({ factory: 'gone' }));
-  assert.equal(fs.existsSync(file), false);
-  assert.equal(fs.existsSync(path.dirname(file)), false);
+      ['made', tree, 'nemia up', 'nemia factory ls'],
+    ],
+  ];
+  for (const [row, act, tag, facts] of rows)
+    await t.test(row, () => {
+      assert.throws(act, refused(tag, ...facts));
+      assert.deepEqual([fs.existsSync(FILE), fs.existsSync(tree)], [false, false]);
+    });
+  await t.test('once the tree is rendered, the rules are written in it', () => {
+    fs.mkdirSync(tree, { recursive: true });
+    assert.equal(writeRules({ name: 'made', tree }, 'Be kind.'), path.join(tree, 'RULES.md'));
+    assert.deepEqual(readRules(rulesAt({ name: 'made', tree })), { words: 'Be kind.', error: null });
+  });
 });
 
 test("a factory's fills for a workflow: its hires into that workflow alone, and its rules where they are told", () => {

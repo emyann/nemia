@@ -181,6 +181,18 @@ test('gateLines', async (t) => {
     ['approved, with none', atPlan({ approvals: [approval('plan', 1)] }), PLAN_DONE, { plan: 'approved 23:10Z' }],
     ['nothing for a step not signed off', atPlan(), phases({ t1: 'running' }), {}],
     ['nothing for a step with no gate', atPlan({ gates: undefined }), PLAN_DONE, {}],
+    [
+      'at its gate on a held run: no command, its approval asked once the hold lifts',
+      atPlan({ hold: { at: '2026-09-17T01:00:00.000Z', until: ['r-0'] } }),
+      PLAN_DONE,
+      { plan: 'awaiting approval:  held until r-0 ships; its approval is asked once the hold lifts' },
+    ],
+    [
+      'at its gate on a pruned run: never approved, and no command offered',
+      atPlan({ pruned: { at: '2026-09-17T01:00:00.000Z', worktrees: [] } }),
+      PLAN_DONE,
+      { plan: 'not approved, and never can be: the run was pruned at 2026-09-17T01:00:00.000Z — its worktrees were removed (nemia prune)' },
+    ],
   ] as Array<[string, Run, (id: string) => TaskPhase, Record<string, string>]>) {
     await t.test(row, () => assert.deepEqual(gateLines(PLANNED, r, p, signedDone, asked), expected));
   }
@@ -214,6 +226,14 @@ test('approvalRefusal: what may be approved, and what is refused before the gate
   });
   await t.test('REFUSED a step the run does not have', () => {
     names(refused(atPlan(), 'desing', PLAN_DONE), 'r-1 has no step "desing"', 'plan, implement, review');
+  });
+  await t.test('REFUSED a pruned run', () => {
+    names(
+      refused(atPlan({ pruned: { at: '2026-09-17T01:00:00.000Z', worktrees: [] } }), 'plan', PLAN_DONE),
+      'r-1 was pruned at 2026-09-17T01:00:00.000Z',
+      'nemia prune',
+      'nemia start',
+    );
   });
   await t.test('REFUSED a cancelled run', () => {
     names(refused(atPlan(CANCELLED), 'plan', PLAN_DONE), `r-1 was cancelled at ${CANCELLED.cancelledAt}`, 'nemia start');
@@ -304,6 +324,9 @@ test('approvalRefusal: approved already, and a send-back asked', async (t) => {
       'try 1',
       'the next tick sends it back',
     );
+  });
+  await t.test("an ask of another step's try is not this step's: it may be approved", () => {
+    assert.equal(refused(atPlan(), 'plan', PLAN_DONE, signedDone, undefined, [{ ...WORDLESS, step: 'review', try: 1 }]), null);
   });
   await t.test('REFUSED a wordless ask at its gate, which no tick honours: delete it, then approve', () => {
     names(

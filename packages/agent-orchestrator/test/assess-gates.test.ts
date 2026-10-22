@@ -271,6 +271,23 @@ test('slotNeed at a gate', async (t) => {
   });
 });
 
+/** `implement → review → ship`: the ending step works in the repository's checkout, and is gated. */
+const SHIP: Workflow = { name: 'ship', after: ['review'], workspace: 'main', gate: true, body: 'Ship it.' };
+const ENDS: Workflow[] = [step('implement'), step('review', ['implement']), SHIP];
+/** implement and review done on the run's branch, ship never filed. */
+const atEnd = (extra: Partial<RepositoryRun> = {}) =>
+  run(
+    {},
+    {
+      ...extra,
+      steps: {
+        implement: { taskId: 't1', workspace: '/wt', branch: 'wf/r-1/implement' },
+        review: { taskId: 't2', workspace: '/wt', branch: 'wf/r-1/implement' },
+        ship: { taskId: null },
+      },
+    },
+  );
+
 test('cancelPlan and forgetRefusal at a gate', async (t) => {
   await t.test('a run waiting at its gate is not finished: cancel calls it off, with nothing to stop', () => {
     assert.deepEqual(cancelPlan(PLANNED, atPlan(), PLAN_DONE, signedDone, asked), { kind: 'cancel', stop: [] });
@@ -294,6 +311,34 @@ test('cancelPlan and forgetRefusal at a gate', async (t) => {
   });
   await t.test('called off, it files nothing: forgettable', () => {
     assert.equal(forgetRefusal(PLANNED, atPlan(CANCELLED), PLAN_DONE, [], signedDone, asked), null);
+  });
+  await t.test('REFUSED forgetting a run at a gate whose step never ran: the approval files the step itself', () => {
+    names(
+      forgetRefusal(ENDS, atEnd(), DONE, [], signedDone, asked),
+      'ship waits at its gate',
+      'it is filed once it is approved',
+      'nemia approve r-1 ship',
+    );
+  });
+  await t.test('REFUSED forgetting a run at two gates whose steps never ran: each is filed once approved', () => {
+    const two = [step('implement'), { ...SHIP, after: ['implement'] }, { ...SHIP, name: 'land', after: ['implement'] }];
+    names(
+      forgetRefusal(two, run({ implement: 't1', ship: null, land: null }), phases({ t1: 'succeeded' }), [], signedDone, asked),
+      'ship and land wait at their gates',
+      'each is filed once each is approved',
+      'nemia approve r-1 ship',
+      'nemia approve r-1 land',
+    );
+  });
+  await t.test('REFUSED forgetting a run at a gate that ran and one that never did: each, or what waits on it, is filed', () => {
+    const mixed: Workflow[] = [step('plan'), step('implement'), { ...SHIP, after: ['implement'] }];
+    names(
+      forgetRefusal(mixed, run({ plan: 't1', implement: 't2', ship: null }, { gates: ['plan'] }), DONE, [], signedDone, asked),
+      'plan and ship wait at their gates',
+      'each is filed, or what waits on it is',
+      'nemia approve r-1 plan',
+      'nemia approve r-1 ship',
+    );
   });
 });
 
@@ -351,23 +396,6 @@ test('composeBrief after an approved gate', async (t) => {
     assert.ok(composeBrief(resumed[1], approved, resumed).startsWith(`${PRECEDENCE}\n\ndo implement\n## Approved\n`));
   });
 });
-
-/** `implement → review → ship`: the ending step works in the repository's checkout, and is gated. */
-const SHIP: Workflow = { name: 'ship', after: ['review'], workspace: 'main', gate: true, body: 'Ship it.' };
-const ENDS: Workflow[] = [step('implement'), step('review', ['implement']), SHIP];
-/** implement and review done on the run's branch, ship never filed. */
-const atEnd = (extra: Partial<RepositoryRun> = {}) =>
-  run(
-    {},
-    {
-      ...extra,
-      steps: {
-        implement: { taskId: 't1', workspace: '/wt', branch: 'wf/r-1/implement' },
-        review: { taskId: 't2', workspace: '/wt', branch: 'wf/r-1/implement' },
-        ship: { taskId: null },
-      },
-    },
-  );
 
 test('REFUSED once pruned: a step at its gate is offered no approval and no send-back', async (t) => {
   const pruned = { at: '2026-09-17T01:00:00.000Z', worktrees: [] };

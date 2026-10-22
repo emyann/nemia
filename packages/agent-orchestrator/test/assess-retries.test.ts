@@ -26,7 +26,7 @@ import {
   type SpendOf,
   type TaskPhase,
 } from '../src/run.ts';
-import { dueNote, nextTry, signoffsSpent, type EarlierTry } from '../src/retry/retry-ask.ts';
+import { dueNote, nextTry, signoffsSpent, type EarlierTry, type RetryHow } from '../src/retry/retry-ask.ts';
 import { PRECEDENCE } from '../src/brief/index.ts';
 import { CLOSEOUT_SCHEMA, type Closeout } from '../src/closeout/closeout.ts';
 import { closeoutAsked } from '../src/views/views.verb.ts';
@@ -492,6 +492,42 @@ test('`retries:`: the tries the run files on its own when a check refuses', asyn
       assert.equal(lines.length, 1);
       names(lines[0], 'implement:', 'no retry was spent', 'nemia retry r-1 implement --recheck');
     });
+  await t.test('a check that did not finish on a step over its budget: --recheck offered, and a new session needs --budget', () => {
+    const capped: Workflow[] = [{ ...RETRIED[0], budget: 3 }, RETRIED[1]];
+    const over: SpendOf = (id) => (id === 't1' ? { usd: 4, measured: 1, unmeasured: 0, budgetEnded: false } : undefined);
+    const p = phases({ t1: 'succeeded', c1: 'stopped' });
+    const d = decision(
+      capped,
+      onTry(),
+      p,
+      nothingShipped,
+      signedDone,
+      asked,
+      () => undefined,
+      [],
+      [],
+      () => false,
+      over,
+    );
+    assert.deepEqual(d.kind === 'awaiting' && d.unfinishedCheck, ['implement']);
+    names(retryLines(capped, onTry(), d, p, signedDone, asked, over)[0], 'nemia retry r-1 implement --recheck', '--budget above $4.00');
+    const refusal = (how: RetryHow) =>
+      retryRefusal(
+        capped,
+        onTry(),
+        'implement',
+        how,
+        p,
+        signedDone,
+        asked,
+        () => undefined,
+        [],
+        () => false,
+        over,
+      );
+    assert.equal(refusal({ mode: 'recheck' }), null, 'its check again needs no --budget');
+    names(refusal({ mode: 'nudge' }), 'nemia retry r-1 implement --recheck', 'nemia retry r-1 implement --budget <amount>');
+  });
   await t.test('a caller that gives no verdict reads a check stopped at its deadline as the tick does', () => {
     const unread = assess(RETRIED, onTry(), checkFailed, signedDone, asked);
     assert.deepEqual([unread.retry, unread.blocked, unread.status], [[], ['review'], 'failed']);

@@ -12,7 +12,17 @@ import type { Workflow } from '../step/step.ts';
 import type { SpendOf } from '../status/status.ts';
 import type { Closeout } from '../closeout/closeout.ts';
 import type { Verdict } from '../check/check.ts';
-import { continuesFrom, messageRefusal, nextTry, type EarlierTry, type RetryAsk, type RetryHow, type RetryMode } from './retry-ask.ts';
+import {
+  continuesFrom,
+  dueNote,
+  messageRefusal,
+  nextTry,
+  type EarlierTry,
+  type Retry,
+  type RetryAsk,
+  type RetryHow,
+  type RetryMode,
+} from './retry-ask.ts';
 import { deniedOffer, pauseAskVoid, pauseAsksVoid, retriesDue, tryNote } from './retry.ts';
 import { retryRefusal } from './retry-refusal.ts';
 import { retrySection } from '../brief/brief-sections.ts';
@@ -206,6 +216,44 @@ test('a pause ask (retriesDue, pauseAskVoid): due only on the very task it stopp
   });
 });
 
+test('dueNote: what `nemia ls` says of a try due, by who asked for it', async (t) => {
+  const r = run({ implement: 't1', review: null });
+  const lacking = run({}, { steps: { implement: { taskId: 't1', filesRead: { taskId: 't1', lacked: { 'notes.md': 'missing' } } } } });
+  const checked: Workflow = { ...step('implement'), retries: 2 };
+  const rows: Array<[string, Workflow, Run, Retry, string[]]> = [
+    [
+      'a person ask',
+      IMPLEMENT,
+      r,
+      { step: 'implement', try: 2, mode: 'fresh', by: 'ask' },
+      ['try 2 asked', '--fresh', 'the next tick files it'],
+    ],
+    [
+      'the run sign-off nudge',
+      IMPLEMENT,
+      r,
+      { step: 'implement', try: 2, mode: 'nudge', by: 'signoff' },
+      ['try 2 due', 'ended without its closeout'],
+    ],
+    [
+      'the sign-off nudge of a closeout that named a file the run lacks',
+      IMPLEMENT,
+      lacking,
+      { step: 'implement', try: 2, mode: 'nudge', by: 'signoff' },
+      ['named a file the run does not have'],
+    ],
+    ['a pause ask', IMPLEMENT, r, { step: 'implement', try: 2, mode: 'nudge', by: 'pause' }, ['try 2 due', 'nemia pause --now']],
+    [
+      'a try `retries:` files',
+      checked,
+      r,
+      { step: 'implement', try: 2, mode: 'nudge', by: 'retries' },
+      ['try 2 due', 'retries: 2, 0 spent'],
+    ],
+  ];
+  for (const [name, s, x, due, facts] of rows) await t.test(name, () => namesFor(name, dueNote(s, x, due), facts));
+});
+
 /** What `nemia retry r-1 implement` says over a pause's `asks`: null where it writes its ask. */
 const refusalOverPause = (r: Run, phaseOf: (id: string) => TaskPhase, asks: readonly RetryAsk[], budget?: number, spendOf?: SpendOf) =>
   retryRefusal(
@@ -256,6 +304,18 @@ test('retryRefusal: what `nemia retry` refuses, and what it says to do instead',
     names(said, 'the run tries implement', '`retries: 2` has 2 left', 'try 2', 'nemia ls r-1');
     names(said, 'the run tries implement again itself');
   });
+  await t.test('a step the run nudges to sign off itself', () => {
+    const said = retryRefusal(
+      STEPS,
+      failedRun(),
+      'implement',
+      { mode: 'nudge' },
+      phases({ t1: 'failed' }),
+      () => undefined,
+      () => 'unsigned',
+    );
+    names(said, 'the run nudges implement itself', 'try 2', 'nemia ls r-1');
+  });
   await t.test('a check still due or running', () => {
     assert.match(refusalOf(onTry(), { t1: 'succeeded', c1: 'running' })!, /check is still due or running/);
     names(refusalOf(onTry(), { t1: 'succeeded', c1: 'running' }), "implement's check is still due or running", 'nemia ls r-1');
@@ -263,6 +323,38 @@ test('retryRefusal: what `nemia retry` refuses, and what it says to do instead',
   await t.test('a verified step', () => assert.match(refusalOf(onTry(), { t1: 'succeeded', c1: 'succeeded' })!, /is verified/));
   await t.test('--recheck of a failed step with no check', () => {
     names(refusalOf(failedRun(), { t1: 'failed' }, { mode: 'recheck' }), 'implement is failed', 'nemia retry r-1 implement (or --fresh)');
+  });
+  await t.test('--recheck of a step its harness blocked, or denied a call: no check of it failed', () => {
+    const blocked = retryRefusal(
+      STEPS,
+      failedRun(),
+      'implement',
+      { mode: 'recheck' },
+      phases({ t1: 'running' }),
+      () => undefined,
+      asked,
+      undefined,
+      [],
+      () => true,
+    );
+    names(blocked, '--recheck', 'blocked by its harness', 'nemia retry r-1 implement (or --fresh)');
+    const DENYING: Workflow[] = [{ ...step('implement'), check: 'npm test', denials: 'fail' }, step('review', ['implement'])];
+    const deniedOf: SpendOf = (id) =>
+      id === 't1' ? { usd: 0, measured: 0, unmeasured: 0, budgetEnded: false, denied: ['Bash(pytest)'] } : undefined;
+    const denied = retryRefusal(
+      DENYING,
+      failedRun(),
+      'implement',
+      { mode: 'recheck' },
+      phases({ t1: 'succeeded' }),
+      signedDone,
+      asked,
+      undefined,
+      [],
+      () => false,
+      deniedOf,
+    );
+    names(denied, '--recheck', 'implement was denied a call', 'nemia retry r-1 implement (or --fresh)');
   });
   await t.test('a step the workflow does not have', () => {
     assert.match(refusalOf(onTry(), waiting, { mode: 'nudge' }, [], 'deploy')!, /no step "deploy" — its steps are implement, review/);
@@ -493,5 +585,9 @@ test('deniedOffer: each rule once, one line, the first five named and the rest c
       only,
       /its try a call, .* SendMessage may be its own disallowedTools: at work \(SendMessage\), which beats any allowedTools:, so no rule is offered for it\./,
     );
+  });
+  await t.test('calls its own deny beside one it does not: the rule for that one, and which rules are at work for them', () => {
+    const mixed = deniedOffer(['Bash(npm)', 'SendMessage', 'Bash(pytest)'], { disallowedTools: ['Bash(npm run build)', 'SendMessage'] });
+    names(mixed, 'Bash(pytest:*)', 'Bash(npm), SendMessage', '(Bash(npm run build), SendMessage)', 'no rule is offered for them');
   });
 });

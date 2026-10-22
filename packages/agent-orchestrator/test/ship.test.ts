@@ -516,6 +516,24 @@ test("a place that gives no reading of the checkout, or reads its merge as anoth
   );
 
   await s.test(
+    "an ending settled with no merge staged holds nothing, and the place's `status` is not asked: its staged-merge file says none is in progress",
+    async () => {
+      let asked = 0;
+      const counted = statusPlace((request) => {
+        asked += 1;
+        return stage.place().place.askNow('status', request);
+      });
+      const { repo, waiting, staging } = await stagingAndWaiting();
+      world().takeBack(repo);
+      settle(`${staging.id}-ship`, 'succeeded', BLOCKED);
+      assert.equal(stagedHere(at.repositoryRun(readRun(staging.id))), false, 'the merge taken back by hand');
+      const hold = await holdOf(e, waiting.id, statusMemo(at.liveHeads, counted));
+      assert.equal(hold, undefined, 'its session settled and nothing staged: the checkout is free for the run approved behind it');
+      assert.equal(asked, 0, 'read off the file, with no process');
+    },
+  );
+
+  await s.test(
     'REFUSED: a staged merge its place gives no reading of holds the checkout — another run approved on the same repository waits for it',
     async () => {
       const { repo, waiting, staging } = await stagingAndWaiting();
@@ -613,7 +631,7 @@ test('an ending that stops on its own word, or whose check refuses the merged tr
 
   await s.test(
     "a check that refuses leaves the checkout clean: the abort the ending's prose names takes the trial merge back, and the run says what happened",
-    async () => {
+    async (st) => {
       const { repo, id, branch, base } = await at.atTheGate();
       await stage.runWith(e, approveRun(id, 'ship'));
       await at.pass(id);
@@ -630,6 +648,15 @@ test('an ending that stops on its own word, or whose check refuses the merged tr
       assert.equal(decision.kind, 'awaiting');
       if (decision.kind !== 'awaiting') return;
       assert.deepEqual([decision.outcome, decision.stuck, decision.branches], ['blocked', ['ship'], [branch]]);
+      const printed = await at.printedBy(st, ['decide', id]);
+      assert.ok(
+        printed.some((l) => l.startsWith(`  branch    ${branch}`)),
+        printed.join('\n'),
+      );
+      assert.ok(
+        !printed.some((l) => /^ {2}(merges|others) {4}/.test(l)),
+        `an ending that ended blocked waits at no gate and had no landing refused: nothing reads what it merges onto\n${printed.join('\n')}`,
+      );
     },
   );
 

@@ -407,4 +407,9 @@ test('a step its harness ended at its budget reads budget exhausted, with the am
       'budget exhausted at $3',
     );
   });
+  await t.test('cut off with no `budget:` and nothing measured: the word alone, no amount and no cap beside it', () => {
+    const unmeasured = spends({}, ['t1']);
+    assert.equal(stepStatus(STEPS[0], r, p, nothingSaid, asked, STEPS, unmeasured), 'budget exhausted');
+    assert.equal(listed(STEPS, r, shown({ t1: 'failed' }), signedOff({}), { spent: unmeasured }).steps[0].status, 'budget exhausted');
+  });
 });

@@ -342,6 +342,7 @@ test('at the cap and past a budget: rounds exhausted, its once more asking for `
       'review: it asked for round 4, and `rounds: 3` are spent. Its findings are below. Once more — implement continued, then a new review:  nemia round r-1 review',
       'review: enough — go on with what is there; its findings stay on the record, and ship is filed and handed them with your words:  nemia accept r-1 review --message "<why>"',
     ]);
+    assert.equal(listed(LOOP, r, said, { spent }).steps[1].note, 'round 3 of 3, and it asked again — once more: nemia round r-1 review');
   });
 });
 

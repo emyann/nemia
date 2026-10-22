@@ -203,6 +203,10 @@ test('roundAsk: what `nemia round` takes and refuses', async (t) => {
     names(itself, 'the run goes round again itself', '`rounds: 3` has 2 left', 'round 2', 'nemia ls r-1');
     names(refusalOf(ask(inRound(2), saidIn(2, false))), 'review signed off', '(`again: false`)');
   });
+  await t.test("REFUSED: a loop at its gate, a person's word and not a round", () => {
+    const gated = refusalOf(ask(inRound(2, { gates: ['review'] }), saidIn(2, false)));
+    names(gated, '(`again: false`)', 'waits at its gate', 'nemia approve r-1 review', 'nemia retry r-1 review --message "<objection>"');
+  });
   await t.test('REFUSED: a target blocked in its round, and a round already asked for', () => {
     const blocked = (name: string) =>
       name === 'implement' ? { ...answered, outcome: 'blocked' as const, needs: 'which flag' } : undefined;

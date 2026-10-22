@@ -204,6 +204,12 @@ test('two runs of one repository at their endings: the oldest approval takes the
       const { decision, checkout } = await stage.runWith(e(), decideRun(first.id));
       assert.deepEqual([decision.kind, decision.kind === 'running' ? decision.waiting : []], ['running', ['ship']]);
       assert.deepEqual(checkout, { run: second.id, step: 'ship' });
+      const holder = await stage.runWith(e(), decideRun(second.id));
+      assert.deepEqual(
+        [holder.decision.kind, holder.decision.kind === 'running' ? holder.decision.waiting : [], holder.checkout],
+        ['running', ['ship'], undefined],
+        'the run in the checkout waits on its own ship, and on no other run',
+      );
       const printed = await at.printedBy(st, ['decide', first.id]);
       assert.ok(printed.includes(waitLine(second.id)), printed.join('\n'));
     },

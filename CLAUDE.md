@@ -61,23 +61,21 @@ holds what every change needs.
 
 ## Rules the code keeps
 
-- **The runtime owns how a session runs; the layers above own what it means.** `decide` (`agent-runtime/src/core/domain.ts`) is pure and
-  stays a screen long `(no test yet)`. A knob on a workload is a field carried on the task and read by a runner, never a callback into
-  `decide`, and no `if` in `engine.ts` belongs in `decide` `(no test yet)`. What sits in which layer today, and what is a candidate to
-  move, is in `docs/architecture.md`, *Who owns what*.
+- **The runtime owns how a session runs; the layers above own what it means.** `decide` (`agent-runtime/src/core/domain.ts`) is pure
+  and stays a screen long. A knob on a workload is a field carried on the task and read by a runner, never a callback into `decide`,
+  and no `if` in `engine.ts` belongs in `decide`. What sits in which layer today, and what is a candidate to move, is in
+  `docs/architecture.md`, *Who owns what*.
 - **Level-triggered.** A tick reads the world, decides, acts, and carries nothing between passes. A guard that only fires on a
-  transition is wrong after a restart `(no test yet)`.
-- **Prose is not a constraint.** If the packages need an agent to do something, the machinery refuses the alternative
-  `(no test yet)`.
-- **Errors say what to do next.** A message names the fix — the command to type, the field to set — and not only what went wrong
-  `(no test yet)`: what a refusal is thrown as and the exit code it carries are refused when they are wrong, its words are nobody's
-  to check.
+  transition is wrong after a restart.
+- **Prose is not a constraint.** If the packages need an agent to do something, the machinery refuses the alternative.
+- **Errors say what to do next.** A message names the fix — the command to type, the field to set — and not only what went wrong: what
+  a refusal is thrown as and the exit code it carries are refused when they are wrong, its words are nobody's to check.
 - **A state machine is drawn by its code.** A new machine prints its own Mermaid diagram, held between `diagram:<name>` markers in its
-  package's docs whose begin line names the command; never a drawing `(no test yet)`. A diagram that has drifted from what its
-  command prints is another matter, and refused.
+  package's docs whose begin line names the command; never a drawing. A diagram that has drifted from what its command prints is
+  another matter, and refused.
 - **The Kubernetes test for a new field on the runtime's task: does the Pod spec (`core/v1`) have one?** A container's command, args,
   env, volumes, restart policy, resources and priority are the runtime's; what a workflow means — a step, a gate, a check's verdict, a
-  budget across tries — is not `(no test yet)`.
+  budget across tries — is not.
 
 ## Git
 

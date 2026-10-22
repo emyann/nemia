@@ -30,17 +30,17 @@ const section = (file: string, hit: number[], missed: number[], branches: { take
 
 /**
  * A file's coverage with `hitLines` hit of `found`, and `branchHit` branches of `branchFound`: the first `branchHit` of line 1's
- * block 0, as `section` takes them, unless `hitBranches` names others.
+ * branches, as `section` takes them, unless `takenByLine` says others.
  */
 const cover = (
   hitLines: number[],
   found: number,
   branchHit = 0,
   branchFound = 0,
-  hitBranches = Array.from({ length: branchHit }, (_, i) => `1,0,${i}`),
+  takenByLine: Record<string, number> = branchHit > 0 ? { 1: branchHit } : {},
 ): FileCoverage => ({
   lines: { found, hit: hitLines.length, hitLines },
-  branches: { found: branchFound, hit: branchHit, hitBranches },
+  branches: { found: branchFound, hit: branchHit, takenByLine },
 });
 
 /** A record of package `p` holding `files`. */
@@ -97,16 +97,16 @@ test('a comparison finds the branches that fell where every line is still hit', 
   const falls = compared(recordWith({ 'src/a.ts': cover([1], 1, 2, 2) }), recordWith({ 'src/a.ts': cover([1], 1, 1, 2) }));
   assert.deepEqual(
     falls.map((fall) => [fall.file, fall.linesLost, fall.branchesLost, fall.branches]),
-    [['src/a.ts', [], ['1,0,1'], { before: 2, after: 1 }]],
+    [['src/a.ts', [], ['1 (2→1)'], { before: 2, after: 1 }]],
   );
 });
 
-test('a REFUSED comparison names a branch no longer taken where another took its place and the count held', () => {
-  const before = recordWith({ 'src/a.ts': cover([1], 1, 1, 2, ['1,0,0']) });
-  const after = recordWith({ 'src/a.ts': cover([1], 1, 1, 2, ['1,0,1']) });
+test("a REFUSED comparison names a line whose branch is no longer taken where another line's took its place", () => {
+  const before = recordWith({ 'src/a.ts': cover([1], 1, 1, 2, { 3: 1 }) });
+  const after = recordWith({ 'src/a.ts': cover([1], 1, 1, 2, { 4: 1 }) });
   assert.deepEqual(
     compared(before, after).map((fall) => [fall.file, fall.branchesLost]),
-    [['src/a.ts', ['1,0,0']]],
+    [['src/a.ts', ['3 (1→0)']]],
   );
 });
 

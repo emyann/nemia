@@ -98,12 +98,68 @@ test('a sign-in no one approves within its bound is ended and reads expired', as
   assert.equal((await Effect.runPromise(v.mcpSignInState('github'))).state, 'expired');
 });
 
-test('a sign-out removes the server at local scope and forgets the state', async () => {
+test('a sign-out adds the server with no secret, then removes it at local scope, and forgets the state', async () => {
   const s = seams();
   const v = mcpSignInVerbsOf(CLAUDE, scratch('ae-sign-in-'), undefined, { cli: s.run, ask: s.ask });
   assert.deepEqual(await Effect.runPromise(v.mcpSignOut('github', GITHUB)), { signedOut: true });
-  assert.deepEqual(s.cli, [['mcp', 'remove', '--scope', 'local', 'github']]);
+  assert.deepEqual(
+    s.cli.map((a) => a[1]),
+    ['add', 'remove'],
+  );
+  assert.deepEqual(s.cli[1], ['mcp', 'remove', '--scope', 'local', 'github']);
   assert.deepEqual(await Effect.runPromise(v.mcpSignInState('github')), { state: 'none' });
+});
+
+test('a server signed in with no secret, whose sign-in ran no CLI, is signed out by an add then a remove', async () => {
+  const s = seams();
+  const v = mcpSignInVerbsOf(CLAUDE, scratch('ae-sign-in-'), undefined, { cli: s.run, ask: s.ask });
+  await Effect.runPromise(v.mcpSignIn('linear', { ...GITHUB, url: 'https://mcp.linear.app/mcp' }));
+  s.sessions[0].settle({ connected: true });
+  await until(() => s.sessions[0].ended);
+  assert.equal(s.cli.length, 0, 'the sign-in filed nothing under the name');
+  assert.deepEqual(await Effect.runPromise(v.mcpSignOut('linear', { ...GITHUB, url: 'https://mcp.linear.app/mcp' })), { signedOut: true });
+  assert.deepEqual(
+    s.cli.map((a) => [a[1], a.at(-1)]),
+    [
+      ['add', 'https://mcp.linear.app/mcp'],
+      ['remove', 'linear'],
+    ],
+  );
+});
+
+test('REFUSED: two sign-ins asked at once on one port, the first not yet answered, open one session; the second is refused held', async () => {
+  const s = seams();
+  let answer = () => {};
+  const late = new Promise<void>((r) => (answer = r));
+  const slowCli: McpCli = async (args) => {
+    s.cli.push(args);
+    if (s.cli.length === 1) await late;
+    return { code: 0, out: '' };
+  };
+  const v = mcpSignInVerbsOf(CLAUDE, scratch('ae-sign-in-'), undefined, { cli: slowCli, ask: s.ask });
+  const first = Effect.runPromise(v.mcpSignIn('github', GITHUB, 'secret'));
+  await until(() => s.cli.length > 0);
+  const second = await Effect.runPromiseExit(v.mcpSignIn('other', { ...GITHUB, url: 'https://other.example/mcp' }, 'secret'));
+  assert.ok(Exit.isFailure(second));
+  const err = (second.cause as unknown as { reasons: Array<{ error: { held: boolean } }> }).reasons[0].error;
+  assert.equal(err.held, true, 'the port is held from the first child on');
+  assert.ok(Exit.isFailure(await Effect.runPromiseExit(v.mcpSignOut('github', GITHUB))), 'nothing to sign out of while one is started');
+  answer();
+  await first;
+  assert.equal(s.sessions.length, 1, 'one session listens on the port');
+  s.sessions[0].settle({ connected: true });
+  await until(() => s.sessions[0].ended);
+});
+
+test('a sign-in whose secret is not stored lets its port go', async () => {
+  const s = seams();
+  const refusing: McpCli = async (args) => (args[1] === 'add' ? { code: 1, out: 'bad' } : { code: 0, out: '' });
+  const v = mcpSignInVerbsOf(CLAUDE, scratch('ae-sign-in-'), undefined, { cli: refusing, ask: s.ask });
+  assert.ok(Exit.isFailure(await Effect.runPromiseExit(v.mcpSignIn('github', GITHUB, 'secret'))));
+  assert.ok(
+    Exit.isSuccess(await Effect.runPromiseExit(v.mcpSignIn('github', GITHUB))),
+    'the port was let go, so a sign-in with no secret starts',
+  );
 });
 
 test('REFUSED: an engine with no Claude Code harness signs in and out of nothing, and spawns nothing', async () => {

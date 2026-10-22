@@ -88,9 +88,33 @@ const signInRefusal = (name: unknown, server: unknown): string | undefined => {
 };
 
 /**
- * The three verbs over the harnesses this engine has, the hold of each waiting sign-in kept here by its callback port. Each is refused,
- * with nothing spawned, where the engine runs no Claude Code harness: only Claude Code is measured to sign in (`signsInMcp`), and Codex
- * 0.154 hands GitHub no client secret.
+ * The callback ports this engine's sign-ins hold: a port is claimed by name before a sign-in's first child is spawned, and held by its
+ * session once that is open, so two sign-ins asked at once never both listen there. `settle` lets a hold go once, saying how it ended.
+ */
+const portsHeld = (states: Map<string, McpSignInState>) => {
+  const byPort = new Map<number, Held>();
+  const claimed = new Map<number, string>();
+  const waitsOn = (port: number) => {
+    const held = byPort.get(port);
+    if (held) return `a sign-in to \`${held.name}\` already waits on port ${port} until ${held.until}`;
+    const starting = claimed.get(port);
+    return starting === undefined ? undefined : `a sign-in to \`${starting}\` is being started on port ${port}`;
+  };
+  const portOf = (name: string) =>
+    [...byPort.entries()].find(([, h]) => h.name === name)?.[0] ?? [...claimed.entries()].find(([, n]) => n === name)?.[0];
+  const settle = (port: number, held: Held, state: McpSignInState) => {
+    if (byPort.get(port) !== held) return;
+    byPort.delete(port);
+    held.session.end();
+    states.set(held.name, state);
+  };
+  return { byPort, claimed, waitsOn, portOf, settle };
+};
+
+/**
+ * The three verbs over the harnesses this engine has, the hold of each waiting sign-in kept here by its callback port (`portsHeld`).
+ * Each is refused, with nothing spawned, where the engine runs no Claude Code harness: only Claude Code is measured to sign in
+ * (`signsInMcp`), and Codex 0.154 hands GitHub no client secret.
  */
 export const mcpSignInVerbsOf = (
   harnesses: Record<string, HarnessConfig>,
@@ -98,8 +122,8 @@ export const mcpSignInVerbsOf = (
   executable: string | undefined,
   seams: SignInSeams = {},
 ) => {
-  const byPort = new Map<number, Held>();
   const states = new Map<string, McpSignInState>();
+  const { byPort, claimed, waitsOn, portOf, settle } = portsHeld(states);
   const cwd = path.join(root, SIGN_IN_FOLDER);
   const withinMs = seams.withinMs ?? SIGN_IN_MS;
   const refuse = (message: string, held = false) => Effect.fail(new McpSignInRefused({ message, held }));
@@ -114,25 +138,7 @@ export const mcpSignInVerbsOf = (
       ? "no Claude Code was found to run `claude mcp` with: the Agent SDK bundles none for this platform. Set the engine's `claudeExecutable`."
       : claudeCli(claude);
   };
-  const heldBy = (name: string) => [...byPort.entries()].find(([, h]) => h.name === name);
-  const settle = (port: number, held: Held, state: McpSignInState) => {
-    if (byPort.get(port) !== held) return;
-    byPort.delete(port);
-    held.session.end();
-    states.set(held.name, state);
-  };
-
-  const mcpSignIn = Effect.fnUntraced(function* (name: string, server: RemoteMcpServer, clientSecret?: string) {
-    const refused = signInRefusal(name, server) ?? noClaude();
-    if (refused) return yield* refuse(refused);
-    const port = server.oauth!.callbackPort!;
-    const other = byPort.get(port);
-    if (other) {
-      return yield* refuse(
-        `a sign-in to \`${other.name}\` already waits on port ${port} until ${other.until}, and the harness listens there for one at a time. Finish it in the browser, or ask again after then.`,
-        true,
-      );
-    }
+  const opened = Effect.fnUntraced(function* (name: string, server: RemoteMcpServer, port: number, clientSecret?: string) {
     mkdirSync(cwd, { recursive: true });
     if (clientSecret !== undefined) {
       const cli = cliOf();
@@ -153,22 +159,37 @@ export const mcpSignInVerbsOf = (
     return { authUrl: session.authUrl, until } satisfies McpSignInStarted;
   });
 
+  const mcpSignIn = Effect.fnUntraced(function* (name: string, server: RemoteMcpServer, clientSecret?: string) {
+    const refused = signInRefusal(name, server) ?? noClaude();
+    if (refused) return yield* refuse(refused);
+    const port = server.oauth!.callbackPort!;
+    const waiting = waitsOn(port);
+    if (waiting) {
+      return yield* refuse(
+        `${waiting}, and the harness listens there for one at a time. Finish it in the browser, or ask again after then.`,
+        true,
+      );
+    }
+    claimed.set(port, name);
+    return yield* opened(name, server, port, clientSecret).pipe(Effect.ensuring(Effect.sync(() => claimed.delete(port))));
+  });
+
   const mcpSignInState = (name: string): Effect.Effect<McpSignInState> => Effect.sync(() => states.get(name) ?? { state: 'none' });
 
   const mcpSignOut = Effect.fnUntraced(function* (name: string, server: RemoteMcpServer) {
     const refused = signInRefusal(name, server) ?? noClaude();
     if (refused) return yield* refuse(refused);
-    const waiting = heldBy(name);
-    if (waiting) {
+    const port = portOf(name);
+    if (port !== undefined) {
       return yield* refuse(
-        `a sign-in to \`${name}\` waits on port ${waiting[0]} until ${waiting[1].until}: there is nothing to sign out of yet. Finish it in the browser, or ask again after then.`,
+        `${waitsOn(port)}: there is nothing to sign out of yet. Finish it in the browser, or ask again after then.`,
         true,
       );
     }
     const cli = cliOf();
     if (typeof cli === 'string') return yield* refuse(cli);
     mkdirSync(cwd, { recursive: true });
-    const why = yield* Effect.promise(() => clearSignIn(cli, name, cwd));
+    const why = yield* Effect.promise(() => clearSignIn(cli, name, server, cwd));
     if (why) return yield* refuse(why);
     states.delete(name);
     return { signedOut: true as const };

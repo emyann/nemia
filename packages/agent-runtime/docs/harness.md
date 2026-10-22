@@ -150,6 +150,16 @@ What moved from 0.3.270, for the card that designs the GitHub sign-in on this:
 - **The first `mcpServerStatus()` of a session can answer `pending`,** where the 0.3.270 measurement saw `needs-auth` at once. MCP
   startup is non-blocking, so a caller that needs a settled word must ask again rather than read the first answer as final — which
   `mcpServersRead` already does under `MCP_STATE_MS`, and which the sign-in card's own flow must do too.
+- **A server whose connect has failed answers `failed`, with the reason on `error`,** where the same address read `pending` on 0.3.270.
+  Measured here against two servers recorded for a factory, an http one at GitHub's MCP address and an sse one at `https://docs.example/mcp`,
+  which resolves to nothing: the sse one came back `failed` with `SSE error: getaddrinfo ENOTFOUND docs.example`, and the http one
+  `pending` on the first read and `needs-auth` on a second of the same configuration folder. So the two answers are a sequence, not a
+  choice: how far a session got before it answered decides the word, and a whole configuration folder the harness has never written in
+  answers `pending` for every server — measured with `CLAUDE_CONFIG_DIR` on an empty directory, where both servers read `pending`
+  twice. A caller reading a word as a fact about an address reads it after a settled read, never off the first.
+  This is what the e2e's `factory-servers` page was pinned to: it held each chip to `pending` or unread, which was true of 0.3.270 and
+  is a race on 0.3.308, so it now holds each chip to the state the api answered for that server instead — the board's own promise, and
+  true whatever the harness said.
 - The three undeclared methods carry the same control-request subtypes as before (`mcp_authenticate`, `mcp_oauth_callback_url`,
   `mcp_clear_auth`), and `mcpAuthenticate`'s answer has the same six keys. The authorize URL still carries PKCE S256 and the scopes
   GitHub's MCP server asks for.

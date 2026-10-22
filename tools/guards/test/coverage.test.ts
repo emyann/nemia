@@ -114,7 +114,7 @@ test('the coverage flags go right after the script’s node, so its reporters ke
   const script = "node --test --test-reporter=spec --test-reporter-destination=stdout 'test/*.test.ts'";
   assert.equal(
     withCoverage(script, '/tmp/x y/lcov.info'),
-    "node --experimental-test-coverage --test-reporter=lcov --test-reporter-destination='/tmp/x y/lcov.info' --test --test-reporter=spec --test-reporter-destination=stdout 'test/*.test.ts'",
+    "node --experimental-test-coverage --test-coverage-exclude='**/node_modules/**' --test-reporter=lcov --test-reporter-destination='/tmp/x y/lcov.info' --test --test-reporter=spec --test-reporter-destination=stdout 'test/*.test.ts'",
   );
   assert.equal(withCoverage('tsx --test', '/tmp/l'), undefined, 'a script that does not start with node is refused');
 });

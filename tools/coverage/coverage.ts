@@ -185,10 +185,19 @@ const quoted = (word: string): string => `'${word.replaceAll("'", `'\\''`)}'`;
 /**
  * A package's `test` script with coverage gathered into `destination` as lcov: the flags put right after its leading `node `, so
  * the script's own reporters keep their destinations. Undefined for a script that does not start with `node `.
+ *
+ * It names an exclusion of its own, which replaces Node's default one: that default is the runner's test-file globs, matched on each
+ * file's whole path, so a package whose path goes through a `test/` folder (a fixture under a guards' `test/`) has every file
+ * excluded. `recordOf` drops the package's tests and helpers itself.
  */
 export const withCoverage = (script: string, destination: string): string | undefined => {
   const trimmed = script.trimStart();
   if (!trimmed.startsWith('node ')) return undefined;
-  const flags = `--experimental-test-coverage --test-reporter=lcov --test-reporter-destination=${quoted(destination)}`;
+  const flags = [
+    '--experimental-test-coverage',
+    `--test-coverage-exclude=${quoted('**/node_modules/**')}`,
+    '--test-reporter=lcov',
+    `--test-reporter-destination=${quoted(destination)}`,
+  ].join(' ');
   return `node ${flags} ${trimmed.slice('node '.length).trimStart()}`;
 };

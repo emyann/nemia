@@ -5,7 +5,8 @@
  * moves, a name a try's folder cannot take, a skill only the repository has, an agent whose every allow reaches outside the try's folder,
  * and the guard's.
  *
- * In the harness's scratch store (`root`). Your agents are `scribe`, with a result schema beside it; `careful` and `planner`, whose modes
+ * In the harness's scratch store (`root`), on the stand-ins: the runtime's test engine, where a try's task is signed off by hand, and the
+ * test place. Your agents are `scribe`, with a result schema beside it; `careful` and `planner`, whose modes
  * ask first and who allow a rule inside the try's folder and one outside it; `outward`, whose mode asks first and who allows only rules
  * outside it; `borrower`, which gives a skill only the repository's .claude/skills has; `agents` and `skills`, whose names a try's folder
  * cannot take; and those a try's fence does not reach: `coder` on codex, `faraway`, a remote A2A agent, and `bridged`, bridged to
@@ -17,9 +18,18 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
-import { app } from '../app.ts';
-import { startRun, engine, tryFolder } from 'agent-orchestrator';
-import { runWith } from '../../test/shipped-place.ts';
+import { startRun, tryFolder } from 'agent-orchestrator';
+import { Effect } from 'effect';
+import { testEngine } from 'agent-runtime/testing';
+import { testPlace } from 'agent-orchestrator/testing';
+import { appOver, engineFor, runOver } from '../../test/placed.ts';
+
+const stand = testPlace();
+const standIn = testEngine();
+const engine = () => engineFor(standIn);
+const runWith = runOver(stand.layer);
+const app = appOver(standIn, stand);
+
 /** The board's repository: a plain directory, with agents of its own and a skill only it has. */
 const repo = scratch('nemia-api-try-repo-');
 process.env.HKB_REPO = repo;
@@ -112,30 +122,13 @@ async function refused(res: Response | Promise<Response>, status: number, patter
   return body.error;
 }
 
-/** A task's journal, as the engine writes it: filed in the step's folder, and signed off. */
+/** A task filed in the step's folder on the engine, and signed off. */
 function signedOff(taskId: string, cwd: string): void {
-  const at = '2026-09-26T00:10:00.000Z';
-  fs.mkdirSync(path.join(root, 'engine', 'tasks'), { recursive: true });
-  fs.writeFileSync(
-    path.join(root, 'engine', 'tasks', `${taskId}.jsonl`),
-    [
-      { kind: 'filed', at, brief: 'Write it.', cwd, maxAttempts: 1, harness: 'claude' },
-      { kind: 'starting', at, attempt: 1 },
-      { kind: 'spawned', at, attempt: 1 },
-      {
-        kind: 'ended',
-        at,
-        attempt: 1,
-        sessionId: `ae/${taskId}/1`,
-        observed: 'done',
-        reason: 'harness',
-        closeout: { outcome: 'done', summary: 'Wrote it.', needs: null, artifacts: [] },
-      },
-      { kind: 'settled', at, outcome: 'succeeded' },
-    ]
-      .map((e) => `${JSON.stringify(e)}\n`)
-      .join(''),
-  );
+  Effect.runSync(engine().file({ id: taskId, brief: 'Write it.', cwd, harness: 'claude' }));
+  standIn.settle(taskId, 'succeeded', {
+    exitCode: 0,
+    closeout: { outcome: 'done', summary: 'Wrote it.', needs: null, artifacts: [] },
+  });
 }
 
 const listed = async (): Promise<RunSummary[]> => (await (await app.request('/api/runs')).json()) as RunSummary[];

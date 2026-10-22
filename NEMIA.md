@@ -15,9 +15,11 @@ team that works it is in `workflows/agents/`. What follows is for the operator o
   there (*What waits on the person*, below, says what is still yours on such a run, and how to ask to read one yourself).
 - A quick run whose check refuses its size is a `build` card: cancel it and start the card with `build`, as the refusal says.
 - A landing whose check refused is sent back to the step that built the change, with the check's words (`nemia decide <run>` prints
-  them), without waiting to be asked: in `quick`, `nemia retry <run> implement --message "<what failed>"`. On `build`, the next
-  landing is approved again by whoever approved the first: an approval is for one try. On `quick` the work goes round the review once
-  more instead, and its pass files the landing, with nobody to approve.
+  them), without waiting to be asked: in `quick`, through the review's loop, `nemia retry <run> review --message "<what failed>"` —
+  implement is verified and its follower filed, so `nemia retry <run> implement` is refused there. On `build`, the next landing is
+  approved again by whoever approved the first: an approval is for one try. On `quick` the review is filed again with the objection,
+  sends the work round implement when it asks for a round, and its pass files the landing, with nobody to approve. A landing refused
+  for what was not the work — a dirty checkout, a flaky test — is shipped again as it stands: `nemia retry <run> land`.
 - One coherent slice a card: a card cut too small slows the factory more than it saves.
 - Cards that change the command table (`packages/agent-orchestrator/src/command/`, the api's routes) or the board's frame collide with
   each other: chain them, the second started `--after` the first, never side by side.
@@ -38,7 +40,7 @@ to the person as a card to start, fold into another or drop, with what its stats
   approve <run> land` is refused there ("what waits on it is filed once it has passed its check, with nobody's approval, so there is
   nothing to approve"). There is nothing to bring the person about it. What is still theirs on such a run: a check that refused, a
   review that asked twice and is `exhausted` (`nemia round <run> review`, or `nemia accept <run> review`), and a landing that refused —
-  which goes back to implement, `nemia retry <run> implement --message "<what failed>"`. A person who wants to read a quick change
+  which goes back through the review, `nemia retry <run> review --message "<what failed>"`, or ships again, `nemia retry <run> land`. A person who wants to read a quick change
   before it lands says so when the run starts — `nemia start … --gate land`, or the card's own `gate:` line naming land — and then
   everything below holds for that run as for a build run.
 - The landing step's gate (Otto, on `build` and on a quick run gated at it) is approved only once the run's own pull request is green

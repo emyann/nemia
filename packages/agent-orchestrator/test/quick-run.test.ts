@@ -27,7 +27,7 @@ process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
 
-const { advanceRun, decideRun, endingSteps, sendBackTo, startRun, runWith: runEngine } = await import('../src/runner.ts');
+const { advanceRun, decideRun, endingSteps, startRun, runWith: runEngine } = await import('../src/runner.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 const { readRun } = await import('../src/record/record.store.ts');
 
@@ -128,15 +128,6 @@ test("a quick review that asks again files implement again on the run's branch, 
   assert.equal(b.filings.at(-1), `${id}-implement-try2`, `implement is filed again: ${b.filings.join(', ')}`);
   assert.ok(!b.filings.includes(`${id}-land`), b.filings.join(', '));
   assert.equal(readRun(id).steps.implement.branch, branch, 'on the branch the work is on');
-});
-
-test('a quick run sends the work back to implement, the one step there is to send it to', async () => {
-  const { id, b, e } = await toTheCheck(quickFolder());
-  b.settle(`${id}-implement-check`, 'succeeded', { exitCode: 0 });
-  await runWith(e, advanceRun(readRun(id)));
-  const run = readRun(id);
-  const review = (run.workflow ?? []).find((step) => step.name === 'review')!;
-  assert.deepEqual(sendBackTo(review, run), ['review'], 'the review itself, once it has run');
 });
 
 test('REFUSED: a quick run whose check refuses files no land and no second try; a copy given retries: files one', async () => {

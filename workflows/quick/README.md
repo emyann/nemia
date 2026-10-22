@@ -63,7 +63,9 @@ second objection leaves the step `exhausted` with the run waiting on a person, w
 no spec to read, and the review reads one step's closeout rather than two.
 
 **A finding sends the work back** to implement, on the same branch, with the findings in its brief — the workflow routes that, not the
-reviewer. A person may send it back too, after a round or at any stop: `nemia retry <run> implement --message "<objection>"`.
+reviewer. A person sends it back only through the review: at the review's stop, `nemia round <run> review` for another round or
+`nemia accept <run> review` to take it as it stands; once land has stopped, `nemia retry <run> review --message "<objection>"`, which
+files the review again with the objection. `nemia retry <run> implement` is refused once implement is verified and the review filed.
 
 ## The landing, and what a person still does
 
@@ -78,9 +80,10 @@ landing then waits for `nemia approve <run> land` exactly as build's does. Nothi
 one: the review reads implement's pictures in light and dark, and a page or a state with no picture of it is a finding of its own.
 
 **A landing that refuses**: nothing is merged and the checkout is untouched. Where the pull request is red or unmergeable, the work goes
-back to implement with what refused it (`nemia decide <run>` prints the land step's `blocked`): `nemia retry <run> implement --message
-"<what failed>"`. Where it was the fast-forward that was declined, a person brings the checkout onto `origin/<base>` and retries land
-itself, the line the refusal printed. Whoever operates the factory sends it back, by instruction (`NEMIA.md`): no step is filed by
+back through the review's loop with what refused it (`nemia decide <run>` prints the land step's `blocked`): `nemia retry <run> review
+--message "<what failed>"` files the review again with those words, and it sends the work round implement or passes it, which files
+land again. Where it was the fast-forward that was declined, or anything else that was not the work, a person brings the checkout onto
+`origin/<base>` and ships again as it stands, `nemia retry <run> land`, the line the refusal printed. Whoever operates the factory sends it back, by instruction (`NEMIA.md`): no step is filed by
 itself — but an ending its review routes is filed by the tick, with no person in between.
 
 ## The closeouts

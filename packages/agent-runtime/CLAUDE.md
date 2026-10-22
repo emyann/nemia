@@ -309,6 +309,10 @@ What Claude Code does as the steps meet it. Where the orchestrator's code holds 
 - **A `PreToolUse` hook runs in a `--bg` session, and its `ask` prompts over every allow** (2.1.290, 2026-10-05): over an allow rule in
   `--settings` and one in the folder's `settings.local.json` alike, listed `waitingFor: "permission prompt"`, and offers Yes and No
   alone. Its `allow` does not lift an `ask` rule, and a `deny` rule stands over it (`src/harness/claude/admission.ts`).
+- **A `PreToolUse` hook is handed a Bash call's command exactly as typed, and its `deny` stands in a `dontAsk` job** (2.1.308,
+  2026-10-22): a `--bg` session in `dontAsk` (`permission_mode` in the hook's input) typed `git … diff --out''put=<file> HEAD`,
+  `Bash(git:*)` allowed in `--settings`; the hook's `tool_input.command` held the two quotes as typed, before any quote removal, its
+  deny refused the call, and no file was written. So a hook can read a line as the shell would; a permission rule only matches the text.
 - **An `ask` rule in `--settings` outranks the same rule allowed in the folder's `settings.local.json`** (2.1.290, 2026-10-05): a
   `--bg --remote-control` session in auto, `Bash(probe:*)` asked there and allowed in a trusted folder's local settings, is still
   asked, and its prompt offers Yes and No alone, no "don't ask again"; a prompt widened by a person is an ask taken out at filing.

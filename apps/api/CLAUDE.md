@@ -3,8 +3,8 @@
 The workflows behind HTTP, and the feed as a stream: Hono over the orchestrator's public contract (`agent-orchestrator`,
 `agent-orchestrator/run`, `agent-orchestrator/workflow`; the entries:
 `packages/agent-orchestrator/test/contract.test.ts`), and nothing below it: its source imports no runtime, while its
-tests may import the runtime's public entries to build fakes. A harness fact it needs comes from the orchestrator; what it holds today
-below its layer is in `docs/architecture.md`, *Who owns what*.
+tests may import the runtime's public entries, and the test place from `agent-orchestrator/testing`. A harness fact it needs comes
+from the orchestrator; what it holds today below its layer is in `docs/architecture.md`, *Who owns what*.
 
 - **A body read off a response is `unknown`**: name the api's own answer type (`(await res.json()) as RunDetail`).
 - **An encoded `..` never reaches a route in a test**: `app.request` resolves `%2E%2E` before the router sees it. Send `..%2F…` to reach
@@ -45,6 +45,12 @@ below its layer is in `docs/architecture.md`, *Who owns what*.
 - **A handler's body stays a plain `async` function inside `served`**: a failure yielded in `Effect.gen` never reaches a `try` around
   it, and the routes catch what they word themselves; `runPromise` rejects with the failure itself, so `app.onError` sees its kind.
   A package's program runs over the request's engine and the app's place with `runPlaced(placeService, e, …)`, a verb of the engine itself with `engineRead` (store.ts).
+- **A test is given the stand-ins, and names the real thing in a boundary file**: the runtime's test engine (`agent-runtime/testing`)
+  and the test place (`agent-orchestrator/testing`), given to the app with `appOver(engine, stand)` (`Engine.over` under it) and to a
+  package program with `runOver` (`test/placed.ts`); a task is filed on the stand-in and moved with `settle`, never a journal written by
+  hand. A test that needs the real engine or the git place — a Claude Code file the harness reads, a journal entry the stand-in has no
+  model of — is `<what>.boundary.test.ts`, and runs its programs with the `runWith` of `test/shipped-place.ts`; any other file that still
+  does is on the orchestrator's `test/stand-ins.baseline.ts`, which only shrinks.
 - **In a test, what a statement means goes into the test's name, an assertion's message, or a JSDoc on a property.**
 - **What a route holds is taken with `acquireRelease` and let go as its scope closes** (`followFeed` under `feedEvents`, `serverAsk`): a release
   that ends a process waits for it, so a test reads its pid gone as the Effect returns. An ask requests share (`makeQuota` in
@@ -53,7 +59,7 @@ below its layer is in `docs/architecture.md`, *Who owns what*.
   of `test/waits.ts`): a stream's reader is counted a few microtasks after its response, so a test waits for it before it breaks the feed.
 - **A package program that asks the place is run with `runPlaced(placeService, e, program)`** (`src/store.ts`), the place the app's layer
   holds (`PlaceService` in `Services`, `gitPlaceLayer` in `liveOf`, `Served.placeService`); a test replaces it with
-  `Layer.merge(liveOf(), PlaceService.layer(…))`, and runs a package program itself with the `runWith` of `test/placed.ts`.
+  `Layer.merge(liveOf(), PlaceService.layer(…))`, and runs a package program itself with the `runOver` of `test/placed.ts`.
 - **A request's factory and repository are resolved in `served`** (`placeFor`, `factories/place.ts`): a handler reads `repo` and `factory`
   off `Served`, never `?repo=` itself.
 - **An agent fills a step by the file a start would run it with** (`stepsFilled`, the package's `roster/fills.store.ts`), never by its

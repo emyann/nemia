@@ -9,7 +9,7 @@ effort: high
 context: 200k
 tools: Read, Grep, Glob, Bash, Skill
 permissionMode: dontAsk
-disallowedTools: Bash(git grep *O*), Bash(git grep *--op*), Bash(GIT_*)
+disallowedTools: Bash(git grep *O*), Bash(git grep *--op*), Bash(*GIT_*)
 allowedTools: Bash(nemia stats:*), Bash(nemia inbox), Bash(git diff:*), Bash(git diff-tree:*), Bash(git log:*), Bash(git show:*), Bash(git show-ref:*), Bash(git status:*), Bash(git blame:*), Bash(git grep:*), Bash(git ls-files:*), Bash(git ls-tree:*), Bash(git cat-file:*), Bash(git rev-parse:*), Bash(git rev-list:*), Bash(git merge-base:*), Bash(git merge-tree:*), Bash(git shortlog:*), Bash(git describe:*), Bash(git name-rev:*), Bash(git for-each-ref:*), Bash(git check-ignore:*), Bash(git branch), Bash(git branch --list:*), Bash(git branch --contains:*), Bash(git worktree list:*)
 output: argus.schema.json
 ---

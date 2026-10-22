@@ -958,9 +958,9 @@ const COLLECTOR_FENCED = [
   { agent: 'otto', workflow: 'quick', file: 'quick/land.md' },
 ];
 
-/** The rules on the `disallowedTools:` line of the shipped file `file`, none where it has no such line. */
-const denyLineOf = (file: string): string[] =>
-  /^disallowedTools: (.*)$/m.exec(fs.readFileSync(path.join(SHIPPED_HOLDERS[0], file), 'utf8'))?.[1].split(', ') ?? [];
+/** The rules on the `disallowedTools:` line of the file `file` of the holder `root`, none where it has no such line. */
+const denyLineOf = (file: string, root = SHIPPED_HOLDERS[0]): string[] =>
+  /^disallowedTools: (.*)$/m.exec(fs.readFileSync(path.join(root, file), 'utf8'))?.[1].split(', ') ?? [];
 
 /** The step of the shipped `workflow` that `agent` runs, as `wf start` freezes it. */
 const shippedStepIn = (agent: string, workflow: string): Step => {
@@ -1784,10 +1784,12 @@ test('every read-only agent is refused every git write: no allow of its own, of 
  *   deny is `--op` and every longer spelling holds it. A pattern or path of a search that carries a capital `O` is refused with them:
  *   the cost of a deny that cannot read an option list is a refusal the session reports, which is the trade this set is built on.
  * - An assignment before a git command names a program git then runs: `GIT_EXTERNAL_DIFF` once per changed path for every diff git
- *   shows, and `diff.external` through `GIT_CONFIG_COUNT`/`GIT_CONFIG_KEY_0`. An allow is matched against the part with its assignment
- *   stripped, so no allow of the set can refuse one; a deny is matched against the part as typed too, so one deny of every part that
- *   opens `GIT_` covers git's whole environment, whatever option it names. It is the fence under what each of these roles' skills
- *   already says in prose: never `VAR=`.
+ *   shows, and `diff.external` through `GIT_CONFIG_COUNT`/`GIT_CONFIG_KEY_0`. An allow is matched against the part with every leading
+ *   wrapper stripped (`unwrapped`), so no allow of the set can refuse one; a deny is matched against the part as typed too, with its
+ *   wrappers kept, so the deny is of `GIT_` anywhere in that part — `Bash(*GIT_*)`, the repository's own shape for a deny of what an
+ *   assignment says (`LIVE_COLLECTOR`). Without the leading `*` the deny reaches only a part that opens `GIT_`, and a first assignment
+ *   that names something else, or a `nohup` or a `timeout` before it, carries the whole of git's environment through. It is the fence
+ *   under what each of these roles' skills already says in prose: never `VAR=`.
  */
 const GIT_RUNS_A_PROGRAM: Call[] = [
   'git grep -Osh foo HEAD',
@@ -1802,6 +1804,10 @@ const GIT_RUNS_A_PROGRAM: Call[] = [
   'GIT_EXTERNAL_DIFF=sh git show HEAD',
   'GIT_EXTERNAL_DIFF=sh git log -p',
   'GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=diff.external GIT_CONFIG_VALUE_0=sh git diff HEAD',
+  'FOO=1 GIT_EXTERNAL_DIFF=sh git diff HEAD',
+  'FOO=1 GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=diff.external GIT_CONFIG_VALUE_0=sh git diff HEAD',
+  'nohup GIT_EXTERNAL_DIFF=sh git diff HEAD',
+  'timeout 5 GIT_EXTERNAL_DIFF=sh git diff HEAD',
 ].map((command) => ({ tool: 'Bash', command }));
 
 /** A plain read of each verb those denies narrow, which every read-only agent still asks. */
@@ -1810,31 +1816,97 @@ const STILL_ASKED: Call[] = ['git grep -n foo HEAD', 'git diff HEAD', 'git show 
   command,
 }));
 
-test('every read-only agent is refused every call of the set that would run a program of its own, and asks each plain read all the same', () => {
-  for (const agent of READ_ONLY_AGENTS) {
-    const step = shippedStepOf(agent);
-    assert.deepEqual(runs(step, GIT_RUNS_A_PROGRAM), [], agent);
-    assert.deepEqual(runs(step, STILL_ASKED, {}, []), STILL_ASKED.map(shown), agent);
+/** The three denies that answer the allow of a read, by the rule each is written as, on each read-only agent and on each of its steps. */
+const RUNS_A_PROGRAM_DENIES = ['Bash(git grep *O*)', 'Bash(git grep *--op*)', 'Bash(*GIT_*)'];
+
+/**
+ * Every read-only step there is, as `<workflow>/<step>`: each step of a shipped folder whose agent is one of `READ_ONLY_AGENTS`, never
+ * the first step of each agent alone (`shippedStepOf`). A step's own `disallowedTools:` replaces its agent's whole, so a second step of
+ * one of those agents is a line of its own that must carry the denies too.
+ */
+const readOnlySteps = (): Array<{ named: string; step: Step }> =>
+  shipped()
+    .filter(({ step }) => READ_ONLY_AGENTS.includes(step.agent?.name ?? '') && dontAskJob(step))
+    .map(({ dir, step }) => ({ named: `${path.basename(dir)}/${step.name}`, step }));
+
+test('every read-only step is refused every call of the set that would run a program of its own, and asks each plain read all the same', () => {
+  const steps = readOnlySteps();
+  assert.deepEqual(
+    [...new Set(steps.map(({ step }) => step.agent?.name ?? step.name))].sort(),
+    [...READ_ONLY_AGENTS].sort(),
+    'every read-only agent has a step here',
+  );
+  for (const { named, step } of steps) {
+    assert.deepEqual(runs(step, GIT_RUNS_A_PROGRAM), [], named);
+    assert.deepEqual(runs(step, STILL_ASKED, {}, []), STILL_ASKED.map(shown), named);
+    assert.deepEqual(runs(step, GIT_READS, {}, []), GIT_READS.map(shown), named);
+    assert.deepEqual(runs(step, GIT_WRITES), [], named);
   }
 });
 
-test('REFUSED: a read-only agent without those denies runs a program by each of them', () => {
-  for (const agent of READ_ONLY_AGENTS) {
-    const step = shippedStepOf(agent);
-    const open = {
-      ...step,
-      disallowedTools: (step.disallowedTools ?? []).filter((rule) => !/^Bash\((?:git grep |GIT_)/.test(rule)),
-    };
-    assert.deepEqual(runs(open, GIT_RUNS_A_PROGRAM), GIT_RUNS_A_PROGRAM.map(shown), agent);
-  }
-});
-
-test('REFUSED: each deny on its own, so none of the three is carried by another', () => {
-  const step = shippedStepOf('agora');
-  const without = (rule: string): Step => ({
-    ...step,
-    disallowedTools: (step.disallowedTools ?? []).filter((kept) => kept !== rule),
+/**
+ * Every line of the holder `root` that falls short of the three denies, as `<file>: <rule>`: a read-only agent's own file that does not
+ * name one, and a step file of such an agent whose own `disallowedTools:` — which replaces its agent's whole — does not repeat one. A
+ * step with no line of its own keeps its agent's and is nothing to say.
+ */
+function runsAProgramUndenied(root = SHIPPED_HOLDERS[0]): string[] {
+  const files = [
+    ...READ_ONLY_AGENTS.map((agent) => `agents/${agent}.md`),
+    ...shipped()
+      .filter(({ step }) => READ_ONLY_AGENTS.includes(step.agent?.name ?? ''))
+      .map(({ dir, step }) => `${path.basename(dir)}/${step.name}.md`)
+      .filter((file) => denyLineOf(file, root).length > 0),
+  ];
+  return files.flatMap((file) => {
+    const line = denyLineOf(file, root);
+    return RUNS_A_PROGRAM_DENIES.filter((rule) => !line.includes(rule)).map((rule) => `${file}: ${rule}`);
   });
+}
+
+test("each read-only agent's file names the three denies, and each of its steps' own line repeats them", () => {
+  assert.deepEqual(runsAProgramUndenied(), []);
+  assert.equal(
+    shipped().filter(({ step }) => READ_ONLY_AGENTS.includes(step.agent?.name ?? '')).length,
+    4,
+    'one step per read-only agent today; a second one is a line of its own, which the guard above reads',
+  );
+});
+
+test('REFUSED: an agent file or a step file of a read-only agent that drops one of the three denies is named', () => {
+  for (const file of ['agents/agora.md', 'build/review.md', 'intake/intake.md', 'janitor/argus.md'])
+    for (const rule of RUNS_A_PROGRAM_DENIES) {
+      const root = scratch('wf-fences-denies-');
+      fs.cpSync(SHIPPED_HOLDERS[0], root, { recursive: true });
+      const at = path.join(root, file);
+      const text = fs.readFileSync(at, 'utf8');
+      const dropped = text.replace(`${rule}, `, '').replace(`, ${rule}`, '');
+      assert.notEqual(dropped, text, `${file} names ${rule}`);
+      fs.writeFileSync(at, dropped);
+      assert.ok(runsAProgramUndenied(root).includes(`${file}: ${rule}`), `${file} dropping ${rule} is named`);
+    }
+});
+
+test('REFUSED: a read-only step without those denies runs a program by each of them, and a step file that drops one is named', () => {
+  for (const { named, step } of readOnlySteps()) {
+    const open = { ...step, disallowedTools: (step.disallowedTools ?? []).filter((rule) => !RUNS_A_PROGRAM_DENIES.includes(rule)) };
+    assert.deepEqual(runs(open, GIT_RUNS_A_PROGRAM), GIT_RUNS_A_PROGRAM.map(shown), named);
+  }
+  for (const { named, step } of readOnlySteps())
+    for (const rule of RUNS_A_PROGRAM_DENIES) {
+      const denies = step.disallowedTools ?? [];
+      assert.ok(denies.includes(rule), `${named} denies ${rule}, so taking it off says something`);
+      const one = { ...step, disallowedTools: denies.filter((kept) => kept !== rule) };
+      assert.notDeepEqual(runs(one, GIT_RUNS_A_PROGRAM), [], `${named}: without ${rule}, a spelling of it runs`);
+    }
+});
+
+test('REFUSED: each deny on its own, so none of the three is carried by another and each spelling has the one that refuses it', () => {
+  const step = shippedStepOf('agora');
+  const without = (rule: string): Step => {
+    const denies = step.disallowedTools ?? [];
+    assert.ok(denies.includes(rule), `Agora denies ${rule}, so taking it off says something`);
+    return { ...step, disallowedTools: denies.filter((kept) => kept !== rule) };
+  };
   assert.deepEqual(runs(without('Bash(git grep *O*)'), GIT_RUNS_A_PROGRAM), [
     'Bash(git grep -Osh foo HEAD)',
     'Bash(git grep -n -Osh foo HEAD)',
@@ -1846,12 +1918,27 @@ test('REFUSED: each deny on its own, so none of the three is carried by another'
     'Bash(git grep --ope=sh foo HEAD)',
     'Bash(git grep --op=sh foo HEAD)',
   ]);
-  assert.deepEqual(runs(without('Bash(GIT_*)'), GIT_RUNS_A_PROGRAM), [
+  assert.deepEqual(runs(without('Bash(*GIT_*)'), GIT_RUNS_A_PROGRAM), [
     'Bash(GIT_EXTERNAL_DIFF=sh git diff HEAD)',
     'Bash(GIT_EXTERNAL_DIFF=sh git show HEAD)',
     'Bash(GIT_EXTERNAL_DIFF=sh git log -p)',
     'Bash(GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=diff.external GIT_CONFIG_VALUE_0=sh git diff HEAD)',
+    'Bash(FOO=1 GIT_EXTERNAL_DIFF=sh git diff HEAD)',
+    'Bash(FOO=1 GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=diff.external GIT_CONFIG_VALUE_0=sh git diff HEAD)',
+    'Bash(nohup GIT_EXTERNAL_DIFF=sh git diff HEAD)',
+    'Bash(timeout 5 GIT_EXTERNAL_DIFF=sh git diff HEAD)',
   ]);
+  const narrow = { ...step, disallowedTools: (step.disallowedTools ?? []).map((rule) => (rule === 'Bash(*GIT_*)' ? 'Bash(GIT_*)' : rule)) };
+  assert.deepEqual(
+    runs(narrow, GIT_RUNS_A_PROGRAM),
+    [
+      'Bash(FOO=1 GIT_EXTERNAL_DIFF=sh git diff HEAD)',
+      'Bash(FOO=1 GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=diff.external GIT_CONFIG_VALUE_0=sh git diff HEAD)',
+      'Bash(nohup GIT_EXTERNAL_DIFF=sh git diff HEAD)',
+      'Bash(timeout 5 GIT_EXTERNAL_DIFF=sh git diff HEAD)',
+    ],
+    'the deny without its leading * reaches only a part that opens GIT_',
+  );
 });
 
 test('REFUSED: a read-only agent allowed git whole, git worktree whole or git branch whole runs a write', () => {

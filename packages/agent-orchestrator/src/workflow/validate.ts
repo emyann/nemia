@@ -84,18 +84,35 @@ export function validate(steps: readonly Workflow[]): void {
 }
 
 /**
+ * Why nobody may file an ending's `check:`: it has no `gate: true`, so no approval starts it, and it waits on no step with a `loop:`,
+ * so no pass of a step that could send the work back routes it either. Undefined where one of the two holds.
+ *
+ * A `check:` there is the run's own: it runs the command on the merge the step staged and commits that merge onto the base branch on its
+ * word (`landingDue`). Nothing may start that but a person's approval, or the pass of a step the ending waits on that can send the work
+ * back — a review, which judges the work and files another round instead where it should not land. An ending with neither would land
+ * whatever its session staged on nobody's word. The rule reads two steps, the ending and what it waits on, which is why it is here and
+ * not in `workspaceOf`, given one step's keys.
+ */
+function unfilableCheck(steps: readonly Workflow[], s: Workflow): string | undefined {
+  if (s.check === undefined || s.gate === true) return undefined;
+  if (s.after.some((name) => steps.some((x) => x.name === name && x.loop))) return undefined;
+  const waits = s.after.length ? `no step with a \`loop:\` (it waits on ${s.after.join(', ')})` : 'nothing';
+  const before = s.after.length === 1 ? s.after[0] : 'the step before it';
+  return (
+    `, and \`check: ${s.check}\` is a command the run executes there on the merge the step leaves staged, committing it onto the base` +
+    ` branch when it passes — which is nobody's to start unless a person approves it or a step that can send the work back has passed,` +
+    ` and this step has no \`gate: true\` and waits on ${waits}. Add \`gate: true\`, give ${before} a \`loop:\` so that its pass files the` +
+    ` landing, or delete the \`check:\` line.`
+  );
+}
+
+/**
  * The ways a step cannot run in the repository's own checkout (`workspace: main`): it is not the workflow's last step, or its `check:`
- * is nobody's to file.
+ * is nobody's to file (`unfilableCheck`).
  *
  * The checkout is where a person's work is, and it is one directory, on the base branch. A step after this one would start from a
  * checkout this one has changed, and a step running beside it would share that directory — the arrangement worktrees exist to prevent.
  * So a workflow has one such step, at its end, and it is refused here rather than at the moment two sessions collide.
- *
- * And a `check:` there is the run's own: it runs the command on the merge the step staged and commits that merge onto the base branch on
- * its word (`landingDue`). Nothing may start that but a person's approval (`gate: true`), or the pass of a step the ending waits on that
- * can send the work back (`loop:`) — a review, which judges the work and files another round instead where it should not land. An ending
- * with neither would land whatever its session staged on nobody's word, so it is refused. The rule reads two steps, the ending and what
- * it waits on, which is why it is here and not in `workspaceOf`, given one step's keys.
  */
 function validateMainWorkspace(steps: readonly Workflow[]): void {
   for (const s of steps.filter((x) => x.workspace === 'main')) {
@@ -112,14 +129,8 @@ function validateMainWorkspace(steps: readonly Workflow[]): void {
         `${named}, and ${beside.join(', ')} ${beside.length > 1 ? 'end' : 'ends'} the workflow beside it, so both could be working in that one directory at once. A run has one ending: make ${s.name} wait on ${beside.join(', ')}, or delete the line.`,
       );
     }
-    if (s.check === undefined || s.gate === true) continue;
-    const loops = s.after.filter((name) => steps.some((x) => x.name === name && x.loop));
-    if (loops.length) continue;
-    const waits = s.after.length ? `it waits on ${s.after.join(', ')}` : 'nothing';
-    const before = s.after.length === 1 ? s.after[0] : 'the step before it';
-    throw new WorkflowError(
-      `${named}, and \`check: ${s.check}\` is a command the run executes there on the merge the step leaves staged, committing it onto the base branch when it passes — which is nobody's to start unless a person approves it or a step that can send the work back has passed, and this step has no \`gate: true\` and waits on ${s.after.length ? `no step with a \`loop:\` (${waits})` : waits}. Add \`gate: true\`, give ${before} a \`loop:\` so that its pass files the landing, or delete the \`check:\` line.`,
-    );
+    const unfilable = unfilableCheck(steps, s);
+    if (unfilable) throw new WorkflowError(`${named}${unfilable}`);
   }
 }
 

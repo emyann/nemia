@@ -28,8 +28,9 @@ runs the suite, the types, the lint, the whole e2e and the build on that commit,
 check's refusal, with the Actions URL, the failing jobs and the tail of their log — your next try is handed that, since you may type no
 `gh` yourself.
 
-This is a quick build: no spec was written for you and no review follows. You are handed a card, and the person who approves the
-landing reads your plan and your change at its gate.
+This is a quick build: no spec was written for you. You are handed a card, and a review reads your plan and your change — Agora's,
+read-only, which asks for another round or passes. Its pass lands the change: there is no person's gate after it, so the review is the
+one reader between your work and the base branch.
 
 **Write your plan first**, before you build: what changes, where, and what proves it, in a few lines. It goes in your closeout's `plan`,
 as you wrote it, corrected where the work proved it wrong. Then build it, with the tests that prove it.
@@ -43,17 +44,17 @@ read, which of two behaviours), sign off `blocked` and say in `needs` what is un
 grows past the bound, do not trim it to fit, split it or drop its tests: sign off `blocked`, and say in `needs` that the card is a
 `build` card and why.
 
-**Nothing runs your tests for you before the gate.** The check proves the bound, the pictures and the probes, then pushes
+**Nothing runs your tests for you.** The check proves the bound, the pictures and the probes, then pushes
 the branch and waits on CI: it runs `change.ts size`, `pictures.ts`, `probe.ts`, `pull-request.ts push` and
 `pull-request.ts wait`, in that order, and nothing else. Run them yourself before you sign off, as `CLAUDE.md`, *Check your work*, says
 of a step's session: the tests of what you changed, the types and the lint, and for a change to the board the e2e pages it touches, with
-pictures. CI's `ci` context runs the suite, the types, the lint and the whole e2e on the commit your check pushed, before the gate, and that is
+pictures. CI's `ci` context runs the suite, the types, the lint and the whole e2e on the commit your check pushed, before the review, and that is
 the last thing any suite reads: the landing merges that same commit and its check is only the receipt that it was merged. A red `ci`
 comes back to you, with what the check said; a landing refuses before anything is merged — a pull request GitHub calls unmergeable, a
 `ci` no longer green — and nothing landed.
 
 **Name the pages** the change touches in your closeout's `pages`, each by the name `npm run e2e -- --pages <name,…>` takes, `[]` when
-it touches none: they are the pages you ran, and nothing reads them but the person at the gate.
+it touches none: they are the pages you ran, and nothing reads them but the review.
 
 When the change touches `apps/web`, picture the pages and the states it touches, in light and dark, and at a phone's width where the
 page sets one: `WF_ARTIFACTS=<your files directory> npm run e2e -- --photos --pages <name,…>` pictures the pages named, in both themes,
@@ -61,7 +62,7 @@ and visits no other. The `look` skill says how, and how to picture a state no pa
 Name each picture in `artifacts` by its absolute path. `npm run e2e` without `--photos` takes no picture but a failing page's.
 The check refuses a change under `apps/web/src` whose `artifacts` names no picture that is there (`pictures.ts`); a change only under
 `apps/web/test` asks for none. Run the e2e on the pages the change touches, `npm run e2e -- --pages <name,…>`, never the whole suite
-but to measure it: CI runs every page on the commit your check pushes, before the gate.
+but to measure it: CI runs every page on the commit your check pushes, before the review.
 
 When the change touches `apps/web`, load `shadcn` for the board's components, and load `change-the-board` before `shadcn`: it says
 where your shell must be for that load.

@@ -23,6 +23,7 @@ import {
   checkoutWord,
   heldCheckouts,
   type MainClaim,
+  approvedFirst,
   endingSteps,
   firstLine,
   merges,
@@ -9672,12 +9673,30 @@ const UNREAD = (): MergeState => {
   throw new Error('the checkout was read');
 };
 
-test('an ending lands on its check only where it is approved first and has a check: a gated main step, never a plain step or one with no check', () => {
+test('an ending lands on its check where it acts on the base branch and has a check, whoever files it: never a plain step or one with no check', () => {
   assert.equal(landsOnCheck(LANDER, run({})), true);
   assert.equal(landsOnCheck({ ...LANDER, check: undefined }, run({})), false, 'a ship with no check: its session lands it, as before');
   assert.equal(landsOnCheck({ ...LANDER, workspace: undefined }, run({})), false, 'a step of the work');
-  assert.equal(landsOnCheck({ ...LANDER, gate: undefined }, run({})), false);
-  assert.equal(landsOnCheck({ ...LANDER, gate: undefined }, run({}, { gates: ['ship'] })), true, 'a gate the run was started with counts');
+  assert.equal(
+    landsOnCheck({ ...LANDER, gate: undefined }, run({})),
+    true,
+    "an ungated ending lands on its check in the same way: who files it — a person's approval, or the pass of a review before it — is `approvedFirst`'s and `hasGate`'s, never this",
+  );
+  assert.equal(landsOnCheck({ ...LANDER, gate: undefined }, run({}, { gates: ['ship'] })), true, 'a gate makes no difference to it');
+});
+
+test("an ungated ending is nobody's to decide: no gated ending, nothing at a gate, and the send-back through its loop still offered", () => {
+  const ungated = { ...LANDER, gate: undefined };
+  const steps = [{ ...step('implement'), loop: undefined }, { ...step('review'), after: ['implement'], loop: 'implement' }, ungated];
+  const ours = run({ implement: 't-impl', review: 't-review' });
+  assert.deepEqual(endingSteps(steps, ours), [], 'nothing of it waits on a person');
+  assert.deepEqual(
+    endingSteps([step('implement'), LANDER], ours).map((s) => s.name),
+    ['ship'],
+    'a gated one does',
+  );
+  assert.equal(approvedFirst(ungated, ours), false, 'and no approval is owed before it is filed');
+  assert.equal(approvedFirst(LANDER, ours), true);
 });
 
 test('landingDue commits only a merge that is ours, clean and whole, on a check that passed, with a message', () => {

@@ -2232,8 +2232,8 @@ test("REFUSED at load: a `resume:` on a step that runs in the repository's check
 test("an ending's `check:` is filed by a person's approval or by a step that can send the work back: REFUSED at load with neither", () => {
   const ending = { name: 'ship', after: ['review'], body: 'x', workspace: 'main', check: 'npm test' } as Workflow;
   const folder = (loop: boolean, gate: boolean): Workflow[] => [
-    { name: 'implement', after: [], body: 'x' } as Workflow,
-    { name: 'review', after: ['implement'], body: 'x', ...(loop ? { loop: 'implement' } : {}) } as Workflow,
+    { name: 'implement', after: [], body: 'x' },
+    { name: 'review', after: ['implement'], body: 'x', ...(loop ? { loop: 'implement' } : {}) },
     { ...ending, ...(gate ? { gate: true } : {}) },
   ];
 
@@ -2256,8 +2256,8 @@ test("an ending's `check:` is filed by a person's approval or by a step that can
   assert.doesNotThrow(() => validate(folder(false, true)), "a person's approval files it: build's shape");
   assert.doesNotThrow(() => validate(folder(true, true)), 'and both together');
   assert.doesNotThrow(
-    () => validate(folder(false, false).map((s) => (s.name === 'ship' ? ({ ...s, check: undefined } as Workflow) : s))),
-    'an ending with no check runs its own, and is nobody\'s to file in advance',
+    () => validate(folder(false, false).map((s) => (s.name === 'ship' ? { ...s, check: undefined } : s))),
+    "an ending with no check runs its own, and is nobody's to file in advance",
   );
 });
 
@@ -2273,7 +2273,7 @@ test("a step that runs in the repository's checkout reads its `check:`, its `gat
   assert.deepEqual(
     [ungated.gate, ungated.check],
     [undefined, 'npm test'],
-    'ungated, the step file itself loads: who files it is the folder\'s, and `validate` reads the steps together',
+    "ungated, the step file itself loads: who files it is the folder's, and `validate` reads the steps together",
   );
   assert.throws(
     () => fm('ship', 'workspace: main\ngate: true\ncheck: none'),

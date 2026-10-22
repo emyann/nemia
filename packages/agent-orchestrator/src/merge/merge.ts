@@ -295,7 +295,10 @@ export function landingRefusedOn(record: StepRecord | undefined, sha: string): s
   return record.check.taskId;
 }
 
-/** What to do with a loop whose work merges cleanly: approve the ending at its gate, wait for the tick that files an ungated one, ship a stopped one again, or nothing. */
+/**
+ * What to do with a loop whose work merges cleanly: approve the ending at its gate, wait for the tick that files an ungated one, ship a
+ * stopped one again, or nothing.
+ */
 function cleanNext(steps: readonly Workflow[], run: Run, looping: Workflow, reads: MergeReads): string {
   const ending = endingAfter(steps, looping);
   if (!ending) return `see where the run stands: nemia decide ${run.id}`;

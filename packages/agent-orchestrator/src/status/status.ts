@@ -1,9 +1,9 @@
 /**
  * Where one step of a run stands (`stepStatus`, `ownStatus`), and the facts it reads: a gate's (`hasGate`, `approvalOf`, `atGate`), an
- * ending's (`endsOnBase`, `landsOnCheck`, `resultOnBase`), what a step may spend (`taskSpend`, `overBudget`, `budgetRefusal`), and a loop's (`roundOf`,
- * `loopOf`, `owedFields`). And what a step consumed, in words (`sumUsage`, `readWords`, `usedLines`, `dollars`, `durationWord`):
- * `views.verb.ts` asks the engine (`consumption`). Pure, and read by nearly every other part of the run's judgement; it reads the record
- * alone.
+ * ending's (`endsOnBase`, `landsOnCheck`, `resultOnBase`), what a step may spend (`taskSpend`, `overBudget`, `budgetRefusal`), and a
+ * loop's (`roundOf`, `loopOf`, `owedFields`). And what a step consumed, in words (`sumUsage`, `readWords`, `usedLines`, `dollars`,
+ * `durationWord`): `views.verb.ts` asks the engine (`consumption`). Pure, and read by nearly every other part of the run's judgement;
+ * it reads the record alone.
  */
 import type { Verdict } from '../check/check.ts';
 import { DEFAULT_ROUNDS, LOOP_REPLIES, outputFields, type Workflow } from '../step/step.ts';

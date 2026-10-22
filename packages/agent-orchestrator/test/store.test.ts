@@ -92,6 +92,18 @@ const placed = <A, E, R>(program: EffectOf<A, E, R>) => givenPlace(() => stand()
 const { main: cli } = await import('../src/cli/main.ts');
 /** `nemia`, as a person types it, over the test's place. */
 const main = (argv: string[], e?: Engine) => cli(argv, e, undefined, stand().place);
+/**
+ * Refused by kind and exit 2, its message naming each of `named` — the command, flag or field its fix names, and the step, run or
+ * amount it is about — never its sentence, which is nobody's to check.
+ */
+const refusedNaming =
+  (tag: 'Missing' | 'Conflict' | 'Invalid', ...named: string[]) =>
+  (err: Error & { exitCode?: number; _tag?: string }) => {
+    assert.equal(err._tag, tag, err.message);
+    assert.equal(err.exitCode, 2, err.message);
+    for (const n of named) assert.ok(err.message.includes(n), `${n} is not named in: ${err.message}`);
+    return true;
+  };
 
 /** The paths `checkout` holds uncommitted, a line each. */
 const uncommitted = (checkout: string): string => world().changes(checkout).join('\n');
@@ -1061,8 +1073,7 @@ test('`nemia start` refuses an `output:` file that is not there, and an `input:`
   fs.writeFileSync(path.join(early, 'respond.md'), '---\nafter: implement\ninput: review\nplace: git\n---\nanswer it\n');
   await assert.rejects(
     async () => await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: early })),
-    (err: Error & { exitCode?: number }) =>
-      err.exitCode === 2 && /respond: `input: review`, but respond does not wait on review/.test(err.message),
+    refusedNaming('Invalid', 'respond: `input: review`', 'does not wait on review', 'Add review to `after:`'),
   );
 
   assert.equal(runs(), before, 'no run record for either');
@@ -1147,7 +1158,7 @@ test("an absolute path outside the step's files directory is refused, and never 
   assert.deepEqual(
     missingArtifacts(stand().place, readRun(run.id), 'implement', declaring(outside)),
     outside.map((p) => ({ path: p, why: 'outside' })),
-    'every one is a file that exists, which looking would have found',
+    'each exists: looking would have found it',
   );
   const looked = spies
     .flatMap((spy) => spy.mock.calls.map((call) => String(call.arguments[0])))
@@ -1158,7 +1169,7 @@ test("an absolute path outside the step's files directory is refused, and never 
   assert.deepEqual(
     missingArtifacts(stand().place, readRun(run.id), 'implement', declaring([path.join(files, 'link.txt')])),
     [{ path: path.join(files, 'link.txt'), why: 'missing' }],
-    'a link inside the directory that leads out is as outside as where it leads',
+    'a link that leads out is as outside as where it leads',
   );
   assert.deepEqual(artifactFiles(run, 'implement'), [], 'and is not listed');
 });
@@ -1288,7 +1299,7 @@ test('`retries: 1` re-files a step its check refused, once, continuing its sessi
       stdout: 'ok 1 - builds\nnot ok 2 - parses a trailing comma\n# fail 1',
       stderr: 'npm error Test failed.',
     },
-    'try 2 is told the command, the exit, and the last lines of both streams',
+    'try 2 is told the command, the exit and both tails',
   );
   assert.match(spec.brief, /Do not weaken the check to pass it/, 'and not to weaken the check');
 
@@ -1516,10 +1527,7 @@ test("a step named for another step's try is refused at `nemia start`, before an
   const runs = fs.readdirSync(path.join(ROOT, 'runs')).length;
   await assert.rejects(
     async () => await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: dir })),
-    (err: Error & { exitCode?: number }) =>
-      err.exitCode === 2 &&
-      err.message.startsWith("implement-try2: a step may not be named for another step's try") &&
-      /Rename implement-try2\.md/.test(err.message),
+    refusedNaming('Invalid', 'implement-try2: a step may not be named', 'Rename implement-try2.md'),
   );
   assert.equal(fs.readdirSync(path.join(ROOT, 'runs')).length, runs);
 });
@@ -1651,6 +1659,10 @@ test('implement ⇄ review: `again: true` files round 2 — implement continued 
  * A check's stdout as `workflows/build`'s prints it: turbo's prefixed lines, the pictures' `wf pictures:` lines, then a tail longer
  * than 20 lines.
  */
+/** The line a check that touched no page prints last, planted in its stdout. */
+const NO_PAGES = 'wf check: nothing under apps/web/ or apps/api/ was touched: no build, no e2e';
+/** The pages a cut-short check named before it was stopped, planted in the engine's log. */
+const PAGES_RUN = 'wf pictures: the pages this change touched: run';
 const picturesLog = (named: readonly string[]): string =>
   [
     'agent-orchestrator:test: ✔ files a step (12 ms)',
@@ -1659,7 +1671,7 @@ const picturesLog = (named: readonly string[]): string =>
     ...named.map((n) => `wf pictures: named ${n}`),
     `wf pictures: ${named.length} picture(s) named, 0 missing, in 3.1 s`,
     ...Array.from({ length: 24 }, (_, i) => `web:build: chunk ${i} built`),
-    'wf check: nothing under apps/web/ or apps/api/ was touched: no build, no e2e',
+    NO_PAGES,
     '',
   ].join('\n');
 /**
@@ -1690,17 +1702,14 @@ test('the step after a checked step is handed what the check said: its exit, the
     `wf pictures: named ${NAMED_1}`,
     `wf pictures: named ${NAMED_2}`,
     'wf pictures: 2 picture(s) named, 0 missing, in 3.1 s',
-    'wf check: nothing under apps/web/ or apps/api/ was touched: no build, no e2e',
+    NO_PAGES,
   ]);
   assert.doesNotMatch(said.stdout, /named #/, 'the marked lines are above the tail, so only the whole stdout hands them');
   assert.match(brief, /from all of it and not only the tail\./);
   assert.deepEqual(dataUnder(brief, CHECK_SAID), {
     command: 'npm test',
     exit: 0,
-    stdout: [
-      ...Array.from({ length: 19 }, (_, i) => `web:build: chunk ${i + 5} built`),
-      'wf check: nothing under apps/web/ or apps/api/ was touched: no build, no e2e',
-    ].join('\n'),
+    stdout: [...Array.from({ length: 19 }, (_, i) => `web:build: chunk ${i + 5} built`), NO_PAGES].join('\n'),
     stderr: 'npm warn deprecated glob@7',
     reported: said.reported,
   });
@@ -1728,7 +1737,7 @@ test("each round's review is handed that round's check, never the first try's", 
 
 test('REFUSED silence: a check that did not finish says so, and one whose log cannot be read says why, in the brief of the step after it', async () => {
   const cut = await throughCheck('check: npm test', 'succeeded');
-  cut.logs.set(`${cut.run.id}-implement-check`, 'wf pictures: the pages this change touched: run\nok 1 - builds\n');
+  cut.logs.set(`${cut.run.id}-implement-check`, `${PAGES_RUN}\nok 1 - builds\n`);
   await runWith(cut.e, advanceRun(readRun(cut.run.id)));
   const unfinished = cut.tasks.get(`${cut.run.id}-review`)!.spec.brief;
   assert.match(
@@ -1741,12 +1750,12 @@ test('REFUSED silence: a check that did not finish says so, and one whose log ca
     {
       command: 'npm test',
       exit: 'unfinished',
-      stdout: 'wf pictures: the pages this change touched: run\nok 1 - builds',
+      stdout: `${PAGES_RUN}\nok 1 - builds`,
       stderr: '',
-      reported: ['wf pictures: the pages this change touched: run'],
+      reported: [PAGES_RUN],
       partial: true,
     },
-    "no whole stdout was kept, so its marked lines are read from the end of the engine's log, and said to be partial",
+    "no whole stdout kept: read off the engine's log, partial",
   );
   assert.match(unfinished, /Its whole stdout\nwas not kept, so `partial` is true: a line printed earlier may be missing/);
   assert.doesNotMatch(unfinished, /from all of it/);
@@ -1899,7 +1908,7 @@ test("`nemia accept` at the cap ends the loop on a person's word: the ask is wri
   await assert.rejects(runWith(b.e, acceptRun(run.id, undefined, ENOUGH)), refusedWith(/^try 3 of review is already accepted, at /));
   await assert.rejects(
     runWith(b.e, roundRun(run.id)),
-    refusedWith(/^review asked for round 4, and a person accepted its work as it stands at .*take that acceptance back first/),
+    refusedNaming('Conflict', 'review asked for round 4', 'accept-review-3', `nemia round ${run.id} review`),
   );
 
   const l = await runWith(b.e, list(b.e, readRun(run.id)));
@@ -2038,7 +2047,7 @@ test('`nemia round` refuses a round still running, a round the run files itself 
   await runWith(b.e, advanceRun(readRun(run.id)));
   await assert.rejects(
     runWith(b.e, roundRun(run.id)),
-    refusedWith(/^round 1 of review's loop is still running, so there is nothing to go round again until it ends/),
+    refusedNaming('Conflict', "round 1 of review's loop is still running", `nemia ls ${run.id}`, `nemia cancel ${run.id}`),
   );
   assert.deepEqual(roundAsksOf(run.id), []);
 
@@ -2048,7 +2057,7 @@ test('`nemia round` refuses a round still running, a round the run files itself 
   await toReview(m, more.id, 1, true);
   await assert.rejects(
     runWith(m.e, roundRun(more.id)),
-    refusedWith(/^the run goes round again itself: review asked for another round, and `rounds: 3` has 2 left/),
+    refusedNaming('Conflict', 'the run goes round again itself', '`rounds: 3` has 2 left', `nemia ls ${more.id}`),
   );
   assert.deepEqual(roundAsksOf(more.id), []);
 
@@ -2065,7 +2074,7 @@ test('`nemia round` refuses a round still running, a round the run files itself 
 
   await assert.rejects(
     main(['round', 'no-such-run', 'review', 'again']),
-    refusedWith(/^nemia round takes the run and, when the run has more than one loop, the step/),
+    refusedNaming('Invalid', 'nemia round <runId> [<step>]', '--budget <amount>'),
   );
 });
 
@@ -3038,7 +3047,7 @@ test('REFUSED: `nemia retry` with an empty --message, or --message on --recheck 
   await assert.rejects(runWith(e, retryRun(run.id, 'implement', { mode: 'nudge', message: ' \n' })), refusedWith(/^--message is empty/));
   await assert.rejects(
     runWith(e, retryRun(run.id, 'implement', { mode: 'recheck', message: 'the suite is fixed' })),
-    refusedWith(/^--message carries your answer into the try's brief, and --recheck files no session to read it/),
+    refusedNaming('Conflict', `nemia retry ${run.id} implement --recheck`, `nemia retry ${run.id} implement --message "<answer>"`),
   );
   assert.deepEqual(asksOf(run.id), []);
   await runWith(e, retryRun(run.id, 'implement', { mode: 'fresh', message: 'main has the fix for the flake' }));
@@ -3100,7 +3109,7 @@ test('`nemia retry --message` takes the next argument as the answer whatever it 
   assert.deepEqual(
     await asked('--message', '--flag stays; say so in the README'),
     { mode: 'nudge', message: '--flag stays; say so in the README' },
-    'the ask file says how, after `nemia retry` with these flags on a step waiting on you',
+    'the ask file says how, after `nemia retry` with these flags',
   );
   assert.deepEqual(await asked('--fresh', '--message', '-n is short for --dry-run'), {
     mode: 'fresh',
@@ -3716,15 +3725,13 @@ test('REFUSED at shipped defaults: `nemia retry` on a step whose session still w
   b.settle(`${run.id}-implement`, 'running');
   await assert.rejects(
     main(['retry', run.id, 'implement'], b.e),
-    refusedWith(/^implement is still running, so there is nothing to try again until it ends/),
+    refusedNaming('Conflict', 'implement is still running', `nemia ls ${run.id}`, `nemia cancel ${run.id}`),
   );
   await assert.rejects(main(['retry', run.id, 'implement', '--fresh'], b.e), refusedWith(/^implement is still running/));
   b.settle(`${run.id}-implement`, 'needs-human' as TaskPhase);
   await assert.rejects(
     main(['retry', run.id, 'implement', '--recheck'], b.e),
-    refusedWith(
-      /^--recheck runs a step's check again, and implement is running, its session blocked by its harness with nothing signed off: no check of it failed/,
-    ),
+    refusedNaming('Conflict', 'implement is running', 'no check of it failed', `nemia retry ${run.id} implement`, '--fresh'),
   );
   b.settle(`${run.id}-implement`, 'needs-human' as TaskPhase, SIGNED);
   await assert.rejects(main(['retry', run.id, 'implement'], b.e), refusedWith(/^implement is still running/));
@@ -3834,10 +3841,7 @@ test("REFUSED at shipped defaults, before the first `start()`: `nemia plan` on a
   );
   fs.writeFileSync(path.join(plan, 'b.md'), cardText(`workflow: ${first}\nafter: c`, 'the second card'));
   fs.writeFileSync(path.join(plan, 'c.md'), cardText(`workflow: ${first}\nafter: b`, 'the third card'));
-  await assert.rejects(
-    planned(),
-    refusedWith(/^b\.md, c\.md wait on each other — b after c, c after b — so none of them could ever start\./),
-  );
+  await assert.rejects(planned(), refusedNaming('Invalid', 'b.md, c.md wait on each other', 'b after c, c after b', '`after:`'));
   fs.rmSync(path.join(plan, 'c.md'));
   fs.writeFileSync(path.join(plan, 'b.md'), cardText(`workflow: ${first}\nafter: a`, 'the second card'));
   fs.mkdirSync(path.join(plan, 'drafts'));
@@ -3862,23 +3866,20 @@ test('REFUSED by name: `nemia plan` with --after, --workflows or --no-worktree �
   const typed = (...flags: string[]) => main(['plan', plan, ...flags], b.e);
   await assert.rejects(
     typed('--repo', repo, '--after', 'r-xyz'),
-    refusedWith(/^nemia plan does not take --after: each card says what it waits on, in its after:, and the folder is the whole plan\./),
+    refusedNaming('Invalid', 'nemia plan does not take --after', 'nemia start <card.md> --workflows <dir> --after <runId>'),
   );
   await assert.rejects(typed('--after=r-xyz', '--repo', repo), refusedWith(/^nemia plan does not take --after:/));
   await assert.rejects(
     typed('--workflows', 'dev', '--repo', repo),
-    refusedWith(/^nemia plan does not take --workflows: each card names its own, in its workflow:/),
+    refusedNaming('Invalid', 'nemia plan does not take --workflows', 'in its workflow:'),
   );
   await assert.rejects(typed('--no-worktree', '--repo', repo), refusedWith(/^nemia plan does not take --no-worktree:/));
   await assert.rejects(
     typed('--repos', repo),
-    refusedWith(/^nemia plan does not take --repos\. It takes the plan folder, then --repo <r> and --factory <name>\.$/),
+    refusedNaming('Invalid', 'nemia plan does not take --repos', '--repo <r>', '--factory <name>'),
   );
-  await assert.rejects(
-    typed('--repo', repo, '--repo', repo),
-    refusedWith(/^nemia plan takes --repo once: a plan works on one repository\.$/),
-  );
-  await assert.rejects(typed('--repo'), refusedWith(/^--repo takes the repository the plan works on: nemia plan <folder> --repo <r>$/));
+  await assert.rejects(typed('--repo', repo, '--repo', repo), refusedNaming('Invalid', 'nemia plan takes --repo once'));
+  await assert.rejects(typed('--repo'), refusedNaming('Invalid', 'nemia plan <folder> --repo <r>'));
   await assert.rejects(typed('--repo='), refusedWith(/^--repo takes the repository the plan works on/));
   await assert.rejects(
     typed(plan, '--repo', repo),
@@ -4156,14 +4157,14 @@ test("REFUSED: `nemia say` on a step the run does not have, a step not filed, a 
 
   await assert.rejects(
     runWith(e, sayRun(run.id, 'implement', 'Start with the parser.')),
-    verbatim(`say: \`${taskId}\` has not started an attempt yet, so there is no session to hear anything.`, 2),
+    refusedNaming('Conflict', `say: \`${taskId}\``, 'has not started an attempt'),
     "the engine's refusal: filed, with no attempt started",
   );
   b.settle(taskId, 'running');
   for (const words of [[''], [' \n '], []]) {
     await assert.rejects(
       main(['say', run.id, 'implement', ...words], e),
-      verbatim('say: `text` is empty. Give the words the session should hear.', 2),
+      refusedNaming('Conflict', 'say: `text` is empty'),
       `the engine's refusal of empty words, from the verb and from the command line with none at all: ${JSON.stringify(words)}`,
     );
   }
@@ -4516,26 +4517,31 @@ test('REFUSED at `nemia start`, before a run is written: an --input that is not 
   );
   await assert.rejects(
     starting(path.join(given, 'a', 'notes.md'), `${given}/b/../a/notes.md`),
-    refusedWith(/is given twice\. Each file is copied once: give it one --input\.$/),
+    refusedNaming('Invalid', `--input ${given}/b/../a/notes.md is given twice`, 'give it one --input'),
   );
   assert.equal(runsWritten(), before, 'no run written, and no inputs directory');
 
   const typed = (...flags: string[]) =>
     main(['start', 'a run with files', '--workflows', folder(), '--repo', repo, '--no-worktree', ...flags]);
-  await assert.rejects(typed('--input'), refusedWith(/^--input takes a file to hand the run's steps: nemia start <brief> --input <file>/));
+  await assert.rejects(typed('--input'), refusedNaming('Invalid', 'nemia start <brief> --input <file>'));
   await assert.rejects(typed('--input='), refusedWith(/^--input takes a file to hand the run's steps/));
   await assert.rejects(typed('--input', '--after', 'r-xyz'), refusedWith(/^--input takes a file to hand the run's steps/));
   await assert.rejects(typed('--input', path.join(given, 'a')), refusedWith(/ is a directory, and --input copies one file\./));
   await assert.rejects(
     typed('--inputs', path.join(given, 'a', 'notes.md')),
-    refusedWith(
-      /^nemia start does not take --inputs\. .*; --input <file> once per file to hand its steps; --gate <step> once per step to gate; --factory <name>; and, for an inbox card, --brief "<brief>"\.$/,
+    refusedNaming(
+      'Invalid',
+      'nemia start does not take --inputs',
+      '--input <file> once per file',
+      '--gate <step>',
+      '--factory <name>',
+      '--brief "<brief>"',
     ),
   );
   const plan = aPlan(() => ({ 'a.md': cardText(`workflow: ${oneStep()}`, 'the only card') }));
   await assert.rejects(
     main(['plan', plan, '--repo', repo, '--input', path.join(given, 'a', 'notes.md')]),
-    refusedWith(/^nemia plan does not take --input: a card has no input files of its own\./),
+    refusedNaming('Invalid', 'nemia plan does not take --input', 'nemia start <card.md> --workflows <dir> --input <file>'),
   );
   assert.equal(runsWritten(), before, 'nor by the CLI');
 });
@@ -4703,10 +4709,10 @@ test("`nemia start <card>.md` starts the card's body — its id from the body, i
   const before = runsWritten();
   await assert.rejects(
     main(['start', path.join(plan, 'd.md'), '--repo', repo], b.e),
-    refusedWith(
-      new RegExp(
-        `^${escaped(path.join(plan, 'd.md'))}: \`after: a, b\` — this card waits on the runs of a and b, and nemia start was given no --after, so it would start at once`,
-      ),
+    refusedNaming(
+      'Invalid',
+      `${path.join(plan, 'd.md')}: \`after: a, b\``,
+      `nemia start ${path.join(plan, 'd.md')} --after <a's run id> --after <b's run id>`,
     ),
   );
   assert.equal(runsWritten(), before, 'no run written');
@@ -4765,13 +4771,11 @@ test('REFUSED past its budget at shipped defaults: a claude step whose ended tri
   );
   await assert.rejects(
     runWith(e, retryRun(run.id, 'implement', { mode: 'nudge' })),
-    refusedWith(
-      /^implement is over budget: its tries have cost \$4\.25 of its \$3 budget, .*: nemia retry \S+ implement --budget <amount>\.$/,
-    ),
+    refusedNaming('Conflict', 'implement is over budget', '$4.25 of its $3 budget', `nemia retry ${run.id} implement --budget <amount>`),
   );
   await assert.rejects(
     runWith(e, retryRun(run.id, 'implement', { mode: 'nudge', budget: 4 })),
-    refusedWith(/^--budget 4 is not above \$4\.25, what implement's tries have cost/),
+    refusedNaming('Conflict', '--budget 4 is not above $4.25', `nemia retry ${run.id} implement --budget <amount>`),
   );
   assert.deepEqual(asksOf(run.id), [], 'no ask written');
   const { offers, decision: d } = await runWith(e, decideRun(run.id));
@@ -4849,11 +4853,16 @@ test("a claude-detached step's `budget:` goes to the engine as `budgetUsd`; a se
   ]);
   await assert.rejects(
     runWith(e, retryRun(run.id, 'implement', { mode: 'fresh' })),
-    refusedWith(/^implement ended at its budget: its harness stopped its session at \$3/),
+    refusedNaming(
+      'Conflict',
+      'implement ended at its budget',
+      'stopped its session at $3,',
+      `nemia retry ${run.id} implement --budget <amount> --fresh`,
+    ),
   );
   await assert.rejects(
     runWith(e, retryRun(run.id, 'implement', { mode: 'fresh', budget: 2 })),
-    refusedWith(/^--budget 2 is not above \$3\.02, what implement's tries have cost/),
+    refusedNaming('Conflict', '--budget 2 is not above $3.02', `nemia retry ${run.id} implement --budget <amount>`),
   );
   await runWith(e, retryRun(run.id, 'implement', { mode: 'fresh', budget: 8 }));
   assert.deepEqual((await runWith(e, advanceRun(readRun(run.id)))).tried, ['implement']);
@@ -4878,13 +4887,17 @@ test('a step blocked under its cap takes a `--budget` above it at shipped defaul
   assert.deepEqual([l.steps[0].status, l.waitingOnYou], ['succeeded · BLOCKED', ['implement']]);
   await assert.rejects(
     runWith(e, retryRun(run.id, 'implement', { mode: 'nudge', budget: 15 })),
-    refusedWith(
-      /^--budget 15 is not above \$20, the \$20 cap in force on implement, whose tries have cost \$19\.27: .*Give more than \$20: nemia retry \S+ implement --budget <amount>\.$/,
+    refusedNaming(
+      'Conflict',
+      '--budget 15 is not above $20',
+      'the $20 cap in force on implement',
+      'cost $19.27',
+      `nemia retry ${run.id} implement --budget <amount>`,
     ),
   );
   await assert.rejects(
     runWith(e, retryRun(run.id, 'implement', { mode: 'nudge', budget: 20 })),
-    refusedWith(/^--budget 20 is not above \$20, the \$20 cap in force on implement/),
+    refusedNaming('Conflict', '--budget 20 is not above $20', 'the $20 cap in force on implement'),
   );
   assert.deepEqual(asksOf(run.id), [], 'no ask written');
 
@@ -4923,13 +4936,11 @@ test("REFUSED past a budget in a loop at shipped defaults: review's `again: true
   );
   await assert.rejects(
     runWith(b.e, roundRun(run.id)),
-    refusedWith(/^review asked for round 2, and implement has cost \$4\.25 of its \$3 budget/),
+    refusedNaming('Conflict', 'review asked for round 2', '$4.25 of its $3 budget', `nemia round ${run.id} review --budget <amount>`),
   );
   await assert.rejects(
     main(['round', run.id, '--budget', 'lots'], b.e),
-    refusedWith(
-      /^--budget takes the most a step of the loop may cost together, in dollars, above what it has cost — an amount above zero, in digits, like 5 or 2\.50, and lots is not one/,
-    ),
+    refusedNaming('Invalid', 'lots is not one', 'nemia round <runId> [<step>] --budget <amount>'),
   );
   assert.deepEqual(roundAsksOf(run.id), []);
 
@@ -5095,10 +5106,9 @@ test('REFUSED at shipped defaults: `nemia rm` on a run with a step in flight, on
   assert.deepEqual(b.stopped, [], 'nothing stopped: cancelling is its own verb');
 
   await runWith(b.e, cancelRun(running.id));
-  assert.match(
-    (await runWith(b.e, forgetRun(running.id))).refusal!,
-    /^implement is pending\. It was cancelled at .*, and a tick stops what is in flight: nemia rm .* once it has settled/,
-  );
+  const pending = (await runWith(b.e, forgetRun(running.id))).refusal!;
+  assert.ok(pending.startsWith('implement is pending. It was cancelled at '), pending);
+  assert.ok(pending.includes(`nemia rm ${running.id}`), pending);
   b.settle(`${running.id}-implement`, 'stopped');
   assert.equal(
     (await runWith(b.e, forgetRun(running.id))).kind,
@@ -5309,16 +5319,11 @@ test('a run whose tasks the engine no longer knows is forgotten; so is a record 
   fs.writeFileSync(path.join(ROOT, 'runs', 'gone-run-3c4d.cancelled'), '2026-09-16T00:00:00.000Z');
   fs.mkdirSync(path.join(ROOT, 'runs', 'gone-run-3c4d.asks', 'done'), { recursive: true });
   const leftover = await rmTyped(t, neverHeardOfAnything, 'gone-run-3c4d');
-  assert.deepEqual(
-    [leftover.printed, leftover.error],
-    [
-      [
-        'gone-run-3c4d  no such run — nothing to forget but what was left under its id: removed runs/gone-run-3c4d.cancelled, runs/gone-run-3c4d.asks/',
-      ],
-      undefined,
-    ],
-    'no record, and files left under the id: a cancellation typed as it went, an asks directory',
-  );
+  assert.equal(leftover.error, undefined, 'no record is no refusal');
+  assert.equal(leftover.printed.length, 1);
+  const [gone] = leftover.printed;
+  assert.ok(gone.startsWith('gone-run-3c4d  no such run'), gone);
+  assert.ok(gone.includes('runs/gone-run-3c4d.cancelled') && gone.includes('runs/gone-run-3c4d.asks/'), gone);
   assert.ok(!under('runs', 'gone-run-3c4d.asks') && !under('runs', 'gone-run-3c4d.cancelled'));
 });
 
@@ -5510,7 +5515,7 @@ test("`nemia rm`'s program, given the engine as a service, answers what its plai
   const program = (how: ForgetHow) => runPlaced(forgetRun(run.id, how).pipe(Effect.provide(EngineService.layer(b.e))));
 
   const refused = await program({});
-  assert.equal(refused.kind, 'refused', 'a step in flight: nothing is touched, so the face may be asked the same');
+  assert.equal(refused.kind, 'refused', 'a step in flight: nothing is touched');
   assert.deepStrictEqual(refused, await runWith(b.e, forgetRun(run.id)));
 
   const wt = readRun(run.id).steps.implement.workspace!;
@@ -5810,16 +5815,14 @@ test("REFUSED as a typed failure: `nemia say`'s engine refusing, exit code 2, is
   const run = await started(folder());
   await runWith(b.e, advanceRun(readRun(run.id)));
   const taskId = `${run.id}-implement`;
-  assert.equal(
-    await v.over(
-      b.e,
-      v.sayRun(run.id, 'implement', 'Start with the parser.').pipe(
-        v.Effect.map(() => 'answered'),
-        v.Effect.catchTag('Conflict', (r) => v.Effect.succeed(r.message)),
-      ),
+  const unheard = await v.over(
+    b.e,
+    v.sayRun(run.id, 'implement', 'Start with the parser.').pipe(
+      v.Effect.map(() => 'answered'),
+      v.Effect.catchTag('Conflict', (r) => v.Effect.succeed(r.message)),
     ),
-    `say: \`${taskId}\` has not started an attempt yet, so there is no session to hear anything.`,
   );
+  assert.ok(unheard.startsWith(`say: \`${taskId}\``) && unheard.includes('has not started an attempt'), unheard);
 
   b.settle(taskId, 'running');
   const lost = new Error(`say: ae/${taskId}/1 was not given the words (connect ECONNREFUSED). Nothing was journalled.`);

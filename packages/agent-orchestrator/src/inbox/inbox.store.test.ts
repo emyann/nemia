@@ -42,8 +42,18 @@ heldUnasked(engine);
 /** The engine of this test: the stand-in, which no command here files on, stops, says to or forgets from (`heldUnasked`). */
 const noEngine = () => engineOf(engine().layer);
 
-/** Refused by name: exit 2, and the message — never `String(err)`, which starts with `Error: `. */
-const refusedWith = (pattern: RegExp) => (err: Error & { exitCode?: number }) => err.exitCode === 2 && pattern.test(err.message);
+/**
+ * Refused by kind and exit 2, its message naming each of `named` — the command, flag or field its fix names, and the card or path it is
+ * about — never its sentence, which is nobody's to check. Read off the message, never `String(err)`, which starts with `Error: `.
+ */
+const refusedWith =
+  (tag: 'Missing' | 'Conflict' | 'Invalid', ...named: string[]) =>
+  (err: Error & { exitCode?: number; _tag?: string }) => {
+    assert.equal(err._tag, tag, err.message);
+    assert.equal(err.exitCode, 2, err.message);
+    for (const n of named) assert.ok(err.message.includes(n), `${n} is not named in: ${err.message}`);
+    return true;
+  };
 const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
 
 /** What `main` printed, line by line, for one verb. */
@@ -185,7 +195,7 @@ test('`nemia inbox add` files a card under the slug of its first line and a suff
       [third.slice(0, -3), ['show-the-flag-on-the-settin-zz99'], true],
       [byPath.card.name, [], true],
     ].sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
-    'listed: a card a record names as started, a card that does not read, a file that is not a card; a hidden file and a README are not',
+    'started, broken and non-card listed; hidden and README not',
   );
   const lines = await printedBy(t, 'inbox');
   assert.ok(
@@ -232,11 +242,11 @@ test("`nemia inbox add --factory` files a card that names its factory, over the 
   emptyInbox();
   assert.throws(
     () => addToInbox({ text: 'an idea', factory: 'Pipao' }),
-    refusedWith(/^the idea: `factory: Pipao` — `Pipao` is not a factory's name: .* — pipao, say\. /),
+    refusedWith('Invalid', '`factory: Pipao`', 'pipao, say', 'nemia factory ls'),
   );
   await assert.rejects(
     main(['inbox', 'add', 'an idea', '--factory', 'pipao', '--factory', 'nemia'], noEngine()),
-    refusedWith(/^nemia inbox add takes --factory once: a card names one factory\.$/),
+    refusedWith('Invalid', 'nemia inbox add takes --factory once'),
   );
   assert.deepEqual(inInbox(), [], 'nothing filed');
 });
@@ -264,59 +274,36 @@ test('REFUSED by name at shipped defaults: `nemia inbox add` with no idea, an em
   const add = (...argv: string[]) => main(['inbox', 'add', ...argv], noEngine());
   await assert.rejects(
     add(),
-    refusedWith(
-      /^nemia inbox add takes the idea, first: nemia inbox add "<idea>" \[--workflow <name>\] \[--repo <path>\] \[--factory <name>\], or a file: nemia inbox add \.\/idea\.md\. Nothing was filed\.$/,
-    ),
+    refusedWith('Invalid', 'takes the idea, first', 'nemia inbox add "<idea>"', '[--factory <name>]', 'nemia inbox add ./idea.md'),
   );
-  await assert.rejects(add('--workflow', 'dev'), refusedWith(/^nemia inbox add takes the idea, first:/));
-  await assert.rejects(add(''), refusedWith(/^nemia inbox add takes the idea, and the idea has nothing in it\./));
-  await assert.rejects(add('   '), refusedWith(/^nemia inbox add takes the idea, and the idea has nothing in it\./));
+  await assert.rejects(add('--workflow', 'dev'), refusedWith('Invalid', 'takes the idea, first', 'nemia inbox add "<idea>"'));
+  await assert.rejects(add(''), refusedWith('Invalid', 'the idea has nothing in it', 'nemia inbox add "<idea>"'));
+  await assert.rejects(add('   '), refusedWith('Invalid', 'the idea has nothing in it', 'nemia inbox add "<idea>"'));
   const dir = fs.mkdtempSync(path.join(ROOT, 'given-'));
   const empty = path.join(dir, 'empty.md');
   fs.writeFileSync(empty, '\n');
-  await assert.rejects(add(empty), refusedWith(new RegExp(`^nemia inbox add takes the idea, and ${escaped(empty)} has nothing in it\\.`)));
-  await assert.rejects(
-    add(dir),
-    refusedWith(new RegExp(`^${escaped(dir)} is a directory, and nemia inbox add takes the idea as text or as one file`)),
-  );
+  await assert.rejects(add(empty), refusedWith('Invalid', `${empty} has nothing in it`, 'nemia inbox add ./idea.md'));
+  await assert.rejects(add(dir), refusedWith('Invalid', `${dir} is a directory`, 'nemia inbox add ./idea.md'));
   const waits = path.join(dir, 'd.md');
   fs.writeFileSync(waits, '---\nworkflow: dev\nafter: b, c\n---\nShow the flag.\n');
-  await assert.rejects(
-    add(waits),
-    refusedWith(
-      new RegExp(
-        `^${escaped(waits)}: \`after\` is not a key an inbox card has: what a card waits on is said when it is started, once the runs it could wait on are known\\. Delete the line and file the idea, then give the wait when you start the card nemia inbox add names: nemia start <inbox>/<name>\\.md --after <runId>\\.$`,
-      ),
-    ),
-  );
-  await assert.rejects(
-    add('an idea', '--repo', empty),
-    refusedWith(new RegExp(`^the idea: \`repo: ${escaped(empty)}\` names no directory\\.`)),
-  );
+  await assert.rejects(add(waits), refusedWith('Invalid', `${waits}: \`after\``, 'nemia start <inbox>/<name>.md --after <runId>'));
+  await assert.rejects(add('an idea', '--repo', empty), refusedWith('Invalid', `\`repo: ${empty}\` names no directory`));
   await assert.rejects(
     add('an idea', '--repo', path.join(ROOT, 'no-such-repo')),
-    refusedWith(/^the idea: `repo: .*no-such-repo` names no directory\./),
+    refusedWith('Invalid', `\`repo: ${path.join(ROOT, 'no-such-repo')}\` names no directory`),
   );
   assert.throws(
     () => addToInbox({ text: 'an idea', repo: 'code/app' }),
-    refusedWith(/^the idea: `repo: code\/app` is not an absolute path\./),
+    refusedWith('Invalid', '`repo: code/app` is not an absolute path', '`repo: /home/me/code/app`'),
   );
-  await assert.rejects(
-    add('an idea', '--workflow'),
-    refusedWith(/^--workflow takes the workflow to start the card on, by name or as a path/),
-  );
-  await assert.rejects(add('an idea', '--workflow='), refusedWith(/^--workflow takes the workflow to start the card on/));
-  await assert.rejects(
-    add('an idea', '--repo', ROOT, '--repo', ROOT),
-    refusedWith(/^nemia inbox add takes --repo once: a card names one repository\.$/),
-  );
+  await assert.rejects(add('an idea', '--workflow'), refusedWith('Invalid', 'nemia inbox add "<idea>" --workflow <name>'));
+  await assert.rejects(add('an idea', '--workflow='), refusedWith('Invalid', 'nemia inbox add "<idea>" --workflow <name>'));
+  await assert.rejects(add('an idea', '--repo', ROOT, '--repo', ROOT), refusedWith('Invalid', 'nemia inbox add takes --repo once'));
   await assert.rejects(
     add('an idea', '--workflows', 'dev'),
-    refusedWith(
-      /^nemia inbox add does not take --workflows\. It takes the idea, then --workflow <name>, --repo <path> and --factory <name>\.$/,
-    ),
+    refusedWith('Invalid', 'does not take --workflows', '--workflow <name>', '--repo <path>', '--factory <name>'),
   );
-  await assert.rejects(add('an', 'idea'), refusedWith(/^nemia inbox add takes one idea, and idea is a second\. Quote an idea with spaces/));
+  await assert.rejects(add('an', 'idea'), refusedWith('Invalid', 'idea is a second', 'nemia inbox add "<idea>"'));
   assert.deepEqual(inInbox(), [], 'nothing filed');
 
   const { card, file } = addToInbox({ text: 'Stay where you are' });
@@ -325,28 +312,23 @@ test('REFUSED by name at shipped defaults: `nemia inbox add` with no idea, an em
   for (const name of ['../runs/r-outside.json', '../runs/r-outside', 'sub/card', '..']) {
     await assert.rejects(
       rm(name),
-      refusedWith(
-        new RegExp(
-          `^\`${escaped(name)}\` is not a card's name: a name stays in the inbox, with no slash and not \\. or \\.\\., since it names a file there\\.`,
-        ),
-      ),
+      refusedWith('Invalid', `\`${name}\` is not a card's name`, 'no slash', 'the name nemia inbox lists'),
       name,
     );
   }
-  assert.throws(() => dropFromInbox('../runs/r-outside'), refusedWith(/^`\.\.\/runs\/r-outside` is not a card's name/));
-  await assert.rejects(rm('.hidden'), refusedWith(/^`\.hidden` is not a card's name: a name that starts with a dot is a hidden file/));
-  await assert.rejects(
-    rm(),
-    refusedWith(/^nemia inbox rm takes the name of the card to drop, as nemia inbox lists it: nemia inbox rm <name>\.$/),
-  );
-  await assert.rejects(
-    rm(card.name, 'another'),
-    refusedWith(/^nemia inbox rm drops one card, and another is a second: nemia inbox rm <name>, once per card\.$/),
-  );
+  assert.throws(() => dropFromInbox('../runs/r-outside'), refusedWith('Invalid', "`../runs/r-outside` is not a card's name"));
+  await assert.rejects(rm('.hidden'), refusedWith('Invalid', "`.hidden` is not a card's name", 'hidden file'));
+  await assert.rejects(rm(), refusedWith('Invalid', 'nemia inbox rm <name>'));
+  await assert.rejects(rm(card.name, 'another'), refusedWith('Invalid', 'another is a second', 'nemia inbox rm <name>, once per card'));
   await assert.rejects(
     main(['inbox', 'list'], noEngine()),
     refusedWith(
-      /^nemia inbox does not take list\. It lists the inbox — nemia inbox — files a card with nemia inbox add "<idea>", queues one with nemia inbox queue <name>, and drops one with nemia inbox rm <name>/,
+      'Invalid',
+      'does not take list',
+      'nemia inbox add "<idea>"',
+      'nemia inbox queue <name>',
+      'nemia inbox rm <name>',
+      'nemia inbox --help',
     ),
   );
   assert.ok(fs.existsSync(path.join(ROOT, 'runs', 'r-outside.json')), 'the record outside the inbox is still there');
@@ -400,24 +382,20 @@ test('`nemia start <inbox>/<name>`, the name as `nemia inbox` lists it, starts t
 
   await assert.rejects(
     starting(path.join(INBOX, 'cache-the-views'), '--repo', repo),
-    refusedWith(
-      new RegExp(
-        `^no card cache-the-views in the inbox\\. Its cards are: ${escaped([card.name, other.card.name].sort().join(', '))}\\. Start one of those`,
-      ),
-    ),
+    refusedWith('Missing', 'no card cache-the-views in', `Its cards are: ${[card.name, other.card.name].sort().join(', ')}.`),
     'a name with no card, typed without its .md, is refused, never started as a run asked to do its own path',
   );
   fs.writeFileSync(path.join(INBOX, 'notes.txt'), 'Refactor everything.\n');
   await assert.rejects(
     starting(path.join(INBOX, 'notes.txt'), '--workflows', 'dev', '--repo', repo),
-    refusedWith(/^no card notes\.txt in the inbox\./),
+    refusedWith('Missing', 'no card notes.txt in'),
     'a file in the inbox that is not a card is refused, not read as a brief',
   );
   fs.mkdirSync(path.join(INBOX, 'drafts'));
   fs.writeFileSync(path.join(INBOX, 'drafts', 'idea.md'), 'Refactor everything.\n');
   await assert.rejects(
     starting(path.join(INBOX, 'drafts', 'idea.md'), '--workflows', 'dev', '--repo', repo),
-    refusedWith(/^`drafts\/idea` is not a card's name: a name stays in the inbox, with no slash/),
+    refusedWith('Invalid', "`drafts/idea` is not a card's name", 'no slash'),
     'and so is one in a folder inside it',
   );
   assert.equal(runsWritten(), before, 'no run written');
@@ -541,7 +519,7 @@ test("a card's `from:` is set and taken off by `nemia inbox from`, and its run i
       await runPlaced(
         startFromInbox({ name: card.card.name, workflow: path.join(repo, 'workflows', 'dev'), callerRepo: repo, after: ['source-a1'] }),
       ),
-    refusedWith(/from: .*source-a1/),
+    refusedWith('Invalid', 'from: source-a1', '--after source-a1'),
   );
   assert.equal(runsWritten(), before, 'nothing written');
   assert.ok(fs.existsSync(card.file), 'the card is kept');
@@ -568,50 +546,56 @@ test('REFUSED by name at shipped defaults, before a run is written and with the 
   await assert.rejects(
     starting(path.join(INBOX, 'cache-the-view.md')),
     refusedWith(
-      new RegExp(
-        `^no card cache-the-view in the inbox\\. Its cards are: ${escaped(kept.card.name)}\\. Start one of those — nemia start ${escaped(path.join(INBOX, '<name>.md'))} — or park the idea first: nemia inbox add "<idea>"\\.$`,
-      ),
+      'Missing',
+      'no card cache-the-view in',
+      `Its cards are: ${kept.card.name}.`,
+      `nemia start ${path.join(INBOX, '<name>.md')}`,
+      'nemia inbox add "<idea>"',
     ),
   );
   await assert.rejects(
     async () => await runPlaced(startFromInbox({ name: '../runs/x', callerRepo: repo })),
-    refusedWith(/^`\.\.\/runs\/x` is not a card's name: a name stays in the inbox/),
+    refusedWith('Invalid', "`../runs/x` is not a card's name", 'no slash'),
   );
   await assert.rejects(
     async () => await runPlaced(startFromInbox({ name: 'a/b', callerRepo: repo })),
-    refusedWith(/^`a\/b` is not a card's name/),
+    refusedWith('Invalid', "`a/b` is not a card's name"),
   );
   await assert.rejects(
     async () => await runPlaced(startFromInbox({ name: '', callerRepo: repo })),
-    refusedWith(/^A card is named by its file in the inbox, minus \.md, as nemia inbox lists it, and this name is empty\./),
+    refusedWith('Invalid', 'this name is empty', 'nemia inbox lists'),
   );
 
   await assert.rejects(
     starting(kept.file),
     refusedWith(
-      new RegExp(
-        `^${escaped(kept.card.file)}: no workflow — the card names none, and none was given, so nothing says what runs it\\. The repository's workflows are: dev, ui, in ${escaped(path.join(repo, 'workflows'))}\\. Name one: nemia start ${escaped(kept.file)} --workflows dev, or write \`workflow: dev\` in the card\\.$`,
-      ),
+      'Invalid',
+      `${kept.card.file}: no workflow`,
+      `workflows are: dev, ui, in ${path.join(repo, 'workflows')}.`,
+      `nemia start ${kept.file} --workflows dev`,
+      '`workflow: dev`',
     ),
   );
   const loose = addToInbox({ text: 'Anywhere at all' });
   await assert.rejects(
     async () => await runPlaced(startFromInbox({ name: loose.card.name, callerRepo: fs.mkdtempSync(path.join(ROOT, 'bare-')) })),
-    refusedWith(/: no workflow — .* has no workflows\. Give a workflow folder:/),
+    refusedWith('Invalid', `${loose.card.file}: no workflow`, 'has no workflows', `nemia start ${loose.file} --workflows <dir>`),
   );
 
   const nope = addToInbox({ text: 'Store the flag', workflow: 'nope', repo });
   await assert.rejects(
     starting(nope.file),
     refusedWith(
-      new RegExp(
-        `^${escaped(nope.card.file)}: \`workflow: nope\` — no workflow folder at ${escaped(path.join(INBOX, 'nope'))}, nor a workflow named nope in ${escaped(path.join(repo, 'workflows'))}\\. The repository's workflows are: dev, ui`,
-      ),
+      'Invalid',
+      `${nope.card.file}: \`workflow: nope\``,
+      `no workflow folder at ${path.join(INBOX, 'nope')},`,
+      `named nope in ${path.join(repo, 'workflows')}.`,
+      'workflows are: dev, ui',
     ),
   );
   await assert.rejects(
     starting(kept.file, '--workflows', 'nope'),
-    refusedWith(/^no workflow folder at .*nope, nor a workflow named nope in /),
+    refusedWith('Invalid', 'no workflow folder at ', `named nope in ${path.join(repo, 'workflows')}.`, 'workflows are: dev, ui'),
   );
 
   fs.writeFileSync(
@@ -620,7 +604,7 @@ test('REFUSED by name at shipped defaults, before a run is written and with the 
   );
   await assert.rejects(
     starting(path.join(INBOX, 'hand-written-a1b2.md')),
-    refusedWith(/^hand-written-a1b2\.md: `after` is not a key an inbox card has: what a card waits on is said when it is started/),
+    refusedWith('Invalid', 'hand-written-a1b2.md: `after`', 'nemia start <inbox>/hand-written-a1b2.md --after <runId>'),
   );
   fs.writeFileSync(
     path.join(INBOX, 'moved-repo-a1b2.md'),
@@ -628,34 +612,29 @@ test('REFUSED by name at shipped defaults, before a run is written and with the 
   );
   await assert.rejects(
     starting(path.join(INBOX, 'moved-repo-a1b2.md')),
-    refusedWith(/^moved-repo-a1b2\.md: `repo: .*moved-away` names no directory\./),
+    refusedWith('Invalid', 'moved-repo-a1b2.md: `repo: ', `${path.join(ROOT, 'moved-away')}\` names no directory`),
   );
 
   await assert.rejects(
     starting(kept.file, '--workflows', 'dev', '--brief', ''),
-    refusedWith(/^--brief takes what the run is asked to do in place of an inbox card's body/),
+    refusedWith('Invalid', 'nemia start <inbox>/<name>.md --brief "<brief>"'),
   );
   await assert.rejects(
     async () => await runPlaced(startFromInbox({ name: kept.card.name, workflow: 'dev', brief: '  \n', callerRepo: repo })),
-    refusedWith(
-      new RegExp(
-        `^${escaped(kept.card.file)}: the brief given in place of the card's body is empty\\. Give what the run is asked to do, or leave it out`,
-      ),
-    ),
+    refusedWith('Invalid', `${kept.card.file}: the brief`, 'is empty'),
   );
   await assert.rejects(
     starting('add a flag', '--workflows', path.join(repo, 'workflows', 'dev'), '--repo', repo, '--brief', 'x'),
-    refusedWith(
-      new RegExp(
-        `^nemia start takes --brief only for a card of the inbox, in place of its body: nemia start ${escaped(path.join(INBOX, '<name>.md'))} --brief "<brief>"\\.`,
-      ),
-    ),
+    refusedWith('Invalid', `nemia start ${path.join(INBOX, '<name>.md')} --brief "<brief>"`, 'nemia start "<brief>"'),
   );
   await assert.rejects(
     starting(kept.file, '--workflows', 'dev', '--brief', 'x', '--brief', 'y'),
-    refusedWith(/^nemia start takes --brief once: a run is asked one thing\.$/),
+    refusedWith('Invalid', 'nemia start takes --brief once'),
   );
-  await assert.rejects(starting(kept.file, '--workflows', 'dev', '--after', 'no-such-run-zz99'), refusedWith(/no-such-run-zz99/));
+  await assert.rejects(
+    starting(kept.file, '--workflows', 'dev', '--after', 'no-such-run-zz99'),
+    refusedWith('Invalid', '--after no-such-run-zz99', 'nemia ls'),
+  );
 
   assert.equal(runsWritten(), before, 'no run written');
   for (const f of [kept.file, loose.file, nope.file, path.join(INBOX, 'hand-written-a1b2.md'), path.join(INBOX, 'moved-repo-a1b2.md')])
@@ -697,15 +676,11 @@ test(
 
     await assert.rejects(
       main(['start', file], noEngine()),
-      refusedWith(
-        new RegExp(
-          `^${escaped(card.file)}: this card was started as ${escaped(id)} — that run's record says so — and is still in the inbox because its removal failed\\. Drop it with nemia inbox rm ${escaped(card.name)};`,
-        ),
-      ),
+      refusedWith('Conflict', `${card.file}: this card was started as ${id}`, `nemia inbox rm ${card.name};`),
     );
     await assert.rejects(
       async () => await runPlaced(startFromInbox({ name: card.name, callerRepo: repo })),
-      refusedWith(/: this card was started as /),
+      refusedWith('Conflict', `${card.file}: this card was started as ${id}`, `nemia inbox rm ${card.name};`),
     );
     assert.equal(runsWritten(), before + 1, 'not started twice');
     await printedBy(t, 'inbox', 'rm', card.name);

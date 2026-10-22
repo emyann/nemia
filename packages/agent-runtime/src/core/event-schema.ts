@@ -30,6 +30,8 @@ const McpServerSchema = Schema.Union([
     type: Schema.Literals(['http', 'sse']),
     url: Schema.String,
     headers: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+    /** An OAuth client's facts, never its secret, which Claude Code reads from its own store (`RemoteMcpServer`). */
+    oauth: Schema.optional(Schema.Struct({ clientId: Schema.String, callbackPort: Schema.optional(Schema.Number) })),
   }),
 ]);
 

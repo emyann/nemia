@@ -9,4 +9,4 @@
 export { testEngine } from './service/index.ts';
 export { bell, until, WAITED } from './waits/index.ts';
 export type { Bell, Truthy, Waiter } from './waits/index.ts';
-export type { Printed, TestEnd, TestEngine, TestFiling, TestKeeps, TestTask } from './service/index.ts';
+export type { Printed, TestEnd, TestEngine, TestFiling, TestKeeps, TestMcpState, TestTask } from './service/index.ts';

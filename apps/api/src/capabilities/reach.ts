@@ -16,7 +16,7 @@
  * matches the bare command; a rule naming a tool whole — `Bash`, or `Bash(*)` — as a deny, removes the tool. A Codex step reads no
  * `.claude/settings.json`, and nothing of a Codex session was measured: its fence is its sandbox, and the page claims nothing else for it.
  */
-import { HARNESSES } from 'agent-orchestrator';
+import { DEFAULT_FACTORY, FACTORY_SERVERS, HARNESSES } from 'agent-orchestrator';
 import {
   type AskServer,
   capabilitiesOf,
@@ -26,8 +26,9 @@ import {
   SETTINGS,
   type Capabilities,
   type DeniedRule,
+  type McpServer,
 } from './capabilities.ts';
-import type { Engine } from '../store.ts';
+import { runPlaced, type Engine } from '../store.ts';
 import { listWorkflows, type WorkflowListing, type WorkflowSource, type WorkflowStepSpec } from '../workflows/workflows.ts';
 import type { PlaceService } from 'agent-orchestrator';
 
@@ -466,6 +467,26 @@ function stepReach(
 }
 
 /**
+ * `servers` with the state the harness reports of each server the **default factory** records under the same name: the default factory
+ * is the one every run and card that names none runs in, so a server it records is one the checkout's own steps are handed, and the
+ * page shows the same chip the factory's settings page does.
+ *
+ * A server the default factory does not record keeps `factoryState: null` — a `.mcp.json` server has no sign-in of ours to show — and
+ * so does one whose state could not be read, which is not an absence. The read is one short-lived harness session for the whole
+ * record, and none at all for a default factory that records no server, which is the common case.
+ */
+const statedByFactory = async (
+  servers: readonly McpServer[],
+  e: Engine['Service'],
+  placeService: PlaceService['Service'],
+): Promise<McpServer[]> => {
+  if (!servers.length) return [...servers];
+  const listing = await runPlaced(placeService, e, FACTORY_SERVERS.handler({ factory: DEFAULT_FACTORY })).catch(() => undefined);
+  const by = new Map((listing?.servers ?? []).map((s) => [s.name, s.state]));
+  return servers.map((server) => ({ ...server, factoryState: by.get(server.name) ?? null }));
+};
+
+/**
  * Everything the Capabilities page reads, off the checkout at `repo`: what it offers (`capabilitiesOf`, its servers asked through `asker`
  * with `env`), and what each step of each workflow listed from it and from `home` gets. A workflows directory that cannot be listed is a
  * warning, and no step is shown; the rest is served.
@@ -481,6 +502,7 @@ export async function capabilitiesWithSteps(
   }: { e: Engine['Service']; placeService: PlaceService['Service']; env: NodeJS.ProcessEnv; home: string; asker: AskServer },
 ): Promise<CapabilitiesWithSteps> {
   const capabilities = await capabilitiesOf(repo, { env, asker });
+  capabilities.mcp = await statedByFactory(capabilities.mcp, e, placeService);
   let workflows: WorkflowListing[] = [];
   try {
     workflows = await listWorkflows(e, placeService, repo, home);

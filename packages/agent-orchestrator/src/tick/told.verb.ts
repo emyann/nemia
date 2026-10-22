@@ -5,7 +5,7 @@
  * the run's folder finds them, and the run's place.
  */
 import path from 'node:path';
-import type { ClaudeFlags, CodexArgs } from '../runtime-client.ts';
+import { mcpServerOf, type ClaudeFlags, type CodexArgs } from '../runtime-client.ts';
 import { lackedOf, type Run, type StepRecord } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { filedFolders, type FiledFolders } from '../filed/filed.ts';
@@ -24,6 +24,9 @@ import type { Place } from '../place/place.store.ts';
 import type { PlaceSay } from '../place/place.ts';
 import { composeBrief } from '../brief/index.ts';
 import { artifactsDir, inputsDir } from '../record/record.store.ts';
+import { DEFAULT_FACTORY } from '../factory/factory.ts';
+import { factoryServers } from '../servers/servers.store.ts';
+import type { FactoryServers } from '../servers/servers.ts';
 import { inboxDir } from '../record/files.store.ts';
 
 /**
@@ -80,11 +83,31 @@ export function placeTold(run: Run, step: Workflow, place: Place, heads?: Readon
  * Where a step of `run` is filed its folders from (`filedFolders`, `filedConfig`): the run's artifacts folder, the store's inbox, and the
  * run's inputs folder (`inputsDir`) only when its record names an input, so a run given none is filed and told as before.
  */
-export const filedAt = (run: Pick<Run, 'id' | 'inputs'>): { runArtifacts: string; inbox: string; inputs?: string } => ({
+export const filedAt = (
+  run: Pick<Run, 'id' | 'inputs' | 'factory'>,
+): { runArtifacts: string; inbox: string; inputs?: string; servers: FactoryServers } => ({
   runArtifacts: path.dirname(artifactsDir(run, 'step')),
   inbox: inboxDir(),
   ...(run.inputs?.length ? { inputs: inputsDir(run) } : {}),
+  servers: recordedServers(run.factory),
 });
+
+/**
+ * The MCP servers the factory `factory` records, each through `mcpServerOf` — the runtime's one producer of the bytes a harness sees,
+ * applied here and nowhere else on this road, so a session is handed the spelling a state read was handed and finds the sign-in filed
+ * under it. `{}` for a factory that records none — and `{}`, silently here, for a record that does not read: this is spread into
+ * every filing, and a throw would be a defect that stops the whole pass over one bad file. The pass refuses the step itself and says
+ * why (`fileReady`), where a note can carry the file and the command to type, and `nemia factory servers` refuses it loudly to the
+ * person who asks.
+ */
+const recordedServers = (factory: string | undefined): FactoryServers => {
+  try {
+    const record = factoryServers(factory ?? DEFAULT_FACTORY);
+    return Object.fromEntries(Object.entries(record).map(([name, server]) => [name, mcpServerOf(server)]));
+  } catch {
+    return {};
+  }
+};
 
 /**
  * What `step` of `run`, not yet filed, would be told now from `steps` (`composeBrief`), with what its place says to it (`placeTold`):

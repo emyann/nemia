@@ -84,8 +84,11 @@ import {
   type TickReport,
 } from './options.ts';
 import { harnessRefusalOf } from './harness-refusal.ts';
+import { McpStateRefused, mcpStateVerbOf } from './mcp-state.ts';
 import { traceparentOf } from '../harness/telemetry.ts';
 import { attachedSessions, putDrain, liftDrain, type Attached } from '../harness/claude/index.ts';
+import type { McpServersRead } from '../harness/mcp-state.ts';
+import type { RemoteMcpServer } from '../harness/seam.ts';
 
 /** Options an engine cannot be built from (`optionsRefusalOf`), and why. Nothing was built. */
 export class EngineRefused extends Schema.TaggedError<EngineRefused>()('EngineRefused', {
@@ -383,6 +386,23 @@ export type EngineShape = {
    */
   readonly quota: (harness?: string) => Effect.Effect<HarnessQuota, QuotaRefused | RunnerError>;
   /**
+   * The state of each of `servers` — a record of them, every one in one short-lived Claude Code session with the servers
+   * inline, asked once and ended (`mcpServersRead`): `connected`, `needs-auth`, `failed`, `pending` or `disabled`, the harness's own
+   * words carried and never re-worded, with the tool count of a connected one and the error of a failed one. No turn begins, so the
+   * read costs no token; it costs one CLI spawn, whatever the record's size. No task is touched and nothing is journalled.
+   *
+   * The bytes handed over are `mcpServerOf`'s, the same a task's own session will be given, so a sign-in made against what this read
+   * judged is the sign-in that session finds.
+   *
+   * A look that failed answers `{ read: false, why }` and never an empty list: an absence read off a failed look is not an absence,
+   * and a caller reads that as "the state is unread", never as `needs-auth`.
+   *
+   * Refused — `McpStateRefused`, and nothing opened — in this order: a record that is not a map of servers by name; an empty record;
+   * an entry with no `url`, a server the harness starts having no connection to report; and an engine with no Claude Code harness,
+   * naming the harnesses it has.
+   */
+  readonly mcpState: (servers: Record<string, RemoteMcpServer>) => Effect.Effect<McpServersRead, McpStateRefused>;
+  /**
    * Answer a task held open (`holdOpen`) that waits for one — phase `input-required`. Journalled as an `input` entry — `at`,
    * `text`, and `config` if given — which is returned, and which `view` carries as `state.inputs`. The next tick starts
    * the task's next turn: an attempt that continues the session that signed (`--resume`), told `text` in place of the
@@ -679,6 +699,21 @@ const writtenVerbsOf = (...given: Parameters<typeof sayVerbOf>) => ({
  *
  * Fails with `EngineRefused` for what `optionsRefusalOf` refuses.
  */
+/**
+ * The verbs that ask a harness something in a session of their own, opened for the ask and let go with it: what is left of a plan's
+ * usage (`quota`), and the state of each server a caller hands (`mcpState`).
+ */
+const askedVerbsOf = (
+  runners: Record<string, SeamOps>,
+  fallback: string,
+  harnesses: Record<string, HarnessConfig>,
+  root: string,
+  executable: string | undefined,
+): Pick<EngineShape, 'quota' | 'mcpState'> => ({
+  quota: quotaVerbOf(runners, fallback),
+  mcpState: mcpStateVerbOf(harnesses, root, executable),
+});
+
 const make = (options: EngineOptions) =>
   Effect.gen(function* () {
     const refused = optionsRefusalOf(options);
@@ -828,7 +863,7 @@ const make = (options: EngineOptions) =>
       output: outputVerbOf(read, runners, harnessOf),
       follow: followVerbOf(read, runners, harnessOf),
       ...writtenVerbsOf(go, read, runners, harnesses, harnessOf),
-      quota: quotaVerbOf(runners, fallback),
+      ...askedVerbsOf(runners, fallback, harnesses, root, options.claudeExecutable),
       answer: answerVerb,
       close: (taskId) => go(close(taskId)),
       feed: feedVerb,

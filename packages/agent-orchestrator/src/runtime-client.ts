@@ -75,6 +75,22 @@ export { trustedFolder } from 'agent-runtime';
  * under the repository the place answered for the folder; each `undefined` for a harness that keeps no trust.
  */
 export { folderTrust, trustFolder, type FolderTrust, type FolderTrusted } from 'agent-runtime';
+/**
+ * One MCP server a factory records and a harness is handed (`RemoteMcpServer`), and the one producer of its bytes (`mcpServerOf`): the
+ * record carries the server's wire facts, and the runtime spells them in the one key order a sign-in is filed under.
+ */
+export { mcpServerOf, type LocalMcpServer, type RemoteMcpServer } from 'agent-runtime';
+/**
+ * What a harness says of the servers it was handed, carried here whole and never worded again: the five state words it has
+ * (`MCP_STATES`), one server's state as it says it, and what a whole read answers — the states, or that the look failed and why,
+ * never an empty list. Asked of the engine's `mcpState`, and refused by `McpStateRefused`.
+ */
+export { MCP_STATES, McpStateRefused, type McpServerState, type McpServersRead } from 'agent-runtime';
+/**
+ * Whether a harness files a sign-in for a remote MCP server, read off its name: the runtime's judgement, carried, for the pass that
+ * will not start a step whose server needs one. A harness it answers false for is shown its servers and never refused them.
+ */
+export { signsInMcp } from 'agent-runtime';
 
 /**
  * The allow rules the repository's own harness configuration grants a session started in it, as the harness reads them

@@ -456,6 +456,10 @@ export { INBOX, INBOX_ADD, INBOX_QUEUE } from './inbox/commands.verb.ts';
 export { FACTORY } from './factory/factory.verb.ts';
 export { FACTORY_INSTRUCT, FACTORY_INSTRUCTION, factoryInstruction } from './factory/instruction.verb.ts';
 export { FACTORY_RULES, factoryRules } from './rules/rules.verb.ts';
+/** A factory's own MCP servers: the entry that lists its record with each server's state, and the name rule the board shares. */
+export { FACTORY_SERVERS } from './servers/servers.verb.ts';
+export type { ServerListed, ServersListing } from './servers/servers.verb.ts';
+export { serverNameRefusal } from './servers/servers.ts';
 export type { FactoryRules } from './rules/rules.verb.ts';
 export type { FactoryInstruction } from './factory/instruction.verb.ts';
 export { AGENTS_CUSTOM } from './agents/custom.verb.ts';

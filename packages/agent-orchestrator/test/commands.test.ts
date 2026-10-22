@@ -85,6 +85,9 @@ test('each command is served on the api where it was before the table, the lift 
       ['factory fire', { method: 'DELETE', path: '/api/factories/:factory/hires/:step', status: 200 }],
       ['factory schedule', { method: 'PUT', path: '/api/factories/:factory/schedules/:workflow', status: 200 }],
       ['factory unschedule', { method: 'DELETE', path: '/api/factories/:factory/schedules/:workflow', status: 200 }],
+      ['factory servers', { method: 'GET', path: '/api/factories/:factory/servers', status: 200 }],
+      ['factory server add', { method: 'PUT', path: '/api/factories/:factory/servers/:server', status: 200 }],
+      ['factory server rm', { method: 'DELETE', path: '/api/factories/:factory/servers/:server', status: 200 }],
       [
         'factory rules',
         [
@@ -237,6 +240,7 @@ test('every command the api posts or deletes on writes, and the api guards it; t
       'factory',
       'factory ls',
       'factory plan',
+      'factory servers',
       'template check',
       'ls',
       'show',

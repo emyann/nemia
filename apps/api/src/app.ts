@@ -9,6 +9,7 @@ import { customInstructions } from './custom/custom.ts';
 import { commands } from './commands/index.ts';
 import { capabilitiesWithSteps, McpAsker } from './capabilities/index.ts';
 import { factories, factoryInstruction, factoryRules } from './factories/index.ts';
+import { factoryServers } from './servers/index.ts';
 import { ceilingsOf, metricsOf, passesOf, seriesOf, pauseNowOf, pauseOf, feed, QuotaAsker, readDaemon } from './factory/index.ts';
 import { inbox } from './inbox/inbox.ts';
 import { ApiConfig, type ApiEnv, type ApiRuntime, ReadMemo, served, type Services } from './layer.ts';
@@ -178,6 +179,7 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     )
     .route('/', factories)
     .route('/', factoryRules)
+    .route('/', factoryServers)
     .route('/', factoryInstruction)
     .route('/', workflows)
     .route('/', step)

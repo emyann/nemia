@@ -41,6 +41,12 @@ export type McpServer = {
   error: string | null;
   /** Why the api did not ask it — not enabled, or not a stdio server. */
   notAsked: string | null;
+  /**
+   * The state the harness reports of the server of this name the default factory records — `connected`, `needs-auth`, `failed`,
+   * `pending` or `disabled`, the harness's own word, carried — or `null`: for a server the default factory does not record, and for one
+   * whose state could not be read, which is not an absence. A server of the checkout's `.mcp.json` alone has none.
+   */
+  factoryState: string | null;
   /** When it was asked: the api asks each server once while it runs. */
   checkedAt: string | null;
 };
@@ -119,6 +125,7 @@ export async function capabilitiesOf(
         tools: null,
         error: server.invalid,
         notAsked: null,
+        factoryState: null,
         checkedAt: null,
       };
       if (server.invalid) return entry;

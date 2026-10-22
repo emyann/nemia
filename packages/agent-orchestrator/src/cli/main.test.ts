@@ -1,6 +1,13 @@
 /**
  * `main`, the verbs' table: the help for a verb it does not know and for one given too little, and the lines of the verbs no other test
  * reads — `nemia cancel`, `nemia show`, `nemia logs` and `nemia accept` — over a store and a repository of their own, on the test place.
+ *
+ * The root test below types `factory servers default`, and the factory is `default` on purpose. A `factory servers` read is two reads:
+ * the factory's own existence (`factoryThere`), and its record. The record is read under the root the handler is given (`rootGiven`,
+ * which is what that test pins); the existence check returns early for `DEFAULT_FACTORY` and otherwise calls `readFactories()`, whose
+ * `factoriesDir()` still reads the module-level root `factory.store.ts` pinned as it loaded. So any other name would fail there and not
+ * at the read — `factory.store.ts` is unconverted, carries the most lines of `test/global-roots.baseline.ts` and is the next card's
+ * work, the baseline only shrinking. `default` is the one name where the two roots cannot differ, so it isolates the read.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -84,6 +91,7 @@ const board = () => {
     },
     stop: async () => {},
     logs: async (id: string) => `the output of ${id}`,
+    mcpState: async () => ({ read: false as const, why: 'no harness is run in this test, so no state is read' }),
   });
   const settle = (id: string, phase: TaskPhase, closeout?: unknown) => tasks.set(id, { phase, closeout });
   return { e, settle };
@@ -115,6 +123,31 @@ test('wf, the alias, writes its one hint line on stderr before the help, and not
   assert.deepEqual(err, [`${WF_HINT}\n`]);
   assert.deepEqual(out, [HELP]);
   assert.match(WF_HINT, new RegExp(`\\b${CLI} <args>`), 'the hint names what to type next');
+});
+
+test('a read is run against the root the process names when it is typed, not one a module pinned as it loaded', async (t) => {
+  const { e } = board();
+  const other = scratch('wf-main-other-');
+  const file = path.join(other, 'factories', 'default', 'servers.json');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, `${JSON.stringify({ servers: { github: { type: 'http', url: 'https://api.githubcopilot.com/mcp/' } } })}\n`);
+  const was = process.env.WF_ROOT;
+  try {
+    process.env.WF_ROOT = other;
+    const { out } = await typed(t, e, 'factory', 'servers', 'default');
+    assert.ok(
+      out.some((line) => line.includes('https://api.githubcopilot.com/mcp/')),
+      `the record under the root the process names is the one read, by servers.store.ts's required home: ${JSON.stringify(out)}`,
+    );
+    process.env.WF_ROOT = was;
+    const back = await typed(t, e, 'factory', 'servers', 'default');
+    assert.ok(
+      back.out.some((line) => line.includes('no server recorded')),
+      `and this root records none, so the read follows the root rather than a module's: ${JSON.stringify(back.out)}`,
+    );
+  } finally {
+    process.env.WF_ROOT = was;
+  }
 });
 
 test('the verbs the help names are the verbs main runs, and no other', () => {

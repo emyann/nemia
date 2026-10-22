@@ -5,9 +5,12 @@
  * by id (`filings`) and by what it was filed with (`specs`), each stop taken (`stopped`), each word said (`said`), each interrupt asked
  * (`interrupts`) and each `forget` call by call (`forgets`); `refuseSay(n)` refuses the next `n` says as the runtime refuses a session
  * not running; `keeps(id, sizes)` plants what `kept` answers of a task, and `failKept(n)` fails the next `n` as a store that does not
- * list fails one; `plantTranscript(id, n, events)` plants what `transcript` reads of an attempt, and `restart(id)` starts a task's next.
+ * list fails one; `plantTranscript(id, n, events)` plants what `transcript` reads of an attempt, and `restart(id)` starts a task's next;
+ * `plantMcpState(name, state)` plants the state a server reads as, `failMcpState(why)` makes the next read a look that failed, and
+ * `mcpReads` counts the reads asked, which is how a test proves a pass read a record's states once rather than once per task.
  *
- * It keeps `file`, `view`, `list`, `stop`, `logs`, `feed`, `output`, `say`, `interrupt`, `transcript`, `forget` and `kept`, each
+ * It keeps `file`, `view`, `list`, `stop`, `logs`, `feed`, `output`, `say`, `interrupt`, `transcript`, `forget`, `kept` and
+ * `mcpState`, each
  * answering what the real engine answers over a harness that costs nothing: `test/engine-walks.ts` holds the walks both run, and `APART`
  * there what this one cannot say. Every other verb dies naming itself. Reached from another package through `agent-runtime/testing`
  * alone, and by no file of a `src`.
@@ -27,12 +30,15 @@ import {
   TranscriptRefused,
   type EngineShape,
 } from './engine.ts';
+import type { McpServerState, McpServersRead } from '../harness/mcp-state.ts';
+import type { RemoteMcpServer } from '../harness/seam.ts';
 
 /** One event of a session's transcript, as `transcript` answers it. */
 type TranscriptEvent = Effect.Success<ReturnType<EngineShape['transcript']>>['events'][number];
 import { ForgetRefused } from './forget.ts';
 import { KeptRefused, type KeptReport } from './kept.ts';
-import type { TaskSpec } from './options.ts';
+import { mcpStateRefusal, type TaskSpec } from './options.ts';
+import { McpStateRefused } from './mcp-state.ts';
 import { notACount, notAStream, OutputRefused } from './output.ts';
 import { SayRefused } from './say.ts';
 import { InterruptRefused } from './interrupt.ts';
@@ -234,6 +240,12 @@ export type TestEngine = {
   readonly keeps: (id: string, sizes: TestKeeps) => void;
   /** Fails the next `times` asks of `kept` with a `JournalError`, as the engine fails one over a store that does not list. */
   readonly failKept: (times: number) => void;
+  /** The record of each `mcpState` read asked, by the server names it was handed, in order: one entry per read. */
+  readonly mcpReads: Array<readonly string[]>;
+  /** Plants the state the server `name` reads as, in place of what was planted before; one planted nothing reads `pending`. */
+  readonly plantMcpState: (name: string, state: TestMcpState) => void;
+  /** Makes every `mcpState` read a look that failed, with `why`; `undefined` lets them read again. */
+  readonly failMcpState: (why: string | undefined) => void;
 };
 
 /**
@@ -293,6 +305,36 @@ const keptVerbOf = (tasks: Map<string, TestTask>, sizes: Map<string, TestKeeps>,
       };
     };
     return Effect.sync(() => ({ tasks: [...tasks.keys()].map(of) }));
+  };
+
+/**
+ * What a test plants of one server's state: its words, and the tool count and error that go with them. A server a test plants nothing
+ * for reads `pending`, as the real read reads a server the harness named nothing of.
+ */
+export type TestMcpState = Omit<McpServerState, 'name'>;
+
+/**
+ * `mcpState` over what a test planted: refuses a record as the real verb refuses one (`mcpStateRefusal`, its own words and its own
+ * order), counts the read in `reads`, then answers a planted look that failed, else each server of the record once, in the record's
+ * order, with what was planted of it and `pending` where nothing was.
+ *
+ * It keeps no harness, so unlike the real verb it refuses no engine for having none: that difference is declared on `APART`.
+ */
+const mcpStateOf = (
+  planted: Map<string, TestMcpState>,
+  reads: Array<readonly string[]>,
+  failures: { why: string | undefined },
+): EngineShape['mcpState'] =>
+  function (servers: Record<string, RemoteMcpServer>) {
+    const refused = mcpStateRefusal(servers);
+    if (refused) return Effect.fail(new McpStateRefused({ message: refused }));
+    reads.push(Object.keys(servers));
+    const why = failures.why;
+    if (why !== undefined) return Effect.succeed<McpServersRead>({ read: false, why });
+    return Effect.succeed<McpServersRead>({
+      read: true,
+      servers: Object.keys(servers).map((name) => ({ name, ...(planted.get(name) ?? { status: 'pending' as const }) })),
+    });
   };
 
 /**
@@ -397,7 +439,21 @@ const sayAskedOf =
 
 /** The kept verbs over what a stand-in holds. */
 const keptOf = (
-  held: Omit<TestEngine, 'layer' | 'refuseSay' | 'settle' | 'keeps' | 'failKept' | 'plantAsk' | 'cutAsks' | 'plantTranscript' | 'restart'>,
+  held: Omit<
+    TestEngine,
+    | 'layer'
+    | 'refuseSay'
+    | 'settle'
+    | 'keeps'
+    | 'failKept'
+    | 'plantAsk'
+    | 'cutAsks'
+    | 'plantTranscript'
+    | 'restart'
+    | 'plantMcpState'
+    | 'failMcpState'
+    | 'mcpReads'
+  >,
   sayRefusals: { left: number },
   sizes: Map<string, TestKeeps>,
   keptFailures: { left: number },
@@ -465,6 +521,35 @@ const taskFor = (tasks: Map<string, TestTask>, id: string, before: string): Test
   return t;
 };
 
+/** The task `id` started again: the attempt it had kept as a failed earlier try, and a new attempt at work in its place. */
+const restartIn = (tasks: Map<string, TestTask>, id: string): TestTask => {
+  const t = tasks.get(id);
+  if (!t?.attempt) throw new Error(`the test engine holds no started task ${id}: settle it at work before restarting it`);
+  t.earlier.push(attemptOf(t, 'failed', {}));
+  t.attempt = null;
+  t.attempt = attemptOf(t, 'running (working)', {});
+  t.phase = 'running (working)';
+  return t;
+};
+
+/**
+ * What the stand-in holds about MCP states: what a read answers for each server planted, the failure a read is made to answer instead,
+ * and every read asked of it, in order — with the verb that serves them and the two a test moves them by.
+ */
+const mcpHeld = () => {
+  const planted = new Map<string, TestMcpState>();
+  const failure: { why: string | undefined } = { why: undefined };
+  const mcpReads: Array<readonly string[]> = [];
+  return {
+    mcpState: mcpStateOf(planted, mcpReads, failure),
+    read: {
+      mcpReads,
+      plantMcpState: (name: string, state: TestMcpState) => void planted.set(name, state),
+      failMcpState: (why: string | undefined) => void Object.assign(failure, { why }),
+    },
+  };
+};
+
 /**
  * A stand-in with no task on it, and the layer that serves it: new at each call, so two share nothing.
  *
@@ -485,9 +570,11 @@ export const testEngine = (): TestEngine => {
   const sayRefusals = { left: 0 };
   const sizes = new Map<string, TestKeeps>();
   const keptFailures = { left: 0 };
+  const mcp = mcpHeld();
   const layer = Layer.succeed(Engine)(
     Engine.of({
       ...keptOf(held, sayRefusals, sizes, keptFailures),
+      mcpState: mcp.mcpState,
       tick: unkept('tick'),
       admit: unkept('admit'),
       follow: unkept('follow'),
@@ -527,23 +614,21 @@ export const testEngine = (): TestEngine => {
   const cutAsks = (id: string) => asking(id, 'cutting', () => []);
   const plantTranscript = (id: string, n: number, events: readonly TranscriptEvent[]) =>
     void taskFor(held.tasks, id, 'planting its transcript').transcripts.set(n, [...events]);
-  const restart = (id: string): TestTask => {
-    const t = held.tasks.get(id);
-    if (!t?.attempt) throw new Error(`the test engine holds no started task ${id}: settle it at work before restarting it`);
-    t.earlier.push(attemptOf(t, 'failed', {}));
-    t.attempt = null;
-    t.attempt = attemptOf(t, 'running (working)', {});
-    t.phase = 'running (working)';
-    return t;
+  const restart = (id: string): TestTask => restartIn(held.tasks, id);
+  const refuseSay = (times: number) => void Object.assign(sayRefusals, { left: times });
+  const keeps = (id: string, planted: TestKeeps) => void sizes.set(id, planted);
+  const failKept = (times: number) => void Object.assign(keptFailures, { left: times });
+  return {
+    layer,
+    ...held,
+    ...mcp.read,
+    refuseSay,
+    settle,
+    keeps,
+    failKept,
+    plantAsk,
+    cutAsks,
+    plantTranscript,
+    restart,
   };
-  const refuseSay = (times: number) => {
-    sayRefusals.left = times;
-  };
-  const keeps = (id: string, planted: TestKeeps) => {
-    sizes.set(id, planted);
-  };
-  const failKept = (times: number) => {
-    keptFailures.left = times;
-  };
-  return { layer, ...held, refuseSay, settle, keeps, failKept, plantAsk, cutAsks, plantTranscript, restart };
 };

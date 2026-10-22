@@ -7,11 +7,57 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import type { McpServer } from './seam.ts';
+import type { McpServer, RemoteMcpServer } from './seam.ts';
 import type { HarnessArgs } from './args.ts';
 
 const isMap = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const isStringMap = (v: unknown) => isMap(v) && Object.values(v).every((s) => typeof s === 'string');
+
+/** Why `mcp.<name>`, a server with a `command`, is not one a harness can start — or `undefined`. */
+const localRefuses = (name: string, server: Record<string, unknown>): string | undefined => {
+  const at = `\`mcp.${name}\``;
+  if (typeof server.command !== 'string' || !server.command)
+    return `\`mcp.${name}.command\` is not a program to run. Give it as a string, like "npx".`;
+  if (server.type !== undefined && server.type !== 'stdio')
+    return `${at} has a \`command\` and \`type: ${JSON.stringify(server.type)}\`. Leave \`type\` out, or give "stdio".`;
+  if (server.args !== undefined && !(Array.isArray(server.args) && server.args.every((a) => typeof a === 'string'))) {
+    return `\`mcp.${name}.args\` is not a list of strings. Give one argument per entry, like ["-y", "@playwright/mcp"].`;
+  }
+  if (server.env !== undefined && !isStringMap(server.env))
+    return `\`mcp.${name}.env\` is not a map of strings. Quote every value, like { "PORT": "3000" }.`;
+  return undefined;
+};
+
+/**
+ * Why `mcp.<name>.oauth` is not an OAuth client — or `undefined`. It holds what a sign-in needs and no secret: a task's `config` is
+ * journalled with it, and the harness reads a secret from its own store alone, so one named here is refused by name.
+ */
+const oauthRefuses = (name: string, oauth: unknown): string | undefined => {
+  if (!isMap(oauth)) return `\`mcp.${name}.oauth\` is not an OAuth client. Give it as { "clientId": "Iv23li...", "callbackPort": 8791 }.`;
+  const odd = Object.keys(oauth).find((k) => !['clientId', 'callbackPort'].includes(k));
+  if (odd) {
+    return `\`mcp.${name}.oauth\` has \`${odd}\`, which it does not take: it holds \`clientId\` and \`callbackPort\` and no secret, which Claude Code reads from its own store alone. Take \`${odd}\` off it.`;
+  }
+  if (typeof oauth.clientId !== 'string' || !oauth.clientId)
+    return `\`mcp.${name}.oauth\` names no client. Set \`clientId\` to the OAuth app's client id, as a string.`;
+  const port = oauth.callbackPort;
+  if (port !== undefined && !(typeof port === 'number' && Number.isSafeInteger(port) && port > 0 && port < 65536)) {
+    return `\`mcp.${name}.oauth.callbackPort\` is not a port. Give the port the OAuth app's callback is registered on, a whole number from 1 to 65535, like 8791.`;
+  }
+  return undefined;
+};
+
+/** Why `mcp.<name>`, a server with a `url`, is not one a harness can reach — or `undefined`. */
+const remoteRefuses = (name: string, server: Record<string, unknown>, at: string): string | undefined => {
+  if (typeof server.url !== 'string' || !server.url)
+    return `\`mcp.${name}.url\` is not an address. Give it as a string, like "https://example.com/mcp".`;
+  if (server.type !== 'http' && server.type !== 'sse') {
+    return `${at} has a \`url\` and ${server.type === undefined ? 'no `type`' : `\`type: ${JSON.stringify(server.type)}\``}. Give "type": "http", or "sse": Claude Code loads no server from a url without one.`;
+  }
+  if (server.headers !== undefined && !isStringMap(server.headers))
+    return `\`mcp.${name}.headers\` is not a map of strings. Quote every value, like { "Authorization": "Bearer ..." }.`;
+  return server.oauth === undefined ? undefined : oauthRefuses(name, server.oauth);
+};
 
 /**
  * Why a task's `mcp` is not a map of MCP servers, as a sentence that says what to write — or
@@ -20,7 +66,7 @@ const isStringMap = (v: unknown) => isMap(v) && Object.values(v).every((s) => ty
  */
 export const mcpRefuses = (mcp: unknown): string | undefined => {
   const shape =
-    'An entry is { "command": "npx", "args": [...], "env": {...} }, or { "type": "http", "url": "https://...", "headers": {...} }, as in a `.mcp.json`.';
+    'An entry is { "command": "npx", "args": [...], "env": {...} }, or { "type": "http", "url": "https://...", "headers": {...}, "oauth": { "clientId": "..." } }, as in a `.mcp.json`.';
   if (!isMap(mcp)) return `\`mcp: ${JSON.stringify(mcp)}\` is not a map of MCP servers by name. ${shape}`;
   for (const [name, server] of Object.entries(mcp)) {
     const at = `\`mcp.${name}\``;
@@ -28,30 +74,54 @@ export const mcpRefuses = (mcp: unknown): string | undefined => {
     if (!isMap(server)) return `${at} is not a server. ${shape}`;
     const local = 'command' in server;
     if (local === 'url' in server) return `${at} has ${local ? 'both `command` and `url`' : 'neither `command` nor `url`'}. ${shape}`;
-    const stray = Object.keys(server).find((k) => !(local ? ['type', 'command', 'args', 'env'] : ['type', 'url', 'headers']).includes(k));
-    if (stray) return `${at} has \`${stray}\`, which a server with a \`${local ? 'command' : 'url'}\` does not take. ${shape}`;
-    if (local) {
-      if (typeof server.command !== 'string' || !server.command)
-        return `\`mcp.${name}.command\` is not a program to run. Give it as a string, like "npx".`;
-      if (server.type !== undefined && server.type !== 'stdio')
-        return `${at} has a \`command\` and \`type: ${JSON.stringify(server.type)}\`. Leave \`type\` out, or give "stdio".`;
-      if (server.args !== undefined && !(Array.isArray(server.args) && server.args.every((a) => typeof a === 'string'))) {
-        return `\`mcp.${name}.args\` is not a list of strings. Give one argument per entry, like ["-y", "@playwright/mcp"].`;
-      }
-      if (server.env !== undefined && !isStringMap(server.env))
-        return `\`mcp.${name}.env\` is not a map of strings. Quote every value, like { "PORT": "3000" }.`;
-    } else {
-      if (typeof server.url !== 'string' || !server.url)
-        return `\`mcp.${name}.url\` is not an address. Give it as a string, like "https://example.com/mcp".`;
-      if (server.type !== 'http' && server.type !== 'sse') {
-        return `${at} has a \`url\` and ${server.type === undefined ? 'no `type`' : `\`type: ${JSON.stringify(server.type)}\``}. Give "type": "http", or "sse": Claude Code loads no server from a url without one.`;
-      }
-      if (server.headers !== undefined && !isStringMap(server.headers))
-        return `\`mcp.${name}.headers\` is not a map of strings. Quote every value, like { "Authorization": "Bearer ..." }.`;
+    if (local && 'oauth' in server) {
+      return `${at} has a \`command\` and \`oauth\`, and a server the harness starts signs in to nothing. Take \`oauth\` off it, or give it a \`url\` instead of a \`command\`.`;
     }
+    const stray = Object.keys(server).find(
+      (k) => !(local ? ['type', 'command', 'args', 'env'] : ['type', 'url', 'headers', 'oauth']).includes(k),
+    );
+    if (stray) return `${at} has \`${stray}\`, which a server with a \`${local ? 'command' : 'url'}\` does not take. ${shape}`;
+    const why = local ? localRefuses(name, server) : remoteRefuses(name, server, at);
+    if (why) return why;
   }
   return undefined;
 };
+
+/**
+ * One recorded server as a harness is handed it: the same facts, rebuilt in one fixed key order — `type`, `url`, `headers` sorted by
+ * name, then `oauth` — and nothing else.
+ *
+ * **The one producer.** Claude Code files a sign-in under `name|sha256({type,url,headers})[:16]`, so the bytes of a server's wire
+ * facts *are* its identity: a session handed a server spelled one way and a state read of it spelled another are two servers to
+ * Claude Code, and the second finds no sign-in. Every road that hands a recorded server to a harness goes through here — the
+ * session's `Options.mcpServers` and the state read both — so the config the board judged is the config the session runs. Sorting
+ * the headers makes the record's own key order no part of that identity: a person who reorders two headers in a form keeps their
+ * sign-in.
+ *
+ * `oauth` sits outside the hash, which is why it may be edited without asking for a new sign-in; a header may not (measured,
+ * finding 6). Pure.
+ */
+export const mcpServerOf = (server: RemoteMcpServer): RemoteMcpServer => ({
+  type: server.type,
+  url: server.url,
+  ...(server.headers === undefined
+    ? {}
+    : {
+        headers: Object.fromEntries(
+          Object.keys(server.headers)
+            .sort()
+            .map((k) => [k, server.headers![k]]),
+        ),
+      }),
+  ...(server.oauth === undefined
+    ? {}
+    : {
+        oauth: {
+          clientId: server.oauth.clientId,
+          ...(server.oauth.callbackPort === undefined ? {} : { callbackPort: server.oauth.callbackPort }),
+        },
+      }),
+});
 
 /**
  * The checkout's own `.mcp.json`, when it has one, as an absolute path: the repository's servers, named so that
@@ -197,8 +267,16 @@ const tomlStrings = (m: Record<string, string> | undefined) =>
 
 /**
  * A task's `mcp` as Codex's `mcp_servers` table, inline: `command`, `args`, `env`, or `url` with its
- * headers as `http_headers`. One value with every name quoted, because a dotted `-c` key is split on
+ * `type` as `transport` and its headers as `http_headers`. One value with every name quoted, because a dotted `-c` key is split on
  * every dot, quotes or none (Codex answers "invalid transport in `mcp_servers."a`").
+ *
+ * The transport is written because a url without one is the half-formed entry `mcpRefuses` exists to prevent: Codex names the
+ * transport itself ("invalid transport"), so a remote server that does not say which is one that loads and says nothing.
+ *
+ * **No oauth table.** A remote server's `oauth` is dropped here, and a recorded server reaches a Codex session unsigned. Nothing of
+ * Codex has been measured — not whether it reads such a table, not what it would call the fields, not where it would file a
+ * credential — so writing one would be a guess spelled as configuration. A Codex task is shown its servers rather than refused
+ * them, and the state a board reads of one is unread, never a false `connected`; Codex's sign-in is measured before it is built.
  */
 export const codexMcpServers = (mcp: Record<string, McpServer>): string =>
   tomlTable(
@@ -214,6 +292,7 @@ export const codexMcpServers = (mcp: Record<string, McpServer>): string =>
               ])
             : tomlTable([
                 ['url', tomlString(s.url)],
+                ['transport', tomlString(s.type)],
                 ['http_headers', tomlStrings(s.headers)],
               ]),
         ] as const,

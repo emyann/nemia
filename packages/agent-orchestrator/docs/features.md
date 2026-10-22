@@ -6124,3 +6124,27 @@ Two things changed behind the rename. A step may not be named `run` — its cut 
 `stepSetRefusal` refuses the workflow at `nemia start`, naming `run.md` to rename; no shipped workflow has such a step. And
 `pull-request.ts`'s `nemia retry <run> <step> --recheck` line now takes the step from `WF_STEP` with `implement` as its fallback, as
 `landing.ts` does: read off the branch it would have named `run`, which is no step a person can retry.
+
+## Shipped: a factory's MCP servers, recorded beside it and named by its agents (2026-10-22)
+
+The card `a-factory-s-mcp-servers-reco`, card 1 of the intent `mcp-servers-configured-from-izq1`. A factory keeps its own MCP servers in
+`factories/<name>/servers.json`, one entry per server, read and written by `src/servers/` and by `nemia factory servers`,
+`nemia factory server add` and `nemia factory server rm`. An agent's `mcp:` name resolves against that record before the checkout's
+`.mcp.json` (`serversOf`, `src/filed/filed.ts`), and a step's session is handed the servers inline, byte-identical to the config any
+sign-in was made against: `mcpServerOf` (`agent-runtime/src/harness/mcp.ts`) is the one producer of those bytes, since the harness files
+a sign-in under `name|sha256({type,url,headers})[:16]` and two spellings are two servers to it. A remote entry carries
+`oauth: {clientId, callbackPort}` and never a secret; an `Authorization` header is refused by name.
+
+A server's state is an engine read verb, `mcpState`, which opens one short-lived Claude Code session for a whole record and answers the
+harness's own words — `connected`, `needs-auth`, `failed`, `pending`, `disabled` — carried whole above it. The board's factory settings
+page lists a factory's servers with a chip each, read when the page opens and again on a **Check again** press, never on the board's
+minute poll (the owner, at the design gate of 2026-10-21); Capabilities shows the same chip for a server the default factory records. A
+pass refuses to start a Claude Code step whose named server reports `needs-auth`, once per pass for the whole factory, and says what to
+do; a look that failed refuses nothing, since an absence read off a failed look is not an absence.
+
+`workflows/servers/<name>.json` is the shipped list and is empty: Nemia ships no server today.
+
+**What follows, and is card 2**: GitHub's hosted MCP server as the first shipped one, and the sign-in itself —
+`mcpAuthenticate`, `mcpSubmitOAuthCallbackUrl` and `mcpClearAuth`, none of them called here. Measured against it: Codex 0.154 cannot sign
+in to GitHub's hosted MCP through a GitHub App at all, so a Codex step is shown its factory's servers unsigned and refused none of them,
+and the pre-start refusal is Claude Code's only.

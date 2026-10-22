@@ -89,7 +89,8 @@ export type EngineOptions = {
   /**
    * The Claude Code the attached sessions are run with (`pathToClaudeCodeExecutable`), where it is not the Agent SDK's own bundled
    * CLI: a command of this runtime's own, as a container's is. Read by both roads the SDK runs — a held session (`hold`) and a
-   * job's own process (`claudeJobSpec`, as `AE_CLAUDE_EXECUTABLE`) — and by neither road Claude Code runs itself: a `--bg`
+   * job's own process (`claudeJobSpec`, as `AE_CLAUDE_EXECUTABLE`) — and by the session a state read opens (`mcpState`), which is
+   * the same road — and by neither road Claude Code runs itself: a `--bg`
    * session runs the `claude` on the PATH, whatever this says. Absent: the SDK's own.
    */
   claudeExecutable?: string;
@@ -362,3 +363,21 @@ export const admissionOf = (options: EngineOptions, harnesses: Record<string, Ha
       return typeof h === 'object' && h !== null && typeof h.pool === 'string' ? h.pool : (harness ?? 'default');
     },
   });
+
+/** Why a record is no record of remote servers to read the state of, as a sentence that says what to do, or `undefined`. */
+export const mcpStateRefusal = (servers: unknown): string | undefined => {
+  if (typeof servers !== 'object' || servers === null || Array.isArray(servers)) {
+    return `takes a map of remote MCP servers by name, as a record holds them; it was handed ${JSON.stringify(servers)}. Give { "<name>": { "type": "http", "url": "https://..." } }.`;
+  }
+  const names = Object.keys(servers);
+  if (!names.length) {
+    return 'takes at least one server, and was handed none: a state is read of the servers a record holds. Ask it of a record that holds one, or do not ask.';
+  }
+  for (const name of names) {
+    const server = (servers as Record<string, unknown>)[name];
+    if (typeof server !== 'object' || server === null || !('url' in server)) {
+      return `\`${name}\` is not a remote server, and a state is read of one alone: a server the harness starts has no connection to report. Give it a \`url\`, or take it off the ask.`;
+    }
+  }
+  return undefined;
+};

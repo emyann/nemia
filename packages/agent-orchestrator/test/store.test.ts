@@ -43,6 +43,7 @@ import type { PlaceService } from '../src/place/place.store.ts';
 import type { PlaceOutcome } from '../src/place/place.ts';
 import { placeOver, unreadBy } from './place-over.ts';
 import { PRECEDENCE } from '../src/brief/index.ts';
+import type { StoreRoot } from '../src/config/root.store.ts';
 
 const ROOT = scratch('wf-store-');
 const WORKFLOW = path.join(ROOT, 'workflow');
@@ -5620,8 +5621,9 @@ const verbPrograms = async () => {
   const { approveRun } = await import('../src/gate/gate.verb.ts');
   const { sayRun } = await import('../src/say/say.verb.ts');
   const { cancelRun } = await import('../src/cancel/cancel.verb.ts');
-  const over = <A, E>(e: Engine, program: EffectOf<A, E, EngineService | PlaceService>): Promise<A> =>
-    Effect.runPromise(placed(program).pipe(Effect.provide(EngineService.layer(e))));
+  const { storeRootLayer } = await import('../src/config/root.store.ts');
+  const over = <A, E>(e: Engine, program: EffectOf<A, E, EngineService | PlaceService | StoreRoot>): Promise<A> =>
+    Effect.runPromise(placed(program).pipe(Effect.provide(EngineService.layer(e)), Effect.provide(storeRootLayer(process.env))));
   return { Effect, EngineService, over, acceptRun, approveRun, cancelRun, retryRun, roundRun, sayRun };
 };
 
@@ -5712,7 +5714,7 @@ test('the programs of `nemia round`, `nemia accept`, `nemia retry`, `nemia appro
 
 test('REFUSED as a typed failure: a run not there is a `Missing`, and a state that forbids the verb a `Conflict`, which each program fails with in the words its plain face rejects with', async () => {
   const v = await verbPrograms();
-  const recovered = <A>(e: Engine, program: EffectOf<A, Refusal, EngineService | PlaceService>, tag: 'Missing' | 'Conflict') =>
+  const recovered = <A>(e: Engine, program: EffectOf<A, Refusal, EngineService | PlaceService | StoreRoot>, tag: 'Missing' | 'Conflict') =>
     v.over(
       e,
       program.pipe(
@@ -5733,7 +5735,7 @@ test('REFUSED as a typed failure: a run not there is a `Missing`, and a state th
   const run = await started(looped());
   await runWith(b.e, advanceRun(readRun(run.id)));
   b.settle(`${run.id}-implement`, 'running');
-  const refusals: Array<[string, EffectOf<unknown, Refusal, EngineService | PlaceService>, Promise<unknown>]> = [
+  const refusals: Array<[string, EffectOf<unknown, Refusal, EngineService | PlaceService | StoreRoot>, Promise<unknown>]> = [
     ['nemia retry', v.retryRun(run.id, 'implement', { mode: 'fresh' }), runWith(b.e, retryRun(run.id, 'implement', { mode: 'fresh' }))],
     ['nemia round', v.roundRun(run.id), runWith(b.e, roundRun(run.id))],
     ['nemia approve', v.approveRun(run.id, 'implement', 'ok'), runWith(b.e, approveRun(run.id, 'implement', 'ok'))],
@@ -5750,7 +5752,7 @@ test("REFUSED as a typed failure: a record the store refuses to read is each pro
   const v = await verbPrograms();
   const e = board().e;
   fs.writeFileSync(path.join(ROOT, 'runs', 'garbled.json'), '{ not json');
-  const programs: Array<[string, EffectOf<unknown, Refusal, EngineService | PlaceService>]> = [
+  const programs: Array<[string, EffectOf<unknown, Refusal, EngineService | PlaceService | StoreRoot>]> = [
     ['nemia round', v.roundRun('garbled')],
     ['nemia accept', v.acceptRun('garbled', undefined, ENOUGH)],
     ['nemia retry', v.retryRun('garbled', 'implement', { mode: 'fresh' })],
@@ -5782,7 +5784,7 @@ test('a journal that does not read is a defect of each program, which no `Effect
     ...b.e,
     view: () => Effect.die(boom),
   };
-  const verbs: Array<[string, EffectOf<unknown, Refusal, EngineService | PlaceService>, () => Promise<unknown>]> = [
+  const verbs: Array<[string, EffectOf<unknown, Refusal, EngineService | PlaceService | StoreRoot>, () => Promise<unknown>]> = [
     ['nemia round', v.roundRun(run.id), () => runWith(broken, roundRun(run.id))],
     ['nemia accept', v.acceptRun(run.id, undefined, ENOUGH), () => runWith(broken, acceptRun(run.id, undefined, ENOUGH))],
     [
@@ -5854,11 +5856,11 @@ async function _verbProgramTypes() {
   void ([
     v.roundRun('x') satisfies EffectOf<RoundAsked, Refusal, EngineService>,
     v.acceptRun('x') satisfies EffectOf<Accepted, Refusal, EngineService>,
-    v.retryRun('x', 'y', { mode: 'fresh' }) satisfies EffectOf<Asked, Refusal, EngineService | PlaceService>,
+    v.retryRun('x', 'y', { mode: 'fresh' }) satisfies EffectOf<Asked, Refusal, EngineService | PlaceService | StoreRoot>,
     v.approveRun('x', 'y') satisfies EffectOf<Approved, Refusal, EngineService | PlaceService>,
     v.sayRun('x', 'y', 'z') satisfies EffectOf<Told, Refusal, EngineService>,
     v.cancelRun('x') satisfies EffectOf<Cancelled, Refusal, EngineService>,
-  ] satisfies Array<EffectOf<unknown, Refusal, EngineService | PlaceService>>);
+  ] satisfies Array<EffectOf<unknown, Refusal, EngineService | PlaceService | StoreRoot>>);
   void [
     // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
     v.roundRun('x') satisfies EffectOf<RoundAsked, never, EngineService>,

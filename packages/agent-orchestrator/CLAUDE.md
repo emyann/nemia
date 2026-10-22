@@ -12,6 +12,10 @@ it holds today that is a candidate for the runtime is in `docs/architecture.md`,
   required `home: string` with no default. `test/root-given.test.ts` refuses by name a new module-level root, a parameter defaulted to
   one, and a new line of a body that reads one — the shape most of the debt is in, since such a function takes no root at all;
   `test/global-roots.baseline.ts` counts the lines that still do, per file, and only shrinks.
+- **`src/servers/` is the store that already takes its root by parameter**: `servers.store.ts`'s functions take a required
+  `home: string` first, threaded from `servers.verb.ts`'s handlers (`Command.handler`'s third argument, through `rootGiven`), from
+  `filedAt` and from the pass's `PassReads.home`, which `advanceRun` asks of `StoreRoot`. Copy it, not `level.store.ts`, for a new
+  per-factory file: it is in no line of `test/global-roots.baseline.ts`, and the baseline only shrinks.
 - **Every test process starts with `WF_ROOT`, `AE_ROOT` and `HOME` pointed at throwaway folders** (`test/ambient.ts`, loaded with
   `--import`), and the throwaway home carries a test git identity: a module that pins a root as it loads pins a throwaway one, and
   `os.homedir()` answers a throwaway too. A test that needs the person's own home reads `REAL_HOME`.

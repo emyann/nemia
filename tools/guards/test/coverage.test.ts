@@ -28,10 +28,19 @@ const section = (file: string, hit: number[], missed: number[], branches: { take
     'end_of_record',
   ].join('\n');
 
-/** A file's coverage with `hitLines` hit of `found`, and `branchHit` branches of `branchFound`. */
-const cover = (hitLines: number[], found: number, branchHit = 0, branchFound = 0): FileCoverage => ({
+/**
+ * A file's coverage with `hitLines` hit of `found`, and `branchHit` branches of `branchFound`: the first `branchHit` of line 1's
+ * block 0, as `section` takes them, unless `hitBranches` names others.
+ */
+const cover = (
+  hitLines: number[],
+  found: number,
+  branchHit = 0,
+  branchFound = 0,
+  hitBranches = Array.from({ length: branchHit }, (_, i) => `1,0,${i}`),
+): FileCoverage => ({
   lines: { found, hit: hitLines.length, hitLines },
-  branches: { found: branchFound, hit: branchHit },
+  branches: { found: branchFound, hit: branchHit, hitBranches },
 });
 
 /** A record of package `p` holding `files`. */
@@ -87,8 +96,17 @@ test('a comparison where every file hits what it did, or more, finds no fall', (
 test('a comparison finds the branches that fell where every line is still hit', () => {
   const falls = compared(recordWith({ 'src/a.ts': cover([1], 1, 2, 2) }), recordWith({ 'src/a.ts': cover([1], 1, 1, 2) }));
   assert.deepEqual(
-    falls.map((fall) => [fall.file, fall.linesLost, fall.branches]),
-    [['src/a.ts', [], { before: 2, after: 1 }]],
+    falls.map((fall) => [fall.file, fall.linesLost, fall.branchesLost, fall.branches]),
+    [['src/a.ts', [], ['1,0,1'], { before: 2, after: 1 }]],
+  );
+});
+
+test('a REFUSED comparison names a branch no longer taken where another took its place and the count held', () => {
+  const before = recordWith({ 'src/a.ts': cover([1], 1, 1, 2, ['1,0,0']) });
+  const after = recordWith({ 'src/a.ts': cover([1], 1, 1, 2, ['1,0,1']) });
+  assert.deepEqual(
+    compared(before, after).map((fall) => [fall.file, fall.branchesLost]),
+    [['src/a.ts', ['1,0,0']]],
   );
 });
 

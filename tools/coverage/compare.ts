@@ -34,7 +34,8 @@ const totals = (record: CoverageRecord) =>
 /** One file's fall, said on a line: the file gone, or the lines it lost and its hit counts before and after. */
 const said = (fall: Fall): string => {
   if (fall.gone) return `${fall.file}: gone from after (it hit ${fall.lines.before} lines, ${fall.branches.before} branches)`;
-  const lost = fall.linesLost.length > 0 ? `, lines lost: ${fall.linesLost.join(', ')}` : '';
+  const lines = fall.linesLost.length > 0 ? `, lines lost: ${fall.linesLost.join(', ')}` : '';
+  const lost = `${lines}${fall.branchesLost.length > 0 ? `, branches lost (line,block,branch): ${fall.branchesLost.join(' ')}` : ''}`;
   return `${fall.file}: lines hit ${fall.lines.before} → ${fall.lines.after}, branches hit ${fall.branches.before} → ${fall.branches.after}${lost}`;
 };
 

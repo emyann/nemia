@@ -9,7 +9,8 @@ import path from 'node:path';
 /** The lines and branches of one source file the suite reached: `found` of each, `hit` of those, and which lines were hit. */
 export type FileCoverage = {
   lines: { found: number; hit: number; hitLines: number[] };
-  branches: { found: number; hit: number };
+  /** `hitBranches`, each `line,block,branch` as lcov's `BRDA` names it, is absent from a record written before it was kept. */
+  branches: { found: number; hit: number; hitBranches?: string[] };
 };
 
 /** One package's coverage, by each source file's path from the package's folder. */
@@ -20,6 +21,8 @@ export type Fall = {
   file: string;
   gone: boolean;
   linesLost: number[];
+  /** The branches hit before and not after, where both records name them. */
+  branchesLost: string[];
   lines: { before: number; after: number };
   branches: { before: number; after: number };
 };
@@ -36,7 +39,15 @@ const isSource = (fromPackage: string): boolean => {
 };
 
 /** A record's lines, as lcov says them for one file, before they are kept or dropped. */
-type Section = { file: string; lineCounts: Map<number, number>; lf?: number; lh?: number; brf?: number; brh?: number; brda: number[] };
+type Section = {
+  file: string;
+  lineCounts: Map<number, number>;
+  lf?: number;
+  lh?: number;
+  brf?: number;
+  brh?: number;
+  brda: Array<{ at: string; taken: number }>;
+};
 
 /** The `SF:` sections of an lcov text, each with its `DA`, `LF`, `LH`, `BRDA`, `BRF` and `BRH` lines read. */
 const sections = (lcov: string): Section[] => {
@@ -54,8 +65,8 @@ const sections = (lcov: string): Section[] => {
       const [at, count] = value.split(',').map(Number);
       current.lineCounts.set(at, (current.lineCounts.get(at) ?? 0) + count);
     } else if (current && key === 'BRDA') {
-      const taken = value.split(',')[3];
-      current.brda.push(taken === '-' ? 0 : Number(taken));
+      const [line, block, branch, taken] = value.split(',');
+      current.brda.push({ at: `${line},${block},${branch}`, taken: taken === '-' ? 0 : Number(taken) });
     } else if (current && (key === 'LF' || key === 'LH' || key === 'BRF' || key === 'BRH')) {
       current[key.toLowerCase() as 'lf' | 'lh' | 'brf' | 'brh'] = Number(value);
     } else if (key === 'end_of_record') {
@@ -73,7 +84,8 @@ const coverageOf = (section: Section): FileCoverage => {
     lines: { found: section.lf ?? section.lineCounts.size, hit: section.lh ?? hitLines.length, hitLines },
     branches: {
       found: section.brf ?? section.brda.length,
-      hit: section.brh ?? section.brda.filter((taken) => taken > 0).length,
+      hit: section.brh ?? section.brda.filter(({ taken }) => taken > 0).length,
+      hitBranches: [...new Set(section.brda.filter(({ taken }) => taken > 0).map(({ at }) => at))].sort(),
     },
   };
 };
@@ -83,7 +95,11 @@ const merged = (a: FileCoverage, b: FileCoverage): FileCoverage => {
   const hitLines = [...new Set([...a.lines.hitLines, ...b.lines.hitLines])].sort((x, y) => x - y);
   return {
     lines: { found: Math.max(a.lines.found, b.lines.found), hit: hitLines.length, hitLines },
-    branches: { found: Math.max(a.branches.found, b.branches.found), hit: Math.max(a.branches.hit, b.branches.hit) },
+    branches: {
+      found: Math.max(a.branches.found, b.branches.found),
+      hit: Math.max(a.branches.hit, b.branches.hit),
+      hitBranches: [...new Set([...(a.branches.hitBranches ?? []), ...(b.branches.hitBranches ?? [])])].sort(),
+    },
   };
 };
 
@@ -116,13 +132,15 @@ export const compared = (before: CoverageRecord, after: CoverageRecord): Fall[] 
     const lines = { before: was.lines.hit, after: now?.lines.hit ?? 0 };
     const branches = { before: was.branches.hit, after: now?.branches.hit ?? 0 };
     if (!now) {
-      falls.push({ file, gone: true, linesLost: was.lines.hitLines, lines, branches });
+      falls.push({ file, gone: true, linesLost: was.lines.hitLines, branchesLost: was.branches.hitBranches ?? [], lines, branches });
       continue;
     }
     const still = new Set(now.lines.hitLines);
     const linesLost = was.lines.hitLines.filter((at) => !still.has(at));
-    if (linesLost.length > 0 || lines.after < lines.before || branches.after < branches.before) {
-      falls.push({ file, gone: false, linesLost, lines, branches });
+    const stillTaken = new Set(now.branches.hitBranches ?? []);
+    const branchesLost = now.branches.hitBranches ? (was.branches.hitBranches ?? []).filter((at) => !stillTaken.has(at)) : [];
+    if (linesLost.length > 0 || branchesLost.length > 0 || lines.after < lines.before || branches.after < branches.before) {
+      falls.push({ file, gone: false, linesLost, branchesLost, lines, branches });
     }
   }
   return falls;

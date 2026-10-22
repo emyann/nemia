@@ -16,6 +16,7 @@ import { scratch } from '../../test/scratch.ts';
 import { promised } from '../../test/promised.ts';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from '../../test/placed.ts';
+import { storeRootLayer } from '../config/root.store.ts';
 
 const ROOT = scratch('wf-meter-');
 const RUNS = path.join(ROOT, 'runs');
@@ -462,6 +463,7 @@ test("a pass's metrics go into the registry of whoever runs it: its time, each p
     Effect.runPromise(program.pipe(Effect.provideService(Metric.MetricRegistry, registry)));
   await own(
     tickRun({}).pipe(
+      Effect.provide(storeRootLayer(process.env)),
       Effect.provide(stand().layer),
       Effect.provide(EngineService.layer(fake({ queued: ['t-q', 't-r'], running: { claude: 3 } }))),
     ),

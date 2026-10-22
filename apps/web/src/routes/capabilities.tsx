@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { when } from '../components/Facts';
+import { ServerState } from '../components/FactoryServers';
 import { AllowedReach, ASKS, CHIP, PLAIN, Reach, STRUCK } from '../components/Reach';
 import {
   capabilitiesQuery,
@@ -175,13 +176,19 @@ function DescribedRow({ item }: { item: Described }) {
   );
 }
 
+/**
+ * One MCP server of the checkout's `.mcp.json`. Where the **default factory** — the one every run and card that names none runs in —
+ * records a server of the same name, the same state chip the factory's settings page draws is drawn here (`ServerState`); a server it
+ * does not record has no sign-in of ours to show, and gets none.
+ */
 function ServerRow({ server }: { server: McpServer }) {
-  const { name, enabled, tools, error, notAsked, checkedAt } = server;
+  const { name, enabled, tools, error, notAsked, checkedAt, factoryState } = server;
 
   return (
     <li aria-label={`MCP server ${name}`} className="space-y-2 px-3 py-3">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <span className="font-medium">{name}</span>
+        {factoryState !== null && <ServerState state={factoryState} />}
         <span
           className={`${CHIP} ${enabled ? container.sage : hairline}`}
           title={enabled ? 'Enabled by .claude/settings.json' : 'Not enabled by .claude/settings.json'}

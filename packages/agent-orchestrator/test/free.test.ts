@@ -23,6 +23,7 @@ import { testPlace } from '../place/memory/index.ts';
 import { until, WAITED } from 'agent-runtime/testing';
 import { steeredClock } from './steered.ts';
 import type { PlaceRequests, PlaceVerb } from '../src/place/place.ts';
+import { storeRootLayer } from '../src/config/root.store.ts';
 
 const ROOT = scratch('wf-free-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -155,7 +156,10 @@ const counting = (asked: Asked) =>
   });
 
 const tick = (memo?: ReturnType<typeof freshRestMemo>) =>
-  runEngine(e, tickRun({ repo: ROOT, ...(memo ? { memo } : {}) }).pipe(Effect.provide(stand().layer)));
+  runEngine(
+    e,
+    tickRun({ repo: ROOT, ...(memo ? { memo } : {}) }).pipe(Effect.provide(stand().layer), Effect.provide(storeRootLayer(process.env))),
+  );
 
 /** Passes until `ok` holds of one, a dozen at most. */
 async function ticked(ok: (pass: Pass) => boolean, what: string): Promise<Pass> {
@@ -476,7 +480,11 @@ test('the daemon frees a finished run with no person: `up` forks the sweep besid
   const { id } = await merged();
   assert.ok(whole(id));
   const daemon = Effect.runFork(
-    Effect.scoped(up(e, { every: 20, repo: ROOT, holder: 'wf up' })).pipe(Effect.provide(stand().layer), Effect.provide(Logger.layer([]))),
+    Effect.scoped(up(e, { every: 20, repo: ROOT, holder: 'wf up' })).pipe(
+      Effect.provide(stand().layer),
+      Effect.provide(storeRootLayer(process.env)),
+      Effect.provide(Logger.layer([])),
+    ),
   );
   t.after(() => Effect.runPromise(Fiber.interrupt(daemon)));
   await until(t, () => gone(id), `the daemon frees ${id}`, { everyMs: 50 });
@@ -494,6 +502,7 @@ test(
     const daemon = Effect.runFork(
       Effect.scoped(up(e, { every: 20, repo: ROOT, holder: 'wf up', onTaken: () => turns })).pipe(
         Effect.provide(stand().layer),
+        Effect.provide(storeRootLayer(process.env)),
         Effect.provide(Logger.layer([])),
       ),
     );

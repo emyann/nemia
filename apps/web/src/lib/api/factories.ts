@@ -262,3 +262,109 @@ export const hireAgent = (name: string, step: string, agent: string): Promise<Hi
 /** Fire the agent the factory `name` hires into `step`, `<workflow>/<step>`. Rejects with a `WriteRefusal` where it hires none (404). */
 export const fireAgent = (name: string, step: string): Promise<Fired> =>
   send('DELETE', hireRoute(name, step), Schema.Struct({ file: Schema.String, fired: Schema.String }), { body: {}, may: HIRE_WRITTEN });
+
+/**
+ * Mirrors `ServerListed` in the orchestrator, with the state the harness reports, as apps/api/src/servers/servers.ts answers it: one
+ * MCP server a factory records, its wire facts — `type`, `url`, `headers` — and the facts of the OAuth client it signs in through,
+ * never a secret. `state` is the harness's own word, carried, or null where the state could not be read, which is not an absence.
+ */
+export type FactoryServer = {
+  name: string;
+  type: string;
+  url: string;
+  headers?: Record<string, string>;
+  oauth?: { clientId: string; callbackPort?: number };
+  state: string | null;
+  tools?: number;
+  error?: string;
+};
+
+/** One server Nemia ships, as the add form offers it: the facts a factory would record of it. */
+export type ShippedServer = {
+  name: string;
+  type: string;
+  url: string;
+  headers?: Record<string, string>;
+  oauth?: { clientId: string; callbackPort?: number };
+};
+
+/**
+ * What the board reads of a factory's MCP servers: its record with each server's state, `unread` saying in the runtime's words why
+ * none was read, and the servers Nemia ships.
+ */
+export type FactoryServers = {
+  factory: string;
+  servers: FactoryServer[];
+  unread: string | null;
+  shipped: ShippedServer[];
+};
+
+const ServerOauthSchema = Schema.Struct({ clientId: Schema.String, callbackPort: Schema.optional(Schema.Number) });
+
+/** Decodes a `FactoryServers`. */
+const FactoryServersSchema = Schema.Struct({
+  factory: Schema.String,
+  servers: Schema.mutable(
+    Schema.Array(
+      Schema.Struct({
+        name: Schema.String,
+        type: Schema.String,
+        url: Schema.String,
+        headers: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+        oauth: Schema.optional(ServerOauthSchema),
+        state: Schema.NullOr(Schema.String),
+        tools: Schema.optional(Schema.Number),
+        error: Schema.optional(Schema.String),
+      }),
+    ),
+  ),
+  unread: Schema.NullOr(Schema.String),
+  shipped: Schema.mutable(
+    Schema.Array(
+      Schema.Struct({
+        name: Schema.String,
+        type: Schema.String,
+        url: Schema.String,
+        headers: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+        oauth: Schema.optional(ServerOauthSchema),
+      }),
+    ),
+  ),
+}) satisfies Schema.Schema<FactoryServers>;
+
+const serversRoute = (name: string): string => `/api/factories/${encodeURIComponent(name)}/servers`;
+const serverRoute = (name: string, server: string): string => `${serversRoute(name)}/${encodeURIComponent(server)}`;
+
+/**
+ * The MCP servers of the factory `name`, with the state its harness reports of each. **Not polled**: the read spawns a short-lived
+ * harness session to ask the states, so it is made when a person opens the page and when they press to read again, never on the
+ * board's minute poll — a chip may be a few minutes old, and a press is how it is refreshed.
+ */
+export const factoryServersQuery = (name: string) =>
+  queryOptions({
+    queryKey: ['factory-servers', name],
+    queryFn: () => get(serversRoute(name), FactoryServersSchema),
+  });
+
+/** What a write of a factory's servers may have done, and what to look at before writing them again. */
+const SERVERS_WRITTEN = "The server may be recorded: read the factory's servers again before writing them again.";
+
+/** The answer a write of one server gives: the file written, and the server as it was recorded. */
+type ServerWritten = { file: string };
+
+const ServerWrittenSchema = Schema.Struct({ file: Schema.String }) satisfies Schema.Schema<ServerWritten>;
+
+/**
+ * Record `server` for the factory `name`, a second of one name replacing the first. Rejects with a `WriteRefusal` in the package's
+ * words: no such factory (404), a name that is no factory's or no server's (400), and a server it refuses (422) — a local one, an
+ * `Authorization` header, a `url` that is no address, a transport the harness loads nothing from.
+ */
+export const recordServer = (
+  name: string,
+  server: string,
+  body: { url: string; transport?: string; header?: string[]; clientId?: string; callbackPort?: string },
+): Promise<ServerWritten> => send('PUT', serverRoute(name, server), ServerWrittenSchema, { body, may: SERVERS_WRITTEN });
+
+/** Take the server `server` off the factory `name`'s record. Rejects as `recordServer` does, and 404 for a server it does not record. */
+export const removeServer = (name: string, server: string): Promise<ServerWritten> =>
+  send('DELETE', serverRoute(name, server), ServerWrittenSchema, { body: {}, may: SERVERS_WRITTEN });

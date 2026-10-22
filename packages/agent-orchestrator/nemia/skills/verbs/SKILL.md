@@ -28,6 +28,8 @@ They write nothing: run them unasked, as often as you need. One that sets with s
   nemia factory plan <name> --to <x.y.z> [--template <folder|archive>]
                                preview a templated factory's upgrade: what merges cleanly, and each
                                conflict with its sides; nothing is written
+  nemia factory servers <factory>
+                               a factory's own MCP servers, each with the state its harness reports
   nemia factory rules <name> [--file <path>|- | --clear]
                                a factory's rules and policies: words told to every agent hired into
                                it, after its custom instructions and before the step's own note,
@@ -300,6 +302,11 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                daemon, at every level; a second replaces the first
   nemia factory unschedule <factory> <workflow>
                                take a workflow's schedule back: the daemon starts it no more
+  nemia factory server add <factory> <server> --url <address> [--transport http|sse] [--header <name>=<value> ...] [--client-id <id>] [--callback-port <port>]
+                               record a remote MCP server for a factory: its steps' sessions are
+                               handed it, and an agent `mcp:` line names it
+  nemia factory server rm <factory> <server>
+                               take a server off a factory's record
   nemia factory instruct <name> --file <path>|- | --clear
                                write the instruction the store keeps for a factory (- for stdin), what
                                Nemia is to know of it and no step is told, or remove it with --clear

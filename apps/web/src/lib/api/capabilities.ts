@@ -36,6 +36,11 @@ export type McpServer = {
   error: string | null;
   notAsked: string | null;
   checkedAt: string | null;
+  /**
+   * The state the harness reports of the server of this name the **default factory** records — the harness's own word, carried — or
+   * null: for a server the default factory does not record, and for one whose state could not be read, which is not an absence.
+   */
+  factoryState: string | null;
 };
 
 /** Decodes a `McpServer`. */
@@ -53,6 +58,7 @@ const McpServerSchema = Schema.Struct({
   error: Schema.NullOr(Schema.String),
   notAsked: Schema.NullOr(Schema.String),
   checkedAt: Schema.NullOr(Schema.String),
+  factoryState: Schema.NullOr(Schema.String),
 }) satisfies Schema.Schema<McpServer>;
 
 /** A permission rule, and where it was read: the settings' file, or a step's `disallowedTools:`. */

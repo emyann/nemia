@@ -4,6 +4,7 @@
  * `runMain` runs either as the process's command, a signal letting go of the lease before the process exits.
  */
 import { Cause, Deferred, Effect, Exit, Fiber, type Metric, type Scope } from 'effect';
+import type { StoreRoot } from '../config/root.store.ts';
 import type { PlaceService } from '../place/place.store.ts';
 import { over, quotaHarnesses, type Engine, type HarnessQuota } from '../runtime-client.ts';
 import { HOME } from '../record/record.store.ts';
@@ -225,7 +226,7 @@ const saidStarted = ({ held, replaced }: TakenStore): Effect.Effect<void> =>
 export const up = (
   e: Engine,
   { every, repo, holder, series = [], onTaken }: UpOptions,
-): Effect.Effect<never, unknown, Scope.Scope | PlaceService> =>
+): Effect.Effect<never, unknown, Scope.Scope | PlaceService | StoreRoot> =>
   Effect.gen(function* () {
     const taken = yield* Effect.acquireRelease(
       Effect.try({ try: () => takeStore({ every, cwd: repo, by: holder, release: leaseRelease(runningRelease()) }), catch: (err) => err }),

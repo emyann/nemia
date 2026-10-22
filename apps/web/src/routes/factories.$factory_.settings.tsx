@@ -4,14 +4,17 @@ import { FactoryInstruction } from '@/components/FactoryInstruction';
 import { FactoryRules } from '@/components/FactoryRules';
 import { FactoryTrust } from '@/components/FactoryTrust';
 import { FactorySchedules } from '@/components/FactorySchedules';
+import { FactoryServers } from '@/components/FactoryServers';
 import { routeLink } from '@/components/routeLink';
 import { LinkButton } from '@/components/ui/button';
-import { factoriesQuery, factoryInstructionQuery, factoryRulesQuery } from '@/lib/api';
+import { factoriesQuery, factoryInstructionQuery, factoryRulesQuery, factoryServersQuery } from '@/lib/api';
 
 /**
  * A factory's settings, at /factories/$factory/settings: `$factory_` draws it on its own, not inside the floor, which has no outlet for it.
- * It waits for the factories, then prefetches the rules and the instruction of a factory a person made, each of which says why it does
- * not read in its own section; the default factory and a name no factory has ask for neither.
+ * It waits for the factories, then prefetches the rules, the instruction and the MCP servers of a factory a person made, each of which
+ * says why it does not read in its own section; the default factory and a name no factory has ask for none. The servers are prefetched
+ * because something that mounts beside the floor after its first render narrows a floor already fitted — and because that read spawns a
+ * harness session, which the loader makes once per visit rather than on each render.
  */
 export const Route = createFileRoute('/factories/$factory_/settings')({
   loader: async ({ context, params }) => {
@@ -20,6 +23,7 @@ export const Route = createFileRoute('/factories/$factory_/settings')({
       await Promise.all([
         context.queryClient.prefetchQuery(factoryRulesQuery(params.factory)),
         context.queryClient.prefetchQuery(factoryInstructionQuery(params.factory)),
+        context.queryClient.prefetchQuery(factoryServersQuery(params.factory)),
       ]);
   },
   component: SettingsPage,
@@ -69,6 +73,7 @@ function SettingsPage() {
           <FactoryTrust factory={factory} />
           <FactoryRules name={name} />
           <FactoryInstruction name={name} />
+          <FactoryServers name={name} />
           <FactorySchedules factory={factory} />
         </>
       )}

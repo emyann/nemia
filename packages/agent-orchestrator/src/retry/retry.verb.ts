@@ -5,6 +5,7 @@
  */
 import { Effect } from 'effect';
 import { configRefusal, tried } from '../runtime-client.ts';
+import { StoreRoot } from '../config/root.store.ts';
 import { tryOf, type Run } from '../record/record.ts';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 import { filedRefusal, lineOf } from '../keys/index.ts';
@@ -73,7 +74,8 @@ export const retryRun = Effect.fn('retry')(function* (
   if (refused) return yield* Effect.fail(new Conflict({ message: refused }));
   const step = steps.find((s) => s.name === stepName)!;
   const denied = landingDenies(run, yield* PlaceService);
-  const refusedConfig = yield* tried(() => tryRefused(run, steps, step, how, spendOf, denied));
+  const home = yield* StoreRoot;
+  const refusedConfig = yield* tried(() => tryRefused(run, steps, step, how, spendOf, denied, home));
   if (refusedConfig) return yield* Effect.fail(new Invalid({ message: refusedConfig }));
   const ask: RetryAsk = {
     step: stepName,
@@ -117,6 +119,7 @@ function tryRefused(
   how: RetryHow,
   spendOf: SpendOf,
   denied: readonly string[],
+  home: string,
 ): string | undefined {
   if (how.mode === 'recheck' || isRemoteHarness(step.harness)) return undefined;
   const record = run.steps[step.name];
@@ -124,7 +127,7 @@ function tryRefused(
   const config = filedConfig(step, steps, run, {
     model: tryModel(step, record, how),
     budgetUsd,
-    ...filedAt(run),
+    ...filedAt(run, home),
     own: toldOf(run, step).own,
     landingDenied: () => denied,
   });

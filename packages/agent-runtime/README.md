@@ -2269,6 +2269,7 @@ of pure code sits beside it.
 | `src/harness/trust.ts` | a harness's trust of a folder, off the harness's own file: whether it is given (`trustedFolder`), what it is in a person's words (`folderTrust`) and the act of giving it (`trustFolder`), each `undefined` for a harness that keeps no trust |
 | `src/harness/telemetry.ts` | where an engine's sessions export (`Telemetry`), the runner that tells each spawn (`telemetered`), the trace context of the span that filed a task (`traceparentOf`), and the variables no child inherits from the engine's process (`withoutTelemetry`) |
 | `src/harness/mcp.ts` | a task's MCP servers: what is refused, the configs written, and Claude Code's flags for them; for Codex, the server names its config already has and a task's servers as its `mcp_servers` table |
+| `src/harness/mcp-state.ts` | the state of each server a caller hands — connected, needs-auth, failed, pending, disabled — read in one short-lived Claude Code session (`mcpServersRead`), with a look that failed and a state word this runtime does not know both answering unread |
 | `src/harness/transcript.ts` | the one transcript reader behind every harness's `transcript`, and its cursor |
 | `src/harness/sdk.ts` | the same four verbs on the Agent SDK, with the tradeoff written down |
 | `src/harness/index.ts` | the face of the seam, as the A2A seam and the face take it; `core/` imports `seam.ts` and `args.ts` by their own path |
@@ -2334,6 +2335,7 @@ of pure code sits beside it.
 | `src/service/kept.ts` | the engine's `kept` verb, `keptVerbOf`, and `KeptRefused`: what the store and the harnesses keep on the disk by task (`KeptReport`), each harness asked once with every session, a path counted once, nothing removed |
 | `src/service/compact.ts` | the engine's `compact` verb, `compactVerbOf`, and `CompactRefused`: each harness with a `compact` asked to count, or with `{ yes: true }` rewrite, its ended sessions' captures (`CompactReport`) |
 | `src/service/bodies.ts` | the engine's verbs over the store's bodies, `sweep` and `removeBody`, behind a refusal of an argument they do not take (`BodyRefused`) |
+| `src/service/mcp-state.ts` | the engine's `mcpState` verb, `mcpStateVerbOf`, and `McpStateRefused`: the state of each server a caller hands, read through Claude Code's own `query()` inside one short-lived session at the engine's root, and refused before one is opened where the record is no record of remote servers or no harness reads one |
 | `src/service/watch.ts` | the engine's `watch`, on its `feed`: each entry in order, at least once, drained on the store's push and on a timer |
 | `src/service/options.ts` | what `Engine.layer` is built from and answers with — `HarnessConfig`, `Pooled`, `EngineOptions`, `TaskSpec`, `TickReport`, `EngineIo` — and what the engine refuses of its options before it builds anything (`optionsRefusalOf`) |
 | `src/service/harness-refusal.ts` | `harnessRefusalOf`: what the engine refuses of a task on the harness it names, in that harness's words — a knob the harness lacks, an argument only another takes (`mountsMisplaced` among them), a session that would not stay open, and the harness's own `refuses` |

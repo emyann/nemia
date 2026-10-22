@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import { Effect } from 'effect';
 import { EngineService, asked as engineAsked, denialText, over, type Engine, type TaskView } from '../runtime-client.ts';
 import { wordFeed } from '../feed/word-feed.verb.ts';
+import { StoreRoot } from '../config/root.store.ts';
 import type { Verdict } from '../check/check.ts';
 import type { Workflow } from '../workflow.ts';
 import { folderPlace } from '../record/places.store.ts';
@@ -447,7 +448,8 @@ const readPass = Effect.fnUntraced(function* (e: Engine, run: Run) {
   const sessionBlocked = harnessBlocked(views);
   const spendOf = spendReader(views);
   const { asks, rounds: roundAsks, notes: askNotes } = runStore.asks.read(run.id);
-  const reads: PassReads = { steps, views, phaseOf, signedOff, asked, verdictOf, sessionBlocked, spendOf, asks, roundAsks };
+  const home = yield* StoreRoot;
+  const reads: PassReads = { steps, views, phaseOf, signedOff, asked, verdictOf, sessionBlocked, spendOf, asks, roundAsks, home };
   return { reads, askNotes };
 });
 

@@ -63,6 +63,18 @@ place's to answer** (its `root` verb). The orchestrator asks both when a place j
 `src/trust/trust.verb.ts`), and says no harness's word of it: every sentence that names the harness, its file or its key is the
 runtime's, carried whole (`HARNESS_WORDS` in `packages/agent-orchestrator/test/words.test.ts`).
 
+**A factory's MCP servers are the orchestrator's record and the runtime's bytes.** The record is a file beside the factory,
+`factories/<name>/servers.json`, read and written by `packages/agent-orchestrator/src/servers/` — its store taking the store's root as
+a required `home: string`, as every store function does since the root became a service (`StoreRoot`). What a session is handed is the
+runtime's: `mcpServerOf` (`agent-runtime/src/harness/mcp.ts`) is the one producer of a server object's bytes, in one fixed key order,
+feeding both the session's `Options.mcpServers` and the state read, because the harness files a sign-in under those bytes and two
+spellings are two servers to it. An agent's `mcp:` name resolves against the factory's record first and against the checkout's
+`.mcp.json` after (`serversOf`, `src/filed/filed.ts`), the factory's name taken out of `checkoutMcp` altogether. **The state of a
+server is an engine read verb**, `mcpState` (`agent-runtime/src/service/mcp-state.ts`): `mcpServerStatus()` is a method on the Agent
+SDK's `query()` object, so only the runtime may ask it, and it travels runtime → orchestrator (`src/runtime-client.ts`) → api → board.
+The states are the harness's own words — `connected`, `needs-auth`, `failed`, `pending`, `disabled` — carried whole and never worded
+again above, and a look that failed says the state is unread, which is not an absence.
+
 **Where a run's work lives is the place's**, an interface the orchestrator owns and asks (`PlaceService`, `src/place/place.store.ts`:
 `ask(verb, request)` and `askNow`, over the contract of `src/place/place.ts`), required by every program that asks it and with no
 default: the daemon, a CLI command, the api's layer and each test give one by name, and a program given none does not compile

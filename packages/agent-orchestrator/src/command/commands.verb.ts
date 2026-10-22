@@ -23,6 +23,7 @@ import { runStore } from '../record/files.store.ts';
 import { stepsOf } from '../record/record.store.ts';
 import { messageRefusal, type RetryHow } from '../retry/index.ts';
 import { retryRun } from '../retry/retry.verb.ts';
+import { rootGiven, StoreRoot } from '../config/root.store.ts';
 import { acceptWordsRefusal } from '../round/round.ts';
 import { acceptRun, roundRun } from '../round/round.verb.ts';
 import { saidLines } from '../say/say.ts';
@@ -159,12 +160,14 @@ const RETRY: Command<{ try: number; file: string; stopFirst: boolean }> = {
   nemia: 'answers',
   route: { method: 'POST', path: '/api/runs/:runId/steps/:step/retry', status: 202 },
   apiTakes: ['answers'],
-  handler: Effect.fnUntraced(function* (args: Args) {
+  handler: Effect.fnUntraced(function* (args: Args, _env, home) {
     const { runId, step } = named(args);
     const how = howOf(args);
     const typed = typedOf(args);
     const message = typed.length ? { message: yield* typedAnswers(runId, step, typed, { note: how.message }) } : {};
-    const { ask, file, stopFirst } = yield* retryRun(runId, step, { ...how, ...message }, { stopBlocked: true });
+    const { ask, file, stopFirst } = yield* retryRun(runId, step, { ...how, ...message }, { stopBlocked: true }).pipe(
+      Effect.provideService(StoreRoot, rootGiven(home, 'retry')),
+    );
     return { try: ask.try, file, stopFirst };
   }),
   print({ try: tryNo, file, stopFirst }, args) {

@@ -31,6 +31,7 @@ import { keptRuns } from '../record/files.store.ts';
 import type { Run } from '../record/record.ts';
 import { trustedLines, type PlaceTrust, type Untrusted } from '../trust/trust.ts';
 import { FACTORY_TRUST, NO_TRUST, trustPlaces, untrustedPlaces } from '../trust/trust.verb.ts';
+import { FACTORY_SERVER_ADD, FACTORY_SERVER_RM, FACTORY_SERVERS } from '../servers/servers.verb.ts';
 
 export const FACTORY_HELP = `nemia factory [ls]
 nemia factory add <name> --repo <path> [--repo <path> ...] [--no-trust]
@@ -44,6 +45,9 @@ nemia factory hire <factory> <agent> --step <workflow>/<step>
 nemia factory fire <factory> --step <workflow>/<step>
 nemia factory schedule <factory> <workflow> --cron <expr> --brief <text> [--repo <path>] [--tz <zone>]
 nemia factory unschedule <factory> <workflow>
+nemia factory servers <factory>
+nemia factory server add <factory> <server> --url <address> [--transport http|sse] [--header <name>=<value> ...] [--client-id <id>] [--callback-port <port>]
+nemia factory server rm <factory> <server>
 nemia factory rules <name> [--file <path>|- | --clear]
 nemia factory instruction <name> [--path <path> | --store | --clear]
 nemia factory instruct <name> --file <path>|- | --clear
@@ -140,6 +144,14 @@ of a workflow not attached, still hired into or scheduled, a schedule of a workf
 that does not read, or with an empty brief, an unschedule of a workflow not scheduled, a --step that is not <workflow>/<step>, a hire into a workflow
 not attached or into a step whose file names its own agent:, and a fire of a step with no hire. A start in a factory of a workflow it has not attached is
 refused, naming the attach.`;
+
+/**
+ * A factory's own MCP servers, kept beside it as `factories/<name>/servers.json`, not in its file: one entry per server, with the
+ * server's wire facts and the facts of the OAuth client it signs in through, and never a secret. An agent's `mcp:` line resolves a
+ * name against that record before the checkout's `.mcp.json`, and the record's servers are handed to a step's session inline, byte
+ * for byte as `mcpServerOf` spells them, so the sign-in the harness filed is found. `nemia factory servers` lists them with the state
+ * the harness reports; `server add` records a remote one and `server rm` takes one off (`servers/servers.verb.ts`).
+ */
 
 /** Why the api does not file, attach, detach or remove a factory: the board reads them, and the command line is their one writer. */
 const WRITTEN_HERE = { side: 'cli', why: 'the board files, attaches to and removes no factory: nemia factory does' } as const;
@@ -441,6 +453,9 @@ export const FACTORIES: readonly Command[] = [
   FACTORY_FIRE,
   FACTORY_SCHEDULE,
   FACTORY_UNSCHEDULE,
+  FACTORY_SERVERS,
+  FACTORY_SERVER_ADD,
+  FACTORY_SERVER_RM,
   FACTORY_RULES,
   FACTORY_INSTRUCTION,
   FACTORY_INSTRUCT,

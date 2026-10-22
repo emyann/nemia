@@ -5,7 +5,7 @@
  * the run's folder finds them, and the run's place.
  */
 import path from 'node:path';
-import type { ClaudeFlags, CodexArgs } from '../runtime-client.ts';
+import { mcpServerOf, type ClaudeFlags, type CodexArgs } from '../runtime-client.ts';
 import { lackedOf, type Run, type StepRecord } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { filedFolders, type FiledFolders } from '../filed/filed.ts';
@@ -24,6 +24,9 @@ import type { Place } from '../place/place.store.ts';
 import type { PlaceSay } from '../place/place.ts';
 import { composeBrief } from '../brief/index.ts';
 import { artifactsDir, inputsDir } from '../record/record.store.ts';
+import { DEFAULT_FACTORY } from '../factory/factory.ts';
+import { factoryServers } from '../servers/servers.store.ts';
+import type { FactoryServers } from '../servers/servers.ts';
 import { inboxDir } from '../record/files.store.ts';
 
 /**
@@ -77,14 +80,45 @@ export function placeTold(run: Run, step: Workflow, place: Place, heads?: Readon
 }
 
 /**
- * Where a step of `run` is filed its folders from (`filedFolders`, `filedConfig`): the run's artifacts folder, the store's inbox, and the
- * run's inputs folder (`inputsDir`) only when its record names an input, so a run given none is filed and told as before.
+ * The folders a step of `run` is filed from (`filedFolders`): the run's artifacts folder, the store's inbox, and the run's inputs
+ * folder (`inputsDir`) only when its record names an input, so a run given none is filed and told as before. What a *brief* reads,
+ * which asks for no server; `filedAt` is what a filing takes.
  */
-export const filedAt = (run: Pick<Run, 'id' | 'inputs'>): { runArtifacts: string; inbox: string; inputs?: string } => ({
+export const filedFoldersAt = (run: Pick<Run, 'id' | 'inputs'>): { runArtifacts: string; inbox: string; inputs?: string } => ({
   runArtifacts: path.dirname(artifactsDir(run, 'step')),
   inbox: inboxDir(),
   ...(run.inputs?.length ? { inputs: inputsDir(run) } : {}),
 });
+
+/**
+ * What a step of `run` is filed with (`filedConfig`): its folders, and the MCP servers the run's factory records, read from the store
+ * `home` the caller was given. The root is a parameter and has no default: a caller that passes none does not compile, so no filing
+ * reads a store nobody named (`test/root-given.test.ts`).
+ */
+export const filedAt = (
+  run: Pick<Run, 'id' | 'inputs' | 'factory'>,
+  home: string,
+): { runArtifacts: string; inbox: string; inputs?: string; servers: FactoryServers } => ({
+  ...filedFoldersAt(run),
+  servers: recordedServers(run.factory, home),
+});
+
+/**
+ * The MCP servers the factory `factory` records, each through `mcpServerOf` — the runtime's one producer of the bytes a harness sees,
+ * applied here and nowhere else on this road, so a session is handed the spelling a state read was handed and finds the sign-in filed
+ * under it. `{}` for a factory that records none — and `{}`, silently here, for a record that does not read: this is spread into
+ * every filing, and a throw would be a defect that stops the whole pass over one bad file. The pass refuses the step itself and says
+ * why (`fileReady`), where a note can carry the file and the command to type, and `nemia factory servers` refuses it loudly to the
+ * person who asks.
+ */
+const recordedServers = (factory: string | undefined, home: string): FactoryServers => {
+  try {
+    const record = factoryServers(home, factory ?? DEFAULT_FACTORY);
+    return Object.fromEntries(Object.entries(record).map(([name, server]) => [name, mcpServerOf(server)]));
+  } catch {
+    return {};
+  }
+};
 
 /**
  * What `step` of `run`, not yet filed, would be told now from `steps` (`composeBrief`), with what its place says to it (`placeTold`):
@@ -117,7 +151,7 @@ export const foldersTold = (
   reads: { steps: readonly Workflow[]; signedOff: (step: string) => Closeout | undefined },
   step: Workflow,
 ): FiledFolders => {
-  const folders = filedFolders(step, reads.steps, filedAt(run));
+  const folders = filedFolders(step, reads.steps, filedFoldersAt(run));
   const closeouts = folders.handed.filter((m) => holdsCloseout(run, path.basename(m.path))).map((m) => m.path);
   const named = folders.handed
     .filter((m) => !closeouts.includes(m.path))

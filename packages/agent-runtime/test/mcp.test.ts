@@ -25,7 +25,8 @@ import { claudeOps } from '../src/harness/claude/bg.ts';
 import { attachedOptions } from '../src/harness/claude/attached-options.ts';
 import { detachedOps, type HarnessIO, type HarnessSpec } from '../src/harness/detached/detached.ts';
 import { codex } from '../src/harness/codex/codex.ts';
-import { codexMcpServerNames, everyMcpServer } from '../src/harness/mcp.ts';
+import { codexMcpServerNames, codexMcpServers, everyMcpServer, mcpRefuses, mcpServerOf } from '../src/harness/mcp.ts';
+import type { RemoteMcpServer } from '../src/harness/seam.ts';
 import { scratch } from './scratch.ts';
 import { builtEngine } from './engine.ts';
 import { until, WAITED, type Waiter } from '../src/waits/index.ts';
@@ -231,7 +232,7 @@ test("codex is given a task's servers as one mcp_servers override, and a task wi
   assert.equal(given.args[at - 1], '-c');
   assert.equal(
     given.args[at],
-    'mcp_servers={"browser"={"command"="npx","args"=["-y","@playwright/mcp"],"env"={"HEADLESS"="1"}},"docs"={"url"="https://docs.example/mcp","http_headers"={"Authorization"="Bearer t"}}}',
+    'mcp_servers={"browser"={"command"="npx","args"=["-y","@playwright/mcp"],"env"={"HEADLESS"="1"}},"docs"={"url"="https://docs.example/mcp","transport"="http","http_headers"={"Authorization"="Bearer t"}}}',
   );
   assert.equal(given.args.includes('--strict-mcp-config'), false, "Claude Code's flag is not Codex's");
 
@@ -430,7 +431,7 @@ test(
     const picked = await spawnAtDefaults(t, { cwd, harness: 'codex', config: { checkoutMcp: ['b'], mcp: { mine: { command: 'x' } } } });
     assert.equal(
       picked.args?.find((a) => a.startsWith('mcp_servers=')),
-      'mcp_servers={"b"={"url"="https://b.example/mcp"},"mine"={"command"="x"}}',
+      'mcp_servers={"b"={"url"="https://b.example/mcp","transport"="http"},"mine"={"command"="x"}}',
     );
     const none = await spawnAtDefaults(t, { cwd, harness: 'codex', config: { checkoutMcp: [] } });
     assert.ok(none.args, 'codex was spawned');
@@ -508,5 +509,98 @@ test('everyMcpServer answers {} for a cwd with no .mcp.json and a task with no s
     () => everyMcpServer(broken, undefined),
     (err: Error) => err.message.includes(file) && err.message.includes('not valid JSON'),
     'refused here as `checkoutMcpConfig` refuses it, before a session exists',
+  );
+});
+
+/**
+ * A factory's recorded server, the one the card is built for: the hosted GitHub server with a toolset header and the Nemia Factory
+ * App's client. Its headers are given out of order on purpose, so what `mcpServerOf` answers proves it fixes the order.
+ */
+const RECORDED: RemoteMcpServer = {
+  type: 'http',
+  url: 'https://api.githubcopilot.com/mcp/',
+  headers: { 'X-MCP-Toolsets': 'actions,repos', 'X-MCP-Readonly': 'false' },
+  oauth: { clientId: 'Iv23liQBfm9prqhvXkuY', callbackPort: 8791 },
+};
+
+test('mcpServerOf spells a recorded server in one fixed key order, headers sorted — the bytes a sign-in is filed under', () => {
+  assert.equal(
+    JSON.stringify(mcpServerOf(RECORDED)),
+    '{"type":"http","url":"https://api.githubcopilot.com/mcp/","headers":{"X-MCP-Readonly":"false","X-MCP-Toolsets":"actions,repos"},"oauth":{"clientId":"Iv23liQBfm9prqhvXkuY","callbackPort":8791}}',
+    'Claude Code files a sign-in under name|sha256({type,url,headers})[:16]: a key reordered here moves that key and loses every sign-in silently',
+  );
+  assert.equal(
+    JSON.stringify(mcpServerOf({ type: 'http', url: 'https://api.githubcopilot.com/mcp/' })),
+    '{"type":"http","url":"https://api.githubcopilot.com/mcp/"}',
+    'a server with neither headers nor oauth carries neither key — an empty map would be other bytes',
+  );
+  assert.equal(
+    JSON.stringify(mcpServerOf({ ...RECORDED, oauth: { clientId: 'Iv23liQBfm9prqhvXkuY' } })),
+    '{"type":"http","url":"https://api.githubcopilot.com/mcp/","headers":{"X-MCP-Readonly":"false","X-MCP-Toolsets":"actions,repos"},"oauth":{"clientId":"Iv23liQBfm9prqhvXkuY"}}',
+    'a callbackPort left out is left out, not written as undefined',
+  );
+  assert.equal(
+    JSON.stringify(mcpServerOf({ ...RECORDED, headers: { 'X-MCP-Readonly': 'false', 'X-MCP-Toolsets': 'actions,repos' } })),
+    JSON.stringify(mcpServerOf(RECORDED)),
+    "the record's own header order is no part of the identity: a person who reorders two headers keeps their sign-in",
+  );
+});
+
+test('the state read and the session are handed the same bytes, because mcpServerOf is the one producer', () => {
+  const cwd = tmp('one-producer');
+  const mcp = { github: mcpServerOf(RECORDED) };
+  const session = jobServers(cwd, { mcp }).servers;
+  const probe = everyMcpServer(cwd, { mcp });
+  assert.equal(
+    JSON.stringify(session),
+    JSON.stringify(probe),
+    'a session handed one spelling and a state read handed another are two servers to Claude Code, and the second finds no sign-in',
+  );
+  assert.equal(JSON.stringify(probe), JSON.stringify({ github: mcpServerOf(RECORDED) }), 'and both are what the one producer spells');
+});
+
+test('mcpRefuses accepts oauth on a remote server, and refuses each way of giving it wrong', () => {
+  const at = (server: unknown) => mcpRefuses({ github: server });
+  assert.equal(at(RECORDED), undefined, 'a recorded server is accepted — before this card its `oauth` was refused as a stray');
+  assert.equal(at({ type: 'http', url: 'https://e.example/mcp', oauth: { clientId: 'c' } }), undefined, 'a clientId alone is enough');
+
+  assert.match(at({ type: 'http', url: 'https://e.example/mcp', oauth: { callbackPort: 8791 } })!, /names no client\. Set `clientId`/);
+  assert.match(
+    at({ type: 'http', url: 'https://e.example/mcp', oauth: { clientId: '' } })!,
+    /names no client/,
+    'an empty client id names none',
+  );
+  assert.match(
+    at({ type: 'http', url: 'https://e.example/mcp', oauth: { clientId: 'c', callbackPort: '8791' } })!,
+    /callbackPort` is not a port\. Give the port .* from 1 to 65535/,
+  );
+  assert.match(at({ type: 'http', url: 'https://e.example/mcp', oauth: { clientId: 'c', callbackPort: 0 } })!, /is not a port/);
+  assert.match(at({ type: 'http', url: 'https://e.example/mcp', oauth: { clientId: 'c', callbackPort: 65536 } })!, /is not a port/);
+  assert.match(at({ type: 'http', url: 'https://e.example/mcp', oauth: 'Iv23li' })!, /is not an OAuth client\. Give it as/);
+  assert.match(
+    at({ type: 'http', url: 'https://e.example/mcp', oauth: { clientId: 'c', clientSecret: 's' } })!,
+    /has `clientSecret`, which it does not take: it holds `clientId` and `callbackPort` and no secret/,
+    'a secret is refused by name: Claude Code reads one from its own store alone',
+  );
+  assert.match(
+    at({ command: 'npx', oauth: { clientId: 'c' } })!,
+    /has a `command` and `oauth`, and a server the harness starts signs in to nothing/,
+    'and a local server takes none — said in its own words, not as a stray',
+  );
+});
+
+test("codexMcpServers writes a remote server's transport, and writes no oauth table even when the record has one", () => {
+  const toml = codexMcpServers({ github: RECORDED });
+  assert.equal(
+    toml,
+    '{"github"={"url"="https://api.githubcopilot.com/mcp/","transport"="http","http_headers"={"X-MCP-Toolsets"="actions,repos","X-MCP-Readonly"="false"}}}',
+    'a url with no transport is the half-formed entry mcpRefuses exists to prevent: Codex names the transport itself',
+  );
+  assert.equal(toml.includes('oauth'), false, 'nothing of Codex is measured, so no oauth table is guessed into its config');
+  assert.equal(toml.includes('Iv23li'), false, 'and the client id reaches it nowhere');
+  assert.equal(
+    codexMcpServers({ sse: { type: 'sse', url: 'https://e.example/sse' } }),
+    '{"sse"={"url"="https://e.example/sse","transport"="sse"}}',
+    'sse says sse',
   );
 });

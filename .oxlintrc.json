@@ -802,8 +802,7 @@
     {
       "files": ["packages/agent-runtime/src/harness/mcp.ts"],
       "rules": {
-        "complexity": ["error", { "max": 26 }],
-        "sonarjs/cognitive-complexity": ["error", 50]
+        "sonarjs/cognitive-complexity": ["error", 23]
       }
     },
     {

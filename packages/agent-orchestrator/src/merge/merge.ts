@@ -255,7 +255,14 @@ function loopRefusal(steps: readonly Workflow[], run: Run, looping: Workflow, re
   return `round ${now} of ${looping.name}'s loop is ${status}, so its work is not ready to merge. Wait for it: nemia ls ${run.id}.`;
 }
 
-/** Why a step waiting on the loop holds a merge off: it runs, landed, or is approved and files next — or undefined. */
+/**
+ * Why a step waiting on the loop holds a merge off: it runs, landed, is approved and files next, or is an ungated ending the next tick
+ * files (`routed`) — or undefined.
+ *
+ * `routed` is the ungated ending's case, and it is why `cleanNext` needs none: a merge filed there would file the work again with
+ * `then: 'merge'` on the very pass that files the landing, which is the collision this refusal exists to prevent. Read before the trial
+ * merge, so it answers whether the base conflicts or not (`test/ship.test.ts`, *a merge asked of quick's shape*).
+ */
 function followerRefusal(steps: readonly Workflow[], run: Run, looping: Workflow, reads: MergeReads): string | undefined {
   const approved = steps.find(
     (s) => s.after.includes(looping.name) && approvedFirst(s, run) && !run.steps[s.name]?.taskId && approvalOf(run, s.name),
@@ -296,14 +303,17 @@ export function landingRefusedOn(record: StepRecord | undefined, sha: string): s
 }
 
 /**
- * What to do with a loop whose work merges cleanly: approve the ending at its gate, wait for the tick that files an ungated one, ship a
- * stopped one again, or nothing.
+ * What to do with a loop whose work merges cleanly: approve the ending at its gate, ship a stopped one again, or nothing.
+ *
+ * It names an approval without asking whether the ending is gated, because an ungated one never reaches here: `followerRefusal` runs
+ * first, and its `routed` holds the merge off for exactly the state this would answer — an ungated ending not yet filed. Filed, it is
+ * either stopped, which the line above answers, or running, which `followerRefusal` answers. `test/ship.test.ts`, *a merge asked of
+ * quick's shape*, reads `routed`'s words back on a clean base and a moved one alike.
  */
 function cleanNext(steps: readonly Workflow[], run: Run, looping: Workflow, reads: MergeReads): string {
   const ending = endingAfter(steps, looping);
   if (!ending) return `see where the run stands: nemia decide ${run.id}`;
   if (run.steps[ending.name]?.taskId && reads.stopped(ending)) return `ship it again: nemia retry ${run.id} ${ending.name}`;
-  if (!hasGate(ending, run)) return `the run lands it on the next tick: nemia ls ${run.id}`;
   return `approve the landing: nemia approve ${run.id} ${ending.name}`;
 }
 

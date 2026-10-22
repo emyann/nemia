@@ -25,6 +25,7 @@ import {
   type MainClaim,
   approvedFirst,
   endingSteps,
+  endingStopped,
   firstLine,
   merges,
   resultSteps,
@@ -9697,6 +9698,39 @@ test("an ungated ending is nobody's to decide: no gated ending, nothing at a gat
   );
   assert.equal(approvedFirst(ungated, ours), false, 'and no approval is owed before it is filed');
   assert.equal(approvedFirst(LANDER, ours), true);
+});
+
+test('an ending that stopped on the base branch is read so whether a person filed it or its workflow did: the send-back and its own try are offered either way', () => {
+  const ungated = { ...LANDER, gate: undefined };
+  const shipFiledAndSettled = (rest: Partial<RepositoryRun> = {}): Run => ({
+    ...run({ implement: 't-impl' }, rest),
+    steps: { implement: { taskId: 't-impl', branch: 'wf/r-1/implement' }, ship: { taskId: 't-ship' } },
+  });
+  const settled = () => 'succeeded' as TaskPhase;
+  const did = (ending: Workflow, outcome: Closeout['outcome'] = 'blocked', rest: Partial<RepositoryRun> = {}): boolean =>
+    endingStopped(
+      ending,
+      shipFiledAndSettled(rest),
+      settled,
+      (name) => (name === 'ship' ? said(outcome) : undefined),
+      () => true,
+      [step('implement'), ending],
+      () => undefined,
+    );
+
+  assert.equal(
+    did(ungated),
+    true,
+    "quick's land: filed by its review's pass and stopped there, it still offers `nemia retry <run> land` and the send-back",
+  );
+  assert.equal(did(LANDER), true, "build's land, gated, as before");
+  assert.equal(
+    did({ ...LANDER, gate: undefined }, 'blocked', { gates: ['ship'] }),
+    true,
+    'a gate the run was started with changes nothing',
+  );
+  assert.equal(did({ ...ungated, workspace: undefined }), false, 'a step of the work stopped on no base branch, and has its own ways on');
+  assert.equal(did(ungated, 'done'), false, 'an ending that signed off done stopped at nothing');
 });
 
 test('landingDue commits only a merge that is ours, clean and whole, on a check that passed, with a message', () => {

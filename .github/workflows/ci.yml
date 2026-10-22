@@ -24,12 +24,20 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
+# Every job, and every step that reaches the network (an action, npm ci, the Chromium install, a curl), carries a timeout-minutes of its
+# own: without one GitHub waits 360 minutes, and a stalled Chromium download held a run for over 30 before a person cancelled it
+# (Actions run 39767847275). Each bound is read off the step times of 12 green ci runs of 2026-10-22 and set well above the slowest:
+# an action took 17 s at most and is bounded at 5 minutes, npm ci 39 s at 10, the Chromium install 469 s (a cache miss; 15 s on a
+# hit) at 15, an e2e shard 802 s at 30, a test leg 247 s at 20, every other job under 100 s at 15 or less. A step that stalls fails
+# with GitHub's own line naming it, "has timed out after N minutes", and `gh run rerun --failed` answers it. A step's bound stays
+# under its job's, or the job's fires first and names no step. ci-workflow.test.ts refuses a job or a network step without a bound.
 jobs:
   test:
     # The shard is empty on every leg but the orchestrator's, where it reads ' 1/2' or ' 2/2': two shards of one workspace on one node
     # must read apart in the run's summary, or a person cannot tell which half failed.
     name: test ${{ matrix.workspace }} on node ${{ matrix.node }} ${{ matrix.shard }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       # Every leg runs: one package's failure on one node says nothing about the other eleven.
       fail-fast: false
@@ -59,7 +67,9 @@ jobs:
             shard: '2/2'
     steps:
       - uses: actions/checkout@v7
+        timeout-minutes: 5
       - uses: actions/setup-node@v7
+        timeout-minutes: 5
         # No cache: npm — the lockfile's own install is part of what is under test, and a cache keyed across legs hides a broken one.
         with:
           node-version: ${{ matrix.node }}
@@ -71,6 +81,7 @@ jobs:
           git config --global user.email 'ci@nemia.invalid'
           git config --global init.defaultBranch main
       - run: npm ci
+        timeout-minutes: 10
       # Both runs pass --force: turbo.json hashes no environment (envMode loose passes it through without hashing it, WF_TEST_SHARD as
       # well as TZ), so without it the second run replays the first from the cache and the second timezone is never tested.
       #
@@ -100,28 +111,37 @@ jobs:
   lint:
     # Whole, and on the floor engines.node claims: the linter's verdict does not differ by node, so one leg is enough.
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
+        timeout-minutes: 5
       - uses: actions/setup-node@v7
+        timeout-minutes: 5
         with:
           node-version: '24.16.0'
       - run: npm ci
+        timeout-minutes: 10
       - run: npm run lint
 
   typecheck:
     # Whole, on the same floor: tsc reads the repository's own TypeScript, not the runtime's.
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
+        timeout-minutes: 5
       - uses: actions/setup-node@v7
+        timeout-minutes: 5
         with:
           node-version: '24.16.0'
       - run: npm ci
+        timeout-minutes: 10
       - run: npm run typecheck
 
   e2e:
     name: e2e shard ${{ matrix.shard }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       # Every shard runs: one shard's failing page says nothing about the other three, and the bound below needs every shard's times.
       fail-fast: false
@@ -131,15 +151,19 @@ jobs:
         shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v7
+        timeout-minutes: 5
       - uses: actions/setup-node@v7
+        timeout-minutes: 5
         # No cache: npm, as the legs above.
         with:
           node-version: '24.16.0'
       - run: npm ci
+        timeout-minutes: 10
       - name: Cache Playwright's browsers
         # Keyed on the lockfile, which pins playwright: a dependency change downloads Chromium again, which is minutes and not
         # correctness. The restore-key gives a near miss the last build rather than none.
         uses: actions/cache@v6
+        timeout-minutes: 5
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -148,6 +172,7 @@ jobs:
         # From the checkout's own playwright, never an npx download, as apps/web/CLAUDE.md says: an install from elsewhere deletes the
         # builds of every Playwright it does not see. --with-deps runs apt even on a cache hit, which is minutes and not correctness.
         run: npx playwright install --with-deps chromium
+        timeout-minutes: 15
         working-directory: apps/web
       - name: Visit this shard's pages
         # The shard is the leg's own and the count is read back off the matrix: a literal here would leave a shard's pages unvisited the
@@ -162,6 +187,7 @@ jobs:
         # error — a shard that passed and wrote no times is a broken runner, not a quiet success.
         if: success()
         uses: actions/upload-artifact@v7
+        timeout-minutes: 5
         with:
           name: pages-${{ matrix.shard }}-of-${{ strategy.job-total }}
           path: .e2e/pages-*.json
@@ -173,6 +199,7 @@ jobs:
         # Only a failure's: a passing run with no --photos takes no picture but a failing page's, and there is nothing to keep.
         if: failure()
         uses: actions/upload-artifact@v7
+        timeout-minutes: 5
         with:
           name: e2e-failure-shard-${{ matrix.shard }}
           path: .e2e/*.png
@@ -185,16 +212,20 @@ jobs:
     # --pages, silences inside a run. Its one writer is apps/web/test/e2e/timing.ts: no copy of the number belongs in this file.
     needs: [e2e]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     # Whatever the shards did: a shard that failed still uploaded its times, and this job names a shard that wrote none rather than
     # summing less than the whole.
     if: always()
     steps:
       - uses: actions/checkout@v7
+        timeout-minutes: 5
       - uses: actions/setup-node@v7
+        timeout-minutes: 5
         with:
           node-version: '24.16.0'
       - name: Download every shard's page times
         uses: actions/download-artifact@v8
+        timeout-minutes: 5
         with:
           pattern: pages-*-of-*
           merge-multiple: true
@@ -207,12 +238,16 @@ jobs:
     # The board builds, and the two paths a generator writes are the bytes that are committed. A stale one is green here without this
     # job and red on the next person's typecheck.
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
+        timeout-minutes: 5
       - uses: actions/setup-node@v7
+        timeout-minutes: 5
         with:
           node-version: '24.16.0'
       - run: npm ci
+        timeout-minutes: 10
       # Writes apps/web/src/routeTree.gen.ts, which a new route file needs before typecheck passes.
       - run: npm run build
       # Writes apps/web/theme/, which is generated from DESIGN.md and never edited (the kit's generator, recorded in apps/web/package.json).
@@ -243,13 +278,16 @@ jobs:
     # 2026-10-19 with this very version and held no secret (docs/plan-github-ci.md, "3. What the history exposes"), so what is left to
     # watch is what arrives — and a range keeps the scan a second long instead of minutes of false positives from the history.
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
+        timeout-minutes: 5
         with:
           # The whole history: the range below names a commit before this push, which the shallow default has not, and git refuses a
           # range whose first end it cannot resolve.
           fetch-depth: 0
       - name: Download gitleaks and check it against its release's sha256
+        timeout-minutes: 5
         # A pinned download in a run step, never a third party's action: nothing of theirs runs with this token, and the version and
         # the bytes are both this file's. v8.30.1 is the version the owner's audit used. To move it, change both lines below together:
         # take the new hash from gitleaks_<version>_checksums.txt of that release. A release that detects the stub shapes differently
@@ -407,16 +445,20 @@ jobs:
     # The job runs on every event and its suite step alone is skipped: a skipped step leaves the job success, so the gate's whitelist
     # below stands. A workflow-level paths: would skip the whole of ci, the gate with it, and its required context would never report.
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
+        timeout-minutes: 5
         with:
           # The whole history: due.ts diffs the range from the commit before this push, or the pull request's base, which the shallow
           # default has not, and a range git cannot resolve is read as due — the suite would run on every event.
           fetch-depth: 0
       - uses: actions/setup-node@v7
+        timeout-minutes: 5
         with:
           node-version: '24.16.0'
       - run: npm ci
+        timeout-minutes: 10
       - name: Decide whether the guards' suite is due
         id: due
         # The shas come through env, never interpolated into the command line, as the gitleaks scan takes them; GITHUB_EVENT_NAME,
@@ -436,6 +478,7 @@ jobs:
   # list changes, and always() makes it run even when one of them fails, is skipped or is cancelled — each of which it reads as a failure.
   ci:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     if: always()
     needs: [test, lint, typecheck, e2e, e2e-bound, build, gitleaks, guards]
     steps:

@@ -885,6 +885,44 @@ function guardsDrift(workflow: Workflow): string[] {
   return sentences;
 }
 
+/** A run step that downloads: the lockfile's install, the browser's, a release fetched by hand. Every action here reaches the network. */
+const NETWORK = /\bnpm ci\b|playwright install|\bcurl\b/;
+
+/** Whether a step reaches the network, and so must end at a bound of its own rather than at its job's. */
+const reachesNetwork = (step: Step): boolean => step.uses !== undefined || NETWORK.test(step.run ?? '');
+
+/** A bound as GitHub takes it: a whole number of minutes above zero. */
+const bounded = (minutes: unknown): minutes is number => typeof minutes === 'number' && Number.isInteger(minutes) && minutes > 0;
+
+/**
+ * A job with no `timeout-minutes`, a step that reaches the network with none, and a step whose bound is not under its job's. Without
+ * one GitHub waits 360 minutes on a stalled download, and the run's own wait on `ci` gives up long before; a step's bound at or past its
+ * job's lets the job's fire first, and the red then names no step.
+ */
+function stallDrift(workflow: Workflow): string[] {
+  return Object.entries(workflow.jobs).flatMap(([name, job]) => {
+    const minutes = job['timeout-minutes'];
+    if (!bounded(minutes))
+      return [
+        `the ${name} job in ${FILE} has no timeout-minutes: give it a bound well above its slowest green run, or a stall holds it for GitHub's default of 360 minutes`,
+      ];
+    return (job.steps ?? []).flatMap((step) => {
+      const label = step.name ?? step.uses ?? step.run ?? '?';
+      const own = step['timeout-minutes'];
+      if (!reachesNetwork(step)) return [];
+      if (!bounded(own))
+        return [
+          `the step "${label}" of the ${name} job in ${FILE} reaches the network and has no timeout-minutes: give it a bound well above its slowest green run, so a stalled download fails naming the step`,
+        ];
+      if (own >= minutes)
+        return [
+          `the step "${label}" of the ${name} job in ${FILE} is bounded at ${own} minutes, not under its job's ${minutes}: lower it below the job's, or the job's bound fires first and names no step`,
+        ];
+      return [];
+    });
+  });
+}
+
 /** Every clause, over the shipped file. */
 const drift = (
   workflow: Workflow,
@@ -904,6 +942,7 @@ const drift = (
   ...hiddenDrift(workflow),
   ...gateDrift(workflow),
   ...guardsDrift(workflow),
+  ...stallDrift(workflow),
   ...actionDrift(workflow),
   ...zoneDrift(workflow),
   ...filterDrift(workflow),
@@ -1664,4 +1703,30 @@ test('REFUSED: the guards workspace with neither a leg nor a job of its own, a g
   assert.equal(due?.run, DUE_COMMAND, 'the due step runs due.ts today');
   due.run = 'echo due=true >> "$GITHUB_OUTPUT"';
   refused(guardsDrift(swapped), DUE_COMMAND, 'the due step swapped');
+});
+
+test("REFUSED: a job with no bound, a step that reaches the network with none, and a step bounded at its job's bound", () => {
+  const shipped = readWorkflow();
+  assert.deepEqual(stallDrift(shipped), [], 'every job and every network step is bounded today');
+  const install = (workflow: Workflow): Step => {
+    const step = (workflow.jobs[E2E].steps ?? []).find((each) => each.run?.includes('playwright install') === true);
+    assert.ok(step !== undefined, 'the e2e job installs Chromium today');
+    return step;
+  };
+  const refused = (drift: string[], token: string, why: string): void => {
+    assert.equal(drift.length, 1, why);
+    assert.ok(drift[0].includes(token), `${why}: the sentence names ${token}`);
+  };
+
+  const unbounded = structuredClone(shipped);
+  delete unbounded.jobs[E2E]['timeout-minutes'];
+  refused(stallDrift(unbounded), `the ${E2E} job`, 'a job with no bound');
+
+  const stalling = structuredClone(shipped);
+  delete install(stalling)['timeout-minutes'];
+  refused(stallDrift(stalling), 'Install Chromium', 'the Chromium install with no bound');
+
+  const outlived = structuredClone(shipped);
+  install(outlived)['timeout-minutes'] = outlived.jobs[E2E]['timeout-minutes'];
+  refused(stallDrift(outlived), 'Install Chromium', "the install bounded at its job's bound");
 });

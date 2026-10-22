@@ -1930,7 +1930,8 @@ test('every read-only step is refused every call of the set that would run a pro
 
 /**
  * The verbs of the read set that take git's `--output=<file>`, which creates or truncates the file it names; each measured on git 2.43 to
- * write it (`git diff --output=x --stat HEAD~1 HEAD` prints nothing and writes `x`). `grep`, `ls-files`, `status` and `cat-file` write none.
+ * write it (`git diff --output=x --stat HEAD~1 HEAD` prints nothing and writes `x`). `grep`, `ls-files`, `status` and `cat-file` write
+ * none.
  */
 const OUTPUT_VERBS = ['diff', 'diff-tree', 'log', 'show', 'rev-list', 'blame', 'shortlog'];
 

@@ -2,7 +2,10 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import type { ConversationItem } from '@/lib/conversation';
 import { Talk, TalkEmpty } from './Talk';
 
-/** The family's talk: an item of every kind at once, the same with the line over what is new, and the empty shell. */
+/**
+ * The family's talk: an item of every kind at once, the line over what is new, the compact density, a message being written, and the
+ * empty shell.
+ */
 const meta: Meta = { title: 'Conversation/Talk' };
 export default meta;
 
@@ -90,6 +93,46 @@ export const WhatIsNew: StoryObj = {
         readable="m:1"
         onRead={() => {}}
         drawOwn={drawOwn}
+      />
+    </div>
+  ),
+};
+
+/** The same talk compact, as a panel beside something else draws it — the run page's Activity tab. */
+export const Compact: StoryObj = {
+  render: () => (
+    <div style={PANEL}>
+      <Talk
+        items={ITEMS}
+        marks="chat"
+        label="Nemia's talk"
+        backLabel="Earlier messages"
+        newAt={null}
+        unread={0}
+        readable={null}
+        onRead={() => {}}
+        drawOwn={drawOwn}
+        density="compact"
+      />
+    </div>
+  ),
+};
+
+/** A message being written, under the items, until the whole of it takes its place. */
+export const BeingWritten: StoryObj = {
+  render: () => (
+    <div style={PANEL}>
+      <Talk
+        items={ITEMS}
+        marks="chat"
+        label="Nemia's talk"
+        backLabel="Earlier messages"
+        newAt={null}
+        unread={0}
+        readable={null}
+        onRead={() => {}}
+        drawOwn={drawOwn}
+        writing="I am reading the second gate now, and I will"
       />
     </div>
   ),

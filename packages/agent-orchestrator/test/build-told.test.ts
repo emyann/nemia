@@ -4,8 +4,8 @@
  * skill it adds to its agent's, as a deny of its own, or as a field its own `output:` declares. `untold` reads each step as `nemia start`
  * freezes it, and is first made to refuse a copy of the shipped team with one of each taken away.
  *
- * The build workflow's review declares only the mutants it judged; the reviewer's own schema gives its findings and the round, merged
- * into one output with one owner a field (`mergedOutput`).
+ * No step of the build workflow declares a closeout of its own: review's fields are the reviewer's own schema's, its findings and the
+ * round, merged into one output with one owner a field (`mergedOutput`).
  *
  * The design system kit's skills sit in a folder of the board's (`KIT_SKILLS`): build's design, implement and review are each given
  * every one on their `skills:` line, named with the folder, and `kitDrift` holds the names given to the folders that are there and to
@@ -79,7 +79,6 @@ const MERGES_THE_BASE = [
   '`git merge main-worktree/HEAD`',
   'Then run again the tests of what the merge touched',
   'Measure again whatever your change wrote by a measure, a baseline or a count that only shrinks',
-  'Try your mutants again on the merged result',
   'never your branch into the base',
   'merge the commit it names and no other',
 ];
@@ -161,14 +160,11 @@ const OPENS_THE_PULL_REQUEST = [
   "a red, cancelled or missing `ci` comes back as the check's refusal, with the Actions URL, the failing jobs and the tail of their log",
 ];
 
-/** What an implement step is told, build's and quick's alike: the base, the board's components, its mutants, a dashboard rendered. */
+/** What an implement step is told, build's and quick's alike: the base, the board's components, a dashboard rendered. */
 const IMPLEMENT_TOLD = [
   ...MERGES_THE_BASE,
   ...OPENS_THE_PULL_REQUEST,
   "load `shadcn` for the board's components",
-  '**Name your mutants** in the closeout: one per rule or guard the change adds',
-  'Try them first: `node workflows/build/mutants.ts <closeout.json>` after you commit.',
-  'saying why in `noMutants`',
   'When the change touches `tools/observe`',
   '`node tools/observe/render/render.ts --out <your files directory>` starts a throwaway stack from this workspace',
   'the check refuses a changed dashboard whose picture and',
@@ -214,7 +210,7 @@ const TOLD: Told[] = [
     says: IMPLEMENT_TOLD,
     adds: ['shadcn', 'look', 'react-aria', 'see-a-dashboard'],
     denies: [],
-    declares: ['mutants', 'noMutants'],
+    declares: [],
   },
   {
     workflow: 'build',
@@ -225,8 +221,6 @@ const TOLD: Told[] = [
       ...READS_THE_PULL_REQUEST,
       'Run the typecheck and the lint yourself, each bare and one command per call: `npx turbo run typecheck --force`, `npm run lint`.',
       "Run a package's tests, `npx turbo run test --force --continue --filter=<package>`, only where a finding needs a run to stand on.",
-      '**Judge the mutants, do not run them**',
-      "Quote each `wf mutants:` line you judged in your closeout's `mutants`.",
       'Never build or run the e2e',
       '**Open the change when a picture cannot show it**: when it changes what a page does when pressed, typed into or hovered, or a state no picture shows.',
       'Run `npm run board:serve`, bare',
@@ -242,7 +236,7 @@ const TOLD: Told[] = [
     ],
     adds: ['shadcn', 'look', 'react-aria', 'see-a-dashboard'],
     denies: ['Bash(cd:*)', ...NO_BUILD, ...WHOLE_SUITE, ...BROWSER_FENCE],
-    declares: ['findings', 'mutants', 'again'],
+    declares: ['findings', 'again'],
   },
   {
     workflow: 'quick',
@@ -250,7 +244,7 @@ const TOLD: Told[] = [
     says: [...IMPLEMENT_TOLD, ...QUICK_TOLD],
     adds: ['shadcn', 'look', 'react-aria', 'see-a-dashboard'],
     denies: [],
-    declares: ['plan', 'pages', 'mutants', 'noMutants'],
+    declares: ['plan', 'pages'],
   },
   { workflow: 'intake', step: 'intake', says: [], adds: [], denies: ['Bash(cd:*)', ...NO_BUILD], declares: [] },
   {
@@ -412,8 +406,8 @@ test('REFUSED: a step that adds a skill no more, or declares its closeout no mor
   }
   const quick = shippedEdited('quick', 'implement', (text) => text.replace(' react-aria,', ''));
   assert.deepEqual(untold('quick', quick), ['quick/implement: skill react-aria']);
-  const undeclared = shippedEdited('build', 'implement', (text) => text.replace('output: implement.schema.json\n', ''));
-  assert.deepEqual(untold('build', undeclared), ['build/implement: declares mutants', 'build/implement: declares noMutants']);
+  const undeclared = shippedEdited('quick', 'implement', (text) => text.replace('output: implement.schema.json\n', ''));
+  assert.deepEqual(untold('quick', undeclared), ['quick/implement: declares plan', 'quick/implement: declares pages']);
 });
 
 test('REFUSED: a step that denies a command no more is named', () => {
@@ -431,8 +425,8 @@ test('REFUSED: a step that denies a command no more is named', () => {
 test('REFUSED: a step whose note says a sentence no more is named, whatever line the sentence broke on', () => {
   const design = shippedEdited('build', 'design', (text) => text.replace(/^The checks you may run here.*\n/m, ''));
   assert.deepEqual(untold('build', design), [`build/design: says "${TOLD[0].says[1]}"`]);
-  const review = shippedEdited('build', 'review', (text) => text.replace('**Judge the mutants, do not run them**', '**Run the mutants**'));
-  assert.deepEqual(untold('build', review), ['build/review: says "**Judge the mutants, do not run them**"']);
+  const review = shippedEdited('build', 'review', (text) => text.replace('Never build or run the e2e', 'Build and run the e2e'));
+  assert.deepEqual(untold('build', review), ['build/review: says "Never build or run the e2e"']);
   assert.match('Run a\n   check   bare.', across('Run a check bare.'));
   assert.deepEqual(untold('build', []), ['build/design: is not there', 'build/implement: is not there', 'build/review: is not there']);
 });
@@ -641,7 +635,7 @@ test("REFUSED: quick's implement told no more what build's is told, or what make
     JSON.stringify({ ...declared, properties, required: declared.required.filter((name) => name !== 'plan') }),
   );
   assert.deepEqual(untold('quick', loadWorkflows(path.join(root, 'quick'), { repo: REPO })), ['quick/implement: declares plan']);
-  assert.deepEqual(new Set(declared.required), new Set(['plan', 'pages', 'mutants', 'noMutants']), 'each is required of the closeout');
+  assert.deepEqual(new Set(declared.required), new Set(['plan', 'pages']), 'each is required of the closeout');
 });
 
 test("REFUSED: design or review told no more to load change-the-board first, or where ds-spec's reader runs from, is named", () => {
@@ -669,15 +663,18 @@ test("REFUSED: design, implement or review told of the look's parts no more is n
   assert.match(fs.readFileSync(path.join(REPO, TRIGGER), 'utf8'), /`apps\/web\/src\/components\/look`,\s+taken\s+through\s+its\s+door/);
 });
 
-test("the shipped review declares only `mutants`: Agora's own schema gives `findings` and `again`, each field with one owner", () => {
+test("the shipped review declares no closeout of its own: Agora's schema gives `findings` and `again`, each field with one owner", () => {
   const review = buildSteps().find((s) => s.name === 'review')!;
-  assert.deepEqual(outputFields(review), ['findings', 'again', 'mutants']);
+  assert.deepEqual(outputFields(review), ['findings', 'again']);
   assert.deepEqual(Object.fromEntries(Object.entries(review.output!.owners!).map(([field, o]) => [field, `${o.by} ${o.name} ${o.file}`])), {
     findings: 'agent agora review.schema.json',
     again: 'agent agora review.schema.json',
-    mutants: 'step review review.schema.json',
   });
   assert.equal(review.loop, 'implement');
-  const own = JSON.parse(fs.readFileSync(path.join(HOLDER, 'build', 'review.schema.json'), 'utf8')) as { properties: object };
-  assert.deepEqual(Object.keys(own.properties), ['mutants']);
+  for (const step of ['implement', 'review'])
+    assert.equal(
+      fs.existsSync(path.join(HOLDER, 'build', `${step}.schema.json`)),
+      false,
+      `build's ${step} declares no closeout of its own, so no schema sits beside it`,
+    );
 });

@@ -260,14 +260,14 @@ function based(files: Record<string, string>): { repo: string; base: string } {
 
 test("REFUSED at shipped defaults: implement's check, as frozen, refuses a live probe of its run and passes once it is stopped", () => {
   const scripts = Object.fromEntries(
-    ['landing.ts', 'mutants.ts', 'pictures.ts', 'probe.ts', 'pull-request.ts'].map((name) => [
+    ['landing.ts', 'pictures.ts', 'probe.ts', 'pull-request.ts'].map((name) => [
       `workflows/build/${name}`,
       fs.readFileSync(path.join(BUILD, name), 'utf8'),
     ]),
   );
   const { repo, base } = based(scripts);
   const closeout = path.join(scratch('wf-probe-closeout-'), 'closeout.json');
-  fs.writeFileSync(closeout, JSON.stringify({ outcome: 'done', summary: 's', artifacts: [], mutants: [], noMutants: 'a fixture' }));
+  fs.writeFileSync(closeout, JSON.stringify({ outcome: 'done', summary: 's', artifacts: [] }));
   const at = placed({ rows: [row('r-1-probe-a', 'blocked')] });
   fs.writeFileSync(path.join(at.bin, 'npm'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
   const gh = ghIn(at.bin, passing(repo));
@@ -283,10 +283,7 @@ test("REFUSED at shipped defaults: implement's check, as frozen, refuses a live 
   fs.writeFileSync(at.rowsFile, JSON.stringify([row('r-1-probe-a', 'stopped')]));
   const passed = run({ WF_BASE_REF: base });
   assert.equal(passed.status, 0, passed.out);
-  const old = based({
-    'workflows/build/mutants.ts': scripts['workflows/build/mutants.ts'],
-    'workflows/build/pictures.ts': scripts['workflows/build/pictures.ts'],
-  });
+  const old = based({ 'workflows/build/pictures.ts': scripts['workflows/build/pictures.ts'] });
   const r = spawnSync(checkArgv(implementCheck())[0], checkArgv(implementCheck()).slice(1), {
     cwd: old.repo,
     env: { ...envAt(at), ...gh.env(), TMPDIR: scratch('wf-probe-tmp-'), WF_RUN: 'r-1', WF_CLOSEOUT: closeout, WF_BASE_REF: old.base },

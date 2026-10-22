@@ -321,7 +321,6 @@ function shipped(repo: string, env: Record<string, string>): { status: number | 
 
 test("REFUSED at shipped defaults: implement's check, as frozen, refuses a page touched with no picture, and passes one named", () => {
   const scripts = {
-    'workflows/build/mutants.ts': fs.readFileSync(path.join(BUILD, 'mutants.ts'), 'utf8'),
     'workflows/build/pictures.ts': fs.readFileSync(SCRIPT, 'utf8'),
     'workflows/build/probe.ts': fs.readFileSync(path.join(BUILD, 'probe.ts'), 'utf8'),
     'workflows/build/pull-request.ts': fs.readFileSync(path.join(BUILD, 'pull-request.ts'), 'utf8'),
@@ -329,8 +328,7 @@ test("REFUSED at shipped defaults: implement's check, as frozen, refuses a page 
   };
   const { repo, base } = workOn(PAGE, scripts);
   const files = scratch('wf-pictures-files-');
-  const unsigned = { mutants: [], noMutants: 'a fixture' };
-  const env = (artifacts: string[]) => ({ WF_BASE_REF: base, WF_ARTIFACTS: files, WF_CLOSEOUT: closeoutFile(artifacts, unsigned) });
+  const env = (artifacts: string[]) => ({ WF_BASE_REF: base, WF_ARTIFACTS: files, WF_CLOSEOUT: closeoutFile(artifacts) });
   const refused = shipped(repo, env([]));
   assert.notEqual(refused.status, 0, refused.out);
   assert.match(refused.out, /npm run e2e -- --photos --pages/);

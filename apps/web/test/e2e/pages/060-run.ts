@@ -250,16 +250,22 @@ export default {
     await graph.locator(`.react-flow__node[data-id="${SESSION.step}"]`).click();
     const inspector = stepBar(page, FAKE.id, SESSION.step);
     await inspector.getByRole('tab', { name: 'Activity' }).click();
+
     await expectVisible(
-      inspector.locator('[data-turn="tools"]', { hasText: SESSION.folded }),
-      `${SESSION.step}'s Activity tab draws its conversation, the calls folded into one line (${SESSION.folded})`,
+      inspector.locator('[data-session-turn="folded"]', { hasText: SESSION.folded }),
+      `${SESSION.step}'s Activity tab draws its conversation by the family, the calls folded into one line (${SESSION.folded})`,
     );
-    await expectVisible(inspector.locator('section[aria-label="Closeout"]'), `${SESSION.step}'s Activity tab ends with its closeout`);
+    await expectVisible(
+      inspector.locator('[data-session-talk].gap-2'),
+      `${SESSION.step}'s Activity tab draws the talk compact, closer than the session's own page`,
+    );
+    await expectVisible(inspector.locator('[data-session-closeout]'), `${SESSION.step}'s Activity tab ends with its closeout`);
     await expectVisible(
       inspector.locator(`a[href="/runs/${FAKE.id}/steps/${SESSION.step}"]`, { hasText: 'Open the session' }),
       `${SESSION.step}'s Activity tab links to its session's page`,
     );
     await settled(page);
+    await photograph(page, path.join(OUT, `run-activity-${await themeOf(page)}.png`), { fullPage: true });
 
     await graph.locator(`.react-flow__node[data-id="${FAKE.unverified}"]`).click();
     const output = stepBar(page, FAKE.id, FAKE.unverified);

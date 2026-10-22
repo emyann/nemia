@@ -475,7 +475,7 @@ test("REFUSED at shipped defaults: a save whose step declares a field its agent'
         own: { keys: ['place', 'output'], body: '' },
       },
     ],
-    schemas: [{ file: 'judge.schema.json', text: fields('findings', 'mutants') }],
+    schemas: [{ file: 'judge.schema.json', text: fields('findings', 'severity') }],
   });
   assert.equal(res.status, 422, await res.clone().text());
   const refused = (await res.json()) as BuildRefused;

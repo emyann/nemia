@@ -123,7 +123,7 @@ function change(repo: string, base: string, verb: string, ...args: string[]): Ra
 /** A closeout as the check is handed it (`WF_CLOSEOUT`), written to a scratch file: its path. */
 function closeoutFile(more: Record<string, unknown>): string {
   const file = path.join(scratch('wf-quick-closeout-'), 'closeout.json');
-  fs.writeFileSync(file, JSON.stringify({ outcome: 'done', summary: 's', artifacts: [], mutants: [], noMutants: 'a fixture', ...more }));
+  fs.writeFileSync(file, JSON.stringify({ outcome: 'done', summary: 's', artifacts: [], ...more }));
   return file;
 }
 
@@ -131,7 +131,7 @@ function closeoutFile(more: Record<string, unknown>): string {
 const SCRIPTS = {
   'workflows/quick/change.ts': TEXT,
   ...Object.fromEntries(
-    ['landing.ts', 'mutants.ts', 'pictures.ts', 'probe.ts', 'pull-request.ts'].map((name) => [
+    ['landing.ts', 'pictures.ts', 'probe.ts', 'pull-request.ts'].map((name) => [
       `workflows/build/${name}`,
       fs.readFileSync(path.join(REPO, 'workflows', 'build', name), 'utf8'),
     ]),
@@ -191,7 +191,7 @@ test("REFUSED at shipped defaults: implement's check, as frozen, refuses a chang
 /** An `npx` and an `npm` that fail whatever they are handed: a check that passes over them ran no test, no types, no lint, no page. */
 const UNRUNNABLE: Failing = { npx: 3, e2e: 4, npm: 5 };
 
-test("REFUSED at shipped defaults: implement's check, as frozen, runs its six clauses in order, refuses on each one's refusal, and runs no npm or npx", () => {
+test("REFUSED at shipped defaults: implement's check, as frozen, runs its five clauses in order, refuses on each one's refusal, and runs no npm or npx", () => {
   const { repo, base } = workOn({ 'apps/api/src/a.ts': 'x\n', 'apps/web/src/routes/x.tsx': 'export const x = 1;\n' }, SCRIPTS);
   const files = scratch('wf-quick-files-');
   const picture = path.join(files, 'x-dark.png');
@@ -203,7 +203,6 @@ test("REFUSED at shipped defaults: implement's check, as frozen, runs its six cl
     /wf size: 2 files, 2 lines/,
     /wf pictures: 1 picture named/,
     /no live probe of run r-1/,
-    /wf mutants: /,
     /wf pr: #7 is at [0-9a-f]{12}, the commit this check judges/,
     /wf ci: `ci` passed on/,
   ];
@@ -228,7 +227,7 @@ test("REFUSED at shipped defaults: implement's check, as frozen, runs its six cl
   assert.match(unpictured.err, /npm run e2e -- --photos --pages/);
   assert.deepEqual(
     printed(unpictured).map((at) => at >= 0),
-    [true, false, false, false, false, false],
+    [true, false, false, false, false],
     'the pictures are asked second',
   );
 
@@ -237,25 +236,17 @@ test("REFUSED at shipped defaults: implement's check, as frozen, runs its six cl
   assert.match(probing.err, /cannot tell which probes are live/);
   assert.deepEqual(
     printed(probing).map((at) => at >= 0),
-    [true, true, false, false, false, false],
+    [true, true, false, false, false],
     'the probes are read third',
   );
 
-  const unproven = run({ ...signed, noMutants: null });
-  assert.notEqual(unproven.code, 0, unproven.out);
-  assert.match(unproven.err, /names no mutant and says not why/);
-  assert.deepEqual(
-    printed(unproven).map((at) => at >= 0),
-    [true, true, true, false, false, false],
-    'the mutants are proven fourth',
-  );
   const unopened = run(signed, {}, [...passing(repo).filter((rule) => rule.when !== 'pr list'), { when: 'pr list', out: '[]' }]);
   assert.notEqual(unopened.code, 0, unopened.out);
   assert.match(unopened.err, /no open pull request has wf\/r-1\/run as its head/);
   assert.deepEqual(
     printed(unopened).map((at) => at >= 0),
-    [true, true, true, true, false, false],
-    'the branch is pushed fifth, after the mutants',
+    [true, true, true, false, false],
+    'the branch is pushed fourth, after the probes are read',
   );
 
   const red = run(signed, {}, [
@@ -267,10 +258,10 @@ test("REFUSED at shipped defaults: implement's check, as frozen, runs its six cl
   assert.ok(red.err.includes('nemia retry r-1 implement --recheck'), red.err);
   assert.deepEqual(
     printed(red).map((at) => at >= 0),
-    [true, true, true, true, true, false],
+    [true, true, true, true, false],
     'CI is waited on last',
   );
-  for (const refused of [unpictured, probing, unproven, unopened, red]) assert.deepEqual(refused.said, []);
+  for (const refused of [unpictured, probing, unopened, red]) assert.deepEqual(refused.said, []);
 });
 
 test('REFUSED: a change of one line past the bound, added or removed, and none at it', () => {
@@ -364,7 +355,7 @@ test("REFUSED: a note or a README that says another bound than the script's, or 
   const clauses = [...check.matchAll(/node\s+"\$\w+\/([\w-]+\.ts)"\s+(size|tests|pages|push|wait)?/g)].map(([, script, verb]) =>
     verb ? `${script} ${verb}` : script,
   );
-  assert.deepEqual(clauses, ['change.ts size', 'pictures.ts', 'probe.ts', 'mutants.ts', 'pull-request.ts push', 'pull-request.ts wait']);
+  assert.deepEqual(clauses, ['change.ts size', 'pictures.ts', 'probe.ts', 'pull-request.ts push', 'pull-request.ts wait']);
   assert.doesNotMatch(check, /\bnpm\b|\bnpx\b/);
   const ticked = clauses.map((clause) => `\`${clause.replace('.', '\\.').replace(' ', '\\s+')}\``);
   const runs = new RegExp(
@@ -372,7 +363,7 @@ test("REFUSED: a note or a README that says another bound than the script's, or 
   );
   for (const file of ['implement.md', 'README.md']) {
     assert.match(said(file), runs, `${file} says what the check runs`);
-    assert.doesNotMatch(said(file).replace('`mutants.ts`,', '`mutants.ts`, `change.ts tests`,'), runs);
+    assert.doesNotMatch(said(file).replace('`probe.ts`,', '`probe.ts`, `change.ts tests`,'), runs);
   }
   for (const made of /const GENERATED = \[([^\]]*)\];/
     .exec(TEXT)![1]

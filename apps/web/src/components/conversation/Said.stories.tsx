@@ -1,8 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import type { ConversationItem } from '@/lib/conversation';
-import { Note, Said } from './Said';
+import { Note, Said, Writing } from './Said';
 
-/** What is said in a conversation: the agent's words with their links, the person's own, and a quiet line that frames them. */
+/**
+ * What is said in a conversation: the agent's words with their links, the person's own, the message being written, and a quiet line
+ * that frames them.
+ */
 const meta: Meta = { title: 'Conversation/Said' };
 export default meta;
 
@@ -76,6 +79,15 @@ export const OneAfterAnother: StoryObj = {
       <Note what="session" marks="chat">
         A session of hers began — her 4
       </Note>
+    </div>
+  ),
+};
+
+/** The message being written, as it comes: the agent's bubble alone, with nothing said over it yet. */
+export const BeingWritten: StoryObj = {
+  render: () => (
+    <div style={PANEL}>
+      <Writing text="Both checks are green. I am reading the second gate now, and I" marks="chat" />
     </div>
   ),
 };

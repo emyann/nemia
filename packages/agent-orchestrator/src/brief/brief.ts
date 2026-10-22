@@ -105,8 +105,8 @@ const opened = (step: Workflow): string => [PRECEDENCE, briefBody(step)].filter(
  *
  * A step filed after a step with a `check:` is handed what that check said (`## What <step>'s check said`): its exit, the last lines of
  * each stream, and every line of its stdout that starts `wf <name>:`, whole. That is evidence, not process: the run executed the command,
- * so what it printed is a fact about the work, as the diff is — a reviewer judges the mutants a check ran with it rather than being sent to
- * a log its fence does not reach. See `checkHandedSection`.
+ * so what it printed is a fact about the work, as the diff is — a reviewer reads the lines a check marked in its brief rather than being
+ * sent to a log its fence does not reach. See `checkHandedSection`.
  *
  * Every brief ends on what finishing means: the command the step is judged by, when it has one, where its files go, and then the
  * closeout, last, because it says to give it last. A loop's target past its first round answers the findings it was handed. A folder

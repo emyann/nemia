@@ -165,10 +165,10 @@ const TRANSCRIPT = /^\/api\/runs\/[^/]+\/steps\/[^/]+\/transcript(\/stream)?$/;
 /** What the session page says of a step none of whose sessions has started. */
 const NO_SESSION = 'No session of it has started yet, so there is no conversation to show.';
 
-/** Refuses unless the session page says it has no conversation, once its reads are done. */
+/** Refuses unless the session page says it has no conversation, in the family's empty shell, once its reads are done. */
 async function expectNoConversation(page: Page, assertion: string): Promise<void> {
   await idle(page);
-  await expectVisible(page.getByText(NO_SESSION, { exact: true }), assertion);
+  await expectVisible(page.locator('[data-session-empty]').getByText(NO_SESSION, { exact: true }), assertion);
 }
 
 /**

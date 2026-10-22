@@ -38,7 +38,7 @@ function twice(): string {
   fs.writeFileSync(path.join(workflows, 'agents', 'judger.md'), '---\noutput: judger.schema.json\n---\nYou judge.\n');
   fs.writeFileSync(path.join(workflows, 'agents', 'judger.schema.json'), fields('findings'));
   fs.writeFileSync(path.join(dir, 'judge.md'), '---\nworkspace: folder\nagent: judger\noutput: judge.schema.json\n---\n');
-  fs.writeFileSync(path.join(dir, 'judge.schema.json'), fields('findings', 'mutants'));
+  fs.writeFileSync(path.join(dir, 'judge.schema.json'), fields('findings', 'severity'));
   return dir;
 }
 

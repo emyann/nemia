@@ -107,8 +107,9 @@ and forgetting to wire it in:
   The second zone was every leg's until the card of 2026-10-21 measured what it bought. Local time is read in `apps/web/src/lib` (8
   files) and nowhere else: the orchestrator, the runtime and the api read none, and the runtime's one hit formats a number. In 54 `ci`
   runs the New York pass never failed on its own — each of the 8 failures had already failed under UTC. The web's pass is 47 s, so its
-  second zone is cheap; the other four legs were about 21 runner-minutes a push for a zone no code of theirs can read. A workspace that
-  grows a local-time read needs its second zone back in the file: nothing scans for one, and the risk is named here rather than held.
+  second zone is cheap; the shape measured then had ten legs, and the second zone of the eight that are not the web's came to about 21
+  runner-minutes a push for a zone no code of theirs can read. A workspace that grows a local-time read needs its second zone back in
+  the file: nothing scans for one, and the risk is named here rather than held.
 
   The orchestrator's leg was the longest job of the run, 766 s for its two passes against one pass of 364 s, so its suite runs in two
   halves with Node's `--test-shard=<i>/2`. Its four legs arrive through `matrix.include` rather than a `shard` axis: a matrix cannot
@@ -127,7 +128,7 @@ and forgetting to wire it in:
   The floor was 22.18.0, where type stripping became unflagged, and rose to 24.16.0 when CI first ran the suite on it. Two things it
   cannot do: libuv 1.51.0 truncates a millisecond time set through `utimes` — 496 of 1,000 such times read back changed, which the
   runtime's capture cache and its quiescence compare with `===` — and Node's test runner takes `--test-isolation` only from 24.13.1,
-  which `workflows/build/mutants.ts` passes. The first is what sets the floor: libuv 1.52.1 keeps the millisecond, no Node 22 release
+  which the mutant runner passed before it was removed. The first is what sets the floor: libuv 1.52.1 keeps the millisecond, no Node 22 release
   ships it (22.23.3, the line's latest, carries 1.51.0), and 24.16.0 is the first 24.x that does — 24.15.0 still carries 1.51.0. So the
   floor is the first release the suite passes on, not a round number.
 - **`npm run lint` and `npm run typecheck`**, whole, on the floor. So are the e2e shards, their bound and the build: every job but the
@@ -226,7 +227,7 @@ named checks. What was planned here, for the record:
   anything but `SUCCESS` at the head. Reading a queue's result, and several named checks through a place's `checks` verb, is the merge
   queue's.
 - **Round checks.** Settled by the CI intent, not here: they stay local, and narrow to what the change touched. A round proves the
-  bound, the pictures, the probes, the mutants, the types and the lint whole, and the tests of the packages whose turbo inputs cover the
+  bound, the pictures, the probes, the types and the lint whole, and the tests of the packages whose turbo inputs cover the
   diff; the whole forced suite and the whole e2e become CI's, and the laptop stops paying for them.
 - **What went away.** The landing's whole-suite check on the merged tree, and the hand push of main. The trial merge at the gate stays
   as advice a person reads, and `landingDue` and the git place are untouched: the tick still takes back a merge left staged on main.

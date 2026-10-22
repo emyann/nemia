@@ -11,8 +11,8 @@ import {
   sessionToRead,
   summaryLine,
   summaryShown,
-  summaryOf,
   tailStart,
+  withSaid,
   type ToolCall,
   type ToolsTurn,
   type Turn,
@@ -60,7 +60,7 @@ const call = (id: string, name: string, input: unknown = {}, out = `${name} said
 const kinds = (turns: Turn[]) => turns.map((t) => t.kind);
 const fold = (turns: Turn[]) => turns.find((t): t is ToolsTurn => t.kind === 'tools')!;
 
-test('the calls between two things said fold into one line, in the words Claude Code web uses, and open to the calls', () => {
+test('the calls between two things said fold into one turn, in the order they came, each with its result', () => {
   const turns = foldTranscript([
     said('u', 'Implement it.', 'user'),
     said('a1', 'Looking first.'),
@@ -75,7 +75,6 @@ test('the calls between two things said fold into one line, in the words Claude 
   ]);
   assert.deepEqual(kinds(turns), ['said', 'said', 'tools', 'said']);
   const tools = fold(turns);
-  assert.equal(tools.summary, 'Ran 3 commands, searched code, read 3 files');
   assert.equal(tools.calls, 7);
   assert.deepEqual(
     tools.turns.map((t) => (t.kind === 'tool' ? t.call.id : t.kind)),
@@ -180,34 +179,15 @@ test('a fold keeps its key while calls are added to it, so a reader who opened i
   const two = foldTranscript([...call('b1', 'Bash'), ...call('b2', 'Bash')]);
   const three = foldTranscript([...call('b1', 'Bash'), ...call('b2', 'Bash'), ...call('b3', 'Read')]);
   assert.equal(fold(two).key, fold(three).key);
-  assert.equal(fold(three).summary, 'Ran 2 commands, read a file');
+  assert.deepEqual(
+    fold(three).turns.map((t) => t.key),
+    ['tool:b1', 'tool:b2', 'tool:b3'],
+    'the call added rides in the same fold',
+  );
 });
 
 const calls = (...named: Array<[string, unknown?]>): ToolCall[] =>
   named.map(([name, input = {}], i) => ({ id: `c${i}`, at: '', name, input, result: null }));
-
-test('a summary counts a file once however often it was read or edited, an MCP tool by its server, and Codex by what it did', () => {
-  assert.equal(summaryOf(calls(['Read', { file_path: '/a' }], ['Read', { file_path: '/a', offset: 200 }])), 'Read a file');
-  assert.equal(
-    summaryOf(calls(['Edit', { file_path: '/a' }], ['Write', { file_path: '/b' }], ['Edit', { file_path: '/a' }])),
-    'Edited 2 files',
-  );
-  assert.equal(summaryOf(calls(['Glob', { pattern: '*.ts' }], ['Grep', { pattern: 'x' }])), 'Searched code 2 times');
-  assert.equal(
-    summaryOf(calls(['mcp__playwright__browser_navigate'], ['mcp__playwright__browser_click'], ['WebFetch'])),
-    'Used playwright 2 times, fetched a page',
-  );
-  assert.equal(
-    summaryOf(
-      calls(
-        ['CommandExecution', { command: ['/bin/bash', '-lc', 'npm test'] }],
-        ['FileChange', { changes: { '/repo/a': {}, '/repo/b': {} } }],
-      ),
-    ),
-    'Ran a command, edited 2 files',
-  );
-  assert.equal(summaryOf(calls(['Frobnicate'], ['Frobnicate'], ['Task'])), 'Used Frobnicate 2 times, ran an agent');
-});
 
 test("a call's detail is the one thing it was about, on one line", () => {
   const [bash, codexBash, read, fetch, change, bare] = calls(
@@ -326,4 +306,117 @@ test('closeoutOf reads a v0 and a v1 statement into one shape: one line, its bod
       values: [{ name: 'PR', value: 'https://x.test/1' }],
     },
   );
+});
+
+const { sessionItems, HARNESS_TOOL, THOUGHT_TOOL } = await import('../src/lib/sessionItems.ts');
+
+type Item = import('../src/lib/conversation.ts').ConversationItem<import('../src/lib/sessionItems.ts').SessionOwn>;
+
+/** What each item of `items` is: its kind, and for an `own` item what the step's own part draws it as. */
+const shapes = (items: Item[]) => items.map((item) => (item.kind === 'own' ? `own:${item.own.what}` : item.kind));
+
+/** The one work turn of `items`. */
+const work = (items: Item[]) => items.find((item): item is Extract<Item, { kind: 'work' }> => item.kind === 'work')!;
+
+test('the adapter maps a step’s session onto the family’s shape: its brief, its words, its work, what it was told and its closeout', () => {
+  const turns = withSaid(
+    foldTranscript([
+      said('u', 'Implement what was asked.', 'user'),
+      thought('t1', 'Where is it?'),
+      said('a1', 'Looking first.'),
+      ...call('b1', 'Bash', { command: 'npm test' }, 'pass 233'),
+      thought('t2'),
+      quiet('s1', 'Hook ran'),
+      ...call('b2', 'Bash', { command: 'false' }, 'exit 1', true),
+      said('a2', 'Done.'),
+      quiet('s2', 'Background session idle'),
+      use('c', 'StructuredOutput', { outcome: 'blocked', summary: 'Stuck.' }),
+    ]),
+    [{ at: new Date(clock + 1000).toISOString(), attempt: 1, text: 'Try the other file.', after: null, arrived: null }],
+  );
+  const items = sessionItems(turns, 'implement', false);
+  assert.deepEqual(shapes(items), ['own:brief', 'work', 'said', 'work', 'said', 'note', 'own:closeout', 'own:told']);
+
+  const [brief] = items;
+  assert.ok(brief.kind === 'own' && brief.own.what === 'brief');
+  assert.equal(brief.own.text, 'Implement what was asked.', 'the brief carries its words, for the line that opens to them');
+
+  const words = items[2];
+  assert.ok(words.kind === 'said');
+  assert.deepEqual(
+    { who: words.who, yours: words.yours, markdown: words.markdown, text: words.text },
+    { who: 'implement', yours: false, markdown: true, text: 'Looking first.' },
+    'the session’s own words are the agent’s side, drawn from their markdown',
+  );
+
+  const note = items[5];
+  assert.ok(note.kind === 'note');
+  assert.deepEqual([note.what, note.words], ['system', 'Background session idle'], 'a line the harness wrote on its own is a quiet note');
+
+  const closeout = items[6];
+  assert.ok(closeout.kind === 'own' && closeout.own.what === 'closeout');
+  assert.equal(closeout.own.call.name, 'StructuredOutput');
+
+  const told = items.at(-1)!;
+  assert.ok(told.kind === 'own' && told.own.what === 'told');
+  assert.deepEqual([told.own.text, told.own.attempt, told.own.arrived], ['Try the other file.', 1, null]);
+});
+
+test('a turn’s lines: a call with what it asked and what came back, a thought behind its line, and the harness’s own line', () => {
+  const items = sessionItems(
+    foldTranscript([
+      ...call('b1', 'Bash', { command: 'npm test' }, 'pass 233'),
+      thought('t1', 'It passed.'),
+      thought('t2'),
+      quiet('s1', 'Hook ran'),
+      ...call('b2', 'Bash', { command: 'false' }, 'exit 1', true),
+    ]),
+    'implement',
+    false,
+  );
+  const lines = work(items).lines;
+  assert.deepEqual(
+    lines.map((line) => [line.tool, line.sentence, line.state]),
+    [
+      ['Bash', 'Bash', 'done'],
+      [THOUGHT_TOOL, 'Thought', 'done'],
+      [THOUGHT_TOOL, 'Thought, with no text kept', 'done'],
+      [HARNESS_TOOL, 'A line from the harness', 'done'],
+      ['Bash', 'Bash', 'error'],
+    ],
+    'every call, thought and harness line of the fold is a line of the one turn',
+  );
+  assert.equal(lines[0].fact, 'npm test', 'a call says the one thing it was about beside its name');
+  assert.equal(lines[0].input, JSON.stringify({ command: 'npm test' }, null, 2), 'its input indented, so a long one is more than a line');
+  assert.equal(lines[0].result, 'pass 233');
+  assert.equal(lines[1].result, 'It passed.', 'a thought’s words are behind its line, as a call’s result is');
+  assert.equal(lines[2].result, undefined, 'and a thought the harness kept no text for opens on nothing');
+  assert.equal(lines[3].result, 'Hook ran');
+  assert.equal(work(items).ms > 0, true, 'the turn spans its first line to its last');
+});
+
+test('REFUSED: a call with no answer in the tail of a session that is over drawn as running, and a lone call as anything but a turn', () => {
+  const turns = foldTranscript([said('a', 'Running them.'), use('b1', 'Bash', { command: 'sleep 60' })]);
+  assert.deepEqual(shapes(sessionItems(turns, 'implement', true)), ['said', 'work']);
+  const [live, dead] = [sessionItems(turns, 'implement', true), sessionItems(turns, 'implement', false)].map(work);
+  assert.deepEqual([live.lines.length, live.lines[0].state, live.running], [1, 'running', true]);
+  assert.deepEqual([dead.lines.length, dead.lines[0].state, dead.running], [1, 'pending', false]);
+
+  const answered = sessionItems(foldTranscript([...call('b1', 'Bash'), said('a', 'Done.'), use('b2', 'Bash')]), 'implement', true);
+  assert.equal(work(answered).running, false, 'a turn before the tail is folded however live the session is');
+});
+
+test('REFUSED: a StructuredOutput call between two things said folded into the work turn', () => {
+  const items = sessionItems(
+    foldTranscript([
+      said('a1', 'Nearly there.'),
+      ...call('b1', 'Bash'),
+      use('c', 'StructuredOutput', { outcome: 'done', summary: 'Shipped.' }),
+      ...call('b2', 'Bash'),
+      said('a2', 'Signed off.'),
+    ]),
+    'implement',
+    false,
+  );
+  assert.deepEqual(shapes(items), ['said', 'work', 'own:closeout', 'work', 'said']);
 });

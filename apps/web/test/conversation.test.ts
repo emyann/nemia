@@ -5,8 +5,8 @@
  *
  * And the one rule every part of `components/conversation` keeps, read off its files: a part names no conversation itself, so each
  * conversation's pages keep their names and a step's session is never drawn under hers. Only `Worked` can be rendered by Node — the
- * family's other parts reach the look's door, which Node refuses — so they are held to it here, by their text, and so are the three
- * parts of a step's session that stand in the folder until S6.
+ * family's other parts reach the look's door, which Node refuses — so they are held to it here, by their text. The folder holds the
+ * shared family alone: what is one conversation's own is in `components/chat` or `components/session`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -60,6 +60,11 @@ test('the words the family says: a folded turn, the pill over the talk, and the 
   assert.equal(turnWords(134_000, 1), 'Worked for 2m 14s · 1 step');
   assert.equal(jumpWords(2), '2 new · Jump to the latest');
   assert.equal(jumpWords(1), '1 new · Jump to the latest');
+  assert.equal(
+    jumpWords(0),
+    'Jump to the latest',
+    'and with no count where nothing is counted unread, so a step’s session offers the way back all the same',
+  );
   assert.equal(newWords(2), '2 new');
   assert.equal(newWords(1), '1 new');
 });
@@ -78,6 +83,12 @@ test('REFUSED: a family part that names a conversation itself; a mark built from
   assert.deepEqual(namedMarks('<div data-band={what} data-cut-ring marks="chat" />'), [], 'a mark that is no conversation’s');
   assert.deepEqual(namedMarks("{...mark(marks, 'talk', atEnd ? 'latest' : 'back')}"), [], 'and a prefix that is the caller’s');
   assert.deepEqual(namedMarks("{...mark(marks, 'talk', 'latest')}"), [], 'whatever the arguments after it are');
+  assert.deepEqual(namedMarks("<Trace {...mark('chat', 'turn', 'running')} />"), ["mark('chat'"]);
+  assert.deepEqual(
+    namedMarks("const MARKS = 'session';\n{...mark(MARKS, 'talk')}"),
+    [],
+    'a prefix a conversation’s own part names itself, outside the family, is none',
+  );
 
   const parts = fs
     .readdirSync(FAMILY)
@@ -85,18 +96,8 @@ test('REFUSED: a family part that names a conversation itself; a mark built from
     .sort();
   assert.deepEqual(
     parts,
-    [
-      'Composer.tsx',
-      'Conversation.tsx',
-      'ConversationBand.tsx',
-      'Jump.tsx',
-      'PromptBox.tsx',
-      'Said.tsx',
-      'Talk.tsx',
-      'Turns.tsx',
-      'Worked.tsx',
-    ],
-    'the folder is read off the tree, so a part added to it is held to the rule too; the last three are a step’s own until S6',
+    ['Composer.tsx', 'ConversationBand.tsx', 'Jump.tsx', 'Said.tsx', 'Talk.tsx', 'Worked.tsx'],
+    'the folder is read off the tree, so a part added to it is held to the rule too, and holds the shared family alone',
   );
   for (const part of parts)
     assert.deepEqual(
@@ -136,6 +137,11 @@ test('a talk follows its latest by how much is drawn, which a turn grows a line 
 
   const talk = fs.readFileSync(path.join(FAMILY, 'Talk.tsx'), 'utf8');
   assert.match(talk, /const drawn = drawnCount\(items\);/, 'and the talk follows its latest by that number');
+  assert.match(
+    talk,
+    /\}, \[atEnd, drawn, writing\]\);/,
+    'and by the message being written too: a text that grows is one item however long, so the talk would stop following it halfway',
+  );
   assert.doesNotMatch(
     talk,
     /items\.length/,

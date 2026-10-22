@@ -14,9 +14,10 @@ import { Told } from './Told';
 import { Asked } from './GateBrief';
 
 /**
- * A step's conversation, loaded when the Activity tab is first opened: the scroller and the tool views are not needed to read the canvas.
+ * A step's talk, loaded when the Activity tab is first opened: the family's talk and the step's own parts are not needed to read the
+ * canvas.
  */
-const Conversation = lazy(() => import('./conversation/Conversation').then((m) => ({ default: m.Conversation })));
+const SessionTalk = lazy(() => import('./session/SessionTalk').then((m) => ({ default: m.SessionTalk })));
 import { StatusChip, StepNote } from './StatusChip';
 
 type Step = RunDetail['steps'][number];
@@ -242,7 +243,7 @@ function Activity({ run, step }: { run: RunDetail; step: Step }) {
       {!following.loading &&
         (tail.length ? (
           <Suspense fallback={<p className="text-muted-foreground">Reading its conversation…</p>}>
-            <Conversation turns={tail} live={following.live} density="compact" className="min-h-0 flex-1" />
+            <SessionTalk who={step.name} turns={tail} live={following.live} density="compact" />
           </Suspense>
         ) : (
           !following.error && (

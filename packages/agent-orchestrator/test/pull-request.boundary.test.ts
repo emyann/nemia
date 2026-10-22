@@ -111,7 +111,7 @@ test("open pushes the run's branch and creates the pull request with the title a
     file,
   ]);
   assert.ok(!r.calls.some((call) => call.argv.includes('--draft')), 'never a draft');
-  assert.equal(asked(r.calls, 'pr', 'edit').length, 0);
+  assert.equal(asked(r.calls, 'api').length, 0, 'the fields of a pull request it just created are not patched');
   assert.match(r.out, /wf pr: https:\/\/github\.com\/o\/r\/pull\/7/);
 });
 
@@ -121,7 +121,17 @@ test('open on a branch whose pull request is already open updates its title and 
   const r = pr(at, 'open', ['--title', 'The same card', '--body-file', file]);
   assert.equal(r.code, 0, r.err);
   assert.equal(asked(r.calls, 'pr', 'create').length, 0, 'never a second pull request');
-  assert.deepEqual(asked(r.calls, 'pr', 'edit')[0].argv, ['pr', 'edit', '7', '--title', 'The same card', '--body-file', file]);
+  assert.equal(asked(r.calls, 'pr', 'edit').length, 0, 'never `gh pr edit`, whose GraphQL query GitHub refuses');
+  assert.deepEqual(asked(r.calls, 'api')[0].argv, [
+    'api',
+    '-X',
+    'PATCH',
+    'repos/{owner}/{repo}/pulls/7',
+    '-f',
+    'title=The same card',
+    '-F',
+    `body=@${file}`,
+  ]);
   assert.match(r.out, /wf pr: https:\/\/github\.com\/o\/r\/pull\/7/);
 });
 
@@ -209,7 +219,7 @@ test('REFUSED: a draft pull request, or one based on another branch than the rem
   assert.match(draft.err, /#7 is a draft/);
   assert.match(draft.err, /gh pr ready 7/);
   assert.equal(tip(at.bare!, at.branch), null, 'no push follows a draft');
-  assert.equal(asked(draft.calls, 'pr', 'edit').length, 0);
+  assert.equal(asked(draft.calls, 'api').length, 0);
 
   const other = placed();
   const at2 = gitIn(other.repo, 'rev-parse', 'HEAD').trim();
@@ -221,6 +231,7 @@ test('REFUSED: a draft pull request, or one based on another branch than the rem
   assert.equal(based.code, 1, based.out);
   assert.match(based.err, /#7 is based on `release`, not on the remote's default branch `main`/);
   assert.match(based.err, /gh pr edit 7 --base main/);
+  assert.match(based.err, /gh api -X PATCH repos\/\{owner\}\/\{repo\}\/pulls\/7 -f base=main/);
 });
 
 test('REFUSED: two open pull requests for one branch, naming the close a person types', () => {
@@ -386,7 +397,7 @@ test("build's implement check pushes through the script before the typecheck, wa
   const clauses = [...frozen.matchAll(/node\s+"\$\w+\/([\w-]+\.ts)"\s+(check|push|wait)?/g)].map(([, script, verb]) =>
     verb ? `${script} ${verb}` : script,
   );
-  assert.deepEqual(clauses, ['pictures.ts', 'probe.ts check', 'pull-request.ts push', 'mutants.ts', 'pull-request.ts wait']);
+  assert.deepEqual(clauses, ['pictures.ts', 'probe.ts check', 'pull-request.ts push', 'pull-request.ts wait']);
   assert.ok(
     frozen.indexOf('pull-request.ts" push') < frozen.indexOf('npm run typecheck'),
     `the push is before the typecheck, so CI's wall time overlaps the local gates:\n${frozen}`,
@@ -465,7 +476,7 @@ test("the wait's two bounds are the numbers the README states, and both fit unde
   assert.ok(
     CHECK_DEADLINE_SECONDS - whole >= 900,
     `the round check's deadline is ${CHECK_DEADLINE_SECONDS} s and the wait takes up to ${whole} s of it: the clauses before it — the ` +
-      'pictures, the probe, the push, the typecheck, the lint and every mutant — have what is left, and 900 s is the least that is ' +
+      'pictures, the probe, the push, the typecheck and the lint — have what is left, and 900 s is the least that is ' +
       'honest. Re-measure the deadline (src/check/check.ts) before you raise the wait.',
   );
 });

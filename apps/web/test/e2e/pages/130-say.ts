@@ -12,8 +12,9 @@ export default {
   /**
    * The steering channel: words said to draft's running session from its page go through the api to the session's inbox and onto its
    * record, where the step's detail and wf decide read them back. In a page of its own whose one refusal is the point, words sent after the
-   * session ended while the page still shows it running are refused in the package's words under the box, and nothing is said or
-   * journalled. The page follows a live session, whose stream never finishes (`follows`). It takes its writes back, draft's task journal,
+   * session ended while the page still shows it running are refused in the package's words under the composer, which keeps them to send
+   * again, and nothing is said or journalled. The page follows a live session, whose stream never finishes (`follows`). It takes its
+   * writes back, draft's task journal,
    * the engine's feed, its conversation and `claude agents` as seeded, at work and told nothing, so each page after it, in either theme,
    * reads the store as it was: the session's end goes on the feed as the runtime writes it, and the feed cut back empties the api's memo of
    * runs at rest; `claude agents` lists it done, its process gone, which ends its follow, and the workflow feed says the step settled.
@@ -35,21 +36,18 @@ export default {
     const sayRoute = `/api/runs/${SAYING.run}/steps/${SAYING.step}/say`;
     const said = (r: { request: () => { method: () => string }; url: () => string }) =>
       r.request().method() === 'POST' && new URL(r.url()).pathname === sayRoute;
-    const boxOf = (p: Page, state = '') =>
-      p.locator(`section${state ? `[data-say="${state}"]` : ''}[aria-label="Say something to ${SAYING.step}"]`);
+    const boxOf = (p: Page) => p.locator(`section[aria-label="Say something to ${SAYING.step}"]`);
     const fieldOf = (p: Page) => boxOf(p).getByRole('textbox', { name: `What to say to ${SAYING.step}'s session` });
     const sendOf = (p: Page) => boxOf(p).getByRole('button', { name: 'Send' });
     try {
       const top = page.locator('header[aria-label="The step"]');
       await expectVisible(top.getByRole('heading', { level: 1, name: SAYING.step, exact: true }), 'the page is headed by the step');
       await expectVisible(top.locator('[data-following]'), 'a session in flight is followed live');
-      const talk = page.getByRole('region', { name: "The step's conversation" });
-      await expectVisible(
-        talk.locator('[data-turn="said"][data-role="assistant"]', { hasText: SAYING.line }),
-        "the session's words so far",
-      );
+      const talk = page.getByRole('log', { name: "The step's conversation" });
+      await expectVisible(talk.locator('[data-session-bubble="agent"]', { hasText: SAYING.line }), "the session's words so far");
 
-      await expectVisible(boxOf(page, 'open'), 'the prompt box is open for a session in flight');
+      await expectVisible(boxOf(page).locator('[data-session-composer="open"]'), 'the composer is drawn for a session in flight');
+      await expectCount(page.locator('[data-band="stopped"]'), 0, 'and no band stands in its place');
       if (await sendOf(page).isEnabled()) throw new Refused('Send is disabled while there is nothing to send');
       await fieldOf(page).fill(SAYING.words);
       const before = heard.length;
@@ -85,17 +83,17 @@ export default {
       if (JSON.stringify(onRecord) !== JSON.stringify([entry])) {
         throw new Refused(`the step's detail carries what was said, off the engine's journal — it carries ${JSON.stringify(onRecord)}`);
       }
-      const told = talk.locator('[data-turn="told"]', { hasText: SAYING.words });
+      const told = talk.locator('[data-session-message="told"]', { hasText: SAYING.words });
       await expectVisible(told, 'the words, a turn of their own in the conversation');
-      await expectVisible(told.getByText('You said, while it ran'), 'marked as yours, said while the session ran');
+      await expectVisible(told.getByText('You said, while it ran', { exact: false }), 'marked as yours, said while the session ran');
       await expectVisible(
-        told.locator('[data-arrived]', { hasText: 'in its conversation' }),
+        told.locator('[data-session-arrived]', { hasText: 'in its conversation' }),
         "the turn says the words are in the session's conversation, once its transcript, which the page follows, shows their arrival",
       );
       await expectCount(
-        talk.locator('[data-turn="system"]', { hasText: SAYING.words }),
+        talk.locator('[data-session-marker="system"]', { hasText: SAYING.words }),
         0,
-        "no system line with the words: the session's record of their arrival is the turn",
+        "no quiet line with the words: the session's record of their arrival is the turn",
       );
       await expectCount(talk.getByText(SAYING.words, { exact: true }), 1, 'the words are drawn once');
       if ((await fieldOf(page).inputValue()) !== '') throw new Refused('the box is emptied once the words are said');
@@ -131,8 +129,8 @@ export default {
         );
         await refused.goto(page.url(), { waitUntil: 'load' });
         await expectVisible(
-          boxOf(refused, 'open'),
-          'the prompt box, open, on a page of its own that holds the run as read before its session ends',
+          boxOf(refused).locator('[data-session-composer="open"]'),
+          'the composer, on a page of its own that holds the run as read before its session ends',
         );
         const end = new Date().toISOString();
         const ended = [
@@ -164,8 +162,8 @@ export default {
             `the package refuses words for a step whose session ended — the api answered ${answered.status()}: ${JSON.stringify(error)}`,
           );
         }
-        await expectVisible(boxOf(refused).locator('[data-refused]'), 'the refusal is shown under the box, not swallowed');
-        const shown = await boxOf(refused).locator('[data-refused] p.font-mono').textContent();
+        await expectVisible(boxOf(refused).locator('[data-session-refused]'), 'the refusal is shown under the box, not swallowed');
+        const shown = await boxOf(refused).locator('[data-session-refused] p.font-mono').textContent();
         if (shown !== error)
           throw new Refused(
             `the refusal under the box is the package's sentence, verbatim — it shows ${JSON.stringify(shown)}, and the api said ${JSON.stringify(error)}`,
@@ -201,6 +199,9 @@ export default {
       fs.writeFileSync(registry, listed);
       fed(SAYING.run, SAYING.step, 'running');
     }
-    await expectVisible(boxOf(page, 'open'), 'with the writes taken back, the box is open again once the run is read again');
+    await expectVisible(
+      boxOf(page).locator('[data-session-composer="open"]'),
+      'with the writes taken back, the composer stands again once the run is read again',
+    );
   },
 } satisfies PageSpec;

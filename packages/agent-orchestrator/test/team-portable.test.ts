@@ -21,7 +21,7 @@ import { REPO } from './team.ts';
 const PLANTED: Record<string, string> = {
   'apps/': 'When the change touches `apps/web`, picture its pages.',
   'packages/': 'Read packages/agent-runtime/README.md first.',
-  'workflows/': 'Try them first: `node workflows/build/mutations.ts`.',
+  'workflows/': 'Try it first: `node workflows/build/pictures.ts`.',
   '.claude/skills': 'read `.claude/skills/board/SKILL.md` with Read',
   'docs/': 'the layers are in docs/architecture.md',
   npm: 'allowedTools: Agent, Bash(npm run lint)',
@@ -34,9 +34,6 @@ const PLANTED: Record<string, string> = {
   '.oxlintrc': 'a ceiling raised in `.oxlintrc.json`',
   tsc: 'the typecheck is `tsc --noEmit`',
   shadcn: "load `shadcn` for the board's components",
-  mutant: 'name a mutant for each rule',
-  mutants: '"required": ["mutants"]',
-  noMutants: 'saying why in `noMutants`',
   wf: 'allowedTools: Bash(wf stats:*)',
   $80: "the owner's line is about $80 a run",
   'From design': 'the spec, handed to you under *From design*',
@@ -121,7 +118,11 @@ test("REFUSED: each of this repository's words, planted in an agent's body, in i
       word,
     );
   }
-  assert.ok(REPOSITORY_WORDS.length >= 22, 'the list only grows');
+  assert.ok(
+    REPOSITORY_WORDS.length >= 19,
+    "the list only grows, but for a word that stops being this repository's: `mutant`, `mutants` and `noMutants` went with the " +
+      'mutants approach, taking the floor from 22 to 19. Lowering it again asks for the same reason in writing.',
+  );
 });
 
 test("REFUSED: a word of this repository beside a link to Anthropic's documentation, and inside a link to anywhere else", () => {
@@ -139,7 +140,7 @@ test('the matcher takes a word whole, and lets through what any factory says', (
     ['b.md', 'disallowedTools: Bash(cd:*), Edit(~/.claude/settings.json)\nallowedTools: Bash(nemia stats:*), Bash(nemia inbox)'],
     ['c.md', "the repository's instruction files (`CLAUDE.md` at the root and in each folder the change touches), its docs"],
     ['d.md', 'never the store (`~/.agent-workflows`), `~/.claude` or `~/.cache`; the packages you touched; a limit raised'],
-    ['e.md', 'a wfx of the workflows, $800, the implementer, a transmutant, From designs'],
+    ['e.md', 'a wfx of the workflows, $800, the implementer, From designs'],
   ]);
   assert.deepEqual(oursIn(generic), []);
 });

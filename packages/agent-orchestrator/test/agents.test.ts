@@ -395,7 +395,7 @@ test('REFUSED at load: a field both a step and its agent declare, naming the fie
     'dev/implement.md': '---\nplace: git\n---\nImplement it.\n',
     'dev/judge.md': '---\nplace: git\nagent: reviewer\nafter: implement\noutput: judge.schema.json\n---\n',
     'dev/judge.schema.json':
-      '{"type":"object","properties":{"findings":{"type":"string"},"mutants":{"type":"string"}},"required":["findings","mutants"],"additionalProperties":false}',
+      '{"type":"object","properties":{"findings":{"type":"string"},"severity":{"type":"string"}},"required":["findings","severity"],"additionalProperties":false}',
   });
   assert.equal(
     refusal(() => loadWorkflows(path.join(dir, 'dev'))),

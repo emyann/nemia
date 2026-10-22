@@ -10,61 +10,12 @@
       "items": {
         "type": "string"
       },
-      "description": "The e2e pages the change touches, each by the name `npm run e2e -- --pages <name,…>` takes: the check runs those. Empty when the change touches no page of the board."
-    },
-    "mutants": {
-      "type": "array",
-      "description": "One mutant per rule or guard the change adds: a small edit that breaks the rule, and the test that must fail on it. Implement's check applies each to a copy of your committed result, runs its test, and refuses the step when the test still passes, when `from` is not in the file exactly once, or when the test fails or runs nothing without the mutant.",
-      "items": {
-        "type": "object",
-        "properties": {
-          "file": {
-            "type": "string",
-            "description": "The file to mutate, by path from the workspace root; not under node_modules."
-          },
-          "from": {
-            "type": "string",
-            "description": "Text the committed file holds exactly once, whitespace and line breaks included."
-          },
-          "to": {
-            "type": "string",
-            "description": "What `from` becomes: valid code that breaks the rule, not a syntax error."
-          },
-          "test": {
-            "type": "string",
-            "description": "The test file that must fail with the mutant in, by path from the workspace root; it is run with node --test from the nearest package.json above it."
-          },
-          "name": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "One test in that file, by its exact name: the whole name as the test declares it, never a part of it (a test in a describe by its own name). Only that test runs; null runs the whole file."
-          }
-        },
-        "required": [
-          "file",
-          "from",
-          "to",
-          "test",
-          "name"
-        ],
-        "additionalProperties": false
-      }
-    },
-    "noMutants": {
-      "type": [
-        "string",
-        "null"
-      ],
-      "description": "Why the change names no mutant, when `mutants` is empty: it adds no rule a test could refuse. Null when you name mutants."
+      "description": "The e2e pages the change touches, each by the name `npm run e2e -- --pages <name,\u2026>` takes: the check runs those. Empty when the change touches no page of the board."
     }
   },
   "required": [
     "plan",
-    "pages",
-    "mutants",
-    "noMutants"
+    "pages"
   ],
   "additionalProperties": false
 }

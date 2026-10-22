@@ -50,7 +50,7 @@ test('a v0 closeout is converted on read: the whole summary its body, its first 
   assert.equal(read({ outcome: 'done', summary: 's', artifacts: [], needs: null, body: 'mine' }).body, undefined);
 });
 
-test('a v1 closeout is read by its own envelope: files and values apart, and a cut summary leading the body', () => {
+test('a v1 closeout is read by its own envelope: files and values apart, a cut summary leading the body, a field no step declares kept', () => {
   const c = read({
     apiVersion: 'nemia/v1',
     outcome: 'done',
@@ -60,16 +60,21 @@ test('a v1 closeout is read by its own envelope: files and values apart, and a c
     needs: null,
     mutants: [],
   });
-  assert.deepEqual(c, {
-    apiVersion: 'nemia/v1',
-    outcome: 'done',
-    summary: 'Short.',
-    body: 'The rest.',
-    artifacts: ['a.md'],
-    values: [{ name: 'PR', value: 'https://x/1' }],
-    needs: undefined,
-    output: { mutants: [] },
-  });
+  assert.deepEqual(
+    c,
+    {
+      apiVersion: 'nemia/v1',
+      outcome: 'done',
+      summary: 'Short.',
+      body: 'The rest.',
+      artifacts: ['a.md'],
+      values: [{ name: 'PR', value: 'https://x/1' }],
+      needs: undefined,
+      output: { mutants: [] },
+    },
+    '`mutants` is a field no step declares any more, and a closeout written when one did still reads: the envelope nests a field the ' +
+      'frozen step did not declare under `output`, rather than dropping it or refusing the closeout',
+  );
   const twoLines = read({ apiVersion: 'nemia/v1', outcome: 'done', summary: 'One.\nTwo.', body: 'Body.', artifacts: [], needs: null });
   assert.equal(twoLines.summary, 'One.');
   assert.equal(twoLines.body, 'One.\nTwo.\n\nBody.');

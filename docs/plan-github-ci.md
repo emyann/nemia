@@ -99,9 +99,30 @@ What it runs, all of it reporting **one required context, `ci`**, from a single 
 branch protection is configured once and never touched as the job list grows. The gate's `needs` clause is what refuses adding a job
 and forgetting to wire it in:
 
-- **Ten test legs**: one per workspace, on node 24.16.0 — the floor `engines.node` claims — and 24, each leg running its package's suite
-  twice, under `TZ=UTC` and `TZ=America/New_York`. Both runs pass `--force`: `turbo.json` hashes no environment, so without it the second
-  run replays the first from the cache and the second timezone is never tested.
+- **Twelve test legs**: one per workspace, on node 24.16.0 — the floor `engines.node` claims — and 24, the orchestrator in two shards
+  on each node, so four legs of its own. Each leg runs its package's suite once, under `TZ=UTC`; the web's leg alone runs it a second
+  time under `TZ=America/New_York`, conditioned with `if: matrix.workspace == 'web'`. Both runs pass `--force`: `turbo.json` hashes no
+  environment, so without it the second run replays the first from the cache and the second timezone is never tested.
+
+  The second zone was every leg's until the card of 2026-10-21 measured what it bought. Local time is read in `apps/web/src/lib` (8
+  files) and nowhere else: the orchestrator, the runtime and the api read none, and the runtime's one hit formats a number. In 54 `ci`
+  runs the New York pass never failed on its own — each of the 8 failures had already failed under UTC. The web's pass is 47 s, so its
+  second zone is cheap; the other four legs were about 21 runner-minutes a push for a zone no code of theirs can read. A workspace that
+  grows a local-time read needs its second zone back in the file: nothing scans for one, and the risk is named here rather than held.
+
+  The orchestrator's leg was the longest job of the run, 766 s for its two passes against one pass of 364 s, so its suite runs in two
+  halves with Node's `--test-shard=<i>/2`. Its four legs arrive through `matrix.include` rather than a `shard` axis: a matrix cannot
+  split one combination, and GitHub makes a leg of its own of an `include` entry whose value for an axis the axis does not hold — so
+  `agent-orchestrator` is off `matrix.workspace` and named by four entries, two nodes by two halves. A `shard` axis would instead need
+  nine `exclude` entries, and a forgotten exclusion would run a workspace's whole suite beside its halves.
+
+  The fraction reaches `node --test` through a hole in the orchestrator's own `test` script,
+  `${WF_TEST_SHARD:+--test-shard=$WF_TEST_SHARD}`, written after `--test` and before the script's globs, with the leg passing
+  `WF_TEST_SHARD: ${{ matrix.shard }}` in the run step's env. Not as a turbo `-- --test-shard=1/2`: turbo appends that after the
+  script's own arguments, where node has stopped parsing options and reads it as a file pattern instead (`options.globPatterns` is
+  argv past the first positional). And not through `NODE_OPTIONS`, which every node child the suite spawns would inherit. Unset — a
+  person's `npm test`, a run's check — the hole expands to nothing and the suite runs whole. Node deals the files to the shards
+  round-robin by index, not by duration, so the halves are as even as that parity makes them; the job costs the slower one.
 
   The floor was 22.18.0, where type stripping became unflagged, and rose to 24.16.0 when CI first ran the suite on it. Two things it
   cannot do: libuv 1.51.0 truncates a millisecond time set through `utimes` — 496 of 1,000 such times read back changed, which the
@@ -144,7 +165,13 @@ own sentence naming the fix: a workspace with a suite and no leg, a leg that doe
 from `engines.node`, a job that pins its node by hand and pins it off that floor — or pins none at all — a hidden path uploaded
 without `include-hidden-files`, a node version left unquoted (YAML reads `24.16` as a number and setup-node installs another
 release), a timezone
-the leg does not run its suite under and a run of it that drops `--force`, a `cancel-in-progress` that would cancel a run of `main`, a
+the legs do not run their suites under — `UTC` unconditioned, and `America/New_York` conditioned on the web and no other leg — a third
+zone nothing here accounts for, a run of a suite that drops `--force`, an `include` entry that would be merged into an existing leg
+rather than making one (a workspace the axis already names, or an entry with no workspace or no node), a workspace that arrived through
+`include` and lost a node the axis names, a set of shards that does not tile 1/n … n/n or a shard written in a form
+`--test-shard` does not take, a leg beside the shards with no shard of its own, a sharded workspace whose `test` script has no hole for
+the fraction or holds it after its globs, a suite run not given `WF_TEST_SHARD: ${{ matrix.shard }}` or given a literal in its place, a
+leg name that does not name its shard, a `cancel-in-progress` that would cancel a run of `main`, a
 job outside the gate's `needs`, a gate without `always()`, a gate step not given the results through its environment or interpolating an
 expression into its shell, an action that is not GitHub's own by major tag, and the trigger that would run a fork's code against a
 writable token. Card 2 added three clauses of its own: an `e2e` matrix that is not 1..n in order or a run of the e2e that does not take

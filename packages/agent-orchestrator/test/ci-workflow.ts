@@ -42,9 +42,10 @@ export const STALE_STEP = 'Refuse a stale generated file';
 /** The command the shards run, which the guard reads the shard's flags off. */
 export const E2E_COMMAND = 'npm run e2e';
 
-export type Step = { name?: string; uses?: string; with?: Record<string, unknown>; run?: string; env?: Record<string, string> };
+export type Step = { name?: string; if?: string; uses?: string; with?: Record<string, unknown>; run?: string; env?: Record<string, string> };
 
 export type Job = {
+  name?: string;
   if?: string;
   needs?: string[];
   strategy?: { 'fail-fast'?: boolean; matrix?: Record<string, unknown[]> };

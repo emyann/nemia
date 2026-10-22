@@ -1,7 +1,7 @@
 /**
- * A remote A2A agent as a harness, end to end, at shipped defaults: `builtEngine` with a harness that is a URL, against
- * the SDK's own server over HTTP (`remote-server.ts`), on each binding the runtime speaks, in each order a card can list
- * them. What is proven is what crosses the wire, counted by the server itself: a spawn is one SendMessage and never two,
+ * A remote A2A agent as a harness, end to end, at shipped defaults but where a test shortens a bound at its seam: `builtEngine`
+ * with a harness that is a URL, against the SDK's own server over HTTP (`remote-server.ts`), on each binding the runtime speaks,
+ * in each order a card can list them. What is proven is what crosses the wire, counted by the server itself: a spawn is one SendMessage and never two,
  * a pass one GetTask per open task and none once they settle, a stop one CancelTask. And what a refusal refuses: a card
  * whose auth cannot be met, or whose bindings are not spoken, ends the attempt `unstartable` with nothing sent; an address
  * that cannot be reached, or carries a secret, is refused when the engine is made. The secret itself is on no file the
@@ -858,18 +858,26 @@ test('a request the agent holds holds a pass for the request bound, and the task
   assert.equal(seen.get('ae/held/1')?.state, 'working', 'as last seen');
 });
 
+/** How long the pass waits on a send in the test below, at the seam (`spawnWaitMs`): shorter than the shipped `SPAWN_WAIT_MS`. */
+const SPAWN_HELD_MS = 50;
+
 test(
-  `at shipped defaults an agent that replies later than ${REQUEST_MS / 1000} s is read submitted, then ends with its reply, sent once: the send leaves the pass`,
+  'an agent that replies later than the request bound is read submitted, then ends with its reply, sent once: the send leaves the pass',
   WAITED,
   async (t) => {
-    const s = await serve({ script: () => [{ reply: 'slow and sure', data: { verdict: 'fine' }, after: REQUEST_MS + 500 }] });
-    const { root, e } = engineOn(s);
+    const s = await serve({ script: () => [{ reply: 'slow and sure', data: { verdict: 'fine' }, after: 1_500 }] });
+    const root = scratch('ae-remote-');
+    const card = (await (await fetch(`${s.url}/.well-known/agent-card.json`)).json()) as Record<string, unknown>;
+    assert.ok(SPAWN_HELD_MS < SPAWN_WAIT_MS && HELD_MS < REQUEST_MS, 'both bounds shortened at the seam, never lengthened');
+    const remote = remoteOps('remote', { card }, root, undefined, HELD_MS, { spawnWaitMs: SPAWN_HELD_MS });
+    const e = builtEngine(EngineService.layer({ root, harnesses: { remote } }));
     const id = await Effect.runPromise(e.file(task()));
     const [ms] = await timed(async () => {
       await Effect.runPromise(e.tick());
       await Effect.runPromise(e.tick());
     });
-    assert.ok(ms < SPAWN_WAIT_MS + 3_000, `${ms} ms: the pass waited ${SPAWN_WAIT_MS / 1000} s for the answer, and went on`);
+    assert.ok(ms >= SPAWN_HELD_MS - TIMER_SLACK_MS, `${ms} ms: the pass waited the spawn's bound for the answer`);
+    assert.equal(s.replies(), 0, 'and went on before the agent replied: the send is off the pass');
     const spawned = (journalOf(root, id) as Array<{ kind: string; error?: string }>).find((ev) => ev.kind === 'spawned');
     assert.ok(spawned && spawned.error === undefined, 'spawned, with no doubt');
     assert.equal((await Effect.runPromise(e.view(id))).phase, 'running (working)', 'being sent: submitted, which runs as working');

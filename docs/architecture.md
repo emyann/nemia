@@ -110,7 +110,7 @@ of the process that asks, the release installed, and a change to the place reach
 `src/status/status.ts`): a reviewer's `again: true`, and a person's `nemia round`. A merge of the base (`nemia merge`, `src/merge/`) is
 no round: the loop's target is filed again to merge the base at the commit a trial merge read, its try `then: 'merge'`, the run's
 `baseRef` moves to that commit, and the reviewer after it reads the merge; a finding of it with `again: true` is a round, counted as any
-(`test/ship.test.ts`, *a merge send-back leaves the round count unchanged*). A merge of work that merges cleanly is refused, pointed to
+(`test/merge-round-walk.boundary.test.ts`, *a merge send-back leaves the round count unchanged*). A merge of work that merges cleanly is refused, pointed to
 the landing — its approval, or, where its review routes an ungated one, the tick that files it; one of a run whose result step closes no
 loop, to `nemia retry`. Unless the ending's last landing check refused
 the merge staged on the base as it is now (`Landed`'s `refusedOn`): the conflict is semantic, and the merge is asked, its target handed

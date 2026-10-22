@@ -48,6 +48,9 @@ description: "Review a change in this repository as a second engineer would: aga
      does not set; a temporary folder taken from the operating system rather than the repository's own helper.
    - A type-aware lint fix kept unread where the guard it touched exists because a caller does not keep the type.
    - A limit's ceiling raised, or a baseline or a count that only shrinks loosened, in place of the function being cut.
+   - A focused test added where a scenario already walks its story or a table already holds its function's inputs: a finding of
+     kind `test` that names the scenario or the table it should join, as a checkpoint or a row. A race, a crash window, a real
+     boundary or an invariant of a pure function is no such finding.
 6. **Write each finding so the engineer can act on it alone**: the file, the line, the input or case, and the wrong result; its `kind`,
    and the `rule` it cites, by the file that states or holds it and its words. No finding invented to look thorough, none about taste.
 7. **Decide the round**: `again` true only when a finding is worth another round of work. From the second round, read the engineer's

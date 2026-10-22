@@ -55,7 +55,7 @@ const FOLDER = folderOf({
 });
 
 /**
- * An engine board a test settles by hand, as gate.test.ts's: what each task was filed with, every filing, and each task's own session
+ * An engine board a test settles by hand, as the story's stage: what each task was filed with, every filing, and each task's own session
  * (`native-<id>`). A settled task carries the closeout it is given. `list` views the tasks it is handed that were filed, each a read;
  * `reads` is every `view` the caller asked for, in order: what a pass costs the engine.
  */

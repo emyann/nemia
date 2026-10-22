@@ -55,6 +55,9 @@ holds what every change needs.
   `agent-orchestrator`'s `comments.test.ts` — are re-run the same way after a test, a doc or a name moves anywhere.
 - A run's check leaves what its tests cost in `WF_ARTIFACTS`, a `test-costs-<package>-<stamp>.json` per package and try; `node
   tools/test-costs/report.ts <dir>...` ranks them. A package's peak is its largest process, not the sum of the files running at once.
+- A change to tests alone shows that no source file's coverage dropped: `node tools/coverage/record.ts <package-dir> --out
+  before.json` before it and `after.json` after, then `node tools/coverage/compare.ts before.json after.json`, which exits 1 naming
+  each file whose hit lines or branches fell. A session's measure, never run by the suite or CI: it runs the package's whole suite.
 - **A run's checks inherit the daemon's environment** (`WF_MAX_CONCURRENT=50` on the owner's machine): a test that relies on a default
   passes there and fails by hand. All of it but the telemetry, which the runtime takes out of every child that is no session and the
   three test seats drop.
@@ -174,6 +177,8 @@ What the `create-an-agent` skill, being generic, does not say here:
   touched what they read (`tools/guards/CLAUDE.md`). A config guard that imports the orchestrator past its three entries stays in it.
 - `tools/test-costs/` — the repository's test-cost recorder, on every package's `test` script: a probe in each test file's process, a
   reporter beside spec, and `report.ts`; held by `tools/guards/test/test-costs.test.ts` and `suite.test.ts`.
+- `tools/coverage/` — a package's line and branch coverage per source file (`record.ts`) and the comparison of two records
+  (`compare.ts`), a session's measure; held by `tools/guards/test/coverage.test.ts` and its boundary.
 - `tools/journal-bytes/` — what a copy of a runtime store's journals cost, by event kind, the share that is a copy, and the heap a
   full read holds, before and after a refile through bodies (`node --expose-gc tools/journal-bytes/report.ts <root> [--refile <dir>]`).
 - `tools/observe/` — the side Grafana for building Nemia, never shipped: `docker compose -f tools/observe/compose.yaml up -d`, the daemon

@@ -2,8 +2,9 @@
  * What the api's handlers run on: the services every route may read, the runtime an app builds from their layer (`appOf` in app.ts), and
  * `served`, which runs a handler on the request's runtime over them. A test gives the api another environment, engine, root, asker or
  * memo by building an app over a layer of its own, and what the app keeps between requests is its own (`ReadMemo`, the askers, the steps
- * followed: `Followings`). What the package's own verbs read is not a service: the runs, the inbox and the daemon's file are under the
- * package's `HOME`, fixed as it loads (`StoreRoot`, store.ts).
+ * followed: `Followings`). The root is the app's own service, given where the app's layer is composed from `WF_ROOT` (`StoreRoot`,
+ * store.ts; `storeRootLayer` at `app.ts`): what the package still reads off a root of its own as it loads is named in its
+ * `test/global-roots.baseline.ts`.
  */
 import { Context, Effect, Layer, type ManagedRuntime, Metric } from 'effect';
 import type { Context as RequestContext } from 'hono';

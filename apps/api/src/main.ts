@@ -16,7 +16,7 @@
  */
 import { serve } from '@hono/node-server';
 import { Context, Effect } from 'effect';
-import { Conflict, currentRelease, DEFAULT_EVERY_MS, HOME, holdUrl, runMain, runningRelease, trialRefusal, up } from 'agent-orchestrator';
+import { Conflict, currentRelease, DEFAULT_EVERY_MS, holdUrl, runMain, runningRelease, trialRefusal, up, wfRoot } from 'agent-orchestrator';
 import { app, runtime } from './app.ts';
 import type { Services } from './layer.ts';
 import { repoOf } from './capabilities/capabilities.ts';
@@ -36,7 +36,7 @@ let e: Engine['Service'];
 let services: Context.Context<Services>;
 const running = runningRelease();
 try {
-  const trial = trialRefusal(running, currentRelease(), HOME, process.env);
+  const trial = trialRefusal(running, currentRelease(), wfRoot(process.env), process.env);
   if (trial !== null) throw new Conflict({ message: trial });
   ticks = ticksOf(process.argv.slice(2));
   port = portOf(process.env.PORT, ticks);

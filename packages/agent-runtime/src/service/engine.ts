@@ -3,8 +3,6 @@
  * are Effects with typed errors.
  */
 import { Context, Effect, Exit, Fiber, Layer, Schema, type Scope, type Stream } from 'effect';
-import path from 'node:path';
-import os from 'node:os';
 import { fold, nameFor, pathOf, type Input, type LifecycleStep, type Said, type Sighting, type State } from '../core/index.ts';
 import {
   argsRefusalOf,
@@ -666,7 +664,7 @@ const writtenVerbsOf = (...given: Parameters<typeof sayVerbOf>) => ({
 });
 
 /**
- * The engine over `options` that `Engine.layer` builds: the file-backed store under `root` (`~/.agent-engine` by default) or the
+ * The engine over `options` that `Engine.layer` builds: the file-backed store under the `root` given — required, with no default — or the
  * `journal` given, and the `harnesses` given — by default `claude`, `codex` and `claude-detached`. Built once, and shared by every verb:
  *
  * - the store, and its `subscribe` where it has one (the file store's does), which pushes to `watch`;
@@ -685,7 +683,7 @@ const make = (options: EngineOptions) =>
   Effect.gen(function* () {
     const refused = optionsRefusalOf(options);
     if (refused) return yield* Effect.fail(new EngineRefused({ message: refused }));
-    const root = options.root ?? path.join(os.homedir(), '.agent-engine');
+    const root = options.root;
     const harnesses = options.harnesses ?? DEFAULT_HARNESSES;
     const fallback = options.defaultHarness ?? Object.keys(harnesses)[0] ?? 'claude';
 
@@ -891,11 +889,12 @@ const attachVerbsOf = (attached: Attached, root: string, serving: ReturnType<typ
 });
 
 /**
- * The engine, as a service. `Engine.layer(options)` builds one from `EngineOptions`, failing with `EngineRefused` for what
+ * The engine, as a service. `Engine.layer(options)` builds one from `EngineOptions`, whose `root` is required and has no default, so an
+ * engine built with none does not compile; it fails with `EngineRefused` for what
  * `optionsRefusalOf` refuses; a test of a layer above takes the stand-in, `testEngine` of `agent-runtime/testing`. The default harness,
  * `defaultHarness` or else the first, takes a task that names none, and answers `logs`, `transcript` and `say` for a task whose
  * harness this engine does not have, whose `view` asks no harness.
  */
 export class Engine extends Context.Service<Engine, EngineShape>()('agent-runtime/Engine') {
-  static readonly layer = (options: EngineOptions = {}): Layer.Layer<Engine, EngineRefused> => Layer.effect(Engine, make(options));
+  static readonly layer = (options: EngineOptions): Layer.Layer<Engine, EngineRefused> => Layer.effect(Engine, make(options));
 }

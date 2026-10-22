@@ -16,6 +16,7 @@ import { Engine } from '../src/index.ts';
 import type { RunnerOps } from '../src/harness/seam.ts';
 import { asyncStore, asyncOps, type AsyncJournal, type AsyncRunner } from './promise-runner.ts';
 import { builtEngine } from './engine.ts';
+import { scratch } from './scratch.ts';
 
 /**
  * A journal in memory and a harness whose sessions a test moves by hand: what outlives a runtime's process. With
@@ -62,7 +63,8 @@ const world = (o: { spawnHangs?: boolean } = {}) => {
       return '';
     },
   } satisfies AsyncRunner;
-  const runtime = () => builtEngine(Engine.layer({ journal: asyncStore(journal), harnesses: { fake: asyncOps(fake) } }));
+  const runtime = () =>
+    builtEngine(Engine.layer({ root: scratch('ae-restart-root-'), journal: asyncStore(journal), harnesses: { fake: asyncOps(fake) } }));
   const ops: RunnerOps = {
     spawn: (r) => Effect.promise(() => fake.spawn(r)),
     observe: Effect.promise(() => fake.observe()),

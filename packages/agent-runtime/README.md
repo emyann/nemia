@@ -316,6 +316,8 @@ to own the process.
 ## Using it
 
 The engine is an Effect service, `Engine`, and `agent-runtime` its one face: `Engine.layer(options)` takes the engine's options,
+whose `root` — where the file-backed store lives — is required and has no default, so an engine built with none does not compile:
+whoever composes the program says where its records go (`ae` reads `AE_ROOT` once, in `src/cli/main.ts`, and hands the root down),
 and each verb is an Effect whose refusal is a tagged error (`FileRefused`, `TickRefused`, `ListRefused`, …) whose message says
 what to do instead, with no verb in front. A program is run at its edge — `ae`, the api's server, a test — with `Effect.runPromise`;
 a caller that writes no Effect reaches the system through the api. Keep your `effect` version aligned with this package's: Context
@@ -326,7 +328,7 @@ program, `engine` the service it yields (`const engine = yield* Engine`).
 import { Effect } from 'effect'
 import { codex, Engine } from 'agent-runtime'
 
-const layer = Engine.layer({ harnesses: { claude: 'claude-bg', codex } })
+const layer = Engine.layer({ root, harnesses: { claude: 'claude-bg', codex } })
 
 const { entries, cursor } = await Effect.runPromise(
   Effect.gen(function* () {
@@ -348,6 +350,7 @@ const tried = <A>(taskId: string, f: () => Promise<A>) =>
   Effect.tryPromise({ try: f, catch: (e) => new JournalError({ taskId, message: String(e) }) })
 
 Engine.layer({
+  root, // still required: the engine's runners write under it, whatever store keeps the records
   journal: {
     append: (taskId, event) => Effect.asVoid(tried(taskId, () => db.event.create({ data: { jobId: +taskId, payload: event } }))),
     read:   (taskId) => tried(taskId, async () => (await db.event.findMany({ where: { jobId: +taskId } })).map(r => r.payload)),
@@ -564,6 +567,7 @@ where the other harnesses are, by name, and a task picks it by that name, as it 
 
 ```ts
 const layer = Engine.layer({
+  root,
   harnesses: { reviewer: { url: 'https://agents.example/reviewer' } },
   credentials: (scheme, agentUrl, harness) => (scheme === 'token' ? process.env.REVIEWER_TOKEN : undefined),
   missingCredential: (scheme) => `set REVIEWER_TOKEN for \`${scheme}\``, // optional: the end of the refusal's words
@@ -1087,7 +1091,7 @@ unqueued, or whose turn has started, and refuses one it has no record of and a s
 any task in the call). `queued` that is not true or false is refused at `file()` and in a brief, where
 `queued: true` is how `ae start` files one.
 
-**The engine admits too, under its ceiling.** `Engine.layer({ maxConcurrent })` is how many sessions of each pool may be
+**The engine admits too, under its ceiling.** `Engine.layer({ root, maxConcurrent })` is how many sessions of each pool may be
 at work at once; with it, each pass ends by admitting the queued tasks its pools have room for, and the next pass starts
 them (`toAdmit`, `src/core/admission.ts`, pure, called by the pass off the views it built from its one observation). A
 session holds a slot while it works, starts, or is admitted and not yet started; one blocked on a person, held for an
@@ -1098,7 +1102,7 @@ harnesses under one rate limit share one ceiling. With no `maxConcurrent` the pa
 `admit`, as under `ae`, which builds its engine with no ceiling and refuses `AE_MAX_CONCURRENT` (exit 2, naming the option).
 agent-orchestrator files every task `queued` with its run's momentum as `priority`, and hands the engine its ceiling.
 
-**An engine can be unschedulable**, as a node is (`Node.spec.unschedulable`): `Engine.layer({ unschedulable })` is a
+**An engine can be unschedulable**, as a node is (`Node.spec.unschedulable`): `Engine.layer({ root, unschedulable })` is a
 function the pass asks before it admits, every pass, so it is never fixed when the engine is built. While it says true the
 pass admits no queued task, whatever room its pools have; what is at work goes on, a task `admit` names still starts, and
 so does one filed unqueued. Once it says false, the next pass admits as before. One that is not a function is refused
@@ -1795,7 +1799,7 @@ attempt); and, at the engine's `file`, a harness that ends its session with its 
 
 ## What a session exports: `telemetry` and `labels`
 
-An engine given a collector, `Engine.layer({ telemetry: { endpoint } })` (the absolute http(s) URL of an OTLP/HTTP collector,
+An engine given a collector, `Engine.layer({ root, telemetry: { endpoint } })` (the absolute http(s) URL of an OTLP/HTTP collector,
 refused otherwise), tells each spawn where to export, and a harness that can export hands it to its session; an engine given none hands
 nothing. A task filed with `labels`, a Pod's `metadata.labels` — at most 16, each a lowercase word to a text of 1 to 256 characters
 with no control character — is journalled with them, and each of its sessions says them on its resource beside the key the runtime says
@@ -1815,7 +1819,7 @@ worker, a `claude` verb, an admission command, the quota's ask — is started wi
 exports nothing, and a Claude Code session exports only as its runner tells it.
 
 A session's tools' inputs — a command's text, a file's path, an error's words — stay off unless the collector asks for them:
-`Engine.layer({ telemetry: { endpoint, toolDetails: true } })` (any `toolDetails` but `true` is refused). Claude Code is then handed
+`Engine.layer({ root, telemetry: { endpoint, toolDetails: true } })` (any `toolDetails` but `true` is refused). Claude Code is then handed
 `OTEL_LOG_TOOL_DETAILS=1` beside the rest, in a job's environment and in a background session's `--settings`' `env`. Measured on 2.1.293:
 it adds `full_command` (Bash) and `file_path` (Read) to each `claude_code.tool` span, an error's text to `claude_code.tool.execution`'s
 `error` (its class otherwise), and `tool_parameters`, `tool_input` and `error` to the `tool_decision` and `tool_result` events; without
@@ -2446,7 +2450,7 @@ const next = Effect.gen(function* () {
   }
   return cursor
 })
-const cursor = await Effect.runPromise(next.pipe(Effect.provide(Engine.layer())))
+const cursor = await Effect.runPromise(next.pipe(Effect.provide(Engine.layer({ root }))))
 ```
 
 The cursor is a byte offset into the feed as it was ever written, and never expires: a consumer that was away for a

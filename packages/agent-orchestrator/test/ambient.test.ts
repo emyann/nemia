@@ -5,7 +5,9 @@
  * a default fails naming the sentinel, and one that deletes the variable first passes. And a command that ticks, typed in such a file on a
  * store no daemon holds, starts none: the script turns the start off (`NEMIA_DAEMON_START=off`). And a collector the shell or the daemon
  * names is not one a test file exports to: the script drops `OTEL_EXPORTER_OTLP_ENDPOINT`. And a harness's own files are never the
- * person's: the script sets `CLAUDE_CONFIG_DIR` to a scratch folder.
+ * person's: the script sets `CLAUDE_CONFIG_DIR` to a scratch folder. And neither store is the person's: the script points `WF_ROOT`,
+ * `AE_ROOT` and `HOME` at scratch folders, so a module that pins a root as it loads pins a throwaway one and `os.homedir()` answers a
+ * throwaway too.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,8 +16,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
-import { SENTINEL } from './ambient.ts';
-import { scratch } from './scratch.ts';
+import { AWAY, ENGINE, REAL_HOME, SENTINEL, STORE } from './ambient.ts';
+import { machineTempDir, scratch } from './scratch.ts';
 
 const PACKAGE = path.join(import.meta.dirname, '..');
 const TELEMETRY = pathToFileURL(path.join(PACKAGE, 'src', 'telemetry', 'telemetry.ts')).href;
@@ -204,4 +206,23 @@ test("REFUSED under a person's own CLAUDE_CONFIG_DIR: a test file is given a scr
 
 test("this file's own process has the scratch folder too", () => {
   assert.equal(path.basename(process.env.CLAUDE_CONFIG_DIR ?? '').startsWith('wf-ambient-claude-'), true);
+});
+
+test("the three roots a test process starts with are each a scratch folder, and none is the person's store", () => {
+  const temp = fs.realpathSync(machineTempDir());
+  for (const [name, dir, prefix] of [
+    ['WF_ROOT', STORE, 'wf-ambient-store-'],
+    ['AE_ROOT', ENGINE, 'wf-ambient-engine-'],
+    ['HOME', AWAY, 'wf-ambient-home-'],
+  ] as const) {
+    assert.equal(process.env[name], dir, `${name} is not what ambient.ts made`);
+    assert.ok(path.isAbsolute(dir), `${name}=${dir} is not absolute`);
+    assert.ok(fs.realpathSync(dir).startsWith(`${temp}${path.sep}`), `${name}=${dir} is not under ${temp}`);
+    assert.ok(path.basename(dir).startsWith(prefix), `${name}=${dir} is not a scratch folder of this process's`);
+    for (const live of [path.join(REAL_HOME, '.agent-workflows'), path.join(REAL_HOME, '.agent-engine'), REAL_HOME]) {
+      assert.notEqual(fs.realpathSync(dir), live, `${name} is the person's own ${live}`);
+      assert.equal(fs.realpathSync(dir).startsWith(`${live}${path.sep}`), false, `${name} is under the person's own ${live}`);
+    }
+  }
+  assert.equal(fs.realpathSync(os.homedir()), fs.realpathSync(AWAY), "os.homedir() still answers the person's own home");
 });

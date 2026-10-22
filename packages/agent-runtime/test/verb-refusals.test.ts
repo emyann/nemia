@@ -497,7 +497,11 @@ test("interrupt's refusal of a task settled and of one with no attempt in flight
 });
 
 test('options an engine cannot be built from: EngineRefused from the layer, worded by refusalWords as ae says it', async () => {
-  const options = { journal: asyncStore(memoryJournal()), maxConcurrent: 0 } as unknown as EngineOptions;
+  const options: EngineOptions = {
+    root: scratch('ae-verbs-refused-'),
+    journal: asyncStore(memoryJournal()),
+    maxConcurrent: 0,
+  };
   const refused = await failure(Effect.runPromise(Engine.use((e) => Effect.succeed(e)).pipe(Effect.provide(Engine.layer(options)))));
   assert.equal(refused._tag, 'EngineRefused');
   assert.match(refused.message, /^`maxConcurrent: 0` is not a ceiling\./);

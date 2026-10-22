@@ -3,9 +3,10 @@
  * a call of `os.tmpdir` anywhere else under `test/`, or in a test beside the code under `src/`, is refused. `test/scratch.ts` here is
  * the one copy, and each other package's is held to it by that package's own `scratch.test.ts`. A test of where the code under test
  * runs a process names the temp directory with `machineTempDir()`, which the scan refuses only on a line that makes a root with
- * `mkdtempSync`. A Claude Code runner a test
- * makes is given its `root`, which it writes to as it looks (`harness/claude/quiet.ts`): a call with none is refused, since
- * the default is the person's own store.
+ * `mkdtempSync`. A Claude Code runner a test makes, and an engine, are each given their `root`, which they write to as they look
+ * (`harness/claude/quiet.ts`, `service/engine.ts`): a call with none is refused. `root` is required on both today, so the typecheck
+ * refuses one too — this rule is what names the call and the line, and what catches a rootless literal written inline and cast past
+ * the typecheck (`rootlessRunners`, whose one escape says what it does not reach).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -63,10 +64,23 @@ test('no test makes a root but through scratch', () => {
   assert.deepEqual(refused, [], 'make the root with scratch(prefix) from test/scratch.ts, which takes it away with what runs in it');
 });
 
-/** The makers of a Claude Code runner, whose `root` defaults to the person's own store. */
-const RUNNERS = /\b(?:claudeOps|claudeCodeOps|Runner\.claude)\s*\(/g;
+/**
+ * The makers of a Claude Code runner, and of an engine: each writes under its `root`, and each must be given one. `Engine.layer` is
+ * among them because the engine builds its runners under the root it is given, and it was the maker the rule missed when a test wrote
+ * `~/.agent-engine/parent/ae_t_1.json` on the person's own machine.
+ */
+const RUNNERS = /\b(?:claudeOps|claudeCodeOps|Runner\.claude|Engine\.layer)\s*\(/g;
 
-/** Each call in `text` of a maker in `RUNNERS` whose arguments do not name `root`, by its line; a comment line is passed over. */
+/**
+ * Each call in `text` of a maker in `RUNNERS` whose arguments do not name `root`, by its line; a comment line is passed over, and so
+ * is a call handed one bare name (`Engine.layer(options)`, `claudeOps(...opts)`), which the rule trusts to the typecheck: the
+ * required `root` on the options type refuses that one at compile time, and this rule cannot read where the name was bound.
+ *
+ * So the one shape neither reaches is a rootless literal bound and cast on another line, then handed over by name. Six call sites in
+ * this package hand a root-carrying variable by name, which is why the escape is here rather than the sites being rewritten; the
+ * package has no rootless cast left — `test/verb-refusals.test.ts`'s was the one, and it names a root now, with no cast at all: a
+ * `maxConcurrent: 0` is a legal number the engine refuses when it builds, which is what that test is about.
+ */
 const rootlessRunners = (text: string) =>
   [...text.matchAll(RUNNERS)].flatMap((m) => {
     const start = (m.index ?? 0) + m[0].length;
@@ -78,14 +92,17 @@ const rootlessRunners = (text: string) =>
     }
     const line = text.slice(0, m.index).split('\n').length;
     const shown = text.split('\n')[line - 1].trim();
-    if (/^(?:\*|\/\/|\/\*)/.test(shown) || /\broot\b/.test(text.slice(start, end))) return [];
+    const args = text.slice(start, end);
+    const given = /^\s*\)/.test(args) ? false : /^\s*(?:\.\.\.)?[A-Za-z_$][\w$]*\s*\)?\s*$/.test(args);
+    if (/^(?:\*|\/\/|\/\*)/.test(shown) || /\broot\b/.test(args) || given) return [];
     return [`${line}: ${shown}`];
   });
 
-test('REFUSED: a Claude Code runner made with no root is found, whichever maker and however its arguments are laid out', () => {
+test('REFUSED: a Claude Code runner or an engine made with no root is found, whichever maker and however its arguments are laid out', () => {
   const maker = 'claude' + 'Ops';
   const codeMaker = 'claudeCode' + 'Ops';
   const runnerMaker = 'Runner.' + 'claude';
+  const engineMaker = 'Engine.' + 'layer';
   assert.deepEqual(rootlessRunners(`const a = 1;\nconst ops = ${maker}({ now: () => t });\n`), [
     `2: const ops = ${maker}({ now: () => t });`,
   ]);
@@ -95,13 +112,36 @@ test('REFUSED: a Claude Code runner made with no root is found, whichever maker 
   assert.deepEqual(rootlessRunners(`${maker}({\n  root,\n  now: () => f(t),\n})`), [], 'a root given on another line');
   assert.deepEqual(rootlessRunners(`${maker}({ ...opsOptions(root), now })`), [], 'a root given through a helper');
   assert.deepEqual(rootlessRunners(` * The argv \`${maker}().spawn\` hands over`), [], 'a comment is passed over');
+  assert.equal(rootlessRunners(`${engineMaker}()`).length, 1, 'an engine with no options at all');
+  assert.deepEqual(
+    rootlessRunners(`const e = ${engineMaker}({ journal: memoryJournal() });\n`),
+    [`1: const e = ${engineMaker}({ journal: memoryJournal() });`],
+    'a journal is no root: the engine builds its runners under the root',
+  );
+  assert.equal(rootlessRunners(`${engineMaker}({\n  harnesses,\n})`).length, 1, 'laid over several lines');
+  assert.deepEqual(rootlessRunners(`${engineMaker}({ ...optionsFor(root) })`), [], 'a root given through a helper');
+  assert.deepEqual(
+    rootlessRunners(`${engineMaker}(options)`),
+    [],
+    'one bare name, trusted to the typecheck: the required root refuses it there, and this rule cannot read where it was bound',
+  );
+  assert.deepEqual(rootlessRunners(`${engineMaker}(...given)`), [], 'and one spread bare');
+  assert.deepEqual(
+    rootlessRunners(`const e = ${engineMaker}({ journal } as never);\n`),
+    [`1: const e = ${engineMaker}({ journal } as never);`],
+    'a literal cast past the typecheck is exactly what the rule is for',
+  );
 });
 
-test('no test makes a Claude Code runner over the default store', () => {
+test('no test makes a Claude Code runner or an engine over the default store', () => {
   const files = [
     ...fs.readdirSync(TEST, { recursive: true, encoding: 'utf8' }).filter((f) => /\.(ts|tsx)$/.test(f) && f !== 'scratch.test.ts'),
     ...besideTheCode(),
   ];
   const refused = files.flatMap((f) => rootlessRunners(fs.readFileSync(path.join(TEST, f), 'utf8')).map((l) => `${f}:${l}`));
-  assert.deepEqual(refused, [], "give the runner a root from scratch(prefix): with none it writes into the person's own ~/.agent-engine");
+  assert.deepEqual(
+    refused,
+    [],
+    "give the runner or the engine a root from scratch(prefix): with none it writes into the person's own ~/.agent-engine",
+  );
 });

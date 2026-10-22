@@ -10,7 +10,7 @@ you start from it, and a person decides whether it ships.
 
 ## Commit as you go
 
-This section is a step's that writes the repository; a read-only step reads the sections below instead.
+This section is a step's that writes the repository; a read-only step works from *Read what changed* instead.
 
 - Commit your work on your branch in small commits with plain messages, as you make it: a short imperative subject, and a body saying
   why when it is not plain.
@@ -39,6 +39,8 @@ branch changed against the base, file by file.
 
 ## Merge the base when a person asks
 
+This section is a step's that writes the repository; a read-only step works from *Read what changed* instead.
+
 A person can send a loop's work back to merge its base branch (`nemia merge <run>`), when the base moved and the work no longer lands.
 Your brief names the commit the person's trial merge read: merge that commit, never the base as it stands now, which may have moved again.
 
@@ -52,7 +54,7 @@ finds it with `git log --merges -1`.
 
 ## Stage a landing
 
-This section is a step's that lands the run's result; a read-only step reads the sections above instead.
+This section is a step's that lands the run's result; a read-only step works from *Read what changed* instead.
 
 When your step lands the run's result on its base, in the repository's own checkout, you stage the merge and the run commits it:
 

@@ -111,8 +111,11 @@ test('the place declares what a landing is denied, the commands that commit its 
   assert.ok(fs.existsSync(path.join(GIT_SKILL, 'SKILL.md')), 'and it is still a skill');
 });
 
-/** The sections of the skill that are a step's that writes the repository, each of which opens by saying whose it is. */
-const WRITE_SECTIONS = ['Commit as you go', 'Stage a landing'];
+/**
+ * The sections of the skill a read-only step cannot act on, each of which opens by saying whose it is and naming the section such a step
+ * works from instead: committing, merging the base and landing all write the repository.
+ */
+const WRITE_SECTIONS = ['Commit as you go', SKILL_SECTIONS.merge, 'Stage a landing'];
 
 /** The read forms *Read what changed* names, each one a read-only step of any factory may type. */
 const READ_FORMS = [
@@ -151,6 +154,10 @@ test('each section of the skill that writes the repository opens by saying whose
   for (const name of WRITE_SECTIONS) {
     const opener = openerOf(skill, name);
     assert.match(opener, /read-only step/, `${name} opens by saying whose section it is`);
+    assert.ok(
+      opener.includes(`*${SKILL_SECTIONS.read}*`),
+      `${name} names the section a read-only step works from, never a direction: ${opener}`,
+    );
     assert.doesNotMatch(opener, /\bnever\b/i, `${name} opens saying whose work it is, not what the reader may not do`);
   }
 });
@@ -160,8 +167,15 @@ test('Read what changed names each read form a read-only step types, so the one 
   for (const form of READ_FORMS) assert.ok(section.includes(`\`${form}`), `${SKILL_SECTIONS.read} names ${form}: ${section}`);
 });
 
-test('REFUSED: a Stage a landing that opens with a prohibition, and a Read what changed with a form taken out, are each named', () => {
+test('REFUSED: an opener that points a direction rather than naming the section, one that is a prohibition, and a read form taken out', () => {
   const skill = fs.readFileSync(path.join(GIT_SKILL, 'SKILL.md'), 'utf8');
+  const directed = skill.replaceAll(
+    `a read-only step works from *${SKILL_SECTIONS.read}* instead.`,
+    'a read-only step reads the sections below instead.',
+  );
+  assert.notEqual(directed, skill, 'each write section names the section a read-only step works from');
+  for (const name of WRITE_SECTIONS)
+    assert.ok(!openerOf(directed, name).includes(`*${SKILL_SECTIONS.read}*`), `${name}: a direction in place of the name`);
   const forbidding = skill.replace(/^## Stage a landing\n\n[^\n]+/m, '## Stage a landing\n\nA read-only step never commits here.');
   assert.notEqual(forbidding, skill, 'Stage a landing opens with one line');
   assert.match(openerOf(forbidding, 'Stage a landing'), /\bnever\b/i);

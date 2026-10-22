@@ -25,10 +25,11 @@
  * Every read-only agent of the team (`READ_ONLY_AGENTS`) asks each of git's read-only questions by its own allow, whatever the settings
  * say, and runs no git write (`GIT_READS`, `GIT_WRITES`, `runs`); the four carry one and the same set of rules, each names the place's
  * own skill, which grants no tool so their Skill tool loads it (`placeSkillUnnamed`, `allowedToolsOf`), and git whole, `git worktree`
- * whole or `git branch` whole in place of a rule of the set opens a write. `git grep`'s pager option, the one read of the set that runs
- * a program of its own, is denied by each of them beside the allow (`GIT_GREP_PAGER`). Every git question Agora's skill names is one
- * that allow reaches (`askedGit`). Its step is refused the whole suite its round's check already ran by a deny of its own of each
- * spelling (`WHOLE_SUITE`), and runs a package's tests and a file's
+ * whole or `git branch` whole in place of a rule of the set opens a write. Each call of the set that would run a program of its own —
+ * `git grep`'s pager option in every spelling git takes, and an assignment of git's environment that names a program git runs — is
+ * denied by each of them beside the allow (`GIT_RUNS_A_PROGRAM`), each deny proven to be the one that refuses its own spellings. Every
+ * git question Agora's skill names is one that allow reaches (`askedGit`). Its step is refused the whole suite its round's check
+ * already ran by a deny of its own of each spelling (`WHOLE_SUITE`), and runs a package's tests and a file's
  * (`SCOPED_TESTS`). An agent's fence names no command of this repository: the checks a step names in its note are allowed by the
  * settings (`CHECKERS`, `unallowed`), and the denies that answer those allows are the step's own.
  * The render of a checkout's dashboards (`tools/observe/render/render.ts`) starts a container, so it is the implementer's alone: design
@@ -1774,32 +1775,83 @@ test('every read-only agent is refused every git write: no allow of its own, of 
 });
 
 /**
- * `git grep`'s pager option, which runs a program of its own on the files that matched (`-O<command>`,
- * `--open-files-in-pager=<command>`), in the spellings a session types: glued, after another option, and spelled out. It is the one read
- * of the set that can run anything, so each read-only agent denies it beside the allow, and the deny is matched against the command as
- * typed, with any assignment kept.
+ * Every call of the read set that would run a program of its own, in the spellings a session types, each measured in a checkout to run
+ * one:
+ *
+ * - `git grep`'s pager option runs a command on the files that matched. Short, it is `-O<command>`, and git bundles it after other short
+ *   options (`-nOsh`), so the deny is every capital `O` after `git grep`. Long, git's parse-options takes any unambiguous abbreviation,
+ *   and `--open-files-in-pager` is the only long option of `git grep` that begins `--op` (`--o` alone git refuses as ambiguous), so the
+ *   deny is `--op` and every longer spelling holds it. A pattern or path of a search that carries a capital `O` is refused with them:
+ *   the cost of a deny that cannot read an option list is a refusal the session reports, which is the trade this set is built on.
+ * - An assignment before a git command names a program git then runs: `GIT_EXTERNAL_DIFF` once per changed path for every diff git
+ *   shows, and `diff.external` through `GIT_CONFIG_COUNT`/`GIT_CONFIG_KEY_0`. An allow is matched against the part with its assignment
+ *   stripped, so no allow of the set can refuse one; a deny is matched against the part as typed too, so one deny of every part that
+ *   opens `GIT_` covers git's whole environment, whatever option it names. It is the fence under what each of these roles' skills
+ *   already says in prose: never `VAR=`.
  */
-const GIT_GREP_PAGER: Call[] = [
+const GIT_RUNS_A_PROGRAM: Call[] = [
   'git grep -Osh foo HEAD',
   'git grep -n -Osh foo HEAD',
+  'git grep -nOsh foo HEAD',
   'git grep --open-files-in-pager=sh foo HEAD',
+  'git grep --open=sh foo HEAD',
+  'git grep --ope=sh foo HEAD',
+  'git grep --op=sh foo HEAD',
   'GIT_PAGER=sh git grep -Osh foo HEAD',
+  'GIT_EXTERNAL_DIFF=sh git diff HEAD',
+  'GIT_EXTERNAL_DIFF=sh git show HEAD',
+  'GIT_EXTERNAL_DIFF=sh git log -p',
+  'GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=diff.external GIT_CONFIG_VALUE_0=sh git diff HEAD',
 ].map((command) => ({ tool: 'Bash', command }));
 
-test("every read-only agent denies git grep's pager option, which would run a program of its own, and asks a plain git grep all the same", () => {
+/** A plain read of each verb those denies narrow, which every read-only agent still asks. */
+const STILL_ASKED: Call[] = ['git grep -n foo HEAD', 'git diff HEAD', 'git show HEAD', 'git log -p'].map((command) => ({
+  tool: 'Bash',
+  command,
+}));
+
+test('every read-only agent is refused every call of the set that would run a program of its own, and asks each plain read all the same', () => {
   for (const agent of READ_ONLY_AGENTS) {
     const step = shippedStepOf(agent);
-    assert.deepEqual(runs(step, GIT_GREP_PAGER), [], agent);
-    assert.deepEqual(runs(step, [{ tool: 'Bash', command: 'git grep -n foo HEAD' }], {}, []), ['Bash(git grep -n foo HEAD)'], agent);
+    assert.deepEqual(runs(step, GIT_RUNS_A_PROGRAM), [], agent);
+    assert.deepEqual(runs(step, STILL_ASKED, {}, []), STILL_ASKED.map(shown), agent);
   }
 });
 
-test("REFUSED: a read-only agent without its deny of git grep's pager option runs a program by it", () => {
+test('REFUSED: a read-only agent without those denies runs a program by each of them', () => {
   for (const agent of READ_ONLY_AGENTS) {
     const step = shippedStepOf(agent);
-    const open = { ...step, disallowedTools: (step.disallowedTools ?? []).filter((rule) => !rule.startsWith('Bash(git grep ')) };
-    assert.deepEqual(runs(open, GIT_GREP_PAGER), GIT_GREP_PAGER.map(shown), agent);
+    const open = {
+      ...step,
+      disallowedTools: (step.disallowedTools ?? []).filter((rule) => !/^Bash\((?:git grep |GIT_)/.test(rule)),
+    };
+    assert.deepEqual(runs(open, GIT_RUNS_A_PROGRAM), GIT_RUNS_A_PROGRAM.map(shown), agent);
   }
+});
+
+test('REFUSED: each deny on its own, so none of the three is carried by another', () => {
+  const step = shippedStepOf('agora');
+  const without = (rule: string): Step => ({
+    ...step,
+    disallowedTools: (step.disallowedTools ?? []).filter((kept) => kept !== rule),
+  });
+  assert.deepEqual(runs(without('Bash(git grep *O*)'), GIT_RUNS_A_PROGRAM), [
+    'Bash(git grep -Osh foo HEAD)',
+    'Bash(git grep -n -Osh foo HEAD)',
+    'Bash(git grep -nOsh foo HEAD)',
+  ]);
+  assert.deepEqual(runs(without('Bash(git grep *--op*)'), GIT_RUNS_A_PROGRAM), [
+    'Bash(git grep --open-files-in-pager=sh foo HEAD)',
+    'Bash(git grep --open=sh foo HEAD)',
+    'Bash(git grep --ope=sh foo HEAD)',
+    'Bash(git grep --op=sh foo HEAD)',
+  ]);
+  assert.deepEqual(runs(without('Bash(GIT_*)'), GIT_RUNS_A_PROGRAM), [
+    'Bash(GIT_EXTERNAL_DIFF=sh git diff HEAD)',
+    'Bash(GIT_EXTERNAL_DIFF=sh git show HEAD)',
+    'Bash(GIT_EXTERNAL_DIFF=sh git log -p)',
+    'Bash(GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=diff.external GIT_CONFIG_VALUE_0=sh git diff HEAD)',
+  ]);
 });
 
 test('REFUSED: a read-only agent allowed git whole, git worktree whole or git branch whole runs a write', () => {

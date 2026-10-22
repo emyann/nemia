@@ -340,11 +340,20 @@ const breakdownOf = (page: Page): Locator => page.locator('[data-slot="tooltip"]
  */
 async function theClockPreview(page: Page): Promise<void> {
   const size = page.viewportSize() ?? LAPTOP;
+  const first = page.locator(`${FLIGHT} tr[data-run]`).first();
+  const clock = first.locator('td[data-clock] button');
+  /** The clock reached by the table's own arrow keys from its row: the keyboard alone, which is the focus a tooltip opens on. */
+  const byKeys = async () => {
+    await first.scrollIntoViewIfNeeded();
+    await first.focus();
+    const elsewhere = () => clock.evaluate((found) => found !== document.activeElement);
+    for (let at = 0; at < 14 && (await elsewhere()); at += 1) await page.keyboard.press('ArrowRight');
+    if (await elsewhere()) throw new Refused("the arrow keys reach the Clock cell's button along its row — they do not");
+  };
   try {
     for (const sized of [LAPTOP, PHONE]) {
       const where = JSON.stringify(sized);
       await page.setViewportSize(sized);
-      const clock = page.locator(`${FLIGHT} tr[data-run] td[data-clock] button`).first();
       await clock.scrollIntoViewIfNeeded();
       await page.mouse.move(0, 0);
       await expectCount(breakdownOf(page), 0, `in ${where}, no breakdown is open before the pointer comes to a clock`);
@@ -352,25 +361,25 @@ async function theClockPreview(page: Page): Promise<void> {
       await expectVisible(breakdownOf(page), `in ${where}, a clock the pointer rests on opens its breakdown`);
       await page.mouse.move(0, 0);
       await expectCount(breakdownOf(page), 0, 'the pointer gone, it closes');
-      await clock.focus();
-      await expectVisible(breakdownOf(page), `in ${where}, a clock the keyboard focuses opens it, with no pointer`);
+      await byKeys();
+      await expectVisible(breakdownOf(page), `in ${where}, a clock the keyboard reaches opens it, with no pointer`);
       await page.keyboard.press('Escape');
       await expectCount(breakdownOf(page), 0, 'Escape closes it');
-      await clock.focus();
-      await expectVisible(breakdownOf(page), 'focused again, it opens again');
-      await page.locator(`${FLIGHT} tr[data-run]`).first().focus();
+      await first.focus();
+      await byKeys();
+      await expectVisible(breakdownOf(page), 'left and reached again, it opens again');
+      await first.focus();
       await expectCount(breakdownOf(page), 0, 'the focus gone from the clock, it closes');
     }
     await page.setViewportSize(LAPTOP);
-    const row = page
+    const barred = page
       .locator(`${FLIGHT} tr[data-run]`)
       .filter({ has: page.locator('[data-step-bar][data-step-preview="card"]') })
       .first();
-    const clock = row.locator('td[data-clock] button');
-    const bar = row.locator('[data-step-bar]').first();
-    await row.scrollIntoViewIfNeeded();
+    const bar = barred.locator('[data-step-bar]').first();
+    await barred.scrollIntoViewIfNeeded();
     await page.mouse.move(0, 0);
-    await clock.hover();
+    await barred.locator('td[data-clock] button').hover();
     await expectVisible(breakdownOf(page), "the clock's breakdown opens on the row the rail's bars stand in");
     await bar.hover();
     await expectVisible(previewOf(page), "the pointer slid onto a bar of the same row opens the step's card");

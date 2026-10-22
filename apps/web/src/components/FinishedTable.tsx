@@ -83,13 +83,13 @@ export function FinishedTable({ page }: { page: FinishedPage }) {
               <Column id="factory" className={cn(HEAD, 'w-24')}>
                 Factory
               </Column>
-              <Column id="created" className={cn(HEAD, 'w-28')}>
+              <Column id="created" className={cn(HEAD, 'w-32')}>
                 Created
               </Column>
-              <Column id="finished" className={cn(HEAD, 'w-28')}>
+              <Column id="finished" className={cn(HEAD, 'w-32')}>
                 Finished
               </Column>
-              <Column id="clock" align="end" className={cn(HEAD, 'w-28')}>
+              <Column id="clock" align="end" className={cn(HEAD, 'w-32')}>
                 Clock
               </Column>
               <Column id="cost" align="end" className={cn(HEAD, 'w-20')}>

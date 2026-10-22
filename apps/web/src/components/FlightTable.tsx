@@ -60,7 +60,7 @@ export function FlightTable({ runs, asOf }: { runs: readonly ListedRun[]; asOf: 
             <Column id="now" className={cn(HEAD, 'w-56')}>
               Now
             </Column>
-            <Column id="clock" align="end" className={cn(HEAD, 'w-28')}>
+            <Column id="clock" align="end" className={cn(HEAD, 'w-32')}>
               Clock
             </Column>
             <Column id="cost" align="end" className={cn(HEAD, 'w-24')}>

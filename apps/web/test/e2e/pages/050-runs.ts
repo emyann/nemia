@@ -494,6 +494,20 @@ async function finger(page: Page, open: OpenRuns, finished: FinishedPage): Promi
 }
 
 /**
+ * The Clock cell's button of `row`, reached by the table's own arrow keys from the row: the keyboard alone, which is what makes the
+ * focus a visible one and so opens the preview — React Aria opens a tooltip on focus only where the focus came from the keyboard.
+ */
+async function reachClock(page: Page, row: Locator, where: string): Promise<Locator> {
+  const clock = row.locator('td[data-clock] button');
+  await row.scrollIntoViewIfNeeded();
+  await row.focus();
+  const elsewhere = () => clock.evaluate((found) => found !== document.activeElement);
+  for (let at = 0; at < 14 && (await elsewhere()); at += 1) await page.keyboard.press('ArrowRight');
+  if (await elsewhere()) throw new Refused(`the arrow keys reach the Clock cell's button along a ${where} row — they do not`);
+  return clock;
+}
+
+/**
  * The Clock column of both tables says the run's time at work, which is what `runClock` writes for a row, and never its wall time: a run
  * that waited an hour for others to land said `1h 33m` while it had worked for minutes, and one that has filed nothing says `not
  * started`. A preview over the words breaks that clock down — the rows the waiting card's Clock tile shows, with the wall time as the
@@ -519,13 +533,15 @@ async function clocksSay(page: Page, open: OpenRuns, finished: FinishedPage): Pr
     throw new Refused("the seed holds a run whose wall time is not its time at work: without one the column's words prove nothing");
 
   for (const table of tables) {
+    const row = section(page, table.where).locator('tr[data-run]').first();
+    const id = await row.getAttribute('data-run');
     const asked: string[] = [];
-    const hear = (request: { url(): string }) => void (request.url().includes('/api/') && asked.push(request.url()));
-    const trigger = section(page, table.where).locator('tr[data-run] td[data-clock] button').first();
-    await trigger.scrollIntoViewIfNeeded();
+    const hear = (request: { url(): string }) => void (request.url().includes(`/api/runs/${id}`) && asked.push(request.url()));
+    await row.scrollIntoViewIfNeeded();
+    await page.mouse.move(0, 0);
     page.on('request', hear);
-    await trigger.focus();
-    await expectVisible(tooltip(page), `the Clock cell of a ${table.where} row opens its preview on focus, with no pointer`);
+    await row.locator('td[data-clock] button').hover();
+    await expectVisible(tooltip(page), `the Clock cell of a ${table.where} row opens its preview on a resting pointer`);
     const rows = await tooltip(page)
       .locator('[data-breakdown-row]')
       .evaluateAll((all) => all.map((row) => row.getAttribute('data-breakdown-row') ?? ''));
@@ -533,12 +549,17 @@ async function clocksSay(page: Page, open: OpenRuns, finished: FinishedPage): Pr
       if (!rows.includes(what))
         throw new Refused(`the ${table.where} preview holds the waiting card's own rows — it holds ${rows.join(', ')}`);
     await expectVisible(tooltip(page).locator('[data-breakdown-row="Waiting on you"] dd'), 'each row with its figure');
-    const described = await focused(page).getAttribute('aria-describedby');
-    if (!described) throw new Refused(`the ${table.where} Clock cell is described by its preview while it shows`);
-    await photograph(page, path.join(OUT, `runs-clock-preview-${table.where}-${await themeOf(page)}.png`));
     page.off('request', hear);
     if (asked.length)
       throw new Refused(`the preview opens with no request: the row carries its clock — the page asked ${asked.join(', ')}`);
+    await page.mouse.move(0, 0);
+    await expectCount(tooltip(page), 0, 'the pointer gone, it closes');
+
+    await reachClock(page, row, table.where);
+    await expectVisible(tooltip(page), `and the ${table.where} row's clock opens it on focus too, with no pointer`);
+    const described = await focused(page).getAttribute('aria-describedby');
+    if (!described) throw new Refused(`the ${table.where} Clock cell is described by its preview while it shows`);
+    await photograph(page, path.join(OUT, `runs-clock-preview-${table.where}-${await themeOf(page)}.png`));
     await page.keyboard.press('Escape');
     await expectCount(tooltip(page), 0, 'Escape closes it');
   }

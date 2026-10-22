@@ -8,15 +8,16 @@ team that works it is in `workflows/agents/`. What follows is for the operator o
 - Every run starts in this factory: `nemia start "<brief>" --workflows <workflow> --factory nemia`.
 - An idea that changes the model or needs more than one card goes to `intake` first (Iris interviews the person), and its build is
   started `--after` the intake run: `nemia start "<brief>" --workflows build --factory nemia --after <intake run>`.
-- A small change its card settles goes to `quick` (`--workflows quick`, or `workflow: quick` on its card): implement, then land,
-  which waits at its gate, with no spec and no review. `workflows/quick/README.md` says the bound; a settled change past it goes
-  straight to `build`.
-- A quick run has no review but the person's read when land waits at its gate: read its plan on the run's page and its whole change
-  in a terminal (`git diff main...wf/<run>/run`) before approving, until the board shows the change there.
+- A small change its card settles goes to `quick` (`--workflows quick`, or `workflow: quick` on its card): implement, then a review,
+  then a landing nobody is asked to approve — Agora's pass files it. `workflows/quick/README.md` says the bound; a settled change past
+  it goes straight to `build`.
+- A quick run is read by Agora, not by the person: there is nothing to bring you for its landing, and `nemia approve` is refused
+  there (*What waits on the person*, below, says what is still yours on such a run, and how to ask to read one yourself).
 - A quick run whose check refuses its size is a `build` card: cancel it and start the card with `build`, as the refusal says.
 - A landing whose check refused is sent back to the step that built the change, with the check's words (`nemia decide <run>` prints
-  them), without waiting to be asked: in `quick`, `nemia retry <run> implement --message "<what failed>"`. The next landing is
-  approved by whoever approved the first: an approval is for one try.
+  them), without waiting to be asked: in `quick`, `nemia retry <run> implement --message "<what failed>"`. On `build`, the next
+  landing is approved again by whoever approved the first: an approval is for one try. On `quick` the work goes round the review once
+  more instead, and its pass files the landing, with nobody to approve.
 - One coherent slice a card: a card cut too small slows the factory more than it saves.
 - Cards that change the command table (`packages/agent-orchestrator/src/command/`, the api's routes) or the board's frame collide with
   each other: chain them, the second started `--after` the first, never side by side.

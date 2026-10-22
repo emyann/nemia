@@ -2251,6 +2251,16 @@ test("an ending's `check:` is filed by a person's approval or by a step that can
     /and this step has no `gate: true` and waits on nothing\. Add `gate: true`, give the step before it a `loop:`/,
     'an ending that waits on nothing has no step to route it either',
   );
+  assert.throws(
+    () =>
+      validate([...folder(true, false).slice(0, 2), { name: 'measure', after: ['review'], body: 'x' }, { ...ending, after: ['measure'] }]),
+    (e: WorkflowError) =>
+      e.exitCode === 2 &&
+      /and this step has no `gate: true` and waits on no step with a `loop:` \(it waits on measure\)\. Add `gate: true`, give measure a `loop:`/.test(
+        e.message,
+      ),
+    'a looping step in the folder that the ending does not wait on routes nothing: measure sits between the loop and the merge, and nothing it hands on can be sent back',
+  );
 
   assert.doesNotThrow(() => validate(folder(true, false)), "a looping step before it files it: quick's shape");
   assert.doesNotThrow(() => validate(folder(false, true)), "a person's approval files it: build's shape");

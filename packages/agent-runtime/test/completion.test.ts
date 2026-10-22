@@ -33,7 +33,7 @@ const BOOT = 'boot-1';
  * Claude Code's `--bg` runner over a scratch root, whose monotonic clock, when the test gives it a wall clock (`now`) and no
  * monotonic one (`mono`), reads the same as the wall clock: a machine whose two clocks agree.
  */
-const bgOps = (o: ClaudeOptions = {}) => {
+const bgOps = (o: Omit<ClaudeOptions, 'root'> & { root?: string } = {}) => {
   const now = o.now;
   return claudeOps({
     ...(now ? { mono: () => ({ boot: BOOT, ms: now() }) } : {}),

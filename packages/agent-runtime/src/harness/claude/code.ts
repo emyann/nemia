@@ -22,7 +22,6 @@
  * background session's environment is its own.
  */
 import { Effect, Stream } from 'effect';
-import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { nameParts, type Sighting } from '../../core/index.ts';
@@ -269,8 +268,8 @@ export const isClaudeJob = (sessionId: string) => nameParts(sessionId) !== undef
  * - `kept` names what either mode keeps under each session's name, joined the same way, a path named once.
  * - `compact` rewrites the jobs' ended captures to what their readers read (`claudeStreamKept`); a background session keeps none.
  */
-export const claudeCodeOps = (options: ClaudeOptions = {}, attached?: Attached): RunnerOps => {
-  const root = options.root ?? path.join(os.homedir(), '.agent-engine');
+export const claudeCodeOps = (options: ClaudeOptions, attached?: Attached): RunnerOps => {
+  const root = options.root;
   const spec = claudeJobSpec(options.claudeExecutable);
   const plain = detachedOps(spec, root);
   const job = attached ? withAttached(plain, attached) : plain;

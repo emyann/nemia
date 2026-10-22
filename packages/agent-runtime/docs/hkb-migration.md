@@ -98,7 +98,7 @@ import { openBoard } from './db.ts'
 export const prismaJournal = (boardId: number): JournalOps => { /* four methods */ }
 ```
 
-The engine takes it as `Engine.layer({ journal: prismaJournal(boardId) })`, each method an Effect
+The engine takes it as `Engine.layer({ root, journal: prismaJournal(boardId) })`, each method an Effect
 (`list` an Effect value): a Prisma call goes in through `Effect.tryPromise`, its failure a `JournalError`.
 
 Three details that make it fit:

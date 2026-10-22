@@ -14,6 +14,7 @@ import { Engine } from '../src/index.ts';
 import { admissionOf, awaitsAdmission, decide, fold, nameFor, type State } from '../src/core/domain.ts';
 import { asyncStore, asyncOps, type AsyncJournal, type AsyncRunner } from './promise-runner.ts';
 import { builtEngine } from './engine.ts';
+import { scratch } from './scratch.ts';
 
 const T0 = new Date('2026-09-25T09:00:00Z');
 const at = (ms: number) => new Date(T0.getTime() + ms).toISOString();
@@ -140,6 +141,7 @@ const board = () => {
   const journal = memoryJournal(reads);
   const engine = builtEngine(
     Engine.layer({
+      root: scratch('ae-admit-root-'),
       journal: asyncStore(journal),
       harnesses: { fake: asyncOps(countingHarness(sessions, observes)) },
       defaultHarness: 'fake',

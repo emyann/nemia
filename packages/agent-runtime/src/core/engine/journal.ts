@@ -10,7 +10,6 @@
 import { Context, Effect, Layer, Result, Schema } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
 import type { Event } from '../domain.ts';
 import {
   entryWords,
@@ -442,15 +441,15 @@ export class Journal extends Context.Service<Journal, JournalShape>()('engine/Jo
     );
   };
 
-  /** Files under `root` (default `~/.agent-engine`). The default, and the standalone one. */
-  static files = (root?: string) => Journal.layer(Journal.filesOps(root));
+  /** Files under `root`, which is required: with none a journal would be written into the person's own `~/.agent-engine`. */
+  static files = (root: string) => Journal.layer(Journal.filesOps(root));
 
   /**
    * The same implementation as a plain value, for a caller that needs its optional `subscribe`. A line is read as its JSON,
    * or as its text where it is none — a write cut short — for the decoder to refuse by place. A task's journal is read through
    * one `journalReader` for the value's life, so a read costs a `stat` and the bytes appended since this value last read it.
    */
-  static filesOps = (root = path.join(os.homedir(), '.agent-engine')): BodiedJournalOps => {
+  static filesOps = (root: string): BodiedJournalOps => {
     const dir = path.join(root, 'tasks');
     const file = (id: string) => path.join(dir, `${id}.jsonl`);
     const feedFile = path.join(root, 'feed.jsonl');

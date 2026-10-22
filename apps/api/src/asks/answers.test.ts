@@ -2,14 +2,20 @@
  * The questions a closeout asks, on a run's detail (`StepCloseout.questions`), and a person's answers to them on POST …/retry
  * (`answeredHow`): checked against the questions the step's current closeout asks, written as the words the package gives them
  * (`answerText`), and refused (400) when they do not fit or ride on a recheck. A closeout that asks in free text is answered as before.
+ *
+ * On the stand-ins: the runtime's test engine, each step's task filed and settled with its closeout by hand, and the test place, under
+ * the run record this file seeds.
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { Effect } from 'effect';
+import { testEngine } from 'agent-runtime/testing';
+import { testPlace } from 'agent-orchestrator/testing';
+import { appOver, engineFor } from '../../test/placed.ts';
 import type { RunDetail } from '../detail/detail.ts';
-import { app } from '../app.ts';
 import { askFile } from 'agent-orchestrator';
 import { answerText, type Question } from 'agent-orchestrator/run';
 import { parseWorkflow } from 'agent-orchestrator/workflow';
@@ -21,20 +27,14 @@ const write = (file: string, text: string) => {
   fs.writeFileSync(file, text);
 };
 
+const standIn = testEngine();
+const app = appOver(standIn, testPlace());
+
 /** A step's task that ran once on Codex and signed off with `closeout`. */
-const signedOff = (taskId: string, closeout: object) =>
-  write(
-    path.join(root, 'engine', 'tasks', `${taskId}.jsonl`),
-    [
-      { kind: 'filed', at: at(0), brief: 'Do it.', cwd: '/code/app', maxAttempts: 1, harness: 'codex' },
-      { kind: 'starting', at: at(1), attempt: 1 },
-      { kind: 'spawned', at: at(1), attempt: 1 },
-      { kind: 'ended', at: at(9), attempt: 1, sessionId: `ae/${taskId}/1`, observed: 'done', reason: 'harness', closeout },
-      { kind: 'settled', at: at(9), outcome: 'succeeded' },
-    ]
-      .map((line) => `${JSON.stringify(line)}\n`)
-      .join(''),
-  );
+const signedOff = (taskId: string, closeout: object) => {
+  Effect.runSync(engineFor(standIn).file({ id: taskId, brief: 'Do it.', cwd: '/code/app', harness: 'codex' }));
+  standIn.settle(taskId, 'succeeded', { exitCode: 0, closeout });
+};
 
 /** A step declaring `open` in its schema, and every field of `more`, as the loader reads it and the run freezes it. */
 const declaring = (name: string, open: object, more: Record<string, object> = {}) =>

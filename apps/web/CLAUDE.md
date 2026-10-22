@@ -80,22 +80,29 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
 
 - A time of day in words has one writer, `timeOfDay` (`lib/timeOfDay.ts`): 12-hour (`1:11 PM`), date-fns's `h:mm a` under `zoneOf`,
   which is the one place a zone becomes date-fns's context and gives none where there is none, the browser's own. Every date word is
-  date-fns's default English, wherever the browser is. `clockWord`, `whenWords`, `whenColumn` and `fireWord` each decide their day
-  (`isSameDay`, `isSameYear`) and take the time from it.
+  date-fns's default English, wherever the browser is. `clockWord`, `whenWords` and `fireWord` each decide their day
+  (`isSameDay`, `isSameYear`) and take the time from it; `agoWords` decides no day and takes no zone, a distance having neither.
 - A whole instant has one writer, `lib/instant.ts`: text on a page is `instantWords` (`7:08 PM` today, `9 Oct 5:30 PM`, `31 Dec 2025,
   4:10 PM`: a comma after a year alone), a `title` is `instantWhole` (`12 Oct 2026, 7:08:53 PM`), the Timeline's cell is
   `timeToTheSecond`; a component draws one with `Instant` (`components/Instant.tsx`). date-fns is imported only in the four files that
   write a moment (`lib/timeOfDay.ts`, `lib/instant.ts`, `lib/runWords.ts`, `lib/quota.ts`); a fifth that needs it joins the list with
   its reason.
-- A time on the runs page is `whenWords`, or `whenColumn` in a table (`lib/runWords.ts`); its date is `dateParts`. A schedule's
-  far fire is `instantWords` (`14 Oct 12:00 PM`, `1 Jan 2027, 4:00 AM`); `whenWords` keeps dropping the time in another year.
+- A time on the runs page is `whenWords`, and how long ago something was, in a table's column, is `agoWords` (`3 minutes ago`,
+  `4 months ago`, `just now` under a minute; date-fns's `formatDistanceStrict`, which writes no `about`), the whole instant staying on
+  hover (`instantWhole`); a date's parts are `dateParts`. A schedule's far fire is `instantWords` (`14 Oct 12:00 PM`,
+  `1 Jan 2027, 4:00 AM`); `whenWords` keeps dropping the time in another year.
 - A colour says one thing: `yours` (waits on a person), `alive`, `money` (an amount), `rest` (grey, and sage for done) and `failure`.
   `src/styles.css` reads each from a theme role once (`--meaning-*`, `bg-yours`); `lib/meaning.ts` holds the drawn forms, each class a
   whole literal.
 - A cut corner is a shape of its own under unclipped content: `look/cut.ts`, `look/CutFrame.tsx`, `look/CutButton.tsx`, with
   `cutShape`, `cutRing` and `cutPoints` for a new part that takes one; the copy control is `look/CopyId.tsx`.
 - The look's own parts are `src/components/look`, taken through its door (`index.ts`) by every file outside it; each has its stories
-  beside it (`<Part>.stories.tsx`), one a state.
+  beside it (`<Part>.stories.tsx`), one a state. A breakdown is drawn once, by `look/Breakdown.tsx`: `BreakdownRows` for its rows and
+  its foot, `BreakdownPreview` for the kit's rich tooltip over a focusable trigger the caller gives — the look's `StatTile` hangs its
+  sticker there and both runs tables their Clock cell (`components/RunClockCell.tsx`), so the card and the rows say one thing.
+- What a run's Clock says has one writer, `runClock` (`lib/factory.ts`): a card says a sentence, a table's row the time at work alone
+  and `not started` for a run nothing of which is filed (`place: 'row'`). The breakdown under it is `clockBreakdown`
+  (`lib/breakdown.ts`), whose head is verbatim the words the tile or the cell shows and whose foot is the wall time its rows add up to.
 - A write that changes a run calls `runsMoved` (`lib/runWrites.ts`), never `['runs']` by hand; a key that stands for every key under it
   is said by `filterOf` (`lib/feed.ts`), which the feed invalidates through. `['runs-finished']` stands for every page of the finished
   runs, each factory's (`filterOf`, `polled`, `runsMoved`).

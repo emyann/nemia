@@ -89,7 +89,7 @@ const whats = (breakdown: Breakdown): string[] => breakdown.rows.map((row) => ro
 
 test('REFUSED: a breakdown that does not add up to its tile: the clock, the cost and the tokens, each with its last line for the rest', async () => {
   const run = await decoded();
-  const clock = clockBreakdown(run.clock!, '13:11');
+  const clock = clockBreakdown(run.clock!, '17m', '13:11');
   assert.equal(sum(clock), run.clock!.wallMs, "the clock's rows add up to the wall time");
   assert.deepEqual(whats(clock), ['Sessions at work', 'Checks running', 'Waiting on you', 'Queued for a slot', CLOCK_REST]);
   assert.equal(clock.rows.at(-1)!.amount, 40 * S, 'the last line is the rest');
@@ -111,14 +111,14 @@ test('a run at its second gate: the card says the present wait, and the clock’
   const run = await decoded({ ...model, wallMs: 50 * M, clock, waitingSince });
   assert.equal(run.waitingSince, waitingSince, 'the schema keeps the instant');
   assert.equal(presentWait(run, new Date(AS_OF)), '3m');
-  const row = clockBreakdown(run.clock!, '11:10').rows.find((r) => r.what === 'Waiting on you')!;
+  const row = clockBreakdown(run.clock!, '25m', '11:10').rows.find((r) => r.what === 'Waiting on you')!;
   assert.equal(row.amount, 25 * M + 10 * S);
   assert.equal(row.said, '25m');
 });
 
 test('the last line is absent when the rest is nothing', async () => {
   const run = await decoded();
-  const clock = clockBreakdown({ ...run.clock!, wallMs: run.clock!.wallMs - 40 * S, restMs: 0 }, '13:11');
+  const clock = clockBreakdown({ ...run.clock!, wallMs: run.clock!.wallMs - 40 * S, restMs: 0 }, '17m', '13:11');
   assert.deepEqual(whats(clock), ['Sessions at work', 'Checks running', 'Waiting on you', 'Queued for a slot']);
   assert.equal(sum(clock), run.clock!.wallMs - 40 * S);
   const cost = costBreakdown(spent(1.884 + 3.614), run.stepCosts!);
@@ -136,7 +136,7 @@ const centsOf = (said: string): number => (said.startsWith('$') ? Math.round(Num
 
 test('REFUSED: rows that say a minute or a cent less than their tile: what plain rounding down would lose is shared out', async () => {
   const run = await decoded();
-  const clock = clockBreakdown(run.clock!, '13:11');
+  const clock = clockBreakdown(run.clock!, '17m', '13:11');
   assert.equal(sinceWords(run.clock!.wallMs), '27m', 'the tile');
   assert.deepEqual(
     clock.rows.map((row) => row.said),
@@ -164,6 +164,7 @@ test('a part of nothing says so, a step nothing was measured of says so, and the
   const run = await decoded();
   const clock = clockBreakdown(
     { wallMs: 6 * M, sessionsMs: 6 * M - 20 * S, checksMs: 0, personMs: 20 * S, slotMs: 0, restMs: 0 },
+    '5m',
     'Tue 13:32',
   );
   assert.deepEqual(
@@ -175,8 +176,8 @@ test('a part of nothing says so, a step nothing was measured of says so, and the
       ['none', true],
     ],
   );
-  assert.equal(clock.head, '6m since it was created');
-  assert.equal(clock.foot, 'Wall time, from Tue 13:32.');
+  assert.equal(clock.head, '5m', 'the head is verbatim the words the tile or the cell shows, never a figure of its own');
+  assert.equal(clock.foot, 'Wall time 6m, from Tue 13:32.', 'the rows add up to the foot, which the head is a part of');
   const cost = costBreakdown(run.cost!, run.stepCosts!);
   assert.equal(cost.head, '$5.63 so far, by step');
   assert.deepEqual(cost.rows[2], { what: 'land', amount: 0, said: 'none measured', none: true });

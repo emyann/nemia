@@ -20,6 +20,8 @@ const FILES = [
   'components/look/CutField.tsx',
   'components/FlightTable.tsx',
   'components/FinishedTable.tsx',
+  'components/RunClockCell.tsx',
+  'components/look/Breakdown.tsx',
   'components/look/Plate.tsx',
   'components/look/Sticker.tsx',
   'components/look/RunSteps.tsx',

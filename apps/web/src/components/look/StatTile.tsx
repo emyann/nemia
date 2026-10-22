@@ -1,29 +1,9 @@
-import { Focusable, Tooltip, TooltipTrigger } from '@/components/ui/ds';
+import { Focusable } from '@/components/ui/ds';
 import type { Breakdown } from '@/lib/breakdown';
 import type { Hue } from '@/lib/meaning';
 import { cn, focusRing } from '@/components/ui/ds/utils';
+import { BreakdownPreview } from './Breakdown';
 import { Sticker } from './Sticker';
-
-/** A breakdown's rows as a list of terms, then its closing note under a rule. */
-function Rows({ breakdown }: { breakdown: Breakdown }) {
-  return (
-    <>
-      <dl data-breakdown className="m-0 mt-1 grid grid-cols-[1fr_auto] gap-x-6 gap-y-1 text-body-medium">
-        {breakdown.rows.map((row) => (
-          <div key={row.what} data-breakdown-row={row.what} className="contents">
-            <dt>{row.what}</dt>
-            <dd className={cn('m-0 text-end font-mono', !row.none && 'text-on-surface')}>{row.said}</dd>
-          </div>
-        ))}
-      </dl>
-      {breakdown.foot && (
-        <p data-breakdown-foot className="m-0 mt-2 border-t border-outline-variant pt-2 text-body-small">
-          {breakdown.foot}
-        </p>
-      )}
-    </>
-  );
-}
 
 /**
  * A stat of a waiting run: the look's sticker tile, which the keyboard reaches, under the kit's rich tooltip with its `breakdown`: a
@@ -39,7 +19,7 @@ export function StatTile({ hue, label, value, breakdown }: { hue: Hue; label: st
   );
   if (!breakdown) return <span data-stat-tile={name}>{tile}</span>;
   return (
-    <TooltipTrigger delay={200} closeDelay={150}>
+    <BreakdownPreview breakdown={breakdown}>
       <Focusable>
         <span
           role="group"
@@ -52,9 +32,6 @@ export function StatTile({ hue, label, value, breakdown }: { hue: Hue; label: st
           {tile}
         </span>
       </Focusable>
-      <Tooltip variant="rich" headline={breakdown.head}>
-        <Rows breakdown={breakdown} />
-      </Tooltip>
-    </TooltipTrigger>
+    </BreakdownPreview>
   );
 }

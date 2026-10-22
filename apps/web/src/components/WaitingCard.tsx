@@ -3,23 +3,28 @@ import type { WaitingRun } from '@/lib/api';
 import { clockBreakdown, costBreakdown, tokensBreakdown, tokensSaid } from '@/lib/breakdown';
 import { factoryOf } from '@/lib/factories';
 import { titleOf } from '@/lib/factory';
-import { openWord, presentWait, sinceShort, waitSentence, waitTag, whenWords } from '@/lib/runWords';
+import { runClock } from '@/lib/factory';
+import { openWord, presentWait, waitSentence, waitTag, whenWords } from '@/lib/runWords';
 import { previewBar } from './StepPreview';
 import { CopyId, CutButton, CutFrame, CutTag, RunSteps, StatTile, TextLink } from './look';
 
 /**
- * A waiting run's three tiles: its wall time, what it cost and its tokens, each over its breakdown where the answer gives one. Every
+ * A waiting run's three tiles: its time at work, what it cost and its tokens, each over its breakdown where the answer gives one. Every
  * time is said against `asOf`, the instant the answer was read at.
+ *
+ * The Clock tile says the time at work, as the runs tables' Clock column does (`runClock`, drawn as a row says it), and hands those
+ * very words to its breakdown as its head, where the wall time the rows add up to is the foot: the card and the tables say one thing.
  */
 function Tiles({ run, asOf }: { run: WaitingRun; asOf: Date }) {
   const { clock, cost, tokens, stepCosts } = run;
+  const atWork = runClock(run, asOf.getTime(), false, 'row').words;
   return (
     <div data-tiles className="flex flex-wrap gap-2">
       <StatTile
         hue="grey"
         label="Clock"
-        value={sinceShort(clock?.wallMs ?? run.wallMs)}
-        breakdown={clock && clockBreakdown(clock, whenWords(new Date(run.createdAt), asOf))}
+        value={atWork}
+        breakdown={clock && clockBreakdown(clock, atWork, whenWords(new Date(run.createdAt), asOf))}
       />
       <StatTile hue="money" label="Cost" value={cost?.said ?? 'none'} breakdown={cost && stepCosts && costBreakdown(cost, stepCosts)} />
       <StatTile

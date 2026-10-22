@@ -59,8 +59,10 @@ test('REFUSED: a clock moved before the rest is asked wakes nothing, however far
 });
 
 test('REFUSED: a clock no program was given cannot be moved, and says so', async () => {
-  await assert.rejects(steeredClock().adjust(1), (err: Error) => {
-    assert.equal(err.message, 'steeredClock: no program was given this clock yet, so there is none to move; provide its `layer` first');
+  await assert.rejects(steeredClock().adjust(1), (err: unknown) => {
+    assert.ok(err instanceof Error, String(err));
+    assert.ok(err.message.startsWith('steeredClock: no program was given this clock'), err.message);
+    assert.ok(err.message.includes('provide its `layer` first'), err.message);
     return true;
   });
 });

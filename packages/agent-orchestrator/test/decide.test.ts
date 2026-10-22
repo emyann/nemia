@@ -393,7 +393,11 @@ test('`nemia decide` refuses a flag it does not take, and --sensitive without gl
   for (const argv of [['--sensitive', 'src/**', 'no-such-run'], ['--sensitive']]) {
     await assert.rejects(
       main(['decide', ...argv]),
-      refused(/^nemia decide takes the run first: nemia decide <runId> \[--sensitive <globs>\]/),
+      (err: Error & { exitCode?: number; _tag?: string }) =>
+        err._tag === 'Invalid' &&
+        err.exitCode === 2 &&
+        err.message.startsWith('nemia decide takes the run first') &&
+        err.message.includes('nemia decide <runId> [--sensitive <globs>]'),
       `${argv.join(' ')}: a flag before the run is refused, not answered with the general help, which exits 0 and says nothing of the order`,
     );
   }
@@ -693,13 +697,16 @@ test("the branch's standing against the base is a fact on every screen — on it
   );
 });
 
+/** The ending's own words, as the folder below writes them: what `nemia decide` echoes as what approving it does. */
+const SHIP_IT = "Ship it: trial merge this run's result branch onto main, run the check, and commit.";
+
 test("a folder whose last step is an ending: `nemia decide` says what that step would do in the folder's words, and the word that runs it — and prints no git command, since the step is the one that merges", async (t) => {
   const repo = aRepo();
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   fs.writeFileSync(
     path.join(dir, 'ship.md'),
-    "---\nafter: implement\nplace: git\nworkspace: main\ngate: true\n---\nShip it: trial merge this run's result branch onto main, run the check, and commit.\n\nAbort on any failure.\n",
+    `---\nafter: implement\nplace: git\nworkspace: main\ngate: true\n---\n${SHIP_IT}\n\nAbort on any failure.\n`,
   );
   const run = await runPlaced(startRun({ brief: 'add sub', repo, workflowDir: dir }));
   const { e, settle } = board();
@@ -721,7 +728,7 @@ test("a folder whose last step is an ending: `nemia decide` says what that step 
   indexOf(lines, `  branch    ${branch} is ahead of main by 1 commit`);
   const decide = indexOf(lines, "  to decide  ship has not run: this workflow's ending, and your approval is what runs it:");
   assert.deepEqual(lines.slice(decide + 1, decide + 5), [
-    "    Ship it: trial merge this run's result branch onto main, run the check, and commit.",
+    `    ${SHIP_IT}`,
     '',
     `  approve it    nemia approve ${run.id} ship [--message "<words>"]`,
     `  send it back  nemia retry ${run.id} implement --message "<objection>"`,
@@ -729,10 +736,7 @@ test("a folder whose last step is an ending: `nemia decide` says what that step 
   assert.ok(!lines.some((l) => /ship it   git|drop it   git/.test(l)), 'the folder says what shipping is, so nobody is told to type it');
 
   const said = await listed(t, e, run.id);
-  indexOf(
-    said,
-    `   → to decide: Ship it: trial merge this run's result branch onto main, run the check, and commit. — nemia approve ${run.id} ship`,
-  );
+  indexOf(said, `   → to decide: ${SHIP_IT} — nemia approve ${run.id} ship`);
   assert.ok(
     !said.some((l) => l.includes('waiting on you')),
     '`nemia ls` says it in one line, where it says who the run waits on: the ending is not said twice',
@@ -954,13 +958,12 @@ test('REFUSED at `nemia start`: --no-worktree on a workflow whose last step merg
   const before = fs.readdirSync(path.join(ROOT, 'runs')).filter((f) => f.endsWith('.json')).length;
   await assert.rejects(
     async () => await runPlaced(startRun({ brief: 'add sub', repo, workflowDir: dir, isolate: false })),
-    (err: Error & { exitCode?: number }) => {
-      assert.equal(err.exitCode, 2);
-      assert.match(
-        err.message,
-        /^ship: `workspace: main` ends this workflow by merging the run's result branch onto the base branch, and --no-worktree gives the run no result branch/,
-      );
-      assert.match(err.message, /Either drop --no-worktree, or start a workflow whose last step is not an ending\.$/);
+    (err: Error & { exitCode?: number; _tag?: string }) => {
+      assert.deepEqual([err._tag, err.exitCode], ['Invalid', 2]);
+      assert.ok(err.message.startsWith('ship: `workspace: main` ends this workflow'), err.message);
+      assert.ok(err.message.includes('--no-worktree gives the run no result branch'), err.message);
+      assert.ok(err.message.includes('Either drop --no-worktree'), 'and names the flag to drop');
+      assert.ok(err.message.includes('whose last step is not an ending'), 'or the workflow to start');
       return true;
     },
   );

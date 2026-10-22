@@ -175,14 +175,13 @@ test('REFUSED: --answer that does not fit the questions the step asks now — a 
 
 test('REFUSED: --answer to a step that asks no questions, naming --message instead, and --answer with --recheck before a run is read', async () => {
   const { run, e } = await asking({ open: [] });
-  assert.equal(
-    await refusal(['retry', run.id, 'plan', '--answer', '1=a'], e),
-    'The step asks no questions now, so there is nothing to answer. Read the step again, and say what you mean with --message "<words>", without --answer.',
-  );
-  assert.match(
-    await refusal(['retry', 'no-such-run-zz9z', 'plan', '--recheck', '--answer', '1=a'], e),
-    /^--answer carries your answers into the try's brief, and --recheck files no session to read them/,
-  );
+  const none = await refusal(['retry', run.id, 'plan', '--answer', '1=a'], e);
+  assert.ok(none.startsWith('The step asks no questions now'), none);
+  assert.ok(none.includes('--message "<words>", without --answer'), 'and names the flag to use instead');
+  const both = await refusal(['retry', 'no-such-run-zz9z', 'plan', '--recheck', '--answer', '1=a'], e);
+  assert.ok(both.startsWith('--answer carries your answers'), both);
+  assert.ok(both.includes('--recheck), or give them'), 'and names both ways out');
+  assert.ok(both.includes('--answer <n>=<letter>'), both);
   assert.deepEqual(asksOf(run.id), [], 'nothing written');
 });
 

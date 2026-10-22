@@ -173,7 +173,8 @@ test("REFUSED at shipped defaults: implement's check, as frozen, refuses a chang
   assert.ok(refused.err.includes(`bound of ${FILES} files and ${LINES} lines`), refused.err);
   assert.ok(refused.err.includes('It is a card for the build workflow'), refused.err);
   assert.ok(refused.err.includes('  nemia cancel r-1\n'), refused.err);
-  assert.ok(refused.err.includes('  nemia start "<the card\'s text>" --workflows build --factory nemia\n'), refused.err);
+  assert.ok(refused.err.includes('  nemia start "<the card\'s text>" '), refused.err);
+  assert.ok(refused.err.includes(' --workflows build --factory nemia\n'), refused.err);
   assert.deepEqual(refused.said, [], 'nothing else of the check ran: the bound is first');
 
   const within = workOn(files(FILES), SCRIPTS);

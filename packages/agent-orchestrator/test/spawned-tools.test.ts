@@ -1,9 +1,10 @@
 /**
  * A Node primitive before a spawned tool: no `src` starts `du`, `find`, `rm`, `cp`, `mv`, `ls`, `df` or `stat` as a process, where
  * `node:fs` answers the same in this one (`lstat`, `readdir`, `rm`, `cp`, `rename`, `statfs`) with no fork, no output to parse and no
- * tool to be missing. Over `packages/*\/src` and `apps/*\/src`, tests left out, a call is refused when one of `TOOLS` is the command
- * handed to one of `SPAWNS`, written there or held by a `const` of the same file, or the first word of a line handed to one of
- * `SHELLS`. Read off the syntax tree, so a call oxfmt splits over lines is the same call. A word that runs nothing passes.
+ * tool to be missing. Over the `src` of each workspace the root package.json names, tests left out, a call is refused when one of
+ * `TOOLS` is the command handed to one of `SPAWNS`, written there or held by a `const` of the same file, or the first word of a line
+ * handed to one of `SHELLS`. Read off the syntax tree, so a call oxfmt splits over lines is the same call. A word that runs nothing
+ * passes.
  *
  * The test reads files outside this package: `turbo.json` makes the apps' sources and the runtime inputs of this package's tests.
  */
@@ -12,6 +13,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
+import { workspaces } from './workspaces.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = path.join(import.meta.dirname, '..', '..', '..');
@@ -72,14 +74,10 @@ function sourcesUnder(dir: string, root: string): string[] {
   });
 }
 
-/** Each spawned tool under the `src` of every package and app of `root`, as `<file>: <tool> (…)`. */
+/** Each spawned tool under the `src` of every workspace the root package.json of `root` names, as `<file>: <tool> (…)`. */
 function spawnedTools(root: string): string[] {
-  return ['packages', 'apps']
-    .flatMap((kind) => {
-      const at = path.join(root, kind);
-      return fs.existsSync(at) ? fs.readdirSync(at).map((name) => path.join(at, name, 'src')) : [];
-    })
-    .flatMap((src) => sourcesUnder(src, root))
+  return workspaces(root)
+    .flatMap((dir) => sourcesUnder(path.join(root, dir, 'src'), root))
     .flatMap((file) => spawnedIn(fs.readFileSync(path.join(root, file), 'utf8'), file).map((found) => `${file}: ${found}`));
 }
 
@@ -95,6 +93,8 @@ test('REFUSED on a fixture: a tool spawned by name, through a const, by its path
   const root = scratch('wf-spawned-tools-');
   const src = path.join(root, 'packages', 'one', 'src');
   fs.mkdirSync(src, { recursive: true });
+  fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ workspaces: ['packages/*'] }));
+  fs.writeFileSync(path.join(root, 'packages', 'one', 'package.json'), '{}');
   fs.writeFileSync(
     path.join(src, 'size.ts'),
     [

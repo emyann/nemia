@@ -399,6 +399,6 @@ included. Each file that says one today is counted, and the count only shrinks.
 
 Each rule's test first refuses planted source that breaks it, so none can pass by reading nothing. The contract tests
 read every file git lists outside their package; `turbo.json` makes the apps' `src` and `test`, for the runtime the apps' root
-`.ts` files and the orchestrator's source and tests, and for the orchestrator `workflows/agents/`, inputs of their package's test (`packages/agent-orchestrator/test/turbo-inputs.test.ts`),
+`.ts` files and the orchestrator's source and tests, and for the orchestrator `workflows/agents/`, inputs of their package's test (`tools/guards/test/turbo-inputs.test.ts`),
 so a breach there cannot replay a pass from turbo's cache. A change to any other file outside a package is not in its
 cache key: run `npx turbo run test --force` after one.

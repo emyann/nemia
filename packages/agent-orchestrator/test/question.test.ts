@@ -19,6 +19,7 @@ import {
   type Question,
 } from '../src/question/question.ts';
 import { parseWorkflow } from '../src/workflow.ts';
+import { Invalid } from '../src/refusal/refusal.ts';
 
 const cut: Question = {
   title: 'How is the card cut?',
@@ -55,7 +56,9 @@ test('questionsOf reads a list of questions as it is', () => {
 });
 
 test('questionsOf refuses a recommended option that is none of the options', () => {
-  assert.match(refusedWith([{ ...cut, recommended: 'c' }]), /question 1 recommends "c", which is none of its options \("a", "b"\)/);
+  const said = refusedWith([{ ...cut, recommended: 'c' }]);
+  assert.ok(said.startsWith('question 1 recommends "c"'), said);
+  assert.ok(said.endsWith('("a", "b")'), said);
 });
 
 test('questionsOf refuses an option offered twice', () => {
@@ -72,8 +75,12 @@ test('questionsOf refuses a question with no options', () => {
 
 test('questionsOf refuses a question missing a key, and one with a key more', () => {
   const { multiple: _, ...without } = cut;
-  assert.match(refusedWith([without]), /question 1 has the keys body, options, recommended, title, and a question has body, multiple/);
-  assert.match(refusedWith([cut, { ...where, why: 'x' }]), /question 2 has the keys body, multiple, options, recommended, title, why/);
+  const missing = refusedWith([without]);
+  assert.ok(missing.startsWith('question 1 has the keys body, options, recommended, title,'), missing);
+  assert.ok(missing.includes('a question has body, multiple'), missing);
+  const more = refusedWith([cut, { ...where, why: 'x' }]);
+  assert.ok(more.startsWith('question 2 has the keys body, multiple, options,'), more);
+  assert.ok(more.includes(' recommended, title, why,'), more);
   assert.match(refusedWith([{ ...cut, options: [{ label: 'a' }] }]), /question 1's option 1 has the keys label, and an option has/);
 });
 
@@ -104,8 +111,11 @@ test('the loader expands a field marked `x-shape: questions` to the strict schem
 test('the loader refuses a shape it does not know, naming the one there is', () => {
   assert.throws(
     () => stepWith({ open: { 'x-shape': 'poll' } }),
-    (err: Error & { exitCode?: number }) => {
-      assert.match(err.message, /`open` asks for the shape "poll", and the one shape there is is `questions`/);
+    (err: unknown) => {
+      assert.ok(err instanceof Invalid, String(err));
+      assert.ok(err.message.includes('`open` asks for the shape "poll"'), err.message);
+      assert.ok(err.message.includes('is `questions`'), err.message);
+      assert.ok(err.message.includes('"x-shape": "questions"'), err.message);
       assert.equal(err.exitCode, 2);
       return true;
     },

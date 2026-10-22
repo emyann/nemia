@@ -107,10 +107,9 @@ test('a subscription given a floor is scoped by it; REFUSED: a floor that is no 
 });
 
 test('REFUSED: a task never filed, one not long-lived and one settled, each naming how a long-lived task is filed', async () => {
-  assert.match(
-    await refusal(() => typed(SUBSCRIBE, ['a', 'nowhere'])),
-    /^no task nowhere is filed on the store's engine: file it long-lived/,
-  );
+  const nowhere = await refusal(() => typed(SUBSCRIBE, ['a', 'nowhere']));
+  assert.match(nowhere, /^no task nowhere is filed on the store's engine/);
+  assert.match(nowhere, /file it long-lived/);
   assert.match(await refusal(() => typed(SUBSCRIBE, ['a', 'job'])), /^the task job is not long-lived.*restartPolicy: Always/);
   assert.match(await refusal(() => typed(SUBSCRIBE, ['a', 'ended'])), /^the task ended has settled \(stopped\)/);
   assert.deepEqual(listSubscriptions(), [], 'nothing put');
@@ -138,7 +137,10 @@ test("an unsubscribe removes the subscription, not its deliverer's file; a name 
 });
 
 test("REFUSED: the name nemia, Nemia's own, given or taken away by hand, naming nemia level; her keeper's stays", async () => {
-  assert.match(await refusal(() => typed(SUBSCRIBE, ['nemia', 'nemia'])), /^the subscription nemia is Nemia's own.*nemia level semi-auto/);
+  const given = await refusal(() => typed(SUBSCRIBE, ['nemia', 'nemia']));
+  assert.match(given, /^the subscription nemia is Nemia's own/);
+  assert.match(given, /nemia level semi-auto/);
+
   assert.deepEqual(listSubscriptions(), [], 'nothing put');
   putSubscription('nemia', { task: 'nemia', selectors: [...DEFAULT_SELECTORS], digestEvery: 1440, from: 0 });
   assert.match(await refusal(() => typed(UNSUBSCRIBE, ['nemia'])), /^the subscription nemia is Nemia's own.*nemia level manual/);

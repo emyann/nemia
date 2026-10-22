@@ -107,7 +107,9 @@ test('nemia agents card prints the card alone on stdout, and what it is not on s
     false,
     "not a field of the card: it is a word to the person, not data a reader would take for the protocol's",
   );
-  assert.match(err, /^scribe \(repo\) — a card, not an address: nothing here serves this agent over A2A/m);
+  assert.match(err, /^scribe \(repo\) — /m, 'the note names the agent and its place');
+  assert.ok(err.includes('a card, not an address'), err);
+  assert.ok(err.includes('over A2A'), err);
 });
 
 test('REFUSED at shipped defaults: a card for an agent in neither place, one in both with nothing saying which, and a --from that is neither', async (t) => {
@@ -155,8 +157,10 @@ test('REFUSED at shipped defaults: a card for an agent whose skill says no descr
   anAgent(path.join(repo, 'workflows', 'agents'), 'scribe', 'Writes it down.', '---\nname: read-a-thing\n---\nRead it.\n');
   await assert.rejects(
     () => printedBy(t, 'agents', 'card', 'scribe', '--repo', repo),
-    (err: Error) => {
-      assert.match(err.message, /read-a-thing\/SKILL\.md has no `description:`, and the A2A protocol marks a skill's description REQUIRED/);
+    (err: Error & { exitCode?: number; _tag?: string }) => {
+      assert.deepEqual([err._tag, err.exitCode], ['Invalid', 2]);
+      assert.ok(err.message.includes(path.join('read-a-thing', 'SKILL.md has no `description:`')), err.message);
+      assert.ok(err.message.includes('`description: <what it does, one line>`'), 'and names the line to write');
       return true;
     },
   );
@@ -166,12 +170,11 @@ test('REFUSED at shipped defaults: a card for an agent whose skill says no descr
   );
   await assert.rejects(
     () => printedBy(t, 'agents', 'card', 'scribe', '--repo', repo),
-    (err: Error) => {
-      assert.match(
-        err.message,
-        /gives the skill `gone-away`, and no skills folder has it — looked in /,
-        'your place has a `read-a-thing` of its own, so the skill that is nowhere is another',
-      );
+    (err: Error & { exitCode?: number; _tag?: string }) => {
+      assert.deepEqual([err._tag, err.exitCode], ['Invalid', 2]);
+      assert.ok(err.message.includes('gives the skill `gone-away`'), 'yours has its own read-a-thing: the lost one is another');
+      assert.ok(err.message.includes('no skills folder has it — looked in '), err.message);
+      assert.ok(err.message.includes('write skills/gone-away/SKILL.md'), 'and names the file to write');
       return true;
     },
   );

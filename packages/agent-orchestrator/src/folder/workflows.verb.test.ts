@@ -76,14 +76,17 @@ test("REFUSED: a folder that does not load is listed with the loader's words who
   assert.ok(listed[good] && 'steps' in listed[good]);
 });
 
-test("REFUSED: a draft the writer refuses is thrown in the writer's words whole, and nothing is written", async () => {
+test("REFUSED: a draft the writer refuses is thrown as the writer's Invalid, naming the file and the fix, and nothing is written", async () => {
   const dir = path.join(ROOT, 'workflows', 'twice');
   const draft = JSON.stringify([
     { name: 'plan', after: [], place: 'git', body: 'Plan it.' },
     { name: 'plan', after: [], place: 'git', body: 'Plan it again.' },
   ]);
   await assert.rejects(runWith(e(), WORKFLOWS_WRITE.handler({ from: 'yours', name: 'twice', draft }, undefined, ROOT)), (err: Error) => {
-    assert.equal(err.message, 'two steps are named plan, and a step is its file, plan.md. Rename one of them.');
+    assert.deepEqual([(err as { _tag?: string })._tag, (err as { exitCode?: number }).exitCode], ['Invalid', 2]);
+    assert.ok(err.message.startsWith('two steps are named plan'), err.message);
+    assert.ok(err.message.includes('plan.md'), err.message);
+    assert.ok(err.message.includes('Rename one'), err.message);
     return true;
   });
   assert.equal(fs.existsSync(dir), false);
@@ -167,10 +170,10 @@ test("REFUSED: a repository's workflow is not removed here, nor a folder nested 
   const fromRepo = WORKFLOWS_REMOVE.handler({ from: 'repo', name: 'shared', version: 'v1', repo }, undefined, ROOT);
   await assert.rejects(runWith(e(), fromRepo), (err: Error) => {
     assert.ok(err instanceof Invalid, `${err.name}: ${err.message}`);
-    assert.equal(
-      err.message,
-      `nemia workflows remove refuses to write the repository's workflows (${path.join(repo, 'workflows')}): only yours is written, in ${yours}, and nothing into a checkout. Build the workflow in yours — \`cp -r ${theirs} ${yours}/\` starts from this one — then copy the folder into ${path.join(repo, 'workflows')} by hand, where git shows it as a change to commit.`,
-    );
+    assert.ok(err.message.startsWith(`nemia workflows remove refuses `), err.message);
+    assert.ok(err.message.includes(`(${path.join(repo, 'workflows')})`), err.message);
+    assert.ok(err.message.includes(`only yours is written, in ${yours}`), err.message);
+    assert.ok(err.message.includes(`\`cp -r ${theirs} ${yours}/\``), err.message);
     return true;
   });
   assert.ok(fs.existsSync(theirs));

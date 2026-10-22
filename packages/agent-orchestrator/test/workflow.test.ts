@@ -45,6 +45,25 @@ import { placesOf, shippedFolders, TEAM_DEV, teamCopy } from './team.ts';
 
 const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: 'do a thing' });
 
+/**
+ * That `message` opens on `at` — the step or file it is about — and names each of `named`: the line as written, and the key, line or
+ * command its fix names. The sentence around them is the code's to word ("Errors say what to do next", CLAUDE.md).
+ */
+const names = (message: string, at: string, ...named: string[]): true => {
+  assert.ok(message.startsWith(at), `opens on ${at}: ${message}`);
+  for (const name of named) assert.ok(message.includes(name), `names ${name}: ${message}`);
+  return true;
+};
+
+/** Refused as a `WorkflowError` with exit 2, the author's to fix, its message as `names` reads it. */
+const refusedNaming =
+  (at: string, ...named: string[]) =>
+  (e: unknown): true => {
+    assert.ok(e instanceof WorkflowError, String(e));
+    assert.equal(e.exitCode, 2, e.message);
+    return names(e.message, at, ...named);
+  };
+
 /** A strict output schema: `findings`, each a file, a line and what would go wrong. */
 const FINDINGS = {
   type: 'object',
@@ -355,7 +374,7 @@ test("REFUSED at shipped defaults: the team's review with its loop pointed at a 
     fs.readFileSync(path.join(elsewhere, 'review.md'), 'utf8').replace(/^loop: implement$/m, 'loop: docs'),
   );
   assert.match(fs.readFileSync(path.join(elsewhere, 'review.md'), 'utf8'), /^loop: docs$/m, 'the change is really in the file');
-  assert.match(refused(elsewhere), /^review: `loop: docs`, but review does not wait on docs, directly or through the steps between/);
+  names(refused(elsewhere), 'review: ', '`loop: docs`', '`after:`');
 
   const lacks = copy();
   const schemaFile = path.join(lacks, '..', 'agents', 'review.schema.json');
@@ -363,17 +382,12 @@ test("REFUSED at shipped defaults: the team's review with its loop pointed at a 
   delete schema.properties.again;
   schema.required = schema.required.filter((f: string) => f !== 'again');
   fs.writeFileSync(schemaFile, JSON.stringify(schema));
-  assert.match(
-    refused(lacks),
-    /^review: `loop: implement` runs implement again when this step's closeout says `again: true`, and `output: review\.schema\.json` does not declare `again`/,
-  );
+  names(refused(lacks), 'review: ', '`loop: implement`', '`output: review.schema.json`', '`again`');
 
   const beside = copy();
   fs.writeFileSync(path.join(beside, 'docs.md'), docs);
-  assert.match(
-    refused(beside),
-    /^review: `loop: implement` files review again after implement each round, .*docs waits on implement too, so review forks a worktree of its own/,
-  );
+  const forks = refused(beside);
+  names(forks, 'review: ', '`loop: implement`', 'docs waits on implement', 'after review');
 });
 
 test('a chain does not fan out; a diamond does', () => {
@@ -620,11 +634,11 @@ test('`afer: implement` is refused — accepted, it made the reviewer a root tha
   fs.writeFileSync(review, fs.readFileSync(review, 'utf8').replace(/^after:/m, 'afer:'));
   assert.match(fs.readFileSync(review, 'utf8'), /^afer: implement$/m, 'the typo is really in the file');
 
-  assert.throws(() => loadWorkflows(dir), /review: `afer` is not a key a step has\. A step's keys are: after, /);
+  assert.throws(() => loadWorkflows(dir), refusedNaming('review: ', '`afer`', 'after, resume'));
 });
 
 test('guide is refused by name, never silently dropped', () => {
-  assert.throws(() => fm('implement', 'guide: CLAUDE.md'), /implement: a step may not set `guide` — the harness reads CLAUDE\.md/);
+  assert.throws(() => fm('implement', 'guide: CLAUDE.md'), refusedNaming('implement: ', '`guide`', 'CLAUDE.md'));
 });
 
 test("REFUSED: `maxAttempts`, retired with the runtime's own — at 1, what it was at by default, and at any count — pointing at `retries:` and `nemia retry`", () => {
@@ -634,15 +648,7 @@ test("REFUSED: `maxAttempts`, retired with the runtime's own — at 1, what it w
       (e: unknown) => {
         assert.ok(e instanceof WorkflowError);
         assert.equal(e.exitCode, 2);
-        assert.match(
-          e.message,
-          /^implement: a step may not set `maxAttempts` — the runtime makes one attempt at a session and tries nothing again on its own/,
-        );
-        assert.match(
-          e.message,
-          /`retries: N` files the step again after its check refuses it, and `nemia retry <run> <step>` asks for a try of one that failed, was lost or could not start/,
-        );
-        assert.match(e.message, /Delete the line\.$/);
+        names(e.message, 'implement: ', '`maxAttempts`', '`retries: N`', '`nemia retry <run> <step>`', 'Delete the line');
         return true;
       },
     );
@@ -722,19 +728,15 @@ test("REFUSED: a step that continues another's session with a context window of 
     ]);
   assert.throws(
     () => folder('context: 200k', 'context: 150k'),
-    refusedWith(
-      /^respond: `context: 150k`, and it continues implement's session, which runs on `context: 200k`\. A session keeps one window: delete the line, and respond continues on implement's, or give implement the window you meant for both\.$/,
-    ),
+    refusedNaming('respond: ', '`context: 150k`', "implement's session", '`context: 200k`', 'delete the line'),
   );
   assert.throws(
     () => folder('harness: claude', 'context: 150000'),
-    refusedWith(
-      /^respond: `context: 150k`, and it continues implement's session, which runs on the model's whole window\. A session keeps one window: delete the line, and respond continues on implement's\.$/,
-    ),
+    refusedNaming('respond: ', '`context: 150k`', "implement's session", "the model's whole window", 'delete the line'),
   );
   assert.throws(
     () => folder('context: 200k', 'harness: claude', [['more', '---\nresume: respond\nplace: git\ncontext: 300k\n---\nmore\n']]),
-    refusedWith(/^more: `context: 300k`, and it continues respond's session, which runs on `context: 200k`/),
+    refusedNaming('more: ', '`context: 300k`', "respond's session", '`context: 200k`'),
     "through a chain: a step that continues respond continues implement's session",
   );
   const same = folder('context: 200k', 'context: 200000');
@@ -754,52 +756,38 @@ test("REFUSED: a step that continues another's session with a context window of 
 });
 
 test('REFUSED: an empty tools: — blank, or only commas — is not "every tool", nor "none"', () => {
-  assert.throws(
-    () => fm('review', 'tools:'),
-    refusedWith(
-      /^review: `tools` has no value, which reads as every tool to one person and as none to another\. Name the tools .*`tools: Read, Grep, Glob, Bash`/,
-    ),
-  );
-  assert.throws(
-    () => fm('review', 'tools: ,'),
-    refusedWith(/^review: `tools: ,` names no tool\. .*Without the line, the step has the harness's own set\./),
-  );
+  assert.throws(() => fm('review', 'tools:'), refusedNaming('review: ', '`tools` has no value', '`tools: Read, Grep, Glob, Bash`'));
+  assert.throws(() => fm('review', 'tools: ,'), refusedNaming('review: ', '`tools: ,`', 'names no tool', 'Without the line'));
   assert.throws(() => fm('review', 'tools:  , ,'), refusedWith(/names no tool/));
 });
 
 test('REFUSED: a tools: entry with a space or a comma inside — a list without its commas, a rule, or a list in brackets or quotes', () => {
   assert.throws(
     () => fm('review', 'tools: Read Grep Glob'),
-    refusedWith(
-      /^review: `tools: Read Grep Glob` has a space inside `Read Grep Glob`, which is not one name\. A step's tools are .*bare and comma-separated/,
-    ),
+    refusedNaming('review: ', '`tools: Read Grep Glob`', '`Read Grep Glob`', 'comma-separated'),
   );
   assert.throws(
     () => fm('review', 'tools: Read, Bash(git diff, git log)'),
-    refusedWith(
-      /^review: `tools: Read, Bash\(git diff, git log\)` has a comma inside an entry, and the list is split on every comma, so the harness would be given `Read`, `Bash\(git diff`, `git log\)` as names\./,
-    ),
+    refusedNaming('review: ', '`tools: Read, Bash(git diff, git log)`', 'a comma inside an entry', '`Bash(git diff`', '`git log)`'),
   );
   assert.throws(() => fm('review', 'tools: [Read, Grep]'), refusedWith(/has a comma inside an entry/));
   assert.throws(() => fm('review', 'tools: "Read, Grep"'), refusedWith(/has a comma inside an entry/));
   assert.throws(
     () => fm('review', 'tools: Read, Bash(npm test)'),
-    refusedWith(/has `Bash\(npm test\)`, which is not a tool name: it is a rule for what a tool may run, .*`Bash`, whole/),
+    refusedNaming('review: ', '`Bash(npm test)`', 'not a tool name', '`Bash`, whole'),
   );
   assert.throws(
     () => fm('review', 'tools: Read, Bash(git:*)'),
-    refusedWith(/has `Bash\(git:\*\)`, which is not a tool name: it is a rule/),
+    refusedNaming('review: ', '`Bash(git:*)`', 'not a tool name'),
     'a rule with no space in it too',
   );
-  assert.throws(() => fm('review', 'tools: "Read"'), refusedWith(/has `"Read"`, which is not a tool name: a name is written bare/));
+  assert.throws(() => fm('review', 'tools: "Read"'), refusedNaming('review: ', '`"Read"`', 'not a tool name', 'bare'));
 });
 
 test('REFUSED: tools: on a codex step, naming the sandbox sandbox: sets instead', () => {
   assert.throws(
     () => fm('review', 'harness: codex\ntools: Read, Grep, Glob'),
-    refusedWith(
-      /^review: `tools: Read, Grep, Glob` is a tool list, and codex has none: one shell, fenced by its sandbox\. The sandbox is `sandbox:` — `read-only` reads and runs commands and writes nothing.*`sandbox: read-only` for a step that must not write\./,
-    ),
+    refusedNaming('review: ', '`tools: Read, Grep, Glob`', 'codex has none', '`sandbox: read-only`'),
   );
   assert.throws(
     () => fm('review', 'tools: Read\nharness: codex\nsandbox: read-only'),
@@ -841,15 +829,11 @@ test('disallowedTools: is the rules the harness is given to deny, one rule per e
 test('REFUSED: an empty disallowedTools: — blank, or only commas — which denies nothing and reads as a fence', () => {
   assert.throws(
     () => fm('review', 'disallowedTools:'),
-    refusedWith(
-      /^review: `disallowedTools` has no value, which denies nothing and reads as a fence\. Name what the session may not have — `disallowedTools: Bash\(npm run build\), SendMessage` — or delete the line/,
-    ),
+    refusedNaming('review: ', '`disallowedTools` has no value', '`disallowedTools: Bash(npm run build), SendMessage`', 'delete the line'),
   );
   assert.throws(
     () => fm('review', 'disallowedTools: ,'),
-    refusedWith(
-      /^review: `disallowedTools: ,` names no rule\. .*Without the line, the step is denied nothing beyond the checkout's settings\./,
-    ),
+    refusedNaming('review: ', '`disallowedTools: ,`', 'names no rule', 'Without the line'),
   );
   assert.throws(() => fm('review', 'disallowedTools:  , ,'), refusedWith(/names no rule/));
 });
@@ -857,8 +841,13 @@ test('REFUSED: an empty disallowedTools: — blank, or only commas — which den
 test('REFUSED: a disallowedTools: entry that is not one rule — a comma inside its parentheses, a space outside them, a list in brackets or quotes', () => {
   assert.throws(
     () => fm('review', 'disallowedTools: Bash(git push, git reset)'),
-    refusedWith(
-      /^review: `disallowedTools: Bash\(git push, git reset\)` has a comma inside an entry, and the list is split on every comma, so the harness would be given `Bash\(git push`, `git reset\)` as rules\. .*Two commands are two rules: `Bash\(git push\), Bash\(git reset\)`\./,
+    refusedNaming(
+      'review: ',
+      '`disallowedTools: Bash(git push, git reset)`',
+      'a comma inside an entry',
+      '`Bash(git push`',
+      '`git reset)`',
+      '`Bash(git push), Bash(git reset)`',
     ),
   );
   assert.throws(
@@ -868,29 +857,27 @@ test('REFUSED: a disallowedTools: entry that is not one rule — a comma inside 
   );
   assert.throws(
     () => fm('review', 'disallowedTools: [SendMessage, CronCreate]'),
-    refusedWith(/has `\[SendMessage`, which is not one rule: a rule is a bare name, without quotes or brackets/),
+    refusedNaming('review: ', '`[SendMessage`', 'not one rule', 'bare name'),
   );
   assert.throws(
     () => fm('review', 'disallowedTools: "SendMessage, CronCreate"'),
-    refusedWith(/has `"SendMessage`, which is not one rule: a rule is a bare name, without quotes or brackets/),
+    refusedNaming('review: ', '`"SendMessage`', 'not one rule', 'bare name'),
   );
   assert.throws(
     () => fm('review', 'disallowedTools: SendMessage CronCreate'),
-    refusedWith(
-      /^review: `disallowedTools: SendMessage CronCreate` has `SendMessage CronCreate`, which is not one rule: a space outside the parentheses separates two rules, to the harness\. Each entry is one rule/,
-    ),
+    refusedNaming('review: ', '`disallowedTools: SendMessage CronCreate`', '`SendMessage CronCreate`', 'not one rule', 'a space outside'),
   );
   assert.throws(
     () => fm('review', 'disallowedTools: "SendMessage"'),
-    refusedWith(/has `"SendMessage"`, which is not one rule: a rule is a bare name, without quotes or brackets/),
+    refusedNaming('review: ', '`"SendMessage"`', 'not one rule', 'bare name'),
   );
   assert.throws(
     () => fm('review', 'disallowedTools: Bash(npm run build'),
-    refusedWith(/has `Bash\(npm run build`, which is not one rule: a rule has one pair of parentheses, right after the name, closed/),
+    refusedNaming('review: ', '`Bash(npm run build`', 'not one rule', 'parentheses'),
   );
   assert.throws(
     () => fm('review', 'disallowedTools: Bash (npm run build)'),
-    refusedWith(/which is not one rule: a rule has one pair of parentheses, right after the name/),
+    refusedNaming('review: ', '`Bash (npm run build)`', 'not one rule', 'parentheses'),
   );
 });
 
@@ -915,48 +902,38 @@ test('allowedTools: is the rules the harness is given to allow without asking, o
 test("REFUSED: an allowedTools: that names no rule, or an entry that is not one rule — the deny list's refusals in the allow list's words", () => {
   assert.throws(
     () => fm('write', 'allowedTools:'),
-    refusedWith(
-      /^write: `allowedTools` has no value, which allows nothing and reads as a permission\. Name what the session may do without being asked — `allowedTools: Edit\(\*\*\), Bash\(npm test\)` — or delete the line/,
-    ),
+    refusedNaming('write: ', '`allowedTools` has no value', '`allowedTools: Edit(**), Bash(npm test)`', 'delete the line'),
   );
   assert.throws(
     () => fm('write', 'allowedTools: ,'),
-    refusedWith(
-      /^write: `allowedTools: ,` names no rule\. .*Without the line, the step may do only what its `permissionMode` allows by itself\./,
-    ),
+    refusedNaming('write: ', '`allowedTools: ,`', 'names no rule', 'Without the line', '`permissionMode`'),
   );
   assert.throws(
     () => fm('write', 'allowedTools: Bash(npm test, npm run build)'),
-    refusedWith(
-      /^write: `allowedTools: Bash\(npm test, npm run build\)` has a comma inside an entry, and the list is split on every comma, so the harness would be given `Bash\(npm test`, `npm run build\)` as rules\. .*Two tools are two rules: `Edit\(\*\*\), Bash\(npm test\)`\./,
+    refusedNaming(
+      'write: ',
+      '`allowedTools: Bash(npm test, npm run build)`',
+      'a comma inside an entry',
+      '`Bash(npm test`',
+      '`npm run build)`',
+      '`Edit(**), Bash(npm test)`',
     ),
   );
-  assert.throws(
-    () => fm('write', 'allowedTools: [Write, Edit]'),
-    refusedWith(/has `\[Write`, which is not one rule: a rule is a bare name, without quotes or brackets/),
-  );
-  assert.throws(
-    () => fm('write', 'allowedTools: Write Edit'),
-    refusedWith(/has `Write Edit`, which is not one rule: a space outside the parentheses separates two rules, to the harness/),
-  );
-  assert.throws(
-    () => fm('write', 'allowedTools: Write(**'),
-    refusedWith(/has `Write\(\*\*`, which is not one rule: a rule has one pair of parentheses, right after the name, closed/),
-  );
+  assert.throws(() => fm('write', 'allowedTools: [Write, Edit]'), refusedNaming('write: ', '`[Write`', 'not one rule', 'bare name'));
+  assert.throws(() => fm('write', 'allowedTools: Write Edit'), refusedNaming('write: ', '`Write Edit`', 'not one rule', 'a space outside'));
+  assert.throws(() => fm('write', 'allowedTools: Write(**'), refusedNaming('write: ', '`Write(**`', 'not one rule', 'parentheses'));
 });
 
 test('REFUSED: a rule on a file-editing tool that is not Edit, in either list, which Claude Code takes and never matches', () => {
   assert.throws(
     () => fm('write', 'allowedTools: Write(**)'),
-    refusedWith(
-      /^write: `allowedTools: Write\(\*\*\)` has `Write\(\*\*\)`, and Claude Code matches a file write against `Edit` rules alone: it takes this rule, warns that it is not matched, and denies the write anyway — so the step would be fenced out of its own work with nothing said where the run can read it\. Write `Edit\(\*\*\)` instead: an `Edit` rule covers every file-editing tool, Write, NotebookEdit with it\./,
-    ),
+    refusedNaming('write: ', '`allowedTools: Write(**)`', '`Write(**)`', 'denies the write', 'Write `Edit(**)` instead'),
     'with allowedTools: Write(**), a note writer is denied its own note.md while Claude Code says on stderr that the rule "is not ' +
       'matched by file permission checks"; with Edit(**) it writes inside its folder and is denied outside it',
   );
   assert.throws(
     () => fm('write', 'allowedTools: Edit(**), NotebookEdit(notes/**)'),
-    refusedWith(/has `NotebookEdit\(notes\/\*\*\)`.*Write `Edit\(notes\/\*\*\)` instead/),
+    refusedNaming('write: ', '`NotebookEdit(notes/**)`', 'Write `Edit(notes/**)` instead'),
     'wherever in the list it sits, and whatever the path',
   );
   for (const h of ['claude', 'claude-detached']) {
@@ -968,14 +945,12 @@ test('REFUSED: a rule on a file-editing tool that is not Edit, in either list, w
   }
   assert.throws(
     () => fm('write', 'disallowedTools: Write(**)'),
-    refusedWith(
-      /^write: `disallowedTools: Write\(\*\*\)` has `Write\(\*\*\)`, and Claude Code matches a file write against `Edit` rules alone: it takes this rule, warns that it is not matched, and allows the write anyway — so the step would be fenced by nothing while its file reads as fenced\. Write `Edit\(\*\*\)` instead: an `Edit` rule covers every file-editing tool, Write, NotebookEdit with it\./,
-    ),
+    refusedNaming('write: ', '`disallowedTools: Write(**)`', '`Write(**)`', 'allows the write', 'Write `Edit(**)` instead'),
     'the deny list is read in the same check: taken, a rule it can never match leaves the step reading as fenced when it is not',
   );
   assert.throws(
     () => fm('write', 'disallowedTools: SendMessage, NotebookEdit(notes/**)'),
-    refusedWith(/has `NotebookEdit\(notes\/\*\*\)`.*Write `Edit\(notes\/\*\*\)` instead/),
+    refusedNaming('write: ', '`NotebookEdit(notes/**)`', 'Write `Edit(notes/**)` instead'),
     'wherever in the deny list it sits',
   );
   assert.deepEqual(fm('write', 'allowedTools: Edit(**)').allowedTools, ['Edit(**)'], 'allowed: the rule that works');
@@ -1027,13 +1002,11 @@ test("a step on the former name beside an agent on the new one sets that one key
 test('REFUSED: a former name handed to `renderStep` or `renderAgent`, which write the name a key has now — as a board page open since before sends it', () => {
   assert.throws(
     () => renderStep({ name: 'write', after: [], body: 'Write.', disallow: ['SendMessage'] } as unknown as StepDraft),
-    refusedWith(
-      /^write: `disallow` is `disallowedTools`'s former name, which a file may still say but nothing writes\. Send `disallowedTools` — a page that sends the former name is stale: reload it, and save again\.$/,
-    ),
+    refusedNaming('write: ', '`disallow`', 'former name', 'Send `disallowedTools`', 'reload it'),
   );
   assert.throws(
     () => renderAgent({ name: 'writer', body: 'Write.', keys: { allow: 'Edit(**)' } } as never),
-    refusedWith(/^agents\/writer\.md: `allow` is `allowedTools`'s former name, .* Send `allowedTools`/),
+    refusedNaming('agents/writer.md: ', '`allow`', 'former name', 'Send `allowedTools`'),
   );
   assert.doesNotThrow(
     () => renderStep({ name: 'write', after: [], body: 'Write.', allow: null } as unknown as StepDraft),
@@ -1044,46 +1017,39 @@ test('REFUSED: a former name handed to `renderStep` or `renderAgent`, which writ
 test('REFUSED: a list set under both its names, naming both lines and which one to keep', () => {
   assert.throws(
     () => fm('write', 'allow: Edit(**)\nallowedTools: Read'),
-    refusedWith(
-      /^write: `allowedTools` is set twice, as `allow:` and as `allowedTools:` — `allow:` is its former name, and reads as `allowedTools:`\. Keep the `allowedTools:` line and delete the other\.$/,
-    ),
+    refusedNaming('write: ', '`allowedTools` is set twice', '`allow:`', 'Keep the `allowedTools:` line'),
   );
   assert.throws(
     () => fm('write', 'disallowedTools: SendMessage\ndisallow: Bash'),
-    refusedWith(/^write: `disallowedTools` is set twice, as `disallowedTools:` and as `disallow:` — `disallow:` is its former name/),
+    refusedNaming('write: ', '`disallowedTools` is set twice', '`disallow:`', 'Keep the `disallowedTools:` line'),
     'whichever comes first',
   );
   assert.throws(
     () => parseAgent('writer', '---\nallow: Edit(**)\nallowedTools: Edit(**)\n---\nWrite.\n'),
-    refusedWith(/`allowedTools` is set twice, as `allow:` and as `allowedTools:`/),
+    refusedNaming('agents/writer.md: ', '`allowedTools` is set twice', '`allow:`'),
     'in an agent too, even with one value',
   );
   assert.throws(
     () => fm('write', 'allow: Edit(**)\nallow: Read'),
-    refusedWith(/^write: `allow` is set twice, and a step that says two things says nothing\./),
+    refusedNaming('write: ', '`allow` is set twice'),
     'the former name twice is refused as any key twice',
   );
 });
 
 test('REFUSED: a list under its former name, in the words of the line as written', () => {
-  assert.throws(() => fm('write', 'allow:'), refusedWith(/^write: `allow` has no value, which allows nothing and reads as a permission\./));
-  assert.throws(
-    () => fm('write', 'disallow:'),
-    refusedWith(/^write: `disallow` has no value, which denies nothing and reads as a fence\./),
-  );
+  assert.throws(() => fm('write', 'allow:'), refusedNaming('write: ', '`allow` has no value', 'allows nothing'));
+  assert.throws(() => fm('write', 'disallow:'), refusedNaming('write: ', '`disallow` has no value', 'denies nothing'));
   assert.throws(
     () => fm('write', 'allow: Write(**)'),
-    refusedWith(
-      /^write: `allow: Write\(\*\*\)` \(`allow:` is `allowedTools:`'s former name\) has `Write\(\*\*\)`, and Claude Code matches a file write against `Edit` rules alone/,
-    ),
+    refusedNaming('write: ', '`allow: Write(**)`', "`allowedTools:`'s former name", 'Write `Edit(**)` instead'),
   );
   assert.throws(
     () => fm('write', 'disallow: NotebookEdit(notes/**)'),
-    refusedWith(/^write: `disallow: NotebookEdit\(notes\/\*\*\)` \(`disallow:` is `disallowedTools:`'s former name\) has/),
+    refusedNaming('write: ', '`disallow: NotebookEdit(notes/**)`', "`disallowedTools:`'s former name"),
   );
   assert.throws(
     () => fm('write', 'allow: Bash(npm test, npm run build)'),
-    refusedWith(/^write: `allow: Bash\(npm test, npm run build\)` \(`allow:` is/),
+    refusedNaming('write: ', '`allow: Bash(npm test, npm run build)`', "`allowedTools:`'s former name"),
   );
 });
 
@@ -1218,7 +1184,7 @@ test("an effort loads as written: which efforts a step's harness takes is the ru
 });
 
 test('an empty check is refused, and so is one that reads as "no check" but runs as a command', () => {
-  assert.throws(() => fm('implement', 'check:'), /implement: `check` has no value\. Give the command that must exit 0/);
+  assert.throws(() => fm('implement', 'check:'), refusedNaming('implement: ', '`check` has no value', 'exit 0'));
   assert.throws(() => fm('implement', 'check:   '), /`check` has no value/);
   for (const none of ['none', '""', "''"]) assert.throws(() => fm('implement', `check: ${none}`), /exits 127/, none);
   assert.throws(() => fm('implement', 'model:'), /implement: `model` has no value\. Delete the line/, 'empty is not absent, for any key');
@@ -1227,7 +1193,7 @@ test('an empty check is refused, and so is one that reads as "no check" but runs
 test('deadlineSeconds: 5m is refused, with the seconds to write instead', () => {
   assert.throws(
     () => fm('review', 'deadlineSeconds: 5m'),
-    /review: `deadlineSeconds: 5m` is not a count\. .* with no unit — `deadlineSeconds: 300`\./,
+    refusedNaming('review: ', '`deadlineSeconds: 5m`', 'not a count', '`deadlineSeconds: 300`'),
   );
   assert.throws(() => fm('review', 'deadlineSeconds: 2h'), /`deadlineSeconds: 7200`/);
   for (const bad of ['0', '-5', '1.5', '9e2', 'NaN', 'Infinity', 'ninety', '0x10']) {
@@ -1276,9 +1242,9 @@ test('retries is a whole count, and may be 0, which is what absent means', () =>
 test("harness: banana is refused with the harnesses there are; harness: check is the run's own", () => {
   assert.throws(
     () => fm('review', 'harness: banana'),
-    /review: `harness: banana` is not a harness a step can run on\. The harnesses are: claude, codex, claude-detached, and `a2a:<name>` for a remote A2A agent the store's `a2a-agents\.json` declares\./,
+    refusedNaming('review: ', '`harness: banana`', 'claude, codex, claude-detached', '`a2a:<name>`', '`a2a-agents.json`'),
   );
-  assert.throws(() => fm('review', 'harness: check'), /`harness: check` is the run's own harness .*Put the command in `check:`/);
+  assert.throws(() => fm('review', 'harness: check'), refusedNaming('review: ', '`harness: check`', '`check:`'));
   assert.throws(() => fm('review', 'harness: Codex'), /not a harness a step can run on/, 'names are exact');
   for (const h of ['claude', 'codex', 'claude-detached']) assert.equal(fm('x', `harness: ${h}`).harness, h);
 });
@@ -1372,7 +1338,7 @@ test('a frontmatter line that is not `key: value` is refused; blank lines and # 
 test('frontmatter that never closes is refused; a file saved on Windows keeps its keys', () => {
   assert.throws(
     () => parseWorkflow('review', '---\nplace: git\nharness: codex\nafter: implement\nReview it.'),
-    /review: the frontmatter opened on the first line never closes/,
+    refusedNaming('review: ', 'never closes'),
   );
   const crlf = parseWorkflow('review', '\uFEFF---\r\nplace: git\r\nharness: codex\r\nafter: implement\r\n---\r\nReview it.\r\n');
   assert.equal(crlf.harness, 'codex');
@@ -1435,14 +1401,12 @@ test('`output:` is read at load — the file as the step names it, and the schem
 });
 
 test('an `output:` file that is not there is refused at load, with the fix', () => {
-  assert.match(
-    refusal({ 'review.schema.json': null }),
-    /^review: `output: review\.schema\.json` is not there\. It is a JSON Schema file, relative to the workflow folder — write it beside review\.md/,
-  );
+  assert.match(refusal({ 'review.schema.json': null }), /^review: `output: review\.schema\.json` is not there\./);
+  names(refusal({ 'review.schema.json': null }), 'review: ', 'JSON Schema', 'beside review.md');
   assert.match(refusal({ 'review.schema.json': null, 'review.schema.json.md': '---\nplace: git\n---\nnot the schema\n' }), /is not there/);
   assert.throws(
     () => parseWorkflow('review', '---\nplace: git\noutput: review.schema.json\n---\nreview it\n'),
-    /review: `output: review\.schema\.json` names a file beside the step, and this step was read without its folder/,
+    refusedNaming('review: ', '`output: review.schema.json`', 'without its folder'),
     'a step read without its folder has nowhere to read the file from, and does not pretend it has none',
   );
 });
@@ -1481,44 +1445,45 @@ test('an output schema that is not strict is refused, and says where', () => {
   const withItems = (changed: object) => ({ ...FINDINGS, properties: { findings: { type: 'array', items: { ...items, ...changed } } } });
   const { additionalProperties: _, ...open } = FINDINGS;
 
-  assert.match(
+  names(
     refusal({ 'review.schema.json': { ...FINDINGS, required: [] } }),
-    /review: `output: review\.schema\.json` is not strict at the top: `findings` is not in `required`\. Codex refuses/,
+    'review: ',
+    '`output: review.schema.json`',
+    'not strict at the top',
+    '`findings`',
+    '`required`',
   );
-  assert.match(refusal({ 'review.schema.json': open }), /not strict at the top: `additionalProperties` is not `false`/);
+  names(refusal({ 'review.schema.json': open }), 'review: ', 'not strict at the top', '`additionalProperties`', '`false`');
   assert.match(
     refusal({ 'review.schema.json': { ...FINDINGS, required: ['findings', 'ghost'] } }),
-    /not strict at the top: `required` names `ghost`, which is not a property/,
+    /not strict at the top: `required` names `ghost`/,
   );
   assert.match(
     refusal({ 'review.schema.json': withItems({ required: ['file', 'what'] }) }),
-    /not strict at findings\[\]: `line` is not in `required`\. .*required and nullable instead/,
+    /not strict at findings\[\]: `line` is not in `required`/,
   );
+  names(refusal({ 'review.schema.json': withItems({ required: ['file', 'what'] }) }), 'review: ', 'nullable');
   assert.match(
     refusal({ 'review.schema.json': withItems({ additionalProperties: true }) }),
-    /not strict at findings\[\]: `additionalProperties` is not `false`/,
+    /not strict at findings\[\]: `additionalProperties`/,
   );
   const deep = withItems({
     properties: { ...items.properties, fix: { anyOf: [{ type: 'null' }, { type: 'object', properties: { patch: { type: 'string' } } }] } },
     required: [...items.required, 'fix'],
   });
-  assert.match(refusal({ 'review.schema.json': deep }), /not strict at findings\[\]\.fix\.anyOf\[1\]: `patch` is not in `required`/);
+  names(refusal({ 'review.schema.json': deep }), 'review: ', 'not strict at findings[].fix.anyOf[1]', '`patch`', '`required`');
 
-  assert.match(
-    refusal({ 'review.schema.json': '{ "findings": ' }),
-    /`output: review\.schema\.json` is not JSON \(/,
+  assert.throws(
+    () => loadWorkflows(outputFolder({ 'review.schema.json': '{ "findings": ' })),
+    refusedNaming('review: ', '`output: review.schema.json` is not JSON'),
     'not a schema of fields at all',
   );
   for (const shape of [[], { type: 'array', items: {} }, { type: 'object', properties: {}, required: [], additionalProperties: false }]) {
-    assert.match(
-      refusal({ 'review.schema.json': shape }),
-      /is not a schema of fields\. Give it `"type": "object"` and at least one field/,
-      JSON.stringify(shape),
-    );
+    names(refusal({ 'review.schema.json': shape }), 'review: ', 'not a schema of fields', '`"type": "object"`');
   }
-  assert.match(
-    refusal({ 'review.schema.json': { ...FINDINGS, $defs: { finding: items } } }),
-    /sets `\$defs` beside its fields, and only its `properties` are merged/,
+  assert.throws(
+    () => loadWorkflows(outputFolder({ 'review.schema.json': { ...FINDINGS, $defs: { finding: items } } })),
+    refusedNaming('review: ', '`$defs`', '`properties`'),
     'only properties is merged into the closeout: a definition beside them would not reach the harness',
   );
 });
@@ -1533,11 +1498,10 @@ test('an output schema that names a field every closeout already has is refused'
     };
     assert.match(
       refusal({ 'review.schema.json': schema }),
-      new RegExp(
-        `review: \`output: review\\.schema\\.json\` declares \`${field}\`, which every closeout already has\\. .*\`summary\` and \`body\` are the step.s own account, for the person who decides`,
-      ),
+      new RegExp(`^review: \`output: review\\.schema\\.json\` declares \`${field}\``),
       field,
     );
+    names(refusal({ 'review.schema.json': schema }), 'review: ', 'every closeout already has', '`summary`', '`body`');
   }
 });
 
@@ -1564,10 +1528,8 @@ test('`input:` names steps this one waits on — directly, or through `resume` �
     'a step handed a resume without the after the parser adds is still reading finished work',
   );
 
-  const notAfter =
-    /respond: `input: review`, but respond does not wait on review, directly or through the steps between — a step cannot read the product of work that has not finished\. Add review to `after:`, or delete the line\./;
-  assert.match(refusal(respond('after: implement\ninput: review')), notAfter);
-  assert.match(refusal(respond('input: review')), notAfter, 'a root reads nothing');
+  for (const keys of ['after: implement\ninput: review', 'input: review'])
+    names(refusal(respond(keys)), 'respond: ', '`input: review`', 'does not wait on review', 'Add review to `after:`', 'delete the line');
   const implementDeclares = { 'implement.md': '---\nplace: git\noutput: review.schema.json\n---\nimplement it\n' };
   assert.deepEqual(
     loadWorkflows(outputFolder({ ...implementDeclares, ...respond('after: review\ninput: implement') })).find((s) => s.name === 'respond')!
@@ -1579,13 +1541,15 @@ test('`input:` names steps this one waits on — directly, or through `resume` �
 
 test('`input:` naming no step, or a step that declares no output, is refused — nothing of its closeout would travel', () => {
   const respond = (keys: string) => ({ 'respond.md': `---\nplace: git\n${keys}\n---\nanswer it\n` });
-  assert.match(
-    refusal(respond('after: review\ninput: reveiw')),
-    /respond: `input: reveiw` names a step that is not here\. Correct the name, or delete the line\./,
-  );
-  assert.match(
+  assert.match(refusal(respond('after: review\ninput: reveiw')), /^respond: `input: reveiw` names a step that is not here\./);
+  names(refusal(respond('after: review\ninput: reveiw')), 'respond: ', 'delete the line');
+  names(
     refusal(respond('after: implement\ninput: implement')),
-    /respond: `input: implement`, but implement declares no `output:`, so nothing of its closeout travels — its summary goes to the person who decides, never to a step\. Give implement\.md an `output:` schema/,
+    'respond: ',
+    '`input: implement`',
+    'implement declares no `output:`',
+    'implement.md',
+    '`output:` schema',
   );
 });
 
@@ -1595,9 +1559,9 @@ test('an output schema is read strict wherever an object can sit — and one tha
     'review.schema.json': { type: 'object', properties: { product }, required: ['product'], additionalProperties: false },
   });
 
-  assert.match(
-    refusal(around({ $defs: { value: loose }, $ref: '#/properties/product/$defs/value' })),
-    /^review: `output: review\.schema\.json` uses `\$ref` at product\. The run checks a schema is strict by reading it, and does not follow references .* Inline what it points at, and delete `\$ref`\./,
+  assert.throws(
+    () => loadWorkflows(outputFolder(around({ $defs: { value: loose }, $ref: '#/properties/product/$defs/value' }))),
+    refusedNaming('review: ', '`output: review.schema.json`', '`$ref` at product', 'delete `$ref`'),
     'a definition nested under the field, and a reference to it: a walk that read neither would load a loose object',
   );
   const strict = { ...loose, required: ['optional'], additionalProperties: false };
@@ -1688,35 +1652,37 @@ test('`loop:` names the step to run again and `rounds:` counts, 3 unless it says
 
 test('REFUSED at load: `loop:` naming a step that is not an ancestor — one beside it, one after it, itself, one not here, or two', () => {
   const docs = { 'docs.md': '---\nafter: implement\nplace: git\n---\ndocument it\n' };
-  assert.match(
-    refusal(loopFiles('loop: docs', docs)),
-    /^review: `loop: docs`, but review does not wait on docs, directly or through the steps between — a loop runs again work that finished before this step\. Add docs to `after:`, or name a step review waits on\.$/,
-  );
+  names(refusal(loopFiles('loop: docs', docs)), 'review: ', '`loop: docs`', 'does not wait on docs', 'Add docs to `after:`');
   assert.match(
     refusal(loopFiles('loop: ship', { 'ship.md': '---\nafter: review\nplace: git\n---\nship it\n' })),
     /^review: `loop: ship`, but review does not wait on ship/,
   );
-  assert.match(refusal(loopFiles('loop: review')), /^review: `loop: review` names this step\. A loop runs an earlier step again/);
-  assert.match(
-    refusal(loopFiles('loop: implemnt')),
-    /^review: `loop: implemnt` names a step that is not here\. Correct the name, or delete the line\./,
-  );
+  names(refusal(loopFiles('loop: review')), 'review: ', '`loop: review`', 'names this step');
+  names(refusal(loopFiles('loop: implemnt')), 'review: ', '`loop: implemnt`', 'not here', 'delete the line');
   assert.match(refusal(loopFiles('loop: implement, docs', docs)), /^review: `loop: implement, docs` names more than one step\./);
 });
 
 test('REFUSED at load: a step with `loop:` whose output does not declare `again` as a boolean — or declares nothing', () => {
-  const lacks =
-    /^review: `loop: implement` runs implement again when this step's closeout says `again: true`, and `output: review\.schema\.json` does not declare `again`\. Declare it — `"again": \{ "type": "boolean" \}`, listed in `required`/;
-  assert.match(refusal(loopFiles('loop: implement', { 'review.schema.json': FINDINGS })), lacks);
-  assert.match(
+  names(
+    refusal(loopFiles('loop: implement', { 'review.schema.json': FINDINGS })),
+    'review: ',
+    '`loop: implement`',
+    '`output: review.schema.json` does not declare `again`',
+    '`"again": { "type": "boolean" }`',
+    '`required`',
+  );
+  names(
     refusal({ 'review.md': '---\nafter: implement\nplace: git\nloop: implement\n---\nreview it\n' }),
-    /^review: `loop: implement` runs implement again when this step's closeout says `again: true`, and this step declares no `output:`, so its closeout has no `again`\./,
+    'review: ',
+    '`loop: implement`',
+    'declares no `output:`',
+    '`again`',
   );
   for (const type of ['string', ['boolean', 'null']]) {
     const schema = { ...LOOPING, properties: { ...LOOPING.properties, again: { type } } };
     assert.match(
       refusal(loopFiles('loop: implement', { 'review.schema.json': schema })),
-      /declares `again` as .*It is `"type": "boolean"`: true or false, and nothing the run would have to interpret\./,
+      /^review: .*declares `again` as .*`"type": "boolean"`/,
       JSON.stringify(type),
     );
   }
@@ -1832,7 +1798,7 @@ test('`place: folder` runs a step in a folder the run makes, with a check and a 
         ['write', '---\nplace: git\npermissionMode: dontAsk\n---\nWrite.\n'],
         ['review', '---\nafter: write\nplace: folder\n---\nReview.\n'],
       ]),
-    (e: WorkflowError) => e.exitCode === 2 && e.message.startsWith('review says `place: folder`, and write works on a repository'),
+    refusedNaming('review says `place: folder`', 'write works on a repository'),
     'and at load, from a folder of files, as a person writes them',
   );
 });
@@ -1892,10 +1858,7 @@ test('`workspace: folder` is read as its former spelling, `place: folder`, and n
   assert.equal(renderStep(former), '---\nplace: folder\n---\nDo the work.\n', 'a save writes `place: folder` and no `workspace:` line');
   assert.throws(
     () => renderStep({ ...former, workspace: 'folder' as never }),
-    (e: WorkflowError) =>
-      e.exitCode === 2 &&
-      e.message ===
-        'write: `workspace: folder` is the former spelling of `place: folder`, which a file may still say but nothing writes. Send `place: folder` — a page that sends the former spelling is stale: reload it, and save again.',
+    refusedNaming('write: ', '`workspace: folder`', 'former spelling', 'Send `place: folder`', 'reload it'),
   );
   for (const place of ['folder', 'git'])
     assert.throws(
@@ -1989,11 +1952,7 @@ test("REFUSED at load: a background step of a folder team in a permission mode t
 
   assert.throws(
     () => parseFolder([['write', '---\nworkspace: folder\nbackground: true\npermissionMode: acceptEdits\n---\nWrite.\n']]),
-    (e: WorkflowError) =>
-      e.exitCode === 2 &&
-      e.message.startsWith(
-        'write: `place: folder` works in a folder nobody has opened, `background: true` runs the step as a background session, and `permissionMode: acceptEdits` can',
-      ),
+    refusedNaming('write: ', '`place: folder`', '`background: true`', '`permissionMode: acceptEdits`'),
     'at load, from files: the same refusal reaches a person writing a folder of markdown',
   );
 });
@@ -2006,10 +1965,7 @@ test('`background: true` runs a claude step as a background session, `background
   assert.equal(fm('supervise', 'background: false\nbudget: 2').budget, 2, 'a job keeps a cap');
   const refusedWith = (pattern: RegExp) => (e: WorkflowError) => e.exitCode === 2 && pattern.test(e.message);
   assert.throws(() => fm('supervise', 'background: yes'), refusedWith(/^supervise: `background: yes` is not `true` or `false`\./));
-  assert.throws(
-    () => fm('supervise', 'background:'),
-    refusedWith(/^supervise: `background: ` is not `true` or `false`\.|^supervise: `background` has no value/),
-  );
+  assert.throws(() => fm('supervise', 'background:'), refusedNaming('supervise: ', '`background` has no value', 'Delete the line'));
   assert.throws(() => fm('supervise', 'background: true\nbackground: true'), refusedWith(/background/));
   for (const harness of ['codex', 'claude-detached']) {
     assert.equal(fm('supervise', `harness: ${harness}\nbackground: true`).background, true, harness);
@@ -2035,18 +1991,21 @@ test('`denials: fail` is read on a job of `claude` and `claude-detached`, and a 
       word,
     );
   }
-  assert.throws(() => fm('review', 'denials:'), refusedWith(/^review: `denials` has no value|^review: `denials: ` is not `fail`/));
+  assert.throws(() => fm('review', 'denials:'), refusedNaming('review: ', '`denials` has no value', 'Delete the line'));
   assert.throws(() => fm('review', 'denials: fail\ndenials: fail'), refusedWith(/^review: `denials` is set twice/));
   assert.throws(
     () => fm('review', 'harness: codex\ndenials: fail'),
-    refusedWith(
-      /^review: `denials: fail` stops the step on a call the harness denied, and `codex exec` records none: .* Run the step on claude — delete `harness: codex` — or delete `denials: fail`\.$/,
-    ),
+    refusedNaming('review: ', '`denials: fail`', '`codex exec` records none', 'delete `harness: codex`', 'delete `denials: fail`'),
   );
   assert.throws(
     () => fm('supervise', 'background: true\ndenials: fail'),
-    refusedWith(
-      /^supervise: `denials: fail` stops the step on a call the harness denied, and `background: true` runs it as a Claude Code background session \(`claude --bg`\), whose denials are not read \(agent-runtime's open issue 28\) — so the line would never stop anything\. Delete `background: true` to run the step as a job, which records each call it was denied, or delete `denials: fail`\.$/,
+    refusedNaming(
+      'supervise: ',
+      '`denials: fail`',
+      '`claude --bg`',
+      'open issue 28',
+      'Delete `background: true`',
+      'delete `denials: fail`',
     ),
   );
   const step = fm('review', 'denials: fail\nallowedTools: Edit(**)');
@@ -2210,15 +2169,11 @@ test("REFUSED at load: `slot: none` on a step of a workflow that has another —
 test("REFUSED at load: a `resume:` on a step that runs in the repository's checkout — its session ran in another directory, and an ending starts cold", () => {
   assert.throws(
     () => fm('ship', 'workspace: main\nresume: review'),
-    (e: WorkflowError) =>
-      e.exitCode === 2 &&
-      /^ship: `workspace: main` runs the step in the repository's own checkout, and `resume: review` continues review's session, which ran in the worktree review worked in — the same conversation, in another directory, told none of what this step needs\. A step that ends a run starts cold, where the base branch is, and is told which branch to act on\. Delete one of the two lines\.$/.test(
-        e.message,
-      ),
+    refusedNaming('ship: ', '`workspace: main`', "`resume: review` continues review's session", 'Delete one of the two lines'),
   );
   assert.throws(
     () => fm('ship', 'resume: review\nworkspace: main'),
-    /`workspace: main` runs the step in the repository's own checkout, and `resume: review`/,
+    refusedNaming('ship: ', '`workspace: main`', '`resume: review`', 'Delete one of the two lines'),
     'whichever order the two lines are written in',
   );
   assert.deepEqual(
@@ -2239,26 +2194,26 @@ test("an ending's `check:` is filed by a person's approval or by a step that can
 
   assert.throws(
     () => validate(folder(false, false)),
-    (e: WorkflowError) =>
-      e.exitCode === 2 &&
-      /^ship: `workspace: main` runs the step in the repository's own checkout, and `check: npm test` is a command the run executes there on the merge the step leaves staged, committing it onto the base branch when it passes — which is nobody's to start unless a person approves it or a step that can send the work back has passed, and this step has no `gate: true` and waits on no step with a `loop:` \(it waits on review\)\. Add `gate: true`, give review a `loop:` so that its pass files the landing, or delete the `check:` line\.$/.test(
-        e.message,
-      ),
+    refusedNaming(
+      'ship: ',
+      '`workspace: main`',
+      '`check: npm test`',
+      '(it waits on review)',
+      'Add `gate: true`',
+      'give review a `loop:`',
+      'delete the `check:` line',
+    ),
     "the fixture that makes it refuse: the accepted folder with its review's `loop:` line deleted",
   );
   assert.throws(
     () => validate([{ ...ending, after: [] }]),
-    /and this step has no `gate: true` and waits on nothing\. Add `gate: true`, give the step before it a `loop:`/,
+    refusedNaming('ship: ', 'waits on nothing', 'Add `gate: true`', 'give the step before it a `loop:`'),
     'an ending that waits on nothing has no step to route it either',
   );
   assert.throws(
     () =>
       validate([...folder(true, false).slice(0, 2), { name: 'measure', after: ['review'], body: 'x' }, { ...ending, after: ['measure'] }]),
-    (e: WorkflowError) =>
-      e.exitCode === 2 &&
-      /and this step has no `gate: true` and waits on no step with a `loop:` \(it waits on measure\)\. Add `gate: true`, give measure a `loop:`/.test(
-        e.message,
-      ),
+    refusedNaming('ship: ', '(it waits on measure)', 'Add `gate: true`', 'give measure a `loop:`'),
     'a looping step in the folder that the ending does not wait on routes nothing: measure sits between the loop and the merge, and nothing it hands on can be sent back',
   );
 
@@ -2300,11 +2255,14 @@ test("REFUSED at load: a `check:` on a gated step in the repository's checkout t
   ]) {
     assert.throws(
       () => fm('ship', lines),
-      (e: WorkflowError) =>
-        e.exitCode === 2 &&
-        /^ship: `workspace: main` with `check: npm test` has the run commit the merge the step stages once the check passes, and keeps the session from committing it first by denying it what its place denies a landing session \(`denyWhileLanding`, which its place declares\) — which codex cannot be denied: one shell, fenced by its sandbox, and a sandbox that lets it stage a merge lets it commit one\. Run the ending on claude — delete `harness: codex` — or delete the `check:` line\.$/.test(
-          e.message,
-        ),
+      refusedNaming(
+        'ship: ',
+        '`workspace: main`',
+        '`check: npm test`',
+        '`denyWhileLanding`',
+        'delete `harness: codex`',
+        'delete the `check:` line',
+      ),
       lines,
     );
   }
@@ -2328,11 +2286,13 @@ test("REFUSED at load: `retries:` on a step that runs in the repository's checko
   ]) {
     assert.throws(
       () => fm('ship', lines),
-      (e: WorkflowError) =>
-        e.exitCode === 2 &&
-        /^ship: `workspace: main` runs the step in the repository's own checkout, and `retries: [01]` would have the run do it again there on its own, on a refusal nobody read\. A step that ends a run is tried again on a person's word: nemia retry <run> ship\. Delete the `retries:` line\.$/.test(
-          e.message,
-        ),
+      refusedNaming(
+        'ship: ',
+        '`workspace: main`',
+        `\`retries: ${/retries: (\d)/.exec(lines)![1]}\``,
+        'nemia retry <run> ship',
+        'Delete the `retries:` line',
+      ),
       lines,
     );
   }
@@ -2367,33 +2327,33 @@ test("`remote: true` bridges a step's sessions to claude.ai, `remote: false` doe
 });
 
 test('REFUSED at load: `rounds:` on a step with no `loop:`, and rounds that are not a count above zero', () => {
-  assert.match(
+  names(
     refusal({ 'review.md': '---\nafter: implement\nplace: git\nrounds: 2\n---\nreview it\n' }),
-    /^review: `rounds: 2` counts the rounds of a loop, and this step has no `loop:`\. Add `loop: <step>`.*that is `retries:`\./,
+    'review: ',
+    '`rounds: 2`',
+    'no `loop:`',
+    'Add `loop: <step>`',
+    '`retries:`',
   );
   for (const bad of ['0', 'three', '-1', '2.5']) {
-    assert.match(
-      refusal(loopFiles(`loop: implement\nrounds: ${bad}`)),
-      /`rounds: .*` is not a count\. `rounds` is how many rounds `loop:` may run, the first included: a whole number above zero/,
-      bad,
-    );
+    names(refusal(loopFiles(`loop: implement\nrounds: ${bad}`)), 'review: ', `\`rounds: ${bad}\` is not a count`, 'above zero');
   }
 });
 
 test('REFUSED at load: a loop a round could not file again as it was — a step in it that forks, merges or resumes, a step in two loops, a target that declares `replies`', () => {
-  assert.match(
-    refusal(loopFiles('loop: implement', { 'docs.md': '---\nafter: implement\nplace: git\n---\ndocument it\n' })),
-    /^review: `loop: implement` files review again after implement each round, in the workspace implement works in, and review does not work there: docs waits on implement too, so review forks a worktree of its own, cut once, which would not have the next round's work\. A loop's steps are a chain/,
+  assert.throws(
+    () => loadWorkflows(outputFolder(loopFiles('loop: implement', { 'docs.md': '---\nafter: implement\nplace: git\n---\ndocument it\n' }))),
+    refusedNaming('review: ', '`loop: implement`', 'docs waits on implement too', 'review forks a worktree', 'after review'),
     'implement → review (loop: implement), and docs beside review: review forks a worktree cut once, off the first round',
   );
   assert.throws(
     () => validate([step('implement'), looping('review', ['implement', 'test'], 'implement'), step('test', ['implement'])]),
-    /review does not work there: it waits on implement and test, so it merges their branches into a worktree of its own/,
+    refusedNaming('review: ', 'it waits on implement and test', 'merges their branches', 'after review'),
     "read in the workflow's order, so review's merge is found before test's fork beside it",
   );
   assert.throws(
     () => validate([step('implement'), { ...step('test', ['implement']), resume: 'implement' }, looping('review', ['test'], 'implement')]),
-    /test: `resume: implement`, and test is in review's loop \(`loop: implement`\), which files it as a new session each round/,
+    refusedNaming('test: ', '`resume: implement`', "review's loop (`loop: implement`)", 'Delete the line'),
   );
   assert.throws(
     () => validate([step('implement'), { ...looping('review', [], 'implement'), resume: 'implement', after: ['implement'] }]),
@@ -2402,17 +2362,20 @@ test('REFUSED at load: a loop a round could not file again as it was — a step 
   );
   assert.throws(
     () => validate([step('a'), looping('b', ['a'], 'a'), looping('c', ['b'], 'b')]),
-    /b is in two loops: b's \(`loop: a`\) and c's \(`loop: b`\)\. A round of either would file it again under the other/,
+    refusedNaming('b ', 'two loops', "b's (`loop: a`)", "c's (`loop: b`)"),
   );
   const replies = { type: 'object', properties: { replies: { type: 'string' } }, required: ['replies'], additionalProperties: false };
-  assert.match(
+  names(
     refusal(
       loopFiles('loop: implement', {
         'implement.md': '---\nplace: git\noutput: implement.schema.json\n---\nimplement it\n',
         'implement.schema.json': replies,
       }),
     ),
-    /^implement: `output: implement\.schema\.json` declares `replies`, and review loops back to implement \(`loop: implement`\), so the run adds `replies` to its closeout: its answer to each finding\. Rename the field\./,
+    'implement: ',
+    '`output: implement.schema.json` declares `replies`',
+    '(`loop: implement`)',
+    'Rename the field',
   );
 });
 
@@ -2788,7 +2751,7 @@ test("REFUSED by `renderStep`, in the parser's words where the parser has them: 
   };
 
   assert.equal(message({ ...step, afer: ['implement'] }), parsersWords('afer: implement'), "a key no step has: the parser's sentence");
-  assert.match(message({ ...step, afer: ['implement'] }), /^review: `afer` is not a key a step has\. A step's keys are: after, /);
+  names(message({ ...step, afer: ['implement'] }), 'review: ', '`afer`', 'after, resume');
   assert.equal(message({ ...step, guide: 'CLAUDE.md' }), parsersWords('guide: CLAUDE.md'));
   assert.equal(
     message({ ...step, maxAttempts: 2 }),
@@ -2802,22 +2765,22 @@ test("REFUSED by `renderStep`, in the parser's words where the parser has them: 
   );
 
   const injected = { ...step, check: 'npm test\nharness: codex' };
-  assert.equal(
-    message(injected),
-    'review: `check` holds a line break, and a frontmatter line is one key and its value: what follows the break would be read as a line of its own. Write it on one line — commands joined with `&&`.',
+  assert.throws(
+    () => renderStep(injected),
+    refusedNaming('review: ', '`check` holds a line break', 'Write it on one line', '`&&`'),
     'written as given, the break would end the line, and what follows would be a key of its own: a harness nobody chose',
   );
   assert.match(message({ ...step, model: 'opus\r' }), /^review: `model` holds a line break/);
   assert.match(message({ ...step, tools: ['Read', 'Grep\nBash'] }), /^review: `tools` holds a line break/);
-  assert.equal(
-    message({ ...step, model: { name: 'opus' } }),
-    'review: `model` is {"name":"opus"}, and a frontmatter line holds a word, a number or a list: an object would be written as `[object Object]`.',
+  assert.throws(
+    () => renderStep({ ...step, model: { name: 'opus' } } as unknown as StepDraft),
+    refusedNaming('review: ', '`model` is {"name":"opus"}', '`[object Object]`'),
     'a key the draft sends as an object would be written as a value nobody chose: refused by name instead',
   );
 
-  assert.equal(
-    message({ ...step, after: ['implement, docs'] }),
-    "review: `after` lists `implement, docs`, and a list is split on every comma, so it would be read as `implement`, `docs`. A step's name has no comma: give each step an entry of its own.",
+  assert.throws(
+    () => renderStep({ ...step, after: ['implement, docs'] }),
+    refusedNaming('review: ', '`after` lists `implement, docs`', '`implement`, `docs`', 'an entry of its own'),
   );
   assert.match(message({ ...step, input: ['a,b'] }), /^review: `input` lists `a,b`/);
 

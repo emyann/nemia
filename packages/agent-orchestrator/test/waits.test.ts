@@ -42,7 +42,8 @@ test("REFUSED: a test script with no default timeout, or another than `WAITED`'s
     `the test script gives no --test-timeout=${WAITED.timeout}, so a test given no \`WAITED\` that waits is never bounded: add it`,
   ];
   assert.deepEqual(timeoutBreaks("node --test --test-concurrency=2 'test/*.test.ts'"), refused, 'none');
-  assert.deepEqual(timeoutBreaks("node --test --test-concurrency=2 --test-timeout=600000 'test/*.test.ts'"), refused, 'a longer one');
+  const longer = "node --test --test-concurrency=2 --test-timeout=600000 'test/*.test.ts'";
+  assert.deepEqual(timeoutBreaks(longer), refused, 'a longer one');
   assert.deepEqual(timeoutBreaks(`node --test --test-concurrency=2 --test-timeout=${WAITED.timeout} 'test/*.test.ts'`), [], 'its own');
 });
 

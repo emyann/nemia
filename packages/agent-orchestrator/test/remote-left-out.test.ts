@@ -139,7 +139,10 @@ for (const [what, text] of [
         const refused = ended(queued);
         assert.equal(refused.length, 1, JSON.stringify(journal(queued)));
         assert.equal(refused[0].reason, 'unstartable');
-        assert.match(String(refused[0].error), /^`harness: a2a:reviewer` is not a harness this engine has, so nothing was started/);
+        const error = String(refused[0].error);
+        assert.ok(error.startsWith('`harness: a2a:reviewer` is not a harness'), error);
+        assert.ok(error.includes('nothing was started'), error);
+        assert.ok(error.includes('Its harnesses are: '), error);
         assert.equal(server.sent.length, 1, 'and nothing more was sent to the agent');
 
         fs.writeFileSync(FILE, good);

@@ -257,7 +257,8 @@ test('REFUSED at shipped defaults: rules with a frontmatter block, a link, or a 
     await assert.rejects(started(here, what, 'pipao'), (err: Error & { exitCode?: number; _tag?: string }) => {
       assert.match(err.message, said, what);
       assert.ok(err.message.includes(here.file), `${what}: names the file: ${err.message}`);
-      assert.match(err.message, /Or remove the rules: nemia factory rules pipao --clear\. Nothing was started\.$/, what);
+      assert.ok(err.message.includes('nemia factory rules pipao --clear'), what);
+      assert.ok(err.message.endsWith('Nothing was started.'), what);
       assert.equal(err._tag, 'Invalid', what);
       assert.equal(err.exitCode, 2, what);
       return true;

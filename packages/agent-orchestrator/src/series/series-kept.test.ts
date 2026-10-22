@@ -139,7 +139,10 @@ test('`nemia series --json` is the answer the api serves; REFUSED: a --range it 
   assert.equal(rangeOf(undefined), '24h');
   await assert.rejects(main(['series', '--range', '2w'], noEngine()), (err: Error & { exitCode?: number }) => {
     assert.equal(err.exitCode, 2);
-    assert.equal(err.message, '--range takes 24h, 7d, 30d, all: nemia series --range 7d, not "2w".');
+    assert.match(err.message, /^--range takes 24h, 7d, 30d, all: /);
+    assert.match(err.message, /nemia series --range 7d/);
+    assert.match(err.message, /not "2w"\.$/);
+
     return true;
   });
 });

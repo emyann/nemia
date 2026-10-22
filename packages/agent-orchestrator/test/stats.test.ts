@@ -351,11 +351,7 @@ test('nemia stats --json answers the numbers of the store: a landing on its firs
   );
   assert.equal(s.all.total.tries, 5);
   const build = s.all.steps.find((row) => row.step === 'build');
-  assert.deepEqual(
-    build?.checks,
-    { passed: 0, refused: 1, unfinished: 1 },
-    'a check ended with no exit code did not finish; exit 1 refused',
-  );
+  assert.deepEqual(build?.checks, { passed: 0, refused: 1, unfinished: 1 }, 'no exit code is unfinished; exit 1 refused');
   assert.equal(build?.costUsd, null, 'no session of build was measured');
   assert.equal(s.all.steps.find((row) => row.step === 'implement')?.agent, 'ada');
   assert.deepEqual(s.unreadable, ['marks-2', 'spoilt'], 'a run whose journal does not read is left out whole, and named');
@@ -385,7 +381,8 @@ test('nemia stats --line prints one line, and nemia stats prints the tiles and t
   const words = await printedBy(t, ['stats', '--from', DAY, '--to', DAY]);
   assert.match(words, /^last 14 days \(/);
   assert.match(words, new RegExp(`^${DAY}\\s+1\\s+1\\s+1\\s+100%\\s+\\$3\\.50\\s+4h00m`, 'm'));
-  assert.match(words, /left out, a journal of each not reading \(nemia ls says why\): marks-2, spoilt/);
+  assert.ok(words.includes('left out, a journal of each not reading'), words);
+  assert.ok(words.includes('(nemia ls says why): marks-2, spoilt'), words);
 });
 
 test('nemia stats --help prints each flag and what it takes, and is refused nothing', async (t) => {

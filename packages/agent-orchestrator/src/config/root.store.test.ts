@@ -39,7 +39,8 @@ test('REFUSED: a relative WF_ROOT is refused where the layer is built, in wfRoot
     (error: unknown) =>
       error instanceof Invalid &&
       error.exitCode === 2 &&
-      error.message ===
-        "WF_ROOT=rel is not an absolute path. It is the directory where runs and the engine's board live, the same for every process that reads them: WF_ROOT=/srv/wf — or unset, for ~/.agent-workflows.",
+      error.message.startsWith('WF_ROOT=rel ') &&
+      error.message.includes('WF_ROOT=/srv/wf') &&
+      error.message.includes('~/.agent-workflows'),
   );
 });

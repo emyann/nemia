@@ -40,9 +40,14 @@ heldUnasked(engine);
 /** The engine of this test: the stand-in, which no command here files on, stops, says to or forgets from (`heldUnasked`). */
 const noEngine = () => engineOf(engine().layer);
 
-/** Refused by kind, exit 2, and the message — never `String(err)`, which starts with `Error: `. */
-const refusedWith = (tag: 'Missing' | 'Conflict' | 'Invalid', pattern: RegExp) => (err: Error & { exitCode?: number; _tag?: string }) =>
-  err._tag === tag && err.exitCode === 2 && pattern.test(err.message);
+/**
+ * Refused by kind, exit 2, and what the message names — the fix's command or flag, the factory, the step — each a pattern it matches or
+ * a token it holds; never `String(err)`, which starts with `Error: `.
+ */
+const refusedWith =
+  (tag: 'Missing' | 'Conflict' | 'Invalid', ...named: Array<RegExp | string>) =>
+  (err: Error & { exitCode?: number; _tag?: string }) =>
+    err._tag === tag && err.exitCode === 2 && named.every((n) => (typeof n === 'string' ? err.message.includes(n) : n.test(err.message)));
 const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
 
 type Mocker = { mock: { method: (o: object, m: string, f: (...a: unknown[]) => void) => { mock: { restore: () => void } } } };
@@ -90,7 +95,7 @@ test('REFUSED: an add of a name already filed is a Conflict, and the file is lef
   const before = fs.readFileSync(path.join(FACTORIES, 'pipao.json'));
   await assert.rejects(
     main(['factory', 'add', 'pipao', '--repo', other], noEngine()),
-    refusedWith('Conflict', /^There is a factory pipao already, .* nemia factory ls; .* nemia factory rm pipao, then add it again\.$/),
+    refusedWith('Conflict', /^There is a factory pipao already/, 'nemia factory ls', 'nemia factory rm pipao'),
   );
   assert.deepEqual(fs.readFileSync(path.join(FACTORIES, 'pipao.json')), before);
   assert.deepEqual(filed(), ['pipao.json'], 'no hidden file left behind');
@@ -116,7 +121,7 @@ test('REFUSED: the default factory is not added, and no file of its name is writ
   const repo = fresh();
   await assert.rejects(
     main(['factory', 'add', 'default', '--repo', repo], noEngine()),
-    refusedWith('Conflict', /^`default` is the default factory: .* nemia factory add does not take it/),
+    refusedWith('Conflict', /^`default` is the default factory/, 'nemia factory add does not take it'),
   );
   assert.deepEqual(filed(), []);
 });
@@ -126,10 +131,7 @@ test('REFUSED: an add with no --repo, or with one that is missing or a file, is 
   const gone = path.join(ROOT, 'no-such-dir');
   const aFile = path.join(repo, 'README.md');
   fs.writeFileSync(aFile, 'not a directory\n');
-  await assert.rejects(
-    main(['factory', 'add', 'pipao'], noEngine()),
-    refusedWith('Invalid', /^A factory names one repository at least, and none was given: nemia factory add pipao --repo <path>/),
-  );
+  await assert.rejects(main(['factory', 'add', 'pipao'], noEngine()), refusedWith('Invalid', 'nemia factory add pipao --repo <path>'));
   await assert.rejects(
     main(['factory', 'add', 'pipao', '--repo', repo, '--repo', gone, '--repo', aFile], noEngine()),
     refusedWith('Invalid', new RegExp(`^--repo names a directory, and ${escaped(gone)}, ${escaped(aFile)} are not directories\\.`)),
@@ -210,7 +212,7 @@ test('REFUSED: an rm of the default is a Conflict, and of a name with no factory
   await assert.rejects(main(['factory', 'rm', 'default'], noEngine()), refusedWith('Conflict', /nemia factory rm does not take it/));
   await assert.rejects(
     main(['factory', 'rm', 'nope'], noEngine()),
-    refusedWith('Missing', /^no factory nope in the store\. Its factories are: pipao\. Nothing was removed\.$/),
+    refusedWith('Missing', /^no factory nope /, /: pipao\. /, /removed\.$/),
   );
   await assert.rejects(main(['factory', 'rm', '../runs'], noEngine()), refusedWith('Invalid', /is not a factory's name/));
   assert.deepEqual(filed(), ['pipao.json']);
@@ -234,7 +236,16 @@ test('REFUSED: nemia factory with a subcommand it does not have names its forms;
     main(['factory', 'frob'], noEngine()),
     refusedWith(
       'Invalid',
-      /^nemia factory does not take frob\. .*nemia factory ls.*nemia factory add <name> --repo <path>.*nemia factory attach <factory> <workflow>.*nemia factory detach <factory> <workflow>.*nemia factory hire <factory> <agent> --step <workflow>\/<step>.*nemia factory fire <factory> --step <workflow>\/<step>.*nemia factory schedule <factory> <workflow> --cron <expr> --brief <text>.*nemia factory unschedule <factory> <workflow>.*nemia factory rm <name>/,
+      'nemia factory does not take frob',
+      'nemia factory ls',
+      'nemia factory add <name> --repo <path>',
+      'nemia factory attach <factory> <workflow>',
+      'nemia factory detach <factory> <workflow>',
+      'nemia factory hire <factory> <agent> --step',
+      'nemia factory fire <factory> --step <workflow>/<step>',
+      '--cron <expr> --brief <text>',
+      'nemia factory unschedule <factory> <workflow>',
+      'nemia factory rm <name>',
     ),
   );
   await assert.rejects(main(['factory', 'add', 'pipao', '--rep', '/x'], noEngine()), refusedWith('Invalid', /does not take --rep\./));
@@ -297,7 +308,7 @@ test('nemia factory fire takes one hire back and keeps the rest; a step it hires
   const before = fs.readFileSync(file);
   assert.throws(
     () => fireAgent({ factory: 'pipao', step: 'build/implement' }),
-    refusedWith('Missing', /^pipao hires no agent into build\/implement\. It hires into: build\/review\. Nothing was fired\.$/),
+    refusedWith('Missing', /^pipao hires no agent into build\/implement\./, 'It hires into: build/review.', /fired\.$/),
   );
   assert.deepEqual(fs.readFileSync(file), before);
   fireAgent({ factory: 'pipao', step: 'build/review' });
@@ -312,10 +323,7 @@ test('REFUSED: a hire or a fire in the default factory is a Conflict, and in no 
   await main(['factory', 'add', 'pipao', '--repo', repo], noEngine());
   await assert.rejects(
     main(['factory', 'hire', 'default', 'ada', '--step', 'build/implement'], noEngine()),
-    refusedWith(
-      'Conflict',
-      /^`default` is the default factory: .* nemia factory hire does not take it\. In it, a step that names no agent runs as a plain session/,
-    ),
+    refusedWith('Conflict', /^`default` is the default factory/, 'nemia factory hire does not take it', 'a plain session'),
   );
   await assert.rejects(
     main(['factory', 'fire', 'default', '--step', 'build/implement'], noEngine()),
@@ -323,7 +331,7 @@ test('REFUSED: a hire or a fire in the default factory is a Conflict, and in no 
   );
   await assert.rejects(
     main(['factory', 'hire', 'nope', 'ada', '--step', 'build/implement'], noEngine()),
-    refusedWith('Missing', /^no factory nope in the store\. Its factories are: pipao\. Nothing was hired\.$/),
+    refusedWith('Missing', /^no factory nope /, /: pipao\. /, /hired\.$/),
   );
   assert.throws(() => fireAgent({ factory: 'nope', step: 'build/implement' }), refusedWith('Missing', /Nothing was fired\.$/));
   assert.throws(
@@ -361,17 +369,14 @@ test('REFUSED: a factory whose file does not read is Invalid to hire, fire and a
   const bent = readFactories().find((f) => f.name === 'bent');
   assert.ok(bent && 'error' in bent, 'listed with why');
   assert.match(bent.error, /^does not read as a factory: `hires` /);
-  assert.throws(() => readFactory('bent'), refusedWith('Invalid', /^the factory bent: \S*bent\.json does not read as a factory: `hires` /));
+  assert.throws(() => readFactory('bent'), refusedWith('Invalid', /^the factory bent: \S*bent\.json /, 'factory: `hires` '));
   assert.throws(
     () => hireAgent({ factory: 'bent', agent: 'ada', step: 'build/implement' }),
-    refusedWith('Invalid', /^the factory bent: .* It was left as it is, and nothing was changed\.$/),
+    refusedWith('Invalid', /^the factory bent: /, 'It was left as it is', /changed\.$/),
   );
   assert.throws(() => fireAgent({ factory: 'bent', step: 'build/implement' }), refusedWith('Invalid', /does not read as a factory/));
   assert.deepEqual(fs.readFileSync(file), before);
-  assert.throws(
-    () => readFactory('nope'),
-    refusedWith('Missing', /^no factory nope in the store\. Its factories are: bent\. Nothing was started\.$/),
-  );
+  assert.throws(() => readFactory('nope'), refusedWith('Missing', /^no factory nope /, /: bent\. /, /started\.$/));
 });
 
 test('REFUSED: nemia factory hire and fire with a --step missing or twice, an unknown flag, or an argument too many, each by name', async () => {
@@ -439,10 +444,7 @@ test('REFUSED: a hire into a step of a workflow the factory has not attached is 
   const before = fs.readFileSync(file);
   assert.throws(
     () => hireAgent({ factory: 'pipao', agent: 'ada', step: 'build/implement' }),
-    refusedWith(
-      'Invalid',
-      /^pipao does not offer the workflow build, so it hires no one into its steps\. Attach it first — nemia factory attach pipao build — then hire\. Nothing was hired\.$/,
-    ),
+    refusedWith('Invalid', /^pipao does not offer the workflow build/, 'nemia factory attach pipao build', /hired\.$/),
   );
   assert.throws(
     () => hireAgent({ factory: 'pipao', agent: 'ada', step: 'intak/x' }),
@@ -502,12 +504,16 @@ test('REFUSED: a detach of a workflow the factory still hires into is Invalid, n
     () => detachWorkflow({ factory: 'pipao', workflow: 'build' }),
     refusedWith(
       'Invalid',
-      /^pipao hires into build's steps: build\/implement, build\/review\. Fire each first — nemia factory fire pipao --step build\/implement; nemia factory fire pipao --step build\/review — then detach it\. Nothing was detached\.$/,
+      /^pipao hires into build's steps: /,
+      'build/implement, build/review.',
+      'nemia factory fire pipao --step build/implement',
+      'nemia factory fire pipao --step build/review',
+      /detached\.$/,
     ),
   );
   assert.throws(
     () => detachWorkflow({ factory: 'pipao', workflow: 'intake' }),
-    refusedWith('Missing', /^pipao has not attached intake\. It offers: build, builder\. Nothing was detached\.$/),
+    refusedWith('Missing', /^pipao has not attached intake\./, 'It offers: build, builder.', /detached\.$/),
   );
   assert.deepEqual(fs.readFileSync(file), before);
   fireAgent({ factory: 'pipao', step: 'build/implement' });
@@ -522,7 +528,7 @@ test('REFUSED: a detach of a workflow the factory still hires into is Invalid, n
   detachWorkflow({ factory: 'pipao', workflow: 'builder' });
   assert.throws(
     () => detachWorkflow({ factory: 'pipao', workflow: 'builder' }),
-    refusedWith('Missing', /^pipao has not attached builder\. It offers none\. Nothing was detached\.$/),
+    refusedWith('Missing', /^pipao has not attached builder\./, 'It offers none.', /detached\.$/),
   );
 });
 
@@ -557,10 +563,7 @@ test('REFUSED: attach and detach on the default factory, on no factory, with a n
   const listed = readFactories().find((f) => f.name === 'bent');
   assert.ok(listed && 'error' in listed, 'listed with why');
   assert.match(listed.error, /^does not read as a factory: `workflows` /);
-  assert.throws(
-    () => readFactory('bent'),
-    refusedWith('Invalid', /^the factory bent: \S*bent\.json does not read as a factory: `workflows` /),
-  );
+  assert.throws(() => readFactory('bent'), refusedWith('Invalid', /^the factory bent: \S*bent\.json /, 'factory: `workflows` '));
   assert.throws(() => attachWorkflow({ factory: 'bent', workflow: 'build' }), refusedWith('Invalid', /It was left as it is/));
   assert.throws(() => detachWorkflow({ factory: 'bent', workflow: 'build' }), refusedWith('Invalid', /It was left as it is/));
   assert.deepEqual(fs.readFileSync(bent), bentBefore);
@@ -620,14 +623,11 @@ test("REFUSED: a schedule of a workflow not attached, a cron or zone Cron does n
   const at = { factory: 'pipao', workflow: 'janitor', cron: '0 9 * * 1', brief: 'Read the stats' };
   assert.throws(
     () => setSchedule({ ...at, workflow: 'build' }),
-    refusedWith(
-      'Invalid',
-      /^pipao does not offer the workflow build.*nemia factory attach pipao build — then schedule it\. Nothing was scheduled\.$/,
-    ),
+    refusedWith('Invalid', /^pipao does not offer the workflow build/, 'nemia factory attach pipao build', /scheduled\.$/),
   );
   assert.throws(
     () => setSchedule({ ...at, cron: '61 * * * *' }),
-    refusedWith('Invalid', /^--cron "61 \* \* \* \*": .*between 0 and 59.*Nothing was scheduled\.$/),
+    refusedWith('Invalid', '--cron "61 * * * *"', 'between 0 and 59', /scheduled\.$/),
   );
   assert.throws(
     () => setSchedule({ ...at, tz: 'Not/AZone' }),
@@ -645,7 +645,7 @@ test("REFUSED: a schedule of a workflow not attached, a cron or zone Cron does n
   assert.deepEqual(fs.readFileSync(file), before);
   assert.throws(
     () => clearSchedule({ factory: 'pipao', workflow: 'janitor' }),
-    refusedWith('Missing', /^pipao does not schedule janitor\. It schedules none\. Nothing was unscheduled\.$/),
+    refusedWith('Missing', /^pipao does not schedule janitor\./, 'It schedules none.', /unscheduled\.$/),
   );
   assert.deepEqual(fs.readFileSync(file), before);
 });
@@ -656,10 +656,7 @@ test('REFUSED: a schedule naming no repository in a factory of two, which a sche
   addFactory({ name: 'pipao', repos: [repo, other] });
   attachWorkflow({ factory: 'pipao', workflow: 'janitor' });
   const at = { factory: 'pipao', workflow: 'janitor', cron: '0 9 * * 1', brief: 'Read the stats' };
-  assert.throws(
-    () => setSchedule(at),
-    refusedWith('Invalid', /^pipao works on .*: name the one its scheduled runs work on with --repo\. Nothing was scheduled\.$/),
-  );
+  assert.throws(() => setSchedule(at), refusedWith('Invalid', /^pipao works on /, 'with --repo', /scheduled\.$/));
   assert.equal(setSchedule({ ...at, repo: other }).schedule.repo, other);
 });
 
@@ -672,10 +669,7 @@ test('REFUSED: a detach of a workflow the factory schedules is Invalid, naming t
   const before = fs.readFileSync(file);
   assert.throws(
     () => detachWorkflow({ factory: 'pipao', workflow: 'janitor' }),
-    refusedWith(
-      'Invalid',
-      /^pipao schedules janitor: unschedule it first — nemia factory unschedule pipao janitor — then detach it\. Nothing was detached\.$/,
-    ),
+    refusedWith('Invalid', /^pipao schedules janitor: /, 'nemia factory unschedule pipao janitor', /detached\.$/),
   );
   assert.deepEqual(fs.readFileSync(file), before);
   clearSchedule({ factory: 'pipao', workflow: 'janitor' });

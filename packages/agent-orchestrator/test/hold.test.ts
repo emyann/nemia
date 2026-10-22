@@ -1038,9 +1038,12 @@ test("holdWord says the person's why and who put the hold after `ships`, before 
   );
   assert.equal(holdWord([{ run: 'a-1' }, { run: 'b-2' }], said), 'held until a-1 and b-2 ship (why: merge conflicts; by operator)');
   assert.equal(holdWord([], said), 'held, on a hold that names no run (why: merge conflicts; by operator)');
+  const later = heldLater({ at: 't', until: ['a-1'], why: 'w', by: 'b' }, 'its approval');
+  assert.ok(later.startsWith('held until a-1 ships (why: w; by b); '), later);
   assert.equal(
-    heldLater({ at: 't', until: ['a-1'], why: 'w', by: 'b' }, 'its approval'),
-    'held until a-1 ships (why: w; by b); its approval is asked once the hold lifts',
+    later.replace(' (why: w; by b)', ''),
+    heldLater({ at: 't', until: ['a-1'] }, 'its approval'),
+    'the plain line, with the why',
   );
   assert.equal(heldLater({ at: 't', until: ['a-1'] }, 'its approval'), 'held until a-1 ships; its approval is asked once the hold lifts');
 });

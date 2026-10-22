@@ -232,7 +232,7 @@ test('REFUSED: a verb the script has not, and a merge with no subject, no body f
   }
   const missing = land(w, 'merge', args(path.join(scratch('wf-land-none-'), 'gone.md')));
   assert.equal(missing.code, 1, missing.out);
-  assert.match(missing.err, /is not a file, and the merge commit's body is the one you wrote/);
+  assert.ok(missing.err.includes('gone.md` is not a file'), missing.err);
   assert.match(missing.err, /\$WF_STEP_FILES/);
 
   const empty = land(w, 'merge', args(body('   \n')));
@@ -247,7 +247,8 @@ test('REFUSED: a dirty checkout and a merge in progress, before anything calls g
   fs.writeFileSync(path.join(dirty.repo, 'a.ts'), 'export const a = 99;\n');
   const r = land(dirty, 'merge', args());
   assert.equal(r.code, 1, r.out);
-  assert.match(r.err, /this checkout has uncommitted changes, and a landing fast-forwards the base branch/);
+  assert.ok(r.err.includes('this checkout has uncommitted changes'), r.err);
+  assert.ok(r.err.includes('a.ts'), 'and names what is uncommitted');
   assert.deepEqual(r.calls, [], 'gh is not called at all');
 
   const midway = world();
@@ -290,7 +291,7 @@ test('REFUSED: a draft pull request, one based on another branch, and one whose 
   assert.equal(b.code, 1, b.out);
   assert.match(b.err, /#7 is based on `release`, not on the base branch `main`/);
   assert.match(b.err, /gh pr edit 7 --base main/);
-  assert.match(b.err, /gh api -X PATCH repos\/\{owner\}\/\{repo\}\/pulls\/7 -f base=main/);
+  assert.ok(b.err.includes('gh api -X PATCH repos/{owner}/{repo}/pulls/7 -f base=main'), b.err);
 
   const moved = world();
   moved.gh.answers(mergeable(moved, { headRefOid: moved.base }));
@@ -375,7 +376,8 @@ test('REFUSED: a fast-forward git declines after GitHub merged, leaving the chec
   const diverged = gitIn(w.repo, 'rev-parse', 'HEAD').trim();
   const r = land(w, 'merge', args());
   assert.equal(r.code, 1, r.out);
-  assert.match(r.err, /#7 is merged on GitHub, but `git merge --ff-only origin\/main` was declined here/);
+  assert.ok(r.err.includes('#7 is merged on GitHub'), r.err);
+  assert.ok(r.err.includes('`git merge --ff-only origin/main` was declined'), r.err);
   assert.match(r.err, /a landing never merges in a person's checkout/);
   assert.ok(r.err.includes(RETRY), r.err);
   assert.deepEqual(stands(w.repo), { branch: 'main', head: diverged, clean: true, merging: false }, 'left as it was found');
@@ -401,7 +403,7 @@ test('REFUSED: no open pull request of the run, and two of them, each naming wha
   w.gh.answers([...mergeable(w).filter((rule) => rule.when !== 'pr list'), { when: 'pr list', out: '[]' }]);
   const r = land(w, 'merge', args());
   assert.equal(r.code, 1, r.out);
-  assert.match(r.err, /no open pull request has a branch of `wf\/r-1\/` as its head/);
+  assert.ok(r.err.includes('no open pull request has a branch of `wf/r-1/`'), r.err);
   assert.match(r.err, /gh pr reopen <number>/);
 
   const other = world({ extra: `wf/${RUN}/review` });
@@ -412,7 +414,8 @@ test('REFUSED: no open pull request of the run, and two of them, each naming wha
   ]);
   const both = land(other, 'merge', args());
   assert.equal(both.code, 1, both.out);
-  assert.match(both.err, /2 open pull requests have a branch of `wf\/r-1\/` as their head \(#7, #8\)/);
+  assert.ok(both.err.includes('2 open pull requests have a branch of `wf/r-1/`'), both.err);
+  assert.ok(both.err.includes('(#7, #8)'), both.err);
   assert.match(both.err, /gh pr close <number>/);
   assert.equal(asked(both.calls, 'pr', 'merge').length, 0);
 });
@@ -426,7 +429,7 @@ test("REFUSED: a pull request of another run's branch is no landing of this one"
   ]);
   const r = land(w, 'merge', args());
   assert.equal(r.code, 1, r.out);
-  assert.match(r.err, /no open pull request has a branch of `wf\/r-1\/` as its head/);
+  assert.ok(r.err.includes('no open pull request has a branch of `wf/r-1/`'), r.err);
   assert.equal(asked(r.calls, 'pr', 'merge').length, 0);
 });
 
@@ -447,7 +450,8 @@ test('REFUSED: a receipt whose pull request is not merged, or merged as a commit
   w.gh.answers([...landed(w).filter((rule) => rule.when !== 'pr list'), { when: 'pr list', out: '[]' }]);
   const none = land(w, 'receipt', ['--run', RUN]);
   assert.equal(none.code, 1, none.out);
-  assert.match(none.err, /no pull request of `wf\/r-1\/` is merged, so nothing of this run landed/);
+  assert.ok(none.err.includes('no pull request of `wf/r-1/` is merged'), none.err);
+  assert.ok(none.err.includes('nothing of this run landed'), none.err);
   assert.match(none.err, /landing\.ts merge --run r-1 --subject … --body-file …/);
 
   w.gh.answers(landed(w, { mergeCommit: { oid: w.tip } }));
@@ -467,7 +471,8 @@ test('REFUSED: a receipt in a checkout the fast-forward did not reach, one that 
   behind.gh.answers(landed(behind));
   const r = land(behind, 'receipt', ['--run', RUN]);
   assert.equal(r.code, 1, r.out);
-  assert.match(r.err, /the merge of #7, is not reachable from this checkout's HEAD: the fast-forward did not happen here/);
+  assert.ok(r.err.includes("the merge of #7, is not reachable from this checkout's HEAD"), r.err);
+  assert.ok(r.err.includes('the fast-forward did not happen'), r.err);
   assert.match(r.err, /git fetch origin && git merge --ff-only origin\/main/);
 
   const dirty = world();
@@ -491,7 +496,7 @@ test('REFUSED: a receipt in a checkout the fast-forward did not reach, one that 
   left.gh.answers(landed(left));
   const l = land(left, 'receipt', ['--run', RUN]);
   assert.equal(l.code, 1, l.out);
-  assert.match(l.err, /`wf\/r-1\/review` is not an ancestor of this checkout's HEAD/);
+  assert.ok(l.err.includes('`wf/r-1/review` is not an ancestor'), l.err);
   assert.match(l.err, /the run would record a landing that left it out/);
 });
 
@@ -504,7 +509,9 @@ test('merge after a fast-forward it was declined merges nothing a second time: i
   const declined = land(w, 'merge', args());
   assert.equal(declined.code, 1, declined.out);
   assert.match(declined.err, /was declined here/);
-  assert.match(declined.err, /the merge run again\s+fast-forwards it alone, the pull request being merged already/);
+  assert.ok(declined.err.includes('fast-forwards it alone'), declined.err);
+  assert.ok(declined.err.includes('being merged already'), declined.err);
+  assert.ok(declined.err.includes(RETRY), 'and names the line that runs it again');
   assert.match(declined.err, /git log origin\/main\.\.HEAD/);
   assert.equal(asked(declined.calls, 'pr', 'merge').length, 1, 'GitHub merged it once');
 

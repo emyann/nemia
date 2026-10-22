@@ -52,15 +52,15 @@ test('REFUSED: nemia start of a step declaring a field its agent declares exits 
   console.error = () => undefined;
   process.chdir(ROOT);
   try {
-    await assert.rejects(main(['start', 'judge it', '--workflows', dir]), (err: Error & { exitCode?: number }) => {
-      assert.equal(err.exitCode, 2);
-      assert.ok(
-        err.message.includes(
-          'judge: `findings` is declared by agent judger (agents/judger.md, `output: judger.schema.json`) and by step judge ' +
-            '(judge.md, `output: judge.schema.json`): a field has one owner. Delete it from one of the two.',
-        ),
-        err.message,
-      );
+    await assert.rejects(main(['start', 'judge it', '--workflows', dir]), (err: Error & { exitCode?: number; _tag?: string }) => {
+      assert.deepEqual([err._tag, err.exitCode], ['Invalid', 2]);
+      for (const fact of [
+        'judge: `findings` is declared by agent judger',
+        '(agents/judger.md, `output: judger.schema.json`)',
+        'step judge (judge.md, `output: judge.schema.json`)',
+        'Delete it from one of the two.',
+      ])
+        assert.ok(err.message.includes(fact), `${fact} — in: ${err.message}`);
       return true;
     });
   } finally {

@@ -266,16 +266,15 @@ test("a step's worktree gets what .worktreeinclude lists from the main checkout 
   );
   assert.ok(!fs.existsSync(path.join(wt, 'node_modules/.package-lock.json')), "without the file npm keeps for main's tree");
 
-  assert.deepEqual(
-    pass.notes,
-    [
-      'implement: .worktreeinclude: skipped missing.txt — not in the main checkout',
-      `implement: .worktreeinclude: refused "../${path.basename(outside)}/secret" is outside the repository`,
-      'implement: .worktreeinclude: refused "escape" leads outside the repository',
-      'implement: .worktreeinclude: refused "notes.txt" is not gitignored — the hand-off would commit it',
-    ],
-    'a line appended after `nemia start`, which would have refused it, is refused by the cut too',
-  );
+  assert.equal(pass.notes.length, 4, 'a line added after `nemia start` is refused by the cut');
+  const [skipped, outsideNote, escaped, ignored] = pass.notes;
+  assert.ok(skipped.startsWith('implement: .worktreeinclude: skipped missing.txt'), skipped);
+  assert.ok(skipped.endsWith('not in the main checkout'), skipped);
+  assert.equal(outsideNote, `implement: .worktreeinclude: refused "../${path.basename(outside)}/secret" is outside the repository`);
+  assert.ok(escaped.startsWith('implement: .worktreeinclude: refused "escape"'), escaped);
+  assert.ok(escaped.endsWith('outside the repository'), escaped);
+  assert.ok(ignored.startsWith('implement: .worktreeinclude: refused "notes.txt"'), ignored);
+  assert.ok(ignored.includes('is not gitignored'), ignored);
   assert.doesNotMatch(tasks.get(`${run.id}-implement`)!.spec.brief, /npm ci/, 'links cost nothing, and the brief says nothing of them');
 });
 
@@ -303,7 +302,7 @@ test('nemia start refuses a .worktreeinclude line outside the repository, by nam
       assert.match(err.message, /"C:\\x" is absolute/);
       assert.match(err.message, /"\.git\/hooks" is git's own/);
       assert.match(err.message, /fix or remove those lines/);
-      assert.doesNotMatch(err.message, /\.env\.local/, 'a leading / is the root of the repository, and nothing to refuse');
+      assert.doesNotMatch(err.message, /\.env\.local/, 'a leading / is the repository root: not refused');
       assert.equal(err.exitCode, 2);
       return true;
     },

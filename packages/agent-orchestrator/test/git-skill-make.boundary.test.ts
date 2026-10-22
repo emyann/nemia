@@ -104,7 +104,9 @@ test('REFUSED: make on a repository that is no directory, on an `at` holding a w
   const fresh = atOf('b');
   const outcome = make({ repo, at: fresh, name: 'wf/r-1/b', from: 'no-such-branch', also: [] });
   assert.ok('refused' in outcome, JSON.stringify(outcome));
-  assert.match(outcome.refused, /could not be cut on wf\/r-1\/b from no-such-branch: .*no-such-branch/);
+  const cut = 'could not be cut on wf/r-1/b from no-such-branch: ';
+  assert.ok(outcome.refused.includes(cut), outcome.refused);
+  assert.ok(outcome.refused.slice(outcome.refused.indexOf(cut) + cut.length).includes('no-such-branch'), "and git's own words name it");
 });
 
 test('make is unread for a request whose `also` is no list of strings', () => {
@@ -228,6 +230,6 @@ test(".worktreeinclude: paths to copy, a leading / anchored at the root as gitig
         { line: '.git/hooks', why: "is git's own" },
       ],
     },
-    "/etc/hosts is the repository's etc/hosts, as a line in a .gitignore would be: nothing outside it",
+    "a leading / is the repository's root, as in a .gitignore",
   );
 });

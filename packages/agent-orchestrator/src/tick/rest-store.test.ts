@@ -283,11 +283,7 @@ test('a pass that answers the finished runs from memory carries no refused move:
   for (let k = 0; k < 3; k++) {
     const pass = await verified();
     assert.ok(pass.cost!.rested >= 200, `pass ${k + 1}: the finished runs answered from memory (${pass.cost!.rested})`);
-    assert.equal(
-      pass.refused,
-      undefined,
-      `pass ${k + 1}: no refused move; the refusals are the runtime's pass's (\`TickReport.refused\`), taken before the memo is read, and a settled task is asked nothing (\`settledQuiet\` in the runtime's domain.ts)`,
-    );
+    assert.equal(pass.refused, undefined, `pass ${k + 1}: no refused move`);
   }
 });
 
@@ -525,7 +521,11 @@ test('REFUSED: a memo that answers otherwise than a full pass, its inputs unchan
   kept.advanced = { ...was, status: 'failed' };
   await assert.rejects(
     verified(),
-    (err: Error) => err.message.includes(run.id) && /from its memo of runs at rest, and a full pass answers otherwise/.test(err.message),
+    (err: Error) =>
+      err instanceof Error &&
+      err.message.includes(run.id) &&
+      /from its memo of runs at rest/.test(err.message) &&
+      /a full pass answers otherwise/.test(err.message),
   );
   kept.advanced = was;
   await rested();
@@ -551,7 +551,11 @@ test('REFUSED: a memo that holds a run a full pass finds not at rest throws unde
   MEMO.runs.set(run.id, { stamp: restStamps().get(run.id)!, run, tipped: [], advanced });
   await assert.rejects(
     verified(),
-    (err: Error) => err.message.includes(run.id) && /a full pass finds it not at rest \(status, settled, inFlight\)/.test(err.message),
+    (err: Error) =>
+      err instanceof Error &&
+      err.message.includes(run.id) &&
+      /a full pass finds it not at rest/.test(err.message) &&
+      /\(status, settled, inFlight\)/.test(err.message),
   );
   MEMO.runs.delete(run.id);
   await rested();

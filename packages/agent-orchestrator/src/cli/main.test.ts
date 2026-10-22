@@ -267,7 +267,7 @@ test('nemia logs: a step that has not run, and the output of one that has, from 
   assert.deepEqual(
     await typed(t, b.e, 'logs', run.id, 'deploy'),
     { out: ['deploy has not run yet'], err: [] },
-    'a step the run does not have is one that has not run, exit 0',
+    'a step the run lacks has not run, exit 0',
   );
 });
 

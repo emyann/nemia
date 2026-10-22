@@ -40,8 +40,14 @@ function meaningsRefusal(keys: readonly string[], meanings: Readonly<Record<stri
   return bad ? `${bad[0]}'s meaning is not one line: ${JSON.stringify(bad[1])}` : null;
 }
 
-/** Refused by name: exit 2, and the message — never `String(err)`, which starts with `Error: `. */
-const refusedWith = (pattern: RegExp) => (err: Error & { exitCode?: number }) => err.exitCode === 2 && pattern.test(err.message);
+/**
+ * Refused by name: exit 2, and every one of `patterns` in the message — never `String(err)`, which starts with `Error: ` — each a fact
+ * the refusal carries (the file, the key at fault, the fix it names), never its sentence.
+ */
+const refusedWith =
+  (...patterns: RegExp[]) =>
+  (err: Error & { exitCode?: number }) =>
+    err.exitCode === 2 && patterns.every((pattern) => pattern.test(err.message));
 
 /** The directories there are, for a card's `repo:`. */
 const DIRS = new Set(['/home/me/code/app', '/home/me/code/other']);
@@ -110,22 +116,24 @@ test('REFUSED by name at shipped defaults: a key an inbox card does not have —
   assert.throws(
     () => read('---\nworkflow: dev\nharness: codex\n---\nx\n'),
     refusedWith(
-      /^cache-the-views-k2q9\.md: `harness` is not a key an inbox card has\. An inbox card's keys are: workflow, repo, queued, gate, factory, from, each optional — what runs it, the repository it is about, when it was queued to start on its own, the step its run waits at for a person, the factory that processes it, and the runs it is handed as context;/,
+      /^cache-the-views-k2q9\.md: `harness` is not a key/,
+      /workflow, repo, queued, gate, factory, from/,
+      /Correct the spelling or delete the line/,
     ),
   );
-  assert.throws(
-    () => read('---\nrepos: /home/me/code/app\n---\nx\n'),
-    refusedWith(/^cache-the-views-k2q9\.md: `repos` is not a key an inbox card has\./),
-  );
+  assert.throws(() => read('---\nrepos: /home/me/code/app\n---\nx\n'), refusedWith(/^cache-the-views-k2q9\.md: `repos` is not a key/));
   assert.throws(
     () => read('---\nworkflow: dev\nafter: parse-the-flag-1x2y\n---\nx\n'),
     refusedWith(
-      /^cache-the-views-k2q9\.md: `after` is not a key an inbox card has: what a card waits on is said when it is started, once the runs it could wait on are known — nemia start <inbox>\/cache-the-views-k2q9\.md --after <runId>\. Delete the line\.$/,
+      /^cache-the-views-k2q9\.md: `after` is not a key/,
+      /nemia start <inbox>\/cache-the-views-k2q9\.md/,
+      /--after <runId>/,
+      /Delete the line\.$/,
     ),
   );
   assert.throws(
     () => read('---\nworkflow:\n---\nx\n'),
-    refusedWith(/^cache-the-views-k2q9\.md: `workflow` has no value\. Delete the line rather than leaving it blank/),
+    refusedWith(/^cache-the-views-k2q9\.md: `workflow` has no value\./, /Delete the line/),
   );
   assert.throws(() => read('---\nrepo:   \n---\nx\n'), refusedWith(/^cache-the-views-k2q9\.md: `repo` has no value\./));
   assert.throws(
@@ -134,26 +142,25 @@ test('REFUSED by name at shipped defaults: a key an inbox card does not have —
   );
   assert.throws(
     () => read('---\nrepo: code/app\n---\nx\n'),
-    refusedWith(
-      /^cache-the-views-k2q9\.md: `repo: code\/app` is not an absolute path\. `repo:` is the repository the idea is about, from the root/,
-    ),
+    refusedWith(/^cache-the-views-k2q9\.md: `repo: code\/app` /, /is not an absolute path/, /`repo: \/home\/me\/code\/app`/),
   );
   assert.throws(
     () => read('---\nrepo: ./app\n---\nx\n'),
-    refusedWith(/^cache-the-views-k2q9\.md: `repo: \.\/app` is not an absolute path\./),
+    refusedWith(/^cache-the-views-k2q9\.md: `repo: \.\/app` /, /is not an absolute path/),
   );
   assert.throws(
     () => read('---\nrepo: /home/me/code/gone\n---\nx\n'),
-    refusedWith(
-      /^cache-the-views-k2q9\.md: `repo: \/home\/me\/code\/gone` names no directory\. Correct it to the repository the idea is about, or delete the line/,
-    ),
+    refusedWith(/^cache-the-views-k2q9\.md: `repo: \/home\/me\/code\/gone` /, /names no directory/, /or delete the line/),
   );
   assert.throws(() => read('---\nworkflow: dev\n---\n'), refusedWith(/^cache-the-views-k2q9\.md: the body is empty\./));
   assert.throws(() => read('   \n'), refusedWith(/^cache-the-views-k2q9\.md: the body is empty\./));
-  assert.throws(() => read('---\nworkflow dev\n---\nx\n'), refusedWith(/^cache-the-views-k2q9\.md: `workflow dev` is not `key: value`\./));
+  assert.throws(
+    () => read('---\nworkflow dev\n---\nx\n'),
+    refusedWith(/^cache-the-views-k2q9\.md: `workflow dev` /, /is not `key: value`/),
+  );
   assert.throws(
     () => read('---\nworkflow: dev\nCache the views.\n'),
-    refusedWith(/^cache-the-views-k2q9\.md: the frontmatter opened on the first line never closes/),
+    refusedWith(/^cache-the-views-k2q9\.md: the frontmatter/, /never closes/, /a line that is just `---`/),
   );
 });
 
@@ -195,14 +202,15 @@ test("`gate:` names the step a card's run waits at for a person, carried by the 
   assert.throws(
     () => read('---\nworkflow: dev\ngate: plan, review\n---\nx\n'),
     refusedWith(
-      /^cache-the-views-k2q9\.md: `gate: plan, review` names more than one step\. A card gates one step of its workflow — `gate: plan` — and its start gates any other: nemia start <inbox>\/cache-the-views-k2q9\.md --gate <step>\.$/,
+      /^cache-the-views-k2q9\.md: `gate: plan, review` /,
+      /names more than one step/,
+      /nemia start <inbox>\/cache-the-views-k2q9\.md/,
+      /--gate <step>\.$/,
     ),
   );
   assert.throws(
     () => read('---\nworkflow: dev\ngate: true\n---\nx\n'),
-    refusedWith(
-      /^cache-the-views-k2q9\.md: `gate: true` is how a step's own file gates it, and a card names the step its run waits at — `gate: plan` — since a card is not a step\. Name the step, or delete the line\.$/,
-    ),
+    refusedWith(/^cache-the-views-k2q9\.md: `gate: true` /, /`gate: plan`/, /Name the step, or delete the line\.$/),
   );
   assert.throws(() => read('---\ngate:\n---\nx\n'), refusedWith(/^cache-the-views-k2q9\.md: `gate` has no value\./));
   assert.throws(() => read('---\ngate: plan\ngate: review\n---\nx\n'), refusedWith(/^cache-the-views-k2q9\.md: `gate` is set twice/));
@@ -253,18 +261,16 @@ test("`factory:` names the factory that processes a card, carried by the card, i
 
   assert.throws(
     () => read('---\nfactory: Pipao\n---\nx\n'),
-    refusedWith(
-      /^cache-the-views-k2q9\.md: `factory: Pipao` — `Pipao` is not a factory's name: .* — pipao, say\. Correct it to a factory nemia factory ls lists\.$/,
-    ),
+    refusedWith(/^cache-the-views-k2q9\.md: `factory: Pipao` /, /`Pipao` is not a factory's name/, /pipao, say/, /nemia factory ls/),
   );
   assert.throws(
     () => ideaCard('the idea', 'x', { factory: 'my factory' }, isDirectory),
-    refusedWith(/^the idea: `factory: my factory` — `my factory` is not a factory's name/),
+    refusedWith(/^the idea: `factory: my factory` /, /`my factory` is not a factory's name/),
     'a factory given to nemia inbox add is refused as the card would be',
   );
   assert.throws(
     () => ideaCard('the idea', 'x', { factory: 'pipao\nqueued: 2026-09-16T10:00:00.000Z' }, isDirectory),
-    refusedWith(/^the idea: the factory given, .* is more than one line, and a card's factory: is one\./),
+    refusedWith(/^the idea: the factory given, /, /is more than one line/, /a card's factory: is one/),
   );
   assert.throws(() => read('---\nfactory:\n---\nx\n'), refusedWith(/^cache-the-views-k2q9\.md: `factory` has no value\./));
   assert.throws(
@@ -273,9 +279,7 @@ test("`factory:` names the factory that processes a card, carried by the card, i
   );
   assert.throws(
     () => read('---\nfactry: pipao\n---\nx\n'),
-    refusedWith(
-      /^cache-the-views-k2q9\.md: `factry` is not a key an inbox card has\. An inbox card's keys are: workflow, repo, queued, gate, factory,/,
-    ),
+    refusedWith(/^cache-the-views-k2q9\.md: `factry` is not a key/, /workflow, repo, queued, gate, factory,/),
   );
 });
 
@@ -296,71 +300,83 @@ test("`inboxListing`: each card by file name, with the runs whose record's `from
     { id: 'broken-gh78', from: { inbox: 'broken-a1b2' } },
   ];
   const listing = inboxListing(files, runs, isDirectory);
-  assert.deepEqual(listing, [
-    {
-      name: 'broken-a1b2',
-      file: 'broken-a1b2.md',
-      title: null,
-      workflow: null,
-      repo: null,
-      factory: null,
-      startedAs: ['broken-gh78'],
-      from: [],
-      factoryRepo: null,
-      error:
-        'broken-a1b2.md: `after` is not a key an inbox card has: what a card waits on is said when it is started, once the runs it could wait on are known — nemia start <inbox>/broken-a1b2.md --after <runId>. Delete the line.',
-    },
-    {
-      name: 'cache-the-views-k2q9',
-      file: 'cache-the-views-k2q9.md',
-      title: 'Cache the views between passes.',
-      workflow: null,
-      repo: '/home/me/code/app',
-      factory: null,
-      startedAs: [],
-      from: [],
-      factoryRepo: null,
-      error: null,
-    },
-    {
-      name: 'drafts/',
-      file: 'drafts/',
-      title: null,
-      workflow: null,
-      repo: null,
-      factory: null,
-      startedAs: [],
-      from: [],
-      factoryRepo: null,
-      error: 'drafts/: not a card. The inbox holds one markdown file per card, <name>.md — move it out, or, for a card, name it <name>.md.',
-    },
-    {
-      name: 'notes.txt',
-      file: 'notes.txt',
-      title: null,
-      workflow: null,
-      repo: null,
-      factory: null,
-      startedAs: [],
-      from: [],
-      factoryRepo: null,
-      error:
-        'notes.txt: not a card. The inbox holds one markdown file per card, <name>.md — move it out, or, for a card, name it <name>.md.',
-    },
-    {
-      name: 'parse-the-flag-1x2y',
-      file: 'parse-the-flag-1x2y.md',
-      title: 'Parse the flag.',
-      workflow: 'dev',
-      repo: null,
-      factory: null,
-      startedAs: ['parse-the-flag-ab12', 'parse-the-flag-ef56'],
-      from: [],
-      factoryRepo: null,
-      error: null,
-    },
-  ] satisfies InboxListing[]);
+  const said = new Map(listing.map((l) => [l.name, l.error]));
+  assert.deepEqual(
+    listing.map((l) => ({ ...l, error: l.error === null ? null : 'refused' })),
+    [
+      {
+        name: 'broken-a1b2',
+        file: 'broken-a1b2.md',
+        title: null,
+        workflow: null,
+        repo: null,
+        factory: null,
+        startedAs: ['broken-gh78'],
+        from: [],
+        factoryRepo: null,
+        error: 'refused',
+      },
+      {
+        name: 'cache-the-views-k2q9',
+        file: 'cache-the-views-k2q9.md',
+        title: 'Cache the views between passes.',
+        workflow: null,
+        repo: '/home/me/code/app',
+        factory: null,
+        startedAs: [],
+        from: [],
+        factoryRepo: null,
+        error: null,
+      },
+      {
+        name: 'drafts/',
+        file: 'drafts/',
+        title: null,
+        workflow: null,
+        repo: null,
+        factory: null,
+        startedAs: [],
+        from: [],
+        factoryRepo: null,
+        error: 'refused',
+      },
+      {
+        name: 'notes.txt',
+        file: 'notes.txt',
+        title: null,
+        workflow: null,
+        repo: null,
+        factory: null,
+        startedAs: [],
+        from: [],
+        factoryRepo: null,
+        error: 'refused',
+      },
+      {
+        name: 'parse-the-flag-1x2y',
+        file: 'parse-the-flag-1x2y.md',
+        title: 'Parse the flag.',
+        workflow: 'dev',
+        repo: null,
+        factory: null,
+        startedAs: ['parse-the-flag-ab12', 'parse-the-flag-ef56'],
+        from: [],
+        factoryRepo: null,
+        error: null,
+      },
+    ] satisfies InboxListing[],
+  );
+  const broken = said.get('broken-a1b2')!;
+  assert.match(broken, /^broken-a1b2\.md: `after` is not a key/);
+  assert.match(broken, /nemia start <inbox>\/broken-a1b2\.md --after <runId>/);
+  assert.match(broken, /Delete the line\.$/);
+  for (const name of ['drafts/', 'notes.txt']) {
+    const error = said.get(name)!;
+    assert.ok(error.startsWith(`${name}: not a card.`), error);
+    assert.ok(error.includes('name it <name>.md'), error);
+  }
   assert.deepEqual(inboxListing([], runs, isDirectory), []);
+
   assert.deepEqual(
     inboxListing([files[3]], [{ id: 'gone-1234', from: { inbox: 'parse-the-flag-1x2y' } }], isDirectory).map((l) => l.startedAs),
     [[]],
@@ -495,7 +511,11 @@ test('REFUSED by name at shipped defaults: `nemia inbox add` with nothing in the
     assert.throws(
       () => ideaCard('the idea', text, {}, isDirectory),
       refusedWith(
-        /^nemia inbox add takes the idea, and the idea has nothing in it\. Give it as text — nemia inbox add "<idea>" — or as a file: nemia inbox add \.\/idea\.md\. Nothing was filed\.$/,
+        /^nemia inbox add takes the idea, /,
+        /the idea has nothing in it/,
+        /nemia inbox add "<idea>"/,
+        /nemia inbox add \.\/idea\.md/,
+        /Nothing was filed\.$/,
       ),
     );
   }
@@ -506,7 +526,9 @@ test('REFUSED by name at shipped defaults: `nemia inbox add` with nothing in the
   assert.throws(
     () => ideaCard('./ideas/d.md', '---\nworkflow: dev\nafter: b, c\n---\nShow the flag.\n', {}, isDirectory),
     refusedWith(
-      /^\.\/ideas\/d\.md: `after` is not a key an inbox card has: what a card waits on is said when it is started, once the runs it could wait on are known\. Delete the line and file the idea, then give the wait when you start the card nemia inbox add names: nemia start <inbox>\/<name>\.md --after <runId>\.$/,
+      /^\.\/ideas\/d\.md: `after` is not a key/,
+      /Delete the line and file the idea/,
+      /nemia start <inbox>\/<name>\.md --after <runId>\.$/,
     ),
     "not a card yet, so the refusal names no card's path: file the idea, then give the wait at start",
   );
@@ -522,13 +544,11 @@ test('REFUSED by name at shipped defaults: `nemia inbox add` with nothing in the
   );
   assert.throws(
     () => ideaCard('the idea', 'x', { repo: '/home/me/code/gone' }, isDirectory),
-    refusedWith(/^the idea: `repo: \/home\/me\/code\/gone` names no directory\./),
+    refusedWith(/^the idea: `repo: \/home\/me\/code\/gone` /, /names no directory/),
   );
   assert.throws(
     () => ideaCard('the idea', 'x', { workflow: 'dev\nharness: codex' }, isDirectory),
-    refusedWith(
-      /^the idea: the workflow given, "dev\\nharness: codex", is more than one line, and a card's workflow: is one\. Give the one line it names\.$/,
-    ),
+    refusedWith(/^the idea: the workflow given, "dev\\nharness: codex", /, /is more than one line/, /Give the one line it names\.$/),
   );
   assert.throws(
     () => ideaCard('the idea', 'x', { repo: '/home/me/code/app\r\n---' }, isDirectory),
@@ -608,7 +628,9 @@ test('a queued card is a card with `queued:`, the ISO time it was queued — REF
   assert.throws(
     () => read('---\nrepo: /home/me/code/app\nqueued: 2026-09-16T10:00:00.000Z\n---\nx\n'),
     refusedWith(
-      /^cache-the-views-k2q9\.md: `queued:` with no `workflow:` — a card that starts on its own has nothing to say what runs it\. Write `workflow:`, or delete the `queued:` line and queue the card with its workflow: nemia inbox queue cache-the-views-k2q9 --workflow <w> writes both\.$/,
+      /^cache-the-views-k2q9\.md: `queued:` with no `workflow:`/,
+      /Write `workflow:`, or delete the `queued:` line/,
+      /nemia inbox queue cache-the-views-k2q9 --workflow <w>/,
     ),
   );
   assert.throws(
@@ -618,7 +640,9 @@ test('a queued card is a card with `queued:`, the ISO time it was queued — REF
   assert.throws(
     () => ideaCard('./idea.md', '---\nworkflow: dev\nqueued: 2026-09-16T10:00:00.000Z\n---\nCache the views.\n', {}, isDirectory),
     refusedWith(
-      /^\.\/idea\.md: `queued` is not a key a filed idea keeps: a card is queued once it is in the inbox, at the time it is queued\. Delete the line and file the idea, then queue the card nemia inbox add names: nemia inbox queue <name>\.$/,
+      /^\.\/idea\.md: `queued` is not a key a filed idea keeps/,
+      /Delete the line and file the idea/,
+      /nemia inbox queue <name>\.$/,
     ),
   );
 });
@@ -677,6 +701,7 @@ test("`inboxListing` gives each queued card its place in the order — by when i
   ];
   const app = '/home/me/code/app';
   const noGit = 'Command failed: git rev-parse HEAD / fatal: not a git repository (or any of the parent directories): .git';
+  const dFirstWhy = 'd-first.md: `workflow: nope` — no workflow folder.';
   const tries = new Map([
     [
       'd-first',
@@ -684,7 +709,7 @@ test("`inboxListing` gives each queued card its place in the order — by when i
         at: '2026-09-16T10:06:00.000Z',
         text: files[3].text,
         repo: app,
-        why: 'd-first.md: `workflow: nope` — no workflow folder.',
+        why: dFirstWhy,
         refused: true,
       },
     ],
@@ -734,14 +759,27 @@ test("`inboxListing` gives each queued card its place in the order — by when i
   );
   assert.equal(nextQueued(inboxListing(files.slice(5), [], isDirectory), app), undefined, 'nothing queued');
 
-  assert.deepEqual(inboxLines(listing, true), [
-    `a-tied     Tied, and first by name  workflow: dev  queued 2 of 4 — failed at 2026-09-16T10:07:00.000Z on ${app}: ${noGit} — not a refusal: the tick tries it again on every pass, where it keeps its place`,
-    'b-late     Late  workflow: dev  queued 4 of 4',
-    'c-tied     Tied  workflow: dev  queued 3 of 4',
-    `d-first    First, and refused  workflow: nope  queued 1 of 4 — not started at 2026-09-16T10:06:00.000Z on ${app}: d-first.md: \`workflow: nope\` — no workflow folder. Edit the card, or take it back and queue it again, or run nemia up in the repository it is about, and the tick tries it again`,
-    'e-started  Started by hand  workflow: dev  started as started-by-hand-ab12',
-    'f-parked   Parked  workflow: dev',
-  ]);
+  const lines = inboxLines(listing, true);
+  assert.deepEqual(
+    lines.map((line) => line.split(' — ')[0]),
+    [
+      'a-tied     Tied, and first by name  workflow: dev  queued 2 of 4',
+      'b-late     Late  workflow: dev  queued 4 of 4',
+      'c-tied     Tied  workflow: dev  queued 3 of 4',
+      'd-first    First, and refused  workflow: nope  queued 1 of 4',
+      'e-started  Started by hand  workflow: dev  started as started-by-hand-ab12',
+      'f-parked   Parked  workflow: dev',
+    ],
+    'each card on one line, its try said after it only where there is one',
+  );
+  assert.equal(lines.filter((line) => line.includes(' — ')).length, 2);
+  const [failed, , , notStarted] = lines;
+  assert.ok(failed.includes(` — failed at 2026-09-16T10:07:00.000Z on ${app}: ${noGit} — `), failed);
+  assert.match(failed, /not a refusal: the tick tries it again/);
+  assert.ok(notStarted.includes(` — not started at 2026-09-16T10:06:00.000Z on ${app}: ${dFirstWhy} `), notStarted);
+  assert.match(notStarted, /Edit the card/);
+  assert.match(notStarted, /run nemia up in the repository it is about/);
+
   assert.equal(
     inboxLines(listing).find((line) => line.startsWith('d-first')),
     `d-first    First, and refused  workflow: nope  queued 1 of 4 — not started at 2026-09-16T10:06:00.000Z: d-first.md: \`workflow: nope\` — no workflow folder. Edit the card, or take it back and queue it again, and the tick tries it again`,
@@ -827,23 +865,24 @@ test('`queueLine`: what `nemia up` logs of the queue — `started <card> as <run
     queueLine({ card: 'cache-the-views-k2q9', run: 'cache-the-views-between-pass-ab12', removed: true }),
     'started cache-the-views-k2q9 as cache-the-views-between-pass-ab12',
   );
-  assert.equal(
-    queueLine({
-      card: 'cache-the-views-k2q9',
-      run: 'cache-ab12',
-      removed: false,
-      why: '/inbox/cache-the-views-k2q9.md could not be removed — EACCES',
-    }),
-    'started cache-the-views-k2q9 as cache-ab12 — still in the inbox: /inbox/cache-the-views-k2q9.md could not be removed — EACCES. nemia inbox lists it as started as cache-ab12, and it is not started again: drop it with nemia inbox rm cache-the-views-k2q9',
-  );
-  assert.equal(
-    queueLine({ card: 'cache-the-views-k2q9', refused: 'cache-the-views-k2q9.md: `workflow: nope` — no workflow folder.' }),
-    'cache-the-views-k2q9 not started: cache-the-views-k2q9.md: `workflow: nope` — no workflow folder. — left queued as it is, and not tried again while it reads the same: edit the card, or take it back and queue it again (nemia inbox queue cache-the-views-k2q9 --off, then nemia inbox queue cache-the-views-k2q9)',
-  );
-  assert.equal(
-    queueLine({ card: 'cache-the-views-k2q9', refused: 'cache-the-views-k2q9.md: no workflow folder.', on: '/home/me/code/app' }),
-    'cache-the-views-k2q9 not started on /home/me/code/app: cache-the-views-k2q9.md: no workflow folder. — left queued as it is, and not tried again while it reads the same: edit the card, or take it back and queue it again (nemia inbox queue cache-the-views-k2q9 --off, then nemia inbox queue cache-the-views-k2q9), or run nemia up in the repository it is about',
-  );
+  const removal = '/inbox/cache-the-views-k2q9.md could not be removed — EACCES';
+  const stillIn = queueLine({ card: 'cache-the-views-k2q9', run: 'cache-ab12', removed: false, why: removal });
+  assert.ok(stillIn.startsWith('started cache-the-views-k2q9 as cache-ab12 — '), stillIn);
+  assert.ok(stillIn.includes(`still in the inbox: ${removal}. `), stillIn);
+  assert.match(stillIn, /it is not started again/);
+  assert.match(stillIn, /nemia inbox rm cache-the-views-k2q9$/);
+
+  const noFolder = 'cache-the-views-k2q9.md: `workflow: nope` — no workflow folder.';
+  const notStarted = queueLine({ card: 'cache-the-views-k2q9', refused: noFolder });
+  assert.ok(notStarted.startsWith(`cache-the-views-k2q9 not started: ${noFolder} — `), notStarted);
+  assert.match(notStarted, /left queued as it is/);
+  assert.match(notStarted, /nemia inbox queue cache-the-views-k2q9 --off/);
+  assert.match(notStarted, /then nemia inbox queue cache-the-views-k2q9\)$/);
+
+  const elsewhere = queueLine({ card: 'cache-the-views-k2q9', refused: noFolder, on: '/home/me/code/app' });
+  assert.ok(elsewhere.startsWith(`cache-the-views-k2q9 not started on /home/me/code/app: ${noFolder} — `), elsewhere);
+  assert.match(elsewhere, /nemia inbox queue cache-the-views-k2q9 --off/);
+  assert.match(elsewhere, /, or run nemia up in the repository it is about$/);
   assert.equal(
     queueLine({ card: 'cache-the-views-k2q9', failed: 'Command failed: git rev-parse HEAD / fatal: not a git repository', again: false }),
     'cache-the-views-k2q9 not started: Command failed: git rev-parse HEAD / fatal: not a git repository — not a refusal: tried again on the next pass, where it keeps its place, and said again only if it fails otherwise',
@@ -880,7 +919,7 @@ test('a queued card whose `repo:` names no directory any more keeps its place in
   assert.equal(
     inboxLines(refused).at(-1),
     `gone-a1b2    ${why}  queued 1 of 2 — not started at 2026-09-16T10:00:00.000Z Edit the card, or take it back and queue it again, and the tick tries it again`,
-    'nemia inbox says so beside why it does not read, without saying that twice',
+    'said beside why it does not read, once',
   );
 });
 

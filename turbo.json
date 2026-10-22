@@ -16,8 +16,6 @@
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/.oxlintrc.json",
-        "$TURBO_ROOT$/.github/**",
-        "$TURBO_ROOT$/.gitleaks.toml",
         "$TURBO_ROOT$/lint/**",
         "$TURBO_ROOT$/tools/**",
         "$TURBO_ROOT$/apps/*/src/**",
@@ -31,6 +29,38 @@
         "$TURBO_ROOT$/workflows/agents/**",
         "$TURBO_ROOT$/packages/agent-runtime/**",
         "!$TURBO_ROOT$/packages/agent-runtime/.turbo/**"
+      ]
+    },
+    "guards#test": {
+      "dependsOn": ["^transit"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/.github/**",
+        "$TURBO_ROOT$/.gitleaks.toml",
+        "$TURBO_ROOT$/workflows/**",
+        "$TURBO_ROOT$/docs/**",
+        "$TURBO_ROOT$/tools/**",
+        "$TURBO_ROOT$/package.json",
+        "$TURBO_ROOT$/package-lock.json",
+        "$TURBO_ROOT$/turbo.json",
+        "$TURBO_ROOT$/packages/*/package.json",
+        "$TURBO_ROOT$/apps/*/package.json",
+        "$TURBO_ROOT$/packages/agent-runtime/test/remote-agent.test.ts",
+        "$TURBO_ROOT$/apps/web/test/e2e/pages/NAMES",
+        "$TURBO_ROOT$/apps/web/src/routeTree.gen.ts",
+        "$TURBO_ROOT$/apps/web/theme/**",
+        "$TURBO_ROOT$/apps/*/test/**",
+        "$TURBO_ROOT$/apps/*/src/*.test.ts*",
+        "$TURBO_ROOT$/apps/*/src/*/*.test.ts*",
+        "$TURBO_ROOT$/apps/*/tsconfig.json",
+        "$TURBO_ROOT$/apps/docs/src/content/docs/**",
+        "$TURBO_ROOT$/CLAUDE.md",
+        "$TURBO_ROOT$/apps/*/CLAUDE.md",
+        "$TURBO_ROOT$/packages/*/CLAUDE.md",
+        "$TURBO_ROOT$/README.md",
+        "$TURBO_ROOT$/LICENSE",
+        "$TURBO_ROOT$/.claude/settings.json",
+        "$TURBO_ROOT$/.claude/skills/**"
       ]
     },
     "agent-runtime#test": {

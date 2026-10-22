@@ -4,7 +4,7 @@
 # package's scripts needs the owner's review. Everything else is unowned on purpose: a review of the code is the run's, not this file's.
 #
 # This is prose to GitHub until branch protection requires a code owner's review, which is the owner's hand step. What it must cover is
-# refused by packages/agent-orchestrator/test/repo-guards.test.ts, by the path left out.
+# refused by tools/guards/test/repo-guards.test.ts, by the path left out.
 
 # The check itself: this workflow, and every file beside it.
 /.github/ @emyann

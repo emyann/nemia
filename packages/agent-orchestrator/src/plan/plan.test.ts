@@ -3,6 +3,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { WorkflowError } from '../step/step.ts';
 import { CARD_KEYS, cardToStart, parsePlan, planLines, planOrder, planStopped, type PlanFile, type Planned } from './plan.ts';
 
 const card = (name: string, keys: string, body = `do ${name}`): PlanFile => ({ file: `${name}.md`, text: `---\n${keys}\n---\n${body}\n` });
@@ -14,8 +15,14 @@ const DIAMOND: readonly PlanFile[] = [
   card('d', 'workflow: dev\nafter: b, c'),
 ];
 
-/** Refused by name: exit 2, and the message — never `String(err)`, which starts with `Error: `. */
-const refusedWith = (pattern: RegExp) => (err: Error & { exitCode?: number }) => err.exitCode === 2 && pattern.test(err.message);
+/**
+ * Refused by name: a `WorkflowError`, exit 2, the message opening as `pattern` says — never `String(err)`, which starts with `Error: ` —
+ * and naming each of `fixes`, the key, the card or the command its fix turns on.
+ */
+const refusedWith =
+  (pattern: RegExp, ...fixes: string[]) =>
+  (err: Error & { exitCode?: number }) =>
+    err instanceof WorkflowError && err.exitCode === 2 && pattern.test(err.message) && fixes.every((fix) => err.message.includes(fix));
 
 test('a card is its file: the name without .md, `workflow:` and `after:` from its frontmatter, the body as its brief — and README.md is not a card', () => {
   const cards = parsePlan([
@@ -65,18 +72,13 @@ test('`planOrder` puts parents first — the diamond is a, b, c, d whatever orde
 test('REFUSED by name at shipped defaults: a card with no `workflow:`, an empty body, a key a card does not have, a key set twice or to nothing, and a line that is not a key', () => {
   assert.throws(
     () => parsePlan([{ file: 'a.md', text: 'Parse the flag.\n' }]),
-    refusedWith(/^a\.md: no `workflow:`, so nothing says what runs this card\. Name it in the frontmatter: `workflow: dev`/),
+    refusedWith(/^a\.md: no `workflow:`/, 'Name it in the frontmatter', '`workflow: dev`'),
   );
   assert.throws(() => parsePlan([card('a', 'after: b'), card('b', 'workflow: dev')]), refusedWith(/^a\.md: no `workflow:`/));
-  assert.throws(
-    () => parsePlan([card('a', 'workflow: dev', '')]),
-    refusedWith(/^a\.md: the body is empty\. A card's body is its run's brief/),
-  );
+  assert.throws(() => parsePlan([card('a', 'workflow: dev', '')]), refusedWith(/^a\.md: the body is empty\./, "its run's brief"));
   assert.throws(
     () => parsePlan([card('a', 'workflow: dev\nharness: codex')]),
-    refusedWith(
-      /^a\.md: `harness` is not a key a card has\. A card's keys are: workflow, after — what runs it, and what ships first; how its steps run is its workflow's to say\./,
-    ),
+    refusedWith(/^a\.md: `harness` is not a key a card has\./, "A card's keys are: workflow, after", "its workflow's to say"),
   );
   assert.throws(
     () => parsePlan([card('a', 'workflow: dev'), card('b', 'workflow: dev\nafer: a')]),
@@ -84,37 +86,39 @@ test('REFUSED by name at shipped defaults: a card with no `workflow:`, an empty 
   );
   assert.throws(
     () => parsePlan([card('a', 'workflow: dev\nworkflow: ui')]),
-    refusedWith(/^a\.md: `workflow` is set twice, and a card that says two things says nothing\. Keep one line\.$/),
+    refusedWith(/^a\.md: `workflow` is set twice/, 'Keep one line.'),
   );
   assert.throws(
     () => parsePlan([card('a', 'workflow: dev'), card('b', 'workflow: dev\nafter: a\nafter: a')]),
-    refusedWith(/^b\.md: `after` is set twice.*list every card on it: `after: a, b`/),
+    refusedWith(/^b\.md: `after` is set twice/, 'list every card on it', '`after: a, b`'),
   );
   assert.throws(() => parsePlan([card('a', 'workflow:')]), refusedWith(/^a\.md: `workflow` has no value\./));
   assert.throws(() => parsePlan([card('a', 'workflow dev')]), refusedWith(/^a\.md: `workflow dev` is not `key: value`\./));
   assert.throws(
     () => parsePlan([card('a', 'workflow: dev\nrepo: /home/me/code/app')]),
     refusedWith(
-      /^a\.md: `repo` is not a key a plan's card has: a plan works on one repository, the one nemia plan <folder> --repo <r> is given, and a card started by hand works on nemia start's --repo\. `repo:` is an inbox card's — delete the line, or file the idea in the inbox: nemia inbox add <file> --repo <r>\.$/,
+      /^a\.md: `repo` is not a key a plan's card has/,
+      'nemia plan <folder> --repo <r>',
+      "nemia start's --repo",
+      'delete the line',
+      'nemia inbox add <file> --repo <r>',
     ),
     "`repo:` is an inbox card's key: a plan works on the one repository `nemia plan --repo` is given",
   );
   assert.throws(
     () => parsePlan([{ file: 'a.md', text: '---\nworkflow: dev\nParse the flag.\n' }]),
-    refusedWith(/^a\.md: the frontmatter opened on the first line never closes/),
+    refusedWith(/^a\.md: the frontmatter opened/, 'never closes'),
   );
 });
 
 test('REFUSED by name at shipped defaults: an `after:` naming a card the folder does not have, the card itself, a card twice, or no card — and a cycle of three, named round, whatever waits on it', () => {
   assert.throws(
     () => parsePlan([card('a', 'workflow: dev'), card('b', 'workflow: dev\nafter: e')]),
-    refusedWith(
-      /^b\.md: `after: e` names e, and the plan has no card e\. Its cards are: a, b\. Correct the name, or delete it from the line\.$/,
-    ),
+    refusedWith(/^b\.md: `after: e` names e/, 'no card e', 'Its cards are: a, b.', 'Correct the name', 'delete it from the line'),
   );
   assert.throws(
     () => parsePlan([card('a', 'workflow: dev'), card('b', 'workflow: dev\nafter: a.md')]),
-    refusedWith(/^b\.md: `after: a\.md` names a\.md, and the plan has no card a\.md\. A card is named without its \.md: `a`\./),
+    refusedWith(/^b\.md: `after: a\.md` names a\.md/, 'no card a.md', 'without its .md: `a`'),
   );
   assert.throws(() => parsePlan([card('a', 'workflow: dev\nafter: a')]), refusedWith(/^a\.md: `after: a` names this card\./));
   assert.throws(
@@ -135,9 +139,7 @@ test('REFUSED by name at shipped defaults: an `after:` naming a card the folder 
   ];
   assert.throws(
     () => parsePlan(three),
-    refusedWith(
-      /^a\.md, c\.md, b\.md wait on each other — a after c, c after b, b after a — so none of them could ever start\. Take one of those cards out of the other's `after:`\.$/,
-    ),
+    refusedWith(/^a\.md, c\.md, b\.md wait on each other/, 'a after c, c after b, b after a', "out of the other's `after:`"),
   );
   assert.throws(
     () =>
@@ -153,23 +155,16 @@ test('REFUSED by name at shipped defaults: an `after:` naming a card the folder 
 test('REFUSED by name at shipped defaults: a file that is not .md, a folder inside the plan, and a folder with no card — a README alone included', () => {
   assert.throws(
     () => parsePlan([card('a', 'workflow: dev'), { file: 'notes.txt', text: '' }]),
-    refusedWith(
-      /^notes\.txt in the plan folder: not a card\. A plan folder holds one markdown file per card, <card>\.md, and a README\.md that says what the plan is for\. Move it out of the folder, or, for a card, name it <card>\.md\.$/,
-    ),
+    refusedWith(/^notes\.txt in the plan folder: not a card\./, 'README.md', 'Move it out of the folder', 'name it <card>.md'),
   );
   assert.throws(
     () => parsePlan([card('a', 'workflow: dev'), { file: 'notes.txt', text: '' }, { file: 'drafts/', text: '' }], '/plans/q3'),
-    refusedWith(/^drafts\/, notes\.txt in \/plans\/q3: not cards\..* Move them out of the folder/),
+    refusedWith(/^drafts\/, notes\.txt in \/plans\/q3: not cards\./, 'Move them out of the folder'),
   );
-  assert.throws(
-    () => parsePlan([]),
-    refusedWith(
-      /^the plan folder has no cards in it\. A card is one markdown file, <card>\.md: `workflow:` in its frontmatter, and its run's brief below\./,
-    ),
-  );
+  assert.throws(() => parsePlan([]), refusedWith(/^the plan folder has no cards in it\./, '<card>.md', '`workflow:` in its frontmatter'));
   assert.throws(
     () => parsePlan([{ file: 'README.md', text: '# Q3\n' }], '/plans/q3'),
-    refusedWith(/^\/plans\/q3 has no cards in it — README\.md says what the plan is for, and is not a card\./),
+    refusedWith(/^\/plans\/q3 has no cards in it/, 'README.md says what the plan is for', 'is not a card'),
   );
 });
 
@@ -196,30 +191,34 @@ test('a plan stopped part-way says which card refused and why, names the runs th
     repo: '/repo',
     folderOf: (c: { workflow: string }) => `/repo/workflows/${c.workflow.replace('./flows/', '')}`,
   };
-  assert.deepEqual(planStopped({ card: cards[2], why: 'the disk is full', rest: [cards[3]] }, startedOf(['a', 'b']), opts).split('\n'), [
-    'nemia plan stopped at c.md: the disk is full',
-    'The runs it started stand, and the tick files each as its edges allow: a (parse-the-flag-1x2y), b (document-it-3z4w). Cancel one with nemia cancel <runId>.',
-    'Start the rest by hand, parents first, once what stopped c.md is fixed — each --after the run of a card it waits on:',
-    "  nemia start '/plans/q3/c.md' --workflows '/repo/workflows/ui' --repo '/repo' --after parse-the-flag-1x2y",
-    "  nemia start '/plans/q3/d.md' --workflows '/repo/workflows/dev' --repo '/repo' --after document-it-3z4w --after <c's run id>",
-  ]);
-  assert.deepEqual(
-    planStopped({ card: cards[0], why: 'not a git repository', rest: cards.slice(1) }, [], opts)
-      .split('\n')
-      .slice(0, 4),
-    [
-      'nemia plan stopped at a.md: not a git repository',
-      'It started no run.',
-      'Start the rest by hand, parents first, once what stopped a.md is fixed — each --after the run of a card it waits on:',
-      "  nemia start '/plans/q3/a.md' --workflows '/repo/workflows/dev' --repo '/repo'",
-    ],
+  const startOf = (line: string, file: string, ...args: string[]) => {
+    assert.ok(line.startsWith(`  nemia start ${file} `), line);
+    for (const arg of args) assert.ok(line.includes(` ${arg}`), `${line} gives ${arg}`);
+    assert.equal(line.split(' --').length - 1, args.length, line);
+  };
+  const stopped = planStopped({ card: cards[2], why: 'the disk is full', rest: [cards[3]] }, startedOf(['a', 'b']), opts).split('\n');
+  assert.equal(stopped.length, 5);
+  assert.equal(stopped[0], 'nemia plan stopped at c.md: the disk is full');
+  for (const fact of ['stand', 'a (parse-the-flag-1x2y), b (document-it-3z4w)', 'nemia cancel <runId>'])
+    assert.ok(stopped[1].includes(fact), fact);
+  for (const fact of ['parents first', 'once what stopped c.md is fixed', '--after']) assert.ok(stopped[2].includes(fact), fact);
+  startOf(stopped[3], "'/plans/q3/c.md'", "--workflows '/repo/workflows/ui'", "--repo '/repo'", '--after parse-the-flag-1x2y');
+  startOf(
+    stopped[4],
+    "'/plans/q3/d.md'",
+    "--workflows '/repo/workflows/dev'",
+    "--repo '/repo'",
+    '--after document-it-3z4w',
+    "--after <c's run id>",
   );
+  const none = planStopped({ card: cards[0], why: 'not a git repository', rest: cards.slice(1) }, [], opts).split('\n');
+  assert.equal(none[0], 'nemia plan stopped at a.md: not a git repository');
+  assert.equal(none[1], 'It started no run.');
+  assert.ok(none[2].includes('once what stopped a.md is fixed'), none[2]);
+  startOf(none[3], "'/plans/q3/a.md'", "--workflows '/repo/workflows/dev'", "--repo '/repo'");
   const spaced = { dir: "/home/me/plans/q3 it's", repo: '/code/my app', folderOf: () => '/code/my app/workflows/dev' };
-  assert.equal(
-    planStopped({ card: cards[0], why: 'x', rest: [] }, [], spaced).split('\n').at(-1),
-    `  nemia start '/home/me/plans/q3 it'\\''s/a.md' --workflows '/code/my app/workflows/dev' --repo '/code/my app'`,
-    'quoted for the shell: a space, and a quote, in a path',
-  );
+  const quotedForTheShell = planStopped({ card: cards[0], why: 'x', rest: [] }, [], spaced).split('\n').at(-1)!;
+  startOf(quotedForTheShell, `'/home/me/plans/q3 it'\\''s/a.md'`, "--workflows '/code/my app/workflows/dev'", "--repo '/code/my app'");
 });
 
 test('`cardToStart`: a card file starts its body, with its `workflow:` and `after:` — a file with no frontmatter of keys is not a card and is taken whole; a card naming `after:` with no --after is refused, naming the ids to give', () => {
@@ -255,14 +254,19 @@ test('`cardToStart`: a card file starts its body, with its `workflow:` and `afte
   assert.throws(
     () => cardToStart('plans/q3/d.md', '---\nworkflow: dev\nafter: b, c\n---\nShow the flag.\n', []),
     refusedWith(
-      /^plans\/q3\/d\.md: `after: b, c` — this card waits on the runs of b and c, and nemia start was given no --after, so it would start at once, beside the work it was written to wait for\. Give the id of each, from nemia ls: nemia start plans\/q3\/d\.md --after <b's run id> --after <c's run id>\.$/,
+      /^plans\/q3\/d\.md: `after: b, c`/,
+      'waits on the runs of b and c',
+      'given no --after',
+      'nemia ls',
+      'nemia start plans/q3/d.md',
+      "--after <b's run id> --after <c's run id>.",
     ),
     'a card whose after: names cards, started with no --after, is refused whatever the rest of it says',
   );
   assert.throws(() => cardToStart('e.md', '---\nafter: a, b, c\n---\nx\n', []), refusedWith(/waits on the runs of a, b and c,/));
   assert.throws(
     () => cardToStart('e.md', '---\nafter: a\n---\nx\n', []),
-    refusedWith(/^e\.md: `after: a` — this card waits on the run of a,.* nemia start e\.md --after <a's run id>\.$/),
+    refusedWith(/^e\.md: `after: a`/, 'waits on the run of a,', "nemia start e.md --after <a's run id>."),
   );
   assert.throws(
     () => cardToStart('a.md', '---\nworkflow: dev\n---\n', []),

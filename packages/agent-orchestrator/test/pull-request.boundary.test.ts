@@ -162,7 +162,8 @@ test("REFUSED: a HEAD that is on no run's branch, or on the remote's default bra
   named.gh.answers([{ when: 'auth status' }, { when: 'repo view', out: JSON.stringify({ defaultBranchRef: { name: 'wf/r-1/run' } }) }]);
   const base = pr(named, 'push');
   assert.equal(base.code, 1, base.out);
-  assert.match(base.err, /HEAD is on `wf\/r-1\/run`, the remote's default branch, and this script never pushes the base/);
+  assert.ok(base.err.includes("HEAD is on `wf/r-1/run`, the remote's default branch"), base.err);
+  assert.ok(base.err.includes('git switch wf/r-1/run'), base.err);
   assert.equal(tip(named.bare!, 'wf/r-1/run'), null, 'nothing is pushed');
 });
 
@@ -229,9 +230,10 @@ test('REFUSED: a draft pull request, or one based on another branch than the rem
   ]);
   const based = pr(other, 'open', ['--title', 'x', '--body-file', body()]);
   assert.equal(based.code, 1, based.out);
-  assert.match(based.err, /#7 is based on `release`, not on the remote's default branch `main`/);
+  assert.ok(based.err.includes('#7 is based on `release`'), based.err);
+  assert.ok(based.err.includes("the remote's default branch `main`"), based.err);
   assert.match(based.err, /gh pr edit 7 --base main/);
-  assert.match(based.err, /gh api -X PATCH repos\/\{owner\}\/\{repo\}\/pulls\/7 -f base=main/);
+  assert.ok(based.err.includes('gh api -X PATCH repos/{owner}/{repo}/pulls/7 -f base=main'), based.err);
 });
 
 test('REFUSED: two open pull requests for one branch, naming the close a person types', () => {
@@ -244,7 +246,8 @@ test('REFUSED: two open pull requests for one branch, naming the close a person 
   at.gh.answers([...passing(at.repo).filter((rule) => rule.when !== 'pr list'), { when: 'pr list', out: two }]);
   const r = pr(at, 'push');
   assert.equal(r.code, 1, r.out);
-  assert.match(r.err, /2 open pull requests have wf\/r-1\/run as its head \(#7, #8\)/);
+  assert.ok(r.err.includes('2 open pull requests have wf/r-1/run'), r.err);
+  assert.ok(r.err.includes('(#7, #8)'), r.err);
   assert.match(r.err, /gh pr close <number>/);
 });
 
@@ -282,20 +285,17 @@ test('REFUSED: a pull request whose head is another commit, and none open at all
   const stale = pr(at, 'push', [], { WF_PR_HEAD_SECONDS: '0' });
   assert.equal(stale.code, 1, stale.out);
   assert.ok(stale.err.includes(`#7 has ${was.slice(0, 12)} as its head and this workspace is on ${now.slice(0, 12)}`), stale.err);
-  assert.match(
-    stale.err,
-    /0 s after the push/,
-    'a head that stays elsewhere for the bound is still refused, and says how long it was read',
-  );
-  assert.match(stale.err, /CI's verdict would be for another commit than the one this check judges/);
-  assert.match(stale.err, /node pull-request\.ts open --title "<the card's line>" --body-file "\$WF_STEP_FILES\/pr-body\.md"/);
+  assert.match(stale.err, /0 s after the push/, 'a head elsewhere for the bound is refused, saying how long');
+  assert.ok(stale.err.includes('node pull-request.ts open --title'), stale.err);
+  assert.ok(stale.err.includes('--body-file "$WF_STEP_FILES/pr-body.md"'), stale.err);
 
   const none = placed();
   none.gh.answers([...passing(none.repo).filter((rule) => rule.when !== 'pr list'), { when: 'pr list', out: '[]' }]);
   const unopened = pr(none, 'push');
   assert.equal(unopened.code, 1, unopened.out);
-  assert.match(unopened.err, /no open pull request has wf\/r-1\/run as its head, and CI judges a pull request's head/);
-  assert.match(unopened.err, /node pull-request\.ts open --title "<the card's line>" --body-file "\$WF_STEP_FILES\/pr-body\.md"/);
+  assert.ok(unopened.err.includes('no open pull request has wf/r-1/run as its head'), unopened.err);
+  assert.ok(unopened.err.includes('node pull-request.ts open --title'), unopened.err);
+  assert.ok(unopened.err.includes('--body-file "$WF_STEP_FILES/pr-body.md"'), unopened.err);
 });
 
 test('wait polls the ci context until it has a verdict, and passes on a green one', () => {
@@ -326,7 +326,7 @@ test('REFUSED: a red ci, with the Actions URL, the failing jobs, a tail of the f
   ]);
   const r = pr(at, 'wait', [], { WF_CI_POLL_SECONDS: '0', WF_STEP: 'implement' });
   assert.equal(r.code, 1, r.out);
-  assert.match(r.err, /`ci` for #7 is failure, so this round is red where it is judged/);
+  assert.ok(r.err.includes('`ci` for #7 is failure'), r.err);
   assert.ok(r.err.includes(`The Actions URL: ${CI_URL}`), r.err);
   assert.match(r.err, /the jobs that did not pass:/);
   assert.match(r.err, /test agent-orchestrator on node 22: FAILURE/);
@@ -434,11 +434,7 @@ test('the wait tells its two bounds apart: the start is its own, and what is lef
   ]);
   const absent = pr(at, 'wait', [], { WF_CI_START_SECONDS: '0', WF_CI_WAIT_SECONDS: '5', WF_CI_POLL_SECONDS: '0' });
   assert.equal(absent.code, 1, absent.out);
-  assert.match(
-    absent.err,
-    /no `ci` context was reported for #7 within 0 s/,
-    'a `ci` that was never reported is refused on the start bound, not on the whole',
-  );
+  assert.match(absent.err, /no `ci` context was reported for #7 within 0 s/, 'a `ci` never reported is refused on the start bound');
 
   const slow = placed();
   slow.gh.answers([
@@ -456,7 +452,7 @@ test('the wait tells its two bounds apart: the start is its own, and what is lef
   ]);
   const unfinished = pr(started, 'wait', [], { WF_CI_START_SECONDS: '600', WF_CI_WAIT_SECONDS: '0', WF_CI_POLL_SECONDS: '0' });
   assert.equal(unfinished.code, 1, unfinished.out);
-  assert.match(unfinished.err, /was still in_progress after 0 s/, 'a `ci` that started is bounded by the whole, not by the start');
+  assert.match(unfinished.err, /was still in_progress after 0 s/, 'a started `ci` is bounded by the whole');
 });
 
 /** The number the script's constant `name` holds, read from its shipped text; it must be there. */

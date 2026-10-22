@@ -171,7 +171,9 @@ test('REFUSED at shipped defaults: a card with no skills, or for an agent with n
     () => agentCard(agent, 'abc123', []),
     (e: Error) => {
       assert.ok(e instanceof WorkflowError, String(e));
-      assert.match(e.message, /^agents\/scribe\.md: its card has no skills, and the A2A protocol marks a card's skills REQUIRED/);
+      assert.equal(e.exitCode, 2);
+      assert.ok(e.message.startsWith('agents/scribe.md: its card has no skills'), e.message);
+      assert.ok(e.message.includes('`skills:`'), 'and names the line its entries are generated from');
       return true;
     },
   );
@@ -193,7 +195,9 @@ test('REFUSED: a card from a skill no folder has, or whose SKILL.md says nothing
   assert.throws(
     () => cardSkills(lost, found),
     (e: Error) => {
-      assert.match(e.message, /^agents\/scribe\.md gives the skill `no-such-skill`, and no skills folder has it — looked in /);
+      assert.ok(e instanceof WorkflowError, String(e));
+      assert.ok(e.message.startsWith('agents/scribe.md gives the skill `no-such-skill`'), e.message);
+      assert.ok(e.message.includes('write skills/no-such-skill/SKILL.md'), 'and names the file to write');
       assert.ok(e.message.includes(path.join(root, 'skills')), e.message);
       return true;
     },
@@ -201,6 +205,9 @@ test('REFUSED: a card from a skill no folder has, or whose SKILL.md says nothing
   fs.writeFileSync(path.join(root, 'skills', 'file-it', 'SKILL.md'), '---\nname: File it away\n---\nHow to file.\n');
   assert.throws(
     () => cardSkills(agent, found),
-    (e: Error) => /SKILL\.md has no `description:`, and the A2A protocol marks a skill's description REQUIRED/.test(e.message),
+    (e: Error) =>
+      e instanceof WorkflowError &&
+      e.message.includes(path.join('file-it', 'SKILL.md has no `description:`')) &&
+      e.message.includes('`description: <what it does, one line>`'),
   );
 });

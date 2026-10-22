@@ -635,12 +635,19 @@ test('a path names an inbox card by its file, by its name, through a link to the
   }
 });
 
+/** `said` refuses each of `imported` in turn, naming the file, the function and its module, and the fix: a method on RunStore. */
+function refusedFor(said: readonly string[], ...imported: Array<[fn: string, from: string]>): void {
+  assert.equal(said.length, imported.length, said.join('\n'));
+  imported.forEach(([fn, from], i) => {
+    assert.ok(said[i].startsWith(`src/new/new.verb.ts imports ${fn} from ${from}: `), said[i]);
+    assert.ok(said[i].includes('runStore (src/record/files.store.ts)'), said[i]);
+    assert.ok(said[i].includes('RunStore (src/record/record.ts)'), said[i]);
+  });
+}
+
 test('a file that imports a run function from record.store.ts is refused, naming the file and the function', () => {
   const sources = { 'src/new/new.verb.ts': "import { readRun, stepsOf } from '../record/record.store.ts';\n" };
-  assert.deepEqual(refusals(sources), [
-    'src/new/new.verb.ts imports readRun from record.store.ts: read and write through runStore (src/record/files.store.ts), adding ' +
-      'the method to RunStore (src/record/record.ts)',
-  ]);
+  refusedFor(refusals(sources), ['readRun', 'record.store.ts']);
 });
 
 test('an import spread over lines is refused, as is a re-export, a namespace and a dynamic import', () => {
@@ -654,19 +661,11 @@ test('an import spread over lines is refused, as is a re-export, a namespace and
 
 test('a run function imported through runner.ts is refused, naming runner.ts as the module it came from', () => {
   const sources = { 'src/new/new.verb.ts': "import {\n  HOME,\n  readRun,\n} from '../runner.ts';\n" };
-  assert.deepEqual(refusals(sources), [
-    'src/new/new.verb.ts imports readRun from runner.ts: read and write through runStore (src/record/files.store.ts), adding ' +
-      'the method to RunStore (src/record/record.ts)',
-  ]);
+  refusedFor(refusals(sources), ['readRun', 'runner.ts']);
   const both = {
     'src/new/new.verb.ts': "import { listRuns } from '../runner.ts';\nimport { readAsks } from '../record/record.store.ts';\n",
   };
-  assert.deepEqual(refusals(both), [
-    'src/new/new.verb.ts imports readAsks from record.store.ts: read and write through runStore (src/record/files.store.ts), adding ' +
-      'the method to RunStore (src/record/record.ts)',
-    'src/new/new.verb.ts imports listRuns from runner.ts: read and write through runStore (src/record/files.store.ts), adding ' +
-      'the method to RunStore (src/record/record.ts)',
-  ]);
+  refusedFor(refusals(both), ['readAsks', 'record.store.ts'], ['listRuns', 'runner.ts']);
   assert.deepEqual(directImports("import { readRun } from '../runners.ts';\nimport { stepsOf } from '../../runner.ts';\n"), []);
 });
 

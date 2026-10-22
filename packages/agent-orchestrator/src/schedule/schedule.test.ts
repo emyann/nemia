@@ -49,10 +49,10 @@ test('a start, a refusal and a failure each say what follows', () => {
     scheduleLine({ ...at, run: 'read-the-stats-ab12' }),
     'started nemia/janitor as read-the-stats-ab12, for its fire at 2026-10-05T13:00:00.000Z',
   );
-  assert.match(
-    scheduleLine({ ...at, refused: 'janitor is not attached' }),
-    /not tried again until its next fire.*nemia factory unschedule nemia janitor/,
-  );
+  const held = scheduleLine({ ...at, refused: 'janitor is not attached' });
+  assert.match(held, /janitor is not attached/);
+  assert.match(held, /not tried again until its next fire/);
+  assert.match(held, /nemia factory unschedule nemia janitor/);
   assert.match(scheduleLine({ ...at, failed: 'EIO', again: false }), /not a refusal: tried again on the next pass/);
 });
 
@@ -72,10 +72,9 @@ test('nemia ls lists each schedule with its next fire and last run, and a kept r
   assert.deepEqual(scheduleLines([row], clock), [
     'scheduled  nemia/janitor  0 9 * * 1 (America/Montreal)  next <2026-10-12>  last read-the-stats-ab12 (<2026-10-05>)',
   ]);
-  assert.deepEqual(scheduleLines([{ ...row, tz: null, last: null, refused: 'janitor is not attached' }], clock), [
-    'scheduled  nemia/janitor  0 9 * * 1  next <2026-10-12>  last none',
-    '  refused: janitor is not attached',
-  ]);
+  const listed = scheduleLines([{ ...row, tz: null, last: null, refused: 'janitor is not attached' }], clock);
+  assert.deepEqual(listed, ['scheduled  nemia/janitor  0 9 * * 1  next <2026-10-12>  last none', '  refused: janitor is not attached']);
+
   assert.deepEqual(scheduleLines([], clock), []);
 });
 

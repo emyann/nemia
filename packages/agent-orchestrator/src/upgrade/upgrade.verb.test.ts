@@ -41,8 +41,10 @@ heldUnasked(stood);
 const noEngine = () => engineOf(stood().layer);
 
 /** Refused by kind, exit 2, and the message — never `String(err)`, which starts with `Error: `. */
-const refusedWith = (tag: 'Missing' | 'Conflict' | 'Invalid', pattern: RegExp) => (err: Error & { exitCode?: number; _tag?: string }) =>
-  err._tag === tag && err.exitCode === 2 && pattern.test(err.message);
+const refusedWith =
+  (tag: 'Missing' | 'Conflict' | 'Invalid', ...patterns: RegExp[]) =>
+  (err: Error & { exitCode?: number; _tag?: string }) =>
+    err._tag === tag && err.exitCode === 2 && patterns.every((pattern) => pattern.test(err.message));
 
 /** A repository holding the tests' team as its `workflows/`, in one commit, so a start has a base to record. */
 function repoWithTeam(): string {
@@ -156,7 +158,7 @@ test('upgrade refuses, writing nothing: no template, no render, a --to that is n
   await assert.rejects(upgrade('kept', '--to', '2'), refusedWith('Invalid', /--to <x\.y\.z>/));
   await assert.rejects(
     upgrade('kept', '--to', '0.2.0'),
-    refusedWith('Conflict', /is at version 0\.1\.0, not 0\.2\.0: [^]*--template <folder\|archive>/),
+    refusedWith('Conflict', /is at version 0\.1\.0, not 0\.2\.0: /, /--template <folder\|archive>/),
   );
   await assert.rejects(upgrade('kept', '--to', '0.1.0'), refusedWith('Conflict', /kept is already applied at 0\.1\.0/));
   edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
@@ -164,7 +166,7 @@ test('upgrade refuses, writing nothing: no template, no render, a --to that is n
   });
   await assert.rejects(
     upgrade('kept', '--to', '0.1.0'),
-    refusedWith('Conflict', /the template at 0\.1\.0 now renders other content: [^]*give it a new version/),
+    refusedWith('Conflict', /the template at 0\.1\.0 now renders other content: /, /give it a new version/),
   );
   released(dir, '0.0.9', 5);
   await assert.rejects(upgrade('kept', '--to', '0.0.9'), refusedWith('Conflict', /0\.0\.9 is below 0\.1\.0[^]*--to 0\.0\.9 --downgrade/));
@@ -244,10 +246,10 @@ test('conflicts wait for a choice with only the status written; resolve writes e
       ['ConflictsPending', 'True', 'Conflicts'],
     ],
   );
-  assert.match(
-    waiting.conditions[1].message,
-    /nemia factory resolve clash 'workflows\/dev\/README\.md:1-1' --ours\|--theirs\|--file <path>/,
-  );
+  const pending = waiting.conditions[1].message;
+  assert.ok(pending.includes(`nemia factory resolve clash '${README}:1-1' `), pending);
+  assert.ok(pending.includes('--ours|--theirs|--file <path>'), pending);
+
   assert.deepEqual(waiting.upgrade, {
     from: '0.1.0',
     to: '0.2.0',

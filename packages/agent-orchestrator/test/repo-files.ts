@@ -1,11 +1,13 @@
 /**
- * The repository's files as a test that reads all of them sees them: `names.test.ts`, `others.test.ts` and `local-paths.test.ts`.
+ * The repository's files as a test that reads all of them sees them, through git: `names.test.ts`, `others.test.ts` and
+ * `local-paths.test.ts`. A test that needs only the root or the workspaces imports `workspaces.ts`, which spawns nothing.
  */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { REPO } from './workspaces.ts';
 
-export const REPO = path.join(import.meta.dirname, '..', '..', '..');
+export { REPO, workspaces } from './workspaces.ts';
 
 /** Every file the repository holds, tracked or not yet added, ignored ones left out: git's list, as a path from the root. */
 export const files = (): string[] =>

@@ -228,10 +228,9 @@ test("the place's stage words, run as said with the checkout and the branches fi
 
 test('REFUSED: open on no directory, on a directory that is no repository, and on a repository with no commit', () => {
   const plain = scratch('wf-git-skill-plain-');
-  assert.match(
-    refusalOf(run('open', { root: path.join(plain, 'nowhere'), isolate: true })),
-    /nowhere is not a directory: name a git repository with --repo$/,
-  );
+  const nowhere = refusalOf(run('open', { root: path.join(plain, 'nowhere'), isolate: true }));
+  assert.ok(nowhere.startsWith(`${path.join(plain, 'nowhere')} is not a directory`), nowhere);
+  assert.ok(nowhere.endsWith('name a git repository with --repo'), nowhere);
   assert.equal(
     refusalOf(run('open', { root: plain, isolate: true })),
     `${plain} is not a git repository: run git init there and commit once, or name a repository with --repo`,

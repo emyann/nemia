@@ -55,7 +55,7 @@ test('a daemon’s line says how the one before it ended: stopped and when, gone
       source: 'daemon',
       message: 'daemon started · first daemon on this store',
     },
-    'a daemon is involved by its pid, carries no run\u2019s labels, and is the daemon\u2019s own source',
+    'involved by its pid, no run\u2019s labels, its own source',
   );
   assert.equal(startedLine(5151, standing('stopped', { stoppedAt: ago(1) }), AT, NOW).note, `last stopped at ${ago(1)}`);
   assert.match(

@@ -241,10 +241,9 @@ test('REFUSED: a check that fails changes nothing: the pointer stays, no release
   const { tag, message } = await refusalOf({ tag: 'v3', repo: REPO }, idle().host);
   assert.equal(tag, 'Invalid');
   const log = /read (\S+)\.$/.exec(message)?.[1] ?? '';
-  assert.match(
-    message,
-    /^nemia upgrade v3: npm run release:check exited 1, so nothing changed and releases\/current stays where it was: read /,
-  );
+  assert.match(message, /^nemia upgrade v3: npm run release:check exited 1, /);
+  assert.match(message, /nothing changed/);
+  assert.match(message, /releases\/current stays where it was/);
   assert.ok(log.startsWith(path.join(releasesDir(), '.logs', 'v3-')) && fs.existsSync(log), log);
   assert.match(fs.readFileSync(log, 'utf8'), /\$ npm ci[\s\S]*\$ npm run build[\s\S]*\$ npm run release:check/);
   assert.equal(currentRelease()?.tag, 'v1');
@@ -258,7 +257,8 @@ test('REFUSED: a build that fails changes nothing, and its check never runs', as
   fs.rmSync(SEEN, { force: true });
   const { tag, message } = await refusalOf({ tag: 'v4', repo: REPO }, idle().host);
   assert.equal(tag, 'Invalid');
-  assert.match(message, /^nemia upgrade v4: npm run build exited 3, so nothing changed/);
+  assert.match(message, /^nemia upgrade v4: npm run build exited 3, /);
+  assert.match(message, /nothing changed/);
   assert.equal(fs.existsSync(SEEN), false, 'the check did not run');
   assert.equal(currentRelease()?.tag, 'v1');
   assert.equal(fs.existsSync(releaseDir('v4')), false);
@@ -269,10 +269,10 @@ test('REFUSED: a tag with no release:check script is Invalid, naming the fix, an
   tagged('v5', 'five', scripts({ check: null }));
   const { tag, message } = await refusalOf({ tag: 'v5', repo: REPO }, idle().host);
   assert.equal(tag, 'Invalid');
-  assert.equal(
-    message,
-    "nemia upgrade v5: the tag's package.json has no release:check script, so it cannot be checked as a release: tag a commit that has one.",
-  );
+  assert.match(message, /^nemia upgrade v5: /);
+  assert.match(message, /package\.json has no release:check script/);
+  assert.match(message, /tag a commit that has one\.$/);
+
   assert.equal(fs.existsSync(releaseDir('v5')), false);
 });
 

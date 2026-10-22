@@ -169,7 +169,9 @@ test('a secret not given sends nothing, and the step fails naming the variable t
   const view = await Effect.runPromise(e.view(`${id}-ask`));
   assert.equal(view.phase, 'failed');
   const words = JSON.stringify(view.state.attempts) + decided.join('\n');
-  assert.match(words, /set WF_A2A_CRITIC_TOKEN to the secret for the scheme `token` critic's card declares/);
+  assert.ok(words.includes('set WF_A2A_CRITIC_TOKEN to the secret'), words);
+  assert.ok(words.includes("the scheme `token` critic's card declares"), words);
+  assert.ok(words.includes('`nemia retry`'), words);
   assert.ok(
     decided.some((line) => line.trim() === `ask: failed. Send it again, as a new Task told what happened:  nemia retry ${id} ask`),
     `offered a new Task, not a session continued nor a model, which nemia retry refuses on a remote step:\n${decided.join('\n')}`,

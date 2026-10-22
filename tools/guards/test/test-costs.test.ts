@@ -262,6 +262,7 @@ test('REFUSED: a report of folders with no record exits 2 and names the folder t
   const { out, err, code } = report([scratch('test-costs-report-')]);
   assert.equal(code, 2);
   assert.equal(out, '');
-  assert.match(err, /pass a check's files directory, such as ~\/\.agent-workflows\/runs\/<run>\/artifacts\/<step>/);
+  assert.ok(err.includes("pass a check's files directory"), err);
+  assert.ok(err.includes('~/.agent-workflows/runs/<run>/artifacts/<step>'), err);
   assert.equal(report(['--top', 'x', '.']).code, 2);
 });

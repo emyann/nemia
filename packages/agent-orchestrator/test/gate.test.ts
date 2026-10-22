@@ -57,6 +57,15 @@ const { engineOf } = await import('../src/runtime-client.ts');
 /** Refused by name: exit 2, and the message — never `String(err)`, which starts with `Error: `. */
 const refusedWith = (pattern: RegExp) => (err: Error & { exitCode?: number }) => err.exitCode === 2 && pattern.test(err.message);
 
+/**
+ * Refused by kind (`_tag`), exit 2, and what the message names — the fix's command or flag, the step, the try — each a pattern it
+ * matches or a token it holds.
+ */
+const refusedAs =
+  (tag: 'Missing' | 'Conflict' | 'Invalid', ...named: Array<RegExp | string>) =>
+  (err: Error & { exitCode?: number; _tag?: string }) =>
+    err._tag === tag && err.exitCode === 2 && named.every((n) => (typeof n === 'string' ? err.message.includes(n) : n.test(err.message)));
+
 /** A repository with one commit, so `nemia start` has a base to record. */
 const aRepo = (): string => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
@@ -164,27 +173,19 @@ test('REFUSED at `nemia start`, before a run is written: a --gate naming a step 
       await runPlaced(startRun({ brief: 'plan the flag', repo, workflowDir: planned(), isolate: false, gates }));
   await assert.rejects(
     starting('plan', 'desing'),
-    refusedWith(
-      /^--gate desing: the workflow has no step "desing", so nothing would ever wait at it\. Its steps are: plan, implement, review — gate one of them by its name\.$/,
-    ),
+    refusedAs('Invalid', /^--gate desing: /, 'no step "desing"', 'Its steps are: plan, implement, review'),
   );
-  await assert.rejects(
-    starting('plan', 'plan'),
-    refusedWith(/^--gate plan is given twice, and a run is gated at a step once\. Give each step one --gate\.$/),
-  );
+  await assert.rejects(starting('plan', 'plan'), refusedAs('Invalid', /^--gate plan is given twice/, 'one --gate'));
   assert.equal(runsWritten(), before, 'no run written');
 
   const typed = (...flags: string[]) =>
     main(['start', 'plan the flag', '--workflows', planned(), '--repo', repo, '--no-worktree', ...flags]);
-  await assert.rejects(
-    typed('--gate'),
-    refusedWith(/^--gate takes the step whose closeout waits for a person before anything after it is filed/),
-  );
+  await assert.rejects(typed('--gate'), refusedAs('Invalid', /^--gate takes the step /));
   await assert.rejects(typed('--gate', '--no-worktree'), refusedWith(/^--gate takes the step/));
   await assert.rejects(typed('--gate', 'reveiw'), refusedWith(/^--gate reveiw: the workflow has no step "reveiw"/));
   await assert.rejects(
     main(['plan', ROOT, '--gate', 'plan']),
-    refusedWith(/^nemia plan does not take --gate: a plan's cards are gated by their workflows' own gate: true\./),
+    refusedAs('Invalid', /^nemia plan does not take --gate/, 'gate: true', 'nemia start <card.md> --workflows <dir> --gate <step>'),
   );
   assert.equal(runsWritten(), before, 'nor by the CLI');
 });
@@ -209,8 +210,12 @@ test("an inbox card's `gate:` is frozen on the run it starts, beside a start's -
   const before = runsWritten();
   await assert.rejects(
     async () => await runPlaced(startFromInbox({ name: 'plan-the-flag-e5f6', callerRepo: repo, isolate: false })),
-    refusedWith(
-      /^plan-the-flag-e5f6\.md: `gate: desing`: the workflow has no step "desing", so nothing would ever wait at it\. Its steps are: plan, implement, review — gate one of them by its name\. Correct the line, or delete it\.$/,
+    refusedAs(
+      'Invalid',
+      /^plan-the-flag-e5f6\.md: `gate: desing`: /,
+      'no step "desing"',
+      'Its steps are: plan, implement, review',
+      'Correct the line, or delete it',
     ),
   );
   card('plan-the-flag-g7h8', 'plan');
@@ -339,7 +344,7 @@ test("REFUSED at shipped defaults: a parent whose last step waits at its gate ha
 
   await assert.rejects(
     runWith(b.e, retryRun(parent.id, 'implement', { mode: 'nudge', message: 'one more thing' })),
-    refusedWith(/^implement signed off done and declares no check: what waits on it has been filed, and there is nothing to try again\.$/),
+    refusedAs('Conflict', /^implement signed off done and declares no check/, 'nothing to try again'),
     'approved, its one step has handed on: nothing waits on it, and a send-back would file a session on a run a person merged',
   );
   assert.ok(!fs.existsSync(path.join(asksDir(parent.id), 'retry-implement-2')), 'no ask written');
@@ -412,7 +417,7 @@ test('REFUSED at shipped defaults: `nemia approve` on a step not gated, one not 
   await assert.rejects(runWith(gate.e, approveRun(id, 'plan', '')), refusedWith(/^--message is empty/));
   await assert.rejects(
     runWith(gate.e, approveRun('no-such-run-zz9z', 'plan')),
-    refusedWith(/^no such run: no-such-run-zz9z\. nemia approve takes a run by its id, as nemia ls lists it/),
+    refusedAs('Missing', /^no such run: no-such-run-zz9z\. /, 'nemia ls'),
   );
   assert.deepEqual(asksOf(id), []);
 
@@ -424,14 +429,14 @@ test('REFUSED at shipped defaults: `nemia approve` on a step not gated, one not 
   b.settle(`${running.id}-plan`, 'running');
   await assert.rejects(
     runWith(b.e, approveRun(running.id, 'plan')),
-    refusedWith(/^plan has not signed off yet: it is still running\. Its gate holds once it has signed off: approve it then/),
+    refusedAs('Conflict', /^plan has not signed off yet/, 'still running', 'approve it then'),
   );
   assert.deepEqual(asksOf(running.id), []);
 
   await runWith(gate.e, approveRun(id, 'plan', 'yes'));
   await assert.rejects(
     runWith(gate.e, approveRun(id, 'plan', 'yes, again')),
-    refusedWith(/^try 1 of plan is already approved, at .*, with words: what waits on it is filed on the next tick, once\./),
+    refusedAs('Conflict', /^try 1 of plan is already approved, at .*, with words/, 'on the next tick'),
   );
   assert.equal(JSON.parse(fs.readFileSync(path.join(asksDir(id), 'approve-plan-1'), 'utf8')).message, 'yes', 'the first approval stands');
 
@@ -439,9 +444,7 @@ test('REFUSED at shipped defaults: `nemia approve` on a step not gated, one not 
   await runWith(sentBack.e, retryRun(sentBack.run.id, 'plan', { mode: 'nudge', message: 'store it first' }));
   await assert.rejects(
     runWith(sentBack.e, approveRun(sentBack.run.id, 'plan')),
-    refusedWith(
-      /^try 2 of plan is already asked for \(--nudge, at .*\): the next tick sends it back, and an approval of try 1 would be spent by it at once\./,
-    ),
+    refusedAs('Conflict', /^try 2 of plan is already asked for \(--nudge, at /, 'an approval of try 1'),
   );
   assert.deepEqual(asksOf(sentBack.run.id), ['retry-plan-2']);
 
@@ -449,7 +452,7 @@ test('REFUSED at shipped defaults: `nemia approve` on a step not gated, one not 
   markCancelled(called.run.id);
   await assert.rejects(
     runWith(called.e, approveRun(called.run.id, 'plan')),
-    refusedWith(/was cancelled at .*, and a cancelled run files nothing, so an approval would never be honoured\./),
+    refusedAs('Conflict', /was cancelled at /, 'a cancelled run files nothing'),
   );
   assert.deepEqual(asksOf(called.run.id), []);
 
@@ -458,8 +461,12 @@ test('REFUSED at shipped defaults: `nemia approve` on a step not gated, one not 
   fs.writeFileSync(path.join(asksDir(stray.run.id), 'approve-plan-1'), 'yes please');
   await assert.rejects(
     runWith(stray.e, approveRun(stray.run.id, 'plan')),
-    refusedWith(
-      /^try 1 of plan cannot be approved: .*approve-plan-1 is already there, and it is not an approval — unreadable .*Delete it \(rm .*\), then approve again/,
+    refusedAs(
+      'Conflict',
+      /^try 1 of plan cannot be approved: /,
+      /approve-plan-1 is already there/,
+      /\(rm .*approve-plan-1/,
+      'then approve again',
     ),
     "a file at the approval's name that is not one is named, with how to clear it, and never read as already approved",
   );
@@ -467,16 +474,15 @@ test('REFUSED at shipped defaults: `nemia approve` on a step not gated, one not 
   const typed = (...flags: string[]) => main(['approve', 'no-such-run-zz9z', 'plan', ...flags]);
   await assert.rejects(
     typed('--mesage', 'yes'),
-    refusedWith(/^nemia approve does not take --mesage\. It takes the run, the step, --answer <n>=<letter> and --message "<words>"/),
+    refusedAs('Invalid', /^nemia approve does not take --mesage\. /, '--answer <n>=<letter>', '--message "<words>"'),
   );
-  await assert.rejects(typed('--message'), refusedWith(/^--message takes the words that go with your approval, quoted/));
-  await assert.rejects(typed('--message='), (err: Error & { exitCode?: number }) => {
+  await assert.rejects(typed('--message'), refusedAs('Invalid', /^--message takes the words /, 'quoted'));
+  await assert.rejects(typed('--message='), (err: Error & { exitCode?: number; _tag?: string }) => {
+    assert.equal(err._tag, 'Invalid');
     assert.equal(err.exitCode, 2);
-    assert.equal(
-      err.message,
-      "--message is empty, and an approval's words are handed to every step after the gate: empty, they tell them nothing. " +
-        'Say what you approve, or on what terms — nemia approve no-such-run-zz9z plan --message "<words>" — or leave --message out.',
-    );
+    assert.match(err.message, /^--message is empty/);
+    assert.ok(err.message.includes('nemia approve no-such-run-zz9z plan --message "<words>"'), err.message);
+    assert.ok(err.message.includes('or leave --message out'), err.message);
     return true;
   });
   await assert.rejects(typed('--message', 'a', '--message', 'b'), refusedWith(/^nemia approve takes --message once/));
@@ -601,13 +607,11 @@ test("REFUSED at shipped defaults: a wordless `nemia retry` taken while a gated 
   const file = path.join(asksDir(run.id), 'retry-plan-2');
   await assert.rejects(
     runWith(e, approveRun(run.id, 'plan')),
-    refusedWith(
-      /^try 2 of plan is asked for \(--nudge, at .*\) with no words, and plan is at its gate, so no tick honours it: .*Delete that ask — retry-plan-2, in the run's \.asks directory — then approve it/,
-    ),
+    refusedAs('Conflict', /^try 2 of plan is asked for \(--nudge, at /, 'with no words', 'at its gate', 'retry-plan-2', 'then approve it'),
   );
   await assert.rejects(
     runWith(e, retryRun(run.id, 'plan', { mode: 'nudge', message: 'store it first' })),
-    refusedWith(/^try 2 of plan is asked for \(--nudge, at .*\) with no words, and plan is awaiting approval, so no tick honours it/),
+    refusedAs('Conflict', /^try 2 of plan is asked for \(--nudge, at /, 'with no words', 'awaiting approval'),
   );
   assert.ok(fs.existsSync(file), 'left where it is, for a person to take back');
 

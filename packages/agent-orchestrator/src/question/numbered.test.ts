@@ -102,17 +102,18 @@ test('REFUSED: an --answer in no form, naming the forms it takes', () => {
 });
 
 test('REFUSED: a number past the questions asked, or below 1, naming how many it asks and the command that numbers them', () => {
-  assert.equal(
-    refused(['1=a', '4=a']),
-    '--answer 4=a names question 4, and the step asks 3 now, numbered from 1 as nemia decide r-1 prints them.',
-  );
+  const past = refused(['1=a', '4=a']);
+  assert.match(past, /^--answer 4=a names question 4, /);
+  assert.match(past, /the step asks 3 now/);
+  assert.match(past, /nemia decide r-1/);
   assert.match(refused(['0=a']), /^--answer 0=a names question 0, and the step asks 3 now/);
 });
 
 test('REFUSED: a letter its question does not offer, naming its letters and labels', () => {
-  assert.equal(
-    refused(['1=d']),
-    '--answer 1=d: "How is the card cut?" offers no d: its options are a (one card), b (two cards), c (three, cut thin).',
-  );
-  assert.match(refused(['2=a,c']), /"Where do the answers go\?" offers no c: its options are a \(retry\), b \(gate\)\.$/);
+  const cut = refused(['1=d']);
+  assert.ok(cut.startsWith('--answer 1=d: "How is the card cut?" offers no d'), cut);
+  assert.match(cut, /a \(one card\), b \(two cards\), c \(three, cut thin\)\.$/);
+  const where = refused(['2=a,c']);
+  assert.match(where, /"Where do the answers go\?" offers no c/);
+  assert.match(where, /a \(retry\), b \(gate\)\.$/);
 });

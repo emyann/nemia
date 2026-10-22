@@ -14,6 +14,7 @@ import type { TaskPhase } from '../src/run.ts';
 import { scratch } from './scratch.ts';
 import { promised } from './promised.ts';
 import { Effect } from 'effect';
+import { Invalid } from '../src/refusal/refusal.ts';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from './placed.ts';
 
@@ -262,11 +263,12 @@ test("REFUSED at `nemia start`, with nothing written: `slot: none` on a step of 
   for (const steps of shapes) {
     await assert.rejects(
       async () => await runPlaced(startRun({ brief: 'watch it', repo, workflowDir: folderOf(steps) })),
-      (err: Error & { exitCode?: number }) =>
+      (err: unknown) =>
+        err instanceof Invalid &&
         err.exitCode === 2 &&
-        /^supervise: `slot: none` takes this step's whole RUN out of the cap on runs in flight \(WF_MAX_RUNS\), and this workflow has \w+ beside it — a slot is a run's, not a step's/.test(
-          err.message,
-        ),
+        err.message.startsWith('supervise: `slot: none` takes this step') &&
+        err.message.includes('(WF_MAX_RUNS)') &&
+        err.message.includes("a slot is a run's, not a step's"),
       Object.keys(steps).join(' + '),
     );
   }

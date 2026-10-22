@@ -183,6 +183,11 @@ const repositoryRunOf = (run: Run): RepositoryRun => {
   return run;
 };
 const refusedWith = (pattern: RegExp) => (err: Error & { exitCode?: number }) => err.exitCode === 2 && pattern.test(err.message);
+/** A refusal of the kind `tag`, exit 2, whose words name each of `facts`: what was refused and the fix. */
+const refusal =
+  (tag: 'Missing' | 'Invalid' | 'Conflict', ...facts: string[]) =>
+  (err: Error & { exitCode?: number; _tag?: string }) =>
+    err._tag === tag && err.exitCode === 2 && facts.every((fact) => err.message.includes(fact));
 
 /** Git in a checkout, as a person types it there. */
 const gitIn = (cwd: string, ...args: string[]) =>
@@ -242,7 +247,10 @@ test("REFUSED at `nemia start`, before a run is written: --after an unknown run,
     async () =>
       await runPlaced(startRun({ brief: 'a child', repo, workflowDir: folder(), after }));
 
-  await assert.rejects(starting('no-such-run-zz9z'), refusedWith(/^--after no-such-run-zz9z: the store has no run no-such-run-zz9z\./));
+  await assert.rejects(
+    starting('no-such-run-zz9z'),
+    refusal('Invalid', '--after no-such-run-zz9z:', 'no run no-such-run-zz9z', 'nemia ls'),
+  );
   await assert.rejects(starting(p.run.id, p.run.id), refusedWith(new RegExp(`^--after ${escaped(p.run.id)} is given twice`)));
   await assert.rejects(
     starting(other.run.id),
@@ -254,7 +262,7 @@ test("REFUSED at `nemia start`, before a run is written: --after an unknown run,
   );
   await assert.rejects(
     starting(called.run.id),
-    refusedWith(/was cancelled at .*, and a cancelled run never ships, so this run would wait for ever\./),
+    refusal('Invalid', `--after ${called.run.id}:`, 'was cancelled at', 'never ships', `without --after ${called.run.id}`),
   );
   await assert.rejects(starting(direct.id), refusedWith(/\(--no-worktree\), so it has no result branch to ship/));
   gitIn(repo, 'checkout', '-q', '-b', 'elsewhere');
@@ -271,12 +279,7 @@ test("REFUSED at `nemia start`, before a run is written: --after an unknown run,
   await assert.rejects(typed('--after', '--no-worktree'), refusedWith(/^--after takes the run this one waits on/));
   await assert.rejects(typed('--after', p.run.id, '--after', p.run.id), refusedWith(/is given twice/));
   await assert.rejects(typed('--after='), refusedWith(/^--after takes the run this one waits on, by its id/));
-  await assert.rejects(
-    typed('--afer', p.run.id),
-    refusedWith(
-      /^nemia start does not take --afer\. It takes the brief, then --workflows <dir>, --repo <r>, --no-worktree, and --after <runId>/,
-    ),
-  );
+  await assert.rejects(typed('--afer', p.run.id), refusal('Invalid', 'nemia start does not take --afer.', '--after <runId>'));
   await assert.rejects(typed('-a', p.run.id), refusedWith(/^nemia start does not take -a\./));
   await assert.rejects(typed('--repo', repo), refusedWith(/^nemia start takes --repo once/));
   await assert.rejects(

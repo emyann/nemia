@@ -460,7 +460,7 @@ What it leaves:
   load (`mcp:`), a step's own `mcp:` line adds to them as its `skills:` does, and the runtime leaves the rest of
   the file out (`checkoutMcp`): a session loads what its agent and its step name and no other. A server only one
   repository has is named by the step that needs it, and no agent of this repository's team names one
-  (`test/team-portable.test.ts`). The line only adds; one that takes a server of the agent's away is not built.
+  (`tools/guards/test/team-portable.test.ts`). The line only adds; one that takes a server of the agent's away is not built.
 - **`--tools` does not narrow a server's tools, measured.** `claude --help` (2.1.270) says the list is "from the
   built-in set", and a `claude -p` with `--tools Read,Grep,Glob,Bash` and `.mcp.json` listed every `browser_*`
   tool (2026-09-13, *Shipped: looking is a skill*). What keeps a server's tool from such a step is its permission
@@ -5162,7 +5162,7 @@ that can write, run a program or move a ref.
   and `describe`, beside `diff`, `log`, `show`, `status` and `branch --list`. Left out: `git -C` (a prefix rule for it admits
   `git -C <dir> push`, which no deny `Bash(git push:*)` matches), `git grep` (`-O<cmd>` runs a program; the Grep tool searches)
   and `git fetch`. `workflows/dev/README.md` says so, under *What git a fenced step may run*. The deny list did not change.
-- **`test/git-reads.test.ts`** holds every `Bash(git …)` allow to a named list of reads, and that list to no verb that writes, runs a
+- **`tools/guards/test/git-reads.test.ts`** holds every `Bash(git …)` allow to a named list of reads, and that list to no verb that writes, runs a
   program or moves a ref and no option before the verb; it failed with `Bash(git -C:*)` and with `Bash(git commit:*)` added.
 - **The agents say it in one line**: the planner, the reviewer and the ui reviewer name the reads, and that `git -C` and a `cd`
   elsewhere are denied. A courtesy that saves a retry; the guard is the settings and the test.

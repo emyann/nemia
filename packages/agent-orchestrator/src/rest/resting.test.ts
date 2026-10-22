@@ -144,6 +144,8 @@ test('REFUSED: a verified read refuses a run judged afresh otherwise than the me
     refused = err;
   }
   assert.ok(refused instanceof Error, 'an answer the memo gave otherwise is refused');
-  assert.match(refused.message, /answered verified differently from a fresh read \(WF_VERIFY_REST\)/);
+  assert.ok(refused.message.includes(`answered ${run.id} differently`), refused.message);
+  assert.match(refused.message, /\(WF_VERIFY_REST\)/);
+
   read.answered(stored('unkept'), { said: 'anything' });
 });

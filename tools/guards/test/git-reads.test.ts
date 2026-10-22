@@ -107,7 +107,7 @@ const shipped = () => (JSON.parse(fs.readFileSync(SETTINGS, 'utf8')) as { permis
 test('every git allow in the shipped settings is a read on the named list, and the list names no verb that writes', () => {
   const { allow } = shipped();
   assert.deepEqual(refusals(allow), []);
-  assert.deepEqual(refusals(READS), [], 'the list itself holds no verb that writes, runs a program or moves a ref');
+  assert.deepEqual(refusals(READS), [], 'the list itself: no write, program or ref moved');
   for (const rule of ['Bash(git merge-tree:*)', 'Bash(git merge-base:*)', 'Bash(git ls-tree:*)'])
     assert.ok(
       allow.includes(rule),
@@ -140,19 +140,11 @@ test('REFUSED: a git allow for -C, grep, fetch, a verb that writes, a bare git, 
   }
   READS.push('Bash(git -C:*)', 'Bash(git commit:*)');
   try {
-    assert.match(
-      refusalOf('Bash(git -C:*)')!,
-      /option before the verb/,
-      'refused for what it is, not only for being off the list: put on the list, a rule that writes is refused all the same',
-    );
+    assert.match(refusalOf('Bash(git -C:*)')!, /option before the verb/, 'for what it is: on the list, a write is still refused');
     assert.match(refusalOf('Bash(git commit:*)')!, /writes/);
   } finally {
     READS.splice(-2);
   }
-  assert.match(
-    refusalOf('Bash(git cat-file:*)')!,
-    /not on the named list/,
-    'a read off the list is refused too: the list is named, not inferred',
-  );
+  assert.match(refusalOf('Bash(git cat-file:*)')!, /not on the named list/, 'a read off the list too: it is named, not inferred');
   assert.equal(refusalOf('Bash(npm test)'), undefined, 'not a git rule');
 });

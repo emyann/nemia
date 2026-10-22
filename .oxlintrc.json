@@ -65,6 +65,8 @@
     "unicorn/no-array-fill-with-reference-type": "error",
     // The size and complexity limits (docs/design-2026-09-28-feature-folders.md, "The limits"). The sizes skip blank lines and comments,
     // so a JSDoc is never a reason to split. A file over one today has its own ceiling in an override below, and never a higher one.
+    // packages/agent-orchestrator/test/limits.test.ts holds these thresholds and the per-file ceilings, and refuses a disable that
+    // names a limit.
     "max-lines": ["error", { "max": 500, "skipBlankLines": true, "skipComments": true }],
     "max-lines-per-function": ["error", { "max": 80, "skipBlankLines": true, "skipComments": true }],
     // Cyclomatic counts the paths, so it says how many tests a function needs; cognitive weighs the nesting, which cyclomatic does not.
@@ -133,10 +135,9 @@
         "typescript/restrict-template-expressions": "off"
       }
     },
-    // The comment guards (lint/comments.ts), one block per package, the same rules in each, none with
-    // an `excludeFiles`. The runtime's block also covers the folders beside the packages: lint/**, the guards' own plugin, and tools/**,
-    // the repository's test tooling.
-    // packages/agent-orchestrator/test/comments.test.ts reads these blocks.
+    // The comment guards (lint/comments.ts), one block per package, the same rules in each, none with an `excludeFiles`. The runtime's
+    // block also covers the folders beside the packages: lint/**, the guards' own plugin, and tools/**, the repository's test tooling.
+    // packages/agent-orchestrator/test/comments.test.ts holds this file's shape for them.
     {
       "files": ["apps/api/**"],
       "rules": {
@@ -209,7 +210,8 @@
     },
     // The layers (docs/architecture.md): each reaches the one below it, and nothing reaches up or skips one. One block per layer, over its
     // source alone, since a test may import the runtime's entries for a fake. Their globs never overlap, because a later block that sets
-    // `no-restricted-imports` on a file replaces an earlier one's options. packages/agent-orchestrator/test/imports.boundary.test.ts reads these blocks.
+    // `no-restricted-imports` on a file replaces an earlier one's options.
+    // packages/agent-orchestrator/test/imports.boundary.test.ts holds them to the layers of docs/architecture.md.
     // The board reaches the api over HTTP alone: no workspace package, no harness SDK, no path into packages/.
     {
       "files": ["apps/web/src/**"],
@@ -323,8 +325,9 @@
         "sonarjs/cognitive-complexity": "off"
       }
     },
-    // Each file over a limit today, at its own ceiling: its measure, rule by rule, and nothing higher. Lint refuses the file that grows;
-    // packages/agent-orchestrator/test/limits.test.ts refuses a ceiling above the measure, and holds each file's count of offenders.
+    // Each file over a limit today, at its own ceiling: its measure, rule by rule, and nothing higher. Lint refuses the file that grows.
+    // The ceilings only fall: a limit is met by cutting, never by raising a ceiling. packages/agent-orchestrator/test/limits.test.ts
+    // ratchets them: it refuses a ceiling above the measure, and holds each file's count of offenders.
     {
       "files": ["apps/api/src/capabilities/capabilities.ts"],
       "rules": {

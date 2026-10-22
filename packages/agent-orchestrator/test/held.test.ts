@@ -579,11 +579,7 @@ test("REFUSED by the engine: a close it will not journal is said on the pass, in
       }),
   });
   const refused = await pass(run.id);
-  assert.deepEqual(
-    refused.tried,
-    [],
-    "something else answered the task between the run's read and its close, and the engine refused the close: nothing filed over a task that did not close",
-  );
+  assert.deepEqual(refused.tried, [], 'answered between read and close: nothing filed over it');
   assert.ok(
     refused.notes.some((n) => /^plan: close: `.*-plan` has been answered already/.test(n)),
     refused.notes.join('\n'),

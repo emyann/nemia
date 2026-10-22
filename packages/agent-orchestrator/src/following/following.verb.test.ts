@@ -331,5 +331,7 @@ test('REFUSED: a step with no task filed, as Missing, in words saying when to fo
   assert.ok(Exit.isFailure(exit));
   const err = Cause.squash(exit.cause) as Error & { _tag?: string };
   assert.equal(err._tag, 'Missing');
-  assert.equal(err.message, 'run r-5 has no session of a step `implement` to follow: follow it once `nemia ls` shows it filed.');
+  assert.ok(err.message.startsWith('run r-5 '), err.message);
+  assert.ok(err.message.includes('`implement`'), err.message);
+  assert.ok(err.message.includes('`nemia ls`'), err.message);
 });

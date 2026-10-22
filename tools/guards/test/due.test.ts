@@ -4,7 +4,11 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { dueOf } from '../due.ts';
+import fs from 'node:fs';
+import path from 'node:path';
+import { dependencyFolders, dueOf, patternOf, TASK } from '../due.ts';
+
+const ROOT = path.join(import.meta.dirname, '..', '..', '..');
 
 const INPUTS = [
   '$TURBO_DEFAULT$',
@@ -64,4 +68,15 @@ test('an input of a shape it does not read is refused, whatever the paths', () =
     '$TURBO_ROOT$/a/**/b',
   ])
     assert.throws(() => dueOf([], [input], []), Error, input);
+});
+
+test("the repository's own guards#test inputs, which turbo caches by, are the ones the due decision reads", () => {
+  const turbo = JSON.parse(fs.readFileSync(path.join(ROOT, 'turbo.json'), 'utf8')) as { tasks: Record<string, { inputs?: string[] }> };
+  const inputs = turbo.tasks[TASK]?.inputs ?? [];
+  assert.ok(inputs.length > 0, `turbo.json lists inputs for ${TASK}`);
+  for (const input of inputs) assert.doesNotThrow(() => patternOf(input), input);
+  const folders = dependencyFolders(ROOT);
+  for (const file of ['workflows/x.md', '.github/workflows/ci.yml', 'docs/x.md'])
+    assert.equal(dueOf([file], inputs, folders).due, true, file);
+  assert.equal(dueOf(['apps/web/src/x.tsx'], inputs, folders).due, false);
 });

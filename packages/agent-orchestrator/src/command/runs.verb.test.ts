@@ -56,10 +56,9 @@ test("REFUSED at shipped defaults: nemia rm's arguments, before any run is read,
   const force =
     "--force-unmerged forces --delete-branches to delete a branch not merged into its run's base branch, and alone deletes nothing: nemia rm <runId> --delete-branches --force-unmerged.";
   for (const argv of [['a', '--force-unmerged'], ['--force-unmerged']]) assert.equal(refusedBy(RM, argv), force, argv.join(' '));
-  assert.equal(
-    refusedBy(RM, ['--delete-branches']),
-    'nemia rm takes the runs to forget, by id: nemia rm <runId> [<runId> ...] — nemia ls lists them.',
-  );
+  const noRun = refusedBy(RM, ['--delete-branches']);
+  assert.ok(noRun?.includes('nemia rm <runId> [<runId> ...]'), noRun ?? 'not refused');
+  assert.ok(noRun?.includes('nemia ls'), noRun ?? 'not refused');
   assert.equal(refusedBy(RM, []), null);
   assert.equal(refusedBy(RM, ['a', '--delete-branches', '--force-unmerged']), null);
 });

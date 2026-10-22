@@ -116,7 +116,7 @@ test('REFUSED: collisionsDue for a result left to the person, an ending landed o
   assert.equal(
     collisionsDue([{ ...STEPS[0] }, { ...STEPS[1], check: undefined }], refused(SHA), undefined),
     undefined,
-    'an ending with no `check:` lands nothing on one: its session commits or aborts in its own prose, and no check refused a merge',
+    'an ending with no `check:` lands nothing: no check refused',
   );
   assert.equal(
     collisionsDue([{ ...STEPS[0] }, { ...STEPS[1], workspace: undefined }], refused(SHA), undefined),

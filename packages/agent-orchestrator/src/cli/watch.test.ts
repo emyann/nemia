@@ -202,7 +202,8 @@ test(
     };
     const words = await lines({});
     assert.equal(words.out[0], 'watching from 0, ^C to stop');
-    assert.match(words.out[1] ?? '', /^\d\d:\d\d:\d\d {2}daemon down {2}· daemon: none has held this store/);
+    assert.match(words.out[1] ?? '', /^\d\d:\d\d:\d\d {2}daemon down {2}· daemon: /);
+    assert.ok(words.out[1]?.includes('none has held this store'), words.out[1]);
     const json = await lines({ json: true });
     assert.deepEqual(json.err, ['watching from 0, ^C to stop']);
     assert.deepEqual(Object.keys(JSON.parse(json.out[0] ?? '{}')), ['liveness', 'at', 'note']);

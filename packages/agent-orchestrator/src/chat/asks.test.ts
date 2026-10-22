@@ -235,7 +235,7 @@ test('an answer whose call was cut is said to her as words, naming the question,
   appendAsk(dir, kept);
   appendAnswer(dir, { id: 'call-1', at: new Date().toISOString(), answers: { [RAW.questions[0].question]: 'First line as it is' } });
   const first = await runWith(e, answersDue(id, dir));
-  assert.deepEqual(first.words, ['call-1'], 'no call of it is open and none took it: the answer is owed as words');
+  assert.deepEqual(first.words, ['call-1'], 'no call open, none took it: owed as words');
   assert.equal(engine().said.length, 1);
   assert.match(engine().said[0].text, /They answered: First line as it is/);
   assert.deepEqual(

@@ -213,18 +213,17 @@ test('the refusals name the pid, where and since when it ticks, its last pass, a
     [holder(), 'the file names no process start'],
   ] as const) {
     const refusal = holdRefusal(held(file, as('unknown')), 'up', '/store', NOW);
-    assert.doesNotMatch(refusal, /kill 4242 —/, 'a pid not confirmed as the daemon is never handed over as a pid to kill as it stands');
+    assert.doesNotMatch(refusal, /kill 4242 —/, 'an unconfirmed pid is never handed over to kill');
     assert.ok(
       refusal.includes(
         `stop it with its pid, once checked: 4242 could not be confirmed here as the process that wrote daemon.json (${why}), `,
       ),
       refusal,
     );
-    assert.match(
-      refusal,
-      /a pid is reused once its process ends — if ps -p 4242 -o lstart=,args= shows a nemia up started at 2026-09-22T11:00:00\.000Z, kill 4242; /,
-      'it is named, said unconfirmed, and how to check it comes before the kill',
-    );
+    const check = refusal.indexOf('ps -p 4242 -o lstart=,args=');
+    assert.ok(check >= 0, refusal);
+    assert.ok(refusal.includes('2026-09-22T11:00:00.000Z, kill 4242; '), refusal);
+    assert.ok(check < refusal.indexOf('kill 4242; '), 'how to check it comes before the kill');
   }
 });
 

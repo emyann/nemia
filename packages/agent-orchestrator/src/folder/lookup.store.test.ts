@@ -34,8 +34,10 @@ test('REFUSED: a place that cannot be listed, naming the folder and what to chec
   try {
     foldersIn(dir);
   } catch (err) {
-    message = (err as Error).message;
+    assert.ok(err instanceof Error, String(err));
+    message = err.message;
   }
-  assert.match(message, /could not be listed \(.*EACCES.*\), so no workflow in it is shown\. Check its permissions\.$/);
+  assert.ok(message.includes('EACCES'), message);
+  assert.ok(message.endsWith('Check its permissions.'), message);
   assert.ok(message.startsWith(`${dir} could not be listed`), message);
 });

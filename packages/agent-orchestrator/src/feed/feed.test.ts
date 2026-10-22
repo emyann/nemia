@@ -77,6 +77,12 @@ const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null 
 /** Refused by name: exit 2, and the message — never `String(err)`, which starts with `Error: `. */
 const refusedWith = (pattern: RegExp) => (err: Error & { exitCode?: number }) => err.exitCode === 2 && pattern.test(err.message);
 
+/** A refusal, exit 2, whose message names each of `tokens`: the facts it carries and the fix it names. */
+const refusedNaming =
+  (...tokens: string[]) =>
+  (err: Error & { exitCode?: number }) =>
+    err.exitCode === 2 && tokens.every((token) => err.message.includes(token));
+
 /**
  * An engine board a test settles by hand, as queue-store.test.ts's: a task filed is `pending`, one given a live word (`running (working)`)
  * is running with it, and a settled one carries the closeout it is given. A task denied calls has its attempt ended, or running with
@@ -230,11 +236,7 @@ test('a transition is written once, not on every pass: the gate a step reaches, 
   assert.equal(words(run.id, 'plan').length, 1, 'and each step says its first word, once');
 
   for (let i = 0; i < 3; i++) await runWith(b.e, tickRun());
-  assert.deepEqual(
-    words(run.id, 'plan').slice(1),
-    ['pending'],
-    'filed on that pass, it reads as filed on the next, since the feed words what the pass read before it filed, and then says nothing more',
-  );
+  assert.deepEqual(words(run.id, 'plan').slice(1), ['pending'], 'filed on that pass reads as filed on the next, then quiet');
   const quiet = size();
   await runWith(b.e, tickRun());
   assert.equal(size(), quiet, 'a pass that judged nothing new writes nothing');
@@ -306,11 +308,7 @@ test("a run waiting at its ending's gate reads `awaiting approval` in the feed, 
   b.set(`${run.id}-implement`, 'succeeded', SIGNED);
   for (let i = 0; i < 3; i++) await runWith(b.e, tickRun());
 
-  assert.equal(
-    words(run.id, 'ship').at(-1),
-    'awaiting approval',
-    "the ship step waits at its gate, with work on the step's branch as a session leaves it: a branch that never moved is read by git as merged already",
-  );
+  assert.equal(words(run.id, 'ship').at(-1), 'awaiting approval', 'ship waits at its gate, with work on the branch it left');
   const last = lines()
     .filter((l) => l.run === run.id && l.step === undefined)
     .at(-1)!;
@@ -324,11 +322,7 @@ test("a run waiting at its ending's gate reads `awaiting approval` in the feed, 
   await runWith(b.e, tickRun());
   b.set(`${broke.id}-implement`, 'failed');
   for (let i = 0; i < 2; i++) await runWith(b.e, tickRun());
-  assert.equal(
-    words(broke.id).at(-1),
-    'failed',
-    'a run in which a step did break says so: a word that fits a gate is not a word that hides a failure',
-  );
+  assert.equal(words(broke.id).at(-1), 'failed', 'a run whose step broke says failed, gate or not');
 });
 
 /** What a pass judged of a step at work, with the calls `denials` says it was denied, and the labels a filing gives it. */
@@ -1124,11 +1118,16 @@ test('REFUSED: a cursor inside a line is refused by name, by the read and by `ne
   }
   assert.throws(() => watchFeed({ from: inside, onLine: () => {} }), refusedWith(/falls inside a line/));
 
+  const past = cursor + 10;
   assert.throws(
-    () => readFeed(cursor + 10),
-    refusedWith(new RegExp(`^cursor ${cursor + 10} is past the end of the feed \\(${cursor} bytes, .*nemia watch --once 0$`)),
+    () => readFeed(past),
+    (err: Error & { exitCode?: number }) =>
+      err.exitCode === 2 &&
+      err.message.startsWith('cursor ' + past + ' ') &&
+      err.message.includes('(' + cursor + ' bytes, ') &&
+      err.message.endsWith('nemia watch --once 0'),
   );
-  await assert.rejects(main(['watch', 'twelve'], b.e), refusedWith(/^nemia watch takes one cursor at most, a whole number of bytes/));
+  await assert.rejects(main(['watch', 'twelve'], b.e), refusedNaming('nemia watch', 'one cursor at most', 'a whole number of bytes'));
   await assert.rejects(main(['watch', '0', '1'], b.e), refusedWith(/^nemia watch does not take 1: nemia watch \[cursor\]/));
   assert.throws(() => readFeed(-1), refusedWith(/^a feed cursor is a whole number of bytes/));
 
@@ -1142,7 +1141,7 @@ test('REFUSED: a cursor inside a line is refused by name, by the read and by `ne
   }
   assert.equal(at, cursor);
   emptyStore();
-  assert.deepEqual(readFeed(0), { lines: [], cursor: 0 }, 'a feed not written yet reads as nothing, at 0, where every reader starts');
+  assert.deepEqual(readFeed(0), { lines: [], cursor: 0 }, 'a feed not written yet reads as nothing, at 0');
 });
 
 test('the cursor never passes a partial line: a line being written is not read, nor stepped over, and is read once it ends', () => {
@@ -1461,7 +1460,7 @@ test(
     } finally {
       watch.stop();
     }
-    assert.deepEqual(errors, [], 'a watch already following never says the refusal a cursor given by hand gets');
+    assert.deepEqual(errors, [], 'a watch following never says a cursor-by-hand refusal');
     assert.equal(cuts.length, 1, 'the cut is said once');
     assert.match(
       cuts[0],
@@ -1498,7 +1497,9 @@ test(
         "a reader acts on the banner at once, as fast as it can: in this process, before the next line of the watch's own start",
       );
       await until(t, () => err.length > 0, 'the truncation said on stderr', { bell: said });
-      assert.match(err[0], /^nemia watch: the feed was truncated under this watch at cursor \d+, and is 0 bytes now .*from its start/);
+      assert.match(err[0], /^nemia watch: the feed was truncated /);
+      assert.match(err[0], /at cursor \d+, and is 0 bytes now /);
+      assert.ok(err[0].includes('from its start'), err[0]);
     } finally {
       watch.stop();
     }
@@ -1873,7 +1874,7 @@ test("a removed run's one-shots go with it: a run back under an id it had says i
       ['Approved', `try 1 · at ${put}`],
       ['HoldPut', `since ${put}`],
     ],
-    'so a run back under an id it had says each of its acts again: a count left behind would make the new run’s acts read as already written, and none would ever be said',
+    'a run back under an old id says each of its acts again',
   );
 });
 

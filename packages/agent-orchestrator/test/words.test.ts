@@ -52,7 +52,7 @@ const WORKFLOW = [
 ];
 
 /** The team's names that are plain English, counted only as a quoted literal or a path segment. */
-const PLAIN_NAMES: readonly string[] = [];
+const PLAIN_NAMES: readonly string[] = ['grace'];
 
 /** The cards and slices filed to remove a word from a layer, by the id an entry names. */
 const CARDS: Readonly<Record<string, string>> = {
@@ -391,6 +391,11 @@ test("the lists: the runtime's harness words but the plain ones, every plain one
   ]);
   assert.ok(TEAM.includes('ada') && TEAM.includes('seldon'), `the team read is ${TEAM.join(', ')}`);
   assert.ok(!TEAM.some((n) => n.endsWith('.schema')), 'a schema beside the agents is no agent');
+  assert.deepEqual(
+    PLAIN_NAMES.filter((n) => !TEAM.includes(n)),
+    [],
+    'every plain name is an agent of the team: take off one that left it',
+  );
 });
 
 test('the harness words, the workflow words and the team names are held to their baselines, each entry naming its card or move', () => {
@@ -417,6 +422,11 @@ test('REFUSED: a new file in each layer that says a word of another', () => {
   assert.deepEqual(planted('team', 'packages/agent-runtime/src/x.ts', "export const reviewer = 'seldon';\n"), [
     `packages/agent-runtime/src/x.ts holds 1 team names: ${TEAM_RULE.fix}; never add them here`,
   ]);
+  assert.deepEqual(
+    planted('team', 'packages/agent-runtime/src/x.ts', "/** Past the grace. */\nexport const lead = 'grace';\n"),
+    [`packages/agent-runtime/src/x.ts holds 1 team names: ${TEAM_RULE.fix}; never add them here`],
+    'a plain name counts quoted, and not in prose',
+  );
 });
 
 test('REFUSED: a new agent of the team, with no edit to the test', () => {

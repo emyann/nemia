@@ -5,8 +5,9 @@
  * the same entry with a toolset header, which is kept; and a local server, against the same entry given a `url`. And the split's
  * precedence is proven by a name that is on both the record and the checkout's list, which must leave `checkoutMcp` altogether.
  *
- * A store of its own, since `WF_ROOT` is read as the module loads: every part of the package is imported dynamically, after it is set,
- * or a file that ran first in the same process would have fixed the store's root already.
+ * The store takes its root as a required `home: string`, so every call here names this file's own scratch root and nothing reads the
+ * person's: that is what `test/root-given.test.ts` holds for the whole package, and this file is the fixture that shows it. The
+ * package is still imported dynamically, after `WF_ROOT` is set, because the modules beside the store read theirs as they load.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -18,7 +19,9 @@ const ROOT = scratch('wf-servers-');
 process.env.WF_ROOT = ROOT;
 const { DEFAULT_FACTORY } = await import('../factory/factory.ts');
 const { factoryServerRefusal, factoryServersRefusal, serverNameRefusal, splitServers } = await import('./servers.ts');
-const { factoryServers, factoryServersFile, readFactoryServers, writeFactoryServers } = await import('./servers.store.ts');
+const { factoryServers, factoryServersFile, readFactoryServers, shippedServers, writeFactoryServers } = await import(
+  './servers.store.ts'
+);
 
 /** The hosted GitHub server as a factory records it: a toolset header, and the facts of an OAuth client with no secret. */
 const GITHUB = {
@@ -29,21 +32,48 @@ const GITHUB = {
 } as const;
 
 test("a factory's server record round-trips, and one with no server is removed rather than left empty", () => {
-  assert.equal(readFactoryServers('pipao'), undefined, 'none written');
-  assert.deepEqual(factoryServers('pipao'), {}, 'and a reader that only reads takes an empty record');
-  writeFactoryServers('pipao', { github: GITHUB });
-  assert.equal(factoryServersFile('pipao'), path.join(ROOT, 'factories', 'pipao', 'servers.json'));
-  assert.deepEqual(readFactoryServers('pipao'), { servers: { github: GITHUB } });
+  assert.equal(readFactoryServers(ROOT, 'pipao'), undefined, 'none written');
+  assert.deepEqual(factoryServers(ROOT, 'pipao'), {}, 'and a reader that only reads takes an empty record');
+  writeFactoryServers(ROOT, 'pipao', { github: GITHUB });
+  assert.equal(factoryServersFile(ROOT, 'pipao'), path.join(ROOT, 'factories', 'pipao', 'servers.json'));
+  assert.deepEqual(readFactoryServers(ROOT, 'pipao'), { servers: { github: GITHUB } });
   assert.deepEqual(fs.readdirSync(path.join(ROOT, 'factories', 'pipao')), ['servers.json'], 'no hidden file left');
-  writeFactoryServers('pipao', {});
-  assert.equal(fs.existsSync(factoryServersFile('pipao')), false, 'removed, so a re-read finds none rather than an empty map');
+  writeFactoryServers(ROOT, 'pipao', {});
+  assert.equal(fs.existsSync(factoryServersFile(ROOT, 'pipao')), false, 'removed, so a re-read finds none rather than an empty map');
+});
+
+test('the store writes under the root it is given and no other: two roots, one factory name, two records', () => {
+  const other = scratch('wf-servers-other-');
+  writeFactoryServers(ROOT, 'twice', { github: GITHUB });
+  writeFactoryServers(other, 'twice', { docs: { type: 'sse', url: 'https://docs.example/mcp' } });
+  assert.deepEqual(Object.keys(factoryServers(ROOT, 'twice')), ['github'], "the first root's record");
+  assert.deepEqual(Object.keys(factoryServers(other, 'twice')), ['docs'], "and the second root's, written beside it and not over it");
+  assert.equal(fs.existsSync(path.join(other, 'factories', 'twice', 'servers.json')), true);
+  writeFactoryServers(ROOT, 'twice', {});
+  writeFactoryServers(other, 'twice', {});
+});
+
+test('the servers Nemia ships: an absent folder is none, a file that does not read is left out, and the rest are offered', () => {
+  const dir = path.join(scratch('wf-shipped-'), 'servers');
+  assert.deepEqual(shippedServers(dir), [], 'git commits no empty directory, so an absent folder is no error');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'github.json'), JSON.stringify(GITHUB));
+  fs.writeFileSync(path.join(dir, 'broken.json'), 'not json');
+  fs.writeFileSync(path.join(dir, 'local.json'), JSON.stringify({ command: 'npx' }));
+  fs.writeFileSync(path.join(dir, 'two words.json'), JSON.stringify(GITHUB));
+  fs.writeFileSync(path.join(dir, 'notes.md'), 'read me');
+  assert.deepEqual(
+    shippedServers(dir),
+    [{ name: 'github', ...GITHUB }],
+    'one bad shipped file blanks no form: the broken, the local and the ill-named are left out',
+  );
 });
 
 test('a record a newer tick wrote keeps the keys this one does not name, server by server', () => {
   const file = path.join(ROOT, 'factories', 'later', 'servers.json');
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify({ servers: { github: { ...GITHUB, mood: 'bright' } }, checked: '2026-10-21T00:00:00.000Z' }));
-  const read = readFactoryServers('later');
+  const read = readFactoryServers(ROOT, 'later');
   assert.equal((read!.servers.github as unknown as { mood: string }).mood, 'bright', 'a Struct would strip it; a StructWithRest keeps it');
 });
 
@@ -52,7 +82,7 @@ test('REFUSED: a server record that does not read, naming the file, its wrong fi
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, 'not json');
   assert.throws(
-    () => readFactoryServers('broken'),
+    () => readFactoryServers(ROOT, 'broken'),
     (e: Error) => {
       assert.match(e.message, /is not JSON: add the server again with nemia factory server add broken <server> --url <address>\./);
       return true;
@@ -60,20 +90,20 @@ test('REFUSED: a server record that does not read, naming the file, its wrong fi
   );
   fs.writeFileSync(file, JSON.stringify({ servers: { github: { type: 'ftp', url: 'x' } } }));
   assert.throws(
-    () => readFactoryServers('broken'),
+    () => readFactoryServers(ROOT, 'broken'),
     (e: Error) => {
       assert.match(e.message, /servers\.json: its servers\.github\.type /, 'the first wrong field, named');
       assert.match(e.message, /add the server again with nemia factory server add broken/, 'and the command to type');
       return true;
     },
   );
-  assert.throws(() => factoryServersFile('Nope!'), /is not a factory's name/);
+  assert.throws(() => factoryServersFile(ROOT, 'Nope!'), /is not a factory's name/);
 });
 
 test('the default factory is given a record of its own, while factories/default.json is never written', () => {
-  writeFactoryServers(DEFAULT_FACTORY, { github: GITHUB });
-  assert.deepEqual(factoryServers(DEFAULT_FACTORY), { github: GITHUB }, 'every run and card that names no factory runs in it');
-  assert.equal(factoryServersFile(DEFAULT_FACTORY), path.join(ROOT, 'factories', 'default', 'servers.json'));
+  writeFactoryServers(ROOT, DEFAULT_FACTORY, { github: GITHUB });
+  assert.deepEqual(factoryServers(ROOT, DEFAULT_FACTORY), { github: GITHUB }, 'every run and card that names no factory runs in it');
+  assert.equal(factoryServersFile(ROOT, DEFAULT_FACTORY), path.join(ROOT, 'factories', 'default', 'servers.json'));
   assert.equal(fs.existsSync(path.join(ROOT, 'factories', 'default.json')), false, 'the default factory is still no file');
 });
 

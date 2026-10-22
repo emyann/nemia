@@ -11,6 +11,7 @@
  * else by `test/root-given.test.ts`.
  */
 import { Context, Layer } from 'effect';
+import { Invalid } from '../refusal/refusal.ts';
 import { type Env, wfRoot } from './config.store.ts';
 
 /**
@@ -28,3 +29,16 @@ export class StoreRoot extends Context.Service<StoreRoot, string>()('orchestrato
  * this, and a module that loads cannot.
  */
 export const storeRootLayer = (env: Env): Layer.Layer<StoreRoot> => StoreRoot.layer(wfRoot(env));
+
+/**
+ * The store root a command's handler was given, refused (`Invalid`) where it was given none. `Command.handler` takes its root as an
+ * optional third argument, because most verbs still read a module's; a verb that takes it as a required `home` says so with this, and
+ * names the road that forgot to pass one. Both roads pass one — the CLI from `wfRoot(process.env)` (`src/cli/main.ts`), the api from
+ * `s.home` (`apps/api/src/commands/routes.ts`) — so this is what a new one is refused by, rather than silently reading the live store.
+ */
+export const rootGiven = (home: string | undefined, verb: string): string => {
+  if (home !== undefined) return home;
+  throw new Invalid({
+    message: `nemia ${verb} was given no store root: pass it as the third argument of the command's handler, read from the environment where the program is composed (storeRootLayer, src/config/root.store.ts). Nothing was read or written.`,
+  });
+};

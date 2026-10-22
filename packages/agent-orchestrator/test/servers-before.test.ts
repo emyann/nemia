@@ -7,7 +7,8 @@
  * nothing, which files; and a look that failed, which refuses nothing at all. And the read is one ask of the engine for a factory's
  * whole record, however many steps name it, which is the owner's answer about the probe's cost made into a test.
  *
- * A store of its own, since `WF_ROOT` is read as the package loads.
+ * A store of its own, since `WF_ROOT` is read as the package loads; the servers store itself takes this file's root by parameter,
+ * as every caller of it does.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -34,10 +35,10 @@ const GITHUB = { type: 'http', url: 'https://api.githubcopilot.com/mcp/', oauth:
 const DOCS = { type: 'http', url: 'https://docs.example/mcp' } as const;
 
 /** What the pass read of this test's own factory's servers, over the stand-in as the test has planted it. */
-const before = () => runWith(engineOf(engine().layer), serversBefore(factory()));
+const before = () => runWith(engineOf(engine().layer), serversBefore(factory(), ROOT));
 
 test('a step whose factory server reports needs-auth is refused, and the same step with it connected is not', async () => {
-  writeFactoryServers(factory(), { github: GITHUB, docs: DOCS });
+  writeFactoryServers(ROOT, factory(), { github: GITHUB, docs: DOCS });
   engine().plantMcpState('github', { status: 'needs-auth' });
   engine().plantMcpState('docs', { status: 'connected', tools: 12 });
   const read = await before();
@@ -53,7 +54,7 @@ test('a step whose factory server reports needs-auth is refused, and the same st
 });
 
 test('the same step on a harness that files no sign-in of its own IS filed: it is shown its servers, never refused them', async () => {
-  writeFactoryServers(factory(), { github: GITHUB });
+  writeFactoryServers(ROOT, factory(), { github: GITHUB });
   engine().plantMcpState('github', { status: 'needs-auth' });
   const read = await before();
   assert.equal(read.refuses('codex', ['github']), null, 'nothing of its sign-in is measured, so nothing of it is refused');
@@ -63,7 +64,7 @@ test('the same step on a harness that files no sign-in of its own IS filed: it i
 });
 
 test('a look that failed refuses nothing at all, and says the states are unread once for the pass', async () => {
-  writeFactoryServers(factory(), { github: GITHUB });
+  writeFactoryServers(ROOT, factory(), { github: GITHUB });
   engine().plantMcpState('github', { status: 'needs-auth' });
   engine().failMcpState('the session read no state within 45s');
   const read = await before();
@@ -84,7 +85,7 @@ test('a factory that records no server asks the engine nothing: no session is sp
 });
 
 test("the pass reads a factory's whole record in one ask, whatever the steps that name it", async () => {
-  writeFactoryServers(factory(), { github: GITHUB, docs: DOCS });
+  writeFactoryServers(ROOT, factory(), { github: GITHUB, docs: DOCS });
   engine().plantMcpState('github', { status: 'connected', tools: 46 });
   engine().plantMcpState('docs', { status: 'disabled' });
   const read = await before();

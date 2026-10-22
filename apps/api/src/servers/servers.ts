@@ -4,11 +4,19 @@
  * say the same things in the same words. And the servers Nemia ships, which the add form offers.
  *
  * A folder of its own because `src/factories/` holds six source files, the cap, and a limit is met by cutting rather than by raising a
- * ceiling. The state is the runtime's, asked through the package: no file here imports the runtime or a harness SDK.
+ * ceiling. The state is the runtime's, asked through the package: no file here imports the runtime or a harness SDK. And the shipped
+ * folder is read by the package too (`shippedServers`): a reader of the api touches no disk of its own (`test/kinds.test.ts`), so this
+ * file names the folder and the package reads it.
  */
-import fs from 'node:fs';
 import path from 'node:path';
-import { FACTORY_SERVERS, factoryNameRefusal, serverNameRefusal, type ServersListing } from 'agent-orchestrator';
+import {
+  FACTORY_SERVERS,
+  factoryNameRefusal,
+  serverNameRefusal,
+  shippedServers,
+  type ServersListing,
+  type ShippedServer,
+} from 'agent-orchestrator';
 import { Hono } from 'hono';
 import { valueAt } from '../body.ts';
 import { HOME_REPO } from '../capabilities/capabilities.ts';
@@ -22,40 +30,6 @@ import { runPlaced } from '../store.ts';
  * git commits no empty directory, so the folder may not be there at all, which is no error.
  */
 export const SHIPPED_SERVERS = path.join(HOME_REPO, 'workflows', 'servers');
-
-/** One server Nemia ships, as the board offers it: its name, and the facts a factory would record of it. */
-export type ShippedServer = {
-  readonly name: string;
-  readonly type: 'http' | 'sse';
-  readonly url: string;
-  readonly headers?: Readonly<Record<string, string>>;
-  readonly oauth?: { readonly clientId: string; readonly callbackPort?: number };
-};
-
-/**
- * The servers Nemia ships, by name: each `<name>.json` of `dir` that reads as one. An absent folder is an empty list, never a throw —
- * git commits no empty directory, so the folder need not be there — and a file that does not read is left out rather than failing the
- * read, since one bad shipped file must not blank the add form.
- */
-export const shippedServers = (dir: string = SHIPPED_SERVERS): readonly ShippedServer[] => {
-  let files: string[];
-  try {
-    files = fs.readdirSync(dir).filter((f) => f.endsWith('.json'));
-  } catch {
-    return [];
-  }
-  return files.flatMap((file): ShippedServer[] => {
-    const name = file.slice(0, -'.json'.length);
-    if (serverNameRefusal(name) !== undefined) return [];
-    try {
-      const read = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8')) as Omit<ShippedServer, 'name'>;
-      if (typeof read?.url !== 'string' || (read.type !== 'http' && read.type !== 'sse')) return [];
-      return [{ name, ...read }];
-    } catch {
-      return [];
-    }
-  });
-};
 
 /** What the board reads of a factory's servers: its record with each state, and the list Nemia ships for the add form. */
 export type FactoryServersRead = ServersListing & { readonly shipped: readonly ShippedServer[] };
@@ -131,7 +105,7 @@ export const factoryServers = new Hono<ApiEnv>().get('/api/factories/:factory/se
     const wrong = factoryNameRefusal(factory);
     if (wrong !== undefined) return c.json({ error: `GET /api/factories/${factory}/servers: ${wrong}` }, 400);
     const listing = await runPlaced(placeService, e, FACTORY_SERVERS.handler({ factory }));
-    return c.json({ ...listing, shipped: shippedServers() } satisfies FactoryServersRead);
+    return c.json({ ...listing, shipped: shippedServers(SHIPPED_SERVERS) } satisfies FactoryServersRead);
   }),
 );
 

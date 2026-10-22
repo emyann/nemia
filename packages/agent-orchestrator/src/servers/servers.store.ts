@@ -5,15 +5,18 @@
  * The default factory's *folder* file is legal, so a server may be added to it, while `factories/default.json` stays refused: the
  * default factory is no file, and the special case for it is the controller's (`servers.verb.ts`), never this store's.
  *
- * Beneath the controllers, beside `record.store.ts`, the one store file it imports.
+ * Beneath the controllers, beside `record.store.ts`, the one store file it imports — for `firstRefusal` alone: the store's root is
+ * no module's to read, so every function here takes it as a required `home: string` and a caller that forgets it does not compile
+ * (`test/root-given.test.ts`, `packages/agent-orchestrator/CLAUDE.md`).
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { Result, Schema } from 'effect';
 import { factoryNameRefusal } from '../factory/factory.ts';
-import { firstRefusal, HOME } from '../record/record.store.ts';
+import { firstRefusal } from '../record/record.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
-import type { FactoryServers, FactoryServersFile } from './servers.ts';
+import { factoryServerRefusal, serverNameRefusal } from './servers.ts';
+import type { FactoryServer, FactoryServers, FactoryServersFile, ShippedServer } from './servers.ts';
 
 /**
  * One server a factory records: its wire facts — `type`, `url`, `headers` — and the facts of the OAuth client it signs in through,
@@ -37,19 +40,19 @@ const FactoryServersSchema = Schema.StructWithRest(Schema.Struct({ servers: Sche
   Schema.Record(Schema.String, Schema.Unknown),
 ]);
 
-/** The file the factory `name`'s servers are kept in. Refused (`Invalid`): a name that is no factory's. */
-export function factoryServersFile(name: string): string {
+/** The file the factory `name`'s servers are kept in, under the store `home`. Refused (`Invalid`): a name that is no factory's. */
+export function factoryServersFile(home: string, name: string): string {
   const bad = factoryNameRefusal(name);
   if (bad) throw new Invalid({ message: bad });
-  return path.join(HOME, 'factories', name, 'servers.json');
+  return path.join(home, 'factories', name, 'servers.json');
 }
 
 /**
  * The factory `name`'s servers, or `undefined` where none was written. Refused (`Invalid`), naming the file, its first wrong field and
  * the command that writes it again, where it does not read as a record.
  */
-export function readFactoryServers(name: string): FactoryServersFile | undefined {
-  const file = factoryServersFile(name);
+export function readFactoryServers(home: string, name: string): FactoryServersFile | undefined {
+  const file = factoryServersFile(home, name);
   let text: string;
   try {
     text = fs.readFileSync(file, 'utf8');
@@ -73,11 +76,11 @@ export function readFactoryServers(name: string): FactoryServersFile | undefined
 }
 
 /** The factory `name`'s servers, `{}` where none was written: what a caller that only reads them takes. */
-export const factoryServers = (name: string): FactoryServers => readFactoryServers(name)?.servers ?? {};
+export const factoryServers = (home: string, name: string): FactoryServers => readFactoryServers(home, name)?.servers ?? {};
 
 /** Writes the factory `name`'s servers whole; a record with no server is removed, so a re-read finds none rather than an empty map. */
-export function writeFactoryServers(name: string, servers: FactoryServers): void {
-  const file = factoryServersFile(name);
+export function writeFactoryServers(home: string, name: string, servers: FactoryServers): void {
+  const file = factoryServersFile(home, name);
   if (!Object.keys(servers).length) {
     fs.rmSync(file, { force: true });
     return;
@@ -87,3 +90,31 @@ export function writeFactoryServers(name: string, servers: FactoryServers): void
   fs.writeFileSync(hidden, `${JSON.stringify({ servers })}\n`);
   fs.renameSync(hidden, file);
 }
+
+/**
+ * The servers Nemia ships, by name: each `<name>.json` of `dir` that reads as one, in the folder's order. The folder is data in a
+ * checkout (`workflows/servers/`), not the store, so `dir` is the caller's to name and no root is read here.
+ *
+ * An absent folder is an empty list, never a throw — git commits no empty directory, and there is no shipped server today — and a
+ * file that does not read is left out rather than failing the read, since one bad shipped file must not blank the add form.
+ */
+export const shippedServers = (dir: string): readonly ShippedServer[] => {
+  let files: string[];
+  try {
+    files = fs.readdirSync(dir).filter((f) => f.endsWith('.json'));
+  } catch {
+    return [];
+  }
+  return files.flatMap((file): ShippedServer[] => {
+    const name = file.slice(0, -'.json'.length);
+    if (serverNameRefusal(name) !== undefined) return [];
+    let read: unknown;
+    try {
+      read = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'));
+    } catch {
+      return [];
+    }
+    if (factoryServerRefusal(read) !== undefined) return [];
+    return [{ name, ...(read as FactoryServer) }];
+  });
+};

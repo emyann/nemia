@@ -15,6 +15,7 @@ import { scratch } from './scratch.ts';
 import { bell, until, WAITED } from 'agent-runtime/testing';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest } from './placed.ts';
+import { storeRootLayer } from '../src/config/root.store.ts';
 
 const stand = eachTest(testPlace);
 const ROOT = scratch('wf-remote-follow-');
@@ -85,7 +86,7 @@ async function following(t: TestContext, agent: string, url: string) {
   const id = await started(agent, url);
   const e = engine();
   const rt = runtimeOf(t, e);
-  const tick = () => rt.runPromise(tickRun({ repo: ROOT }));
+  const tick = () => rt.runPromise(tickRun({ repo: ROOT }).pipe(Effect.provide(storeRootLayer(process.env))));
   await until(
     t,
     async () => {

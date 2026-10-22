@@ -24,6 +24,7 @@ import { plainEngine } from './promised.ts';
 import { runGiven, runOver } from './placed.ts';
 import { testPlace } from '../place/memory/index.ts';
 import type { PlaceService } from '../src/place/place.store.ts';
+import type { StoreRoot } from '../src/config/root.store.ts';
 
 const place = testPlace();
 const stand = () => place;
@@ -179,9 +180,9 @@ test("REFUSED: what is not a refusal is a defect the tick's program dies of, rec
  * failure.
  */
 function _tickProgramTypes(e: Engine) {
-  void (tickRun() satisfies EffectOf<Pass, Refusal, Service | PlaceService>);
+  void (tickRun() satisfies EffectOf<Pass, Refusal, Service | PlaceService | StoreRoot>);
   // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
-  void (tickRun() satisfies EffectOf<Pass, never, Service | PlaceService>);
+  void (tickRun() satisfies EffectOf<Pass, never, Service | PlaceService | StoreRoot>);
   // @ts-expect-error -- tickRun requires EngineService, and runPromise takes no requirement
   void Effect.runPromise(tickRun());
   // @ts-expect-error -- a program that asks the place is given none: the engine alone does not give it

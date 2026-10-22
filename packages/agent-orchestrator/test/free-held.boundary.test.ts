@@ -16,6 +16,7 @@ import { asyncOps, asyncStore, plainEngine, type AsyncJournal, type AsyncRunner 
 import { scratch } from './scratch.ts';
 import { runGiven } from './placed.ts';
 import type { PlaceRequests, PlaceVerb } from '../src/place/place.ts';
+import { storeRootLayer } from '../src/config/root.store.ts';
 
 const ROOT = scratch('wf-free-held-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -127,7 +128,7 @@ const counting = (asked: Asked) =>
   });
 
 const tick = (memo?: ReturnType<typeof freshRestMemo>) =>
-  runEngine(e, tickRun({ repo: ROOT, ...(memo ? { memo } : {}) }).pipe(Effect.provide(gitPlaceLayer)));
+  runEngine(e, tickRun({ repo: ROOT, ...(memo ? { memo } : {}) }).pipe(Effect.provide(gitPlaceLayer), Effect.provide(storeRootLayer(process.env))));
 
 /** Passes until `ok` holds of one, a dozen at most. */
 async function ticked(ok: (pass: Pass) => boolean, what: string): Promise<Pass> {

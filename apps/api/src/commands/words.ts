@@ -10,7 +10,7 @@ import { AGENTS_COPY, AGENTS_CUSTOM, AUTO_CONFIRM, AUTO_DROP } from './library.t
 import { LEVEL, SUBSCRIBE, UNSUBSCRIBE } from './sessions.ts';
 import { FACTORY_RULES_WORDS } from '../factories/rules.ts';
 import { FACTORY_SCHEDULE, FACTORY_UNSCHEDULE } from '../factories/schedules.ts';
-import { FACTORY_SERVER_WORDS } from '../servers/index.ts';
+import { FACTORY_SERVER_WORDS } from '../servers/servers.ts';
 
 /**
  * What a route's path names: the run and the step — `step` empty on a route that names none, `runId` on a route of the store's own, where

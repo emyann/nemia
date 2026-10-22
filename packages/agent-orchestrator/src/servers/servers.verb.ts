@@ -12,6 +12,7 @@
 import { Effect } from 'effect';
 import { EngineService, signsInMcp, tried, type McpServerState, type McpServersRead } from '../runtime-client.ts';
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
+import { rootGiven } from '../config/root.store.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { DEFAULT_FACTORY, noFactoryLine } from '../factory/factory.ts';
 import { readFactories } from '../factory/factory.store.ts';
@@ -75,10 +76,10 @@ const listedOf = (name: string, server: FactoryServers[string], state: McpServer
  * the store has no factory under — a listing of nothing would read as a factory that records none — and never for the default
  * factory, which is no file.
  */
-export const serversListed = Effect.fn('serversListed')(function* (factory: string) {
+export const serversListed = Effect.fn('serversListed')(function* (factory: string, home: string) {
   const record = yield* tried(() => {
     factoryThere(factory, 'listed');
-    return factoryServers(factory);
+    return factoryServers(home, factory);
   });
   const { by, unread } = yield* statesOf(record);
   return {
@@ -105,7 +106,7 @@ export const FACTORY_SERVERS: Command<ServersListing> = {
   writes: false,
   nemia: 'read',
   route: { method: 'GET', path: '/api/factories/:factory/servers', status: 200 },
-  handler: (args) => serversListed(textOf(args, 'factory')),
+  handler: (args, _env, home) => serversListed(textOf(args, 'factory'), rootGiven(home, 'factory servers')),
   print: ({ factory, servers, unread }) =>
     servers.length === 0
       ? [`${factory}  no server recorded — nemia factory server add ${factory} <server> --url <address>`]
@@ -234,8 +235,9 @@ export const FACTORY_SERVER_ADD: Command<Added> = {
   writes: true,
   nemia: 'prompts',
   route: { method: 'PUT', path: '/api/factories/:factory/servers/:server', status: 200 },
-  handler: (args) =>
+  handler: (args, _env, home) =>
     tried(() => {
+      const store = rootGiven(home, 'factory server add');
       const factory = textOf(args, 'factory');
       const name = textOf(args, 'server');
       const transport = textOf(args, 'transport') || 'http';
@@ -252,9 +254,9 @@ export const FACTORY_SERVER_ADD: Command<Added> = {
       };
       const refused = factoryServerRefusal(server);
       if (refused) throw new Invalid({ message: `${refused} Nothing was recorded.` });
-      const record = factoryServers(factory);
-      writeFactoryServers(factory, { ...record, [name]: server });
-      return { file: factoryServersFile(factory), name, server, replaced: record[name] ?? null };
+      const record = factoryServers(store, factory);
+      writeFactoryServers(store, factory, { ...record, [name]: server });
+      return { file: factoryServersFile(store, factory), name, server, replaced: record[name] ?? null };
     }),
   print: ({ file, name, server, replaced }, args) => [
     `${textOf(args, 'factory')}  ${name} → ${server.type} ${server.url}${replaced === null ? '' : ` (was ${replaced.url})`}`,
@@ -285,12 +287,13 @@ export const FACTORY_SERVER_RM: Command<{ file: string; removed: string }> = {
   writes: true,
   nemia: 'prompts',
   route: { method: 'DELETE', path: '/api/factories/:factory/servers/:server', status: 200 },
-  handler: (args) =>
+  handler: (args, _env, home) =>
     tried(() => {
+      const store = rootGiven(home, 'factory server rm');
       const factory = textOf(args, 'factory');
       const name = textOf(args, 'server');
       factoryThere(factory, 'removed');
-      const record = factoryServers(factory);
+      const record = factoryServers(store, factory);
       if (!Object.hasOwn(record, name)) {
         const names = Object.keys(record);
         throw new Missing({
@@ -298,8 +301,8 @@ export const FACTORY_SERVER_RM: Command<{ file: string; removed: string }> = {
         });
       }
       const { [name]: _gone, ...left } = record;
-      writeFactoryServers(factory, left);
-      return { file: factoryServersFile(factory), removed: name };
+      writeFactoryServers(store, factory, left);
+      return { file: factoryServersFile(store, factory), removed: name };
     }),
   print: ({ file, removed }, args) => [
     `${textOf(args, 'factory')}  ${removed} removed`,
@@ -334,8 +337,8 @@ const NOTHING: ServersBefore = { refusal: null, notes: [], refuses: () => null }
  * - A look that failed refuses nothing at all and says the states are unread, once for the pass: an absence read off a failed look is
  *   not an absence, and a step refused on a harness that was merely busy would be refused for ever.
  */
-export const serversBefore = Effect.fn('serversBefore')(function* (factory: string) {
-  const read: { readonly record: FactoryServers } | { readonly refused: string } = yield* tried(() => factoryServers(factory)).pipe(
+export const serversBefore = Effect.fn('serversBefore')(function* (factory: string, home: string) {
+  const read: { readonly record: FactoryServers } | { readonly refused: string } = yield* tried(() => factoryServers(home, factory)).pipe(
     Effect.map((record) => ({ record })),
     Effect.catch((err) => Effect.succeed({ refused: err.message })),
   );
@@ -363,9 +366,14 @@ export const serversBefore = Effect.fn('serversBefore')(function* (factory: stri
  * The servers of `factory` as a pass about to file `ready` steps needs them: one look for the whole pass, since a look is a session
  * spawned, and no look at all for a pass with no step to file. What the look left unread is noted on `notes`, once for the pass.
  */
-export const serversFiling = Effect.fn('serversFiling')(function* (factory: string, ready: readonly string[], notes: string[]) {
+export const serversFiling = Effect.fn('serversFiling')(function* (
+  factory: string,
+  home: string,
+  ready: readonly string[],
+  notes: string[],
+) {
   if (!ready.length) return undefined;
-  const servers = yield* serversBefore(factory);
+  const servers = yield* serversBefore(factory, home);
   notes.push(...servers.notes);
   return servers;
 });

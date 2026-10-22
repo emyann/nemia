@@ -14,7 +14,7 @@ import path from 'node:path';
 import { addFactory } from 'agent-orchestrator';
 import { scratch } from '../../test/scratch.ts';
 import { app } from '../app.ts';
-import { shippedServers, SHIPPED_SERVERS } from './servers.ts';
+import { SHIPPED_SERVERS } from './servers.ts';
 
 type FactoryServersRead = import('./servers.ts').FactoryServersRead;
 
@@ -110,14 +110,9 @@ test('a server removed leaves the record, and one the factory does not record is
   assert.deepEqual((await answered<FactoryServersRead>(app.request(URL))).servers, []);
 });
 
-test('the shipped list tolerates a folder that is not there at all, and leaves out a file that does not read', () => {
-  assert.deepEqual(shippedServers(path.join(root, 'no-such-folder')), [], 'git commits no empty directory, so it may be absent');
-  const dir = scratch('nemia-api-shipped-');
-  fs.writeFileSync(path.join(dir, 'github.json'), JSON.stringify({ type: 'http', url: 'https://api.githubcopilot.com/mcp/' }));
-  fs.writeFileSync(path.join(dir, 'broken.json'), '{');
-  fs.writeFileSync(path.join(dir, 'noturl.json'), JSON.stringify({ type: 'http' }));
-  fs.writeFileSync(path.join(dir, 'Nope!.json'), JSON.stringify({ type: 'http', url: 'https://e.example/mcp' }));
-  fs.writeFileSync(path.join(dir, 'README.md'), 'not a server');
-  assert.deepEqual(shippedServers(dir), [{ name: 'github', type: 'http', url: 'https://api.githubcopilot.com/mcp/' }]);
+test('the shipped folder is the checkout\'s own, beside the skills it ships, and the read answers what it holds', async () => {
   assert.ok(SHIPPED_SERVERS.endsWith(path.join('workflows', 'servers')), 'read beside workflows/skills, of the checkout the api runs from');
+  assert.equal(path.isAbsolute(SHIPPED_SERVERS), true, 'named whole, so the read does not depend on where the api was started');
+  const read = await answered<FactoryServersRead>(app.request(URL));
+  assert.deepEqual(read.shipped, [], 'there is none today, and an absent folder is no error (the package reads it)');
 });

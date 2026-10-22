@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import { Effect } from 'effect';
 import { EngineService, asked as engineAsked, denialText, over, type Engine, type TaskView } from '../runtime-client.ts';
 import { wordFeed } from '../feed/word-feed.verb.ts';
+import { StoreRoot } from '../config/root.store.ts';
 import type { Verdict } from '../check/check.ts';
 import type { Workflow } from '../workflow.ts';
 import { folderPlace } from '../record/places.store.ts';
@@ -367,7 +368,16 @@ export const advancePass = Effect.fn('advancePass')(
 
     const notes: string[] = [...askNotes, ...handed.collected, ...lacking.notes, ...landing.notes, ...lift.notes, ...closeNotes];
     notes.unshift(...took.notes);
-    const f: Filing = { e: { ...e, file: (spec) => e.file(inParts(spec)) }, run, reads, closer, mayFile: mayFileOf(run), notes, heads };
+    const f: Filing = {
+      e: { ...e, file: (spec) => e.file(inParts(spec)) },
+      run,
+      reads,
+      closer,
+      mayFile: mayFileOf(run),
+      notes,
+      home: yield* StoreRoot,
+      heads,
+    };
     const { tried, rechecked } = yield* fileTries(f, assessed.retry);
     const looped = yield* fileRounds(f, assessed.round);
     const checked = yield* fileChecks(f, [...assessed.check, ...rechecked]);

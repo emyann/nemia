@@ -460,6 +460,8 @@ export { FACTORY_RULES, factoryRules } from './rules/rules.verb.ts';
 export { FACTORY_SERVERS } from './servers/servers.verb.ts';
 export type { ServerListed, ServersListing } from './servers/servers.verb.ts';
 export { serverNameRefusal } from './servers/servers.ts';
+export type { ShippedServer } from './servers/servers.ts';
+export { shippedServers } from './servers/servers.store.ts';
 export type { FactoryRules } from './rules/rules.verb.ts';
 export type { FactoryInstruction } from './factory/instruction.verb.ts';
 export { AGENTS_CUSTOM } from './agents/custom.verb.ts';

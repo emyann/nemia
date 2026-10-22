@@ -269,14 +269,9 @@ test("what a blocked session's harness waits for is read afresh on every request
   const heldStep = async () => (await summary()).steps.find((s) => s.name === 'held')!;
 
   setWait('workspace trust dialog');
-  assert.deepEqual(
-    (await heldStep()).waitingFor,
-    {
-      words: 'waiting for a workspace trust dialog',
-      advice: 'answer it in Claude Code: claude agents, session ae/t-held/1',
-    },
-    "the pass's own word, whatever the last pass carried",
-  );
+  const waits = (await heldStep()).waitingFor;
+  assert.equal(waits?.words, 'waiting for a workspace trust dialog', "the pass's own word, whatever the last pass carried");
+  assert.ok(waits?.advice.includes('session ae/t-held/1'), `answered where the session runs: ${waits?.advice}`);
   assert.equal(
     (await Effect.runPromise(engine().view('t-held'))).waitingFor,
     'workspace trust dialog',

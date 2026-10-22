@@ -91,11 +91,7 @@ test("REFUSED: a run's detail says why one step's session alone could not be rea
   assert.ok(words?.includes("`ae/t-build/1`'s transcript cannot be read"), `the runtime's words: ${words}`);
   assert.ok(words?.includes('"yesterday"'), `naming what did not decode: ${words}`);
   assert.equal(unread.get('review')?.sessionUnread, null, 'the step read beside it says nothing');
-  assert.equal(
-    (await Effect.runPromise(engine().view('t-build'))).unreadWhy,
-    words,
-    "the words are the engine's own, off the transcript Claude Code wrote",
-  );
+  assert.equal((await Effect.runPromise(engine().view('t-build'))).unreadWhy, words, "the engine's own words");
 
   transcript(build, at(-1));
   const file = path.join(config, 'projects', '-code-app', `${build}.jsonl`);

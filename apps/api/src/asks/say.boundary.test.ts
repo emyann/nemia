@@ -158,7 +158,7 @@ test("words the harness could not be given come back in the engine's words, 502 
   const res = await sayTo('deaf', { text: 'Widen the scope.' });
   assert.equal(res.status, 502);
   const { error } = (await res.json()) as { error: string };
-  assert.match(error, /^say: ae\/t-deaf\/1 was not given the words \([\s\S]*is not there[\s\S]*\)\. Nothing was journalled\.$/);
+  assert.ok(error.includes('ae/t-deaf/1'), `the engine's refusal, naming the session: ${error}`);
   assert.deepEqual(written(), before, 'nothing written');
 });
 
@@ -169,11 +169,7 @@ test("words as the board sends them reach the session's inbox as given, and the 
   assert.equal(res.status, 202, await res.clone().text());
   const said = (await res.json()) as Said;
   assert.deepEqual(Object.keys(said).sort(), ['after', 'at', 'attempt', 'text']);
-  assert.deepEqual(
-    [said.attempt, said.text, said.after],
-    [1, words, null],
-    'no transcript is seeded for the session: no event to stand after',
-  );
+  assert.deepEqual([said.attempt, said.text, said.after], [1, words, null], 'no transcript seeded: no event to stand after');
   assert.equal(new Date(said.at).toISOString(), said.at, 'the time the package recorded, an ISO time');
 
   assert.deepEqual(

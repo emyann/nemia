@@ -3,40 +3,41 @@
  * package's `acceptRun`, `nemia accept`'s own, which writes the acceptance and nothing else, and refused in the package's words. The api
  * judges none of it: every refusal here is asserted equal to what `acceptRun` itself says.
  *
- * At shipped defaults: the api's own engine over a store this file seeds, the harness's fake `claude` (test/harness.ts) first on PATH.
+ * On the stand-ins: the runtime's test engine, where each step's task is filed and settled with its closeout by hand, and the test place,
+ * under the run records this file seeds. One engine for the file, since its runs are seeded as it loads and its tests read them in turn.
  */
-import { root, stops } from '../../test/harness.ts';
+import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Acceptance } from 'agent-orchestrator';
-import { runWith } from '../../test/placed.ts';
+import { Effect } from 'effect';
+import { testEngine } from 'agent-runtime/testing';
+import { testPlace } from 'agent-orchestrator/testing';
+import { appOver, engineFor, runOver } from '../../test/placed.ts';
 import type { RunDecision } from '../decide/decision.ts';
 import type { RunDetail } from '../detail/detail.ts';
-import { app } from '../app.ts';
-import { acceptFile, acceptRun, engine, list, roundRun, runStore } from 'agent-orchestrator';
+import { acceptFile, acceptRun, list, roundRun, runStore } from 'agent-orchestrator';
+
+const stand = testPlace();
+const standIn = testEngine();
+const engine = () => engineFor(standIn);
+const runWith = runOver(stand.layer);
+const app = appOver(standIn, stand);
 
 const T0 = Date.parse('2026-09-22T09:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
-const jsonl = (lines: object[]) => lines.map((line) => `${JSON.stringify(line)}\n`).join('');
 const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, text);
 };
 
 /** A step's task that ran once on Codex and signed off with `closeout`. */
-const signedOff = (taskId: string, closeout: object) =>
-  write(
-    path.join(root, 'engine', 'tasks', `${taskId}.jsonl`),
-    jsonl([
-      { kind: 'filed', at: at(0), brief: 'Do it.', cwd: '/code/app', maxAttempts: 1, harness: 'codex' },
-      { kind: 'starting', at: at(1), attempt: 1 },
-      { kind: 'spawned', at: at(1), attempt: 1 },
-      { kind: 'ended', at: at(9), attempt: 1, sessionId: `ae/${taskId}/1`, observed: 'done', reason: 'harness', closeout },
-      { kind: 'settled', at: at(9), outcome: 'succeeded' },
-    ]),
-  );
+const signedOff = (taskId: string, closeout: object) => {
+  Effect.runSync(engine().file({ id: taskId, brief: 'Do it.', cwd: '/code/app', maxAttempts: 1, harness: 'codex' }));
+  standIn.settle(taskId, 'succeeded', { exitCode: 0, closeout });
+};
 
 const DONE = { outcome: 'done', summary: 'Done.', needs: null, artifacts: [] };
 const AGAIN = { type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false };
@@ -232,7 +233,7 @@ test("an acceptance as the board sends it is the package's: 202 with the step, t
   assert.deepEqual(JSON.parse(fs.readFileSync(took.file, 'utf8')), { step: 'review', try: 2, at: took.at, message: WHY });
   assert.deepEqual(asked(), ['accept-review-2']);
   assert.equal(fs.readFileSync(path.join(root, 'runs', `${R}.json`), 'utf8'), record, "the api wrote nothing of the run's record");
-  assert.equal(stops(), 0, 'and stopped nothing');
+  assert.deepEqual(standIn.stopped, [], 'and stopped nothing');
 
   const run = (await (await app.request(`/api/runs/${R}`)).json()) as RunDetail;
   const review = run.steps.find((s) => s.name === 'review')!;

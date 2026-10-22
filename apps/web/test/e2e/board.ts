@@ -156,6 +156,21 @@ export const cancelledAt = (): string => fs.readFileSync(path.join(store!, 'runs
 /** The frame's floating bar while it shows the step `step` of the run `run`, found by the address it carries (`data-bar`). */
 export const stepBar = (page: Page, run: string, step: string): Locator => page.locator(`aside[data-bar="step:${run}/${step}"]`);
 
+/**
+ * The Clock cell's button of `row`, reached by the table's own arrow keys from the row: the keyboard alone, which is what makes the
+ * focus a visible one and so opens the preview — React Aria opens a tooltip on focus only where the focus came from the keyboard.
+ * `where` names the table the row is in, for the refusal.
+ */
+export async function reachClock(page: Page, row: Locator, where: string): Promise<Locator> {
+  const clock = row.locator('td[data-clock] button');
+  await row.scrollIntoViewIfNeeded();
+  await row.focus();
+  const elsewhere = () => clock.evaluate((found) => found !== document.activeElement);
+  for (let at = 0; at < 14 && (await elsewhere()); at += 1) await page.keyboard.press('ArrowRight');
+  if (await elsewhere()) throw new Refused(`the arrow keys reach the Clock cell's button along a ${where} row — they do not`);
+  return clock;
+}
+
 /** The theme a page is in, as its browser prefers it: what names a photograph taken beside the visit's own. */
 export const themeOf = (page: Page): Promise<string> =>
   page.evaluate(() => (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));

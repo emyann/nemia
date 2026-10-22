@@ -3,19 +3,17 @@ import type { ListedRun } from '@/lib/api';
 import { factoryOf } from '@/lib/factories';
 import { titleOf } from '@/lib/factory';
 import { ink } from '@/lib/meaning';
-import { nowOf, sinceShort } from '@/lib/runWords';
+import { nowOf } from '@/lib/runWords';
 import { cn } from '@/components/ui/ds/utils';
+import { RunClockCell } from './RunClockCell';
 import { previewBar } from './StepPreview';
 import { CopyId, CutFrame, CutTag, FRAMED_BOX, FRAMED_END, FRAMED_ROW, FRAMED_TABLE, RunSteps, TextLink } from './look';
 
 /** A column's heading, in the look's small caps. */
 const HEAD = 'text-label-small uppercase';
 
-/** How long a run has been at work without a stop, at `asOf`; none for a run nothing of which runs. */
-const workingMs = (run: ListedRun, asOf: Date): number | null => (run.atWork?.since ? asOf.getTime() - Date.parse(run.atWork.since) : null);
-
 /** What a row in flight does now: the word of its step as a tag and its note; for a run the api could not judge, the api's sentence. */
-function Now({ run, asOf }: { run: ListedRun; asOf: Date }) {
+function Now({ run }: { run: ListedRun }) {
   if (run.unreadable) {
     return (
       <span data-now-unreadable className={`text-body-small break-words ${ink.failure}`}>
@@ -23,16 +21,16 @@ function Now({ run, asOf }: { run: ListedRun; asOf: Date }) {
       </span>
     );
   }
-  const now = nowOf(run, workingMs(run, asOf));
+  const now = nowOf(run);
   if (!now) return null;
   return (
-    <span className="flex items-center gap-3">
+    <span className="flex min-w-0 items-center gap-3">
       <CutTag>
         <Tag data-now-word variant="tonal" color="secondary" className="uppercase">
           {now.word}
         </Tag>
       </CutTag>
-      <span data-now-note className="text-body-small whitespace-nowrap text-on-surface-variant">
+      <span data-now-note title={now.note} className="block truncate text-body-small text-on-surface-variant">
         {now.note}
       </span>
     </span>
@@ -42,7 +40,8 @@ function Now({ run, asOf }: { run: ListedRun; asOf: Date }) {
 /**
  * The runs in flight, as the kit's dense table in the look's cut frame, in the hue of a session at work: each run's title as a link,
  * its id with a copy control and its factory, each control and each factory at one edge from row to row; its own steps as a rail, each
- * bar a button that opens its step's card; what it does now; its wall time at `asOf` and its cost, plain.
+ * bar a button that opens its step's card; what it does now, its note cut to the column's room with the whole of it on hover; its time
+ * at work at `asOf`, a preview over it breaking that clock down (`RunClockCell`); and its cost, plain.
  * Narrower than its columns, the table scrolls sideways inside its frame.
  */
 export function FlightTable({ runs, asOf }: { runs: readonly ListedRun[]; asOf: Date }) {
@@ -58,10 +57,10 @@ export function FlightTable({ runs, asOf }: { runs: readonly ListedRun[]; asOf: 
             <Column id="steps" className={cn(HEAD, 'w-40')}>
               Steps
             </Column>
-            <Column id="now" className={cn(HEAD, 'w-64')}>
+            <Column id="now" className={cn(HEAD, 'w-56')}>
               Now
             </Column>
-            <Column id="clock" align="end" className={cn(HEAD, 'w-20')}>
+            <Column id="clock" align="end" className={cn(HEAD, 'w-32')}>
               Clock
             </Column>
             <Column id="cost" align="end" className={cn(HEAD, 'w-24')}>
@@ -93,10 +92,10 @@ export function FlightTable({ runs, asOf }: { runs: readonly ListedRun[]; asOf: 
                   />
                 </Cell>
                 <Cell>
-                  <Now run={run} asOf={asOf} />
+                  <Now run={run} />
                 </Cell>
-                <Cell data-clock className="font-mono text-body-small whitespace-nowrap">
-                  {sinceShort(run.wallMs)}
+                <Cell data-clock>
+                  <RunClockCell run={run} asOf={asOf} finished={false} />
                 </Cell>
                 <Cell data-cost className={`font-mono text-body-small whitespace-nowrap ${ink.money}`}>
                   {run.cost?.said}

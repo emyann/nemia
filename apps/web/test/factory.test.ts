@@ -1288,6 +1288,28 @@ test("a card's clock is the run's time at work: a run that is over took it, one 
   );
 });
 
+test("REFUSED: a row's clock saying what a card says — a column says the time at work alone, and `not started` for a run nothing of which is filed", () => {
+  const startedAt = '2026-09-20T12:00:00.000Z';
+  const base = { createdAt: startedAt, startedAt, cancelledAt: null, waiting: null, waitingOnYou: [] };
+  const later = Date.parse('2026-09-20T16:30:00.000Z');
+  const row = (run: Parameters<typeof runClock>[0], finished: boolean) => runClock(run, later, finished, 'row');
+
+  const done = { ...base, atWork: { ms: (2 * 60 + 10) * 60_000, since: null, endedAt: '2026-09-20T15:00:00.000Z' } };
+  assert.equal(row(done, true).words, '2h 10m', 'the figure alone: the column is headed Clock, and the preview says the rest');
+  assert.equal(runClock(done, later, true).words, 'took 2h 10m', 'and a card still says its sentence');
+  assert.equal(row(done, true).title, runClock(done, later, true).title, 'the times in full are the same wherever the clock is drawn');
+
+  const running = { ...base, atWork: { ms: 20 * 60_000, since: '2026-09-20T16:00:00.000Z', endedAt: null } };
+  assert.equal(row(running, false).words, '50m', 'what ran before, and the time since what runs started');
+
+  const created = '2026-09-20T08:00:00.000Z';
+  const unfiled = { createdAt: created, startedAt: null, cancelledAt: null, waiting: null };
+  assert.equal(row(unfiled, false).words, 'not started', 'REFUSED: the hours since it was created, which are no time at work');
+  assert.equal(runClock(unfiled, later, false).words, 'waiting for 8h 30m', 'and a card still says how long it has waited');
+  assert.equal(row({ ...unfiled, cancelledAt: '2026-09-20T09:00:00.000Z' }, true).words, 'not started');
+  assert.equal(row({ ...base, atWork: null }, true).words, 'not judged', 'a run the api gives no time at work of');
+});
+
 test('REFUSED: a run at a gate is not over — it is at work for what it ran, says no end, and its clock stands still until a person answers', () => {
   const startedAt = '2026-09-20T12:00:00.000Z';
   const atWork = { ms: 20 * 60_000, since: null, endedAt: '2026-09-20T12:20:00.000Z' };

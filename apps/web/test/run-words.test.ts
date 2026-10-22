@@ -7,8 +7,10 @@ import assert from 'node:assert/strict';
 import type { RunSummary } from '../src/lib/api.ts';
 import { stateMeaning, type StepState } from '../src/lib/status.ts';
 import {
+  agoWords,
   barSaid,
   endedWords,
+  JUST_NOW,
   nowOf,
   openWord,
   presentWait,
@@ -24,7 +26,6 @@ import {
   waitSentence,
   waitTag,
   WAITS_TAG,
-  whenColumn,
   whenWords,
   type WaitKind,
 } from '../src/lib/runWords.ts';
@@ -214,7 +215,7 @@ test('REFUSED: no sentence says a word of git or of a command line, though the r
   for (const kind of WAIT_KINDS) assert.doesNotMatch(waitSentence(ROWS[kind].row), words, kind);
   for (const kind of WAIT_KINDS) assert.doesNotMatch(waitTag(ROWS[kind].row), words, `the tag of ${kind}`);
   for (const kind of WAIT_KINDS) {
-    const now = nowOf(ROWS[kind].row, 120_000);
+    const now = nowOf(ROWS[kind].row);
     assert.doesNotMatch(`${now?.word} ${now?.note}`, words, `the note of ${kind}`);
   }
   assert.doesNotMatch(`${WAITS} ${WAITS_TAG}`, words);
@@ -284,15 +285,22 @@ test("a waiting card's tag names the step where the person acts on one, and says
   assert.equal(WAITS_TAG, 'waits on you');
 });
 
-test('what a run in flight does now: its first step not done, its place among its steps, and how long it has been at work', () => {
+test('what a run in flight does now: its first step not done and its place among its steps, and no duration at all', () => {
   const working = summary([...DONE.slice(0, 1), ['implement', 'running (working)'], ['review', 'waiting'], ['land', 'waiting']]);
-  assert.deepEqual(nowOf(working, 2 * 60_000 + 59_000), { word: 'at work', note: 'implement (2 of 4), 2m' });
-  assert.deepEqual(nowOf(working, null), { word: 'at work', note: 'implement (2 of 4)' }, 'no time where the api gives none');
+  assert.deepEqual(nowOf(working), { word: 'at work', note: 'implement (2 of 4)' });
   const checking = summary([...DONE.slice(0, 1), ['implement', 'checking']]);
-  assert.deepEqual(nowOf(checking, 60_000), { word: 'being checked', note: 'implement (2 of 2)' }, 'a time only for a session at work');
+  assert.deepEqual(nowOf(checking), { word: 'being checked', note: 'implement (2 of 2)' });
   const queued = summary([['design', 'waiting']]);
-  assert.deepEqual(nowOf(queued, null), { word: 'to come', note: 'design (1 of 1)' });
-  assert.equal(nowOf(summary([...DONE]), null), null, 'every step done: nothing to say');
+  assert.deepEqual(nowOf(queued), { word: 'to come', note: 'design (1 of 1)' });
+  assert.equal(nowOf(summary([...DONE])), null, 'every step done: nothing to say');
+  const DURATION = /\b\d+[dhms]\b|under a minute/;
+  assert.match(`implement (2 of 4), 2m`, DURATION, 'the pattern finds the duration the note used to carry');
+  for (const row of [working, checking, queued])
+    assert.doesNotMatch(
+      nowOf(row)!.note,
+      DURATION,
+      'REFUSED: a duration in the note, which stood beside the Clock column and read as one word with it',
+    );
 });
 
 /** No character but printable ASCII: a narrow no-break space before AM or PM is refused. */
@@ -314,23 +322,23 @@ test('when something happened: the time alone on the same day, the day before it
   }
 });
 
-test("REFUSED: a finished row's time carries its date on the day itself, each of its day and its hour two characters wide", () => {
+test("a finished row's Created and Finished columns say how long ago, in one unit, with no `about` in any of them", () => {
   const now = new Date('2026-10-11T17:38:00.000Z');
-  const today = whenColumn(new Date('2026-10-11T17:11:59.000Z'), now, 'America/Montreal');
-  assert.equal(today, '11 Oct  1:11 PM', 'today says its date too');
-  assert.equal(
-    whenColumn(new Date('2026-08-03T13:05:00.000Z'), now, 'UTC'),
-    ' 3 Aug  1:05 PM',
-    'a day and an hour of one digit are padded',
-  );
-  assert.equal(whenColumn(new Date('2026-10-11T03:59:00.000Z'), now, 'America/Montreal'), '10 Oct 11:59 PM');
-  assert.equal(whenColumn(new Date('2026-01-01T00:05:00.000Z'), now, 'UTC'), ' 1 Jan 12:05 AM');
-  assert.equal(whenColumn(new Date('2025-12-31T23:05:00.000Z'), now, 'UTC'), '31 Dec 2025', 'another year: the day and its year');
-  assert.equal(whenColumn(new Date('2025-01-03T23:05:00.000Z'), now, 'UTC'), ' 3 Jan 2025');
-  for (let hour = 0; hour < 24 * 365; hour += 7) {
-    const words = whenColumn(new Date(Date.UTC(2026, 0, 1, hour, 7)), now, 'UTC');
-    assert.equal(words.length, 15, words);
+  const [S, M, H, D] = [1_000, 60_000, 3_600_000, 86_400_000];
+  const ago = (ms: number) => agoWords(new Date(now.getTime() - ms), now);
+  assert.equal(ago(0), JUST_NOW, 'under a minute there is no room for seconds');
+  assert.equal(ago(59 * S), JUST_NOW);
+  assert.equal(ago(3 * M), '3 minutes ago');
+  assert.equal(ago(M), '1 minute ago');
+  assert.equal(ago(2 * H), '2 hours ago');
+  assert.equal(ago(3 * D), '3 days ago');
+  assert.equal(ago(120 * D), '4 months ago');
+  assert.equal(ago(730 * D), '2 years ago');
+  for (let hour = 0; hour < 24 * 365 * 3; hour += 7) {
+    const words = ago(hour * H);
     assert.match(words, PLAIN, words);
+    assert.doesNotMatch(words, /about/, 'REFUSED: `about`, which formatDistance writes and formatDistanceStrict does not');
+    assert.ok(words === JUST_NOW || /^\d+ \w+ ago$/.test(words), words);
   }
 });
 

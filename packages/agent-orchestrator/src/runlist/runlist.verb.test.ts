@@ -203,7 +203,7 @@ test('a run that moves and also waits is among the waiting, once; a cancelled ru
   );
 });
 
-test('a waiting run carries the cost of each of its steps and a clock whose parts add up to its wall time; a run in flight carries neither', async (t) => {
+test('a waiting run and a run in flight each carry a clock whose parts add up to its wall time; the costs and the wait are the waiting row\u2019s alone', async (t) => {
   seeded(t);
   const id = await started({ plan: null, build: 'plan' }, ['plan']);
   t.mock.timers.setTime(T0 + 10 * MIN);
@@ -232,11 +232,42 @@ test('a waiting run carries the cost of each of its steps and a clock whose part
     row.stepCosts?.map((cost) => cost.step),
     ['plan', 'build'],
   );
-  assert.equal('clock' in light.inFlight[0], false);
   assert.equal('stepCosts' in light.inFlight[0], false);
   assert.equal('waitingSince' in light.inFlight[0], false);
   assert.equal(row.waitingSince, new Date(T0 + 10 * MIN).toISOString(), 'the gate was reached as plan ended');
-  assert.equal(light.inFlight[0].wallMs, 50 * MIN, 'created at 10:10, read at 11:00');
+  const moving = light.inFlight[0];
+  assert.equal(moving.wallMs, 50 * MIN, 'created at 10:10, read at 11:00');
+  assert.ok(moving.clock, 'a run in flight carries its clock too: the cell breaks it down');
+  const { wallMs: movingWall, ...movingParts } = moving.clock;
+  assert.equal(movingWall, moving.wallMs, "the clock's wall time is the row's own");
+  assert.equal(
+    Object.values(movingParts).reduce((sum, ms) => sum + ms, 0),
+    movingWall,
+  );
+});
+
+test("a finished row carries a clock frozen where its work stopped, whose parts add up to the row's own wall time", async (t) => {
+  seeded(t);
+  const id = await started({ work: null });
+  t.mock.timers.setTime(T0 + 10 * MIN);
+  engine().settle(`${id}-work`, 'succeeded', {
+    closeout: SIGNED,
+    startedAt: new Date(T0).toISOString(),
+    spawnedAt: new Date(T0).toISOString(),
+  });
+  await advanced(id);
+  t.mock.timers.setTime(T0 + 90 * MIN);
+
+  const [row] = (await finishedPage()).runs;
+  assert.equal(row.wallMs, 10 * MIN, 'created at 10:00, its work stopped at 10:10');
+  assert.ok(row.clock);
+  assert.equal(row.clock.wallMs, 10 * MIN, 'read at its finish and not at now: an hour and a half later it says the same');
+  assert.equal(row.clock.sessionsMs, 10 * MIN, 'the whole of it was a session at work');
+  const { wallMs, ...parts } = row.clock;
+  assert.equal(
+    Object.values(parts).reduce((sum, ms) => sum + ms, 0),
+    wallMs,
+  );
 });
 
 test('a run at its second gate has waited since that gate was reached, while its clock sums both waits on a person', async (t) => {
@@ -377,7 +408,7 @@ test('a warm read of the open runs costs the records of the open runs alone: as 
   const few = await warm();
   copies(fs.readFileSync(path.join(RUNS_DIR, `${model}.json`), 'utf8'), 200);
   const many = await warm();
-  assert.equal(few, 2, 'the waiting run and the run in flight, and no record more');
+  assert.equal(few, 3, "the run in flight, which is at rest in no memo, and the two open runs' records, read for their clocks");
   assert.equal(many, few, "a warm read reads no finished run's record, however many there are");
 
   const warmed = await runWith(e(), RUNS_OPEN.handler({}, unverified, ROOT, kept));

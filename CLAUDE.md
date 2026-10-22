@@ -103,6 +103,22 @@ What the `create-an-agent` skill, being generic, does not say here:
   precedence, and the routing rule that says which layer owns a new instruction (*Where a new instruction goes*).
 - An agent's questions are an output field `{ "x-shape": "questions" }`, expanded by `packages/agent-orchestrator/src/question/question.ts`.
 - Its checks are *Check your work*, forced for `workflows/`; a new agent is named in *Where things are*.
+- **Every agent of the team reads the repository through git.** The four read-only ones (Seldon, Agora, Iris, Argus, each `dontAsk`, which
+  no allow from a step reaches) carry the same read-only git set on their own `allowedTools:` in `workflows/agents/`, and each holds the
+  place's `git` skill on its `skills:`; the two writers (Ada, Otto) run `auto` and need no allow. Nothing in the set writes the
+  repository, its refs or its configuration — `git merge-tree`, which writes a loose object and no ref, is the one that writes bytes —
+  and `git push` stays refused by Ada's and Otto's `disallowedTools:`. **What the set would let git run a program by is denied beside
+  it**, on each of the four and on each step that replaces their deny list, since no allow rule can exclude an option and an allow is
+  matched with a leading assignment stripped: `Bash(git grep *O*)` and `Bash(git grep *--op*)` for the pager option, which runs a
+  command on the files that matched (every short spelling carries a capital `O`, git bundling it after other short options; every long
+  one carries `--op`, since git takes any unambiguous abbreviation and `--o` alone it refuses), and `Bash(*GIT_*)` for every assignment
+  of git's environment — `GIT_EXTERNAL_DIFF`, and `diff.external` through `GIT_CONFIG_COUNT` — which is the fence under the "never
+  `VAR=`" these roles' skills already say. The leading `*` is the point of that last one, as it is for the collector's `Bash(*:4318*)`:
+  a deny is matched against the part as typed, and without it the rule reaches only a part that *opens* `GIT_`, so a first assignment
+  naming something else, or a `nohup` or `timeout` before it, would carry the whole of git's environment through. Adding a verb to the
+  set means asking what program it can be made to run. The set is on the agents rather than in `.claude/settings.json` so
+  that the team travels to a factory that is not this checkout; `packages/agent-orchestrator/test/agent-fences.test.ts` holds every read
+  open to each of the four, every write refused, and the four lines equal.
 
 ## Where things are
 
@@ -123,8 +139,8 @@ What the `create-an-agent` skill, being generic, does not say here:
   outside a run by `change-the-board`; a kit update that adds or renames one names it on the three lines and in the skill
   (`packages/agent-orchestrator/test/build-told.test.ts`); the
   board's look is `apps/web/DESIGN.md`, its generated theme `apps/web/theme/` (`apps/web/CLAUDE.md`, *The design system kit*).
-- `apps/web/src/components/look` — the look's own parts (the cut frame, tag and button, the plate, the sticker and stat tile, the rail,
-  the scan lines, the pager, the text link, the copy id) behind one door, each with its stories beside it; Nemia's Storybook
+- `apps/web/src/components/look` — the look's own parts (the cut frame, tag and button, the plate, the sticker and stat tile, the
+  breakdown and its preview, the rail, the scan lines, the pager, the text link, the copy id) behind one door, each with its stories beside it; Nemia's Storybook
   (`npm run storybook`, from `apps/web`) shows them to a person, and `change-the-board` says which to take (`apps/web/CLAUDE.md`).
 - `workflows/` — this repository's own team, `agents/`: Iris (product engineer), Seldon (software architect), Ada (software engineer),
   Agora (code reviewer), Otto (release engineer), Argus (janitor); and four workflows: `intake` (an idea to an intent), `build` (an

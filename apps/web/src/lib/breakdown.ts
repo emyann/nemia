@@ -5,12 +5,12 @@
  */
 import type { RunTokens, Spent } from './api/judged.ts';
 import type { RunClock, StepCost } from './api/runs.ts';
-import { sinceCreated, sinceWords } from './runWords.ts';
+import { sinceWords } from './runWords.ts';
 
 /** One line of a breakdown: what it counts, how much in the tile's own unit, how the page says it, and whether it says there is none. */
 export type BreakdownRow = { what: string; amount: number; said: string; none: boolean };
 
-/** A tile's breakdown: its headline, its rows, which add up to the tile, and a closing note, empty for none. */
+/** A tile's breakdown: its headline, its rows, which add up to what the foot says, and a closing note, empty for none. */
 export type Breakdown = { head: string; rows: BreakdownRow[]; foot: string };
 
 /**
@@ -34,10 +34,13 @@ export const CLOCK_REST = 'Everything else';
 
 /**
  * Where a run's wall time went: sessions, checks, the wait on a person, the wait for a slot, and a last line for the rest, absent when
- * it is nothing. The rows' numbers add up to `clock.wallMs`, and their minutes to the tile's. `from` is when the run was created, as
- * the page says a time.
+ * it is nothing. The rows' numbers add up to `clock.wallMs`, which the foot says, and their minutes to its; `from` is when the run was
+ * created, as the page says a time.
+ *
+ * `head` is verbatim what the tile or the cell this hangs under shows — the time at work — so the two can never disagree by a rounded
+ * minute. The wall time is the foot and not the head: the rows are the wall's parts, and the figure above them is a part of it.
  */
-export function clockBreakdown(clock: RunClock, from: string): Breakdown {
+export function clockBreakdown(clock: RunClock, head: string, from: string): Breakdown {
   const parts: Array<[string, number]> = [
     ['Sessions at work', clock.sessionsMs],
     ['Checks running', clock.checksMs],
@@ -51,9 +54,9 @@ export function clockBreakdown(clock: RunClock, from: string): Breakdown {
     Math.floor(Math.max(0, clock.wallMs) / 60_000),
   );
   return {
-    head: sinceCreated(clock.wallMs),
+    head,
     rows: parts.map(([what, ms], i) => ({ what, amount: ms, said: minutesSaid(ms, minutes[i]), none: ms <= 0 })),
-    foot: `Wall time, from ${from}.`,
+    foot: `Wall time ${sinceWords(clock.wallMs)}, from ${from}.`,
   };
 }
 

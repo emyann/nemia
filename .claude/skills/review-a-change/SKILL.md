@@ -8,9 +8,11 @@ description: "Review a change in this repository as a second engineer would: aga
 1. **Know what was asked**: the spec handed to you, its goal and constraints. Review the change against that, not against a change you
    would have made.
 2. **Read the whole diff** against the base (`git diff <base>...HEAD`, the base as your brief names it), and the tests beside it.
-   Read a file with Read, list a folder with Glob and search with Grep; never `ls`, `find`, `head`, `cat`, `grep`, `git grep`, `awk`,
-   `sed` or a pipe in Bash: Bash runs only the checks and reads your step names and git's read-only questions, each bare, one per call, and never a write:
-   `git diff`, `git log`, `git show`, `git status`, `git merge-base`, `git rev-parse` and `git branch --contains`. Whether main is merged
+   Read a file with Read, list a folder with Glob and search with Grep; never `ls`, `find`, `head`, `cat`, `grep`, `awk`,
+   `sed` or a pipe in Bash: Bash runs only the checks and reads your step names and git's read-only questions, each bare, one per call, and never a write —
+   the change (`git diff`, `git log`, `git show`), the workspace (`git status`), a line's author (`git blame`), what git tracks
+   (`git ls-files`), a name resolved (`git rev-parse`) and where a commit stands (`git merge-base`, `git branch --contains`). Search the
+   working tree with Grep, and a revision with `git grep <pattern> <rev>`, the one search no tool here can do. Whether main is merged
    into the branch is `git merge-base --is-ancestor <commit> HEAD`, answered by its exit code alone, so ask it with nothing after it,
    never `; echo $?` or `&& echo`; `git branch --contains <commit>` answers in words. Read, Grep and Glob reach this workspace, by
    paths from its root, and each folder your brief says you may read — those the steps before you handed over — under its own path;

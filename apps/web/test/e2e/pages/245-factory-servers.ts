@@ -141,9 +141,9 @@ export default {
    * Remove takes it off again. The record is taken back whatever happens.
    *
    * What the api refuses of a record — an `Authorization` header, a local server — is proven in its own tests
-   * (`apps/api/test/servers.test.ts`) and not driven through the board, since the e2e's watch counts every 4xx against a page and a
-   * `PageSpec` has no way to expect one (`checks.ts`, `visit.ts`): the same rule `350-lift.ts` states. What the refusal looks like drawn
-   * is the `ServerForm` stories' business, as the chips' three colours are `ServerState`'s.
+   * (`apps/api/src/servers/servers.test.ts`, each answered 422 by name) and not driven through the board, since the e2e's watch counts
+   * every 4xx against a page and a `PageSpec` has no way to expect one (`checks.ts`, `visit.ts`): the rule `350-lift.ts` states. What
+   * a refusal looks like drawn is the `ServerForm` stories' business, as the chips' colours are `ServerState`'s.
    */
   name: 'factory-servers',
   route: `/factories/${FACTORY}/settings`,

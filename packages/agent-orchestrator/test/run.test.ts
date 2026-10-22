@@ -204,6 +204,18 @@ const run = (steps: Record<string, string | null>, rest: Partial<RepositoryRun> 
 const phases = (m: Record<string, TaskPhase>) => (id: string) => m[id] ?? 'unknown';
 
 /**
+ * That the code said something — a refusal, a line — and that it names each of `facts`: the command, flag or field its fix names,
+ * and the ids, steps and counts the behaviour turns on. Never its sentence, whose words are nobody's to check.
+ */
+const namesFor = (why: string, said: string | null | undefined, ...facts: string[]): void => {
+  assert.equal(typeof said, 'string', `${why}: the code said nothing`);
+  for (const fact of facts) assert.ok(said!.includes(fact), `${why}: ${JSON.stringify(said)} does not name ${JSON.stringify(fact)}`);
+};
+
+/** `namesFor`, where the test's title says why. */
+const names = (said: string | null | undefined, ...facts: string[]): void => namesFor('refused', said, ...facts);
+
+/**
  * A run whose implement is on the try after the run's one sign-off nudge, spent: what `retriesDue` leaves an unsigned step to a person
  * on.
  */
@@ -1586,18 +1598,18 @@ test("UNSIGNED off what the runtime reports since stage 4a: a last attempt its h
     'unsigned',
     "the LAST attempt's word",
   );
-  const words = (v: ReturnType<typeof viewed>) => v.get('t1')!.state.attempts.map((a) => endWords(v.get('t1')!.state, a));
-  assert.deepEqual(words(quiet), [{ ended: 'failed', reason: 'unsigned' }]);
+  const endingsOf = (v: ReturnType<typeof viewed>) => v.get('t1')!.state.attempts.map((a) => endWords(v.get('t1')!.state, a));
+  assert.deepEqual(endingsOf(quiet), [{ ended: 'failed', reason: 'unsigned' }]);
   const legacy = viewed('failed', [{ ended: 'failed', reason: 'unsigned' }]);
   assert.deepEqual(
-    [closeoutAsked(legacy)('t1'), words(legacy)],
+    [closeoutAsked(legacy)('t1'), endingsOf(legacy)],
     ['unsigned', [{ ended: 'failed', reason: 'unsigned' }]],
     'as an old journal reads',
   );
 
   const before = viewed('succeeded', [{ ended: 'done', reason: 'harness' }]);
   assert.deepEqual(
-    [closeoutAsked(before)('t1'), words(before)],
+    [closeoutAsked(before)('t1'), endingsOf(before)],
     [true, [{ ended: 'done', reason: 'harness' }]],
     'a control, the words the runtime recorded: no `stated` key, a journal from before',
   );
@@ -1605,13 +1617,13 @@ test("UNSIGNED off what the runtime reports since stage 4a: a last attempt its h
     { ended: 'done', reason: 'harness', stated: true, closeout: { outcome: 'done', summary: 'did it', artifacts: [], needs: null } },
   ]);
   assert.deepEqual(
-    [closeoutAsked(signed)('t1'), words(signed)],
+    [closeoutAsked(signed)('t1'), endingsOf(signed)],
     [true, [{ ended: 'done', reason: 'harness' }]],
     'a control, the words the runtime recorded: a statement',
   );
   const unasked = viewed('succeeded', [unstated], false);
   assert.deepEqual(
-    [closeoutAsked(unasked)('t1'), words(unasked)],
+    [closeoutAsked(unasked)('t1'), endingsOf(unasked)],
     [false, [{ ended: 'done', reason: 'harness' }]],
     'a task asked for no statement',
   );
@@ -1970,13 +1982,9 @@ test('a check that did not finish is no refusal: `retries:` spends nothing on it
     );
     const d = decision(RETRIED, onTry(), p, nothingShipped, signedDone, asked, () => verdict);
     assert.deepEqual(d.kind === 'awaiting' && [d.failedCheck, d.unfinishedCheck, d.outcome], [[], ['implement'], 'failed'], why);
-    assert.deepEqual(
-      retryLines(RETRIED, onTry(), d, p, signedDone, asked),
-      [
-        'implement: its check did not finish, so no retry was spent on it. Run the check again, and nothing else:  nemia retry r-1 implement --recheck',
-      ],
-      why,
-    );
+    const lines = retryLines(RETRIED, onTry(), d, p, signedDone, asked);
+    assert.equal(lines.length, 1, why);
+    names(lines[0], 'implement:', 'no retry was spent', 'nemia retry r-1 implement --recheck');
   }
   assert.equal(refusedCheck('failed', 1), true);
   assert.equal(refusedCheck('failed', undefined), false, 'a verdict nobody read is no refusal');
@@ -2124,15 +2132,19 @@ test('`nemia retry` is refused, saying what to do instead: a step still running,
     refusal(onTry(), { t1: 'succeeded', c1: 'stopped' }, { mode: 'fresh' }, [askFor(2, 'recheck')])!,
     /^try 2 of implement is already asked for \(--recheck, at /,
   );
-  assert.match(
-    refusal(onTry(), { t1: 'succeeded', c1: 'failed' }, { mode: 'nudge' }, [], 'implement', 1)!,
-    /^the run tries implement again itself.*`retries: 2` has 2 left, so the next tick files try 2/,
+  names(
+    refusal(onTry(), { t1: 'succeeded', c1: 'failed' }, { mode: 'nudge' }, [], 'implement', 1),
+    'the run tries implement',
+    '`retries: 2` has 2 left',
+    'try 2',
+    'nemia ls r-1',
   );
   assert.match(refusal(onTry(), { t1: 'succeeded', c1: 'running' })!, /check is still due or running/);
   assert.match(refusal(onTry(), { t1: 'succeeded', c1: 'succeeded' })!, /is verified/);
-  assert.match(
-    refusal(run({ implement: 't1', review: null }), { t1: 'failed' }, { mode: 'recheck' })!,
-    /^--recheck runs a step's check again, and implement is failed/,
+  names(
+    refusal(run({ implement: 't1', review: null }), { t1: 'failed' }, { mode: 'recheck' }),
+    'implement is failed',
+    'nemia retry r-1 implement (or --fresh)',
   );
   assert.match(
     refusal(onTry(), { t1: 'succeeded', c1: 'stopped' }, { mode: 'nudge' }, [], 'deploy')!,
@@ -2198,14 +2210,18 @@ test("REFUSED before, now accepted: a step whose session its harness blocked, wi
   ] as RetryHow[]) {
     assert.equal(refusal(how), null, JSON.stringify(how));
   }
-  assert.equal(
+  names(
     refusal({ mode: 'recheck' }),
-    "--recheck runs a step's check again, and implement is running, its session blocked by its harness with nothing signed off: no check of it failed. Ask for another session instead: nemia retry r-1 implement (or --fresh).",
+    '--recheck',
+    'blocked by its harness',
+    'nothing signed off',
+    'nemia retry r-1 implement (or --fresh)',
   );
-  assert.match(
-    refusal({ mode: 'nudge' }, () => false)!,
-    /^implement is still running, so there is nothing to try again until it ends/,
-    'a session still working',
+  names(
+    refusal({ mode: 'nudge' }, () => false),
+    'implement is still running',
+    'nemia ls r-1',
+    'nemia cancel r-1',
   );
   assert.match(refusal({ mode: 'nudge' }, needsHuman, signedDone)!, /^implement is still running/, 'a session that signed off and runs on');
   assert.match(
@@ -2568,25 +2584,22 @@ test('REFUSED: `nemia retry --message` with an empty answer, or on --recheck —
   const refusal = (how: RetryHow, r: Run = onTry()) =>
     retryRefusal(RETRIED, r, 'implement', how, phases(p), signedDone, asked, () => 'unfinished');
   for (const message of ['', '   ', '\n\t']) {
-    assert.match(
-      refusal({ mode: 'nudge', message })!,
-      /^--message is empty, and an empty answer tells the step nothing\. .*nemia retry r-1 implement --message "<answer>"/,
-      JSON.stringify(message),
-    );
+    names(refusal({ mode: 'nudge', message }), '--message is empty', 'nemia retry r-1 implement --message "<answer>"');
   }
-  assert.match(
-    refusal({ mode: 'recheck', message: 'the suite is fixed on main' })!,
-    /^--message carries your answer into the try's brief, and --recheck files no session to read it .*\(nemia retry r-1 implement --recheck\)/,
+  names(
+    refusal({ mode: 'recheck', message: 'the suite is fixed on main' }),
+    '--recheck files no session',
+    '(nemia retry r-1 implement --recheck)',
   );
   assert.match(
     refusal({ mode: 'fresh', message: '' }, onTry([], 'c1', CANCELLED))!,
     /^--message is empty/,
-    'before anything about the run: a cancelled run would be refused for something else',
+    'before the run: a cancelled one is refused otherwise',
   );
   assert.match(
     retryRefusal(RETRIED, onTry(), 'deploy', { mode: 'recheck', message: 'x' }, phases(p), signedDone, asked)!,
     /^--message carries your answer/,
-    'before anything about the run: a step it does not have would be refused for something else',
+    'before the run: a step it lacks is refused otherwise',
   );
   assert.equal(messageRefusal({ mode: 'recheck' }), null);
   assert.match(
@@ -3163,10 +3176,10 @@ test('the brief says a file under a configuration folder is not handed over, nam
   for (const contract of [artifactsContract(FILES), artifactsContract(FILES, false, true)])
     assert.match(contract, /A file whose path passes through `\.claude`, a folder a harness reads as its own configuration, is\nrefused/);
   assert.doesNotMatch(artifactsContract(FILES, true), /configuration/, 'nothing follows a step in the checkout to read it');
-  assert.deepEqual(artifactLines(FILES, [{ path: '.claude/skills/x/SKILL.md', why: 'configuration' }], []), [
-    '!! declared through a folder a harness reads as its own configuration, and not handed over: .claude/skills/x/SKILL.md' +
-      '  — the steps after it would read it as theirs; name it outside `.claude`',
-  ]);
+  const refused = artifactLines(FILES, [{ path: '.claude/skills/x/SKILL.md', why: 'configuration' }], []);
+  assert.equal(refused.length, 1);
+  assert.ok(refused[0].startsWith('!! '), refused[0]);
+  names(refused[0], 'not handed over: .claude/skills/x/SKILL.md', 'name it outside `.claude`');
 });
 
 test("`nemia decide` tells apart why a declared file is missing — each refusal named, never passed over — then lists the step's files with their sizes", () => {
@@ -3488,87 +3501,97 @@ test('REFUSED: `nemia accept` takes a loop out of rounds with `again` still true
     "the run's one loop needs no naming",
   );
 
-  assert.match(
-    why(acceptAsk(LOOP, r, 'review', undefined, ALL_SUCCEEDED, said, asked)),
-    /^--message says why the work is good enough with its findings open.*Say it: nemia accept r-1 review --message "<why>"\.$/,
+  namesFor(
     'the words are asked for before anything about the run: an acceptance is nothing but its reason',
+    why(acceptAsk(LOOP, r, 'review', undefined, ALL_SUCCEEDED, said, asked)),
+    'nemia accept r-1 review --message "<why>"',
   );
   assert.match(
     why(acceptAsk(LOOP, r, undefined, undefined, ALL_SUCCEEDED, said, asked)),
     /nemia accept r-1 \[<step>\] --message "<why>"\.$/,
     'named as they would type it',
   );
-  assert.match(
+  names(
     why(acceptAsk(LOOP, r, 'review', '   ', ALL_SUCCEEDED, said, asked)),
-    /^--message is empty, and an acceptance's words are the whole reason/,
+    '--message is empty',
+    'nemia accept r-1 review --message "<why>"',
   );
 
-  assert.match(
-    why(acceptAsk(LOOP, inRound(3, CANCELLED), 'review', ENOUGH, ALL_SUCCEEDED, said, asked)),
-    /^r-1 was cancelled at 2026-01-02T00:00:00Z, and a cancelled run files nothing/,
+  namesFor(
     'a cancelled run files nothing, so nothing would ever honour it',
+    why(acceptAsk(LOOP, inRound(3, CANCELLED), 'review', ENOUGH, ALL_SUCCEEDED, said, asked)),
+    'r-1 was cancelled at 2026-01-02T00:00:00Z',
+    'nemia start',
   );
 
-  assert.match(
-    why(acceptAsk(LOOP, r, 'reviewer', ENOUGH, ALL_SUCCEEDED, said, asked)),
-    /^r-1 has no step "reviewer" — its steps are implement, review, ship\.$/,
-    'a step that is not here',
-  );
-  assert.match(
+  names(why(acceptAsk(LOOP, r, 'reviewer', ENOUGH, ALL_SUCCEEDED, said, asked)), 'no step "reviewer"', 'implement, review, ship');
+  names(
     why(acceptAsk(LOOP, r, 'ship', ENOUGH, ALL_SUCCEEDED, said, asked)),
-    /^ship has no `loop:`.*this run's loops close at review.*nemia approve r-1 ship\.$/,
-    'a step that closes no loop',
+    'ship has no `loop:`',
+    'loops close at review',
+    'nemia approve r-1 ship',
   );
-  assert.match(
+  names(
     why(acceptAsk(STEPS, run({ implement: 't1', review: 't2' }), undefined, ENOUGH, ALL_SUCCEEDED, said, asked)),
-    /^no step of r-1 has `loop:`, so there is no loop to end/,
-    'a workflow with no loop',
+    'no step of r-1 has `loop:`',
+    'nemia approve r-1 <step>',
   );
   const TWO = [...LOOP, { ...step('proofread', ['ship']), loop: 'ship', rounds: 2 }];
-  assert.match(
+  names(
     why(acceptAsk(TWO, r, undefined, ENOUGH, ALL_SUCCEEDED, said, asked)),
-    /^r-1 has 2 loops, closing at review, proofread: name the one to accept as it stands/,
-    'a workflow with several loops, and none named',
+    'r-1 has 2 loops, closing at review, proofread',
+    'nemia accept r-1 <step> --message "<why>"',
   );
 
-  assert.match(
+  names(
     why(acceptAsk(LOOP, inRound(3, acceptedTry(3)), 'review', ENOUGH, ALL_SUCCEEDED, said, asked)),
-    /^try 3 of review is already accepted, at 2026-09-20T14:05:00\.000Z/,
-    'already accepted: decided, and the next tick honours it once',
+    'try 3 of review is already accepted',
+    '2026-09-20T14:05:00.000Z',
   );
-  assert.match(
+  names(
     why(acceptAsk(LOOP, r, 'review', ENOUGH, ALL_SUCCEEDED, said, asked, [roundAskFor(4)])),
-    /^round 4 of review's loop is already asked for .*take that ask back first — round-review-4, in the run's \.asks directory/,
-    'a round already asked for: decided, and the next tick honours it once',
+    "round 4 of review's loop is already asked for",
+    'round-review-4',
+    '.asks',
   );
 
-  assert.match(
-    why(acceptAsk(LOOP, inRound(1), 'review', ENOUGH, ALL_SUCCEEDED, saidIn(1, true), asked)),
-    /^review asked for another round, and `rounds: 3` has 2 left, so the next tick files round 2 itself/,
+  namesFor(
     "below the cap the run goes round itself: not a person's to end early",
+    why(acceptAsk(LOOP, inRound(1), 'review', ENOUGH, ALL_SUCCEEDED, saidIn(1, true), asked)),
+    '`rounds: 3` has 2 left',
+    'files round 2 itself',
+    'nemia decide r-1',
   );
   const BUDGETED_LOOP: Workflow[] = [{ ...IMPLEMENT, budget: 3 }, LOOPING_REVIEW, LOOP[2]];
   const held: SpendOf = (id) => (id === 'i1' || id === 'i2' ? { usd: 2, measured: 1, unmeasured: 0, budgetEnded: false } : undefined);
-  assert.match(
-    why(acceptAsk(BUDGETED_LOOP, inRound(2), 'review', ENOUGH, ALL_SUCCEEDED, saidIn(2, true), asked, [], held)),
-    /^review asked for round 3, and its loop waits on a budget, not on you: `rounds: 3` has one round left\. Raise the cap and go round — nemia round r-1 review --budget <amount> — and accept the work as it stands once its rounds are spent\.$/,
+  namesFor(
     "a round held on a budget waits on a raise: not a person's to end early",
+    why(acceptAsk(BUDGETED_LOOP, inRound(2), 'review', ENOUGH, ALL_SUCCEEDED, saidIn(2, true), asked, [], held)),
+    'review asked for round 3',
+    'waits on a budget',
+    '`rounds: 3` has one round left',
+    'nemia round r-1 review --budget <amount>',
   );
 
-  assert.match(
+  namesFor(
+    'a loop that ended `again: false` handed on by itself',
     why(acceptAsk(LOOP, inRound(2), 'review', ENOUGH, ALL_SUCCEEDED, saidIn(2, false), asked)),
-    /^review signed off without asking for another round \(`again: false`\), so its loop is over on its own word/,
-    'a loop that ended again: false handed on by itself',
+    'review signed off',
+    '(`again: false`)',
+    'its loop is over',
   );
-  assert.match(
+  names(
     why(acceptAsk(LOOP, reviewDue(3), 'review', ENOUGH, ALL_SUCCEEDED, saidIn(3, true), asked)),
-    /^round 3 of review's loop is still running \(review is .*\), so it has not asked for anything yet/,
-    'a round still running has asked for nothing yet',
+    "round 3 of review's loop is still running",
+    'nemia ls r-1',
+    'nemia cancel r-1',
   );
 
-  assert.match(
-    why(roundAsk(LOOP, inRound(3, acceptedTry(3)), 'review', ALL_SUCCEEDED, said, asked)),
-    /^review asked for round 4, and a person accepted its work as it stands at 2026-09-20T14:05:00\.000Z, with its findings open \(nemia accept\).*take that acceptance back first — accept-review-3, in the run's \.asks directory — then ask again: nemia round r-1 review\.$/,
+  const roundAccepted = why(roundAsk(LOOP, inRound(3, acceptedTry(3)), 'review', ALL_SUCCEEDED, said, asked));
+  names(roundAccepted, 'review asked for round 4', '2026-09-20T14:05:00.000Z', '(nemia accept)', 'accept-review-3', '.asks');
+  names(roundAccepted, 'nemia round r-1 review');
+  assert.ok(
+    !roundAccepted.includes('without asking'),
     'nemia round refuses an accepted loop, rather than telling a person it signed off without asking, the one thing it did not do',
   );
 });
@@ -3975,27 +3998,26 @@ test('`nemia round` is refused, saying what to do instead — a round still runn
   assert.deepEqual(ask(inRound(3), saidIn(3, true), ALL_SUCCEEDED, 'review'), { step: 'review', round: 4 });
 
   assert.match(refused(ask(inRound(3, CANCELLED), saidIn(3, true))), /^r-1 was cancelled at .*a round would never be honoured/);
-  assert.match(
+  names(
     refused(ask(reviewDue(2), saidIn(2, true), phases({ i2: 'running' }))),
-    /^round 2 of review's loop is still running, so there is nothing to go round again until it ends\. Wait for it: nemia ls r-1 \(or stop the run: nemia cancel r-1\)\./,
+    "round 2 of review's loop is still running",
+    'nemia ls r-1',
+    'nemia cancel r-1',
   );
-  assert.match(
-    refused(ask(inRound(1), saidIn(1, true))),
-    /^the run goes round again itself: review asked for another round, and `rounds: 3` has 2 left, so the next tick files round 2\./,
-  );
-  assert.match(refused(ask(inRound(2), saidIn(2, false))), /^review signed off without asking for another round \(`again: false`\)/);
+  names(refused(ask(inRound(1), saidIn(1, true))), 'the run goes round again itself', '`rounds: 3` has 2 left', 'round 2', 'nemia ls r-1');
+  names(refused(ask(inRound(2), saidIn(2, false))), 'review signed off', '(`again: false`)');
   const blocked = (name: string) => (name === 'implement' ? { ...answered, outcome: 'blocked' as const, needs: 'which flag' } : undefined);
-  assert.match(
-    refused(ask(reviewDue(2), blocked)),
-    /^implement is blocked in round 2 of review's loop, so the round cannot end.*nemia retry r-1 implement/,
-  );
-  assert.match(
+  names(refused(ask(reviewDue(2), blocked)), "implement is blocked in round 2 of review's loop", 'nemia retry r-1 implement');
+  names(
     refused(ask(inRound(3), saidIn(3, true), ALL_SUCCEEDED, undefined, [roundAskFor(4)])),
-    /^round 4 of review's loop is already asked for \(at 2026-09-13T12:00:00\.000Z\)/,
+    "round 4 of review's loop is already asked for",
+    '(at 2026-09-13T12:00:00.000Z)',
   );
-  assert.match(
+  names(
     refused(ask(inRound(3), saidIn(3, true), ALL_SUCCEEDED, 'implement')),
-    /^implement has no `loop:`, so there is no round of it to run — this run's loops close at review\. To try implement again: nemia retry r-1 implement\./,
+    'implement has no `loop:`',
+    'loops close at review',
+    'nemia retry r-1 implement',
   );
   assert.match(refused(ask(inRound(3), saidIn(3, true), ALL_SUCCEEDED, 'deploy')), /^r-1 has no step "deploy"/);
   assert.match(
@@ -4010,9 +4032,9 @@ test('`nemia round` with no step takes the loop only when there is one — with 
     step('docs', ['review']),
     { ...step('proof', ['docs']), output: { file: 'proof.json', schema: LOOPING }, loop: 'docs', rounds: 2 },
   ];
-  assert.deepEqual(roundAsk(two, run({ implement: 'i1', review: 'r1', docs: null, proof: null }), undefined, ALL_SUCCEEDED), {
-    refusal: 'r-1 has 2 loops, closing at review, proof: name the one to go round again — nemia round r-1 <step>.',
-  });
+  const answer = roundAsk(two, run({ implement: 'i1', review: 'r1', docs: null, proof: null }), undefined, ALL_SUCCEEDED);
+  assert.deepEqual(Object.keys(answer), ['refusal']);
+  names('refusal' in answer ? answer.refusal : undefined, 'r-1 has 2 loops, closing at review, proof', 'nemia round r-1 <step>');
 });
 
 test("a new session of a loop's target within a round is handed the findings it owes replies to — a fresh try, or a nudge with no session to continue — and a continued one is not handed them twice", () => {
@@ -4255,29 +4277,19 @@ test('REFUSED by name at `nemia start --after`: a run given twice, one the store
   };
   const parentOf = (id: string): Pick<ParentRun, 'record' | 'gone'> => parents[id] ?? {};
   const refusal = (...after: string[]) => afterRefusal(after, { repo: '/repo', branch: 'main' }, parentOf);
-  assert.match(refusal('a-1', 'a-1')!, /^--after a-1 is given twice, and a run waits on another once\./);
-  assert.match(refusal('a-1', 'x-9')!, /^--after x-9: the store has no run x-9\. .*nemia ls lists them\.$/);
-  assert.equal(
-    refusal('r-2'),
-    '--after r-2: r-2 works on /elsewhere, and this run on /repo. A run waits for another to ship onto its own base branch, which a run on another repository never does: start it with --repo /elsewhere, or start it without --after r-2.',
-  );
-  assert.match(
-    refusal('d-3')!,
-    /^--after d-3: d-3 worked on main itself \(--no-worktree\), so it has no result branch to ship, and this run would wait for ever\./,
-  );
-  assert.match(
-    refusal('f-4')!,
-    /^--after f-4: f-4 ships onto feature, and this run would start from main, a base without f-4's work\. Check out feature/,
-  );
-  assert.equal(
-    refusal('c-5'),
-    `--after c-5: c-5 was cancelled at ${at}, and a cancelled run never ships, so this run would wait for ever. Start it without --after c-5.`,
+  names(refusal('a-1', 'a-1'), '--after a-1 is given twice', 'one --after');
+  names(refusal('a-1', 'x-9'), '--after x-9:', 'no run x-9', 'nemia ls');
+  names(refusal('r-2'), '--after r-2:', '/elsewhere', '/repo', '--repo /elsewhere', 'without --after r-2');
+  names(refusal('d-3'), '--after d-3:', '(--no-worktree)', 'wait for ever', 'without --after d-3');
+  names(refusal('f-4'), '--after f-4:', 'ships onto feature', 'from main', 'Check out feature in /repo', 'without --after f-4');
+  namesFor(
     'read from the record and git alone, nothing of whether a run shipped: a cancelled run never does',
+    refusal('c-5'),
+    '--after c-5:',
+    `c-5 was cancelled at ${at}`,
+    'without --after c-5',
   );
-  assert.match(
-    refusal('g-6')!,
-    /^--after g-6: wf\/g-6\/implement is gone, and git cannot find it on main, so this run would wait for ever\. If g-6's work is on main, there is nothing to wait for/,
-  );
+  names(refusal('g-6'), '--after g-6:', 'wf/g-6/implement is gone', 'on main', 'without --after g-6');
   assert.equal(refusal(), null, 'allowed: no parent');
   assert.equal(refusal('a-1'), null, 'allowed: a parent still to ship');
   assert.equal(
@@ -4432,9 +4444,12 @@ test('REFUSED by `sayRefusal` before the engine is asked: a step the run does no
     'review has not been filed yet, so there is no session to hear anything. Say it once it runs: nemia ls r-1.',
   );
   for (const phase of ['succeeded', 'failed', 'stopped'] as const) {
-    assert.equal(
+    names(
       sayRefusal(STEPS, live, 'implement', phases({ t1: phase })),
-      `implement is not running: try 1's task settled \`${phase}\`, so no session of it is there to hear anything. Words for the step go into its next try's brief, where it may be tried again (nemia decide r-1 says): nemia retry r-1 implement --message "<words>".`,
+      'implement is not running',
+      `try 1's task settled \`${phase}\``,
+      'nemia decide r-1',
+      'nemia retry r-1 implement --message "<words>"',
     );
   }
   const onTry2 = run({}, { steps: { implement: { taskId: 't2', tries: [{ taskId: 't1', then: 'nudge' }] }, review: { taskId: null } } });
@@ -5694,37 +5709,37 @@ test('REFUSED by name: `nemia retry` of a step over its budget without `--budget
       () => false,
       of,
     );
-  assert.equal(
+  names(
     refusal({ mode: 'nudge' }),
-    'implement is over budget: its tries have cost $4.25 of its $3 budget, and the run spends nothing more on it until a person raises the cap. Raise it with the try, above $4.25: nemia retry r-1 implement --budget <amount>.',
+    'implement is over budget',
+    '$4.25 of its $3 budget',
+    'above $4.25',
+    'nemia retry r-1 implement --budget <amount>.',
   );
-  assert.match(
-    refusal({ mode: 'fresh', model: 'opus' })!,
-    /Raise it with the try, above \$4\.25: nemia retry r-1 implement --budget <amount> --model opus\.$/,
-  );
-  for (const low of [3, 4.25]) {
-    assert.equal(
+  names(refusal({ mode: 'fresh', model: 'opus' }), 'above $4.25', 'nemia retry r-1 implement --budget <amount> --model opus.');
+  for (const low of [3, 4.25])
+    names(
       refusal({ mode: 'nudge', budget: low }),
-      `--budget ${low} is not above $4.25, what implement's tries have cost: a try under it would read over budget again as soon as it ended. Give more than $4.25: nemia retry r-1 implement --budget <amount>.`,
+      `--budget ${low} is not above $4.25`,
+      'more than $4.25',
+      'nemia retry r-1 implement --budget <amount>',
     );
-  }
   assert.equal(refusal({ mode: 'nudge', budget: 4.26 }), null);
   assert.equal(refusal({ mode: 'recheck' }), null, 'a recheck costs nothing');
-  assert.match(
-    refusal({ mode: 'recheck', budget: 10 })!,
-    /^--budget raises a step's cap for the session a try files, and --recheck files none/,
-  );
+  names(refusal({ mode: 'recheck', budget: 10 }), '--budget', '--recheck files none');
   assert.match(refusal({ mode: 'nudge', budget: 0 })!, /^--budget 0 is not an amount\./);
-  assert.equal(
-    refusal({ mode: 'nudge', budget: 10 }, [], spends({ t0: 1, t1: 1 })),
-    'the run tries implement again itself: its check refused, and `retries: 2` has 1 left, so the next tick files try 3. Wait for it: nemia ls r-1.',
-    'under its cap with `retries:` left, the step is not waiting on a person',
-  );
-  assert.equal(
-    refusal({ mode: 'nudge', budget: 3 }, [], spends({ t0: 1, t1: 1 })),
-    'the run tries implement again itself: its check refused, and `retries: 2` has 1 left, so the next tick files try 3. Wait for it: nemia ls r-1.',
-    'what the run does itself is said first, so the fix is never a --budget it would refuse next',
-  );
+  for (const budget of [10, 3]) {
+    const itself = refusal({ mode: 'nudge', budget }, [], spends({ t0: 1, t1: 1 }));
+    namesFor(
+      'under its cap with `retries:` left, the step is not waiting on a person',
+      itself,
+      'the run tries implement again itself',
+      '`retries: 2` has 1 left',
+      'try 3',
+      'nemia ls r-1',
+    );
+    assert.ok(!itself!.includes('--budget'), 'what the run does itself is said first, so the fix is never a --budget it would refuse next');
+  }
   const spentOut: Workflow[] = [{ ...BUDGETED[0], retries: 1 }, BUDGETED[1]];
   const outOfRetries = (how: RetryHow) =>
     retryRefusal(
@@ -5742,7 +5757,7 @@ test('REFUSED by name: `nemia retry` of a step over its budget without `--budget
     );
   assert.equal(outOfRetries({ mode: 'nudge', budget: 10 }), null, '`retries:` spent, under its cap: a raise is taken');
   assert.match(outOfRetries({ mode: 'nudge', budget: 2.5 })!, /^--budget 2\.5 is not above \$3, the \$3 cap in force on implement/);
-  assert.equal(
+  names(
     retryRefusal(
       STEPS,
       run({ implement: 't1', review: null }),
@@ -5752,11 +5767,17 @@ test('REFUSED by name: `nemia retry` of a step over its budget without `--budget
       signedDone,
       asked,
     ),
-    "--budget raises a step's cap, and implement has no `budget:`, so there is no cap to raise. Try it without --budget: nemia retry r-1 implement.",
+    'implement has no `budget:`',
+    'without --budget: nemia retry r-1 implement.',
   );
-  assert.match(
-    refusal({ mode: 'nudge', budget: 10 }, [askFor(3)])!,
-    /^try 3 of implement is asked for \(--nudge, at .*\) without a --budget above \$4\.25, and implement is over budget: its tries have cost \$4\.25 of its \$3 budget, so no tick honours it\. Delete that ask — retry-implement-3, in the run's \.asks directory — and ask again: nemia retry r-1 implement --budget <amount>\.$/,
+  names(
+    refusal({ mode: 'nudge', budget: 10 }, [askFor(3)]),
+    'try 3 of implement is asked for (--nudge, at ',
+    'without a --budget above $4.25',
+    '$4.25 of its $3 budget',
+    'retry-implement-3',
+    '.asks',
+    'nemia retry r-1 implement --budget <amount>',
   );
   assert.match(
     refusal({ mode: 'nudge' }, [{ ...askFor(3), budget: 10 }])!,
@@ -5798,18 +5819,26 @@ test('a step blocked under its cap takes a `--budget` above it, and the tick fil
       spent,
     );
   assert.equal(refusal({ mode: 'nudge', budget: 40 }), null);
-  assert.equal(refusal({ mode: 'nudge' }), null, 'nor is a try without one refused: the cap is not what stops it');
+  assert.equal(refusal({ mode: 'nudge' }), null, 'nor without one: the cap is not what stops it');
   for (const low of [15, 20]) {
-    assert.equal(
+    names(
       refusal({ mode: 'nudge', budget: low }),
-      `--budget ${low} is not above $20, the $20 cap in force on implement, whose tries have cost $19.27: --budget only ever raises the cap. Give more than $20: nemia retry r-1 implement --budget <amount>.`,
+      `--budget ${low} is not above $20`,
+      '$20 cap in force on implement',
+      '$19.27',
+      'more than $20',
+      'nemia retry r-1 implement --budget <amount>',
     );
   }
   assert.deepEqual(due([{ ...askFor(2), budget: 40 }]), [{ step: 'implement', try: 2, mode: 'nudge', budget: 40, by: 'ask' }]);
   assert.deepEqual(due([{ ...askFor(2), budget: 20 }]), [], 'an ask not above the cap in force is never due');
-  assert.match(
-    refusal({ mode: 'nudge', budget: 40 }, [{ ...askFor(2), budget: 20 }])!,
-    /^try 2 of implement is asked for \(--nudge, at .*\) with --budget 20, not above \$20, so no tick honours it\. Delete that ask — retry-implement-2, in the run's \.asks directory — and ask again: nemia retry r-1 implement --budget <amount>\.$/,
+  names(
+    refusal({ mode: 'nudge', budget: 40 }, [{ ...askFor(2), budget: 20 }]),
+    'try 2 of implement is asked for (--nudge, at ',
+    'with --budget 20, not above $20',
+    'retry-implement-2',
+    '.asks',
+    'nemia retry r-1 implement --budget <amount>',
   );
 
   const free = run({ implement: 't1', review: null });
@@ -5817,9 +5846,13 @@ test('a step blocked under its cap takes a `--budget` above it, and the tick fil
   const unbudgeted = (asks: RetryAsk[]) => retriesDue(STEPS, free, failed, signedDone, asked, () => undefined, asks);
   assert.deepEqual(unbudgeted([{ ...askFor(2), budget: 10 }]), [], 'no `budget:`: an ask with a --budget is never due');
   assert.deepEqual(unbudgeted([askFor(2)]), [{ step: 'implement', try: 2, mode: 'nudge', by: 'ask' }]);
-  assert.match(
-    retryRefusal(STEPS, free, 'implement', { mode: 'nudge' }, failed, signedDone, asked, () => undefined, [{ ...askFor(2), budget: 10 }])!,
-    /^try 2 of implement is asked for \(--nudge, at .*\) with --budget 10, and implement has no `budget:`, so there is no cap to raise and no tick honours it\. Delete that ask — retry-implement-2, in the run's \.asks directory — and ask again: nemia retry r-1 implement\.$/,
+  names(
+    retryRefusal(STEPS, free, 'implement', { mode: 'nudge' }, failed, signedDone, asked, () => undefined, [{ ...askFor(2), budget: 10 }]),
+    'try 2 of implement is asked for (--nudge, at ',
+    'with --budget 10',
+    'no `budget:`',
+    'retry-implement-2',
+    'nemia retry r-1 implement.',
   );
 });
 
@@ -5923,19 +5956,26 @@ test("a step its harness ended at its budget reads budget exhausted, with the am
       () => false,
       of,
     );
-  assert.match(
-    refusal({ mode: 'nudge' })!,
-    /^implement ended at its budget: its harness stopped its session at \$3, and its tries have cost \$3\.02, and the run spends nothing more on it until a person raises the cap\./,
+  names(
+    refusal({ mode: 'nudge' }),
+    'implement ended at its budget',
+    'stopped its session at $3',
+    'cost $3.02',
+    'nemia retry r-1 implement --budget <amount>',
   );
-  assert.equal(
+  names(
     refusal({ mode: 'nudge', budget: 2 }),
-    "--budget 2 is not above $3.02, what implement's tries have cost: a try under it would read budget exhausted again as soon as it ended. Give more than $3.02: nemia retry r-1 implement --budget <amount>.",
+    '--budget 2 is not above $3.02',
+    'more than $3.02',
+    'nemia retry r-1 implement --budget <amount>',
   );
   const unmeasured = spends({}, ['t1']);
-  assert.equal(
-    refusal({ mode: 'nudge', budget: 3 }, unmeasured),
-    "--budget 3 is not above $3, the $3 budget implement's session was ended at: a try under it would read budget exhausted again as soon as it ended. Give more than $3: nemia retry r-1 implement --budget <amount>.",
+  namesFor(
     'a session cut off before its cost was written: the cap it was ended at is what a raise has to pass',
+    refusal({ mode: 'nudge', budget: 3 }, unmeasured),
+    '--budget 3 is not above $3',
+    'more than $3:',
+    'nemia retry r-1 implement --budget <amount>',
   );
   assert.equal(refusal({ mode: 'fresh', budget: 5 }, unmeasured), null);
   assert.equal(
@@ -6077,9 +6117,12 @@ test('a step that says `denials: fail` and signed off denied a call reads denied
       () => false,
       denied,
     );
-  assert.equal(
+  names(
     refusal({ mode: 'recheck' }),
-    "--recheck runs a step's check again, and implement was denied a call by its harness, and its check was never run: no check of it failed. Ask for another session instead: nemia retry r-1 implement (or --fresh).",
+    '--recheck',
+    'implement was denied a call',
+    'check was never run',
+    'nemia retry r-1 implement (or --fresh)',
   );
   assert.equal(refusal({ mode: 'fresh' }), null);
   assert.equal(refusal({ mode: 'nudge' }), null);
@@ -6436,18 +6479,26 @@ test('REFUSED past a budget in a loop: `again: true` files no round while a step
 
   const ask = (budget?: number, asks: RoundAsk[] = []) =>
     roundAsk(BUDGETED_LOOP, r, undefined, ALL_SUCCEEDED, said, asked, asks, spent, budget);
-  assert.deepEqual(ask(), {
-    refusal:
-      'review asked for round 2, and implement has cost $4.25 of its $3 budget: the run files nothing more for it until a person raises the cap. Raise it with the round, above $4.25: nemia round r-1 review --budget <amount>.',
-  });
-  assert.deepEqual(ask(4), {
-    refusal:
-      '--budget 4 is not above $4.25, what implement has cost: the round would be held again as soon as it was asked for. Give more than $4.25: nemia round r-1 review --budget <amount>.',
-  });
+  const refusedRound = (answer: ReturnType<typeof ask>): string => {
+    assert.deepEqual(Object.keys(answer), ['refusal']);
+    return (answer as { refusal: string }).refusal;
+  };
+  names(
+    refusedRound(ask()),
+    'review asked for round 2',
+    'implement has cost $4.25 of its $3 budget',
+    'above $4.25',
+    'nemia round r-1 review --budget <amount>',
+  );
+  names(refusedRound(ask(4)), '--budget 4 is not above $4.25', 'more than $4.25', 'nemia round r-1 review --budget <amount>');
   assert.deepEqual(ask(10), { step: 'review', round: 2, budget: 10 });
-  assert.match(
-    (ask(10, [roundAskFor(2)]) as { refusal: string }).refusal,
-    /^round 2 of review's loop is asked for \(at .*\) without a --budget above \$4\.25, and implement has cost \$4\.25 of its \$3 budget, so no tick honours it/,
+  names(
+    refusedRound(ask(10, [roundAskFor(2)])),
+    "round 2 of review's loop is asked for (at ",
+    'without a --budget above $4.25',
+    '$4.25 of its $3 budget',
+    'round-review-2',
+    'nemia round r-1 review --budget <amount>',
   );
 
   const due = roundsDue(BUDGETED_LOOP, r, ALL_SUCCEEDED, said, asked, [{ ...roundAskFor(2), budget: 10 }], spent);
@@ -6665,15 +6716,16 @@ test('at the cap and past a budget: the loop reads rounds exhausted, and its onc
     }).steps[1].note,
     'round 3 of 3, and it asked again — once more: nemia round r-1 review --budget <amount>',
   );
-  assert.match(
+  names(
     (roundAsk(BUDGETED_LOOP, r, 'review', ALL_SUCCEEDED, said, asked, [], spent) as { refusal: string }).refusal,
-    /^review asked for round 4, and implement has cost \$3\.50 of its \$3 budget: .*--budget <amount>\.$/,
+    'review asked for round 4',
+    'implement has cost $3.50 of its $3 budget',
+    'nemia round r-1 review --budget <amount>',
   );
   assert.deepEqual(roundAsk(BUDGETED_LOOP, r, 'review', ALL_SUCCEEDED, said, asked, [], spent, 5), { step: 'review', round: 4, budget: 5 });
-  assert.deepEqual(roundAsk(LOOP, r, 'review', ALL_SUCCEEDED, said, asked, [], spent, 5), {
-    refusal:
-      "--budget raises the cap of a step of the loop over its budget, and no step of review's loop is. Once more without it: nemia round r-1 review.",
-  });
+  const unraised = roundAsk(LOOP, r, 'review', ALL_SUCCEEDED, said, asked, [], spent, 5);
+  assert.deepEqual(Object.keys(unraised), ['refusal']);
+  names((unraised as { refusal: string }).refusal, '--budget', "no step of review's loop is", 'nemia round r-1 review.');
   assert.deepEqual(
     roundAsk(LOOP, r, 'review', ALL_SUCCEEDED, said, asked, [], spent),
     { step: 'review', round: 4 },
@@ -6997,13 +7049,9 @@ test('REFUSED as a verdict past a budget: a step whose check did not finish read
     assert.deepEqual([a.retry, a.blocked, a.status], [[], ['review'], 'failed'], why);
     const d = decision(BUDGETED, r, p, nothingShipped, signedDone, asked, v, [], [], () => false, spent);
     assert.deepEqual(d.kind === 'awaiting' && [d.unfinishedCheck, d.failedCheck, d.overBudget], [['implement'], [], []], why);
-    assert.deepEqual(
-      retryLines(BUDGETED, r, d, p, signedDone, asked, spent, v),
-      [
-        'implement: its check did not finish, so no retry was spent on it. Run the check again, and nothing else:  nemia retry r-1 implement --recheck  (a new session needs --budget above $4.25: its tries have cost $4.25 of $3)',
-      ],
-      why,
-    );
+    const lines = retryLines(BUDGETED, r, d, p, signedDone, asked, spent, v);
+    assert.equal(lines.length, 1, why);
+    names(lines[0], 'implement:', 'no retry was spent', 'nemia retry r-1 implement --recheck', '--budget above $4.25', '$4.25 of $3');
     const l = listing({
       steps: BUDGETED,
       run: r,
@@ -7022,16 +7070,14 @@ test('REFUSED as a verdict past a budget: a step whose check did not finish read
 
     const refusal = (how: RetryHow) => retryRefusal(BUDGETED, r, 'implement', how, p, signedDone, asked, v, [], () => false, spent);
     assert.equal(refusal({ mode: 'recheck' }), null, `${why}: the recheck costs nothing`);
-    assert.equal(
+    names(
       refusal({ mode: 'nudge' }),
-      "implement's check did not finish, and implement is over budget: its tries have cost $4.25 of its $3 budget. Run its check again, which needs no --budget: nemia retry r-1 implement --recheck — or raise the cap for a new session, above $4.25: nemia retry r-1 implement --budget <amount>.",
-      why,
+      "implement's check did not finish",
+      '$4.25 of its $3 budget',
+      'nemia retry r-1 implement --recheck',
+      'above $4.25: nemia retry r-1 implement --budget <amount>',
     );
-    assert.match(
-      refusal({ mode: 'nudge', budget: 4 })!,
-      /^--budget 4 is not above \$4\.25, what implement's tries have cost: a try under it would read over budget again/,
-      why,
-    );
+    names(refusal({ mode: 'nudge', budget: 4 }), '--budget 4 is not above $4.25', 'nemia retry r-1 implement --budget <amount>');
     assert.equal(refusal({ mode: 'fresh', budget: 10 }), null, why);
     assert.deepEqual(
       retriesDue(BUDGETED, r, p, signedDone, asked, v, [askFor(3)], () => false, spent),
@@ -7464,23 +7510,28 @@ test('`forgetLine` says in one line what happened to each run: forgotten, with w
     forgetLine(forgotten),
     'r-1  forgotten: removed 2 worktrees, committed what review left uncommitted on wf/r-1/review as 1a2b3c4; removed runs/r-1.json, runs/r-1/, checks/r-1-implement-check.stderr; kept wf/r-1/implement, wf/r-1/review — branches are kept unless asked: --delete-branches deletes those merged into main',
   );
-  assert.equal(
-    forgetLine({
-      ...forgotten,
-      removed: [],
-      handedOff: [],
-      gone: ['/wf/worktrees/r-1/implement'],
-      branches: [
-        { branch: 'wf/r-1/implement', deleted: true, why: 'merged' },
-        { branch: 'wf/r-1/fix', deleted: true, why: 'forced' },
-        { branch: 'wf/r-1/review', deleted: false, why: 'unmerged' },
-        { branch: 'wf/r-1/odd', deleted: false, why: { git: 'error: it is checked out elsewhere' } },
-        { branch: 'wf/r-1/plan', deleted: false, why: { unread: 'it exited 1' } },
-      ],
-      unfrozen: 'no workflow folder at /wf/dev',
-    }),
-    "r-1  forgotten: 1 worktree was already gone; removed runs/r-1.json, runs/r-1/, checks/r-1-implement-check.stderr; deleted wf/r-1/implement (merged into main), wf/r-1/fix (not merged into main, forced); kept wf/r-1/review: not merged into main — --force-unmerged deletes it, and the work on it; kept wf/r-1/odd: git would not delete it — error: it is checked out elsewhere; kept wf/r-1/plan: the place's remove did not answer — it exited 1; nemia rm r-1 again deletes it once it does; its workflow was never frozen, and no workflow folder at /wf/dev",
-  );
+  const gitSaid = 'error: it is checked out elsewhere';
+  const unfrozen = 'no workflow folder at /wf/dev';
+  const fates = forgetLine({
+    ...forgotten,
+    removed: [],
+    handedOff: [],
+    gone: ['/wf/worktrees/r-1/implement'],
+    branches: [
+      { branch: 'wf/r-1/implement', deleted: true, why: 'merged' },
+      { branch: 'wf/r-1/fix', deleted: true, why: 'forced' },
+      { branch: 'wf/r-1/review', deleted: false, why: 'unmerged' },
+      { branch: 'wf/r-1/odd', deleted: false, why: { git: gitSaid } },
+      { branch: 'wf/r-1/plan', deleted: false, why: { unread: 'it exited 1' } },
+    ],
+    unfrozen,
+  });
+  assert.ok(fates.startsWith('r-1  forgotten: 1 worktree was already gone; '), fates);
+  names(fates, 'removed runs/r-1.json', 'runs/r-1/', 'checks/r-1-implement-check.stderr');
+  names(fates, 'deleted wf/r-1/implement (merged into main)', 'wf/r-1/fix (not merged into main, forced)');
+  names(fates, 'kept wf/r-1/review: not merged into main', '--force-unmerged');
+  names(fates, 'kept wf/r-1/odd:', gitSaid, 'kept wf/r-1/plan:', 'it exited 1', 'nemia rm r-1 again');
+  names(fates, 'never frozen', unfrozen);
   assert.equal(
     forgetLine({ ...forgotten, isolate: false, removed: [], handedOff: [], branches: [], files: ['runs/r-1.json'] }),
     'r-1  forgotten: no worktrees, it worked in /repo itself; removed runs/r-1.json; no branch of its own',
@@ -7537,11 +7588,12 @@ test('`forgetLine` says in one line what happened to each run: forgotten, with w
       "/wf/worktrees/r-1/fix is left as it is: the place's handoff did not answer — it did not answer within 120s. nemia rm r-1 again once it does. Its record, files and branches are kept until every worktree is gone: nemia rm r-1 again then.",
   );
 
+  const refusedFor = 'implement is running. Forgetting is not cancelling: …';
   assert.equal(
     forgetLine({
       id: 'r-1',
       kind: 'refused',
-      refusal: 'implement is running. Forgetting is not cancelling: …',
+      refusal: refusedFor,
       removed: [],
       handedOff: [],
       gone: [],
@@ -7549,7 +7601,7 @@ test('`forgetLine` says in one line what happened to each run: forgotten, with w
       branches: [],
       files: [],
     }),
-    'r-1  not forgotten: implement is running. Forgetting is not cancelling: …',
+    `r-1  not forgotten: ${refusedFor}`,
   );
   const missing: Forgot = { id: 'r-9', kind: 'missing', removed: [], handedOff: [], gone: [], left: [], branches: [], files: [] };
   assert.equal(forgetLine(missing), 'r-9  no such run — nothing to forget');
@@ -7857,33 +7909,39 @@ test('REFUSED by `approvalRefusal`, by name: empty words, a step the run does no
   assert.equal(refused(atPlan(), 'plan', PLAN_DONE), null);
   assert.equal(refused(atPlan(), 'plan', PLAN_DONE, signedDone, 'ship the second reading'), null);
 
-  assert.match(
-    refused(atPlan(), 'plan', PLAN_DONE, signedDone, ' \n') ?? '',
-    /^--message is empty, and an approval's words are handed to every step after the gate: empty, they tell them nothing\. .*nemia approve r-1 plan --message "<words>" — or leave --message out\.$/,
+  names(
+    refused(atPlan(), 'plan', PLAN_DONE, signedDone, ' \n'),
+    '--message is empty',
+    'nemia approve r-1 plan --message "<words>"',
+    'leave --message out',
   );
   assert.equal(approvalWordsRefusal(''), approvalWordsRefusal(' ', 'nemia approve <runId> <step>'), 'the CLI says it in the same words');
-  assert.equal(refused(atPlan(), 'desing', PLAN_DONE), 'r-1 has no step "desing" — its steps are plan, implement, review.');
-  assert.match(
-    refused(atPlan(CANCELLED), 'plan', PLAN_DONE) ?? '',
-    /^r-1 was cancelled at .*, and a cancelled run files nothing, so an approval would never be honoured\./,
-  );
-  assert.equal(
+  names(refused(atPlan(), 'desing', PLAN_DONE), 'r-1 has no step "desing"', 'plan, implement, review');
+  names(refused(atPlan(CANCELLED), 'plan', PLAN_DONE), `r-1 was cancelled at ${CANCELLED.cancelledAt}`, 'nemia start');
+  names(
     refused(
       run({ plan: 't1', implement: 't2', review: null }, { gates: ['plan'] }),
       'implement',
       phases({ t1: 'succeeded', t2: 'succeeded' }),
     ),
-    "implement has no gate: what waits on it is filed once it has signed off, with nobody's approval, so there is nothing to approve. r-1 is gated at plan. A gate is set on a step, `gate: true`, or at start: nemia start --gate <step>.",
+    'implement has no gate',
+    'r-1 is gated at plan',
+    '`gate: true`',
+    'nemia start --gate <step>',
   );
   assert.match(refused(atPlan({ gates: undefined }), 'plan', PLAN_DONE) ?? '', /^plan has no gate: .* r-1 is gated at no step\./);
-  assert.equal(
+  names(
     refused(atPlan({ approvals: [approval('plan', 1, 'yes')] }), 'plan', PLAN_DONE),
-    'try 1 of plan is already approved, at 2026-09-16T23:10:00.000Z, with words: what waits on it is filed on the next tick, once. To send it back instead, before that tick: nemia retry r-1 plan --message "<objection>".',
+    'try 1 of plan is already approved',
+    '2026-09-16T23:10:00.000Z',
+    'nemia retry r-1 plan --message "<objection>"',
   );
   const sendBack: RetryAsk = { step: 'plan', try: 2, mode: 'nudge', message: 'store it first', at: '2026-09-16T23:00:00.000Z' };
-  assert.match(
-    refused(atPlan(), 'plan', PLAN_DONE, signedDone, undefined, [sendBack]) ?? '',
-    /^try 2 of plan is already asked for \(--nudge, at 2026-09-16T23:00:00\.000Z\): the next tick sends it back, and an approval of try 1 would be spent by it at once\. /,
+  names(
+    refused(atPlan(), 'plan', PLAN_DONE, signedDone, undefined, [sendBack]),
+    'try 2 of plan is already asked for',
+    '(--nudge, at 2026-09-16T23:00:00.000Z)',
+    'try 1',
   );
 
   const blocked = () => ({ outcome: 'blocked' as const, summary: 's', artifacts: [], needs: 'which reading?' });
@@ -7935,33 +7993,33 @@ test('sending back from a gate is `nemia retry --message`: a step at its gate �
   const refusal = (r: Run, how: RetryHow, p = PLAN_DONE) => retryRefusal(PLANNED, r, 'plan', how, p, signedDone, asked);
   assert.equal(refusal(atPlan(), { mode: 'nudge', message: 'store the flag before you parse it' }), null);
   assert.equal(refusal(atPlan(), { mode: 'fresh', message: 'start over from the second reading' }), null);
-  assert.equal(
+  names(
     refusal(atPlan(), { mode: 'nudge' }),
-    'plan is awaiting approval: a try of it sends it back from its gate, and one with no words tells its session nothing to change, so it would sign off as it did. Say what to change: nemia retry r-1 plan --message "<objection>" — or approve it: nemia approve r-1 plan.',
+    'plan is awaiting approval',
+    'nemia retry r-1 plan --message "<objection>" —',
+    'nemia approve r-1 plan',
   );
-  assert.match(
-    refusal(atPlan(), { mode: 'fresh' }) ?? '',
-    /Say what to change: nemia retry r-1 plan --message "<objection>" --fresh — or approve it/,
-  );
-  assert.equal(
-    refusal(atPlan(), { mode: 'recheck' }),
-    '--recheck runs a step\'s check again, and plan is awaiting approval: no check of it failed. To send it back from its gate, say what to change: nemia retry r-1 plan --message "<objection>".',
-  );
+  names(refusal(atPlan(), { mode: 'fresh' }), 'nemia retry r-1 plan --message "<objection>" --fresh', 'nemia approve r-1 plan');
+  names(refusal(atPlan(), { mode: 'recheck' }), '--recheck', 'plan is awaiting approval', 'nemia retry r-1 plan --message "<objection>".');
 
   const approved = atPlan({ approvals: [approval('plan', 1)] });
   assert.equal(
     refusal(approved, { mode: 'nudge', message: 'not yet: store it first' }),
     null,
-    'approved, and nothing after it filed: an approval given before the send-back',
+    'approved, nothing after it filed: before the send-back',
   );
-  assert.match(
-    refusal(approved, { mode: 'nudge' }) ?? '',
-    /^plan is approved \(try 1, at 2026-09-16T23:10:00\.000Z\), and nothing after it is filed yet: .* — or leave it approved, and the next tick files what waits on it\.$/,
+  names(
+    refusal(approved, { mode: 'nudge' }),
+    'plan is approved (try 1, at 2026-09-16T23:10:00.000Z)',
+    'nothing after it is filed yet',
+    'nemia retry r-1 plan --message "<objection>"',
   );
   const handedOn = run({ plan: 't1', implement: 't2', review: null }, { gates: ['plan'], approvals: [approval('plan', 1)] });
-  assert.equal(
+  names(
     refusal(handedOn, { mode: 'nudge', message: 'too late' }, phases({ t1: 'succeeded', t2: 'running' })),
-    'plan signed off done and declares no check: what waits on it has been filed, and there is nothing to try again.',
+    'plan signed off done',
+    'has been filed',
+    'nothing to try again',
   );
   const terminal: Workflow[] = [{ ...step('implement'), check: 'npm test' }];
   const last = run(
@@ -7974,9 +8032,10 @@ test('sending back from a gate is `nemia retry --message`: a step at its gate �
     undefined,
     'a step nothing waits on has handed on once approved: a send-back would file a session on a finished, maybe merged, run',
   );
-  assert.equal(
+  names(
     retryRefusal(terminal, last, 'implement', { mode: 'nudge', message: 'one more thing' }, passed, signedDone, asked),
-    'implement is verified: its check passed, and there is nothing to try again.',
+    'implement is verified',
+    'nothing to try again',
   );
   assert.equal(
     retryRefusal(
@@ -8085,14 +8144,18 @@ test("REFUSED at a gate: `cancelPlan` calls a run waiting at its gate off — it
   const r = run({ implement: 't1', review: 't2', ship: null }, { gates: ['review'] });
   const handed = (name: string) =>
     name === 'review' ? { outcome: 'done' as const, summary: 's', artifacts: [], output: { again: false } } : signedDone();
-  const refusal = roundAsk(looped, r, 'review', phases({ t1: 'succeeded', t2: 'succeeded' }), handed, asked);
-  assert.deepEqual(refusal, {
-    refusal:
-      'review signed off without asking for another round (`again: false`), and waits at its gate: a person\'s word moves it, not a round. Approve it — nemia approve r-1 review — or send it back: nemia retry r-1 review --message "<objection>".',
-  });
+  const answer = roundAsk(looped, r, 'review', phases({ t1: 'succeeded', t2: 'succeeded' }), handed, asked);
+  assert.deepEqual(Object.keys(answer), ['refusal']);
+  names(
+    (answer as { refusal: string }).refusal,
+    '(`again: false`)',
+    'waits at its gate',
+    'nemia approve r-1 review',
+    'nemia retry r-1 review --message "<objection>"',
+  );
   assert.deepEqual(
     roundAsk(looped, r, 'review', phases({ t1: 'succeeded', t2: 'succeeded' }), handed, asked, [], () => undefined, 5),
-    refusal,
+    answer,
     'with --budget, the same: the round has ended, and waits for a person',
   );
 });
@@ -8139,7 +8202,7 @@ test('every step after an approved gate is handed the approval and its words und
     review.includes(
       'plan, try 1, approved at 2026-09-16T23:10:00.000Z, with no words.\n\nimplement, try 1, approved at 2026-09-16T23:10:00.000Z:\n\n````text\nthe ```fence``` stays\n````',
     ),
-    `in the order the steps run, words that open a fence of their own inside the section's, and none says so:\n${review}`,
+    `in the order the steps run, an approval's text that opens a fence of its own inside the section's, and none says so:\n${review}`,
   );
 
   const resumed: Workflow[] = [step('plan'), { ...step('implement', ['plan']), resume: 'plan' }];
@@ -8215,11 +8278,17 @@ test("REFUSED at a gate, pass after pass: a wordless ask for the next try — as
     approvalRefusal(PLANNED, atPlan(), 'plan', undefined, PLAN_DONE, signedDone, asked, () => undefined, [wordless]),
     'try 2 of plan is asked for (--nudge, at 2026-09-16T23:00:00.000Z) with no words, and plan is at its gate, so no tick honours it: a send-back says what to change. Delete that ask — retry-plan-2, in the run\'s .asks directory — then approve it, or send it back with words: nemia retry r-1 plan --message "<objection>".',
   );
-  assert.equal(
+  names(
     retryRefusal(PLANNED, atPlan(), 'plan', { mode: 'nudge', message: 'store it first' }, PLAN_DONE, signedDone, asked, () => undefined, [
       wordless,
     ]),
-    'try 2 of plan is asked for (--nudge, at 2026-09-16T23:00:00.000Z) with no words, and plan is awaiting approval, so no tick honours it: a send-back says what to change. Delete that ask — retry-plan-2, in the run\'s .asks directory — and ask again: nemia retry r-1 plan --message "<objection>".',
+    'try 2 of plan is asked for',
+    '(--nudge, at 2026-09-16T23:00:00.000Z)',
+    'with no words',
+    'plan is awaiting approval',
+    'retry-plan-2',
+    '.asks',
+    'nemia retry r-1 plan --message "<objection>"',
   );
   assert.match(
     approvalRefusal(PLANNED, atPlan(), 'plan', undefined, PLAN_DONE, signedDone, asked, () => undefined, [withWords]) ?? '',
@@ -8423,12 +8492,12 @@ test('REFUSED: a try of the ending step itself, which has not run — it names t
     "ship is at its gate, and nothing of it has run: it ends the run in the repository's own checkout, and your approval is what files it, so there is no try of it to replace. " +
       'Approve it: nemia approve r-1 ship — or send the work back: nemia retry r-1 review --message "<objection>".',
   );
-  assert.equal(
-    retryRefusal(ENDS, atEnd(), 'ship', { mode: 'fresh', message: 'merge it the other way round' }, DONE, signedDone, asked)?.startsWith(
-      'ship is at its gate, and nothing of it has run',
-    ),
-    true,
+  namesFor(
     'with words, and with --fresh, the same: what is missing is not the objection, it is a try to replace',
+    retryRefusal(ENDS, atEnd(), 'ship', { mode: 'fresh', message: 'merge it the other way round' }, DONE, signedDone, asked),
+    'ship is at its gate',
+    'nothing of it has run',
+    'nemia approve r-1 ship',
   );
   const ran = atEnd({ steps: { ship: { taskId: 't3', workspace: '/repo', branch: 'main' } }, approvals: [approval('ship', 1)] });
   assert.equal(
@@ -9103,24 +9172,24 @@ test("REFUSED while the work goes round again: an ending's gate does not hold on
   );
   assert.equal(stepStatus(SHIP, r, DONE, said(false), asked, looping), 'awaiting approval');
 
-  assert.deepEqual(
-    roundAsk(looping, r, 'review', DONE, said(false), asked),
-    {
-      refusal:
-        "review signed off without asking for another round (`again: false`), so its loop is over — and nothing waiting on it has been filed: the run is at ship's gate, " +
-        'where nothing of ship has run and your approval is what files it. Approve it: nemia approve r-1 ship — or send the work back: nemia retry r-1 review --message "<objection>".',
-    },
+  const atGate = roundAsk(looping, r, 'review', DONE, said(false), asked);
+  assert.deepEqual(Object.keys(atGate), ['refusal']);
+  const gateRefused = (atGate as { refusal: string }).refusal;
+  names(gateRefused, '(`again: false`)', "ship's gate", 'nemia approve r-1 ship', 'nemia retry r-1 review --message "<objection>"');
+  assert.ok(
+    !gateRefused.includes('What waits on it has been filed'),
     "refused there, and not with what waits on it has been filed: nothing has been, and what the run waits for is a person's word",
   );
   const plain: Workflow[] = [looping[0], looping[1], step('docs', ['review'])];
   const withDocs = run({}, { steps: { ...r.steps, docs: { taskId: 't3', workspace: '/wt', branch: 'wf/r-1/implement' } } });
-  assert.deepEqual(
-    roundAsk(plain, withDocs, 'review', DONE, said(false), asked),
-    {
-      refusal:
-        'review signed off without asking for another round (`again: false`), so its loop is over and there is nothing to go round again. What waits on it has been filed: nemia ls r-1.',
-    },
+  const handedOn = roundAsk(plain, withDocs, 'review', DONE, said(false), asked);
+  assert.deepEqual(Object.keys(handedOn), ['refusal']);
+  namesFor(
     'a loop whose follower is a step like any other says what waits on it HAS been filed',
+    (handedOn as { refusal: string }).refusal,
+    '(`again: false`)',
+    'What waits on it has been filed',
+    'nemia ls r-1',
   );
 });
 
@@ -9774,7 +9843,7 @@ test('REFUSED: landingDue aborts a merge it is not to commit — a check that re
   assert.deepEqual(
     due(atLanding(), 'checking', 'succeeded', 'failed', STAGED, 'm', 1),
     { ...abort('its check refused the merge (exit 1)'), refusedOn: 'base000' },
-    'a refusal of the staged merge names the base it was staged on, which `nemia merge` reads',
+    'names the base it was staged on, for `nemia merge`',
   );
   const { head: _, ...headless } = STAGED;
   assert.deepEqual(
@@ -9997,14 +10066,8 @@ test("REFUSED: nemia rm of a run whose ending's merge is staged and not landed, 
       merging,
     );
   const refusal = forget(r, 'ours');
-  assert.match(
-    String(refusal),
-    /ship's merge is staged in the repository's checkout \(\/repo\), and the run has not yet committed or aborted it/,
-  );
-  assert.match(
-    String(refusal),
-    /The next tick lands it, cancelled or not: nemia rm r-1 once nemia ls r-1 says what became of ship's merge/,
-  );
+  names(String(refusal), "ship's merge is staged", '(/repo)', 'not yet committed or aborted');
+  names(String(refusal), 'The next tick lands it', 'nemia rm r-1 once nemia ls r-1');
   assert.match(
     String(forget(r, 'none')),
     /ship signed off, and the run has not yet checked its merge and committed or aborted it/,
@@ -10065,44 +10128,54 @@ test("`nemia retry`'s refusals, whole: a `--model` an `auto` step would drop, on
   ) => retryRefusal(steps, r, name, how, phases(p), signedDone, asked, () => verdict, asks);
   const remote: Workflow[] = [{ ...step('implement'), harness: 'a2a:reviewer' }, step('review', ['implement'])];
   const failed = run({ implement: 't1', review: null });
-  assert.equal(
+  names(
     refusal(STEPS, failed, { t1: 'failed' }, { mode: 'nudge', model: 'haiku' }),
-    "`--model haiku`: implement names no `permissionMode:`, so it is filed in `auto`, the runtime's default, and Claude Code drops `auto` on that model: the session runs in `default`, and a job denies every call `default` would ask about. The step's mode is frozen with the run, so ask for a model that keeps `auto` — nemia retry r-1 implement --model sonnet, or opus, or fable — or, to run it on haiku, start a run of a folder whose step names a mode the model keeps: `permissionMode: acceptEdits`, or `permissionMode: dontAsk` with `allowedTools:` rules.",
+    '`--model haiku`',
+    'no `permissionMode:`',
+    'nemia retry r-1 implement --model sonnet',
+    '`permissionMode: acceptEdits`',
+    '`permissionMode: dontAsk`',
+    '`allowedTools:`',
   );
-  assert.equal(
+  names(
     refusal(remote, failed, { t1: 'failed' }, { mode: 'fresh', model: 'opus' }),
-    '`--model opus` is how a harness of ours is to run the session, and a remote agent runs as its operator configured it: A2A carries no such argument, and the runtime refuses a task filed with one, and implement runs on `harness: a2a:reviewer`, a remote A2A agent: its try would be sent without it. Ask without --model: nemia retry r-1 implement.',
+    '`--model opus`',
+    '`harness: a2a:reviewer`',
+    'without --model: nemia retry r-1 implement.',
   );
-  assert.equal(
+  names(
     refusal(remote, failed, { t1: 'failed' }, { mode: 'nudge', budget: 5 }),
-    '`--budget 5` is a spend cap a harness of ours keeps, and a remote agent keeps none and reports no cost, and implement runs on `harness: a2a:reviewer`, a remote A2A agent: its try would be sent without it. Ask without --budget: nemia retry r-1 implement.',
+    '`--budget 5`',
+    '`harness: a2a:reviewer`',
+    'without --budget: nemia retry r-1 implement.',
   );
-  assert.equal(
+  names(
     refusal(RETRIED, onTry([], 'c1', CANCELLED), { t1: 'succeeded', c1: 'stopped' }, { mode: 'nudge' }),
-    'r-1 was cancelled at 2026-01-02T00:00:00Z, and a cancelled run files nothing, so a retry would never be honoured. Start a new run for the work with nemia start.',
+    'r-1 was cancelled at 2026-01-02T00:00:00Z',
+    'nemia start',
   );
-  assert.equal(
-    refusal(STEPS, failed, { t1: 'running' }, { mode: 'nudge' }, [], 'review'),
-    'review has not been filed yet, so there is no try to replace. Wait for it: nemia ls r-1.',
-  );
-  assert.equal(
+  names(refusal(STEPS, failed, { t1: 'running' }, { mode: 'nudge' }, [], 'review'), 'review has not been filed yet', 'nemia ls r-1');
+  names(
     refusal(RETRIED, onTry(), { t1: 'succeeded', c1: 'running' }, { mode: 'nudge' }),
-    "implement's check is still due or running, so there is no verdict to act on yet. Wait for it: nemia ls r-1.",
+    "implement's check is still due or running",
+    'nemia ls r-1',
   );
-  assert.equal(
+  names(
     refusal(RETRIED, onTry(), { t1: 'succeeded', c1: 'failed' }, { mode: 'nudge' }, [], 'implement', 1),
-    'the run tries implement again itself: its check refused, and `retries: 2` has 2 left, so the next tick files try 2. Wait for it: nemia ls r-1.',
+    'the run tries implement again itself',
+    '`retries: 2` has 2 left',
+    'try 2',
+    'nemia ls r-1',
   );
   const waiting = { t1: 'succeeded', c1: 'stopped' } as const;
-  assert.equal(
+  names(
     refusal(RETRIED, onTry(), waiting, { mode: 'nudge', budget: 5 }),
-    "--budget raises a step's cap, and implement has no `budget:`, so there is no cap to raise. Try it without --budget: nemia retry r-1 implement.",
+    'implement has no `budget:`',
+    'without --budget: nemia retry r-1 implement.',
   );
-  assert.equal(
-    refusal(RETRIED, onTry(), waiting, { mode: 'nudge', budget: 5 }, [askFor(2)]),
-    'try 2 of implement is already asked for (--nudge, at 2026-09-13T10:00:00.000Z), and the next tick honours it once. Wait for it: nemia ls r-1.',
-    'an ask already waiting is said first, before the --budget the step would refuse',
-  );
+  const waited = refusal(RETRIED, onTry(), waiting, { mode: 'nudge', budget: 5 }, [askFor(2)]);
+  names(waited, 'try 2 of implement is already asked for', '(--nudge, at 2026-09-13T10:00:00.000Z)', 'nemia ls r-1');
+  assert.ok(!waited!.includes('`budget:`'), 'an ask already waiting is said first, before the --budget the step would refuse');
 });
 
 test('`forgetRefusal` says its reasons in one order, whole — in flight, the gates, what is due, the asks unheard, the runs stranded, the runs held, and each fix in the same order — and each in its plural', () => {

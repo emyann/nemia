@@ -161,7 +161,7 @@ The tests need no live harness, and nothing a clean `ubuntu-latest` lacks: the a
 (`apps/api/test/harness.ts`), the one docker-shaped test stubs `docker`, every `fetch` is loopback, and the live tests run only under
 `AE_LIVE=1`, which CI never sets.
 
-**Prose is not what holds the workflow to the repository.** `packages/agent-orchestrator/test/ci-workflow.test.ts` refuses, each by its
+**Prose is not what holds the workflow to the repository.** `tools/guards/test/ci-workflow.test.ts` refuses, each by its
 own sentence naming the fix: a workspace with a suite and no leg, a leg that does not filter to its own workspace, a node floor adrift
 from `engines.node`, a job that pins its node by hand and pins it off that floor — or pins none at all — a hidden path uploaded
 without `include-hidden-files`, a node version left unquoted (YAML reads `24.16` as a number and setup-node installs another
@@ -185,12 +185,12 @@ bytes are not checked against a sha256, a scan missing `--log-opts`, `--redact`,
 and the self-check step dropped from the job; and, over `.gitleaks.toml` itself, a top-level `[[allowlists]]`, an allowlist not nested
 under one `[[rules]]` block carrying `id = "generic-api-key"`, a `[[rules]]` block carrying any other key — which replaces the default
 rule rather than extending it, leaving a rule that detects nothing — a `paths` scope wider than the one file, a regex anchored at
-neither end, and a stub secret that file writes which no regex there matches. `packages/agent-orchestrator/test/repo-guards.test.ts`
+neither end, and a stub secret that file writes which no regex there matches. `tools/guards/test/repo-guards.test.ts`
 holds the two things that are not the workflow: a path of `CODEOWNERS` left out, given to somebody else or to nobody, the manifest line
 written `/package.json` and so owning the root's alone, and a package without its `private` line. What the gate's script decides is not
-read but run, in `packages/agent-orchestrator/test/ci-gate.boundary.test.ts`, the build job's staleness step likewise in
-`packages/agent-orchestrator/test/ci-build.boundary.test.ts`, and the scan job's two shell steps in
-`packages/agent-orchestrator/test/ci-scan.boundary.test.ts` — the ranges it resolves on a pull request, a push, a branch's first push and
+read but run, in `tools/guards/test/ci-gate.boundary.test.ts`, the build job's staleness step likewise in
+`tools/guards/test/ci-build.boundary.test.ts`, and the scan job's two shell steps in
+`tools/guards/test/ci-scan.boundary.test.ts` — the ranges it resolves on a pull request, a push, a branch's first push and
 a dispatch, the flags that reach the binary, its three verdicts, and each refusal of the self-check, over a `gitleaks` stub. Each of the
 three ends on a step that reads right and decides wrong: the staleness step that lists the stale files and forgets to fail, the scan step
 that calls every exit 1 a secret found, and the gate run

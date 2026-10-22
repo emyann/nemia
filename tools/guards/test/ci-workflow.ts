@@ -39,10 +39,24 @@ export const GENERATED = ['apps/web/src/routeTree.gen.ts', 'apps/web/theme/'];
 /** What the build job's staleness step is called, so the guard and the boundary test find the same step. */
 export const STALE_STEP = 'Refuse a stale generated file';
 
+/**
+ * The workspace that has a job of its own rather than a leg, by its turbo name and its folder, and that job: the guards' suite runs
+ * only when `due.ts` says the event touched what they read, a decision a matrix leg cannot carry.
+ */
+export const OWN_JOB = { name: 'guards', folder: 'tools/guards', job: 'guards' } as const;
+
+/** The id of the guards job's step that decides whether the suite is due, and the command it runs. */
+export const DUE_STEP = 'due';
+export const DUE_COMMAND = 'node tools/guards/due.ts';
+
+/** The condition the guards' suite step runs under: the due step's answer, so a skipped step leaves the job `success`. */
+export const DUE_IF = "steps.due.outputs.due == 'true'";
+
 /** The command the shards run, which the guard reads the shard's flags off. */
 export const E2E_COMMAND = 'npm run e2e';
 
 export type Step = {
+  id?: string;
   name?: string;
   if?: string;
   uses?: string;
@@ -61,7 +75,7 @@ export type Job = {
 
 export type Workflow = {
   name?: string;
-  on?: Record<string, { branches?: string[] } | null>;
+  on?: Record<string, { branches?: string[]; paths?: string[]; 'paths-ignore'?: string[] } | null>;
   permissions?: Record<string, string>;
   concurrency?: { group?: string; 'cancel-in-progress'?: unknown };
   jobs: Record<string, Job>;

@@ -3,7 +3,7 @@
 # A reader of CI has no test to ask, so the reasons are beside the lines. What this file must agree with in the repository — a workspace
 # with no leg, a node floor adrift from engines.node, a job outside the gate's needs, an action that is not GitHub's own by major tag,
 # a set of shards that does not tile a suite, a second timezone run for a workspace that reads no local time —
-# is refused by packages/agent-orchestrator/test/ci-workflow.test.ts, not by this comment.
+# is refused by tools/guards/test/ci-workflow.test.ts, not by this comment.
 name: ci
 
 # A pull request is tested by pull_request, which runs the fork's code against a token that can only read. The sibling trigger that
@@ -272,7 +272,7 @@ jobs:
         # without it, and every difference between the two runs is named below.
         #
         # The controls are generated here, not written down, so this file holds no string any gitleaks rule matches. What the step
-        # refuses is run rather than read, in packages/agent-orchestrator/test/ci-scan.boundary.test.ts.
+        # refuses is run rather than read, in tools/guards/test/ci-scan.boundary.test.ts.
         run: |
           fixture=$(mktemp -d)
           # The reports go outside the fixture: a report holds the secrets it found, so one written beside the fixture's files would be
@@ -401,12 +401,43 @@ jobs:
             exit 1
           fi
 
+  guards:
+    # The repository's own guards (tools/guards): tests of this file, the docs and the workflows, run only when the push or the pull
+    # request touched what they read — the guards#test inputs in turbo.json, or a workspace they depend on — which due.ts decides.
+    # The job runs on every event and its suite step alone is skipped: a skipped step leaves the job success, so the gate's whitelist
+    # below stands. A workflow-level paths: would skip the whole of ci, the gate with it, and its required context would never report.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The whole history: due.ts diffs the range from the commit before this push, or the pull request's base, which the shallow
+          # default has not, and a range git cannot resolve is read as due — the suite would run on every event.
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24.16.0'
+      - run: npm ci
+      - name: Decide whether the guards' suite is due
+        id: due
+        # The shas come through env, never interpolated into the command line, as the gitleaks scan takes them; GITHUB_EVENT_NAME,
+        # GITHUB_SHA and GITHUB_OUTPUT are GitHub's own.
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BEFORE: ${{ github.event.before }}
+        run: node tools/guards/due.ts
+      - name: test under TZ=UTC
+        if: steps.due.outputs.due == 'true'
+        run: npx turbo run test --force --filter=guards
+        env:
+          TZ: UTC
+
   # The one context branch protection requires. It needs every other job, so protection is configured once and never touched as the job
   # list changes, and always() makes it run even when one of them fails, is skipped or is cancelled — each of which it reads as a failure.
   ci:
     runs-on: ubuntu-latest
     if: always()
-    needs: [test, lint, typecheck, e2e, e2e-bound, build, gitleaks]
+    needs: [test, lint, typecheck, e2e, e2e-bound, build, gitleaks, guards]
     steps:
       - name: Every job succeeded
         # toJSON(needs) goes through env, never interpolated into the shell: on a pull request from a fork, an expression the branch

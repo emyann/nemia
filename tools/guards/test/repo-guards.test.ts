@@ -33,7 +33,7 @@ export const OWNER = '@emyann';
 export const OWNED = ['/.github/', '/.claude/settings.json', '/workflows/', 'package.json'];
 
 /** The packages that are published from nowhere, so that an accidental `npm publish -w` is refused by npm itself. */
-export const PRIVATE = ['packages/agent-orchestrator', 'packages/agent-runtime'];
+export const PRIVATE = ['packages/agent-orchestrator', 'packages/agent-runtime', 'tools/guards'];
 
 /**
  * Each line of `CODEOWNERS` that owns something, as git reads them: a pattern and the owners after it, the comments left out. The

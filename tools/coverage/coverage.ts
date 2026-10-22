@@ -139,8 +139,10 @@ const takeIn = (arms: Range[], ranges: Range[], taken: Set<string>, file: string
 const lineAt = (text: string) => {
   const starts = [0];
   for (let at = text.indexOf('\n'); at !== -1; at = text.indexOf('\n', at + 1)) starts.push(at + 1);
-  return (from: number) =>
-    starts.findLastIndex((start) => start <= from + (/^\s*/.exec(text.slice(from, from + 200))?.[0].length ?? 0)) + 1;
+  return (from: number) => {
+    const at = from + /^\s*/.exec(text.slice(from, from + 200))![0].length;
+    return starts.filter((start) => start <= at).length;
+  };
 };
 
 /** The arms of each source file from the suite's processes, read twice (every range, then which each took) to hold one at a time. */
@@ -204,18 +206,15 @@ export const recordOf = (
 };
 
 /**
- * The lines of the arms `was` took that `now` takes no more: an arm `now` knows is read as it says; one it does not know ran, in
- * every process of `now`, as often as the innermost range around it, and is read as that range.
+ * The lines of the arms `was` took that `now` takes no more, each read as the innermost range of `now` around it, itself where
+ * `now` knows it: an arm `now` never reported ran, in every process of it, as often as that range.
  */
 const armsLostIn = (was: FileCoverage['arms'], now: FileCoverage['arms'] = { taken: {}, untaken: {} }): number[] => {
-  const span = (key: string) => key.split('-').map(Number);
+  const spans = Object.keys({ ...now.taken, ...now.untaken }).map((key) => [key, ...key.split('-').map(Number)] as const);
   const takenNow = (key: string): boolean => {
-    if (key in now.taken || key in now.untaken) return key in now.taken;
-    const [start, end] = span(key);
-    const around = Object.keys({ ...now.taken, ...now.untaken })
-      .filter((other) => span(other)[0] <= start && end <= span(other)[1])
-      .sort((a, b) => span(b)[0] - span(a)[0] || span(a)[1] - span(b)[1])[0];
-    return around !== undefined && around in now.taken;
+    const [start, end] = key.split('-').map(Number);
+    const around = spans.filter(([, s, e]) => s <= start && end <= e).sort(([, a, x], [, b, y]) => b - a || x - y)[0];
+    return around !== undefined && around[0] in now.taken;
   };
   const lost = Object.entries(was.taken).flatMap(([key, line]) => (takenNow(key) ? [] : [line]));
   return [...new Set(lost)].sort((a, b) => a - b);

@@ -174,7 +174,7 @@ export const CLAUDE_JOB_BIN = path.join(path.dirname(fileURLToPath(import.meta.u
  *
  * The stream's first line names the session, so its id is known while it runs and its transcript can be read then; each call it
  * was denied is a line as it happens, so a job killed before its result still says what it was denied (`claudeStreamOutput`).
- * Nobody is there to ask, so the bin runs the session `permissionPrompts: 'none'` (`sdk.d.ts:1870`): a call that would ask is
+ * Nobody is there to ask, so the bin runs the session `permissionPrompts: 'none'` (`sdk.d.ts:2054`): a call that would ask is
  * denied at once, never waited on, and no decision of the bin's can be left in flight when it dies.
  *
  * Its input is a stream too: the brief is the first user message on its stdin, and each word said to it while it works is

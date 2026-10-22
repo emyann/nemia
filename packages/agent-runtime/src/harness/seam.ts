@@ -75,7 +75,7 @@ export type LocalMcpServer = { type?: 'stdio'; command: string; args?: string[];
 /**
  * A server the harness connects to, as a `.mcp.json` entry gives it, with the facts of an OAuth client where one signs in.
  *
- * `oauth` is **not declared** on the SDK's type for an HTTP server (`sdk.d.ts:1083-1098`): it was measured working at SDK 0.3.270 — a
+ * `oauth` is **not declared** on the SDK's type for an HTTP server (`sdk.d.ts:1205-1220`): it was measured working at SDK 0.3.270 — a
  * server handed inline with it reported `needs-auth`, signed in, and a second session with the same config found the sign-in — and
  * it rides the untyped seam, so an SDK that renames or validates it breaks the sign-in with nothing failing the typecheck. It carries
  * no secret: Claude Code reads the client secret from its own store alone, and `oauth` sits outside the sign-in key's hash

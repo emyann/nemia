@@ -15,7 +15,7 @@
  * - Its input is the stdin the worker writes: the brief's line first, then each word a person says (`claudeJobSpec.input.line`),
  *   each pushed on the SDK's streaming prompt as a user message of its own. The prompt ends when stdin ends, which the worker does
  *   at the session's `result` line (`closesOn`), and the session ends with it — a job is one prompt.
- * - `permissionPrompts: 'none'` (`sdk.d.ts:1870`) is what `--permission-prompts none` was: nobody is here to ask, so a call that
+ * - `permissionPrompts: 'none'` (`sdk.d.ts:2054`) is what `--permission-prompts none` was: nobody is here to ask, so a call that
  *   would prompt is denied at once and the session carries on, and Claude Code prints the `system`/`permission_denied` line the
  *   readers count as a denial. `canUseTool` is never called, so no decision of this process can be left in flight when it dies.
  * - The SDK is given no `spawnClaudeCodeProcess`: unlike a holder, which detaches its children so a let-go leaves a group to kill,

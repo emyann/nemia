@@ -1,7 +1,7 @@
 /**
  * What a harness says of the MCP servers it was handed: the other half of `mcp.ts`, which is about the config handed in.
  *
- * `mcpServerStatus()` is a method on the Agent SDK's `query()` object (`sdk.d.ts:2775`), so a state can be read only from inside a
+ * `mcpServerStatus()` is a method on the Agent SDK's `query()` object (`sdk.d.ts:3078`), so a state can be read only from inside a
  * session. The read opens one short-lived Claude Code session with **every** server of a record inline (`mcpServerOf`, the one
  * producer, so the bytes judged here are the bytes a task's own session will run), asks it once, and ends it. Its input is a stream
  * nothing is ever pushed on, so no turn begins and the read costs no token — a CLI spawn of seconds, and nothing else.
@@ -15,7 +15,7 @@ import { mcpServerOf } from './mcp.ts';
 import type { RemoteMcpServer } from './seam.ts';
 import { withoutTelemetry } from './telemetry.ts';
 
-/** The five words a harness has for a server's state, as the SDK reports them (`sdk.d.ts:1127-1166`), carried and never re-worded. */
+/** The five words a harness has for a server's state, as the SDK reports them (`sdk.d.ts:1265-1315`), carried and never re-worded. */
 export const MCP_STATES = ['connected', 'needs-auth', 'failed', 'pending', 'disabled'] as const;
 
 /** One server's state, as the harness says it: its words, how many tools it offers while connected, and its error while failed. */

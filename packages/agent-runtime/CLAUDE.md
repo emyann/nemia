@@ -103,7 +103,7 @@ down is in `docs/architecture.md`, *Who owns what*.
   the SDK translation: `attachedOptions` is one function for both roads, and a flag added there reaches a held session and a job
   alike. The runner writes the bin its spawn request as a file (`HarnessSpec.needsRequest`, `<name>.request.json`, owner-only
   because the task's `config.mcp` may carry a secret), since no argv could carry it.
-- **A job is denied by `permissionPrompts: 'none'`** (`sdk.d.ts:1870`), never by a `canUseTool` of ours: a decision in the bin's
+- **A job is denied by `permissionPrompts: 'none'`** (`sdk.d.ts:2054`), never by a `canUseTool` of ours: a decision in the bin's
   process would die with it, and Claude Code prints the `system`/`permission_denied` line the readers already count.
 - **A detached session's id is read by the worker from its spec's `start` event, on whole stdout lines** (`readers`, `bin/ae-worker.ts`).
   Measured 2026-10-06: `codex exec --json` (0.154.0) prints `thread.started` first; `claude -p` (2.1.291) prints `system`/`init` first
@@ -139,7 +139,7 @@ down is in `docs/architecture.md`, *Who owns what*.
   the `initialize` request carried `[""]` without it, and none with it). The agent's own prompt rides that preset's `append`, as the
   file's text read at spawn, and reaches the CLI as `appendSystemPrompt` on the `initialize` request, never as
   `--append-system-prompt-file`; so does `systemPromptFile`, as `systemPrompt` alone, and a task giving both is refused by name. A
-  resumed session keeps the prompt it was recorded with (`systemPrompt`'s own `snapshot`, which defaults on, `sdk.d.ts:2203-2256`),
+  resumed session keeps the prompt it was recorded with (`systemPrompt`'s own `snapshot`, which defaults on, `sdk.d.ts:2350-2461`),
   so a prompt file edited mid-session reaches no live session until it is compacted.
 - **An attached session's MCP servers are `Options.mcpServers`, which the SDK spells onto the child's argv as inline JSON**
   (`sdk.mjs`, `--mcp-config <json>`), with `Options.strictMcpConfig` as the fence: that path writes no MCP config file, and a
@@ -295,7 +295,7 @@ What Claude Code does as the steps meet it. Where the orchestrator's code holds 
   with background tasks off alone, moved to the background with neither), and a shell `&` still detaches, its `$!` alive to `kill -0`.
 - **A job exports logs, metrics and traces from its environment over `http/json`, flushed at exit, and joins `TRACEPARENT`** — an
   environment `attachedOptions` now composes onto `Options.env` inside the bin, where the SDK replaces the child's environment
-  entirely (`sdk.d.ts:1535`), so the engine's own telemetry is off the bin's process and the session's is on the CLI's;
+  entirely (`sdk.d.ts:1694`), so the engine's own telemetry is off the bin's process and the session's is on the CLI's;
   a `--bg` session runs in a pre-spawned process, ignores the asker's environment and `TRACEPARENT`, and exports only what `--settings`'
   `env` says; a job's Bash tool sees no `OTEL_*`, but `TRACEPARENT` (2.1.291, 2026-10-06; `claudeTelemetryEnv`, `telemeteredFlags`).
   Whether a `--bg` session's Bash tool inherits that `env`'s telemetry is unmeasured: its `env.PATH` reaches it, so a `claude -p` run

@@ -6,7 +6,7 @@
  *
  * **`mcpServers` here is the one site that names the SDK's shape for a server, so the one that says where the shape and ours part.** A
  * recorded server carries `oauth: { clientId, callbackPort }` (`mcpServerOf`), and `oauth` is not declared on the SDK's type for an
- * HTTP server (`sdk.d.ts:1083-1098`). It was measured working at SDK 0.3.270 — a server handed inline with it reported `needs-auth`,
+ * HTTP server (`sdk.d.ts:1205-1220`). It was measured working at SDK 0.3.270 — a server handed inline with it reported `needs-auth`,
  * signed in, and a second session with the same config found the sign-in — and the cast is what lets it through, so no typecheck
  * reads it and no test of ours can hold it. An SDK that renames the field or validates its input breaks every sign-in silently: the
  * server simply comes back `needs-auth` for ever. Look for it in `sdk.d.ts` on each SDK bump, and say here when it is declared.
@@ -76,7 +76,7 @@ const promptText = (key: string, cwd: string, file: string): string => {
 };
 
 /**
- * The session's system prompt, as `Options.systemPrompt` takes it (`sdk.d.ts:2247-2257`): Claude Code's own preset with the agent's
+ * The session's system prompt, as `Options.systemPrompt` takes it (`sdk.d.ts:2451-2461`): Claude Code's own preset with the agent's
  * prompt appended to it (`appendSystemPromptFile`), the prompt file's text alone in place of Claude Code's (`systemPromptFile`), or
  * the bare preset where the task names neither — asked for even then, because the SDK sends an empty system prompt when
  * `systemPrompt` is unasked, and a `claude -p` job has Claude Code's own.
@@ -151,15 +151,15 @@ const askedOf = (r: SpawnRequest): AttachedOptions => ({
  * - `config.claude` with the admission's hook (`admittedFlags`) on `extraArgs`, its plugin folders as `plugins`, its settings on
  *   the SDK's own `settings`, the session's auto-memory off in them (`memorylessSettings`), and its prompt files as `systemPrompt`;
  * - the partial messages, always asked for: the SDK emits a `stream_event` for each piece of a block only when
- *   `includePartialMessages` is set (`sdk.d.ts:1736`, `--include-partial-messages` to its CLI), and a follow of the session reads
+ *   `includePartialMessages` is set (`sdk.d.ts:1896`, `--include-partial-messages` to its CLI), and a follow of the session reads
  *   their `text_delta`s and nothing else (`attached-follow.ts`); the capture goes on dropping them;
- * - the mode, `auto` unless the task names one; the servers on `Options.mcpServers` (`sdk.d.ts:1813`) and nothing but them
- *   (`Options.strictMcpConfig`, `sdk.d.ts:2145`) — the SDK spells that map onto the child's argv as inline JSON, and Claude Code
+ * - the mode, `auto` unless the task names one; the servers on `Options.mcpServers` (`sdk.d.ts:1991`) and nothing but them
+ *   (`Options.strictMcpConfig`, `sdk.d.ts:2349`) — the SDK spells that map onto the child's argv as inline JSON, and Claude Code
  *   expands a `${NAME:-default}` in a server's arguments there as it does from a config file (measured 2.1.306,
  *   `test/live.test.ts`), so the checkout's own `--output-dir` still resolves — no Chrome; `--setting-sources project`; Claude
  *   Code's own system prompt as the preset `claude_code`, which a `claude -p` job has by default and the SDK leaves empty when
  *   unasked, with the agent's own prompt appended to it (`promptOf`) and not to nothing;
- * - the model, the effort, the context window as `Settings.autoCompactWindow` in those same settings (`sdk.d.ts:8353`), the closing
+ * - the model, the effort, the context window as `Settings.autoCompactWindow` in those same settings (`sdk.d.ts:9304`), the closing
  *   statement's schema (`outputFormat`, handed on as it was given, unread), the session to resume, the worktree, and the spend cap;
  * - the environment: the engine's own, its telemetry taken out (`withoutTelemetry`), with the task's `env`, `CLAUDE_JOB_ENV` and the
  *   session's own telemetry laid over it, as a job's.

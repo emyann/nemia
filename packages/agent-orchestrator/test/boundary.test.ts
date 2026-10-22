@@ -116,6 +116,7 @@ const STORE_SHARED: Record<string, readonly string[]> = {
   'src/skills/read.store.ts': [],
   'src/meter/tally.store.ts': [],
   'src/config/config.store.ts': [],
+  'src/config/root.store.ts': ['src/config/config.store.ts'],
   'src/agents/read.store.ts': ['src/skills/read.store.ts'],
   'src/folder/folder.store.ts': ['src/agents/read.store.ts', 'src/skills/read.store.ts'],
   'src/record/steps.store.ts': ['src/config/config.store.ts', 'src/folder/folder.store.ts'],

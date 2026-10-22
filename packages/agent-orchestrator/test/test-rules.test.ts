@@ -54,11 +54,63 @@ const ALLOWED = ['packages/agent-orchestrator/test/test-rules.test.ts'];
 /** Every test file of the repository but this one, beside the code or under a `test/`, by its path from the root. */
 const testFiles = (): string[] => walk(ROOT, (name) => /\.test\.tsx?$/.test(name)).filter((f) => !ALLOWED.includes(f));
 
+/** Where the string or template opened by the quote at `i` of `text` ends, past its closing quote; a string ends at a line break. */
+const pastQuote = (text: string, i: number, quote: string): number => {
+  let k = i + 1;
+  for (; k < text.length; k++) {
+    if (text[k] === '\\') k++;
+    else if (text[k] === quote || (quote !== '`' && text[k] === '\n')) break;
+  }
+  return k + 1;
+};
+
+/** Whether the `/` at `i` of `text` opens a pattern rather than divides: what stands before it is no value. */
+const opensPattern = (text: string, i: number): boolean => {
+  let k = i - 1;
+  while (k >= 0 && /\s/.test(text[k])) k--;
+  return k < 0 || /[(,=:[!&|?{};+\-*%<>~^]/.test(text[k]) || /\b(?:return|typeof|of|in)$/.test(text.slice(Math.max(0, k - 6), k + 1));
+};
+
 /**
  * `text` with every comment blanked and its line breaks kept, so a sentence quoted in prose — a header paragraph, the example above a
- * signature — is passed over while the line numbers still read true.
+ * signature — is passed over while the line numbers still read true. Read a character at a time, past each string, template and
+ * pattern, so a `//` in a URL or a `/*` in a glob is no comment: a pattern of the text alone blanked the code after one, and every
+ * assertion it held passed the sweep unread.
  */
-const uncommented = (text: string): string => text.replace(/\/\*[\s\S]*?(?:\*\/|$)|\/\/[^\n]*/g, (found) => found.replace(/[^\n]/g, ' '));
+const uncommented = (text: string): string => {
+  const out = text.split('');
+  const blank = (from: number, to: number) => {
+    for (let k = from; k < to; k++) if (out[k] !== '\n') out[k] = ' ';
+  };
+  let i = 0;
+  while (i < text.length) {
+    const c = text[i];
+    const next = text[i + 1];
+    if (c === '/' && next === '/') {
+      const end = text.indexOf('\n', i);
+      const to = end === -1 ? text.length : end;
+      blank(i, to);
+      i = to;
+    } else if (c === '/' && next === '*') {
+      const end = text.indexOf('*/', i + 2);
+      const to = end === -1 ? text.length : end + 2;
+      blank(i, to);
+      i = to;
+    } else if (c === "'" || c === '"' || c === '`') i = pastQuote(text, i, c);
+    else if (c === '/' && opensPattern(text, i)) {
+      let k = i + 1;
+      let inClass = false;
+      while (k < text.length && text[k] !== '\n' && (inClass || text[k] !== '/')) {
+        if (text[k] === '\\') k++;
+        else if (text[k] === '[') inClass = true;
+        else if (text[k] === ']') inClass = false;
+        k++;
+      }
+      i = k + 1;
+    } else i++;
+  }
+  return out.join('');
+};
 
 /**
  * The text of the call whose `(` stands at `open`, to the `)` that closes it, or `undefined` where none does. A call and not a line:
@@ -258,6 +310,11 @@ test('REFUSED: an assertion that expects a whole sentence of what the code said 
     'a template that interpolates expects no fixed sentence',
   );
   assert.deepEqual(pinnedWords(`/** assert.equal(e.message, '${sentence}'); */\n`), [], 'and one quoted in a comment');
+  assert.equal(
+    pinnedWords(`const glob = 'src/*.ts';\nconst at = 'https://example.com/a'; assert.equal(e.message, '${sentence}');\n`).length,
+    1,
+    'a // in a string or a /* in a glob is no comment, and blanks nothing after it',
+  );
 });
 
 test('REFUSED: a floor at a bound the shipped code owns is found; a ceiling, a local bound and a wait on an event are not', () => {

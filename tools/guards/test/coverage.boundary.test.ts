@@ -31,4 +31,6 @@ test("a package's suite run with coverage records the lines its test reached in 
   for (const reached of [2, 3, 4]) assert.ok(one.lines.hitLines.includes(reached), `line ${reached} is reached: ${one.lines.hitLines}`);
   for (const missed of [6, 7]) assert.ok(!one.lines.hitLines.includes(missed), `line ${missed} is on the branch never taken`);
   assert.ok(one.branches.hit < one.branches.found, `a branch is left untaken: ${JSON.stringify(one.branches)}`);
+  assert.ok(Object.keys(one.arms.taken).length > 0, `the process's raw V8 ranges are read as arms: ${JSON.stringify(one.arms)}`);
+  assert.deepEqual(Object.values(one.arms.untaken), [6], 'the one arm untaken opens on the branch never taken');
 });

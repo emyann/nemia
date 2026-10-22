@@ -9,8 +9,8 @@
  * `plantMcpState(name, state)` plants the state a server reads as, `failMcpState(why)` makes the next read a look that failed, and
  * `mcpReads` counts the reads asked, which is how a test proves a pass read a record's states once rather than once per task.
  *
- * It keeps `file`, `view`, `list`, `stop`, `logs`, `feed`, `output`, `say`, `interrupt`, `transcript`, `forget`, `kept` and
- * `mcpState`, each
+ * It keeps `file`, `view`, `list`, `stop`, `logs`, `feed`, `output`, `say`, `interrupt`, `transcript`, `forget`, `kept`, `mcpState`
+ * and the three sign-in verbs (`signIns`, `signOuts` and `settleSignIn` read and move them), each
  * answering what the real engine answers over a harness that costs nothing: `test/engine-walks.ts` holds the walks both run, and `APART`
  * there what this one cannot say. Every other verb dies naming itself. Reached from another package through `agent-runtime/testing`
  * alone, and by no file of a `src`.
@@ -39,6 +39,8 @@ import { ForgetRefused } from './forget.ts';
 import { KeptRefused, type KeptReport } from './kept.ts';
 import { mcpStateRefusal, type TaskSpec } from './options.ts';
 import { McpStateRefused } from './mcp-state.ts';
+import type { McpSignInState } from './mcp-sign-in.ts';
+import { signInHeld } from './test-sign-in.ts';
 import { notACount, notAStream, OutputRefused } from './output.ts';
 import { SayRefused } from './say.ts';
 import { InterruptRefused } from './interrupt.ts';
@@ -246,6 +248,15 @@ export type TestEngine = {
   readonly plantMcpState: (name: string, state: TestMcpState) => void;
   /** Makes every `mcpState` read a look that failed, with `why`; `undefined` lets them read again. */
   readonly failMcpState: (why: string | undefined) => void;
+  /** Each `mcpSignIn` asked and not refused, in order: the server's name, and whether a client secret was handed — never its value. */
+  readonly signIns: Array<{ readonly name: string; readonly secret: boolean }>;
+  /** Each `mcpSignOut` asked and not refused, by the server's name, in order. */
+  readonly signOuts: string[];
+  /**
+   * Settles `name`'s waiting sign-in on `state`, freeing its callback port, as the real hold does when the server connects or its
+   * time is up.
+   */
+  readonly settleSignIn: (name: string, state: McpSignInState) => void;
 };
 
 /**
@@ -453,6 +464,9 @@ const keptOf = (
     | 'plantMcpState'
     | 'failMcpState'
     | 'mcpReads'
+    | 'signIns'
+    | 'signOuts'
+    | 'settleSignIn'
   >,
   sayRefusals: { left: number },
   sizes: Map<string, TestKeeps>,
@@ -571,10 +585,12 @@ export const testEngine = (): TestEngine => {
   const sizes = new Map<string, TestKeeps>();
   const keptFailures = { left: 0 };
   const mcp = mcpHeld();
+  const signIn = signInHeld();
   const layer = Layer.succeed(Engine)(
     Engine.of({
       ...keptOf(held, sayRefusals, sizes, keptFailures),
       mcpState: mcp.mcpState,
+      ...signIn.verbs,
       tick: unkept('tick'),
       admit: unkept('admit'),
       follow: unkept('follow'),
@@ -622,6 +638,7 @@ export const testEngine = (): TestEngine => {
     layer,
     ...held,
     ...mcp.read,
+    ...signIn.read,
     refuseSay,
     settle,
     keeps,

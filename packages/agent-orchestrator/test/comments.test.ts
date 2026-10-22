@@ -9,7 +9,7 @@
  * file a guard block covers.
  *
  * No line that holds a comment is wider than oxfmt's print width, which wraps code but rewraps no comment: the plugin's rule refuses
- * one, and a scan of every source file under packages/, apps/, lint/ and tools/ is the floor under it.
+ * one, in every folder a guard block covers.
  *
  * The design system kit the shadcn CLI writes into the board, and its skills beside it, are another repository's code, fetched again
  * at each update: the linter skips them (`"ignorePatterns"`) and so do the scans here, and no other folder may join them.
@@ -474,38 +474,6 @@ function commentsOf(file: string, text: string): Found[] {
   visit(source);
   return [...found.values()].sort((a, b) => a.line - b.line);
 }
-
-/**
- * Each line of `text` that holds any part of a comment and is wider than 140 columns, measured whole in code points, indentation and code
- * before the comment included: `<file>:<line> is <n> columns`, each line once, in order.
- */
-function wideCommentLines(file: string, text: string): string[] {
-  const lines = text.split('\n');
-  const held = new Set(commentsOf(file, text).flatMap(({ line, text: comment }) => comment.split('\n').map((_, i) => line + i)));
-  return [...held]
-    .sort((a, b) => a - b)
-    .flatMap((line) => {
-      const width = Array.from(lines[line - 1].replace(/\r$/, '')).length;
-      return width > COMMENT_WIDTH ? [`${file}:${line} is ${width} columns`] : [];
-    });
-}
-
-test('REFUSED: a line over 140 columns that holds a comment is found, in a JSDoc, a //, after code and in JSX; a wide code line is not', () => {
-  const at = (needle: string) => `width.tsx:${lineOf(WIDTH, needle)} is ${COMMENT_WIDTH + 1} columns`;
-  assert.deepEqual(wideCommentLines('width.tsx', WIDTH), WIDE_LINES.map(at));
-});
-
-test('no line that holds a comment, under packages/, apps/, lint/ and tools/, is over 140 columns', () => {
-  const files = sourceFiles();
-  const wide = files.flatMap((file) => wideCommentLines(file, fs.readFileSync(path.join(ROOT, file), 'utf8')));
-  assert.deepEqual(wide, [], `rewrap these comments within ${COMMENT_WIDTH} columns: oxfmt rewraps none`);
-  const folders = ['lint', 'tools', ...workspacePackages().flatMap((pkg) => [`${pkg}/src`, `${pkg}/test`])];
-  assert.deepEqual(
-    folders.filter((folder) => !files.some((file) => file.startsWith(`${folder}/`))),
-    [],
-    'the scan read no source file in these folders',
-  );
-});
 
 /** A name a comment may quote: an identifier, a dotted path of them, with `()` after a call. */
 const NAME = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*(?:\(\))?$/;

@@ -40,6 +40,9 @@ const LIES: { readonly [V in Kept]: (answer: Answer) => Answer } = {
   hold: Effect.map(() => 'elsewhere'),
   drain: Effect.catch(() => Effect.void),
   mcpState: Effect.catch(() => Effect.succeed({ read: true, servers: [] })),
+  mcpSignIn: Effect.catch(() => Effect.succeed({ authUrl: 'https://elsewhere.example', until: '2026-01-01T00:00:00.000Z' })),
+  mcpSignInState: Effect.map(() => ({ state: 'connected' })),
+  mcpSignOut: Effect.catch(() => Effect.succeed({ signedOut: true })),
 };
 
 /** A new stand-in whose `verb` does what it does and answers `lie` of its true answer. */

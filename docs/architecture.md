@@ -73,7 +73,13 @@ spellings are two servers to it. An agent's `mcp:` name resolves against the fac
 server is an engine read verb**, `mcpState` (`agent-runtime/src/service/mcp-state.ts`): `mcpServerStatus()` is a method on the Agent
 SDK's `query()` object, so only the runtime may ask it, and it travels runtime → orchestrator (`src/runtime-client.ts`) → api → board.
 The states are the harness's own words — `connected`, `needs-auth`, `failed`, `pending`, `disabled` — carried whole and never worded
-again above, and a look that failed says the state is unread, which is not an absence.
+again above, and a look that failed says the state is unread, which is not an absence. **A sign-in is three engine verbs**,
+`mcpSignIn`, `mcpSignInState` and `mcpSignOut` (`agent-runtime/src/service/mcp-sign-in.ts`), since only the runtime spawns Claude Code
+or holds an SDK session: it stores a client secret it is handed in the harness's own store through a `claude mcp add --scope local`
+child under the engine's root, holds a session asked `mcpAuthenticate` in memory by its callback port until the server reads
+`connected`, and signs out through a `claude mcp add` with no secret then a `claude mcp remove --scope local`. Which secret a server is handed is the orchestrator's
+(`src/servers/clients.ts`, keyed by client id, exported by no entry), and the api and the board carry an address to open and a state
+word, never a secret or a token.
 
 **Where a run's work lives is the place's**, an interface the orchestrator owns and asks (`PlaceService`, `src/place/place.store.ts`:
 `ask(verb, request)` and `askNow`, over the contract of `src/place/place.ts`), required by every program that asks it and with no

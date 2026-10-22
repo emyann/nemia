@@ -19,6 +19,9 @@ import { boundedAttributes, type DeniedFact, type StepFact, type TimelineFact, t
 const ENGINE_PHASES: Readonly<Record<string, Phase>> = {
   tick: 'runtime',
   mcpState: 'runtime',
+  mcpSignIn: 'runtime',
+  mcpSignInState: 'runtime',
+  mcpSignOut: 'runtime',
   view: 'journals',
   list: 'journals',
   feed: 'journals',

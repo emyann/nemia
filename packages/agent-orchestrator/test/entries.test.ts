@@ -369,6 +369,9 @@ const PINNED: Record<string, string[]> = {
     'sendBackTo',
     'seriesMemo',
     'serverNameRefusal',
+    'serverSignIn',
+    'serverSignInState',
+    'serverSignOut',
     'setInstruction',
     'shippedServers',
     'setSchedule',
@@ -793,6 +796,17 @@ test('REFUSED: an entry that drops a name, or gains one', () => {
 test('each entry exports exactly its pinned names', async () => {
   for (const [entry, pinned] of Object.entries(PINNED)) {
     assert.deepEqual(drift(entry, Object.keys(await import(entry)), pinned), [], entry);
+  }
+});
+
+test('no entry exports the shipped client secrets, nor anything that answers one', async () => {
+  for (const entry of Object.keys(PINNED)) {
+    const names = Object.keys(await import(entry));
+    assert.deepEqual(
+      names.filter((n) => /secret/i.test(n)),
+      [],
+      `${entry}: the shipped secret is handed to the engine inside the package, never to a caller`,
+    );
   }
 });
 

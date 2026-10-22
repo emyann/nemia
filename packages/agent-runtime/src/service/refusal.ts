@@ -15,6 +15,7 @@ const REFUSALS = new Set([
   'InterruptRefused',
   'QuotaRefused',
   'McpStateRefused',
+  'McpSignInRefused',
   'EngineRefused',
   'BodyRefused',
   'ForgetRefused',

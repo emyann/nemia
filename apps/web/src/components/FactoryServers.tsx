@@ -11,7 +11,7 @@
  * the record, and a server's own sign-in is the road for a credential. Every other header is kept, and a line beside the field says a
  * header changed after a sign-in asks for a new one.
  */
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,7 @@ import { Input } from '@/components/ui/input';
 import { CutFrame, CutPress, CutTag, FRAMED_BOX, Plate } from '@/components/look';
 import { container, hairline } from '@/lib/meaning';
 import { CHIP } from './Reach';
+import { ServerSignIn } from './ServerSignIn';
 import { stateDrawn } from '../lib/serverState';
 import { factoryServersQuery, recordServer, removeServer, type FactoryServer, type ShippedServer } from '../lib/api';
 
@@ -45,10 +46,21 @@ export function ServerState({ state }: { state: string | null }) {
 }
 
 /**
- * One recorded server: its name, its state, its address, its headers, and the press that takes it off the record. Exported for its
- * stories, which draw a state a node test cannot judge.
+ * One recorded server: its name, its state, its address, its headers, its sign-in where it signs in through an OAuth client
+ * (`signIn`, `ServerSignIn`), and the press that takes it off the record. Exported for its stories, which draw a state a node test
+ * cannot judge.
  */
-export function ServerRow({ server, pending, onRemove }: { server: FactoryServer; pending: boolean; onRemove: (name: string) => void }) {
+export function ServerRow({
+  server,
+  pending,
+  onRemove,
+  signIn,
+}: {
+  server: FactoryServer;
+  pending: boolean;
+  onRemove: (name: string) => void;
+  signIn?: ReactNode;
+}) {
   const headers = Object.entries(server.headers ?? {});
   return (
     <li data-factory-server={server.name} aria-label={`MCP server ${server.name}`} className="flex flex-col gap-2 px-3 py-3">
@@ -77,6 +89,7 @@ export function ServerRow({ server, pending, onRemove }: { server: FactoryServer
           {server.oauth.callbackPort !== undefined && <> on port {server.oauth.callbackPort}</>}.
         </p>
       )}
+      {signIn}
       {server.error !== undefined && (
         <pre className="rounded bg-failure-container p-2 font-mono text-body-small leading-snug whitespace-pre-wrap break-words text-on-failure-container">
           {server.error}
@@ -129,7 +142,10 @@ function SignInFields({ draft, set }: Fills) {
       <Field>
         <FieldLabel htmlFor="server-client-id">OAuth client id</FieldLabel>
         <Input id="server-client-id" name="clientId" value={draft.clientId} onChange={set('clientId')} placeholder="Iv23li…" />
-        <FieldDescription>For a server that signs in. No secret: the harness reads one from its own store.</FieldDescription>
+        <FieldDescription>
+          For a server that signs in. No secret: a server Nemia ships signs in with the secret Nemia ships, and the harness reads any
+          other's from its own store.
+        </FieldDescription>
       </Field>
       <Field>
         <FieldLabel htmlFor="server-callback-port">Callback port</FieldLabel>
@@ -219,6 +235,36 @@ export function ServerForm({
   );
 }
 
+/** The record's rows in a cut frame, each with its sign-in where it signs in through an OAuth client; nothing for an empty record. */
+function ServerList({
+  factory,
+  servers,
+  pending,
+  onRemove,
+}: {
+  factory: string;
+  servers: readonly FactoryServer[];
+  pending: boolean;
+  onRemove: (name: string) => void;
+}) {
+  if (servers.length === 0) return null;
+  return (
+    <CutFrame className={FRAMED_BOX}>
+      <ul className="divide-y divide-outline-variant">
+        {servers.map((server) => (
+          <ServerRow
+            key={server.name}
+            server={server}
+            pending={pending}
+            onRemove={onRemove}
+            signIn={server.oauth && <ServerSignIn factory={factory} server={server.name} state={server.state} />}
+          />
+        ))}
+      </ul>
+    </CutFrame>
+  );
+}
+
 /**
  * A factory's MCP servers section. The record is listed in a cut frame under its plate, each server with its state; the form records a
  * remote one. A refusal is shown in the api's own words, the record as it was.
@@ -262,20 +308,7 @@ export function FactoryServers({ name }: { name: string }) {
               <AlertDescription className="break-words">{data.unread}</AlertDescription>
             </Alert>
           )}
-          {servers.length > 0 && (
-            <CutFrame className={FRAMED_BOX}>
-              <ul className="divide-y divide-outline-variant">
-                {servers.map((server) => (
-                  <ServerRow
-                    key={server.name}
-                    server={server}
-                    pending={change.isPending}
-                    onRemove={(server) => ask({ kind: 'remove', server })}
-                  />
-                ))}
-              </ul>
-            </CutFrame>
-          )}
+          <ServerList factory={name} servers={servers} pending={change.isPending} onRemove={(server) => ask({ kind: 'remove', server })} />
           <ServerForm
             shipped={data.shipped}
             pending={change.isPending}

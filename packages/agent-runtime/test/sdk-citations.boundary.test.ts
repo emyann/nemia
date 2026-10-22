@@ -1,6 +1,9 @@
 /**
  * Every `sdk.d.ts:<line>` citation in our prose points at what it claims, in the Agent SDK that is installed.
  *
+ * A boundary test: the real installed `sdk.d.ts` is its whole subject — a stand-in of it would be a second table of line numbers,
+ * which is the very thing this refuses — and the files it scans are the real git listing of the checkout.
+ *
  * Prose is not a constraint: a dozen comments across the runtime name a line of the SDK's own declarations, and an SDK bump rewrites
  * that file top to bottom — 0.3.270 to 0.3.308 moved every one of them, some by two hundred lines. A citation nobody can check rots
  * into a line that says something else, and a reader who follows it is misled with no warning, which is the same class of fault as a

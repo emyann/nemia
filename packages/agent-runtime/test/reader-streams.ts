@@ -7,13 +7,16 @@
 /** The session id every Claude Code line here carries. */
 export const SESSION = '5e551011-0000-4000-8000-000000000001';
 
+/** The model every Claude Code `init` line here names: what the session really started on, as a reader reads it back. */
+export const MODEL = 'claude-haiku-4-5';
+
 /** A `result` object as `claude -p --output-format json` prints it, on one line (keys trimmed), with `o` over its fields. */
 export const resultLine = (o: object) =>
   JSON.stringify({ type: 'result', subtype: 'success', is_error: false, num_turns: 2, result: 'ok', session_id: SESSION, ...o });
 
 /** Lines of `claude -p --output-format stream-json --verbose`, shaped as Claude Code prints them (keys trimmed). */
 export const stream = {
-  init: JSON.stringify({ type: 'system', subtype: 'init', session_id: SESSION, permissionMode: 'default', model: 'claude-haiku-4-5' }),
+  init: JSON.stringify({ type: 'system', subtype: 'init', session_id: SESSION, permissionMode: 'default', model: MODEL }),
   calls: (...uses: Array<[string, string, object]>) =>
     JSON.stringify({
       type: 'assistant',
@@ -137,7 +140,7 @@ export const SKILLS_STREAM = [
  * before its result.
  */
 export const FILES_STREAM = [
-  JSON.stringify({ type: 'system', subtype: 'init', cwd: '/w', session_id: SESSION, permissionMode: 'default', model: 'claude-haiku-4-5' }),
+  JSON.stringify({ type: 'system', subtype: 'init', cwd: '/w', session_id: SESSION, permissionMode: 'default', model: MODEL }),
   stream.calls(['toolu_r1', 'Read', { file_path: '/w/apps/web/a.tsx' }], ['toolu_e1', 'Edit', { file_path: '/w/b.ts' }]),
   stream.calls(['toolu_r2', 'Read', { file_path: '/w/apps/web/a.tsx' }], ['toolu_r3', 'Read', { file_path: '/elsewhere/c.ts' }]),
   stream.calls(['toolu_r4', 'Read', { file_path: '/w/d.ts' }]),

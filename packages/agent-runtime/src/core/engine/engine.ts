@@ -237,6 +237,7 @@ const endFacts = (seen: Sighting | undefined) => ({
   denials: seen?.denials,
   skills: seen?.skills,
   files: seen?.files,
+  ranOn: seen?.ranOn,
   limit: seen?.limit,
 });
 

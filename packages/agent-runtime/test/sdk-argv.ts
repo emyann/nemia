@@ -1,13 +1,14 @@
 /**
  * One value read off an argv the **Agent SDK** wrote for the Claude Code it spawns.
  *
- * The SDK spells a flag's value two ways, and which way is the SDK's own choice, not ours: `--flag=value` for nearly everything it
- * builds (`Ke(flag, value)` in its `sdk.mjs` — the mode, the prompts, the tool lists, the setting sources, `--add-dir`,
- * `--plugin-dir`, `--resume`), and `--flag value` for `--mcp-config`, `--managed-settings` and every `extraArgs` key, `--settings`
- * among them (`Cy`/`b9`, which join with `=` only where the value itself opens with `-`), beside the four it opens with
- * (`--output-format stream-json --verbose --input-format stream-json`). 0.3.295 moved the first group from the two-argument form to
- * the joined one, which read as `argv[argv.indexOf(flag) + 1]` silently answered `argv[0]` — `indexOf` gives `-1`, and `-1 + 1` is a
- * real index. So a test of the SDK's argv reads it here, in both forms, and is refused where the flag is not there at all.
+ * The SDK spells a flag's value two ways, and which way is the SDK's own choice, not ours. Joined, --flag=value, for nearly
+ * everything it builds: the mode, the prompts, the tool lists, the setting sources, --add-dir, --plugin-dir, --resume. Two
+ * arguments, --flag value, for --mcp-config, --managed-settings and every `extraArgs` key, --settings among them — those it joins
+ * only where the value itself opens with a dash — beside the four it opens with (--output-format stream-json --verbose
+ * --input-format stream-json). SDK 0.3.295 moved the first group from the two-argument form to the joined one, which read as
+ * `argv[argv.indexOf(flag) + 1]` silently answered `argv[0]`: `indexOf` gives -1, and -1 + 1 is a real index. So a test of the
+ * SDK's argv reads it here, in both forms, and is refused where the flag is not there at all. Which flag goes which way is read off
+ * the installed `sdk.mjs`, where the SDK's two argument builders are.
  *
  * For the argv the SDK wrote alone. The argv **we** write — `claudePrintFlags`' `claude -p` spec, `ae`'s own command line, an MCP
  * server's `args` from a config — is ours to spell, and a test of one reads it as it is written there.

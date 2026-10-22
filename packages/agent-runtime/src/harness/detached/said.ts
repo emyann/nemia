@@ -27,7 +27,7 @@ import { overNow, type RunFile } from './run-file.ts';
  * The shipped readers' version — `claudeResultOutput`, `claudeStreamOutput` and `codexOutput`: a kept output of another
  * version is read again from its capture. Goes up with every change to what a reader reads, as `SAID_DIGEST` does.
  */
-export const SAID_VERSION = 6;
+export const SAID_VERSION = 7;
 
 /**
  * The former versions whose kept output the shipped readers would read the same but for the fields they have added since:
@@ -35,13 +35,13 @@ export const SAID_VERSION = 6;
  * capture read before they were. A version leaves this list the moment a reader changes what one of its fields says, or
  * stops saying one: the digest pin catches a reader that reads otherwise, never a version wrongly left here.
  */
-export const SAID_EXTENDED: readonly number[] = [1, 2, 3, 4];
+export const SAID_EXTENDED: readonly number[] = [1, 2, 3, 4, 6];
 
 /**
  * The digest of what the shipped readers read of the streams in `test/reader-streams.ts`: a reader that reads otherwise fails
  * `test/said.test.ts` until this is recorded again, beside a `SAID_VERSION` gone up with it.
  */
-export const SAID_DIGEST = 'e075c33ec0a687c8c12744072822221bbfc91810896680d96b690450ca6f5479';
+export const SAID_DIGEST = '8d691696a7caba0cf90cf679f5e12b17d9706ffc25bba260f872df349ee6d5b5';
 
 /** What a capture is known by: its size and mtime, as `fs.statSync` gives them. */
 export type SaidKey = { size: number; mtimeMs: number };

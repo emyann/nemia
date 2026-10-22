@@ -6,7 +6,7 @@
  * store.ts; `storeRootLayer` at `app.ts`): what the package still reads off a root of its own as it loads is named in its
  * `test/global-roots.baseline.ts`.
  */
-import { Context, Effect, Layer, type ManagedRuntime, Metric } from 'effect';
+import { Context, type Duration, Effect, Layer, type ManagedRuntime, Metric } from 'effect';
 import type { Context as RequestContext } from 'hono';
 import { routePath } from 'hono/route';
 import {
@@ -83,6 +83,16 @@ export class ReadMemo extends Context.Service<
 }
 
 /**
+ * How often the api's streams read again what nothing pushes to them: a step's conversation no live stream can be had of (`step`,
+ * `readAgain` in steps/steps.ts), Nemia's chat (`chat`, nemia/chat.ts), and the feed's file for the lines no hub brought (`feed`,
+ * `followFeed`). Each left out is the shipped beat its own module names (`STEP_BEAT_MS`, `CHAT_BEAT_MS`, the package's own for the
+ * feed), so this file imports none of them; a test gives shorter ones with
+ * `appOf(Layer.merge(liveOf(), Layer.succeed(Beats)({ ...Beats.defaultValue(), step: … })))` rather than wait them out.
+ */
+export type BeatsShape = { readonly step?: number; readonly chat?: number; readonly feed?: Duration.Input };
+export const Beats = Context.Reference<BeatsShape>('api/Beats', { defaultValue: () => ({}) });
+
+/**
  * Every service a handler may read: what an app's layer provides whole, the steps followed live among them (`Followings`), and the place
  * the package's programs ask (`PlaceService`).
  */
@@ -111,6 +121,7 @@ export type Served = {
   quota: QuotaAsker['Service'];
   memo: ReadMemo['Service'];
   followings: Followings['Service'];
+  beats: BeatsShape;
 };
 
 /** The upper bounds of a request's reads, the files the runtime read for it, one past the last for more. */
@@ -153,6 +164,7 @@ export const served = <A>(c: RequestContext<ApiEnv>, handle: (s: Served) => A | 
         quota: yield* QuotaAsker,
         memo: yield* ReadMemo,
         followings: yield* Followings,
+        beats: yield* Beats,
       };
       const before = yield* readsOf(services.e);
       return yield* Effect.promise(async () =>

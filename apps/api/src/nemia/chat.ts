@@ -23,7 +23,7 @@ import { refusedBeforeReading, type Guarded } from '../guard.ts';
 import { type ApiEnv, served, type Served } from '../layer.ts';
 import { runPlaced } from '../store.ts';
 
-/** How often a followed chat is read again. */
+/** How often a followed chat is read again, shipped: `Beats.chat`'s default (layer.ts). */
 export const CHAT_BEAT_MS = 2000;
 
 const SEND_SHAPE = '`{ "text": "<what you write to Nemia>" }`';
@@ -120,7 +120,7 @@ export const nemiaChat = new Hono<ApiEnv>()
         let unread = false;
         while (!stream.aborted) {
           shown = await sent(stream, read, shown);
-          await stream.sleep(CHAT_BEAT_MS);
+          await stream.sleep(s.beats.chat ?? CHAT_BEAT_MS);
           if (stream.aborted) break;
           try {
             read = await runPlaced(s.placeService, s.e, chatSince(nemiaChatPlace(), read.cursor, readsOf(s)));

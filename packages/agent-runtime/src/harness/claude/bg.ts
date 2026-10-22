@@ -124,6 +124,12 @@ export type ClaudeOptions = {
    */
   sayTimeoutMs?: number;
   /**
+   * The pace of a background session's follow (`bgFollowOf`): how long one `claude agents` listing is shared by its followers, and
+   * the longest a follower waits between passes. Default `FOLLOW_PACE_MS`, the shipped second: a parameter so that a test of a
+   * follow shortens it rather than waiting it out (`test/follow-bg.test.ts`).
+   */
+  followPaceMs?: number;
+  /**
    * Where Claude Code registers each running session, by pid: `find` finds a session there by its name, `say` its inbox, and
    * `observe` the bridge of each session it holds a process for (`claudeBridge`). Default
    * `sessions` under `$CLAUDE_CONFIG_DIR`, or under `~/.claude`, read when the runner is made.
@@ -372,7 +378,10 @@ export const claudeOps = (options: ClaudeOptions): RunnerOps => {
     release: releaseFrom(registry, options.usageFrom ?? transcriptUsageSince),
     logs: sessionLogs,
     transcript: sessionTranscript,
-    follow: bgFollowOf(sharedListing(sh('claude', ['agents', '--all', '--json'], { verb: 'follow' }))),
+    follow: bgFollowOf(
+      sharedListing(sh('claude', ['agents', '--all', '--json'], { verb: 'follow' }), options.followPaceMs),
+      options.followPaceMs,
+    ),
     say: sayThrough(sessionsDir, registry.pids, options.sayTimeoutMs),
     quota: claudeQuota(),
     forget: forgetUnder(root),

@@ -95,6 +95,9 @@ const RunFileSchema = Schema.StructWithRest(
      * writes one twice. Absent, nothing has been, and the worker starts at `input.from`.
      */
     inputAt: Schema.optional(Schema.Finite),
+    /** The worker's stop grace and heartbeat, as the spawn wrote them (`DetachedOptions`); absent from a run file written before. */
+    stopGraceMs: Schema.optional(Schema.Finite),
+    beatMs: Schema.optional(Schema.Finite),
     /** The harness printed the line that closes its input, and the worker ended its stdin: words said now reach nobody. */
     inputClosed: Schema.optional(Schema.Literal(true)),
     /**

@@ -18,7 +18,7 @@ import { seal } from './verbs/seal.ts';
 import { standing } from './verbs/standing.ts';
 import { status } from './verbs/status.ts';
 import { trial } from './verbs/trial.ts';
-import type { Place } from '../../src/place/place.store.ts';
+import { STOP_GRACE_MS, type AskOptions, type Place } from '../../src/place/place.store.ts';
 import { PLACE_DEADLINE_MS, type PlaceRequests, type PlaceVerb } from '../../src/place/place.ts';
 
 /** Each verb's body. */
@@ -49,14 +49,15 @@ export type GitPlaceOptions = { readonly env?: NodeJS.ProcessEnv; readonly start
 
 /** A git place: one object that answers every repository it is asked of, and keeps nothing of any. */
 export function gitPlace(options: GitPlaceOptions = {}): Place {
-  const asked = (verb: PlaceVerb, deadlineMs: number | undefined) => ({
-    deadlineMs: deadlineMs ?? PLACE_DEADLINE_MS[verb],
+  const asked = (verb: PlaceVerb, given: AskOptions | undefined) => ({
+    deadlineMs: given?.deadlineMs ?? PLACE_DEADLINE_MS[verb],
+    graceMs: given?.graceMs ?? STOP_GRACE_MS,
     env: options.env ?? process.env,
     started: options.started ?? (() => undefined),
   });
   return {
     declared,
-    ask: (verb, request, given) => answered(verb, () => body(verb, request), asked(verb, given?.deadlineMs)),
-    askNow: (verb, request, given) => answeredNow(verb, body(verb, request), asked(verb, given?.deadlineMs)),
+    ask: (verb, request, given) => answered(verb, () => body(verb, request), asked(verb, given)),
+    askNow: (verb, request, given) => answeredNow(verb, body(verb, request), asked(verb, given)),
   };
 }

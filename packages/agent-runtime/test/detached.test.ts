@@ -34,6 +34,8 @@ import {
   detachedFind,
   detachedOps,
   STALE_MS,
+  WORKER_BEAT_MS,
+  WORKER_STOP_GRACE_MS,
   type HarnessIO,
   type HarnessOutput,
   type HarnessSpec,
@@ -58,6 +60,30 @@ import { until, WAITED, type Waiter } from '../src/waits/index.ts';
 const root = () => scratch('ae-detached-');
 const sh = (script: string): HarnessSpec => ({ name: 'sh', command: () => ({ cmd: 'sh', args: ['-c', script] }) });
 const req = (name: string, cwd: string) => ({ name, brief: 'x', cwd });
+/**
+ * The worker's stop grace and heartbeat, short: a test of a stop or a beat waits these, never the shipped `WORKER_STOP_GRACE_MS`
+ * and `WORKER_BEAT_MS` (asserted below them in the test of the plan).
+ */
+const QUICK = { stopGraceMs: 300, beatMs: 200 } as const;
+/** A timer fires up to a millisecond before a clock read around it says its delay is gone: a floor at a timer's bound sits under it. */
+const TIMER_SLACK_MS = 50;
+
+test('every plan carries its worker’s stop grace and heartbeat: the options given, else the shipped bounds; a beat the lease would call dead is refused', () => {
+  const dir = root();
+  const planOf = (ops: ReturnType<typeof detachedOps>, name: string) => {
+    Effect.runSync(ops.spawn(req(name, dir)));
+    return JSON.parse(fs.readFileSync(path.join(dir, 'runs', 'sh', `${name.replace(/[^a-zA-Z0-9]+/g, '_')}.json`), 'utf8')) as {
+      stopGraceMs?: number;
+      beatMs?: number;
+    };
+  };
+  const given = planOf(detachedOps(sh('true'), dir, QUICK), 'ae/b1/1');
+  assert.deepEqual([given.stopGraceMs, given.beatMs], [QUICK.stopGraceMs, QUICK.beatMs]);
+  const shipped = planOf(detachedOps(sh('true'), dir), 'ae/b1/2');
+  assert.deepEqual([shipped.stopGraceMs, shipped.beatMs], [WORKER_STOP_GRACE_MS, WORKER_BEAT_MS]);
+  assert.ok(QUICK.stopGraceMs < WORKER_STOP_GRACE_MS && QUICK.beatMs < WORKER_BEAT_MS, 'the tests wait less than shipped');
+  assert.throws(() => detachedOps(sh('true'), dir, { beatMs: STALE_MS }), RangeError);
+});
 
 /** Looks at `name` in test `t`, every 150ms, until it is `want`; answers its sighting then. */
 const settle = (t: Waiter, ops: ReturnType<typeof detachedOps>, name: string, want: SessionState) => {
@@ -222,7 +248,7 @@ for (const [what, takeAway] of [
     async (t) => {
       const dir = root();
       const cwd = scratch('ae-harness-');
-      const ops = detachedOps(sh('echo $$ > pid; exec sleep 30'), dir);
+      const ops = detachedOps(sh('echo $$ > pid; exec sleep 30'), dir, QUICK);
       await Effect.runPromise(ops.spawn(req('ae/g1/1', cwd)));
       const file = path.join(dir, 'runs', 'sh', 'ae_g1_1.json');
       let worker = 0;
@@ -254,7 +280,7 @@ test(
   async (t) => {
     const dir = root();
     const cwd = scratch('ae-harness-');
-    const ops = detachedOps(sh("(trap '' TERM; : > started; while :; do sleep 1; done) & wait"), dir);
+    const ops = detachedOps(sh("(trap '' TERM; : > started; while :; do sleep 1; done) & wait"), dir, QUICK);
     await Effect.runPromise(ops.spawn(req('ae/g3/1', cwd)));
     await within(t, () => fs.existsSync(path.join(cwd, 'started')), 'the harness started');
     const worker = runningIn([dir]).find((p) => /\bae-worker\.ts\b/.test(p.args))!.pid;
@@ -266,18 +292,21 @@ test(
 test('a stop kills what of its harness ignored SIGTERM before the worker exits, holding its output or not', WAITED, async (t) => {
   const dir = root();
   const cwd = scratch('ae-harness-');
-  const ops = detachedOps(sh("(trap '' TERM; : > started; while :; do sleep 1; done) & wait"), dir);
+  const ops = detachedOps(sh("(trap '' TERM; : > started; while :; do sleep 1; done) & wait"), dir, QUICK);
   await Effect.runPromise(ops.spawn(req('ae/g3/2', cwd)));
   await within(t, () => fs.existsSync(path.join(cwd, 'started')), 'the harness started');
   const worker = runningIn([dir]).find((p) => /\bae-worker\.ts\b/.test(p.args))!.pid;
+  const asked = performance.now();
   await Effect.runPromise(ops.stop('ae/g3/2'));
   await within(t, () => !alive(worker) && runningIn([cwd]).length === 0, 'the worker and all of its harness ended');
+  const ms = performance.now() - asked;
+  assert.ok(ms >= QUICK.stopGraceMs - TIMER_SLACK_MS, `${ms} ms: what ignored SIGTERM was given the plan's grace before the kill`);
   await settle(t, ops, 'ae/g3/2', 'canceled');
 });
 
 test('a worker whose run file is taken away while it writes words on ends its harness too — and a listener with it', WAITED, async (t) => {
   const dir = root();
-  const ops = detachedOps(listener(dir), dir);
+  const ops = detachedOps(listener(dir), dir, QUICK);
   await Effect.runPromise(ops.spawn({ name: 'ae/g2/1', brief: 'b', cwd: dir }));
   await within(t, () => heardIn(dir).length === 1, 'the brief read');
   assert.equal(runningIn([dir]).length, 2, 'the worker and the listener');
@@ -486,7 +515,7 @@ test(
   WAITED,
   async (t) => {
     const dir = root();
-    const ops = detachedOps(sh('sleep 30'), dir);
+    const ops = detachedOps(sh('sleep 30'), dir, QUICK);
     await Effect.runPromise(ops.spawn(req('ae/m3/1', dir)));
     const file = path.join(dir, 'runs', 'sh', 'ae_m3_1.json');
     const read = () =>

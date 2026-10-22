@@ -7,20 +7,56 @@ import type { Run } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
 import { runKeys, stepKeys, type StepKeys } from '../meter/index.ts';
 
-/** Where the process exports its traces, logs and metrics over OTLP: the collector's base `url`, and the service they are filed under. */
-export type Otlp = { url: string; serviceName: string };
+/**
+ * Where the process exports its traces, logs and metrics over OTLP: the collector's base `url`, the service they are filed under, and
+ * how often each signal is posted where the environment says (`EXPORT_INTERVALS`), in ms, else the exporter's own.
+ */
+export type Otlp = { url: string; serviceName: string; every: { traces?: number; logs?: number; metrics?: number } };
+
+/**
+ * The standard OTel variables that say how often each signal is posted, in whole milliseconds: the span batch's delay, the log
+ * batch's, and the metric reader's interval. Effect's own exporters built from config read the first the same way.
+ */
+export const EXPORT_INTERVALS = {
+  traces: 'OTEL_BSP_SCHEDULE_DELAY',
+  logs: 'OTEL_BLRP_SCHEDULE_DELAY',
+  metrics: 'OTEL_METRIC_EXPORT_INTERVAL',
+} as const;
+
+/** The interval `env` gives under `name`: unset or blank none, a whole number of ms from 1 that number, anything else wrong. */
+const intervalOf = (env: Readonly<Record<string, string | undefined>>, name: string): number | undefined | { wrong: string } => {
+  const value = env[name]?.trim();
+  if (!value) return undefined;
+  return /^[1-9]\d*$/.test(value) ? Number(value) : { wrong: value };
+};
 
 /** The service a process's spans, logs and metrics are filed under when `OTEL_SERVICE_NAME` names none. */
 export const DEFAULT_SERVICE_NAME = 'nemia';
 
 /**
- * The OTLP export `env` asks for: its endpoint, `OTEL_EXPORTER_OTLP_ENDPOINT`, without a trailing `/`, and its service,
- * `OTEL_SERVICE_NAME` or `nemia`. Answers undefined, no export, when the endpoint is unset or blank.
+ * The OTLP export `env` asks for: its endpoint, `OTEL_EXPORTER_OTLP_ENDPOINT`, without a trailing `/`, its service,
+ * `OTEL_SERVICE_NAME` or `nemia`, and each signal's interval its `EXPORT_INTERVALS` variable gives; one that is no whole number of ms
+ * from 1 is left to the exporter, and said by `exportIntervalRefusalOf`. Answers undefined, no export, when the endpoint is unset or blank.
  */
 export function otlpOf(env: Readonly<Record<string, string | undefined>>): Otlp | undefined {
   const url = env.OTEL_EXPORTER_OTLP_ENDPOINT?.trim().replace(/\/+$/, '');
   if (!url) return undefined;
-  return { url, serviceName: env.OTEL_SERVICE_NAME?.trim() || DEFAULT_SERVICE_NAME };
+  const every: Otlp['every'] = {};
+  for (const [signal, name] of Object.entries(EXPORT_INTERVALS) as [keyof Otlp['every'], string][]) {
+    const ms = intervalOf(env, name);
+    if (typeof ms === 'number') every[signal] = ms;
+  }
+  return { url, serviceName: env.OTEL_SERVICE_NAME?.trim() || DEFAULT_SERVICE_NAME, every };
+}
+
+/** Why an `EXPORT_INTERVALS` variable of `env` is not read, in a sentence that names the fix, or `undefined` when each is read or unset. */
+export function exportIntervalRefusalOf(env: Readonly<Record<string, string | undefined>>): string | undefined {
+  for (const name of Object.values(EXPORT_INTERVALS)) {
+    const ms = intervalOf(env, name);
+    if (ms !== undefined && typeof ms !== 'number')
+      return `${name} is ${JSON.stringify(ms.wrong)}, which is no interval: set it to a whole number of milliseconds from 1, or unset it. The exporter's own interval is kept.`;
+  }
+  return undefined;
 }
 
 /** The variable that asks each session the daemon starts to export its tools' inputs too: `1` asks, unset, blank or `0` does not. */

@@ -16,7 +16,7 @@ import {
   selectorsRefusal,
   selects,
 } from 'agent-orchestrator';
-import type { ApiEnv } from '../layer.ts';
+import { type ApiEnv, Beats } from '../layer.ts';
 
 /**
  * What a line of the workflow feed is about, as its SSE event names it: a daemon that took the store (`daemon`), a step's word (`step`),
@@ -110,11 +110,17 @@ export const OPENED = ': open\n\n';
  * @param from the byte of the feed to read from
  * @param selectors the selectors a line must be taken by, none for every line
  * @param bookmarkEvery how often the stream says where it has read to, the one cadence every surface reads by default
+ * @param beat how often the reader reads the file for the lines no hub brought: `Beats.feed`, none for the package's own beat
  * @returns the stream's events, in the order the reader hands them on, with a bookmark between them
  */
-export const feedEvents = (from: number, selectors: Selectors = [], bookmarkEvery: Duration.Input = BOOKMARK_EVERY) => {
+export const feedEvents = (
+  from: number,
+  selectors: Selectors = [],
+  bookmarkEvery: Duration.Input = BOOKMARK_EVERY,
+  beat?: Duration.Input,
+) => {
   const at = { cursor: from };
-  const lines = followFeed(from).pipe(
+  const lines = followFeed(from, beat === undefined ? {} : { beat }).pipe(
     Stream.tap((f) =>
       Effect.sync(() => {
         if (f.kind === 'line') at.cursor = f.cursor;
@@ -178,10 +184,12 @@ export const feed = new Hono<ApiEnv>().get('/api/feed/stream', (c) => {
     stream.onAbort(() => gone.abort());
     if (stream.aborted) gone.abort();
     await stream.write(OPENED);
-    const relayed = feedEvents(from, selectors).pipe(
-      Stream.runForEach((message) => Effect.promise(() => stream.writeSSE(message))),
-      Effect.catch((err) => Effect.promise(() => stream.writeSSE(unreadable(err, false)))),
-    );
+    const relayed = Effect.gen(function* () {
+      const beats = yield* Beats;
+      return yield* feedEvents(from, selectors, BOOKMARK_EVERY, beats.feed).pipe(
+        Stream.runForEach((message) => Effect.promise(() => stream.writeSSE(message))),
+      );
+    }).pipe(Effect.catch((err) => Effect.promise(() => stream.writeSSE(unreadable(err, false)))));
     await c.var.runtime.runPromiseExit(relayed, { signal: gone.signal });
   });
 });

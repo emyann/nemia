@@ -5,7 +5,19 @@ import { FINISHED_SIZE, type FinishedPage, type OpenRuns, type WaitingRun } from
 import { rowsSaid } from '../../../src/lib/finished.ts';
 import { runClock, titleOf } from '../../../src/lib/factory.ts';
 import { agoWords, endedWords, openWord, presentWait, sinceShort, waitSentence, waitTag } from '../../../src/lib/runWords.ts';
-import { answered, fed, photograph, photographBothWidths, SECTIONS, sectionsOf, sidebar, themeOf, railPlace, litOf } from '../board.ts';
+import {
+  answered,
+  fed,
+  photograph,
+  photographBothWidths,
+  reachClock,
+  SECTIONS,
+  sectionsOf,
+  sidebar,
+  themeOf,
+  railPlace,
+  litOf,
+} from '../board.ts';
 import { expectBeneath, expectCount, expectNone, expectTexts, expectVisible, idle, literal, Refused, WAIT_MS } from '../checks.ts';
 import { agosRefused } from '../runs-times.ts';
 import { contrastHolds } from '../runs-contrast.ts';
@@ -491,20 +503,6 @@ async function finger(page: Page, open: OpenRuns, finished: FinishedPage): Promi
   const off = await missed(controls[2][0], 23, 23, 15);
   await clip.evaluate((style) => (style as HTMLStyleElement).remove());
   if (!off.length) throw new Refused('the probe refuses a copy control whose target is clipped — it found nothing cut');
-}
-
-/**
- * The Clock cell's button of `row`, reached by the table's own arrow keys from the row: the keyboard alone, which is what makes the
- * focus a visible one and so opens the preview — React Aria opens a tooltip on focus only where the focus came from the keyboard.
- */
-async function reachClock(page: Page, row: Locator, where: string): Promise<Locator> {
-  const clock = row.locator('td[data-clock] button');
-  await row.scrollIntoViewIfNeeded();
-  await row.focus();
-  const elsewhere = () => clock.evaluate((found) => found !== document.activeElement);
-  for (let at = 0; at < 14 && (await elsewhere()); at += 1) await page.keyboard.press('ArrowRight');
-  if (await elsewhere()) throw new Refused(`the arrow keys reach the Clock cell's button along a ${where} row — they do not`);
-  return clock;
 }
 
 /**

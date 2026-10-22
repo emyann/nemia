@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { photograph, themeOf } from '../board.ts';
+import { photograph, reachClock, themeOf } from '../board.ts';
 import { expectCount, expectNone, expectVisible, idle, Refused } from '../checks.ts';
 import type { LibraryAgent, RunDetail, RunSummary } from '../../../src/lib/api.ts';
 import { stepCardOf, type StepCardFacts } from '../../../src/lib/stepCard.ts';
@@ -329,19 +329,6 @@ async function onAPhone(page: Page): Promise<void> {
   }
 }
 
-/**
- * The Clock cell's button of `row`, reached by the table's own arrow keys from the row: the keyboard alone, which is what makes the
- * focus a visible one — React Aria opens a tooltip on focus only where the focus came from the keyboard.
- */
-async function clockByKeys(page: Page, row: Locator): Promise<void> {
-  const clock = row.locator('td[data-clock] button');
-  await row.scrollIntoViewIfNeeded();
-  await row.focus();
-  const elsewhere = () => clock.evaluate((found) => found !== document.activeElement);
-  for (let at = 0; at < 14 && (await elsewhere()); at += 1) await page.keyboard.press('ArrowRight');
-  if (await elsewhere()) throw new Refused("the arrow keys reach the Clock cell's button along its row — they do not");
-}
-
 /** The breakdown a Clock cell's preview opens, wherever on the page it stands. */
 const breakdownOf = (page: Page): Locator => page.locator('[data-slot="tooltip"] [data-breakdown]');
 
@@ -366,12 +353,12 @@ async function theClockPreview(page: Page): Promise<void> {
       await expectVisible(breakdownOf(page), `in ${where}, a clock the pointer rests on opens its breakdown`);
       await page.mouse.move(0, 0);
       await expectCount(breakdownOf(page), 0, 'the pointer gone, it closes');
-      await clockByKeys(page, first);
+      await reachClock(page, first, 'in-flight');
       await expectVisible(breakdownOf(page), `in ${where}, a clock the keyboard reaches opens it, with no pointer`);
       await page.keyboard.press('Escape');
       await expectCount(breakdownOf(page), 0, 'Escape closes it');
       await first.focus();
-      await clockByKeys(page, first);
+      await reachClock(page, first, 'in-flight');
       await expectVisible(breakdownOf(page), 'left and reached again, it opens again');
       await first.focus();
       await expectCount(breakdownOf(page), 0, 'the focus gone from the clock, it closes');

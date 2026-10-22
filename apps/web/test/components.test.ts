@@ -7538,7 +7538,9 @@ test("REFUSED: a Clock cell that says the run's wall time — it says the time a
   assert.match(working, />10m</, 'ten minutes at work');
   assert.doesNotMatch(working, />1h</, 'REFUSED: the hour of wall time the column used to show');
   assert.match(working, /<button[^>]*data-clock-words/, 'the words are a button, which the keyboard reaches to open the preview');
-  assert.match(clockCell(clocked({ atWork: { ms: 600_000, since: null, endedAt: null } }), true), />took 10m<|>10m</);
+  const done = clockCell(clocked({ atWork: { ms: 600_000, since: null, endedAt: null } }), true);
+  assert.match(done, />10m</, 'a finished row says the figure alone');
+  assert.doesNotMatch(done, /took/, "REFUSED: the card's sentence in a row's cell");
 
   const unstarted = clockCell(clocked({ startedAt: null, atWork: null }));
   assert.match(unstarted, />not started</);

@@ -92,8 +92,11 @@ async function pastTheLast(page: Page): Promise<void> {
 /** A run that finished more than a year back, whenever the e2e runs: four hundred days ago. */
 const LONG_AGO = { id: 'finished-another-year-e2py', title: 'Finished another year', factory: FACTORY, finishedAgo: 400 * 24 * 60 };
 
-/** The longest `how long ago` the column writes: the longest unit, at two digits, which `agoWords` says for a run that old. */
-const LONGEST_AGO = '11 months ago';
+/**
+ * The longest `how long ago` words a column writes: the longest unit at two digits, and the minute unit at its own longest, which
+ * `formatDistanceStrict` keeps to just under the hour — a character more, and a wider word.
+ */
+const LONGEST_AGO = ['11 months ago', '59 minutes ago'];
 
 /**
  * Every text of a column the owner saw run into the next: the two `how long ago` words, the Clock cell's own, and the note of a row in
@@ -143,11 +146,14 @@ async function datesFit(page: Page): Promise<void> {
     const said = await tight.evaluateAll((all) => all.map((text) => text.firstChild?.nodeValue ?? ''));
     const wide = page.viewportSize();
     try {
-      await tight.evaluateAll((all, words) => all.forEach((text) => (text.firstChild!.nodeValue = words)), LONGEST_AGO);
-      await expectRoom(page, `and so have the longest words a column takes, "${LONGEST_AGO}"`);
-      if (wide) {
-        await page.setViewportSize({ width: 560, height: wide.height });
-        await expectRoom(page, 'and at a phone\u2019s width, where the tables scroll sideways inside their frames');
+      for (const words of LONGEST_AGO) {
+        await tight.evaluateAll((all, word) => all.forEach((text) => (text.firstChild!.nodeValue = word)), words);
+        await expectRoom(page, `and so have the longest words a column takes, "${words}"`);
+        if (wide) {
+          await page.setViewportSize({ width: 560, height: wide.height });
+          await expectRoom(page, `and at a phone\u2019s width, where the tables scroll sideways inside their frames, "${words}"`);
+          await page.setViewportSize(wide);
+        }
       }
     } finally {
       if (wide) await page.setViewportSize(wide);

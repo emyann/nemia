@@ -131,7 +131,7 @@ test(
   },
 );
 
-test("REFUSED: a NEMIA_TOOL_DETAILS that asks nothing is said on stderr as the engine is built, and no session is started for it", async (t) => {
+test('REFUSED: a NEMIA_TOOL_DETAILS that asks nothing is said on stderr as the engine is built, and no session is started for it', async (t) => {
   withEnv(t, { OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:9', NEMIA_TOOL_DETAILS: 'true' });
   const said = t.mock.method(console, 'error', () => {});
   clientEngine();

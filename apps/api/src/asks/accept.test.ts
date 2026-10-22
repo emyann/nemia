@@ -140,7 +140,7 @@ const nothingWritten = (why: string, run = R) => {
 
 const WHY = 'The findings are follow-up work.';
 
-test("REFUSED: a body that is not an acceptance (400), a run or a step that does not exist (404), and words missing or empty (422, naming --message) — and nothing is written", async () => {
+test('REFUSED: a body that is not an acceptance (400), a run or a step that does not exist (404), and words missing or empty (422, naming --message) — and nothing is written', async () => {
   const bodies: Array<[unknown, RegExp]> = [
     ['not json', /^POST …\/accept takes a JSON body/],
     [[WHY], /^POST …\/accept takes a JSON object/],

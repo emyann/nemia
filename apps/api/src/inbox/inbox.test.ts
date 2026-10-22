@@ -10,16 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import { app } from '../app.ts';
-import {
-  addFactory,
-  addToInbox,
-  fromNote,
-  INBOX_KEY_MEANINGS,
-  inboxDir,
-  startFromInbox,
-  runStore,
-  engine,
-} from 'agent-orchestrator';
+import { addFactory, addToInbox, fromNote, INBOX_KEY_MEANINGS, inboxDir, startFromInbox, runStore, engine } from 'agent-orchestrator';
 import { runWith } from '../../test/placed.ts';
 const repo = scratch('nemia-api-inbox-repo-');
 process.env.HKB_REPO = repo;
@@ -452,7 +443,6 @@ test("REFUSED at shipped defaults: a drop of a card that is not there is a 404, 
   assert.deepEqual(cards(), [`${card.name}.md`]);
 });
 
-
 test('POST /api/runs with `card` starts the card through the package: the brief as the person edited it, the workflow the api found, `after` — the record carries `from`, and the card leaves the inbox', async () => {
   clear();
   const { card } = addToInbox({ text: 'Show what a step cost\n\nOn the run page.', workflow: 'mine', repo });
@@ -581,7 +571,7 @@ test("REFUSED at shipped defaults: a `card` that is not there is a 404 carrying 
   assert.deepEqual(cards(), [`${card.name}.md`]);
 });
 
-test("REFUSED at shipped defaults: a card started already is a 409, a blank brief, a card that does not read and a run it cannot wait on are 422s — and nothing is written or removed", async () => {
+test('REFUSED at shipped defaults: a card started already is a 409, a blank brief, a card that does not read and a run it cannot wait on are 422s — and nothing is written or removed', async () => {
   clear();
   const { card: started } = addToInbox({ text: 'Started once' });
   write(path.join(root, 'runs', 'started-once-k2q9.json'), startedFrom('started-once-k2q9', started.name));
@@ -719,7 +709,6 @@ write(path.join(second, 'workflows', 'solo', 'implement.md'), '---\nplace: git\n
 addFactory({ name: 'mill', repos: [first] });
 addFactory({ name: 'pair', repos: [first, second] });
 
-
 test('POST /api/inbox with `factory` files the card in it, as `nemia inbox add --factory` does: its `factory:` key, its workflow as a start in the factory finds it, and no `repo:` nobody sent — and GET /api/inbox lists it with its factory', async () => {
   clear();
   const res = await file({ body: 'Mill the views', factory: 'mill', workflow: 'dev', from: 'repo' });
@@ -781,7 +770,7 @@ test('REFUSED at shipped defaults: a `factory` that is not text, or is `default`
   assert.deepEqual(cards(), []);
 });
 
-test("REFUSED at shipped defaults: a `factory` the store does not have is a 404, and a name that is no slug a 422, the 404 naming the factories there are — and no card is written", async () => {
+test('REFUSED at shipped defaults: a `factory` the store does not have is a 404, and a name that is no slug a 422, the 404 naming the factories there are — and no card is written', async () => {
   clear();
   const unknown = await file({ body: 'An idea', factory: 'nobody' });
   assert.equal(unknown.status, 404);

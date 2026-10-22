@@ -209,7 +209,7 @@ test("a run's detail carries its gates and each gated step's gate — awaiting a
   );
 });
 
-test("REFUSED: a body that is not an approval (400), a run or a step that does not exist (404), and empty words (422, naming --message) — and nothing is written", async () => {
+test('REFUSED: a body that is not an approval (400), a run or a step that does not exist (404), and empty words (422, naming --message) — and nothing is written', async () => {
   const bodies: Array<[unknown, RegExp]> = [
     ['not json', /^POST …\/approve takes a JSON body/],
     [['Ship it.'], /^POST …\/approve takes a JSON object/],

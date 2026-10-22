@@ -70,7 +70,7 @@ test('REFUSED: a step sent with its slash as two segments is no route', async ()
   assert.equal(fs.readFileSync(RECORD, 'utf8'), before);
 });
 
-test("REFUSED at shipped defaults: no factory (404), the default (409), a workflow not offered and a step that is no <workflow>/<step> (422)", async () => {
+test('REFUSED at shipped defaults: no factory (404), the default (409), a workflow not offered and a step that is no <workflow>/<step> (422)', async () => {
   assert.match(await refused(() => send('PUT', '/api/factories/gone/hires/build%2Fimplement', { agent: 'ada' }), 404), /gone/);
   assert.match(await refused(() => send('DELETE', '/api/factories/gone/hires/build%2Fimplement', {}), 404), /gone/);
   assert.match(

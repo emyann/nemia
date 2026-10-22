@@ -211,7 +211,6 @@ const nothingWritten = (why: string) => {
   assert.equal(fs.readFileSync(recordFile, 'utf8'), record, `the run's record untouched: ${why}`);
 };
 
-
 const detail = async (id = R) => (await app.request(`/api/runs/${id}`)).json() as Promise<RunDetail>;
 const summary = async (id = R) => ((await (await app.request('/api/runs')).json()) as RunSummary[]).find((r) => r.id === id)!;
 const lastLineOf = async (step: string): Promise<string | null> => (await detail()).steps.find((s) => s.name === step)!.lastLine;
@@ -361,7 +360,7 @@ test("a blocked session's last line follows its conversation: words written sinc
   );
 });
 
-test("REFUSED at shipped defaults: an empty message, and a message on a recheck, are 422s, each naming the flag it is of — and nothing is written", async () => {
+test('REFUSED at shipped defaults: an empty message, and a message on a recheck, are 422s, each naming the flag it is of — and nothing is written', async () => {
   for (const [step, how] of [
     ['implement', { mode: 'nudge', message: '' }],
     ['implement', { mode: 'fresh', message: '  \n ' }],
@@ -380,7 +379,7 @@ test("REFUSED at shipped defaults: an empty message, and a message on a recheck,
   nothingWritten('a message the package refuses');
 });
 
-test("REFUSED at shipped defaults: a step not waiting on a person, a session still working however it is asked, a recheck of a session the harness blocked, and a recheck with no check that failed are 409s, each naming why — and nothing is written, and no session stopped", async () => {
+test('REFUSED at shipped defaults: a step not waiting on a person, a session still working however it is asked, a recheck of a session the harness blocked, and a recheck with no check that failed are 409s, each naming why — and nothing is written, and no session stopped', async () => {
   const cases: Array<[string, RetryHow, RegExp]> = [
     ['tokens', { mode: 'nudge' }, /^tokens signed off done and declares no check/],
     ['review', { mode: 'nudge', message: 'Start.' }, /^review has not been filed yet/],

@@ -231,7 +231,7 @@ test('DELETE /api/inbox/:name/queue takes back a queued card whose repository is
   assert.equal((await listed()).find((e) => e.name === card.name)!.queued, undefined);
 });
 
-test("REFUSED at shipped defaults: a queue of a card with no workflow, or that does not read, is a 422; of a card not there a 404; of one queued already, or a run was started from, a 409 — and nothing written", async () => {
+test('REFUSED at shipped defaults: a queue of a card with no workflow, or that does not read, is a 422; of a card not there a 404; of one queued already, or a run was started from, a 409 — and nothing written', async () => {
   clear();
   const bare = addToInbox({ text: 'No workflow named' }).card;
   const queued = addToInbox({ text: 'Queued already', workflow: 'dev' }).card;

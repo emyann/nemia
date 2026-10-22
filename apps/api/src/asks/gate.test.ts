@@ -5,42 +5,42 @@
  * …/retry with words, as `nemia retry --message` is. A gate whose step asks questions as data is answered with `answers` on either:
  * checked against the questions its current closeout asks, and written in the package's words (`approvedAnswerText`, `answerText`).
  *
- * At shipped defaults: the api's own engine over the harness's scratch store (`root`), which this file seeds, the harness's fake `claude`
- * (test/harness.ts) first on PATH.
+ * On the stand-ins: the runtime's test engine, each task filed and moved by hand (`engine().settle`), and the test place, under
+ * the run records this file seeds. One engine for the file, since its runs are seeded as it loads and its tests read them in turn.
  */
-import { root, stops } from '../../test/harness.ts';
+import { root } from '../../test/harness.ts';
 import type { DecideCommand, Decidable } from '../decide/decision.ts';
 import type { RunDetail } from '../detail/detail.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { app } from '../app.ts';
-import { approvalFile, approveRun, askFile, engine, list, retryRun, runStore, type RunSummary } from 'agent-orchestrator';
-import { runWith } from '../../test/shipped-place.ts';
+import { approvalFile, approveRun, askFile, list, retryRun, runStore, type RunSummary } from 'agent-orchestrator';
 import { answerText, approvedAnswerText, onYouWords, type Question } from 'agent-orchestrator/run';
 import { parseWorkflow } from 'agent-orchestrator/workflow';
+import { Effect } from 'effect';
+import { testEngine } from 'agent-runtime/testing';
+import { testPlace } from 'agent-orchestrator/testing';
+import { appOver, engineFor, runOver } from '../../test/placed.ts';
+
+const stand = testPlace();
+const standIn = testEngine();
+const engine = () => engineFor(standIn);
+const runWith = runOver(stand.layer);
+const app = appOver(standIn, stand);
 
 const T0 = Date.parse('2026-09-16T21:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
-const jsonl = (lines: object[]) => lines.map((line) => `${JSON.stringify(line)}\n`).join('');
 const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, text);
 };
 
 /** A step's task that ran once on Codex and signed off with `closeout`. */
-const signedOff = (taskId: string, closeout: object) =>
-  write(
-    path.join(root, 'engine', 'tasks', `${taskId}.jsonl`),
-    jsonl([
-      { kind: 'filed', at: at(0), brief: 'Do it.', cwd: '/code/app', maxAttempts: 1, harness: 'codex' },
-      { kind: 'starting', at: at(1), attempt: 1 },
-      { kind: 'spawned', at: at(1), attempt: 1 },
-      { kind: 'ended', at: at(9), attempt: 1, sessionId: `ae/${taskId}/1`, observed: 'done', reason: 'harness', closeout },
-      { kind: 'settled', at: at(9), outcome: 'succeeded' },
-    ]),
-  );
+const signedOff = (taskId: string, closeout: object) => {
+  Effect.runSync(engine().file({ id: taskId, brief: 'Do it.', cwd: '/code/app', harness: 'codex' }));
+  standIn.settle(taskId, 'succeeded', { exitCode: 0, closeout });
+};
 
 const PLAN = { outcome: 'done', summary: '## The plan\n\n- parse the flag\n- store it', needs: null, artifacts: [] };
 
@@ -278,7 +278,7 @@ test("an approval as the board sends it is the package's: 202 with the try, when
   });
   assert.deepEqual(asked(), ['approve-plan-1']);
   assert.equal(fs.readFileSync(path.join(root, 'runs', `${R}.json`), 'utf8'), record, "the api wrote nothing of the run's record");
-  assert.equal(stops(), 0, 'and stopped nothing');
+  assert.equal(standIn.stopped.length, 0, 'and stopped nothing');
 
   const run = await detail();
   const plan = run.steps.find((s) => s.name === 'plan');

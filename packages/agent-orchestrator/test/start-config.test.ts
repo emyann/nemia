@@ -21,6 +21,7 @@ const stand = eachTest(testPlace);
 const runPlaced = runGiven(() => stand().layer);
 const { startPlan } = await import('../src/plan/plan.verb.ts');
 type ConfigRefused = import('../src/start/start.verb.ts').ConfigRefused;
+type Workflow = import('../src/step/step.ts').Workflow;
 const { configRefusal } = await import('../src/runtime-client.ts');
 const { declared } = await import('../place/git/declared.ts');
 
@@ -81,10 +82,21 @@ test('REFUSED: an ending on a harness that cannot be denied the commit it lands,
   assert.equal(why, `ship: ${configRefusal('codex', { disallowedTools: [...declared.denyWhileLanding] })}`);
 });
 
-test("REFUSED: a gate given at start makes an ending land on its check, and its harness's refusal of the deny list follows it", () => {
-  const steps = stepsToStart(GATED, true, places, DENIED).map((s) => (s.name === 'ship' ? { ...s, gate: undefined, harness: 'codex' } : s));
-  assert.equal(configRefused(steps, places, [], DENIED), undefined, 'not gated, the ending lands nothing and is denied nothing');
-  assert.match(configRefused(steps, places, ['ship'], DENIED)!, /^ship: .*is a deny list/);
+test('REFUSED: the deny list follows an ending that lands on its check, gated or not — and an ending with no `check:` takes none', () => {
+  const codex = (over: Partial<Workflow>) =>
+    stepsToStart(GATED, true, places, DENIED).map((s) => (s.name === 'ship' ? { ...s, harness: 'codex', ...over } : s));
+  const ungated = codex({ gate: undefined });
+  assert.match(
+    configRefused(ungated, places, [], DENIED)!,
+    /^ship: .*is a deny list/,
+    'an ungated ending lands on its check all the same — its workflow files it — so it is denied the commit, which codex cannot be',
+  );
+  assert.match(configRefused(ungated, places, ['ship'], DENIED)!, /^ship: .*is a deny list/, 'and a gate given at start changes nothing');
+  assert.equal(
+    configRefused(codex({ gate: undefined, check: undefined }), places, [], DENIED),
+    undefined,
+    'an ending with no check lands nothing on one: its session commits in its own prose, and nothing is denied it',
+  );
 });
 
 test('a step on a remote agent is asked nothing, and a folder whose every step its harness takes is no refusal', () => {

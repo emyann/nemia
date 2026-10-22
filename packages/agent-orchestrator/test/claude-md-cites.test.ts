@@ -143,7 +143,7 @@ test('a citation whose test file and name are both there, on one line or over tw
   assert.deepEqual(brokenCites(root, 'CLAUDE.md', testFiles(root)), []);
 });
 
-test("every CLAUDE.md of the repository is read, the root's and each package's and app's", () => {
+test("every CLAUDE.md of the repository is read, the root's and each package's, app's and the guards'", () => {
   assert.deepEqual([...claudeFiles(ROOT)].sort(), [
     'CLAUDE.md',
     'apps/api/CLAUDE.md',
@@ -151,6 +151,7 @@ test("every CLAUDE.md of the repository is read, the root's and each package's a
     'apps/web/CLAUDE.md',
     'packages/agent-orchestrator/CLAUDE.md',
     'packages/agent-runtime/CLAUDE.md',
+    'tools/guards/CLAUDE.md',
   ]);
 });
 

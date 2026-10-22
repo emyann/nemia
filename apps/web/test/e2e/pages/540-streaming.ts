@@ -125,8 +125,9 @@ export default {
   /**
    * A step whose session says its words in pieces is drawn as they come. The page writes STREAMING, a step at work in a `claude -p` job,
    * and opens its session: the header's `[data-following]` says the session is streamed (`data-streamed`). Each piece the job prints grows
-   * the message being written, drawn last and marked `[data-partial]`; once the job prints the message whole, it takes the partial's place,
-   * drawn once. The session's stream never finishes: the page waits on what it reads, never on the network. It leaves for the list before
+   * the message being written, drawn last and marked `[data-session-partial]`; once the job prints the message whole, it takes the
+   * partial's place, drawn once, and the talk is still at its latest, which it follows by what is drawn and not by its items. The
+   * session's stream never finishes: the page waits on what it reads, never on the network. It leaves for the list before
    * every file it writes is taken back and the engine's feed cut back, so no session is drawn losing its run, and each page after it, in
    * either theme, reads the store as seeded.
    */
@@ -142,8 +143,8 @@ export default {
       await page.goto(new URL(`/runs/${STREAMING.id}/steps/${STREAMING.step}`, page.url()).href, { waitUntil: 'load' });
       const top = page.locator('header[aria-label="The step"]');
       await expectVisible(top.locator('[data-following][data-streamed]'), 'the session is followed live, and said streamed');
-      const talk = page.getByRole('region', { name: "The step's conversation" });
-      const partial = talk.locator('[data-partial]');
+      const talk = page.getByRole('log', { name: "The step's conversation" });
+      const partial = talk.locator('[data-session-partial]');
       await expectCount(partial, 0, 'nothing is being written before the first piece');
 
       piece(f, 0);
@@ -151,12 +152,16 @@ export default {
       piece(f, 1);
       piece(f, 2);
       await expectVisible(partial.getByText(WHOLE, { exact: true }), 'the message being written grows with each piece, in order');
+      await expectVisible(
+        page.locator('[data-session-talk="latest"]'),
+        'and the talk is still at its latest as the pieces land: what is drawn grows with the text, which the items alone do not',
+      );
       await settled(page);
       await photograph(page, path.join(OUT, `streaming-partial-${await themeOf(page)}.png`), { fullPage: true });
 
       whole(f);
       await expectCount(partial, 0, 'the message being written is gone once the whole message is read');
-      const message = talk.locator('[data-turn="said"][data-role="assistant"]', { hasText: WHOLE });
+      const message = talk.locator('[data-session-bubble="agent"]', { hasText: WHOLE });
       await expectCount(message, 1, 'and the whole message is drawn in its place, once');
       if ((await top.locator('[data-following][data-streamed]').count()) !== 1)
         throw new Refused('the session is still followed live after the message is read whole');

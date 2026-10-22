@@ -357,7 +357,7 @@ export type RunDetail = {
     accepted: StepAcceptance | null;
     /** For a step the harness blocked, what its session said last; null for any other, and for one that said nothing the api could read. */
     lastLine: string | null;
-    /** What a person said to its current try's session while it ran (the CLI's `say`, or the session page's prompt box), in order. */
+    /** What a person said to its current try's session while it ran (the CLI's `say`, or the session page's composer), in order. */
     said: Said[];
     /** The try a person asked for that the next tick files; null when none is. */
     asked: StepAsked | null;

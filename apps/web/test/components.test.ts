@@ -6,6 +6,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { behind, detail as detailOf, listed, summary, unpinned } from './run-fixtures.ts';
 import './tsx.ts';
 
@@ -763,64 +764,69 @@ test("the inspector's Details show `loop` and `rounds` beside `after` on a loopi
   assert.match(without, />after<\/dt>/);
 });
 
-const { ToolCallView, ToolRun, TurnView } = await import('../src/components/conversation/Turns.tsx');
+const { SessionOwn } = await import('../src/components/session/SessionOwn.tsx');
+const { SessionTalk } = await import('../src/components/session/SessionTalk.tsx');
 const { foldTranscript, tailStart } = await import('../src/lib/transcript.ts');
+const { sessionItems } = await import('../src/lib/sessionItems.ts');
 type TranscriptEvent = import('../src/lib/api.ts').TranscriptEvent;
 
-test('a thought is drawn folded: a line that says it thought, and its text only once it is opened', () => {
-  const thoughts: TranscriptEvent[] = [
+/** The step's session drawn by the family, as the session page draws it. */
+const talk = (events: TranscriptEvent[], live = false) =>
+  renderToStaticMarkup(createElement(SessionTalk, { who: 'implement', turns: foldTranscript(events), live }));
+
+/** One of the step's own items drawn on its own, as the family's `drawOwn` hands it over. */
+const own = (what: import('../src/lib/sessionItems.ts').SessionOwn) =>
+  renderToStaticMarkup(createElement(SessionOwn, { own: what, marks: 'session' }));
+
+test('the brief is drawn folded: a line that opens, and its words nowhere until it is opened', () => {
+  const html = talk([{ id: 'u-1:0', at, role: 'user', kind: 'text', text: 'Implement what was asked.' }]);
+  assert.match(html, /data-session-brief/, 'the brief is the step\u2019s own item, not a person\u2019s bubble');
+  assert.match(html, /aria-expanded="false"/);
+  assert.doesNotMatch(
+    html,
+    /Implement what was asked/,
+    'folded: React Aria lays out a closed panel\u2019s children, so its words are drawn only while it is open',
+  );
+  assert.match(html, />What it was told</);
+});
+
+test('a thought rides as a line of a turn of work, its words behind the line, and the session\u2019s own words are a bubble', () => {
+  const html = talk([
     { id: 'a-1:0', at, role: 'assistant', kind: 'thinking', text: 'The word goes in a file.' },
-    { id: 'a-2:0', at, role: 'assistant', kind: 'thinking' },
-    { id: 'a-3:0', at, role: 'assistant', kind: 'text', text: 'Writing it.' },
-  ];
-  const [withText, without] = foldTranscript(thoughts).map((turn) =>
-    renderToStaticMarkup(createElement(TurnView, { turn, live: false, last: false, tail: false })),
-  );
-  assert.match(withText, /data-turn="thinking"/);
-  assert.match(withText, /aria-expanded="false"/);
-  assert.doesNotMatch(withText, /data-expanded/, 'folded: its fold is not marked expanded');
-  assert.match(withText, /<p>Thought<\/p>/);
-  assert.doesNotMatch(withText, /The word goes in a file/, 'folded: its text is not drawn until it is opened');
-  assert.match(without, /<p>Thought, with no text kept<\/p>/, 'a thought the harness kept no text for says so');
-});
-
-test('a tool call is drawn with its result: folded, how its result says it went; opened, what it was given and what came back', () => {
-  const [turn] = foldTranscript([
-    { id: 'toolu_bash', at, role: 'assistant', kind: 'tool_use', tool: { name: 'Bash', input: { command: 'echo word > WORD.txt' } } },
-    { id: 'toolu_bash', at, role: 'user', kind: 'tool_result', result: { text: 'WORD.txt: Permission denied', isError: true } },
+    { id: 'a-2:0', at, role: 'assistant', kind: 'text', text: 'Writing it.' },
   ]);
-  assert.ok(turn?.kind === 'tool');
-  const folded = renderToStaticMarkup(createElement(TurnView, { turn, live: true, last: true, tail: true }));
-  assert.match(
-    folded,
-    /data-tool-state="error"/,
-    'live, and in the tail, as a call still running would be: its result says how it went, not the session',
-  );
-  assert.match(folded, /data-tool="Bash"/);
-  assert.match(folded, /echo word &gt; WORD\.txt/, 'what it ran, on its line');
-  assert.doesNotMatch(folded, /Permission denied/, 'folded: the result is behind its line');
+  assert.match(html, /data-session-turn="folded"/, 'a turn with nothing still at work folds into one line');
+  assert.match(html, /Worked for 0s · 1 step/);
+  assert.doesNotMatch(html, /The word goes in a file/, 'folded: the thought is behind the line');
+  assert.match(html, /data-session-message="agent"/);
+  assert.match(html, /data-session-bubble="agent"[^>]*>(<[^>]+>)*Writing it\./, 'the session\u2019s words, drawn from their markdown');
+});
 
-  const opened = renderToStaticMarkup(createElement(ToolCallView, { call: turn.call, running: false, defaultOpen: true }));
-  assert.match(opened, /data-expanded="true"/);
-  assert.match(opened, /command.{1,16}echo word &gt; WORD\.txt/, 'its input');
-  assert.match(opened, />Error<\/h4>/);
-  assert.match(opened, /WORD\.txt: Permission denied/, 'its result');
-
-  const call = { ...turn.call, result: null };
-  assert.match(
-    renderToStaticMarkup(createElement(ToolCallView, { call, running: true })),
-    /data-tool-state="running"/,
-    'with no result yet: running while the session may answer it',
+test('a turn still at work is drawn open, each line in the state its call is in', () => {
+  const events: TranscriptEvent[] = [
+    { id: 'u-1:0', at, role: 'user', kind: 'text', text: 'Run the checks.' },
+    { id: 'toolu_test', at, role: 'assistant', kind: 'tool_use', tool: { name: 'Bash', input: { command: 'npm test' } } },
+    { id: 'toolu_test', at, role: 'user', kind: 'tool_result', result: { text: 'pass 233', isError: true } },
+    { id: 'toolu_types', at, role: 'assistant', kind: 'tool_use', tool: { name: 'Bash', input: { command: 'npm run typecheck' } } },
+  ];
+  assert.equal(tailStart(foldTranscript(events)), 1, 'the turn is in the tail');
+  const live = talk(events, true);
+  assert.match(live, /data-session-turn="running"/, 'a turn with a call still unanswered is drawn open');
+  assert.deepEqual(
+    [...live.matchAll(/data-session-step="([^"]+)"/g)].map((m) => m[1]),
+    ['error', 'running'],
   );
-  assert.match(
-    renderToStaticMarkup(createElement(ToolCallView, { call, running: false })),
-    /data-tool-state="no-result"/,
-    'and unanswered once it cannot',
+  const over = talk(events, false);
+  assert.match(over, /data-session-turn="folded"/, 'and folded once the session cannot answer it');
+  assert.deepEqual(
+    [...over.matchAll(/data-session-step="([^"]+)"/g)].map((m) => m[1]),
+    [],
+    'folded: its lines are not drawn, which React Aria would otherwise keep and lay out',
   );
 });
 
-test('a StructuredOutput call is drawn as the closeout, named, with its outcome — not as a tool call', () => {
-  const [turn] = foldTranscript([
+test('a StructuredOutput call is drawn as the closeout, named, with its outcome, summary and needs — not as a line of work', () => {
+  const html = talk([
     {
       id: 'toolu_closeout',
       at,
@@ -832,52 +838,75 @@ test('a StructuredOutput call is drawn as the closeout, named, with its outcome 
       },
     },
   ]);
-  const html = renderToStaticMarkup(createElement(TurnView, { turn: turn, live: false, last: true, tail: true }));
   assert.match(html, /aria-label="Closeout"/);
-  assert.match(html, />Closeout<\/h3>/);
-  assert.match(html, /data-outcome="blocked"/);
+  assert.match(html, />Closeout</);
+  assert.match(html, /data-session-outcome="blocked"/);
+  assert.match(html, /WORD\.txt is not writable/);
   assert.match(html, /A writable WORD\.txt/);
-  assert.doesNotMatch(html, /data-turn="tool"/);
+  assert.doesNotMatch(html, /data-session-step=/, 'never a line of work');
 });
 
-test('in a live fold with nothing said after it, every call still waiting is running — a batch is answered after all of it', () => {
-  const pending: TranscriptEvent[] = [
-    { id: 'u-1:0', at, role: 'user', kind: 'text', text: 'Run the checks.' },
-    { id: 'toolu_test', at, role: 'assistant', kind: 'tool_use', tool: { name: 'Bash', input: { command: 'npm test' } } },
-    { id: 'toolu_types', at, role: 'assistant', kind: 'tool_use', tool: { name: 'Bash', input: { command: 'npm run typecheck' } } },
-  ];
-  const turns = foldTranscript(pending);
-  const fold = turns[1];
-  assert.ok(fold.kind === 'tools');
-  assert.equal(tailStart(turns), 1, 'the fold is in the tail');
-  const states = (live: boolean, tail: boolean) =>
-    [
-      ...renderToStaticMarkup(createElement(ToolRun, { turn: fold, live, tail, defaultOpen: true })).matchAll(/data-tool-state="([^"]+)"/g),
-    ].map((m) => m[1]);
-  assert.deepEqual(states(true, true), ['running', 'running']);
-  assert.deepEqual(states(false, true), ['no-result', 'no-result'], 'once the session is not live, a call with no result had none');
-  assert.deepEqual(states(true, false), ['no-result', 'no-result'], 'nor once it has said something since');
+test('what a person told the session is their own words, once, with when they reached its conversation', () => {
+  const html = own({ what: 'told', at, attempt: 1, text: 'Widen the api too.', arrived: '2026-09-13T00:01:00.000Z' });
+  assert.match(html, /data-session-message="told"/);
+  assert.equal([...html.matchAll(/Widen the api too\./g)].length, 1, 'drawn once: the session\u2019s own line for them is taken out');
+  assert.match(html, /data-session-arrived="2026-09-13T00:01:00\.000Z"/);
+  assert.match(html, />You said, while it ran ·/, 'marked as yours, said while the session ran');
+  assert.doesNotMatch(
+    own({ what: 'told', at, attempt: 1, text: 'Widen the api too.', arrived: null }),
+    /data-session-arrived/,
+    'and says nothing of its arrival until the transcript shows it',
+  );
 });
 
-test("REFUSED: a closed fold draws none of its calls, and a closed call none of its input — React Aria's panel would keep them, hidden", () => {
-  const turns = foldTranscript([
-    { id: 'toolu_test', at, role: 'assistant', kind: 'tool_use', tool: { name: 'Bash', input: { command: 'npm test' } } },
-    { id: 'toolu_test', at, role: 'user', kind: 'tool_result', result: { text: 'pass 233', isError: false } },
-    { id: 'toolu_types', at, role: 'assistant', kind: 'tool_use', tool: { name: 'Read', input: { file_path: 'README.md' } } },
+test('a line the harness wrote on its own is a quiet note; one between two calls is a line of the turn', () => {
+  const alone = talk([{ id: 's-1:0', at, role: 'system', kind: 'text', text: 'Background session idle' }]);
+  assert.match(alone, /data-session-marker="system"/);
+  assert.match(alone, /Background session idle/);
+
+  const between = foldTranscript([
+    { id: 'toolu_a', at, role: 'assistant', kind: 'tool_use', tool: { name: 'Bash', input: { command: 'npm test' } } },
+    { id: 's-2:0', at, role: 'assistant', kind: 'system', text: 'Hook ran' },
+    { id: 'toolu_b', at, role: 'assistant', kind: 'tool_use', tool: { name: 'Bash', input: { command: 'npm run lint' } } },
   ]);
-  const fold = turns[0];
-  assert.ok(fold.kind === 'tools');
-  const closed = renderToStaticMarkup(createElement(ToolRun, { turn: fold, live: false, tail: false }));
-  assert.match(closed, /aria-expanded="false"/);
-  assert.doesNotMatch(closed, /data-turn="tool"/, 'closed: its calls are not drawn');
-  assert.doesNotMatch(closed, /border-l/, 'and nothing of what holds them, whose margin and border would show under the line');
-  const opened = renderToStaticMarkup(createElement(ToolRun, { turn: fold, live: false, tail: false, defaultOpen: true }));
-  assert.equal([...opened.matchAll(/data-turn="tool"/g)].length, 2, 'opened: both calls');
+  const lines = sessionItems(between, 'implement', false).flatMap((item) => (item.kind === 'work' ? item.lines : []));
+  assert.deepEqual(
+    lines.map((line) => line.sentence),
+    ['Bash', 'A line from the harness', 'Bash'],
+  );
+});
 
-  const call = fold.turns[0];
-  assert.ok(call.kind === 'tool');
-  const folded = renderToStaticMarkup(createElement(ToolCallView, { call: call.call, running: false }));
-  assert.doesNotMatch(folded, />Parameters<\/h4>|pass 233/, 'a closed call draws neither its input nor its result');
+test('the Activity tab draws the session compact, over the last of its turns, and links to the whole of it', () => {
+  const compact = renderToStaticMarkup(createElement(SessionTalk, { who: 'implement', turns: [], live: false, density: 'compact' }));
+  assert.match(compact, /data-session-talk="latest"[^>]*class="[^"]*gap-2"/, 'the tab stands its items closer than the page does');
+  assert.doesNotMatch(
+    renderToStaticMarkup(createElement(SessionTalk, { who: 'implement', turns: [], live: false })),
+    /data-session-talk="latest"[^>]*class="[^"]*gap-2"/,
+    'and the page stands them at the room they want',
+  );
+
+  const inspector = fs.readFileSync(new URL('../src/components/StepInspector.tsx', import.meta.url), 'utf8');
+  assert.match(inspector, /const tail = turns\.slice\(-ACTIVITY_TURNS\);/, 'the tab draws the tail of the conversation, not the whole');
+  assert.match(
+    inspector,
+    /<SessionTalk who=\{step\.name\} turns=\{tail\} live=\{following\.live\} density="compact" \/>/,
+    'drawn by the family, compact, over that tail',
+  );
+  assert.match(inspector, /Open the session/, 'and the whole of it is one click away');
+});
+
+test('the message being written is drawn after the turns, until the whole of it takes its place', () => {
+  const events: TranscriptEvent[] = [{ id: 'u-1:0', at, role: 'user', kind: 'text', text: 'Say how rivers end.' }];
+  const writing = renderToStaticMarkup(
+    createElement(SessionTalk, { who: 'implement', turns: foldTranscript(events), live: true, writing: 'Rivers run to' }),
+  );
+  assert.match(writing, /data-session-partial/);
+  assert.match(writing, /Rivers run to/);
+  assert.doesNotMatch(
+    renderToStaticMarkup(createElement(SessionTalk, { who: 'implement', turns: foldTranscript(events), live: true, writing: null })),
+    /data-session-partial/,
+    'nothing is drawn before the first piece',
+  );
 });
 
 const { Markdown } = await import('../src/components/Markdown.tsx');
@@ -7228,6 +7257,7 @@ test('the run page draws one tag per kind the run is behind on, and the verb to 
 });
 
 const { Worked, WorkedLine } = await import('../src/components/conversation/Worked.tsx');
+const { HARNESS_TOOL, THOUGHT_TOOL } = await import('../src/lib/sessionItems.ts');
 const { ChatLostBand, ChatRetryingBand, ChatStoppedBand, ChatUnreadableBand } = await import('../src/components/chat/ChatBand.tsx');
 const { chatItems } = await import('../src/lib/chatFollowing.ts');
 type ConversationLine = import('../src/lib/conversation.ts').ConversationLine;
@@ -7317,6 +7347,19 @@ test('a line opens to what it asked and what came back where it has either, and 
     createElement(WorkedLine, { line: line({ input: 'rg -n drainsThis', result: 'feed.ts:88' }), marks: 'chat' }),
   );
   assert.doesNotMatch(closed, /rg -n drainsThis/, 'a closed fold lays out nothing it holds');
+});
+
+test('a line that called nothing is drawn by the name its adapter gives it: a thought thinks, a harness line informs, an unknown tool is plain', () => {
+  const glyphOf = (tool: string) =>
+    /lucide-([a-z-]+)"/.exec(renderToStaticMarkup(createElement(WorkedLine, { line: line({ tool }), marks: 'session' })))?.[1];
+  assert.equal(glyphOf(THOUGHT_TOOL), 'brain', 'the name the step’s adapter writes on a thought is the one the family draws a brain for');
+  assert.equal(glyphOf(HARNESS_TOOL), 'info', 'and the one it writes on a line of the harness, the one it draws an info for');
+  assert.equal(glyphOf('Bash'), 'terminal', 'a tool the board knows draws its own');
+  assert.equal(
+    glyphOf('NoSuchToolOfAny'),
+    'wrench',
+    'and one it does not, the plain one — which is what either name renamed on one side alone would quietly become',
+  );
 });
 
 test("her session stopped is a status, the daemon lost an alert in the failure's colour, and neither is dimmed by an opacity", async () => {

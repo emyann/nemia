@@ -2,8 +2,11 @@
  * The composer of a conversation of the board: a field that grows with what is written, Enter sends and Shift+Enter makes a new line,
  * the two hints under it, and one button on its right. What it invites (`placeholder`), what a reader is told it is (`label`) and
  * whether it takes anything at all (`off`) are its caller's — a family part knows no conversation's vocabulary, the two buttons' labels
- * included. Where a `stop` is given the button is it, which ends the turn and leaves the session open, and the field stays live, so
- * Enter still sends the next words; where there is none it is the send. Its data marks are under the prefix `marks` names (`mark`).
+ * included. It holds what is written itself and empties the field the moment it is sent; a caller whose send may be refused puts the
+ * words it refused back by drawing the composer afresh on `start`.
+ *
+ * Where a `stop` is given the button is it, which ends the turn and leaves the session open, and the field stays live, so Enter still
+ * sends the next words; where there is none it is the send. Its data marks are under the prefix `marks` names (`mark`).
  */
 import { useRef, useState } from 'react';
 import { ArrowUpIcon } from 'lucide-react';
@@ -26,6 +29,8 @@ const Key = ({ children }: { children: string }) => (
 
 type Props = {
   marks: string;
+  /** What the field holds to begin with: the words a caller's send was refused, put back to be sent again. */
+  start?: string;
   label: string;
   placeholder: string;
   off: boolean;
@@ -35,8 +40,8 @@ type Props = {
 };
 
 /** The field, its button, and the hints: `onSend` takes what was written once there is something in it, `stop` ends the turn. */
-export function Composer({ marks, label, placeholder, off, sendLabel, onSend, stop }: Props) {
-  const [text, setText] = useState('');
+export function Composer({ marks, start = '', label, placeholder, off, sendLabel, onSend, stop }: Props) {
+  const [text, setText] = useState(start);
   const form = useRef<HTMLFormElement>(null);
   const ready = text.trim() !== '' && !off;
   const stops = stop !== undefined;

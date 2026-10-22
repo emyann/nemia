@@ -102,10 +102,12 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
 - Both conversations follow their stream through the one `follow` of `lib/follow.ts`, each handing it a `Follower`: a step's is
   `lib/following.ts`, her chat's `lib/chatFollowing.ts`.
 - Both conversations are drawn by the one family of `components/conversation/` on the one turn shape of `lib/conversation.ts`, each
-  mapping its own events onto that shape through an adapter of its own: her chat's is `chatItems` (`lib/chatFollowing.ts`). A family
-  part writes every data mark under the prefix its caller names (`mark`), never a `data-chat-` of its own and never a prefix quoted at
-  the call — hers names `chat`, a step's session `session`; `test/conversation.test.ts` reads both forms off every `.tsx` of the folder
-  — and what is one conversation's alone stays in that conversation's folder (her kept message, her asks).
+  mapping its own events onto that shape through an adapter of its own: her chat's is `chatItems` (`lib/chatFollowing.ts`), a step's
+  session's is `sessionItems` (`lib/sessionItems.ts`, beside the fold it reads, `lib/transcript.ts`). A family part writes every data
+  mark under the prefix its caller names (`mark`), never a `data-chat-` of its own and never a prefix quoted at the call — hers names
+  `chat`, a step's session `session`, and `test/conversation.test.ts` reads both forms off every `.tsx` of the folder — and what is one
+  conversation's alone stays in that conversation's folder: hers is `components/chat/` (her kept message, her asks), a step's session's
+  is `components/session/` (its brief, its told turns, its closeout, its bands, its composer).
 - A value two files under `lib/api/` need sits in a sibling that imports no sibling: the builder's saves decode a `WorkflowListing`, so
   they sit in `workflows.ts` beside its schema.
 

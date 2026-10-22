@@ -127,9 +127,12 @@ export const SESSION = {
   sessionId: '5b0f7a52-2c1e-4d8b-9a3f-6e1d2c7b4a90',
   prompt: 'Implement what was asked.\n\n## What was asked for\n\nGive the board a look.',
   thought: 'The Factory draws every run; a finished one should step off the floor.',
-  /** The seven calls between two things said, as one line. */
-  folded: 'Ran 3 commands, searched code, read 3 files',
-  calls: 7,
+  /** The seven calls between two things said, and the thought among them, as the one line the family's folded turn says. */
+  folded: 'Worked for 6m 30s · 8 steps',
+  /** How many lines that turn opens to: its seven calls and the thought kept without its text. */
+  lines: 8,
+  /** The first line of what the first file read came back as, which its line opens to. */
+  readFirstLine: "1\timport type { RunSummary } from './api';",
   /** An item of the list in the words that follow the calls, as their markdown draws it. */
   listed: 'a finished run steps off the floor',
   system: 'Background session idle',

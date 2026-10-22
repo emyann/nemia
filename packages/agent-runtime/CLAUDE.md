@@ -105,8 +105,13 @@ down is in `docs/architecture.md`, *Who owns what*.
   the SDK translation: `attachedOptions` is one function for both roads, and a flag added there reaches a held session and a job
   alike. The runner writes the bin its spawn request as a file (`HarnessSpec.needsRequest`, `<name>.request.json`, owner-only
   because the task's `config.mcp` may carry a secret), since no argv could carry it.
-- **A job is denied by `permissionPrompts: 'none'`** (`sdk.d.ts:1870`), never by a `canUseTool` of ours: a decision in the bin's
+- **A job is denied by `permissionPrompts: 'none'`** (`sdk.d.ts:2054`), never by a `canUseTool` of ours: a decision in the bin's
   process would die with it, and Claude Code prints the `system`/`permission_denied` line the readers already count.
+- **A session's `system`/`init` line says the model it really started on, and the runtime carries it onto the attempt as `ranOn`**
+  (`claudeStreamOutput`, `Sighting.ranOn`, `Attempt.ranOn`): `config.model` is what was asked for, `ranOn` what happened, and the
+  alias between them is Claude Code's to resolve. Named for what happened, since the core may name no harness argument
+  (`test/core-reads.test.ts`), and carried, never judged: nothing compares the two. Absent from an attempt an older runtime
+  recorded, and from a harness that cannot say.
 - **A detached session's id is read by the worker from its spec's `start` event, on whole stdout lines** (`readers`, `bin/ae-worker.ts`).
   Measured 2026-10-06: `codex exec --json` (0.154.0) prints `thread.started` first; `claude -p` (2.1.291) prints `system`/`init` first
   under `--output-format stream-json --verbose`, and one `result` line under `--output-format json`. A job's bin prints the SDK's
@@ -133,15 +138,30 @@ down is in `docs/architecture.md`, *Who owns what*.
   call in flight (`takeover.verb.ts`).
 - **A `parked` run that carries `calling` is a call its holder cut**: the next holder resumes that session with `crashNote`, the road a
   crashed holder's session already takes (`noteOf`, `attached.ts`).
-- **The Agent SDK (0.3.270) speaks to its CLI in control requests both ways, and writes a resume as one argument, `--resume=<id>`**: the
+- **The Agent SDK (0.3.308) speaks to its CLI in control requests both ways, and writes a resume as one argument, `--resume=<id>`**: the
   stand-in CLI (`test/fixtures/stand-in-claude.ts`) answers `initialize` and asks `hook_callback` and `can_use_tool` as it does, and
   `test/attached.boundary.test.ts` pins it; an SDK update that moves the protocol fails there first.
+- **`--resume=<id>` is the shape of nearly every flag the SDK builds, from 0.3.295**: the mode, the prompts, the tool lists, the
+  setting sources, `--add-dir`, `--plugin-dir`, `--model`, `--effort` are all `--flag=value`, while `--mcp-config`,
+  `--managed-settings` and every `extraArgs` key — `--settings` among them — stay two arguments (`docs/harness.md`). So a test that
+  reads an **SDK-written** argv reads it through `test/sdk-argv.ts`'s `sdkArgValue`, which takes either form and refuses an absent
+  flag: `argv[argv.indexOf(flag) + 1]` answered `argv[0]` without failing when the form moved, since `indexOf` gives -1. The argv
+  **we** write — `claudePrintFlags`, `claudeArgv`, `ae`'s own, an MCP server's `args` — is ours to spell, and a test of one reads it
+  as written there. The orchestrator keeps its own copy of the reader for its own tests (`test/sdk-argv.ts` there).
+- **The Agent SDK is pinned exactly, and the pin is a test** (`test/sdk-pin.ts`, `test/sdk-pin.test.ts`): a range spec, a lock, an
+  installed tree or a bundled `claudeCodeVersion` that disagrees is refused, naming the install command. The dependency once stood as
+  `^0.3.261` with the lock at 0.3.270, and for 140 step sessions the team asked for `opus` and got `claude-opus-5` where the owner's
+  own terminal had `claude-opus-5-5` — a range cannot say which Claude Code a session gets. `test/sdk-citations.boundary.test.ts`
+  refuses an `sdk.d.ts:<line>` citation in our prose whose line no longer declares what it claims; a bump moves all of them.
+- **Fork subagents are on by default in an SDK session from 0.3.302, as in the terminal**, so a step's `Agent` call forks the parent's
+  context rather than starting fresh and costs tokens the run's budgets were measured without. The factory keeps the SDK's default;
+  `CLAUDE_CODE_FORK_SUBAGENT=0` in `CLAUDE_JOB_ENV` (`harness/claude/code.ts`) turns it off, and no test watches it.
 - **The SDK sends an empty system prompt when `systemPrompt` is unasked**, so an agent's own prompt appended to it is appended to
   nothing: `attachedOptions` asks for the preset `claude_code`, which a `claude -p` job has by default (measured 0.3.270:
   the `initialize` request carried `[""]` without it, and none with it). The agent's own prompt rides that preset's `append`, as the
   file's text read at spawn, and reaches the CLI as `appendSystemPrompt` on the `initialize` request, never as
   `--append-system-prompt-file`; so does `systemPromptFile`, as `systemPrompt` alone, and a task giving both is refused by name. A
-  resumed session keeps the prompt it was recorded with (`systemPrompt`'s own `snapshot`, which defaults on, `sdk.d.ts:2203-2256`),
+  resumed session keeps the prompt it was recorded with (`systemPrompt`'s own `snapshot`, which defaults on, `sdk.d.ts:2350-2461`),
   so a prompt file edited mid-session reaches no live session until it is compacted.
 - **An attached session's MCP servers are `Options.mcpServers`, which the SDK spells onto the child's argv as inline JSON**
   (`sdk.mjs`, `--mcp-config <json>`), with `Options.strictMcpConfig` as the fence: that path writes no MCP config file, and a
@@ -151,7 +171,8 @@ down is in `docs/architecture.md`, *Who owns what*.
   the inline map too**, not from a config file alone (measured 2.1.306, `test/live.test.ts`: a variable the task's `env` set came
   back expanded and one nothing sets came back as its default), so the repository's own
   `--output-dir ${WF_STEP_FILES:-/tmp/playwright-mcp}` still writes outside the workspace on this road. `Settings.autoCompactWindow`, in the one settings object, moves the window
-  `--autocompact <n>` moves (measured 0.3.270 against the real CLI: 150000 either way gave `rawMaxTokens: 150000`, against the
+  `--autocompact <n>` moves (measured 0.3.270 against the real CLI and carried, both options still there on 0.3.308: 150000 either
+  way gave `rawMaxTokens: 150000`, against the
   model's 200000 asked for neither), and the flag stays only where `claude.settings` is a file's path the runtime will not rewrite.
 - **`Options.settings` overwrites a `settings` left on `extraArgs`, and `extraArgs` stringifies its values** (`sdk.mjs`): so
   `Options.settings` is the only writer of a session's settings — an object there is JSON the SDK writes itself — and an object left
@@ -297,7 +318,7 @@ What Claude Code does as the steps meet it. Where the orchestrator's code holds 
   with background tasks off alone, moved to the background with neither), and a shell `&` still detaches, its `$!` alive to `kill -0`.
 - **A job exports logs, metrics and traces from its environment over `http/json`, flushed at exit, and joins `TRACEPARENT`** — an
   environment `attachedOptions` now composes onto `Options.env` inside the bin, where the SDK replaces the child's environment
-  entirely (`sdk.d.ts:1535`), so the engine's own telemetry is off the bin's process and the session's is on the CLI's;
+  entirely (`sdk.d.ts:1694`), so the engine's own telemetry is off the bin's process and the session's is on the CLI's;
   a `--bg` session runs in a pre-spawned process, ignores the asker's environment and `TRACEPARENT`, and exports only what `--settings`'
   `env` says; a job's Bash tool sees no `OTEL_*`, but `TRACEPARENT` (2.1.291, 2026-10-06; `claudeTelemetryEnv`, `telemeteredFlags`).
   Whether a `--bg` session's Bash tool inherits that `env`'s telemetry is unmeasured: its `env.PATH` reaches it, so a `claude -p` run

@@ -5,11 +5,11 @@
  * prompt — and it writes none: the servers ride `Options.mcpServers` and the prompt `Options.systemPrompt`.
  *
  * **`mcpServers` here is the one site that names the SDK's shape for a server, so the one that says where the shape and ours part.** A
- * recorded server carries `oauth: { clientId, callbackPort }` (`mcpServerOf`), and `oauth` is not declared on the SDK's type for an
- * HTTP server (`sdk.d.ts:1083-1098`). It was measured working at SDK 0.3.270 — a server handed inline with it reported `needs-auth`,
- * signed in, and a second session with the same config found the sign-in — and the cast is what lets it through, so no typecheck
- * reads it and no test of ours can hold it. An SDK that renames the field or validates its input breaks every sign-in silently: the
- * server simply comes back `needs-auth` for ever. Look for it in `sdk.d.ts` on each SDK bump, and say here when it is declared.
+ * recorded server carries `oauth: { clientId, callbackPort }` (`mcpServerOf`), and `oauth` is still not declared on the SDK's type
+ * for an HTTP server (`sdk.d.ts:1205-1220`), so the cast is what lets it through and no typecheck reads it. What it does is measured
+ * rather than typed: on 0.3.308 the SDK's own schema for an http server declares `oauth` and the server comes back with it echoed on
+ * `McpServerStatus.config` (`seam.ts`, `docs/harness.md`). An SDK that renamed the field would break every sign-in silently — the
+ * server would simply come back `needs-auth` for ever — so it is re-measured at each bump, not carried.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -76,7 +76,7 @@ const promptText = (key: string, cwd: string, file: string): string => {
 };
 
 /**
- * The session's system prompt, as `Options.systemPrompt` takes it (`sdk.d.ts:2247-2257`): Claude Code's own preset with the agent's
+ * The session's system prompt, as `Options.systemPrompt` takes it (`sdk.d.ts:2451-2461`): Claude Code's own preset with the agent's
  * prompt appended to it (`appendSystemPromptFile`), the prompt file's text alone in place of Claude Code's (`systemPromptFile`), or
  * the bare preset where the task names neither — asked for even then, because the SDK sends an empty system prompt when
  * `systemPrompt` is unasked, and a `claude -p` job has Claude Code's own.
@@ -151,15 +151,15 @@ const askedOf = (r: SpawnRequest): AttachedOptions => ({
  * - `config.claude` with the admission's hook (`admittedFlags`) on `extraArgs`, its plugin folders as `plugins`, its settings on
  *   the SDK's own `settings`, the session's auto-memory off in them (`memorylessSettings`), and its prompt files as `systemPrompt`;
  * - the partial messages, always asked for: the SDK emits a `stream_event` for each piece of a block only when
- *   `includePartialMessages` is set (`sdk.d.ts:1736`, `--include-partial-messages` to its CLI), and a follow of the session reads
+ *   `includePartialMessages` is set (`sdk.d.ts:1896`, `--include-partial-messages` to its CLI), and a follow of the session reads
  *   their `text_delta`s and nothing else (`attached-follow.ts`); the capture goes on dropping them;
- * - the mode, `auto` unless the task names one; the servers on `Options.mcpServers` (`sdk.d.ts:1813`) and nothing but them
- *   (`Options.strictMcpConfig`, `sdk.d.ts:2145`) — the SDK spells that map onto the child's argv as inline JSON, and Claude Code
+ * - the mode, `auto` unless the task names one; the servers on `Options.mcpServers` (`sdk.d.ts:1991`) and nothing but them
+ *   (`Options.strictMcpConfig`, `sdk.d.ts:2349`) — the SDK spells that map onto the child's argv as inline JSON, and Claude Code
  *   expands a `${NAME:-default}` in a server's arguments there as it does from a config file (measured 2.1.306,
  *   `test/live.test.ts`), so the checkout's own `--output-dir` still resolves — no Chrome; `--setting-sources project`; Claude
  *   Code's own system prompt as the preset `claude_code`, which a `claude -p` job has by default and the SDK leaves empty when
  *   unasked, with the agent's own prompt appended to it (`promptOf`) and not to nothing;
- * - the model, the effort, the context window as `Settings.autoCompactWindow` in those same settings (`sdk.d.ts:8353`), the closing
+ * - the model, the effort, the context window as `Settings.autoCompactWindow` in those same settings (`sdk.d.ts:9304`), the closing
  *   statement's schema (`outputFormat`, handed on as it was given, unread), the session to resume, the worktree, and the spend cap;
  * - the environment: the engine's own, its telemetry taken out (`withoutTelemetry`), with the task's `env`, `CLAUDE_JOB_ENV` and the
  *   session's own telemetry laid over it, as a job's.
@@ -186,14 +186,15 @@ export const attachedOptions = (r: SpawnRequest): AttachedOptions => {
     strictMcpConfig: true,
     ...askedOf(r),
     /**
-     * What is left of Claude Code's command line: `config.claude`'s own flags, and the two the Agent SDK 0.3.270 has no `Options`
+     * What is left of Claude Code's command line: `config.claude`'s own flags, and the two the Agent SDK 0.3.308 has no `Options`
      * for — `--no-chrome`, because Claude in Chrome connects even in a strict session (`claudeMcpArgs`), and `--worktree`. Looked
      * for in `sdk.d.ts` and not there; everything else a task gives here is a flag only Claude Code has. Look for an `Options`
      * before adding another, and say in this note when there is none.
      *
      * `--autocompact` beside them for the one task that cannot carry `autoCompactWindow`: where `config.claude.settings` is a
      * file's path there is no settings object of ours to put the window in, and the runtime rewrites no settings file
-     * (`memorylessSettings`). The two reach the same window, measured on 0.3.270 against the real Claude Code: 150000 asked each
+     * (`memorylessSettings`). The two reach the same window, measured on 0.3.270 against the real Claude Code and carried, both
+     * options still there on 0.3.308: 150000 asked each
      * way gave `rawMaxTokens: 150000`, where a session asked for neither got the model's 200000.
      */
     extraArgs: {

@@ -1057,7 +1057,7 @@ agent-orchestrator gives — `appendSystemPromptFile`, `systemPromptFile`, `plug
 plugin directory of the step's own, and the runtime reads none of it: `domain.ts` and `engine.ts` never open `config`.
 
 An **attached** session has no command line of the runtime's making, so each of those keys reaches it on the Agent SDK's own
-`Options` where the SDK has one (`attachedOptions`, SDK 0.3.270): `appendSystemPromptFile` and `systemPromptFile` as
+`Options` where the SDK has one (`attachedOptions`, SDK 0.3.308): `appendSystemPromptFile` and `systemPromptFile` as
 `systemPrompt` — the file's text, read when the session is spawned, appended to the `claude_code` preset or in place of it, from the
 task's own `cwd` where the path is relative, as Claude Code resolved the flag's path from inside the child and as `pluginDir` is
 resolved —
@@ -1067,8 +1067,9 @@ stays raw, on `extraArgs`: `--no-chrome` and `--worktree`, which `sdk.d.ts` has 
 here — a flag only Claude Code has, which is what this bag is for. The context window, which is `contextTokens` and not a
 `claude` key, rides `Settings.autoCompactWindow` in those same settings, and falls back to `--autocompact` for the one task whose
 `claude.settings` is a file's path: there is no settings object of the runtime's to put it in, and the runtime rewrites no
-settings file. Both reach the same window (measured against Claude Code on SDK 0.3.270: 150000 asked either way, `rawMaxTokens:
-150000`; a session asked for neither got the model's 200000).
+settings file. Both reach the same window (measured against Claude Code on SDK 0.3.270, and carried: 150000 asked either way,
+`rawMaxTokens: 150000`; a session asked for neither got the model's 200000. `Settings.autoCompactWindow` and `--autocompact` are
+both still there on 0.3.308, `sdk.d.ts:9304` and the CLI's own flag, so what moved is neither option).
 
 `file()` refuses a `claude` that is not an object of camelCase keys, two letters or more, whose values each say one thing
 on the command line (`false`, `null`, `''`, an object and an empty list do not); a flag the runtime gives itself

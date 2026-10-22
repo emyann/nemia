@@ -48,6 +48,7 @@ import { claudeCodeOps } from '../src/harness/claude/code.ts';
 import type { SpawnRequest } from '../src/harness/seam.ts';
 import { Engine } from '../src/index.ts';
 import { scratch } from './scratch.ts';
+import { sdkArgValue } from './sdk-argv.ts';
 import { until, WAITED } from '../src/waits/index.ts';
 import { holder, inCall, kept, lines, NAME, place, run, STAND_IN } from './attached-held.ts';
 
@@ -795,7 +796,7 @@ test("a session is started on Claude Code's own system prompt, the agent's appen
   assert.equal(
     init.appendSystemPrompt,
     'you are the agent',
-    "the agent's own prompt is appended on the initialize request (`sdk.d.ts:4176`), as its text and not its file's path",
+    "the agent's own prompt is appended on the initialize request (`sdk.d.ts:4687`), as its text and not its file's path",
   );
   const [argv] = lines(dir, 'argv.jsonl') as string[][];
   assert.ok(!argv.includes('--append-system-prompt-file'), "the prompt is no longer a flag: the SDK carries it in the session's init");
@@ -815,19 +816,16 @@ test('a task’s servers ride the child’s argv as inline JSON, strict, and the
   await Effect.runPromise(h.attached.ops.spawn(request));
   await until(t, () => run(root)?.state === 'completed', 'the session completed', { everyMs: 50 });
   const [argv] = lines(dir, 'argv.jsonl') as string[][];
-  const at = argv.indexOf('--mcp-config');
-  assert.ok(at >= 0, `the SDK compiled \`mcpServers\` onto the child's argv; it gave ${argv.join(' ')}`);
   assert.deepEqual(
-    JSON.parse(argv[at + 1]),
+    JSON.parse(sdkArgValue(argv, '--mcp-config')),
     { mcpServers: { probe: { command: 'probe-server', args: ['--once'] } } },
     'the servers themselves, inline, where the runtime used to name a file of its own',
   );
   assert.ok(argv.includes('--strict-mcp-config'), '`strictMcpConfig` is still the fence');
   assert.equal(fs.existsSync(stale), false, 'a config an older runtime left under this name is cleared at the spawn, never read');
   assert.ok(!argv.includes('--autocompact'), 'the window is no flag of ours any more');
-  const settings = argv.indexOf('--settings');
   assert.deepEqual(
-    JSON.parse(argv[settings + 1]),
+    JSON.parse(sdkArgValue(argv, '--settings')),
     { autoMemoryEnabled: false, autoCompactWindow: 150_000 },
     'it rides the one settings object, beside auto-memory off: `Settings.autoCompactWindow`, which the SDK spells as `--settings`',
   );

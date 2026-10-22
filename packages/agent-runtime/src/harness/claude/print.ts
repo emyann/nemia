@@ -88,6 +88,7 @@ export const PRINTED = {
     type: Schema.Literal('system'),
     subtype: Schema.Literal('init'),
     cwd: Schema.optional(Schema.NonEmptyString),
+    model: Schema.optional(Schema.NonEmptyString),
   }),
   stream_event: Schema.Struct({
     type: Schema.Literal('stream_event'),

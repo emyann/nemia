@@ -8,7 +8,7 @@ import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Journal, type JournalError } from './journal.ts';
-import type { Event, Usage } from '../domain.ts';
+import { fold, type Event, type Usage } from '../domain.ts';
 import { HarnessArgsSchema, type StoredEvent } from '../event-schema.ts';
 import type { HarnessArgs } from '../../harness/args.ts';
 import { ioCounts } from './tally.ts';
@@ -585,6 +585,39 @@ test('the skills an end names are read back as written, an empty list kept; a li
     Effect.flatMap(Journal, (j) => j.read('t-bad')),
   );
   assert.ok(error.message.includes('entry 2 is a `ended` event, and its `skills` is "look"'), error.message);
+});
+
+test('the model an end names is read back as written, and folds onto the attempt; an end an older runtime wrote names none', async () => {
+  const end = (attempt: number, model?: unknown) => ({
+    kind: 'ended',
+    at: '2026-09-24T00:00:01Z',
+    attempt,
+    sessionId: 's',
+    observed: 'done',
+    reason: 'harness',
+    ...(model === undefined ? {} : { ranOn: model }),
+  });
+  const starting = (attempt: number) => ({ kind: 'starting', at: '2026-09-24T00:00:00Z', attempt, name: `ae-t-model-${attempt}` });
+  const dir = legacyStore({ 't-model': [TODAY, starting(1), end(1), starting(2), end(2, 'claude-opus-5-5')] });
+  const read = await run(
+    dir,
+    Effect.flatMap(Journal, (j) => j.read('t-model')),
+  );
+  assert.deepEqual(
+    read.map((e) => (e.kind === 'ended' ? e.ranOn : undefined)),
+    [undefined, undefined, undefined, undefined, 'claude-opus-5-5'],
+    'an end an older runtime wrote carries no model, and nothing is invented for it',
+  );
+  assert.deepEqual(
+    fold('t-model', read).attempts.map((a) => a.ranOn),
+    [undefined, 'claude-opus-5-5'],
+    "and the model an end does name is the attempt's, so a person reading a task sees which model its session ran on",
+  );
+  const error = await failureOf(
+    legacyStore({ 't-bad-model': [TODAY, starting(1), end(1, 5)] }),
+    Effect.flatMap(Journal, (j) => j.read('t-bad-model')),
+  );
+  assert.ok(error.message.includes('entry 3 is a `ended` event, and its `ranOn` is 5'), error.message);
 });
 
 test('the files an end names are read back as written, an empty list kept; a list of anything but paths fails the read', async () => {

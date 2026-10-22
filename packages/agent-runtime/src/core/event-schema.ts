@@ -155,6 +155,7 @@ const Ended = event('ended', {
   denials: Schema.optional(Schema.mutable(Schema.Array(Schema.Struct({ tool: Schema.String, what: Schema.optional(Schema.String) })))),
   skills: Schema.optional(Schema.mutable(Schema.Array(Schema.String))),
   files: Schema.optional(Schema.mutable(Schema.Array(Schema.String))),
+  ranOn: Schema.optional(Schema.String),
   limit: Schema.optional(Schema.String),
   error: Schema.optional(Schema.String),
   mono: Schema.optional(MonotonicSchema),

@@ -133,6 +133,13 @@ export type Sighting = {
    */
   files?: string[];
   /**
+   * What the session really ran on, as the harness resolved the alias it was asked for — `opus` is an alias, and which model it
+   * names is the harness's to decide and moves with its version. Absent when the harness cannot say. **Carried, never judged**:
+   * `decide` does not read it, and nothing here compares it with what was asked for. Named for what happened rather than for the
+   * harness argument that asked for it, which the core may not so much as spell (`test/core-reads.test.ts`).
+   */
+  ranOn?: string;
+  /**
    * Whether the harness still holds the session's process — Claude Code's registry lists a pid for it. A fact about the
    * process, beside `state`, which is the turn's: a turn that ended (`completed`, or Claude Code's idle `blocked`) leaves a
    * process that is still there. Absent from a harness that cannot say, which reads as not held. Read by `decide` only for a
@@ -319,9 +326,9 @@ export type EndReason = 'harness' | 'lost' | 'unsigned' | 'unstartable' | 'opera
  *   failed without the harness vouching that nothing started: whether a session exists is then the grace window's to
  *   find out.
  * - `ended`: an attempt reached a terminal state, as observed — never as assumed. `usage`, `exitCode`, `denials`, `skills`,
- *   `files` and `limit` come from the same sighting, when its runner measured them; `decide` reads none of them. `stated`, on an end
- *   read off a sighting of a task that asked for a closing statement: whether one came. A fact, never a verdict — `decide`
- *   does not read it, and the layer above judges what a missing statement means. Absent from an end an older runtime
+ *   `files`, `ranOn` and `limit` come from the same sighting, when its runner measured them; `decide` reads none of them.
+ *   `stated`, on an end read off a sighting of a task that asked for a closing statement: whether one came. A fact, never a
+ *   verdict — `decide` does not read it, and the layer above judges what a missing statement means. Absent from an end an older runtime
  *   wrote, and from an end with no sighting behind it (`lost`, `unstartable`, a cut).
  * - `measured`: what an ended attempt consumed, read once its session was let go — for a harness that writes part of it
  *   only as the session's process exits, which is after the end was written (Claude Code's cost). Merged into the
@@ -430,6 +437,7 @@ export type Event =
       denials?: Denial[];
       skills?: string[];
       files?: string[];
+      ranOn?: string;
       limit?: string;
       error?: string;
       mono?: Monotonic;
@@ -502,6 +510,11 @@ export type Attempt = {
   skills?: string[];
   /** The files its session read or wrote, relative to its folder, `[]` for none, when its harness said. Carried, never read. */
   files?: string[];
+  /**
+   * What its session really ran on, as its harness resolved the alias the task asked for, when its harness said. Absent from an
+   * attempt an older runtime recorded, and from one whose harness cannot say. Carried, never read.
+   */
+  ranOn?: string;
   /** The limit its configuration set that its harness says it ended the session at — `budget` — when it said one. Carried, never read. */
   limit?: string;
   /**
@@ -577,6 +590,7 @@ function endAttempt(a: Attempt, e: Extract<Event, { kind: 'ended' }>): void {
   if (e.denials?.length) a.denials = e.denials;
   if (e.skills) a.skills = e.skills;
   if (e.files) a.files = e.files;
+  if (e.ranOn) a.ranOn = e.ranOn;
   if (e.limit) a.limit = e.limit;
   a.error = e.error ?? a.error;
 }

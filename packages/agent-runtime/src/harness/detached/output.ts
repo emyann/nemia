@@ -153,8 +153,9 @@ const isCall = (block: Exclude<Printed<'assistant'>['message']['content'], strin
 
 /**
  * What a stream says, gathered from its decoded lines in one pass: its last result; its `permission_denied` events, in order; the
- * input each call was made with, by id; whether an `init` line started it and the first folder one names; its `Skill` calls and
- * its file tools' calls, each once by id, first called first; and the ids of the calls an event or a result says were denied.
+ * input each call was made with, by id; whether an `init` line started it, the first folder one names and the first model one
+ * names; its `Skill` calls and its file tools' calls, each once by id, first called first; and the ids of the calls an event or a
+ * result says were denied.
  */
 type StreamFacts = {
   result?: Printed<'result'>;
@@ -162,6 +163,8 @@ type StreamFacts = {
   inputs: Map<string, unknown>;
   started: boolean;
   cwd?: string;
+  /** The model the session really started on, as its `init` line resolved the alias it was asked for. */
+  model?: string;
   skills: Map<string, unknown>;
   files: Map<string, [string, unknown]>;
   denied: Set<string>;
@@ -188,6 +191,7 @@ const gather = (facts: StreamFacts, printed: PrintedLine): void => {
   } else if (printed.kind === 'system init') {
     facts.started = true;
     facts.cwd ??= printed.line.cwd;
+    facts.model ??= printed.line.model;
   } else if (printed.kind === 'assistant') gatherCalls(facts, printed.line);
 };
 
@@ -201,7 +205,9 @@ const gather = (facts: StreamFacts, printed: PrintedLine): void => {
  * `permission_denials`, one per call, in the order the stream first named each.
  *
  * The skills it loaded are read off the stream alone (`loadedSkills`), and said only by a stream with its `init` line; the files
- * it read or wrote (`touchedFiles`), only by one whose `init` line names its folder.
+ * it read or wrote (`touchedFiles`), only by one whose `init` line names its folder; the model it really started on, only by one
+ * whose `init` line names a model, which is the alias — `opus` — already resolved to the model id the harness chose for it; what it
+ * answers it `ranOn`, so no field of a recorded fact is spelt as the harness argument that asked for it.
  *
  * Throws an `Error` naming the line, its field and the fix when a line of a kind it reads does not decode (`printedLinesOf`).
  */
@@ -210,7 +216,12 @@ export const claudeStreamOutput = (output: string): HarnessOutput => {
   for (const printed of decoded(output, STREAM_KINDS)) gather(facts, printed);
   const skills = facts.started ? loadedSkills(facts) : undefined;
   const files = facts.cwd === undefined ? undefined : touchedFiles(facts.cwd, facts);
-  return { ...readClaude(facts.result, facts.events, facts.inputs), ...(skills ? { skills } : {}), ...(files ? { files } : {}) };
+  return {
+    ...readClaude(facts.result, facts.events, facts.inputs),
+    ...(skills ? { skills } : {}),
+    ...(files ? { files } : {}),
+    ...(facts.model ? { ranOn: facts.model } : {}),
+  };
 };
 
 /** The skill a `Skill` call's input names, after its last `:` — a plugin's skill by its bare name — or none. */

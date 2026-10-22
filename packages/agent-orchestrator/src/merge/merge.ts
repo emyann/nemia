@@ -24,6 +24,8 @@ import {
   approvalOf,
   approvedFirst,
   capOf,
+  endsOnBase,
+  hasGate,
   loopOf,
   roundOf,
   roundWord,
@@ -218,15 +220,14 @@ function loopNamed(steps: readonly Workflow[], run: Run, name: string | undefine
     return {
       refusal: `${run.id} has ${loops.length} loops, closing at ${loops.map((s) => s.name).join(', ')}: name the one whose work merges — nemia merge ${run.id} <step>.`,
     };
-  const result = name ?? resultStep(steps, run);
+  const result = name ?? resultStep(steps);
   return {
     refusal: `${result} closes no loop, so no review would read a merge of ${run.branch ?? 'the base'} as one. Send it back with the merge to make instead: nemia retry ${run.id} ${result} --message "merge ${run.branch ?? 'the base'}, keeping both meanings".`,
   };
 }
 
 /** The step whose work a run's ending lands: the one its ending waits on, or the workflow's last. */
-const resultStep = (steps: readonly Workflow[], run: Run): string =>
-  steps.find((s) => approvedFirst(s, run))?.after[0] ?? steps.at(-1)?.name ?? '<step>';
+const resultStep = (steps: readonly Workflow[]): string => steps.find(endsOnBase)?.after[0] ?? steps.at(-1)?.name ?? '<step>';
 
 /** Why a merge cannot be asked over an ask already there: a merge, or a round, of this loop. */
 function askedRefusal(run: Run, looping: Workflow, asks: readonly RoundAsk[]): string | undefined {
@@ -261,22 +262,25 @@ function followerRefusal(steps: readonly Workflow[], run: Run, looping: Workflow
   );
   if (approved)
     return `${approved.name} is approved and files on the next tick, where it merges ${run.branch} itself. If its merge stops, merge then: nemia merge ${run.id} ${looping.name}.`;
+  const routed = steps.find((s) => s.after.includes(looping.name) && endsOnBase(s) && !hasGate(s, run) && !run.steps[s.name]?.taskId);
+  if (routed)
+    return `${routed.name} has no gate: the run files it on the next tick, once ${looping.name} passes, and it merges ${run.branch} itself. If its merge stops, merge then: nemia merge ${run.id} ${looping.name}.`;
   const filed = steps.filter((s) => s.after.includes(looping.name) && run.steps[s.name]?.taskId);
   const going = filed.find((s) => !reads.stopped(s));
   if (!going) return undefined;
   return `${going.name} waits on ${looping.name} and is ${reads.standingOf(going).status}, so a merge would file the work again under a step that ran on it. See where the run stands: nemia decide ${run.id}.`;
 }
 
-/** The ending that waits on a loop: the step after it that a person approves before it is filed — or undefined. */
-const endingAfter = (steps: readonly Workflow[], run: Run, looping: Workflow): Workflow | undefined =>
-  steps.find((s) => s.after.includes(looping.name) && approvedFirst(s, run));
+/** The ending that waits on a loop: the step after it that acts on the base branch, gated or routed by that loop — or undefined. */
+const endingAfter = (steps: readonly Workflow[], looping: Workflow): Workflow | undefined =>
+  steps.find((s) => s.after.includes(looping.name) && endsOnBase(s));
 
 /**
  * The landing of the ending after `looping` that its check refused on `sha` (`MergeLanding`): its record says it aborted the merge staged
  * on that commit of the base (`Landed`'s `refusedOn`), and names its check's task — or undefined.
  */
 function refusedLanding(steps: readonly Workflow[], run: Run, looping: Workflow, sha: string): MergeLanding | undefined {
-  const ending = endingAfter(steps, run, looping);
+  const ending = endingAfter(steps, looping);
   const check = ending ? landingRefusedOn(run.steps[ending.name], sha) : undefined;
   return ending && check ? { step: ending.name, check } : undefined;
 }
@@ -291,11 +295,12 @@ export function landingRefusedOn(record: StepRecord | undefined, sha: string): s
   return record.check.taskId;
 }
 
-/** What to do with a loop whose work merges cleanly: approve the ending at its gate, ship a stopped one again, or nothing. */
+/** What to do with a loop whose work merges cleanly: approve the ending at its gate, wait for the tick that files an ungated one, ship a stopped one again, or nothing. */
 function cleanNext(steps: readonly Workflow[], run: Run, looping: Workflow, reads: MergeReads): string {
-  const ending = endingAfter(steps, run, looping);
+  const ending = endingAfter(steps, looping);
   if (!ending) return `see where the run stands: nemia decide ${run.id}`;
   if (run.steps[ending.name]?.taskId && reads.stopped(ending)) return `ship it again: nemia retry ${run.id} ${ending.name}`;
+  if (!hasGate(ending, run)) return `the run lands it on the next tick: nemia ls ${run.id}`;
   return `approve the landing: nemia approve ${run.id} ${ending.name}`;
 }
 

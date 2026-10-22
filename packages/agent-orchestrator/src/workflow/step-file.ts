@@ -337,7 +337,7 @@ export function stepFrom(
     after,
     resume: meta.resume,
     place: placeNamed(name, meta.place),
-    workspace: workspaceOf(name, meta.workspace, meta.check, meta.resume, meta.gate, meta.retries, harness),
+    workspace: workspaceOf(name, meta.workspace, meta.check, meta.resume, meta.retries, harness),
     writable: writableNamesOf(name, meta.writable),
     reads: readsNamesOf(name, meta.reads),
     slot: slotOf(name, meta.slot),

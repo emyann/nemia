@@ -2229,25 +2229,39 @@ test("REFUSED at load: a `resume:` on a step that runs in the repository's check
   assert.equal(fm('ship', 'after: review\nworkspace: main').workspace, 'main', 'and an ending step waits on what it acts on');
 });
 
-test("REFUSED at load: a `check:` on a step that runs in the repository's checkout with no `gate: true` — the run would commit onto the base branch on the check's word, which only a person's approval may start", () => {
+test("an ending's `check:` is filed by a person's approval or by a step that can send the work back: REFUSED at load with neither", () => {
+  const ending = { name: 'ship', after: ['review'], body: 'x', workspace: 'main', check: 'npm test' } as Workflow;
+  const folder = (loop: boolean, gate: boolean): Workflow[] => [
+    { name: 'implement', after: [], body: 'x' } as Workflow,
+    { name: 'review', after: ['implement'], body: 'x', ...(loop ? { loop: 'implement' } : {}) } as Workflow,
+    { ...ending, ...(gate ? { gate: true } : {}) },
+  ];
+
   assert.throws(
-    () => fm('ship', 'workspace: main\ncheck: npm test'),
+    () => validate(folder(false, false)),
     (e: WorkflowError) =>
       e.exitCode === 2 &&
-      /^ship: `workspace: main` runs the step in the repository's own checkout, and `check: npm test` is a command the run executes there on the merge the step leaves staged, committing it onto the base branch when it passes — which only a person's approval may start, and this step has no `gate: true`\. Add `gate: true`, or delete the `check:` line\.$/.test(
+      /^ship: `workspace: main` runs the step in the repository's own checkout, and `check: npm test` is a command the run executes there on the merge the step leaves staged, committing it onto the base branch when it passes — which is nobody's to start unless a person approves it or a step that can send the work back has passed, and this step has no `gate: true` and waits on no step with a `loop:` \(it waits on review\)\. Add `gate: true`, give review a `loop:` so that its pass files the landing, or delete the `check:` line\.$/.test(
         e.message,
       ),
+    "the fixture that makes it refuse: the accepted folder with its review's `loop:` line deleted",
   );
   assert.throws(
-    () => fm('ship', 'check: npm test\nworkspace: main'),
-    /`workspace: main` runs the step in the repository's own checkout, and `check: npm test`/,
-    'whichever order the lines are written in',
+    () => validate([{ ...ending, after: [] }]),
+    /and this step has no `gate: true` and waits on nothing\. Add `gate: true`, give the step before it a `loop:`/,
+    'an ending that waits on nothing has no step to route it either',
   );
-  assert.throws(
-    () => fm('ship', 'workspace: main\ncheck: none'),
-    /`workspace: main` runs the step in the repository's own checkout, and `check: none`/,
-    'the two together are refused before the check is read on its own',
+
+  assert.doesNotThrow(() => validate(folder(true, false)), "a looping step before it files it: quick's shape");
+  assert.doesNotThrow(() => validate(folder(false, true)), "a person's approval files it: build's shape");
+  assert.doesNotThrow(() => validate(folder(true, true)), 'and both together');
+  assert.doesNotThrow(
+    () => validate(folder(false, false).map((s) => (s.name === 'ship' ? ({ ...s, check: undefined } as Workflow) : s))),
+    'an ending with no check runs its own, and is nobody\'s to file in advance',
   );
+});
+
+test("a step that runs in the repository's checkout reads its `check:`, its `gate:` and its `retries:` as any step does", () => {
   const ship = fm('ship', 'workspace: main\ngate: true\ncheck: npm test');
   assert.deepEqual(
     [ship.workspace, ship.gate, ship.check],
@@ -2255,11 +2269,18 @@ test("REFUSED at load: a `check:` on a step that runs in the repository's checko
     'gated, it loads: the run executes the check on the merge the step staged, and lands or aborts it',
   );
   assert.deepEqual([fm('ship', 'check: npm test\ngate: true\nworkspace: main').check], ['npm test'], 'whichever order');
+  const ungated = fm('ship', 'workspace: main\ncheck: npm test');
+  assert.deepEqual(
+    [ungated.gate, ungated.check],
+    [undefined, 'npm test'],
+    'ungated, the step file itself loads: who files it is the folder\'s, and `validate` reads the steps together',
+  );
   assert.throws(
     () => fm('ship', 'workspace: main\ngate: true\ncheck: none'),
     /check/,
     "the check's own refusals still hold beside the gate",
   );
+  assert.throws(() => fm('ship', 'workspace: main\ncheck: none'), /check/, 'and without it');
 });
 
 test("REFUSED at load: a `check:` on a gated step in the repository's checkout that runs on codex — the run keeps the session from committing the merge by a deny list, which codex takes none of", () => {

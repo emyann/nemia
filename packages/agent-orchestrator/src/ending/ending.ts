@@ -19,7 +19,16 @@ import {
   type StepStatus,
   type TaskPhase,
 } from '../record/record.ts';
-import { approvalOf, approvedFirst, branchWord, hasGate, landsOnCheck, resultOnBase, type BranchStanding } from '../status/status.ts';
+import {
+  approvalOf,
+  approvedFirst,
+  branchWord,
+  endsOnBase,
+  hasGate,
+  landsOnCheck,
+  resultOnBase,
+  type BranchStanding,
+} from '../status/status.ts';
 import type { CheckoutHold } from '../cap/cap.ts';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 import type { Assessment } from '../tick/assess.ts';
@@ -90,7 +99,8 @@ export type Landing =
  * no verdict. Once neither runs:
  * - **commit**: the step signed off done (`own` is `checking`), its check passed on the merge, the merge takes in every result branch and
  *   has no conflict, and the step's closeout gave a message. Only then does anything land on the base branch: the step was filed on a
- *   person's approval, and its check is the run's own, from the folder frozen on the record.
+ *   person's approval, or by its workflow once the step before it — one that can send the work back — passed, and its check is the run's
+ *   own, from the folder frozen on the record.
  * - **abort**, of a merge that is this run's: its check refused it or did not finish — a check that did not finish is no verdict, and no
  *   merge waits on one, since nothing would ever commit it; the step signed off anything but done, or ended with no closeout, failed or was
  *   stopped; the run was called off, or held before the check was filed; the merge has a conflict, or leaves a result branch out; or the
@@ -286,10 +296,10 @@ export function toDecide(
 }
 
 /**
- * Whether the workflow has a step that acts on the base branch itself (`workspace: main`): the folder says what happens when the work is
+ * Whether the workflow has a step that acts on the base branch itself (`endsOnBase`): the folder says what happens when the work is
  * done, so nobody is handed its branch and told to type `git merge`. Pure.
  */
-export const merges = (steps: readonly Workflow[]): boolean => steps.some((s) => s.workspace === 'main');
+export const merges = (steps: readonly Workflow[]): boolean => steps.some(endsOnBase);
 
 /**
  * The workflow's ending steps: the steps nothing waits on that have a gate (`hasGate`). Pure.
@@ -298,6 +308,10 @@ export const merges = (steps: readonly Workflow[]): boolean => steps.some((s) =>
  * — merge it, open a pull request, publish the study — and where it acts on the base branch it says `workspace: main` and is held before it
  * is filed. A gate a run was started with (`--gate <the last step>`) makes an ending of a step that was written as work: approving it is
  * then acceptance, and what becomes of the branch is still a person's (`merges`). Usually one; several only where a workflow ends wide.
+ *
+ * An ending with no gate is none of these: it is filed by its workflow, once the step before it that can send the work back passes
+ * (`quick`'s land, routed by its review), and there is nothing for a person to decide about it. It still lands on its check
+ * (`landsOnCheck`), which is what the landing reads.
  */
 export const endingSteps = (steps: readonly Workflow[], run: Pick<Run, 'gates'>): Workflow[] =>
   terminalSteps(steps).filter((s) => hasGate(s, run));

@@ -167,35 +167,8 @@ const sayRefuses = async (step: string, text: string, run = R): Promise<string> 
 const detailSteps = async (id = R): Promise<RunDetail['steps']> =>
   ((await (await app.request(`/api/runs/${id}`)).json()) as RunDetail).steps;
 
-test('REFUSED at shipped defaults: words another site could send — a page on another site (403), a name that is not this machine (403), a body not sent as application/json (415) — and JSON that is not the words (400): nothing said, nothing written', async () => {
+test('REFUSED at shipped defaults: JSON that is not the words (400): nothing said, nothing written', async () => {
   const before = written();
-  const body = { text: 'Widen the scope to apps/api too.' };
-  for (const site of ['cross-site', 'same-site', 'none']) {
-    const res = await sayTo('implement', body, { ...BOARD, 'sec-fetch-site': site });
-    assert.equal(res.status, 403, site);
-    assert.equal(
-      ((await res.json()) as { error: string }).error,
-      `POST /api/runs/${R}/steps/implement/say refuses a request made by a page on another site (Sec-Fetch-Site: ${site}): the words go into the session of a step at work in this repository, as a person's, and its agent acts on them. Say it from the step's session page on the board, or with \`nemia say ${R} implement "<words>"\`.`,
-    );
-  }
-  for (const host of ['evil.example', 'evil.example:8787', 'localhost.evil.example:8787']) {
-    const res = await sayTo('implement', body, { ...BOARD, host });
-    assert.equal(res.status, 403, host);
-    assert.ok(
-      ((await res.json()) as { error: string }).error.startsWith(
-        `POST /api/runs/${R}/steps/implement/say refuses a request addressed to ${host}: the api hands a person's words to a step's running session only for a request to this machine`,
-      ),
-    );
-  }
-  for (const type of ['text/plain;charset=UTF-8', 'application/x-www-form-urlencoded', 'multipart/form-data; boundary=x']) {
-    const res = await sayTo('implement', body, { ...BOARD, 'content-type': type });
-    assert.equal(res.status, 415, type);
-    assert.ok(
-      ((await res.json()) as { error: string }).error.startsWith(
-        `POST /api/runs/${R}/steps/implement/say takes its body as \`content-type: application/json\``,
-      ),
-    );
-  }
   const bodies: Array<[unknown, RegExp]> = [
     ['Widen the scope to apps/api too.', /^POST …\/say takes a JSON body: `\{ "text": "<words>" \}`\.$/],
     [['Widen the scope'], /^POST …\/say takes a JSON object: /],

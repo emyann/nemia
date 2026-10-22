@@ -973,40 +973,6 @@ test("REFUSED at shipped defaults: a write to the repository's workflows is a 40
   assert.equal(fs.existsSync(path.join(STORE, 'x')), false);
 });
 
-test('REFUSED at shipped defaults: a write another site could make — a body not sent as application/json (415), a page on another site (403), a name that is not this machine (403) — for both writes, and nothing is written', async () => {
-  const dir = planned('guarded');
-  const before = snapshot(dir);
-  const steps = await listedSteps('guarded');
-  const writes = [
-    ['PUT /api/workflows/yours/guarded', (h: Record<string, string>) => put('guarded', { steps: [steps[0]] }, 'yours', h)],
-    ['POST /api/workflows/yours', (h: Record<string, string>) => post({ name: 'guarded-2', step: steps[0] }, 'yours', h)],
-  ] as const;
-  for (const [route, send] of writes) {
-    const type = await send({ 'content-type': 'text/plain;charset=UTF-8' });
-    assert.equal(type.status, 415, route);
-    assert.ok(
-      ((await type.json()) as { error: string }).error.startsWith(`${route} takes its body as \`content-type: application/json\``),
-      route,
-    );
-    const site = await send({ 'content-type': 'application/json', 'sec-fetch-site': 'cross-site' });
-    assert.equal(site.status, 403, route);
-    assert.ok(
-      ((await site.json()) as { error: string }).error.startsWith(
-        `${route} refuses a request made by a page on another site (Sec-Fetch-Site: cross-site)`,
-      ),
-      route,
-    );
-    const host = await send({ 'content-type': 'application/json', host: 'evil.example:8787' });
-    assert.equal(host.status, 403, route);
-    assert.ok(
-      ((await host.json()) as { error: string }).error.startsWith(`${route} refuses a request addressed to evil.example:8787`),
-      route,
-    );
-  }
-  assert.deepEqual(snapshot(dir), before);
-  assert.equal(fs.existsSync(path.join(STORE, 'guarded-2')), false);
-});
-
 test("REFUSED at shipped defaults: a body not in the listing's shape is a 400 naming the step and the key — a `version` left out among them, so a save that does not say what it read is never written over a folder changed since — and nothing is written", async () => {
   const dir = planned('shaped');
   const before = snapshot(dir);

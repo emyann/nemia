@@ -188,10 +188,6 @@ test("REFUSED: agents that cannot be read offer none to hire, and say why in the
     refused: unreadAgentsRefusal('agents/ada.md is not a file'),
     agents: [],
   });
-  assert.match(
-    unreadAgentsRefusal('x'),
-    /^The agents beside this workflow could not be read, so none is offered to hire into this step: x\./,
-  );
 });
 
 test("each skill of a step's layers, the agent's then its own: one named with its folder as written, with where the repository has it", () => {

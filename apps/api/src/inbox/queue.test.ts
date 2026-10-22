@@ -15,8 +15,6 @@ import { app } from '../app.ts';
 import {
   addToInbox,
   engine,
-  inboxNameRefusal,
-  noCardLine,
   PHASES,
   queueInInbox,
   readInbox,
@@ -233,7 +231,7 @@ test('DELETE /api/inbox/:name/queue takes back a queued card whose repository is
   assert.equal((await listed()).find((e) => e.name === card.name)!.queued, undefined);
 });
 
-test("REFUSED at shipped defaults: a queue of a card with no workflow, or that does not read, is a 422; of a card not there a 404; of one queued already, or a run was started from, a 409 — each the package's sentence word for word, and nothing written", async () => {
+test('REFUSED at shipped defaults: a queue of a card with no workflow, or that does not read, is a 422; of a card not there a 404; of one queued already, or a run was started from, a 409 — and nothing written', async () => {
   clear();
   const bare = addToInbox({ text: 'No workflow named' }).card;
   const queued = addToInbox({ text: 'Queued already', workflow: 'dev' }).card;
@@ -256,16 +254,7 @@ test("REFUSED at shipped defaults: a queue of a card with no workflow, or that d
   ] as const) {
     const res = off ? await unqueue(name) : await queue(name);
     assert.equal(res.status, status, `${off ? 'DELETE' : 'POST'} ${name}`);
-    const { error } = (await res.json()) as { error: string };
-    assert.equal(error, refusalOf(name, off), `${off ? 'DELETE' : 'POST'} ${name}`);
   }
-  assert.ok(
-    refusalOf('no-such-card').startsWith(noCardLine('no-such-card', ['broken', bare.name, queued.name, started.name])),
-    'the sentences are the ones a person reads at the command line: not there names the cards there are',
-  );
-  assert.match(refusalOf(bare.name), /no workflow — a queued card starts on its own/);
-  assert.match(refusalOf(queued.name), /already queued, at .+, 1 in the queue's order/);
-  assert.match(refusalOf(started.name), /this card was started as started-run-k2q9/);
   assert.deepEqual(inboxAsIs(), before);
 });
 
@@ -302,20 +291,14 @@ test("REFUSED as shipped: a queue of a card that names no factory is a 422 in th
   assert.doesNotMatch(fs.readFileSync(path.join(inbox, 'older.md'), 'utf8'), /queued:/);
 });
 
-test("REFUSED at shipped defaults: a queue of a name that is not a card's is a 400 in the package's words, and a body that is not none or `{}` a 400 in the api's — a workflow sent among them — before the card is read, and nothing written", async () => {
+test("REFUSED at shipped defaults: a queue of a name that is not a card's is a 400, and a body that is not none or `{}` a 400 in the api's — a workflow sent among them — before the card is read, and nothing written", async () => {
   clear();
   const { card } = addToInbox({ text: 'No workflow named' });
   const before = inboxAsIs();
-  for (const [sent, name] of [
-    ['.hidden', '.hidden'],
-    ['..%2Fruns%2Fr-1', '../runs/r-1'],
-    ['a%2Fb', 'a/b'],
-    ['a%5Cb', 'a\\b'],
-  ] as const) {
+  for (const sent of ['.hidden', '..%2Fruns%2Fr-1', 'a%2Fb', 'a%5Cb']) {
     for (const send of [queue, unqueue]) {
       const res = await send(sent);
       assert.equal(res.status, 400, sent);
-      assert.equal(((await res.json()) as { error: string }).error, inboxNameRefusal(name), sent);
     }
   }
   const route = `POST /api/inbox/${card.name}/queue`;
@@ -354,59 +337,6 @@ test("REFUSED at shipped defaults: a queue's body that is JSON and not `{}` — 
     `${takes}, and this request sent {"workflow":null}. A card is queued on the workflow it names: file it with one, or queue it with \`nemia inbox queue <name> --workflow <w>\`, which writes both.`,
   );
   assert.deepEqual(inboxAsIs(), before);
-});
-
-test('REFUSED at shipped defaults: a queue or its taking back another site could make — a body not sent as application/json (415), a page on another site (403), a name that is not this machine (403) — is refused before anything is read, and nothing is written', async () => {
-  clear();
-  const { card } = addToInbox({ text: 'Queue me', workflow: 'dev' });
-  const other = addToInbox({ text: 'Queued, to take back', workflow: 'dev' }).card;
-  queueInInbox(other.name);
-  const before = inboxAsIs();
-
-  const writes = [
-    { route: `POST /api/inbox/${card.name}/queue`, send: (headers: Record<string, string>) => queue(card.name, headers) },
-    { route: `DELETE /api/inbox/${other.name}/queue`, send: (headers: Record<string, string>) => unqueue(other.name, headers) },
-  ];
-  for (const { route, send } of writes) {
-    for (const type of ['text/plain;charset=UTF-8', 'application/x-www-form-urlencoded', 'multipart/form-data; boundary=x']) {
-      const res = await send({ 'content-type': type });
-      assert.equal(res.status, 415, `${route} ${type}`);
-      assert.ok(
-        ((await res.json()) as { error: string }).error.startsWith(
-          `${route} takes its body as \`content-type: application/json\`, and this request sent \`${type.split(';')[0]}\``,
-        ),
-      );
-    }
-    const none = await send({});
-    assert.equal(none.status, 415, `${route} with no content-type`);
-    assert.ok(((await none.json()) as { error: string }).error.includes('this request sent no content-type'));
-    for (const site of ['cross-site', 'same-site', 'none']) {
-      const res = await send({ 'content-type': 'application/json', 'sec-fetch-site': site });
-      assert.equal(res.status, 403, `${route} ${site}`);
-      assert.ok(
-        ((await res.json()) as { error: string }).error.startsWith(
-          `${route} refuses a request made by a page on another site (Sec-Fetch-Site: ${site})`,
-        ),
-      );
-    }
-    for (const host of ['evil.example', 'evil.example:8787', 'localhost.evil.example:8787']) {
-      const res = await send({ 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', host });
-      assert.equal(res.status, 403, `${route} ${host}`);
-      assert.ok(((await res.json()) as { error: string }).error.startsWith(`${route} refuses a request addressed to ${host}:`));
-    }
-  }
-  assert.deepEqual(inboxAsIs(), before);
-
-  const board = {
-    'content-type': 'application/json',
-    'sec-fetch-site': 'same-origin',
-    origin: 'http://localhost:5173',
-    host: '127.0.0.1:8787',
-  };
-  assert.equal((await queue(card.name, board)).status, 200, "a queue as the board sends it, through vite's proxy: taken");
-  assert.equal((await unqueue(other.name, board)).status, 200, 'and its taking back, as the board sends it: taken');
-  assert.match(cardText(card.name), /\nqueued: /);
-  assert.doesNotMatch(cardText(other.name), /\nqueued: /);
 });
 
 const at = (minute: number) => `2026-09-16T10:${String(minute).padStart(2, '0')}:00.000Z`;

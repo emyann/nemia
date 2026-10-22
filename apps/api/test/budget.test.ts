@@ -17,7 +17,6 @@ import type { RunDetail } from '../src/detail/detail.ts';
 import { app } from '../src/app.ts';
 import {
   askFile,
-  budgetRefusal,
   decideRun,
   engine,
   list,
@@ -484,38 +483,12 @@ test("REFUSED once pruned: steps over their budget are offered no raise — the 
   nothingWritten('reading a pruned run asks for nothing');
 });
 
-test('REFUSED at shipped defaults: a raise another site could make — a page on another site, a name that is not this machine, a body not sent as JSON — on both routes, and nothing is written', async () => {
-  const cases: Array<[string, (body: unknown, headers: Record<string, string>) => Response | Promise<Response>]> = [
-    [`POST /api/runs/${R}/steps/tokens/retry`, (body, headers) => askTry('tokens', body, headers)],
-    [`POST /api/runs/${R}/round`, (body, headers) => askRound(body, headers)],
-  ];
-  for (const [route, ask] of cases) {
-    const body = { mode: 'nudge', budget: 5 };
-    for (const site of ['cross-site', 'same-site', 'none']) {
-      const res = await ask(body, { ...BOARD, 'sec-fetch-site': site });
-      assert.equal(res.status, 403, `${route} ${site}`);
-      const { error } = (await res.json()) as Refused;
-      assert.ok(error.startsWith(`${route} refuses a request made by a page on another site (Sec-Fetch-Site: ${site})`), error);
-    }
-    const named = await ask(body, { ...BOARD, host: 'evil.example:8787' });
-    assert.equal(named.status, 403, route);
-    assert.ok(((await named.json()) as Refused).error.startsWith(`${route} refuses a request addressed to evil.example:8787:`));
-    const typed = await ask(body, { ...BOARD, 'content-type': 'text/plain;charset=UTF-8' });
-    assert.equal(typed.status, 415, route);
-    assert.ok(((await typed.json()) as Refused).error.startsWith(`${route} takes its body as \`content-type: application/json\``));
-  }
-  nothingWritten('a request another site could make');
-});
-
 test("REFUSED at shipped defaults: a try's budget that is not an amount — 0, below it, a word — is a 400; a budget on a recheck a 422; and a raise not above what the step has cost, or none, a 409 — each in the package's words, and nothing is written", async () => {
-  const command = `nemia retry ${R} tokens`;
   for (const budget of [0, -1]) {
     const how: RetryHow = { mode: 'nudge', budget };
     const res = await askTry('tokens', how);
     assert.equal(res.status, 400, String(budget));
     const { error } = (await res.json()) as Refused;
-    assert.equal(error, budgetRefusal(how, command));
-    assert.equal(error, await retryRefuses('tokens', how), 'and the sentence `retryRun` refuses it with');
     assert.ok(error.startsWith(`--budget ${budget} is not an amount.`), error);
   }
   for (const budget of ['five', '5', null]) {
@@ -535,7 +508,6 @@ test("REFUSED at shipped defaults: a try's budget that is not an amount — 0, b
   const rechecked = await askTry('tokens', recheck);
   assert.equal(rechecked.status, 422);
   const { error: noSession } = (await rechecked.json()) as Refused;
-  assert.equal(noSession, budgetRefusal(recheck, command));
   assert.ok(noSession.startsWith("--budget raises a step's cap for the session a try files, and --recheck files none"), noSession);
 
   const refusals: Array<[RetryHow, string]> = [

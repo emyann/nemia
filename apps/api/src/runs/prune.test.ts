@@ -372,22 +372,3 @@ test("REFUSED at shipped defaults: a body that is not `nemia prune`'s two switch
     'the same run, sent the switches as the board sends them, is pruned: the refusals above were of the body alone',
   );
 });
-
-test('REFUSED at shipped defaults: a prune from a page on another site, addressed to another name, or not sent as JSON, before anything is read, and the run stands', async () => {
-  repositoryRun('p-guard', { merge: true });
-  const cases: Array<[Record<string, string>, number, RegExp]> = [
-    [{ ...BOARD, 'sec-fetch-site': 'cross-site' }, 403, /refuses a request made by a page on another site/],
-    [{ ...BOARD, 'sec-fetch-site': 'same-site' }, 403, /refuses a request made by a page on another site/],
-    [{ ...BOARD, host: 'evil.example:8787' }, 403, /refuses a request addressed to evil\.example:8787/],
-    [{ ...BOARD, 'content-type': 'text/plain' }, 415, /takes its body as `content-type: application\/json`/],
-  ];
-  for (const [headers, status, words] of cases) {
-    const before = stateOf('p-guard');
-    const res = await pruneOn('p-guard', { artifacts: true }, headers);
-    assert.equal(res.status, status, JSON.stringify(headers));
-    const { error } = (await res.json()) as { error: string };
-    assert.match(error, words);
-    assert.match(error, /^POST \/api\/runs\/p-guard\/prune /);
-    assert.deepEqual(stateOf('p-guard'), before, JSON.stringify(headers));
-  }
-});

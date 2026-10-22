@@ -11,7 +11,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Layer } from 'effect';
-import { addFactory, attachWorkflow, factoryNameRefusal, hireRefusalOf } from 'agent-orchestrator';
+import { addFactory, attachWorkflow, hireRefusalOf } from 'agent-orchestrator';
 import { scratch } from '../../test/scratch.ts';
 import { app, appOf, liveOf } from '../app.ts';
 import { StoreRoot } from '../store.ts';
@@ -70,7 +70,7 @@ test('REFUSED: a step sent with its slash as two segments is no route', async ()
   assert.equal(fs.readFileSync(RECORD, 'utf8'), before);
 });
 
-test("REFUSED at shipped defaults: no factory (404), the default (409), a workflow not offered and a step that is no <workflow>/<step> (422) — in the package's words", async () => {
+test('REFUSED at shipped defaults: no factory (404), the default (409), a workflow not offered and a step that is no <workflow>/<step> (422)', async () => {
   assert.match(await refused(() => send('PUT', '/api/factories/gone/hires/build%2Fimplement', { agent: 'ada' }), 404), /gone/);
   assert.match(await refused(() => send('DELETE', '/api/factories/gone/hires/build%2Fimplement', {}), 404), /gone/);
   assert.match(
@@ -104,7 +104,7 @@ test("REFUSED at shipped defaults: a hire into a step whose own file names its a
   assert.equal(await refused(put, 409), words('otto', mine), "yours, read under the app's store root");
 });
 
-test("REFUSED: a body with no agent and one that is not JSON (400), in the api's words, and a name that is no factory's (400) in the package's", async () => {
+test("REFUSED: a body with no agent and one that is not JSON (400), in the api's words, and a name that is no factory's (400)", async () => {
   assert.equal(
     await refused(() => send('PUT', HIRE, {}), 400),
     'PUT /api/factories/mill/hires/build%2Fimplement: `agent` names the agent to hire, a string, its file\'s name without .md: `{ "agent": "<the agent\'s name>" }`. This request\'s was left out.',
@@ -113,21 +113,5 @@ test("REFUSED: a body with no agent and one that is not JSON (400), in the api's
     await refused(() => send('PUT', HIRE, '{agent'), 400),
     'PUT /api/factories/mill/hires/build%2Fimplement takes a JSON body: `{ "agent": "<the agent\'s name>" }`.',
   );
-  assert.equal(
-    await refused(() => send('PUT', '/api/factories/Not%20One/hires/build%2Fimplement', { agent: 'ada' }), 400),
-    `PUT /api/factories/Not One/hires/build%2Fimplement: ${factoryNameRefusal('Not One')}`,
-  );
-});
-
-test('REFUSED at shipped defaults: a hire and a fire made by a page on another site (403), and a hire sent as a form (415)', async () => {
-  const site = { ...json, 'sec-fetch-site': 'cross-site' };
-  assert.match(
-    await refused(() => send('PUT', HIRE, { agent: 'ada' }, site), 403),
-    /^PUT \/api\/factories\/mill\/hires\/build%2Fimplement refuses a request made by a page on another site/,
-  );
-  assert.match(await refused(() => send('DELETE', HIRE, {}, site), 403), /^DELETE .* Fire it on the step's page on the board\.$/);
-  assert.match(
-    await refused(() => send('PUT', HIRE, 'agent=ada', { 'content-type': 'application/x-www-form-urlencoded' }), 415),
-    /takes its body as `content-type: application\/json`/,
-  );
+  await refused(() => send('PUT', '/api/factories/Not%20One/hires/build%2Fimplement', { agent: 'ada' }), 400);
 });

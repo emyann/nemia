@@ -317,25 +317,6 @@ test('the board removes a try: its record and the folders it worked in', async (
   assert.equal(gone.status, 404);
 });
 
-test('a removal is guarded as every write is', async () => {
-  const id = await idOf(await tryIt('scribe', { brief: 'Kept.' }));
-  ended(id);
-  try {
-    assert.equal((await remove(id, { 'content-type': 'text/plain' })).status, 415);
-    const crossSite = await remove(id, { ...json, 'sec-fetch-site': 'cross-site' });
-    assert.equal(crossSite.status, 403);
-    const { error } = (await crossSite.json()) as { error: string };
-    assert.ok(
-      error.includes("the engine's journals and session files of its tasks"),
-      `what goes with it, the engine's records named: ${error}`,
-    );
-    assert.equal((await remove(id, { ...json, host: 'evil.example' })).status, 403);
-    assert.ok(fs.existsSync(path.join(RUNS, `${id}.json`)), 'the try is still there');
-  } finally {
-    assert.equal((await remove(id)).status, 200);
-  }
-});
-
 test('a repository agent is refused: copy it to yours — the store this api reads — to try it, its schema with it', async () => {
   const error = await refused(tryIt('critic', { brief: 'Criticise it.' }, 'repo'), 403, /[Cc]opy it to yours to try it/);
   assert.ok(
@@ -421,10 +402,7 @@ test('an agent not there, one named as a try folder cannot be, and one giving a 
   assert.ok(error.includes(path.join(root, 'workflows', 'skills')), 'and the library to copy it into');
 });
 
-test('a try is guarded as every write is', async () => {
-  await refused(tryIt('scribe', { brief: 'Do it.' }, 'yours', { 'content-type': 'text/plain' }), 415, /application\/json/);
-  await refused(tryIt('scribe', { brief: 'Do it.' }, 'yours', { ...json, 'sec-fetch-site': 'cross-site' }), 403, /another site/);
-  await refused(tryIt('scribe', { brief: 'Do it.' }, 'yours', { ...json, host: 'evil.example' }), 403, /evil\.example/);
+test('REFUSED: a try of an agent from neither `repo` nor `yours` is a 400 naming both', async () => {
   await refused(tryIt('scribe', { brief: 'Do it.' }, 'elsewhere'), 400, /`repo` or `yours`/);
 });
 

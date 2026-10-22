@@ -268,7 +268,7 @@ test("an unfrozen run whose step names an agent only its repository's `.claude/a
   fs.writeFileSync(path.join(named, 'work.md'), '---\nplace: git\nagent: repo-only\n---\nwork it\n');
   fs.mkdirSync(path.join(REPO, '.claude', 'agents'), { recursive: true });
   fs.writeFileSync(path.join(REPO, '.claude', 'agents', 'repo-only.md'), '---\nharness: codex\n---\nYou work.\n');
-  assert.throws(() => loadWorkflows(named), 'the folder alone does not read: nothing beside it holds the agent');
+  assert.throws(() => loadWorkflows(named), 'nothing beside the folder holds the agent');
   const run = await started('the agent is the repository own');
   unfrozen(run.id, named);
 
@@ -282,7 +282,7 @@ test("an unfrozen run whose step names an agent only the store's `workflows/agen
   fs.writeFileSync(path.join(named, 'work.md'), '---\nplace: git\nagent: store-only\n---\nwork it\n');
   fs.mkdirSync(path.join(ROOT, 'workflows', 'agents'), { recursive: true });
   fs.writeFileSync(path.join(ROOT, 'workflows', 'agents', 'store-only.md'), '---\nharness: codex\n---\nYou work.\n');
-  assert.throws(() => loadWorkflows(named, { repo: REPO }), 'the folder and its repository do not hold the agent: the store alone does');
+  assert.throws(() => loadWorkflows(named, { repo: REPO }), 'the store alone holds the agent');
   const run = await started('the agent is yours');
   unfrozen(run.id, named);
 

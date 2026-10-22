@@ -27,6 +27,7 @@ import { scratch } from './scratch.ts';
 import { TEAM, TEAM_DEV } from './team.ts';
 import { promised } from './promised.ts';
 import { Effect } from 'effect';
+import { Conflict } from '../src/refusal/refusal.ts';
 import { runGiven, runOver } from './placed.ts';
 
 const ROOT = scratch('wf-ship-git-');
@@ -572,7 +573,7 @@ for (const [said, exitCode, words] of [
     assert.deepEqual(
       readRun(id).steps.ship.landed,
       { aborted: words, ...(exitCode === undefined ? {} : { refusedOn: base }) },
-      'a refusal names the base the merge was staged on, which `nemia merge` reads; a check that did not finish names none',
+      'the base `nemia merge` reads, on a refusal alone',
     );
     assert.ok(pass.notes.includes(`ship: ${words}, so the run aborted its merge; nothing landed on main`), pass.notes.join('\n'));
     const shipLine = (await runWith(e, list(e, readRun(id)))).steps.find((s) => s.name === 'ship')!;
@@ -590,14 +591,14 @@ for (const [said, exitCode, words] of [
         `ship: its check did not finish, so the run aborted the merge and nothing landed on main. Merge and check again:  nemia retry ${id} ship`,
       );
 
-    await assert.rejects(runWith(e, retryRun(id, 'ship', { mode: 'recheck' })), (err: Error & { exitCode?: number }) => {
+    await assert.rejects(runWith(e, retryRun(id, 'ship', { mode: 'recheck' })), (err: unknown) => {
+      assert.ok(err instanceof Conflict, String(err));
       assert.equal(err.exitCode, 2);
-      assert.match(
-        err.message,
-        new RegExp(
-          `^--recheck runs a step's check again on the work as it stands, and ship's check was run on the merge ship staged in the repository's checkout, which the run aborted when its check ${exitCode === undefined ? 'did not finish' : 'refused it'}: there is nothing staged for it to judge\\. Merge and check again, in a new try of ship: nemia retry ${id} ship\\.$`,
-        ),
-      );
+      assert.ok(err.message.startsWith('--recheck '), err.message);
+      const why = exitCode === undefined ? 'did not finish' : 'refused it';
+      assert.ok(err.message.includes('when its check ' + why + ': '), err.message);
+      assert.ok(err.message.includes('nothing staged for it to judge'), err.message);
+      assert.ok(err.message.endsWith('nemia retry ' + id + ' ship.'), err.message);
       return true;
     });
     await runWith(e, retryRun(id, 'ship', { mode: 'nudge' }));

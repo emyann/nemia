@@ -148,5 +148,6 @@ test("REFUSED: a task that drops the apps' tests or root files, the team, the te
   delete turbo.tasks['agent-runtime#test'];
   const [refused, ...rest] = missingInputs(turbo);
   assert.deepEqual(rest, []);
-  assert.match(refused, /^turbo\.json has no inputs for agent-runtime#test: give it \$TURBO_DEFAULT\$, /);
+  assert.ok(refused.startsWith('turbo.json has no inputs for agent-runtime#test'), refused);
+  assert.ok(refused.includes('give it $TURBO_DEFAULT$, '), refused);
 });

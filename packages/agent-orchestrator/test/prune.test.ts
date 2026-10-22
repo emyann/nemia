@@ -202,11 +202,7 @@ test('`nemia prune` on a run that shipped: listed with its size and nothing remo
   fs.mkdirSync(path.join(ROOT, 'runs', `${run.id}.asks`, 'done'), { recursive: true });
 
   const dry = await typed(t, b.e, 'prune', run.id);
-  assert.equal(
-    dry.error,
-    undefined,
-    'a dry run, as the CLI says it with nobody at a terminal: the worktree and its size, and how to remove it',
-  );
+  assert.equal(dry.error, undefined, 'a dry run with nobody at a terminal is no refusal');
   assert.match(dry.printed[0], new RegExp(`^${run.id}  would remove 1 worktree, \\d+\\.\\d KB$`));
   assert.match(dry.printed[1], new RegExp(`^   ${wt.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}  \\d+\\.\\d KB$`));
   assert.equal(
@@ -418,18 +414,10 @@ test('REFUSED at shipped defaults: whatever holds `nemia rm` — a step waiting 
     'refused',
     'a gated step that signed off: the run is not running, and not merged, so --unmerged is given, and the gate alone holds it',
   );
-  assert.equal(
-    atGate.refusal,
-    gateWords(' --unmerged'),
-    'the prune it names is the one given, --unmerged kept: this run is not merged, and without it the next prune is refused in turn',
-  );
+  assert.equal(atGate.refusal, gateWords(' --unmerged'), 'the prune it names keeps --unmerged: the run is not merged');
   const bare = await runWith(b.e, prune(run.id, { yes: true }));
   assert.equal(bare.refusal, gateWords(''), 'without --unmerged, the gate alone is said');
-  assert.doesNotMatch(
-    bare.refusal,
-    /--unmerged/,
-    '--unmerged gets past no gate, so offering it would name a command that is refused in turn',
-  );
+  assert.doesNotMatch(bare.refusal, /--unmerged/, '--unmerged gets past no gate, so it is not offered');
   assert.ok(fs.existsSync(wt) && !under('runs', `${run.id}.pruned`));
 
   const shipped = await aFinished(b, { merged: true });
@@ -831,11 +819,7 @@ test('REFUSED at shipped defaults under --artifacts: a run not over, a finished 
   assert.equal((await runWith(b.e, prune(unmerged.run.id, { yes: true, unmerged: true }))).kind, 'pruned');
   const mark = fs.readFileSync(path.join(ROOT, 'runs', `${unmerged.run.id}.pruned`), 'utf8');
   const after = await runWith(b.e, prune(unmerged.run.id, { artifacts: true, yes: true }));
-  assert.equal(
-    after.refusal,
-    u.refusal,
-    'once its worktree is gone by a plain prune under --unmerged, its files are still refused with the not-merged words: that word was for the worktree',
-  );
+  assert.equal(after.refusal, u.refusal, 'its files still refused as not merged, its worktree gone');
   assert.ok(fs.existsSync(unmergedShot), 'its files kept');
   assert.equal(fs.readFileSync(path.join(ROOT, 'runs', `${unmerged.run.id}.pruned`), 'utf8'), mark, 'and its mark as it was');
   const all = await typed(t, b.e, 'prune', '--artifacts', '--yes');

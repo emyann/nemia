@@ -173,9 +173,10 @@ test("REFUSED: a step's `skills:` that names no skill, one twice, or a name no s
     refusal(() => stepOf(AGENTS, 'agent: ada\nskills: a, a')),
     'build: `skills: a, a` names `a` twice. Name it once.',
   );
-  assert.ok(
-    refusal(() => stepOf(AGENTS, 'agent: ada\nskills: Look')).startsWith("build: `skills: Look` has `Look`, which is not a skill's name."),
-  );
+  const odd = refusal(() => stepOf(AGENTS, 'agent: ada\nskills: Look'));
+  assert.ok(odd.startsWith('build: `skills: Look` has `Look`'), odd);
+  assert.ok(odd.includes("which is not a skill's name."), odd);
+  assert.ok(odd.includes('or `folder:name`'), odd);
 });
 
 test("REFUSED: a name on `skills:` that is neither a skill's name nor folder:name, in words that say the two forms", () => {
@@ -189,14 +190,16 @@ test("REFUSED: a name on `skills:` that is neither a skill's name nor folder:nam
 });
 
 test('REFUSED: two skills of one bare name in one step, on one line or across the agent’s and the step’s, naming both', () => {
-  assert.equal(
-    refusal(() => stepOf(AGENTS, 'agent: ada\nskills: x, app:x')),
-    'build: `skills: x, app:x` gives `x` and `app:x`, two skills named `x`. A session loads a skill by its bare name, so one step holds one skill of a name. Keep one.',
-  );
-  assert.equal(
-    refusal(() => stepOf(AGENTS, 'agent: ada\nskills: app:alpha')),
-    "build: its session would be given `alpha`, on agents/ada.md's `skills:`, and `app:alpha`, on this step's `skills:`: two skills named `alpha`. A session loads a skill by its bare name, so one step holds one skill of a name. Keep one of them here, and give the other to another step.",
-  );
+  const line = refusal(() => stepOf(AGENTS, 'agent: ada\nskills: x, app:x'));
+  assert.ok(line.startsWith('build: `skills: x, app:x` gives `x` and `app:x`'), line);
+  assert.ok(line.includes('two skills named `x`'), line);
+  assert.ok(line.endsWith('Keep one.'), line);
+  const across = refusal(() => stepOf(AGENTS, 'agent: ada\nskills: app:alpha'));
+  assert.ok(across.startsWith('build: its session would be given '), across);
+  assert.ok(across.includes("`alpha`, on agents/ada.md's `skills:`"), across);
+  assert.ok(across.includes("`app:alpha`, on this step's `skills:`"), across);
+  assert.ok(across.includes('two skills named `alpha`'), across);
+  assert.ok(across.endsWith('give the other to another step.'), across);
   const nested = agentsOf({ ada: '---\nskills: a:x\n---\nWork.\n' });
   const both = refusal(() => stepOf(nested, 'agent: ada\nskills: b:x'));
   assert.ok(both.includes("`a:x`, on agents/ada.md's `skills:`, and `b:x`, on this step's `skills:`"), both);

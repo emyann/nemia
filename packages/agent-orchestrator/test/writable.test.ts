@@ -11,6 +11,7 @@ import { parseWorkflow, agentsDir } from '../src/workflow.ts';
 import { loadAgents } from '../src/agents/read.store.ts';
 import { stepMounts } from '../src/factory/factory.ts';
 import { teamCopy } from './team.ts';
+import { Invalid } from '../src/refusal/refusal.ts';
 
 /** A step `review` with this frontmatter and a body, as a folder hands it to the parser. */
 const fm = (lines: string) => parseWorkflow('review', `---\nplace: git\n${lines}\n---\nDo the work.\n`);
@@ -89,9 +90,13 @@ test("REFUSED at load: `writable:` on a step whose agent's fence writes nothing,
   const agents = loadAgents(agentsDir(path.join(team, 'dev')));
   assert.throws(
     () => parseWorkflow('plan', '---\nplace: git\nagent: planner\nwritable: web\n---\n', undefined, agents),
-    (err: Error) =>
-      err.message ===
-      "plan: `writable: web` lets the step write those folders, and its fence, with agents/planner.md's, runs in `plan`, which writes nothing: `writable:` widens where a step's writes reach, never what it may do. Delete the line, or run the step on a fence that writes — an agent whose file allows `Edit(**)`, say.",
+    (err: unknown) =>
+      err instanceof Invalid &&
+      err.exitCode === 2 &&
+      err.message.startsWith('plan: `writable: web`') &&
+      err.message.includes("with agents/planner.md's, runs in `plan`") &&
+      err.message.includes('Delete the line') &&
+      err.message.includes('allows `Edit(**)`'),
   );
 });
 

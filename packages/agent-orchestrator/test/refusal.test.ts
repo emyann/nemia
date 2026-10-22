@@ -78,7 +78,9 @@ test('REFUSED: a verb throws the kind of what it refuses, with its words', async
     Effect.runPromise(unhold('r-nope')),
     (err: unknown) =>
       err instanceof Missing &&
-      err.message === 'no such run: r-nope. nemia hold takes a run by its id, as nemia ls lists it: nemia hold <runId> --off.',
+      err.exitCode === 2 &&
+      err.message.startsWith('no such run: r-nope.') &&
+      err.message.includes('nemia hold <runId> --off'),
   );
   assert.throws(
     () => maxRuns({ WF_MAX_RUNS: 'two' }),

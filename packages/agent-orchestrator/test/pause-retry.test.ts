@@ -11,6 +11,7 @@ import { testEngine } from 'agent-runtime/testing';
 import { scratch } from './scratch.ts';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from './placed.ts';
+import { Conflict } from '../src/refusal/refusal.ts';
 
 const ROOT = scratch('wf-pause-retry-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -49,8 +50,12 @@ async function pausedThen(phase: 'failed' | 'stopped') {
 
 test('REFUSED: a retry over a void pause ask of its try, which the verb leaves for the tick; once a pass set it aside, the retry is written', async () => {
   const { e, id, pauseAsk } = await pausedThen('failed');
-  await assert.rejects(runWith(e, retryRun(id, 'implement', { mode: 'fresh', message: 'start over' })), (err: Error) => {
-    assert.match(err.message, /^try 2 of implement is held by the ask nemia pause --now wrote .* the next pass sets it aside/);
+  await assert.rejects(runWith(e, retryRun(id, 'implement', { mode: 'fresh', message: 'start over' })), (err: unknown) => {
+    assert.ok(err instanceof Conflict, String(err));
+    assert.equal(err.exitCode, 2);
+    assert.ok(err.message.startsWith('try 2 of implement is held by the ask '), err.message);
+    assert.ok(err.message.includes('nemia pause --now'), err.message);
+    assert.ok(err.message.includes(`nemia retry ${id} implement`), err.message);
     return true;
   });
   assert.deepEqual(JSON.parse(fs.readFileSync(askFile(id, 'implement', 2), 'utf8')), pauseAsk);

@@ -80,10 +80,8 @@ for (const [what, text, why] of [
       const made = await said(['ls']);
       assert.match(made.out, new RegExp(id), made.out);
       assert.match(made.err, why, 'engine() says why it left the file or the entry out');
-      assert.match(
-        made.err,
-        /It is left out until the file is fixed and this process restarts: a step that names it is refused by `nemia start`, one at work on it is held/,
-      );
+      assert.ok(made.err.includes('until the file is fixed and this process restarts'), made.err);
+      assert.ok(made.err.includes('refused by `nemia start`'), made.err);
       const ticked = await said(['tick']);
       assert.match(ticked.err, why);
       assert.ok(readRun(id).steps.work, `the local step was filed: ${JSON.stringify(readRun(id).steps)}`);

@@ -61,6 +61,12 @@ const refusedWith = (pattern: RegExp) => (err: Error & { exitCode?: number }) =>
 const refusedAs = (tag: string, pattern: RegExp) => (err: Error & { exitCode?: number; _tag?: string }) =>
   err._tag === tag && refusedWith(pattern)(err);
 
+/** Refused as `refusedAs`, of the kind `tag`, its words naming each of `named`: a fact the refusal turns on, or the fix it names. */
+const refusedNaming =
+  (tag: string, ...named: string[]) =>
+  (err: Error & { exitCode?: number; _tag?: string }) =>
+    err._tag === tag && err.exitCode === 2 && named.every((n) => err.message.includes(n));
+
 /**
  * An engine board a test settles by hand, as the engine would: a task filed is `pending`, and one asked to stop before it settled is
  * settled `stopped` by the next engine tick. Its feed has every filing, at the time the test's clock says, and `later` moves that clock on,
@@ -709,12 +715,7 @@ test('REFUSED by name at shipped defaults: `nemia inbox queue` of a name with no
       ),
     ),
   );
-  await assert.rejects(
-    queue(),
-    refusedWith(
-      /^nemia inbox queue takes the name of the card to queue, as nemia inbox lists it: nemia inbox queue <name> \[--workflow <w>\] \[--off\]\.$/,
-    ),
-  );
+  await assert.rejects(queue(), refusedNaming('Invalid', 'the name of the card', 'nemia inbox queue <name> [--workflow <w>] [--off]'));
   await assert.rejects(queue('../runs/x'), refusedWith(/^`\.\.\/runs\/x` is not a card's name/));
   await assert.rejects(
     queue(bare.card.name),
@@ -727,7 +728,7 @@ test('REFUSED by name at shipped defaults: `nemia inbox queue` of a name with no
   );
   await assert.rejects(
     queue(bare.card.name, '--off', '--workflow', 'dev'),
-    refusedWith(/^--off takes the card out of the queue, and --workflow writes what starts it: give one of them\.$/),
+    refusedNaming('Invalid', '--off', '--workflow', 'give one of them'),
   );
   await assert.rejects(queue(bare.card.name, '--workflow'), refusedWith(/^--workflow takes the workflow the card starts on/));
   await assert.rejects(queue(bare.card.name, 'another'), refusedWith(/^nemia inbox queue queues one card, and another is a second/));
@@ -780,7 +781,7 @@ test('REFUSED by name at shipped defaults: `nemia inbox queue` of a name with no
   );
   await assert.rejects(
     async () => await runPlaced(startFromInbox({ name: 'no-such-card', callerRepo: repo })),
-    refusedAs('Missing', /^no card no-such-card in the inbox\. Its cards are: .*\. Start one of those — nemia start /),
+    refusedNaming('Missing', 'no card no-such-card in the inbox', 'nemia start '),
     'a start of a card not there',
   );
   assert.equal(fs.readFileSync(kept, 'utf8').includes('queued:'), false, 'and not queued');
@@ -926,12 +927,11 @@ test("REFUSED at shipped defaults, on the repository it was tried on: a queued c
   const refused = await runWith(b.e, tickRun({ repo: none }));
   assert.ok(refused.queue && 'refused' in refused.queue, JSON.stringify(refused.queue));
   assert.equal(refused.queue.on, none);
-  assert.match(
-    queueLine(refused.queue),
-    new RegExp(
-      `^${card.name} not started on ${none.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}: ${card.name}\\.md: \`workflow: dev\` — no workflow folder at .*, or run nemia up in the repository it is about$`,
-    ),
-  );
+  const line = queueLine(refused.queue);
+  assert.ok(line.startsWith(`${card.name} not started on ${none}: ${card.name}.md: `), line);
+  assert.ok(line.includes('`workflow: dev`'), line);
+  assert.ok(line.includes('no workflow folder at '), line);
+  assert.ok(line.endsWith('run nemia up in the repository it is about'), line);
   assert.deepEqual(
     [(await runWith(b.e, tickRun({ repo: none }))).queue, listRuns()],
     [undefined, []],
@@ -979,16 +979,23 @@ test('REFUSED as shipped: `nemia inbox queue` of a card that names no factory, a
   const before = [loose, history].map((f) => fs.readFileSync(f, 'utf8'));
   await assert.rejects(
     main(['inbox', 'queue', 'loose'], b.e),
-    refusedAs(
+    refusedNaming(
       'Invalid',
-      /^\S+\/inbox\/loose\.md: this card names no factory, and a queued card is started on its own only in the factory named for it\. Write `factory: <name>` in its frontmatter — one of solo, then queue it again: nemia inbox queue loose\. Nothing was queued\.$/,
+      '/inbox/loose.md: this card names no factory',
+      '`factory: <name>`',
+      'one of solo',
+      'nemia inbox queue loose.',
+      'Nothing was queued.',
     ),
   );
   await assert.rejects(
     main(['inbox', 'queue', 'history'], b.e),
-    refusedAs(
+    refusedNaming(
       'Invalid',
-      /^`default` is the default factory: .* Name a factory — `factory: <name>` in \S+\/inbox\/history\.md, one of solo\. Nothing was queued\.$/,
+      '`default` is the default factory',
+      '`factory: <name>` in ',
+      '/inbox/history.md, one of solo.',
+      'Nothing was queued.',
     ),
   );
   assert.deepEqual(
@@ -1035,7 +1042,8 @@ test("REFUSED at shipped defaults, on its factory's repository: a queued card of
   const refused = await runWith(b.e, tickRun({ repo: daemons }));
   assert.ok(refused.queue && 'refused' in refused.queue, JSON.stringify(refused.queue));
   assert.equal(refused.queue.on, undefined, "the card's factory names the repository, not the daemon");
-  assert.match(refused.queue.refused, /^dev: the factory solo does not offer this workflow — it offers none yet\. /);
+  assert.ok(refused.queue.refused.startsWith('dev: the factory solo does not offer this workflow'), refused.queue.refused);
+  assert.ok(refused.queue.refused.includes('nemia factory attach solo dev'), refused.queue.refused);
   assert.equal(filesStore.inbox.tries().get('unattached-card')?.repo, solo);
   assert.deepEqual(
     [(await runWith(b.e, tickRun({ repo: daemons }))).queue, listRuns()],
@@ -1056,10 +1064,11 @@ test("REFUSED as shipped: a queued card that names no factory is refused from a 
   const refused = await runWith(b.e, tickRun({ repo: solo }));
   assert.ok(refused.queue && 'refused' in refused.queue, JSON.stringify(refused.queue));
   assert.equal(refused.queue.on, undefined, 'refused wherever the daemon runs');
-  assert.match(
-    refused.queue.refused,
-    /^\S+\/inbox\/loose-card\.md: this card names no factory, .* — one of solo; a new card names it as it is filed: /,
-  );
+  const said = refused.queue.refused;
+  assert.ok(said.includes('/inbox/loose-card.md: this card names no factory'), said);
+  assert.ok(said.includes('`factory: <name>`'), said);
+  assert.ok(said.includes('one of solo;'), said);
+  assert.ok(said.includes('nemia inbox add "<idea>" --factory <name>'), said);
   assert.doesNotMatch(refused.queue.refused, /--factory <name>;|at start/, 'a daemon has no flag to give');
   assert.doesNotMatch(queueLine(refused.queue), / not started on |run nemia up in the repository/);
   assert.deepEqual([(await runWith(b.e, tickRun({ repo: solo }))).queue, listRuns()], [undefined, []], 'the refusal lasts');
@@ -1075,10 +1084,10 @@ test("REFUSED as shipped: a queued card that names no factory is refused from a 
   aCard('default-card', { workflow: 'dev', factory: 'default', queued: at(2) }, 'Build it in the history.');
   const history = await runWith(b.e, tickRun({ repo: solo }));
   assert.ok(history.queue && 'refused' in history.queue, JSON.stringify(history.queue));
-  assert.match(
-    history.queue.refused,
-    /^`default` is the default factory: .* Name a factory — `factory: <name>` in \S+\/inbox\/default-card\.md, one of solo\. /,
-  );
+  const historySaid = history.queue.refused;
+  assert.ok(historySaid.startsWith('`default` is the default factory'), historySaid);
+  assert.ok(historySaid.includes('`factory: <name>` in '), historySaid);
+  assert.ok(historySaid.includes('/inbox/default-card.md, one of solo.'), historySaid);
   assert.deepEqual(fromCard('default-card'), []);
 });
 

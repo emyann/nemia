@@ -57,7 +57,7 @@ test('no test makes a root but through scratch, under test/ or beside the code i
   const refused = files
     .filter((f) => !ALLOWED.includes(f.split(path.sep).join('/')))
     .flatMap((f) => tmpdirCalls(fs.readFileSync(path.join(TEST, '..', f), 'utf8')).map((l) => `${f}:${l}`));
-  assert.deepEqual(refused, [], 'make the root with scratch(prefix) from ./scratch.ts, which takes it away with what runs in it');
+  assert.deepEqual(refused, [], 'make the root with scratch(prefix) from ./scratch.ts');
 });
 
 test("the helper is the runtime's, byte for byte", () => {

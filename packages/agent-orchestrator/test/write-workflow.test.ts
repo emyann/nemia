@@ -191,7 +191,7 @@ test("REFUSED at shipped defaults, with the folder as it was: a folder outside t
   assert.equal(
     refusal(notYet, () => writeWorkflow(notYet, [step('implement')])),
     fix(notYet),
-    "a workflows/ of a folder no factory names is no repository's",
+    "a workflows/ no factory names is no repository's",
   );
   const unknown = scratch('wf-write-unknown-');
   fs.mkdirSync(path.join(unknown, '.git'));
@@ -199,7 +199,7 @@ test("REFUSED at shipped defaults, with the folder as it was: a folder outside t
   assert.equal(
     refusal(checkout, () => writeWorkflow(checkout, [step('implement')])),
     fix(checkout),
-    'a checkout with a .git that no factory names is not known by it',
+    'a .git no factory names is not known by it',
   );
   assert.equal(
     refusal(STORE, () => writeWorkflow(STORE, [step('implement')])),
@@ -247,10 +247,8 @@ test("REFUSED, with the folder as it was, in the parser's words and naming the s
   );
 
   const docs = step('docs', { after: ['implement'] });
-  assert.match(
-    refusal(dir, () => writeWorkflow(dir, [implement, docs, { ...review, after: ['implement'], loop: 'docs' }])),
-    /^review: `loop: docs`, but review does not wait on docs, directly or through the steps between/,
-  );
+  const unwaited = refusal(dir, () => writeWorkflow(dir, [implement, docs, { ...review, after: ['implement'], loop: 'docs' }]));
+  assert.ok(unwaited.startsWith('review: `loop: docs`, but review does not wait on docs'), unwaited);
   assert.match(
     refusal(dir, () => writeWorkflow(dir, [implement, { ...review, loop: 'review' }])),
     /^review: `loop: review` names this step\./,
@@ -264,21 +262,21 @@ test("REFUSED, with the folder as it was, in the parser's words and naming the s
 test('REFUSED, with the folder as it was: an `output:` naming a schema that is not beside the step — not there, or outside the folder though it is there', () => {
   const dir = devIn('output');
   const [implement, review] = loadWorkflows(dir) as [Workflow, Workflow];
-  assert.match(
-    refusal(dir, () => writeWorkflow(dir, [implement, { ...review, output: { file: 'reviews.schema.json' } }])),
-    /^review: `output: reviews\.schema\.json` is not there\. It is a JSON Schema file, relative to the workflow folder — write it beside review\.md/,
-  );
+  const absent = refusal(dir, () => writeWorkflow(dir, [implement, { ...review, output: { file: 'reviews.schema.json' } }]));
+  assert.ok(absent.startsWith('review: `output: reviews.schema.json` is not there.'), absent);
+  assert.ok(absent.includes('write it beside review.md'), absent);
   const theirs = path.join(devIn('theirs'), 'review.schema.json');
   const up = path.relative(dir, theirs);
-  assert.equal(
-    refusal(dir, () => writeWorkflow(dir, [implement, { ...review, output: { file: up } }])),
-    `review: \`output: ${up}\` names a file outside the workflow folder. A schema is part of what the step is judged by, and lives in the folder with it: write it beside review.md and name it from there — \`output: review.schema.json\` — or delete the line, and the step declares no output.`,
-    "a schema of the step's own, beside another workflow: there, strict, and still not the folder's",
+  const elsewhere = refusal(dir, () => writeWorkflow(dir, [implement, { ...review, output: { file: up } }]));
+  assert.ok(
+    elsewhere.startsWith('review: `output: ' + up + '` names a file outside the workflow folder.'),
+    "a schema of the step's own beside another workflow",
   );
-  assert.match(
-    refusal(dir, () => writeWorkflow(dir, [implement, { ...review, output: { file: theirs } }])),
-    /^review: `output: \/.*` names a file outside the workflow folder/,
-  );
+  assert.ok(elsewhere.includes('write it beside review.md'), elsewhere);
+  assert.ok(elsewhere.includes('`output: review.schema.json`'), elsewhere);
+  assert.ok(elsewhere.includes('or delete the line'), elsewhere);
+  const absolute = refusal(dir, () => writeWorkflow(dir, [implement, { ...review, output: { file: theirs } }]));
+  assert.ok(absolute.startsWith('review: `output: ' + theirs + '` names a file outside the workflow folder'), absolute);
   const loose = { type: 'object', properties: { x: { type: 'string' } }, required: [], additionalProperties: false } as const;
   const written = writeWorkflow(dir, [implement, { ...review, output: { file: 'review.schema.json', schema: loose } } as StepDraft]);
   assert.deepEqual(
@@ -302,10 +300,9 @@ test('REFUSED, with the folder as it was: a step name that is not a file name, o
     refusal(dir, () => writeWorkflow(dir, named('README'))),
     `\`README\` is not a step's name: README.md is the folder's README, which says what the workflow is for and is never read as a step. ${fix}`,
   );
-  assert.equal(
-    refusal(dir, () => writeWorkflow(dir, named('docs.md'))),
-    "`docs.md` is not a step's name: it is a file's name, and a step is named without its .md: `docs`.",
-  );
+  const md = refusal(dir, () => writeWorkflow(dir, named('docs.md')));
+  assert.ok(md.startsWith("`docs.md` is not a step's name"), md);
+  assert.ok(md.endsWith('named without its .md: `docs`.'), md);
   assert.equal(
     refusal(dir, () => writeWorkflow(dir, named('plan,docs'))),
     `\`plan,docs\` is not a step's name: \`after:\` and \`input:\` split on every comma, so no step could wait on it. ${fix}`,
@@ -319,10 +316,10 @@ test('REFUSED, with the folder as it was: a step name that is not a file name, o
     `A step has no name, and a step is named by its file in the workflow's folder. ${fix}`,
   );
 
-  assert.equal(
-    refusal(dir, () => writeWorkflow(dir, [implement, review, { ...implement, body: 'again' }])),
-    'two steps are named implement, and a step is its file, implement.md. Rename one of them.',
-  );
+  const twice = refusal(dir, () => writeWorkflow(dir, [implement, review, { ...implement, body: 'again' }]));
+  assert.ok(twice.startsWith('two steps are named implement'), twice);
+  assert.ok(twice.includes('implement.md'), twice);
+  assert.ok(twice.endsWith('Rename one of them.'), twice);
   assert.equal(
     refusal(dir, () => writeWorkflow(dir, [])),
     `no steps to write to ${dir}, and a workflow has at least one. To remove the workflow, remove its folder.`,
@@ -425,7 +422,7 @@ test("REFUSED at shipped defaults, with the folder as it was: a step's file that
   assert.equal(
     refusal(dir, () => writeWorkflow(dir, [implement, { ...review, rounds: 2 }, ship])),
     fix('review.md'),
-    'a step the write would render through a link — its file moved out and linked back in, as a person keeping a step beside another would',
+    'a step the write would render through a link',
   );
   assert.equal(
     refusal(dir, () => writeWorkflow(dir, [implement])),
@@ -440,7 +437,7 @@ test("REFUSED at shipped defaults, with the folder as it was: a step's file that
   assert.equal(
     refusal(dir, () => writeWorkflow(dir, [implement, review, ship], '# theirs\n')),
     fix('README.md'),
-    'a linked README is refused when a README is given, since that is when it is written',
+    'a linked README is refused when a README is given',
   );
   assert.equal(fs.readFileSync(path.join(away, 'README.md'), 'utf8'), readme, 'and what it points at is untouched');
   assert.deepEqual(

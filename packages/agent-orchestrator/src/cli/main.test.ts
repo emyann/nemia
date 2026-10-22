@@ -84,6 +84,7 @@ const board = () => {
     },
     stop: async () => {},
     logs: async (id: string) => `the output of ${id}`,
+    mcpState: async () => ({ read: false as const, why: 'no harness is run in this test, so no state is read' }),
   });
   const settle = (id: string, phase: TaskPhase, closeout?: unknown) => tasks.set(id, { phase, closeout });
   return { e, settle };
@@ -115,6 +116,31 @@ test('wf, the alias, writes its one hint line on stderr before the help, and not
   assert.deepEqual(err, [`${WF_HINT}\n`]);
   assert.deepEqual(out, [HELP]);
   assert.match(WF_HINT, new RegExp(`\\b${CLI} <args>`), 'the hint names what to type next');
+});
+
+test('a read is run against the root the process names when it is typed, not one a module pinned as it loaded', async (t) => {
+  const { e } = board();
+  const other = scratch('wf-main-other-');
+  const file = path.join(other, 'factories', 'default', 'servers.json');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, `${JSON.stringify({ servers: { github: { type: 'http', url: 'https://api.githubcopilot.com/mcp/' } } })}\n`);
+  const was = process.env.WF_ROOT;
+  try {
+    process.env.WF_ROOT = other;
+    const { out } = await typed(t, e, 'factory', 'servers', 'default');
+    assert.ok(
+      out.some((line) => line.includes('https://api.githubcopilot.com/mcp/')),
+      `the record under the root the process names is the one read: ${JSON.stringify(out)}`,
+    );
+    process.env.WF_ROOT = was;
+    const back = await typed(t, e, 'factory', 'servers', 'default');
+    assert.ok(
+      back.out.some((line) => line.includes('no server recorded')),
+      `and this root records none, so the read follows the root rather than a module's: ${JSON.stringify(back.out)}`,
+    );
+  } finally {
+    process.env.WF_ROOT = was;
+  }
 });
 
 test('the verbs the help names are the verbs main runs, and no other', () => {

@@ -12,6 +12,7 @@ import path from 'node:path';
 import { gitPlace } from '../place/git/place.ts';
 import type { PlaceOutcome, PlaceVerb } from '../src/runner.ts';
 import { SKILL_SECTIONS, unknownHoles } from '../src/place/place.ts';
+import { STOP_GRACE_MS } from '../src/place/place.store.ts';
 import { running } from './running.ts';
 import { steppingClock } from './clock.ts';
 import { scratch } from './scratch.ts';
@@ -402,40 +403,82 @@ test('land commits a staged merge with the message given, and answers the commit
   assert.equal(merging(dir), false);
 });
 
+/**
+ * The grace the deadline tests below give a stopped group (`AskOptions.graceMs`), shorter than the shipped `STOP_GRACE_MS` and above
+ * what the cleaning shell takes on SIGTERM; and their first deadline, which a try that missed git reaching its hook or filter doubles.
+ */
+const GRACE_MS = 400;
+const FIRST_DEADLINE_MS = 300;
+const HELD_TRIES = 6;
+
+/**
+ * Asks `ask` of a place made by `make` at a deadline doubling from `FIRST_DEADLINE_MS` until git was where `marker` says at it: the
+ * outcome, the deadline it was asked at, and what `make` made. A try that missed is no failure, `HELD_TRIES` of them is.
+ */
+function heldAsked<M extends { readonly marker: string }>(
+  make: () => M,
+  ask: (made: M, deadlineMs: number) => PlaceOutcome<PlaceVerb>,
+): { outcome: PlaceOutcome<PlaceVerb>; deadlineMs: number; made: M } {
+  for (let tries = 1, deadlineMs = FIRST_DEADLINE_MS; ; tries++, deadlineMs *= 2) {
+    const made = make();
+    const outcome = ask(made, deadlineMs);
+    if (fs.existsSync(made.marker)) return { outcome, deadlineMs, made };
+    assert.ok(tries < HELD_TRIES, `git reached what holds it before the deadline, on one of ${HELD_TRIES} tries: ${unreadOf(outcome)}`);
+  }
+}
+
+/** The deadline's words, the first of them. */
+const stoppedAt = (deadlineMs: number) => `it gave no answer within ${deadlineMs / 1000} s, its deadline, and was stopped`;
+
 test('a land held past its deadline by a hook leaves the hook running nowhere, the merge staged, and the abort answers', (t) => {
-  const dir = repository();
-  staged(dir);
-  const held = scratch('wf-git-held-');
-  const marker = path.join(held, 'in-the-hook');
-  const hook = path.join(held, 'hook.sh');
-  fs.writeFileSync(hook, `touch '${marker}'\nsleep 60\n`);
-  fs.writeFileSync(path.join(dir, '.git', 'hooks', 'pre-commit'), `#!/bin/sh\nexec /bin/sh '${hook}'\n`, { mode: 0o755 });
+  const hooks: string[] = [];
   t.after(() => {
-    for (const pid of running(hook)) process.kill(pid, 'SIGKILL');
+    for (const hook of hooks) for (const pid of running(hook)) process.kill(pid, 'SIGKILL');
   });
-  const outcome = gitPlace({ env: ENV }).askNow('land', { checkout: dir, act: 'commit', message: 'm' }, { deadlineMs: 3000 });
-  assert.match(unreadOf(outcome), /^it gave no answer within 3 s, its deadline, and was stopped/);
-  assert.ok(fs.existsSync(marker), 'git was in the hook at the deadline');
-  assert.deepEqual(running(hook), [], 'the hook runs no more');
-  assert.equal(merging(dir), true, 'the merge is still staged');
-  assert.deepEqual(answerOf(run('land', { checkout: dir, act: 'abort' })), { aborted: true });
+  const { outcome, deadlineMs, made } = heldAsked(
+    () => {
+      const dir = repository();
+      staged(dir);
+      const held = scratch('wf-git-held-');
+      const marker = path.join(held, 'in-the-hook');
+      const hook = path.join(held, 'hook.sh');
+      hooks.push(hook);
+      fs.writeFileSync(hook, `touch '${marker}'\nsleep 60\n`);
+      fs.writeFileSync(path.join(dir, '.git', 'hooks', 'pre-commit'), `#!/bin/sh\nexec /bin/sh '${hook}'\n`, { mode: 0o755 });
+      return { dir, marker, hook };
+    },
+    ({ dir }, deadlineMs) =>
+      gitPlace({ env: ENV }).askNow('land', { checkout: dir, act: 'commit', message: 'm' }, { deadlineMs, graceMs: GRACE_MS }),
+  );
+  assert.ok(unreadOf(outcome).startsWith(stoppedAt(deadlineMs)), unreadOf(outcome));
+  assert.deepEqual(running(made.hook), [], 'the hook runs no more');
+  assert.equal(merging(made.dir), true, 'the merge is still staged');
+  assert.deepEqual(answerOf(run('land', { checkout: made.dir, act: 'abort' })), { aborted: true });
 });
 
 test('a handoff held past its deadline by a clean filter leaves no index.lock, and the next verb answers', (t) => {
-  const dir = repository();
-  const held = scratch('wf-git-held-');
-  const marker = path.join(held, 'in-the-filter');
-  const filter = path.join(held, 'filter.sh');
-  fs.writeFileSync(filter, `touch '${marker}'\nsleep 60\n`);
-  git(dir, 'config', 'filter.held.clean', `/bin/sh '${filter}'`);
-  fs.writeFileSync(path.join(dir, '.gitattributes'), 'f filter=held\n');
-  fs.writeFileSync(path.join(dir, 'f'), 'left by the step\n');
+  const filters: string[] = [];
   t.after(() => {
-    for (const pid of running(filter)) process.kill(pid, 'SIGKILL');
+    for (const filter of filters) for (const pid of running(filter)) process.kill(pid, 'SIGKILL');
   });
-  const outcome = gitPlace({ env: ENV }).askNow('handoff', { workspace: dir, step: 'build', why: '' }, { deadlineMs: 3000 });
-  assert.match(unreadOf(outcome), /^it gave no answer within 3 s, its deadline, and was stopped/);
-  assert.ok(fs.existsSync(marker), 'git add was in the filter, holding the lock, at the deadline');
+  const { outcome, deadlineMs, made } = heldAsked(
+    () => {
+      const dir = repository();
+      const held = scratch('wf-git-held-');
+      const marker = path.join(held, 'in-the-filter');
+      const filter = path.join(held, 'filter.sh');
+      filters.push(filter);
+      fs.writeFileSync(filter, `touch '${marker}'\nsleep 60\n`);
+      git(dir, 'config', 'filter.held.clean', `/bin/sh '${filter}'`);
+      fs.writeFileSync(path.join(dir, '.gitattributes'), 'f filter=held\n');
+      fs.writeFileSync(path.join(dir, 'f'), 'left by the step\n');
+      return { dir, marker, filter };
+    },
+    ({ dir }, deadlineMs) =>
+      gitPlace({ env: ENV }).askNow('handoff', { workspace: dir, step: 'build', why: '' }, { deadlineMs, graceMs: GRACE_MS }),
+  );
+  const { dir, filter } = made;
+  assert.ok(unreadOf(outcome).startsWith(stoppedAt(deadlineMs)), unreadOf(outcome));
   assert.equal(fs.existsSync(path.join(dir, '.git', 'index.lock')), false, 'the lock is gone');
   assert.deepEqual(running(filter), [], 'the filter runs no more');
   git(dir, 'config', '--unset', 'filter.held.clean');
@@ -463,32 +506,40 @@ function heldPlace(on: string): { dir: string; shell: string; marker: string } {
   return { dir, shell, marker };
 }
 
-test('a group still cleaning up on SIGTERM is given its grace on a stepped wall clock', (t) => {
-  const { dir, shell, marker } = heldPlace(`trap 'sleep 0.3; exit 0' TERM`);
+/** A held handoff of `heldPlace(on)`, its shells killed once the test `t` ends. */
+const heldHandoff = (t: { after: (fn: () => void) => void }, on: string) => {
+  const shells: string[] = [];
   t.after(() => {
-    for (const pid of running(shell)) process.kill(pid, 'SIGKILL');
+    for (const shell of shells) for (const pid of running(shell)) process.kill(pid, 'SIGKILL');
   });
+  return heldAsked(
+    () => {
+      const made = heldPlace(on);
+      shells.push(made.shell);
+      return made;
+    },
+    ({ dir }, deadlineMs) =>
+      gitPlace({ env: ENV }).askNow('handoff', { workspace: dir, step: 'build', why: '' }, { deadlineMs, graceMs: GRACE_MS }),
+  );
+};
+
+test('a group still cleaning up on SIGTERM is given its grace on a stepped wall clock', (t) => {
   steppingClock(t, 60_000);
-  const outcome = gitPlace({ env: ENV }).askNow('handoff', { workspace: dir, step: 'build', why: '' }, { deadlineMs: 3000 });
-  assert.ok(fs.existsSync(marker), 'the shell had set its trap at the deadline');
-  assert.equal(unreadOf(outcome), 'it gave no answer within 3 s, its deadline, and was stopped');
-  assert.deepEqual(running(shell), [], 'the shell ended on SIGTERM');
+  const { outcome, deadlineMs, made } = heldHandoff(t, `trap 'sleep 0.1; exit 0' TERM`);
+  assert.equal(unreadOf(outcome), stoppedAt(deadlineMs));
+  assert.deepEqual(running(made.shell), [], 'the shell ended on SIGTERM');
 });
 
 test('REFUSED: a group that ignores SIGTERM is killed once its grace is over, on a stepped wall clock', (t) => {
-  const { dir, shell, marker } = heldPlace(`trap '' TERM`);
-  t.after(() => {
-    for (const pid of running(shell)) process.kill(pid, 'SIGKILL');
-  });
   steppingClock(t, 60_000);
-  const outcome = gitPlace({ env: ENV }).askNow('handoff', { workspace: dir, step: 'build', why: '' }, { deadlineMs: 3000 });
-  assert.ok(fs.existsSync(marker), 'the shell had set its trap at the deadline');
+  assert.ok(GRACE_MS < STOP_GRACE_MS, 'the tests give a shorter grace than shipped, never a longer one');
+  const { outcome, deadlineMs, made } = heldHandoff(t, `trap '' TERM`);
   assert.equal(
     unreadOf(outcome),
-    'it gave no answer within 3 s, its deadline, and was stopped, and a process it started outlived SIGTERM for 2 s and was killed, ' +
+    `${stoppedAt(deadlineMs)}, and a process it started outlived SIGTERM for ${GRACE_MS / 1000} s and was killed, ` +
       'so a lock it held may be left',
   );
-  assert.deepEqual(running(shell), [], 'the shell is killed');
+  assert.deepEqual(running(made.shell), [], 'the shell is killed');
 });
 
 test('land aborts a merge that conflicts, and leaves the checkout at ours', () => {

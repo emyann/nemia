@@ -144,8 +144,16 @@ export function readInclude(repo: string): WorktreeInclude | null | string {
   return worktreeInclude(fs.readFileSync(file, 'utf8'));
 }
 
-/** What a way of asking is given: the verb's deadline, the environment git runs in, and what to call for each process it starts. */
-export type Asked = { readonly deadlineMs: number; readonly env: NodeJS.ProcessEnv; readonly started: () => void };
+/**
+ * What a way of asking is given: the verb's deadline, the grace a command stopped at it has to end on SIGTERM (`graceMs`), the
+ * environment git runs in, and what to call for each process it starts.
+ */
+export type Asked = {
+  readonly deadlineMs: number;
+  readonly graceMs: number;
+  readonly env: NodeJS.ProcessEnv;
+  readonly started: () => void;
+};
 
 /** A body moved one step: what it yields or returns next, or what it threw. */
 type Moved<V extends PlaceVerb> = { readonly step: IteratorResult<Command, Reply<V>> } | { readonly threw: unknown };
@@ -187,7 +195,7 @@ function ranNow(
   const child = spawnSync(command.cmd, command.args, options);
   const timedOut = child.error !== undefined && 'code' in child.error && child.error.code === 'ETIMEDOUT';
   const ran = { status: child.status, signal: child.signal, stdout: child.stdout ?? '', stderr: child.stderr ?? '', error: child.error };
-  return { ran, timedOut, killed: timedOut && child.pid > 0 && stopGroup(child.pid) };
+  return { ran, timedOut, killed: timedOut && child.pid > 0 && stopGroup(child.pid, asked.graceMs) };
 }
 
 /**
@@ -203,7 +211,7 @@ export function answeredNow<V extends PlaceVerb>(verb: V, body: Asking<Reply<V>>
     if ('threw' in at) return unreadNow(verb, thrownWords(verb, at.threw));
     if (at.step.done) return outcomeOf(at.step.value);
     const { ran, timedOut, killed } = ranNow(at.step.value, until - performance.now(), asked);
-    if (timedOut) return unreadNow(verb, stoppedWords(asked.deadlineMs, killed, ran.stderr));
+    if (timedOut) return unreadNow(verb, stoppedWords(asked.deadlineMs, killed, ran.stderr, asked.graceMs));
     at = moved(body, ran);
   }
 }
@@ -242,7 +250,8 @@ const ranLater = (command: Command, asked: Asked, heard: Heard): Effect.Effect<R
     const out: Buffer[] = [];
     return Effect.acquireRelease(
       Effect.sync(() => startedChild(command, asked, out, heard)),
-      (child, exit) => (Exit.isSuccess(exit) ? Effect.void : Effect.map(stopChild(child), (killed) => void (heard.killed = killed))),
+      (child, exit) =>
+        Exit.isSuccess(exit) ? Effect.void : Effect.map(stopChild(child, asked.graceMs), (killed) => void (heard.killed = killed)),
     ).pipe(
       Effect.flatMap(ended),
       Effect.scoped,
@@ -271,7 +280,9 @@ export const answered = <V extends PlaceVerb>(verb: V, make: () => Asking<Reply<
       Effect.timeoutOrElse({
         duration: asked.deadlineMs,
         orElse: () =>
-          Effect.sync(() => unreadNow(verb, stoppedWords(asked.deadlineMs, heard.killed, Buffer.concat(heard.stderr).toString('utf8')))),
+          Effect.sync(() =>
+            unreadNow(verb, stoppedWords(asked.deadlineMs, heard.killed, Buffer.concat(heard.stderr).toString('utf8'), asked.graceMs)),
+          ),
       }),
     );
   });

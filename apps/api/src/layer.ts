@@ -6,7 +6,7 @@
  * store.ts; `storeRootLayer` at `app.ts`): what the package still reads off a root of its own as it loads is named in its
  * `test/global-roots.baseline.ts`.
  */
-import { Context, Effect, Layer, type ManagedRuntime, Metric } from 'effect';
+import { Context, type Duration, Effect, Layer, type ManagedRuntime, Metric } from 'effect';
 import type { Context as RequestContext } from 'hono';
 import { routePath } from 'hono/route';
 import {
@@ -31,7 +31,9 @@ import { McpAsker } from './capabilities/capabilities.ts';
 import type { LastSaid } from './detail/detail.ts';
 import { placeFor } from './factories/place.ts';
 import { QuotaAsker } from './factory/quota.ts';
+import { CHAT_BEAT_MS } from './nemia/chat.ts';
 import { Followings } from './steps/following.ts';
+import { STEP_BEAT_MS } from './steps/steps.ts';
 import { Engine, StoreRoot } from './store.ts';
 import type { StepRun } from './step/step.ts';
 
@@ -83,6 +85,17 @@ export class ReadMemo extends Context.Service<
 }
 
 /**
+ * How often the api's streams read again what nothing pushes to them: a step's conversation no live stream can be had of (`step`,
+ * `STEP_BEAT_MS`, `readAgain` in steps/steps.ts), Nemia's chat (`chat`, `CHAT_BEAT_MS`, nemia/chat.ts), and the feed's file for the lines
+ * no hub brought (`feed`, none for the package's own beat, `followFeed`). The shipped beats by default; a test gives shorter ones with
+ * `appOf(Layer.merge(liveOf(), Layer.succeed(Beats)({ ...Beats.defaultValue(), step: … })))` rather than wait them out.
+ */
+export type BeatsShape = { readonly step: number; readonly chat: number; readonly feed?: Duration.Input };
+export const Beats = Context.Reference<BeatsShape>('api/Beats', {
+  defaultValue: () => ({ step: STEP_BEAT_MS, chat: CHAT_BEAT_MS }),
+});
+
+/**
  * Every service a handler may read: what an app's layer provides whole, the steps followed live among them (`Followings`), and the place
  * the package's programs ask (`PlaceService`).
  */
@@ -111,6 +124,7 @@ export type Served = {
   quota: QuotaAsker['Service'];
   memo: ReadMemo['Service'];
   followings: Followings['Service'];
+  beats: BeatsShape;
 };
 
 /** The upper bounds of a request's reads, the files the runtime read for it, one past the last for more. */
@@ -153,6 +167,7 @@ export const served = <A>(c: RequestContext<ApiEnv>, handle: (s: Served) => A | 
         quota: yield* QuotaAsker,
         memo: yield* ReadMemo,
         followings: yield* Followings,
+        beats: yield* Beats,
       };
       const before = yield* readsOf(services.e);
       return yield* Effect.promise(async () =>

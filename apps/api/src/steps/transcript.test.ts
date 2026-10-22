@@ -15,8 +15,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { setTimeout as sleep } from 'node:timers/promises';
-import type { StepTranscript } from './steps.ts';
+import { STEP_BEAT_MS, type StepTranscript } from './steps.ts';
 import { app, appOf, liveOf } from '../app.ts';
+import { Beats } from '../layer.ts';
 import { Engine } from '../store.ts';
 import { emitFeed, engine } from 'agent-orchestrator';
 
@@ -398,6 +399,9 @@ test("a conversation the engine cannot read is a 502 that says how to read the s
   assert.match(error, /`nemia logs r-talk broken` reads its output from the command line\.$/);
 });
 
+/** The beat the unstreamed app's streams read again on (`Beats.step`), shorter than the shipped `STEP_BEAT_MS`. */
+const BEAT_MS = 100;
+
 /**
  * An app over the api's own engine but for `follow`, refused as a harness that does not stream its sessions refuses it, until `streams`
  * says yes — a harness that starts pushing its sessions under a reader. Its runtime is let go once the test `t` ends.
@@ -409,7 +413,9 @@ function unstreamedApp(t: TestContext, streams: { yes: boolean } = { yes: false 
     follow: (taskId: string) =>
       streams.yes ? real.follow(taskId) : Effect.fail({ _tag: 'FollowRefused', message: 'the `x` harness does not stream its sessions' }),
   } as unknown as ReturnType<typeof engine>;
-  const own = appOf(Layer.merge(liveOf(), Layer.succeed(Engine)(unstreamed)));
+  const own = appOf(
+    Layer.mergeAll(liveOf(), Layer.succeed(Engine)(unstreamed), Layer.succeed(Beats)({ ...Beats.defaultValue(), step: BEAT_MS })),
+  );
   t.after(() => own.runtime.dispose());
   return own.app;
 }
@@ -422,6 +428,7 @@ test(
   { timeout: 60_000 },
   async (t) => {
     const streams = { yes: false };
+    assert.ok(BEAT_MS < STEP_BEAT_MS, 'read again on a beat shorter than shipped, never longer');
     const app = unstreamedApp(t, streams);
     const sessionId = runningTask('t-unpushed');
     const lines = conversation(sessionId);

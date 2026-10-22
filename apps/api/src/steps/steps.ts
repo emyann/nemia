@@ -207,6 +207,8 @@ type Reading = {
   placeService: PlaceService['Service'];
   id: string;
   step: string;
+  /** How long `readAgain` waits between two reads: the served `Beats.step`, `STEP_BEAT_MS` unless a test gives another. */
+  beatMs: number;
 };
 
 /** Why a following stopped short of `settled`: the task it was on, and the words of an upstream that failed, null where none did. */
@@ -258,16 +260,16 @@ async function followed(
 const unpushedWords = (id: string, step: string) =>
   `Step '${step}' of run '${id}' runs a session its harness does not push as it is written: what it said so far is sent, and it is read again every few seconds.`;
 
-/** How often the conversation of a step no live stream can be had of is read again (`readAgain`). */
+/** How often the conversation of a step no live stream can be had of is read again (`readAgain`), shipped: `Beats.step`'s default. */
 export const STEP_BEAT_MS = 5_000;
 
 /**
- * The conversation of the step `step` of the run `id` read again every `STEP_BEAT_MS` for as long as a reader is there, once its
- * following stopped short of `settled` (`from`, the task it was on, the cursor to read from and why it stopped): why no live stream can
- * be had, said as `unreadable` with `retrying: true` and again only when those words change; then, each beat, the conversation read
- * afresh from the cursor, its events as `transcript`, `settled` once the task has settled, and the following asked for again, so a
- * harness that starts pushing its session resumes the live relay with `following` true and `readable` clears what was said. A read
- * that fails is the next beat's words. A pass that moved to another task is read from that task's start, and every beat after it from
+ * The conversation of the step `step` of the run `id` read again every beat (`r.beatMs`, `STEP_BEAT_MS` shipped) for as long as a reader
+ * is there, once its following stopped short of `settled` (`from`, the task it was on, the cursor to read from and why it stopped): why no
+ * live stream can be had, said as `unreadable` with `retrying: true` and again only when those words change; then, each beat, the
+ * conversation read afresh from the cursor, its events as `transcript`, `settled` once the task has settled, and the following asked for
+ * again, so a harness that starts pushing its session resumes the live relay with `following` true and `readable` clears what was said. A
+ * read that fails is the next beat's words. A pass that moved to another task is read from that task's start, and every beat after it from
  * the cursor it reached: the cursor is dropped at the move alone, never again. Ends on a settled task or a reader that has gone, and on
  * nothing else: no road here gives up.
  */
@@ -295,7 +297,7 @@ async function readAgain(
       words = err instanceof Error ? err.message : String(err);
     }
     if (read === undefined) {
-      await stream.sleep(STEP_BEAT_MS);
+      await stream.sleep(r.beatMs);
       continue;
     }
     after = read.cursor;
@@ -306,7 +308,7 @@ async function readAgain(
     if (again.taskId !== task) after = undefined;
     task = again.taskId;
     words = again.error ?? unpushedWords(r.id, r.step);
-    await stream.sleep(STEP_BEAT_MS);
+    await stream.sleep(r.beatMs);
   }
 }
 
@@ -474,7 +476,7 @@ export const steps = new Hono<ApiEnv>()
     }),
   )
   .get('/api/runs/:id/steps/:step/transcript/stream', (c) =>
-    served(c, async ({ e, placeService, home, followings }) => {
+    served(c, async ({ e, placeService, home, followings, beats }) => {
       const id = c.req.param('id');
       const step = c.req.param('step');
       const found = taskOfStep(id, step, home);
@@ -498,7 +500,7 @@ export const steps = new Hono<ApiEnv>()
       }
       return streamSSE(c, async (stream) => {
         if (!read.open) return settledFrom(stream, read);
-        const r: Reading = { runtime: c.var.runtime, followings, e, placeService, id, step };
+        const r: Reading = { runtime: c.var.runtime, followings, e, placeService, id, step, beatMs: beats.step };
         const stopped = await followed(stream, r, taskId, read);
         if (stopped === null) return;
         const same = stopped.taskId === taskId;

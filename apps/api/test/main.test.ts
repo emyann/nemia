@@ -9,8 +9,9 @@ import os from 'node:os';
 import path from 'node:path';
 import type { MetricRead } from '../src/factory/ceilings.ts';
 import { OPENED } from '../src/factory/feed.ts';
-import { DEFAULT_PORT, portOf, ticksOf, VIEWER_PORT } from '../src/port.ts';
+import { argsOf, DEFAULT_PORT, portOf, ticksOf, VIEWER_PORT } from '../src/port.ts';
 import { scratch } from './scratch.ts';
+import { DEFAULT_EVERY_MS } from 'agent-orchestrator';
 
 const API = path.join(import.meta.dirname, '..');
 
@@ -39,6 +40,13 @@ test('a PORT that is not a port is refused with the fix, not read as 8787', () =
 test('the api ticks with no argument, and not with --no-tick; any other is refused naming --no-tick', () => {
   assert.equal(ticksOf([]), true);
   assert.equal(ticksOf(['--no-tick']), false);
+  assert.deepEqual(argsOf([]), { ticks: true, every: DEFAULT_EVERY_MS }, 'with none, at the shipped interval');
+  assert.deepEqual(argsOf(['250']), { ticks: true, every: 250 }, 'an interval, read as nemia up reads it');
+  assert.throws(
+    () => argsOf(['--no-tick', '250']),
+    (err: Error & { exitCode?: number }) => err.exitCode === 2,
+    'REFUSED: an interval beside --no-tick, which ticks nothing',
+  );
   for (const argv of [['--tick=no'], ['--no-tick', 'x'], ['tick']])
     assert.throws(
       () => ticksOf(argv),
@@ -249,6 +257,13 @@ test('(f) --no-tick serves the board and writes no lease; (g) any other argument
   assert.equal(fs.existsSync(path.join(wrong.root, 'daemon.json')), false);
 });
 
+/**
+ * How often an api a test starts as the daemon passes, given as its `[ms]`, shorter than the shipped `DEFAULT_EVERY_MS`; and how long its
+ * exporters hold a span before they post it (`OTEL_BSP_SCHEDULE_DELAY`, the OTel name), shorter than the exporter's own default.
+ */
+const PASS_MS = 100;
+const EXPORT_MS = '100';
+
 /** A collector on loopback that answers each post: its url, and the body of the first post to `path` that has `word`. */
 async function collector(t: { after: (fn: () => Promise<void>) => void }) {
   const waiting: { path: string; word: string; found: (body: string) => void }[] = [];
@@ -269,7 +284,7 @@ async function collector(t: { after: (fn: () => Promise<void>) => void }) {
 test("the api's daemon exports its passes' spans to the collector OTEL_EXPORTER_OTLP_ENDPOINT names, as the nemia service", async (t) => {
   const c = await collector(t);
   const pass = c.posted('/v1/traces', '"tick"');
-  const api = startApi('0', [], undefined, c.url);
+  const api = startApi('0', [], undefined, c.url, { OTEL_BSP_SCHEDULE_DELAY: EXPORT_MS });
   t.after(() => api.child.kill());
   const spans = await Promise.race([pass, api.ended.then((code) => assert.fail(`the api exited ${code}:\n${api.output()}`))]);
   assert.match(spans, /"nemia"/);
@@ -278,7 +293,7 @@ test("the api's daemon exports its passes' spans to the collector OTEL_EXPORTER_
 test('an api started --no-tick exports a server span per request, with the HTTP attributes, to the collector it was given', async (t) => {
   const c = await collector(t);
   const posted = c.posted('/v1/traces', '"GET /api/version"');
-  const api = startApi('0', ['--no-tick'], undefined, c.url);
+  const api = startApi('0', ['--no-tick'], undefined, c.url, { OTEL_BSP_SCHEDULE_DELAY: EXPORT_MS });
   t.after(() => api.child.kill());
   const [, got] = await api.said(/api listening on http:\/\/127\.0\.0\.1:(\d+)/);
   assert.equal((await fetch(`http://127.0.0.1:${got}/api/version`)).status, 200);
@@ -384,7 +399,8 @@ function signedOffRun(root: string): void {
 }
 
 test("REFUSED: a line the api's daemon writes reaches the api's stream from the hub its runtime built, with no read of the file", async (t) => {
-  const api = startApi('0');
+  assert.ok(PASS_MS < DEFAULT_EVERY_MS);
+  const api = startApi('0', [String(PASS_MS)]);
   t.after(() => api.child.kill());
   const [url] = await api.said(/http:\/\/127\.0\.0\.1:\d+/);
   await leaseSays(api.root, (l) => l.url === url);
@@ -414,7 +430,7 @@ test("REFUSED: a line the api's daemon writes reaches the api's stream from the 
 });
 
 test("the api's daemon still says its own pass lines, in the time-first layout, through the logger the app's layer holds", async (t) => {
-  const api = startApi('0');
+  const api = startApi('0', [String(PASS_MS)]);
   t.after(() => api.child.kill());
   await api.said(/api listening on/);
   signedOffRun(api.root);

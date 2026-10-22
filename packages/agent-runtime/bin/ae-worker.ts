@@ -41,7 +41,7 @@
  * The run file is the session. Removed — the file alone, or the store it is in — the session has been taken away, and
  * nobody is left who could stop its harness: `stop` finds a worker by its run file. So the worker takes a run file gone
  * from under it for a stop, writes nothing again, so the file is never made anew, and exits. It notices at its next write:
- * the heartbeat, within five seconds, or sooner at a word or an id. Its parent going is not a stop: outliving the engine
+ * the heartbeat, within `BEAT_MS`, or sooner at a word or an id. Its parent going is not a stop: outliving the engine
  * is what it is for.
  *
  * The harness's own id for its session (`nativeId`) is read from its start event (`HarnessSpec.start`): the first whole line of its
@@ -54,10 +54,11 @@
  * The harness's environment is the worker's, with the plan's `env` over it. Its stdout and stderr both go to the log, in the order
  * they arrive; with `streams`, each also goes whole to a file of its own, the one place a reader finds one apart from the other.
  *
- * argv: <runFile>  — JSON: { cmd, args, cwd, logFile, env?, streams?, stopFile?, start?, input?, inputAt? }
+ * argv: <runFile>  — JSON: { cmd, args, cwd, logFile, env?, streams?, stopFile?, start?, input?, inputAt?, stopGraceMs?, beatMs? }
  */
 import fs from 'node:fs';
 import { spawn } from 'node:child_process';
+import { WORKER_BEAT_MS, WORKER_STOP_GRACE_MS } from '../src/harness/detached/worker-bounds.ts';
 
 const runFile = process.argv[2];
 const plan = JSON.parse(fs.readFileSync(runFile, 'utf8')) as {
@@ -72,6 +73,8 @@ const plan = JSON.parse(fs.readFileSync(runFile, 'utf8')) as {
   pid?: number;
   input?: { first: string; inbox: string; from: number; closesOn: { key: string; value: string } };
   inputAt?: number;
+  stopGraceMs?: number;
+  beatMs?: number;
 };
 
 /** The running boot's id, read once from where Linux keeps it; `undefined` where the machine does not say. */
@@ -101,8 +104,13 @@ let status = {
   /** A harness started here has closed nothing yet, whatever the one before it did. */
   inputClosed: undefined as true | undefined,
 };
-/** How long a harness told to stop has to end on SIGTERM before what is left of its group is killed. */
-const STOP_GRACE_MS = 5_000;
+/**
+ * How long a harness told to stop has to end on SIGTERM before what is left of its group is killed: the plan's, which the spawn
+ * writes, or the shipped bound for a run file written before plans carried it.
+ */
+const STOP_GRACE_MS = plan.stopGraceMs ?? WORKER_STOP_GRACE_MS;
+/** How often the run file is rewritten when nothing else moves it: the heartbeat, the plan's or the shipped one. */
+const BEAT_MS = plan.beatMs ?? WORKER_BEAT_MS;
 let spawned = false;
 let gone = false;
 let stopping = false;
@@ -302,7 +310,7 @@ child.stderr!.on('data', toLog);
 child.stdout!.on('data', keep(whole?.stdout));
 child.stderr!.on('data', keep(whole?.stderr));
 
-const beat = setInterval(() => write(), 5_000);
+const beat = setInterval(() => write(), BEAT_MS);
 beat.unref?.();
 
 /** How often the inbox is looked at for words: the most a word waits before it is written on. */

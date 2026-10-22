@@ -34,10 +34,12 @@ import { quote } from '../../core/quote.ts';
 import { outputIn, saidFilesAt, saidWhen, type SaidMemo } from './said.ts';
 import { compactOps } from './compact.ts';
 import { lookedFor } from './looked.ts';
-import { detachedStateOf, firstRunFile, leased, runFileIn, type Carried, type Run, type RunFile } from './run-file.ts';
+import { detachedStateOf, firstRunFile, leased, runFileIn, STALE_MS, type Carried, type Run, type RunFile } from './run-file.ts';
+import { WORKER_BEAT_MS, WORKER_STOP_GRACE_MS } from './worker-bounds.ts';
 import { spawnFiles, spawnInput } from './spawn-files.ts';
 
 export { detachedStateOf, STALE_MS } from './run-file.ts';
+export { WORKER_BEAT_MS, WORKER_STOP_GRACE_MS } from './worker-bounds.ts';
 import { followOf, type PartialMark } from './follow.ts';
 
 /** Everything this engine needs to know about a harness. Add one by writing one of these. */
@@ -726,7 +728,18 @@ const startWorker = (file: string, cwd: string): void => {
  *   cannot be read; a run its worker started with no input; a run whose harness has printed its closing line; one that is
  *   not working; and words whose line holds a line break, which would reach the harness as two, or as half a message.
  */
-export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
+/**
+ * How a detached runner's workers run, beside the spec: their stop grace (`stopGraceMs`, default `WORKER_STOP_GRACE_MS`) and their
+ * heartbeat (`beatMs`, default `WORKER_BEAT_MS`, refused at or above `STALE_MS`), written onto every plan for the worker to read.
+ * Options so that a test of a stop or a heartbeat shortens them rather than waiting the shipped bounds out (`test/detached.test.ts`).
+ */
+export type DetachedOptions = { stopGraceMs?: number; beatMs?: number };
+
+export const detachedOps = (spec: HarnessSpec, root: string, options: DetachedOptions = {}): RunnerOps => {
+  const stopGraceMs = options.stopGraceMs ?? WORKER_STOP_GRACE_MS;
+  const beatMs = options.beatMs ?? WORKER_BEAT_MS;
+  if (!(beatMs > 0 && beatMs < STALE_MS))
+    throw new RangeError(`detachedOps: beatMs ${beatMs} must be above 0 and under STALE_MS (${STALE_MS}), or a live worker reads as dead`);
   const dir = path.join(root, 'runs', spec.name);
   const runFile = (name: string) => runFileOf(spec, root, name);
   const logFile = (name: string) => path.join(dir, `${safe(name)}.log`);
@@ -826,6 +839,8 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
               ? { resumeFrom: r.resumeFrom, carried: carriedBy(readAll(), r.resumeFrom, Date.now(), r.name) }
               : {}),
             ...(input ? { input } : {}),
+            stopGraceMs,
+            beatMs,
           };
           fs.writeFileSync(runFile(r.name), firstRunFile(plan));
 

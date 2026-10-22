@@ -78,14 +78,18 @@ const callAt = (clean: string, open: number): string | undefined => {
   return undefined;
 };
 
-/** Each assertion of `clean`, as the text of its call: `assert(…)`, one of its verbs, and a `.includes(…)` of an expected value. */
-const assertions = (clean: string): Array<{ at: number; call: string }> => {
-  const heads = /\bassert(?:\.(?:equal|strictEqual|deepEqual|deepStrictEqual|match|doesNotMatch|notEqual|ok))?\s*\(|\.includes\s*\(/g;
-  const found: Array<{ at: number; call: string }> = [];
+/**
+ * Each assertion of `clean`, as the text of its call: `assert(…)`, one of its verbs, and a `.includes(…)` of an expected value.
+ * `refusal` marks an `assert.throws` or an `assert.rejects`, whose subject is the error by construction.
+ */
+const assertions = (clean: string): Array<{ at: number; call: string; refusal: boolean }> => {
+  const heads =
+    /\bassert(?:\.(equal|strictEqual|deepEqual|deepStrictEqual|match|doesNotMatch|notEqual|ok|throws|rejects))?\s*\(|\.includes\s*\(/g;
+  const found: Array<{ at: number; call: string; refusal: boolean }> = [];
   for (const m of clean.matchAll(heads)) {
     const open = clean.indexOf('(', m.index + m[0].length - 1);
     const call = callAt(clean, open);
-    if (call !== undefined) found.push({ at: open, call });
+    if (call !== undefined) found.push({ at: open, call, refusal: m[1] === 'throws' || m[1] === 'rejects' });
   }
   return found;
 };
@@ -115,6 +119,26 @@ const LITERALS = /'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"|`((?:[^`\\$]|\\.|\
 const subjectOf = (call: string): string => call.replace(LITERALS, (found) => found.replace(/[^\n]/g, ' '));
 
 /**
+ * Where the second argument of the call `call` begins and ends: what an `assert.throws` or an `assert.rejects` expects of the error —
+ * a pattern, a string, an object's `message`, a function that reads it, or a helper wrapping one (`refusedWith(/…/)`). Not the first,
+ * which is what is run, nor the third, which is the assertion's own words. Read on the call with its literals blanked, so a comma or a
+ * bracket inside a sentence divides nothing. `undefined` where the call has one argument.
+ */
+const secondArg = (call: string): { from: number; to: number } | undefined => {
+  const blank = subjectOf(call);
+  const commas: number[] = [];
+  let depth = 0;
+  for (let i = 0; i < blank.length; i++) {
+    const c = blank[i];
+    if ('([{'.includes(c)) depth++;
+    else if (')]}'.includes(c)) depth--;
+    else if (c === ',' && depth === 1) commas.push(i);
+  }
+  if (!commas.length) return undefined;
+  return { from: commas[0] + 1, to: commas[1] ?? blank.length - 1 };
+};
+
+/**
  * Each line of `text` whose assertion over what the code said expects a whole sentence, by its line and the sentence's opening
  * words. An expected value counts when it is a literal of `SENTENCE` characters or more holding two spaces or more: an escape of a
  * line break, a tab or a space counts as the space it is, so a sentence a formatter broke across two lines of source is one
@@ -127,14 +151,16 @@ export const pinnedWords = (text: string): string[] => {
   const clean = uncommented(text);
   const lineAt = (index: number) => clean.slice(0, index).split('\n').length;
   const found = new Map<number, string>();
-  for (const { at, call } of assertions(clean)) {
-    if (!SAID.test(subjectOf(call))) continue;
-    for (const m of call.matchAll(LITERALS)) {
+  for (const { at, call, refusal } of assertions(clean)) {
+    const expected = refusal ? secondArg(call) : SAID.test(subjectOf(call)) ? { from: 0, to: call.length } : undefined;
+    if (!expected) continue;
+    const scope = call.slice(expected.from, expected.to);
+    for (const m of scope.matchAll(LITERALS)) {
       const body = m[1] ?? m[2] ?? m[3] ?? m[4];
       if (body === undefined) continue;
       const words = body.replace(/\\[nstr]/g, ' ');
       if (words.length < SENTENCE || (words.match(/ /g)?.length ?? 0) < 2) continue;
-      const line = lineAt(at + m.index);
+      const line = lineAt(at + expected.from + m.index);
       if (!found.has(line)) found.set(line, `${line}: a whole sentence expected of what the code said — ${body.slice(0, 60)}`);
     }
   }
@@ -209,6 +235,18 @@ test('REFUSED: an assertion that expects a whole sentence of what the code said 
     pinnedWords(`assert.equal(e.message, '${sentence}' + ' and nothing was written at all here');\n`).length,
     1,
     'two sentences on one line is one line to unpin',
+  );
+
+  assert.deepEqual(
+    pinnedWords(`assert.throws(() => load(dir), /${sentence.replace(/[`:]/g, '')}/);\nassert.rejects(p, { message: '${sentence}' });\n`)
+      .length,
+    2,
+    'a refusal expected by assert.throws or assert.rejects, whose subject is the error by construction',
+  );
+  assert.deepEqual(
+    pinnedWords(`assert.throws(() => run('${sentence}'), { _tag: 'StepRefused' }, '${sentence}');\n`),
+    [],
+    'what the throws runs, and its own words, are not what it expects of the error',
   );
 
   assert.deepEqual(pinnedWords(`assert.equal(e._tag, 'StepRefused');\nassert.equal(code, 2);\n`), [], 'the kind and the exit code');

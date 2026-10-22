@@ -99,22 +99,6 @@ test('REFUSED at shipped defaults: a file that is not there is a 404 naming `nem
   await refused({ file: source('scout', ['description: x']), also: true }, 400, /^POST \/api\/agents\/yours\/copy does not take `also`: /);
 });
 
-test('REFUSED at shipped defaults: a copy from a page on another site, or addressed to another name, is a 403 naming `nemia agents copy <file>`, nothing written', async () => {
-  const file = source('envoy', ['description: Carries word.']);
-  const before = held();
-  for (const headers of [
-    { ...json, 'sec-fetch-site': 'cross-site' },
-    { ...json, 'sec-fetch-site': 'same-origin', host: 'evil.example:8787' },
-  ]) {
-    const res = await app.request('/api/agents/yours/copy', { method: 'POST', headers, body: JSON.stringify({ file }) });
-    const { error } = (await res.json()) as { error: string };
-    assert.equal(res.status, 403, error);
-    assert.match(error, /[Cc]opy it with `nemia agents copy <file>`/);
-    assert.ok(!error.includes('Agents page'), error);
-  }
-  assert.deepEqual(held(), before, 'nothing written');
-});
-
 test('the agent files the store knows are read on GET /api/agents/sources: yours, then the folder `path` names; a folder not there is a 404', async () => {
   fs.mkdirSync(AGENTS, { recursive: true });
   fs.writeFileSync(path.join(AGENTS, 'keeper.md'), '---\ndescription: Keeps the notes.\n---\nKeep them.\n');

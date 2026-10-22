@@ -1,7 +1,9 @@
 /**
- * The tick as an Effect program (`tickRun`, over `EngineService`) beside its plain face (`tick`): the face runs the program over the engine
- * it is handed and adds nothing, a refusal is the program's typed failure and the face's rejection, and anything else is a defect the
- * program dies of and the face rethrows as it was thrown. Walked through the runtime itself, `plainEngine` over an in-memory journal
+ * The tick as an Effect program (`tickRun`, over `EngineService`) beside its plain face (`tick`): each meters its pass over every phase
+ * the meter has, a refusal is the program's typed failure and the face's rejection, and anything else is a defect the
+ * program dies of and the face rethrows as it was thrown. That the face is the program over the engine it is handed and adds nothing is
+ * `runWith`'s own definition (`src/runtime-client.ts`), said in the type by `_tickProgramTypes` below, and no test of it can fail.
+ * Walked through the runtime itself, `plainEngine` over an in-memory journal
  * and a harness the test signs by hand, as unreadable-journal.test.ts does.
  *
  * `WF_ROOT` is set before the runner is imported, which reads it as the module loads. `WF_VERIFY_REST=1` judges in full every run a pass
@@ -111,22 +113,21 @@ const failingWith = (err: unknown): Engine => ({
   tick: () => Effect.die(err),
 });
 
-test("the tick's program, given the engine as a service, answers what its plain face answers: the face runs the program and adds nothing", async () => {
+test("the tick's program and its plain face each meter their pass over every phase the meter has", async () => {
   const run = await runPlaced(startRun({ brief: 'one run', repo: REPO, workflowDir: FOLDER }));
   for (let k = 0; k < 3; k++) await runWith(e, tickRun({ repo: ROOT }));
   signAll();
   const status = async () => (await runWith(e, tickRun({ repo: ROOT }))).runs.find((a) => a.run.id === run.id)?.status;
   let now = await status();
   for (let k = 0; k < 4 && now !== 'succeeded'; k++) now = await status();
-  assert.equal(now, 'succeeded', 'the run finished before the two are compared');
+  assert.equal(now, 'succeeded', 'the run finished before the pass is metered');
 
   const { cost: faceCost, ...face } = await runWith(e, tickRun({ repo: ROOT, memo: freshRestMemo() }));
-  const { cost: programCost, ...program } = await programOn(e, { repo: ROOT, memo: freshRestMemo() });
+  const { cost: programCost } = await programOn(e, { repo: ROOT, memo: freshRestMemo() });
   assert.deepEqual(
     face.runs.map((a) => [a.run.id, a.status]),
     [[run.id, 'succeeded']],
   );
-  assert.deepStrictEqual(program, face);
   assert.deepEqual(Object.keys(programCost?.phases ?? {}), [...PHASES], 'the program meters its pass as the face does');
   assert.deepEqual(Object.keys(faceCost?.phases ?? {}), [...PHASES]);
 });

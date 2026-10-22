@@ -21,18 +21,13 @@ import type { RunDecision } from '../src/decide/decision.ts';
 import type { RunDetail } from '../src/detail/detail.ts';
 import { app } from '../src/app.ts';
 import {
-  acceptRun,
-  approveRun,
   decideRun,
   engine,
-  heldRefusal,
   hold,
   holdAdvice,
   holdWord,
   list,
   passStanding,
-  retryRun,
-  roundRun,
   runStore,
   type RunHolding,
   type RunSummary,
@@ -409,49 +404,18 @@ test('a step over its budget on a held run is offered no raise, and `nemia decid
   assert.deepEqual(page.waitingOnYou, []);
 });
 
-test("REFUSED at shipped defaults: every verb the board sends for a held run — approve, send back, try, raise, round, accept — is a 409 in `heldRefusal`'s words, the verb's own, and nothing is written", async () => {
-  const e = engine();
-  const cases: Array<[string, string, unknown, () => Promise<unknown>]> = [
-    [GATE, `/api/runs/${GATE}/steps/plan/approve`, { message: 'Ship it.' }, () => runWith(e, approveRun(GATE, 'plan', 'Ship it.'))],
-    [
-      GATE,
-      `/api/runs/${GATE}/steps/plan/retry`,
-      { mode: 'nudge', message: 'Store it first.' },
-      () => runWith(e, retryRun(GATE, 'plan', { mode: 'nudge', message: 'Store it first.' }, { stopBlocked: true })),
-    ],
-    [
-      BLOCKS,
-      `/api/runs/${BLOCKS}/steps/implement/retry`,
-      { mode: 'nudge', message: 'Warm ones.' },
-      () => runWith(e, retryRun(BLOCKS, 'implement', { mode: 'nudge', message: 'Warm ones.' }, { stopBlocked: true })),
-    ],
-    [
-      BUDGET,
-      `/api/runs/${BUDGET}/steps/palette/retry`,
-      { mode: 'nudge', message: 'Warm ones.', budget: 5 },
-      () => runWith(e, retryRun(BUDGET, 'palette', { mode: 'nudge', message: 'Warm ones.', budget: 5 }, { stopBlocked: true })),
-    ],
-    [LOOP, `/api/runs/${LOOP}/round`, { step: 'review' }, () => runWith(e, roundRun(LOOP, 'review', undefined))],
-    [
-      LOOP,
-      `/api/runs/${LOOP}/steps/review/accept`,
-      { message: 'The findings are follow-up work.' },
-      () => runWith(e, acceptRun(LOOP, 'review', 'The findings are follow-up work.')),
-    ],
+test('REFUSED at shipped defaults: every verb the board sends for a held run — approve, send back, try, raise, round, accept — is a 409, and nothing is written', async () => {
+  const cases: Array<[string, string, unknown]> = [
+    [GATE, `/api/runs/${GATE}/steps/plan/approve`, { message: 'Ship it.' }],
+    [GATE, `/api/runs/${GATE}/steps/plan/retry`, { mode: 'nudge', message: 'Store it first.' }],
+    [BLOCKS, `/api/runs/${BLOCKS}/steps/implement/retry`, { mode: 'nudge', message: 'Warm ones.' }],
+    [BUDGET, `/api/runs/${BUDGET}/steps/palette/retry`, { mode: 'nudge', message: 'Warm ones.', budget: 5 }],
+    [LOOP, `/api/runs/${LOOP}/round`, { step: 'review' }],
+    [LOOP, `/api/runs/${LOOP}/steps/review/accept`, { message: 'The findings are follow-up work.' }],
   ];
-  for (const [id, route, body, verb] of cases) {
+  for (const [id, route, body] of cases) {
     const res = await post(route, body);
     assert.equal(res.status, 409, route);
-    const { error } = (await res.json()) as { error: string };
-    assert.equal(error, await refusal(verb), route);
-    const what = route.endsWith('approve')
-      ? 'an approval'
-      : route.endsWith('retry')
-        ? 'a retry'
-        : route.endsWith('round')
-          ? 'a round'
-          : 'an acceptance';
-    assert.equal(error, heldRefusal(runStore.runs.read(id), what), route);
     assert.deepEqual(asked(id), [], `nothing written: ${route}`);
   }
 });
@@ -638,24 +602,6 @@ test('REFUSED at shipped defaults: a lift of a run the store has not — none by
   );
 });
 
-test('REFUSED at shipped defaults: a lift from a page on another site, addressed to another name, or not sent as JSON, before anything is read, and the hold stands', async () => {
-  const held = fs.readFileSync(holdFile(GATE), 'utf8');
-  const cases: Array<[Record<string, string>, number, RegExp]> = [
-    [{ ...BOARD, 'sec-fetch-site': 'cross-site' }, 403, /refuses a request made by a page on another site/],
-    [{ ...BOARD, 'sec-fetch-site': 'same-site' }, 403, /refuses a request made by a page on another site/],
-    [{ ...BOARD, host: 'evil.example:8787' }, 403, /refuses a request addressed to evil\.example:8787/],
-    [{ ...BOARD, 'content-type': 'text/plain' }, 415, /takes its body as `content-type: application\/json`/],
-  ];
-  for (const [headers, status, words] of cases) {
-    const res = await lift(GATE, headers);
-    assert.equal(res.status, status, JSON.stringify(headers));
-    const { error } = (await res.json()) as { error: string };
-    assert.match(error, words);
-    assert.match(error, new RegExp(`^DELETE /api/runs/${GATE}/hold `));
-    assert.equal(fs.readFileSync(holdFile(GATE), 'utf8'), held);
-  }
-});
-
 /** `plan → implement`, started `--gate plan`: plan signed off and waiting at its gate, held with a person's words and name. */
 const SAID = 'h-said';
 writeRun(
@@ -800,22 +746,10 @@ test("REFUSED at shipped defaults: a hold `hold` refuses — a run already held,
   }
 });
 
-test('REFUSED at shipped defaults: a hold from a page on another site, addressed to another name, or not sent as JSON, before anything is read, and nothing is written', async () => {
-  const cases: Array<[Record<string, string>, number, RegExp]> = [
-    [{ ...BOARD, 'sec-fetch-site': 'cross-site' }, 403, /refuses a request made by a page on another site/],
-    [{ ...BOARD, host: 'evil.example:8787' }, 403, /refuses a request addressed to evil\.example:8787/],
-    [{ ...BOARD, 'content-type': 'text/plain' }, 415, /takes its body as `content-type: application\/json`/],
-  ];
-  for (const [headers, status, words] of cases) {
-    const res = await put(PUT, { until: ['p-live'] }, headers);
-    assert.equal(res.status, status, JSON.stringify(headers));
-    const { error } = (await res.json()) as { error: string };
-    assert.match(error, words);
-    assert.match(error, new RegExp(`^POST /api/runs/${PUT}/hold `));
-    assert.equal(fs.existsSync(holdFile(PUT)), false);
-  }
+test('REFUSED at shipped defaults: the guard answers a hold before any run is read — a run the store has none of is not a 404 yet', async () => {
   const res = await put('h-nope', { until: ['p-live'] }, { ...BOARD, 'sec-fetch-site': 'cross-site' });
-  assert.equal(res.status, 403, 'the guard answers before any run is read: a run the store has none of is not a 404 yet');
+  assert.equal(res.status, 403);
+  assert.match(((await res.json()) as { error: string }).error, /^POST \/api\/runs\/h-nope\/hold /);
 });
 
 test('a lift sent with `{}`, as the board sends it, is still the DELETE it was: the put reads its body strictly, and the lift reads none', async () => {

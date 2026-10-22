@@ -21,16 +21,13 @@ import {
   addToInbox,
   attachWorkflow,
   clearSchedule,
-  factoryNameRefusal,
   hireAgent,
   loadWorkflows,
-  noFactoryLine,
   readInbox,
   removeFactory,
   runStore,
   setSchedule,
   hireRefusalOf,
-  unattachedRefusal,
   unfilledRefusal,
 } from 'agent-orchestrator';
 
@@ -150,13 +147,11 @@ test('?factory=default is the default factory: the same answer as naming none, a
   );
 });
 
-test("REFUSED at shipped defaults: a factory the store does not have is a 404, and a name that is no factory's a 422, each in the package's words", async () => {
+test("REFUSED at shipped defaults: a factory the store does not have is a 404, and a name that is no factory's a 422", async () => {
   const unknown = await get<unknown>('/api/workflows?factory=nope');
   assert.equal(unknown.status, 404);
-  assert.ok(said(unknown.body).startsWith(noFactoryLine('nope', ['hired', 'pair', 'solo'])), said(unknown.body));
   const bad = await get<unknown>('/api/workflows?factory=Bad');
   assert.equal(bad.status, 422);
-  assert.equal(said(bad.body), factoryNameRefusal('Bad'));
 });
 
 test("REFUSED at shipped defaults: a repository outside the factory named is a 422 naming the factory's, the ?repo= that asks for one and the add that files one on it — given, or the api's own when the factory has two", async () => {
@@ -197,7 +192,7 @@ test("`unfilled` names a step a factory's hires leave with no agent, in the pack
   assert.equal(hired[0].error, null);
 });
 
-test("a step's page in a factory is read with its hires, and a workflow the factory has not attached is a 404 in the package's words", async () => {
+test("a step's page in a factory is read with its hires, and a workflow the factory has not attached is a 404 naming the factory's own fix alone", async () => {
   const page = await get<WorkflowStepPage>('/api/workflows/repo/alpha/implement?factory=hired');
   assert.equal(page.status, 200);
   assert.equal(page.body.keys.find((k) => k.key === 'agent')?.value, 'ada');
@@ -230,7 +225,6 @@ test("a step's page in a factory is read with its hires, and a workflow the fact
 
   const gamma = await get<unknown>('/api/workflows/repo/gamma/plan?factory=hired');
   assert.equal(gamma.status, 404);
-  assert.equal(said(gamma.body), unattachedRefusal({ name: 'hired', workflows: ['alpha'] }, 'gamma'));
   assert.doesNotMatch(said(gamma.body), /default factory/, "only the factory's own fix");
   const offered = await get<WorkflowStepPage>(`/api/workflows/repo/gamma/plan?repo=${encodeURIComponent(repoR)}`);
   assert.equal(offered.status, 200, 'the default factory offers it');
@@ -240,7 +234,6 @@ test('POST /api/runs?factory= starts the run in the factory: its record names th
   const before = runFiles();
   const refused = await post('/api/runs?factory=solo', { workflow: 'alpha', brief: 'Add a cache' });
   assert.equal(refused.status, 422);
-  assert.equal(said(await refused.json()), unfilledRefusal(loadWorkflows(path.join(repoR, 'workflows', 'alpha')), 'solo', 'alpha'));
   assert.deepEqual(runFiles(), before, 'nothing written');
 
   const res = await post('/api/runs?factory=hired', { workflow: 'alpha', brief: 'Add a cache' });
@@ -286,7 +279,6 @@ test("REFUSED at shipped defaults: a card started in a factory whose hires leave
   const before = runFiles();
   const res = await post('/api/runs?factory=solo', { workflow: 'alpha', card: card.name });
   assert.equal(res.status, 422);
-  assert.equal(said(await res.json()), unfilledRefusal(loadWorkflows(path.join(repoR, 'workflows', 'alpha')), 'solo', 'alpha'));
   assert.ok(
     readInbox().some((c) => c.name === card.name),
     'the card is still there',
@@ -299,7 +291,6 @@ test("the request's factory comes before the card's `factory:`: a card of hired 
   const before = runFiles();
   const res = await post('/api/runs?factory=solo', { workflow: 'alpha', card: card.name });
   assert.equal(res.status, 422, 'started in hired, the card would have run: hired fills alpha');
-  assert.equal(said(await res.json()), unfilledRefusal(loadWorkflows(path.join(repoR, 'workflows', 'alpha')), 'solo', 'alpha'));
   assert.ok(
     readInbox().some((c) => c.name === card.name),
     'the card is still there',

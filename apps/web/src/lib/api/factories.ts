@@ -338,12 +338,14 @@ const serverRoute = (name: string, server: string): string => `${serversRoute(na
 /**
  * The MCP servers of the factory `name`, with the state its harness reports of each. **Not polled**: the read spawns a short-lived
  * harness session to ask the states, so it is made when a person opens the page and when they press to read again, never on the
- * board's minute poll — a chip may be a few minutes old, and a press is how it is refreshed.
+ * board's minute poll — a chip may be a few minutes old, and a press is how it is refreshed. Its answer never goes stale, so neither a
+ * mount after the loader's read nor a window's focus reads it again: the settings route's loader reads it once per visit (`OPENED`).
  */
 export const factoryServersQuery = (name: string) =>
   queryOptions({
     queryKey: ['factory-servers', name],
     queryFn: () => get(serversRoute(name), FactoryServersSchema),
+    staleTime: Infinity,
   });
 
 /** What a write of a factory's servers may have done, and what to look at before writing them again. */

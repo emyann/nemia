@@ -3,7 +3,7 @@
  * form to record a remote one. A server is removed from its row.
  *
  * **The state is read on load and on a press, never on the board's poll.** Reading one spawns a short-lived harness session, so the
- * query is unpolled (`factoryServersQuery`) and "Read again" is how a chip is refreshed: a chip may be a few minutes old, and says so.
+ * query is unpolled (`factoryServersQuery`) and "Check again" is how a chip is refreshed: a chip may be a few minutes old, and says so.
  * A state that could not be read is drawn as unread, in rest — an absence read off a failed look is not an absence — never as a
  * server that needs a sign-in.
  *
@@ -244,14 +244,14 @@ export function FactoryServers({ name }: { name: string }) {
         <Plate count={servers.length} title="MCP servers" hue="alive" quiet={servers.length === 0} />
         <span className="ml-auto">
           <CutPress isDisabled={isFetching} onPress={() => void refetch()}>
-            Read again
+            Check again
           </CutPress>
         </span>
       </div>
       <p data-servers-told className="text-body-medium text-muted-foreground">
         Handed to every step of every run started in this factory whose agent names one, before the checkout's{' '}
         <code className="font-mono text-body-small">.mcp.json</code>. A step whose server needs a sign-in is not started until it has one.
-        The state is read when this page opens and when you press Read again, never on the board's poll: reading one starts a short-lived
+        The state is read when this page opens and when you press Check again, never on the board's poll: reading one starts a short-lived
         harness session.
       </p>
       {data ? (

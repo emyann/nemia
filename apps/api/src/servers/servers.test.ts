@@ -110,7 +110,7 @@ test('a server removed leaves the record, and one the factory does not record is
   assert.deepEqual((await answered<FactoryServersRead>(app.request(URL))).servers, []);
 });
 
-test('the shipped folder is the checkout\'s own, beside the skills it ships, and the read answers what it holds', async () => {
+test("the shipped folder is the checkout's own, beside the skills it ships, and the read answers what it holds", async () => {
   assert.ok(SHIPPED_SERVERS.endsWith(path.join('workflows', 'servers')), 'read beside workflows/skills, of the checkout the api runs from');
   assert.equal(path.isAbsolute(SHIPPED_SERVERS), true, 'named whole, so the read does not depend on where the api was started');
   const read = await answered<FactoryServersRead>(app.request(URL));

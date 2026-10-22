@@ -19,9 +19,7 @@ const ROOT = scratch('wf-servers-');
 process.env.WF_ROOT = ROOT;
 const { DEFAULT_FACTORY } = await import('../factory/factory.ts');
 const { factoryServerRefusal, factoryServersRefusal, serverNameRefusal, splitServers } = await import('./servers.ts');
-const { factoryServers, factoryServersFile, readFactoryServers, shippedServers, writeFactoryServers } = await import(
-  './servers.store.ts'
-);
+const { factoryServers, factoryServersFile, readFactoryServers, shippedServers, writeFactoryServers } = await import('./servers.store.ts');
 
 /** The hosted GitHub server as a factory records it: a toolset header, and the facts of an OAuth client with no secret. */
 const GITHUB = {

@@ -5714,11 +5714,7 @@ test('the programs of `nemia round`, `nemia accept`, `nemia retry`, `nemia appro
 
 test('REFUSED as a typed failure: a run not there is a `Missing`, and a state that forbids the verb a `Conflict`, which each program fails with in the words its plain face rejects with', async () => {
   const v = await verbPrograms();
-  const recovered = <A>(
-    e: Engine,
-    program: EffectOf<A, Refusal, EngineService | PlaceService | StoreRoot>,
-    tag: 'Missing' | 'Conflict',
-  ) =>
+  const recovered = <A>(e: Engine, program: EffectOf<A, Refusal, EngineService | PlaceService | StoreRoot>, tag: 'Missing' | 'Conflict') =>
     v.over(
       e,
       program.pipe(

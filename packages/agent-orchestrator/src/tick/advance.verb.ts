@@ -368,16 +368,7 @@ export const advancePass = Effect.fn('advancePass')(
 
     const notes: string[] = [...askNotes, ...handed.collected, ...lacking.notes, ...landing.notes, ...lift.notes, ...closeNotes];
     notes.unshift(...took.notes);
-    const f: Filing = {
-      e: { ...e, file: (spec) => e.file(inParts(spec)) },
-      run,
-      reads,
-      closer,
-      mayFile: mayFileOf(run),
-      notes,
-      home: yield* StoreRoot,
-      heads,
-    };
+    const f: Filing = { e: { ...e, file: (spec) => e.file(inParts(spec)) }, run, reads, closer, mayFile: mayFileOf(run), notes, heads };
     const { tried, rechecked } = yield* fileTries(f, assessed.retry);
     const looped = yield* fileRounds(f, assessed.round);
     const checked = yield* fileChecks(f, [...assessed.check, ...rechecked]);
@@ -457,7 +448,8 @@ const readPass = Effect.fnUntraced(function* (e: Engine, run: Run) {
   const sessionBlocked = harnessBlocked(views);
   const spendOf = spendReader(views);
   const { asks, rounds: roundAsks, notes: askNotes } = runStore.asks.read(run.id);
-  const reads: PassReads = { steps, views, phaseOf, signedOff, asked, verdictOf, sessionBlocked, spendOf, asks, roundAsks };
+  const home = yield* StoreRoot;
+  const reads: PassReads = { steps, views, phaseOf, signedOff, asked, verdictOf, sessionBlocked, spendOf, asks, roundAsks, home };
   return { reads, askNotes };
 });
 

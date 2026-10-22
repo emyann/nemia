@@ -140,7 +140,7 @@ export default {
         'the section says the record is resolved before the checkout',
       );
       await expectVisible(
-        section.locator('[data-servers-told]', { hasText: 'read when this page opens and when you press Read again' }),
+        section.locator('[data-servers-told]', { hasText: 'read when this page opens and when you press Check again' }),
         'and that a state is read on load and on a press, never on the poll',
       );
       await expectRows(section);

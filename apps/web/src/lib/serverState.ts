@@ -35,7 +35,7 @@ export const stateDrawn = (state: string | null): { word: string } & Drawn => {
     hue: 'grey',
     title:
       state === null
-        ? 'Unread: the state could not be read, which is not an absence — press Read again'
+        ? 'Unread: the state could not be read, which is not an absence — press Check again'
         : `The harness says "${state}", which this board does not know: it is shown as read and nothing is concluded from it`,
   };
 };

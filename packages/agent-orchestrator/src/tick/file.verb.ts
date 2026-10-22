@@ -92,6 +92,8 @@ export type PassReads = {
   spendOf: SpendOf;
   asks: RetryAsk[];
   roundAsks: RoundAsk[];
+  /** The store's root, as the pass was given it (`StoreRoot`): where a filing reads the run's factory's MCP server record. */
+  home: string;
 };
 
 /**
@@ -110,17 +112,7 @@ export type Closer = {
  * pass's notes, which each filing adds to in the order it runs, and `heads`, every branch of the run's repository and its commit as the
  * pass read them, undefined where it did not.
  */
-export type Filing = {
-  e: Engine;
-  run: Run;
-  reads: PassReads;
-  closer: Closer;
-  mayFile: () => boolean;
-  notes: string[];
-  /** The store's root, as the pass was given it (`StoreRoot`): what a filing reads the run's factory record under. */
-  home: string;
-  heads?: Heads;
-};
+export type Filing = { e: Engine; run: Run; reads: PassReads; closer: Closer; mayFile: () => boolean; notes: string[]; heads?: Heads };
 
 /** Every branch of a run's repository and its commit, read when first asked, as a pass read them; undefined where it did not. */
 export type Heads = () => Readonly<Record<string, string>> | undefined;
@@ -341,7 +333,7 @@ const trySpec = (
     config: filedConfig(step, f.reads.steps, f.run, {
       model: tryModel(step, record, r),
       budgetUsd: t.budgetUsd,
-      ...filedAt(f.run, f.home),
+      ...filedAt(f.run, f.reads.home),
       own: t.told.own,
       landingDenied: () => t.told.words?.denied ?? [],
     }),
@@ -454,7 +446,7 @@ function roundSpec(
     ...localFields(target, () => ({
       config: filedConfig(target, reads.steps, run, {
         model: sessionModel(target, record),
-        ...filedAt(run, f.home),
+        ...filedAt(run, f.reads.home),
         budgetUsd: budgetUsdFor(
           r.budget !== undefined && r.raise?.includes(r.target) ? r.budget : budgetOf(target, record),
           stepSpend(run, r.target, reads.spendOf),
@@ -533,7 +525,7 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, ready: rea
   const parents = ready.length && starting ? yield* handedOf(e, run, git) : undefined;
   const filed: string[] = [];
   const placed = yield* PlaceService;
-  const servers = yield* serversFiling(run.factory ?? DEFAULT_FACTORY, f.home, ready, f.notes);
+  const servers = yield* serversFiling(run.factory ?? DEFAULT_FACTORY, f.reads.home, ready, f.notes);
   for (const name of ready) {
     if (!f.mayFile()) break;
     const step = stepNamed(f, name);
@@ -624,7 +616,7 @@ function readySpec(
     ...localFields(step, () => ({
       config: filedConfig(step, reads.steps, run, {
         model: step.model,
-        ...filedAt(run, f.home),
+        ...filedAt(run, f.reads.home),
         budgetUsd: budgetUsdFor(budgetOf(step, run.steps[step.name]), stepSpend(run, step.name, reads.spendOf)),
         own: told.own,
         landingDenied: () => said.words?.denied ?? [],

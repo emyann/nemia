@@ -128,7 +128,10 @@ const counting = (asked: Asked) =>
   });
 
 const tick = (memo?: ReturnType<typeof freshRestMemo>) =>
-  runEngine(e, tickRun({ repo: ROOT, ...(memo ? { memo } : {}) }).pipe(Effect.provide(gitPlaceLayer), Effect.provide(storeRootLayer(process.env))));
+  runEngine(
+    e,
+    tickRun({ repo: ROOT, ...(memo ? { memo } : {}) }).pipe(Effect.provide(gitPlaceLayer), Effect.provide(storeRootLayer(process.env))),
+  );
 
 /** Passes until `ok` holds of one, a dozen at most. */
 async function ticked(ok: (pass: Pass) => boolean, what: string): Promise<Pass> {

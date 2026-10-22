@@ -1,15 +1,15 @@
 /**
  * A factory's server signed in to and out of from the board, through the package's programs (`serverSignIn`, `serverSignInState`,
- * `serverSignOut`): the engine holds the sign-in and Claude Code stores what it yields, so the api carries the address to open and a
+ * `serverSignOut`): the engine holds the sign-in and the harness stores what it yields, so the api carries the address to open and a
  * state word, and never a secret or a token.
  *
  * - `POST /api/factories/:factory/servers/:server/sign-in` — a sign-in started: `{ authUrl, until }`, the address the person opens in
- *   their browser and when the sign-in stops waiting. Guarded as every write of the board's is (guard.ts): it writes Claude Code's own
+ *   their browser and when the sign-in stops waiting. Guarded as every write of the board's is (guard.ts): it writes the harness's own
  *   store. 404 for a factory or a server not recorded, 409 while another sign-in waits on the server's callback port, 422 for a server
  *   with no OAuth client.
  * - `GET /api/factories/:factory/servers/:server/sign-in` — the state of its last sign-in, `{ state, until?, why? }`, from the engine's
  *   memory, spawning nothing: what the board polls while the person is in GitHub's tab.
- * - `DELETE /api/factories/:factory/servers/:server/sign-in` — signed out: `{ signedOut: true }`, the sign-in cleared from Claude Code's
+ * - `DELETE /api/factories/:factory/servers/:server/sign-in` — signed out: `{ signedOut: true }`, the sign-in cleared from the harness's
  *   store, so the next read of the servers' states says `needs-auth`. Guarded; 409 while a sign-in to it waits.
  *
  * Not entries of the command table, so no CLI verb: a CLI sign-in would wait on a browser in its own process, and none is asked for.
@@ -36,7 +36,7 @@ const guardOf = (route: string, does: string, forAnother: string): Guarded => ({
   route,
   does,
   forAnother,
-  why: "it writes Claude Code's own store, where a factory's sessions find what a server signs in with",
+  why: "it writes the harness's own store, where a factory's sessions find what a server signs in with",
   reach: "sign in on the factory's settings page on the board",
   instead: "Sign in on the factory's settings page on the board",
   shape: '`{}`',

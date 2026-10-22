@@ -33,7 +33,7 @@ const kindOf = (e: { readonly message: string; readonly held: boolean }) =>
 
 /**
  * A sign-in to `server` of `factory` started: the address the person opens, and when it stops waiting. A server of a client Nemia
- * ships is handed that client's secret, which the engine stores in Claude Code's own store first; any other is handed none.
+ * ships is handed that client's secret, which the engine stores in the harness's own store first; any other is handed none.
  */
 export const serverSignIn = Effect.fn('serverSignIn')(function* (factory: string, server: string, home: string) {
   const found = yield* recorded(factory, server, home, 'signed in to');

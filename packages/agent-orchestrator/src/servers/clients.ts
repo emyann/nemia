@@ -1,6 +1,6 @@
 /**
  * The client secrets of the OAuth apps Nemia ships, keyed by client id: a sign-in to a server whose `oauth.clientId` is one of them is
- * handed its secret, which the runtime stores in Claude Code's own store (`mcpSignIn`); a server of any other client is handed none.
+ * handed its secret, which the runtime stores in the harness's own store (`mcpSignIn`); a server of any other client is handed none.
  *
  * A secret in a public repository, on purpose, as gh ships its own (cli/cli `internal/authflow/flow.go`: "This value is safe to be
  * embedded in version control"). GitHub sends an app's code only to the callback the app registered, `http://localhost:8791/callback`,

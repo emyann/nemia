@@ -44,7 +44,10 @@ test("Nemia's own client is shipped with a secret, and a client Nemia does not s
 
 test('a sign-in to the shipped server hands the engine its secret; the same server under a foreign client hands none', async () => {
   const engine = testEngine();
-  writeFactoryServers(ROOT, DEFAULT_FACTORY, { github: GITHUB, other: { ...GITHUB, oauth: { clientId: 'Iv23liForeign', callbackPort: 8792 } } });
+  writeFactoryServers(ROOT, DEFAULT_FACTORY, {
+    github: GITHUB,
+    other: { ...GITHUB, oauth: { clientId: 'Iv23liForeign', callbackPort: 8792 } },
+  });
   const started = await runWith(engineOf(engine.layer), serverSignIn(DEFAULT_FACTORY, 'github', ROOT));
   assert.match(started.authUrl, /client_id=Iv23liQBfm9prqhvXkuY/);
   await runWith(engineOf(engine.layer), serverSignIn(DEFAULT_FACTORY, 'other', ROOT));

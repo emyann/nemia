@@ -13,14 +13,7 @@
  */
 import { afterEach, beforeEach } from 'node:test';
 import { Effect, Layer } from 'effect';
-import {
-  engineOf,
-  runWith as runEngine,
-  storeRootLayer,
-  type EngineService,
-  type PlaceService,
-  type StoreRoot,
-} from 'agent-orchestrator';
+import { engineOf, runWith as runEngine, storeRootLayer, type EngineService, type PlaceService, type StoreRoot } from 'agent-orchestrator';
 import type { TestEngine } from 'agent-runtime/testing';
 import type { TestPlace } from 'agent-orchestrator/testing';
 import { appOf, liveOf } from '../src/app.ts';

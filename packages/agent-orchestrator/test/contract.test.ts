@@ -104,7 +104,8 @@ test('code outside packages/agent-orchestrator reaches it through agent-orchestr
 test('REFUSED: a subpath not in its exports, a relative path, import.meta.resolve, and a path built into src — each route', () => {
   const at = 'apps/api/test/x.test.ts';
   const refused = (text: string) => breaches(at, text, GUARDED);
-  const instead = 'reach it through agent-orchestrator or agent-orchestrator/run or agent-orchestrator/workflow or agent-orchestrator/testing';
+  const instead =
+    'reach it through agent-orchestrator or agent-orchestrator/run or agent-orchestrator/workflow or agent-orchestrator/testing';
   const subpath = "const { foldFeed } = await import('agent-orchestrator/feed');";
   const effectFace =
     "import { Missing } from 'agent-orchestrator/effect';\nimport { Invalid } from 'agent-orchestrator/src/refusal/refusal.ts';";
@@ -184,7 +185,11 @@ test('REFUSED: a file of a src or a bin that imports the testing entry; a test f
   const line = "import { testPlace } from 'agent-orchestrator/testing';";
   for (const file of ['apps/api/src/store.ts', 'packages/agent-orchestrator/src/runner.ts', 'packages/agent-orchestrator/bin/nemia.ts'])
     assert.equal(testingBreaches(file, line).length, 1, `refused: ${file}`);
-  assert.equal(testingBreaches('apps/api/src/app.ts', "const t = await import('agent-orchestrator/testing');").length, 1, 'a dynamic import');
+  assert.equal(
+    testingBreaches('apps/api/src/app.ts', "const t = await import('agent-orchestrator/testing');").length,
+    1,
+    'a dynamic import',
+  );
   for (const file of ['apps/api/test/placed.ts', 'apps/api/src/asks/say.test.ts', 'packages/agent-orchestrator/test/x.test.ts'])
     assert.deepEqual(testingBreaches(file, line), [], `not refused: ${file}`);
   assert.deepEqual(testingBreaches('apps/api/src/store.ts', "import { engineOf } from 'agent-orchestrator';"), [], 'the root entry');

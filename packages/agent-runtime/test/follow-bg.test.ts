@@ -1,6 +1,6 @@
 /**
- * A background Claude Code session followed live (`bgFollowOf`), at a pace shorter than shipped — a fake `claude` on `PATH` whose `agents` prints
- * the rows a test writes, and transcripts where Claude Code writes them, grown by hand as a session would.
+ * A background Claude Code session followed live (`bgFollowOf`), at a pace shorter than shipped — a fake `claude` on `PATH` whose
+ * `agents` prints the rows a test writes, and transcripts where Claude Code writes them, grown by hand as a session would.
  *
  * - Each line appended to the transcript is said once, in order, as whole events, each byte of it read once from where the last read
  *   stopped, and with the cursor a read of the transcript gives there.

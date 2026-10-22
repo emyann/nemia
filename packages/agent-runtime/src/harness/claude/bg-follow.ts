@@ -1,7 +1,7 @@
 /**
  * A background Claude Code session followed live (`RunnerOps.follow`), at message level: its transcript read from a byte offset as it
- * grows, each whole line once, and its state from `claude agents`, read at most once a pace (`FOLLOW_PACE_MS`, a second shipped) however many
- * sessions are followed (`sharedListing`).
+ * grows, each whole line once, and its state from `claude agents`, read at most once a pace (`FOLLOW_PACE_MS`, a second shipped)
+ * however many sessions are followed (`sharedListing`).
  */
 import { Effect, Exit, Queue, Stream } from 'effect';
 import fs from 'node:fs';
@@ -25,7 +25,8 @@ const failure = (message: string) => new RunnerError({ verb: 'follow', message: 
 /**
  * The rows of ours `read` lists (`registryOf`), read once however many ask at a time, and kept `ttlMs` after a read that decoded:
  * every follower of one runner shares one `claude agents` per `ttlMs`, a second shipped (`FOLLOW_PACE_MS`). A read that failed, or a
- * listing that does not decode, is kept by none: the next ask reads again. Fails with the read's error, or a `RunnerError` of the verb `follow` naming what does not decode.
+ * listing that does not decode, is kept by none: the next ask reads again. Fails with the read's error, or a `RunnerError` of the
+ * verb `follow` naming what does not decode.
  */
 export const sharedListing = (
   read: Effect.Effect<string, RunnerError>,

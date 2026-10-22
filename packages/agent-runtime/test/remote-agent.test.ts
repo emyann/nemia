@@ -1,10 +1,10 @@
 /**
  * A remote A2A agent as a harness, end to end, at shipped defaults but where a test shortens a bound at its seam: `builtEngine`
  * with a harness that is a URL, against the SDK's own server over HTTP (`remote-server.ts`), on each binding the runtime speaks,
- * in each order a card can list them. What is proven is what crosses the wire, counted by the server itself: a spawn is one SendMessage and never two,
- * a pass one GetTask per open task and none once they settle, a stop one CancelTask. And what a refusal refuses: a card
- * whose auth cannot be met, or whose bindings are not spoken, ends the attempt `unstartable` with nothing sent; an address
- * that cannot be reached, or carries a secret, is refused when the engine is made. The secret itself is on no file the
+ * in each order a card can list them. What is proven is what crosses the wire, counted by the server itself: a spawn is one
+ * SendMessage and never two, a pass one GetTask per open task and none once they settle, a stop one CancelTask. And what a refusal
+ * refuses: a card whose auth cannot be met, or whose bindings are not spoken, ends the attempt `unstartable` with nothing sent; an
+ * address that cannot be reached, or carries a secret, is refused when the engine is made. The secret itself is on no file the
  * runtime writes, which is read byte for byte.
  */
 import { afterEach, test, type TestContext } from 'node:test';

@@ -81,7 +81,7 @@ test(
         { everyMs: 5_000 },
       );
 
-      const attempt = (view as TaskView | undefined)?.state.attempts.at(-1);
+      const attempt = view?.state.attempts.at(-1);
       assert.ok(attempt, `the job ran an attempt: ${view?.phase}`);
       const name = nameFor(id, attempt.n);
       const line = initLine(root, name);

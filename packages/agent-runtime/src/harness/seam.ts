@@ -75,11 +75,16 @@ export type LocalMcpServer = { type?: 'stdio'; command: string; args?: string[];
 /**
  * A server the harness connects to, as a `.mcp.json` entry gives it, with the facts of an OAuth client where one signs in.
  *
- * `oauth` is **not declared** on the SDK's type for an HTTP server (`sdk.d.ts:1205-1220`): it was measured working at SDK 0.3.270 — a
- * server handed inline with it reported `needs-auth`, signed in, and a second session with the same config found the sign-in — and
- * it rides the untyped seam, so an SDK that renames or validates it breaks the sign-in with nothing failing the typecheck. It carries
- * no secret: Claude Code reads the client secret from its own store alone, and `oauth` sits outside the sign-in key's hash
- * (`name|sha256({type,url,headers})[:16]`), which is why changing it asks for no new sign-in.
+ * `oauth` is **still not declared** on the SDK's type for an HTTP server (`sdk.d.ts:1205-1220`), so it rides the untyped seam and
+ * no typecheck of ours reads it. It is **validated and kept** by the SDK all the same, measured on 0.3.308
+ * (`docs/harness.md`, *The MCP sign-in affordances*): a server handed inline with it comes back from `mcpServerStatus()` with its own
+ * `oauth` echoed on `config`, and the SDK's undeclared authenticate method answers an authorize URL built from that `clientId` and
+ * `callbackPort`. The
+ * SDK's own schema for an http or sse server declares `oauth` as `{ clientId?, callbackPort?, authServerMetadataUrl?, scopes?, xaa? }`
+ * (read off `sdk.mjs`), so the two keys we set are known to it — which is why they are neither stripped nor refused, and why a value
+ * of the wrong shape is now refused rather than ignored. It carries no secret: Claude Code reads the client secret from its own store
+ * alone, and `oauth` sits outside the sign-in key's hash (`name|sha256({type,url,headers})[:16]`), which is why changing it asks for
+ * no new sign-in. Look for it in `sdk.d.ts` on each SDK bump, and say here when it is declared.
  */
 export type RemoteMcpServer = {
   type: 'http' | 'sse';

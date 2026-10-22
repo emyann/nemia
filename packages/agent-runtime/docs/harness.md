@@ -98,3 +98,61 @@ the orchestrator's code holds a fact today, it is named beside it.
 - **The Agent SDK takes `NODE_OPTIONS` out of the environment it gives Claude Code**, so an `--import` load hook that makes a race in
   the stand-in happen on demand (`test/fixtures/stand-in-claude.ts`) reaches it only by patching `child_process.spawn` in the test's own
   process — through `createRequire`, before an ESM import binds the name — to put `NODE_OPTIONS` back on the stand-in's spawn.
+- **A session asking for the model alias `opus` starts on what its own Claude Code resolves it to, which moves with the version**
+  (SDK 0.3.308, Claude Code 2.1.308, 2026-10-22, `test/live-sdk.boundary.test.ts`): `claude-opus-5-5`, where the SDK the factory ran
+  before — 0.3.270, bundling 2.1.270 — resolved it to `claude-opus-5`, so for 140 step sessions the team asked for one model and got
+  another with nothing failing. The alias is resolved inside Claude Code and said once, on the session's
+  `{"type":"system","subtype":"init",…}` line, which the runtime now reads and carries onto the attempt as `ranOn`
+  (`harness/detached/output.ts`, `core/domain.ts`): which model a session ran on is a fact of the record, not a grep of a kept stdout.
+  `test/sdk-pin.ts`'s `OPUS_TODAY` is what was measured, and an alias can move under a version that did not, so it is measured again
+  at each bump and never carried.
+- **The SDK joins most of the flags it builds for Claude Code as `--flag=value`, and a few as two arguments** (0.3.308, read off
+  `sdk.mjs`, 2026-10-22; the change landed in 0.3.295): joined for the mode, the prompts, the tool lists, the setting sources,
+  `--add-dir`, `--plugin-dir`, `--resume`, `--model`, `--effort`; two arguments for `--mcp-config`, `--managed-settings` and every
+  `extraArgs` key, `--settings` among them — those it joins only where the value itself opens with a dash — beside the four it opens
+  with (`--output-format stream-json --verbose --input-format stream-json`). A test that read such a value as
+  `argv[argv.indexOf(flag) + 1]` answered `argv[0]` without failing, since `indexOf` gives -1; both packages that read an SDK-written
+  argv now read it through a `sdkArgValue` that takes either form and refuses an absent flag (`test/sdk-argv.ts`).
+- **Fork subagents are on by default in an SDK session from 0.3.302, as in the terminal**, so a step's `Agent` call forks the parent's
+  context rather than starting fresh, and costs tokens the run's budgets were measured without. The factory keeps the SDK's default, by
+  the operator's decision at this bump; `CLAUDE_CODE_FORK_SUBAGENT=0` in `CLAUDE_JOB_ENV` (`harness/claude/code.ts`) turns it off, and
+  no test here watches it — the first evidence is the spend after the daemon restarts.
+
+## The MCP sign-in affordances
+
+What the five things the factory's MCP sign-in rests on do, measured on **SDK 0.3.308 / Claude Code 2.1.308, 2026-10-22**, by a
+throwaway probe: one `query()` with a held input, `settingSources: []`, a throwaway `CLAUDE_CONFIG_DIR`, and one inline http server —
+`{ type: 'http', url: 'https://api.githubcopilot.com/mcp/', oauth: { clientId, callbackPort: 8791 } }` — with the Nemia Factory App's
+own (public) client id. It stopped at the authorize URL: no browser, no token exchange, no sign-in, no secret. It supersedes nothing in
+`izq1-measurement.md`, which measured the same five on 0.3.270; what moved is said beside each.
+
+| affordance | declared in `sdk.d.ts`? | there? | what it answered |
+| --- | --- | --- | --- |
+| `Query.mcpServerStatus()` | **yes**, `sdk.d.ts:3078` | yes | one row for the inline server, `status: 'pending'` at the first call |
+| `Query.mcpAuthenticate(name, redirectUri)` | no | yes | `{ authUrl, requiresUserAction: true, callbackExpected: true, redirectScheme: 'localhost', state, callbackPort: 8791 }` |
+| `Query.mcpSubmitOAuthCallbackUrl(name, url)` | no | yes | refuses a URL with no code or a mismatched state, in a sentence that says to submit the redirect URL from the sign-in's own page |
+| `Query.mcpClearAuth(name)` | no | yes | resolves with `{}`, and the sign-in in flight stays in flight |
+| the inline http server's `oauth: { clientId, callbackPort }` | **no**, `sdk.d.ts:1205-1220` declares `type`, `url`, `headers`, `tools`, `timeout`, `alwaysLoad` and no `oauth` | yes, and **validated** | echoed back whole on `McpServerStatus.config.oauth`, and the authorize URL is built from it |
+
+What moved from 0.3.270, for the card that designs the GitHub sign-in on this:
+
+- **`oauth` is no longer only tolerated: the SDK's own schema declares it**, on an http and on an sse server, as
+  `{ clientId?, callbackPort?, authServerMetadataUrl?, scopes?, xaa? }` (read off `sdk.mjs`). So 0.3.299's and 0.3.301's validation of
+  the server map neither strips nor refuses the two keys the runtime sets — the risk the bump was most likely to realise did not
+  happen — and a value of the wrong shape (a `callbackPort` that is not a positive integer, an `authServerMetadataUrl` that is not
+  https) is now refused rather than ignored. It is still absent from `sdk.d.ts`, so it still rides the untyped seam
+  (`harness/seam.ts`'s `RemoteMcpServer`).
+- **`McpServerStatus` carries `config`, `scope`, `source` and `tools` beside the five status words.** `config` is how the `oauth`
+  above was seen from outside; `source` is where the definition came from — `dynamic` for a server handed inline — and the SDK's own
+  note says to key trust on it rather than on the name. The five words are what they were: `connected`, `failed`, `needs-auth`,
+  `pending`, `disabled`, which `MCP_STATES` (`harness/mcp-state.ts`) carries unchanged. Nothing here reads `config`, `scope` or
+  `source`, and the sign-in card is what `config` is worth reading for.
+- **The first `mcpServerStatus()` of a session can answer `pending`,** where the 0.3.270 measurement saw `needs-auth` at once. MCP
+  startup is non-blocking, so a caller that needs a settled word must ask again rather than read the first answer as final — which
+  `mcpServersRead` already does under `MCP_STATE_MS`, and which the sign-in card's own flow must do too.
+- The three undeclared methods carry the same control-request subtypes as before (`mcp_authenticate`, `mcp_oauth_callback_url`,
+  `mcp_clear_auth`), and `mcpAuthenticate`'s answer has the same six keys. The authorize URL still carries PKCE S256 and the scopes
+  GitHub's MCP server asks for.
+- **Unmeasured, as on 0.3.270 and deliberately:** the token exchange, which needs the owner's client secret in Claude Code's own
+  store, and so whether a sign-in completes and a second session finds it. `izq1-measurement.md` measured both on 0.3.270; neither was
+  re-run here, so the GitHub sign-in card either carries those two or measures them itself.

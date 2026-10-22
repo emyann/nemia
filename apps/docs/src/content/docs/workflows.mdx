@@ -101,9 +101,12 @@ A gate can also be asked for when a run is started (`--gate <step>`), or on a ca
 ## The landing
 
 The end of a run is a step too, its workflow's last: in a workflow that ships to a branch, that step stages the merge. It runs in the
-repository's own checkout (`workspace: main`), has a gate, and has a check.
+repository's own checkout (`workspace: main`), has a check, and either has a gate or waits on a step that can send the work back — a
+review, whose `loop:` closes on the work.
 
-1. A person approves the gate.
+1. A person approves the gate — or, where the ending has none, the review before it passes, and the run files the step itself. A
+   workflow that gives its ending a check and neither is refused when the folder is loaded: its check would commit onto the base branch
+   on nobody's word.
 2. The step's agent stages the merge of the run's branch onto the base, without committing it, and signs off with the commit message.
 3. The run executes the check on the merged tree. On exit 0 it commits the merge; on any other exit it aborts it
    (`landEnding` in `packages/agent-orchestrator/src/ending/ending.verb.ts`, on `landingDue`).

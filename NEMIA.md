@@ -33,7 +33,14 @@ to the person as a card to start, fold into another or drop, with what its stats
 
 - `build`'s design step's gate (Seldon's spec) is the person's when the spec changes the model, a layer's contract or anything of
   taste: a name, a shipped instruction, the board's look. Bring it with the spec's `why` and its placement findings quoted.
-- The landing step's gate (Otto) is approved only once the run's own pull request is green and mergeable on GitHub: open it — its
+- **A `quick` run's landing has no gate, and waits on nobody**: its review's pass files land on the next tick, and `nemia approve <run>
+  land` is refused there ("land has no gate … there is nothing to approve"). There is nothing to bring the person about it. What is
+  still theirs on such a run: a check that refused, a review that asked twice and is `exhausted` (`nemia round <run> review`, or
+  `nemia accept <run> review`), and a landing that refused — which goes back to implement, `nemia retry <run> implement --message
+  "<what failed>"`. A person who wants to read a quick change before it lands says so at the start: `nemia start … --gate land`, or
+  `gate: land` on the card, and then everything below holds for it as for a build run.
+- The landing step's gate (Otto, on `build` and on a quick run gated at it) is approved only once the run's own pull request is green
+  and mergeable on GitHub: open it — its
   address is on the implement closeout as an artifact — and read that the `ci` context passed on the head the review read. `nemia
   decide <run>` reads the trial merge live too (`merges`), with each run in flight on `main` its branch collides with and in which
   files (`others`, `collides`), and a clean merge whose landing check refused the merged tree (`semantic`). Say what both read. When it
@@ -75,5 +82,6 @@ a run that passes it is the person's to continue.
 ## Never
 
 - Push, open a pull request or merge into `main` by hand: a run opens its pull request through `workflows/build/pull-request.ts` and
-  merges it through `workflows/build/landing.ts`, at its ending step, after the person approves it.
+  merges it through `workflows/build/landing.ts`, at its ending step — after the person approves it, or, on `quick`, once its review
+  passes.
 - Stop a process by its name: a run is cancelled with `nemia cancel`, held with `nemia hold`.

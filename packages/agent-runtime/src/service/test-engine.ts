@@ -9,8 +9,8 @@
  * `plantMcpState(name, state)` plants the state a server reads as, `failMcpState(why)` makes the next read a look that failed, and
  * `mcpReads` counts the reads asked, which is how a test proves a pass read a record's states once rather than once per task.
  *
- * It keeps `file`, `view`, `list`, `stop`, `logs`, `feed`, `output`, `say`, `interrupt`, `transcript`, `forget`, `kept` and
- * `mcpState`, each
+ * It keeps `file`, `view`, `list`, `stop`, `logs`, `feed`, `output`, `say`, `interrupt`, `transcript`, `forget`, `kept`,
+ * `mcpState` and `io`, each
  * answering what the real engine answers over a harness that costs nothing: `test/engine-walks.ts` holds the walks both run, and `APART`
  * there what this one cannot say. Every other verb dies naming itself. Reached from another package through `agent-runtime/testing`
  * alone, and by no file of a `src`.
@@ -441,6 +441,7 @@ const sayAskedOf =
   (taskId: string, text: string) =>
     Effect.gen(function* () {
       const refuse = (message: string) => Effect.fail(new SayRefused({ message }));
+      if (typeof text !== 'string' || !text.trim()) return yield* refuse('`text` is empty. Give the words the session should hear.');
       const t = tasks.get(taskId);
       if (!t) return yield* refuse(unknown(taskId));
       if (settledIn(taskId)) return yield* refuse(`\`${taskId}\` has settled (${t.phase}): no session of it is running to hear anything.`);

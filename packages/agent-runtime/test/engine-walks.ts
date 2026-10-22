@@ -431,6 +431,16 @@ const SAY: readonly Walk[] = [
     },
     says: [{ at: '<time>', attempt: 1, text: 'hello', after: null }, [{ at: '<time>', attempt: 1, text: 'hello', after: null }]],
   },
+  {
+    name: 'empty words, or whitespace alone, are refused before the task is looked for, and none is kept',
+    walk: async ({ engine, settle }) => {
+      await asked(engine.file(task('a')));
+      await settle('a', 'running (working)');
+      const refused = [await asked(engine.say('nope', '')), await asked(engine.say('a', '')), await asked(engine.say('a', ' \n\t'))];
+      return [...refused, (await Effect.runPromise(engine.view('a'))).state.said];
+    },
+    says: [{ refused: 'SayRefused' }, { refused: 'SayRefused' }, { refused: 'SayRefused' }, []],
+  },
 ];
 
 const INTERRUPT: readonly Walk[] = [

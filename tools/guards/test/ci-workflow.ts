@@ -63,6 +63,7 @@ export type Step = {
   with?: Record<string, unknown>;
   run?: string;
   env?: Record<string, string>;
+  'timeout-minutes'?: unknown;
 };
 
 export type Job = {
@@ -71,6 +72,7 @@ export type Job = {
   needs?: string[];
   strategy?: { 'fail-fast'?: boolean; matrix?: Record<string, unknown[]> };
   steps?: Step[];
+  'timeout-minutes'?: unknown;
 };
 
 export type Workflow = {

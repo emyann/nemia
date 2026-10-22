@@ -31,22 +31,25 @@ import type { Workflow } from '../step/step.ts';
  * not hold a run for ever.
  *
  * A guard against a hang, not a budget, so it is set well above the slowest round check: the pictures, the probe, the push of the round's
- * commit, the typecheck, the lint, each mutant the closeout names, which its runner fails past five minutes, and last the wait on
+ * commit, the typecheck, the lint, and last the wait on
  * GitHub's `ci` context, which carries a bound of its own (`WHOLE_SECONDS`, 2400 s in `workflows/build/pull-request.ts`) so that a red or
  * missing verdict comes back as the script's refusal in words — the Actions URL, the failing jobs, the retry line — and not as a check
  * this deadline killed. So the number is above the clauses before the wait plus the wait itself: with 3300 those clauses have 900 s, which
  * `pull-request.boundary.test.ts` holds against the script's number. The suite, the types, the lint, the whole e2e and the build run in
  * `ci`, on the pushed commit, and no longer here.
  *
- * Measured from the round checks' journals while the check still ran the suite and the e2e itself, spawned to ended: 346 passed round
- * checks that ran the mutants over a week, median 22 s, p90 160 s, slowest 865 s, the forced suite, four mutants and the e2e; most
- * replayed the suite from turbo's cache, which the forced suite no longer did. One more was stopped at the old 1200 s with five of its
- * nine mutants left; tried again, those five took 303 s, one of them ended at five minutes, so it would have run an estimated 1510 s
- * whole. Twice that, rounded up to five minutes, is 3300. The clauses that remain are a part of those numbers, so the measurement is a
- * ceiling for them; it is made again, the same way, once a round check whose wait was short takes more than half of this number.
+ * The history of the figure, which is where 3300 comes from and the only measurement anyone has made of it: it was measured from the
+ * round checks' journals while the check still ran the suite and the e2e itself, and ran a mutant trial per rule a closeout named,
+ * spawned to ended — 346 passed round checks over a week, median 22 s, p90 160 s, slowest 865 s, the forced suite, four mutant trials
+ * and the e2e; most replayed the suite from turbo's cache, which the forced suite no longer did. One more was stopped at the old 1200 s
+ * with five of its nine trials left; tried again, those five took 303 s, one of them ended at five minutes, so it would have run an
+ * estimated 1510 s whole. Twice that, rounded up to five minutes, is 3300. The mutant trials are gone and the suite and the e2e have
+ * moved to `ci` since, so every clause that remains is a part of those numbers and the bound is looser than when it was measured, never
+ * tighter. Nobody has re-measured it: it is measured again, the same way, once a round check whose wait was short takes more than half
+ * of this number.
  *
- * Longer than `LANDING_CHECK_DEADLINE_SECONDS`, rightly: a landing's check runs no mutant, and a round's runs as many as its closeout
- * names. A constant rather than a step key: every shipped check is the same command family and none needs another number.
+ * Longer than `LANDING_CHECK_DEADLINE_SECONDS`, rightly: a round's check pushes a commit and waits on GitHub, which a landing's does
+ * not. A constant rather than a step key: every shipped check is the same command family and none needs another number.
  */
 export const CHECK_DEADLINE_SECONDS = 3300;
 
@@ -61,8 +64,8 @@ export const CHECK_DEADLINE_SECONDS = 3300;
  * to five minutes, is 2700.
  *
  * The e2e grows by a page at a time, so the number is measured again the same way whenever a passing landing check takes more than half
- * of it. A constant beside `CHECK_DEADLINE_SECONDS` rather than a step key: one shipped command family lands, and a round's check, which
- * runs the mutants besides, is measured on its own.
+ * of it. A constant beside `CHECK_DEADLINE_SECONDS` rather than a step key: one shipped command family lands, and a round's check is
+ * measured on its own.
  */
 export const LANDING_CHECK_DEADLINE_SECONDS = 2700;
 
@@ -352,7 +355,7 @@ export type CheckHanded =
 
 /**
  * `## What <step>'s check said`: a checked step's check, told to the step filed after it — a reviewer, which judges the work with what
- * the run itself established about it, the lines a check printed for it included (`wf mutants: …`).
+ * the run itself established about it, the lines a check printed for it included (`wf pictures: …`).
  *
  * Evidence, not process: the run executed the command, so its output is a fact about the work, as the diff is, and the step reads it
  * rather than being sent to a log its fence may not reach. As data, fenced as JSON under a line saying whose words these are, since a

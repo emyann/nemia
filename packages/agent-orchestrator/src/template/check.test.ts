@@ -92,7 +92,7 @@ const OTHER_FILES = [
   'skills/change-the-board/SKILL.md',
   'skills/grilling/SKILL.md',
   'skills/implement-a-change/SKILL.md',
-  'skills/implement-a-change/scripts/mutants.ts',
+  'skills/implement-a-change/scripts/coverage.ts',
   'skills/land-a-branch/SKILL.md',
   'skills/review-a-change/SKILL.md',
   'skills/write-a-spec/SKILL.md',
@@ -171,7 +171,7 @@ test("RULES.md at the root is a file of the layout, the factory's rules; another
 
 test("a workflow's README and its files that are no .md or .yaml are carried, and a .md that names no step is refused", () => {
   assert.deepEqual(
-    refusalsOf(undefined, (others) => [...others, 'workflows/build/README.md', 'workflows/build/mutants.ts']),
+    refusalsOf(undefined, (others) => [...others, 'workflows/build/README.md', 'workflows/build/coverage.ts']),
     [],
   );
   assertRefused(
@@ -333,7 +333,7 @@ test("a step's place, workspace, reads and tally are today's words", () => {
   const workflow = 'workflows/build/workflow.yaml';
   const step = (edit: (s: any) => void) => refusalsOf((d) => edit(d[workflow].spec.steps[0]));
   assert.deepEqual(
-    step((s) => Object.assign(s, { reads: ['costs'], tally: ['findings', 'findings.kind=placement', 'mutants.proves'] })),
+    step((s) => Object.assign(s, { reads: ['costs'], tally: ['findings', 'findings.kind=placement', 'findings.fixed'] })),
     [],
   );
   assertRefused(

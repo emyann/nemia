@@ -1051,7 +1051,7 @@ Review the change in this workspace as a second engineer would, and look at it a
   closeouts: a field of its `output:` schema that is an array (its items are counted), an integer or a
   number (its value is summed), an array's field and a boolean of its items (the items where it is
   `true`), or an array's field, a string of its items and a value (the items whose string is exactly
-  that value): `tally: findings, findings.kind=placement, mutants.proves`. Refused at load and at
+  that value): `tally: findings, findings.kind=placement`. Refused at load and at
   `wf start`, naming the step's file, the schema and the entry: a `tally:` on a step with no `output:`
   (its own or its agent's) or on a remote agent, a field the schema does not declare or declares as
   another type, a flag that is no boolean of the items of an array, a key that is no string of them, a
@@ -1426,8 +1426,8 @@ nothing that waits on the step ever runs. A step with no `check:` has nothing ru
   and a space, at the start of the line — whole, from the stdout the runtime kept and not only the tail
   (`reportedLines`, at most `REPORTED_LINES`). A check whose stdout the runtime did not keep — filed before it kept
   streams — has those lines read from the end of the log alone, and the section says so, with
-  `"partial": true`: a line absent from it proves nothing. That is how a check marks what the next step must read: `workflows/build`'s mutants
-  print `wf mutants: …`, and a reviewer whose fence reaches no log judges them from its brief. The step reads
+  `"partial": true`: a line absent from it proves nothing. That is how a check marks what the next step must read: `workflows/build`'s pictures
+  print `wf pictures: …`, and a reviewer whose fence reaches no log reads them in its brief. The step reads
   the check of the try or round it follows, read on the pass that files it.
 
 The line is the workflow author's, for their repository. `check: npm test && npm run typecheck` is the check a
@@ -2048,7 +2048,7 @@ dropped. **Nothing in the packages knows what shipping means.**
   `git diff --stat` — never git's `Merge branch '…'`. Its brief says so under *The run checks and lands your merge*
   (`landingContract`), which is shape-neutral: the packages know nothing of what shipping means, so the recipe is the
   step's own note and the staging command its place's (`landingWords`). The tick then files the step's check as it files any — the `check` harness in the checkout,
-  `LANDING_CHECK_DEADLINE_SECONDS` (measured on its own: the whole suite and the e2e on the merged tree where a factory runs them there, and no mutant), `nice`d, its streams kept as a check's are, no `WF_BASE_REF`: mid-merge,
+  `LANDING_CHECK_DEADLINE_SECONDS` (measured on its own: the whole suite and the e2e on the merged tree where a factory runs them there), `nice`d, its streams kept as a check's are, no `WF_BASE_REF`: mid-merge,
   `HEAD...MERGE_HEAD` is what the merge brings — and, on the pass that reads the check settled (`landingDue`, pure;
   `landEnding` in `ending/ending.verb.ts` acts through the place's `land`), commits the merge with the message on exit 0 or
   aborts it on anything else: a refusal, a check that did not finish, a message left blank, a merge that

@@ -61,8 +61,6 @@ const SIGNED = {
   needs: null,
   plan: 'Remove the rule beside each plate in Section; the runs page proves it.',
   pages: ['runs'],
-  mutants: [],
-  noMutants: 'a removal adds no rule',
   replies: [],
 };
 

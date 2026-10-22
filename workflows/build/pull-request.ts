@@ -1,7 +1,7 @@
 /**
  * `node pull-request.ts <verb>` — the one door through which a run's change reaches GitHub: the push of this run's own branch, and the
  * pull request CI judges. A Bash prefix rule cannot tell `git push origin wf/…` from `git push origin main`, and no agent may type
- * either, so the act is this script, read from the run's base as `pictures.ts` and `mutants.ts` are, and `gh` is denied whole to the
+ * either, so the act is this script, read from the run's base as `pictures.ts` and `probe.ts` are, and `gh` is denied whole to the
  * agents that run it.
  *
  * - `open --title <t> --body-file <f>`, which the engineer types once a round after merging the base: it pushes her branch to `origin`

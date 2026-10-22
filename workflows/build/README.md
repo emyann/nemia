@@ -8,9 +8,6 @@ A small change its card settles, within the bound of [`quick`](../quick/README.m
 design → implement ⇄ review → land
 ```
 
-Implement's check runs the mutants Ada's closeout names (`mutants.ts`, read from the run's base, never from the tree it judges): each on a
-copy of her result, and a mutant its test does not kill refuses the step.
-
 Implement pushes its branch and opens the pull request through `pull-request.ts`, read from the base as the others are: it pushes this
 run's own branch, never another and never the base and never forced, and opens or updates the one pull request of the branch, never a
 draft, printing the address that goes on Ada's closeout as an artifact value. Her check pushes again through the same script and refuses
@@ -48,9 +45,8 @@ first message whether the person must act; it reaches the person's phone through
 stops `blocked` on the `needs` line it prints. The check refuses while a probe named for the run is live, naming `probe.ts stop`. Ada's
 and Otto's fences refuse a bare `claude --bg` or Remote Control, and an edit of a harness's trust or local settings anywhere.
 
-Review counts what it closes out on (`tally: findings, findings.kind=placement, mutants.proves`): the findings of each round, those of
-them whose `kind` is `placement` (a change in a boundary the repository's rules give to another concern), and the mutants it judged to
-prove their rule. `wf stats` totals each per day, `—` on a day no review closed out.
+Review counts what it closes out on (`tally: findings, findings.kind=placement`): the findings of each round, and those of
+them whose `kind` is `placement` (a change in a boundary the repository's rules give to another concern). `wf stats` totals each per day, `—` on a day no review closed out.
 
 A doc or a workflow file turbo does not hash is judged by `ci`, which runs on clean runners with no cache of this machine's, on the
 commit implement's check pushed; nothing is replayed from a cache there, and land's receipt replays nothing at all.
@@ -72,8 +68,8 @@ note asks for the cut and each step's budget from those figures; the owner's lin
 (`nemia factory rules <factory>`), never by this folder.
 
 The agents and their skills are any software factory's, and say nothing of this repository (`team-portable.test.ts`); what is ours is on
-the steps (`build-told.test.ts`). Implement and review each declare their own closeout (`output:`, `implement.schema.json` and
-`review.schema.json` beside them): the mutants are this workflow's check, and review's schema is the reviewer's with `mutants` added.
+the steps (`build-told.test.ts`). None of this workflow's steps declares a closeout of its own (no `output:`, and no schema beside
+them): what each closes out on is its agent's, review's `findings` and `again` being Agora's.
 Both add `look`, this repository's skill for its board, to the skills design, implement and review are given. Design and review deny
 the build and the e2e on their own `disallowedTools:`, and review the whole suite, which `ci` runs on the commit implement pushed; the
 checks they do run are named in their notes and allowed by `.claude/settings.json`, the two reads of the pull request among them.

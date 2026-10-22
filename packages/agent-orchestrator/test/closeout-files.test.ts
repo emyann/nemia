@@ -375,13 +375,13 @@ test('the closeout.json a step hands on holds the fields its `output:` declares 
     path.join(dir, 'implement.schema.json'),
     JSON.stringify({
       type: 'object',
-      properties: { mutants: { type: 'array', items: { type: 'string' } }, noMutants: { type: 'string' } },
-      required: ['mutants', 'noMutants'],
+      properties: { notes: { type: 'array', items: { type: 'string' } }, noNotes: { type: 'string' } },
+      required: ['notes', 'noNotes'],
       additionalProperties: false,
     }),
   );
   const { id, files, task } = await started(dir);
-  const mutants = ['keys/merged-output.ts: `if (first)` → `if (first && false)`'];
+  const notes = ['keys/merged-output.ts: the owner of a merged field is the first that names it'];
   const replies = [{ finding: 'the body says its summary twice', answer: 'fixed', why: 'bodyLeadsWith' }];
   engine().settle(task, 'succeeded', {
     closeout: {
@@ -390,8 +390,8 @@ test('the closeout.json a step hands on holds the fields its `output:` declares 
       summary: 'Did the work.',
       artifacts: [],
       needs: null,
-      mutants,
-      noMutants: null,
+      notes,
+      noNotes: null,
       replies,
       aside: 'a field the step declares nowhere',
     },
@@ -400,12 +400,12 @@ test('the closeout.json a step hands on holds the fields its `output:` declares 
   const handed = JSON.parse(fs.readFileSync(path.join(files, 'closeout.json'), 'utf8')) as Record<string, unknown>;
   assert.deepEqual(
     handed.output,
-    { mutants, noMutants: null, replies },
+    { notes, noNotes: null, replies },
     'the step after reads what implement declared, and the replies it gave, out of the file',
   );
   assert.deepEqual(
     Object.keys(handed.output as object).sort(),
-    ['mutants', 'noMutants', 'replies'],
+    ['noNotes', 'notes', 'replies'],
     'and `aside`, declared nowhere, is not handed on',
   );
 });

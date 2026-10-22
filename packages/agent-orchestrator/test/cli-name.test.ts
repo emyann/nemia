@@ -25,7 +25,7 @@ type Kept = { file: string; text: string };
 const KEPT: readonly Kept[] = [
   { file: 'src/check/check.ts', text: '`wf <name>:`' },
   { file: 'src/check/check.ts', text: '/^wf [a-z][a-z-]*: /' },
-  { file: 'src/check/check.ts', text: '`wf mutants: …`' },
+  { file: 'src/check/check.ts', text: '`wf pictures: …`' },
   { file: 'src/check/check.ts', text: '`pkg:test: wf …`' },
   { file: 'src/brief/brief.ts', text: '`wf <name>:`' },
   { file: 'src/daemon/daemon.store.ts', text: "Schema.Literals(['api', 'wf up'])" },

@@ -6,10 +6,9 @@ agent: agora
 loop: implement
 rounds: 3
 budget: 16
-tally: findings, findings.kind=placement, mutants.proves
+tally: findings, findings.kind=placement
 skills: effect, shadcn, change-the-board, look, react-aria, see-a-dashboard, apps/web:ds-build, apps/web:ds-theme, apps/web:ds-spec
 mcp: playwright
-output: review.schema.json
 disallowedTools: Bash(cd:*), mcp__playwright__browser_run_code_unsafe, mcp__playwright__browser_console_messages(filename:*), mcp__playwright__browser_evaluate(filename:*), mcp__playwright__browser_network_request(filename:*), mcp__playwright__browser_network_requests(filename:*), mcp__playwright__browser_snapshot(filename:*), mcp__playwright__browser_take_screenshot(filename:*), Bash(npm run build), Bash(npm run e2e), Bash(npm test), Bash(npx turbo run test), Bash(npx turbo run test --force), Bash(npx turbo run test --continue), Bash(npx turbo run test --force --continue), Bash(npx turbo run test --continue --force), mcp__playwright__browser_navigate(url:*:8787*), mcp__playwright__browser_navigate(url:*:5173*), mcp__playwright__browser_tabs(url:*:8787*), mcp__playwright__browser_tabs(url:*:5173*)
 ---
 Judge what was asked and what the diff does. The steps before you each left their whole closeout in their folder's `closeout.json`:
@@ -42,12 +41,6 @@ the commit you are reviewing. You open, edit, merge and close none: those are re
 Run the typecheck and the lint yourself, each bare and one command per call: `npx turbo run typecheck --force`,
 `npm run lint`. Run a package's tests, `npx turbo run test --force --continue --filter=<package>`, only where a finding needs a run to
 stand on.
-
-**Judge the mutants, do not run them**: implement's check applied each mutant the engineer's closeout names and refused the step if
-one survived; your brief hands you what it said under `## What implement's check said`, each `wf mutants:` line whole in `reported`.
-Judge whether the list covers every rule the change adds, and whether each mutant breaks the rule rather than the file's syntax: a
-rule with no mutant, or a mutant that only stops the file loading, is a finding. Quote each `wf mutants:` line you judged in your
-closeout's `mutants`.
 
 Never build or run the e2e: CI ran every page on the commit implement pushed, and its verdict is in the check you are handed.
 

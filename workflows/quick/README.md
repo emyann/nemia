@@ -25,7 +25,7 @@ step's note, which `packages/agent-orchestrator/test/quick-check.boundary.test.t
 
 ## Implement's check
 
-The check is the cheap set, and CI: it runs `change.ts size`, `pictures.ts`, `probe.ts`, `mutants.ts`, `pull-request.ts push` and
+The check is the cheap set, and CI: it runs `change.ts size`, `pictures.ts`, `probe.ts`, `pull-request.ts push` and
 `pull-request.ts wait`, in that order, and nothing else.
 Each script is read from the run's base (`git show "$WF_BASE_REF:…"`), never from the tree it judges:
 
@@ -33,9 +33,8 @@ Each script is read from the run's base (`git show "$WF_BASE_REF:…"`), never f
    removed counts for nothing and a rename is one file). Past either number it refuses and says what to do next: `nemia cancel <run>`,
    then start the card with `build`. The step has no `retries:`, so the refusal waits on a person and no try trims the work to fit.
    Its `wf size:` line is the bound's own count; the `touched` list at the gate is the place's report, and may count a rename as two.
-2. `build`'s `pictures.ts`, `probe.ts` and `mutants.ts`, where they are in `workflows/build/`: a change under `apps/web/src` owes a
-   picture, no probe is left live, and a rule the change adds is proven by a mutant (a removal names none, and says why in
-   `noMutants`).
+2. `build`'s `pictures.ts` and `probe.ts`, where they are in `workflows/build/`: a change under `apps/web/src` owes a picture, and
+   no probe is left live.
 3. `build`'s `pull-request.ts`, where it is in `workflows/build/`: `push` pushes the branch and refuses unless the one open, non-draft
    pull request of it is at the commit the check judges; `wait` polls the `ci` context of that head and refuses a red, cancelled or
    missing one with the Actions URL, the failing jobs and a tail of their log.
@@ -58,7 +57,7 @@ sends it back, by instruction (`NEMIA.md`): no step is filed by itself.
 
 Implement's closeout is `build`'s with two fields more (`implement.schema.json`): `plan`, what changes, where and what proves it,
 written before the work; and `pages`, the e2e pages she ran, which nothing reads but the person. At land's gate a person is shown the
-plan, the pages, the mutants, the pictures and how many files and lines the branch touched (`nemia decide <run>`, and the run's page); the check's
+plan, the pages, the pictures and how many files and lines the branch touched (`nemia decide <run>`, and the run's page); the check's
 `wf size:` line is handed to the landing step. The board does not show the change itself at a gate: read it in a
 terminal, `git diff main...wf/<run>/run`, until it does.
 

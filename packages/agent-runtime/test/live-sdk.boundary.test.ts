@@ -13,9 +13,16 @@
  * `workflows/build/probe.ts` session proves less still, since that starts the `claude` on PATH and not the one the SDK bundles.
  *
  * So the measurement is a job filed through the runtime's own road, `config: { model: 'opus' }`, on the attached harness a step's
- * session runs on — the SDK's `query()`, through `bin/ae-claude-job.ts`. Its `init` line says the model, and the runtime now carries
- * that onto the attempt (`Sighting.model`), so the assertion is on the attempt's record and the raw line is kept beside it for a
- * person to read. The whole `init` line, and the attempt as the engine recorded it, are written to `WF_ARTIFACTS` when it is set.
+ * session runs on — the SDK's `query()`, through `bin/ae-claude-job.ts`. The session's own
+ * `{"type":"system","subtype":"init",…}` line says the model, `claudeStreamOutput` reads it off that line and nowhere else
+ * (`test/detached.test.ts` holds that), and the runtime carries it onto the attempt as `ranOn`. So the assertion here is on the
+ * attempt's record, which is the `init` line's word arrived at its resting place, and the attempt as the engine recorded it is
+ * written to `WF_ARTIFACTS` when that is set.
+ *
+ * The raw line itself is not kept from here, and this test does not pretend to: the holder writes the capture as the session ends
+ * and the engine releases the session in the same tick it reads that end from, so there is no pass of any wait at which the file is
+ * on disk — watched at 100 ms through a whole session, never seen, while `ranOn` was read all the same. A daemon-held session's
+ * capture holds the line for as long as the session lives, which is where a person reads one.
  *
  * Its control is the old SDK: the same job on 0.3.270 records `claude-opus-5`, which is the measurement the card was filed on.
  *
@@ -28,21 +35,13 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
-import { Engine as EngineService, nameFor, type TaskView } from '../src/index.ts';
+import { Engine as EngineService, type TaskView } from '../src/index.ts';
 import { builtEngine } from './engine.ts';
-import { filesOf } from '../src/harness/claude/attached-file.ts';
 import { scratch } from './scratch.ts';
 import { until, WAITED } from '../src/waits/index.ts';
 import { OPUS_TODAY, SDK_VERSION } from './sdk-pin.ts';
 
 const skip = process.env.AE_LIVE === '1' ? false : 'set AE_LIVE=1 to run against Claude Code (spends money)';
-
-/** The `{"type":"system","subtype":"init",…}` line of the session `name`'s kept stdout under `root`, whole, as Claude Code printed it. */
-const initLine = (root: string, name: string): string | undefined =>
-  fs
-    .readFileSync(filesOf(root, name).out, 'utf8')
-    .split('\n')
-    .find((l) => l.includes('"subtype":"init"'));
 
 /** `what` handed over where the step that runs this has a files directory, so its reader is not this test's stdout alone. */
 const handOver = (file: string, what: string): void => {
@@ -78,27 +77,19 @@ test(
           return view.state.settled !== null;
         },
         'the job settled',
-        { everyMs: 5_000 },
+        { everyMs: 500 },
       );
 
       const attempt = view?.state.attempts.at(-1);
       assert.ok(attempt, `the job ran an attempt: ${view?.phase}`);
-      const name = nameFor(id, attempt.n);
-      const line = initLine(root, name);
-      handOver(`sdk-${SDK_VERSION}-init.txt`, `${line ?? 'no init line kept'}\n`);
       handOver(`sdk-${SDK_VERSION}-attempt.json`, `${JSON.stringify(attempt, null, 2)}\n`);
 
-      assert.ok(line, `the session printed an \`init\` line; its kept stdout is ${filesOf(root, name).out}`);
-      assert.equal(
-        (JSON.parse(line) as { model?: string }).model,
-        OPUS_TODAY,
-        `the \`init\` line of a session asked for \`opus\`, on the Claude Code ${SDK_VERSION} bundles: ${line}`,
-      );
       assert.equal(
         attempt.ranOn,
         OPUS_TODAY,
-        'and the runtime recorded it on the attempt, so which model a session ran on is a fact of the record and not a grep',
+        `a session asked for \`opus\`, on the Claude Code ${SDK_VERSION} bundles, ran on ${attempt.ranOn}; it ended ${attempt.reason}`,
       );
+      assert.equal(attempt.ended, 'done', `and it ran: ${view?.phase}`);
     } finally {
       const session = view?.sessionId;
       if (session)

@@ -6142,9 +6142,39 @@ minute poll (the owner, at the design gate of 2026-10-21); Capabilities shows th
 pass refuses to start a Claude Code step whose named server reports `needs-auth`, once per pass for the whole factory, and says what to
 do; a look that failed refuses nothing, since an absence read off a failed look is not an absence.
 
-`workflows/servers/<name>.json` is the shipped list and is empty: Nemia ships no server today.
+`workflows/servers/<name>.json` is the shipped list; card 2 put GitHub's in it.
 
 **What follows, and is card 2**: GitHub's hosted MCP server as the first shipped one, and the sign-in itself —
 `mcpAuthenticate`, `mcpSubmitOAuthCallbackUrl` and `mcpClearAuth`, none of them called here. Measured against it: Codex 0.154 cannot sign
 in to GitHub's hosted MCP through a GitHub App at all, so a Codex step is shown its factory's servers unsigned and refused none of them,
 and the pre-start refusal is Claude Code's only.
+
+## Shipped: GitHub, Nemia's first shipped server, signed in to from the board (2026-10-22)
+
+Card 2 of the intent `mcp-servers-configured-from-izq1`. `workflows/servers/github.json` ships GitHub's hosted server with its toolsets
+header (`context,repos,issues,pull_requests,users,actions`) and the client id of Nemia's own GitHub App, Nemia Factory; the App's client
+secret ships in `src/servers/clients.ts`, as gh ships its own, and GitHub's push protection let it through. A row of the settings page
+that reads `needs-auth` offers **Sign in**: the api's `POST …/servers/:server/sign-in` asks the engine's `mcpSignIn`, which stores the
+secret with `claude mcp add --scope local` under the engine's root (never `--scope user`, so the owner's own sessions gain nothing) and
+holds a session asked `mcpAuthenticate` for 5 minutes; the board shows the address, polls the state every 2 s, and reads the servers again
+on `connected`. A row that reads `connected` offers **Sign out**, which is `claude mcp remove --scope local`: measured on a scratch store
+to delete the stored token and secret under the server's key, where `mcpClearAuth` answered `{}` and left a sign-in in flight. Each
+agent's GitHub tools are fenced by name (`agent-fences.test.ts`): Agora reads, Ada writes nothing, Otto may merge and writes no file;
+no agent or step names `mcp: github` yet, so no run waits on a sign-in.
+
+Left, each to its own card:
+
+- **The live sign-in on 0.3.308 was not exercised by the card's session**, which had no browser a person could approve in: the token
+  exchange and a task session finding a `--scope local` sign-in stand on `izq1-measurement.md`'s 0.3.270 sign-in and on the key measured
+  equal. The owner reads it at the landing: Sign in on the board, approve in GitHub, Check again reads `connected`, Sign out, Check again
+  reads `needs-auth`.
+- **The `actions` toolset's tool names** (`actions_get`, `actions_list`, `get_job_logs`, `actions_run_trigger` in the fences) are
+  GitHub's documented names, not read off a session; a fence naming a tool the server does not have refuses nothing and allows nothing.
+- **Codex**: 0.154 can hand GitHub no client secret, so its token exchange is refused (`incorrect_client_credentials`). A release that
+  takes `mcp_servers.<n>.oauth.client_secret` (Codex's documentation names one, saved in its own store) would need: the runtime writing
+  that key or running Codex's own add with the secret, `signsInMcp` answering true for `codex`, and `codexMcpServers` keeping `oauth`
+  rather than dropping it.
+- **A CLI sign-in** (`nemia factory server signin`): a sign-in waits on a browser, so the CLI would hold its own process open until it
+  settles; not asked for yet.
+- **A sign-in held across a restart**: the hold is the engine's memory, so an api restart while the person is in GitHub's tab loses it,
+  and they press again.

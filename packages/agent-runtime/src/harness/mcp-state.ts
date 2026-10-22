@@ -40,11 +40,15 @@ export const MCP_STATE_MS = 45_000;
 /**
  * The one ask of a harness this file makes, as a seam: a session opened with `servers` inline, its MCP states, its end. A test gives
  * its own and counts the sessions opened; `claudeMcpStatus` is the real one.
+ *
+ * `stop` is how the caller's bound ends it: an ask that is still waiting when the read's time is up is aborted on that signal, and
+ * ends its session there and then. An ask that ignores it leaves a session behind, which is what the bound exists to prevent.
  */
 export type McpStatusAsk = (
   servers: Record<string, RemoteMcpServer>,
   cwd: string,
-  executable?: string,
+  executable: string | undefined,
+  stop: AbortSignal,
 ) => Promise<readonly McpServerStatus[]>;
 
 /**
@@ -56,8 +60,11 @@ export type McpStatusAsk = (
  *
  * Its prompt is a stream that yields nothing and is closed only after the states are read: a turn begins when a word is pushed, and
  * none ever is.
+ *
+ * `end` is the session's end — the held prompt released and the SDK's own controller aborted, so the child goes — and it is safe to
+ * call twice: it runs on the caller's `stop` and again when the ask returns, whichever comes first.
  */
-export const claudeMcpStatus: McpStatusAsk = async (servers, cwd, executable) => {
+export const claudeMcpStatus: McpStatusAsk = async (servers, cwd, executable, stop) => {
   const abort = new AbortController();
   let close = () => {};
   const held: AsyncIterable<never> = {
@@ -79,12 +86,17 @@ export const claudeMcpStatus: McpStatusAsk = async (servers, cwd, executable) =>
     env: withoutTelemetry(process.env),
     ...(executable === undefined ? {} : { pathToClaudeCodeExecutable: executable }),
   };
+  const end = () => {
+    close();
+    abort.abort();
+  };
+  stop.addEventListener('abort', end, { once: true });
   const q = query({ prompt: held, options });
   try {
     return await q.mcpServerStatus();
   } finally {
-    close();
-    abort.abort();
+    stop.removeEventListener('abort', end);
+    end();
   }
 };
 
@@ -116,6 +128,10 @@ const saidOf = (s: McpServerStatus): Omit<McpServerState, 'name' | 'status'> => 
  * refused.
  * A state word the harness does not have — an SDK that grew a sixth — is carried as a failed look rather than re-worded, so no caller
  * reads an unknown word as `connected`.
+ *
+ * The bound ends the ask as well as the wait: losing a `Promise.race` does not stop what lost it, so the ask is handed an
+ * `AbortSignal` the bound fires. Without it the session a hanging server made slow would be left running — one more child per tick
+ * pass and per page read — which is the thing the bound exists to prevent.
  */
 export const mcpServersRead = async (
   servers: Record<string, RemoteMcpServer>,
@@ -124,12 +140,14 @@ export const mcpServersRead = async (
 ): Promise<McpServersRead> => {
   const { ask = claudeMcpStatus, executable, withinMs = MCP_STATE_MS } = how;
   const handed = Object.fromEntries(Object.entries(servers).map(([name, s]) => [name, mcpServerOf(s)]));
+  const stop = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
   let said: readonly McpServerStatus[];
   try {
     said = await Promise.race([
-      ask(handed, cwd, executable),
-      new Promise<never>((_, reject) =>
-        setTimeout(
+      ask(handed, cwd, executable, stop.signal),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
           () =>
             reject(
               new Error(
@@ -137,11 +155,15 @@ export const mcpServersRead = async (
               ),
             ),
           withinMs,
-        ).unref(),
-      ),
+        );
+        timer.unref();
+      }),
     ]);
   } catch (e) {
+    stop.abort();
     return { read: false, why: `the state of ${Object.keys(servers).length} server(s) could not be read: ${(e as Error).message}` };
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
   }
   const by = new Map(said.map((s) => [s.name, s]));
   const odd = said.find((s) => !(MCP_STATES as readonly string[]).includes(s.status));

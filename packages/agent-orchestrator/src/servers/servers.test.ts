@@ -67,12 +67,26 @@ test('the servers Nemia ships: an absent folder is none, a file that does not re
   );
 });
 
-test('a record a newer tick wrote keeps the keys this one does not name, server by server', () => {
+test('a record a newer tick wrote keeps the keys this one does not name — beside a server, and beside the servers — through a write', () => {
   const file = path.join(ROOT, 'factories', 'later', 'servers.json');
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify({ servers: { github: { ...GITHUB, mood: 'bright' } }, checked: '2026-10-21T00:00:00.000Z' }));
   const read = readFactoryServers(ROOT, 'later');
   assert.equal((read!.servers.github as unknown as { mood: string }).mood, 'bright', 'a Struct would strip it; a StructWithRest keeps it');
+  assert.equal(read!.checked, '2026-10-21T00:00:00.000Z', 'and the key beside the servers is read too, not only the one inside one');
+
+  writeFactoryServers(ROOT, 'later', { ...read!.servers, docs: { type: 'sse', url: 'https://docs.example/mcp' } });
+  const after = readFactoryServers(ROOT, 'later');
+  assert.equal(
+    after!.checked,
+    '2026-10-21T00:00:00.000Z',
+    'a newer tick downgrades to this one and adds a server: what it wrote beside the servers is still there, which is what the rest is for',
+  );
+  assert.equal((after!.servers.github as unknown as { mood: string }).mood, 'bright', 'and so is the key beside that server');
+  assert.deepEqual(Object.keys(after!.servers), ['github', 'docs'], 'with the server the write added');
+
+  writeFactoryServers(ROOT, 'later', {});
+  assert.equal(fs.existsSync(file), false, 'the last server gone, the record goes whole: a stamp of a record that is not there is no fact');
 });
 
 test('REFUSED: a server record that does not read, naming the file, its wrong field and the command that writes it again', () => {

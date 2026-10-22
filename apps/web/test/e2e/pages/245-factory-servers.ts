@@ -68,6 +68,24 @@ async function expectRows(section: Locator): Promise<void> {
   }
 }
 
+/**
+ * Press Check again, which is the card's own interaction: the states are read when the page opens and on this press alone, never on
+ * the board's poll. The press must make the read happen again — a refetch wired to another query key, or a press left disabled, would
+ * draw the same rows off the cache and nothing else would notice — so the page waits for the api's own answer to the read and reads
+ * the rows off what came back.
+ */
+async function checkAgain(page: Page, section: Locator): Promise<void> {
+  const read = page.waitForResponse(
+    (r) => r.request().method() === 'GET' && new URL(r.url()).pathname === `/api/factories/${FACTORY}/servers`,
+    { timeout: WAIT_MS },
+  );
+  const [answer] = await Promise.all([read, section.getByRole('button', { name: 'Check again', exact: true }).click()]);
+  if (answer.status() !== 200)
+    throw new Refused(`Check again reads the states — the api answered ${answer.status()}: ${await answer.text()}`);
+  await idle(page);
+  await expectRows(section);
+}
+
 /** The form records a remote server, which the store's record holds and the list draws; Remove takes it off again. */
 async function recordAndRemove(page: Page, section: Locator, file: string): Promise<void> {
   await section.getByRole('textbox', { name: 'Name' }).fill(ADDED.name);
@@ -80,7 +98,7 @@ async function recordAndRemove(page: Page, section: Locator, file: string): Prom
   await expectVisible(section.locator('[data-servers-done]', { hasText: 'Recorded' }), 'the page says what a run does with it now');
   await expectVisible(section.locator(`[data-factory-server="${ADDED.name}"]`), 'and the server is a row of the list');
   await settled(page);
-  await photograph(page, path.join(OUT, `factory-servers-recorded-${await themeOf(page)}.png`));
+  await photograph(page, path.join(OUT, `factory-servers-recorded-${await themeOf(page)}.png`), { fullPage: true });
   const row = section.locator(`[data-factory-server="${ADDED.name}"]`);
   const [answer] = await Promise.all([answered(page, 'DELETE'), row.getByRole('button', { name: 'Remove', exact: true }).click()]);
   if (answer.status() !== 200) throw new Refused(`Remove writes — the api answered ${answer.status()}: ${await answer.text()}`);
@@ -119,8 +137,13 @@ export default {
    * A factory's MCP servers on its settings page: the two the record holds, each a row with the state its harness reported — or none
    * read, drawn as unread, which is not an absence — its address, its headers and the client it signs in as. The section says the
    * servers are handed to the steps whose agent names one, before the checkout's `.mcp.json`, and that the state is read on load and on
-   * a press alone. The form records a remote server, which lands in the store's record and in the list, and Remove takes it off again.
-   * The record is taken back whatever happens.
+   * a press alone, which Check again then does. The form records a remote server, which lands in the store's record and in the list, and
+   * Remove takes it off again. The record is taken back whatever happens.
+   *
+   * What the api refuses of a record — an `Authorization` header, a local server — is proven in its own tests
+   * (`apps/api/test/servers.test.ts`) and not driven through the board, since the e2e's watch counts every 4xx against a page and a
+   * `PageSpec` has no way to expect one (`checks.ts`, `visit.ts`): the same rule `350-lift.ts` states. What the refusal looks like drawn
+   * is the `ServerForm` stories' business, as the chips' three colours are `ServerState`'s.
    */
   name: 'factory-servers',
   route: `/factories/${FACTORY}/settings`,
@@ -144,8 +167,9 @@ export default {
         'and that a state is read on load and on a press, never on the poll',
       );
       await expectRows(section);
+      await checkAgain(page, section);
       await settled(page);
-      await photograph(page, path.join(OUT, `factory-servers-listed-${await themeOf(page)}.png`));
+      await photograph(page, path.join(OUT, `factory-servers-listed-${await themeOf(page)}.png`), { fullPage: true });
       await recordAndRemove(page, section, file);
     } finally {
       fs.rmSync(folder, { recursive: true, force: true });

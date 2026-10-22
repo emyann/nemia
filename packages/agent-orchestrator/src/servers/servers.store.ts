@@ -72,22 +72,37 @@ export function readFactoryServers(home: string, name: string): FactoryServersFi
     const { path: at, words } = firstRefusal(raw, read.failure);
     throw new Invalid({ message: `${file}: ${at.length ? `its ${at.join('.')} ` : ''}${words}: ${fix}.` });
   }
-  return { servers: read.success.servers };
+  return read.success;
 }
 
 /** The factory `name`'s servers, `{}` where none was written: what a caller that only reads them takes. */
 export const factoryServers = (home: string, name: string): FactoryServers => readFactoryServers(home, name)?.servers ?? {};
 
-/** Writes the factory `name`'s servers whole; a record with no server is removed, so a re-read finds none rather than an empty map. */
+/**
+ * Writes the factory `name`'s servers whole, keeping every other key the file held — a key a newer tick wrote, which this one does not
+ * name: the file is decoded by a `StructWithRest` so that a downgrade takes nothing away, and a write that spelled `{ servers }` alone
+ * would throw those keys away on the next `server add`. A file that does not read is written over: the verbs read the record before
+ * they write it and refuse a broken one themselves, loudly and with the file named.
+ *
+ * A record with no server is removed, with whatever else it held: the record is the servers, and a stamp of a record that no longer
+ * exists is no fact. So a re-read finds none rather than an empty map.
+ */
 export function writeFactoryServers(home: string, name: string, servers: FactoryServers): void {
   const file = factoryServersFile(home, name);
   if (!Object.keys(servers).length) {
     fs.rmSync(file, { force: true });
     return;
   }
+  let kept: Record<string, unknown> = {};
+  try {
+    const { servers: _gone, ...rest } = readFactoryServers(home, name) ?? {};
+    kept = rest;
+  } catch {
+    kept = {};
+  }
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const hidden = path.join(path.dirname(file), `.servers.json.${process.pid}`);
-  fs.writeFileSync(hidden, `${JSON.stringify({ servers })}\n`);
+  fs.writeFileSync(hidden, `${JSON.stringify({ ...kept, servers })}\n`);
   fs.renameSync(hidden, file);
 }
 

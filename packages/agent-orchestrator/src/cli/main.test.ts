@@ -1,6 +1,13 @@
 /**
  * `main`, the verbs' table: the help for a verb it does not know and for one given too little, and the lines of the verbs no other test
  * reads — `nemia cancel`, `nemia show`, `nemia logs` and `nemia accept` — over a store and a repository of their own, on the test place.
+ *
+ * The root test below types `factory servers default`, and the factory is `default` on purpose. A `factory servers` read is two reads:
+ * the factory's own existence (`factoryThere`), and its record. The record is read under the root the handler is given (`rootGiven`,
+ * which is what that test pins); the existence check returns early for `DEFAULT_FACTORY` and otherwise calls `readFactories()`, whose
+ * `factoriesDir()` still reads the module-level root `factory.store.ts` pinned as it loaded. So any other name would fail there and not
+ * at the read — `factory.store.ts` is unconverted, carries the most lines of `test/global-roots.baseline.ts` and is the next card's
+ * work, the baseline only shrinking. `default` is the one name where the two roots cannot differ, so it isolates the read.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -130,7 +137,7 @@ test('a read is run against the root the process names when it is typed, not one
     const { out } = await typed(t, e, 'factory', 'servers', 'default');
     assert.ok(
       out.some((line) => line.includes('https://api.githubcopilot.com/mcp/')),
-      `the record under the root the process names is the one read: ${JSON.stringify(out)}`,
+      `the record under the root the process names is the one read, by servers.store.ts's required home: ${JSON.stringify(out)}`,
     );
     process.env.WF_ROOT = was;
     const back = await typed(t, e, 'factory', 'servers', 'default');

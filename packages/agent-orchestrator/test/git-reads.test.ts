@@ -1,9 +1,16 @@
 /**
- * The git `.claude/settings.json` allows every session in this checkout, and so the whole of the git a `dontAsk` planner or reviewer
- * may run: git's read-only verbs, and nothing that writes, runs a program or moves a ref: `READS`.
+ * The git `.claude/settings.json` allows every session in this checkout — a person's own among them: git's read-only verbs, and nothing
+ * that writes, runs a program or moves a ref: `READS`.
  *
  * An allow rule matches by prefix, so the fence is the list itself: a `Bash(git …)` allow that is not on `READS` fails, and `READS` is held
  * against the verbs that write, run a program or reach past the step's own directory, so the list cannot grow one either.
+ *
+ * This is no longer the whole of the git a `dontAsk` step may run, and has not been since the team's read-only agents took the read set
+ * onto their own `allowedTools:` so that they travel to a factory that is not this checkout: that set is wider than this one — `grep`,
+ * `cat-file`, `diff-tree`, `show-ref`, `rev-list`, `name-rev`, `for-each-ref`, `check-ignore`, `branch --contains` and `worktree list`
+ * besides — and it is judged where it is written, by `agent-fences.test.ts`. `grep` stays off this list all the same, for the reason
+ * `NEVER` gives: an allow here reaches every session in the checkout, including a person's own in a shell they did not fence, and this
+ * list has no deny beside it. The agents allow it and deny the pager option in every spelling git takes, which is why they may.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -40,6 +47,11 @@ const READS = [
  * What no allow may name: every verb that writes a file, the index, a ref or the config, or goes to the network; `grep`, whose
  * `-O<cmd>` runs a program; and `fetch`. Any option before the verb is refused apart from these — `git -C <dir>` above all, since
  * `Bash(git -C:*)` would admit `git -C <dir> push`, which the deny `Bash(git push:*)` does not match.
+ *
+ * `grep` is on this list and on the team's read-only agents' allow both: an allow here is answered by no deny, while each of those
+ * agents denies the pager option in every spelling — a capital `O` after `git grep`, and `--op` with every longer spelling of
+ * `--open-files-in-pager` — beside the allow (`agent-fences.test.ts`, `GIT_RUNS_A_PROGRAM`). A deny is what makes the verb allowable,
+ * and the settings carry none.
  */
 const NEVER = [
   'commit',

@@ -10,6 +10,8 @@ you start from it, and a person decides whether it ships.
 
 ## Commit as you go
 
+This section is a step's that writes the repository; a read-only step works from *Read what changed* instead.
+
 - Commit your work on your branch in small commits with plain messages, as you make it: a short imperative subject, and a body saying
   why when it is not plain.
 - What you leave uncommitted is committed for you when your step ends, in one commit under your step's name. That is a net, not a way to
@@ -23,11 +25,21 @@ Your brief names the commit the run started from, its base. When it does not giv
   `git status` for what is not committed yet.
 - **On a result branch**, from the base's checkout: `git log --oneline <base>..<branch>` for its commits and `git diff <base>...<branch>`
   for its change, as the branch made it, whatever the base did since.
+- **A commit, a file in it and who wrote a line**: `git show <commit>` for a commit whole and `git show <commit>:<path>` for a file as
+  that commit has it, `git blame -L <from>,<to> <path>` for the commit each line came from.
+- **A search of a commit**: `git grep <pattern> <commit>`, which searches a revision rather than the working tree, where your harness's
+  own search reads the files as they are now. `git ls-files <path>` lists what git tracks.
+- **Whether one commit is within another**: `git merge-base --is-ancestor <commit> <commit>`, answered by its exit code alone, so ask it
+  with nothing after it; `git branch --contains <commit>` answers in words. `git worktree list` says which workspaces the repository has.
+
+Each of these reads and writes nothing, so a read-only step may ask any of them.
 
 The run reads the same without you, from git's object store, through this place's `report` verb (`verbs/report.ts`): what each result
 branch changed against the base, file by file.
 
 ## Merge the base when a person asks
+
+This section is a step's that writes the repository; a read-only step works from *Read what changed* instead.
 
 A person can send a loop's work back to merge its base branch (`nemia merge <run>`), when the base moved and the work no longer lands.
 Your brief names the commit the person's trial merge read: merge that commit, never the base as it stands now, which may have moved again.
@@ -41,6 +53,8 @@ Where both meanings cannot hold, change nothing more, and sign off blocked namin
 finds it with `git log --merges -1`.
 
 ## Stage a landing
+
+This section is a step's that lands the run's result; a read-only step works from *Read what changed* instead.
 
 When your step lands the run's result on its base, in the repository's own checkout, you stage the merge and the run commits it:
 

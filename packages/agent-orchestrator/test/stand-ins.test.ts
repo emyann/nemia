@@ -413,6 +413,19 @@ test("the engine's stand-in, taken through the testing entry, measures nothing i
   assert.match(FIX, /`const engine = eachTest\(testEngine\);`/, 'the fix names the line a test writes for an engine');
 });
 
+test("the api's stand-ins, the test place by the orchestrator's testing entry and the engine given through Engine.over, measure nothing; the real place beside them is still refused", () => {
+  const file = 'apps/api/test/x.test.ts';
+  const text =
+    "import { Layer } from 'effect';\nimport { testPlace } from 'agent-orchestrator/testing';\n" +
+    "import { testEngine } from 'agent-runtime/testing';\nimport { Engine } from '../src/store.ts';\n" +
+    "import { eachTest } from './placed.ts';\nconst stand = eachTest(testPlace);\nconst engine = eachTest(testEngine);\n" +
+    'const layer = () => Layer.merge(Engine.over(engine().layer), stand().layer);\n';
+  assert.deepEqual(reachOf(file, over({ [file]: text })).sites, []);
+  assert.deepEqual(breaksOf({ [file]: text }), []);
+  const real = `${text}import { gitPlaceLayer } from 'agent-orchestrator';\nLayer.merge(gitPlaceLayer, layer());\n`;
+  assert.deepEqual(reachOf(file, over({ [file]: real })).kinds, ['place']);
+});
+
 test('REFUSED: a test of the runtime that takes the stand-in of the engine it builds, by the entry, its file or the face; the contract names it', () => {
   const [, engine] = STAND_INS;
   assert.equal(engine.made, 'testEngine');

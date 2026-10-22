@@ -112,8 +112,7 @@ test('a comparison where every file hits what it did, or more, finds no fall', (
   assert.deepEqual(compared(before, recordWith({ 'src/a.ts': cover([1, 2, 3], 4, 2, 2) })), []);
 });
 
-test('a branch is judged by its arms, each taken when any test process took it', async (t) => {
-  // Before, from a checkout whose longer path the loader appends past the source: its script's range is cut at the source's end.
+test("a branch is judged by its arms, each taken when any test process took it, against a before whose checkout's longer path ran its script past the source", async (t) => {
   const bothInOne = pickRecord(ran(2, { yes: 1, no: 1 }, 40));
   const rows: [name: string, after: V8Script[][], lost: number[]][] = [
     ['two arms taken by two test files are nothing lost, each process leaving out its own', [ran(1, { no: 0 }), ran(1, { yes: 0 })], []],

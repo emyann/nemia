@@ -3,29 +3,38 @@
  *
  * A session runs it as a measure around a change that touches tests alone: the sources do not move, so a line or a branch the
  * suite reached before and no longer reaches is a hit count that fell, read exactly, never a percentage rounded.
+ *
+ * A branch is told by V8's ranges, not lcov's count per line: V8 leaves out a block that ran as often as the one around it, so the
+ * merged lcov reads an arm untaken when its sibling ran in another test file. A range is taken when any one process took it.
  */
+import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-/** The lines and branches of one source file the suite reached: `found` of each, `hit` of those, and which lines were hit. */
+/**
+ * The lines and branches of one source file the suite reached: `found` of each, `hit` of those, and which lines were hit (lcov's
+ * branch count is said, never judged); `arms`, each V8 range of the file by `start-end` offsets to its line, split by whether any
+ * test process took it.
+ */
 export type FileCoverage = {
   lines: { found: number; hit: number; hitLines: number[] };
-  /**
-   * `takenByLine`, how many branches were taken on each line that has any, by line number: lcov's block numbers move between runs,
-   * so a branch is told by its line. Absent from a record written before it was kept.
-   */
-  branches: { found: number; hit: number; takenByLine?: Record<string, number> };
+  branches: { found: number; hit: number };
+  arms: { taken: Record<string, number>; untaken: Record<string, number> };
 };
 
-/** One package's coverage, by each source file's path from the package's folder. */
-export type CoverageRecord = { version: 1; package: string; files: Record<string, FileCoverage> };
+/** One package's coverage, by each source file's path from the package's folder. Version 2 keeps each arm. */
+export type CoverageRecord = { version: 2; package: string; files: Record<string, FileCoverage> };
+
+/** One script of one process's raw V8 coverage, as `NODE_V8_COVERAGE` holds it. */
+export type V8Script = { url: string; functions: Array<{ ranges: Array<{ startOffset: number; endOffset: number; count: number }> }> };
 
 /** What fell for one file between two records: the lines it no longer hits, its branch hits before and after, or the file gone. */
 export type Fall = {
   file: string;
   gone: boolean;
   linesLost: number[];
-  /** Each line with fewer branches taken after than before, as `line (before→after)`, where both records count them. */
-  branchesLost: string[];
+  /** The line of each arm some test took before and none takes after, in line order, once each. */
+  armsLost: number[];
   lines: { before: number; after: number };
   branches: { before: number; after: number };
 };
@@ -88,34 +97,10 @@ const coverageOf = (section: Section): FileCoverage => {
     branches: {
       found: section.brf ?? section.brda.length,
       hit: section.brh ?? section.brda.filter(({ taken }) => taken > 0).length,
-      takenByLine: takenOn(section.brda),
     },
+    arms: { taken: {}, untaken: {} },
   };
 };
-
-/** How many branches were taken on each line, of `brda`'s, that has one taken. */
-const takenOn = (brda: Section['brda']): Record<string, number> => {
-  const taken: Record<string, number> = {};
-  for (const { at, taken: count } of brda) {
-    const line = at.split(',')[0];
-    if (count > 0) taken[line] = (taken[line] ?? 0) + 1;
-  }
-  return taken;
-};
-
-/** The larger count of each line of `a` and `b`. */
-const mostOf = (a: Record<string, number>, b: Record<string, number>): Record<string, number> => {
-  const most = { ...a };
-  for (const [line, count] of Object.entries(b)) most[line] = Math.max(most[line] ?? 0, count);
-  return most;
-};
-
-/** Each line of `was` with fewer branches taken in `now`, as `line (before→after)`, in line order. */
-const linesFell = (was: Record<string, number>, now: Record<string, number>): string[] =>
-  Object.entries(was)
-    .filter(([line, count]) => (now[line] ?? 0) < count)
-    .sort(([a], [b]) => Number(a) - Number(b))
-    .map(([line, count]) => `${line} (${count}→${now[line] ?? 0})`);
 
 /** Two sections of one file, as a run that reports a file twice leaves: the lines hit in either, and the larger of each count. */
 const merged = (a: FileCoverage, b: FileCoverage): FileCoverage => {
@@ -125,32 +110,124 @@ const merged = (a: FileCoverage, b: FileCoverage): FileCoverage => {
     branches: {
       found: Math.max(a.branches.found, b.branches.found),
       hit: Math.max(a.branches.hit, b.branches.hit),
-      takenByLine: mostOf(a.branches.takenByLine ?? {}, b.branches.takenByLine ?? {}),
     },
+    arms: a.arms,
   };
 };
 
+type Range = { start: number; end: number; count: number };
+const keyOf = (range: Range): string => `${range.start}-${range.end}`;
+/** A script's ranges, each cut at its source's `length`: past it is the source URL the loader appends, which names the file's path. */
+const rangesOf = (script: V8Script, length: number): Range[] =>
+  script.functions.flatMap(({ ranges }) =>
+    ranges.map((r) => ({ start: r.startOffset, end: Math.min(r.endOffset, length), count: r.count })),
+  );
+
 /**
- * The record of the package in `packageDir` from the lcov text of its suite: each of its own source files by its path from the
- * folder, leaving out its test files, everything under its `test/` folder and any fixtures, and every file outside the folder.
+ * Adds to `taken`, as `file:start-end`, each of `arms` that `ranges`, one process's, took: by the arm's own count where the process
+ * reports it, else by the innermost range around it, which V8 left it out for equalling. Ranges nest: one sweep holds those open.
  */
-export const recordOf = (lcov: string, packageDir: string): CoverageRecord => {
-  const root = path.resolve(packageDir);
-  const files: Record<string, FileCoverage> = {};
-  for (const section of sections(lcov)) {
-    const fromPackage = path.relative(root, path.resolve(root, section.file));
-    if (!isSource(fromPackage)) continue;
-    const key = fromPackage.split(path.sep).join('/');
-    const coverage = coverageOf(section);
-    files[key] = files[key] ? merged(files[key], coverage) : coverage;
+const takeIn = (arms: Range[], ranges: Range[], taken: Set<string>, file: string) => {
+  const items = [...ranges.map((r) => ({ ...r, arm: false })), ...arms.map((r) => ({ ...r, arm: true }))];
+  items.sort((a, b) => a.start - b.start || b.end - a.end || Number(a.arm) - Number(b.arm));
+  const open: Range[] = [];
+  for (const item of items) {
+    while (open.length > 0 && open[open.length - 1].end < item.end) open.pop();
+    if (!item.arm) open.push(item);
+    else if ((open[open.length - 1]?.count ?? 0) > 0) taken.add(`${file}:${keyOf(item)}`);
   }
-  const sorted = Object.fromEntries(Object.entries(files).sort(([a], [b]) => a.localeCompare(b)));
-  return { version: 1, package: path.basename(root), files: sorted };
+};
+
+/** The 1-based line of each offset of `text`, past the blanks a range opens with (a block left out after a brace opens on it). */
+const lineAt = (text: string) => {
+  const starts = [0];
+  for (let at = text.indexOf('\n'); at !== -1; at = text.indexOf('\n', at + 1)) starts.push(at + 1);
+  return (from: number) => {
+    const at = from + /^\s*/.exec(text.slice(from, from + 200))![0].length;
+    return starts.filter((start) => start <= at).length;
+  };
+};
+
+/** The arms of each source file from the suite's processes, read twice (every range, then which each took) to hold one at a time. */
+const armsOf = (
+  processes: () => Iterable<V8Script[]>,
+  keyIn: (url: string) => string | undefined,
+  textOf: (key: string) => string,
+): Map<string, FileCoverage['arms']> => {
+  const texts = new Map<string, string>();
+  const text = (key: string) => texts.get(key) ?? texts.set(key, textOf(key)).get(key)!;
+  function* scripts(): Iterable<[string, Range[]]> {
+    for (const process of processes()) {
+      for (const script of process) {
+        const key = keyIn(script.url);
+        if (key) yield [key, rangesOf(script, text(key).length)];
+      }
+    }
+  }
+  const all = new Map<string, Map<string, Range>>();
+  for (const [key, ranges] of scripts()) {
+    const known = all.get(key) ?? all.set(key, new Map()).get(key)!;
+    for (const range of ranges) known.set(keyOf(range), { ...range, count: 0 });
+  }
+  const taken = new Set<string>();
+  for (const [key, ranges] of scripts()) takeIn([...all.get(key)!.values()], ranges, taken, key);
+  const arms = new Map<string, FileCoverage['arms']>();
+  for (const [key, known] of all) {
+    const line = lineAt(text(key));
+    const split: FileCoverage['arms'] = { taken: {}, untaken: {} };
+    for (const range of known.values()) split[taken.has(`${key}:${keyOf(range)}`) ? 'taken' : 'untaken'][keyOf(range)] = line(range.start);
+    arms.set(key, split);
+  }
+  return arms;
 };
 
 /**
- * The files of `before` whose coverage fell in `after`: a line hit before and not after, fewer lines or branches hit, or the file
- * gone. A file only `after` has is no fall.
+ * The record of the package in `packageDir` from the lcov text of its suite and the raw V8 coverage of each of its processes: each
+ * of its own source files by its path from the folder, leaving out its test files, everything under its `test/` folder and any
+ * fixtures, and every file outside the folder. `textOf` reads a source by its path from the folder, to say the line of each arm.
+ */
+export const recordOf = (
+  lcov: string,
+  packageDir: string,
+  processes: () => Iterable<V8Script[]>,
+  textOf: (key: string) => string = (key) => fs.readFileSync(path.join(packageDir, key), 'utf8'),
+): CoverageRecord => {
+  const root = path.resolve(packageDir);
+  const keyOfPath = (file: string): string | undefined => {
+    const fromPackage = path.relative(root, path.resolve(root, file));
+    return isSource(fromPackage) ? fromPackage.split(path.sep).join('/') : undefined;
+  };
+  const files: Record<string, FileCoverage> = {};
+  for (const section of sections(lcov)) {
+    const key = keyOfPath(section.file);
+    if (!key) continue;
+    const coverage = coverageOf(section);
+    files[key] = files[key] ? merged(files[key], coverage) : coverage;
+  }
+  const kept = (url: string) => [url.startsWith('file:') ? keyOfPath(fileURLToPath(url)) : undefined].find((key) => key && key in files);
+  for (const [key, arms] of armsOf(processes, kept, textOf)) files[key].arms = arms;
+  const sorted = Object.fromEntries(Object.entries(files).sort(([a], [b]) => a.localeCompare(b)));
+  return { version: 2, package: path.basename(root), files: sorted };
+};
+
+/**
+ * The lines of the arms `was` took that `now` takes no more, each read as the innermost range of `now` around it, itself where
+ * `now` knows it: an arm `now` never reported ran, in every process of it, as often as that range.
+ */
+const armsLostIn = (was: FileCoverage['arms'], now: FileCoverage['arms'] = { taken: {}, untaken: {} }): number[] => {
+  const spans = Object.keys({ ...now.taken, ...now.untaken }).map((key) => [key, ...key.split('-').map(Number)] as const);
+  const takenNow = (key: string): boolean => {
+    const [start, end] = key.split('-').map(Number);
+    const around = spans.filter(([, s, e]) => s <= start && end <= e).sort(([, a, x], [, b, y]) => b - a || x - y)[0];
+    return around !== undefined && around[0] in now.taken;
+  };
+  const lost = Object.entries(was.taken).flatMap(([key, line]) => (takenNow(key) ? [] : [line]));
+  return [...new Set(lost)].sort((a, b) => a - b);
+};
+
+/**
+ * The files of `before` whose coverage fell in `after`: a line hit before and not after, fewer lines hit, an arm some test took
+ * before and none takes after, or the file gone. A file only `after` has is no fall; lcov's branch count is said, never judged.
  */
 export const compared = (before: CoverageRecord, after: CoverageRecord): Fall[] => {
   const falls: Fall[] = [];
@@ -163,7 +240,7 @@ export const compared = (before: CoverageRecord, after: CoverageRecord): Fall[] 
         file,
         gone: true,
         linesLost: was.lines.hitLines,
-        branchesLost: linesFell(was.branches.takenByLine ?? {}, {}),
+        armsLost: armsLostIn(was.arms, undefined),
         lines,
         branches,
       });
@@ -171,9 +248,9 @@ export const compared = (before: CoverageRecord, after: CoverageRecord): Fall[] 
     }
     const still = new Set(now.lines.hitLines);
     const linesLost = was.lines.hitLines.filter((at) => !still.has(at));
-    const branchesLost = now.branches.takenByLine ? linesFell(was.branches.takenByLine ?? {}, now.branches.takenByLine) : [];
-    if (linesLost.length > 0 || branchesLost.length > 0 || lines.after < lines.before || branches.after < branches.before) {
-      falls.push({ file, gone: false, linesLost, branchesLost, lines, branches });
+    const armsLost = armsLostIn(was.arms, now.arms);
+    if (linesLost.length > 0 || armsLost.length > 0 || lines.after < lines.before) {
+      falls.push({ file, gone: false, linesLost, armsLost, lines, branches });
     }
   }
   return falls;

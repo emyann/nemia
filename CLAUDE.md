@@ -123,8 +123,8 @@ What the `create-an-agent` skill, being generic, does not say here:
   outside a run by `change-the-board`; a kit update that adds or renames one names it on the three lines and in the skill
   (`packages/agent-orchestrator/test/build-told.test.ts`); the
   board's look is `apps/web/DESIGN.md`, its generated theme `apps/web/theme/` (`apps/web/CLAUDE.md`, *The design system kit*).
-- `apps/web/src/components/look` — the look's own parts (the cut frame, tag and button, the plate, the sticker and stat tile, the rail,
-  the scan lines, the pager, the text link, the copy id) behind one door, each with its stories beside it; Nemia's Storybook
+- `apps/web/src/components/look` — the look's own parts (the cut frame, tag and button, the plate, the sticker and stat tile, the
+  breakdown and its preview, the rail, the scan lines, the pager, the text link, the copy id) behind one door, each with its stories beside it; Nemia's Storybook
   (`npm run storybook`, from `apps/web`) shows them to a person, and `change-the-board` says which to take (`apps/web/CLAUDE.md`).
 - `workflows/` — this repository's own team, `agents/`: Iris (product engineer), Seldon (software architect), Ada (software engineer),
   Agora (code reviewer), Otto (release engineer), Argus (janitor); and four workflows: `intake` (an idea to an intent), `build` (an

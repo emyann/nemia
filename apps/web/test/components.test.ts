@@ -29,6 +29,9 @@ const { stateMeaning } = await import('../src/lib/status.ts');
 const { StepBody, StepPolicy, Told } = await import('../src/components/Told.tsx');
 const { RunGone } = await import('../src/components/RunGone.tsx');
 const { KindsBehind } = await import('../src/components/KindsBehind.tsx');
+const { RunClockCell } = await import('../src/components/RunClockCell.tsx');
+const { BreakdownRows } = await import('../src/components/look/Breakdown.tsx');
+const { clockBreakdown } = await import('../src/lib/breakdown.ts');
 const { instantWhole, instantWords } = await import('../src/lib/instant.ts');
 const { timeOfDay, timeToTheSecond } = await import('../src/lib/timeOfDay.ts');
 type RunDetail = import('../src/lib/api.ts').RunDetail;
@@ -7508,4 +7511,54 @@ test('her several questions answered keep each question beside the answer it was
       'what she asked stands over what the person answered it, so the history reads as a history',
     );
   assert.match(html, new RegExp(`You chose: Cut it on read · Hand them · ${timeOfDay(CHOSE_AT)}`));
+});
+
+/** Where a run's wall time went: an hour of wall, ten minutes of it at work. */
+const CLOCK = { wallMs: 3_600_000, sessionsMs: 600_000, checksMs: 0, personMs: 3_000_000, slotMs: 0, restMs: 0 };
+
+/** A row of either runs table as its Clock cell reads it: an hour old, ten minutes at work, with `more` over it. */
+const clocked = (more: object = {}) => ({
+  createdAt: '2026-10-12T10:00:00.000Z',
+  startedAt: '2026-10-12T10:05:00.000Z',
+  cancelledAt: null,
+  waiting: null,
+  waitingOnYou: [],
+  holding: null,
+  atWork: { ms: 600_000, since: null, endedAt: '2026-10-12T10:15:00.000Z' },
+  clock: CLOCK,
+  ...more,
+});
+
+/** The Clock cell of `run` drawn at eleven, an hour after the fixture was created. */
+const clockCell = (run: object, finished = false): string =>
+  renderToStaticMarkup(createElement(RunClockCell, { run: run as never, asOf: new Date('2026-10-12T11:00:00.000Z'), finished }));
+
+test("REFUSED: a Clock cell that says the run's wall time — it says the time at work, and `not started` for a run nothing of which is filed", () => {
+  const working = clockCell(clocked());
+  assert.match(working, />10m</, 'ten minutes at work');
+  assert.doesNotMatch(working, />1h</, 'REFUSED: the hour of wall time the column used to show');
+  assert.match(working, /<button[^>]*data-clock-words/, 'the words are a button, which the keyboard reaches to open the preview');
+  assert.match(clockCell(clocked({ atWork: { ms: 600_000, since: null, endedAt: null } }), true), />took 10m<|>10m</);
+
+  const unstarted = clockCell(clocked({ startedAt: null, atWork: null }));
+  assert.match(unstarted, />not started</);
+  assert.doesNotMatch(unstarted, />1h</, 'REFUSED: the minutes since it was filed, which are no time at work');
+  assert.match(clockCell(clocked({ startedAt: null, atWork: null, cancelledAt: '2026-10-12T10:30:00.000Z' }), true), />not started</);
+  assert.match(clockCell(clocked({ atWork: null })), />not judged</, 'a run the api gives no time at work of');
+});
+
+test('a Clock cell whose row carries no clock draws the words as a plain span with the times in full, and takes no focus', () => {
+  const unbroken = clockCell(clocked({ clock: null }));
+  assert.match(unbroken, /<span[^>]*data-clock-words/);
+  assert.doesNotMatch(unbroken, /<button/, 'nothing to break down, so nothing for the keyboard to open');
+  assert.match(unbroken, /title="At work 10m 00s\. Started [^"]+"/, 'the times in full stay on the title');
+});
+
+test("a breakdown's rows are terms with their amounts, each named by what it counts, and the foot says the wall time they add up to", () => {
+  const html = renderToStaticMarkup(createElement(BreakdownRows, { breakdown: clockBreakdown(CLOCK, '10m', '11 Oct 1:11 PM') }));
+  for (const what of ['Sessions at work', 'Checks running', 'Waiting on you', 'Queued for a slot'])
+    assert.match(html, new RegExp(`data-breakdown-row="${what}"`), what);
+  assert.doesNotMatch(html, /Everything else/, 'the last line is absent where the four parts cover the wall');
+  assert.match(html, /<dd[^>]*>10m<\/dd>/, "the sessions' ten minutes");
+  assert.match(html, /data-breakdown-foot[^>]*>Wall time 1h, from 11 Oct 1:11 PM\.</);
 });

@@ -39,7 +39,8 @@ applies: ["apps/web/**"]
    or a table in a cut frame (with `FRAMED_BOX`, `FRAMED_END`, `FRAMED_TABLE` and `FRAMED_ROW` around a table), `CutTag` for a tag
    with a cut corner, `CutButton` for the filled cut button that is a link to a route and `CutPress` for the one that is pressed,
    `CutCue` for a cue in a small cut frame beside a face or in a header, `CutField` for a box that holds a field, whose edge lights round its cut when the focus is in it, and `cutShape`, `cutRing` and `cutPoints` for a new part that takes the cut; `Plate` for a section's heading and `PageName` for
-   a page's name; `Sticker` for a tile that carries a number and `StatTile` for one over its breakdown; `RunSteps` for a run's rail;
+   a page's name; `Sticker` for a tile that carries a number and `StatTile` for one over its breakdown; `BreakdownRows` for a breakdown's rows and
+   `BreakdownPreview` for one hung off a focusable trigger of your own; `RunSteps` for a run's rail;
    `ScanLines` for the ground of a page; `Pager`, `TextLink` and `CopyId`. Each is shown in its stories beside it
    (`<Part>.stories.tsx`): `npm run storybook`, from `apps/web`, serves them to a person on port 6007, and `npm run board:serve`
    prints a third line, `stories on <address>`, where a step given a browser opens them. A new part of the look gets its stories in

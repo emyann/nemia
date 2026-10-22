@@ -139,7 +139,7 @@ test("the light answer decodes what the api gives, a waiting run with its clock 
     { step: 'plan', cost: { usd: 1.5, measured: 1, unmeasured: 0, said: '$1.50' } },
     { step: 'land', cost: null },
   ];
-  const listed = { wallMs: 5, finishedAt: null };
+  const listed = { wallMs: 5, finishedAt: null, clock };
   const answer = {
     asOf: '2026-10-12T12:00:00.000Z',
     counts: { waiting: 1, inFlight: 1, finished: 7 },
@@ -153,7 +153,7 @@ test("the light answer decodes what the api gives, a waiting run with its clock 
         ...answer,
         unknown: 1,
         waiting: answer.waiting.map((run) => ({ ...run, page: 1 })),
-        inFlight: answer.inFlight.map((run) => ({ ...run, clock, stepCosts, page: 1 })),
+        inFlight: answer.inFlight.map((run) => ({ ...run, stepCosts, page: 1 })),
       }),
       { status: 200, headers: { 'content-type': 'application/json' } },
     );
@@ -185,6 +185,8 @@ test('REFUSED: a light answer whose row lacks a key the board reads, or that lac
   const { clock: _clock, ...unbroken } = { ...row(), ...more };
   answering(t, { asOf, counts: { waiting: 1, inFlight: 0, finished: 0 }, waiting: [unbroken], inFlight: [] });
   await assert.rejects(readOpen(), refused('waiting[0].clock'));
+  answering(t, { asOf, counts: { waiting: 0, inFlight: 1, finished: 0 }, waiting: [], inFlight: [unbroken] });
+  await assert.rejects(readOpen(), refused('inFlight[0].clock'), 'a row in flight owes its clock too: its cell breaks one down');
   const { waitingSince: _since, ...undated } = { ...row(), ...more };
   answering(t, { asOf, counts: { waiting: 1, inFlight: 0, finished: 0 }, waiting: [undated], inFlight: [] });
   await assert.rejects(readOpen(), refused('waiting[0].waitingSince'));

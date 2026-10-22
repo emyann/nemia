@@ -7,6 +7,7 @@ import { duration, type EdgeState } from './canvas.ts';
 import type { Flow } from './flow.ts';
 import { instantWhole } from './instant.ts';
 import { layers, type Point } from './layout.ts';
+import { sinceShort } from './runWords.ts';
 
 /**
  * Whether a run is in flight, and so on the Factory by default: `assess` has it `running`, or it still moves — the engine holds a task of
@@ -137,9 +138,21 @@ function workedTitle(run: Clocked & { startedAt: string; atWork: AtWork }, now: 
   return `At work ${duration(atWorkMs(run.atWork, now))}. Started ${whole(run.startedAt)}, ${end}.${waitedSentence(run)}`;
 }
 
+/** Where a run's clock is drawn: on a card of the Factory's floor or a run's page, or in a row of the runs page's tables. */
+export type ClockPlace = 'card' | 'row';
+
+/** What a run's clock says in a table's column, where there is room for one short fact: the time at work, to the minute. */
+const rowWords = (run: Clocked, now: number): string => {
+  if (run.startedAt === null) return 'not started';
+  return run.atWork ? sinceShort(atWorkMs(run.atWork, now)) : 'not judged';
+};
+
 /**
  * What a run's clock says, wherever the board says how long a run has been going: `words` on the Factory's card, `at` the instant they
- * count from, and `title` the times in full. `finished` is the card's: not in flight.
+ * count from, and `title` the times in full. `finished` is the card's: not in flight. `place` is where the words are drawn — a card says
+ * a sentence (`waiting for 56m`, `1h 05m at work`), a row of a table one short fact and nothing it says twice (`rowWords`): `1h 05m`,
+ * `not started` for a run nothing of which is filed yet, whose minutes since it was created are not time at work and whose Created
+ * column already says them, and `not judged` for a run the api gives no time at work of. Either way the `title` is the whole of it.
  *
  * Its time at work (`AtWork`), the api's: how long any session or check of it ran, two at once counted once, a wait at a gate, a hold or
  * a slot counted for nothing. A run that is over took it (`took 2h 10m`); any other is at work (`1h 05m at work`), the time since what
@@ -150,14 +163,20 @@ function workedTitle(run: Clocked & { startedAt: string; atWork: AtWork }, now: 
  * has — what it waits on is the card's line above (`waiting.word`), and the title's — and a run called off before it started never did.
  * A run the api could not judge has no time at work, and says when it started.
  */
-export function runClock(run: Clocked, now: number, finished: boolean): { words: string; at: string; title: string } {
+export function runClock(
+  run: Clocked,
+  now: number,
+  finished: boolean,
+  place: ClockPlace = 'card',
+): { words: string; at: string; title: string } {
+  const said = (words: string): string => (place === 'row' ? rowWords(run, now) : words);
   if (run.startedAt === null) {
     const created = `Created ${whole(run.createdAt)}.`;
     const since = duration(now - Date.parse(run.createdAt));
     return run.cancelledAt !== null
-      ? { words: `created ${since} ago`, at: run.createdAt, title: `${created} Called off before anything of it was filed.` }
+      ? { words: said(`created ${since} ago`), at: run.createdAt, title: `${created} Called off before anything of it was filed.` }
       : {
-          words: `waiting for ${since}`,
+          words: said(`waiting for ${since}`),
           at: run.createdAt,
           title: `${created} Nothing of it is filed yet${run.waiting ? `: ${run.waiting.word}` : ''}.`,
         };
@@ -167,14 +186,14 @@ export function runClock(run: Clocked, now: number, finished: boolean): { words:
     const over = isOver({ ...run, atWork }, finished);
     const worked = duration(atWorkMs(atWork, now));
     return {
-      words: over ? `took ${worked}` : `${worked} at work`,
+      words: said(over ? `took ${worked}` : `${worked} at work`),
       at: startedAt,
       title: workedTitle({ ...run, startedAt, atWork }, now, over),
     };
   }
   const since = duration(now - Date.parse(startedAt));
   const title = `Started ${whole(startedAt)}.${waitedSentence(run)}`;
-  return { words: finished ? `started ${since} ago` : `${since} since it started`, at: startedAt, title };
+  return { words: said(finished ? `started ${since} ago` : `${since} since it started`), at: startedAt, title };
 }
 
 type FloorRun = Pick<RunSummary, 'id' | 'createdAt' | 'status' | 'moving' | 'waiting' | 'after' | 'waitingOnYou' | 'cancelledAt'> & {

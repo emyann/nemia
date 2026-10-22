@@ -2,6 +2,7 @@
  * The door of the look's own parts: what the board draws beside the kit's components, each shown in its stories beside it. A file
  * outside this folder takes a part from here, never from the part's own file.
  */
+export { BreakdownPreview, BreakdownRows } from './Breakdown';
 export { CopyId } from './CopyId';
 export { cutPoints, cutRing, cutShape, type CutSize } from './cut';
 export { CutButton, CutPress } from './CutButton';

@@ -3,11 +3,11 @@ import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { FINISHED_SIZE, type FinishedPage, type OpenRuns, type WaitingRun } from '../../../src/lib/api/runs.ts';
 import { rowsSaid } from '../../../src/lib/finished.ts';
-import { titleOf } from '../../../src/lib/factory.ts';
-import { endedWords, openWord, presentWait, waitSentence, waitTag, whenColumn } from '../../../src/lib/runWords.ts';
+import { runClock, titleOf } from '../../../src/lib/factory.ts';
+import { agoWords, endedWords, openWord, presentWait, sinceShort, waitSentence, waitTag } from '../../../src/lib/runWords.ts';
 import { answered, fed, photograph, photographBothWidths, SECTIONS, sectionsOf, sidebar, themeOf, railPlace, litOf } from '../board.ts';
 import { expectBeneath, expectCount, expectNone, expectTexts, expectVisible, idle, literal, Refused, WAIT_MS } from '../checks.ts';
-import { timesRefused } from '../runs-times.ts';
+import { agosRefused } from '../runs-times.ts';
 import { contrastHolds } from '../runs-contrast.ts';
 import { COSTLY, ENDING, GATED, REGATED, regatedFiles, writeRegated } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -375,7 +375,7 @@ async function byKeyboard(page: Page, run: WaitingRun): Promise<void> {
   await expectCount(page.locator('[data-slot="preview-card"]'), 0, "Escape on the rail's last bar leaves no step's card open");
 
   const heads: Record<string, RegExp> = {
-    clock: /since it was created$/,
+    clock: /^(?:not started|not judged|under 1m|\d+[dhm](?: \d+[hm])?)$/,
     cost: new RegExp(`^${literal(COSTLY.cost)} so far, by step$`),
     tokens: new RegExp(`^${COSTLY.tokens.said.replace(' tokens', '')} counted, `),
   };
@@ -393,6 +393,11 @@ async function byKeyboard(page: Page, run: WaitingRun): Promise<void> {
         'the cost is broken down by step, in the run’s order',
       );
     else if ((await tooltip(page).locator('[data-breakdown-row]').count()) < 2) throw new Refused(`the ${tile} tooltip has its rows`);
+    if (tile === 'clock') {
+      const foot = (await tooltip(page).locator('[data-breakdown-foot]').innerText()).trim();
+      if (!/^Wall time .+, from .+\.$/.test(foot))
+        throw new Refused(`the clock's tooltip says the wall time its rows add up to, in its foot — it says "${foot}"`);
+    }
     const described = await focused(page).getAttribute('aria-describedby');
     if (!described) throw new Refused(`the ${tile} tile is described by its tooltip while it shows`);
     await photograph(page, path.join(OUT, `runs-tooltip-${tile}-${await themeOf(page)}.png`));
@@ -488,6 +493,57 @@ async function finger(page: Page, open: OpenRuns, finished: FinishedPage): Promi
   if (!off.length) throw new Refused('the probe refuses a copy control whose target is clipped — it found nothing cut');
 }
 
+/**
+ * The Clock column of both tables says the run's time at work, which is what `runClock` writes for a row, and never its wall time: a run
+ * that waited an hour for others to land said `1h 33m` while it had worked for minutes, and one that has filed nothing says `not
+ * started`. A preview over the words breaks that clock down — the rows the waiting card's Clock tile shows, with the wall time as the
+ * foot — opened by the keyboard alone, with no request heard, and closed by Escape. Both tables, and the open preview, are pictured.
+ */
+async function clocksSay(page: Page, open: OpenRuns, finished: FinishedPage): Promise<void> {
+  const tables = [
+    { where: 'in-flight' as const, at: Date.parse(open.asOf), done: false, runs: open.inFlight },
+    { where: 'finished' as const, at: Date.parse(finished.asOf), done: true, runs: finished.runs },
+  ];
+  let wallsDiffered = 0;
+  for (const table of tables) {
+    const words = await section(page, table.where)
+      .locator('tr[data-run] td[data-clock] [data-clock-words]')
+      .evaluateAll((all) => all.map((at) => (at.textContent ?? '').trim()));
+    const want = table.runs.map((run) => runClock(run, table.at, table.done, 'row').words);
+    if (words.join('|') !== want.join('|'))
+      throw new Refused(`the ${table.where} Clock column says the time at work — expected ${want.join(', ')}, found ${words.join(', ')}`);
+    wallsDiffered += table.runs.filter((run, i) => words[i] !== sinceShort(run.wallMs)).length;
+    await photograph(section(page, table.where), path.join(OUT, `runs-table-${table.where}-${await themeOf(page)}.png`));
+  }
+  if (!wallsDiffered)
+    throw new Refused("the seed holds a run whose wall time is not its time at work: without one the column's words prove nothing");
+
+  for (const table of tables) {
+    const asked: string[] = [];
+    const hear = (request: { url(): string }) => void (request.url().includes('/api/') && asked.push(request.url()));
+    const trigger = section(page, table.where).locator('tr[data-run] td[data-clock] button').first();
+    await trigger.scrollIntoViewIfNeeded();
+    page.on('request', hear);
+    await trigger.focus();
+    await expectVisible(tooltip(page), `the Clock cell of a ${table.where} row opens its preview on focus, with no pointer`);
+    const rows = await tooltip(page)
+      .locator('[data-breakdown-row]')
+      .evaluateAll((all) => all.map((row) => row.getAttribute('data-breakdown-row') ?? ''));
+    for (const what of ['Sessions at work', 'Checks running', 'Waiting on you', 'Queued for a slot'])
+      if (!rows.includes(what))
+        throw new Refused(`the ${table.where} preview holds the waiting card's own rows — it holds ${rows.join(', ')}`);
+    await expectVisible(tooltip(page).locator('[data-breakdown-row="Waiting on you"] dd'), 'each row with its figure');
+    const described = await focused(page).getAttribute('aria-describedby');
+    if (!described) throw new Refused(`the ${table.where} Clock cell is described by its preview while it shows`);
+    await photograph(page, path.join(OUT, `runs-clock-preview-${table.where}-${await themeOf(page)}.png`));
+    page.off('request', hear);
+    if (asked.length)
+      throw new Refused(`the preview opens with no request: the row carries its clock — the page asked ${asked.join(', ')}`);
+    await page.keyboard.press('Escape');
+    await expectCount(tooltip(page), 0, 'Escape closes it');
+  }
+}
+
 /** A row in flight and a finished row say their plain facts: the factory, the steps, what it does now; how it ended, and when. */
 async function rowsSay(page: Page, open: OpenRuns, finished: FinishedPage): Promise<void> {
   const flying = open.inFlight.find((run) => !run.unreadable)!;
@@ -528,23 +584,33 @@ async function rowsSay(page: Page, open: OpenRuns, finished: FinishedPage): Prom
     "and its id's end",
   );
   const asOf = new Date(finished.asOf);
-  const whens = finished.runs.map((run) => [run.createdAt, run.finishedAt].map((at) => whenColumn(new Date(at), asOf)).join('|'));
+  const whens = finished.runs.map((run) => [run.createdAt, run.finishedAt].map((at) => agoWords(new Date(at), asOf)).join('|'));
   await expectNone(async () => {
     const said = await section(page, 'finished')
       .locator('tr[data-run]')
       .evaluateAll((rows) => rows.map((row) => [...row.querySelectorAll('time')].map((time) => time.textContent).join('|')));
     return said.join() === whens.join() ? null : `expected ${whens.join(', ')}, found ${said.join(', ')}`;
-  }, 'a finished row says when it was created and when it finished, its date on every row, as `whenColumn` writes it');
+  }, 'a finished row says how long ago it was created and how long ago it finished, as `agoWords` writes it');
+  const titles = await section(page, 'finished')
+    .locator('tr[data-run] time')
+    .evaluateAll((all) => all.map((time) => time.getAttribute('title') ?? ''));
+  if (!titles.length || titles.some((title) => !/\d{4}, \d{1,2}:\d{2}:\d{2} [AP]M$/.test(title)))
+    throw new Refused(`each of them carries the whole instant on hover — ${titles.join(', ')}`);
   const drawn = await section(page, 'finished')
     .locator('tr[data-run] time')
     .evaluateAll((all) =>
-      all.map((time) => ({
-        words: time.textContent ?? '',
-        whiteSpace: getComputedStyle(time).whiteSpace,
-        width: Math.round(time.getBoundingClientRect().width),
-      })),
+      all.map((time) => {
+        const cell = time.closest('td')!;
+        const box = cell.getBoundingClientRect();
+        const style = getComputedStyle(cell);
+        return {
+          words: time.textContent ?? '',
+          width: Math.round(time.scrollWidth),
+          room: Math.round(box.width - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)),
+        };
+      }),
     );
-  const refused = timesRefused(drawn);
+  const refused = agosRefused(drawn);
   if (refused !== null) throw new Refused(refused);
   await expectTexts(page.locator('[data-pager-rows]'), [rowsSaid(finished)], 'the pager says the rows of the first page');
 }
@@ -809,6 +875,7 @@ async function withRegated(page: Page): Promise<void> {
   await tableByKeyboard(page, finished);
   await finger(page, open, finished);
   await rowsSay(page, open, finished);
+  await clocksSay(page, open, finished);
   await flightAligned(page);
   await lookDetails(page);
   await narrow(page);

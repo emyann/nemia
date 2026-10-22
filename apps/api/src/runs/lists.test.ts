@@ -139,7 +139,7 @@ test('the two reads answer every run of the whole list, once, each row its own w
   );
 });
 
-test('a waiting row carries its steps’ costs and a clock whose parts add up to its wall time; no other row does', async () => {
+test('every row of both reads carries a clock whose parts add up to its wall time; the costs and the wait are the waiting row’s alone', async () => {
   const open = await read<OpenListing>('/api/runs-open');
   const [row] = open.waiting;
   assert.deepEqual(row.stepCosts, [{ step: 'write', cost: null }], 'a session that measured no cost cost nothing known');
@@ -150,10 +150,25 @@ test('a waiting row carries its steps’ costs and a clock whose parts add up to
   assert.equal(sessionsMs, 5 * 60_000);
   assert.deepEqual([checksMs, slotMs, restMs], [0, 0, 0]);
   assert.equal(personMs, wallMs - 5 * 60_000, 'from its blocked sign-off until now');
-  assert.equal('clock' in open.inFlight[0], false);
   assert.equal(row.waitingSince, at(25), 'its present wait began as its blocked sign-off ended');
   assert.equal(wallMs - personMs, Date.parse(row.waitingSince) - Date.parse(row.createdAt), 'its one wait is its whole wait on a person');
+  assert.equal('stepCosts' in open.inFlight[0], false);
   assert.equal('waitingSince' in open.inFlight[0], false);
+  const [moving] = open.inFlight;
+  assert.ok(moving.clock, 'a row in flight carries its clock, which its Clock cell breaks down');
+  assert.equal(moving.clock.wallMs, moving.wallMs);
+  const parts = ['sessionsMs', 'checksMs', 'personMs', 'slotMs', 'restMs'] as const;
+  assert.equal(
+    parts.reduce((sum, part) => sum + moving.clock![part], 0),
+    moving.wallMs,
+  );
+  const [done] = (await read<FinishedListing>('/api/runs-finished')).runs;
+  assert.ok(done.clock, 'a finished row carries one too');
+  assert.equal(done.clock.wallMs, done.wallMs, 'read where its work stopped, so its parts add up to the row');
+  assert.equal(
+    parts.reduce((sum, part) => sum + done.clock![part], 0),
+    done.wallMs,
+  );
 });
 
 test('?ofFactory= keeps the runs of one factory, default those that name none, and a name no run carries answers empty', async () => {

@@ -402,8 +402,13 @@ export const summary = (steps: ReadonlyArray<readonly [string, string]>, extra: 
   ...extra,
 });
 
-/** `run` as the light answer lists one in flight: its wall time, and no end. */
-export const listed = (run: RunSummary, wallMs = 0): ListedRun => ({ ...run, wallMs, finishedAt: null });
+/** `run` as the light answer lists one in flight: its wall time, no end, and no clock but the one `clock` gives. */
+export const listed = (run: RunSummary, wallMs = 0, clock: ListedRun['clock'] = null): ListedRun => ({
+  ...run,
+  wallMs,
+  finishedAt: null,
+  clock,
+});
 
 /**
  * `run` as the light answer lists one that waits on a person: listed, with the breakdowns and the start of its present wait `extra`
@@ -414,7 +419,6 @@ export const waitingRun = (
   extra: Partial<Pick<WaitingRun, 'wallMs' | 'clock' | 'stepCosts' | 'waitingSince'>> = {},
 ): WaitingRun => ({
   ...listed(run),
-  clock: null,
   stepCosts: null,
   waitingSince: null,
   ...extra,

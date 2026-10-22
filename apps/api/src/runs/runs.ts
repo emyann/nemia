@@ -103,14 +103,15 @@ const CONCLUDED = COMMANDS.find((c) => c.name === 'concluded')!;
  * - `GET /api/runs-open` — the light answer (`OpenListing`), by the package's entry (`runs open`): the runs that wait on a person
  *   (`waiting`) and the runs in flight (`inFlight`), each in the store's order, and `counts` of each and of the finished runs; a run that
  *   moves and also waits is among the waiting, once. Each row is the list's own (`RunListing`) with its `wallMs`, created until now, and
- *   `finishedAt: null`. A waiting row carries `stepCosts`, the cost of each of its steps, and `clock`, its wall time in five parts that add
- *   up to it: sessions, checks, a wait on a person, a wait for a slot, and the rest; both null where a task of the run does not read.
- *   It carries `waitingSince` too, the instant its present wait on a person began: the end of the waiting step's last try (the gate
- *   reached, the question asked) or the placing of a hold only a person lifts, the earliest where several are open; null where a task
- *   does not read or the record does not date the wait, as for a run that waits on one which never ships. A row in flight has no such key.
+ *   `finishedAt: null`. Every row, waiting or in flight, carries `clock`, its wall time in five parts that add up to it: sessions,
+ *   checks, a wait on a person, a wait for a slot, and the rest; null where a task of the run does not read, or its record is gone since
+ *   the list was read. A waiting row carries `stepCosts` besides, the cost of each of its steps, and `waitingSince`, the instant its
+ *   present wait on a person began: the end of the waiting step's last try (the gate reached, the question asked) or the placing of a
+ *   hold only a person lifts, the earliest where several are open; null where a task does not read or the record does not date the wait,
+ *   as for a run that waits on one which never ships. A row in flight has neither of those two keys.
  *   `?ofFactory=` keeps the runs of one factory, `default` those whose record names none, compared as strings: a name no run carries
- *   answers empty lists and zero counts. Read off the same memo as `GET /api/runs`, with the journals of the waiting runs read for their
- *   breakdowns: it does not grow with the finished runs, and warm it costs no record of one.
+ *   answers empty lists and zero counts. Read off the same memo as `GET /api/runs`, with the journals of the waiting runs and of the runs
+ *   in flight read for their breakdowns: it does not grow with the finished runs, and warm it costs no record of one.
  * - `GET /api/runs-finished` — one page of the finished runs (`FinishedListing`), by the package's entry (`runs finished`): newest first
  *   by `finishedAt`, when their work stopped — the later of the end of the last session or check and the cancellation — two that stopped
  *   together by id. Each row is the list's own with `finishedAt`, its `wallMs` until then, and its `outcome`: `succeeded`, `failed`,
@@ -118,7 +119,10 @@ const CONCLUDED = COMMANDS.find((c) => c.name === 'concluded')!;
  *   none is said and at most 100; the answer says `total`, `page`, `size` and `pages`, at least 1. A page past the last is an empty page,
  *   200. A run that finishes between two reads moves every later row down one: a row is read twice, never skipped. `?ofFactory=` as
  *   above. A `page` that is no whole number from 1, or a `size` that is none from 1 to 100, is a 422 in the package's words (`Invalid`).
- *   A warm read costs what a warm `GET /api/runs` costs, and no journal and no record of a run at rest.
+ *   Each row carries `clock` too, as a row of the light answer does, read where its work stopped so its five parts add up to its own
+ *   `wallMs` and the breakdown of a finished run stands still. The page is cut before anything is read for it, so beyond what a warm
+ *   `GET /api/runs` costs this read costs the records and the task journals of that page's rows alone — nine where the board asks, at
+ *   most `?size=`'s hundred — and nothing for the finished runs it does not answer.
  * - `GET /api/runs/:id` — a run in full (`detail`) with the address of its workflow's page (`RunPage`), found by the package's entry
  *   (`run`): refused with a 404 when there is no such run, and with a 502 when a task it reads does not, in the words the list says it with
  *   (`RunSummary.unreadable`).

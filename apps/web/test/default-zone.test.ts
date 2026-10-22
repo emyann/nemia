@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 const ZONE = 'Asia/Tokyo';
 const { instantWhole, instantWords } = await import('../src/lib/instant.ts');
 const { clockWord } = await import('../src/lib/quota.ts');
-const { dateParts, whenColumn, whenWords } = await import('../src/lib/runWords.ts');
+const { agoWords, dateParts, whenWords } = await import('../src/lib/runWords.ts');
 const { fireWord } = await import('../src/lib/schedules.ts');
 const { timeOfDay, timeToTheSecond, zoneOf } = await import('../src/lib/timeOfDay.ts');
 
@@ -34,7 +34,7 @@ test('every writer handed no time zone writes the words the machine’s zone giv
   assert.deepEqual(dateParts(at), { year: '2026', month: 'Oct', day: '12' });
   assert.deepEqual(dateParts(at), dateParts(at, ZONE));
   assert.equal(whenWords(at, now), '10:11 PM', 'both instants fall on the 12th in Tokyo, so the date is dropped');
-  assert.equal(whenColumn(at, now), '12 Oct 10:11 PM', 'a column keeps its date, and the hour needs no padding at two digits');
+  assert.equal(agoWords(at, now), '49 minutes ago', 'a distance is the same wherever the machine is: it names no zone and takes none');
   assert.equal(instantWords(at, now), '10:11 PM');
   assert.equal(instantWhole(at), '12 Oct 2026, 10:11:00 PM');
   assert.equal(clockWord(at, now), '10:11 PM', 'the same day in Tokyo');
@@ -51,8 +51,7 @@ test('the day and the year are decided in the machine’s zone too, never in UTC
   const newYear = [new Date('2025-12-31T16:00:00Z'), new Date('2026-10-12T15:00:00Z')] as const;
   assert.equal(whenWords(...newYear), '1 Jan 1:00 AM', '31 Dec 16:00 UTC is already 2026 in Tokyo, so the year is dropped');
   assert.equal(whenWords(...newYear, 'UTC'), '31 Dec 2025', 'and named UTC it is the year before, which drops the time instead');
-  assert.equal(whenColumn(...newYear), ' 1 Jan  1:00 AM', "a column keeps its date and drops the year the machine's zone shares");
-  assert.equal(whenColumn(...newYear, 'UTC'), '31 Dec 2025', 'and named UTC the column says the year instead of the time');
+  assert.equal(agoWords(...newYear), '9 months ago', "a distance crosses no year's end: the zone changes the hover title, never it");
   assert.equal(instantWords(...newYear), '1 Jan 1:00 AM', 'the page keeps its time and drops the year the zone shares');
   assert.equal(instantWords(...newYear, 'UTC'), '31 Dec 2025, 4:00 PM', 'and named UTC it says the year, then a comma, then the time');
 });

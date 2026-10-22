@@ -3,8 +3,10 @@ import type { FinishedPage } from '@/lib/api';
 import { factoryOf } from '@/lib/factories';
 import { titleOf } from '@/lib/factory';
 import { ink } from '@/lib/meaning';
-import { endedWords, sinceShort, whenColumn } from '@/lib/runWords';
+import { agoWords, endedWords } from '@/lib/runWords';
+import { instantWhole } from '@/lib/instant';
 import { cn } from '@/components/ui/ds/utils';
+import { RunClockCell } from './RunClockCell';
 import { CopyId, CutFrame, FRAMED_BOX, FRAMED_ROW, FRAMED_TABLE, Pager, TextLink } from './look';
 
 /** A column's heading, in the look's small caps. */
@@ -13,8 +15,15 @@ const HEAD = 'text-label-small uppercase';
 /** A fact in the mono face, on one line. */
 const FACT = 'font-mono text-body-small whitespace-nowrap';
 
-/** A time as a column writes it (`whenColumn`), its padding kept so the column lines up. */
-const WHEN = 'font-mono text-body-small whitespace-pre';
+/** How long ago a column says something was (`agoWords`), cut to the column's room with the whole instant on hover. */
+const WHEN = 'text-body-small';
+
+/** How long ago `at` was at `asOf`, in a `<time>` whose hover says the whole instant. */
+const Ago = ({ at, asOf }: { at: string; asOf: Date }) => (
+  <time dateTime={at} title={instantWhole(new Date(at))} className="block truncate">
+    {agoWords(new Date(at), asOf)}
+  </time>
+);
 
 /** One finished run's row: its title as a link, then its facts, each plain. Times are said against `asOf`. */
 function FinishedRow({ run, asOf }: { run: FinishedPage['runs'][number]; asOf: Date }) {
@@ -30,13 +39,13 @@ function FinishedRow({ run, asOf }: { run: FinishedPage['runs'][number]; asOf: D
         {factoryOf(run)}
       </Cell>
       <Cell data-created className={cn(WHEN, 'text-on-surface-variant')}>
-        <time dateTime={run.createdAt}>{whenColumn(new Date(run.createdAt), asOf)}</time>
+        <Ago at={run.createdAt} asOf={asOf} />
       </Cell>
       <Cell data-finished className={WHEN}>
-        <time dateTime={run.finishedAt}>{whenColumn(new Date(run.finishedAt), asOf)}</time>
+        <Ago at={run.finishedAt} asOf={asOf} />
       </Cell>
-      <Cell data-clock className={FACT}>
-        {sinceShort(run.wallMs)}
+      <Cell data-clock>
+        <RunClockCell run={run} asOf={asOf} finished />
       </Cell>
       <Cell data-cost className={cn(FACT, ink.money)}>
         {run.cost?.said}
@@ -55,7 +64,8 @@ function FinishedRow({ run, asOf }: { run: FinishedPage['runs'][number]; asOf: D
 
 /**
  * One page of the finished runs, newest finished first, as the kit's dense table in the look's cut frame, quiet: each run's title as a
- * link, its factory, when it was created and when it finished, each with its date, its wall time and its cost, how it ended, and its
+ * link, its factory, how long ago it was created and how long ago it finished, each with the whole instant on hover, its time at work
+ * with a preview over it breaking that clock down (`RunClockCell`), its cost, how it ended, and its
  * id's end with a copy control, the last row with no line under it; then the pager, under a line of its own. A page that holds no row
  * draws no table and no line, and the pager says why. Narrower than its columns, the table scrolls sideways inside its frame.
  */
@@ -73,13 +83,13 @@ export function FinishedTable({ page }: { page: FinishedPage }) {
               <Column id="factory" className={cn(HEAD, 'w-24')}>
                 Factory
               </Column>
-              <Column id="created" className={cn(HEAD, 'w-32')}>
+              <Column id="created" className={cn(HEAD, 'w-28')}>
                 Created
               </Column>
-              <Column id="finished" className={cn(HEAD, 'w-32')}>
+              <Column id="finished" className={cn(HEAD, 'w-28')}>
                 Finished
               </Column>
-              <Column id="clock" align="end" className={cn(HEAD, 'w-20')}>
+              <Column id="clock" align="end" className={cn(HEAD, 'w-28')}>
                 Clock
               </Column>
               <Column id="cost" align="end" className={cn(HEAD, 'w-20')}>

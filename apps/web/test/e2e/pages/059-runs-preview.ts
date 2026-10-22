@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { photograph, themeOf } from '../board.ts';
+import { photograph, reachClock, themeOf } from '../board.ts';
 import { expectCount, expectNone, expectVisible, idle, Refused } from '../checks.ts';
 import type { LibraryAgent, RunDetail, RunSummary } from '../../../src/lib/api.ts';
 import { stepCardOf, type StepCardFacts } from '../../../src/lib/stepCard.ts';
@@ -329,11 +329,66 @@ async function onAPhone(page: Page): Promise<void> {
   }
 }
 
+/** The breakdown a Clock cell's preview opens, wherever on the page it stands. */
+const breakdownOf = (page: Page): Locator => page.locator('[data-slot="tooltip"] [data-breakdown]');
+
+/**
+ * The Clock cell's own preview, beside the rail's: on a resting pointer and on focus it opens the breakdown, Escape and the focus
+ * leaving close it, and it does not fight the rail's card — the pointer moving from a clock onto a bar leaves the card open and the
+ * breakdown gone. Read in a laptop's window and at a phone's, where the rail's bars open a sheet instead and the clock's preview is
+ * the same.
+ */
+async function theClockPreview(page: Page): Promise<void> {
+  const size = page.viewportSize() ?? LAPTOP;
+  const first = page.locator(`${FLIGHT} tr[data-run]`).first();
+  const clock = first.locator('td[data-clock] button');
+  try {
+    for (const sized of [LAPTOP, PHONE]) {
+      const where = JSON.stringify(sized);
+      await page.setViewportSize(sized);
+      await clock.scrollIntoViewIfNeeded();
+      await page.mouse.move(0, 0);
+      await expectCount(breakdownOf(page), 0, `in ${where}, no breakdown is open before the pointer comes to a clock`);
+      await clock.hover();
+      await expectVisible(breakdownOf(page), `in ${where}, a clock the pointer rests on opens its breakdown`);
+      await page.mouse.move(0, 0);
+      await expectCount(breakdownOf(page), 0, 'the pointer gone, it closes');
+      await reachClock(page, first, 'in-flight');
+      await expectVisible(breakdownOf(page), `in ${where}, a clock the keyboard reaches opens it, with no pointer`);
+      await page.keyboard.press('Escape');
+      await expectCount(breakdownOf(page), 0, 'Escape closes it');
+      await first.focus();
+      await reachClock(page, first, 'in-flight');
+      await expectVisible(breakdownOf(page), 'left and reached again, it opens again');
+      await first.focus();
+      await expectCount(breakdownOf(page), 0, 'the focus gone from the clock, it closes');
+    }
+    await page.setViewportSize(LAPTOP);
+    const barred = page
+      .locator(`${FLIGHT} tr[data-run]`)
+      .filter({ has: page.locator('[data-step-bar][data-step-preview="card"]') })
+      .first();
+    const bar = barred.locator('[data-step-bar]').first();
+    await barred.scrollIntoViewIfNeeded();
+    await page.mouse.move(0, 0);
+    await barred.locator('td[data-clock] button').hover();
+    await expectVisible(breakdownOf(page), "the clock's breakdown opens on the row the rail's bars stand in");
+    await bar.hover();
+    await expectVisible(previewOf(page), "the pointer slid onto a bar of the same row opens the step's card");
+    await expectCount(breakdownOf(page), 0, 'and the breakdown is gone: the two previews do not stand over each other');
+    await page.mouse.move(0, 0);
+    await expectCount(previewOf(page), 0, 'the pointer gone, the card closes');
+  } finally {
+    await page.setViewportSize(size);
+  }
+}
+
 export default {
   /**
    * A step's card on the runs page: each bar of a rail in flight is a button named by its step and word, which opens its step's card
    * by the keyboard and by the pointer, reading its agent, its time, its five facts and its action as the api answers them; the action
-   * opens the step's page. On a phone's window a press opens the same card in a modal sheet, which the scrim closes. Writes nothing.
+   * opens the step's page. On a phone's window a press opens the same card in a modal sheet, which the scrim closes. The Clock cell's
+   * own preview opens beside it, by the pointer and by the keyboard, at both widths, and the two do not fight. Writes nothing.
    */
   name: 'runs-preview',
   route: '/runs',
@@ -346,5 +401,6 @@ export default {
     await alongEachRail(page);
     await inAShortWindow(page, (await aBar(page)).bar);
     await onAPhone(page);
+    await theClockPreview(page);
   },
 } satisfies PageSpec;

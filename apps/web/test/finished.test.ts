@@ -9,12 +9,16 @@ import { FINISHED_SIZE, finishedRunsQuery, type FinishedPage } from '../src/lib/
 import { finishedSearch, newerOf, olderOf, pageAt, pageSaid, pageSearch, pastLast, rowsSaid } from '../src/lib/finished.ts';
 import { summary } from './run-fixtures.ts';
 
-/** A finished row as the api answers it: the list's own row with its three facts. */
+/** Where a finished row's wall time went, as the api answers it: five parts that add up to its `wallMs`. */
+const CLOCK = { wallMs: 1_660_000, sessionsMs: 1_200_000, checksMs: 300_000, personMs: 100_000, slotMs: 60_000, restMs: 0 };
+
+/** A finished row as the api answers it: the list's own row with its three facts and its clock. */
 const row = (id: string, extra: Record<string, unknown> = {}) => ({
   ...summary([['plan', 'verified ✓']], { id, status: 'succeeded', moving: false }),
   wallMs: 1_660_000,
   finishedAt: '2026-09-13T00:27:40.000Z',
   outcome: 'succeeded',
+  clock: CLOCK,
   ...extra,
 });
 
@@ -62,12 +66,17 @@ test("the finished read decodes the api's answer, when it was read included, and
   assert.equal(page.asOf, '2026-09-13T01:00:00.000Z', 'the instant every time on the page is said against');
   assert.equal('somethingNew' in page.runs[0], false);
   assert.equal(page.runs[0].steps[0].name, 'plan', "a row keeps the list's own keys");
+  assert.deepEqual(page.runs[0].clock, CLOCK, 'a row carries the clock its cell breaks down');
+  assert.equal(page.runs[0].clock?.wallMs, page.runs[0].wallMs, "the clock's wall time is the row's own");
 });
 
 test('REFUSED: an outcome the board has no word for, a row that does not say when it finished, and pages that are no number', async () => {
   assert.match(await refusal(answer({ runs: [row('r-1', { outcome: 'shelved' })] })), /outcome/);
   const { finishedAt: _dropped, ...unfinished } = row('r-1');
   assert.match(await refusal(answer({ runs: [unfinished] })), /finishedAt/);
+  const { clock: _unbroken, ...noClock } = row('r-1');
+  assert.match(await refusal(answer({ runs: [noClock] })), /clock/);
+  assert.equal(await refusal(answer({ runs: [row('r-1', { clock: null })] })), 'decoded', 'a clock the api could not read is none');
   assert.match(await refusal(answer({ pages: '71' })), /pages/);
   assert.match(await refusal(answer({ asOf: undefined })), /asOf/);
   assert.equal(await refusal(answer()), 'decoded');

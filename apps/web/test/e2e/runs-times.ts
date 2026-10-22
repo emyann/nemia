@@ -1,31 +1,30 @@
 /**
- * The rule of the times in the Runs page's finished table, without a browser: each keeps its padding, and the times of one form are
- * each as wide as the next. A table holds two forms once it crosses a new year, a day and a time (`11 Oct  1:11 PM`) and a day and
- * its year (`31 Dec 2025`), and the two are never as wide as each other.
+ * The rule of the times in the Runs page's finished table, without a browser: each says how long ago it was in the one form the board
+ * writes — `just now`, or one unit and `ago` — never date-fns's `about`, and each has the room of its own cell, the overlap the column
+ * had when it wrote a padded date and a time.
  */
 
-/** A time as the browser draws it: its words with their padding, how its white space is kept, and its width in whole pixels. */
-export interface DrawnTime {
+/** A column's `how long ago` as the browser draws it: its words, its own width and the room its cell leaves it, in whole pixels. */
+export interface DrawnAgo {
   words: string;
-  whiteSpace: string;
   width: number;
+  room: number;
 }
 
-/** The form a time's words are in: `a day and its year` when they end on a year, else `a day and a time`. */
-export const formOf = (words: string): string => (/\d{4}\s*$/.test(words) ? 'a day and its year' : 'a day and a time');
+/** The one form the column writes: `just now` under a minute, else a whole number, one unit, and `ago`. */
+export const AGO = /^(?:just now|\d+ (?:seconds?|minutes?|hours?|days?|months?|years?) ago)$/;
 
 /**
- * What is wrong with `times`, or null: a time whose white space is not kept as written (`pre`), which would lose its padding, or
- * two times of one form that are not as wide as each other. Two forms may differ in width.
+ * What is wrong with `times`, or null: words in no form the column writes (an absolute date, a distance of two units, date-fns's
+ * `about`), or a time wider than the room its cell leaves it, which is the overlap a reader sees.
  */
-export function timesRefused(times: DrawnTime[]): string | null {
-  const loose = times.filter((time) => time.whiteSpace !== 'pre');
-  if (loose.length > 0)
-    return `each time of the finished table keeps its padding — ${loose.map((time) => `${JSON.stringify(time.words)} is ${time.whiteSpace}`).join(', ')}`;
-  for (const form of new Set(times.map((time) => formOf(time.words)))) {
-    const drawn = times.filter((time) => formOf(time.words) === form);
-    if (new Set(drawn.map((time) => time.width)).size > 1)
-      return `every time written as ${form} is as wide as the next — ${drawn.map((time) => `${JSON.stringify(time.words)} ${time.width}px`).join(', ')}`;
-  }
+export function agosRefused(times: DrawnAgo[]): string | null {
+  const said = (time: DrawnAgo) => JSON.stringify(time.words);
+  const wrong = times.filter((time) => !AGO.test(time.words.trim()));
+  if (wrong.length > 0)
+    return `each time of the finished table says how long ago it was, as \`just now\` or one unit and \`ago\` — ${wrong.map(said).join(', ')}`;
+  const over = times.filter((time) => time.width > time.room);
+  if (over.length > 0)
+    return `each time has the room of its own cell — ${over.map((time) => `${said(time)} is ${time.width}px in ${time.room}px`).join(', ')}`;
   return null;
 }

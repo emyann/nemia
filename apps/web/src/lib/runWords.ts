@@ -3,7 +3,7 @@
  * wall time as a fact to the minute; and what a run's rail of steps says aloud. Each sentence is built from the row's steps and their
  * names alone: what the api advises a person to type is never repeated here. Pure.
  */
-import { format, isSameDay, isSameYear } from 'date-fns';
+import { format, formatDistanceStrict, isSameDay, isSameYear } from 'date-fns';
 import type { RunOutcome, RunSummary } from './api/runs.ts';
 import type { Hue } from './meaning.ts';
 import { stepState, type StepState } from './status.ts';
@@ -192,18 +192,16 @@ export function openWord(row: OpenedRow): string {
 export type Now = { word: string; note: string };
 
 /**
- * What a run in flight does now: its first step not done, by the rail's word for its state, its name and its place among the run's
- * steps (`implement (2 of 4)`), then how long the run has been at work without a stop, to the minute, where `workingMs` gives it.
- * None for a run whose every step is done.
+ * What a run in flight does now: its first step not done, by the rail's word for its state, and its name and its place among the run's
+ * steps as the note (`implement (2 of 4)`). None for a run whose every step is done. It says no duration: the row's Clock column says
+ * how long the run has been at work, and a second time in the note beside it read as one word and said the same thing twice.
  */
-export function nowOf(row: WaitingRow, workingMs: number | null): Now | null {
+export function nowOf(row: WaitingRow): Now | null {
   const states = railStates(row.steps, Boolean(row.cancelledAt), row.holding != null);
   const at = states.findIndex((step) => !PAST.includes(step.state));
   const step = states[at];
   if (!step) return null;
-  const place = `${step.name} (${at + 1} of ${states.length})`;
-  const timed = step.state === 'working' && workingMs !== null;
-  return { word: railWord[step.state], note: timed ? `${place}, ${sinceWords(workingMs)}` : place };
+  return { word: railWord[step.state], note: `${step.name} (${at + 1} of ${states.length})` };
 }
 
 /** How a finished run ended, as the page says it: a word, its whole sentence, and the hue it is drawn in. */
@@ -240,6 +238,20 @@ export const presentWait = (run: { waitingSince: string | null }, asOf: Date): s
 
 /** A run's wall time as a fact: `27m since it was created`. */
 export const sinceCreated = (ms: number): string => `${sinceWords(ms)} since it was created`;
+
+/** What a distance under a minute says, a column having no room for seconds. */
+export const JUST_NOW = 'just now';
+
+/**
+ * How long ago `at` was at `now`, the way a table's column says it: `just now` under a minute, else one unit and the word `ago`
+ * (`3 minutes ago`, `2 hours ago`, `3 days ago`, `4 months ago`, `2 years ago`). date-fns's `formatDistanceStrict`, which rounds to the
+ * nearest unit and writes no `about`, unlike `formatDistance`. A distance has no time zone: the whole instant on hover is where the
+ * reader's zone shows (`instantWhole`). `UNREADABLE` where `at` or `now` does not parse.
+ */
+export function agoWords(at: Date, now: Date): string {
+  if (unreadable(at, now)) return UNREADABLE;
+  return Math.abs(now.getTime() - at.getTime()) < 60_000 ? JUST_NOW : formatDistanceStrict(at, now, { addSuffix: true });
+}
 
 /** What the rail says of a step in each state. */
 export const railWord: Record<StepState, string> = {
@@ -308,18 +320,4 @@ export function whenWords(at: Date, now: Date, timeZone?: string): string {
   const time = timeOfDay(at, timeZone);
   if (!isSameYear(at, now, zone)) return `${then.day} ${then.month} ${then.year}`;
   return isSameDay(at, now, zone) ? time : `${then.day} ${then.month} ${time}`;
-}
-
-/**
- * When something of a run happened, as a column of a table writes it: its date on every row, the day of `now` included, and its time
- * on a 12-hour clock, the day and the hour each two characters wide so that a mono column lines up (`11 Oct  1:11 PM`,
- * ` 3 Aug 11:05 AM`); in another year than `now`'s the day and its year (`31 Dec 2025`). Its spaces are plain ones: draw it with
- * its white space kept. `UNREADABLE`, unpadded, where `at` or `now` does not parse.
- */
-export function whenColumn(at: Date, now: Date, timeZone?: string): string {
-  if (unreadable(at, now)) return UNREADABLE;
-  const then = dateParts(at, timeZone);
-  const date = `${then.day.padStart(2)} ${then.month}`;
-  if (!isSameYear(at, now, zoneOf(timeZone))) return `${date} ${then.year}`;
-  return `${date} ${timeOfDay(at, timeZone).padStart(8)}`;
 }

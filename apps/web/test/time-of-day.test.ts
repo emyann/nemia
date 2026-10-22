@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { clockWord } from '../src/lib/quota.ts';
-import { whenColumn, whenWords } from '../src/lib/runWords.ts';
+import { agoWords, whenWords } from '../src/lib/runWords.ts';
 import { fireWord } from '../src/lib/schedules.ts';
 import { timeOfDay } from '../src/lib/timeOfDay.ts';
 
@@ -166,7 +166,7 @@ test('every word that says a time takes it from the one writer, and decides its 
   assert.equal(clockWord(new Date('2026-10-13T02:00:00Z'), now, 'UTC'), 'Tue 2:00 AM', 'another day, by its weekday');
   assert.equal(whenWords(at, now, 'UTC'), '1:11 PM');
   assert.equal(whenWords(new Date('2026-10-11T13:11:00Z'), now, 'UTC'), '11 Oct 1:11 PM', 'another day, by its date');
-  assert.equal(whenColumn(at, now, 'UTC'), '12 Oct  1:11 PM', 'a column pads the hour to two characters');
+  assert.equal(agoWords(at, now), '2 hours ago', 'a distance has no zone to take, and so takes none');
   assert.equal(whenWords(new Date('2025-12-31T13:11:00Z'), now, 'UTC'), '31 Dec 2025', 'the runs page drops the time in another year');
   assert.equal(fireWord(new Date('2026-10-20T12:00:00Z'), now, 'UTC'), '20 Oct 12:00 PM', "a far fire, in the runs page's order");
   assert.equal(

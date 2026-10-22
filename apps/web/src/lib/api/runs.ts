@@ -182,10 +182,11 @@ export const runsQuery = queryOptions({
 });
 
 /**
- * Mirrors `ListedRun` in agent-orchestrator: the list's own row, its wall time (`wallMs`), and when its work stopped, null while it has
- * not.
+ * Mirrors `ListedRun` in agent-orchestrator: the list's own row, its wall time (`wallMs`), when its work stopped, null while it has
+ * not, and where that wall time went (`clock`), null where the api could not read it. Every row of both tables carries the clock, which
+ * is what its Clock cell breaks down.
  */
-export type ListedRun = RunSummary & { wallMs: number; finishedAt: string | null };
+export type ListedRun = RunSummary & { wallMs: number; finishedAt: string | null; clock: RunClock | null };
 
 /**
  * Mirrors `RunClock` in agent-orchestrator: where a run's wall time went, in five parts that add up to `wallMs`: sessions at work,
@@ -197,11 +198,11 @@ export type RunClock = { wallMs: number; sessionsMs: number; checksMs: number; p
 export type StepCost = { step: string; cost: Spent | null };
 
 /**
- * Mirrors `WaitingRun` in agent-orchestrator: a run that waits on a person, with where its wall time went (`clock`), the cost of each
- * of its steps (`stepCosts`) and the instant its present wait on a person began (`waitingSince`), each null where the api could not read
- * it, the last also where the api dates no such wait.
+ * Mirrors `WaitingRun` in agent-orchestrator: a run that waits on a person, with, beyond every row's `clock`, the cost of each of its
+ * steps (`stepCosts`) and the instant its present wait on a person began (`waitingSince`), each null where the api could not read it,
+ * the last also where the api dates no such wait.
  */
-export type WaitingRun = ListedRun & { clock: RunClock | null; stepCosts: StepCost[] | null; waitingSince: string | null };
+export type WaitingRun = ListedRun & { stepCosts: StepCost[] | null; waitingSince: string | null };
 
 /**
  * Mirrors `OpenListing` in apps/api/src/runs/runs.ts: the instant it was read at (`asOf`), the runs that wait on a person (`waiting`)
@@ -226,20 +227,24 @@ const RunClockSchema = Schema.Struct({
 }) satisfies Schema.Schema<RunClock>;
 
 /** The keys a listed row adds to the whole list's (`ListedRun`). */
-const ListedFields = { ...RunSummarySchema.fields, wallMs: Schema.Number, finishedAt: Schema.NullOr(Schema.String) };
+const ListedFields = {
+  ...RunSummarySchema.fields,
+  wallMs: Schema.Number,
+  finishedAt: Schema.NullOr(Schema.String),
+  clock: Schema.NullOr(RunClockSchema),
+};
 
 /** Decodes a `ListedRun`. */
 const ListedRunSchema = Schema.Struct(ListedFields) satisfies Schema.Schema<ListedRun>;
 
-/** Decodes a `WaitingRun`: the listed row, its clock, its steps' costs and when its present wait began. */
+/** Decodes a `WaitingRun`: the listed row with its clock, its steps' costs and when its present wait began. */
 const WaitingRunSchema = Schema.Struct({
   ...ListedFields,
-  clock: Schema.NullOr(RunClockSchema),
   stepCosts: Schema.NullOr(Schema.mutable(Schema.Array(Schema.Struct({ step: Schema.String, cost: Schema.NullOr(SpentSchema) })))),
   waitingSince: Schema.NullOr(Schema.String),
 }) satisfies Schema.Schema<WaitingRun>;
 
-/** Decodes an `OpenRuns`: a waiting row with its breakdowns, a row in flight with its wall time. */
+/** Decodes an `OpenRuns`: a waiting row with its costs and its wait besides, each row with its wall time and its clock. */
 const OpenRunsSchema = Schema.Struct({
   asOf: Schema.String,
   counts: Schema.Struct({ waiting: Schema.Number, inFlight: Schema.Number, finished: Schema.Number }),
@@ -264,9 +269,10 @@ export type RunOutcome = 'succeeded' | 'failed' | 'cancelled' | 'undecided';
 
 /**
  * Mirrors a row of `FinishedListing` in apps/api/src/runs/runs.ts: the list's own row, when its work stopped (`finishedAt`), its wall
- * time from its creation until then (`wallMs`), and how it ended (`outcome`).
+ * time from its creation until then (`wallMs`), how it ended (`outcome`), and where that wall time went (`clock`), read where its work
+ * stopped and so standing still.
  */
-export type FinishedRun = RunSummary & { wallMs: number; finishedAt: string; outcome: RunOutcome };
+export type FinishedRun = RunSummary & { wallMs: number; finishedAt: string; outcome: RunOutcome; clock: RunClock | null };
 
 /**
  * Mirrors `FinishedListing`: one page of the finished runs, newest finished first, read at `asOf`. `total` rows in all, `page` from 1
@@ -274,7 +280,7 @@ export type FinishedRun = RunSummary & { wallMs: number; finishedAt: string; out
  */
 export type FinishedPage = { asOf: string; total: number; page: number; size: number; pages: number; runs: FinishedRun[] };
 
-/** Decodes a `FinishedPage`: each row the list's (`RunSummarySchema`) with its three facts. */
+/** Decodes a `FinishedPage`: each row the list's (`RunSummarySchema`) with its three facts and its clock. */
 const FinishedPageSchema = Schema.Struct({
   asOf: Schema.String,
   total: Schema.Number,
@@ -288,6 +294,7 @@ const FinishedPageSchema = Schema.Struct({
         wallMs: Schema.Number,
         finishedAt: Schema.String,
         outcome: Schema.Literals(['succeeded', 'failed', 'cancelled', 'undecided']),
+        clock: Schema.NullOr(RunClockSchema),
       }),
     ),
   ),

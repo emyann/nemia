@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { instantWhole, instantWords } from '../src/lib/instant.ts';
 import { fireWord } from '../src/lib/schedules.ts';
 import { clockWord } from '../src/lib/quota.ts';
-import { dateParts, whenColumn, whenWords } from '../src/lib/runWords.ts';
+import { agoWords, dateParts, whenWords } from '../src/lib/runWords.ts';
 import { timeOfDay, timeToTheSecond, UNREADABLE } from '../src/lib/timeOfDay.ts';
 
 const NOW = new Date('2026-10-12T23:08:53Z');
@@ -66,9 +66,9 @@ test("REFUSED: the runs page's words say a date that does not parse, or a clock 
   assert.equal(whenWords(NOW, BROKEN, ZONE), UNREADABLE, 'a clock that does not parse');
 });
 
-test("REFUSED: a column's words say a date that does not parse, or a clock that does not, in the fixed words, unpadded", () => {
-  assert.equal(whenColumn(BROKEN, NOW, ZONE), UNREADABLE);
-  assert.equal(whenColumn(NOW, BROKEN, ZONE), UNREADABLE, 'a clock that does not parse');
+test("REFUSED: a column's `how long ago` says a date that does not parse, or a clock that does not, in the fixed words", () => {
+  assert.equal(agoWords(BROKEN, NOW), UNREADABLE);
+  assert.equal(agoWords(NOW, BROKEN), UNREADABLE, 'a clock that does not parse');
 });
 
 test("REFUSED: the page's words say an instant that does not parse, or a clock that does not, in the fixed words", () => {

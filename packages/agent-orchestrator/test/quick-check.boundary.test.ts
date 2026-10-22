@@ -1,7 +1,7 @@
 /**
  * The quick workflow's own check script (`workflows/quick/change.ts`), run as the check runs it: `node change.ts <verb>` in a committed
  * scratch repository whose base is `WF_BASE_REF`, a bounded subprocess, with `npx` and `npm` stubs first on the path that record what
- * they are handed. The bound is read from the shipped script's text (`FILES`, `LINES`), so each refusal is at the shipped numbers, and
+ * they are handed. The bound is read from the shipped script's text (`LINES`), so each refusal is at the shipped number, and
  * the shipped check of `workflows/quick/implement.md` is run whole, as frozen, so the bound is proven wired and first.
  *
  * Its `origin` is a bare repository and its `gh` a stub (`test/origin.ts`), for the two clauses that push the branch and read CI.
@@ -25,13 +25,12 @@ const SCRIPT = path.join(QUICK, 'change.ts');
 
 /** The shipped script's text, and the number its constant `name` holds, the slice ending on `GENERATED`, which must be there. */
 const TEXT = fs.readFileSync(SCRIPT, 'utf8');
-const shippedNumber = (name: 'FILES' | 'LINES'): number => {
+const shippedNumber = (name: 'LINES'): number => {
   const bounds = TEXT.slice(0, TEXT.indexOf('const GENERATED'));
   const found = new RegExp(`const\\s+${name}\\s*=\\s*(\\d+);`).exec(bounds);
   assert.ok(found, `change.ts declares ${name} before GENERATED`);
   return Number(found[1]);
 };
-const FILES = shippedNumber('FILES');
 const LINES = shippedNumber('LINES');
 
 /** Run git in `dir`, as nobody in particular. */
@@ -165,22 +164,22 @@ function shipped(
   return { code: ran.status, out: ran.stdout, err: ran.stderr, said: said() };
 }
 
-test("REFUSED at shipped defaults: implement's check, as frozen, refuses a change of one file past the bound, first, and names build", () => {
-  const over = workOn(files(FILES + 1), SCRIPTS);
+test("REFUSED at shipped defaults: implement's check, as frozen, refuses a change of one line past the bound, first, and names build", () => {
+  const over = workOn({ 'a.ts': lines(LINES + 1) }, SCRIPTS);
   const refused = shipped(over.repo, over.base);
   assert.notEqual(refused.code, 0, refused.out);
-  assert.ok(refused.err.includes(`the change is ${FILES + 1} files and ${FILES + 1} lines`), refused.err);
-  assert.ok(refused.err.includes(`bound of ${FILES} files and ${LINES} lines`), refused.err);
+  assert.ok(refused.err.includes(`the change is ${LINES + 1} lines in 1 files`), refused.err);
+  assert.ok(refused.err.includes(`bound of ${LINES} lines`), refused.err);
   assert.ok(refused.err.includes('It is a card for the build workflow'), refused.err);
   assert.ok(refused.err.includes('  nemia cancel r-1\n'), refused.err);
   assert.ok(refused.err.includes('  nemia start "<the card\'s text>" '), refused.err);
   assert.ok(refused.err.includes(' --workflows build --factory nemia\n'), refused.err);
   assert.deepEqual(refused.said, [], 'nothing else of the check ran: the bound is first');
 
-  const within = workOn(files(FILES), SCRIPTS);
+  const within = workOn({ 'a.ts': lines(LINES) }, SCRIPTS);
   const passed = shipped(within.repo, within.base);
   assert.equal(passed.code, 0, passed.out + passed.err);
-  assert.ok(passed.out.includes(`wf size: ${FILES} files, ${FILES} lines of ${FILES} and ${LINES}\n`), passed.out);
+  assert.ok(passed.out.includes(`wf size: 1 files, ${LINES} lines of ${LINES}\n`), passed.out);
   assert.deepEqual(passed.said, [], 'no types, no lint, no test of a package');
 
   const bare = workOn(files(1));
@@ -269,7 +268,7 @@ test('REFUSED: a change of one line past the bound, added or removed, and none a
   const over = workOn({ 'a.ts': lines(LINES + 1) });
   const refused = change(over.repo, over.base, 'size');
   assert.equal(refused.code, 1, refused.out);
-  assert.ok(refused.err.includes(`the change is 1 files and ${LINES + 1} lines`), refused.err);
+  assert.ok(refused.err.includes(`the change is ${LINES + 1} lines in 1 files`), refused.err);
   const at = workOn({ 'a.ts': lines(LINES) });
   assert.equal(change(at.repo, at.base, 'size').code, 0);
 
@@ -281,8 +280,15 @@ test('REFUSED: a change of one line past the bound, added or removed, and none a
   };
   const cut = removes(101);
   assert.equal(cut.code, 1, cut.out);
-  assert.ok(cut.err.includes(`the change is 2 files and ${LINES + 1} lines`), `removed lines count:\n${cut.err}`);
+  assert.ok(cut.err.includes(`the change is ${LINES + 1} lines in 2 files`), `removed lines count:\n${cut.err}`);
   assert.equal(removes(100).code, 0);
+});
+
+test('a change of many files within the line bound passes: the count of files is said, and refuses nothing', () => {
+  const many = workOn(files(LINES));
+  const passed = change(many.repo, many.base, 'size');
+  assert.equal(passed.code, 0, passed.err);
+  assert.equal(passed.out, `wf size: ${LINES} files, ${LINES} lines of ${LINES}\n`);
 });
 
 test('a generated file counts for nothing, and a test or a doc counts as any file: REFUSED with the same lines in one', () => {
@@ -294,7 +300,7 @@ test('a generated file counts for nothing, and a test or a doc counts as any fil
   const beside = workOn({ ...made, 'src/a.ts': 'export const a = 1;\n' });
   const passed = change(beside.repo, beside.base, 'size');
   assert.equal(passed.code, 0, passed.err);
-  assert.equal(passed.out, `wf size: 1 files, 1 lines of ${FILES} and ${LINES}\n`);
+  assert.equal(passed.out, `wf size: 1 files, 1 lines of ${LINES}\n`);
   for (const counted of ['packages/x/test/a.test.ts', 'docs/a.md', 'apps/web/src/routeTree.ts', 'apps/web/themes/a.css']) {
     const { repo, base } = workOn({ [counted]: lines(LINES + 1) });
     assert.equal(change(repo, base, 'size').code, 1, `${counted} counts`);
@@ -305,25 +311,25 @@ test('the measure is the net change: a line added then removed is none, and a re
   const undone = workOn({ 'a.ts': lines(LINES + 1) });
   fs.rmSync(path.join(undone.repo, 'a.ts'));
   commit(undone.repo, {}, 'take it back');
-  assert.equal(change(undone.repo, undone.base, 'size').out, `wf size: 0 files, 0 lines of ${FILES} and ${LINES}\n`);
+  assert.equal(change(undone.repo, undone.base, 'size').out, `wf size: 0 files, 0 lines of ${LINES}\n`);
 
   const moved = based({ 'a.ts': lines(LINES + 1) });
   git(moved.repo, 'mv', 'a.ts', 'b.ts');
   commit(moved.repo, {}, 'rename');
-  assert.equal(change(moved.repo, moved.base, 'size').out, `wf size: 1 files, 0 lines of ${FILES} and ${LINES}\n`);
+  assert.equal(change(moved.repo, moved.base, 'size').out, `wf size: 1 files, 0 lines of ${LINES}\n`);
 });
 
 test('REFUSED otherwise: a branch that merged a newer base is measured on its own change, from the base it merged last', () => {
   const { repo, base } = workOn({ 'mine.ts': 'export const mine = 1;\n' });
   git(repo, 'checkout', '-q', 'main');
-  commit(repo, files(4 * FILES, 'theirs'), 'the base moves');
+  commit(repo, { 'theirs.ts': lines(LINES + 1, 'theirs') }, 'the base moves');
   git(repo, 'checkout', '-q', BRANCH);
   git(repo, 'merge', '-q', '--no-ff', '-m', 'merge the base', 'main');
   commit(repo, { 'more.ts': 'export const more = 1;\n' }, 'after the merge');
   const measured = change(repo, base, 'size');
   assert.equal(measured.code, 0, measured.err);
-  assert.equal(measured.out, `wf size: 2 files, 2 lines of ${FILES} and ${LINES}\n`);
-  assert.equal(git(repo, 'diff', '--name-only', base, 'HEAD').trim().split('\n').length, 4 * FILES + 2, 'which the first base would not');
+  assert.equal(measured.out, `wf size: 2 files, 2 lines of ${LINES}\n`);
+  assert.equal(git(repo, 'diff', '--numstat', base, 'HEAD').includes(`${LINES + 1}\t0\ttheirs.ts`), true, 'which the first base would not');
 });
 
 test('REFUSED: no base to measure from, and a verb the script has not', () => {
@@ -347,11 +353,15 @@ test('REFUSED: no base to measure from, and a verb the script has not', () => {
 
 test("REFUSED: a note or a README that says another bound than the script's, or other clauses than the check's", () => {
   const said = (file: string): string => fs.readFileSync(path.join(QUICK, file), 'utf8');
-  const note = new RegExp(`at\\s+most\\s+${FILES}\\s+files\\s+and\\s+${LINES}\\s+lines\\s+changed`);
+  const note = new RegExp(`at\\s+most\\s+${LINES}\\s+lines\\s+changed,\\s+in\\s+any\\s+number\\s+of\\s+files`);
   assert.match(said('implement.md'), note);
   assert.doesNotMatch(said('implement.md').replace(`${LINES} lines`, `${LINES + 1} lines`), note);
-  const readme = new RegExp(`at\\s+most\\s+\\*\\*${FILES}\\s+files\\*\\*\\s+and\\s+\\*\\*${LINES}\\s+lines\\*\\*\\s+changed`);
+  for (const file of ['implement.md', 'review.md']) assert.doesNotMatch(said(file), /at\s+most\s+\d+\s+files/, `${file} bounds no files`);
+  const readme = new RegExp(`at\\s+most\\s+\\*\\*${LINES}\\s+lines\\*\\*\\s+changed`);
   assert.match(said('README.md'), readme);
+  assert.doesNotMatch(said('README.md'), /\*\*\d+\s+files\*\*/, 'README.md bounds no files');
+  for (const file of ['implement.md', 'review.md', 'README.md'])
+    assert.doesNotMatch(said(file), /either\s+number/, `${file} says of one bound, not two`);
   const check = loadWorkflows(QUICK, placesOf(QUICK)).find((step) => step.name === 'implement')?.check ?? '';
   const clauses = [...check.matchAll(/node\s+"\$\w+\/([\w-]+\.ts)"\s+(size|tests|pages|push|wait)?/g)].map(([, script, verb]) =>
     verb ? `${script} ${verb}` : script,

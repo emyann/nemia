@@ -6,7 +6,8 @@
  * parent. A line added then removed counts for nothing, and a renamed file is one file.
  *
  * `size` counts the files changed and the lines added plus removed, tests and docs included, a generated file (`GENERATED`) left out,
- * and refuses a change past `FILES` or `LINES`: it is a card for the build workflow, and the refusal gives the two commands.
+ * and refuses a change past `LINES`: it is a card for the build workflow, and the refusal gives the two commands. The count of files
+ * is said, and refuses nothing: the review reads every file.
  *
  * Prints a `wf size:` line and exits 0. Exits 1, on stderr, on a refusal; and when `WF_BASE_REF` is not set, git cannot say what
  * changed, or the verb is another than `size`.
@@ -15,9 +16,6 @@ import { spawnSync } from 'node:child_process';
 
 /** A reason the step is refused: said on stderr, exit 1. */
 class Refusal extends Error {}
-
-/** The most files a quick build changes. */
-const FILES = 10;
 
 /** The most lines a quick build changes, added plus removed. */
 const LINES = 300;
@@ -67,12 +65,12 @@ function changes(): Change[] {
 /** Whether a tool writes `path`. */
 const generated = (path: string): boolean => GENERATED.some((made) => (made.endsWith('/') ? path.startsWith(made) : path === made));
 
-/** The refusal of a change of `files` files and `lines` lines, which names the build workflow and the two commands that take it there. */
+/** The refusal of a change of `lines` lines in `files` files, which names the build workflow and the two commands that take it there. */
 function tooLarge(files: number, lines: number): Refusal {
   const run = process.env.WF_RUN ?? '<run>';
   return new Refusal(
     [
-      `the change is ${files} files and ${lines} lines, past a quick build's bound of ${FILES} files and ${LINES} lines ` +
+      `the change is ${lines} lines in ${files} files, past a quick build's bound of ${LINES} lines ` +
         '(added plus removed; tests and docs count, generated files do not).',
       'It is a card for the build workflow, which gives a change this size a spec and a review. Cancel this run and start the card there:',
       `  nemia cancel ${run}`,
@@ -82,12 +80,12 @@ function tooLarge(files: number, lines: number): Refusal {
   );
 }
 
-/** `size`: says the count, and refuses a change past `FILES` or `LINES`. */
+/** `size`: says the count, and refuses a change past `LINES`. */
 function size(say: (line: string) => void): number {
   const counted = changes().filter((change) => !generated(change.path));
   const lines = counted.reduce((sum, change) => sum + change.lines, 0);
-  say(`wf size: ${counted.length} files, ${lines} lines of ${FILES} and ${LINES}`);
-  if (counted.length > FILES || lines > LINES) throw tooLarge(counted.length, lines);
+  say(`wf size: ${counted.length} files, ${lines} lines of ${LINES}`);
+  if (lines > LINES) throw tooLarge(counted.length, lines);
   return 0;
 }
 

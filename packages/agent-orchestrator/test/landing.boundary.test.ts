@@ -290,6 +290,7 @@ test('REFUSED: a draft pull request, one based on another branch, and one whose 
   assert.equal(b.code, 1, b.out);
   assert.match(b.err, /#7 is based on `release`, not on the base branch `main`/);
   assert.match(b.err, /gh pr edit 7 --base main/);
+  assert.match(b.err, /gh api -X PATCH repos\/\{owner\}\/\{repo\}\/pulls\/7 -f base=main/);
 
   const moved = world();
   moved.gh.answers(mergeable(moved, { headRefOid: moved.base }));

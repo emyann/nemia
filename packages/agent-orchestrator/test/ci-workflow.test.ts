@@ -479,7 +479,7 @@ function nameDrift(workflow: Workflow): string[] {
 
 /**
  * A run of the suite that does not filter to the leg's own workspace. `legDrift` proves the matrix names every workspace; this proves the
- * leg runs the one it is named for, and without it ten legs could run one package's suite while nine of them report another's.
+ * leg runs the one it is named for, and without it twelve legs could run one package's suite while eleven of them report another's.
  */
 function filterDrift(workflow: Workflow): string[] {
   return (workflow.jobs[LEGS]?.steps ?? [])

@@ -179,7 +179,18 @@ test('REFUSED on its route: a merge of a run whose result step closes no loop �
   assert.deepEqual([asked('r-api-noloop'), asked('r-cli-noloop')], [[], []]);
 });
 
-test('REFUSED at shipped defaults: every route that writes, asked by a page on another site — 403, nothing written', async () => {
+/**
+ * The three branches `refusedBeforeReading` (src/guard.ts) refuses a write on, each a header the board would never send: the words of
+ * each route's own refusal are the package's and nobody's to check (root CLAUDE.md), so the walk reads the status and that the route
+ * names itself. `src/guard.test.ts` reads the near misses of each header.
+ */
+const GUARD_LEGS = [
+  ['a page on another site', { 'sec-fetch-site': 'cross-site' }, 403],
+  ['a name that is not this machine', { host: 'evil.example:8787' }, 403],
+  ['a body not sent as JSON', { 'content-type': 'text/plain' }, 415],
+] as const;
+
+test('REFUSED at shipped defaults: every route that writes, asked by a page on another site (403), addressed to another name (403), or not sent as JSON (415) — nothing written', async () => {
   gatedRun('r-guard');
   const routed = COMMANDS.filter((c) => c.writes).flatMap((c) =>
     routeList(c)
@@ -242,10 +253,14 @@ test('REFUSED at shipped defaults: every route that writes, asked by a page on a
     const { method, path: route } = r;
     const url = route.replace(':runId', 'r-guard').replace(':step', 'plan').replace(':name', 'g-guard').replace(':from', 'yours');
     const body = JSON.stringify({ mode: 'nudge', message: 'Go.', text: 'Go.' });
-    const res = await app.request(url, { method, headers: { ...BOARD, 'sec-fetch-site': 'cross-site' }, body });
-    assert.equal(res.status, 403, command.name);
-    assert.match(((await res.json()) as { error: string }).error, new RegExp(`^${method} ${url.replaceAll('/', '\\/')} `), command.name);
+    for (const [what, headers, status] of GUARD_LEGS) {
+      const said = `${command.name} ${method}: ${what}`;
+      const res = await app.request(url, { method, headers: { ...BOARD, ...headers }, body });
+      assert.equal(res.status, status, said);
+      assert.match(((await res.json()) as { error: string }).error, new RegExp(`^${method} ${url.replaceAll('/', '\\/')} `), said);
+    }
   }
+  assert.ok(fs.existsSync(path.join(root, 'runs', 'r-guard.json')), 'the run neither removed nor pruned');
   assert.deepEqual(asked('r-guard'), [], 'nothing written');
   assert.equal(fs.existsSync(path.join(root, 'cordon')), false, 'the store not paused');
   assert.equal(fs.existsSync(path.join(root, 'workflows', 'g-guard')), false, 'no workflow written');

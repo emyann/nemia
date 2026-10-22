@@ -32,8 +32,8 @@ The check is the cheap set, and CI: it runs `change.ts size`, `pictures.ts`, `pr
 Each script is read from the run's base (`git show "$WF_BASE_REF:…"`), never from the tree it judges:
 
 1. `change.ts size`, first: the net change from the base the branch holds to `HEAD` (`git diff --numstat -M`, so a line added then
-   removed counts for nothing and a rename is one file). Past either number it refuses and says what to do next: `nemia cancel <run>`,
-   then start the card with `build`. The step has no `retries:`, so the refusal waits on a person and no try trims the work to fit.
+   removed counts for nothing and a rename is one file). Past `LINES` lines it refuses, however many files they are in, and says what
+   to do next: `nemia cancel <run>`, then start the card with `build`. The step has no `retries:`, so the refusal waits on a person and no try trims the work to fit.
    Its `wf size:` line is the bound's own count; the `touched` list is the place's report, and may count a rename as two.
 2. `build`'s `pictures.ts` and `probe.ts`, where they are in `workflows/build/`: a change under `apps/web/src` owes a picture, and
    no probe is left live.

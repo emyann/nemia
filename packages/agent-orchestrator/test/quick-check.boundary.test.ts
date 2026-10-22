@@ -360,6 +360,8 @@ test("REFUSED: a note or a README that says another bound than the script's, or 
   const readme = new RegExp(`at\\s+most\\s+\\*\\*${LINES}\\s+lines\\*\\*\\s+changed`);
   assert.match(said('README.md'), readme);
   assert.doesNotMatch(said('README.md'), /\*\*\d+\s+files\*\*/, 'README.md bounds no files');
+  for (const file of ['implement.md', 'review.md', 'README.md'])
+    assert.doesNotMatch(said(file), /either\s+number/, `${file} says of one bound, not two`);
   const check = loadWorkflows(QUICK, placesOf(QUICK)).find((step) => step.name === 'implement')?.check ?? '';
   const clauses = [...check.matchAll(/node\s+"\$\w+\/([\w-]+\.ts)"\s+(size|tests|pages|push|wait)?/g)].map(([, script, verb]) =>
     verb ? `${script} ${verb}` : script,

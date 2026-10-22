@@ -244,6 +244,16 @@ refused and reported on the pass, never guessed at. In the orchestrator, the
 core is `assess` (`packages/agent-orchestrator/src/tick/assess.ts`) and the shell is the controllers `src/runner.ts` re-exports. The core is tested as
 data. The shell reads the world, asks the core, and applies one decision; an `if` that judges belongs in the core.
 
+Two facts a program needs are services with no default, given where the program is composed and by nothing else, so a program that
+asks for one and is given none does not compile: the place a run's work lives in (`PlaceService`, `src/place/place.store.ts`) and the
+store's root (`StoreRoot`, `src/config/root.store.ts`, read from `WF_ROOT` by `storeRootLayer` at `src/cli/main.ts` and at
+`apps/api/src/app.ts`). A store function takes the root as a required `home: string` with no default. What a store module still reads
+as it loads is a debt, counted in `packages/agent-orchestrator/test/global-roots.baseline.ts` and held from growing by
+`test/root-given.test.ts`: a module that pins a root as it loads gives the live store to a caller that named none, which is how a run
+of the src tests in one process emptied `~/.agent-workflows/runs` on 2026-10-21. The runtime's half is done: `root` is required on
+`EngineOptions`, `ClaudeOptions` and the journal's makers, and `packages/agent-runtime/src/cli/main.ts` is the one module that reads
+`AE_ROOT` (`test/engine-root.test.ts`).
+
 Both shells are level-triggered: a pass reads the world, decides and acts, and carries nothing between passes that the
 next could not read again. The one thing the orchestrator's tick keeps in memory is a cache under that rule, not beside
 it: a finished run judged at rest on a full pass is answered from its memo while none of its inputs changed — its record,
@@ -301,7 +311,8 @@ A file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or `CLIENT
   custom.store, read.store (in agents and in skills), skills.store, plan.store, daemon.store, feed.store, inbox.store, tally.store,
   places.store, config.store, series.store, subscription.store, level.store, disk.store and a2a.store in the folders. They load as a tree. At
   the bottom are record/places.store.ts, skills/read.store.ts (where agents and skills are looked for, and the skills read there),
-  meter/tally.store.ts (the pass's meter) and config/config.store.ts, which import no store file. agents/read.store.ts (the
+  meter/tally.store.ts (the pass's meter) and config/config.store.ts, which import no store file; config/root.store.ts, the store's
+  root as the service a program is given, imports config.store.ts and nothing else. agents/read.store.ts (the
   agents read, and a person's custom instructions) imports only skills/read.store.ts; folder/folder.store.ts imports only
   agents/read.store.ts and skills/read.store.ts; record/record.store.ts imports only the bottom four, folder.store.ts and
   record/steps.store.ts; workspace/worktree.store.ts imports only record.store.ts, places.store.ts, tally.store.ts and place/place.store.ts; folder/write.store.ts

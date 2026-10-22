@@ -22,7 +22,6 @@
  * background session's environment is its own.
  */
 import { Effect, Stream } from 'effect';
-import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { nameParts, type Sighting } from '../../core/index.ts';

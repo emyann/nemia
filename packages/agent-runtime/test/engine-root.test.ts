@@ -37,20 +37,7 @@ const HOMEDIR_ALLOWED: Readonly<Record<string, string>> = {
 };
 
 /** `text` with every comment blanked and its line breaks kept, so a store named in prose is passed over. */
-const uncommented = (text: string): string => {
-  const out = [...text];
-  let at = 0;
-  while (at < out.length) {
-    if (text.startsWith('//', at)) {
-      while (at < out.length && out[at] !== '\n') out[at++] = ' ';
-    } else if (text.startsWith('/*', at)) {
-      const end = text.indexOf('*/', at + 2);
-      const stop = end === -1 ? out.length : end + 2;
-      for (; at < stop; at++) if (out[at] !== '\n') out[at] = ' ';
-    } else at++;
-  }
-  return out.join('');
-};
+const uncommented = (text: string): string => text.replace(/\/\*[\s\S]*?(?:\*\/|$)|\/\/[^\n]*/g, (found) => found.replace(/[^\n]/g, ' '));
 
 /** Each line of `text` outside a comment that matches `what`, by its line and the line's own words. */
 const linesMatching = (text: string, what: RegExp): string[] => {
@@ -89,7 +76,7 @@ test('REFUSED: a store named or a home read in a source file is found, by line; 
 const sources = (): string[] =>
   fs
     .readdirSync(SRC, { recursive: true, encoding: 'utf8' })
-    .filter((f) => /\.ts$/.test(f) && !f.endsWith('.test.ts'))
+    .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
     .map((f) => f.split(path.sep).join('/'));
 
 test("src/cli/main.ts is the one module that reads AE_ROOT or names the engine's default store", () => {

@@ -278,7 +278,7 @@ test('REFUSED at shipped defaults: an `unschedulable` that is not a function bui
       builtEngine(
         Engine.layer({
           root: scratch('ae-admission-root-'),
-          journal: memoryJournal(),
+          journal: asyncStore(memoryJournal()),
           unschedulable: true as never,
         }),
       ),

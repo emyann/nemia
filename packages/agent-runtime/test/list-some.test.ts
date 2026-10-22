@@ -149,7 +149,9 @@ test('any other failure of a read fails `list()`: a store that cannot be listed'
       return { entries: [], cursor: 0 };
     },
   };
-  const engine = builtEngine(Engine.layer({ root: scratch('ae-list-some-root-'), journal: asyncStore(journal), harnesses: { mine: asyncOps(harness().runner) } }));
+  const engine = builtEngine(
+    Engine.layer({ root: scratch('ae-list-some-root-'), journal: asyncStore(journal), harnesses: { mine: asyncOps(harness().runner) } }),
+  );
   await assert.rejects(Effect.runPromise(engine.list()), (err: Error) => err.message.includes('fake: the store is gone'));
 });
 

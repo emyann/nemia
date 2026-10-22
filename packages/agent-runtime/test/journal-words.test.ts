@@ -68,7 +68,9 @@ const board = (spawnFails?: Error) => {
       return '';
     },
   };
-  const engine = builtEngine(Engine.layer({ root: scratch('ae-journal-words-root-'), journal: asyncStore(journal), harnesses: { fake: asyncOps(fake) } }));
+  const engine = builtEngine(
+    Engine.layer({ root: scratch('ae-journal-words-root-'), journal: asyncStore(journal), harnesses: { fake: asyncOps(fake) } }),
+  );
   const record = async (id: string) =>
     (await journal.read(id)).map((e) => ({ ...e, at: '<at>', ...('mono' in e ? { mono: '<mono>' } : {}) }));
   return { engine, sessions, asked, record };

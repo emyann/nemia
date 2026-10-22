@@ -4,7 +4,7 @@
  * composed (`StoreRoot`, `src/config/root.store.ts`), and a store function takes it as a required `home: string` so a caller that
  * forgets it does not compile.
  *
- * 39 roots across 19 files when the rule landed, `record/record.store.ts`'s `HOME` the one 61 files import. It only shrinks: a file
+ * `record/record.store.ts`'s `HOME`, which 61 files import, is one of them. It only shrinks: a file
  * threaded takes its line away, a count cut is lowered here, and a file this does not name may hold none at all — the sweep refuses a
  * new one by name. The card that opened it — the store's root is an injected service — is done when this is empty, and only then can
  * the suite's files share a process with nothing to lose.

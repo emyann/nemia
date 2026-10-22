@@ -2324,7 +2324,12 @@ test("the mode the api says a Claude Code task runs in is the one the engine's `
   });
   const spawnedWith = async (permissionMode: string | undefined) => {
     await Effect.runPromise(
-      claudeOps({ root: scratch('nemia-api-engine-') }).spawn({ name: 'ae/t/1', brief: 'the prompt', cwd: bin, ...(permissionMode ? { config: { permissionMode } } : {}) }),
+      claudeOps({ root: scratch('nemia-api-engine-') }).spawn({
+        name: 'ae/t/1',
+        brief: 'the prompt',
+        cwd: bin,
+        ...(permissionMode ? { config: { permissionMode } } : {}),
+      }),
     );
     const args = fs.readFileSync(argsFile, 'utf8').replace(/\n$/, '').split('\n');
     return args[args.indexOf('--permission-mode') + 1];

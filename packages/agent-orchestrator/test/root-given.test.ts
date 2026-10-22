@@ -2,10 +2,10 @@
  * No new module-level store root. The store's root is a service a program is given where it is composed (`StoreRoot`,
  * `src/config/root.store.ts`), and a store function takes it as a `home: string` with no default: a module that reads the root as it
  * loads, or a parameter that falls back to one read that way, gives the live store to a caller that named none — which is how a run of
- * the src tests in one process emptied `~/.agent-workflows/runs` on 2026-10-21.
+ * the src tests in one shared process came to empty the person's own `~/.agent-workflows/runs`.
  *
  * The rule is a pure function over a file's text (`globalRoots`), proven first on planted sources it must refuse, then swept over
- * `src/**`. What holds one today is in `test/global-roots.baseline.ts`, with its count: the sweep refuses a file the baseline does not
+ * `src/**`. What holds one is in `test/global-roots.baseline.ts`, with its count: the sweep refuses a file the baseline does not
  * name, and refuses a count that has grown or an entry that no longer holds one, so the list only shrinks and the card that opened it
  * is done when it is empty.
  *
@@ -28,20 +28,7 @@ const ALLOWED = ['src/config/root.store.ts'];
  * `text` with every comment blanked and its line breaks kept, so a root named in prose — a header paragraph, a line above a
  * signature — is passed over while the line numbers still read true.
  */
-const uncommented = (text: string): string => {
-  const out = [...text];
-  let at = 0;
-  while (at < out.length) {
-    if (text.startsWith('//', at)) {
-      while (at < out.length && out[at] !== '\n') out[at++] = ' ';
-    } else if (text.startsWith('/*', at)) {
-      const end = text.indexOf('*/', at + 2);
-      const stop = end === -1 ? out.length : end + 2;
-      for (; at < stop; at++) if (out[at] !== '\n') out[at] = ' ';
-    } else at++;
-  }
-  return out.join('');
-};
+const uncommented = (text: string): string => text.replace(/\/\*[\s\S]*?(?:\*\/|$)|\/\/[^\n]*/g, (found) => found.replace(/[^\n]/g, ' '));
 
 /**
  * Each root `text` holds as it loads, by its line and the line's own words. Three forms, each laid over as many lines as a formatter
@@ -125,7 +112,7 @@ test('REFUSED: a module-level root, a bare wfRoot and a defaulted parameter are 
 const sources = (): string[] =>
   fs
     .readdirSync(SRC, { recursive: true, encoding: 'utf8' })
-    .filter((f) => /\.ts$/.test(f) && !f.endsWith('.test.ts'))
+    .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
     .map((f) => `src/${f.split(path.sep).join('/')}`);
 
 test('no file of src holds a store root as it loads but those the baseline names, with the count it names', () => {

@@ -3,8 +3,6 @@
  * are Effects with typed errors.
  */
 import { Context, Effect, Exit, Fiber, Layer, Schema, type Scope, type Stream } from 'effect';
-import path from 'node:path';
-import os from 'node:os';
 import { fold, nameFor, pathOf, type Input, type LifecycleStep, type Said, type Sighting, type State } from '../core/index.ts';
 import {
   argsRefusalOf,

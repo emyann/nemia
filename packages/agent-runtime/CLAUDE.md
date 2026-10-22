@@ -39,6 +39,11 @@ down is in `docs/architecture.md`, *Who owns what*.
 ## Arguments and doors
 
 - **A parameter taken away is refused, never ignored** (`Object.hasOwn`, the argument count: `tickRefusalOf`, `StepRefused`).
+- **The engine's `root` is required and defaults to nothing**, on `EngineOptions`, `ClaudeOptions`, `claudeCodeOps`'s options,
+  `Journal.files`, `Journal.filesOps` and `Runner.claude`: whoever builds an engine says where its records go, and `src/cli/main.ts`
+  is the one module that reads `AE_ROOT` or names `~/.agent-engine` (`test/engine-root.test.ts`, which also holds `os.homedir()` to
+  that entry and to the files that find a harness's own home). A runner or an engine a test makes with no root is refused by name
+  (`test/scratch.test.ts`), which catches the one a cast hides from the typecheck.
 - **A flag only Claude Code has goes under `config.claude`**, never a named argument; a key moved there is read at its old place off a
   journal (`upgrade`) and refused there (`FORMER_ARGS`). Pin the argv before a move and compare after.
 - **An optional verb renamed on its way through a seam is dropped by every adapter that takes the old type**: keep the old verb beside

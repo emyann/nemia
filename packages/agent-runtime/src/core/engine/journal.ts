@@ -10,7 +10,6 @@
 import { Context, Effect, Layer, Result, Schema } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
 import type { Event } from '../domain.ts';
 import {
   entryWords,

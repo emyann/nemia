@@ -50,7 +50,10 @@ const memoryStore = (): AsyncJournal => {
 /** The `Engine` service, at shipped defaults, over a store a test can read. */
 const engineDoor = () => {
   const journal = memoryStore();
-  return { engine: builtEngine(Engine.layer({ root: scratch('ae-refusal-root-'), journal: asyncStore(journal) })), listed: () => journal.list() };
+  return {
+    engine: builtEngine(Engine.layer({ root: scratch('ae-refusal-root-'), journal: asyncStore(journal) })),
+    listed: () => journal.list(),
+  };
 };
 
 const ok: Filing = { brief: 'b', cwd: '/r' };

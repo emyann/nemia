@@ -118,16 +118,3 @@ test("REFUSED: a body with no agent and one that is not JSON (400), in the api's
     `PUT /api/factories/Not One/hires/build%2Fimplement: ${factoryNameRefusal('Not One')}`,
   );
 });
-
-test('REFUSED at shipped defaults: a hire and a fire made by a page on another site (403), and a hire sent as a form (415)', async () => {
-  const site = { ...json, 'sec-fetch-site': 'cross-site' };
-  assert.match(
-    await refused(() => send('PUT', HIRE, { agent: 'ada' }, site), 403),
-    /^PUT \/api\/factories\/mill\/hires\/build%2Fimplement refuses a request made by a page on another site/,
-  );
-  assert.match(await refused(() => send('DELETE', HIRE, {}, site), 403), /^DELETE .* Fire it on the step's page on the board\.$/);
-  assert.match(
-    await refused(() => send('PUT', HIRE, 'agent=ada', { 'content-type': 'application/x-www-form-urlencoded' }), 415),
-    /takes its body as `content-type: application\/json`/,
-  );
-});

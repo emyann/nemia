@@ -243,26 +243,6 @@ test("REFUSED at shipped defaults: a copy into the repository's skills, or anywh
   assert.deepEqual(fs.readdirSync(THEIRS).sort(), theirs);
 });
 
-test('REFUSED at shipped defaults: a copy is guarded as every write of the board is — another site, another host, another content type', async () => {
-  const other = 'trial-merge-a-branch';
-  await refused(
-    send('/api/skills/yours', { copy: other }, { ...json, 'sec-fetch-site': 'cross-site' }),
-    403,
-    /^POST \/api\/skills\/yours refuses a request made by a page on another site/,
-  );
-  await refused(
-    send('/api/skills/yours', { copy: other }, { ...json, host: 'evil.example' }),
-    403,
-    /refuses a request addressed to evil\.example/,
-  );
-  await refused(
-    send('/api/skills/yours', { copy: other }, { 'content-type': 'text/plain' }),
-    415,
-    /takes its body as `content-type: application\/json`/,
-  );
-  assert.equal(fs.existsSync(path.join(LIBRARY, other)), false);
-});
-
 test('an agent is listed with each skill it gives, where it is found and what it costs, and one no place has with why', async () => {
   fs.writeFileSync(path.join(root, 'workflows', 'agents', 'lost.md'), '---\ndescription: Lost.\nskills: always, gone\n---\nLook.\n');
   try {
@@ -597,7 +577,7 @@ test("a skill's copy command, run as the page gives it, puts the folder under it
   assert.deepEqual(fs.readdirSync(path.join(into, 'mine')), ['SKILL.md'], 'copied again, it lands on the same folder, not inside it');
 });
 
-test("REFUSED at shipped defaults: a write of the repository's skills, and a skill write guarded as every write of the board is", async () => {
+test("REFUSED at shipped defaults: a write of the repository's skills, naming the copy to make by hand", async () => {
   const theirs = snapshotOf(THEIRS);
   await refused(
     send('/api/skills/repo', { skill: NOTES }),
@@ -611,22 +591,6 @@ test("REFUSED at shipped defaults: a write of the repository's skills, and a ski
   assert.ok(error.startsWith("PUT /api/skills/repo/review refuses to write the repository's skills ") && error.includes(hint), error);
   await refused(put('/api/skills/shipped/review', { version: 'x', preload: true }), 400, /the board changes a skill of your library/);
   assert.deepEqual(snapshotOf(THEIRS), theirs, 'nothing is written into the checkout');
-  const { version } = await detail('yours', 'mine');
-  await refused(
-    put('/api/skills/yours/mine', { version, preload: true }, { ...json, 'sec-fetch-site': 'cross-site' }),
-    403,
-    /^PUT \/api\/skills\/yours\/mine refuses a request made by a page on another site/,
-  );
-  await refused(
-    send('/api/skills/yours', { skill: { ...NOTES, name: 'fresh' } }, { ...json, host: 'evil.example' }),
-    403,
-    /refuses a request addressed to evil\.example/,
-  );
-  await refused(
-    put('/api/skills/yours/mine', { version, preload: true }, { 'content-type': 'text/plain' }),
-    415,
-    /takes its body as `content-type: application\/json`/,
-  );
 });
 
 function snapshotOf(dir: string): Record<string, string> {

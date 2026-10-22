@@ -129,11 +129,3 @@ test('REFUSED at shipped defaults: no factory (404), the default (409), a frontm
   assert.ok(badPut.endsWith(factoryNameRefusal('Not One')!), badPut);
   await answered(send('DELETE', URL, {}));
 });
-
-test('REFUSED: a write asked by a page on another site (403), the rules as they were', async () => {
-  const cross = { ...json, 'sec-fetch-site': 'cross-site' };
-  for (const method of ['PUT', 'DELETE']) {
-    const said = await refused(() => app.request(URL, { method, headers: cross, body: JSON.stringify({ words: 'Mine now.' }) }), 403);
-    assert.match(said, new RegExp(`^${method} /api/factories/mill/rules `));
-  }
-});

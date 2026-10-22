@@ -118,19 +118,6 @@ test('REFUSED: a body that is not a subscription, and a name that names no file,
   assert.equal(fs.existsSync(file('b')), false, 'nothing written');
 });
 
-test('REFUSED at shipped defaults: a page on another site gives no subscription, nor takes one away — 403, nothing written', async () => {
-  const cross = { ...BOARD, 'sec-fetch-site': 'cross-site' };
-  const put = await asked('POST', 'c', { task: 'nemia' }, cross);
-  assert.equal(put.status, 403);
-  assert.match(String(put.body.error), /^POST \/api\/subscriptions\/c /);
-  assert.equal(fs.existsSync(file('c')), false, 'nothing written');
-  assert.equal((await asked('POST', 'c', { task: 'nemia' })).status, 201);
-  const drop = await asked('DELETE', 'c', undefined, cross);
-  assert.equal(drop.status, 403);
-  assert.equal(fs.existsSync(file('c')), true, 'the subscription kept');
-  assert.equal((await asked('DELETE', 'c')).status, 200);
-});
-
 test("a subscription is stored with the floor its runs' factories must be at, and takes the level the package knows alone", async () => {
   const put = await asked('POST', 'floored', { task: 'nemia', atLeast: 'auto' });
   assert.equal(put.status, 201);

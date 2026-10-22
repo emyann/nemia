@@ -4,6 +4,7 @@
  * of routes, from the command table; this file owns the values of a header. A refusal's words are nobody's to check (root
  * CLAUDE.md), so each case says the status alone.
  */
+import '../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { refusedBeforeReading, type Guarded } from './guard.ts';

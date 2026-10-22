@@ -356,59 +356,6 @@ test("REFUSED at shipped defaults: a queue's body that is JSON and not `{}` — 
   assert.deepEqual(inboxAsIs(), before);
 });
 
-test('REFUSED at shipped defaults: a queue or its taking back another site could make — a body not sent as application/json (415), a page on another site (403), a name that is not this machine (403) — is refused before anything is read, and nothing is written', async () => {
-  clear();
-  const { card } = addToInbox({ text: 'Queue me', workflow: 'dev' });
-  const other = addToInbox({ text: 'Queued, to take back', workflow: 'dev' }).card;
-  queueInInbox(other.name);
-  const before = inboxAsIs();
-
-  const writes = [
-    { route: `POST /api/inbox/${card.name}/queue`, send: (headers: Record<string, string>) => queue(card.name, headers) },
-    { route: `DELETE /api/inbox/${other.name}/queue`, send: (headers: Record<string, string>) => unqueue(other.name, headers) },
-  ];
-  for (const { route, send } of writes) {
-    for (const type of ['text/plain;charset=UTF-8', 'application/x-www-form-urlencoded', 'multipart/form-data; boundary=x']) {
-      const res = await send({ 'content-type': type });
-      assert.equal(res.status, 415, `${route} ${type}`);
-      assert.ok(
-        ((await res.json()) as { error: string }).error.startsWith(
-          `${route} takes its body as \`content-type: application/json\`, and this request sent \`${type.split(';')[0]}\``,
-        ),
-      );
-    }
-    const none = await send({});
-    assert.equal(none.status, 415, `${route} with no content-type`);
-    assert.ok(((await none.json()) as { error: string }).error.includes('this request sent no content-type'));
-    for (const site of ['cross-site', 'same-site', 'none']) {
-      const res = await send({ 'content-type': 'application/json', 'sec-fetch-site': site });
-      assert.equal(res.status, 403, `${route} ${site}`);
-      assert.ok(
-        ((await res.json()) as { error: string }).error.startsWith(
-          `${route} refuses a request made by a page on another site (Sec-Fetch-Site: ${site})`,
-        ),
-      );
-    }
-    for (const host of ['evil.example', 'evil.example:8787', 'localhost.evil.example:8787']) {
-      const res = await send({ 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', host });
-      assert.equal(res.status, 403, `${route} ${host}`);
-      assert.ok(((await res.json()) as { error: string }).error.startsWith(`${route} refuses a request addressed to ${host}:`));
-    }
-  }
-  assert.deepEqual(inboxAsIs(), before);
-
-  const board = {
-    'content-type': 'application/json',
-    'sec-fetch-site': 'same-origin',
-    origin: 'http://localhost:5173',
-    host: '127.0.0.1:8787',
-  };
-  assert.equal((await queue(card.name, board)).status, 200, "a queue as the board sends it, through vite's proxy: taken");
-  assert.equal((await unqueue(other.name, board)).status, 200, 'and its taking back, as the board sends it: taken');
-  assert.match(cardText(card.name), /\nqueued: /);
-  assert.doesNotMatch(cardText(other.name), /\nqueued: /);
-});
-
 const at = (minute: number) => `2026-09-16T10:${String(minute).padStart(2, '0')}:00.000Z`;
 
 /** A task filed and waiting for a session: in flight. */

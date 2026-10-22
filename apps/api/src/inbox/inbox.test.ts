@@ -486,59 +486,6 @@ const writesSentWith = (name: string) => [
   { route: `DELETE /api/inbox/${name}`, send: (headers: Record<string, string>) => drop(name, headers) },
 ];
 
-test('REFUSED at shipped defaults: a filing or a drop another site could make — a body not sent as application/json (415), a page on another site (403), a name that is not this machine (403) — is refused before anything is read, and nothing is written or removed', async () => {
-  clear();
-  const { card } = addToInbox({ text: 'Keep this one' });
-  const before = cards();
-
-  for (const { route, send } of writesSentWith(card.name)) {
-    for (const type of ['text/plain;charset=UTF-8', 'application/x-www-form-urlencoded', 'multipart/form-data; boundary=x']) {
-      const res = await send({ 'content-type': type });
-      assert.equal(res.status, 415, `${route} ${type}`);
-      const { error } = (await res.json()) as Refused;
-      assert.ok(
-        error.startsWith(`${route} takes its body as \`content-type: application/json\`, and this request sent \`${type.split(';')[0]}\``),
-        error,
-      );
-    }
-    const none = await send({});
-    assert.equal(none.status, 415, `${route} with no content-type`);
-    assert.ok(
-      ((await none.json()) as Refused).error.includes(
-        route.startsWith('DELETE') ? 'this request sent no content-type' : 'this request sent `text/plain`',
-      ),
-      "no header at all: a drop sends no body, so none is added; a filing's body is sent as text/plain, as a page's fetch sends one",
-    );
-
-    for (const site of ['cross-site', 'same-site', 'none']) {
-      const res = await send({ 'content-type': 'application/json', 'sec-fetch-site': site });
-      assert.equal(res.status, 403, `${route} ${site}`);
-      const { error } = (await res.json()) as Refused;
-      assert.ok(error.startsWith(`${route} refuses a request made by a page on another site (Sec-Fetch-Site: ${site})`), error);
-    }
-
-    for (const host of ['evil.example', 'evil.example:8787', 'localhost.evil.example:8787']) {
-      const res = await send({ 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', host });
-      assert.equal(res.status, 403, `${route} ${host}`);
-      assert.ok(((await res.json()) as Refused).error.startsWith(`${route} refuses a request addressed to ${host}:`));
-    }
-  }
-  assert.deepEqual(cards(), before);
-
-  const board = {
-    'content-type': 'application/json',
-    'sec-fetch-site': 'same-origin',
-    origin: 'http://localhost:5173',
-    host: '127.0.0.1:8787',
-  };
-  assert.equal(
-    (await file({ body: 'Filed from the board' }, board)).status,
-    201,
-    "a filing as the board sends it, through vite's proxy: taken",
-  );
-  assert.equal((await drop(card.name, board)).status, 200, "a drop as the board sends it, through vite's proxy: taken");
-});
-
 test('POST /api/runs with `card` starts the card through the package: the brief as the person edited it, the workflow the api found, `after` — the record carries `from`, and the card leaves the inbox', async () => {
   clear();
   const { card } = addToInbox({ text: 'Show what a step cost\n\nOn the run page.', workflow: 'mine', repo });
@@ -791,18 +738,14 @@ test("REFUSED at shipped defaults: a `card` that is not a card's name is a 400 i
   assert.deepEqual(cards(), [`${card.name}.md`]);
 });
 
-test('REFUSED at shipped defaults: a card start another site could make is refused by the guard before its body is read — and the card stays', async () => {
+test('REFUSED at shipped defaults: a card start another site could make is refused by the guard before its body is read — so the card stays', async () => {
   clear();
   const { card } = addToInbox({ text: 'Keep this one' });
   const body = { workflow: 'dev', card: card.name, brief: 'Do it.' };
   const site = await startCard(body, { 'content-type': 'application/json', 'sec-fetch-site': 'cross-site' });
   assert.equal(site.status, 403);
-  assert.ok(((await site.json()) as Refused).error.includes("Start it from the board's Workflows or Inbox page, or with `nemia start`."));
-  const type = await startCard(body, { 'content-type': 'text/plain;charset=UTF-8' });
-  assert.equal(type.status, 415);
-  assert.ok(((await type.json()) as Refused).error.includes('`"card": "<name>"`'), 'the shape it takes names `card`');
   assert.deepEqual(runFiles(), []);
-  assert.deepEqual(cards(), [`${card.name}.md`]);
+  assert.deepEqual(cards(), [`${card.name}.md`], 'the card a start would have taken off the inbox is still on it');
 });
 
 /**

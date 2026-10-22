@@ -119,19 +119,9 @@ test('REFUSED at shipped defaults: a name no place has (404, read, written or cl
   assert.deepEqual(held(), {});
 });
 
-test('REFUSED: words that are not a string (400 naming `words`), a page on another site (403), a body not sent as JSON (415), a name that climbs (400)', async () => {
+test('REFUSED: words that are not a string (400 naming `words`), and a name that climbs (400)', async () => {
   const seven = await refused(() => send('PUT', '/api/custom-instructions/scribe', { words: 7 }), 400);
   assert.ok(seven.startsWith('PUT /api/custom-instructions/scribe: `words` are what the agent is told') && seven.endsWith('was 7.'), seven);
-  for (const method of ['PUT', 'DELETE']) {
-    const body = method === 'PUT' ? { words: 'Hi.' } : {};
-    const site = await refused(
-      () => send(method, '/api/custom-instructions/scribe', body, { ...json, 'sec-fetch-site': 'cross-site' }),
-      403,
-    );
-    assert.ok(site.startsWith(`${method} /api/custom-instructions/scribe refuses a request made by a page on another site`), site);
-    const plain = await refused(() => send(method, '/api/custom-instructions/scribe', body, { 'content-type': 'text/plain' }), 415);
-    assert.ok(plain.includes('this request sent `text/plain`'), plain);
-  }
   const climbs = await refused(() => send('PUT', '/api/custom-instructions/..%2Fx', { words: 'Out.' }), 400);
   assert.ok(climbs.includes("is not an agent's name"), climbs);
   const read = await refused(() => app.request('/api/custom-instructions/..%2Fx'), 400);

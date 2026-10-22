@@ -301,24 +301,6 @@ test("a write to the repository's agents is refused, and nothing is written into
   assert.deepEqual(snapshot(path.join(repo, 'workflows', 'agents')), theirs);
 });
 
-test('a write is guarded as every write of the board is: another site, another host, another content type', async () => {
-  await refused(
-    send('POST', '/api/agents/yours', scribe, { ...json, 'sec-fetch-site': 'cross-site' }),
-    403,
-    /refuses a request made by a page on another site/,
-  );
-  await refused(
-    send('POST', '/api/agents/yours', scribe, { ...json, host: 'evil.example' }),
-    403,
-    /refuses a request addressed to evil\.example/,
-  );
-  await refused(
-    send('DELETE', '/api/agents/yours/reviewer', { version: 'x' }, { 'content-type': 'text/plain' }),
-    415,
-    /takes its body as `content-type: application\/json`/,
-  );
-});
-
 test("refusals carry the package's words: a key, a value, a name, a name taken, a stale version, and an agent still named", async () => {
   await refused(
     send('POST', '/api/agents/yours', { ...scribe, keys: { check: 'npm test' } }),

@@ -374,40 +374,6 @@ test("a blocked session's last line follows its conversation: words written sinc
   );
 });
 
-test('REFUSED at shipped defaults: an ask another site could make — a page on another site (403), a name that is not this machine (403), a body not sent as application/json (415) — and nothing is written', async () => {
-  const body = { mode: 'nudge', message: 'Postgres.' };
-  for (const site of ['cross-site', 'same-site', 'none']) {
-    const res = await ask('implement', body, { ...BOARD, 'sec-fetch-site': site });
-    assert.equal(res.status, 403, site);
-    const { error } = (await res.json()) as { error: string };
-    assert.ok(
-      error.startsWith(
-        `POST /api/runs/${R}/steps/implement/retry refuses a request made by a page on another site (Sec-Fetch-Site: ${site})`,
-      ),
-      error,
-    );
-  }
-  for (const host of ['evil.example', 'evil.example:8787', 'localhost.evil.example:8787']) {
-    const res = await ask('implement', body, { ...BOARD, host });
-    assert.equal(res.status, 403, host);
-    assert.ok(
-      ((await res.json()) as { error: string }).error.startsWith(
-        `POST /api/runs/${R}/steps/implement/retry refuses a request addressed to ${host}:`,
-      ),
-    );
-  }
-  for (const type of ['text/plain;charset=UTF-8', 'application/x-www-form-urlencoded', 'multipart/form-data; boundary=x']) {
-    const res = await ask('implement', body, { ...BOARD, 'content-type': type });
-    assert.equal(res.status, 415, type);
-    assert.ok(
-      ((await res.json()) as { error: string }).error.startsWith(
-        `POST /api/runs/${R}/steps/implement/retry takes its body as \`content-type: application/json\``,
-      ),
-    );
-  }
-  nothingWritten('a request another site could make');
-});
-
 test("REFUSED at shipped defaults: an empty message, and a message on a recheck, are 422s in `messageRefusal`'s words — and nothing is written", async () => {
   for (const [step, how] of [
     ['implement', { mode: 'nudge', message: '' }],

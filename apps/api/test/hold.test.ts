@@ -638,24 +638,6 @@ test('REFUSED at shipped defaults: a lift of a run the store has not — none by
   );
 });
 
-test('REFUSED at shipped defaults: a lift from a page on another site, addressed to another name, or not sent as JSON, before anything is read, and the hold stands', async () => {
-  const held = fs.readFileSync(holdFile(GATE), 'utf8');
-  const cases: Array<[Record<string, string>, number, RegExp]> = [
-    [{ ...BOARD, 'sec-fetch-site': 'cross-site' }, 403, /refuses a request made by a page on another site/],
-    [{ ...BOARD, 'sec-fetch-site': 'same-site' }, 403, /refuses a request made by a page on another site/],
-    [{ ...BOARD, host: 'evil.example:8787' }, 403, /refuses a request addressed to evil\.example:8787/],
-    [{ ...BOARD, 'content-type': 'text/plain' }, 415, /takes its body as `content-type: application\/json`/],
-  ];
-  for (const [headers, status, words] of cases) {
-    const res = await lift(GATE, headers);
-    assert.equal(res.status, status, JSON.stringify(headers));
-    const { error } = (await res.json()) as { error: string };
-    assert.match(error, words);
-    assert.match(error, new RegExp(`^DELETE /api/runs/${GATE}/hold `));
-    assert.equal(fs.readFileSync(holdFile(GATE), 'utf8'), held);
-  }
-});
-
 /** `plan → implement`, started `--gate plan`: plan signed off and waiting at its gate, held with a person's words and name. */
 const SAID = 'h-said';
 writeRun(
@@ -800,22 +782,10 @@ test("REFUSED at shipped defaults: a hold `hold` refuses — a run already held,
   }
 });
 
-test('REFUSED at shipped defaults: a hold from a page on another site, addressed to another name, or not sent as JSON, before anything is read, and nothing is written', async () => {
-  const cases: Array<[Record<string, string>, number, RegExp]> = [
-    [{ ...BOARD, 'sec-fetch-site': 'cross-site' }, 403, /refuses a request made by a page on another site/],
-    [{ ...BOARD, host: 'evil.example:8787' }, 403, /refuses a request addressed to evil\.example:8787/],
-    [{ ...BOARD, 'content-type': 'text/plain' }, 415, /takes its body as `content-type: application\/json`/],
-  ];
-  for (const [headers, status, words] of cases) {
-    const res = await put(PUT, { until: ['p-live'] }, headers);
-    assert.equal(res.status, status, JSON.stringify(headers));
-    const { error } = (await res.json()) as { error: string };
-    assert.match(error, words);
-    assert.match(error, new RegExp(`^POST /api/runs/${PUT}/hold `));
-    assert.equal(fs.existsSync(holdFile(PUT)), false);
-  }
+test('REFUSED at shipped defaults: the guard answers a hold before any run is read — a run the store has none of is not a 404 yet', async () => {
   const res = await put('h-nope', { until: ['p-live'] }, { ...BOARD, 'sec-fetch-site': 'cross-site' });
-  assert.equal(res.status, 403, 'the guard answers before any run is read: a run the store has none of is not a 404 yet');
+  assert.equal(res.status, 403);
+  assert.match(((await res.json()) as { error: string }).error, /^POST \/api\/runs\/h-nope\/hold /);
 });
 
 test('a lift sent with `{}`, as the board sends it, is still the DELETE it was: the put reads its body strictly, and the lift reads none', async () => {

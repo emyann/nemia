@@ -126,19 +126,6 @@ test("REFUSED at shipped defaults: the repository's workflow is not removed (403
   assert.equal(gone.status, 404);
 });
 
-test('REFUSED at shipped defaults: a removal another site could make — a page on another site, a body not sent as JSON — is refused before its body is read, and nothing is removed', async () => {
-  const dir = planned('guarded');
-  const before = snapshot(dir);
-  const route = 'DELETE /api/workflows/yours/guarded';
-  const site = await remove('guarded', undefined, 'yours', { ...json, 'sec-fetch-site': 'cross-site' });
-  assert.equal(site.status, 403);
-  assert.ok((await errorOf(site)).startsWith(`${route} refuses a request made by a page on another site (Sec-Fetch-Site: cross-site)`));
-  const type = await remove('guarded', undefined, 'yours', { 'content-type': 'text/plain;charset=UTF-8' });
-  assert.equal(type.status, 415);
-  assert.ok((await errorOf(type)).startsWith(`${route} takes its body as \`content-type: application/json\``));
-  assert.deepEqual(snapshot(dir), before);
-});
-
 test("REFUSED at shipped defaults: a folder a queued card still needs is the package's 409, in its words, and the folder is kept", async () => {
   const dir = planned('needed');
   const card = path.join(root, 'inbox', 'needing.md');

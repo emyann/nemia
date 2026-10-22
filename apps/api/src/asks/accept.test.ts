@@ -141,39 +141,6 @@ const nothingWritten = (why: string, run = R) => {
 
 const WHY = 'The findings are follow-up work.';
 
-test('REFUSED at shipped defaults: an acceptance another site could make — a page on another site (403), a name that is not this machine (403), a body not sent as application/json (415) — and nothing is written', async () => {
-  const body = { message: WHY };
-  for (const site of ['cross-site', 'same-site', 'none']) {
-    const res = await acceptOver('review', body, { ...BOARD, 'sec-fetch-site': site });
-    assert.equal(res.status, 403, site);
-    const { error } = (await res.json()) as { error: string };
-    assert.ok(
-      error.startsWith(
-        `POST /api/runs/${R}/steps/review/accept refuses a request made by a page on another site (Sec-Fetch-Site: ${site}): the next tick files what waits on a loop a person accepts`,
-      ),
-      error,
-    );
-    assert.ok(error.endsWith(`Accept it from the run's page on the board, or with \`nemia accept ${R} review --message "<why>"\`.`), error);
-  }
-  for (const host of ['evil.example', 'evil.example:8787', 'localhost.evil.example:8787']) {
-    const res = await acceptOver('review', body, { ...BOARD, host });
-    assert.equal(res.status, 403, host);
-    assert.ok(
-      ((await res.json()) as { error: string }).error.startsWith(
-        `POST /api/runs/${R}/steps/review/accept refuses a request addressed to ${host}: the api accepts the work of a loop out of rounds as it stands only for a request to this machine`,
-      ),
-    );
-  }
-  for (const type of ['text/plain;charset=UTF-8', 'application/x-www-form-urlencoded', 'multipart/form-data; boundary=x']) {
-    const res = await acceptOver('review', body, { ...BOARD, 'content-type': type });
-    assert.equal(res.status, 415, type);
-    const { error } = (await res.json()) as { error: string };
-    assert.ok(error.startsWith(`POST /api/runs/${R}/steps/review/accept takes its body as \`content-type: application/json\``), error);
-    assert.ok(error.endsWith('Send `{ "message": "<why>" }`, with that header.'), error);
-  }
-  nothingWritten('a request another site could make');
-});
-
 test("REFUSED: a body that is not an acceptance (400), a run or a step that does not exist (404), and words missing or empty (422, in `acceptWordsRefusal`'s words, which are `acceptRun`'s) — and nothing is written", async () => {
   const bodies: Array<[unknown, RegExp]> = [
     ['not json', /^POST …\/accept takes a JSON body/],

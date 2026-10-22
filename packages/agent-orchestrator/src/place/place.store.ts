@@ -43,12 +43,12 @@ export function signalGroup(pgid: number, signal: NodeJS.Signals | 0): boolean {
 }
 
 /**
- * Whether the process group `pgid` leads has no process left within `STOP_GRACE_MS`, asked every `STOP_POLL_MS`. The grace is measured on
+ * Whether the process group `pgid` leads has no process left within `graceMs`, asked every `STOP_POLL_MS`. The grace is measured on
  * this process's monotonic clock (`performance.now()`), so a wall clock stepped forward never ends it early.
  */
-function emptied(pgid: number): boolean {
+function emptied(pgid: number, graceMs: number): boolean {
   const pause = new Int32Array(new SharedArrayBuffer(4));
-  const until = performance.now() + STOP_GRACE_MS;
+  const until = performance.now() + graceMs;
   while (performance.now() < until) {
     if (!signalGroup(pgid, 0)) return true;
     Atomics.wait(pause, 0, 0, STOP_POLL_MS);
@@ -58,12 +58,13 @@ function emptied(pgid: number): boolean {
 
 /**
  * Stop what is left of the process group `pgid` leads: SIGTERM, on which git takes its locks away; then, when a process of it is still
- * there after `STOP_GRACE_MS`, SIGKILL, and wait as long again for it to be gone. Returns whether it had to kill. Never throws.
+ * there after `graceMs` (`STOP_GRACE_MS` shipped), SIGKILL, and wait as long again for it to be gone. Returns whether it had to kill.
+ * Never throws.
  */
-export function stopGroup(pgid: number): boolean {
-  if (!signalGroup(pgid, 'SIGTERM') || emptied(pgid)) return false;
+export function stopGroup(pgid: number, graceMs: number = STOP_GRACE_MS): boolean {
+  if (!signalGroup(pgid, 'SIGTERM') || emptied(pgid, graceMs)) return false;
   signalGroup(pgid, 'SIGKILL');
-  emptied(pgid);
+  emptied(pgid, graceMs);
   return true;
 }
 
@@ -82,12 +83,12 @@ function lastLines(stderr: string): string {
 
 /**
  * Why a verb stopped at its deadline of `deadlineMs` gave no answer: that it was stopped, whether a process it started outlived SIGTERM
- * and was `killed`, and the last lines the process running then wrote on `stderr`.
+ * for `graceMs` and was `killed`, and the last lines the process running then wrote on `stderr`.
  */
-export function stoppedWords(deadlineMs: number, killed: boolean, stderr: string): string {
+export function stoppedWords(deadlineMs: number, killed: boolean, stderr: string, graceMs: number = STOP_GRACE_MS): string {
   const words = lastLines(stderr);
   const kill = killed
-    ? `, and a process it started outlived SIGTERM for ${STOP_GRACE_MS / 1000} s and was killed, so a lock it held may be left`
+    ? `, and a process it started outlived SIGTERM for ${graceMs / 1000} s and was killed, so a lock it held may be left`
     : '';
   return `it gave no answer within ${deadlineMs / 1000} s, its deadline, and was stopped${kill}${words ? `: ${words}` : ''}`;
 }
@@ -101,8 +102,12 @@ export const unreadNow = (verb: PlaceVerb, said: string): { readonly unread: Unr
   unread: { verb, said, at: new Date().toISOString() },
 });
 
-/** What an ask may say beside its request: another deadline than the verb's own (`PLACE_DEADLINE_MS`), in milliseconds. */
-export type AskOptions = { readonly deadlineMs?: number };
+/**
+ * What an ask may say beside its request, in milliseconds: another deadline than the verb's own (`PLACE_DEADLINE_MS`), and another grace
+ * than `STOP_GRACE_MS` for what a command stopped at it started to end on SIGTERM before it is killed (`graceMs`), which a test shortens
+ * rather than wait the shipped one out.
+ */
+export type AskOptions = { readonly deadlineMs?: number; readonly graceMs?: number };
 
 /**
  * What a place answers: what it declares of itself, and its verbs, asked two ways. `ask` leaves the event loop free while the place
@@ -188,25 +193,25 @@ export function trialMerges(repo: string, trials: readonly { readonly onto: stri
   };
 }
 
-/** Whether the group `pgid` leads has no process left within `STOP_GRACE_MS`, asked every `STOP_POLL_MS`. */
-const emptiedLater = (pgid: number): Effect.Effect<boolean> =>
+/** Whether the group `pgid` leads has no process left within `graceMs`, asked every `STOP_POLL_MS`. */
+const emptiedLater = (pgid: number, graceMs: number): Effect.Effect<boolean> =>
   Effect.sync(() => !signalGroup(pgid, 0)).pipe(
     Effect.repeat({ until: (gone) => gone, schedule: Schedule.spaced(STOP_POLL_MS) }),
-    Effect.timeoutOrElse({ duration: STOP_GRACE_MS, orElse: () => Effect.sync(() => !signalGroup(pgid, 0)) }),
+    Effect.timeoutOrElse({ duration: graceMs, orElse: () => Effect.sync(() => !signalGroup(pgid, 0)) }),
   );
 
 /**
  * A child that has not ended stopped, with what it started: the group it leads sent SIGTERM, then SIGKILL when a process of it outlives
- * `STOP_GRACE_MS`, and its pipes closed. Answers whether it had to kill.
+ * `graceMs` (`STOP_GRACE_MS` shipped), and its pipes closed. Answers whether it had to kill.
  */
-export const stopChild = (child: ChildProcessWithoutNullStreams): Effect.Effect<boolean> =>
+export const stopChild = (child: ChildProcessWithoutNullStreams, graceMs: number = STOP_GRACE_MS): Effect.Effect<boolean> =>
   Effect.gen(function* () {
     const pgid = child.pid;
     if (pgid === undefined) return false;
     let killed = false;
-    if (signalGroup(pgid, 'SIGTERM') && !(yield* emptiedLater(pgid))) {
+    if (signalGroup(pgid, 'SIGTERM') && !(yield* emptiedLater(pgid, graceMs))) {
       signalGroup(pgid, 'SIGKILL');
-      yield* emptiedLater(pgid);
+      yield* emptiedLater(pgid, graceMs);
       killed = true;
     }
     child.stdout.destroy();

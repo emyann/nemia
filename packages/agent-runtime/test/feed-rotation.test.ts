@@ -314,7 +314,7 @@ test(
   'a writer stopped between its journal and its feed line keeps a rotation out, and its line is in the feed the rotation then writes',
   WAITED,
   async (t) => {
-    const { root, ops, head } = await store();
+    const { root, ops, head } = await store(HELD_MS);
     const dir = scratch('ae-feed-hook-');
     const hook = path.join(dir, 'stop-after-journal.mjs');
     fs.writeFileSync(

@@ -17,7 +17,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Ask, ChatEvent, ChatHistory } from 'agent-orchestrator';
 import { at, said, withHer } from './her.ts';
-import { app } from '../src/app.ts';
+import { Layer } from 'effect';
+import { app, appOf, liveOf } from '../src/app.ts';
+import { Beats } from '../src/layer.ts';
+import { CHAT_BEAT_MS } from '../src/nemia/chat.ts';
 
 const BOARD = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' };
 
@@ -204,14 +207,20 @@ test('the stream sends presence first, then her events with the cursor, and resu
   assert.equal(resumed.filter((b) => b.id !== undefined).at(-1)?.id, '1.3.0.0.0.0.0.0.0');
 });
 
-test('a read that fails under an open stream is `unreadable` with retrying, and the first beat that works after it says `readable`', async () => {
+/** The beat a test's own chat stream reads again on (`Beats.chat`), shorter than the shipped `CHAT_BEAT_MS`. */
+const BEAT_MS = 100;
+
+test('a read that fails under an open stream is `unreadable` with retrying, and the first beat that works after it says `readable`', async (t) => {
+  assert.ok(BEAT_MS < CHAT_BEAT_MS, 'read again on a beat shorter than shipped, never longer');
+  const own = appOf(Layer.merge(liveOf(), Layer.succeed(Beats)({ ...Beats.defaultValue(), chat: BEAT_MS })));
+  t.after(() => own.runtime.dispose());
   const { sessionId } = withHer(['One.']);
   const outbox = path.join(root, 'nemia', 'chat', 'outbox.jsonl');
   fs.mkdirSync(path.dirname(outbox), { recursive: true });
   const mended = fs.rmSync.bind(null, outbox, { force: true });
   let broken = false;
   let whole = false;
-  const beats = await streamed(await app.request('/api/nemia/chat/stream'), (got) => {
+  const beats = await streamed(await own.app.request('/api/nemia/chat/stream'), (got) => {
     if (!broken && textsOf(got).length >= 1) {
       broken = true;
       fs.writeFileSync(outbox, '{"id":"half-written"}\n');

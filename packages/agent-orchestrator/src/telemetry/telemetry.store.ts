@@ -22,7 +22,8 @@ export const lineLogger = Logger.make<unknown, void>(({ message, logLevel, date 
 /**
  * The telemetry of a process run in `env`: the line logger (`lineLogger`) in place of Effect's own; and, when `env` names a collector
  * (`otlpOf`), the OTLP tracer and an OTLP logger beside the line logger, each posting JSON to the collector's `/v1/traces` and `/v1/logs`,
- * and every metric of the process's registry posted to its `/v1/metrics`, cumulative, every 10 s and once more as the process ends. A
+ * and every metric of the process's registry posted to its `/v1/metrics`, cumulative, every 10 s and once more as the process ends (each
+ * signal's interval the one the environment's standard variable gives, `EXPORT_INTERVALS`, where it gives one). A
  * collector that does not answer costs a post, never the program. A process provides it once, around its program, never a verb; an
  * export gives the exporter's `Flusher` besides.
  */
@@ -32,9 +33,9 @@ export function telemetryLayer(env: Readonly<Record<string, string | undefined>>
   if (!otlp) return lines;
   const resource = { serviceName: otlp.serviceName };
   const exported = Layer.mergeAll(
-    OtlpTracer.layer({ url: tracesUrl(otlp), resource }),
-    OtlpLogger.layer({ url: logsUrl(otlp), resource, mergeWithExisting: true }).pipe(Layer.provide(lines)),
-    OtlpMetrics.layer({ url: metricsUrl(otlp), resource }),
+    OtlpTracer.layer({ url: tracesUrl(otlp), resource, exportInterval: otlp.every.traces }),
+    OtlpLogger.layer({ url: logsUrl(otlp), resource, mergeWithExisting: true, exportInterval: otlp.every.logs }).pipe(Layer.provide(lines)),
+    OtlpMetrics.layer({ url: metricsUrl(otlp), resource, exportInterval: otlp.every.metrics }),
   );
   return exported.pipe(Layer.provide(OtlpSerialization.layerJson), Layer.provide(FetchHttpClient.layer));
 }

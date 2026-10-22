@@ -231,7 +231,7 @@ const WAITABLE_DEADLINE_MS = 500;
 /** The most asks the silent-server test makes, each with twice the deadline of the one before, for the server to start within it. */
 const SILENT_TRIES = 6;
 
-test('a server that never answers is an error once its time is up, and it is stopped', async () => {
+test("a server that never answers is an error once its time is up, and it is stopped: by the MCP SDK's close, after the SDK's own 2 s grace", async () => {
   for (let tries = 1, deadlineMs = WAITABLE_DEADLINE_MS; ; tries++, deadlineMs *= 2) {
     const starts = path.join(scratch('nemia-api-starts-'), 'starts');
     const repo = repoWith({
@@ -260,10 +260,10 @@ test('REFUSED: a server asked, whose ask is interrupted before it answers, is st
   const starts = path.join(scratch('nemia-api-starts-'), 'starts');
   const repo = scratch('nemia-api-repo-');
   const args = [FIXTURE_SERVER];
-  const env = { ...(process.env as Record<string, string>), HKB_TEST_MODE: 'silent', HKB_TEST_STARTS: starts };
+  const env = { ...(process.env as Record<string, string>), HKB_TEST_MODE: 'deaf', HKB_TEST_STARTS: starts };
   const stop = new AbortController();
   const exit = Effect.runPromiseExit(
-    serverAsk(repo, { name: 'silent', command: process.execPath, args }, { command: process.execPath, args, env }, 60_000),
+    serverAsk(repo, { name: 'deaf', command: process.execPath, args }, { command: process.execPath, args, env }, 60_000),
     { signal: stop.signal },
   );
   const ended = exit.then(() => true);

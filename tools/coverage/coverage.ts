@@ -117,8 +117,11 @@ const merged = (a: FileCoverage, b: FileCoverage): FileCoverage => {
 
 type Range = { start: number; end: number; count: number };
 const keyOf = (range: Range): string => `${range.start}-${range.end}`;
-const rangesOf = (script: V8Script): Range[] =>
-  script.functions.flatMap(({ ranges }) => ranges.map((r) => ({ start: r.startOffset, end: r.endOffset, count: r.count })));
+/** A script's ranges, each cut at its source's `length`: past it is the source URL the loader appends, which names the file's path. */
+const rangesOf = (script: V8Script, length: number): Range[] =>
+  script.functions.flatMap(({ ranges }) =>
+    ranges.map((r) => ({ start: r.startOffset, end: Math.min(r.endOffset, length), count: r.count })),
+  );
 
 /**
  * Adds to `taken`, as `file:start-end`, each of `arms` that `ranges`, one process's, took: by the arm's own count where the process
@@ -151,11 +154,13 @@ const armsOf = (
   keyIn: (url: string) => string | undefined,
   textOf: (key: string) => string,
 ): Map<string, FileCoverage['arms']> => {
+  const texts = new Map<string, string>();
+  const text = (key: string) => texts.get(key) ?? texts.set(key, textOf(key)).get(key)!;
   function* scripts(): Iterable<[string, Range[]]> {
     for (const process of processes()) {
       for (const script of process) {
         const key = keyIn(script.url);
-        if (key) yield [key, rangesOf(script)];
+        if (key) yield [key, rangesOf(script, text(key).length)];
       }
     }
   }
@@ -168,7 +173,7 @@ const armsOf = (
   for (const [key, ranges] of scripts()) takeIn([...all.get(key)!.values()], ranges, taken, key);
   const arms = new Map<string, FileCoverage['arms']>();
   for (const [key, known] of all) {
-    const line = lineAt(textOf(key));
+    const line = lineAt(text(key));
     const split: FileCoverage['arms'] = { taken: {}, untaken: {} };
     for (const range of known.values()) split[taken.has(`${key}:${keyOf(range)}`) ? 'taken' : 'untaken'][keyOf(range)] = line(range.start);
     arms.set(key, split);

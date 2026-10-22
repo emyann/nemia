@@ -45,13 +45,14 @@ const YES = { start: PICK.indexOf('{\n    return'), end: PICK.indexOf('  }\n') +
 const NO = { start: YES.end, end: FN.end - 1 };
 
 /**
- * One process's coverage of `src/pick.ts`, as V8 writes it: `pick` called `calls` times, and the arms given by their counts. V8
- * leaves out an arm's range where it ran as often as `pick`, so a process that took one arm alone reports only the other.
+ * One process's coverage of `src/pick.ts`, as V8 writes it: `pick` called `calls` times, the arms by their counts, the script
+ * `tail` characters past the source's end. V8 leaves out an arm's range where it ran as often as `pick`, so a process that took one
+ * arm alone reports only the other.
  */
-const ran = (calls: number, arms: { yes?: number; no?: number }): V8Script[] => {
+const ran = (calls: number, arms: { yes?: number; no?: number }, tail = 0): V8Script[] => {
   const range = (at: { start: number; end: number }, count = 1) => ({ startOffset: at.start, endOffset: at.end, count });
   const blocks = [...(arms.yes === undefined ? [] : [range(YES, arms.yes)]), ...(arms.no === undefined ? [] : [range(NO, arms.no)])];
-  const functions = [{ ranges: [range({ start: 0, end: PICK.length })] }, { ranges: [range(FN, calls), ...blocks] }];
+  const functions = [{ ranges: [range({ start: 0, end: PICK.length + tail })] }, { ranges: [range(FN, calls), ...blocks] }];
   return [{ url: `file://${PKG}/src/pick.ts`, functions }];
 };
 
@@ -112,29 +113,19 @@ test('a comparison where every file hits what it did, or more, finds no fall', (
 });
 
 test('a branch is judged by its arms, each taken when any test process took it', async (t) => {
-  const bothInOne = pickRecord(ran(2, { yes: 1, no: 1 }));
-  const rows: { name: string; after: CoverageRecord; lost: [string, number[]][] }[] = [
-    {
-      name: 'two arms run by two different test files are nothing lost, though each process leaves out the arm it took',
-      after: pickRecord(ran(1, { no: 0 }), ran(1, { yes: 0 })),
-      lost: [],
-    },
-    {
-      name: 'an arm no process reports is read as the range around it, here taken',
-      after: pickRecord(ran(1, {}), ran(1, { yes: 0 })),
-      lost: [],
-    },
-    {
-      name: 'an arm no test takes any more is REFUSED, by its file and line',
-      after: pickRecord(ran(1, { no: 0 })),
-      lost: [['src/pick.ts', [5]]],
-    },
+  // Before, from a checkout whose longer path the loader appends past the source: its script's range is cut at the source's end.
+  const bothInOne = pickRecord(ran(2, { yes: 1, no: 1 }, 40));
+  const rows: [name: string, after: V8Script[][], lost: number[]][] = [
+    ['two arms taken by two test files are nothing lost, each process leaving out its own', [ran(1, { no: 0 }), ran(1, { yes: 0 })], []],
+    ['an arm no process reports is read as the range around it, here taken', [ran(1, {}), ran(1, { yes: 0 })], []],
+    ['an arm no test takes any more is REFUSED, by its file and line', [ran(1, { no: 0 })], [5]],
   ];
-  for (const row of rows) {
-    await t.test(row.name, () => {
+  for (const [name, after, lost] of rows) {
+    await t.test(name, () => {
+      const falls = compared(bothInOne, pickRecord(...after));
       assert.deepEqual(
-        compared(bothInOne, row.after).map((fall) => [fall.file, fall.armsLost]),
-        row.lost,
+        falls.map((fall) => [fall.file, fall.armsLost]),
+        lost.length > 0 ? [['src/pick.ts', lost]] : [],
       );
     });
   }

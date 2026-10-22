@@ -1,5 +1,5 @@
 /**
- * A background Claude Code session followed live (`bgFollowOf`), at shipped defaults — a fake `claude` on `PATH` whose `agents` prints
+ * A background Claude Code session followed live (`bgFollowOf`), at a pace shorter than shipped — a fake `claude` on `PATH` whose `agents` prints
  * the rows a test writes, and transcripts where Claude Code writes them, grown by hand as a session would.
  *
  * - Each line appended to the transcript is said once, in order, as whole events, each byte of it read once from where the last read
@@ -23,7 +23,7 @@ import { bell, until, WAITED } from '../src/waits/index.ts';
 const config = scratch('ae-follow-bg-config-');
 process.env.CLAUDE_CONFIG_DIR = config;
 const { claudeCodeOps } = await import('../src/harness/claude/code.ts');
-const { followedStateOf, sharedListing } = await import('../src/harness/claude/bg-follow.ts');
+const { FOLLOW_PACE_MS, followedStateOf, sharedListing } = await import('../src/harness/claude/bg-follow.ts');
 const { claudeTranscriptEvents } = await import('../src/harness/claude/transcript.ts');
 const { readTranscript } = await import('../src/harness/transcript.ts');
 const { ioCounts } = await import('../src/core/engine/tally.ts');
@@ -95,7 +95,16 @@ const follow = (ops: Pick<RunnerOps, 'follow'>, name: string, got: Followed[]) =
     ),
   );
 
-const ops = () => claudeCodeOps({ root: scratch('ae-follow-bg-root-') });
+/**
+ * The follow's pace these tests give it (`ClaudeOptions.followPaceMs`): a pass waits for a listing that changed without a change of
+ * the transcript, so at the shipped `FOLLOW_PACE_MS` each move of a row cost a second of every pass of this file.
+ */
+const PACE_MS = 100;
+const ops = () => claudeCodeOps({ root: scratch('ae-follow-bg-root-'), followPaceMs: PACE_MS });
+
+test('the follows here are paced shorter than shipped, never longer', () => {
+  assert.ok(PACE_MS < FOLLOW_PACE_MS);
+});
 const states = (got: readonly Followed[]) => got.flatMap((m) => (m.kind === 'state' ? [m.state] : []));
 const events = (got: readonly Followed[]): TranscriptEvent[] => got.flatMap((m) => (m.kind === 'events' ? m.events : []));
 const ids = (got: readonly Followed[]) => events(got).map((e) => e.id);

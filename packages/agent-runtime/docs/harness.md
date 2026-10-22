@@ -168,3 +168,19 @@ What moved from 0.3.270, for the card that designs the GitHub sign-in on this:
 - **Unmeasured, as on 0.3.270 and deliberately:** the token exchange, which needs the owner's client secret in Claude Code's own
   store, and so whether a sign-in completes and a second session finds it. `izq1-measurement.md` measured both on 0.3.270; neither was
   re-run here, so the GitHub sign-in card either carries those two or measures them itself.
+
+What the GitHub sign-in card measured of the CLI that stores the secret, **Claude Code 2.1.308, 2026-10-22**, each with a throwaway
+`CLAUDE_CONFIG_DIR` and a scratch cwd, a fake secret, and no browser (`harness/mcp-sign-in.ts` is built on these):
+
+- **`claude mcp add --scope local --transport http --header … --client-id … --client-secret --callback-port 8791 <name> <url>`, with
+  `MCP_CLIENT_SECRET` set, files the secret under `mcpOAuthClientConfig["<name>|<sha256(JSON.stringify({type,url,headers}))[:16]>"]`**
+  — the same key an inline session computes (finding 6 of `izq1-measurement.md`, there written at `--scope user`) — and adds the server to
+  `.claude.json`'s `projects[<cwd>].mcpServers` alone, so no session in another folder gains it.
+- **`--header` takes many values**: given last before the name, it reads the name as one more header and the add fails, `missing
+  required argument 'name'`. So the headers go before the other options.
+- **`claude mcp remove --scope local <name>`, from the same cwd, deletes both `mcpOAuthClientConfig[<key>]` and `mcpOAuth[<key>]`**,
+  the stored secret and a stored token planted under that key. So a sign-out is that remove: a later session handed the same bytes finds
+  neither, and reads `needs-auth`; a sign-in after it stores the secret again. `mcpClearAuth` is not used: above, it resolved `{}` and
+  left the sign-in in flight, and what it clears of a completed sign-in is unmeasured.
+- **Unmeasured still**: the token exchange on 0.3.308, and a task session finding a sign-in made through `--scope local` with a real
+  token. Both stand on `izq1-measurement.md`'s 0.3.270 sign-in and its refresh, and on the key above being the one it measured.

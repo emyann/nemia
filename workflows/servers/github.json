@@ -1,0 +1,6 @@
+{
+  "type": "http",
+  "url": "https://api.githubcopilot.com/mcp/",
+  "headers": { "X-MCP-Toolsets": "context,repos,issues,pull_requests,users,actions" },
+  "oauth": { "clientId": "Iv23liQBfm9prqhvXkuY", "callbackPort": 8791 }
+}

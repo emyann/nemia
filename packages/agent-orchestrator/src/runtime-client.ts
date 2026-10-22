@@ -87,6 +87,11 @@ export { mcpServerOf, type LocalMcpServer, type RemoteMcpServer } from 'agent-ru
  */
 export { MCP_STATES, McpStateRefused, type McpServerState, type McpServersRead } from 'agent-runtime';
 /**
+ * A server's sign-in as the engine holds it: what a sign-in answers at once (`McpSignInStarted`), the words of its state
+ * (`SIGN_IN_STATES`, `McpSignInState`), and what the three verbs are refused with (`McpSignInRefused`, `held` where a sign-in waits).
+ */
+export { McpSignInRefused, SIGN_IN_STATES, type McpSignInStarted, type McpSignInState } from 'agent-runtime';
+/**
  * Whether a harness files a sign-in for a remote MCP server, read off its name: the runtime's judgement, carried, for the pass that
  * will not start a step whose server needs one. A harness it answers false for is shown its servers and never refused them.
  */

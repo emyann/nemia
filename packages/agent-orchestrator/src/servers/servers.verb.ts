@@ -200,7 +200,7 @@ function oauthOf(args: Args): { clientId: string; callbackPort?: number } | unde
  * Refused (`Missing`): a factory the store has no file for, and one whose file does not read. The default factory passes — it is no
  * file, and is given a record of its own all the same, since every run and card that names no factory runs in it.
  */
-function factoryThere(name: string, verb: string): void {
+export function factoryThere(name: string, verb: string): void {
   if (name === DEFAULT_FACTORY) return;
   const all = readFactories();
   const found = all.find((f) => f.name === name);

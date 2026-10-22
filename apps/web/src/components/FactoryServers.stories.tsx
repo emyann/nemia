@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import type { FactoryServer, ShippedServer } from '@/lib/api';
 import { ServerForm, ServerRow, ServerState } from './FactoryServers';
+import { SignInView } from './ServerSignIn';
 
 /**
  * A factory's MCP servers: every state a chip carries, a row in each of them, and the form that records a remote one. The colour of a
@@ -52,8 +53,18 @@ export const Rows: StoryObj = {
         server={server('github', 'connected', { tools: 42, oauth: { clientId: 'Iv1.b507a08c87ecfe98', callbackPort: 33418 } })}
         pending={false}
         onRemove={() => {}}
+        signIn={
+          <SignInView name="github" shown={{ at: 'connected' }} refused={null} pending={false} onSignIn={() => {}} onSignOut={() => {}} />
+        }
       />
-      <ServerRow server={server('linear', 'needs-auth', { oauth: { clientId: 'lin_app_01' } })} pending={false} onRemove={() => {}} />
+      <ServerRow
+        server={server('linear', 'needs-auth', { oauth: { clientId: 'lin_app_01' } })}
+        pending={false}
+        onRemove={() => {}}
+        signIn={
+          <SignInView name="linear" shown={{ at: 'offer' }} refused={null} pending={false} onSignIn={() => {}} onSignOut={() => {}} />
+        }
+      />
       <ServerRow server={server('sentry', 'failed', { error: 'connect ETIMEDOUT 140.82.121.6:443' })} pending={false} onRemove={() => {}} />
       <ServerRow server={server('notion', 'pending')} pending={false} onRemove={() => {}} />
       <ServerRow server={server('figma', 'disabled', { type: 'sse' })} pending={false} onRemove={() => {}} />

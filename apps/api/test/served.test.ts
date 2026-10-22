@@ -35,6 +35,11 @@ const OWN: Readonly<Record<string, string>> = {
   'GET /api/machines/:name': "one state machine's graph, read off its code: no run, no store",
   'GET /api/workflows/keys': "the keys a step may set and what each means, the builder's form: no run, no store",
   'GET /api/repository': 'the repository the request is served on, as the request names it',
+  'POST /api/factories/:factory/servers/:server/sign-in':
+    'a sign-in a person makes in their browser, held by the engine until they approve: a CLI verb would wait on a browser in its own process, and none is asked for',
+  'GET /api/factories/:factory/servers/:server/sign-in': "the state of the sign-in the board holds open, read off the engine's memory",
+  'DELETE /api/factories/:factory/servers/:server/sign-in':
+    "a sign-out, the board's beside its sign-in, which no command of the table has either",
   'GET /api/metrics': "the api process's own metrics, kept in its memory: the command line runs in another process, which has none of them",
 };
 

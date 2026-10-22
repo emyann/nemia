@@ -52,7 +52,11 @@ test('a factory with no record answers an empty list, and no state is unread: th
   const read = await answered<FactoryServersRead>(app.request(URL));
   assert.deepEqual(read.servers, []);
   assert.equal(read.unread, null, 'no server, no ask, no spawn');
-  assert.deepEqual(read.shipped, [], 'and Nemia ships none today');
+  assert.deepEqual(
+    read.shipped.map((s) => s.name),
+    ['github'],
+    'and the servers Nemia ships, offered whatever the record holds',
+  );
 });
 
 test('a server recorded is read back off the record, with its state null while no state was read', async () => {
@@ -114,5 +118,17 @@ test("the shipped folder is the checkout's own, beside the skills it ships, and 
   assert.ok(SHIPPED_SERVERS.endsWith(path.join('workflows', 'servers')), 'read beside workflows/skills, of the checkout the api runs from');
   assert.equal(path.isAbsolute(SHIPPED_SERVERS), true, 'named whole, so the read does not depend on where the api was started');
   const read = await answered<FactoryServersRead>(app.request(URL));
-  assert.deepEqual(read.shipped, [], 'there is none today, and an absent folder is no error (the package reads it)');
+  assert.deepEqual(
+    read.shipped,
+    [
+      {
+        name: 'github',
+        type: 'http',
+        url: 'https://api.githubcopilot.com/mcp/',
+        headers: { 'X-MCP-Toolsets': 'context,repos,issues,pull_requests,users,actions' },
+        oauth: { clientId: 'Iv23liQBfm9prqhvXkuY', callbackPort: 8791 },
+      },
+    ],
+    'GitHub, with its client id and no key that names a secret',
+  );
 });

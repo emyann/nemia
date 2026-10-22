@@ -2773,3 +2773,127 @@ test("the same steps with no project rule refuse, and only those the checkout's 
     assert.ok(why?.includes(`take \`${tool}\` off \`tools:\``), `${name}: the refusal names taking ${tool} off the line`);
   }
 });
+
+/** GitHub's tools Agora reads by its own allow, each by name: a pull request, its commits and files, its issues, and its checks' logs. */
+const GITHUB_READS = [
+  'pull_request_read',
+  'list_pull_requests',
+  'search_pull_requests',
+  'get_commit',
+  'list_commits',
+  'get_file_contents',
+  'issue_read',
+  'list_issues',
+  'actions_get',
+  'actions_list',
+  'get_job_logs',
+].map((tool) => `mcp__github__${tool}`);
+
+/** GitHub's tools that write what Otto may not: a file, a branch, a repository, a workflow run. */
+const GITHUB_FILE_WRITES = [
+  'push_files',
+  'create_or_update_file',
+  'delete_file',
+  'create_branch',
+  'create_repository',
+  'fork_repository',
+  'actions_run_trigger',
+].map((tool) => `mcp__github__${tool}`);
+
+/** Every GitHub tool that writes, which Ada, read-only on GitHub in this card, is denied by name. */
+const GITHUB_WRITES = [
+  ...GITHUB_FILE_WRITES,
+  ...[
+    'merge_pull_request',
+    'create_pull_request',
+    'update_pull_request',
+    'update_pull_request_branch',
+    'pull_request_review_write',
+    'add_comment_to_pending_review',
+    'add_reply_to_pull_request_comment',
+    'add_issue_comment',
+    'update_issue_comment',
+    'issue_write',
+    'sub_issue_write',
+    'assign_copilot_to_issue',
+    'request_copilot_review',
+  ].map((tool) => `mcp__github__${tool}`),
+];
+
+/** The tools of `tools` an auto step's own deny list refuses: in auto, a tool no deny names runs. */
+const deniedTo = (step: Step, tools: readonly string[]): string[] =>
+  tools.filter((tool) => deniedPartsOfCall({ tool }).some((part) => (step.disallowedTools ?? []).some((rule) => reaches(rule, part))));
+
+/** The shipped steps that run `agent`, each as its folder resolves it. */
+const stepsOf = (agent: string): Step[] => shipped().flatMap(({ step }) => (step.agent?.name === agent ? [step] : []));
+
+test("GitHub's tools are fenced per agent: Agora reads, Ada reads and writes nothing, Otto merges and writes no file, the rest reach none", () => {
+  for (const step of stepsOf('agora')) {
+    assert.deepEqual(
+      runs(
+        step,
+        GITHUB_READS.map((tool) => ({ tool })),
+      ),
+      GITHUB_READS,
+      `${step.name}: Agora reads by its own allow`,
+    );
+    assert.deepEqual(
+      runs(
+        step,
+        GITHUB_WRITES.map((tool) => ({ tool })),
+      ),
+      [],
+      `${step.name}: and no write reaches Agora`,
+    );
+  }
+  for (const step of stepsOf('ada')) {
+    assert.equal(step.permissionMode, 'auto', step.name);
+    assert.deepEqual(deniedTo(step, GITHUB_WRITES), GITHUB_WRITES, `${step.name}: every write denied by name`);
+    assert.deepEqual(deniedTo(step, GITHUB_READS), [], `${step.name}: every read left open`);
+  }
+  for (const step of stepsOf('otto')) {
+    assert.equal(step.permissionMode, 'auto', step.name);
+    assert.deepEqual(deniedTo(step, GITHUB_FILE_WRITES), GITHUB_FILE_WRITES, `${step.name}: no file, branch or repository`);
+    assert.deepEqual(deniedTo(step, ['mcp__github__merge_pull_request']), [], `${step.name}: Otto alone may merge`);
+  }
+  for (const agent of ['seldon', 'iris', 'argus'])
+    for (const step of stepsOf(agent))
+      assert.deepEqual(
+        runs(
+          step,
+          [...GITHUB_READS, ...GITHUB_WRITES].map((tool) => ({ tool })),
+        ),
+        [],
+        `${agent}: no GitHub tool`,
+      );
+  assert.deepEqual(
+    shipped().flatMap(({ step }) => (step.mcp ?? []).filter((name) => name === 'github').map(() => step.name)),
+    [],
+    'no shipped step loads GitHub yet: each later card names it for its own step, so no run waits on a sign-in today',
+  );
+});
+
+test('REFUSED: Ada without her deny of merge_pull_request, read from her files as a run reads them, may merge; Agora allowed a write may write', () => {
+  const ada = shippedEdited(
+    'ada',
+    'build',
+    'a deny of merge_pull_request',
+    (text) => text.replace(', mcp__github__merge_pull_request', ''),
+    'agents/ada.md',
+    'build/implement.md',
+  );
+  assert.deepEqual(
+    GITHUB_WRITES.filter((tool) => !deniedTo(ada, GITHUB_WRITES).includes(tool)),
+    ['mcp__github__merge_pull_request'],
+  );
+  const agora = shippedEdited('agora', 'build', 'an allowedTools line', (text) =>
+    text.replace(/^allowedTools: (.*)$/m, 'allowedTools: $1, mcp__github__merge_pull_request'),
+  );
+  assert.deepEqual(
+    runs(
+      agora,
+      GITHUB_WRITES.map((tool) => ({ tool })),
+    ),
+    ['mcp__github__merge_pull_request'],
+  );
+});

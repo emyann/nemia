@@ -646,6 +646,41 @@ const IO: readonly Walk[] = [
   },
 ];
 
+/** A server signed in to through an OAuth client, as GitHub is: what a sign-in and a sign-out are handed. */
+const SIGNING = { ...SERVER, oauth: { clientId: 'Iv23liQBfm9prqhvXkuY', callbackPort: 8791 } };
+
+const MCP_SIGN_IN: readonly Walk[] = [
+  {
+    name: 'a sign-in is refused a server with no OAuth client or no callback port, and one that is no remote server',
+    walk: async ({ engine }) => [
+      await asked(engine.mcpSignIn('github', SERVER)),
+      await asked(engine.mcpSignIn('github', { ...SERVER, oauth: { clientId: 'Iv23li' } })),
+      await asked(engine.mcpSignIn('local', { command: 'npx' } as never)),
+    ],
+    says: [{ refused: 'McpSignInRefused' }, { refused: 'McpSignInRefused' }, { refused: 'McpSignInRefused' }],
+  },
+];
+
+const MCP_SIGN_IN_STATE: readonly Walk[] = [
+  {
+    name: 'a server never signed in to from this engine reads none, and asking spawns nothing and touches no task',
+    walk: async ({ engine }) => {
+      await asked(engine.file(task('a')));
+      const state = await asked(engine.mcpSignInState('github'));
+      return [state, (await Effect.runPromise(engine.view('a'))).phase];
+    },
+    says: [{ state: 'none' }, 'pending'],
+  },
+];
+
+const MCP_SIGN_OUT: readonly Walk[] = [
+  {
+    name: 'a sign-out is refused a server with no OAuth client, as a sign-in is',
+    walk: async ({ engine }) => [await asked(engine.mcpSignOut('github', SERVER))],
+    says: [{ refused: 'McpSignInRefused' }],
+  },
+];
+
 /** The contract: every kept verb's walks. */
 export const WALKS = {
   file: FILE,
@@ -664,6 +699,9 @@ export const WALKS = {
   hold: HOLD,
   drain: DRAIN,
   mcpState: MCP_STATE,
+  mcpSignIn: MCP_SIGN_IN,
+  mcpSignInState: MCP_SIGN_IN_STATE,
+  mcpSignOut: MCP_SIGN_OUT,
   io: IO,
 } as const;
 
@@ -749,6 +787,21 @@ export const APART: readonly Apart[] = [
     why: 'a state is read inside a Claude Code session, and the stand-in opens none: it answers what a test planted (`plantMcpState`), where an engine with no Claude Code harness refuses the read and one with it spawns a CLI. A test that needs a state read for real needs the real engine, with a Claude Code harness, in a boundary file.',
     walk: ({ engine }) => asked(engine.mcpState({ github: SERVER })),
     standIn: { read: true, servers: [{ name: 'github', status: 'pending' }] },
+  },
+  {
+    name: 'a sign-in to a server with an OAuth client',
+    why: 'a sign-in stores a secret with the `claude` CLI and holds a Claude Code session, and the stand-in spawns neither: it answers an address built from the client id and waits until a test settles it (`settleSignIn`), where an engine with no Claude Code harness refuses the sign-in. A test of the real one gives `mcpSignInVerbsOf` its seams (`src/service/mcp-sign-in.test.ts`).',
+    walk: ({ engine }) => asked(engine.mcpSignIn('github', SIGNING)),
+    standIn: {
+      authUrl: 'https://github.com/login/oauth/authorize?client_id=Iv23liQBfm9prqhvXkuY&state=stand-in',
+      until: '<time>',
+    },
+  },
+  {
+    name: 'a sign-out of a server with an OAuth client',
+    why: 'a sign-out runs `claude mcp remove`, and the stand-in spawns nothing: it answers that it signed out, where an engine with no Claude Code harness refuses it.',
+    walk: ({ engine }) => asked(engine.mcpSignOut('github', SIGNING)),
+    standIn: { signedOut: true },
   },
   {
     name: 'the feed after a filing',

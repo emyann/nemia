@@ -26,8 +26,8 @@ import { runPlaced } from '../store.ts';
 
 /**
  * `workflows/servers/` of the checkout the api runs from: the MCP servers Nemia ships, each a `<name>.json` a person may add to a
- * factory of theirs without typing its address or its client id. There is none today — the first is this intent's second card — and
- * git commits no empty directory, so the folder may not be there at all, which is no error.
+ * factory of theirs without typing its address or its client id: GitHub's (`github.json`), signed in to from the board
+ * (`sign-in.ts`). A checkout without the folder lists no shipped server, which is no error.
  */
 export const SHIPPED_SERVERS = path.join(HOME_REPO, 'workflows', 'servers');
 

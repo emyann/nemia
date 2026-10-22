@@ -33,7 +33,7 @@ import {
   verifiesRest,
 } from 'agent-orchestrator';
 import { runTasks } from 'agent-orchestrator/run';
-import { runWith } from '../../test/placed.ts';
+import { runWith } from '../../test/shipped-place.ts';
 
 /** The engine the app's requests read through: its reads are what a poll costs. */
 const e = await runtime.runPromise(Engine.useSync((engine) => engine));

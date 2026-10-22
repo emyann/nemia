@@ -79,8 +79,8 @@ const LAYERS: { name: string; at: string[]; refused: string[]; allowed: string[]
   },
 ];
 
-/** Where a test sits beside each layer: no block covers it, so what its layer refuses passes there. */
-const TESTS = ['apps/web/test', 'apps/api/test', 'packages/agent-orchestrator/test', 'packages/agent-runtime/test'];
+/** Where a test sits beside each layer: no block covers it, so what its layer refuses passes there — the api's beside its source too. */
+const TESTS = ['apps/web/test', 'apps/api/test', 'apps/api/src/runs', 'packages/agent-orchestrator/test', 'packages/agent-runtime/test'];
 
 type Block = { files: string[]; excludeFiles?: string[]; rules: Record<string, unknown> };
 type Config = { rules?: Record<string, unknown>; overrides: Block[]; [key: string]: unknown };

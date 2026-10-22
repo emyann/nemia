@@ -24,7 +24,7 @@ import {
   standingReader,
   standingSnapshot,
 } from 'agent-orchestrator';
-import { runWith } from '../../test/placed.ts';
+import { runWith } from '../../test/shipped-place.ts';
 delete process.env.WF_MAX_RUNS;
 const repo = scratch('nemia-api-queue-repo-');
 process.env.HKB_REPO = repo;

@@ -1,7 +1,8 @@
 /**
  * Context without a wait, as the board reads and writes it: `GET /api/runs/:runId/concluded`, the section a run started with `--from` would
  * be handed; `PUT` and `DELETE /api/inbox/:name/from`, a card's `from:` set and taken off; and a step's `taskParts` on `GET /api/runs/:id`,
- * each `## From run` section labelled by how the run was handed it — in the harness's scratch store (`root`).
+ * each `## From run` section labelled by how the run was handed it — in the harness's scratch store (`root`), on the stand-ins: the
+ * runtime's test engine and the test place.
  */
 import { root } from './harness.ts';
 import { test } from 'node:test';
@@ -10,11 +11,18 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { RunDetail } from '../src/detail/detail.ts';
 import type { InboxFromAnswer } from '../src/inbox/inbox.ts';
-import { app } from '../src/app.ts';
 import { addToInbox } from 'agent-orchestrator';
+import { Effect } from 'effect';
+import { testEngine } from 'agent-runtime/testing';
+import { testPlace } from 'agent-orchestrator/testing';
+import { appOver, engineFor } from './placed.ts';
+
+const stand = testPlace();
+const standIn = testEngine();
+const engine = () => engineFor(standIn);
+const app = appOver(standIn, stand);
 
 const JSON_TYPE = { 'content-type': 'application/json' };
-const at = '2026-09-12T00:10:00.000Z';
 
 const writeRun = (run: { id: string } & Record<string, unknown>) => {
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
@@ -35,12 +43,9 @@ const writeRun = (run: { id: string } & Record<string, unknown>) => {
   );
 };
 
-/** A task filed with `brief` and waiting for a slot, as the engine writes its journal. */
-const queuedTask = (taskId: string, brief: string) => {
-  fs.mkdirSync(path.join(root, 'engine', 'tasks'), { recursive: true });
-  const filed = { kind: 'filed', at, brief, cwd: '/code/app', maxAttempts: 1, harness: 'codex' };
-  fs.writeFileSync(path.join(root, 'engine', 'tasks', `${taskId}.jsonl`), JSON.stringify(filed) + '\n');
-};
+/** A task filed with `brief` and waiting for a slot: the package's engine files every task queued. */
+const queuedTask = (taskId: string, brief: string) =>
+  Effect.runSync(engine().file({ id: taskId, brief, cwd: '/code/app', harness: 'codex' }));
 
 const section = (run: string, asked: string) =>
   ['', `## From run ${run}`, '', `Words about ${run}.`, '', 'What it was asked, the first line:', '```', asked, '```'].join('\n');

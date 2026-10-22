@@ -2,7 +2,7 @@
  * What a step was told, by layer, as the run page reads it (`GET /api/runs/:id`, `layers`): each layer from what the run froze at
  * `nemia start` — the agent's instructions and skills, the person's custom instructions, the factory's rules, the step's note, the skill
  * and the deny its line adds, and the task — never from the agent's, the custom instructions', the rules' or the step's file as it is
- * now; and none for a record that froze no workflow.
+ * now; and none for a record that froze no workflow. On the stand-ins: the runtime's test engine and the test place.
  */
 import { root } from './harness.ts';
 import { test } from 'node:test';
@@ -10,11 +10,18 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { RunDetail } from '../src/detail/detail.ts';
-import { app } from '../src/app.ts';
-import { addFactory, attachWorkflow, startRun, engine } from 'agent-orchestrator';
+import { addFactory, attachWorkflow, startRun } from 'agent-orchestrator';
 import { PRECEDENCE } from 'agent-orchestrator/run';
-import { runWith } from './placed.ts';
 import { scratch } from './scratch.ts';
+import { testEngine } from 'agent-runtime/testing';
+import { testPlace } from 'agent-orchestrator/testing';
+import { appOver, engineFor, runOver } from './placed.ts';
+
+const stand = testPlace();
+const standIn = testEngine();
+const engine = () => engineFor(standIn);
+const runWith = runOver(stand.layer);
+const app = appOver(standIn, stand);
 
 const WORKFLOWS = path.join(root, 'workflows');
 const AGENT = path.join(WORKFLOWS, 'agents', 'layered.md');

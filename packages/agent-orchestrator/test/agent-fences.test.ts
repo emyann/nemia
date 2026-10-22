@@ -827,7 +827,7 @@ test("REFUSED: Ada without its deny of pkill and killall, read from its file as 
   const ada = shippedStepOf('ada');
   const line = ada.disallowedTools!.filter((rule) => rule !== 'Bash(pkill:*)' && rule !== 'Bash(killall:*)');
   assert.equal(line.length, ada.disallowedTools!.length - 2, 'Ada denies both by name');
-  const bare = shippedWith('ada', 'build', 'disallowedTools', line.join(', '), ...denyFilesOf('ada'));
+  const bare = shippedWith('ada', 'build', 'disallowedTools', line.join(', '));
   assert.equal(bare.permissionMode, 'auto');
   assert.deepEqual(unfenced(bare), killsByName(bare.name));
   assert.ok(
@@ -845,7 +845,7 @@ test('REFUSED: Ada and Otto without their deny of gh, read from their files as a
     const step = shippedStepOf(agent);
     const line = step.disallowedTools!.filter((rule) => rule !== 'Bash(gh)' && rule !== 'Bash(gh:*)');
     assert.equal(line.length, step.disallowedTools!.length - 2, `${agent} denies gh whole, bare and with arguments`);
-    const bare = shippedWith(agent, 'build', 'disallowedTools', line.join(', '), ...denyFilesOf(agent));
+    const bare = shippedWith(agent, 'build', 'disallowedTools', line.join(', '));
     assert.equal(bare.permissionMode, 'auto', `${agent} runs auto, so its own deny is its fence`);
     assert.deepEqual(unfenced(bare), ghWrites(bare.name));
     assert.ok(ghWrites(bare.name).length >= 12, 'every gh write a session could type is a call here');
@@ -924,7 +924,7 @@ for (const agent of ['ada', 'otto'])
     assert.equal(step.permissionMode, 'auto');
     const line = step.disallowedTools!.filter((rule) => !probeRule(rule));
     assert.ok(line.length < step.disallowedTools!.length, `${agent} denies a session started by hand`);
-    const bare = shippedWith(agent, 'build', 'disallowedTools', line.join(', '), ...denyFilesOf(agent));
+    const bare = shippedWith(agent, 'build', 'disallowedTools', line.join(', '));
     assert.deepEqual(
       unfenced(bare, SETTINGS, PROBES),
       PROBES.map((call) => `${bare.name}: ${shown(call)}`),
@@ -950,15 +950,9 @@ for (const agent of ['ada', 'otto'])
     const step = shippedStepOf(agent);
     const line = step.disallowedTools!.filter((rule) => rule !== 'Edit(//**/.claude/settings.local.json)');
     assert.equal(line.length, step.disallowedTools!.length - 1, `${agent} denies an edit of a folder's local settings`);
-    const bare = shippedWith(agent, 'build', 'disallowedTools', line.join(', '), ...denyFilesOf(agent));
+    const bare = shippedWith(agent, 'build', 'disallowedTools', line.join(', '));
     assert.deepEqual(editsDenied(bare, HARNESS_FILES), HARNESS_FILES.slice(1), 'the rule cut leaves the projects folder open');
-    const none = shippedWith(
-      agent,
-      'build',
-      'disallowedTools',
-      line.filter((rule) => !rule.startsWith('Edit(')).join(', '),
-      ...denyFilesOf(agent),
-    );
+    const none = shippedWith(agent, 'build', 'disallowedTools', line.filter((rule) => !rule.startsWith('Edit(')).join(', '));
     assert.deepEqual(editsDenied(none, HARNESS_FILES), [], 'and the trust and user settings with theirs');
   });
 
@@ -1019,15 +1013,6 @@ const shippedStepIn = (agent: string, workflow: string): Step => {
 };
 
 /**
- * The files a deny of `agent`'s is written in for its step of `workflow`, from the shipped holder: its own, and its step's, which
- * repeats each to add its own.
- */
-const denyFilesOf = (agent: string, workflow = 'build'): string[] => [
-  `agents/${agent}.md`,
-  ...COLLECTOR_FENCED.filter((fenced) => fenced.agent === agent && fenced.workflow === workflow).map((fenced) => fenced.file),
-];
-
-/**
  * The step of the shipped `workflow` that `agent` runs, read from a scratch copy of the shipped team in which `edit` rewrote each file
  * of `of`, the agent's alone by default. Fails, saying which file has no `what`, when the edit changes nothing in one.
  */
@@ -1042,6 +1027,19 @@ function shippedEdited(agent: string, workflow: string, what: string, edit: (tex
     fs.writeFileSync(file, changed);
   }
   return loadWorkflows(path.join(root, workflow), { repo: REPO }).find((step) => step.agent?.name === agent)!;
+}
+
+/**
+ * The step of the shipped `workflow` that `agent` runs from its file `file`, that file's own `disallowedTools:` line cut to one rule of
+ * its own, and, where `allowed` is given, its agent's file allowing it besides. A step's line adds to its agent's denies, so a line cut
+ * lifts none of them.
+ */
+function stepLineCut(agent: string, workflow: string, file: string, allowed?: string): Step {
+  const ownLine = (text: string) => text.replace(/^disallowedTools: .*$/m, 'disallowedTools: Bash(npm run build)');
+  const allowing = (text: string) => text.replace(/^allowedTools: (.*)$/m, `allowedTools: $1, ${allowed}`);
+  if (allowed === undefined) return shippedEdited(agent, workflow, 'a disallowedTools line', ownLine, file);
+  const edit = (text: string) => (/^agent: /m.test(text) ? ownLine(text) : allowing(text));
+  return shippedEdited(agent, workflow, 'a disallowedTools or an allowedTools line', edit, `agents/${agent}.md`, file);
 }
 
 /** The step of the shipped `workflow` that `agent` runs, its agent's `allowedTools` line replaced by `allowed` (`shippedWith`). */
@@ -1155,22 +1153,16 @@ test('REFUSED: a browser tool an agent allows no more is reached no more, and br
       ['mcp__playwright__browser_click'],
       agent,
     );
-    const unsafe = shippedEdited(
-      agent,
-      workflow,
-      'a deny of browser_run_code_unsafe',
-      (text) =>
-        text
-          .replace(', mcp__playwright__browser_run_code_unsafe', '')
-          .replace(/^allowedTools: (.*)$/m, 'allowedTools: $1, mcp__playwright__browser_run_code_unsafe'),
-      `agents/${agent}.md`,
-      file,
+    const unsafe = shippedEdited(agent, workflow, 'a deny of browser_run_code_unsafe', (text) =>
+      text
+        .replace(', mcp__playwright__browser_run_code_unsafe', '')
+        .replace(/^allowedTools: (.*)$/m, 'allowedTools: $1, mcp__playwright__browser_run_code_unsafe'),
     );
     assert.deepEqual(unfenced(unsafe), [`${unsafe.name}: mcp__playwright__browser_run_code_unsafe`], agent);
-    assert.throws(
-      () => shippedEdited(agent, workflow, 'a deny', (text) => text.replace(', mcp__playwright__browser_run_code_unsafe', ''), file),
-      (err: Error) => err.message.includes('would lift `mcp__playwright__browser_run_code_unsafe`'),
-      `${file} alone cannot drop what its agent denies`,
+    assert.deepEqual(
+      unfenced(stepLineCut(agent, workflow, file, 'mcp__playwright__browser_run_code_unsafe')),
+      [],
+      `${file}'s own line cannot lift what its agent denies`,
     );
     const allowedAlone = shippedEdited(agent, workflow, 'an allowedTools line', (text) =>
       text.replace(/^allowedTools: (.*)$/m, 'allowedTools: $1, mcp__playwright__browser_run_code_unsafe'),
@@ -1211,37 +1203,29 @@ test('REFUSED: design or review with one of its four address rules cut opens the
 });
 
 test("REFUSED: a step or an agent that denies a browser tool its filename no more may have it write a file, the workspace's too", () => {
-  for (const { agent, workflow, file } of BROWSERS)
+  for (const { agent, workflow } of BROWSERS)
     for (const name of FILE_TOOLS) {
       const tool = `mcp__playwright__browser_${name}`;
       const cut = (text: string) => text.replace(`, ${tool}(filename:*)`, '');
       const open = NAMED_FILES.filter((call) => call.tool === tool);
       assert.equal(open.length, 3);
-      const both = shippedEdited(agent, workflow, `a deny of a filename to ${tool}`, cut, `agents/${agent}.md`, file);
+      const dropped = shippedEdited(agent, workflow, `a deny of a filename to ${tool}`, cut);
       assert.deepEqual(
-        unfenced(both, SETTINGS, NAMED_FILES),
-        open.map((call) => `${both.name}: ${shown(call)}`),
-        `${file} and agents/${agent}.md without it`,
+        unfenced(dropped, SETTINGS, NAMED_FILES),
+        open.map((call) => `${dropped.name}: ${shown(call)}`),
+        `agents/${agent}.md without it`,
       );
-      assert.throws(
-        () => shippedEdited(agent, workflow, `a deny of a filename to ${tool}`, cut, file),
-        (err: Error) => err.message.includes(`would lift \`${tool}(filename:*)\``),
-        `${file} alone cannot drop what its agent denies`,
-      );
-      const narrowed = shippedEdited(
-        agent,
-        workflow,
-        `a deny of a filename to ${tool}`,
-        (text) => text.replace(`${tool}(filename:*)`, `${tool}(filename:/tmp/*)`),
-        `agents/${agent}.md`,
-        file,
+      const narrowed = shippedEdited(agent, workflow, `a deny of a filename to ${tool}`, (text) =>
+        text.replace(`${tool}(filename:*)`, `${tool}(filename:/tmp/*)`),
       );
       assert.deepEqual(
         unfenced(narrowed, SETTINGS, NAMED_FILES),
         open.filter((call) => !call.filename?.startsWith('/tmp/')).map((call) => `${narrowed.name}: ${shown(call)}`),
-        `${file} and agents/${agent}.md denying only a file under /tmp leave the workspace's open`,
+        `agents/${agent}.md denying only a file under /tmp leaves the workspace's open`,
       );
     }
+  for (const { agent, workflow, file } of BROWSERS)
+    assert.deepEqual(unfenced(stepLineCut(agent, workflow, file), SETTINGS, NAMED_FILES), [], `${file}'s own line cannot lift them`);
 });
 
 /** The line of a step's note that names the two commands of a served board. */
@@ -1398,21 +1382,13 @@ function withReview(what: string, edit: (text: string) => string): Step | undefi
   return reviewIn('quick', root);
 }
 
-test("REFUSED: a quick review whose skills, mcp or tally is no more build's is unequal to it; one with no loop, no agora or a loosened fence refuses the load", () => {
+test("REFUSED: a quick review whose skills, mcp, tally or fence is no more build's is unequal to it; one with no loop or no agora refuses the load", () => {
   const edits: [string, (text: string) => string][] = [
     ['skills', (text) => text.replace(', apps/web:ds-spec', '')],
     ['mcp', (text) => text.replace('mcp: playwright\n', '')],
     ['tally', (text) => text.replace(', findings.kind=placement', '')],
+    ['fence', (text) => text.replace(', Bash(npm test)', '')],
   ];
-  assert.throws(
-    () => withReview('fence', (text) => text.replace(', Bash(*GIT_*)', '')),
-    (e: Error) =>
-      e instanceof WorkflowError &&
-      e.message.includes('would lift `Bash(*GIT_*)`') &&
-      e.message.includes('agents/agora.md denies its agent agora') &&
-      e.message.includes('`disallowedTools: '),
-    "nor the fence: a step may only tighten its agent's, so dropping one of Agora's is refused at load",
-  );
   assert.throws(
     () => withReview('loop', (text) => text.replace('loop: implement\n', '').replace('rounds: 2\n', '')),
     (e: Error) =>
@@ -1952,9 +1928,9 @@ const STILL_ASKED: Call[] = ['git grep -n foo HEAD', 'git diff HEAD', 'git show 
 const RUNS_A_PROGRAM_DENIES = ['Bash(git grep *O*)', 'Bash(git grep *--op*)', 'Bash(*GIT_*)'];
 
 /**
- * Every read-only step there is, as `<workflow>/<step>`: each step of a shipped folder whose agent is one of `READ_ONLY_AGENTS`, never
- * the first step of each agent alone (`shippedStepOf`). A step's own `disallowedTools:` replaces its agent's whole, so a second step of
- * one of those agents is a line of its own that must carry the denies too.
+ * Every read-only step there is, as `<workflow>/<step>`: each step of a shipped folder whose agent is one of `READ_ONLY_AGENTS`, as it
+ * resolves, never the first step of each agent alone (`shippedStepOf`): each step's own `disallowedTools:` adds to its agent's, and what
+ * its session is refused is read whole on each.
  */
 const readOnlySteps = (): Array<{ named: string; step: Step }> =>
   shipped()
@@ -2022,10 +1998,10 @@ const GIT_READS_OUTSIDE: Call[] = [
   'timeout 5 git blame CLAUDE.md --contents /etc/hostname',
 ].map((command) => ({ tool: 'Bash', command }));
 
-/** The denies that answer a read outside the repository, on each read-only agent and on each of its steps. */
+/** The denies that answer a read outside the repository, on each read-only agent's line, and so on each of its steps. */
 const READS_OUTSIDE_DENIES = ['Bash(git *--no-ind*)', 'Bash(git blame *--con*)', 'Bash(git grep -f*)', 'Bash(git grep * -f*)'];
 
-/** Every deny a read-only agent's line and each of its steps' own line carries beside the read set. */
+/** Every deny a read-only agent's line carries beside the read set, which each of its steps is refused with its own. */
 const READ_SET_DENIES = [...RUNS_A_PROGRAM_DENIES, WRITES_A_FILE_DENY, ...READS_OUTSIDE_DENIES];
 
 test('every read-only step is refused every spelling of a read outside the repository the fence can read, and still asks each read', () => {
@@ -2089,35 +2065,34 @@ test('REFUSED: a read-only step without the deny of --output writes a file by ea
 });
 
 /**
- * Every line of the holder `root` that falls short of the read set's denies (`READ_SET_DENIES`), as `<file>: <rule>`: a read-only
- * agent's own file that does not name one, and a step file of such an agent whose own `disallowedTools:` — which replaces its agent's
- * whole — does not repeat one. A step with no line of its own keeps its agent's and is nothing to say.
+ * Every read-only agent's file of the holder `root` that falls short of the read set's denies (`READ_SET_DENIES`), as `<file>: <rule>`.
+ * A step's own `disallowedTools:` adds to its agent's, so a step file is nothing to say: each step is refused them by its agent's.
  */
 function runsAProgramUndenied(root = SHIPPED_HOLDERS[0]): string[] {
-  const files = [
-    ...READ_ONLY_AGENTS.map((agent) => `agents/${agent}.md`),
-    ...shipped()
-      .filter(({ step }) => READ_ONLY_AGENTS.includes(step.agent?.name ?? ''))
-      .map(({ dir, step }) => `${path.basename(dir)}/${step.name}.md`)
-      .filter((file) => denyLineOf(file, root).length > 0),
-  ];
+  const files = READ_ONLY_AGENTS.map((agent) => `agents/${agent}.md`);
   return files.flatMap((file) => {
     const line = denyLineOf(file, root);
     return READ_SET_DENIES.filter((rule) => !line.includes(rule)).map((rule) => `${file}: ${rule}`);
   });
 }
 
-test("each read-only agent's file names the read set's denies, and each of its steps' own line repeats them", () => {
+test("each read-only agent's file names the read set's denies, and each of its steps is refused them", () => {
   assert.deepEqual(runsAProgramUndenied(), []);
+  for (const { named, step } of readOnlySteps())
+    assert.deepEqual(
+      READ_SET_DENIES.filter((rule) => !step.disallowedTools?.includes(rule)),
+      [],
+      `${named} is refused its agent's`,
+    );
   assert.equal(
     shipped().filter(({ step }) => READ_ONLY_AGENTS.includes(step.agent?.name ?? '')).length,
     5,
-    "one step per read-only agent today but Agora, who reviews in build and in quick: each step's line is its own, and the guard above reads every one of them",
+    "one step per read-only agent today but Agora, who reviews in build and in quick: each step's line is its own, and each is read resolved above",
   );
 });
 
-test("REFUSED: an agent file or a step file of a read-only agent that drops one of the read set's denies is named", () => {
-  for (const file of ['agents/agora.md', 'build/design.md', 'build/review.md', 'quick/review.md', 'intake/intake.md', 'janitor/argus.md'])
+test("REFUSED: a read-only agent's file that drops one of the read set's denies is named", () => {
+  for (const file of READ_ONLY_AGENTS.map((agent) => `agents/${agent}.md`))
     for (const rule of READ_SET_DENIES) {
       const root = scratch('wf-fences-denies-');
       fs.cpSync(SHIPPED_HOLDERS[0], root, { recursive: true });
@@ -2130,7 +2105,52 @@ test("REFUSED: an agent file or a step file of a read-only agent that drops one 
     }
 });
 
-test('REFUSED: a read-only step without those denies runs a program by each of them, and a step file that drops one is named', () => {
+/**
+ * Every rule a step file of the holder `root` writes on its own `disallowedTools:` that its agent's file denies already, as
+ * `<file>: <rule>`: a step's line adds to its agent's, so a repeat is a copy that the next change to the agent leaves behind.
+ */
+function repeatedDenies(root = SHIPPED_HOLDERS[0]): string[] {
+  return shipped()
+    .filter(({ step }) => step.agent !== undefined)
+    .flatMap(({ dir, step }) => {
+      const file = `${path.basename(dir)}/${step.name}.md`;
+      const agents = denyLineOf(`agents/${step.agent!.name}.md`, root);
+      return denyLineOf(file, root)
+        .filter((rule) => agents.includes(rule))
+        .map((rule) => `${file}: ${rule}`);
+    });
+}
+
+test("no shipped step file repeats a deny of its agent's, which its own line adds to", () => {
+  assert.deepEqual(repeatedDenies(), []);
+});
+
+test("REFUSED: a step file that writes one of its agent's denies back onto its own line is named", () => {
+  const root = scratch('wf-fences-repeated-');
+  fs.cpSync(SHIPPED_HOLDERS[0], root, { recursive: true });
+  for (const [file, rule] of [
+    ['build/design.md', WRITES_A_FILE_DENY],
+    ['build/land.md', 'Bash(git push:*)'],
+  ]) {
+    const at = path.join(root, file);
+    const text = fs.readFileSync(at, 'utf8');
+    const added = text.replace(/^disallowedTools: (.*)$/m, `disallowedTools: $1, ${rule}`);
+    assert.notEqual(added, text, `${file} has a disallowedTools line`);
+    fs.writeFileSync(at, added);
+  }
+  assert.deepEqual(repeatedDenies(root), [`build/design.md: ${WRITES_A_FILE_DENY}`, 'build/land.md: Bash(git push:*)']);
+});
+
+test("REFUSED: a read-only step's own line cut to one rule lifts none of its agent's, though the line alone would leave them open", () => {
+  const cut = stepLineCut('seldon', 'build', 'build/design.md');
+  assert.deepEqual(cut.disallowedTools?.[0], 'Bash(npm run build)', 'the line is cut');
+  assert.deepEqual(runs(cut, GIT_RUNS_A_PROGRAM), [], 'its agent still refuses every program the set would run');
+  assert.deepEqual(runs(cut, GIT_WRITES_A_FILE), [], 'and every --output');
+  const alone = { ...cut, disallowedTools: ['Bash(npm run build)'] };
+  assert.deepEqual(runs(alone, GIT_RUNS_A_PROGRAM), GIT_RUNS_A_PROGRAM.map(shown), "the line alone, as it once replaced its agent's");
+});
+
+test('REFUSED: a read-only step without those denies runs a program by each of them, and without any one of them a spelling runs', () => {
   for (const { named, step } of readOnlySteps()) {
     const open = { ...step, disallowedTools: (step.disallowedTools ?? []).filter((rule) => !RUNS_A_PROGRAM_DENIES.includes(rule)) };
     assert.deepEqual(runs(open, GIT_RUNS_A_PROGRAM), GIT_RUNS_A_PROGRAM.map(shown), named);
@@ -2360,9 +2380,9 @@ test('every shipped step is refused the live collector by address: implement and
     const agents = denyLineOf(`agents/${agent}.md`);
     assert.ok(agents.length > 0, `${agent} denies of its own`);
     assert.deepEqual(
-      agents.filter((rule) => !denyLineOf(file).includes(rule)),
+      agents.filter((rule) => !step.disallowedTools?.includes(rule)),
       [],
-      `${file} repeats each deny of ${agent}'s`,
+      `${file}'s own line adds to each deny of ${agent}'s`,
     );
   }
   assert.deepEqual(
@@ -2383,7 +2403,13 @@ test('REFUSED: implement or land with one of its two address rules cut is open o
   for (const { agent, workflow, file } of COLLECTOR_FENCED)
     for (const port of ['4318', '4317']) {
       const rule = `Bash(*:${port}*)`;
-      const cut = shippedEdited(agent, workflow, `the rule ${rule}`, (text) => text.replace(`, ${rule}`, ''), file);
+      const cut = shippedEdited(
+        agent,
+        workflow,
+        `the rule ${rule}`,
+        (text) => text.replace(`${rule}, `, '').replace(`, ${rule}`, ''),
+        file,
+      );
       const open = LIVE_COLLECTOR.filter((call) => call.command?.includes(`:${port}`));
       assert.equal(open.length, port === '4318' ? 5 : 1);
       assert.deepEqual(
@@ -3034,13 +3060,8 @@ test("GitHub's tools are fenced per agent: Agora reads, Ada reads and writes not
 });
 
 test('REFUSED: Ada without her deny of merge_pull_request, read from her files as a run reads them, may merge; Agora allowed a write may write', () => {
-  const ada = shippedEdited(
-    'ada',
-    'build',
-    'a deny of merge_pull_request',
-    (text) => text.replace(', mcp__github__merge_pull_request', ''),
-    'agents/ada.md',
-    'build/implement.md',
+  const ada = shippedEdited('ada', 'build', 'a deny of merge_pull_request', (text) =>
+    text.replace(', mcp__github__merge_pull_request', ''),
   );
   assert.deepEqual(
     GITHUB_WRITES.filter((tool) => !deniedTo(ada, GITHUB_WRITES).includes(tool)),

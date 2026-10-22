@@ -9,10 +9,11 @@ import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { isReadme, WorkflowError, type Workflow } from '../step/step.ts';
 import { codexModeWritten } from '../former/former.ts';
-import { parseWorkflow, renderStep, type StepDraft } from '../workflow/index.ts';
+import { agentDeniesOf, parseWorkflow, renderStep, type StepDraft } from '../workflow/index.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { agentsFolderRefusal, asFileSays, linkRefusal, parseFolder, stepNameRefusal, workflowInUse } from './folder.ts';
 import { agentsFor } from '../agents/read.store.ts';
+import type { Agents } from '../agents/agents.ts';
 import { skillsFor, type Places } from '../skills/read.store.ts';
 import { HOME, isDirectory } from '../record/record.store.ts';
 import { readFactories } from '../factory/factory.store.ts';
@@ -32,7 +33,7 @@ export type WorkflowWritten = { dir: string; steps: Workflow[]; written: string[
  * every refusal the parser has surfaces here, in its words and naming the step: a key a step does not have, `after:` naming no step, a
  * cycle, a `loop:` that is not a back edge, an `output:` naming a schema that is not in the folder. What `nemia start` refuses beyond the
  * parser — a step named for another's check, `remote: true` off `claude` — is still `nemia start`'s to refuse, as for a folder written by
- * hand.
+ * hand. A draft naming its agent writes its own denies alone (`ownLine`): a step's `disallowedTools:` adds to its agent's.
  *
  * Then the `.md` of each step not in the set is removed, before a byte is written: on a filesystem that does not tell case apart —
  * macOS's, Windows's — `Plan.md` and `plan.md` are one file, and a step renamed by case would otherwise be written and then removed under
@@ -84,7 +85,9 @@ export function writeWorkflow(
   for (const step of steps) refuse(stepNameRefusal(step?.name));
   const twice = steps.find((step, i) => steps.findIndex((other) => other.name === step.name) !== i);
   if (twice) refuse(`two steps are named ${twice.name}, and a step is its file, ${twice.name}.md. Rename one of them.`);
-  const texts = steps.map((step) => [step.name, renderStep(step)] as const);
+  const where = places ?? placesAround(at);
+  const agents = agentsFor(at, where);
+  const texts = steps.map((step) => [step.name, renderStep(ownLine(step, agents))] as const);
   const read = (file: string): string | undefined => {
     try {
       return fs.readFileSync(path.resolve(at, file), 'utf8');
@@ -92,8 +95,6 @@ export function writeWorkflow(
       return undefined;
     }
   };
-  const where = places ?? placesAround(at);
-  const agents = agentsFor(at, where);
   const parsed = parseFolder(texts, read, agents, skillsFor(at, where));
   const onCodex = steps.find((step) => step.permissionMode != null && parsed.find((s) => s.name === step.name)?.harness === 'codex');
   if (onCodex) refuse(codexModeWritten(onCodex.name, onCodex.permissionMode!));
@@ -123,6 +124,18 @@ export function writeWorkflow(
   if (readme !== undefined)
     put(entries.find((e) => e.isFile() && isReadme(e.name))?.name ?? 'README.md', readme, (there) => there === readme);
   return { dir: at, steps: parsed, written: written.sort(), kept: kept.sort(), removed: removed.sort() };
+}
+
+/**
+ * Draft `step` as its own file holds it: one that names its agent `agent:` by name and sends a `disallowedTools` list — the board sends
+ * the resolved one, its agent's denies with the step's own — without the rules that agent's file denies, which the step's line adds to
+ * (`deniesWith`), so a save never pins its agent's line into the step again. Any other draft as it is.
+ */
+function ownLine(step: StepDraft, agents: Agents): StepDraft {
+  const agent = typeof step.agent === 'string' ? agents.get(step.agent) : undefined;
+  if (!step.disallowedTools || agent === undefined || agent instanceof WorkflowError) return step;
+  const denies = agentDeniesOf(agent);
+  return { ...step, disallowedTools: step.disallowedTools.filter((rule) => !denies.includes(rule)) };
 }
 
 /** What `removeWorkflow` did: the folder removed, and the files it held, by their path in it, sorted. */

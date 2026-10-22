@@ -1,7 +1,8 @@
 /**
  * A folder run (`workspace: folder`, `place: { kind: 'folder' }` on the record), as the board reads it: no repository, no base, no
  * branch. The list, the detail and the decision answer for it without throwing, and say what the record says — null where a repository run
- * has a repository — rather than a repository run's words. In a scratch store, with no git repository anywhere.
+ * has a repository — rather than a repository run's words. In a scratch store, with no git repository anywhere, on the stand-ins: the
+ * runtime's test engine, the step's task signed off by hand, and the test place.
  *
  * And a folder team as the board finds and files for it, with the repository the api is pointed at a plain directory that is no
  * repository at all: `repoOf` resolves a path and never asks git, so the api runs, the store's own workflows list, and a card for a
@@ -13,7 +14,16 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
-import { app } from '../src/app.ts';
+import { Effect } from 'effect';
+import { testEngine } from 'agent-runtime/testing';
+import { testPlace } from 'agent-orchestrator/testing';
+import { appOver, engineFor } from './placed.ts';
+
+const stand = testPlace();
+const standIn = testEngine();
+const engine = () => engineFor(standIn);
+const app = appOver(standIn, stand);
+
 /** What the board is pointed at, as `HKB_REPO`: a plain directory, no git, no workflows folder of its own, read as any repository. */
 const notARepo = scratch('nemia-api-folder-here-');
 process.env.HKB_REPO = notARepo;
@@ -33,29 +43,13 @@ fs.writeFileSync(path.join(onRepo, 'implement.md'), '---\nplace: git\n---\nMake 
 const at = '2026-09-19T00:10:00.000Z';
 const work = path.join(root, 'runs', 'f-notes', 'work');
 
-/** A task's journal, as the engine writes it: filed in the step's folder, and signed off. */
+/** A task filed in the step's folder on the engine, and signed off. */
 function signedOff(taskId: string, cwd: string): void {
-  fs.mkdirSync(path.join(root, 'engine', 'tasks'), { recursive: true });
-  fs.writeFileSync(
-    path.join(root, 'engine', 'tasks', `${taskId}.jsonl`),
-    [
-      { kind: 'filed', at, brief: 'Write it.', cwd, maxAttempts: 1, harness: 'claude' },
-      { kind: 'starting', at, attempt: 1 },
-      { kind: 'spawned', at, attempt: 1 },
-      {
-        kind: 'ended',
-        at,
-        attempt: 1,
-        sessionId: `ae/${taskId}/1`,
-        observed: 'done',
-        reason: 'harness',
-        closeout: { outcome: 'done', summary: 'Wrote it.', needs: null, artifacts: [] },
-      },
-      { kind: 'settled', at, outcome: 'succeeded' },
-    ]
-      .map((e) => `${JSON.stringify(e)}\n`)
-      .join(''),
-  );
+  Effect.runSync(engine().file({ id: taskId, brief: 'Write it.', cwd, harness: 'claude' }));
+  standIn.settle(taskId, 'succeeded', {
+    exitCode: 0,
+    closeout: { outcome: 'done', summary: 'Wrote it.', needs: null, artifacts: [] },
+  });
 }
 
 fs.mkdirSync(path.join(work, 'write'), { recursive: true });

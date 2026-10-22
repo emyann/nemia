@@ -55,7 +55,8 @@ Three things say what a session can do:
   this way.
 
 **Fences only tighten.** A step may narrow its agent's fence, never widen it, and a step that would is refused when the workflow is read
-(`fenceRefusal`). Its tools may only be ones the agent has, its denies must keep each of the agent's, and its permission mode may be
+(`fenceRefusal`). Its denies add to the agent's, so it can never take one of them away; its tools may only be ones the agent has, and
+its permission mode may be
 no wider than the agent's. From narrowest, the modes are `plan`; then `dontAsk`, `default` and `manual`; then `acceptEdits`; then
 `auto`; then `bypassPermissions`. A step that needs a wider fence needs another agent.
 

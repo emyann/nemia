@@ -173,6 +173,7 @@ const PINNED: Record<string, string[]> = {
     'endWords',
     'endingSteps',
     'engine',
+    'engineOf',
     'ensureDaemon',
     'envNameOf',
     'envelopeRefusals',
@@ -691,6 +692,7 @@ const PINNED: Record<string, string[]> = {
     'workChecks',
     'workspacePlan',
   ],
+  'agent-orchestrator/testing': ['testPlace'],
   'agent-orchestrator/workflow': [
     'AGENTS_FOLDER',
     'AGENT_KEYS',

@@ -1,7 +1,7 @@
 /**
- * Fences only tighten: a step that names an agent, or is hired one, may narrow the agent's `tools:`, `allowedTools:`, `disallowedTools:`,
- * `permissionMode:` and `sandbox:`, and never widen them, nor set `background: true` over an agent an allow rule would widen
- * (`fenceRefusal`). One refusing fixture per key, each beside what still loads.
+ * Fences only tighten: a step that names an agent, or is hired one, may narrow the agent's `tools:`, `allowedTools:`, `permissionMode:`
+ * and `sandbox:`, and never widen them, nor set `background: true` over an agent an allow rule would widen (`fenceRefusal`); its
+ * `disallowedTools:` adds to the agent's (`deniesWith`), so it can lift none. One refusing fixture per key, each beside what still loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -138,17 +138,22 @@ test('REFUSED at shipped defaults: an `Edit` allow over an agent whose mode asks
   assert.deepEqual(stepOf(agents, 'agent: bypass\nallowedTools: Bash(git push)').allowedTools, ['Bash(git push)'], 'asks about nothing');
 });
 
-test("REFUSED at shipped defaults: `disallowedTools:` that leaves out one of its agent's denies", () => {
+test("a step's `disallowedTools:` adds to its agent's: the session is refused its own rules, then each of the agent's they do not cover", () => {
   const agents = agentsOf({ ada: '---\ndisallowedTools: Bash(git push), Bash(git push:*)\n---\nWork.\n' });
-  const said = refusal(() => stepOf(agents, 'agent: ada\ndisallowedTools: Bash(git push)'));
-  holds(said, 'build', 'disallowedTools: Bash(git push)', '`Bash(git push:*)`', 'ada');
-  assert.ok(said.includes('replaces'), `says the list replaces the agent's: ${said}`);
+  const step = stepOf(agents, 'agent: ada\ndisallowedTools: Bash(npm run build)');
   assert.deepEqual(
-    stepOf(agents, 'agent: ada\ndisallowedTools: Bash(git push), Bash(git push:*), Bash(npm run build)').disallowedTools,
-    ['Bash(git push)', 'Bash(git push:*)', 'Bash(npm run build)'],
-    'the list that keeps both and adds one loads',
+    step.disallowedTools,
+    ['Bash(npm run build)', 'Bash(git push)', 'Bash(git push:*)'],
+    'a line that leaves them out loads',
+  );
+  assert.deepEqual(step.agent?.agentDenies, ['Bash(git push)', 'Bash(git push:*)'], "the agent's are kept apart, to write the line back");
+  assert.deepEqual(
+    stepOf(agents, 'agent: ada\ndisallowedTools: Bash(git push:*), Bash(npm run build), Bash(git push)').disallowedTools,
+    ['Bash(git push:*)', 'Bash(npm run build)', 'Bash(git push)'],
+    'a line that repeats every deny of its agent, as each had to before, resolves to itself',
   );
   assert.deepEqual(stepOf(agents, 'agent: ada\ndisallowedTools: Bash').disallowedTools, ['Bash'], 'a bare tool covers its rules');
+  assert.deepEqual(stepOf(agents, 'agent: ada').disallowedTools, ['Bash(git push)', 'Bash(git push:*)'], "no line is the agent's");
 });
 
 test("REFUSED at shipped defaults: `permissionMode:` wider than its agent's, or than the default when it names none", () => {

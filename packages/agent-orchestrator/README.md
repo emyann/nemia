@@ -440,13 +440,15 @@ workflow — the listings skip it, and a workflow named `agents` is refused by n
 At `wf start` each node is resolved and frozen on the run, and resolved afresh while the run has filed nothing — a run
 waiting `--after` takes the folder as it stands at its first filing — or when a person types `nemia refresh`, which takes the newest
 revision of every kind for every filing after it. Between those a run never reads `agents/` again, from a worktree or
-anywhere: the agent's keys are the defaults, a key the step writes wins — a fence key only narrows the agent's (*Five layers*, below) —
+anywhere: the agent's keys are the defaults, a key the step writes wins — a fence key only narrows the agent's, and `disallowedTools:`
+adds to it (*Five layers*, below) —
 and the refusals that depend on the harness read the merged keys and name the step. On codex, and on a step that continues another's
 session (`resume:`), the brief is the agent's instructions, then your custom instructions for it, then the rules of the run's factory
 (*Five layers*, below), then the step's own words, each after a blank line; on Claude Code the instructions, the custom instructions and
 the factory's rules go after Claude Code's own prompt (*An agent rendered for Claude Code*, below) and the brief is the step's own words
 alone. `renderStep`
-writes a resolved step back as its file was: `agent:`, the keys the step set itself, and its own note, never the agent's. `wf start` names
+writes a resolved step back as its file was: `agent:`, the keys the step set itself, and its own note, never the agent's — its
+`disallowedTools:` without the denies its agent gave it (`StepAgent.agentDenies`), and no line where it only repeated them. `wf start` names
 each node's agent beside it — `implement (implementer) → review (reviewer) → ship (shipper)` — and a node with nothing attached by its
 name alone.
 
@@ -518,8 +520,10 @@ skills its `skills:` line adds, and the task, its brief after them. A skill the 
 so one both name stays the agent's, and the stats mark an added skill's change on the step, never on its agent.
 
 Fences only tighten: a step may narrow its agent's fence, never widen it, and the loader refuses one that would (`fenceRefusal`). A
-step's `tools:` may name only tools its agent's list has; its `allowedTools:` only what its agent's rules allow; its `disallowedTools:`,
-which replaces its agent's list, must keep each of its agent's denies. Its `permissionMode:` or `sandbox:` may be no wider than its
+step's `disallowedTools:` adds to its agent's: the session is refused the step's own rules, then each of the agent's they do not cover,
+so a step can never take one of its agent's denies away, and a deny added to the agent reaches every step that hires it. A step's
+`tools:` and `allowedTools:` replace its agent's: its `tools:` may name only tools its agent's list has; its `allowedTools:` only what
+its agent's rules allow. Its `permissionMode:` or `sandbox:` may be no wider than its
 agent's, or than its harness's default when the agent names none: from narrowest, `plan`; `dontAsk`, `default` and `manual`;
 `acceptEdits`; `auto`; `bypassPermissions` — and on codex `read-only`; `workspace-write`; `danger-full-access`. And it may not run a
 fenced agent on the other harness, whose fence cannot be compared. Its `writable:` widens where its writes reach and never what it may
@@ -812,6 +816,13 @@ for another step's sake by machinery, not by a sentence in its brief. A reviewer
 `npm run build` and `npm run e2e`, which an implementer's check needs and which write into the workspace — those two
 commands, and not the build and the e2e by another name (below) — and an implementer `SendMessage`, `CronCreate`, `CronDelete`
 and `RemoteTrigger`, which no step needs.
+
+**A step's line adds to its agent's.** A step that names an agent writes only the denies it adds: the session is refused the step's
+own rules, in their order, then each of its agent's that none of them covers. So when the team tightens an agent — a deny added to its
+file — every step that hires it, and every copy of a step line written before, gets the new deny and still loads; a step can never take
+one of its agent's away, and one that needs fewer needs another agent. A line written when a step's list replaced its agent's, repeating
+every one of them, reads as the same list, and a run frozen before the change is filed with the list it was frozen with. Written back
+(`renderStep`, the board's save), a step's line holds its own rules alone.
 
 Refused at load: a line that names no rule; an entry with a comma inside it (`Bash(git push, git reset)`
 would reach the harness as two halves of a rule, so write two rules); an entry that is not one rule

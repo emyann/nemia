@@ -9,7 +9,7 @@ broken. This page says what the tests hold; the tests are the rules.
 | Layer | Owns | Public contract |
 |---|---|---|
 | `packages/agent-runtime` | Agent sessions on a harness, durably: a job that runs to its end, and a long-lived session that runs until stopped (`restartPolicy: 'Always'` with `background: true`, the runtime's README, *A long-lived session*). How a session runs: its command, mounts, restart and spend, the journal, the attempts, the harnesses' vocabulary. The `ae` command. | `agent-runtime` → `src/index.ts`, the runtime in Effect. `agent-runtime/testing` → `src/testing.ts`, the engine's stand-in and the wait a test makes on its event (`until`, `bell`, `WAITED`), for test files alone. `agent-runtime/vocabulary` → `src/vocabulary.ts`, the harnesses' words, what their fence words reach (`fenceReach`), the first character of a path a harness's permission rule cannot carry (`unruledIn`) and the folders a harness reads as its own configuration in a mounted folder (`configFolderIn`), pure. `decide` is exported by none. |
-| `packages/agent-orchestrator` | A folder of markdown as a workflow, and a run of its steps: which task to file next, what a person must decide, what the run's record says. The revisions of each kind a run resolves — a ledger of (number, hash, when) per kind and name under `revisions/<kind>/<name>.json`, and the numbers pinned on the run and on each filed step. The `wf` command, to become `nemia`. | `agent-orchestrator` → `src/runner.ts`: the controllers, everything that reads or writes the disk, and the refusals by kind, `Missing`, `Conflict` and `Invalid`, re-exported by name. `agent-orchestrator/run` → `src/run.ts`: `assess` (`src/tick/assess.ts`), and the words a run is described in, re-exported by name. `agent-orchestrator/workflow` → `src/workflow.ts`: the format, pure. |
+| `packages/agent-orchestrator` | A folder of markdown as a workflow, and a run of its steps: which task to file next, what a person must decide, what the run's record says. The revisions of each kind a run resolves — a ledger of (number, hash, when) per kind and name under `revisions/<kind>/<name>.json`, and the numbers pinned on the run and on each filed step. The `wf` command, to become `nemia`. | `agent-orchestrator` → `src/runner.ts`: the controllers, everything that reads or writes the disk, and the refusals by kind, `Missing`, `Conflict` and `Invalid`, re-exported by name. `agent-orchestrator/run` → `src/run.ts`: `assess` (`src/tick/assess.ts`), and the words a run is described in, re-exported by name. `agent-orchestrator/workflow` → `src/workflow.ts`: the format, pure. `agent-orchestrator/testing` → `place/memory/index.ts`, the test place (`testPlace`), for test files alone. |
 | `apps/api` | The workflows behind HTTP, and the feed as a stream, read through the orchestrator's live reader (`followFeed`) on the hub its daemon publishes to. | Its routes. |
 | `apps/web` | The board people look at. It talks to the api over HTTP, decodes each answer it reads with a schema of its own (`effect`), imports none of our packages, names no store path, and builds no command of its own: a command or a store folder it shows is text the api answered (`STORE_PATHS` and `COMMAND_TEXT` in `apps/web/test/structure.test.ts`, both empty). | Its pages. |
 
@@ -89,7 +89,8 @@ every factory and repository of its process, a question a call that runs git and
 (`test/git-ask.boundary.test.ts`); it is given as `gitPlaceLayer` by `src/place/shipped.store.ts`, the one file of `src` that imports it (`placeBreaks` in `test/boundary.test.ts`),
 so no `src` names git (`test/git-calls.test.ts`). The test place is a second one, beside it (`packages/agent-orchestrator/place/memory`,
 `testPlace()`): it answers the same verbs from memory, in real directories and with no process, new for each test, and no file of `src`
-or `bin` imports it: the door gives git alone (`placeBreaks`). One table of walks holds it to git (`test/place-walks.ts`): each walk
+or `bin` imports it: the door gives git alone (`placeBreaks`). A test of another package takes it through the package's
+`agent-orchestrator/testing` entry, as the api's do (`apps/api/test/placed.ts`). One table of walks holds it to git (`test/place-walks.ts`): each walk
 has the one answer both places must give,
 `test/git-place.boundary.test.ts` asks them of git and `test/place-contract.test.ts` of the test place, where a lie about any verb
 fails a walk and a verb with no walk is named. A test is given the stand-in, and one that reaches the real thing says so by its name,
@@ -299,7 +300,8 @@ import `agent-runtime/testing`, the engine's stand-in (`testingBreaches` in the 
 any route: a subpath not in its `exports`, a relative path, `import.meta.resolve`, or a path built with path.join. `decide` is exported
 by no entry, and the stand-in by the testing entry alone. The apps
 reach packages/agent-orchestrator through `agent-orchestrator`, `agent-orchestrator/run`,
-and `agent-orchestrator/workflow` alone. `./workflow` is the pure format, and what reads a folder from disk, and the
+and `agent-orchestrator/workflow` alone; a test file, and no file of a `src` or a `bin`, may also import `agent-orchestrator/testing`,
+the test place (`testingBreaches` in the orchestrator's `contract.test.ts`). `./workflow` is the pure format, and what reads a folder from disk, and the
 refusals by kind, are exported from `agent-orchestrator`. XState is a dependency
 of the runtime alone: `src/core/lifecycle.ts` is the one file of any workspace that imports it, and neither entry exports it,
 the machine, or the readings `decide` moves by. `agent-runtime` exports the lifecycle's graph as plain data (`lifecycleGraph`: its states, edges and a person's verbs),

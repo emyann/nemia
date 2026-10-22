@@ -64,7 +64,7 @@ const citationRefusals = (lines: string[], at: string, cited: string, claims: Re
   const claim = claims[cited];
   if (claim === undefined)
     return [
-      `${at} cites sdk.d.ts:${cited}, which test/sdk-citations.test.ts names no identifier for. Add it to CLAIMS with the ` +
+      `${at} cites sdk.d.ts:${cited}, which test/sdk-citations.boundary.test.ts names no identifier for. Add it to CLAIMS with the ` +
         'identifier the line declares, so the next SDK bump refuses it when it moves.',
     ];
   const [from, to] = cited.includes('-') ? cited.split('-').map(Number) : [Number(cited), Number(cited)];

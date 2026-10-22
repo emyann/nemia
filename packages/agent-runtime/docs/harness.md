@@ -148,8 +148,10 @@ What moved from 0.3.270, for the card that designs the GitHub sign-in on this:
   `pending`, `disabled`, which `MCP_STATES` (`harness/mcp-state.ts`) carries unchanged. Nothing here reads `config`, `scope` or
   `source`, and the sign-in card is what `config` is worth reading for.
 - **The first `mcpServerStatus()` of a session can answer `pending`,** where the 0.3.270 measurement saw `needs-auth` at once. MCP
-  startup is non-blocking, so a caller that needs a settled word must ask again rather than read the first answer as final — which
-  `mcpServersRead` already does under `MCP_STATE_MS`, and which the sign-in card's own flow must do too.
+  startup is non-blocking, so a caller that needs a settled word must ask again rather than read the first answer as final. Nothing in
+  the runtime does that for it: `mcpServersRead` makes exactly one ask and carries whatever came back, and `MCP_STATE_MS` is a deadline
+  that ends the session rather than a wait for one to settle. Reading again is the caller's — the board has a person press Check again —
+  and the sign-in card's own flow must read again too, or it ships a chip stuck on `pending`.
 - **A server whose connect has failed answers `failed`, with the reason on `error`,** where the same address read `pending` on 0.3.270.
   Measured here against two servers recorded for a factory, an http one at GitHub's MCP address and an sse one at `https://docs.example/mcp`,
   which resolves to nothing: the sse one came back `failed` with `SSE error: getaddrinfo ENOTFOUND docs.example`, and the http one

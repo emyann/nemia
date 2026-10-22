@@ -1,6 +1,6 @@
 /**
  * What the runtime's Agent SDK dependency is pinned to, and what that pin means for a session. Three constants, each a measurement
- * of one release and none of them a guess: `sdk-pin.test.ts` holds the tree to the first two, and `live-sdk.test.ts` — against the
+ * of one release and none of them a guess: `sdk-pin.test.ts` holds the tree to the first two, and `live-sdk.boundary.test.ts` — against the
  * real harness, `AE_LIVE=1` — to the third.
  *
  * **Each is re-measured at the next bump, never carried.** The spec is exact on purpose (`packages/agent-runtime/package.json`): the
@@ -15,7 +15,7 @@ export const SDK_VERSION = '0.3.308';
 export const CLAUDE_CODE_VERSION = '2.1.308';
 
 /**
- * What that Claude Code resolves the model alias `opus` to, measured off a real session's `init` line (`live-sdk.test.ts`, which
+ * What that Claude Code resolves the model alias `opus` to, measured off a real session's `init` line (`live-sdk.boundary.test.ts`, which
  * needs `AE_LIVE=1`). An alias can move under a version that did not, so this is the one of the three a bump cannot infer: the
  * measurement is made again, and when it was made is in `docs/harness.md`.
  */

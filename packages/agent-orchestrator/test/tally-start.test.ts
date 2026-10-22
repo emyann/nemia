@@ -86,8 +86,8 @@ test('nemia start of a step whose tally its closeout holds freezes the tally wit
   assert.deepEqual(readRun(id).workflow?.find((s) => s.name === 'triage')?.tally, ['issues', 'issues.open']);
 });
 
-test("this repository's build workflow counts its review's findings, its placement findings and the mutants that prove their rule, and loads", () => {
+test("this repository's build workflow counts its review's findings and its placement findings, and loads", () => {
   const build = path.join(REPO, 'workflows', 'build');
   const review = loadWorkflows(build, placesOf(build)).find((s) => s.name === 'review');
-  assert.deepEqual(review?.tally, ['findings', 'findings.kind=placement', 'mutants.proves']);
+  assert.deepEqual(review?.tally, ['findings', 'findings.kind=placement']);
 });

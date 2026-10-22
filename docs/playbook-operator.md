@@ -22,7 +22,7 @@ words the agent can act on. It files, chains and restarts. It does not decide wh
 
 - when to restart the daemon, re-arm the watch, re-read a closeout;
 - how to word the person's answer so an agent can act on it;
-- what to verify before bringing a gate (trial merges, mutants, flaky tests) and what to park as a follow-up card;
+- what to verify before bringing a gate (trial merges, flaky tests) and what to park as a follow-up card;
 - how to chain and parallelise the runs the person asked for, paced by the harness quota (see *Filing and chaining*).
 
 ## The loop
@@ -122,11 +122,11 @@ what stopped it (see *Empowering the agents*).
 
 Every gate gets a short formatted section, then one question. The person decides from the message, without opening the board.
 
-- **A spec (design gate):** the change in two or three lines; how it is proven (the tests, the mutants, the fixture that must fail);
+- **A spec (design gate):** the change in two or three lines; how it is proven (the tests, the fixture that must fail);
   the risks the architect names; what is open. Quote the agent where its words carry the decision.
 - **A round (blocked):** the questions exactly as the agent wrote them, each option with what it means, and the agent's recommendation.
   A round arrives as data (`open` in the question shape): print title, body, options and the recommended one.
-- **A landing:** what shipped; the proof (checks, mutants killed, reviewer's verdict); the trial merge; the cost; the reviewer's
+- **A landing:** what shipped; the proof (checks, reviewer's verdict); the trial merge; the cost; the reviewer's
   findings in one line each, with whether they are worth a round.
 - **The operator's view:** agree or disagree with the agent's recommendation, and say why in a sentence. Disagree when a rule of the
   person's is at stake (a rule the person stated, the repository's CLAUDE.md, a cost line), never for taste. Agents' cost estimates have
@@ -168,7 +168,7 @@ Scratch worktree, never the main checkout:
 ```sh
 git worktree add --detach "$S" <branch>
 ln -s $REPO/node_modules "$S/node_modules"   # and each package's node_modules when it has one
-# apply a mutant, run the one test file, restore; then:
+# make the change that should break it, run the one test file, restore; then:
 rm "$S"/node_modules; git worktree remove "$S"
 ```
 
@@ -272,7 +272,8 @@ mount or a skill change. Met on 2026-10-04 and 05, each now a card:
 
 ## Evidence and honesty
 
-- A guard is proven by making it refuse. When a reviewer cannot run a mutant, run it; when an agent claims one direction, run both.
+- A guard is proven by making it refuse. When a reviewer cannot verify a guard, verify it yourself; when an agent claims one
+  direction, run both.
 - A test that fails only under load is a race until shown otherwise: reproduce it on demand before calling it flaky, and park it with
   the numbers when it cannot be reproduced quickly.
 - Measure before claiming, and measure for a step that cannot (rank the tests that refused landings from the check logs; time a landing
@@ -316,7 +317,7 @@ English; never push or open a pull request unless asked.
 
 | Trap | Now held by |
 |---|---|
-| A read-only reviewer cannot run mutants | implement's check runs the mutants the closeout names (`workflows/build/mutants.ts`) |
+| A read-only reviewer cannot prove a test can fail | nothing: the mutant trials were removed on 2026-10-21 and nothing replaced them, so how a change proves its tests can fail is to be revisited. Until then, verify a guard by hand (*Evidence and honesty*, and the scratch worktree above) |
 | Agents wrapped checks in `timeout`, pipes, `cd` and were refused | the skills spell each check bare; `agent-fences.test.ts` holds skills to fences |
 | Agents explored with `head`, `grep`, `awk`, `ls` in Bash | the skills say Read, Grep, Glob; `cd` denied and counted for Seldon, Agora and Iris |
 | A comment line over 140 columns, found by review each time | `npm run lint` refuses it |

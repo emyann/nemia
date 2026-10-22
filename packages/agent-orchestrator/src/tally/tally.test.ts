@@ -196,7 +196,7 @@ test("a step's tries total per tally over the range and per day, null on a day n
 });
 
 /** The words of this repository's build workflow that the counting must never know. */
-const BUILD_WORDS = /\b(findings|mutants|proves|placement)\b/;
+const BUILD_WORDS = /\b(findings|placement)\b/;
 
 /** The source files, tests left out, that read and count tallies. */
 const countingSources = (): Array<[string, string]> =>

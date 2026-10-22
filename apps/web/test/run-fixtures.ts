@@ -115,10 +115,10 @@ export const step = (extra: Partial<Step> = {}): Step => ({
       { path: 'old.log', pruned: 'removed by wf prune --artifacts', prunedAt: '2026-09-30T06:00:00.000Z' },
       { path: 'RESPONSE.md' },
     ],
-    output: { mutants: [], noMutants: 'none' },
+    output: { notes: [], noNotes: 'none' },
     missing: ['replies'],
     replies: [{ finding: 'a.ts:1', answer: 'fixed', why: 'Cut.' }],
-    schema: { mutants: { type: 'array' } },
+    schema: { notes: { type: 'array' } },
     questions: [
       {
         field: 'open',

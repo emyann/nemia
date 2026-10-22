@@ -70,7 +70,7 @@ test('the verdict is the exit code an attempt recorded; none, or one its deadlin
     assert.equal(attemptVerdict(attempt), 'unfinished', JSON.stringify(attempt));
 });
 
-test("a check's bound on a hang, a round's as a landing's, is never below 2400 s; a round's mutants may make it the longer", () => {
+test("a check's bound on a hang, a round's as a landing's, is never below 2400 s; a round's check does more than a landing's", () => {
   assert.ok(
     CHECK_DEADLINE_SECONDS >= 2400,
     `CHECK_DEADLINE_SECONDS is ${CHECK_DEADLINE_SECONDS}: a round's check is bounded no shorter than 2400 s`,
@@ -334,29 +334,26 @@ test(
 
 test('the lines a check marks are those starting `wf <name>:`, whole and in order — never a prefixed line or `wfx:`', () => {
   const log = [
-    'wf mutants: killed #1 src/a.ts: "x" → "y", by test/a.test.ts (failed, 0.4 s)',
-    'agent-orchestrator:test: wf mutants: x',
+    'wf pictures: named #1 run-dark.png, for apps/web/src/routes/run.tsx (0.4 s)',
+    'agent-orchestrator:test: wf pictures: x',
     'wfx: y',
     'wf check: nothing under apps/web/ was touched\r',
-    'Wf Mutants: shouting',
+    'Wf Pictures: shouting',
     '',
     '[nemia check] exit 0',
   ].join('\n');
   assert.deepEqual(reportedLines(log), {
-    lines: [
-      'wf mutants: killed #1 src/a.ts: "x" → "y", by test/a.test.ts (failed, 0.4 s)',
-      'wf check: nothing under apps/web/ was touched',
-    ],
+    lines: ['wf pictures: named #1 run-dark.png, for apps/web/src/routes/run.tsx (0.4 s)', 'wf check: nothing under apps/web/ was touched'],
     cut: 0,
   });
 });
 
 test('past REPORTED_LINES the first that many are kept, and how many more there were is said', () => {
-  const log = Array.from({ length: REPORTED_LINES + 3 }, (_, i) => `wf mutants: killed #${i + 1}`).join('\n');
+  const log = Array.from({ length: REPORTED_LINES + 3 }, (_, i) => `wf pictures: named #${i + 1}`).join('\n');
   const { lines, cut } = reportedLines(log);
   assert.deepEqual(
     [lines.length, lines[0], lines.at(-1), cut],
-    [REPORTED_LINES, 'wf mutants: killed #1', `wf mutants: killed #${REPORTED_LINES}`, 3],
+    [REPORTED_LINES, 'wf pictures: named #1', `wf pictures: named #${REPORTED_LINES}`, 3],
   );
   const section = checkHandedSection({
     step: 'implement',

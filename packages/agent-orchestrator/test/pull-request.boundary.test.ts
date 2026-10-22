@@ -386,7 +386,7 @@ test("build's implement check pushes through the script before the typecheck, wa
   const clauses = [...frozen.matchAll(/node\s+"\$\w+\/([\w-]+\.ts)"\s+(check|push|wait)?/g)].map(([, script, verb]) =>
     verb ? `${script} ${verb}` : script,
   );
-  assert.deepEqual(clauses, ['pictures.ts', 'probe.ts check', 'pull-request.ts push', 'mutants.ts', 'pull-request.ts wait']);
+  assert.deepEqual(clauses, ['pictures.ts', 'probe.ts check', 'pull-request.ts push', 'pull-request.ts wait']);
   assert.ok(
     frozen.indexOf('pull-request.ts" push') < frozen.indexOf('npm run typecheck'),
     `the push is before the typecheck, so CI's wall time overlaps the local gates:\n${frozen}`,
@@ -465,7 +465,7 @@ test("the wait's two bounds are the numbers the README states, and both fit unde
   assert.ok(
     CHECK_DEADLINE_SECONDS - whole >= 900,
     `the round check's deadline is ${CHECK_DEADLINE_SECONDS} s and the wait takes up to ${whole} s of it: the clauses before it — the ` +
-      'pictures, the probe, the push, the typecheck, the lint and every mutant — have what is left, and 900 s is the least that is ' +
+      'pictures, the probe, the push, the typecheck and the lint — have what is left, and 900 s is the least that is ' +
       'honest. Re-measure the deadline (src/check/check.ts) before you raise the wait.',
   );
 });

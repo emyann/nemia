@@ -50,14 +50,14 @@ const settled = (t: Waiter, id: string) => {
   );
 };
 
-const KILLED = Array.from({ length: 10 }, (_, i) => `wf mutants: killed #${i + 1} src/a.ts: "x" → "y", by test/a.test.ts (failed)`);
+const NAMED = Array.from({ length: 10 }, (_, i) => `wf pictures: named #${i + 1} run-dark.png, for apps/web/src/routes/run.tsx`);
 const MARKED = [
-  'wf mutants: baseline: test/a.test.ts passes unmutated',
-  ...KILLED,
+  'wf pictures: the pages this change touched: run, factory',
+  ...NAMED,
   'wf check: no e2e in a round check; it runs once, on the merged tree',
 ];
 
-/** `workflows/build`'s check, in shape: the mutants' lines, then a web build longer than the log the engine keeps, then the last word. */
+/** `workflows/build`'s check, in shape: the pictures' lines, then a web build longer than the log the engine keeps, then the last word. */
 const COMMAND = [
   ...MARKED.slice(0, -1).map((line) => `echo ${JSON.stringify(line)}`),
   'i=0; while [ $i -lt 300 ]; do echo "web:build: dist/assets/chunk-$i.js  41.20 kB | gzip: 12.80 kB, and a line long enough"; i=$((i+1)); done',
@@ -101,7 +101,7 @@ test(
     const id = 'r-1-implement-check';
     await checked(t, id);
     const log = await Effect.runPromise(e.logs(id));
-    assert.doesNotMatch(log, /wf mutants: baseline/, 'the marked lines sit before the end the engine keeps, so its log cannot hand them');
+    assert.doesNotMatch(log, /wf pictures: the pages/, 'the marked lines sit before the end the engine keeps, so its log cannot hand them');
     assert.match(log, /wf check: no e2e/);
 
     const said = await handed(id);

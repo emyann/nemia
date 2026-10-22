@@ -31,6 +31,12 @@ it holds today that is a candidate for the runtime is in `docs/architecture.md`,
 - **A test names its engine with `const engine = eachTest(testEngine);` (`agent-runtime/testing`) and `engineOf(engine().layer)`**:
   `settle(id, phase, end)` takes what the attempt ended with as an object (`{ closeout, exitCode }`), and a `say` or a `stop` is
   refused as the runtime refuses it (say to a task settled `running` first).
+- **A person's story is told as one test, on `story` and its stage** (`test/story.ts`): `const stage = staged({ runWith, main })` at
+  the file's head, after its environment is set, and in a test `const s = story(t)`, each checkpoint `await s.test(name, body)`, so
+  a citation of its name resolves; once one fails the rest are filed skipped, naming it. The stage is new for each test: the test
+  place, the engine's stand-in with `settle` and `e`, `runWith`, `runPlaced`, `main`, and `clock()`. A table is one test whose rows
+  are `t.test` subtests, beside its feature (`src/<feature>/<feature>.test.ts`), or in `test/assess-<area>.test.ts` for `assess`
+  across features, its builders from `test/assessed.ts`.
 
 ## Keys, agents and folders
 

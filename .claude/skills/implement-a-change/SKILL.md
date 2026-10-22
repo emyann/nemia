@@ -48,6 +48,10 @@ description: "Build a change from its spec in this repository: tests first where
      search for the key, and read the code and its test.
    - **A test is given a stand-in, and the real thing is asked for by name.** A file whose whole subject is the real thing, or that
      needs what the stand-in does not model, says so in its name as the repository's guard for that requires.
+   - **A new step of a story is a checkpoint of its scenario, and a new input of a function a row of its table.** Where a scenario
+     test already walks the person's story, add the step as a named checkpoint of it; where a table holds the function's inputs, add
+     the case as a named row. A focused test of its own is for what no story reaches: a race, a crash window, a real boundary, an
+     invariant of a pure function.
 3. **Work in small commits** with plain messages, as you go; the run commits only what you leave, in one commit under your step's name.
 4. **Check what you changed**: its test files, the tests that read a doc, skill or workflow file you touched, and the packages you
    touched where a file alone does not say enough, each as the repository's instructions say how; then the checks the repository's

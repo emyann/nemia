@@ -104,7 +104,7 @@ test("REFUSED at shipped defaults: a hire into a step whose own file names its a
   assert.equal(await refused(put, 409), words('otto', mine), "yours, read under the app's store root");
 });
 
-test("REFUSED: a body with no agent and one that is not JSON (400), in the api's words, and a name that is no factory's (400) in the package's", async () => {
+test("REFUSED: a body with no agent and one that is not JSON (400), in the api's words, and a name that is no factory's (400)", async () => {
   assert.equal(
     await refused(() => send('PUT', HIRE, {}), 400),
     'PUT /api/factories/mill/hires/build%2Fimplement: `agent` names the agent to hire, a string, its file\'s name without .md: `{ "agent": "<the agent\'s name>" }`. This request\'s was left out.',
@@ -113,4 +113,5 @@ test("REFUSED: a body with no agent and one that is not JSON (400), in the api's
     await refused(() => send('PUT', HIRE, '{agent'), 400),
     'PUT /api/factories/mill/hires/build%2Fimplement takes a JSON body: `{ "agent": "<the agent\'s name>" }`.',
   );
+  await refused(() => send('PUT', '/api/factories/Not%20One/hires/build%2Fimplement', { agent: 'ada' }), 400);
 });

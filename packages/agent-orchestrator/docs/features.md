@@ -6157,8 +6157,9 @@ secret ships in `src/servers/clients.ts`, as gh ships its own, and GitHub's push
 that reads `needs-auth` offers **Sign in**: the api's `POST …/servers/:server/sign-in` asks the engine's `mcpSignIn`, which stores the
 secret with `claude mcp add --scope local` under the engine's root (never `--scope user`, so the owner's own sessions gain nothing) and
 holds a session asked `mcpAuthenticate` for 5 minutes; the board shows the address, polls the state every 2 s, and reads the servers again
-on `connected`. A row that reads `connected` offers **Sign out**, which is `claude mcp remove --scope local`: measured on a scratch store
-to delete the stored token and secret under the server's key, where `mcpClearAuth` answered `{}` and left a sign-in in flight. Each
+on `connected`. A row that reads `connected` offers **Sign out**, which is `claude mcp remove --scope local` after an add with no secret
+(a remove finds the key only through a server added under the name, and a foreign client's sign-in adds none): measured on a scratch
+store to delete the stored token and secret under the server's key, where `mcpClearAuth` answered `{}` and left a sign-in in flight. Each
 agent's GitHub tools are fenced by name (`agent-fences.test.ts`): Agora reads, Ada writes nothing, Otto may merge and writes no file;
 no agent or step names `mcp: github` yet, so no run waits on a sign-in.
 

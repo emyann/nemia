@@ -8,7 +8,8 @@
  *   under the same key an inline session computes, and adds the server to the one folder the child ran in, so the owner's own
  *   sessions in their own checkouts do not gain it.
  * - `claude mcp remove --scope local <name>` deletes both the stored secret and the stored token under that key: a later session handed
- *   the same bytes finds no sign-in, which is what a sign-out is.
+ *   the same bytes finds no sign-in, which is what a sign-out is. It finds the key only through a server added under the name: a remove
+ *   of one never added exits 1 and leaves the token, so a sign-out adds the server first, with no secret.
  * - `query().mcpAuthenticate(name, redirectUri)` answers an authorize URL, and the Claude Code child itself listens on the callback
  *   port until the browser's redirect arrives or the session ends; `mcpServerStatus()` then reads `connected`.
  *
@@ -76,9 +77,10 @@ const withoutSecret = (text: string, secret: string): string => (secret ? text.s
 /**
  * The argv of `claude mcp add` for `server` under `name`, as `mcpServerOf` hands its bytes — the headers in its order, which is the
  * order the key is computed over — with `--client-secret` given no value: the CLI reads it from `MCP_CLIENT_SECRET`. The headers come
- * before the other options, never last: `--header` takes many values, and would read the name as one more header (measured).
+ * before the other options, never last: `--header` takes many values, and would read the name as one more header (measured). With
+ * `secret` false, `--client-secret` is left out: the add a sign-out makes stores no secret.
  */
-export const mcpAddArgs = (name: string, server: RemoteMcpServer): string[] => {
+export const mcpAddArgs = (name: string, server: RemoteMcpServer, secret = true): string[] => {
   const s = mcpServerOf(server);
   return [
     'mcp',
@@ -88,7 +90,7 @@ export const mcpAddArgs = (name: string, server: RemoteMcpServer): string[] => {
     '--transport',
     s.type,
     ...Object.entries(s.headers ?? {}).flatMap(([k, v]) => ['--header', `${k}: ${v}`]),
-    ...(s.oauth === undefined ? [] : ['--client-id', s.oauth.clientId, '--client-secret']),
+    ...(s.oauth === undefined ? [] : ['--client-id', s.oauth.clientId, ...(secret ? ['--client-secret'] : [])]),
     ...(s.oauth?.callbackPort === undefined ? [] : ['--callback-port', String(s.oauth.callbackPort)]),
     name,
     s.url,
@@ -116,13 +118,17 @@ export const storeClientSecret = async (
 };
 
 /**
- * `name`'s sign-in cleared from Claude Code's store: `claude mcp remove --scope local <name>`, run in the folder the sign-in added it
- * in, which deletes the token and the secret under its key (measured). Answers why it failed, or `undefined`.
+ * `name`'s sign-in cleared from Claude Code's store, in the folder a sign-in adds it in: `claude mcp add --scope local` with no secret,
+ * then `claude mcp remove --scope local <name>`, which deletes the token and any secret under its key (measured). The add comes first
+ * because a remove finds the key only through a server added under the name, and a sign-in handed no secret added none; where one is
+ * already added the CLI refuses the second add, which is no failure. Answers why the remove failed, or `undefined`.
  */
-export const clearSignIn = async (cli: McpCli, name: string, cwd: string): Promise<string | undefined> => {
-  const removed = await cli(['mcp', 'remove', '--scope', 'local', name], { cwd, env: withoutTelemetry(process.env) });
+export const clearSignIn = async (cli: McpCli, name: string, server: RemoteMcpServer, cwd: string): Promise<string | undefined> => {
+  const env = withoutTelemetry(process.env);
+  await cli(mcpAddArgs(name, server, false), { cwd, env });
+  const removed = await cli(['mcp', 'remove', '--scope', 'local', name], { cwd, env });
   if (removed.code === 0) return undefined;
-  return `\`claude mcp remove\` did not clear the sign-in of \`${name}\` (exit ${removed.code}): ${removed.out.trim()}. Sign in to it first: a server never signed in to from here has nothing to clear.`;
+  return `\`claude mcp remove\` did not clear the sign-in of \`${name}\` (exit ${removed.code}): ${removed.out.trim()}. Read its words, then sign out again.`;
 };
 
 /** How a held sign-in ended: the server read `connected`, or `failed` with why. */

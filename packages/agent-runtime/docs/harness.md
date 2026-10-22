@@ -180,7 +180,11 @@ What the GitHub sign-in card measured of the CLI that stores the secret, **Claud
   required argument 'name'`. So the headers go before the other options.
 - **`claude mcp remove --scope local <name>`, from the same cwd, deletes both `mcpOAuthClientConfig[<key>]` and `mcpOAuth[<key>]`**,
   the stored secret and a stored token planted under that key. So a sign-out is that remove: a later session handed the same bytes finds
-  neither, and reads `needs-auth`; a sign-in after it stores the secret again. `mcpClearAuth` is not used: above, it resolved `{}` and
+  neither, and reads `needs-auth`; a sign-in after it stores the secret again.
+- **A remove finds the key only through a server added under the name**: with a token planted under `name|<key>` and no server
+  added, `claude mcp remove --scope local <name>` exits 1 (`No MCP server named … in local scope`) and leaves the token; `claude mcp
+  add --scope local` with no secret, then the remove, deletes it. A sign-in handed no secret adds no server, so a sign-out always adds
+  first (`clearSignIn`); where one is already added the CLI refuses the second add, and the remove clears both. `mcpClearAuth` is not used: above, it resolved `{}` and
   left the sign-in in flight, and what it clears of a completed sign-in is unmeasured.
 - **Unmeasured still**: the token exchange on 0.3.308, and a task session finding a sign-in made through `--scope local` with a real
   token. Both stand on `izq1-measurement.md`'s 0.3.270 sign-in and its refresh, and on the key above being the one it measured.

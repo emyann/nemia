@@ -77,7 +77,7 @@ again above, and a look that failed says the state is unread, which is not an ab
 `mcpSignIn`, `mcpSignInState` and `mcpSignOut` (`agent-runtime/src/service/mcp-sign-in.ts`), since only the runtime spawns Claude Code
 or holds an SDK session: it stores a client secret it is handed in the harness's own store through a `claude mcp add --scope local`
 child under the engine's root, holds a session asked `mcpAuthenticate` in memory by its callback port until the server reads
-`connected`, and signs out through `claude mcp remove --scope local`. Which secret a server is handed is the orchestrator's
+`connected`, and signs out through a `claude mcp add` with no secret then a `claude mcp remove --scope local`. Which secret a server is handed is the orchestrator's
 (`src/servers/clients.ts`, keyed by client id, exported by no entry), and the api and the board carry an address to open and a state
 word, never a secret or a token.
 

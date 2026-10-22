@@ -74,11 +74,18 @@ export const finishedAtOf = (run: Pick<Listed, 'atWork' | 'cancelledAt' | 'creat
 };
 
 /**
- * A run's wall time in ms, never negative: from its creation until its work stopped (`finishedAtOf`), or until `now` for one not
- * finished.
+ * The instant a run's clock is read at, in epoch milliseconds: when its work stopped (`finishedAtOf`) for a finished run, so that a
+ * finished run's breakdown is frozen where its work ended; `now` for a run still going. `wallMsOf` measures to this same instant, so a
+ * clock's `wallMs` and the row's own are one number, which is what makes a breakdown's rows add up to the row.
  */
-export const wallMsOf = (run: Listed, now: number): number =>
-  Math.max(0, (kindOf(run) === 'finished' ? Date.parse(finishedAtOf(run)) : now) - Date.parse(run.createdAt));
+export const clockUntilOf = (run: Listed, now: number): number =>
+  kindOf(run) === 'finished' ? Date.parse(finishedAtOf(run)) : now;
+
+/**
+ * A run's wall time in ms, never negative: from its creation until its work stopped (`finishedAtOf`), or until `now` for one not
+ * finished (`clockUntilOf`).
+ */
+export const wallMsOf = (run: Listed, now: number): number => Math.max(0, clockUntilOf(run, now) - Date.parse(run.createdAt));
 
 /** How a finished run ended (`RunOutcome`). */
 export const outcomeOf = (run: Pick<Listed, 'cancelledAt' | 'toDecide' | 'status'>): RunOutcome => {

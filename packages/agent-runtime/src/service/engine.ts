@@ -85,6 +85,7 @@ import {
 } from './options.ts';
 import { harnessRefusalOf } from './harness-refusal.ts';
 import { McpStateRefused, mcpStateVerbOf } from './mcp-state.ts';
+import { McpSignInRefused, mcpSignInVerbsOf, type McpSignInStarted, type McpSignInState } from './mcp-sign-in.ts';
 import { traceparentOf } from '../harness/telemetry.ts';
 import { attachedSessions, putDrain, liftDrain, type Attached } from '../harness/claude/index.ts';
 import type { McpServersRead } from '../harness/mcp-state.ts';
@@ -404,6 +405,26 @@ export type EngineShape = {
    */
   readonly mcpState: (servers: Record<string, RemoteMcpServer>) => Effect.Effect<McpServersRead, McpStateRefused>;
   /**
+   * A sign-in to `name`, a remote server with an OAuth client and a callback port, started on Claude Code
+   * (`service/mcp-sign-in.ts`): where `clientSecret` is handed, it is stored in Claude Code's own store first, by a `claude mcp add
+   * --scope local` child run under this engine's root with the secret in its environment alone; then a session is held with the
+   * server inline and asked to authenticate it, and the address the person opens is answered at once, with when the sign-in stops
+   * waiting. The session is held in this engine's memory until the server reads `connected` or `SIGN_IN_MS` passes. No task is
+   * touched and nothing is journalled.
+   *
+   * Refused — `McpSignInRefused` — for a server with no OAuth client or callback port, an engine with no Claude Code harness, a CLI that
+   * did not store the secret, and (`held: true`) a callback port another sign-in still waits on.
+   */
+  readonly mcpSignIn: (name: string, server: RemoteMcpServer, clientSecret?: string) => Effect.Effect<McpSignInStarted, McpSignInRefused>;
+  /** The state of `name`'s last sign-in asked of this engine, from memory, spawning nothing: `none` where none was asked. */
+  readonly mcpSignInState: (name: string) => Effect.Effect<McpSignInState>;
+  /**
+   * `name`'s sign-in cleared from Claude Code's store — its token and its stored secret, by `claude mcp remove --scope local` in the
+   * folder its sign-in added it in — so a session handed the same bytes reads `needs-auth`. Refused as `mcpSignIn` is, and (`held:
+   * true`) while a sign-in to it waits.
+   */
+  readonly mcpSignOut: (name: string, server: RemoteMcpServer) => Effect.Effect<{ readonly signedOut: true }, McpSignInRefused>;
+  /**
    * Answer a task held open (`holdOpen`) that waits for one — phase `input-required`. Journalled as an `input` entry — `at`,
    * `text`, and `config` if given — which is returned, and which `view` carries as `state.inputs`. The next tick starts
    * the task's next turn: an attempt that continues the session that signed (`--resume`), told `text` in place of the
@@ -703,7 +724,8 @@ const writtenVerbsOf = (...given: Parameters<typeof sayVerbOf>) => ({
  */
 /**
  * The verbs that ask a harness something in a session of their own, opened for the ask and let go with it: what is left of a plan's
- * usage (`quota`), and the state of each server a caller hands (`mcpState`).
+ * usage (`quota`), the state of each server a caller hands (`mcpState`), and a server's sign-in and sign-out (`mcpSignIn`,
+ * `mcpSignInState`, `mcpSignOut`), whose waiting sign-ins this engine holds.
  */
 const askedVerbsOf = (
   runners: Record<string, SeamOps>,
@@ -711,9 +733,10 @@ const askedVerbsOf = (
   harnesses: Record<string, HarnessConfig>,
   root: string,
   executable: string | undefined,
-): Pick<EngineShape, 'quota' | 'mcpState'> => ({
+): Pick<EngineShape, 'quota' | 'mcpState' | 'mcpSignIn' | 'mcpSignInState' | 'mcpSignOut'> => ({
   quota: quotaVerbOf(runners, fallback),
   mcpState: mcpStateVerbOf(harnesses, root, executable),
+  ...mcpSignInVerbsOf(harnesses, root, executable),
 });
 
 const make = (options: EngineOptions) =>

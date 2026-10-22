@@ -38,7 +38,7 @@ import { pauseFile } from './pause/pause.store.ts';
 import { holderOnStore } from './daemon/daemon.store.ts';
 import { REMOTE_PREFIX, remoteNameOf } from './harness/harness.ts';
 import { Invalid, isRefusal, type Refusal } from './refusal/refusal.ts';
-import { sessionTelemetryOf, toolDetailsRefusalOf } from './telemetry/telemetry.ts';
+import { exportIntervalRefusalOf, sessionTelemetryOf, toolDetailsRefusalOf } from './telemetry/telemetry.ts';
 
 /** The runtime's engine, built: each verb an Effect whose refusal is a tagged error, which a controller reads with `asked`. */
 export type Engine = EngineShape;
@@ -86,6 +86,11 @@ export { mcpServerOf, type LocalMcpServer, type RemoteMcpServer } from 'agent-ru
  * never an empty list. Asked of the engine's `mcpState`, and refused by `McpStateRefused`.
  */
 export { MCP_STATES, McpStateRefused, type McpServerState, type McpServersRead } from 'agent-runtime';
+/**
+ * A server's sign-in as the engine holds it: what a sign-in answers at once (`McpSignInStarted`), the words of its state
+ * (`SIGN_IN_STATES`, `McpSignInState`), and what the three verbs are refused with (`McpSignInRefused`, `held` where a sign-in waits).
+ */
+export { McpSignInRefused, SIGN_IN_STATES, type McpSignInStarted, type McpSignInState } from 'agent-runtime';
 /**
  * Whether a harness files a sign-in for a remote MCP server, read off its name: the runtime's judgement, carried, for the pass that
  * will not start a step whose server needs one. A harness it answers false for is shown its servers and never refused them.
@@ -154,15 +159,15 @@ export const quotaHarnesses = (): string[] =>
  *
  * When the process exports its own telemetry (`otlpOf`), the engine is handed the same collector, and each session it starts exports
  * there too, tagged with the labels its task was filed with (`stepLabels`); with its tools' inputs only when `NEMIA_TOOL_DETAILS` is
- * `1` (`sessionTelemetryOf`). Any other value is said on stderr and leaves them off (`toolDetailsRefusalOf`).
+ * `1` (`sessionTelemetryOf`). Any other value is said on stderr and leaves them off (`toolDetailsRefusalOf`), as an export interval that
+ * is no number is (`exportIntervalRefusalOf`).
  */
 export const engine = (): Engine => {
   const read = readRemote();
   const remote = Object.fromEntries([...read.agents].map(([name, agent]) => [`${REMOTE_PREFIX}${name}`, agent]));
   for (const why of refusalsOf(read)) console.error(`nemia: ${why} ${LEFT_OUT}`);
   const harnesses = { ...HARNESSES, ...remote };
-  const why = toolDetailsRefusalOf(process.env);
-  if (why) console.error(`nemia: ${why}`);
+  for (const why of [toolDetailsRefusalOf(process.env), exportIntervalRefusalOf(process.env)]) if (why) console.error(`nemia: ${why}`);
   const telemetry = sessionTelemetryOf(process.env);
   return engineOf(
     RuntimeEngine.layer({

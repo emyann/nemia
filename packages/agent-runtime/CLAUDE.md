@@ -66,6 +66,10 @@ down is in `docs/architecture.md`, *Who owns what*.
   and a sealed file (`core/engine/feed.ts`): read it through `readFeed`, never as plain lines from byte 0. How long a write waits for
   a live holder before it refuses naming it is `FEED_LOCK_WAIT_MS`, carried as `withFeedLock`'s and `Journal.filesOps`'s last
   argument and named in the refusal, so a test shortens it rather than waiting the shipped bound out.
+- **A bound the runtime ships is a seam a test shortens, never one it waits out**: the detached worker's stop grace and heartbeat
+  are plan fields `detachedOps`'s options write (`DetachedOptions`, defaults `WORKER_STOP_GRACE_MS` and `WORKER_BEAT_MS` in
+  `harness/detached/worker-bounds.ts`), and a `--bg` follow's pace is `ClaudeOptions.followPaceMs` (default `FOLLOW_PACE_MS`), as a
+  say's is `sayTimeoutMs` and a remote request's `requestMs`.
 - **A `claude agents --json` row of ours is decoded by `RegistryRowSchema` (`harness/claude/registry.ts`)**: one that does not decode
   fails the whole read, so every background session is unread, never absent. A field the runtime starts reading is added to the schema;
   a row not ours (no `ae/` name, no `state`) is skipped undecoded.

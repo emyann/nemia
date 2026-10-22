@@ -12,13 +12,15 @@
  * files, which is the rule it keeps.
  *
  * Every workspace package, this one included, declares in its package.json the workspace packages it imports: its source in
- * `dependencies`, its tests in `dependencies` or `devDependencies`. That scan reads every file git lists under apps/ and packages/.
+ * `dependencies`, its tests in `dependencies` or `devDependencies`. That scan reads every file git lists under each workspace the root
+ * package.json names, `tools/guards` among them.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { workspaces } from './workspaces.ts';
 
 const ROOT = path.join(import.meta.dirname, '..', '..', '..');
 const PKG = path.join(import.meta.dirname, '..');
@@ -103,19 +105,23 @@ test('REFUSED: a subpath not in its exports, a relative path, import.meta.resolv
   const at = 'apps/api/test/x.test.ts';
   const refused = (text: string) => breaches(at, text, GUARDED);
   const instead = 'reach it through agent-orchestrator or agent-orchestrator/run or agent-orchestrator/workflow';
+  const subpath = "const { foldFeed } = await import('agent-orchestrator/feed');";
+  const effectFace =
+    "import { Missing } from 'agent-orchestrator/effect';\nimport { Invalid } from 'agent-orchestrator/src/refusal/refusal.ts';";
+  const typeOnly = "import type { Tally } from 'agent-orchestrator/src/meter/tally.store.ts';";
+  const resolved = "const f = await import(new URL('./feed.ts', import.meta.resolve('agent-orchestrator')).href);";
+  const joined = "const f = await import(path.join(ROOT, 'packages', 'agent-orchestrator', 'src', 'feed.ts'));";
   assert.deepEqual(refused("import { x } from 'agent-orchestrator/src/run.ts';"), [
     `${at} imports agent-orchestrator/src/run.ts, which is not an entry of agent-orchestrator: ${instead}`,
   ]);
-  assert.deepEqual(refused("const { foldFeed } = await import('agent-orchestrator/feed');"), [
-    `${at} imports agent-orchestrator/feed, which is not an entry of agent-orchestrator: ${instead}`,
-  ]);
+  assert.deepEqual(refused(subpath), [`${at} imports agent-orchestrator/feed, which is not an entry of agent-orchestrator: ${instead}`]);
   assert.deepEqual(
-    refused("import { Missing } from 'agent-orchestrator/effect';\nimport { Invalid } from 'agent-orchestrator/src/refusal/refusal.ts';"),
+    refused(effectFace),
     [
       `${at} imports agent-orchestrator/effect, which is not an entry of agent-orchestrator: ${instead}`,
       `${at} imports agent-orchestrator/src/refusal/refusal.ts, which is not an entry of agent-orchestrator: ${instead}`,
     ],
-    "REFUSED: the retired Effect face, and the refusals' file in src",
+    'REFUSED: the retired Effect face, and refusal.ts',
   );
   assert.deepEqual(
     breaches('apps/web/test/x.test.ts', "import { foldFeed } from '../../../packages/agent-orchestrator/src/feed.ts';", GUARDED),
@@ -130,15 +136,11 @@ test('REFUSED: a subpath not in its exports, a relative path, import.meta.resolv
     ],
     'REFUSED: a path into a feature folder',
   );
-  assert.deepEqual(refused("import type { Tally } from 'agent-orchestrator/src/meter/tally.store.ts';"), [
+  assert.deepEqual(refused(typeOnly), [
     `${at} imports agent-orchestrator/src/meter/tally.store.ts, which is not an entry of agent-orchestrator: ${instead}`,
   ]);
-  assert.deepEqual(refused("const f = await import(new URL('./feed.ts', import.meta.resolve('agent-orchestrator')).href);"), [
-    `${at}:1 resolves agent-orchestrator to build a path beside its entry: ${instead}`,
-  ]);
-  assert.deepEqual(refused("const f = await import(path.join(ROOT, 'packages', 'agent-orchestrator', 'src', 'feed.ts'));"), [
-    `${at}:1 builds a path into packages/agent-orchestrator/src: ${instead}`,
-  ]);
+  assert.deepEqual(refused(resolved), [`${at}:1 resolves agent-orchestrator to build a path beside its entry: ${instead}`]);
+  assert.deepEqual(refused(joined), [`${at}:1 builds a path into packages/agent-orchestrator/src: ${instead}`]);
 });
 
 test('and what is not a route is not refused: the three entries, the wf CLI spawned, and prose that names a file in src', () => {
@@ -215,11 +217,9 @@ test('./workflow is the pure format, and what reads a folder from disk is export
 /** A workspace package as its package.json says: its folder from the root, its name, and the names it declares. */
 type Manifest = { dir: string; name: string; dependencies: Record<string, string>; devDependencies: Record<string, string> };
 
-/** Every workspace package: each folder under apps/ and packages/ with a package.json, read from it. */
+/** Every workspace package: each workspace the root package.json names (`workspaces`), read from its package.json. */
 function manifests(): Manifest[] {
-  return ['apps', 'packages']
-    .flatMap((top) => fs.readdirSync(path.join(ROOT, top)).map((name) => `${top}/${name}`))
-    .filter((dir) => fs.existsSync(path.join(ROOT, dir, 'package.json')))
+  return workspaces()
     .sort()
     .map((dir) => {
       const json = JSON.parse(fs.readFileSync(path.join(ROOT, dir, 'package.json'), 'utf8')) as Partial<Manifest>;
@@ -262,7 +262,7 @@ test('the declared-imports scan reads every workspace package, and finds workspa
   const all = manifests();
   const names = all.map((m) => m.name);
   const files = packageFiles(all);
-  for (const dir of ['apps/api', 'apps/web', 'packages/agent-orchestrator', 'packages/agent-runtime'])
+  for (const dir of ['apps/api', 'apps/web', 'packages/agent-orchestrator', 'packages/agent-runtime', 'tools/guards'])
     assert.ok(
       files.some(({ manifest }) => manifest.dir === dir),
       `the scan reads ${dir}`,

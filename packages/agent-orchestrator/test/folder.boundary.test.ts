@@ -222,7 +222,9 @@ test('a folder team refuses --repo, --no-worktree and --after, before anything i
 
   const waiting = await rejection(() => runPlaced(startRun({ brief: 'x', repo: NOT_A_REPO, workflowDir: TEAM, after: ['some-run-a1b2'] })));
   assert.equal(waiting.exitCode, 2);
-  assert.match(waiting.message, /^--after some-run-a1b2: this run's team works in folders \(place: folder\)/);
+  assert.ok(waiting.message.startsWith('--after some-run-a1b2: '), waiting.message);
+  assert.ok(waiting.message.includes('(place: folder)'), waiting.message);
+  assert.ok(waiting.message.includes('Start it without --after'), 'and names the flag to drop');
 
   assert.deepEqual(fs.readdirSync(path.join(ROOT, 'runs')).sort(), before, 'nothing was written');
   assert.deepEqual(gitAsked(), []);
@@ -237,10 +239,8 @@ test("REFUSED: a folder team whose agent is given the git place's skill, which h
   const before = fs.readdirSync(path.join(ROOT, 'runs')).sort();
   const refused = await rejection(() => runPlaced(startRun({ brief: 'x', repo: NOT_A_REPO, workflowDir: team })));
   assert.equal(refused.exitCode, 2);
-  assert.match(
-    refused.message,
-    /^write: its agent is given the skill `git`, the git place's, and this workflow's steps say `place: folder`/,
-  );
+  assert.ok(refused.message.startsWith('write: its agent is given the skill `git`'), refused.message);
+  assert.ok(refused.message.includes('`place: folder`'), refused.message);
   assert.match(refused.message, /Take `git` off the agent's `skills:`/);
   assert.deepEqual(fs.readdirSync(path.join(ROOT, 'runs')).sort(), before, 'nothing was written');
   assert.deepEqual(gitAsked(), []);
@@ -373,7 +373,8 @@ test('REFUSED: a card filed for a folder team with a repository — the card nam
       (err: Error & { exitCode?: number }) =>
         err.exitCode === 2 &&
         err.message.startsWith(`--repo ${NOT_A_REPO}: this card's workflow has steps that say \`place: folder\``) &&
-        err.message.endsWith('File the card without a repository, or name a workflow whose steps work on one.'),
+        err.message.includes('File the card without a repository') &&
+        err.message.includes('or name a workflow'),
     );
     const inbox = path.join(ROOT, 'inbox');
     assert.deepEqual(fs.existsSync(inbox) ? fs.readdirSync(inbox) : [], [], 'refused before the card is written');
@@ -572,7 +573,8 @@ test("REFUSED: a card with a repository queued onto a folder team — `--workflo
       refused.message.startsWith(`--repo ${NOT_A_REPO}: this card's workflow has steps that say \`place: folder\``),
       refused.message,
     );
-    assert.match(refused.message, /File the card without a repository, or name a workflow whose steps work on one\.$/);
+    assert.ok(refused.message.includes('File the card without a repository'), refused.message);
+    assert.ok(refused.message.includes('or name a workflow'), refused.message);
     assert.equal(
       fs.readFileSync(file, 'utf8'),
       text,

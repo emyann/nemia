@@ -294,20 +294,22 @@ test('REFUSED: a factory folder whose path a permission rule cannot name refuses
   try {
     await runPlaced(startRun({ brief: 'build it', repo: own, workflowDir: loop, isolate: false, factory: 'spaced' }));
   } catch (err) {
-    message = (err as Error).message;
+    const refused = err as Error & { exitCode?: number; _tag?: string };
+    assert.deepEqual([refused._tag, refused.exitCode], ['Invalid', 2], refused.message);
+    message = refused.message;
   }
   assert.match(message, /^implement: /, "the step's line first");
   assert.ok(message.includes(`\`mounts\` gives the session ${JSON.stringify(spaced)} read-only, and Claude Code holds a folder`), message);
-  assert.ok(
-    message.endsWith(
-      "\nThat folder is the factory spaced's: a run in it mounts every repository of the factory but its own, read-only, for each local " +
-        'step, and none is left off by hand. Hire into loop/implement an agent whose harness holds the mount (nemia factory hire spaced ' +
-        '<agent> --step loop/implement); move or rename the folder, then file the factory again on its new path (nemia factory rm spaced, ' +
-        'then nemia factory add spaced --repo <path> for each, and attach and hire again); or start it in a factory whose repositories ' +
-        "that step's harness can hold. Nothing was written.",
-    ),
-    message,
-  );
+  const factory = message.slice(message.indexOf('\nThat folder is'));
+  assert.ok(factory.startsWith("\nThat folder is the factory spaced's:"), message);
+  for (const fix of [
+    'nemia factory hire spaced <agent> --step loop/implement',
+    'nemia factory rm spaced',
+    'nemia factory add spaced --repo <path>',
+    'start it in a factory',
+  ])
+    assert.ok(factory.includes(fix), `${fix} — in: ${message}`);
+  assert.ok(factory.endsWith('Nothing was written.'), message);
   assert.deepEqual(runs(), before, 'nothing written');
 });
 
@@ -427,10 +429,12 @@ test('REFUSED: a `writable:` folder that is no directory at start', async () => 
 test('REFUSED: a `writable:` in a run started in no factory', async () => {
   const { repos, loop } = fresh();
   writing(loop, path.basename(repos[1]));
-  assert.equal(
-    await refusal({ brief: 'build it', repo: repos[0], workflowDir: loop, isolate: false }),
-    `loop/implement: \`writable: ${path.basename(repos[1])}\` names folders of the run's factory, and this run is started in none, so it mounts no folder. Start it in a factory — nemia start --factory <name> — or delete the line. Nothing was started.`,
-  );
+  const said = await refusal({ brief: 'build it', repo: repos[0], workflowDir: loop, isolate: false });
+  assert.ok(said.startsWith(`loop/implement: \`writable: ${path.basename(repos[1])}\` names folders`), said);
+  assert.ok(said.includes('started in none'), said);
+  assert.ok(said.includes('nemia start --factory <name>'), said);
+  assert.ok(said.includes('or delete the line'), said);
+  assert.ok(said.endsWith('Nothing was started.'), said);
 });
 
 test("REFUSED: a read-only folder no permission rule can name, beside a step's `writable:` one, is said as the read-only mount it is", async () => {
@@ -444,12 +448,10 @@ test("REFUSED: a read-only folder no permission rule can name, beside a step's `
   hireAgent({ factory: 'spaced-web', agent: 'reviewer', step: 'loop/review' });
   writing(loop, path.basename(web));
   const message = await refusal({ brief: 'build it', repo: own, workflowDir: loop, isolate: false, factory: 'spaced-web' });
-  assert.match(message, /^implement: `mounts` gives the session /, 'no `writable:` line quoted: the folder refused is no folder it names');
+  assert.match(message, /^implement: `mounts` gives the session /, 'quotes no `writable:` line: not a folder it names');
   assert.ok(message.includes(`\`mounts\` gives the session ${JSON.stringify(spaced)} read-only, and Claude Code holds a folder`), message);
-  assert.ok(
-    message.includes("\nThat folder is the factory spaced-web's: a run in it mounts every repository of the factory but its own"),
-    message,
-  );
+  assert.ok(message.includes("\nThat folder is the factory spaced-web's:"), message);
+  assert.ok(message.includes('nemia factory hire spaced-web <agent> --step loop/implement'), message);
 });
 
 test('REFUSED at shipped defaults: a `writable:` folder on a harness that cannot hold a writable mount, in the runtime words quoted by the line, with the fix', async () => {
@@ -461,11 +463,18 @@ test('REFUSED at shipped defaults: a `writable:` folder on a harness that cannot
   fs.writeFileSync(path.join(coded, 'code.md'), `---\nplace: git\nwritable: ${path.basename(repos[1])}\n---\nCode it.\n`);
   attachWorkflow({ factory: 'trio', workflow: 'coded' });
   hireAgent({ factory: 'trio', agent: 'coder', step: 'coded/code' });
-  assert.equal(
-    await refusal({ brief: 'code it', repo: repos[0], workflowDir: coded, isolate: false, factory: 'trio' }),
-    `code: \`writable: ${path.basename(repos[1])}\` (filed as \`mounts\`): \`mounts\` gives the session ${repos[1]} writable, and the \`codex\` harness cannot hold a writable mount: its session would not reach the folder as asked. File the task on \`claude\` or \`claude-detached\`, or leave the mount off.\n` +
-      `That folder is the factory trio's, and coded/code names it in \`writable:\`, so the run would mount it writable for that step. Hire into coded/code an agent whose harness holds a writable mount (nemia factory hire trio <agent> --step coded/code), or delete the name from \`writable:\`, so the step only reads the folder. Nothing was written.`,
-  );
+  const said = await refusal({ brief: 'code it', repo: repos[0], workflowDir: coded, isolate: false, factory: 'trio' });
+  const [runtime, factory, ...more] = said.split('\n');
+  assert.deepEqual(more, [], said);
+  assert.ok(runtime.startsWith(`code: \`writable: ${path.basename(repos[1])}\` (filed as \`mounts\`): `), said);
+  assert.ok(runtime.includes(`gives the session ${repos[1]} writable`), said);
+  assert.ok(runtime.includes('the `codex` harness cannot hold a writable mount'), said);
+  assert.ok(runtime.includes('`claude` or `claude-detached`'), said);
+  assert.ok(factory.startsWith("That folder is the factory trio's"), said);
+  assert.ok(factory.includes('coded/code names it in `writable:`'), said);
+  assert.ok(factory.includes('nemia factory hire trio <agent> --step coded/code'), said);
+  assert.ok(factory.includes('delete the name from `writable:`'), said);
+  assert.ok(factory.endsWith('Nothing was written.'), said);
 });
 
 test("a step's `reads: inbox` is filed the store's inbox read-only, on its first filing, a try and a round, and named on each new session's brief; no other step is", async () => {

@@ -87,9 +87,16 @@ function refusal(fn: () => unknown): string {
     fn();
   } catch (err) {
     assert.ok(err instanceof WorkflowError, String(err));
+    assert.equal(err.exitCode, 2);
     return err.message;
   }
   return assert.fail('it was not refused');
+}
+
+/** That `words` open on `head` — the file or the step, and the line refused — and name each of `fixes`: the key, the value, the word. */
+function says(words: string, head: string, ...fixes: string[]): void {
+  assert.ok(words.startsWith(head), words);
+  for (const fix of fixes) assert.ok(words.includes(fix), `${words} names ${fix}`);
 }
 
 const SKILL = (name: string, extra = '') =>
@@ -169,9 +176,11 @@ test("an agent's `skills:` takes a skill named with its folder; REFUSED: one tha
 });
 
 test('REFUSED at shipped defaults: a skill name that is none, a name given twice, an empty list, and a harness prompt that is not one of the three', () => {
-  assert.match(
+  says(
     refusal(() => parseAgent('builder', '---\nskills: Review A Change\n---\nx\n')),
-    /^agents\/builder\.md: `skills: Review A Change` has `Review A Change`, which is not a skill's name/,
+    'agents/builder.md: `skills: Review A Change`',
+    'has `Review A Change`',
+    "not a skill's name",
   );
   assert.match(
     refusal(() => parseAgent('builder', '---\nskills: a-b, a-b\n---\nx\n')),
@@ -181,20 +190,26 @@ test('REFUSED at shipped defaults: a skill name that is none, a name given twice
     refusal(() => parseAgent('builder', '---\nskills: ,\n---\nx\n')),
     /names no skill/,
   );
-  assert.match(
+  says(
     refusal(() => parseAgent('builder', '---\nharnessPrompt: terse\n---\nx\n')),
-    /^agents\/builder\.md: `harnessPrompt: terse` is not one of keep, no-coding, replace/,
+    'agents/builder.md: `harnessPrompt: terse`',
+    'not one of keep, no-coding, replace',
   );
-  assert.match(
+  says(
     refusal(() => parseAgent('builder', '---\nsystemPrompt: terse\n---\nx\n')),
-    /^agents\/builder\.md: `systemPrompt: terse` is not one of keep, no-coding, replace/,
+    'agents/builder.md: `systemPrompt: terse`',
+    'not one of keep, no-coding, replace',
   );
 });
 
 test('REFUSED at shipped defaults: a former word under the new key, which a file written after the rename does not say', () => {
-  assert.match(
+  says(
     refusal(() => parseAgent('builder', '---\nharnessPrompt: own\n---\nx\n')),
-    /^agents\/builder\.md: `harnessPrompt: own` is not one of keep, no-coding, replace\. `own` is the former word, under `systemPrompt:`, for `replace`: write `harnessPrompt: replace`/,
+    'agents/builder.md: `harnessPrompt: own`',
+    'not one of keep, no-coding, replace',
+    '`own` is the former word',
+    '`systemPrompt:`',
+    'write `harnessPrompt: replace`',
   );
   assert.match(
     refusal(() => parseAgent('builder', '---\nharnessPrompt: default\n---\nx\n')),
@@ -203,39 +218,46 @@ test('REFUSED at shipped defaults: a former word under the new key, which a file
 });
 
 test('REFUSED at shipped defaults: `systemPrompt:` and `harnessPrompt:` both set, which are one key', () => {
-  assert.match(
+  says(
     refusal(() => parseAgent('builder', '---\nsystemPrompt: own\nharnessPrompt: keep\n---\nx\n')),
-    /^agents\/builder\.md: `harnessPrompt: keep` and `systemPrompt: own` are both set, and they are one key/,
+    'agents/builder.md: `harnessPrompt: keep` and `systemPrompt: own`',
+    'both set',
+    'one key',
   );
 });
 
 test('REFUSED: a draft that sends the former `systemPrompt`, among its keys or as its own line, which nothing writes', () => {
-  assert.match(
+  says(
     refusal(() => renderAgent({ name: 'builder', keys: { systemPrompt: 'own' } as never, body: 'x' })),
-    /^agents\/builder\.md: `systemPrompt` is `harnessPrompt`'s former name, which a file may still say but nothing writes/,
+    'agents/builder.md: `systemPrompt`',
+    "`harnessPrompt`'s former name",
+    'nothing writes',
   );
-  assert.match(
+  says(
     refusal(() => renderAgent({ name: 'builder', systemPrompt: 'own', keys: {}, body: 'x' } as never)),
-    /^agents\/builder\.md: `systemPrompt` is `harnessPrompt`'s former name/,
+    'agents/builder.md: `systemPrompt`',
+    "`harnessPrompt`'s former name",
   );
 });
 
 test('REFUSED at shipped defaults: `harnessPrompt: replace` with no instructions, which would start a session with no prompt at all', () => {
-  assert.match(
-    refusal(() => parseAgent('builder', '---\nharnessPrompt: replace\n---\n')),
-    /`harnessPrompt: replace` puts the agent's instructions in place of Claude Code's own prompt, and this agent has none/,
-  );
-  assert.match(
-    refusal(() => parseAgent('builder', '---\nsystemPrompt: own\n---\n')),
-    /`systemPrompt: own` puts the agent's instructions in place of Claude Code's own prompt, and this agent has none/,
-  );
+  for (const line of ['harnessPrompt: replace', 'systemPrompt: own'])
+    says(
+      refusal(() => parseAgent('builder', `---\n${line}\n---\n`)),
+      'agents/builder.md: ',
+      `\`${line}\``,
+      "in place of Claude Code's own prompt",
+      'this agent has none',
+    );
   assert.equal(parseAgent('builder', '---\nharnessPrompt: replace\n---\nYou are the whole prompt.\n').harnessPrompt, 'replace');
 });
 
 test('REFUSED at shipped defaults: skills an agent gives with no `Skill` in its tools, or with `Skill` denied (F11)', () => {
-  assert.match(
+  says(
     refusal(() => parseAgent('builder', '---\nskills: write-a-note\ntools: Read, Write\n---\nx\n')),
-    /^agents\/builder\.md: `skills: write-a-note` gives the agent skills, and `tools: Read, Write` has no `Skill`/,
+    'agents/builder.md: `skills: write-a-note`',
+    '`tools: Read, Write`',
+    'no `Skill`',
   );
   assert.match(
     refusal(() => parseAgent('builder', '---\nskills: write-a-note\ndisallowedTools: Skill\n---\nx\n')),
@@ -251,9 +273,11 @@ test('REFUSED at shipped defaults: skills an agent gives with no `Skill` in its 
 test("REFUSED at shipped defaults: a step's own `tools:` or deny list that takes `Skill` from an agent that gives skills", () => {
   const skills = { 'workflows/skills/write-a-note/SKILL.md': SKILL('write-a-note') };
   const agent = '---\nskills: write-a-note\ntools: Read, Skill\n---\nYou build.\n';
-  assert.match(
+  says(
     refusal(() => loadWorkflows(team(agent, skills, '---\nagent: builder\ntools: Read\n---\n'))),
-    /^build: `agent: builder`: `skills: write-a-note` gives the agent skills, and `tools: Read` has no `Skill`/,
+    'build: `agent: builder`: `skills: write-a-note`',
+    '`tools: Read`',
+    'no `Skill`',
   );
   assert.match(
     refusal(() => loadWorkflows(team(agent, skills, '---\nagent: builder\ndisallowedTools: Skill\n---\n'))),
@@ -263,30 +287,38 @@ test("REFUSED at shipped defaults: a step's own `tools:` or deny list that takes
 });
 
 test('REFUSED at shipped defaults: a codex agent with skills or a harness prompt, and a Claude Code agent with them run on codex by its step', () => {
-  assert.match(
+  says(
     refusal(() => parseAgent('builder', '---\nharness: codex\nskills: write-a-note\n---\nx\n')),
-    /`skills: write-a-note` gives Claude Code skills from a plugin directory of the step's own, and codex loads none/,
+    'agents/builder.md: ',
+    '`skills: write-a-note`',
+    'Claude Code skills',
+    'codex loads none',
   );
-  assert.match(
+  says(
     refusal(() => parseAgent('builder', '---\nharness: codex\nharnessPrompt: no-coding\n---\nx\n')),
-    /`harnessPrompt: no-coding` shapes Claude Code's own prompt, and codex is handed its instructions in the brief/,
+    'agents/builder.md: ',
+    '`harnessPrompt: no-coding`',
+    "Claude Code's own prompt",
+    'codex is handed its instructions in the brief',
   );
   const skills = { 'workflows/skills/write-a-note/SKILL.md': SKILL('write-a-note') };
-  assert.match(
+  says(
     refusal(() =>
       loadWorkflows(team('---\nskills: write-a-note\n---\nYou build.\n', skills, '---\nagent: builder\nharness: codex\n---\n')),
     ),
-    /^build: `agent: builder`: `skills: write-a-note` gives Claude Code skills .* codex loads none/,
+    'build: `agent: builder`: `skills: write-a-note`',
+    'Claude Code skills',
+    'codex loads none',
   );
-  assert.match(
+  says(
     refusal(() => loadWorkflows(team('---\nharnessPrompt: replace\n---\nYou build.\n', {}, '---\nagent: builder\nharness: codex\n---\n'))),
-    /^build: `agent: builder`: `harnessPrompt: replace` shapes Claude Code's own prompt/,
+    'build: `agent: builder`: `harnessPrompt: replace`',
+    "shapes Claude Code's own prompt",
   );
-  assert.match(
-    refusal(() => loadWorkflows(team('---\nsystemPrompt: own\n---\nYou build.\n', {}, '---\nagent: builder\nharness: codex\n---\n'))),
-    /^build: `agent: builder`: `harnessPrompt: replace` shapes Claude Code's own prompt/,
-    'the former line is judged as the word it is now',
+  const formerLineJudgedAsNow = refusal(() =>
+    loadWorkflows(team('---\nsystemPrompt: own\n---\nYou build.\n', {}, '---\nagent: builder\nharness: codex\n---\n')),
   );
+  says(formerLineJudgedAsNow, 'build: `agent: builder`: `harnessPrompt: replace`', "shapes Claude Code's own prompt");
   const [codex] = loadWorkflows(team('---\nharness: codex\nharnessPrompt: keep\n---\nYou build.\n', {}));
   assert.equal(
     rendersAgent(codex),
@@ -302,9 +334,11 @@ test('REFUSED at shipped defaults: skills or a harness prompt on a step that con
     { 'workflows/team/plan.md': '---\nplace: git\n---\nPlan it.\n' },
     '---\nagent: builder\nafter: plan\nresume: plan\n---\n',
   );
-  assert.match(
+  says(
     refusal(() => loadWorkflows(dir)),
-    /^build: `agent: builder`: `harnessPrompt: no-coding` shapes the prompt of a session the step starts, and `resume: plan` continues plan's/,
+    'build: `agent: builder`: `harnessPrompt: no-coding`',
+    'a session the step starts',
+    "`resume: plan` continues plan's",
   );
   const told = loadWorkflows(
     team(
@@ -319,11 +353,14 @@ test('REFUSED at shipped defaults: skills or a harness prompt on a step that con
 
 test("REFUSED at shipped defaults: `auto` on a model Claude Code drops it on (F21) — the runtime's default mode or written — and let through where it is kept", () => {
   for (const model of ['haiku', 'claude-haiku-4-5-20251001', 'claude-sonnet-4-5']) {
-    assert.match(
+    says(
       refusal(() => loadWorkflows(team(`---\nmodel: ${model}\n---\nYou build.\n`, {}))),
-      new RegExp(
-        `^build: \`agent: builder\` names an agent whose file is refused — agents/builder\\.md: \`model: ${model}\` names no \`permissionMode:\`, so it is filed in \`auto\`, the runtime's default, and Claude Code drops \`auto\` on that model`,
-      ),
+      'build: `agent: builder` names an agent',
+      'whose file is refused',
+      `agents/builder.md: \`model: ${model}\``,
+      'no `permissionMode:`',
+      "filed in `auto`, the runtime's default",
+      'Claude Code drops `auto` on that model',
     );
     assert.match(
       refusal(() => loadWorkflows(team('---\n---\nx\n', {}, `---\nagent: builder\nmodel: ${model}\npermissionMode: auto\n---\n`))),
@@ -352,7 +389,7 @@ test('REFUSED at shipped defaults: a skill no place has, naming each place looke
     path.join(repo, '.claude', 'skills'),
     path.join(ROOT, 'workflows', 'skills'),
   ].join(', ');
-  assert.match(message, /^build: `agent: builder` gives the skill `draw-a-map`, and no skills folder has it — looked in /);
+  says(message, 'build: `agent: builder` gives the skill `draw-a-map`', 'no skills folder has it', 'looked in ');
   assert.ok(message.includes(looked), message);
 });
 
@@ -438,9 +475,11 @@ test("REFUSED at shipped defaults: Claude Code's own subagent keys a run would d
     );
     assert.match(said, why);
   }
-  assert.match(
+  says(
     refusal(() => parseAgent('code-reviewer', WIZARD.replace('model: sonnet', 'model: inherit'))),
-    /^agents\/code-reviewer\.md: `model: inherit` is Claude Code's word for a subagent that runs on the model of the conversation that called it/,
+    'agents/code-reviewer.md: `model: inherit`',
+    "Claude Code's word for a subagent",
+    'the model of the conversation that called it',
   );
   assert.match(
     refusal(() => parseAgent('code-reviewer', '---\ncolour: blue\n---\n')),
@@ -458,9 +497,12 @@ test("REFUSED at shipped defaults: a name in both of one repository's places, wo
   });
   const dir = path.join(repo, 'workflows', 'team');
   const skill = refusal(() => loadWorkflows(dir, { repo }));
-  assert.match(
+  says(
     skill,
-    /write-a-note is a skill in both .* one repository's two places for skills, and nothing says which a session is given/,
+    'build: `agent: builder` gives the skill `write-a-note`',
+    'write-a-note is a skill in both',
+    "one repository's two places for skills",
+    'Keep one of them',
   );
   assert.ok(
     skill.includes(path.join(repo, 'workflows', 'skills', 'write-a-note')) &&
@@ -470,9 +512,13 @@ test("REFUSED at shipped defaults: a name in both of one repository's places, wo
   fs.rmSync(path.join(repo, '.claude', 'skills'), { recursive: true });
   fs.mkdirSync(path.join(repo, '.claude', 'agents'), { recursive: true });
   fs.writeFileSync(path.join(repo, '.claude', 'agents', 'builder.md'), '---\n---\nAnother builder.\n');
-  assert.match(
+  says(
     refusal(() => loadWorkflows(dir, { repo })),
-    /builder is an agent in both .* one repository's two places for agents, and nothing says which runs/,
+    '',
+    'builder is an agent in both',
+    path.join(repo, '.claude', 'agents', 'builder.md'),
+    "one repository's two places for agents",
+    'nothing says which runs',
   );
   assert.equal(
     loadWorkflows(dir).length,
@@ -483,21 +529,21 @@ test("REFUSED at shipped defaults: a name in both of one repository's places, wo
 
 test('a `skills:` line naming a card file, as it did until 2026-09-25, is refused where it is read and where it is written: the card file is retired', () => {
   const legacy = refusal(() => parseAgent('builder', '---\nskills: builder.skills.json\n---\nx\n', () => '[]'));
-  assert.match(
-    legacy,
-    /^agents\/builder\.md: `skills: builder\.skills\.json` names a card file, which is retired: an agent's card is generated/,
-  );
+  says(legacy, 'agents/builder.md: `skills: builder.skills.json`', 'names a card file, which is retired', "an agent's card is generated");
   const dir = team('---\nskills: builder.skills.json\n---\nYou build.\n', { 'workflows/agents/builder.skills.json': '[]' });
-  assert.match(
+  says(
     refusal(() => loadWorkflows(dir)),
-    /`skills: builder\.skills\.json` names a card file, which is retired/,
+    '',
+    '`skills: builder.skills.json`',
+    'names a card file, which is retired',
   );
   const written = refusal(() => renderAgent({ name: 'builder', skills: 'builder.skills.json', keys: {}, body: 'x\n' }));
-  assert.match(written, /^agents\/builder\.md: `skills: builder\.skills\.json` names a card file, which is retired/);
-  assert.match(written, /A page that sends it is stale: reload it, and save again\.$/);
-  assert.match(
+  says(written, 'agents/builder.md: `skills: builder.skills.json`', 'names a card file, which is retired', 'reload it, and save again');
+  assert.ok(written.endsWith('save again.'), written);
+  says(
     refusal(() => renderAgent({ name: 'builder', card: 'builder.skills.json', keys: {}, body: 'x\n' } as never)),
-    /^agents\/builder\.md: `card: builder\.skills\.json` names a card file, which is retired/,
+    'agents/builder.md: `card: builder.skills.json`',
+    'names a card file, which is retired',
   );
 });
 
@@ -872,7 +918,7 @@ test('REFUSED at shipped defaults: nemia start of a team whose agent gives a ski
   const elsewhere = fs.mkdtempSync(path.join(ROOT, 'elsewhere-'));
   await assert.rejects(
     async () => await runPlaced(startRun({ brief: 'x', repo: elsewhere, workflowDir: dir })),
-    (e: Error) => /gives the skill `mind-the-tone`, and no skills folder has it/.test(e.message),
+    (e: Error) => e instanceof WorkflowError && e.message.includes('`mind-the-tone`') && e.message.includes('no skills folder has it'),
     'started from a directory whose .claude/ has no mind-the-tone, and the store has write-a-note alone',
   );
   assert.deepEqual(fs.existsSync(runs) ? fs.readdirSync(runs).sort() : [], before);

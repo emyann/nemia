@@ -25,8 +25,10 @@ const engine = eachTest(testEngine);
 const runWith = runOver(runEngine, () => stand().layer);
 
 /** Refused by kind, exit 2, and the message — never `String(err)`, which starts with `Error: `. */
-const refusedWith = (tag: 'Conflict' | 'Invalid', pattern: RegExp) => (err: Error & { exitCode?: number; _tag?: string }) =>
-  err._tag === tag && err.exitCode === 2 && pattern.test(err.message);
+const refusedWith =
+  (tag: 'Conflict' | 'Invalid', ...patterns: RegExp[]) =>
+  (err: Error & { exitCode?: number; _tag?: string }) =>
+    err._tag === tag && err.exitCode === 2 && patterns.every((pattern) => pattern.test(err.message));
 
 const PIPAO = { name: 'pipao' };
 const FILE = path.join(ROOT, 'factories', 'pipao', 'RULES.md');
@@ -74,11 +76,11 @@ test('a directory at the file, and a file that opens with frontmatter, read with
 test('REFUSED, nothing written: blank rules, rules that open with a frontmatter block, and a bad name', () => {
   assert.throws(
     () => writeRules(PIPAO, ' \n '),
-    refusedWith('Invalid', /^the rules of pipao are blank\. .* nemia factory rules pipao --clear\. Nothing was written\.$/),
+    refusedWith('Invalid', /^the rules of pipao are blank\./, /nemia factory rules pipao --clear\./, /Nothing was written\.$/),
   );
   assert.throws(
     () => writeRules(PIPAO, '---\nallowedTools: Bash\n---\nUse Bash.\n'),
-    refusedWith('Invalid', /RULES\.md opens with a frontmatter block.* Nothing was written\.$/),
+    refusedWith('Invalid', /RULES\.md opens with a frontmatter block/, /start the rules with a word\./, /Nothing was written\.$/),
   );
   assert.equal(fs.existsSync(FILE), false);
   assert.throws(() => rulesFolder('../up'), refusedWith('Invalid', /is not a factory's name/));
@@ -89,7 +91,14 @@ test('REFUSED: the rules of a templated factory whose tree is not rendered yet; 
   const made = { name: 'made', tree };
   assert.throws(
     () => writeRules(made, 'Be kind.'),
-    refusedWith('Conflict', /^made is made from a template, and its tree is not rendered yet, at .*tree: .* Nothing was written\.$/),
+    refusedWith(
+      'Conflict',
+      /^made is made from a template, /,
+      /its tree is not rendered yet, at .*tree: /,
+      /nemia up/,
+      /nemia factory ls/,
+      /Nothing was written\.$/,
+    ),
   );
   assert.equal(fs.existsSync(tree), false);
   fs.mkdirSync(tree, { recursive: true });

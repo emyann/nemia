@@ -34,7 +34,10 @@ test('REFUSED: a line labelled by a run, and none of the lines handed with it wr
   fs.rmSync(tierDir('hour'), { recursive: true, force: true });
   assert.throws(
     () => appendLines('hour', [line('2026-10-05T10:00:00.000Z', 1), line('2026-10-05T11:00:00.000Z', 2, { factory: 'f', run: 'r-1' })]),
-    (err: Error) => err.message.startsWith('A series line may not be labelled run: its labels are factory, workflow, step, agent'),
+    (err: Error & { _tag?: string }) =>
+      err._tag === 'Invalid' &&
+      err.message.startsWith('A series line may not be labelled run: ') &&
+      err.message.includes('factory, workflow, step, agent'),
   );
   assert.deepEqual(days('hour'), []);
 });

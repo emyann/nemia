@@ -49,7 +49,7 @@ function walk(root: string, wanted: (name: string) => boolean, at = ''): string[
  * The one file neither sweep reads: this one. Its planted sources are the fixtures of the two rules, so a sentence expected in one
  * of them is the rule being proven and not a debt — as `root-given.test.ts` lets the root's own service hold a root.
  */
-const ALLOWED = ['packages/agent-orchestrator/test/test-rules.test.ts'];
+const ALLOWED = ['tools/guards/test/test-rules.test.ts'];
 
 /** Every test file of the repository but this one, beside the code or under a `test/`, by its path from the root. */
 const testFiles = (): string[] => walk(ROOT, (name) => /\.test\.tsx?$/.test(name)).filter((f) => !ALLOWED.includes(f));

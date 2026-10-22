@@ -523,7 +523,7 @@ for (const binding of BINDINGS)
       assert.deepEqual(ids(got), [...new Set(ids(got))], 'each event once');
       assert.ok(subscribedOn(s, binding), `subscribed on ${binding}: ${s.paths.join(', ')}`);
 
-      const held = await opsOn(s, 'ae/held/1', {}, 100);
+      const held = await opsOn(s, 'ae/held/1', { readEveryMs: 1 }, 100);
       s.hanging.a2a = true;
       const err = failure(await drained(held.follow!('ae/held/1'), []));
       assert.equal(err.refused, true);

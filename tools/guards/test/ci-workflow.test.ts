@@ -18,8 +18,9 @@
  * shard list anywhere here would be the second list of pages that `apps/web/CLAUDE.md` forbids — a new page is its file and its NAMES
  * line and nothing else — so there is no list to diff, and the clause holds the wiring instead: the leg's shard, and the matrix's count.
  *
- * The test reads files outside this package, the workflow and the root's `package.json`: `turbo.json` lists `.github/` among this
- * package's test inputs (`turbo-inputs.test.ts`), or turbo replays a pass from its cache after an edit to the workflow.
+ * The test reads files outside this workspace, the workflow and the root's `package.json`: `turbo.json` lists `.github/` among the
+ * `guards#test` task's inputs, or turbo replays a pass from its cache after an edit to the workflow, and `due.ts` reads the same
+ * inputs to decide when CI runs this suite at all.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -28,6 +29,9 @@ import path from 'node:path';
 import {
   BOUND,
   BUILD,
+  DUE_COMMAND,
+  DUE_IF,
+  DUE_STEP,
   E2E,
   E2E_COMMAND,
   FILE,
@@ -35,6 +39,7 @@ import {
   GENERATED,
   gateSteps,
   LEGS,
+  OWN_JOB,
   readWorkflow,
   runSteps,
   ALLOWLIST_STEP,
@@ -77,22 +82,26 @@ const OFF_MATRIX = /\$\{\{/;
  * it: a leg that runs a shard of a suite is held against the script that would have to take the shard, since a script with no hole for
  * it runs the whole suite under every shard and the leg reports a half it never ran.
  */
-type Workspace = { name: string; suite: boolean; test?: string };
+type Workspace = { name: string; folder: string; suite: boolean; test?: string };
 
-/** Every workspace the root `package.json` claims, expanded from its globs: the folders under them that hold a `package.json`. */
+/**
+ * Every workspace the root `package.json` claims, expanded from its globs: the folders under a `<top>/*` that hold a `package.json`,
+ * and a folder named whole (`tools/guards`) as itself.
+ */
 function readWorkspaces(): Workspace[] {
   const root = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')) as {
     workspaces: string[];
     engines: { node: string };
   };
   return root.workspaces
-    .map((glob) => glob.replace(/\/\*$/, ''))
-    .flatMap((top) => fs.readdirSync(path.join(ROOT, top)).map((name) => path.join(ROOT, top, name)))
-    .flatMap((dir) => {
-      const file = path.join(dir, 'package.json');
+    .flatMap((glob) =>
+      glob.endsWith('/*') ? fs.readdirSync(path.join(ROOT, glob.slice(0, -2))).map((name) => `${glob.slice(0, -2)}/${name}`) : [glob],
+    )
+    .flatMap((folder) => {
+      const file = path.join(ROOT, folder, 'package.json');
       if (!fs.existsSync(file)) return [];
       const pkg = JSON.parse(fs.readFileSync(file, 'utf8')) as { name: string; scripts?: Record<string, string> };
-      return [{ name: pkg.name, suite: pkg.scripts?.test !== undefined, test: pkg.scripts?.test }];
+      return [{ name: pkg.name, folder, suite: pkg.scripts?.test !== undefined, test: pkg.scripts?.test }];
     })
     .sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -127,12 +136,17 @@ const legs = (workflow: Workflow): Leg[] => [
 /** The workspaces the legs run, each named once, in the order the legs name them. */
 const workedspaces = (workflow: Workflow): unknown[] => [...new Set(legs(workflow).map((leg) => leg.workspace))];
 
-/** A workspace with a suite and no leg, and a leg naming a workspace this repository does not have. */
+/**
+ * A workspace with a suite and no leg, and a leg naming a workspace this repository does not have. `OWN_JOB`'s workspace needs no leg
+ * while the job of its own is in the file (`guardsDrift` holds that job); without the job it is refused as any other.
+ */
 function legDrift(workflow: Workflow, workspaces: Workspace[]): string[] {
   const named = workedspaces(workflow);
+  const ownJob = (workspace: Workspace): boolean =>
+    workspace.folder === OWN_JOB.folder && workspace.name === OWN_JOB.name && workflow.jobs[OWN_JOB.job] !== undefined;
   return [
     ...workspaces
-      .filter((workspace) => workspace.suite && !named.includes(workspace.name))
+      .filter((workspace) => workspace.suite && !named.includes(workspace.name) && !ownJob(workspace))
       .map(
         (workspace) =>
           `${workspace.name} has a test script and no leg in ${FILE}: add ${workspace.name} to the ${LEGS} job's matrix.workspace, or to its matrix.include with a shard of its own, or CI reports green having never run its suite`,
@@ -828,6 +842,87 @@ function scanDrift(workflow: Workflow, config: string): string[] {
   return sentences;
 }
 
+/**
+ * A guards job that would not run the guards' suite when it is due, or would skip the whole of CI when it is not. The job runs every
+ * event and its suite step alone is conditioned on the due step's answer: a skipped step leaves the job `success`, so the gate's
+ * whitelist stands, where a workflow-level `paths:` skips every job and the gate's required context never reports. The due step reads
+ * the range a push or a pull request changed, so the checkout must hold the history the range's first end is in. Its absence from the
+ * gate's needs is `gateDrift`'s, which refuses any job the gate does not need.
+ */
+function guardsDrift(workflow: Workflow): string[] {
+  const job = workflow.jobs[OWN_JOB.job];
+  const sentences: string[] = [];
+  for (const [event, trigger] of Object.entries(workflow.on ?? {}))
+    for (const key of ['paths', 'paths-ignore'] as const)
+      if (trigger?.[key] !== undefined)
+        sentences.push(
+          `${FILE}'s ${event} trigger carries ${key}: an event it filters out runs no job, and the ${GATE} context branch protection requires never reports. Take it off, and leave the guards' suite step's if: ${DUE_IF} to skip that one suite`,
+        );
+  if (job === undefined)
+    return [
+      ...sentences,
+      `${FILE} has no ${OWN_JOB.job} job: add the job that runs \`${DUE_COMMAND}\` as step id ${DUE_STEP} and then the ${OWN_JOB.name} suite under if: ${DUE_IF}, or the ${OWN_JOB.folder} workspace's suite runs in no CI at all`,
+    ];
+  const steps = job.steps ?? [];
+  const due = steps.find((step) => step.id === DUE_STEP);
+  if (due?.run?.trim() !== DUE_COMMAND)
+    sentences.push(
+      `the ${OWN_JOB.job} job in ${FILE} has no step id ${DUE_STEP} that runs \`${DUE_COMMAND}\`: give the step that id and that command, since the suite step's if: reads its output and nothing else decides when the suite is due`,
+    );
+  const suite = steps.find((step) => step.run?.includes('turbo run test') === true && step.run.includes(`--filter=${OWN_JOB.name}`));
+  if (suite === undefined)
+    sentences.push(
+      `the ${OWN_JOB.job} job in ${FILE} does not run \`npx turbo run test --force --filter=${OWN_JOB.name}\`: add that step under if: ${DUE_IF}, or the job reports green having run no suite`,
+    );
+  else if (suite.if !== DUE_IF)
+    sentences.push(
+      `the ${OWN_JOB.job} job's suite step in ${FILE} is conditioned on ${suite.if === undefined ? 'nothing' : `if: ${suite.if}`}: write if: ${DUE_IF}, so the suite runs exactly when ${DUE_COMMAND} says the event touched what the guards read`,
+    );
+  if (steps.find((step) => step.uses?.startsWith('actions/checkout') === true)?.with?.['fetch-depth'] !== 0)
+    sentences.push(
+      `the ${OWN_JOB.job} job's checkout in ${FILE} does not pass fetch-depth: 0: the due step diffs the commit before this push, which the shallow default has not, so give the checkout fetch-depth: 0 or the suite runs on every event`,
+    );
+  return sentences;
+}
+
+/** A run step that downloads: the lockfile's install, the browser's, a release fetched by hand. Every action here reaches the network. */
+const NETWORK = /\bnpm ci\b|playwright install|\bcurl\b/;
+
+/** Whether a step reaches the network, and so must end at a bound of its own rather than at its job's. */
+const reachesNetwork = (step: Step): boolean => step.uses !== undefined || NETWORK.test(step.run ?? '');
+
+/** A bound as GitHub takes it: a whole number of minutes above zero. */
+const bounded = (minutes: unknown): minutes is number => typeof minutes === 'number' && Number.isInteger(minutes) && minutes > 0;
+
+/**
+ * A job with no `timeout-minutes`, a step that reaches the network with none, and a step whose bound is not under its job's. Without
+ * one GitHub waits 360 minutes on a stalled download, and the run's own wait on `ci` gives up long before; a step's bound at or past its
+ * job's lets the job's fire first, and the red then names no step.
+ */
+function stallDrift(workflow: Workflow): string[] {
+  return Object.entries(workflow.jobs).flatMap(([name, job]) => {
+    const minutes = job['timeout-minutes'];
+    if (!bounded(minutes))
+      return [
+        `the ${name} job in ${FILE} has no timeout-minutes: give it a bound well above its slowest green run, or a stall holds it for GitHub's default of 360 minutes`,
+      ];
+    return (job.steps ?? []).flatMap((step) => {
+      const label = step.name ?? step.uses ?? step.run ?? '?';
+      const own = step['timeout-minutes'];
+      if (!reachesNetwork(step)) return [];
+      if (!bounded(own))
+        return [
+          `the step "${label}" of the ${name} job in ${FILE} reaches the network and has no timeout-minutes: give it a bound well above its slowest green run, so a stalled download fails naming the step`,
+        ];
+      if (own >= minutes)
+        return [
+          `the step "${label}" of the ${name} job in ${FILE} is bounded at ${own} minutes, not under its job's ${minutes}: lower it below the job's, or the job's bound fires first and names no step`,
+        ];
+      return [];
+    });
+  });
+}
+
 /** Every clause, over the shipped file. */
 const drift = (
   workflow: Workflow,
@@ -846,6 +941,8 @@ const drift = (
   ...pinDrift(workflow, engine),
   ...hiddenDrift(workflow),
   ...gateDrift(workflow),
+  ...guardsDrift(workflow),
+  ...stallDrift(workflow),
   ...actionDrift(workflow),
   ...zoneDrift(workflow),
   ...filterDrift(workflow),
@@ -1302,16 +1399,12 @@ test('REFUSED: a shard matrix that is not 1..n, a shard taken off no leg, a coun
   ] as const) {
     const adrift = structuredClone(shipped);
     shardsOf(adrift).splice(0, 4, ...legs);
-    assert.deepEqual(
-      shardDrift(adrift, pages),
-      [
-        `the e2e job's matrix.shard in .github/workflows/ci.yml reads ${JSON.stringify(legs)}, not 1 to ${legs.length || 4} in order: ` +
-          `write it [${Array.from({ length: legs.length || 4 }, (_leg, i) => i + 1).join(', ')}], since the run takes its count off ` +
-          'strategy.job-total and a shard ' +
-          "outside 1..n visits nothing while another's pages are visited by nobody",
-      ],
-      why,
-    );
+    const drift = shardDrift(adrift, pages);
+    assert.equal(drift.length, 1, why);
+    assert.ok(drift[0].startsWith(`the e2e job's matrix.shard in .github/workflows/ci.yml reads ${JSON.stringify(legs)}`), why);
+    assert.ok(drift[0].includes(`not 1 to ${legs.length || 4} in order`), why);
+    assert.ok(drift[0].includes(`write it [${Array.from({ length: legs.length || 4 }, (_leg, i) => i + 1).join(', ')}]`), why);
+    assert.ok(drift[0].includes('strategy.job-total'), why);
   }
 
   const literal = structuredClone(shipped);
@@ -1457,15 +1550,13 @@ test('REFUSED: no scan job, a download unpinned or unchecked, a scan without its
   ] as const) {
     const unchecked = structuredClone(shipped);
     mangle(runSteps(unchecked, SCAN)[0]);
-    assert.deepEqual(
-      scanDrift(unchecked, config),
-      [
-        'the gitleaks job in .github/workflows/ci.yml does not check the download against a sha256: give the step env SHA256 with the ' +
-          "64-digit hash from that release's gitleaks_<version>_checksums.txt and pipe it to `sha256sum --check --strict -`, or a third " +
-          "party's bytes run here unverified",
-      ],
-      why,
-    );
+    const drift = scanDrift(unchecked, config);
+    assert.equal(drift.length, 1, why);
+    assert.ok(drift[0].startsWith('the gitleaks job in .github/workflows/ci.yml'), why);
+    assert.ok(drift[0].includes('does not check the download against a sha256'), why);
+    assert.ok(drift[0].includes('env SHA256'), why);
+    assert.ok(drift[0].includes('gitleaks_<version>_checksums.txt'), why);
+    assert.ok(drift[0].includes('`sha256sum --check --strict -`'), why);
   }
 
   for (const flag of SCAN_FLAGS) {
@@ -1565,4 +1656,77 @@ test('REFUSED: no scan job, a download unpinned or unchecked, a scan without its
       'attribute of a rule, so the default generic-api-key rule becomes one that detects nothing and the scan goes blind to every ' +
       'generic key in the repository. Take regex out, leaving the id and the [[rules.allowlists]] block under it',
   ]);
+});
+
+test('REFUSED: the guards workspace with neither a leg nor a job of its own, a guards job outside the gate, its suite unconditioned, its checkout shallow, a workflow-level paths:, and its due step swapped', () => {
+  const shipped = readWorkflow();
+  const workspaces = readWorkspaces();
+  assert.ok(
+    workspaces.some((workspace) => workspace.folder === OWN_JOB.folder && workspace.suite),
+    `${OWN_JOB.folder} is a workspace with a suite today`,
+  );
+  assert.deepEqual(guardsDrift(shipped), [], 'the guards job is whole today');
+  const refused = (drift: string[], token: string, why: string): void => {
+    assert.equal(drift.length, 1, why);
+    assert.ok(drift[0].includes(token), `${why}: the sentence names ${token}`);
+  };
+
+  const jobless = structuredClone(shipped);
+  delete jobless.jobs[OWN_JOB.job];
+  refused(legDrift(jobless, workspaces), `${OWN_JOB.name} has a test script and no leg`, 'neither a leg nor a job of its own');
+
+  const unneeded = structuredClone(shipped);
+  unneeded.jobs[GATE].needs = (unneeded.jobs[GATE].needs ?? []).filter((job) => job !== OWN_JOB.job);
+  refused(gateDrift(unneeded), `does not need ${OWN_JOB.job}`, 'the guards job dropped from the gate');
+
+  const suiteOf = (workflow: Workflow): Step => {
+    const step = (workflow.jobs[OWN_JOB.job].steps ?? []).find((each) => each.run?.includes('turbo run test') === true);
+    assert.ok(step !== undefined, 'the guards job runs its suite today');
+    return step;
+  };
+  const always = structuredClone(shipped);
+  delete suiteOf(always).if;
+  refused(guardsDrift(always), DUE_IF, 'the suite step unconditioned');
+
+  const shallow = structuredClone(shipped);
+  const checkout = (shallow.jobs[OWN_JOB.job].steps ?? []).find((step) => step.uses?.startsWith('actions/checkout') === true);
+  assert.equal(checkout?.with?.['fetch-depth'], 0, 'the guards job checks the whole history out today');
+  delete checkout.with;
+  refused(guardsDrift(shallow), 'fetch-depth: 0', 'the checkout shallow');
+
+  const filtered = structuredClone(shipped);
+  filtered.on = { ...filtered.on, pull_request: { paths: ['tools/guards/**'] } };
+  refused(guardsDrift(filtered), 'pull_request', 'a workflow-level paths:');
+
+  const swapped = structuredClone(shipped);
+  const due = (swapped.jobs[OWN_JOB.job].steps ?? []).find((step) => step.id === DUE_STEP);
+  assert.equal(due?.run, DUE_COMMAND, 'the due step runs due.ts today');
+  due.run = 'echo due=true >> "$GITHUB_OUTPUT"';
+  refused(guardsDrift(swapped), DUE_COMMAND, 'the due step swapped');
+});
+
+test("REFUSED: a job with no bound, a step that reaches the network with none, and a step bounded at its job's bound", () => {
+  const shipped = readWorkflow();
+  assert.deepEqual(stallDrift(shipped), [], 'every job and every network step is bounded today');
+  const install = (workflow: Workflow): Step => {
+    const step = (workflow.jobs[E2E].steps ?? []).find((each) => each.run?.includes('playwright install') === true);
+    assert.ok(step !== undefined, 'the e2e job installs Chromium today');
+    return step;
+  };
+  const refused = (drift: string[], token: string, why: string): void => {
+    assert.equal(drift.length, 1, why);
+    assert.ok(drift[0].includes(token), `${why}: the sentence names ${token}`);
+  };
+
+  const unbounded = structuredClone(shipped);
+  delete unbounded.jobs[E2E]['timeout-minutes'];
+  refused(stallDrift(unbounded), `the ${E2E} job`, 'a job with no bound');
+
+  const stalling = structuredClone(shipped);
+  delete install(stalling)['timeout-minutes'];
+  refused(stallDrift(stalling), 'Install Chromium', 'the Chromium install with no bound');
+
+  const outlived = structuredClone(shipped);
+  install(outlived)['timeout-minutes'] = outlived.jobs[E2E]['timeout-minutes'];
+  refused(stallDrift(outlived), 'Install Chromium', "the install bounded at its job's bound");
 });

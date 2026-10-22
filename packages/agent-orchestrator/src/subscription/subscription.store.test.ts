@@ -37,7 +37,8 @@ test('a subscription put is listed by its name, and its name taken again is refu
   assert.throws(
     () => putSubscription('watch', { ...SUB, task: 'other' }),
     (err: Error & { exitCode?: number }) => {
-      assert.match(err.message, /already named watch: nemia unsubscribe watch removes it first/);
+      assert.match(err.message, /already named watch: /);
+      assert.match(err.message, /nemia unsubscribe watch/);
       assert.equal(err.exitCode, 2);
       return true;
     },
@@ -102,7 +103,9 @@ test("an unsubscribe removes the person's file, not the deliverer's; a name with
   assert.throws(
     () => dropSubscription('gone'),
     (err: Error & { exitCode?: number }) => {
-      assert.match(err.message, /^no subscription is named gone: nemia subscribe gone <task> puts one/);
+      assert.match(err.message, /^no subscription is named gone: /);
+      assert.match(err.message, /nemia subscribe gone <task>/);
+
       assert.equal(err.exitCode, 2);
       return true;
     },

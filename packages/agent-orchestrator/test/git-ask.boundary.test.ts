@@ -1,9 +1,9 @@
 /**
  * How the git place runs git (`place/git/git.ts`), both ways of asking, against scratch repositories: `ask`, off the event loop, and
  * `askNow` answer the same; a question is git processes and no other between; a verb that throws is unread in one sentence naming it; a
- * git held past its deadline is unread in the deadline's words, with everything it started gone, a child deaf to SIGTERM killed at the
- * shipped grace and named, and the next question answered; an ask interrupted leaves nothing running; and the shipped place counts each
- * question, and each git process it starts, in the pass's `place` phase.
+ * git held past its deadline is unread in the deadline's words, with everything it started gone, a child deaf to SIGTERM killed after
+ * the grace the ask gave and named, and the next question answered; an ask interrupted leaves nothing running; and the shipped place
+ * counts each question, and each git process it starts, in the pass's `place` phase.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -81,10 +81,19 @@ function heldByDeaf(): { dir: string; child: string; marker: string } {
 /** The most tries a deadline test makes, each with twice the deadline of the one before, for its child to be deaf in time. */
 const DEAF_TRIES = 6;
 
-/** The deadline's words for a group that outlived SIGTERM at the shipped grace. */
+/**
+ * The grace the deadline tests give a stopped group (`AskOptions.graceMs`), shorter than the shipped `STOP_GRACE_MS`, which the test of
+ * the deadlines names: waiting the shipped one out cost every try of each test two seconds.
+ */
+const GRACE_MS = 200;
+
+/** The first deadline of a deadline test: long enough for its deaf child to start, mostly; a try that missed doubles it. */
+const FIRST_DEADLINE_MS = 500;
+
+/** The deadline's words for a group that outlived SIGTERM for the grace the tests give. */
 const killedWords = (deadlineMs: number): string =>
   `it gave no answer within ${deadlineMs / 1000} s, its deadline, and was stopped, and a process it started outlived SIGTERM for ` +
-  `${STOP_GRACE_MS / 1000} s and was killed, so a lock it held may be left`;
+  `${GRACE_MS / 1000} s and was killed, so a lock it held may be left`;
 
 test('the two ways of asking answer the same, in the environment the place was given, and a refusal is a refusal either way', async () => {
   const dir = repository();
@@ -114,16 +123,17 @@ test('REFUSED: a verb that throws is unread in one sentence naming the verb and 
 test('the deadline is two minutes a verb, ten for make, and it is what the place holds git to when given none', () => {
   for (const verb of PLACE_VERBS) assert.equal(PLACE_DEADLINE_MS[verb], verb === 'make' ? 600_000 : 120_000, verb);
   assert.equal(STOP_GRACE_MS, 2000);
+  assert.ok(GRACE_MS < STOP_GRACE_MS, 'the deadline tests give a shorter grace, never a longer one');
 });
 
-test('REFUSED at the shipped grace: a git held past its deadline, asked while the process waits, is unread in the deadline words — the child deaf to SIGTERM killed, gone and named, and the next question answered', (t) => {
-  let deadlineMs = 1500;
+test('REFUSED: a git held past its deadline, asked while the process waits, is unread in the deadline words — the child deaf to SIGTERM killed, gone and named, and the next question answered', (t) => {
+  let deadlineMs = FIRST_DEADLINE_MS;
   for (let tries = 1; ; tries++, deadlineMs *= 2) {
     const { dir, child, marker } = heldByDeaf();
     t.after(() => {
       for (const pid of running(child)) process.kill(pid, 'SIGKILL');
     });
-    const said = saidOf(PLACE.askNow('handoff', { workspace: dir, step: 'build', why: '' }, { deadlineMs }), 'handoff');
+    const said = saidOf(PLACE.askNow('handoff', { workspace: dir, step: 'build', why: '' }, { deadlineMs, graceMs: GRACE_MS }), 'handoff');
     assert.deepEqual(running(child), [], `try ${tries}: no child left running`);
     if (!fs.existsSync(marker)) {
       assert.ok(tries < DEAF_TRIES, `the child ignored SIGTERM before the deadline, on one of ${DEAF_TRIES} tries: ${said}`);
@@ -138,14 +148,14 @@ test('REFUSED at the shipped grace: a git held past its deadline, asked while th
   }
 });
 
-test('REFUSED at the shipped grace: a git held past its deadline, asked off the loop, is unread in the same words — the deaf child killed, gone and named, and the next question answered', async (t) => {
-  let deadlineMs = 1500;
+test('REFUSED: a git held past its deadline, asked off the loop, is unread in the same words — the deaf child killed, gone and named, and the next question answered', async (t) => {
+  let deadlineMs = FIRST_DEADLINE_MS;
   for (let tries = 1; ; tries++, deadlineMs *= 2) {
     const { dir, child, marker } = heldByDeaf();
     t.after(() => {
       for (const pid of running(child)) process.kill(pid, 'SIGKILL');
     });
-    const asked = PLACE.ask('handoff', { workspace: dir, step: 'build', why: '' }, { deadlineMs });
+    const asked = PLACE.ask('handoff', { workspace: dir, step: 'build', why: '' }, { deadlineMs, graceMs: GRACE_MS });
     const said = saidOf(await Effect.runPromise(asked), 'handoff');
     assert.deepEqual(running(child), [], `try ${tries}: no child left running`);
     if (!fs.existsSync(marker)) {
@@ -169,7 +179,9 @@ test(
     t.after(() => {
       for (const pid of running(child)) process.kill(pid, 'SIGKILL');
     });
-    const fiber = Effect.runFork(PLACE.ask('handoff', { workspace: dir, step: 'build', why: '' }, { deadlineMs: 600_000 }));
+    const fiber = Effect.runFork(
+      PLACE.ask('handoff', { workspace: dir, step: 'build', why: '' }, { deadlineMs: 600_000, graceMs: GRACE_MS }),
+    );
     await until(t, () => fs.existsSync(marker) && fs.readFileSync(marker, 'utf8') !== '', 'the child, deaf, writes its pid', {
       everyMs: 10,
     });

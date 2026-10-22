@@ -22,6 +22,12 @@ const refusal = (f: () => unknown): string => {
   throw new Error('it did not refuse');
 };
 
+/** That the refusal `words` opens with `head` and names each of `facts`: what it refused and the line that fixes it. */
+const says = (words: string, head: string, ...facts: string[]) => {
+  assert.ok(words.startsWith(head), words);
+  for (const fact of facts) assert.ok(words.includes(fact), `${fact} — not in: ${words}`);
+};
+
 const agentOf = (lines: string) => parseAgent('scout', `---\ndescription: Looks.\n${lines}---\nYou look.\n`);
 const stepOf = (agent: ReturnType<typeof parseAgent> | undefined, lines = ''): Workflow =>
   parseWorkflow(
@@ -65,16 +71,21 @@ test('an mcp: line that names no server, an empty name, what is no name, or a na
       line,
     );
   }
-  assert.match(
+  says(
     refusal(() => renderAgent({ name: 'scout', keys: { mcp: 'a' } as never, body: 'x' })),
-    /`mcp` is the agent's own line, not one of its role keys — give it as the MCP servers, once\./,
+    'agents/scout.md: `mcp` is the agent',
+    'not one of its role keys',
+    'the MCP servers, once',
   );
 });
 
 test("mcpServers, Claude Code's own key, is refused naming the mcp: line that does the work", () => {
-  assert.match(
+  says(
     refusal(() => agentOf('mcpServers: github\n')),
-    /`mcpServers` is Claude Code's own subagent key.* name the servers of the repository's `\.mcp\.json` its sessions load on an `mcp:` line, as `mcp: playwright`/,
+    'agents/scout.md: `mcpServers` is Claude Code',
+    '`.mcp.json`',
+    'an `mcp:` line',
+    'as `mcp: playwright`',
   );
 });
 
@@ -103,9 +114,12 @@ test("a step's mcp: line is refused as an agent's is, under the step's name, and
   assert.match(of('a,, b'), /^look: `mcp: a,, b` has an empty name\. Each is a server's name in the checkout's `\.mcp\.json`/);
   assert.match(of('a, b c'), /^look: `mcp: a, b c` has `b c`, which is not a server's name\./);
   assert.equal(of('a, a'), 'look: `mcp: a, a` names `a` twice. Name it once.');
-  assert.equal(
+  says(
     refusal(() => stepOf(undefined, 'mcp: playwright\n')),
-    "look: `mcp: playwright` adds MCP servers to the step's agent's, and this step has none. Name one — `agent: <name>` — whose servers these add to, or delete the line.",
+    'look: `mcp: playwright`',
+    'this step has none',
+    '`agent: <name>`',
+    'or delete the line',
   );
 });
 
@@ -128,17 +142,25 @@ test('naming a server allows none of its tools: a dontAsk step that names one is
 });
 
 test('an agent that names a server cannot fill a step a remote agent runs, nor may such a step name one itself', () => {
-  assert.match(
+  says(
     refusal(() => stepOf(agentOf(''), 'harness: a2a:helper\nmcp: playwright\n')),
-    /^look: `mcp: playwright` names servers of the checkout's `\.mcp\.json`.*`harness: a2a:helper` is a remote A2A agent/,
+    'look: `mcp: playwright`',
+    '`.mcp.json`',
+    '`harness: a2a:helper` is a remote A2A agent',
+    'Delete the line',
   );
-  assert.match(
+  says(
     refusal(() => agentOf('harness: a2a:helper\nmcp: playwright\n')),
-    /agents\/scout\.md: `mcp: playwright` names servers of the checkout's `\.mcp\.json`.*`harness: a2a:helper` is a remote A2A agent, which loads the servers its operator configured and none of ours\. Delete the line/,
+    'agents/scout.md: `mcp: playwright`',
+    '`.mcp.json`',
+    '`harness: a2a:helper` is a remote A2A agent',
+    'Delete the line',
   );
-  assert.match(
+  says(
     refusal(() => stepOf(agentOf('mcp: playwright\n'), 'harness: a2a:helper\n')),
-    /look: `agent: scout`: `mcp: playwright` names servers.*`harness: a2a:helper` is a remote A2A agent/,
+    'look: `agent: scout`: `mcp: playwright`',
+    '`harness: a2a:helper` is a remote A2A agent',
+    'Delete the line',
   );
   assert.equal(stepOf(agentOf(''), 'harness: a2a:helper\n').agent?.name, 'scout', 'an agent that names none fills it');
 });

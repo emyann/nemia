@@ -16,8 +16,9 @@ import fs from 'node:fs';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createAdaptorServer } from '@hono/node-server';
-import { type Duration, Effect, Logger, Metric, Stream } from 'effect';
-import { app, runtime } from '../app.ts';
+import { type Duration, Effect, Layer, Logger, Metric, Stream } from 'effect';
+import { app, appOf, liveOf, runtime } from '../app.ts';
+import { Beats } from '../layer.ts';
 import { feedEvents, OPENED } from './feed.ts';
 import {
   BOOKMARK_EVERY,
@@ -114,8 +115,8 @@ function readUntil(
 }
 
 /** A stream opened on the api, and a reader of it. */
-const open = async (query = '', headers: Record<string, string> = {}) => {
-  const res = await app.request(`${STREAM}${query}`, { headers });
+const open = async (query = '', headers: Record<string, string> = {}, over: { request: typeof app.request } = app) => {
+  const res = await over.request(`${STREAM}${query}`, { headers });
   assert.equal(res.status, 200, await (res.status === 200 ? '' : res.text()));
   return { res, reader: res.body!.getReader(), text: { value: '' } };
 };
@@ -422,11 +423,17 @@ test(
   },
 );
 
+/** The reader's beat the test below gives its app (`Beats.feed`): a few of them are waited for, never the package's seconds. */
+const BEAT_MS = 100;
+
 test(
   'a read that fails is said once, `retrying`, and cleared by the first read that works, before the lines it found',
   WAITED,
   async (t) => {
     if (process.getuid?.() === 0) return t.skip('a mode of 200 does not keep root from reading');
+    assert.ok(BEAT_MS < 1_000, "the reader's beat shorter than the package's own second (`followFeed`), never longer");
+    const own = appOf(Layer.merge(liveOf(), Layer.succeed(Beats)({ ...Beats.defaultValue(), feed: `${BEAT_MS} millis` })));
+    t.after(() => own.runtime.dispose());
     const pass = emptyFeed();
     const [first] = await pass({ 'r-1': planAt('running') });
     await until(
@@ -435,7 +442,7 @@ test(
       () => `${followers()} readers left behind by the tests before this one`,
       { everyMs: 20 },
     );
-    const { reader, text } = await open(`?after=${end()}`);
+    const { reader, text } = await open(`?after=${end()}`, {}, own.app);
     try {
       await until(
         t,
@@ -464,7 +471,7 @@ test(
         const { error, retrying } = JSON.parse(failed[0].data!);
         assert.equal(retrying, true, 'a read that failed, not a feed that cannot be read from again');
         assert.match(error, /EACCES/);
-        await new Promise((r) => setTimeout(r, 2_500));
+        await new Promise((r) => setTimeout(r, BEAT_MS * 5));
       } finally {
         fs.chmodSync(feedFile(), 0o644);
       }
@@ -472,7 +479,7 @@ test(
       assert.deepEqual(
         cleared.map((b) => b.event),
         ['unreadable', 'readable', 'step'],
-        "said once over more than two of the reader's one-second beats, each failing again, then cleared by the next read that works, before the line it found; an absence, so a bound of time is all there is, and a slow machine makes it prove less, never fail",
+        "said once over more than two of the reader's beats, each failing again, then cleared by the next read that works, before the line it found; an absence, so a bound of time is all there is, and a slow machine makes it prove less, never fail",
       );
       assert.deepEqual(cleared[2], { event: 'step', data: JSON.stringify(line), id: String(end()) });
 

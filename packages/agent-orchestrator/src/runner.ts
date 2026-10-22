@@ -460,9 +460,12 @@ export { FACTORY_RULES, factoryRules } from './rules/rules.verb.ts';
 /** A factory's own MCP servers: the entry that lists its record with each server's state, and the name rule the board shares. */
 export { FACTORY_SERVERS } from './servers/servers.verb.ts';
 export type { ServerListed, ServersListing } from './servers/servers.verb.ts';
-export { serverNameRefusal } from './servers/servers.ts';
-export type { ShippedServer } from './servers/servers.ts';
+export { serverNameRefusal } from './servers/index.ts';
+export type { ShippedServer } from './servers/index.ts';
 export { shippedServers } from './servers/servers.store.ts';
+/** A factory's server signed in to and out of from the board, through the engine; the shipped secret stays inside the package. */
+export { serverSignIn, serverSignInState, serverSignOut } from './servers/sign-in.verb.ts';
+export type { ServerSignInStarted, ServerSignInState } from './servers/sign-in.verb.ts';
 export type { FactoryRules } from './rules/rules.verb.ts';
 export type { FactoryInstruction } from './factory/instruction.verb.ts';
 export { AGENTS_CUSTOM } from './agents/custom.verb.ts';

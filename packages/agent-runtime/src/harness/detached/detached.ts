@@ -35,9 +35,12 @@ import { outputIn, saidFilesAt, saidWhen, type SaidMemo } from './said.ts';
 import { compactOps } from './compact.ts';
 import { lookedFor } from './looked.ts';
 import { detachedStateOf, firstRunFile, leased, runFileIn, type Carried, type Run, type RunFile } from './run-file.ts';
+import { workerBoundsOf, type DetachedOptions } from './detached-options.ts';
 import { spawnFiles, spawnInput } from './spawn-files.ts';
 
 export { detachedStateOf, STALE_MS } from './run-file.ts';
+export { WORKER_BEAT_MS, WORKER_STOP_GRACE_MS } from './worker-bounds.ts';
+export type { DetachedOptions } from './detached-options.ts';
 import { followOf, type PartialMark } from './follow.ts';
 
 /** Everything this engine needs to know about a harness. Add one by writing one of these. */
@@ -726,7 +729,11 @@ const startWorker = (file: string, cwd: string): void => {
  *   cannot be read; a run its worker started with no input; a run whose harness has printed its closing line; one that is
  *   not working; and words whose line holds a line break, which would reach the harness as two, or as half a message.
  */
-export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
+export const detachedOps = (spec: HarnessSpec, root: string, options: DetachedOptions = {}): RunnerOps =>
+  runnerOf(spec, root, workerBoundsOf(options));
+
+/** `detachedOps`, its workers' bounds read. */
+const runnerOf = (spec: HarnessSpec, root: string, bounds: ReturnType<typeof workerBoundsOf>): RunnerOps => {
   const dir = path.join(root, 'runs', spec.name);
   const runFile = (name: string) => runFileOf(spec, root, name);
   const logFile = (name: string) => path.join(dir, `${safe(name)}.log`);
@@ -827,7 +834,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
               : {}),
             ...(input ? { input } : {}),
           };
-          fs.writeFileSync(runFile(r.name), firstRunFile(plan));
+          fs.writeFileSync(runFile(r.name), firstRunFile({ ...plan, ...bounds }));
 
           startWorker(runFile(r.name), r.cwd);
         },

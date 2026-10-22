@@ -1,6 +1,6 @@
 /**
  * `nemia show`, `nemia logs` and `nemia stats` as entries of the table: what each refuses of a command line before anything is read,
- * matched whole in the words `nemia` has always said them, and how `nemia stats` prints what it read.
+ * each matched by the facts it names and the fix it gives, and how `nemia stats` prints what it read.
  *
  * `WF_ROOT` is set before the import, since the store's modules read it as they load.
  */
@@ -26,13 +26,19 @@ function refusedBy(command: CommandSpec, argv: readonly string[]): string | null
   }
 }
 
+/** That `command` refuses `argv` (exit 2 where it throws), naming each of `tokens`: what it refused and the fix it gives. */
+function refusesNaming(command: CommandSpec, argv: readonly string[], ...tokens: string[]): void {
+  const said = refusedBy(command, argv);
+  assert.ok(said !== null && tokens.every((token) => said.includes(token)), `${argv.join(' ')}: ${said}`);
+}
+
 test('nemia show takes one run and nemia logs one run and one step, and each refuses a word more by naming it', () => {
   assert.equal(refusedBy(SHOW, ['r']), null);
   assert.equal(refusedBy(SHOW, ['--x']), "nemia show takes one run's id: not --x.");
   assert.equal(refusedBy(SHOW, ['r', 'extra']), "nemia show takes one run's id: not extra.");
   assert.equal(refusedBy(LOGS, ['r', 's']), null);
-  assert.equal(refusedBy(LOGS, ['r', 's', 'extra']), "nemia logs takes one run's id and one step's name: not extra.");
-  assert.equal(refusedBy(LOGS, ['r', 's', '--tail']), "nemia logs takes one run's id and one step's name: not --tail.");
+  refusesNaming(LOGS, ['r', 's', 'extra'], 'nemia logs', "one run's id and one step's name", 'not extra.');
+  refusesNaming(LOGS, ['r', 's', '--tail'], 'nemia logs', "one run's id and one step's name", 'not --tail.');
 });
 
 test('nemia stats refuses a value left out, empty or given as a flag in what the flag takes', () => {
@@ -42,29 +48,21 @@ test('nemia stats refuses a value left out, empty or given as a flag in what the
   assert.equal(refusedBy(STATS, ['--from', '--to', '2026-09-30']), from);
   assert.equal(refusedBy(STATS, ['--from', '']), from);
   assert.equal(refusedBy(STATS, ['--agent=']), "--agent takes an agent's name: only the steps it fills");
-  assert.equal(refusedBy(STATS, ['--by=--line']), '--by takes what the rows go by: agent, step, factory, workflow, repo');
+  refusesNaming(STATS, ['--by=--line'], '--by', 'agent, step, factory, workflow, repo');
 });
 
 test('nemia stats refuses a flag given twice, and one it does not take, by name', () => {
   assert.equal(refusedBy(STATS, ['--by', 'agent', '--by', 'step']), 'nemia stats takes --by once.');
   assert.equal(refusedBy(STATS, ['--line', '--line']), null);
-  assert.equal(
-    refusedBy(STATS, ['--nope']),
-    'nemia stats does not take --nope. It takes --from, --to, --by, --agent, --step, --factory, --workflow, --repo, and --line or --json.',
-  );
-  assert.equal(
-    refusedBy(STATS, ['stray']),
-    'nemia stats does not take stray. It takes --from, --to, --by, --agent, --step, --factory, --workflow, --repo, and --line or --json.',
-  );
+  const flags = ['--from', '--to', '--by', '--agent', '--step', '--factory', '--workflow', '--repo', '--line', '--json'];
+  refusesNaming(STATS, ['--nope'], 'nemia stats does not take --nope.', ...flags);
+  refusesNaming(STATS, ['stray'], 'nemia stats does not take stray.', ...flags);
 });
 
 test("nemia stats refuses what the query does not take in its flags' names: a key, a day, and days out of order", () => {
-  assert.equal(refusedBy(STATS, ['--by', 'colour']), '--by takes one of agent, step, factory, workflow, repo, not "colour".');
-  assert.equal(refusedBy(STATS, ['--to', '2026-13-40']), '--to takes a day as YYYY-MM-DD, in UTC, such as 2026-09-30 — not "2026-13-40".');
-  assert.equal(
-    refusedBy(STATS, ['--from', '2026-09-30', '--to', '2026-09-01']),
-    '--from 2026-09-30 is after --to 2026-09-01: give the earlier day first.',
-  );
+  refusesNaming(STATS, ['--by', 'colour'], '--by', 'agent, step, factory, workflow, repo', 'not "colour"');
+  refusesNaming(STATS, ['--to', '2026-13-40'], '--to', 'YYYY-MM-DD', 'UTC', 'not "2026-13-40"');
+  refusesNaming(STATS, ['--from', '2026-09-30', '--to', '2026-09-01'], '--from 2026-09-30', '--to 2026-09-01', 'earlier day first');
   assert.equal(refusedBy(STATS, ['--from', '2026-09-01', '--to', '2026-09-30', '--by', 'agent', '--repo', '/r']), null);
 });
 

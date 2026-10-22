@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { REPO } from './team.ts';
+import { REPO } from './workspaces.ts';
 
 /** The five layers in precedence order, as each numbered list names them: the higher number wins. */
 const IN_ORDER = ['Instructions', 'Custom instructions', "The folder's files", "The factory's rules", "The step's policy"];

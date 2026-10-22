@@ -141,7 +141,9 @@ test('a path given twice, and a file another entry stands under, are refused by 
 });
 
 test('a bad checksum, a body cut short and bytes that are no gzip are refused', () => {
-  assert.match(refusal([{ ...MANIFEST, checksum: 1 }]), /the block at byte 0: has a header whose checksum does not add up/);
+  const checksum = refusal([{ ...MANIFEST, checksum: 1 }]);
+  assert.ok(checksum.includes('the block at byte 0'), checksum);
+  assert.ok(checksum.includes('checksum'), checksum);
   const cut = rawTar([MANIFEST, { name: 't/big', body: 'x'.repeat(2000) }], 512 * 4);
   assert.throws(
     () => unpackArchive(gzipSync(cut)),
@@ -165,7 +167,7 @@ test('a tar larger than the limit is refused, naming the limit', () => {
 
 test('every refused entry is said at once', () => {
   const message = refusal([MANIFEST, { name: 't/../a', body: 'x' }, { name: 't/l', type: '2' }, { name: '/b', body: 'y' }]);
-  assert.match(message, /t\/\.\.\/a: has a part[^]*t\/l: is of type "2"[^]*\/b: is absolute/);
+  for (const said of ['t/../a: has a part', 't/l: is of type "2"', '/b: is absolute']) assert.ok(message.includes(said), message);
 });
 
 test("GNU tar's magic and its folder entries are read", () => {

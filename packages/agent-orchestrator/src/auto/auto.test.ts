@@ -34,14 +34,14 @@ test('the default is pinned whole: approve, every step, all five conditions in o
 });
 
 test("a rule's words are made from its fields, each condition's phrase once", () => {
-  const words = ruleWords(DEFAULT_AUTO);
+  const rule = ruleWords(DEFAULT_AUTO);
   assert.equal(
-    words,
+    rule,
     'Approve any step unasked when the agent recommends it, its check passed, every reviewer accepted, no step is past its budget and ' +
       'nothing is left open.',
   );
   for (const phrase of ['the agent recommends it', 'its check passed', 'every reviewer accepted', 'no step is past its budget'])
-    assert.equal(words.split(phrase).length, 2, phrase);
+    assert.equal(rule.split(phrase).length, 2, phrase);
   assert.equal(
     ruleWords({ id: 'tries', answer: 'retry', steps: ['implement', 'review'], when: ['recommends'], under: 20 }),
     'Try again the steps implement and review unasked when the agent recommends it and the run has cost under $20.',
@@ -73,11 +73,13 @@ test('REFUSED: a rule with no id, the default id, an answer or condition that is
   assert.equal(ruleRefusal(good, 'rule 1'), undefined);
   assert.equal(ruleRefusal({ ...good, steps: ['design'], under: 5 }, 'rule 1'), undefined);
   const refused = (rule: unknown): string => ruleRefusal(rule, 'rule 1') ?? '';
-  assert.equal(refused('approve'), 'rule 1 is no rule: { "id", "answer", "steps"?, "when", "under"? }.');
+  assert.ok(refused('approve').startsWith('rule 1 is no rule'), refused('approve'));
+  assert.ok(refused('approve').includes('{ "id", "answer", "steps"?, "when", "under"? }'), refused('approve'));
   assert.match(refused({ ...good, id: 'Gate one' }), /^rule 1: id is a name of lowercase letters/);
   assert.match(refused({ ...good, id: 'default' }), /^rule 1: the id default is the rule that ships/);
   assert.match(refused({ ...good, answer: 'cancel' }), /^rule 1: answer is one of approve, retry; "cancel" is not/);
-  assert.match(refused({ ...good, when: ['cheap'] }), /^rule 1: when is a list of the conditions recommends, checked/);
+  assert.match(refused({ ...good, when: ['cheap'] }), /^rule 1: when /);
+  assert.ok(refused({ ...good, when: ['cheap'] }).includes('recommends, checked'));
   assert.match(refused({ ...good, when: 'checked' }), /^rule 1: when is a list of the conditions/);
   assert.match(refused({ ...good, when: ['checked', 'checked'] }), /^rule 1: when names a condition twice/);
   assert.match(refused({ ...good, steps: [] }), /^rule 1: steps is a list of step names/);

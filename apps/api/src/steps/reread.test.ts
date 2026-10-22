@@ -1,8 +1,8 @@
 /**
  * A step's conversation is read again on the api in one place and for one reason: where no live stream of it can be had — its harness
- * does not push the session, or the upstream failed — the stream's `readAgain` reads it from the cursor every `STEP_BEAT_MS` for as long
- * as a reader is there. Everywhere else it is read once a request: a session the runtime pushes is relayed as it is written, and is never
- * put on a timer.
+ * does not push the session, or the upstream failed — the stream's `readAgain` reads it from the cursor every served beat (`Beats.step`,
+ * `STEP_BEAT_MS` by default) for as long as a reader is there. Everywhere else it is read once a request: a session the runtime pushes
+ * is relayed as it is written, and is never put on a timer.
  *
  * `timers` names what in a source of `src/steps/` reads again on its own — a sleep, `setInterval`, `setTimeout`, an Effect `Schedule` —
  * and `loopsAround` counts the loops whose body calls a function. These tests hold the folder to the one beat and no other, and refuse a
@@ -13,6 +13,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { Effect } from 'effect';
+import { Beats } from '../layer.ts';
 
 const TIMERS: readonly [RegExp, string][] = [
   [/\.sleep\s*\(/, 'a sleep'],
@@ -42,6 +44,9 @@ const loopBodies = (text: string): string[] =>
 /** What in the source `text` reads again on its own: each timer it starts, named. */
 const timers = (text: string): string[] => TIMERS.filter(([pattern]) => pattern.test(text)).map(([, what]) => what);
 
+/** What each sleep of `text` is given to wait. */
+const sleepsOf = (text: string): string[] => [...text.matchAll(/\.sleep\s*\(([^)]*)\)/g)].map((m) => m[1]);
+
 /** How many loops of `text` call `name` in their body. */
 const loopsAround = (text: string, name: string): number =>
   loopBodies(text).filter((body) => new RegExp(`\\b${name}\\s*\\(`).test(body)).length;
@@ -68,14 +73,27 @@ test("a step's conversation is read again in one place alone: `readAgain`, the b
   }
 });
 
-test('the beat is the folder’s one timer, and it waits `STEP_BEAT_MS`', () => {
-  assert.match(routes, /export const STEP_BEAT_MS = /, 'the beat is a constant of its own, read by the test that crosses it');
+test('the beat is the folder’s one timer, and it waits the served beat, `STEP_BEAT_MS` by default', () => {
+  assert.match(routes, /export const STEP_BEAT_MS = /, 'the beat is a constant of its own, the served one by default');
   for (const file of sources) {
     const text = fs.readFileSync(path.join(STEPS, file), 'utf8');
     assert.deepEqual(timers(text), file === 'steps.ts' ? ['a sleep'] : [], `${file}: no timer but the beat's own sleep`);
   }
-  const sleeps = [...routes.matchAll(/\.sleep\s*\(([^)]*)\)/g)].map((m) => m[1]);
-  assert.deepEqual(sleeps, ['STEP_BEAT_MS', 'STEP_BEAT_MS'], 'each wait of the beat is that long, and nothing waits for another reason');
+  assert.deepEqual(
+    sleepsOf(routes),
+    ['r.beatMs', 'r.beatMs'],
+    'each wait of the beat is the one beat, and nothing waits for another reason',
+  );
+  assert.match(routes, /beatMs:\s*beats\.step \?\? STEP_BEAT_MS\b/, "the beat is the app's served `Beats.step`, `STEP_BEAT_MS` unserved");
+  assert.equal(
+    Effect.runSync(
+      Effect.gen(function* () {
+        return (yield* Beats).step;
+      }),
+    ),
+    undefined,
+    'served none by default, so the shipped `STEP_BEAT_MS` is the beat',
+  );
 });
 
 test('REFUSED: a second beat — a loop around `readTranscript` beside the one — and a timer of any kind', () => {
@@ -90,5 +108,10 @@ test('REFUSED: a second beat — a loop around `readTranscript` beside the one �
   assert.deepEqual(timers('const t = setInterval(() => readTranscript(e, id, step, taskId), 1_000);'), ['setInterval']);
   assert.deepEqual(timers('setTimeout(again, 1_000);'), ['setTimeout']);
   assert.deepEqual(timers('Effect.repeat(read, Schedule.spaced("1 second"))'), ['an Effect Schedule']);
-  assert.deepEqual(timers('await stream.sleep(STEP_BEAT_MS);'), ['a sleep']);
+  assert.deepEqual(timers('await stream.sleep(r.beatMs);'), ['a sleep']);
+  assert.notDeepEqual(
+    sleepsOf('await stream.sleep(r.beatMs);\nawait stream.sleep(STEP_BEAT_MS);'),
+    ['r.beatMs', 'r.beatMs'],
+    'a sleep of a length of its own beside the served beat',
+  );
 });

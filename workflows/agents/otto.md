@@ -8,7 +8,7 @@ model: opus
 effort: high
 context: 200k
 permissionMode: auto
-disallowedTools: SendMessage, CronCreate, CronDelete, RemoteTrigger, Bash(git push), Bash(git push:*), Bash(gh), Bash(gh:*), Bash(git branch -D:*), Bash(git branch --delete --force:*), Bash(pkill:*), Bash(killall:*), mcp__playwright__browser_run_code_unsafe, Bash(claude *--bg*), Bash(claude *--background*), Bash(claude *remote-control*), Edit(//**/.claude/settings.local.json), Edit(~/.claude/settings.json), Edit(~/.claude.json)
+disallowedTools: SendMessage, CronCreate, CronDelete, RemoteTrigger, Bash(git push), Bash(git push:*), Bash(gh), Bash(gh:*), Bash(git branch -D:*), Bash(git branch --delete --force:*), Bash(pkill:*), Bash(killall:*), mcp__playwright__browser_run_code_unsafe, Bash(claude *--bg*), Bash(claude *--background*), Bash(claude *remote-control*), Edit(//**/.claude/settings.local.json), Edit(~/.claude/settings.json), Edit(~/.claude.json), mcp__github__push_files, mcp__github__create_or_update_file, mcp__github__delete_file, mcp__github__create_branch, mcp__github__create_repository, mcp__github__fork_repository, mcp__github__actions_run_trigger
 output: land.schema.json
 ---
 You are Otto, a release engineer. You land a run's result on the base branch, in the repository's own checkout where that branch is, and

@@ -1,7 +1,7 @@
 /**
  * A background Claude Code session followed live (`RunnerOps.follow`), at message level: its transcript read from a byte offset as it
- * grows, each whole line once, and its state from `claude agents`, read at most once a second however many sessions are followed
- * (`sharedListing`).
+ * grows, each whole line once, and its state from `claude agents`, read at most once a pace (`FOLLOW_PACE_MS`, a second shipped)
+ * however many sessions are followed (`sharedListing`).
  */
 import { Effect, Exit, Queue, Stream } from 'effect';
 import fs from 'node:fs';
@@ -14,14 +14,24 @@ import { CURSOR_TAIL_BYTES, cursorOf } from '../transcript.ts';
 import { claudeStateOf, registryOf, type RegistryRow } from './registry.ts';
 import { claudeTranscriptEvents, transcriptFile } from './transcript.ts';
 
+/**
+ * The follow's pace, shipped: how long a listing read is kept for every follower (`sharedListing`), and the longest a follower waits
+ * between two passes with no change seen (`bgFollowOf`). A test shortens it on `ClaudeOptions.followPaceMs`.
+ */
+export const FOLLOW_PACE_MS = 1_000;
+
 const failure = (message: string) => new RunnerError({ verb: 'follow', message: `claude: ${message}` });
 
 /**
- * The rows of ours `read` lists (`registryOf`), read once however many ask at a time, and kept a second after a read that decoded:
- * every follower of one runner shares one `claude agents` a second. A read that failed, or a listing that does not decode, is kept by
- * none: the next ask reads again. Fails with the read's error, or a `RunnerError` of the verb `follow` naming what does not decode.
+ * The rows of ours `read` lists (`registryOf`), read once however many ask at a time, and kept `ttlMs` after a read that decoded:
+ * every follower of one runner shares one `claude agents` per `ttlMs`, a second shipped (`FOLLOW_PACE_MS`). A read that failed, or a
+ * listing that does not decode, is kept by none: the next ask reads again. Fails with the read's error, or a `RunnerError` of the
+ * verb `follow` naming what does not decode.
  */
-export const sharedListing = (read: Effect.Effect<string, RunnerError>): Effect.Effect<readonly RegistryRow[], RunnerError> =>
+export const sharedListing = (
+  read: Effect.Effect<string, RunnerError>,
+  ttlMs: number = FOLLOW_PACE_MS,
+): Effect.Effect<readonly RegistryRow[], RunnerError> =>
   Effect.runSync(
     Effect.cachedWithTTL(
       read.pipe(
@@ -30,7 +40,7 @@ export const sharedListing = (read: Effect.Effect<string, RunnerError>): Effect.
           return 'wrong' in listed ? Effect.fail(failure(listed.wrong)) : Effect.succeed(listed.rows);
         }),
       ),
-      (exit) => (Exit.isSuccess(exit) ? '1 second' : 0),
+      (exit) => (Exit.isSuccess(exit) ? ttlMs : 0),
     ),
   );
 
@@ -201,13 +211,13 @@ const pass = (list: Effect.Effect<readonly RegistryRow[], RunnerError>, name: st
  * first, then each whole transcript line written after, once and in order, as events, and each move of its state, across its turns
  * and the respawns Claude Code makes of it, until a pass finds it over (`followedStateOf`), whose moments end the stream. The
  * transcript's folder is watched while the stream is open, waking a pass when the transcript changes, and a pass is made at least
- * once a second; the watch is closed with the stream.
+ * once every `paceMs`, a second shipped (`FOLLOW_PACE_MS`); the watch is closed with the stream.
  *
  * Fails, as a `RunnerError` of the verb `follow`, where the listing does not list `name`, and where the transcript cannot be read or
  * says a line that does not decode.
  */
 export const bgFollowOf =
-  (list: Effect.Effect<readonly RegistryRow[], RunnerError>) =>
+  (list: Effect.Effect<readonly RegistryRow[], RunnerError>, paceMs: number = FOLLOW_PACE_MS) =>
   (name: string): Stream.Stream<Followed, RunnerError> =>
     Stream.callback<Followed, RunnerError>((queue) =>
       Effect.gen(function* () {
@@ -221,7 +231,7 @@ export const bgFollowOf =
           if (at.file && !watch) watch = watched(at.file, () => Queue.offerUnsafe(wake, undefined));
           yield* Queue.offerAll(queue, moments);
           if (over) return yield* Queue.end(queue);
-          yield* Queue.take(wake).pipe(Effect.timeoutOption('1 second'));
+          yield* Queue.take(wake).pipe(Effect.timeoutOption(paceMs));
         }
       }).pipe(Effect.catch((e) => Queue.fail(queue, e))),
     );

@@ -1,7 +1,7 @@
 /**
  * Run by `leaks.test.ts` alone, under a TMPDIR of its own: two tests that each start a detached worker and fail before
  * they stop it — one on a harness that reads its stdin for ever, and one on a harness that ignores SIGTERM, which only the
- * last resort ends. `scratch` must leave nothing behind.
+ * last resort ends, after a stop grace shorter than the shipped one. `scratch` must leave nothing behind.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,7 +22,7 @@ test('a worker whose harness reads its stdin for ever, and a test that fails bef
     name: 'in', command: () => ({ cmd: process.execPath, args: [script] }),
     input: { line: (text) => JSON.stringify({ said: text }), closesOn: { key: 'kind', value: 'end' } },
   };
-  await Effect.runPromise(detachedOps(spec, dir).spawn({ name: 'ae/leak/1', brief: 'b', cwd: dir }));
+  await Effect.runPromise(detachedOps(spec, dir, { stopGraceMs: 300 }).spawn({ name: 'ae/leak/1', brief: 'b', cwd: dir }));
   await started(t, path.join(dir, 'started'));
   assert.fail('failed with its worker running');
 });
@@ -30,7 +30,7 @@ test('a worker whose harness reads its stdin for ever, and a test that fails bef
 test('a worker whose harness ignores SIGTERM, and a test that fails before it stops it', WAITED, async (t) => {
   const dir = scratch('ae-detached-');
   const spec: HarnessSpec = { name: 'sh', command: () => ({ cmd: 'sh', args: ['-c', "trap '' TERM; : > started; while :; do sleep 1; done"] }) };
-  await Effect.runPromise(detachedOps(spec, dir).spawn({ name: 'ae/leak/2', brief: 'b', cwd: dir }));
+  await Effect.runPromise(detachedOps(spec, dir, { stopGraceMs: 300 }).spawn({ name: 'ae/leak/2', brief: 'b', cwd: dir }));
   await started(t, path.join(dir, 'started'));
   assert.fail('failed with its worker running');
 });

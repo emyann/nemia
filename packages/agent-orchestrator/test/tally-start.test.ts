@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
 import { placesOf, REPO } from './team.ts';
+import { Invalid } from '../src/refusal/refusal.ts';
 
 const ROOT = scratch('wf-tally-start-');
 process.env.WF_ROOT = ROOT;
@@ -68,14 +69,12 @@ const runsWritten = () => (fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSy
 
 test('REFUSED: nemia start of a step whose tally its closeout cannot hold exits 2, naming the file, the schema and the field, and writes no run', async () => {
   const runs = runsWritten();
-  await assert.rejects(started(triage('unheld', 'issues, issues.closed')), (err: Error & { exitCode?: number }) => {
+  await assert.rejects(started(triage('unheld', 'issues, issues.closed')), (err: unknown) => {
+    assert.ok(err instanceof Invalid, String(err));
     assert.equal(err.exitCode, 2);
-    assert.ok(
-      err.message.includes(
-        'triage: `tally: issues, issues.closed` in triage.md: `output: triage.schema.json` declares no boolean `closed` on the items of an array `issues`',
-      ),
-      err.message,
-    );
+    assert.ok(err.message.includes('triage: `tally: issues, issues.closed` in triage.md'), err.message);
+    assert.ok(err.message.includes('`output: triage.schema.json`'), err.message);
+    assert.ok(err.message.includes('no boolean `closed` on the items of an array `issues`'), err.message);
     return true;
   });
   assert.equal(runsWritten(), runs, 'no run was written');

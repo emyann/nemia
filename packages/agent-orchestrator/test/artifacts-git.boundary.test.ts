@@ -365,7 +365,7 @@ test('REFUSED at shipped defaults: a copy is never written through a link a step
       { path: 'shots/shot.png', why: 'not collected' },
       { path: 'report.md', why: 'not collected' },
     ],
-    "the run reads a step's files from its directory, and says what it did not collect",
+    'read from the files directory: what is not collected',
   );
 });
 
@@ -396,7 +396,7 @@ test('REFUSED before, now read as it was: a run from before collection — its s
   assert.deepEqual(
     missingArtifacts(shippedGitPlace, readRun(run.id), 'implement', declaring(['docs/RESPONSE.md', '.e2e/shot.png'])),
     [{ path: '.e2e/shot.png', why: 'not collected' }],
-    'the branch has RESPONSE.md; a file git ignores is on no branch',
+    'RESPONSE.md is on the branch; an ignored file is on none',
   );
   assert.deepEqual((await runWith(b.e, advanceRun(readRun(run.id)))).notes, [], 'past hand-off, so no pass collects it');
   assert.deepEqual(artifactFiles(run, 'implement'), [], 'the branch is where the run reads it');

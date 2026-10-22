@@ -16,8 +16,8 @@
 #
 # Scoped by path AND by shape: a secret of another shape in that file is a finding, and a string of these shapes anywhere else is a
 # finding too. That is not this comment's word: the `gitleaks` job proves it on every run, scanning a fixture it writes with the pinned
-# binary and refusing unless the counts come out (the step named by `ALLOWLIST_STEP` in packages/agent-orchestrator/test/ci-workflow.ts).
-# packages/agent-orchestrator/test/ci-workflow.test.ts refuses this file's form, a regex here that matches none of that file's stub
+# binary and refusing unless the counts come out (the step named by `ALLOWLIST_STEP` in tools/guards/test/ci-workflow.ts).
+# tools/guards/test/ci-workflow.test.ts refuses this file's form, a regex here that matches none of that file's stub
 # secrets, and one that matches a line of any other file.
 [extend]
 useDefault = true

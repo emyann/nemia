@@ -285,10 +285,11 @@ test('REFUSED: a factory write that names no factory, the default one, a raise w
     /^no factory is named nope: nemia factory ls/,
   );
   assert.match(await refusal(() => runWith(e, LEVEL.handler({ factory: 'pipao', end: true }))), /^pipao has no raise in force to end/);
-  assert.match(
-    await refusal(() => runWith(e, LEVEL.handler({ factory: 'pipao', level: 'manual', for: '1h' }))),
-    /^pipao is at manual by default, so a raise to manual raises nothing/,
-  );
+  const nothing = await refusal(() => runWith(e, LEVEL.handler({ factory: 'pipao', level: 'manual', for: '1h' })));
+  assert.match(nothing, /^pipao is at manual by default/);
+  assert.match(nothing, /raises nothing/);
+  assert.match(nothing, /nemia level manual --factory pipao/);
+
   assert.equal(fs.existsSync(factoryLevelFile('pipao')), false, 'nothing written');
 });
 

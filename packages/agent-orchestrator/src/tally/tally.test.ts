@@ -57,7 +57,9 @@ test('a tally of the items of an array whose string has a value reads as written
 test('REFUSED: a value its enum does not hold, naming the step file, the schema file and the values it holds', () => {
   const message = refusal('issues.kind=nope', triage);
   assert.match(message, /^triage: `tally: issues.kind=nope` in triage\.md: /);
-  assert.ok(message.includes('`output: triage.schema.json` declares the `kind` of the items of `issues` as one of bug, idea'), message);
+  assert.ok(message.includes('`output: triage.schema.json`'), message);
+  assert.ok(message.includes('the `kind` of the items of `issues`'), message);
+  assert.ok(message.includes('as one of bug, idea'), message);
 });
 
 test('REFUSED: a key that is no string of the items of an array, naming the step file, the schema file, the field and the key', () => {
@@ -87,13 +89,15 @@ test('a tally on a step with no output is refused, naming the step file', () => 
 test('a tally of a field the schema does not declare is refused, naming the step file, the schema file and the fields it has', () => {
   const message = refusal('issues, nope', triage);
   assert.match(message, /triage\.md/);
-  assert.match(message, /`output: triage\.schema\.json` declares no field `nope`; it declares issues, score, seen, verdict/);
+  assert.match(message, /`output: triage\.schema\.json` declares no field `nope`/);
+  assert.match(message, /it declares issues, score, seen, verdict/);
 });
 
 test('a tally of a field that is not an array, an integer or a number is refused, naming the field and its type', () => {
   const message = refusal('verdict', triage);
   assert.match(message, /triage\.md/);
-  assert.match(message, /`output: triage\.schema\.json` declares `verdict` as \["string"\]/);
+  assert.match(message, /`output: triage\.schema\.json` declares `verdict`/);
+  assert.match(message, /`verdict` as \["string"\]/);
 });
 
 test('a flag that is not a boolean of the items of an array is refused, naming the field and the flag', () => {

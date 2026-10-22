@@ -17,7 +17,9 @@ test('REFUSED: rules that open with a frontmatter block, after a byte order mark
     '---',
   ]) {
     const refused = factoryRulesRefusal('/store/factories/pipao/RULES.md', text);
-    assert.match(refused ?? '', /^\/store\/factories\/pipao\/RULES\.md opens with a frontmatter block, a first line of `---`\./);
+    assert.ok(refused?.startsWith('/store/factories/pipao/RULES.md '), refused ?? 'not refused');
+    assert.match(refused ?? '', /opens with a frontmatter block, a first line of `---`\./);
+
     assert.match(refused ?? '', /A factory's rules only add words: they set no key/);
     assert.match(refused ?? '', /start the rules with a word\.$/);
   }

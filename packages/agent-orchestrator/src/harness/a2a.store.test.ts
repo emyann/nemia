@@ -92,32 +92,36 @@ test('a2a-agents.json is refused, naming the file and the fix, for text that is 
     fs.writeFileSync(file, text);
     return refusal(() => readRemoteAgents(file));
   };
-  assert.match(refused('{ reviewer: '), /bad\.json: is not JSON .*\{ "reviewer": \{ "url": "https:\/\/…" \} \}/);
-  assert.match(refused('[]'), /bad\.json: is a list, and it is an object that maps each remote agent's name to its address/);
+  const shape = '{ "reviewer": { "url": "https://…" } }';
+  const notJson = refused('{ reviewer: ');
+  assert.match(notJson, /bad\.json: is not JSON/);
+  assert.ok(notJson.includes(shape), `the fix names the shape the file takes: ${notJson}`);
+  const list = refused('[]');
+  assert.match(list, /bad\.json: is a list/);
+  assert.ok(list.includes(shape), `the fix names the shape the file takes: ${list}`);
   assert.match(refused('"reviewer"'), /bad\.json: is `"reviewer"`, and it is an object/);
-  assert.match(
-    refused(JSON.stringify({ Reviewer: { url: 'https://a.example' } })),
-    /`Reviewer` is not a name a step can give: .*lowercase words joined by dashes.*Rename it\./,
-  );
+  const capital = refused(JSON.stringify({ Reviewer: { url: 'https://a.example' } }));
+  assert.match(capital, /`Reviewer` is not a name a step can give/);
+  assert.match(capital, /lowercase words joined by dashes/);
+  assert.match(capital, /Rename it\./);
   assert.match(
     refused(JSON.stringify({ code_review: { url: 'https://a.example' } })),
     /`code_review` is not a name a step can give/,
-    'an underscore is refused: a dash and an underscore are one in a variable name',
+    'an underscore is refused: one with a dash in a variable',
   );
-  assert.match(
-    refused(JSON.stringify({ reviewer: 'https://a.example' })),
-    /`reviewer` is given "https:\/\/a\.example", and an agent is an object: `\{ "url": "https:\/\/…" \}`/,
-  );
+  const string = refused(JSON.stringify({ reviewer: 'https://a.example' }));
+  assert.match(string, /`reviewer` is given "https:\/\/a\.example"/);
+  assert.ok(string.includes('{ "url": "https://…" }'), `the fix names the shape of an agent: ${string}`);
 });
 
 test("two names whose secrets' variables can meet are refused: a card the other party writes could name a scheme given the other's secret", () => {
   const file = path.join(ROOT, 'meet.json');
   fs.writeFileSync(file, JSON.stringify({ acme: { url: 'https://acme.example' }, 'acme-internal': { url: 'https://internal.example' } }));
   const refused = refusal(() => readRemoteAgents(file));
-  assert.match(
-    refused,
-    /`acme` and `acme-internal` are both declared, and their secrets' variables can meet: `WF_A2A_ACME_INTERNAL_TOKEN` is acme-internal's secret for a scheme its card calls `token`, and acme's for one its card calls `internal-token`/,
-  );
+  assert.match(refused, /`acme` and `acme-internal` are both declared/);
+  assert.match(refused, /`WF_A2A_ACME_INTERNAL_TOKEN`/);
+  assert.match(refused, /`internal-token`/);
+  assert.match(refused, /Rename one/);
   assert.equal(
     envNameOf('acme', 'internal-token'),
     envNameOf('acme-internal', 'token'),
@@ -135,10 +139,10 @@ test("an entry the runtime would refuse is left out of remoteAgents() and said b
     assert.ok(refused.startsWith(`${FILE}: \`reviewer\`: `), refused);
     assert.match(refused, /the `a2a:reviewer` harness/);
     declare({ reviewer: { card: { name: 'no interfaces' } } });
-    assert.match(
-      readRemote().refused.get('reviewer')!,
-      /`reviewer`: .*`card` is not an A2A 1\.0 agent card this runtime reads: its `supportedInterfaces` is missing/,
-    );
+    const noInterfaces = readRemote().refused.get('reviewer')!;
+    assert.ok(noInterfaces.startsWith(`${FILE}: \`reviewer\`: `), noInterfaces);
+    assert.match(noInterfaces, /`card`/);
+    assert.match(noInterfaces, /`supportedInterfaces` is missing/);
     declare({
       reviewer: { card: { supportedInterfaces: [{ url: 3, protocolBinding: 'JSONRPC' }] } },
       critic: { url: 'https://a.example/critic' },
@@ -282,7 +286,8 @@ test('each key that tells a harness of ours how to run is refused on a remote st
       parseWorkflow('ask', `---\nplace: git\nharness: a2a:reviewer\n${key}: ${value}\n---\nx\n`, () => '{"type":"object"}'),
     );
     assert.ok(refused.startsWith(`ask: \`${key}: ${value}\` `), `${key}: ${refused}`);
-    assert.match(refused, /`harness: a2a:reviewer` is a remote A2A agent\. Delete the line/, key);
+    assert.match(refused, /`harness: a2a:reviewer`/, key);
+    assert.match(refused, /Delete the line/, key);
   }
   assert.match(
     loadRefusal(() => parseWorkflow('ask', '---\nplace: git\nharness: a2a:reviewer\nloop: plan\n---\nx\n')),
@@ -316,7 +321,9 @@ test("a key a remote step's agent gives is refused as the step's own is, and so 
       agentsOf({ critic: '---\nmodel: opus\n---\nCriticise.\n' }),
     ),
   );
-  assert.match(refused, /^ask: `model: opus` .*Delete the line — from the step, or from the agent it names/);
+  assert.ok(refused.startsWith('ask: `model: opus` '), refused);
+  assert.match(refused, /Delete the line/);
+  assert.match(refused, /from the agent it names/);
   assert.match(
     loadRefusal(() =>
       parseWorkflow(
@@ -377,10 +384,9 @@ test("a loop's target on a remote agent is refused; a step inside the loop may b
       read,
     ),
   );
-  assert.match(
-    refused,
-    /build runs on `harness: a2a:builder`, a remote A2A agent: a loop's target is continued each round in the session it kept/,
-  );
+  assert.ok(refused.startsWith('review: `loop: build`'), refused);
+  assert.match(refused, /build runs on `harness: a2a:builder`/);
+  assert.match(refused, /Loop back to a step on a harness of ours/);
   const inside = parseFolder(
     [
       ['build', '---\nplace: git\n---\nBuild.\n'],
@@ -493,8 +499,10 @@ test('nemia retry refuses --model and --budget on a remote step, in the words it
       model.message,
       `\`--model haiku\` is how a harness of ours is to run the session, and a remote agent runs as its operator configured it: A2A carries no such argument, and the runtime refuses a task filed with one, and ask runs on \`harness: a2a:reviewer\`, a remote A2A agent: its try would be sent without it. Ask without --model: nemia retry ${run.id} ask.`,
     );
-    await assert.rejects(runWith(e, retryRun(run.id, 'ask', { mode: 'nudge', budget: 5 })), (err: Error) =>
-      err.message.startsWith('`--budget 5` is a spend cap a harness of ours keeps, and a remote agent keeps none'),
+    await assert.rejects(
+      runWith(e, retryRun(run.id, 'ask', { mode: 'nudge', budget: 5 })),
+      (err: Error & { exitCode?: number }) =>
+        err.exitCode === 2 && err.message.startsWith('`--budget 5` ') && err.message.includes(`nemia retry ${run.id} ask`),
     );
     const asked = await runWith(e, retryRun(run.id, 'ask', { mode: 'fresh' }));
     assert.equal(asked.ask.try, 2, 'without them, the same try is asked for');

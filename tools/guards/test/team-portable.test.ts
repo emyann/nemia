@@ -14,8 +14,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { splitFrontmatter } from '../src/step/step.ts';
-import { REPO } from './team.ts';
+import { splitFrontmatter } from 'agent-orchestrator/workflow';
+import { REPO } from './workspaces.ts';
 
 /** This repository's words, which no agent of the team, no schema beside one, no skill of theirs may say, each with text that says it. */
 const PLANTED: Record<string, string> = {

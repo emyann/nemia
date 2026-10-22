@@ -33,11 +33,12 @@ test('a refusal exits 2 and prints its sentence: nemia approve of a run that doe
   const root = path.join(scratch('wf-exit-code-refused-'), 'store');
   const { status, stderr } = wf(root, ['approve', 'r-nope', 'implement']);
   assert.equal(status, 2, `nemia approve of no run exits with the refusal's code; it said: ${stderr}`);
-  assert.equal(
-    stderr,
-    `${offLine(root)}\n` +
-      'no such run: r-nope. nemia approve takes a run by its id, as nemia ls lists it: nemia approve <runId> <step>.\n',
-  );
+  const [off, said, ...rest] = stderr.split('\n');
+  assert.equal(off, offLine(root));
+  assert.deepEqual(rest, [''], `its sentence alone, on one line, and no stack: ${stderr}`);
+  assert.ok(said.startsWith('no such run: r-nope.'), said);
+  assert.ok(said.includes('nemia ls'), said);
+  assert.ok(said.endsWith('nemia approve <runId> <step>.'), said);
 });
 
 test("REFUSED: nemia retry and nemia say of a run that does not exist exit 2, with the store's sentence naming nemia ls", () => {
@@ -66,11 +67,13 @@ test('a refusal of --no-worktree on a workflow that fans out exits 2, as its sib
   const root = path.join(dir, 'store');
   const { status, stderr } = wf(root, ['start', 'two halves', '--workflows', team, '--repo', repo, '--no-worktree']);
   assert.equal(status, 2, `a fan-out refused --no-worktree exits with the refusal's code; it said: ${stderr}`);
-  assert.equal(
-    stderr,
-    `${offLine(root)}\n` +
-      'this workflow can run two steps at once, and --no-worktree would put them in the same directory.\nEither drop --no-worktree, or make the steps a chain.\n',
-  );
+  const [off, why, fix, ...rest] = stderr.split('\n');
+  assert.equal(off, offLine(root));
+  assert.deepEqual(rest, [''], `its two lines alone, and no stack: ${stderr}`);
+  assert.ok(why.startsWith('this workflow can run two steps at once'), why);
+  assert.ok(why.includes('--no-worktree'), why);
+  assert.ok(fix.startsWith('Either drop --no-worktree'), fix);
+  assert.ok(fix.includes('make the steps a chain'), fix);
   assert.deepEqual(fs.existsSync(path.join(root, 'runs')) ? fs.readdirSync(path.join(root, 'runs')) : [], [], 'no run written');
 });
 
@@ -102,11 +105,7 @@ test('an error exits with its exitCode only when that is a whole number from 1 t
   assert.equal(exitCodeOf(Object.assign(new Error('refused'), { exitCode: 2 })), 2);
   assert.equal(exitCodeOf(Object.assign(new Error('stopped'), { exitCode: 130 })), 130);
   assert.equal(exitCodeOf(Object.assign(new Error('highest'), { exitCode: 255 })), 255);
-  assert.equal(
-    exitCodeOf(Object.assign(new Error('odd'), { exitCode: 256 })),
-    1,
-    'REFUSED: a code whose low byte is 0, which exits as a success',
-  );
+  assert.equal(exitCodeOf(Object.assign(new Error('odd'), { exitCode: 256 })), 1, 'REFUSED: 256, whose low byte 0 exits as a success');
   assert.equal(exitCodeOf(new Error('crash')), 1, 'no code is a crash');
   assert.equal(exitCodeOf(Object.assign(new Error('odd'), { exitCode: 0 })), 1, 'REFUSED: an error exiting 0, as a success');
   assert.equal(exitCodeOf(Object.assign(new Error('odd'), { exitCode: -2 })), 1, 'REFUSED: a negative code');

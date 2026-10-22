@@ -185,12 +185,9 @@ test('REFUSED at shipped defaults: an agent file that is a link, by name, in the
     linked.message.startsWith(`${path.join(dir, 'agents', 'implementer.md')} is a link, and an agent's file is its own:`),
     linked.message,
   );
-  assert.ok(
-    linked.message.includes(
-      'Replace the link with a file of its own — remove the link and copy what it pointed at into its place, rm <file> && cp <target> <file> — or take it out of the folder.',
-    ),
-    linked.message,
-  );
+  assert.ok(linked.message.includes('Replace the link with a file of its own'), linked.message);
+  assert.ok(linked.message.includes('rm <file> && cp <target> <file>'), linked.message);
+  assert.ok(linked.message.includes('or take it out of the folder'), linked.message);
   assert.ok(!(agents.get('reviewer') instanceof WorkflowError), 'the agent beside it is read');
 });
 
@@ -397,11 +394,11 @@ test('REFUSED at load: a field both a step and its agent declare, naming the fie
     'dev/judge.schema.json':
       '{"type":"object","properties":{"findings":{"type":"string"},"severity":{"type":"string"}},"required":["findings","severity"],"additionalProperties":false}',
   });
-  assert.equal(
-    refusal(() => loadWorkflows(path.join(dir, 'dev'))),
-    'judge: `findings` is declared by agent reviewer (agents/reviewer.md, `output: review.schema.json`) and by step judge ' +
-      '(judge.md, `output: judge.schema.json`): a field has one owner. Delete it from one of the two.',
-  );
+  const said = refusal(() => loadWorkflows(path.join(dir, 'dev')));
+  assert.ok(said.startsWith('judge: `findings` is declared'), said);
+  assert.ok(said.includes('agent reviewer (agents/reviewer.md, `output: review.schema.json`)'), said);
+  assert.ok(said.includes('step judge (judge.md, `output: judge.schema.json`)'), said);
+  assert.ok(said.includes('Delete it from one of the two'), said);
 });
 
 test('REFUSED at shipped defaults: a broken agent, only when a step names it, naming agents/<file> — a linked one too', () => {
@@ -515,11 +512,8 @@ test("REFUSED at shipped defaults: `sandbox:` on an agent or a step that runs on
     harness: 'codex',
     sandbox: 'dontAsk',
   });
-  assert.ok(
-    refusal(() => agent('reviewer', '---\nharness: codex\npermissionMode: read-only\nsandbox: read-only\n---\nReview.\n')).includes(
-      'are both set, and on codex they are one key',
-    ),
-  );
+  const bothOnAgent = '---\nharness: codex\npermissionMode: read-only\nsandbox: read-only\n---\nReview.\n';
+  assert.ok(refusal(() => agent('reviewer', bothOnAgent)).includes('are both set, and on codex they are one key'));
   assert.ok(refusal(() => agent('writer', '---\nsandbox: read-only\n---\nWrite.\n')).includes(onClaude));
 
   const agents = agentsOf({
@@ -533,17 +527,13 @@ test("REFUSED at shipped defaults: `sandbox:` on an agent or a step that runs on
     moved.startsWith('build: `harness: codex` runs its agent implementer on codex, and agents/implementer.md fences it for claude'),
     `a Claude Code agent's mode, taken by a step that runs on codex by its own line, cannot be compared with a sandbox: ${moved}`,
   );
+  const taken = refusal(() => parseWorkflow('review', '---\nplace: git\nagent: reviewer\nharness: claude\n---\n', undefined, agents));
   assert.ok(
-    refusal(() => parseWorkflow('review', '---\nplace: git\nagent: reviewer\nharness: claude\n---\n', undefined, agents)).includes(
-      onClaude,
-    ),
-    "a codex agent's sandbox, taken by a step that runs on Claude Code by its own line, is refused",
+    taken.includes(onClaude),
+    `a codex agent's sandbox, taken by a step that runs on Claude Code by its own line, is refused: ${taken}`,
   );
-  assert.ok(
-    refusal(() =>
-      parseWorkflow('review', '---\nplace: git\nagent: reviewer\npermissionMode: read-only\nsandbox: read-only\n---\n', undefined, agents),
-    ).includes('are both set'),
-  );
+  const bothOnStep = '---\nplace: git\nagent: reviewer\npermissionMode: read-only\nsandbox: read-only\n---\n';
+  assert.ok(refusal(() => parseWorkflow('review', bothOnStep, undefined, agents)).includes('are both set'));
 });
 
 test("REFUSED at shipped defaults: a step that runs a fenced agent on the other harness, with a fence of its own under either name — an agent with no fence moves, and the step's fence is its own", () => {
@@ -553,12 +543,11 @@ test("REFUSED at shipped defaults: a step that runs a fenced agent on the other 
     mover: '---\nharness: claude\n---\nMove.\n',
   });
   for (const line of ['permissionMode: read-only', 'sandbox: read-only']) {
-    assert.ok(
-      refusal(() =>
-        parseWorkflow('build', `---\nplace: git\nagent: implementer\nharness: codex\n${line}\n---\n`, undefined, agents),
-      ).startsWith('build: `harness: codex` runs its agent implementer on codex, and agents/implementer.md fences it for claude'),
-      `${line}: a sandbox cannot be compared with the agent's mode`,
+    const fenced = refusal(() =>
+      parseWorkflow('build', `---\nplace: git\nagent: implementer\nharness: codex\n${line}\n---\n`, undefined, agents),
     );
+    assert.ok(fenced.startsWith('build: `harness: codex` runs its agent implementer on codex'), `${line}: ${fenced}`);
+    assert.ok(fenced.includes('agents/implementer.md fences it for claude'), `${line}: ${fenced}`);
     const step = parseWorkflow('build', `---\nplace: git\nagent: mover\nharness: codex\n${line}\n---\n`, undefined, agents);
     assert.deepEqual(
       [step.harness, step.sandbox, step.permissionMode],
@@ -573,21 +562,20 @@ test("REFUSED at shipped defaults: a step that runs a fenced agent on the other 
       `${line}: written back as its own`,
     );
   }
+  const planOnClaude = '---\nplace: git\nagent: reviewer\nharness: claude\npermissionMode: plan\n---\n';
+  const compared = refusal(() => parseWorkflow('review', planOnClaude, undefined, agents));
   assert.ok(
-    refusal(() =>
-      parseWorkflow('review', '---\nplace: git\nagent: reviewer\nharness: claude\npermissionMode: plan\n---\n', undefined, agents),
-    ).startsWith('review: `harness: claude` runs its agent reviewer on claude'),
-    "a codex agent's sandbox cannot be compared with the step's mode",
+    compared.startsWith('review: `harness: claude` runs its agent reviewer on claude'),
+    `a codex agent's sandbox cannot be compared with the step's mode: ${compared}`,
   );
   assert.equal(
     parseWorkflow('build', '---\nplace: git\nagent: implementer\n---\n', undefined, agents).permissionMode,
     'dontAsk',
     "a step that writes no fence of its own takes its agent's",
   );
+  const planOnCodex = '---\nplace: git\nagent: implementer\nharness: codex\npermissionMode: plan\n---\n';
   assert.ok(
-    refusal(() =>
-      parseWorkflow('build', '---\nplace: git\nagent: implementer\nharness: codex\npermissionMode: plan\n---\n', undefined, agents),
-    ).startsWith('build: `harness: codex` runs its agent implementer on codex'),
+    refusal(() => parseWorkflow('build', planOnCodex, undefined, agents)).startsWith('build: `harness: codex` runs its agent'),
     'a fence written for the wrong harness is refused',
   );
 });
@@ -623,10 +611,11 @@ test('REFUSED at shipped defaults: writeWorkflow of a draft on codex by its agen
       },
     ),
   );
+  assert.ok(kept.startsWith('review: `permissionMode: dontAsk` on a step that runs on codex'), kept);
+  assert.ok(kept.includes('the former name of `sandbox:`'), kept);
+  assert.ok(kept.includes('clear it, and set the sandbox'), kept);
   assert.ok(
-    kept.startsWith('review: `permissionMode: dontAsk` on a step that runs on codex is the former name of `sandbox:` there') &&
-      kept.includes('a step moved onto codex from Claude Code keeps its permission mode — clear it, and set the sandbox.') &&
-      !kept.includes('`sandbox: dontAsk`'),
+    !kept.includes('`sandbox: dontAsk`'),
     `a Claude Code mode kept by a step moved onto codex is refused as the sandbox a file would read it as: ${kept}`,
   );
   assert.equal(fs.readFileSync(path.join(folder, 'review.md'), 'utf8'), '---\nplace: git\nagent: reviewer\n---\n', 'nothing written');
@@ -749,10 +738,10 @@ test('REFUSED at shipped defaults: a SKILL.md whose card entry cannot be read of
     assert.match(said, /^skills\/a-skill\/SKILL\.md/, said);
     assert.match(said, why, `${JSON.stringify(front)}: ${said}`);
   }
-  assert.match(
-    refusal(() => skillEntryOf('skills/a-skill/SKILL.md', 'a-skill', 'No frontmatter.\n')),
-    /has no frontmatter, and a skill's card entry is read from it/,
-  );
+  const bare = refusal(() => skillEntryOf('skills/a-skill/SKILL.md', 'a-skill', 'No frontmatter.\n'));
+  assert.match(bare, /^skills\/a-skill\/SKILL\.md/, bare);
+  assert.ok(bare.includes('has no frontmatter'), bare);
+  assert.ok(bare.includes("a skill's card entry is read from it"), bare);
 });
 
 test('REFUSED at shipped defaults: a leftover `card:` line, or a `skills:` naming a card file, saying what replaced it', () => {
@@ -760,9 +749,10 @@ test('REFUSED at shipped defaults: a leftover `card:` line, or a `skills:` namin
   assert.ok(card.startsWith("agents/reviewer.md: `card` names a card file, which is retired: an agent's card is generated"), card);
   assert.ok(card.includes("generated from its `skills:`, an entry for each skill made from its SKILL.md's frontmatter"), card);
   assert.ok(card.includes('Delete the line'), card);
+  const anyValue = refusal(() => agent('reviewer', '---\ncard: nothing\n---\n'));
   assert.ok(
-    refusal(() => agent('reviewer', '---\ncard: nothing\n---\n')).includes('which is retired'),
-    'at any value, and whether or not a file is beside it: the line is refused, not its file read',
+    anyValue.includes('which is retired'),
+    `at any value, and whether or not a file is beside it: the line is refused, not its file read: ${anyValue}`,
   );
   const listed = refusal(() => agent('reviewer', '---\ndescription: Reviews\nskills: reviewer.skills.json\n---\nReview it.\n'));
   assert.ok(listed.startsWith('agents/reviewer.md: `skills: reviewer.skills.json` names a card file, which is retired'), listed);

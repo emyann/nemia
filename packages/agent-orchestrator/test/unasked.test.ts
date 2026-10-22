@@ -27,9 +27,15 @@ test('an engine nothing was asked of, and one only read, passes', async () => {
 });
 
 test('REFUSED: an engine a command filed on, stopped, said to or forgot from, each alone', async () => {
-  const refused = (made: TestEngine) =>
-    assert.throws(() => unasked(made), /none of them files on, stops, says to or forgets from: one did/);
-  refused(await atWork());
+  const refused = (made: TestEngine, mark: 'filings' | 'stopped' | 'said' | 'forgets') =>
+    assert.throws(
+      () => unasked(made),
+      (err: unknown) =>
+        err instanceof assert.AssertionError &&
+        err.message.includes('one did') &&
+        (err.actual as Record<typeof mark, unknown[]>)[mark].length > 0,
+    );
+  refused(await atWork(), 'filings');
   for (const mark of ['stopped', 'said', 'forgets'] as const) {
     const made = await atWork();
     if (mark === 'stopped') await over(made, (engine) => engine.stop('t'));
@@ -37,6 +43,6 @@ test('REFUSED: an engine a command filed on, stopped, said to or forgot from, ea
     if (mark === 'forgets') await over(made, (engine) => engine.forget(['t'], { yes: false })).catch(() => undefined);
     made.filings.length = 0;
     assert.ok(made[mark].length > 0, `${mark} was marked`);
-    refused(made);
+    refused(made, mark);
   }
 });

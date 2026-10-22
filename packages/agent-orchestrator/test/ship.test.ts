@@ -98,6 +98,19 @@ const isShipped = async (run: RepositoryRun, branch: string) => (await runPlaced
 /** Every branch of a run's repository and its commit, asked of this test's place now (`headsNow`): what a memo reads a run's tips off. */
 const liveHeads = (run: RepositoryRun) => headsNow(run, stand().place);
 
+/**
+ * That a verb's refusal is of `kind` (its `_tag`), exits 2, and names each of `fixes`: the command it says to type, the step, the word
+ * a person acts on. For `assert.rejects`.
+ */
+const refusedAs =
+  (kind: string, ...fixes: string[]) =>
+  (err: Error & { exitCode?: number; _tag?: string }): true => {
+    assert.equal(err._tag, kind, err.message);
+    assert.equal(err.exitCode, 2);
+    for (const fix of fixes) assert.ok(err.message.includes(fix), `${err.message} names ${fix}`);
+    return true;
+  };
+
 /** A run this file started on a repository, as `isShipped` reads one: a repository run. */
 const repositoryRun = (run: Run): RepositoryRun => {
   assert.ok(isRepositoryRun(run), `${run.id} works on a repository`);
@@ -510,7 +523,7 @@ test("REFUSED at shipped defaults: an ending in the checkout reads its run's art
     allows(`${id}-ship`).includes(rule),
     `the ending is given a read of its own run's artifacts: ${allows(`${id}-ship`).join(', ')}`,
   );
-  assert.equal(rule.startsWith('Read(//'), true, "an absolute path, in the rule's `//` form");
+  assert.match(rule, /^Read\(\/\/.+\)$/, "an absolute path, in the rule's `//` form");
   assert.ok(path.relative(runArtifacts, notes).split(path.sep)[0] !== '..', 'and the file the implement step left lies under it');
   assert.equal(
     fs.existsSync(path.join(repo, '.claude', 'settings.local.json')),
@@ -518,7 +531,7 @@ test("REFUSED at shipped defaults: an ending in the checkout reads its run's art
     'with no local settings in the checkout to give it',
   );
   assert.ok(
-    !allows(`${id}-implement`).some((r) => r.startsWith('Read(')),
+    !allows(`${id}-implement`).some((r) => /^Read\(.*\)$/.test(r)),
     `a step in a worktree is filed with its own rules only: ${allows(`${id}-implement`).join(', ')}`,
   );
   const mounts = (task: string) => (tasks.get(task)!.spec.config as { mounts?: unknown }).mounts;
@@ -653,7 +666,7 @@ test("REFUSED at shipped defaults: `nemia rm` of a run whose merge is staged and
     'with the check settled and nothing landed yet, a merge staged and not landed still holds the checkout',
   );
   const refused = await runWith(e, forgetRun(id));
-  assert.equal(refused.kind, 'refused', 'nor is the run forgotten: the pass that lands it has not come');
+  assert.equal(refused.kind, 'refused', 'nor is the run forgotten before the pass that lands it');
   assert.equal(
     refused.kind === 'refused' && refused.refusal,
     `ship's merge is staged in the repository's checkout (${repo}), and the run has not yet committed or aborted it. ` +
@@ -999,15 +1012,17 @@ test('a sent-back ending merges nothing: the work is filed again, the checkout i
 
 test("REFUSED at the ending's gate, at shipped defaults: a send-back with no words names the step at the gate — ship, not the work — and the two commands it names are honoured", async () => {
   const { id, e } = await atTheGate();
-  await assert.rejects(runWith(e, retryRun(id, 'implement', { mode: 'nudge' })), (err: Error & { exitCode?: number }) => {
-    assert.equal(err.exitCode, 2);
-    assert.equal(
-      err.message,
-      "ship is at its gate, not implement: ship ends the run in the repository's own checkout, nothing of it has run, and the send-back from that gate goes to implement, the work it would act on. " +
-        `A try with no words tells its session nothing to change, so it would sign off as it did. Say what to change: nemia retry ${id} implement --message "<objection>" — or approve the ending, which is what files it: nemia approve ${id} ship.`,
-    );
-    return true;
-  });
+  await assert.rejects(
+    runWith(e, retryRun(id, 'implement', { mode: 'nudge' })),
+    refusedAs(
+      'Conflict',
+      'ship is at its gate, not implement',
+      'goes to implement',
+      'no words',
+      `nemia retry ${id} implement --message "<objection>"`,
+      `nemia approve ${id} ship.`,
+    ),
+  );
   const { ask } = await runWith(e, retryRun(id, 'implement', { mode: 'nudge', message: 'sub subtracts the wrong way round' }));
   assert.deepEqual([ask.step, ask.try], ['implement', 2], 'the send-back it names is honoured');
   const other = await atTheGate();
@@ -1020,15 +1035,17 @@ test("REFUSED at the ending's gate, at shipped defaults: a send-back with no wor
 
 test('REFUSED at shipped defaults: a try of the ending step itself, which has not run, names the approval that files it and the send-back to the work', async () => {
   const { id, e } = await atTheGate();
-  await assert.rejects(runWith(e, retryRun(id, 'ship', { mode: 'nudge' })), (err: Error & { exitCode?: number }) => {
-    assert.equal(err.exitCode, 2);
-    assert.equal(
-      err.message,
-      "ship is at its gate, and nothing of it has run: it ends the run in the repository's own checkout, and your approval is what files it, so there is no try of it to replace. " +
-        `Approve it: nemia approve ${id} ship — or send the work back: nemia retry ${id} implement --message "<objection>".`,
-    );
-    return true;
-  });
+  await assert.rejects(
+    runWith(e, retryRun(id, 'ship', { mode: 'nudge' })),
+    refusedAs(
+      'Conflict',
+      'ship is at its gate',
+      'nothing of it has run',
+      'no try of it to replace',
+      `nemia approve ${id} ship`,
+      `nemia retry ${id} implement --message "<objection>".`,
+    ),
+  );
   assert.equal(readRun(id).steps.ship.taskId, null, 'and nothing was written');
 });
 
@@ -1043,15 +1060,18 @@ test("REFUSED at shipped defaults: `nemia round` at an ending's gate says the ru
   assert.deepEqual([pass.looped, pass.filed], [[], []], 'the loop has handed on, and the ending waits at its gate');
   assert.equal((await runWith(e, list(e, readRun(run.id)))).steps.find((s) => s.name === 'ship')!.status, 'awaiting approval');
 
-  await assert.rejects(runWith(e, roundRun(run.id, 'review')), (err: Error & { exitCode?: number }) => {
-    assert.equal(err.exitCode, 2);
-    assert.equal(
-      err.message,
-      "review signed off without asking for another round (`again: false`), so its loop is over — and nothing waiting on it has been filed: the run is at ship's gate, " +
-        `where nothing of ship has run and your approval is what files it. Approve it: nemia approve ${run.id} ship — or send the work back: nemia retry ${run.id} review --message "<objection>".`,
-    );
-    return true;
-  });
+  await assert.rejects(
+    runWith(e, roundRun(run.id, 'review')),
+    refusedAs(
+      'Conflict',
+      'review signed off',
+      '(`again: false`)',
+      'nothing waiting on it has been filed',
+      "the run is at ship's gate",
+      `nemia approve ${run.id} ship`,
+      `nemia retry ${run.id} review --message "<objection>".`,
+    ),
+  );
   assert.ok(!fs.existsSync(path.join(ROOT, 'runs', `${run.id}.asks`, 'round-review-2')), 'and no ask was written');
 });
 
@@ -1224,7 +1244,7 @@ test("an ending that stopped on the base branch sends the work back through the 
   assert.ok(
     printed.some((l) =>
       l.includes(
-        `ship: blocked. Ship again, when what stopped it was not the work — a dirty checkout, a flaky test. Continue its session, told what happened:  nemia retry ${id} ship  (`,
+        `ship: blocked. Ship again, when what stopped it was not the work — a dirty checkout, a flaky test. Continue its session, told what happened:  nemia retry ${id} ship  (--fresh, or --model <m>, for a new session)`,
       ),
     ),
     `nemia decide offers both ways on, each with when to take it\n${printed.join('\n')}`,
@@ -1256,20 +1276,24 @@ test("an ending that stopped on the base branch sends the work back through the 
   });
   assert.equal(world().head(repo), base, 'nothing merged');
   const brief = tasks.get(`${id}-review-try2`)!.spec.brief;
-  assert.match(
+  assert.ok(
+    brief.includes(
+      "the work went on to ship, which a person approved: it acts on main in the repository's own checkout, and it stopped there — `blocked` —",
+    ),
     brief,
-    /the work went on to ship, which a person approved: it acts on main in the repository's own checkout, and it stopped there — `blocked` —/,
   );
-  assert.match(brief, /## Your answer\n\n```text\ntake main, and keep both subs working\n```/);
-  assert.match(brief, /## What ship said\n\nIts summary:\n\n```text\nmain moved since the branch was cut/);
-  assert.match(brief, /What it needs:\n\n```text\nthe branch has to take main: add.ts conflicts with main's sub\n```/);
-  assert.match(
+  assert.ok(brief.includes('## Your answer\n\n```text\ntake main, and keep both subs working\n```'), brief);
+  assert.ok(brief.includes('## What ship said\n\nIts summary:\n\n```text\nmain moved since the branch was cut'), brief);
+  assert.ok(brief.includes("What it needs:\n\n```text\nthe branch has to take main: add.ts conflicts with main's sub\n```"), brief);
+  assert.ok(
+    brief.includes(
+      "sign off with `again: true` and say what — what ship needs among it: the work's next round is on the run's branch, where merging main into it is the work's to do.",
+    ),
     brief,
-    /sign off with `again: true` and say what — what ship needs among it: the work's next round is on the run's branch, where merging main into it is the work's to do\./,
   );
   await assert.rejects(
     runWith(e, approveRun(id, 'ship')),
-    (err: Error & { exitCode?: number }) => err.exitCode === 2 && err.message.startsWith('ship is not at its gate yet'),
+    refusedAs('Conflict', 'ship is not at its gate yet'),
     'the approval of try 1 does not carry over, and none is taken while the work is out',
   );
 
@@ -1422,32 +1446,20 @@ test("a send-back at the ending's gate spends the acceptance: the loop is open a
 
 test("REFUSED at shipped defaults: a send-back from a stopped ending with no words, to a step that is not the loop's, a round of the loop, or while the ending's own try is asked for — and the ending's try while a send-back is", async () => {
   const { id, e } = await stoppedOnBase();
-  const refused = (words: string) => (err: Error & { exitCode?: number }) => {
-    assert.equal(err.exitCode, 2);
-    assert.equal(err.message, words);
-    return true;
-  };
+  const back = `nemia retry ${id} review --message "<objection>"`;
+  const again = `a dirty checkout, a flaky test: nemia retry ${id} ship.`;
+  const stopped = 'ship stopped on the base branch (blocked)';
   await assert.rejects(
     runWith(e, retryRun(id, 'review', { mode: 'nudge' })),
-    refused(
-      "review's work went on to ship, and ship stopped on the base branch (blocked) without doing what it was approved for: a try of review sends the work back from there, and one with no words tells its session nothing to change. " +
-        `Say what to change: nemia retry ${id} review --message "<objection>" — or ship again, for what was not the work — a dirty checkout, a flaky test: nemia retry ${id} ship.`,
-    ),
+    refusedAs('Conflict', "review's work went on to ship", stopped, 'a try of review sends the work back', 'no words', back, again),
   );
   await assert.rejects(
     runWith(e, retryRun(id, 'implement', { mode: 'nudge', message: 'take main' })),
-    refused(
-      "ship stopped on the base branch (blocked) without doing what it was approved for, and the work goes back through the folder's loop, not to implement: send it back to review, which is filed again with your objection and what ship said, and may ask for a round of the work — " +
-        `nemia retry ${id} review --message "<objection>". Or ship again, for what was not the work — a dirty checkout, a flaky test: nemia retry ${id} ship.`,
-    ),
+    refusedAs('Conflict', stopped, "through the folder's loop, not to implement", 'send it back to review', back, again),
   );
   await assert.rejects(
     runWith(e, roundRun(id, 'review')),
-    refused(
-      'review signed off without asking for another round (`again: false`), and ship stopped on the base branch (blocked) without doing what it was approved for: a round would file the work again with nothing said of why. ' +
-        'Send it back, with what to change — review is filed again with your objection and what ship said, and its `again: true` is the round: ' +
-        `nemia retry ${id} review --message "<objection>". Or ship again, for what was not the work — a dirty checkout, a flaky test: nemia retry ${id} ship.`,
-    ),
+    refusedAs('Conflict', 'review signed off', '(`again: false`)', stopped, 'its `again: true` is the round', back, again),
     "a round carries no words, and the loop is over: what goes round again is the send-back's again: true",
   );
   assert.ok(!fs.existsSync(path.join(ROOT, 'runs', `${id}.asks`, 'round-review-2')), 'and no ask was written');
@@ -1463,11 +1475,14 @@ test("REFUSED at shipped defaults: a send-back from a stopped ending with no wor
     'the two ways on take the same try of the ending: one asked refuses the other, each way round',
   );
   fs.rmSync(path.join(ROOT, 'runs', `${id}.asks`, 'retry-ship-2'));
-  const back = await runWith(e, retryRun(id, 'review', { mode: 'nudge', message: 'take main' }));
+  const sending = await runWith(e, retryRun(id, 'review', { mode: 'nudge', message: 'take main' }));
   await assert.rejects(
     runWith(e, retryRun(id, 'ship', { mode: 'nudge' })),
-    refused(
-      `the work is being sent back from ship (nemia retry ${id} review, at ${back.ask.at}): ship returns to its gate once it settles, and a try of ship now would act on work that is being changed. Wait for it: nemia ls ${id}.`,
+    refusedAs(
+      'Conflict',
+      `the work is being sent back from ship (nemia retry ${id} review, at ${sending.ask.at})`,
+      'ship returns to its gate once it settles',
+      `Wait for it: nemia ls ${id}.`,
     ),
   );
 });
@@ -1476,15 +1491,16 @@ test('REFUSED at shipped defaults: a folder with no loop before its ending has n
   const { id, e, settle, tasks } = await stoppedOnBase(folder());
   await assert.rejects(
     runWith(e, retryRun(id, 'implement', { mode: 'nudge', message: 'take main' })),
-    (err: Error & { exitCode?: number }) => {
-      assert.equal(err.exitCode, 2);
-      assert.equal(
-        err.message,
-        'ship stopped on the base branch (blocked) without doing what it was approved for, and this workflow has no loop before it to send the work back through: a send-back files the looping step an ending waits on, whose `again: true` gives the work a round, and implement does not loop. ' +
-          `Ship again, for what was not the work — a dirty checkout, a flaky test: nemia retry ${id} ship. For work that does not hold on the base branch, call this run off (nemia cancel ${id}) and start one for the work on the base branch as it is now (nemia start); a folder that gives its ending a \`loop:\` step to wait on can send work back.`,
-      );
-      return true;
-    },
+    refusedAs(
+      'Conflict',
+      'ship stopped on the base branch (blocked)',
+      'this workflow has no loop before it',
+      'implement does not loop',
+      `nemia retry ${id} ship.`,
+      `(nemia cancel ${id})`,
+      '(nemia start)',
+      'a `loop:` step',
+    ),
   );
   assert.equal(readRun(id).steps.implement.tries, undefined, 'and nothing was asked');
 
@@ -1916,12 +1932,10 @@ test('REFUSED at shipped defaults: a round or an acceptance of a loop out of rou
   const written = asks();
   const waits = (verb: string) => (err: Error & { exitCode?: number }) => {
     assert.equal(err.exitCode, 2);
-    assert.match(
-      err.message,
-      new RegExp(
-        `^a merge of main into implement's work is asked \\(at [^)]+\\), and the next tick files it once, on round 1: [^]* merge-implement-2, in the run's \\.asks directory — then: ${verb}\\.$`,
-      ),
-    );
+    assert.match(err.message, /^a merge of main into implement's work is asked \(at \S+\)/);
+    for (const fact of ['the next tick files it once, on round 1: ', " merge-implement-2, in the run's .asks directory"])
+      assert.ok(err.message.includes(fact), `${err.message} names ${fact}`);
+    assert.ok(err.message.endsWith(` — then: ${verb}.`), err.message);
     assert.deepEqual(asks(), written, 'nothing written');
     return true;
   };

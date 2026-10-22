@@ -1,26 +1,26 @@
 /**
- * The api's process: its arguments read (`ticksOf`: none, or `--no-tick`), `PORT` read (`portOf`), and the app's runtime built from its
- * live layer (`runtime.context()`) — each refusal printed and exited with its code. Without `--no-tick` it is the store's daemon: it takes
- * the store's lease first (`up`, as the api), so an api refused by another daemon binds no port, then serves the app on loopback alone
- * (`HOST`, port.ts), writes where it listens into the lease (`holdUrl`) and ticks on the engine its layer built, under `runMain`: a signal
- * closes the server and lets the lease go, and a lease taken over or a pass that fails ends the process. Its passes are said as `nemia up`
- * says them, through the telemetry the app's layer holds (`telemetryLayer` in `liveOf`, app.ts): the pass is given the app runtime's
- * context whole (`Effect.provideContext`), so its lines go through the same logger every request's does, its spans and its series are
- * exported to the collector `OTEL_EXPORTER_OTLP_ENDPOINT` names, its own series a collector reads by their increase (`STEP_FOLLOWS`) born
- * at zero with the daemon's (`up`'s `series`), and the hub its layer built (`FeedHub`), which the app's streams of the feed read, and the
- * place its programs ask (`PlaceService`) come with it. The runtime is disposed as the pass ends, however it ends, so the exporters post
- * what they hold once more before the process goes.
+ * The api's process: its arguments read (`argsOf`: none, a pass interval `[ms]`, or `--no-tick`), `PORT` read (`portOf`), and the app's
+ * runtime built from its live layer (`runtime.context()`) — each refusal printed and exited with its code. Without `--no-tick` it is the
+ * store's daemon, ticking at the interval given or `DEFAULT_EVERY_MS`: it takes the store's lease first (`up`, as the api), so an api
+ * refused by another daemon binds no port, then serves the app on loopback alone (`HOST`, port.ts), writes where it listens into the lease
+ * (`holdUrl`) and ticks on the engine its layer built, under `runMain`: a signal closes the server and lets the lease go, and a lease
+ * taken over or a pass that fails ends the process. Its passes are said as `nemia up` says them, through the telemetry the app's layer
+ * holds (`telemetryLayer` in `liveOf`, app.ts): the pass is given the app runtime's context whole (`Effect.provideContext`), so its lines
+ * go through the same logger every request's does, its spans and its series are exported to the collector `OTEL_EXPORTER_OTLP_ENDPOINT`
+ * names, its own series a collector reads by their increase (`STEP_FOLLOWS`) born at zero with the daemon's (`up`'s `series`), and the hub
+ * its layer built (`FeedHub`), which the app's streams of the feed read, and the place its programs ask (`PlaceService`) come with it. The
+ * runtime is disposed as the pass ends, however it ends, so the exporters post what they hold once more before the process goes.
  * With `--no-tick` it serves alone, holding nothing. It prints the port the server got: the one asked for, or a free one for `PORT=0`.
  * Refused first (`Conflict`), binding nothing: a checkout's api on a store that runs an install (`trialRefusal`), unless
  * `NEMIA_ON_INSTALLED=1`; and an install's repository is the one it was built from (`repoOf`).
  */
 import { serve } from '@hono/node-server';
 import { Context, Effect } from 'effect';
-import { Conflict, currentRelease, DEFAULT_EVERY_MS, holdUrl, runMain, runningRelease, trialRefusal, up, wfRoot } from 'agent-orchestrator';
+import { Conflict, currentRelease, holdUrl, runMain, runningRelease, trialRefusal, up, wfRoot } from 'agent-orchestrator';
 import { app, runtime } from './app.ts';
 import type { Services } from './layer.ts';
 import { repoOf } from './capabilities/capabilities.ts';
-import { HOST, portOf, ticksOf } from './port.ts';
+import { argsOf, HOST, portOf } from './port.ts';
 import { STEP_FOLLOWS } from './steps/following.ts';
 import { Engine } from './store.ts';
 
@@ -31,15 +31,15 @@ const fail = (err: unknown): never => {
 };
 
 let port: number;
-let ticks: boolean;
+let args: ReturnType<typeof argsOf>;
 let e: Engine['Service'];
 let services: Context.Context<Services>;
 const running = runningRelease();
 try {
   const trial = trialRefusal(running, currentRelease(), wfRoot(process.env), process.env);
   if (trial !== null) throw new Conflict({ message: trial });
-  ticks = ticksOf(process.argv.slice(2));
-  port = portOf(process.env.PORT, ticks);
+  args = argsOf(process.argv.slice(2));
+  port = portOf(process.env.PORT, args.ticks);
   services = await runtime.context();
   e = Context.get(services, Engine);
 } catch (err) {
@@ -75,11 +75,12 @@ const listening = Effect.acquireRelease(
     }),
 );
 
-if (!ticks!) await Effect.runPromise(Effect.scoped(Effect.andThen(listening, Effect.never))).catch(fail);
+const asked = args!;
+if (!asked.ticks) await Effect.runPromise(Effect.scoped(Effect.andThen(listening, Effect.never))).catch(fail);
 else
   await runMain(
     up(e!, {
-      every: DEFAULT_EVERY_MS,
+      every: asked.every,
       repo: repoOf(process.env, running),
       holder: 'api',
       series: [STEP_FOLLOWS],

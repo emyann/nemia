@@ -31,8 +31,8 @@ const engine = eachTest(testEngine);
 const YOURS = path.join(ROOT, 'workflows');
 const DRAFTS = scratch('wf-writers-cli-drafts-');
 
-/** What `nemia <argv>` printed on stdout, or the words it was refused with. */
-async function typed(t: TestContext, ...argv: string[]): Promise<{ out: string; refused?: string }> {
+/** What `nemia <argv>` printed on stdout, or the words it was refused with, its kind (`_tag`) and its exit code. */
+async function typed(t: TestContext, ...argv: string[]): Promise<{ out: string; refused?: string; tag?: string; exitCode?: number }> {
   const out: string[] = [];
   const log = t.mock.method(console, 'log', (...args: unknown[]) => void out.push(args.join(' ')));
   const err = t.mock.method(console, 'error', () => undefined);
@@ -40,7 +40,8 @@ async function typed(t: TestContext, ...argv: string[]): Promise<{ out: string; 
     await main(argv, engineOf(engine().layer));
     return { out: out.join('\n') };
   } catch (e) {
-    return { out: out.join('\n'), refused: (e as Error).message };
+    const { message, _tag, exitCode } = e as Error & { _tag?: string; exitCode?: number };
+    return { out: out.join('\n'), refused: message, tag: _tag, exitCode };
   } finally {
     log.mock.restore();
     err.mock.restore();
@@ -66,6 +67,25 @@ async function refused(t: TestContext, ...argv: string[]): Promise<string> {
   assert.deepEqual(snapshot(YOURS), before, `a refused nemia ${argv.join(' ')} leaves yours as it was`);
   return words;
 }
+
+/**
+ * The words `nemia <argv>` was refused with, refused as `tag` with exit 2, yours left as it was; asserted on by what they name — the
+ * command, the flag, the folder — never as a sentence.
+ */
+async function refusedAs(t: TestContext, tag: 'Invalid' | 'Conflict' | 'Missing', ...argv: string[]): Promise<string> {
+  const before = snapshot(YOURS);
+  const { refused: words, tag: kind, exitCode } = await typed(t, ...argv);
+  assert.ok(words, `nemia ${argv.join(' ')} was refused`);
+  assert.equal(kind, tag, words);
+  assert.equal(exitCode, 2, words);
+  assert.deepEqual(snapshot(YOURS), before, `a refused nemia ${argv.join(' ')} leaves yours as it was`);
+  return words;
+}
+
+/** Each of `named` is in `words`: a pattern it matches, or a token it holds. */
+const names = (words: string, ...named: Array<RegExp | string>) => {
+  for (const n of named) assert.ok(typeof n === 'string' ? words.includes(n) : n.test(words), `${n} in: ${words}`);
+};
 
 /** The version a line says a thing is at. */
 const versionIn = (words: string): string => /version ([0-9a-f]{16})/.exec(words)?.[1] ?? assert.fail(`no version in: ${words}`);
@@ -126,13 +146,19 @@ test('REFUSED at shipped defaults: an agent written where one is, at a version i
   fs.writeFileSync(file, '---\ndescription: Use this to file things away, neatly.\n---\nFile it.\n');
   const stale = await refused(t, 'agents', 'write', 'yours', 'archivist', '--file', file, '--version', '0000000000000000');
   assert.match(stale, new RegExp(`changed since it was read \\(version 0000000000000000, now ${at}\\)`));
-  assert.match(
-    await refused(t, 'agents', 'write', 'repo', '--file', file),
-    /^nemia agents write refuses to write the repository's agents .*only yours is written/,
+  names(
+    await refusedAs(t, 'Invalid', 'agents', 'write', 'repo', '--file', file),
+    /^nemia agents write refuses /,
+    "the repository's agents",
+    'only yours is written',
+    'copy the file into',
   );
-  assert.equal(
-    await refused(t, 'agents', 'write', 'yours'),
-    "nemia agents write takes --file, the agent's file to write, named <name>.md: nemia agents write (yours | factory) [<name>] --file <name>.md [--factory <name>] [--version <v>]",
+  names(
+    await refusedAs(t, 'Invalid', 'agents', 'write', 'yours'),
+    /^nemia agents write takes --file/,
+    'nemia agents write (yours | factory) [<name>]',
+    '--file <name>.md',
+    '[--factory <name>] [--version <v>]',
   );
   const nowhere = path.join(DRAFTS, 'agents', 'nobody.md');
   assert.match(
@@ -145,21 +171,28 @@ test('REFUSED at shipped defaults: an agent written where one is, at a version i
 
 test('REFUSED at shipped defaults: a key the api alone takes, typed at the command line, in the writer’s own words', async (t) => {
   const file = drafted('agents/plain.md', '---\ndescription: Use this plainly.\n---\nDo it.\n');
-  assert.equal(
-    await refused(t, 'agents', 'write', 'yours', '--file', file, '--draft', '{}'),
-    'nemia agents write takes no --draft: nemia agents write (yours | factory) [<name>] --file <name>.md [--factory <name>] [--version <v>]',
+  names(
+    await refusedAs(t, 'Invalid', 'agents', 'write', 'yours', '--file', file, '--draft', '{}'),
+    /^nemia agents write takes no --draft: /,
+    'nemia agents write (yours | factory) [<name>]',
+    '--file <name>.md',
   );
-  assert.equal(
-    await refused(t, 'agents', 'remove', 'yours', 'plain', '--repo', DRAFTS),
-    'nemia agents remove takes no --repo: nemia agents remove yours <name> --version <v>',
+  names(
+    await refusedAs(t, 'Invalid', 'agents', 'remove', 'yours', 'plain', '--repo', DRAFTS),
+    /^nemia agents remove takes no --repo: /,
+    'nemia agents remove yours <name> --version <v>',
   );
-  assert.equal(
-    await refused(t, 'skills', 'write', 'yours', '--copy', 'tidy'),
-    'nemia skills write takes no --copy: nemia skills write (yours | factory) [<name>] --file <SKILL.md> [--factory <name>] [--version <v>]',
+  names(
+    await refusedAs(t, 'Invalid', 'skills', 'write', 'yours', '--copy', 'tidy'),
+    /^nemia skills write takes no --copy: /,
+    'nemia skills write (yours | factory) [<name>]',
+    '--file <SKILL.md>',
   );
-  assert.equal(
-    await refused(t, 'workflows', 'write', 'yours', 'dev', '--draft', '[]'),
-    'nemia workflows write takes no --draft: nemia workflows write (yours | factory) <name> --folder <draft> [--factory <name>] [--version <v>]',
+  names(
+    await refusedAs(t, 'Invalid', 'workflows', 'write', 'yours', 'dev', '--draft', '[]'),
+    /^nemia workflows write takes no --draft: /,
+    'nemia workflows write (yours | factory) <name>',
+    '--folder <draft>',
   );
 });
 
@@ -172,9 +205,12 @@ test('nemia agents remove removes an agent of yours at the version it was read a
   );
   assert.match(await refused(t, 'agents', 'remove', 'yours', 'courier', '--version', '0000000000000000'), /changed since it was read/);
   assert.match(await refused(t, 'agents', 'remove', 'yours', 'nobody', '--version', at), /nobody/);
-  assert.match(
-    await refused(t, 'agents', 'remove', 'repo', 'courier', '--version', at),
-    /^nemia agents remove refuses to write the repository's agents .*only yours is written/,
+  names(
+    await refusedAs(t, 'Invalid', 'agents', 'remove', 'repo', 'courier', '--version', at),
+    /^nemia agents remove refuses /,
+    "the repository's agents",
+    'only yours is written',
+    'copy the file into',
   );
   const gone = await typed(t, 'agents', 'remove', 'yours', 'courier', '--version', at);
   assert.equal(gone.refused, undefined, gone.refused);
@@ -212,9 +248,12 @@ test('REFUSED at shipped defaults: a skill written where one is, at a version it
     await refused(t, 'skills', 'write', 'yours', 'other', '--file', file),
     `nemia skills write was asked to change other, and ${file} is the skill sweep: name the skill it is.`,
   );
-  assert.match(
-    await refused(t, 'skills', 'write', 'repo', '--file', file),
-    /^nemia skills write refuses to write the repository's skills .*only your library is written/,
+  names(
+    await refusedAs(t, 'Invalid', 'skills', 'write', 'repo', '--file', file),
+    /^nemia skills write refuses /,
+    "the repository's skills",
+    'only your library is written',
+    'copy its folder into the repository',
   );
   assert.match(await refused(t, 'skills', 'write', 'yours'), /^nemia skills write takes --file, /);
 });
@@ -263,17 +302,23 @@ test('REFUSED at shipped defaults: a workflow written where one is, at a version
     await refused(t, 'workflows', 'write', 'yours', 'gone', '--folder', folder, '--version', at),
     `${path.join(YOURS, 'gone')} is not there: it was removed since it was read. Write it with no version to make it again.`,
   );
-  assert.match(
-    await refused(t, 'workflows', 'write', 'yours', '../review', '--folder', folder),
-    /^nemia workflows write: `\.\.\/review` is not a workflow's name/,
+  names(
+    await refusedAs(t, 'Invalid', 'workflows', 'write', 'yours', '../review', '--folder', folder),
+    /^nemia workflows write: /,
+    "`../review` is not a workflow's name",
   );
-  assert.match(
-    await refused(t, 'workflows', 'write', 'repo', 'review', '--folder', folder),
-    /^nemia workflows write refuses to write the repository's workflows .*only yours is written/,
+  names(
+    await refusedAs(t, 'Invalid', 'workflows', 'write', 'repo', 'review', '--folder', folder),
+    /^nemia workflows write refuses /,
+    "the repository's workflows",
+    'only yours is written',
+    'copy the folder into',
   );
-  assert.equal(
-    await refused(t, 'workflows', 'write', 'yours', 'review'),
-    'nemia workflows write takes --folder, the draft folder whose steps and README to write: nemia workflows write (yours | factory) <name> --folder <draft> [--factory <name>] [--version <v>]',
+  names(
+    await refusedAs(t, 'Invalid', 'workflows', 'write', 'yours', 'review'),
+    /^nemia workflows write takes --folder/,
+    'nemia workflows write (yours | factory) <name>',
+    '--folder <draft>',
   );
   const file = path.join(folder, 'README.md');
   assert.equal(
@@ -293,13 +338,17 @@ test('REFUSED at shipped defaults: a workflow removed with no version, at one it
     await refused(t, 'workflows', 'remove', 'yours', 'triage', '--version', '0000000000000000'),
     new RegExp(`it is at version ${at}`),
   );
-  assert.equal(
-    await refused(t, 'workflows', 'remove', 'yours', 'agents', '--version', at),
-    "nemia workflows remove: agents/ holds the agents or the skills beside the workflows, and no workflow has its name. Name the workflow's folder.",
+  names(
+    await refusedAs(t, 'Invalid', 'workflows', 'remove', 'yours', 'agents', '--version', at),
+    /^nemia workflows remove: agents\/ holds /,
+    "Name the workflow's folder",
   );
-  assert.match(
-    await refused(t, 'workflows', 'remove', 'repo', 'triage', '--version', at),
-    /^nemia workflows remove refuses to write the repository's workflows .*only yours is written/,
+  names(
+    await refusedAs(t, 'Invalid', 'workflows', 'remove', 'repo', 'triage', '--version', at),
+    /^nemia workflows remove refuses /,
+    "the repository's workflows",
+    'only yours is written',
+    'copy the folder into',
   );
 });
 
@@ -318,14 +367,18 @@ test('nemia agents try starts a try of an agent of yours with no repository; REF
   const runs = () => fs.readdirSync(path.join(ROOT, 'runs')).sort();
   const before = runs();
   assert.match(await refused(t, 'agents', 'try', 'yours', 'taster', '--brief', 'Once more.'), new RegExp(`still running \\(${id}\\)`));
-  assert.equal(
-    await refused(t, 'agents', 'try', 'yours', 'taster', '--brief', '  '),
-    'The brief is empty, and a try asks the agent to do something. Write what it should do — a sentence is enough.',
+  names(
+    await refusedAs(t, 'Invalid', 'agents', 'try', 'yours', 'taster', '--brief', '  '),
+    /^The brief is empty/,
+    'Write what it should do',
   );
   assert.match(await refused(t, 'agents', 'try', 'yours', 'nobody', '--brief', 'Do it.'), /^Yours has no agent named 'nobody'/);
-  assert.match(
-    await refused(t, 'agents', 'try', 'repo', 'taster', '--brief', 'Do it.'),
-    /^nemia agents try refuses to write the repository's agents .*only yours is written/,
+  names(
+    await refusedAs(t, 'Invalid', 'agents', 'try', 'repo', 'taster', '--brief', 'Do it.'),
+    /^nemia agents try refuses /,
+    "the repository's agents",
+    'only yours is written',
+    'copy the file into',
   );
   assert.deepEqual(runs(), before, 'and no run is started by a refused try');
 });

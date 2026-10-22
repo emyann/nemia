@@ -338,12 +338,14 @@ const serverRoute = (name: string, server: string): string => `${serversRoute(na
 /**
  * The MCP servers of the factory `name`, with the state its harness reports of each. **Not polled**: the read spawns a short-lived
  * harness session to ask the states, so it is made when a person opens the page and when they press to read again, never on the
- * board's minute poll — a chip may be a few minutes old, and a press is how it is refreshed.
+ * board's minute poll — a chip may be a few minutes old, and a press is how it is refreshed. Its answer never goes stale, so neither a
+ * mount after the loader's read nor a window's focus reads it again: the settings route's loader reads it once per visit (`OPENED`).
  */
 export const factoryServersQuery = (name: string) =>
   queryOptions({
     queryKey: ['factory-servers', name],
     queryFn: () => get(serversRoute(name), FactoryServersSchema),
+    staleTime: Infinity,
   });
 
 /** What a write of a factory's servers may have done, and what to look at before writing them again. */
@@ -368,3 +370,52 @@ export const recordServer = (
 /** Take the server `server` off the factory `name`'s record. Rejects as `recordServer` does, and 404 for a server it does not record. */
 export const removeServer = (name: string, server: string): Promise<ServerWritten> =>
   send('DELETE', serverRoute(name, server), ServerWrittenSchema, { body: {}, may: SERVERS_WRITTEN });
+
+/** What a sign-in answers at once, as apps/api/src/servers/sign-in.ts answers it: the address to open, and when it stops waiting. */
+export type SignInStarted = { authUrl: string; until: string };
+
+const SignInStartedSchema = Schema.Struct({ authUrl: Schema.String, until: Schema.String }) satisfies Schema.Schema<SignInStarted>;
+
+/** The words of a sign-in's state, as the engine holds it: none asked, one waiting, or how the last one ended. */
+export const SIGN_IN_WORDS = ['none', 'waiting', 'connected', 'expired', 'failed'] as const;
+
+/** A server's last sign-in, as the api answers it from the engine's memory. */
+export type SignInState = { state: (typeof SIGN_IN_WORDS)[number]; until?: string; why?: string };
+
+const SignInStateSchema = Schema.Struct({
+  state: Schema.Literals(SIGN_IN_WORDS),
+  until: Schema.optional(Schema.String),
+  why: Schema.optional(Schema.String),
+}) satisfies Schema.Schema<SignInState>;
+
+/** What a sign-out answers. */
+type SignedOut = { signedOut: true };
+
+const SignedOutSchema = Schema.Struct({ signedOut: Schema.Literal(true) }) satisfies Schema.Schema<SignedOut>;
+
+const signInRoute = (name: string, server: string): string => `${serverRoute(name, server)}/sign-in`;
+
+/** What a sign-in or a sign-out may have done, and what to look at before asking again. */
+const SIGN_IN_ASKED = "The sign-in may have changed: read the server's state again before asking again.";
+
+/**
+ * Start a sign-in to the factory `name`'s server `server`: resolves with the address the person opens. Rejects with a `WriteRefusal`:
+ * no such server (404), another sign-in waiting on its callback port (409), a server with no OAuth client (422).
+ */
+export const signInServer = (name: string, server: string): Promise<SignInStarted> =>
+  send('POST', signInRoute(name, server), SignInStartedSchema, { body: {}, may: SIGN_IN_ASKED });
+
+/**
+ * The state of `server`'s last sign-in, from the engine's memory: it spawns nothing, so the board polls it while a sign-in waits,
+ * every 2 seconds, and stops once it settles.
+ */
+export const signInStateQuery = (name: string, server: string) =>
+  queryOptions({
+    queryKey: ['factory-server-sign-in', name, server],
+    queryFn: () => get(signInRoute(name, server), SignInStateSchema),
+    refetchInterval: (query) => (query.state.data?.state === 'waiting' ? 2_000 : false),
+  });
+
+/** Sign the factory `name` out of `server`: its sign-in cleared, so its state reads needs-auth on the next read. 409 while one waits. */
+export const signOutServer = (name: string, server: string): Promise<SignedOut> =>
+  send('DELETE', signInRoute(name, server), SignedOutSchema, { body: {}, may: SIGN_IN_ASKED });

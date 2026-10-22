@@ -14,16 +14,20 @@ import { factoriesQuery, factoryInstructionQuery, factoryRulesQuery, factoryServ
  * It waits for the factories, then prefetches the rules, the instruction and the MCP servers of a factory a person made, each of which
  * says why it does not read in its own section; the default factory and a name no factory has ask for none. The servers are prefetched
  * because something that mounts beside the floor after its first render narrows a floor already fitted — and because that read spawns a
- * harness session, which the loader makes once per visit rather than on each render.
+ * harness session, which the loader makes once per visit rather than on each render. The query never goes stale
+ * (`factoryServersQuery`), so the loader reads it as stale on entering the page (`OPENED`) and the section's mount reads nothing again;
+ * a preload, on a link's hover, reads none, since the page it would read for is not open.
  */
 export const Route = createFileRoute('/factories/$factory_/settings')({
-  loader: async ({ context, params }) => {
+  loader: async ({ context, params, cause }) => {
     const factories = await context.queryClient.ensureQueryData(factoriesQuery);
     if (factories.some((f) => f.name === params.factory && !f.default))
       await Promise.all([
         context.queryClient.prefetchQuery(factoryRulesQuery(params.factory)),
         context.queryClient.prefetchQuery(factoryInstructionQuery(params.factory)),
-        context.queryClient.prefetchQuery(factoryServersQuery(params.factory)),
+        cause === 'preload'
+          ? undefined
+          : context.queryClient.prefetchQuery({ ...factoryServersQuery(params.factory), staleTime: OPENED[cause] }),
       ]);
   },
   component: SettingsPage,
@@ -33,6 +37,12 @@ export const Route = createFileRoute('/factories/$factory_/settings')({
     </p>
   ),
 });
+
+/**
+ * How old the servers' states may be for the loader to keep them: none on entering the page, which reads them once, and any while the
+ * page stays open (a search or a reload of the route's own), which leaves the read to Check again.
+ */
+const OPENED = { enter: 0, stay: Infinity } as const;
 
 /** A button to a route, as the router draws its links (`routeLink`). */
 const RouterLinkButton = routeLink(LinkButton);

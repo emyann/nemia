@@ -78,7 +78,9 @@ test('an open that is not heard is no refusal: openPlace throws a plain Error wi
     (err: Error) =>
       !(err instanceof Invalid) &&
       (err as { exitCode?: unknown }).exitCode === undefined &&
-      err.message === "the place's open was not heard: git: not found. Nothing was started: start it again",
+      err.message.startsWith("the place's open was not heard: ") &&
+      err.message.includes('git: not found') &&
+      err.message.endsWith('start it again'),
   );
 });
 

@@ -14,6 +14,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { agentNameRefusal, parseAgent, renderAgent, type Agent, type AgentDraft } from '../src/workflow.ts';
+import { Invalid } from '../src/refusal/refusal.ts';
 import { agentUsers, loadWorkflows } from '../src/folder/folder.store.ts';
 import { agentVersion, loadAgents } from '../src/agents/read.store.ts';
 import { scratch } from './scratch.ts';
@@ -122,7 +123,10 @@ test('a render refuses a key no agent has, agent:, wiring, the role or the descr
   assert.throws(r({ description: 'x' }), (e: Error) => e.message.startsWith("agents/a.md: `description` is the agent's own line"));
   assert.throws(
     r({ role: 'x' }),
-    (e: Error) => e.message === "agents/a.md: `role` is the agent's own line, not one of its role keys — give it as the role, once.",
+    (e: Error) =>
+      e instanceof Invalid &&
+      e.message.startsWith("agents/a.md: `role` is the agent's own line") &&
+      e.message.includes('give it as the role, once'),
   );
   assert.throws(
     () => renderAgent({ name: 'a', role: 'one\ntwo', keys: {}, body: 'x' }),

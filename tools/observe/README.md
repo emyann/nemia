@@ -181,7 +181,7 @@ errors that lets Bash back in, and a count of Bash that drops its tool, its sess
 query that asks a row's `of` or `part` for a value the code gives none of or is not held to the one factory and the one workflow
 picked, and a Timeline factory or workflow choice that may hold several. What a session sends and what the span metrics write are no
 code of ours: the test lists them as measured below.
-`agent-orchestrator/test/observe-time.test.ts` holds the timing below: the command head and the test scope, each over a table of commands,
+`tools/guards/test/observe-time.test.ts` holds the timing below: the command head and the test scope, each over a table of commands,
 the span metrics' dimensions, the retention and reach, and the mounts. `agent-orchestrator/test/profile.test.ts` holds the preload: with no
 endpoint, nothing loaded and nothing opened.
 

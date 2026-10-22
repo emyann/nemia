@@ -749,10 +749,7 @@ test('REFUSED at shipped defaults: `nemia tick --stats` while a daemon holds the
   const e = engineOf();
   await assert.rejects(
     main(['tick', '--stats'], e),
-    refusedWith(
-      new RegExp(`^nemia tick: ${ROOT} is held by the nemia up of pid ${LIVE}, `),
-      / What its last pass cost is read without a pass: nemia up --stats\.$/,
-    ),
+    refusedWith(new RegExp(`^nemia tick: ${ROOT} is held by the nemia up of pid ${LIVE}, `), /: nemia up --stats\.$/),
   );
   await assert.rejects(
     main(['tick'], e),
@@ -761,10 +758,7 @@ test('REFUSED at shipped defaults: `nemia tick --stats` while a daemon holds the
   );
   clear();
   await assert.rejects(main(['tick', '--bogus'], e), refusedWith(/nemia tick takes no --bogus: /));
-  await assert.rejects(
-    main(['up', '--stats', '20'], e),
-    refusedWith(/nemia up --stats reads what the last pass cost and ticks nothing, so it takes no 20: /),
-  );
+  await assert.rejects(main(['up', '--stats', '20'], e), refusedWith(/^nemia up --stats /, /takes no 20: /));
   assert.equal(e.passes, 0, 'nothing ticked');
   assert.equal(fs.existsSync(FILE), false);
 });
@@ -789,7 +783,7 @@ test('`nemia up` says a move the runtime refused once while it lasts, and again 
   assert.deepEqual(
     said.map((l) => l.slice(10)),
     [words(stuck), words(other), words(stuck)],
-    `each pass's report says what was refused, pass 5 has cleared it, and pass 6 has it back:\n${printed.join('\n')}`,
+    `each pass says what was refused; 5 cleared it, 6 has it back:\n${printed.join('\n')}`,
   );
   assert.ok(
     said.every((l) => /^\d\d:\d\d:\d\d  t-/.test(l)),

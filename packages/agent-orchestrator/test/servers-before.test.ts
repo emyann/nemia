@@ -46,10 +46,11 @@ test('a step whose factory server reports needs-auth is refused, and the same st
   const refused = read.refuses('claude', ['github', 'docs']);
   assert.match(refused!, new RegExp(`\`mcp: github, docs\` names \`github\`, which ${factory()} records and which reports needs-auth`));
   assert.match(refused!, /a session of it would reach no tool of that server/, 'why it is not started');
-  assert.match(refused!, /Sign it in on the factory's settings page, then the next pass files the step/, 'and what to do');
+  assert.ok(refused!.includes("the factory's settings page"), refused!);
+  assert.ok(refused!.includes('the next pass files the step'), refused!);
   assert.equal(read.refuses('claude', ['docs']), null, 'the same read, the connected server alone: filed');
   assert.equal(read.refuses('claude', undefined), null, 'a step that names no server: filed');
-  assert.equal(read.refuses('claude', ['repo']), null, "a name the factory does not record: the checkout's, and filed");
+  assert.equal(read.refuses('claude', ['repo']), null, 'a name the factory does not record: filed');
   assert.deepEqual(read.notes, [], 'and nothing is noted when every state was read');
 });
 
@@ -57,10 +58,10 @@ test('the same step on a harness that files no sign-in of its own IS filed: it i
   writeFactoryServers(ROOT, factory(), { github: GITHUB });
   engine().plantMcpState('github', { status: 'needs-auth' });
   const read = await before();
-  assert.equal(read.refuses('codex', ['github']), null, 'nothing of its sign-in is measured, so nothing of it is refused');
+  assert.equal(read.refuses('codex', ['github']), null, 'nothing of its sign-in is measured or refused');
   assert.equal(read.refuses('a2a:partner', ['github']), null, "nor a remote agent, which loads its own operator's servers");
   assert.ok(read.refuses('claude', ['github']), 'while the harness that does file one is still refused');
-  assert.ok(read.refuses(undefined, ['github']), 'the default harness included: a step that names none runs on it');
+  assert.ok(read.refuses(undefined, ['github']), 'the default harness, which a step naming none runs on');
 });
 
 test('a look that failed refuses nothing at all, and says the states are unread once for the pass', async () => {
@@ -68,11 +69,7 @@ test('a look that failed refuses nothing at all, and says the states are unread 
   engine().plantMcpState('github', { status: 'needs-auth' });
   engine().failMcpState('the session read no state within 45s');
   const read = await before();
-  assert.equal(
-    read.refuses('claude', ['github']),
-    null,
-    'an absence read off a failed look is not an absence: a step refused on a harness that was merely busy would be refused for ever',
-  );
+  assert.equal(read.refuses('claude', ['github']), null, 'an absence read off a failed look is not an absence');
   assert.deepEqual(read.notes, [`the state of ${factory()}'s MCP servers is unread: the session read no state within 45s`]);
   assert.equal(read.refusal, null);
 });
@@ -102,6 +99,6 @@ test('a record that does not read refuses every step that names a server, naming
   assert.match(read.refusal!, new RegExp(`the servers ${factory()} records cannot be read: .*servers\\.json is not JSON`));
   assert.match(read.refusal!, new RegExp(`nemia factory server add ${factory()}`), 'the command that writes it again');
   assert.ok(read.refuses('claude', ['github']), 'a step that names a server is not filed');
-  assert.equal(read.refuses('claude', undefined), null, 'a step that names none is untouched by a record it never reads');
+  assert.equal(read.refuses('claude', undefined), null, 'a step that names none never reads the record');
   assert.deepEqual(engine().mcpReads, [], 'and nothing was asked of the engine: there was no record to read states of');
 });

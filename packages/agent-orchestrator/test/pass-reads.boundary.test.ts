@@ -20,6 +20,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { Effect } from 'effect';
+import { Invalid } from '../src/refusal/refusal.ts';
 import type { Run, TaskPhase } from '../src/run.ts';
 import { promised } from './promised.ts';
 import { scratch } from './scratch.ts';
@@ -498,19 +499,19 @@ test('REFUSED: a standing.json that is not the one the tick writes is refused, n
   await onePass((await theStore()).b);
   const { standingFile } = await import('../src/standing/standing.store.ts');
   const was = fs.readFileSync(standingFile(), 'utf8');
-  const refused = (): string => {
-    try {
-      readStanding();
-    } catch (err) {
-      return (err as Error).message;
-    }
-    return 'read';
+  const refused = (said: string) => (err: unknown) => {
+    assert.ok(err instanceof Invalid, String(err));
+    assert.equal(err.exitCode, 2);
+    assert.ok(err.message.startsWith(standingFile()), err.message);
+    assert.ok(err.message.includes(said), err.message);
+    assert.ok(err.message.includes('remove it'), err.message);
+    return true;
   };
   try {
     fs.writeFileSync(standingFile(), JSON.stringify({ ...JSON.parse(was), v: 2 }));
-    assert.match(refused(), /standing\.json: its v .*: only the tick writes it, and its next pass writes it whole/);
+    assert.throws(() => readStanding(), refused(': its v '));
     fs.writeFileSync(standingFile(), was.slice(0, -1));
-    assert.match(refused(), /standing\.json is not JSON: only the tick writes it/);
+    assert.throws(() => readStanding(), refused(' is not JSON: '));
   } finally {
     fs.writeFileSync(standingFile(), was);
   }

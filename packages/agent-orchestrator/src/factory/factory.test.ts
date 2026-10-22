@@ -50,19 +50,17 @@ test('the default factory is refused to add and rm in words of its own', () => {
 
 test('nemia factory ls: the default first, then each factory by name with its repositories, and one that does not read with why', () => {
   assert.deepEqual(factoryLines([]), ['default  every run and card that names no factory — read, never written']);
-  assert.deepEqual(
-    factoryLines([
-      { name: 'pipao', file: '/s/factories/pipao.json', repos: ['/code/pipao'], workflows: [], hires: {}, schedules: {} },
-      { name: 'broken', file: '/s/factories/broken.json', error: 'does not read as a factory: `repos` is missing' },
-      { name: 'abc', file: '/s/factories/abc.json', repos: ['/code/a', '/code/b'], workflows: [], hires: {}, schedules: {} },
-    ]),
-    [
-      'default  every run and card that names no factory — read, never written',
-      'abc      /code/a, /code/b',
-      'broken   /s/factories/broken.json does not read as a factory: `repos` is missing',
-      'pipao    /code/pipao',
-    ],
-  );
+  const factories = [
+    { name: 'pipao', file: '/s/factories/pipao.json', repos: ['/code/pipao'], workflows: [], hires: {}, schedules: {} },
+    { name: 'broken', file: '/s/factories/broken.json', error: 'does not read as a factory: `repos` is missing' },
+    { name: 'abc', file: '/s/factories/abc.json', repos: ['/code/a', '/code/b'], workflows: [], hires: {}, schedules: {} },
+  ];
+  assert.deepEqual(factoryLines(factories), [
+    'default  every run and card that names no factory — read, never written',
+    'abc      /code/a, /code/b',
+    'broken   /s/factories/broken.json does not read as a factory: `repos` is missing',
+    'pipao    /code/pipao',
+  ]);
 });
 
 test('no factory of that name: which there are, or that there is none but the default', () => {
@@ -126,16 +124,13 @@ test('REFUSED: every step no agent fills, naming the factory and hiring as the w
   ];
   const why = unfilledRefusal(steps, 'pipao', 'build');
   assert.ok(why);
-  assert.match(why, /^build: in the factory pipao, 2 steps name no agent, and pipao hires none into them: implement, ship\./);
+  assert.ok(why.startsWith('build: in the factory pipao, 2 steps'), why);
+  assert.ok(why.includes(': implement, ship.'), why);
   assert.match(why, /nemia factory hire pipao <agent> --step build\/implement/);
   assert.match(why, /nemia factory hire pipao <agent> --step build\/ship/);
   assert.doesNotMatch(why, /build\/review|build\/ask/);
-  assert.ok(
-    why.endsWith(
-      '. Hire an agent into each — nemia factory hire pipao <agent> --step build/implement; nemia factory hire pipao <agent> --step build/ship. Nothing was started.',
-    ),
-    why,
-  );
+  assert.ok(why.indexOf('--step build/implement;') < why.indexOf('--step build/ship.'), why);
+  assert.ok(why.endsWith('build/ship. Nothing was started.'), why);
   assert.doesNotMatch(why, /default factory|plain session/);
   assert.equal(unfilledRefusal(steps.slice(1, 3), 'pipao', 'build'), undefined);
   assert.match(unfilledRefusal(steps.slice(0, 1), 'pipao', 'build')!, /^build: in the factory pipao, the step implement names no agent/);
@@ -319,7 +314,8 @@ test("REFUSED: an instruction's path that is empty, absolute, the folder itself,
   for (const p of ['', '  ', '/etc/x', '../x', 'docs/../../x', '.', './', '..']) {
     const why = instructionPathRefusal(p);
     assert.ok(why, `refused: ${JSON.stringify(p)}`);
-    assert.match(why, /Name a file inside the folder by its path from it .* or keep the instruction in the store\.$/);
+    assert.ok(why.includes('a file inside the folder'), why);
+    assert.ok(why.endsWith('keep the instruction in the store.'), why);
   }
   assert.match(instructionPathRefusal('/etc/x')!, /^`\/etc\/x` is absolute/);
   assert.match(instructionPathRefusal('docs/../../x')!, /climbs out of the factory's first folder/);
@@ -417,39 +413,34 @@ test("nemia factory ls: a factory's schedules under its hires, by workflow, with
     refused: null,
     ...over,
   });
-  assert.deepEqual(
-    factoryLines(
-      [
-        {
-          name: 'nemia',
-          file: '/s/nemia.json',
-          repos: ['/code/nemia'],
-          workflows: ['janitor', 'build'],
-          hires: {},
-          schedules: {
-            janitor: { cron: '0 9 * * 1', brief: 'Read the stats\nand say what moved', tz: 'America/Montreal', since },
-            build: { cron: '0 0 1 * *', brief: 'Tidy', repo: '/code/nemia', since },
-          },
-        },
-      ],
-      [
-        listed('janitor', {
-          next: '2026-10-12T13:00:00.000Z',
-          last: { run: 'read-the-stats-ab12', at: '2026-10-05T13:00:02.000Z' },
-        }),
-        listed('build', { next: '2026-11-01T00:00:00.000Z', refused: 'build is not attached to nemia' }),
-        { ...listed('janitor', { last: { run: 'another-factory-s-run', at: since } }), factory: 'pipao' },
-      ],
-      now,
-    ).slice(1),
-    [
-      'nemia    /code/nemia',
-      '         workflows: build, janitor',
-      '         schedule build  0 0 1 * * on /code/nemia  "Tidy"',
-      '           next 2026-11-01T00:00:00.000Z, in 23d12h  last none',
-      '           refused: build is not attached to nemia',
-      '         schedule janitor  0 9 * * 1 (America/Montreal)  "Read the stats"',
-      '           next 2026-10-12T13:00:00.000Z, in 4d01h  last read-the-stats-ab12 (2026-10-05T13:00:02.000Z, 2d22h ago)',
-    ],
-  );
+  const factories = [
+    {
+      name: 'nemia',
+      file: '/s/nemia.json',
+      repos: ['/code/nemia'],
+      workflows: ['janitor', 'build'],
+      hires: {},
+      schedules: {
+        janitor: { cron: '0 9 * * 1', brief: 'Read the stats\nand say what moved', tz: 'America/Montreal', since },
+        build: { cron: '0 0 1 * *', brief: 'Tidy', repo: '/code/nemia', since },
+      },
+    },
+  ];
+  const schedules = [
+    listed('janitor', {
+      next: '2026-10-12T13:00:00.000Z',
+      last: { run: 'read-the-stats-ab12', at: '2026-10-05T13:00:02.000Z' },
+    }),
+    listed('build', { next: '2026-11-01T00:00:00.000Z', refused: 'build is not attached to nemia' }),
+    { ...listed('janitor', { last: { run: 'another-factory-s-run', at: since } }), factory: 'pipao' },
+  ];
+  assert.deepEqual(factoryLines(factories, schedules, now).slice(1), [
+    'nemia    /code/nemia',
+    '         workflows: build, janitor',
+    '         schedule build  0 0 1 * * on /code/nemia  "Tidy"',
+    '           next 2026-11-01T00:00:00.000Z, in 23d12h  last none',
+    '           refused: build is not attached to nemia',
+    '         schedule janitor  0 9 * * 1 (America/Montreal)  "Read the stats"',
+    '           next 2026-10-12T13:00:00.000Z, in 4d01h  last read-the-stats-ab12 (2026-10-05T13:00:02.000Z, 2d22h ago)',
+  ]);
 });

@@ -13,7 +13,9 @@ import path from 'node:path';
 import { Cause, Effect, Layer, Logger, Metric, Queue, Stream } from 'effect';
 import { emitFeed, engine } from 'agent-orchestrator';
 import { appOf, liveOf } from '../app.ts';
+import { Beats } from '../layer.ts';
 import { Engine } from '../store.ts';
+import { STEP_BEAT_MS } from './steps.ts';
 import { STEP_FOLLOWS, type TranscriptEvent } from './following.ts';
 import { bell, until, WAITED } from '../../test/waits.ts';
 
@@ -114,9 +116,19 @@ const working = (history: TranscriptEvent[] = []): Task => ({ attempts: [attempt
 /** `m` said by the attempt `n` (from 1) of `task`. */
 const push = (task: Task, n: number, m: Followed) => Queue.offerUnsafe(task.attempts[n - 1], m);
 
-/** An app over the engine `e`, its runtime let go once the test `t` ends. */
+/**
+ * The beat these tests give a step's stream (`Beats.step`): a stream that falls back to reading again waits it between reads, so at the
+ * shipped `STEP_BEAT_MS` every beat a test crossed cost five seconds of every pass of this file.
+ */
+const BEAT_MS = 100;
+
+test('the beat these tests read again on is shorter than shipped, never longer', () => {
+  assert.ok(BEAT_MS < STEP_BEAT_MS);
+});
+
+/** An app over the engine `e`, on the short beat, its runtime let go once the test `t` ends. */
 function appOver(t: TestContext, e: ReturnType<typeof engine>) {
-  const own = appOf(Layer.merge(liveOf(), Layer.succeed(Engine)(e)));
+  const own = appOf(Layer.mergeAll(liveOf(), Layer.succeed(Engine)(e), Layer.succeed(Beats)({ ...Beats.defaultValue(), step: BEAT_MS })));
   t.after(() => own.runtime.dispose());
   return own;
 }

@@ -78,6 +78,7 @@ const INPUTS: Record<string, readonly string[]> = {
     '$TURBO_ROOT$/apps/web/src/routeTree.gen.ts',
     '$TURBO_ROOT$/apps/web/theme/**',
     ...APP_TESTS,
+    '$TURBO_ROOT$/apps/*/tsconfig.json',
     '$TURBO_ROOT$/apps/docs/src/content/docs/**',
     ...CLAUDE_FILES,
     '$TURBO_ROOT$/README.md',

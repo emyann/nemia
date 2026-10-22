@@ -14,6 +14,8 @@ import {
   lineOf,
   logsUrl,
   metricsUrl,
+  EXPORT_INTERVALS,
+  exportIntervalRefusalOf,
   otlpOf,
   sessionTelemetryOf,
   toolDetailsRefusalOf,
@@ -22,6 +24,30 @@ import {
 import { PASS_METRICS, recordStepMetrics } from '../meter/meter.verb.ts';
 import { EXPORT_BOUND_MS, exportedNow, lineLogger, seriesBorn, telemetryLayer } from './telemetry.store.ts';
 import { collector, seriesOf, type Attributes } from '../../test/collector.ts';
+import { steeredClock } from '../../test/steered.ts';
+import { until, WAITED, type Waiter } from 'agent-runtime/testing';
+
+/**
+ * `program` run to its end on a steered clock: each exporter's flush as its layer closes is bounded by Effect's `shutdownTimeout`, 3 s
+ * by default (`OtlpTracer`, `OtlpLogger`, `OtlpMetrics`), which a collector that does not answer waits out; so each such rest is waited
+ * for as it is asked, then moved past, a millisecond short and then the millisecond, never waited on the wall clock.
+ */
+const steered = async <A>(t: Waiter, program: Effect.Effect<A>): Promise<A> => {
+  const clock = steeredClock();
+  let done = false;
+  const ran = Effect.runPromise(program.pipe(Effect.provide(clock.layer))).finally(() => {
+    done = true;
+    clock.bell.ring();
+  });
+  for (let moved = 0; ; moved++) {
+    await until(t, () => done || clock.asked.filter((ms) => ms === 3000).length > moved, 'an exporter asks its shutdown rest', {
+      bell: clock.bell,
+    });
+    if (done) return ran;
+    await clock.adjust(2999);
+    await clock.adjust(1);
+  }
+};
 
 test('otlpOf: no export without an endpoint, or with a blank one; its endpoint, and its service: nemia unless named', () => {
   assert.equal(otlpOf({}), undefined);
@@ -31,13 +57,24 @@ test('otlpOf: no export without an endpoint, or with a blank one; its endpoint, 
   assert.deepEqual(otlpOf({ OTEL_EXPORTER_OTLP_ENDPOINT: 'http://localhost:4318/' }), {
     url: 'http://localhost:4318',
     serviceName: DEFAULT_SERVICE_NAME,
+    every: {},
   });
   assert.equal(DEFAULT_SERVICE_NAME, 'nemia');
   const named = otlpOf({ OTEL_EXPORTER_OTLP_ENDPOINT: 'http://collector:4318', OTEL_SERVICE_NAME: 'factory' })!;
-  assert.deepEqual(named, { url: 'http://collector:4318', serviceName: 'factory' });
+  assert.deepEqual(named, { url: 'http://collector:4318', serviceName: 'factory', every: {} });
   assert.equal(tracesUrl(named), 'http://collector:4318/v1/traces');
   assert.equal(logsUrl(named), 'http://collector:4318/v1/logs');
   assert.equal(metricsUrl(named), 'http://collector:4318/v1/metrics');
+});
+
+test('otlpOf reads each signal’s interval off its standard variable, in whole ms; REFUSED: one that is no number is left to the exporter, and said', () => {
+  const at = { OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:9' };
+  const given = { ...at, [EXPORT_INTERVALS.traces]: '100', [EXPORT_INTERVALS.logs]: ' 200 ', [EXPORT_INTERVALS.metrics]: '300' };
+  assert.deepEqual(otlpOf(given)?.every, { traces: 100, logs: 200, metrics: 300 });
+  assert.equal(exportIntervalRefusalOf(given), undefined);
+  const wrong = { ...at, [EXPORT_INTERVALS.traces]: '0.5s' };
+  assert.deepEqual(otlpOf(wrong)?.every, {}, 'left to the exporter, never read as some other number');
+  assert.equal(typeof exportIntervalRefusalOf(wrong), 'string');
 });
 
 test("sessionTelemetryOf: no export without an endpoint; the endpoint alone by default; the tools' details only when asked by 1", () => {
@@ -109,7 +146,7 @@ test('the layer prints Info on stdout and Warn and above on stderr, as their lin
   );
 });
 
-test("REFUSED: no endpoint, no export — the tracer is Effect's own, and the line logger is the only logger", async () => {
+test("REFUSED: no endpoint, no export — the tracer is Effect's own, and the line logger is the only logger", WAITED, async (t) => {
   const native = await Effect.runPromise(Effect.tracer);
   const read = await Effect.runPromise(
     Effect.gen(function* () {
@@ -118,7 +155,8 @@ test("REFUSED: no endpoint, no export — the tracer is Effect's own, and the li
   );
   assert.equal(read.tracer, native, 'the tracer is the one a program has with no layer');
   assert.deepEqual([...read.loggers], [lineLogger]);
-  const exported = await Effect.runPromise(
+  const exported = await steered(
+    t,
     Effect.gen(function* () {
       return { tracer: yield* Effect.tracer, loggers: yield* Effect.service(Logger.CurrentLoggers) };
     }).pipe(Effect.provide(telemetryLayer({ OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:9' }))),
@@ -174,9 +212,9 @@ test("REFUSED: no endpoint in the env the layer is given, no metric posted — n
   );
 });
 
-test('a collector that does not answer costs the metrics their post, never the program', async () => {
+test('a collector that does not answer costs the metrics their post, never the program', WAITED, async (t) => {
   const env = { OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:9' };
-  assert.equal(await Effect.runPromise(passed('ran').pipe(Effect.provide(telemetryLayer(env)))), 'ran');
+  assert.equal(await steered(t, passed('ran').pipe(Effect.provide(telemetryLayer(env)))), 'ran');
 });
 
 /** Whether a point's attributes name `factory`. */

@@ -112,7 +112,7 @@ What the `create-an-agent` skill, being generic, does not say here:
   place's `git` skill on its `skills:`; the two writers (Ada, Otto) run `auto` and need no allow. Nothing in the set writes the
   repository, its refs or its configuration — `git merge-tree`, which writes a loose object and no ref, is the one that writes bytes —
   and `git push` stays refused by Ada's and Otto's `disallowedTools:`. **What the set would let git write a file or run a program by is
-  denied beside it**, on each of the four and on each step that replaces their deny list, since no allow rule can exclude an option and an allow is
+  denied beside it**, on each of the four, and so on every step of theirs, whose `disallowedTools:` adds to its agent's, since no allow rule can exclude an option and an allow is
   matched with a leading assignment stripped: `Bash(git grep *O*)` and `Bash(git grep *--op*)` for the pager option, which runs a
   command on the files that matched (every short spelling carries a capital `O`, git bundling it after other short options; every long
   one carries `--op`, since git takes any unambiguous abbreviation and `--o` alone it refuses), and `Bash(*GIT_*)` for every assignment

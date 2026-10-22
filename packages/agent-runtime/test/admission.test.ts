@@ -12,6 +12,7 @@ import { nameFor } from '../src/core/domain.ts';
 import { holdsSlot, ownPool, toAdmit, type AdmissionView } from '../src/core/admission.ts';
 import { asyncStore, asyncOps, type AsyncJournal, type AsyncRunner } from './promise-runner.ts';
 import { builtEngine } from './engine.ts';
+import { scratch } from './scratch.ts';
 
 const memoryJournal = (): AsyncJournal => {
   const tasks = new Map<string, Event[]>();
@@ -55,7 +56,7 @@ const board = (maxConcurrent: number | undefined, pools: { a?: string; b?: strin
     b: { ...asyncOps(fake(sessions)), ...(pools.b ? { pool: pools.b } : {}) },
   };
   const engine = builtEngine(
-    Engine.layer({ journal: asyncStore(journal), harnesses, defaultHarness: 'a', ...(maxConcurrent ? { maxConcurrent } : {}) }),
+    Engine.layer({ root: scratch('ae-admission-root-'), journal: asyncStore(journal), harnesses, defaultHarness: 'a', ...(maxConcurrent ? { maxConcurrent } : {}) }),
   );
   return { engine, sessions, journal };
 };
@@ -239,7 +240,7 @@ test('an engine unschedulable admits no queued task on any pass while it says so
   let unschedulable = false;
   const harnesses: Record<string, HarnessConfig> = { a: asyncOps(fake(sessions)) };
   const engine = builtEngine(
-    Engine.layer({ journal: asyncStore(journal), harnesses, defaultHarness: 'a', maxConcurrent: 3, unschedulable: () => unschedulable }),
+    Engine.layer({ root: scratch('ae-admission-root-'), journal: asyncStore(journal), harnesses, defaultHarness: 'a', maxConcurrent: 3, unschedulable: () => unschedulable }),
   );
   await fileAt(journal, 'before', '2026-10-04T09:00:00.000Z');
   await Effect.runPromise(engine.tick());

@@ -744,7 +744,7 @@ const promiseHarness = (
 test("an AsyncRunner's own say is handed the session as observed and the words; without one, its tasks are refused", async () => {
   const heard: Array<{ session: { name: string; sessionId: string }; text: string }> = [];
   const engine = builtEngine(
-    EngineService.layer({ journal: asyncStore(memoryJournal()), harnesses: { mine: asyncOps(promiseHarness(heard)) } }),
+    EngineService.layer({ root: scratch('ae-say-root-'), journal: asyncStore(memoryJournal()), harnesses: { mine: asyncOps(promiseHarness(heard)) } }),
   );
   const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: '/repo' }));
   await Effect.runPromise(engine.tick());
@@ -752,7 +752,7 @@ test("an AsyncRunner's own say is handed the session as observed and the words; 
   assert.deepEqual(heard, [{ session: { name: `ae/${id}/1`, sessionId: 's-1' }, text: 'hello' }]);
   assert.deepEqual((await Effect.runPromise(engine.view(id))).state.said, [said]);
 
-  const mute = builtEngine(EngineService.layer({ journal: asyncStore(memoryJournal()), harnesses: { mine: asyncOps(promiseHarness()) } }));
+  const mute = builtEngine(EngineService.layer({ root: scratch('ae-say-root-'), journal: asyncStore(memoryJournal()), harnesses: { mine: asyncOps(promiseHarness()) } }));
   const muteId = await Effect.runPromise(mute.file({ brief: 'b', cwd: '/repo' }));
   await Effect.runPromise(mute.tick());
   await refused(mute, muteId, 'hello', /the `mine` harness has no channel into a running session/);
@@ -760,7 +760,7 @@ test("an AsyncRunner's own say is handed the session as observed and the words; 
 
 test("an AsyncRunner's say that rejects journals nothing; a journal that fails after the words were taken says so", async () => {
   const engine = builtEngine(
-    EngineService.layer({ journal: asyncStore(memoryJournal()), harnesses: { mine: asyncOps(promiseHarness([], 'the line is down')) } }),
+    EngineService.layer({ root: scratch('ae-say-root-'), journal: asyncStore(memoryJournal()), harnesses: { mine: asyncOps(promiseHarness([], 'the line is down')) } }),
   );
   const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: '/repo' }));
   await Effect.runPromise(engine.tick());
@@ -768,7 +768,7 @@ test("an AsyncRunner's say that rejects journals nothing; a journal that fails a
 
   const heard: Array<{ session: { name: string; sessionId: string }; text: string }> = [];
   const readOnly = builtEngine(
-    EngineService.layer({ journal: asyncStore(memoryJournal('said')), harnesses: { mine: asyncOps(promiseHarness(heard)) } }),
+    EngineService.layer({ root: scratch('ae-say-root-'), journal: asyncStore(memoryJournal('said')), harnesses: { mine: asyncOps(promiseHarness(heard)) } }),
   );
   const roId = await Effect.runPromise(readOnly.file({ brief: 'b', cwd: '/repo' }));
   await Effect.runPromise(readOnly.tick());
@@ -800,7 +800,7 @@ const talkingHarness = (heard: string[], events: TranscriptEvent[], unread?: str
 };
 
 const toldThrough = async (harness: AsyncRunner) => {
-  const engine = builtEngine(EngineService.layer({ journal: asyncStore(memoryJournal()), harnesses: { mine: asyncOps(harness) } }));
+  const engine = builtEngine(EngineService.layer({ root: scratch('ae-say-root-'), journal: asyncStore(memoryJournal()), harnesses: { mine: asyncOps(harness) } }));
   const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: '/repo' }));
   await Effect.runPromise(engine.tick());
   return { engine, id };
@@ -838,7 +838,7 @@ test("said's after is null when the harness keeps no conversation, holds no even
 
 test('a said journalled with no after reads back with a null one', async () => {
   const journal = memoryJournal();
-  const engine = builtEngine(EngineService.layer({ journal: asyncStore(journal), harnesses: { mine: asyncOps(promiseHarness([])) } }));
+  const engine = builtEngine(EngineService.layer({ root: scratch('ae-say-root-'), journal: asyncStore(journal), harnesses: { mine: asyncOps(promiseHarness([])) } }));
   const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: '/repo' }));
   await Effect.runPromise(engine.tick());
   const at = new Date().toISOString();

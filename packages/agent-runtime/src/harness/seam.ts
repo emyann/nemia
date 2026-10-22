@@ -346,7 +346,7 @@ export class Runner extends Context.Service<Runner, RunnerOps>()('engine/Runner'
       }),
     );
 
-  static claude = (options?: ClaudeOptions) => Runner.layer(claudeOps(options));
+  static claude = (options: ClaudeOptions) => Runner.layer(claudeOps(options));
 
   static test = (control?: { sessions: Map<string, Sighting>; spawned?: SpawnRequest[] }) => Runner.layer(testOps(control));
 }

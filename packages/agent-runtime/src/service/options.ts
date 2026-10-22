@@ -53,8 +53,12 @@ export type EngineOptions = {
    * new Pod; what is at work goes on, `admit` still admits, and a task filed unqueued still starts. Absent: always schedulable.
    */
   unschedulable?: () => boolean;
-  /** Where the file-backed store lives. Ignored when you bring your own `journal`. */
-  root?: string;
+  /**
+   * Where the file-backed store lives. Required, and with no default: an engine made with no root would write into the person's own
+   * `~/.agent-engine`, so the caller that knows where the store is says so (`AE_ROOT`, read in `src/cli/main.ts` alone). Ignored when you
+   * bring your own `journal`, which is where the records then go.
+   */
+  root: string;
   /**
    * The store to keep the engine's records in, instead of the files under `root`: any `StoreOps`, a `JournalOps` among them. Every
    * `append` goes on its `feed` too, and a store that can signal an append (`subscribe`) wakes `watch` at once.
@@ -290,7 +294,7 @@ export const heldHarnessesOf = (harnesses: Record<string, HarnessConfig>): strin
  * are read here, and that each entry is a function at all: what a function *answers* is refused at the follow that asks it
  * (`holderAgentRefusal`).
  */
-const holdersRefusalOf = (options: EngineOptions): string | undefined => {
+const holdersRefusalOf = (options: Omit<EngineOptions, 'root'>): string | undefined => {
   const harnesses = options.harnesses ?? DEFAULT_HARNESSES;
   const names = Object.keys(harnesses);
   const held = heldHarnessesOf(harnesses);
@@ -324,7 +328,7 @@ const harnessConfigRefusalOf = (name: string, h: HarnessConfig): string | undefi
  * entry `holderRefusal` refuses; an `unschedulable`, a `credentials` or a `missingCredential` that is not a function; and a
  * `telemetry` that names no collector.
  */
-export const optionsRefusalOf = (options: EngineOptions): string | undefined => {
+export const optionsRefusalOf = (options: Omit<EngineOptions, 'root'>): string | undefined => {
   const ceiling = ceilingRefusalOf(options.maxConcurrent);
   if (ceiling) return ceiling;
   for (const [name, h] of Object.entries(options.harnesses ?? {})) {

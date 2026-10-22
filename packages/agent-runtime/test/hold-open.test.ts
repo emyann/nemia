@@ -211,7 +211,7 @@ const board = (harnesses?: Record<string, 'claude-bg'>) => {
       return '';
     },
   };
-  const engine = builtEngine(Engine.layer({ journal: asyncStore(journal), harnesses: harnesses ?? { fake: asyncOps(fake) } }));
+  const engine = builtEngine(Engine.layer({ root: scratch('ae-hold-open-root-'), journal: asyncStore(journal), harnesses: harnesses ?? { fake: asyncOps(fake) } }));
   const write = (id: string, events: Event[], filed: Partial<Extract<Event, { kind: 'filed' }>> = {}) =>
     tasks.set(id, [
       { kind: 'filed', at: new Date().toISOString(), brief: 'b', cwd: '/r', holdOpen: true, harness: 'fake', ...filed },
